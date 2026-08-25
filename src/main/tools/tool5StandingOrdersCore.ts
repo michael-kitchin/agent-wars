@@ -12,6 +12,7 @@ import type { CoordinateContext } from '../briefing/map/coordinateContext';
 import { ensureStrategicCoordinateRegistryInitialized } from '../briefing/map/hex-coordinates';
 import { h3ToCode } from '../briefing/map/hex-code-translator';
 import { buildPromptTableLines } from '../promptTableUtils';
+import { SECTION_TITLE_STANDING_ORDER_STATUS, topLevelHeading } from '../openrouter/promptSpec/sectionHeadings';
 import {
   canAssignStandingOrderType,
   parseComputedRoute,
@@ -649,7 +650,7 @@ export function getInjectionText(
   const aiUnitTypeById = new Map(aiUnits.map((u) => [u.id, u.unitType]));
 
   const lines: string[] = [];
-  lines.push('# Standing Order Status');
+  lines.push(topLevelHeading(SECTION_TITLE_STANDING_ORDER_STATUS));
   lines.push('');
 
   const aiUnitIdSet = new Set(aiUnitIds);

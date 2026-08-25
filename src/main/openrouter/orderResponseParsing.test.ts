@@ -10,7 +10,7 @@ import { buildLatLngCoordinateMap } from '../mapData';
 import type { GameStateSnapshot } from '../gameDb';
 import { dbRun, getGameState } from '../gameDb';
 import { h3ToCode } from '../briefing/map/hex-code-translator';
-import { buildJsonAssistantRepairSchema, parseOrdersResponse } from './orderResponseParsing';
+import { parseOrdersResponse } from './orderResponseParsing';
 import { withTempGameDb } from '../testSupport/withTempGameDb';
 import { isEmbarkedLandUnit } from '../game-actions/sealift';
 
@@ -138,21 +138,6 @@ function testCoercesMessageLikeStrategy(): void {
   );
   assert.ok(nonString);
   assert.strictEqual(nonString!.message, '');
-}
-
-/**
- * Ensures repair-schema JSON lists `"message"` before `"strategy"` so a parse-retry nudge matches the live contract.
- *
- * Purpose: Guards the assistant repair prompt against dropping the taunt field.
- * When to use: After edits to `buildJsonAssistantRepairSchema`.
- * Expected outcome: Both production and non-production schemas start with the message key.
- * Exceptions: Assertion failure if key order or presence drifts.
- */
-function testRepairSchemaLeadsWithMessage(): void {
-  const withProduction = buildJsonAssistantRepairSchema(true);
-  const withoutProduction = buildJsonAssistantRepairSchema(false);
-  assert.ok(withProduction.startsWith('{"message":"...","strategy":"...","orders":['));
-  assert.ok(withoutProduction.startsWith('{"message":"...","strategy":"...","orders":['));
 }
 
 /**
@@ -318,7 +303,6 @@ function testExplicitMoveWhileEmbarkedAutoDebarks(): void {
 const tests = [
   { name: 'parseOrdersResponse null strategy and empty orders', fn: testAcceptsNullStrategyAndOmittedOrders },
   { name: 'parseOrdersResponse coerces message like strategy', fn: testCoercesMessageLikeStrategy },
-  { name: 'buildJsonAssistantRepairSchema leads with message', fn: testRepairSchemaLeadsWithMessage },
   { name: 'parseOrdersResponse balanced extract before trailing prose', fn: testExtractsJsonBeforeTrailingBraceInProse },
   { name: 'parseOrdersResponse tries fenced json after bad preamble', fn: testSkipsBadCandidateThenParsesFence },
   { name: 'parseOrdersResponse rejects top-level JSON array', fn: testRejectsTopLevelJsonArray },

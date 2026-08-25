@@ -30,6 +30,10 @@ function testExampleBlockParsesWithParser(): void {
   const messageKeyAt = jsonMatch[1]!.indexOf('"message"');
   const strategyKeyAt = jsonMatch[1]!.indexOf('"strategy"');
   assert.ok(messageKeyAt >= 0 && messageKeyAt < strategyKeyAt, 'example JSON must list message before strategy');
+  const airAt = jsonMatch[1]!.indexOf('"airStrikes"');
+  const ferryAt = jsonMatch[1]!.indexOf('"ferryOrders"');
+  const callbacksAt = jsonMatch[1]!.indexOf('"callbacks"');
+  assert.ok(airAt >= 0 && airAt < ferryAt && ferryAt < callbacksAt, 'example JSON must list air tails before callbacks');
   assert.ok(Array.isArray(parsed.orders));
   assert.ok(parsed.orders!.length >= 3);
 }
@@ -129,8 +133,9 @@ function testTacticalPromptAllowsCopyingBestOptionsHexes(): void {
   assert.ok(move.includes('Best Options This Turn'));
   const user = getInitialUserMessage(flags, true, 'tactical');
   assert.ok(!user.includes('Call plan_route for each sub-unit'));
-  assert.ok(user.includes('Best Options'));
-  assert.ok(user.includes('approach or move/melee'));
+  assert.ok(user.includes('move or approach'));
+  assert.ok(user.includes('Do not emit assign_order or cancel_order for tactical sub-unit ids.'));
+  assert.ok(!user.includes('Copy Best Options approach and move/melee Target Hexes into explicit_move'));
   assert.ok(guidance.includes('approach or move/melee'));
   const intro = buildAvailableToolsIntro(flags, true, 'tactical');
   assert.ok(intro.includes('Best Options This Turn'));
@@ -158,8 +163,8 @@ function testStrategicPromptAllowsCopyingBestOptionsHexesWithoutStandingOrderOve
   assert.ok(move.includes('Best Options This Turn'));
   const user = getInitialUserMessage(flags, true, 'strategic');
   assert.ok(!user.includes('Call plan_route for each unit that needs a move'));
-  assert.ok(user.includes('Best Options'));
-  assert.ok(user.includes('one-step move'));
+  assert.ok(user.includes('Copy option targets into the matching envelope field'));
+  assert.ok(!user.includes('one-step move'));
   const intro = buildAvailableToolsIntro(flags, true, 'strategic');
   assert.ok(intro.includes('Best Options This Turn'));
   assert.ok(intro.includes('one-step move'));
@@ -186,8 +191,10 @@ function testStrategicPromptRoutesFerryBestOptionsToFerryOrders(): void {
   const intro = buildAvailableToolsIntro(flags, true, 'strategic');
   assert.ok(intro.includes('ferryOrders'));
   assert.ok(!/^.*Copy Best Options This Turn Target Hexes into explicit_move/m.test(intro));
-  const user = getInitialUserMessage(flags, true, 'strategic');
-  assert.ok(user.includes('ferryOrders'));
+  const user = getInitialUserMessage(flags, true, 'strategic', { hasAirUnits: true });
+  assert.ok(user.includes('"ferryOrders"'));
+  const noAirUser = getInitialUserMessage(flags, true, 'strategic', { hasAirUnits: false });
+  assert.ok(!noAirUser.includes('"ferryOrders"'));
   const move = getMovementOrderInstruction(flags, 'strategic');
   assert.ok(/approach or move\/melee/i.test(move));
 }
@@ -225,9 +232,10 @@ function testProductionGuidanceSkipsTypesAtDeploymentCap(): void {
   );
   const user = getInitialUserMessage(flags, true, 'strategic');
   assert.ok(
-    /do not queue types at maximum/i.test(user),
-    'user message must tell the model not to queue capped types'
+    !/do not queue types at maximum/i.test(user),
+    'user message must not restate production cap rules the system prompt already owns'
   );
+  assert.ok(!user.includes('Prefer setting queues on every eligible'));
 }
 
 function testTacticalCallbacksClauseMentionsBeat(): void {
@@ -243,6 +251,7 @@ function testTacticalCallbacksClauseMentionsBeat(): void {
   assert.ok(tactical.includes('event-driven'));
   assert.ok(tactical.includes('"message" (string)'));
   assert.ok(tactical.includes('Do not emit assign_order'));
+  assert.match(tactical, /replac/i);
   assert.ok(!tactical.includes('Actions: assign_order'), 'tactical contract must not list assign_order as a live action');
   const strategic = buildFinalJsonContractInstruction({
     includeMemoryUpdates: false,
@@ -294,6 +303,72 @@ function testAirFieldsGatedByIncludeAirActions(): void {
 }
 
 /**
+ * Sealift order verbs appear only when the opponent roster includes a naval unit.
+ *
+ * Purpose: Teaching embark/transport/disembark with no ship invites unfillable orders.
+ * When to use: After `includeNavalActions` on the JSON contract.
+ * Expected outcome: Default lists transport_move; includeNavalActions:false omits the three sealift verbs.
+ * Exceptions: None.
+ */
+function testSealiftActionsGatedByIncludeNavalActions(): void {
+  const withNaval = buildFinalJsonContractInstruction({
+    includeMemoryUpdates: false,
+    includeProductionOrders: false,
+    movementOrderInstruction: '',
+    submitMemoryClause: '',
+    productionSubmitClause: '',
+  });
+  assert.ok(withNaval.includes('transport_move') && withNaval.includes('embark'), 'default contract lists sealift');
+  const withoutNaval = buildFinalJsonContractInstruction({
+    includeMemoryUpdates: false,
+    includeProductionOrders: false,
+    includeNavalActions: false,
+    movementOrderInstruction: '',
+    submitMemoryClause: '',
+    productionSubmitClause: '',
+  });
+  assert.ok(!withoutNaval.includes('transport_move'), 'no-naval contract omits transport_move');
+  assert.ok(!withoutNaval.includes('disembark'), 'no-naval contract omits disembark');
+}
+
+/**
+ * Standing-order actions disappear from the contract and example when that tool group is off.
+ *
+ * Purpose: Teaching assign_order when the tools are off invites unfillable JSON.
+ * When to use: After includeStandingOrderActions on the JSON contract.
+ * Expected outcome: Default strategic lists assign_order; includeStandingOrderActions:false omits it from the action list and example.
+ * Exceptions: None.
+ */
+function testStandingOrderActionsGatedByIncludeStandingOrderActions(): void {
+  const withStanding = buildFinalJsonContractInstruction({
+    includeMemoryUpdates: false,
+    includeProductionOrders: false,
+    movementOrderInstruction: '',
+    submitMemoryClause: '',
+    productionSubmitClause: '',
+  });
+  assert.ok(withStanding.includes('Actions: assign_order'), 'default strategic contract lists assign_order');
+  const withoutStanding = buildFinalJsonContractInstruction({
+    includeMemoryUpdates: false,
+    includeProductionOrders: false,
+    includeStandingOrderActions: false,
+    movementOrderInstruction: '',
+    submitMemoryClause: '',
+    productionSubmitClause: '',
+  });
+  assert.ok(!withoutStanding.includes('Actions: assign_order'), 'orders-off contract omits assign_order from the action list');
+  assert.ok(!withoutStanding.includes('cancel_order'), 'orders-off contract omits cancel_order');
+  assert.ok(withoutStanding.includes('explicit_move'), 'orders-off contract still lists explicit_move');
+  const example = getFinalJsonOrdersExampleBlock({
+    includeMemoryUpdates: false,
+    includeProductionOrders: false,
+    includeStandingOrderActions: false,
+  });
+  assert.ok(!example.includes('"assign_order"'), 'orders-off example omits assign_order');
+  assert.ok(example.includes('"explicit_move"'), 'orders-off example still shows explicit_move');
+}
+
+/**
  * Documents the module-scope binding `tests` (tests).
 
  * Purpose: Supports maintainability by documenting why `tests` exists.
@@ -305,6 +380,11 @@ const tests = [
   { name: 'getFinalJsonOrdersExampleBlock contains parseable JSON', fn: testExampleBlockParsesWithParser },
   { name: 'getFinalJsonOrdersExampleBlock optional tails', fn: testExampleBlockIncludesOptionalTails },
   { name: 'air fields gated by includeAirActions', fn: testAirFieldsGatedByIncludeAirActions },
+  { name: 'sealift actions gated by includeNavalActions', fn: testSealiftActionsGatedByIncludeNavalActions },
+  {
+    name: 'standing-order actions gated by includeStandingOrderActions',
+    fn: testStandingOrderActionsGatedByIncludeStandingOrderActions,
+  },
   { name: 'getFinalJsonOrdersExampleBlock tactical leads with explicit_move', fn: testTacticalExampleBlockLeadsWithExplicitMove },
   { name: 'buildFinalJsonContractInstruction tactical callbacks clause', fn: testTacticalCallbacksClauseMentionsBeat },
   {

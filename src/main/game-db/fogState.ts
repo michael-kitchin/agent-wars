@@ -16,14 +16,14 @@ import { loadScenarioState, REGION_VS_REGION_SCENARIO_ID } from './scenarioState
 import { readPersistedGameSize } from './gameSizeConfig';
 
 /**
- * Documents the module-scope binding `STALE_INTEL_TURNS` (STALE_INTEL_TURNS).
-
- * Purpose: Supports maintainability by documenting why `STALE_INTEL_TURNS` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * How many turns a last-known enemy position remains visible after contact is lost.
+ *
+ * Purpose: The prompt's fog-on staleness sentence must quote this number, not a copy of it.
+ * When to use: Intel expiry in this module, and `buildIntelStalenessRule` in the prompt spec pack.
+ * Expected outcome: A last-known row older than this window is dropped rather than shown as old.
  * Exceptions: None.
  */
-const STALE_INTEL_TURNS = 2;
+export const STALE_INTEL_TURNS = 2;
 /**
  * Documents the module-scope binding `FOG_PLAYERS` (FOG_PLAYERS).
 

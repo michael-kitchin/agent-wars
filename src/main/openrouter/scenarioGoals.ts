@@ -1,5 +1,6 @@
 import type { GameStateSnapshot } from '../gameDb';
 import { logDebug } from '../logger';
+import { SECTION_TITLE_SCENARIO_OBJECTIVE, topLevelHeading } from './promptSpec/sectionHeadings';
 
 /** First sentence of the strategic/tactical win reminder (single source for prompts and matrix tests). */
 export const WIN_CONDITION_REMINDER_FIRST_SENTENCE =
@@ -22,16 +23,30 @@ const REGION_VS_REGION_SCENARIO_WIN_BLOCK =
   `    (2) ${REGION_VS_REGION_SCENARIO_WIN_URBAN_SNIPPET}.`;
 
 /**
- * Defines the `buildWinConditionReminderClause` function shape (export function buildWinConditionReminderClause(): string).
-
- * Purpose: Early paragraph in the system prompt after turn/phase; states win conditions consistent with `region_vs_region` rules and how combat vs strikes apply.
- * When to use: Strategic `buildSystemPromptForTools` after the opening line so the model sees objectives alongside combat coaching.
- * Expected outcome: Plain-language reminder referencing enemy-home hex control or destruction of enemy-home production capacity; unchanged when scenario rules evolve (update here and Scenario Objective in tandem).
+ * The generic objective used when the snapshot has no recognised scenario id.
+ *
+ * Purpose: A prompt without `region_vs_region` must still name a goal, and must not reuse home-region wording.
+ * When to use: `buildWinConditionReminderClause` for an absent or unrecognised id.
+ * Expected outcome: Destroy-the-force or take-territory language with no home-region or urban-production clause.
  * Exceptions: None.
  */
-export function buildWinConditionReminderClause(): string {
-  logDebug('scenarioGoals buildWinConditionReminderClause', {});
-  return `${WIN_CONDITION_REMINDER_FIRST_SENTENCE} ${WIN_CONDITION_REMINDER_SECOND_SENTENCE}`;
+export const GENERIC_OBJECTIVE_SENTENCE =
+  'Your goal is to destroy the enemy force or take enemy territory.';
+
+/**
+ * Builds the early win-condition paragraph for the strategic system prompt.
+ *
+ * Purpose: States how this consultation is won, matching the scenario the snapshot actually carries.
+ * When to use: Strategic `buildSystemPromptForTools` after the opening line.
+ * Expected outcome: Home-region wording only for `region_vs_region`; otherwise the generic objective with no reused home-region sentences.
+ * Exceptions: None.
+ */
+export function buildWinConditionReminderClause(args: { readonly scenarioId?: string | null }): string {
+  logDebug('scenarioGoals buildWinConditionReminderClause', { scenarioId: args.scenarioId });
+  if (args.scenarioId === 'region_vs_region') {
+    return `${WIN_CONDITION_REMINDER_FIRST_SENTENCE} ${WIN_CONDITION_REMINDER_SECOND_SENTENCE}`;
+  }
+  return `${GENERIC_OBJECTIVE_SENTENCE}`;
 }
 
 /**
@@ -59,7 +74,7 @@ export function buildRegionVsRegionScenarioObjectiveBlock(state: GameStateSnapsh
   logDebug('scenarioGoals buildRegionVsRegionScenarioObjectiveBlock', { scenarioId: state.scenarioId });
   if (state.scenarioId !== 'region_vs_region') return '';
   const lines: string[] = [
-    '# Scenario Objective (Required)',
+    topLevelHeading(SECTION_TITLE_SCENARIO_OBJECTIVE),
     '',
     '- Scenario: region_vs_region',
   ];

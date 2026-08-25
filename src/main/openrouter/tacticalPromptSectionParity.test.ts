@@ -30,7 +30,8 @@ import {
 } from '../tacticalBattle/testSupport/tacticalRes4HexFixtures';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { getInjectionText as getStandingOrderInjectionText } from '../tools/tool5StandingOrders';
-import { buildAirOperationsBriefingBlock, buildSealiftBriefingBlock } from './briefingSections';
+import { buildAirOperationsBriefingBlock } from './briefingSectionsAirOps';
+import { buildSealiftBriefingBlock } from './briefingSectionsSealift';
 import { formatTacticalBriefing } from './formatTacticalBriefing';
 import {
   buildLightweightTacticalUnitAssessments,
@@ -339,7 +340,13 @@ test('tactical air and sealift blocks omit when roster lacks type and adapt colu
     format,
     'strategic'
   );
-  assert.ok(strategicEmptyAir.includes('# Air Operations Status'), 'strategic keeps always-on empty-state');
+  assert.equal(strategicEmptyAir, '', 'strategic omits air operations when the roster has no air');
+  const strategicEmptyNaval = buildSealiftBriefingBlock(
+    { ...landOnly.planState, units: landOnly.planState.units.filter((u) => u.unitType !== 'naval') },
+    format,
+    'strategic'
+  );
+  assert.equal(strategicEmptyNaval, '', 'strategic omits naval transport when the roster has no naval');
 });
 
 test('callback stash restores pre-battle subscriptions and drops tactical sub-unit callbacks', () => {
@@ -498,7 +505,7 @@ test('tactical system prompt omits Scenario Objective and includes battle goal p
     assert.ok(prompt.includes('airStrikes'));
     assert.ok(prompt.includes('tactical sub-unit ids'));
     assert.ok(prompt.includes('Do not emit assign_order'));
-    assert.ok(prompt.includes('Standing orders do not move units'));
+    assert.ok(prompt.includes('Standing orders do not move sub-units'));
     assert.ok(prompt.includes('approach and move/melee Target Hexes into explicit_move'));
     assert.ok(!prompt.includes('query_orders'));
     assert.ok(!prompt.includes('# Standing Order Status'));

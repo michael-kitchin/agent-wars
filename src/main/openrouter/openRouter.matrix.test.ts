@@ -22,6 +22,12 @@ import {
   REGION_VS_REGION_SCENARIO_WIN_URBAN_SNIPPET,
   WIN_CONDITION_REMINDER_FIRST_SENTENCE,
 } from './scenarioGoals';
+import {
+  SECTION_TITLE_PRODUCTION_STATUS,
+  SECTION_TITLE_STANDING_ORDER_STATUS,
+  SECTION_TITLE_STRATEGIC_MEMORY,
+} from './promptSpec/sectionHeadings';
+import { PRODUCTION_CAP_QUEUE_GUIDANCE } from '../productionCaps';
 
 /**
  * Documents the `ChatResponse` type alias (type ChatResponse).
@@ -285,37 +291,112 @@ async function run(): Promise<void> {
       const captured = capturedRef.value;
 
       const systemPrompt = captured.messages?.find((m: { role: string; content?: string }) => m.role === 'system')?.content ?? '';
+      const userPrompt = captured.messages?.find((m: { role: string; content?: string }) => m.role === 'user')?.content ?? '';
       const payloadTools = captured.tools ?? [];
       const payloadToolNames = new Set(payloadTools.map((t: { function: { name: string } }) => t.function.name));
+      const memoryOn = enabledUiIds.includes('memory');
+      const productionOn = enabledUiIds.includes('production');
+      const ordersOn = enabledUiIds.includes('orders');
+      if (!memoryOn) {
+        assert.ok(
+          !systemPrompt.includes(`# ${SECTION_TITLE_STRATEGIC_MEMORY}`),
+          `memory section must vanish when the group is off, mask=${mask}`
+        );
+        assert.ok(
+          !systemPrompt.includes('Do not persist enemy positions'),
+          `memory coaching must vanish when the group is off, mask=${mask}`
+        );
+      } else {
+        assert.ok(
+          systemPrompt.includes(`# ${SECTION_TITLE_STRATEGIC_MEMORY}`),
+          `memory section must appear when the group is on, mask=${mask}`
+        );
+      }
+      if (!productionOn) {
+        assert.ok(
+          !systemPrompt.includes(`# ${SECTION_TITLE_PRODUCTION_STATUS}`),
+          `production section must vanish when the group is off, mask=${mask}`
+        );
+        assert.ok(
+          !systemPrompt.includes('productionOrders'),
+          `production envelope tail must vanish when the group is off, mask=${mask}`
+        );
+        assert.ok(
+          !systemPrompt.includes('queue is empty, queue something'),
+          `production coaching must vanish when the group is off, mask=${mask}`
+        );
+      } else {
+        assert.ok(
+          systemPrompt.includes(`# ${SECTION_TITLE_PRODUCTION_STATUS}`),
+          `production section must appear when the group is on, mask=${mask}`
+        );
+      }
+      if (!ordersOn) {
+        assert.ok(
+          !systemPrompt.includes(`# ${SECTION_TITLE_STANDING_ORDER_STATUS}`),
+          `standing-order section must vanish when the group is off, mask=${mask}`
+        );
+        assert.ok(
+          !systemPrompt.includes('Units Without Standing Orders'),
+          `orderless coaching must vanish when the group is off, mask=${mask}`
+        );
+      } else {
+        assert.ok(
+          systemPrompt.includes(`# ${SECTION_TITLE_STANDING_ORDER_STATUS}`),
+          `standing-order section must appear when the group is on, mask=${mask}`
+        );
+      }
+      assert.ok(
+        !userPrompt.includes(PRODUCTION_CAP_QUEUE_GUIDANCE),
+        `opening user message must not restate production cap rules, mask=${mask}`
+      );
 
       assert.ok(
         systemPrompt.includes('Strict schema: top-level must be a JSON object with "message" (string), "strategy" (string) and "orders" (array); do not return a top-level array.'),
         `strict-schema prompt guidance missing for mask=${mask}`
       );
-      assert.ok(systemPrompt.includes('# Air Operations Status'), `air-ops status guidance missing for mask=${mask}`);
-      assert.ok(
-        systemPrompt.includes(
-          `Air rules: strike range ${AIR_STRIKE_RANGE_HEXES} from base, ferry range ${AIR_FERRY_RANGE_HEXES} airport-to-airport, one air action per unit per turn.`
-        ),
-        `air-ops rules guidance missing for mask=${mask}`
-      );
-      assert.ok(
-        systemPrompt.includes('Optional top-level air actions: airStrikes[] entries use'),
-        `air-strike JSON contract guidance missing for mask=${mask}`
-      );
-      assert.ok(
-        systemPrompt.includes('ferryOrders[] entries use { "unitId": "...", "destination": "<hex code>" }'),
-        `ferry JSON contract guidance missing for mask=${mask}`
-      );
+      const hasAir = state.units.some((u) => u.player === 'opponent' && u.unitType === 'air');
+      const hasNaval = state.units.some((u) => u.player === 'opponent' && u.unitType === 'naval');
+      if (hasAir) {
+        assert.ok(systemPrompt.includes('# Air Operations Status'), `air-ops status guidance missing for mask=${mask}`);
+        assert.ok(
+          systemPrompt.includes(
+            `Air rules: strike range ${AIR_STRIKE_RANGE_HEXES} from base, ferry range ${AIR_FERRY_RANGE_HEXES} airport-to-airport, one air action per unit per turn.`
+          ),
+          `air-ops rules guidance missing for mask=${mask}`
+        );
+        assert.ok(
+          systemPrompt.includes('Optional top-level air actions: airStrikes[] entries use'),
+          `air-strike JSON contract guidance missing for mask=${mask}`
+        );
+        assert.ok(
+          systemPrompt.includes('ferryOrders[] entries use { "unitId": "...", "destination": "<hex code>" }'),
+          `ferry JSON contract guidance missing for mask=${mask}`
+        );
+      } else {
+        assert.ok(!systemPrompt.includes('# Air Operations Status'), `air-ops section must be omitted when roster has no air, mask=${mask}`);
+        assert.ok(!systemPrompt.includes('airStrikes'), `airStrikes must be omitted when roster has no air, mask=${mask}`);
+      }
+      if (hasNaval) {
+        assert.ok(systemPrompt.includes('# Naval Transport Status'), `naval transport missing for mask=${mask}`);
+        assert.ok(systemPrompt.includes('transport_move'), `sealift actions missing for mask=${mask}`);
+      } else {
+        assert.ok(!systemPrompt.includes('# Naval Transport Status'), `naval section must be omitted when roster has no naval, mask=${mask}`);
+        assert.ok(!systemPrompt.includes('transport_move'), `sealift actions must be omitted when roster has no naval, mask=${mask}`);
+      }
       assert.ok(
         systemPrompt.includes(`Global Earth map, H3 resolution ${mapData.H3_RESOLUTION}`),
         `global-map context guidance missing for mask=${mask}`
       );
       assert.ok(
-        systemPrompt.includes(
+        !systemPrompt.includes(
           'At least one enemy unit remains in play, and the human player is actively searching for your forces with intent to destroy them.'
         ),
-        `enemy-intent strategic context missing for mask=${mask}`
+        `unconditional enemy-intent claim must not appear for mask=${mask}`
+      );
+      assert.ok(
+        !systemPrompt.includes('damage given up for free'),
+        `unfired-shot free-damage claim must not appear for mask=${mask}`
       );
       assert.ok(
         systemPrompt.includes('You are the enemy commander in a WEGO'),
@@ -599,6 +680,43 @@ async function run(): Promise<void> {
     assert.ok(
       !tacticalSystemPrompt.includes('prioritize scouting this turn'),
       'tactical prompt omits strategic scouting directive'
+    );
+
+    const noScenarioState = { ...state };
+    delete (noScenarioState as { scenarioId?: string }).scenarioId;
+    const noScenarioPrompt = buildSystemPromptModule.buildSystemPromptForTools(
+      noScenarioState as typeof state,
+      tacticalCoordMap,
+      openRouter.getToolNamesForEnabledGroups(apiToggleIds),
+      '# Brief\n\n## Operational Map\n\n```\nx\n```\n',
+      strategicCtx
+    );
+    assert.ok(
+      !noScenarioPrompt.includes(WIN_CONDITION_REMINDER_FIRST_SENTENCE),
+      'absent scenarioId must not reuse region-vs-region win wording'
+    );
+    assert.ok(
+      noScenarioPrompt.includes('destroy the enemy force or take enemy territory'),
+      'absent scenarioId uses the generic objective'
+    );
+    assert.ok(
+      !noScenarioPrompt.includes('Win by controlling all enemy home region hexes'),
+      'absent scenarioId must not teach region-versus-region win-path coaching'
+    );
+    assert.ok(
+      !noScenarioPrompt.includes("Protect your home region's production capacity"),
+      'absent scenarioId must not reuse home-region goals'
+    );
+    const recognisedPrompt = buildSystemPromptModule.buildSystemPromptForTools(
+      state,
+      tacticalCoordMap,
+      openRouter.getToolNamesForEnabledGroups(apiToggleIds),
+      '# Brief\n\n## Operational Map\n\n```\nx\n```\n',
+      strategicCtx
+    );
+    assert.ok(
+      recognisedPrompt.includes(WIN_CONDITION_REMINDER_FIRST_SENTENCE),
+      'region_vs_region still uses the home-region win reminder'
     );
 
     console.log(`openRouter.matrix.test.ts passed (${combosChecked} combinations)`);

@@ -16,10 +16,23 @@ import { ensureStrategicCoordinateRegistryInitialized } from './briefing/map/hex
 import { h3ToCode } from './briefing/map/hex-code-translator';
 import type { CoordinateContext } from './briefing/map/coordinateContext';
 import type { PossibleActionsIndexedState } from './openrouter/possibleUnitActions';
+import { buildActiveCallbacksSection } from './briefing/activeCallbacksSection';
+import { buildEmptyProductionQueuesSection } from './openrouter/briefingSections';
 import {
   OMNISCIENT_GRID_PROXIMITY_BRIEFING_LINE,
   usesOmniscientGridProximity,
 } from './tools/assessUnitProximity';
+import {
+  SECTION_TITLE_ACTIVE_CALLBACKS,
+  SECTION_TITLE_COMMANDERS_BRIEFING,
+  SECTION_TITLE_RECENT_TURN_NOTES,
+  SECTION_TITLE_STRATEGIC_MEMORY,
+  SECTION_TITLE_SUPPLEMENTAL_HEX_INTELLIGENCE,
+  SECTION_TITLE_UNIT_STATUS_AND_THREATS,
+  SECTION_TITLE_ATTENTION_FLAGS,
+  topLevelHeading,
+} from './openrouter/promptSpec/sectionHeadings';
+import { buildIntelStalenessRule } from './openrouter/promptSpec/gameRuleText';
 
 /**
  * Optional shared coordinate/index data to avoid rebuilding within one AI request.
@@ -32,6 +45,15 @@ import {
 export type FormatBriefingSharedContext = {
   latLngByH3?: Map<string, [number, number]>;
   indexedState?: PossibleActionsIndexedState;
+  /**
+   * Whether production tools are enabled for this consultation.
+   *
+   * Contract: True emits the production section even when `productionText` is empty, using the defined empty form.
+   * When to use: Pass from `requestOrdersFlow` as `flags.productionEnabled`.
+   * Expected outcome: Tools-off omits the section; tools-on with no queues still shows Production Status.
+   * Exceptions: None.
+   */
+  includeProductionSection?: boolean;
 };
 
 /**
@@ -81,72 +103,29 @@ function formatUnitDisplayRef(unitId: string): string {
 }
 
 /**
- * Defines the `markdownHeading1` function shape (function markdownHeading1(title: string): string).
-
- * Purpose: Inserts an ATX Markdown H1 with a blank line after the heading line (no leading newline, so the opener does not stack with the double newline already inserted before the briefing in the system prompt).
- * When to use: Use for major Commander briefing sections (e.g. briefing title, Possible unit actions, strategic memory).
+ * Inserts an ATX Markdown H1 with a blank line after the heading line (no leading newline, so the opener does not stack with the double newline already inserted before the briefing in the system prompt).
+ *
+ * Purpose: Shared H1 spacing for strategic `formatBriefing` and the tactical briefing assembler.
+ * When to use: Pass a bare title from `sectionHeadings.ts`, never a string that already begins with `#`.
  * Expected outcome: A string fragment that joins cleanly after the prior prompt paragraph.
  * Exceptions: None.
  */
-function markdownHeading1(title: string): string {
+export function markdownHeading1(title: string): string {
+  logTrace('briefingFormatter markdownHeading1', { title });
   return `# ${title}\n\n`;
 }
 
 /**
- * Defines the `markdownHeading2` function shape (function markdownHeading2(title: string): string).
-
- * Purpose: Inserts an ATX Markdown H2 with a blank line before the heading (so it never runs into a prior paragraph) and a blank line after the heading line.
- * When to use: Use for briefingFormatter sections that follow prose or tables (not for possible-unit-actions bucket titles).
+ * Inserts an ATX Markdown H2 with a blank line before the heading (so it never runs into a prior paragraph) and a blank line after the heading line.
+ *
+ * Purpose: Shared H2 spacing for strategic `formatBriefing` and the tactical briefing assembler.
+ * When to use: Pass a bare title from `sectionHeadings.ts`, never a string that already begins with `#`.
  * Expected outcome: A fragment that joins with prior content without merging the heading into the previous paragraph.
  * Exceptions: None.
  */
-function markdownHeading2(title: string): string {
+export function markdownHeading2(title: string): string {
+  logTrace('briefingFormatter markdownHeading2', { title });
   return `\n\n## ${title}\n\n`;
-}
-
-/**
- * Defines the `formatTerritoryTarget` function shape (function formatTerritoryTarget(hexId: string, latLngByH3: Map<string, [number, number]>): string).
-
- * Purpose: Supports maintainability by documenting why `formatTerritoryTarget` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function formatTerritoryTarget(hexId: string, ctx: CoordinateContext): string {
-  try {
-    return h3ToCode(hexId, ctx);
-  } catch {
-    return 'specified territory';
-  }
-}
-
-/**
- * Defines the `sanitizeCallbackParamsForPrompt` function shape (function sanitizeCallbackParamsForPrompt().
-
- * Purpose: Supports maintainability by documenting why `sanitizeCallbackParamsForPrompt` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function sanitizeCallbackParamsForPrompt(params: unknown, ctx: CoordinateContext): unknown {
-  if (typeof params === 'string') {
-    try {
-      return h3ToCode(params, ctx);
-    } catch {
-      return params;
-    }
-  }
-  if (Array.isArray(params)) {
-    return params.map((x) => sanitizeCallbackParamsForPrompt(x, ctx));
-  }
-  if (params && typeof params === 'object') {
-    const out: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(params as Record<string, unknown>)) {
-      out[k] = sanitizeCallbackParamsForPrompt(v, ctx);
-    }
-    return out;
-  }
-  return params;
 }
 
 /**
@@ -368,7 +347,7 @@ function buildSupplementalHexIntelligenceBlock(hexAssessments: HexAssessmentEntr
     const noteStr = notes.length > 0 ? ` notes: ${notes.join('; ')}` : '';
     bullets.push(`- ${posStr}: terrain ${terrain}; passableBy: ${passableBy || 'unknown'}${noteStr}`);
   }
-  return markdownHeading2('Supplemental Hex Intelligence') + bullets.join('\n');
+  return markdownHeading2(SECTION_TITLE_SUPPLEMENTAL_HEX_INTELLIGENCE) + bullets.join('\n');
 }
 
 /**
@@ -454,58 +433,6 @@ export function buildAttentionFlags(
 }
 
 /**
- * Defines the `formatCallbackLine` function shape (function formatCallbackLine(sub: CallbackSubscription, latLngByH3: Map<string, [number, number]>): string).
-
- * Purpose: Supports maintainability by documenting why `formatCallbackLine` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function formatCallbackLine(sub: CallbackSubscription, ctx: CoordinateContext): string {
-  const n = sub.params?.n as number | undefined;
-  if (sub.event === 'turns' && typeof n === 'number' && sub.subscribedTurn != null) {
-    return `turns(${n}) → fires turn ${sub.subscribedTurn + n}`;
-  }
-  if (sub.event === 'unit_engaged' || sub.event === 'unit_destroyed' || sub.event === 'unit_arrived') {
-    const unitId = (sub.params?.unitId as string) ?? '?';
-    return `${sub.event}(${unitId})`;
-  }
-  if (sub.event === 'threat_escalation') {
-    const unitId = (sub.params?.unitId as string) ?? '?';
-    const severity = (sub.params?.severity as string) ?? '';
-    return `threat_escalation(${unitId}, ${severity})`;
-  }
-  if (sub.event === 'territory_changed') {
-    const hexId = sub.params?.hexId != null ? String(sub.params.hexId) : '';
-    return hexId ? `territory_changed(${formatTerritoryTarget(hexId, ctx)})` : 'territory_changed';
-  }
-  if (sub.event === 'infrastructure_destroyed') {
-    const targetType = sub.params?.targetType != null ? String(sub.params.targetType) : '';
-    return targetType ? `infrastructure_destroyed(${targetType})` : 'infrastructure_destroyed';
-  }
-  const sanitizedParams = sanitizeCallbackParamsForPrompt(sub.params ?? {}, ctx);
-  return `${sub.event}(${JSON.stringify(sanitizedParams)})`;
-}
-
-/**
- * Defines the `buildActiveCallbacksSection` function shape (function buildActiveCallbacksSection().
-
- * Purpose: Supports maintainability by documenting why `buildActiveCallbacksSection` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-export function buildActiveCallbacksSection(subscriptions: CallbackSubscription[], ctx: CoordinateContext): string {
-  const header = '| Event | Details |';
-  const sep = '| --- | --- |';
-  if (subscriptions.length === 0) {
-    return `${header}\n${sep}\n| — | None. You may add callbacks in your response JSON to be consulted on specific events. |`;
-  }
-  const rows = subscriptions.map((s) => `| ${s.event} | ${formatCallbackLine(s, ctx)} |`);
-  return [header, sep, ...rows].join('\n');
-}
-
-/**
  * Honesty sentence when Unit Status distances use grid hops instead of march paths.
  *
  * Purpose: Fog-off strategic assessments report H3 grid distance; the model must not treat that as a legal march ETA.
@@ -548,6 +475,7 @@ export function formatBriefing(
     hexAssessmentCount: precomputed.hexAssessments.length,
     callbackCount: subscriptions?.length ?? 0,
     hasProductionText: productionText.trim().length > 0,
+    includeProductionSection: Boolean(sharedContext?.includeProductionSection),
     standingOrdersInBriefing: standingOrderText.trim().length > 0,
     reusedLatLngByH3: Boolean(sharedContext?.latLngByH3),
   });
@@ -565,15 +493,17 @@ export function formatBriefing(
       return built;
     })();
   const sections: string[] = [];
-  sections.push(markdownHeading1("Commander's Briefing"));
+  sections.push(markdownHeading1(SECTION_TITLE_COMMANDERS_BRIEFING));
   sections.push(buildStrategicNarrative(state, precomputed.unitAssessments, standingOrdersActive));
-  sections.push(markdownHeading2('Unit Status and Threats'));
+  sections.push(markdownHeading2(SECTION_TITLE_UNIT_STATUS_AND_THREATS));
   const gridProximityLine = omniscientGridProximityBriefingLine(state);
   if (gridProximityLine.length > 0) {
     sections.push(gridProximityLine + '\n\n');
+  } else if (state.fogOfWarEnabled === true) {
+    sections.push(buildIntelStalenessRule() + '\n\n');
   }
   sections.push(buildUnitStatusTable(precomputed.unitAssessments, coordCtx, standingOrdersActive));
-  sections.push(markdownHeading2('Attention Flags'));
+  sections.push(markdownHeading2(SECTION_TITLE_ATTENTION_FLAGS));
   sections.push(buildAttentionFlags(precomputed.unitAssessments, 'strategic', standingOrdersActive));
   const operational = buildStrategicOperationalMapSectionMarkdown({
     state,
@@ -591,13 +521,15 @@ export function formatBriefing(
     scope: 'strategic',
     battleId: '',
     currentTurnNumber: state.turnNumber,
-    heading: 'Recent Turn Notes',
+    heading: SECTION_TITLE_RECENT_TURN_NOTES,
   });
   if (recentTurnNotes.trim().length > 0) {
     sections.push('\n\n' + recentTurnNotes);
   }
   if (productionText.trim().length > 0) {
     sections.push('\n\n' + productionText.trim());
+  } else if (sharedContext?.includeProductionSection) {
+    sections.push('\n\n' + buildEmptyProductionQueuesSection());
   }
   const mem = memoryText ?? '';
   if (mem.trim().length > 0) {
@@ -605,11 +537,11 @@ export function formatBriefing(
       mem.includes('=== YOUR STRATEGIC MEMORY') ||
       mem.includes('# YOUR STRATEGIC MEMORY') ||
       mem.includes('# Your strategic memory') ||
-      mem.includes('# Your Strategic Memory');
+      mem.includes(topLevelHeading(SECTION_TITLE_STRATEGIC_MEMORY));
     if (hasStrategicMemoryHeader) {
       sections.push('\n\n' + mem);
     } else {
-      sections.push(markdownHeading1('Your Strategic Memory'));
+      sections.push(markdownHeading1(SECTION_TITLE_STRATEGIC_MEMORY));
       sections.push(mem);
     }
   }
@@ -617,7 +549,7 @@ export function formatBriefing(
     sections.push('\n\n');
     sections.push(standingOrderText);
   }
-  sections.push(markdownHeading2('Active Callbacks'));
+  sections.push(markdownHeading2(SECTION_TITLE_ACTIVE_CALLBACKS));
   sections.push(buildActiveCallbacksSection(subscriptions ?? [], coordCtx));
   return sections.join('');
 }

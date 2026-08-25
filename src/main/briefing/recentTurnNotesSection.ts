@@ -9,6 +9,7 @@ import {
 } from '../../shared/lossSummary';
 import { getRecentTurnNotes, type TurnNoteRow, type TurnNotesScope } from '../gameDb';
 import { logTrace } from '../logger';
+import { subHeading } from '../openrouter/promptSpec/sectionHeadings';
 
 /**
  * Arguments for assembling a recent turn notes prompt section.
@@ -120,5 +121,5 @@ export function buildRecentTurnNotesSection(args: BuildRecentTurnNotesSectionArg
   const rows = getRecentTurnNotes(args.scope, args.battleId, args.currentTurnNumber, 3).filter(rowHasPromptContent);
   if (rows.length === 0) return '';
   const blocks = rows.map((row) => formatTurnBlock(row));
-  return `## ${args.heading}\n\n${blocks.join('\n\n')}`;
+  return `${subHeading(args.heading)}\n\n${blocks.join('\n\n')}`;
 }

@@ -1,4 +1,13 @@
 import { logDebug } from '../logger';
+import {
+  buildCallbackContractClause,
+  buildInvalidOutputRulesClause,
+  buildMemoryWriteLimitsClause,
+  envelopeFieldsForGates,
+  legalOrderActionsForMode,
+  TACTICAL_STANDING_ORDER_PROHIBITION,
+  type EnvelopeGates,
+} from './promptSpec/envelopeContract';
 
 /**
  * Defines the `buildFinalJsonContractInstruction` function shape (export function buildFinalJsonContractInstruction(args: { includeMemoryUpdates: boolean; includeProductionOrders: boolean; movementOrderInstruction: st).
@@ -20,6 +29,24 @@ export function buildFinalJsonContractInstruction(args: {
    * Exceptions: None.
    */
   includeAirActions?: boolean;
+  /**
+   * When false, omit embark / transport_move / disembark from the action list (no naval units on the roster).
+   *
+   * Contract: Defaults to true for backward-compatible prompts that already had a ship.
+   * When to use: Pass from `buildSystemPromptForTools` based on opponent naval presence.
+   * Expected outcome: No-naval consultations do not advertise unused sealift actions.
+   * Exceptions: None.
+   */
+  includeNavalActions?: boolean;
+  /**
+   * When false, omit assign_order / cancel_order from the legal-action list (standing-order tools off).
+   *
+   * Contract: Defaults to true for backward-compatible strategic prompts.
+   * When to use: Pass from `buildSystemPromptForTools` based on `flags.ordersEnabled` and mode.
+   * Expected outcome: Orders-off consultations do not advertise standing-order actions.
+   * Exceptions: None.
+   */
+  includeStandingOrderActions?: boolean;
   movementOrderInstruction: string;
   submitMemoryClause: string;
   productionSubmitClause: string;
@@ -37,6 +64,8 @@ export function buildFinalJsonContractInstruction(args: {
     includeMemoryUpdates,
     includeProductionOrders,
     includeAirActions = true,
+    includeNavalActions = true,
+    includeStandingOrderActions = true,
     movementOrderInstruction,
     submitMemoryClause,
     productionSubmitClause,
@@ -46,34 +75,64 @@ export function buildFinalJsonContractInstruction(args: {
     includeMemoryUpdates,
     includeProductionOrders,
     includeAirActions,
+    includeNavalActions,
+    includeStandingOrderActions,
     coordinateMode,
   });
-  const optionalTail =
-    (includeMemoryUpdates ? ', "memoryUpdates": [...]' : '') +
-    (includeProductionOrders ? ', "productionOrders": [...]' : '');
-  const airFields = includeAirActions ? ', "airStrikes": [ ... ], "ferryOrders": [ ... ]' : '';
-  const submitHeader =
-    `Submit your final JSON only (valid JSON, no comments): { "message": "<one-line taunt or threat>", "strategy": "<one-line>", "orders": [ ... ]${airFields}, "callbacks": [...]${optionalTail} }.`;
+  const gates: EnvelopeGates = {
+    coordinateMode,
+    includeAirActions,
+    includeMemoryUpdates,
+    includeProductionOrders,
+    includeStandingOrderActions: coordinateMode !== 'tactical' && includeStandingOrderActions,
+  };
+  const fields = envelopeFieldsForGates(gates);
+  const headerSlots: Record<string, string> = {
+    message: '"message": "<one-line taunt or threat>"',
+    strategy: '"strategy": "<one-line>"',
+    orders: '"orders": [ ... ]',
+    airStrikes: '"airStrikes": [ ... ]',
+    ferryOrders: '"ferryOrders": [ ... ]',
+    callbacks: '"callbacks": [...]',
+    memoryUpdates: '"memoryUpdates": [...]',
+    productionOrders: '"productionOrders": [...]',
+  };
+  const submitHeader = `Submit your final JSON only (valid JSON, no comments): { ${fields
+    .map((field) => headerSlots[field])
+    .join(', ')} }.`;
   const strictSchemaClause =
     'Strict schema: top-level must be a JSON object with "message" (string), "strategy" (string) and "orders" (array); do not return a top-level array. The "message" field is a one-line in-character taunt or threat addressed to the human player (psychological warfare only: do not reveal real orders, hex codes, unit ids, or operational intent). The "strategy" field is a one-line summary of your plan for this turn.';
   const airUnitOrderNote = includeAirActions
     ? ' Air units never move hex by hex, so "march", "patrol", and "pursue" are rejected for them — use airStrikes for attacks, ferryOrders to reposition, or a "defend" order to keep striking targets in range'
-    : ' Air units never move hex by hex, so "march", "patrol", and "pursue" are rejected for them — give them a "defend" order instead';
+    : '';
+  const standingOrdersIssuable = coordinateMode !== 'tactical' && includeStandingOrderActions;
+  const actionList = legalOrderActionsForMode(
+    coordinateMode,
+    includeNavalActions,
+    standingOrdersIssuable
+  ).join(', ');
+  const sealiftActionClause = includeNavalActions
+    ? ', transport_move (include "navalUnitId" and "destination" hex code), disembark (include "unitId" and "destination" hex code — clears cargo assignment then moves in one action), embark (include "unitId" and "navalUnitId")'
+    : '';
+  const sharedMoveFireClause = `explicit_move (include "destination": briefing hex code for this ${coordinateMode === 'tactical' ? "beat's march" : "turn's move"}; auto-debarks embarked cargo before marching), ranged_attack (include exactly one of targetHexCode or targetUnitId; ranged-only units/actions)${sealiftActionClause}`;
   const ordersClause =
     coordinateMode === 'tactical'
-      ? 'The "orders" array is processed in list order. Each entry includes "action" and usually "unitId". Actions: explicit_move (include "destination": briefing hex code for this beat\'s march; auto-debarks embarked cargo before marching), ranged_attack (include exactly one of targetHexCode or targetUnitId; ranged-only units/actions), transport_move (include "navalUnitId" and "destination" hex code), disembark (include "unitId" and "destination" hex code — clears cargo assignment then moves in one action), embark (include "unitId" and "navalUnitId"). Do not emit assign_order or cancel_order for tactical sub-unit ids.'
-      : 'The "orders" array is processed in list order. Each entry includes "action" and usually "unitId". Actions: assign_order (include "order": { "type": "defend"|"march"|"pursue"|"patrol"|"hold_fire", ... } — required fields per type: "march" needs "destination" (one two-character briefing hex code); "defend" needs "defendHex" (one hex code); "patrol" needs "waypoints" (an array of two or more hex codes, visited in order then looped — a single "destination" is not a valid patrol); "pursue" needs "targetUnitId" (an enemy unit id string); "hold_fire" needs no extra fields.' +
-        airUnitOrderNote +
-        '), cancel_order, explicit_move (include "destination": briefing hex code for this turn\'s move; auto-debarks embarked cargo before marching), ranged_attack (include exactly one of targetHexCode or targetUnitId; ranged-only units/actions), transport_move (include "navalUnitId" and "destination" hex code), disembark (include "unitId" and "destination" hex code — clears cargo assignment then moves in one action), embark (include "unitId" and "navalUnitId"). assign_order place fields are operational-map briefing hex codes, not plan_route orderToHexCode; they may be multi-turn goals. Best Options Target Hexes are this-turn dests only.';
+      ? `The "orders" array is processed in list order. Each entry includes "action" and usually "unitId". Actions: ${actionList}. ${sharedMoveFireClause}. ${TACTICAL_STANDING_ORDER_PROHIBITION}`
+      : standingOrdersIssuable
+        ? `The "orders" array is processed in list order. Each entry includes "action" and usually "unitId". Actions: ${actionList}. assign_order (include "order": { "type": "defend"|"march"|"pursue"|"patrol"|"hold_fire", ... } — required fields per type: "march" needs "destination" (one two-character briefing hex code); "defend" needs "defendHex" (one hex code); "patrol" needs "waypoints" (an array of two or more hex codes, visited in order then looped — a single "destination" is not a valid patrol); "pursue" needs "targetUnitId" (an enemy unit id string); "hold_fire" needs no extra fields.` +
+          airUnitOrderNote +
+          `), cancel_order, ${sharedMoveFireClause}. assign_order place fields are operational-map briefing hex codes, not plan_route orderToHexCode; they may be multi-turn goals. Best Options Target Hexes are this-turn dests only.`
+        : `The "orders" array is processed in list order. Each entry includes "action" and usually "unitId". Actions: ${actionList}. ${sharedMoveFireClause}. Best Options Target Hexes are this-turn dests only.`;
   const airClause = includeAirActions
     ? 'Optional top-level air actions: airStrikes[] entries use { "unitId": "...", exactly one of "targetHexCode" or "targetUnitId", "targetType": "units"|"urban"|"airport"|"seaport" }, ferryOrders[] entries use { "unitId": "...", "destination": "<hex code>" }. '
     : '';
-  const legacyClause = 'Do not use top-level movementOrders or rangedAttacks (legacy).';
-  const callbacksClause =
-    coordinateMode === 'tactical'
-      ? 'Include optional "callbacks" for re-consultation: use tactical sub-unit ids (not strategic parent ids) for unit-scoped events (e.g. unit_destroyed, unit_engaged); subscriptions are evaluated after each tactical beat when event-driven mode is on and are cleared when the battle ends; each consultation replaces the full callback list.'
-      : 'Include optional "callbacks" for re-consultation planning.';
-  return `${submitHeader} ${strictSchemaClause} ${ordersClause} ${airClause}${legacyClause}${movementOrderInstruction} ${callbacksClause}${submitMemoryClause} ${productionSubmitClause}`;
+  const callbacksClause = buildCallbackContractClause(coordinateMode);
+  const invalidOutputClause = buildInvalidOutputRulesClause(gates);
+  const memoryLimits =
+    coordinateMode !== 'tactical' && includeMemoryUpdates ? buildMemoryWriteLimitsClause() : '';
+  const memoryClause = coordinateMode === 'tactical' ? '' : submitMemoryClause;
+  const productionClause = coordinateMode === 'tactical' ? '' : productionSubmitClause;
+  return `${submitHeader} ${strictSchemaClause} ${ordersClause} ${airClause}${invalidOutputClause}${movementOrderInstruction} ${callbacksClause}${memoryClause}${memoryLimits} ${productionClause}`;
 }
 
 /**
@@ -113,6 +172,15 @@ includeProductionOrders: boolean;
    */
   includeAirActions?: boolean;
   /**
+   * When false, the illustrative orders[] example omits assign_order / cancel_order.
+   *
+   * Contract: Optional; defaults to true for strategic examples.
+   * When to use: Pass false when standing-order tools are off.
+   * Expected outcome: Example matches the contract instruction for the consultation.
+   * Exceptions: None.
+   */
+  includeStandingOrderActions?: boolean;
+  /**
    * When `tactical`, the illustrative orders[] example leads with explicit_move / ranged_attack (assign_order stays blocked for sub-unit ids).
    *
    * Contract: Optional coordinate mode for example/contract text; omit or `strategic` for strategic prompts.
@@ -124,89 +192,6 @@ includeProductionOrders: boolean;
 }
 
 /**
- * Documents the `FinalOrdersExamplePayload` interface as a named contract surface (interface FinalOrdersExamplePayload).
-
- * Purpose: Supports maintainability by documenting why `FinalOrdersExamplePayload` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-interface FinalOrdersExamplePayload {
-  /**
-   * One-line in-character taunt or threat to the human player in the illustrative envelope.
-   *
-   * Contract: Plain string; no hex codes, unit ids, or operational intent.
-   * When to use: Example JSON shown in the system prompt.
-   * Expected outcome: Emitted first in the fenced example object.
-   * Exceptions: None.
-   */
-  message: string;
-    /**
-   * Specifies the contract for the `strategy` member (strategy: string;).
-
-   * Contract: Describes stable behavior for callers of `strategy` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-strategy: string;
-    /**
-   * Specifies the contract for the `orders` member (orders: Array<Record<string, unknown>>;).
-
-   * Contract: Describes stable behavior for callers of `orders` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-orders: Array<Record<string, unknown>>;
-    /**
-   * Specifies the contract for the `airStrikes` member (airStrikes: unknown[];).
-
-   * Contract: Describes stable behavior for callers of `airStrikes` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-airStrikes?: unknown[];
-    /**
-   * Specifies the contract for the `ferryOrders` member (ferryOrders: unknown[];).
-
-   * Contract: Describes stable behavior for callers of `ferryOrders` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-ferryOrders?: unknown[];
-    /**
-   * Specifies the contract for the `callbacks` member (callbacks: unknown[];).
-
-   * Contract: Describes stable behavior for callers of `callbacks` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-callbacks: unknown[];
-    /**
-   * Specifies the contract for the `memoryUpdates` member (memoryUpdates?: unknown[];).
-
-   * Contract: Describes stable behavior for callers of `memoryUpdates` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-memoryUpdates?: unknown[];
-    /**
-   * Specifies the contract for the `productionOrders` member (productionOrders?: Array<Record<string, unknown>>;).
-
-   * Contract: Describes stable behavior for callers of `productionOrders` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-productionOrders?: Array<Record<string, unknown>>;
-}
-
-/**
  * Defines the `getFinalJsonOrdersExampleBlock` function shape (export function getFinalJsonOrdersExampleBlock(flags: FinalJsonExampleFlags): string).
 
  * Purpose: Supports maintainability by documenting why `getFinalJsonOrdersExampleBlock` exists.
@@ -215,23 +200,34 @@ productionOrders?: Array<Record<string, unknown>>;
  * Exceptions: None.
  */
 export function getFinalJsonOrdersExampleBlock(flags: FinalJsonExampleFlags): string {
+  const coordinateMode = flags.coordinateMode ?? 'strategic';
+  const includeAirActions = flags.includeAirActions !== false;
+  const includeStandingOrderActions = flags.includeStandingOrderActions !== false;
   logDebug('promptContracts getFinalJsonOrdersExampleBlock', {
     includeMemoryUpdates: flags.includeMemoryUpdates,
     includeProductionOrders: flags.includeProductionOrders,
-    includeAirActions: flags.includeAirActions !== false,
-    coordinateMode: flags.coordinateMode ?? 'strategic',
+    includeAirActions,
+    includeStandingOrderActions,
+    coordinateMode,
   });
-  const tactical = flags.coordinateMode === 'tactical';
-  const includeAir = flags.includeAirActions !== false;
-  const example: FinalOrdersExamplePayload = {
+  const gates: EnvelopeGates = {
+    coordinateMode,
+    includeAirActions,
+    includeMemoryUpdates: flags.includeMemoryUpdates,
+    includeProductionOrders: flags.includeProductionOrders,
+    includeStandingOrderActions: coordinateMode !== 'tactical' && includeStandingOrderActions,
+  };
+  const tactical = coordinateMode === 'tactical';
+  const standingOrdersIssuable = !tactical && includeStandingOrderActions;
+  const values: Record<string, unknown> = {
     message: tactical ? 'This close, hesitation is already a casualty.' : 'You will not find safety in delay.',
     strategy: tactical
       ? 'Close with observed enemies this beat using explicit moves and fire.'
       : 'Close with observed enemies and keep production moving.',
-    orders: tactical
+    orders: tactical || !standingOrdersIssuable
       ? [
-          { action: 'explicit_move', unitId: 'opp-parent:01', destination: 'AB' },
-          { action: 'ranged_attack', unitId: 'opp-parent:02', targetUnitId: 'hum-parent:01' },
+          { action: 'explicit_move', unitId: tactical ? 'opp-parent:01' : 'opponent-armor-2', destination: 'AB' },
+          { action: 'ranged_attack', unitId: tactical ? 'opp-parent:02' : 'opponent-naval-1', targetUnitId: tactical ? 'hum-parent:01' : 'human-armor-1' },
         ]
       : [
           { action: 'assign_order', unitId: 'opponent-infantry-1', order: { type: 'march', destination: 'AB' } },
@@ -239,15 +235,15 @@ export function getFinalJsonOrdersExampleBlock(flags: FinalJsonExampleFlags): st
           { action: 'explicit_move', unitId: 'opponent-armor-2', destination: 'CD' },
           { action: 'ranged_attack', unitId: 'opponent-naval-1', targetUnitId: 'human-armor-1' },
         ],
+    airStrikes: [],
+    ferryOrders: [],
     callbacks: [],
+    memoryUpdates: [],
+    productionOrders: [{ action: 'set_build_queue', hex: 'AB', unitType: 'infantry', count: 1 }],
   };
-  if (includeAir) {
-    example.airStrikes = [];
-    example.ferryOrders = [];
-  }
-  if (flags.includeMemoryUpdates) example.memoryUpdates = [];
-  if (flags.includeProductionOrders) {
-    example.productionOrders = [{ action: 'set_build_queue', hex: 'AB', unitType: 'infantry', count: 1 }];
+  const example: Record<string, unknown> = {};
+  for (const field of envelopeFieldsForGates(gates)) {
+    example[field] = values[field];
   }
   const json = JSON.stringify(example, null, 2);
   return (

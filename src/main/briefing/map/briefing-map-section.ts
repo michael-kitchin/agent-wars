@@ -25,6 +25,11 @@ import {
   renderDisplacedFeaturesLine,
   renderThisTurnOptionsTableMarkdown,
 } from './briefing-tables';
+import {
+  SECTION_TITLE_BEST_OPTIONS_THIS_TURN,
+  SECTION_TITLE_OPERATIONAL_MAP,
+  topLevelHeading,
+} from '../../openrouter/promptSpec/sectionHeadings';
 
 /**
  * Builds the optional **Best Options This Turn** markdown subsection for operational map prompts.
@@ -35,7 +40,7 @@ import {
  * Exceptions: None.
  */
 function formatBestOptionsThisTurnSubsection(optionsMd: string): string {
-  return optionsMd.trim().length > 0 ? `### Best Options This Turn\n\n${optionsMd}\n` : '';
+  return optionsMd.trim().length > 0 ? `### ${SECTION_TITLE_BEST_OPTIONS_THIS_TURN}\n\n${optionsMd}\n` : '';
 }
 
 /**
@@ -69,7 +74,7 @@ export function buildStrategicOperationalMapSectionMarkdown(args: {
     return { lat: ll?.[0] ?? 0, lng: ll?.[1] ?? 0 };
   });
   if (aiUnits.length === 0 && enemyUnits.length === 0) {
-    return '# Operational Map\n\n(No units — map not rendered.)\n';
+    return `${topLevelHeading(SECTION_TITLE_OPERATIONAL_MAP)}\n\n(No units — map not rendered.)\n`;
   }
 
   const mapHexes = listStrategicRes1H3Indexes();
@@ -98,7 +103,7 @@ export function buildStrategicOperationalMapSectionMarkdown(args: {
     'Odd rows are indented one space. Use only hex codes from this map or tables.\n\n';
 
   return (
-    `# Operational Map\n\n${legend}\`\`\`\n${mapString}\n\`\`\`\n\n` +
+    `${topLevelHeading(SECTION_TITLE_OPERATIONAL_MAP)}\n\n${legend}\`\`\`\n${mapString}\n\`\`\`\n\n` +
     `${displacedLine}\n` +
     `${formatBestOptionsThisTurnSubsection(optionsMd)}`
   );

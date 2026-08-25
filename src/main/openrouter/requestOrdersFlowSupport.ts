@@ -60,6 +60,34 @@ const FULL_RESPONSE_LOG_ENV_FLAG = 'AGENT_WARS_LOG_FULL_RESPONSES';
 export const REQUEST_ORDERS_MAX_WALL_CLOCK_MS = 90_000;
 
 /**
+ * Maximum model rounds in one consultation, including tool calls.
+ *
+ * Purpose: The loop bound and the next-consultation warning must quote the same number.
+ * When to use: `requestOrdersFlow` tool loop and `buildToolBudgetExceededWarning`.
+ * Expected outcome: Changing this value updates both the hard stop and the warning text.
+ * Exceptions: None.
+ */
+export const REQUEST_ORDERS_MAX_TOOL_ROUNDS = 50;
+
+/**
+ * Warning appended to the next system prompt after a consultation exhausted its tool budget.
+ *
+ * Purpose: variants.md consultation-policy row: the model must hear the round limit, that nothing was submitted, and to submit promptly.
+ * When to use: `buildSystemPromptForTools` when the previous consultation hit the round cap and planning or orders tools are on.
+ * Expected outcome: Contains `String(REQUEST_ORDERS_MAX_TOOL_ROUNDS)`.
+ * Exceptions: None.
+ */
+export function buildToolBudgetExceededWarning(): string {
+  logDebug('requestOrdersFlowSupport buildToolBudgetExceededWarning', {
+    maxToolRounds: REQUEST_ORDERS_MAX_TOOL_ROUNDS,
+  });
+  return (
+    `\n\nWARNING: Last turn's planning exceeded the tool-call limit (${REQUEST_ORDERS_MAX_TOOL_ROUNDS} rounds). ` +
+    'You submitted no explicit orders. Ensure you submit your final orders JSON promptly after gathering the information you need.\n'
+  );
+}
+
+/**
  * Per-request counters for AI pathfinding session reuse and tool usage inside one `requestOrdersFlow` call.
  *
  * Purpose: Feeds end-of-request debug summaries without exposing mutable globals to callers.

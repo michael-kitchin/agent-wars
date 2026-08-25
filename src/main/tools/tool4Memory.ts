@@ -8,6 +8,7 @@
 import { dbRun, dbGetOne, dbGetAll, saveDatabase } from '../gameDb';
 import { logDebug, logError, logTrace } from '../logger';
 import { buildPromptTableLines } from '../promptTableUtils';
+import { SECTION_TITLE_STRATEGIC_MEMORY, topLevelHeading } from '../openrouter/promptSpec/sectionHeadings';
 
 /**
  * Documents the module-scope binding `PERSISTENT_LIMIT` (PERSISTENT_LIMIT).
@@ -35,7 +36,7 @@ const STORED_LIMIT = 15;
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-const CONTENT_MAX_LENGTH = 500;
+export const CONTENT_MAX_LENGTH = 500;
 /**
  * Documents the module-scope binding `KEY_PATTERN` (KEY_PATTERN).
 
@@ -44,7 +45,7 @@ const CONTENT_MAX_LENGTH = 500;
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-const KEY_PATTERN = /^[a-zA-Z0-9_-]+$/;
+export const KEY_PATTERN = /^[a-zA-Z0-9_-]+$/;
 /**
  * Documents the module-scope binding `KEY_MAX_LENGTH` (KEY_MAX_LENGTH).
 
@@ -53,7 +54,7 @@ const KEY_PATTERN = /^[a-zA-Z0-9_-]+$/;
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-const KEY_MAX_LENGTH = 64;
+export const KEY_MAX_LENGTH = 64;
 /**
  * Documents the module-scope binding `AI_PLAYER_ID` (AI_PLAYER_ID).
 
@@ -276,7 +277,7 @@ export function getInjectionText(playerId: string, currentTurn: number): string 
       : `Stored memories not shown this turn: ${storedNotTriggered.length} (tags: ${[...tagsFromStoredNotTriggered].sort().join(', ') || 'none'}). These are withheld until their reminder triggers; use memory_read to retrieve by key or tag.`;
 
   const lines: string[] = [];
-  lines.push('# Your Strategic Memory');
+  lines.push(topLevelHeading(SECTION_TITLE_STRATEGIC_MEMORY));
   lines.push('');
   lines.push('## Persistent (Active Strategic Context)');
   lines.push('');

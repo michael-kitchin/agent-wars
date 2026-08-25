@@ -6,6 +6,8 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
   resolveFullPromptLogFileName,
+  buildToolBudgetExceededWarning,
+  REQUEST_ORDERS_MAX_TOOL_ROUNDS,
   type PromptLogArtifactKind,
 } from './requestOrdersFlowSupport';
 
@@ -30,4 +32,10 @@ test('resolveFullPromptLogFileName maps each artifact kind to a distinct file', 
     return resolved;
   });
   assert.equal(new Set(fileNames).size, fileNames.length);
+});
+
+test('tool-budget warning quotes the shared round limit', () => {
+  const warning = buildToolBudgetExceededWarning();
+  assert.ok(warning.includes(String(REQUEST_ORDERS_MAX_TOOL_ROUNDS)));
+  assert.match(warning, /tool-call limit/);
 });

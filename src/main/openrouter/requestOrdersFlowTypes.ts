@@ -240,3 +240,115 @@ export interface RequestOrdersOptions {
    */
   tacticalAiBattle?: TacticalBattleSnapshot;
 }
+
+/**
+ * One OpenAI-style chat message in the consultation transcript.
+ *
+ * Purpose: Shared by the tool loop and the parse-repair exchange so those modules do not each invent a message shape.
+ * When to use: The `messages` array in `requestOrdersFlow` and the extracted loop/repair helpers.
+ * Expected outcome: Discriminated by `role`; tool results carry `tool_call_id`.
+ * Exceptions: None.
+ */
+export type RequestOrdersChatMessage =
+  | {
+      /**
+       * System-prompt role.
+       *
+       * Contract: Exactly `'system'`.
+       * When to use: The first message in the consultation.
+       * Expected outcome: Carries the assembled system prompt.
+       * Exceptions: None.
+       */
+      readonly role: 'system';
+      /**
+       * System prompt body.
+       *
+       * Contract: Non-empty assembled prompt string.
+       * When to use: Built by `buildSystemPromptForTools`.
+       * Expected outcome: The model reads this as the rules and briefing.
+       * Exceptions: None.
+       */
+      readonly content: string;
+    }
+  | {
+      /**
+       * User-turn role.
+       *
+       * Contract: Exactly `'user'`.
+       * When to use: Opening message, malformed-completion correction, and repair request.
+       * Expected outcome: The current instruction for this user turn.
+       * Exceptions: None.
+       */
+      readonly role: 'user';
+      /**
+       * User message body.
+       *
+       * Contract: Plain text.
+       * When to use: Opening and repair user turns.
+       * Expected outcome: The model treats this as the current instruction.
+       * Exceptions: None.
+       */
+      readonly content: string;
+    }
+  | {
+      /**
+       * Assistant-turn role.
+       *
+       * Contract: Exactly `'assistant'`.
+       * When to use: Model replies, including those that only contain tool calls.
+       * Expected outcome: `content` may be null when the turn is tool-only.
+       * Exceptions: None.
+       */
+      readonly role: 'assistant';
+      /**
+       * Assistant text, if any.
+       *
+       * Contract: Null when the turn is tool-call-only.
+       * When to use: Final JSON or intermediate commentary.
+       * Expected outcome: Final-json turns have a string; tool turns may be null.
+       * Exceptions: None.
+       */
+      readonly content: string | null;
+      /**
+       * Tool calls requested this turn.
+       *
+       * Contract: OpenAI function-call shape.
+       * When to use: When the model asked for tools instead of final JSON.
+       * Expected outcome: Omitted when the model submitted text.
+       * Exceptions: None.
+       */
+      readonly tool_calls?: ReadonlyArray<{
+        readonly id: string;
+        readonly type: 'function';
+        readonly function: { readonly name: string; readonly arguments: string };
+      }>;
+    }
+  | {
+      /**
+       * Tool-result role.
+       *
+       * Contract: Exactly `'tool'`.
+       * When to use: After executing a requested tool.
+       * Expected outcome: `content` is JSON text the model can read.
+       * Exceptions: None.
+       */
+      readonly role: 'tool';
+      /**
+       * Id matching the assistant's tool call.
+       *
+       * Contract: Must equal the `id` from the corresponding `tool_calls` entry.
+       * When to use: Every tool result row.
+       * Expected outcome: The provider can pair result with request.
+       * Exceptions: None.
+       */
+      readonly tool_call_id: string;
+      /**
+       * Tool result body.
+       *
+       * Contract: JSON string.
+       * When to use: Encoded tool output.
+       * Expected outcome: The model sees the same encoding as other tool results.
+       * Exceptions: None.
+       */
+      readonly content: string;
+    };

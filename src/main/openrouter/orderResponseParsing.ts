@@ -217,14 +217,14 @@ function extractBalancedJsonObjectFrom(s: string, startIndex: number): string | 
 }
 
 /**
- * Documents the module-scope binding `CALLBACK_EVENT_VOCAB` (CALLBACK_EVENT_VOCAB).
-
- * Purpose: Supports maintainability by documenting why `CALLBACK_EVENT_VOCAB` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Event names the parser accepts on a callback subscription.
+ *
+ * Purpose: The taught vocabulary must be a subset of this set so the prompt never invites an event the parser drops.
+ * When to use: `normalizeCallbacks` and `TAUGHT_CALLBACK_EVENTS`.
+ * Expected outcome: Includes `territory_changed` (accepted, never fired) plus every event the evaluator can fire.
  * Exceptions: None.
  */
-const CALLBACK_EVENT_VOCAB = new Set([
+export const CALLBACK_EVENT_VOCAB = new Set([
   'turns',
   'unit_engaged',
   'unit_destroyed',
@@ -350,21 +350,6 @@ function normalizeMemoryUpdates(raw: unknown): MemoryUpdateItem[] {
     }
   }
   return out;
-}
-
-/**
- * Defines the `buildJsonAssistantRepairSchema` function shape (export function buildJsonAssistantRepairSchema(includeProductionOrders: boolean): string).
-
- * Purpose: Supports maintainability by documenting why `buildJsonAssistantRepairSchema` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-export function buildJsonAssistantRepairSchema(includeProductionOrders: boolean): string {
-  logDebug('openRouter buildJsonAssistantRepairSchema', { includeProductionOrders });
-  return includeProductionOrders
-    ? `{"message":"...","strategy":"...","orders":[{"unitId":"opponent-armor-1","action":"assign_order","order":{"type":"march","destination":"CF"}},{"unitId":"opponent-armor-1","action":"explicit_move","destination":"CG"},{"unitId":"opponent-armor-1","action":"ranged_attack","targetHexCode":"CH"},{"unitId":"opponent-armor-1","action":"cancel_order"}],"airStrikes":[{"unitId":"opponent-air-1","targetHexCode":"CI","targetType":"units"}],"ferryOrders":[{"unitId":"opponent-air-2","destination":"CJ"}],"callbacks":[],"memoryUpdates":[],"productionOrders":[{"action":"set_build_queue","hex":"CF","unitType":"infantry","count":1}]}`
-    : `{"message":"...","strategy":"...","orders":[{"unitId":"opponent-armor-1","action":"assign_order","order":{"type":"march","destination":"CF"}},{"unitId":"opponent-armor-1","action":"explicit_move","destination":"CG"},{"unitId":"opponent-armor-1","action":"ranged_attack","targetHexCode":"CH"},{"unitId":"opponent-armor-1","action":"cancel_order"}],"airStrikes":[{"unitId":"opponent-air-1","targetHexCode":"CI","targetType":"units"}],"ferryOrders":[{"unitId":"opponent-air-2","destination":"CJ"}],"callbacks":[],"memoryUpdates":[]}`;
 }
 
 /**

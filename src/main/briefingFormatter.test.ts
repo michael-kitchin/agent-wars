@@ -10,6 +10,7 @@ import type { PrecomputationResult, UnitAssessmentResult } from './precomputatio
 import { buildAttentionFlags, buildStrategicNarrative, buildUnitStatusTable, formatBriefing } from './briefingFormatter';
 import { getOrderedHexList } from './mapData';
 import { OMNISCIENT_GRID_PROXIMITY_BRIEFING_LINE } from './tools/assessUnitProximity';
+import { buildIntelStalenessRule } from './openrouter/promptSpec/gameRuleText';
 
 /**
  * Documents the module-scope binding `fixtureOriginH3` (fixtureOriginH3).
@@ -222,22 +223,24 @@ function testFormatBriefingOmitsStandingOrderWhenInjectionEmpty(): void {
 }
 
 /**
- * Defines the `testFormatBriefingActiveCallbacksWithSubscriptions` function shape (function testFormatBriefingActiveCallbacksWithSubscriptions(): void).
-
- * Purpose: Supports maintainability by documenting why `testFormatBriefingActiveCallbacksWithSubscriptions` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Production appears when the tool flag is on, including the empty-queue form, and is omitted when off.
+ *
+ * Purpose: An empty production string used to hide the section even when tools were enabled.
+ * When to use: After `includeProductionSection` on `formatBriefing`.
+ * Expected outcome: Tools-off omits Production Status; tools-on with empty text emits the defined empty form.
  * Exceptions: None.
  */
-function testFormatBriefingActiveCallbacksWithSubscriptions(): void {
-  const subs = [
-    { event: 'turns', params: { n: 3 }, subscribedTurn: 10 },
-    { event: 'unit_engaged', params: { unitId: 'opponent-armor-1' } },
-  ];
-  const out = formatBriefing(fixtureState, precomputed, '', '', subs);
-  assert.ok(out.includes('## Active Callbacks'), 'Active Callbacks section');
-  assert.ok(out.includes('turns(3) → fires turn 13'), 'turns subscription line');
-  assert.ok(out.includes('unit_engaged(opponent-armor-1)'), 'unit_engaged subscription line');
+function testFormatBriefingProductionSectionFollowsToolFlag(): void {
+  const omitted = formatBriefing(fixtureState, precomputed, '', '');
+  assert.ok(!omitted.includes('# Production Status'), 'tools off omits production');
+  const emptyForm = formatBriefing(fixtureState, precomputed, '', '', [], '', {
+    includeProductionSection: true,
+  });
+  assert.ok(emptyForm.includes('# Production Status'), 'tools on keeps production heading');
+  assert.ok(
+    emptyForm.includes('No currently controlled hexes with editable production queues.'),
+    'empty queues use the defined empty form'
+  );
 }
 
 /**
@@ -501,12 +504,20 @@ function testFormatBriefingGridProximityHonestyLine(): void {
     ),
     'fog-off res1 briefing places grid-hops sentence immediately after Unit Status heading, then the table'
   );
+  assert.ok(
+    !fogOffRes1.includes(buildIntelStalenessRule()),
+    'fog-off res1 briefing omits the intel staleness sentence'
+  );
 
   const fogOnRes1: GameStateSnapshot = { ...res1State, fogOfWarEnabled: true };
   const fogOnOut = formatBriefing(fogOnRes1, precomputed, '', '');
   assert.ok(
     !fogOnOut.includes(OMNISCIENT_GRID_PROXIMITY_BRIEFING_LINE),
     'fog-on res1 briefing omits grid-hops sentence'
+  );
+  assert.ok(
+    fogOnOut.includes(buildIntelStalenessRule()),
+    'fog-on res1 briefing includes the intel staleness sentence'
   );
 
   const fogOffRes3: GameStateSnapshot = { ...fixtureState, fogOfWarEnabled: false };
@@ -532,9 +543,9 @@ function testFormatBriefingGridProximityHonestyLine(): void {
 const tests = [
   { name: 'formatBriefing contains all sections', fn: testFormatBriefingContainsSections },
   { name: 'formatBriefing omits standing order when injection empty', fn: testFormatBriefingOmitsStandingOrderWhenInjectionEmpty },
+  { name: 'formatBriefing production section follows tool flag', fn: testFormatBriefingProductionSectionFollowsToolFlag },
   { name: 'formatBriefing unit table rows', fn: testFormatBriefingUnitTableRows },
   { name: 'formatBriefing possible actions armor ranged', fn: testFormatBriefingPossibleActionsArmorRanged },
-  { name: 'formatBriefing Active callbacks with subscriptions', fn: testFormatBriefingActiveCallbacksWithSubscriptions },
   {
     name: 'unit status and attention ignore low threats when standing orders inactive',
     fn: testUnitStatusAndAttentionIgnoreLowThreatsWhenStandingOrdersInactive,

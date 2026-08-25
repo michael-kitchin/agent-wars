@@ -1,18 +1,16 @@
 import type { GameStateSnapshot } from '../gameDb';
 import { getAndClearAiToolLimitExceededLastTurn } from '../gameDb';
-import { getAttack, getDefense, getRange } from '../combatConstants';
-import { RANGED_RANGE_BY_UNIT_TYPE } from '../../shared/tacticalRanges';
 import { unitHasDirectRangedPlanning } from '../../shared/rangePerimeterModel';
 import { H3_RESOLUTION, LATLNG_DECIMAL_PLACES } from '../mapData';
 import { getValidDestinationsUnoccupied } from '../oneStepMoveDestinations';
-import { getInjectionText } from '../tools/tool4Memory';
-import { getInjectionText as getStandingOrderInjectionText } from '../tools/tool5StandingOrders';
 import {
   computeHomeRegionHexPartitionsForPrompting,
   countControlledHexesInRegion,
 } from '../../shared/homeRegionRules';
 import { buildFinalJsonContractInstruction, getFinalJsonOrdersExampleBlock } from './promptContracts';
-import { buildAirOperationsBriefingBlock, buildProductionBriefingBlock, buildSealiftBriefingBlock } from './briefingSections';
+import { buildAirOperationsBriefingBlock } from './briefingSectionsAirOps';
+import { buildSealiftBriefingBlock } from './briefingSectionsSealift';
+import { buildStatusInjectionTexts } from './requestOrdersInjection';
 import {
   buildAdjacentCellsFallbackBlock,
   formatControlProgressLine,
@@ -25,10 +23,8 @@ import {
   formatLatLng as formatLatLngWithPrecision,
   getMovementOrderInstruction,
 } from './promptText';
-import { ALL_BUILD_UNIT_TYPES } from '../../shared/ipc/productionTypes';
 import { buildRegionVsRegionScenarioObjectiveBlock, buildTacticalBattleGoalClause, buildWinConditionReminderClause } from './scenarioGoals';
 import {
-  NAVAL_MOVEMENT_PROMPT_RULE,
   NAVAL_PLAN_ROUTE_LAND_TARGET_HINT,
   NAVAL_PLAN_ROUTE_PROMPT_SUFFIX,
 } from '../navalMovementMessages';
@@ -37,6 +33,10 @@ import { getToolFlags } from './openRouterToolGroups';
 import { logDebug } from '../logger';
 import type { CoordinateContext } from '../briefing/map/coordinateContext';
 import { h3ToCode } from '../briefing/map/hex-code-translator';
+import { SECTION_TITLE_AVAILABLE_TOOLS, SECTION_TITLE_BEST_OPTIONS_THIS_TURN, topLevelHeading } from './promptSpec/sectionHeadings';
+import { buildCombatRulesParagraph } from './promptSpec/gameRuleText';
+import { buildContextCoaching, type CoachingGates } from './promptSpec/coachingText';
+import { buildToolBudgetExceededWarning } from './requestOrdersFlowSupport';
 
 /** Home regions are defined at strategic res1; always encode with the strategic registry, not tactical res4. */
 const HOME_REGION_HEX_COORD_CTX = { mode: 'strategic' as const };
@@ -59,46 +59,6 @@ function formatHomeRegionHexCodesForPrompt(h3Indexes: readonly string[]): string
     }
   }
   return parts.join(', ');
-}
-
-/** Shared strategy coaching block; strategic prompt also includes `COACHING_STRATEGIC_PRIORITIES` (goals) before this. */
-const COACHING_STRATEGY_BLOCK = `- Your strategy is:
-    (1) Use speed, surprise, and initiative to break the enemy's cohesion and morale
-    (2) Attack the enemy's weaknesses (gaps) and avoid their strengths (surfaces)
-    (3) Create maximum disruption with minimum force`;
-
-/** Coaching for the JSON `"message"` field (player-facing taunt/threat), not operational doctrine. */
-const COACHING_MESSAGE_BLOCK = `- Your message is:
-    Address the human player in character as their enemy commander. Deliver a one-line taunt or threat meant to unnerve them. Psychological warfare only — do not reveal real orders, hex codes, unit ids, or operational intent.`;
-
-const COACHING_STRATEGIC_PRIORITIES = `- Your goals are:
-    (1) Engage enemy forces to reduce their combat effectiveness
-    (2) Disperse your units to maximize visibility
-    (3) Maximize your own unit production
-    (4) Protect your home region's production capacity
-    (5) Degrade or eliminate the enemy home region's urban production capacity`;
-
-const COACHING_TACTICAL_PRIORITY = `- Your priority is to engage enemy forces and inflict losses when advantageous`;
-
-const STRATEGIC_CONTEXT_OPENING =
-  '- At least one enemy unit remains in play, and the human player is actively searching for your forces with intent to destroy them.';
-
-/**
- * Formats the per-type range clause for the Combat stats line in the system prompt.
- *
- * Purpose: Keeps strategic infantry melee-only in LLM coaching while tactical infantry still shows a positive res4 range.
- * When to use: `buildSystemPromptForTools` combat summary only.
- * Expected outcome: Strategic uses `getRange` (`melee only` when range is 0). Tactical uses `RANGED_RANGE_BY_UNIT_TYPE` (air is "strike anywhere in the battle" instead of the large footprint cap).
- * Exceptions: None.
- */
-function formatCombatStatRangeClause(unitType: string, tacticalBattleActive: boolean): string {
-  if (tacticalBattleActive) {
-    if (unitType === 'air') return ', strike anywhere in the battle';
-    const r = RANGED_RANGE_BY_UNIT_TYPE[unitType] ?? 0;
-    return r >= 1 ? `, range ${r}` : ', melee only';
-  }
-  const r = getRange(unitType);
-  return r >= 1 ? `, range ${r}` : ', melee only';
 }
 
 export function buildSystemPromptForTools(
@@ -128,9 +88,7 @@ export function buildSystemPromptForTools(
 
   const limitExceededLastTurn = getAndClearAiToolLimitExceededLastTurn();
   const showLimitWarning = limitExceededLastTurn && (flags.planningEnabled || flags.ordersEnabled);
-  const warning = showLimitWarning
-    ? '\n\nWARNING: Last turn\'s planning exceeded the tool-call limit (50 rounds). You submitted no explicit orders. Ensure you submit your final orders JSON promptly after gathering the information you need.\n'
-    : '';
+  const warning = showLimitWarning ? buildToolBudgetExceededWarning() : '';
 
   const opponentRoster = opponentUnits
     .filter((u) => latLngByH3.has(u.h3Index))
@@ -141,51 +99,65 @@ export function buildSystemPromptForTools(
     .map((u) => `${u.id} (${u.unitType}) at ${format(u.h3Index)}`)
     .join('; ');
 
-  const unitTypes = [...ALL_BUILD_UNIT_TYPES];
   const tacticalBattleActive = coordinateContext.mode === 'tactical';
-  const combatSummary = unitTypes
-    .map(
-      (t) =>
-        `${t}: ${getAttack(t)} attack / ${getDefense(t)} defense${formatCombatStatRangeClause(t, tacticalBattleActive)}`
-    )
-    .join('; ');
-
   const filtered = getFilteredToolMetadata(enabledToolNames);
   const hasNaval = opponentUnits.some((u) => u.unitType === 'naval');
   const hasAir = opponentUnits.some((u) => u.unitType === 'air');
+  const hasPrecomputedBriefing = briefingOverride != null && briefingOverride.length > 0;
+  const hasBestOptionsTable =
+    hasPrecomputedBriefing && (briefingOverride ?? '').includes(SECTION_TITLE_BEST_OPTIONS_THIS_TURN);
+  const homePartitions =
+    state.scenarioId === 'region_vs_region' && coordinateContext.mode !== 'tactical'
+      ? computeHomeRegionHexPartitionsForPrompting(state.aiHomeRegionHexes, state.humanHomeRegionHexes)
+      : null;
+  const coachingGates: CoachingGates = {
+    coordinateMode: coordinateContext.mode,
+    planningEnabled: flags.planningEnabled,
+    ordersEnabled: flags.ordersEnabled && coordinateContext.mode !== 'tactical',
+    memoryEnabled: flags.memoryEnabled && coordinateContext.mode !== 'tactical',
+    productionEnabled: flags.productionEnabled && coordinateContext.mode !== 'tactical',
+    hasAirUnits: hasAir,
+    hasNavalUnits: hasNaval,
+    hasBestOptionsTable,
+    homeRegionsOverlap: (homePartitions?.intersection.length ?? 0) > 0,
+    hasObservedEnemy: humanRoster.length > 0,
+    includeScenarioWinPaths: state.scenarioId === 'region_vs_region' && coordinateContext.mode !== 'tactical',
+  };
   const toolPromptLines = filtered.map((m) => {
     if (m.name === 'plan_route' && !hasNaval) {
       return m.promptLine.replace(NAVAL_PLAN_ROUTE_PROMPT_SUFFIX, '');
     }
     return m.promptLine;
   });
-  const hasPrecomputedBriefing = briefingOverride != null && briefingOverride.length > 0;
-  const toolsIntro = buildAvailableToolsIntro(flags, hasPrecomputedBriefing, coordinateContext.mode);
-  const toolGuidance = buildToolUsageGuidance(flags, hasPrecomputedBriefing, coordinateContext.mode);
+  const toolsIntro = buildAvailableToolsIntro(flags, hasPrecomputedBriefing, coordinateContext.mode, {
+    hasAirUnits: hasAir,
+    hasBestOptionsTable,
+  });
+  const toolGuidance = buildToolUsageGuidance(flags, hasPrecomputedBriefing, coordinateContext.mode, coachingGates);
   const toolsSection =
     filtered.length === 0
-      ? '# Available Tools\n\nNo tools available.'
-      : `# Available Tools
+      ? `${topLevelHeading(SECTION_TITLE_AVAILABLE_TOOLS)}\n\nNo tools available.`
+      : `${topLevelHeading(SECTION_TITLE_AVAILABLE_TOOLS)}
 
 ${toolsIntro}
 ${toolPromptLines.map((line, i) => `${i + 1}. ${line}`).join('\n')}${toolGuidance}`;
 
-  const memoryBlock = flags.memoryEnabled ? getInjectionText('opponent', state.turnNumber) + '\n\n' : '';
-  const standingOrderBlock = flags.ordersEnabled
-    ? getStandingOrderInjectionText('opponent', state, coordinateContext) + '\n\n'
-    : '';
-  const productionBlock = flags.productionEnabled
-    ? buildProductionBriefingBlock({
-        productionEnabled: flags.productionEnabled,
-        state,
-        latLngByH3,
-        resolveToH3,
-        formatHexLabel: (ll) => {
-          const h3 = resolveToH3(ll[0], ll[1]);
-          return h3 ? format(h3) : formatLatLng(ll);
-        },
-      }) + '\n\n'
-    : '';
+  const injection = buildStatusInjectionTexts({
+    memoryEnabled: flags.memoryEnabled,
+    ordersEnabled: flags.ordersEnabled,
+    productionEnabled: flags.productionEnabled,
+    state,
+    latLngByH3,
+    resolveToH3,
+    formatHexLabel: (ll) => {
+      const h3 = resolveToH3(ll[0], ll[1]);
+      return h3 ? format(h3) : formatLatLng(ll);
+    },
+    coordinateContext,
+  });
+  const memoryBlock = flags.memoryEnabled ? injection.memoryText + '\n\n' : '';
+  const standingOrderBlock = flags.ordersEnabled ? injection.standingOrderText + '\n\n' : '';
+  const productionBlock = flags.productionEnabled ? injection.productionText + '\n\n' : '';
   const airOpsRaw = buildAirOperationsBriefingBlock(state, format, coordinateContext.mode);
   const sealiftRaw = buildSealiftBriefingBlock(state, format, coordinateContext.mode);
   const airOpsBlock = airOpsRaw ? `${airOpsRaw}\n\n` : '';
@@ -197,9 +169,8 @@ ${toolPromptLines.map((line, i) => `${i + 1}. ${line}`).join('\n')}${toolGuidanc
     flags.estimationEnabled && !hasPrecomputedBriefing
       ? ' (e.g. use estimate_combat to pick the best)'
       : '';
-  const navalCoaching = hasNaval
-    ? ` Naval units can attack land units at 1 or 2 hexes (range 2). Add ranged_attack when a naval unit is within 2 hexes of an enemy at turn start. ${NAVAL_MOVEMENT_PROMPT_RULE}${flags.planningEnabled ? NAVAL_PLAN_ROUTE_LAND_TARGET_HINT : ''}`
-    : '';
+  const navalPlanRouteHint =
+    hasNaval && flags.planningEnabled ? NAVAL_PLAN_ROUTE_LAND_TARGET_HINT : '';
   const combatAssessHint =
     flags.assessmentEnabled && hasRanged && !hasPrecomputedBriefing
       ? ' When assess_unit reports canAttackThisTurn with attackType "ranged" for an enemy, add ranged_attack with targetHexCode as that enemy\'s cell code from the operational map (or targetUnitId).' +
@@ -213,7 +184,7 @@ ${toolPromptLines.map((line, i) => `${i + 1}. ${line}`).join('\n')}${toolGuidanc
   const movementOrderInstruction = getMovementOrderInstruction(
     flags,
     coordinateContext.mode,
-    hasPrecomputedBriefing
+    hasBestOptionsTable
   );
   const submitMemoryClause = flags.memoryEnabled
     ? ' Use optional "memoryUpdates" for memory writes/deletes (applied from JSON only; there are no memory_write or memory_delete tools).'
@@ -236,10 +207,6 @@ ${toolPromptLines.map((line, i) => `${i + 1}. ${line}`).join('\n')}${toolGuidanc
   ).length;
   const ownHomeRegionControl = countControlledHexesInRegion(state.res1Control ?? [], state.aiHomeRegionHexes, 'opponent');
   const opponentHomeRegionControl = countControlledHexesInRegion(state.res1Control ?? [], state.humanHomeRegionHexes, 'opponent');
-  const homePartitions =
-    state.scenarioId === 'region_vs_region' && coordinateContext.mode !== 'tactical'
-      ? computeHomeRegionHexPartitionsForPrompting(state.aiHomeRegionHexes, state.humanHomeRegionHexes)
-      : null;
   let regionHomeProgressAndHexBullets = '';
   if (homePartitions) {
     const lineOwn = formatControlProgressLine('Your home region control', ownHomeRegionControl.controlled, ownHomeRegionControl.total);
@@ -264,16 +231,12 @@ ${toolPromptLines.map((line, i) => `${i + 1}. ${line}`).join('\n')}${toolGuidanc
     regionHomeProgressAndHexBullets = `\n${lineOwn}${aiHexLine}\n${lineEnemyHome}${humanHexLine}${overlapLine}`;
   }
 
+  const contextCoaching = buildContextCoaching(coachingGates);
   const tacticalContextBlock = `Strategic context:
-${COACHING_TACTICAL_PRIORITY}
-${COACHING_STRATEGY_BLOCK}
-${COACHING_MESSAGE_BLOCK}`;
+${contextCoaching}`;
 
   const strategicContextBlock = `Strategic context:
-${STRATEGIC_CONTEXT_OPENING}
-${COACHING_STRATEGIC_PRIORITIES}
-${COACHING_STRATEGY_BLOCK}
-${COACHING_MESSAGE_BLOCK}
+${contextCoaching}
 - ${formatControlProgressLine('Explored', exploredLandHexes, totalLandHexes, 'land hexes').slice(2)}
 - ${formatControlProgressLine('Controlled', controlledLandHexes, totalLandHexes, 'land hexes').slice(2)}${regionHomeProgressAndHexBullets}`;
 
@@ -286,10 +249,13 @@ ${COACHING_MESSAGE_BLOCK}
     ? `${briefingOverride}\n\n${scenarioObjectiveBlock ? `${scenarioObjectiveBlock}\n\n` : ''}${coachingContextBlock}\n\n${airOpsBlock}${sealiftBlock}${toolsSection}\n\n${humanUnitsLine}`
     : `${memoryBlock}${standingOrderBlock}${productionBlock}${scenarioObjectiveBlock ? `${scenarioObjectiveBlock}\n\n` : ''}${coachingContextBlock}\n\n${airOpsBlock}${sealiftBlock}${toolsSection}\n\n${ownUnitsLine}${humanUnitsLine}${adjacentCellsBlock}`;
 
+  const standingOrdersIssuable = flags.ordersEnabled && coordinateContext.mode !== 'tactical';
   const finalJsonContract = buildFinalJsonContractInstruction({
     includeMemoryUpdates: flags.memoryEnabled,
     includeProductionOrders: flags.productionEnabled,
     includeAirActions: hasAir,
+    includeNavalActions: hasNaval,
+    includeStandingOrderActions: standingOrdersIssuable,
     movementOrderInstruction,
     submitMemoryClause,
     productionSubmitClause: buildProductionSubmitClause(flags),
@@ -299,26 +265,35 @@ ${COACHING_MESSAGE_BLOCK}
     includeMemoryUpdates: flags.memoryEnabled,
     includeProductionOrders: flags.productionEnabled,
     includeAirActions: hasAir,
+    includeStandingOrderActions: standingOrdersIssuable,
     coordinateMode: coordinateContext.mode,
   });
   const scoutingDirective =
     coordinateContext.mode === 'tactical'
       ? ''
       : humanRoster.length === 0
-        ? '\n\nNo human units are currently observed: prioritize scouting this turn by moving units along plausible approach routes to reveal enemy positions; do not remain static unless required for immediate defense.'
+        ? '\n\nNo human units are currently observed. Enemy forces may be out of view.'
         : '';
   const winConditionReminder =
-    coordinateContext.mode === 'tactical' ? buildTacticalBattleGoalClause() : buildWinConditionReminderClause();
+    coordinateContext.mode === 'tactical'
+      ? buildTacticalBattleGoalClause()
+      : buildWinConditionReminderClause({ scenarioId: state.scenarioId });
   const latLngBlock =
     coordinateContext.mode === 'tactical'
       ? buildTacticalLatLngPreamble(LATLNG_DECIMAL_PLACES)
       : buildLatLngPreamble(H3_RESOLUTION, LATLNG_DECIMAL_PLACES);
-  const infantryRangedScope = tacticalBattleActive
-    ? `Infantry may use ranged_attack at tactical res4 range (baseline ${RANGED_RANGE_BY_UNIT_TYPE.infantry}; terrain may reduce it); use movement and melee when out of range.`
-    : 'Infantry has no strategic ranged_attack (melee only); use movement and melee.';
-  const combatTempoClause = hasAir
-    ? 'If a legal ranged_attack or air strike is available this turn, take it — these attacks resolve from turn-start positions and do not prevent movement in the same turn.'
-    : 'If a legal ranged_attack is available this turn, take it — ranged attacks resolve from turn-start positions and do not prevent movement in the same turn.';
+  const combatRulesParagraph = buildCombatRulesParagraph({
+    coordinateMode: coordinateContext.mode,
+    hasAirUnits: hasAir,
+    hasNavalUnits: hasNaval,
+    ordersEnabled: standingOrdersIssuable,
+  });
+  const combatRulesWithToolHints = combatTargetHint
+    ? combatRulesParagraph.replace(
+        'or targetUnitId (not your move destination).',
+        `or targetUnitId (not your move destination)${combatTargetHint}.`
+      )
+    : combatRulesParagraph;
   const turnPhaseHeader =
     coordinateContext.mode === 'tactical'
       ? `Strategic turn: ${state.turnNumber}, tactical beat: ${coordinateContext.tacticalTurnNumber ?? '?'}, phase: ${state.phase}.`
@@ -329,7 +304,7 @@ ${winConditionReminder}${scoutingDirective}${warning}
 
 ${latLngBlock}
 
-Combat: d6 per shot — attack hits on roll ≤ attack stat; defense hits on roll ≤ defense. ${combatSummary}. Ranged uses pre-move positions. At most one ranged_attack per unit from turn-start range; use exactly one of targetHexCode (enemy cell from the map) or targetUnitId (not your move destination)${combatTargetHint}. ${infantryRangedScope} ${combatTempoClause} Drop invalid attacks before submit.${navalCoaching}${combatAssessHint}
+${combatRulesWithToolHints}${navalPlanRouteHint}${combatAssessHint}
 
 ${mainBlock}
 

@@ -13,6 +13,7 @@ import type { PossibleActionTableRow } from '../../openrouter/possibleUnitAction
 import { deriveThisTurnOptionsActionColumn, selectTopRowsPerUnit } from '../../openrouter/possibleUnitActionsTableAssembly';
 import type { CoordinateContext } from './coordinateContext';
 import { h3ToCode } from './hex-code-translator';
+import { SECTION_TITLE_BEST_OPTIONS_THIS_TURN } from '../../openrouter/promptSpec/sectionHeadings';
 
 /**
  * Defines the `infrastructureCellForThisTurnOptionsRow` function shape (function infrastructureCellForThisTurnOptionsRow(r: PossibleActionTableRow): string).
@@ -81,7 +82,11 @@ export function renderThisTurnOptionsTableMarkdown(
   latLngByH3: Map<string, [number, number]>,
   context: CoordinateContext
 ): string {
-  logDebug('briefing-tables renderThisTurnOptionsTableMarkdown', { rowCount: rows.length, mode: context.mode });
+  logDebug('briefing-tables renderThisTurnOptionsTableMarkdown', {
+    rowCount: rows.length,
+    mode: context.mode,
+    sectionTitle: SECTION_TITLE_BEST_OPTIONS_THIS_TURN,
+  });
   if (rows.length === 0) return '';
   const capped = selectTopRowsPerUnit(rows, latLngByH3);
   const grouped = groupThisTurnOptionRowsByTarget(
