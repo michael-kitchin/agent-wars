@@ -4,12 +4,12 @@
  */
 
 import * as assert from 'assert';
-import { gridDisk, latLngToCell } from 'h3-js';
+import { cellToLatLng, gridDisk, latLngToCell } from 'h3-js';
 import type { GameStateSnapshot } from './gameDb';
 import type { PrecomputationResult, UnitAssessmentResult } from './precomputation';
 import { buildAttentionFlags, buildStrategicNarrative, buildUnitStatusTable, formatBriefing } from './briefingFormatter';
 import { getOrderedHexList } from './mapData';
-import { OMNISCIENT_GRID_PROXIMITY_BRIEFING_LINE } from './tools/assessUnitProximity';
+import { FOG_PATH_DISTANCE_BRIEFING_LINE, OMNISCIENT_GRID_PROXIMITY_BRIEFING_LINE } from './tools/assessUnitProximity';
 import { buildIntelStalenessRule } from './openrouter/promptSpec/gameRuleText';
 
 /**
@@ -688,6 +688,104 @@ function testIdleDefendAirIsNotActionNeeded(): void {
 }
 
 /**
+ * Hop-adjacent units are this-turn closers even when fog path ETA is two turns.
+ *
+ * Purpose: Turn 18 listed infantry-555 as Action needed no (path ETA 2) while Best Options offered this-turn
+ * move/melee onto CQ because hops fit the movement budget.
+ * When to use: After edits to `canCloseThisTurn` gridDistance handling.
+ * Expected outcome: Action needed yes; unit appears in Attention Flags.
+ * Exceptions: None.
+ */
+function testHopCloseIsActionNeededWhenPathEtaIsLonger(): void {
+  const assessments: UnitAssessmentResult[] = [
+    {
+      unitId: 'opp-inf-hop-close',
+      result: {
+        status: 'ok',
+        unit: {
+          unitId: 'opp-inf-hop-close',
+          type: 'infantry',
+          position: [1, 1],
+          currentStandingOrder: { orderType: 'march', status: 'en_route' },
+        },
+        nearbyEnemies: [
+          {
+            unitId: 'hum-naval-1',
+            hexDistance: 2,
+            gridDistance: 1,
+            estimatedTurnsToReach: 2,
+            inRangedRange: false,
+            inMeleeRange: false,
+          } as UnitAssessmentResult['result']['nearbyEnemies'][0],
+        ],
+        threats: [{ description: 'under naval fire', severity: 'critical', sourceUnit: 'hum-naval-1' }],
+        canAttackThisTurn: [],
+      } as unknown as UnitAssessmentResult['result'],
+    },
+  ];
+  const table = buildUnitStatusTable(assessments, { mode: 'strategic' as const }, true);
+  const row = table.split('\n').find((l) => l.includes('opp-inf-hop-close'));
+  assert.ok(row && row.includes('| yes |'), `hop-adjacent infantry must read Action needed yes: ${row}`);
+  const flags = buildAttentionFlags(assessments, 'strategic', true);
+  assert.ok(flags.includes('opp-inf-hop-close'), 'hop-adjacent closer belongs in Attention Flags');
+}
+
+/**
+ * A healthy march that recedes from the nearest enemy is a worklist row.
+ *
+ * Purpose: Turn 18 left in-range naval units on MARCH FU after firing because Attention was no.
+ * When to use: After edits to `standingMarchRecedesFromNearestEnemy` / Attention Flags.
+ * Expected outcome: Action needed yes; Attention Flags mention receding.
+ * Exceptions: None.
+ */
+function testRecedingMarchIsActionNeeded(): void {
+  const origin = latLngToCell(40, 0, 1);
+  const ring1 = gridDisk(origin, 1).filter((h) => h !== origin);
+  const neighbor = ring1[0]!;
+  const far = gridDisk(origin, 2).find((h) => h !== origin && !ring1.includes(h));
+  assert.ok(far, 'expected a two-hop dest');
+  const unitLl = cellToLatLng(neighbor);
+  const enemyLl = cellToLatLng(origin);
+  const farLl = cellToLatLng(far!);
+  const assessments: UnitAssessmentResult[] = [
+    {
+      unitId: 'opp-naval-recede',
+      result: {
+        status: 'ok',
+        unit: {
+          unitId: 'opp-naval-recede',
+          type: 'naval',
+          position: [unitLl[0], unitLl[1]],
+          currentStandingOrder: {
+            type: 'march',
+            status: 'en_route',
+            destination: [farLl[0], farLl[1]],
+          },
+        },
+        nearbyEnemies: [
+          {
+            unitId: 'hum-naval-1',
+            hexDistance: 3,
+            estimatedTurnsToReach: 3,
+            position: [enemyLl[0], enemyLl[1]],
+            inRangedRange: false,
+            inMeleeRange: false,
+          } as UnitAssessmentResult['result']['nearbyEnemies'][0],
+        ],
+        threats: [{ description: 'nearby', severity: 'moderate', sourceUnit: 'hum-naval-1' }],
+        canAttackThisTurn: [],
+      } as unknown as UnitAssessmentResult['result'],
+    },
+  ];
+  const table = buildUnitStatusTable(assessments, { mode: 'strategic' as const }, true);
+  const row = table.split('\n').find((l) => l.includes('opp-naval-recede'));
+  assert.ok(row && row.includes('| yes |'), `receding march must read Action needed yes: ${row}`);
+  const flags = buildAttentionFlags(assessments, 'strategic', true);
+  assert.ok(flags.includes('opp-naval-recede'), 'receding march belongs in Attention Flags');
+  assert.ok(flags.includes('recedes'), `Attention Flags must name the receding march: ${flags}`);
+}
+
+/**
  * Verifies the grid-hops honesty line appears only for fog-off strategic (res1) snapshots.
  *
  * Purpose: Fog-off Unit Status distances are grid hops; the model must be told they are not march paths.
@@ -722,6 +820,10 @@ function testFormatBriefingGridProximityHonestyLine(): void {
     'fog-on res1 briefing omits grid-hops sentence'
   );
   assert.ok(
+    fogOnOut.includes(FOG_PATH_DISTANCE_BRIEFING_LINE),
+    'fog-on res1 briefing includes the path-vs-Best-Options sentence'
+  );
+  assert.ok(
     fogOnOut.includes(buildIntelStalenessRule()),
     'fog-on res1 briefing includes the intel staleness sentence'
   );
@@ -731,6 +833,20 @@ function testFormatBriefingGridProximityHonestyLine(): void {
   assert.ok(
     !fogOffRes3Out.includes(OMNISCIENT_GRID_PROXIMITY_BRIEFING_LINE),
     'fog-off non-res1 fixture omits grid-hops sentence'
+  );
+  assert.ok(
+    !fogOffRes3Out.includes(FOG_PATH_DISTANCE_BRIEFING_LINE),
+    'fog-off non-res1 fixture omits the path-vs-Best-Options sentence'
+  );
+  const fogOnRes3: GameStateSnapshot = { ...fixtureState, fogOfWarEnabled: true };
+  const fogOnRes3Out = formatBriefing(fogOnRes3, precomputed, '', '');
+  assert.ok(
+    !fogOnRes3Out.includes(FOG_PATH_DISTANCE_BRIEFING_LINE),
+    'fog-on non-res1 fixture omits the path-vs-Best-Options sentence'
+  );
+  assert.ok(
+    fogOnRes3Out.includes(buildIntelStalenessRule()),
+    'fog-on non-res1 fixture still includes the intel staleness sentence'
   );
   assert.ok(
     !formatBriefing(fixtureState, precomputed, '', '').includes(OMNISCIENT_GRID_PROXIMITY_BRIEFING_LINE),
@@ -783,6 +899,14 @@ const tests = [
   {
     name: 'idle defend air is not Action needed',
     fn: testIdleDefendAirIsNotActionNeeded,
+  },
+  {
+    name: 'hop close is Action needed when path ETA is longer',
+    fn: testHopCloseIsActionNeededWhenPathEtaIsLonger,
+  },
+  {
+    name: 'receding march is Action needed',
+    fn: testRecedingMarchIsActionNeeded,
   },
   {
     name: 'formatBriefing grid proximity honesty line',

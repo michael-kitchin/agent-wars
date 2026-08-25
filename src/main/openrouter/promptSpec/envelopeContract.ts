@@ -350,9 +350,18 @@ export function buildRepairSchemaText(gates: EnvelopeGates): string {
       example.airStrikes = [{ unitId: 'example-air-1', targetHexCode: 'CI', targetType: 'units' }];
     } else if (field === 'ferryOrders') {
       example.ferryOrders = [{ unitId: 'example-air-2', destination: 'CJ' }];
-    } else if (field === 'callbacks') example.callbacks = [];
-    else if (field === 'memoryUpdates') example.memoryUpdates = [];
-    else if (field === 'productionOrders') {
+    } else if (field === 'callbacks') {
+      example.callbacks = [{ event: 'infrastructure_destroyed', params: { targetType: 'airport', hex: 'CD' } }];
+    } else if (field === 'memoryUpdates') {
+      example.memoryUpdates = [
+        {
+          action: 'write',
+          key: 'turn_objectives',
+          tier: 'persistent',
+          content: 'Close with observed enemies; keep air and naval production moving.',
+        },
+      ];
+    } else if (field === 'productionOrders') {
       example.productionOrders = [{ action: 'set_build_queue', hex: 'CF', unitType: 'air', count: 1 }];
     }
   }

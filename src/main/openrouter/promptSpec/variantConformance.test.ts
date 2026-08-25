@@ -38,7 +38,10 @@ import {
   buildWinConditionReminderClause,
 } from '../scenarioGoals';
 import { REQUEST_ORDERS_MAX_TOOL_ROUNDS, buildToolBudgetExceededWarning } from '../requestOrdersFlowSupport';
-import { OMNISCIENT_GRID_PROXIMITY_BRIEFING_LINE } from '../../tools/assessUnitProximity';
+import {
+  FOG_PATH_DISTANCE_BRIEFING_LINE,
+  OMNISCIENT_GRID_PROXIMITY_BRIEFING_LINE,
+} from '../../tools/assessUnitProximity';
 import { GAME_SIZES, getMaxUnitsPerType, parseGameSize } from '../../../shared/gameSize';
 
 /**
@@ -159,6 +162,7 @@ test('fog: hop-distance caveat only with fog off at strategic resolution; stalen
   assert.ok(!fogOff.includes(buildIntelStalenessRule()));
   assert.ok(fogOn.includes(buildIntelStalenessRule()));
   assert.ok(fogOn.includes(String(STALE_INTEL_TURNS)));
+  assert.ok(fogOn.includes(FOG_PATH_DISTANCE_BRIEFING_LINE));
   assert.ok(!fogOn.includes(OMNISCIENT_GRID_PROXIMITY_BRIEFING_LINE));
 
   const res3State: GameStateSnapshot = {
@@ -169,6 +173,8 @@ test('fog: hop-distance caveat only with fog off at strategic resolution; stalen
   };
   const fogOffRes3 = formatBriefing(res3State, precomputed, '', '');
   assert.ok(!fogOffRes3.includes(OMNISCIENT_GRID_PROXIMITY_BRIEFING_LINE));
+  const fogOnRes3 = formatBriefing({ ...res3State, fogOfWarEnabled: true }, precomputed, '', '');
+  assert.ok(!fogOnRes3.includes(FOG_PATH_DISTANCE_BRIEFING_LINE));
 });
 
 test('fog: tactical coaching contains neither hop caveat nor staleness wording', () => {

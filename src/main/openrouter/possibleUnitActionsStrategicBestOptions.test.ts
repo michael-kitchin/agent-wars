@@ -364,9 +364,15 @@ function testStrategicBestOptionsAirStrikesOmitFriendlyAndUncontrolledInfra(): v
   );
   assert.ok(
     thisTurn.some(
-      (r) => r.unitId === 'opponent-air-1' && r.targetH3 === ownUrban && r.actionTypes.includes('ferry')
+      (r) => r.unitId === 'opponent-air-1' && r.actionTypes.includes('air strike')
     ),
-    'own airport remains a ferry destination, labeled ferry not move/melee'
+    'Best Options must list air strikes for the unit in range'
+  );
+  assert.ok(
+    !thisTurn.some(
+      (r) => r.unitId === 'opponent-air-1' && r.actionTypes.includes('ferry')
+    ),
+    'Best Options must not list ferry dests for an air unit that has a this-turn strike'
   );
   assert.ok(
     !thisTurn.some(

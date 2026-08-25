@@ -17,8 +17,8 @@ import { h3ToLatLng, type LatLng, type LatLngMap } from './h3LatLng';
 /**
  * Named arguments for the omniscient-grid gate.
  *
- * Purpose: Keeps fog flag and geometry in one object under the argument-count limit.
- * When to use: `usesOmniscientGridProximity` from assess_unit and briefing formatters.
+ * Purpose: Named fog-plus-resolution arguments for both honesty-line gates.
+ * When to use: `usesOmniscientGridProximity` and `usesFogPathDistanceBriefing` from assess_unit and briefing formatters.
  * Expected outcome: Callers pass the assessed unit (or any representative strategic hex) plus the snapshot fog flag.
  * Exceptions: None.
  */
@@ -26,9 +26,9 @@ export interface OmniscientGridProximityArgs {
   /**
    * Match fog-of-war flag from the snapshot.
    *
-   * Contract: Omniscient scan requires this to be exactly `false`. Missing or `true` keeps path + radius.
+   * Contract: Omniscient scan requires this to be exactly `false`. Fog-on path briefing requires exactly `true`.
    * When to use: `state.fogOfWarEnabled`.
-   * Expected outcome: `undefined` is treated as not omniscient.
+   * Expected outcome: `undefined` is treated as neither omniscient nor fog-path.
    * Exceptions: None.
    */
   fogOfWarEnabled?: boolean;
@@ -61,6 +61,31 @@ export function usesOmniscientGridProximity(args: OmniscientGridProximityArgs): 
     return getResolution(args.h3Index) === 1;
   } catch (err) {
     logError('assessUnitProximity usesOmniscientGridProximity: resolution lookup failed', {
+      h3Index: args.h3Index,
+      err,
+    });
+    return false;
+  }
+}
+
+/**
+ * True when Unit Status distances are march/sail paths and the fog-on honesty line belongs in the briefing.
+ *
+ * Purpose: The path-versus-Best-Options sentence is only meaningful at strategic resolution under fog.
+ * When to use: `formatBriefing` after the omniscient hop line is skipped.
+ * Expected outcome: True only for `fogOfWarEnabled === true` and `getResolution(h3Index) === 1`.
+ * Exceptions: Returns false if resolution lookup throws.
+ */
+export function usesFogPathDistanceBriefing(args: OmniscientGridProximityArgs): boolean {
+  logTrace('assessUnitProximity usesFogPathDistanceBriefing', {
+    fogOfWarEnabled: args.fogOfWarEnabled ?? null,
+    h3Index: args.h3Index,
+  });
+  if (args.fogOfWarEnabled !== true) return false;
+  try {
+    return getResolution(args.h3Index) === 1;
+  } catch (err) {
+    logError('assessUnitProximity usesFogPathDistanceBriefing: resolution lookup failed', {
       h3Index: args.h3Index,
       err,
     });
@@ -259,6 +284,18 @@ export const OMNISCIENT_GRID_PROXIMITY_BRIEFING_LINE =
   'Nearest-enemy distances and threat ETAs are H3 grid hops (straight hex count), not march or sail paths. Best Options This Turn Target Hexes are this-turn legal dests; use plan_route only for dests not listed for that unit.';
 
 /**
+ * Honesty sentence when Unit Status distances use march/sail paths under fog.
+ *
+ * Purpose: Fog-on assessments print path length while Best Options dests use this-turn legal hops, so a unit can
+ * close this turn even when the printed path is longer than one movement budget.
+ * When to use: Strategic formatBriefing immediately after the intel staleness sentence when fog is on at res1.
+ * Expected outcome: Tells the model to copy Best Options Target Hexes rather than treating printed path length as the move budget.
+ * Exceptions: None.
+ */
+export const FOG_PATH_DISTANCE_BRIEFING_LINE =
+  'Nearest-enemy distances are march or sail path lengths when a path exists (otherwise a hop count). Best Options This Turn Target Hexes are already this-turn legal destinations — copy them even when the printed path is longer than one movement budget.';
+
+/**
  * Minimal unit fields required to pair grid distances without a full snapshot type.
  *
  * Purpose: Keeps the omniscient collector free of gameDb while matching assess_unit unit rows.
@@ -374,6 +411,15 @@ export interface OmniscientNearbyScanResult {
     type: string;
     position: LatLng;
     hexDistance: number;
+    /**
+     * Straight hop count to this enemy, always grid-based when measurable.
+     *
+     * Contract: Used by Action needed for this-turn closes; may differ from `hexDistance` under fog.
+     * When to use: `canCloseThisTurn` in the briefing formatter.
+     * Expected outcome: Non-negative hops, or omitted when the pair could not be measured.
+     * Exceptions: None.
+     */
+    gridDistance?: number;
     estimatedTurnsToReach: number | null;
     inRangedRange: boolean;
     inMeleeRange: boolean;
@@ -463,6 +509,7 @@ export function collectOmniscientNearbyUnits(args: CollectOmniscientNearbyUnitsA
         type: other.unitType,
         position,
         hexDistance: gridDist,
+        gridDistance: gridDist,
         estimatedTurnsToReach,
         inRangedRange,
         inMeleeRange,

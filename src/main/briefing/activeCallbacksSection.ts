@@ -95,7 +95,7 @@ export function formatCallbackLine(sub: CallbackSubscription, ctx: CoordinateCon
     if (targetType && cell) return `infrastructure_destroyed(${targetType}, ${cell})`;
     if (targetType) return `infrastructure_destroyed(${targetType})`;
     if (cell) return `infrastructure_destroyed(${cell})`;
-    return 'infrastructure_destroyed(any)';
+    return 'unfiltered (any targetType, any hex) — re-subscribe with event infrastructure_destroyed and no params';
   }
   const sanitizedParams = sanitizeCallbackParamsForPrompt(sub.params ?? {}, ctx);
   return `${sub.event}(${JSON.stringify(sanitizedParams)})`;

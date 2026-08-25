@@ -86,8 +86,8 @@ export const TAUGHT_CALLBACK_EVENTS: readonly TaughtCallbackEvent[] = Object.fre
   },
   {
     event: 'infrastructure_destroyed',
-    parameters: 'targetType, hex',
-    meaning: 'fires when urban, airport, or seaport infrastructure at that briefing hex is destroyed',
+    parameters: 'targetType, hex (omit both for an unfiltered watch)',
+    meaning: 'fires when urban, airport, or seaport infrastructure at that briefing hex is destroyed; omitting targetType and hex watches any',
   },
 ]);
 

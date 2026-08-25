@@ -332,6 +332,10 @@ function testExampleBlockIncludesOptionalTails(): void {
   assert.ok(block.includes('"memoryUpdates"'));
   assert.ok(block.includes('"productionOrders"'));
   assert.ok(block.includes('set_build_queue'));
+  assert.ok(block.includes('"action": "write"') || block.includes('"action":"write"'), 'example must show a memory write');
+  assert.ok(block.includes('infrastructure_destroyed'), 'example must show how to keep a callback');
+  assert.ok(!block.includes('"memoryUpdates": []') && !block.includes('"memoryUpdates":[]'), 'example must not teach empty memoryUpdates');
+  assert.ok(!block.includes('"callbacks": []') && !block.includes('"callbacks":[]'), 'example must not teach empty callbacks');
 }
 
 /**

@@ -8,7 +8,15 @@
  */
 
 import assert from 'node:assert/strict';
-import { deriveThisTurnOptionsActionColumn, selectTopRowsPerUnit, type PossibleActionTableRow } from './possibleUnitActionsTableAssembly';
+import {
+  ACTION_AIR_STRIKES,
+  ACTION_FERRY,
+  deriveThisTurnOptionsActionColumn,
+  omitThisTurnFerryRowsForStrikingAir,
+  selectTopRowsPerUnit,
+  type PossibleActionTableRow,
+  type RawPossibleActionRow,
+} from './possibleUnitActionsTableAssembly';
 
 /**
  * Documents the function binding `fixtureRow` (fixtureRow).
@@ -175,6 +183,59 @@ function testSelectTopRowsPerUnitKeepsAirStrikeAheadOfFerry(): void {
 }
 
 /**
+ * Documents the function binding `rawFixture` (rawFixture).
+ *
+ * Purpose: Builds a minimal `RawPossibleActionRow` for this-turn ferry-vs-strike filtering tests.
+ * When to use: Only inside this test module.
+ * Expected outcome: Valid raw row with defaults for omit-ferry checks.
+ * Exceptions: None.
+ */
+function rawFixture(overrides: Partial<RawPossibleActionRow>): RawPossibleActionRow {
+  return {
+    bucket: 'other',
+    unitId: 'opponent-air-1',
+    unitType: 'air',
+    actionType: ACTION_FERRY,
+    targetH3: '8f283082dcb519f',
+    distance: 1,
+    enemySummary: '—',
+    featuresSummary: '—',
+    enemyUnitCount: 0,
+    urbanHexCount: 0,
+    ...overrides,
+  };
+}
+
+/**
+ * Drops this-turn ferry dests for air units that already have an air-strike row.
+ *
+ * Purpose: Turn 18 listed the same strike-capable air units on both strike and ferry Best Options rows.
+ * When to use: After edits to `omitThisTurnFerryRowsForStrikingAir`.
+ * Expected outcome: Striking units keep strike rows and lose ferry rows; ferry-only units are unchanged.
+ * Exceptions: None.
+ */
+function testOmitThisTurnFerryRowsForStrikingAir(): void {
+  const kept = omitThisTurnFerryRowsForStrikingAir([
+    rawFixture({ actionType: ACTION_AIR_STRIKES, targetH3: 'strike-hex' }),
+    rawFixture({ actionType: ACTION_FERRY, targetH3: 'ferry-hex' }),
+    rawFixture({ unitId: 'opponent-air-2', actionType: ACTION_FERRY, targetH3: 'ferry-only-hex' }),
+  ]);
+  assert.equal(kept.length, 2);
+  assert.ok(
+    kept.some((row) => row.unitId === 'opponent-air-1' && row.actionType === ACTION_AIR_STRIKES),
+    'strike row must remain'
+  );
+  assert.ok(
+    !kept.some((row) => row.unitId === 'opponent-air-1' && row.actionType === ACTION_FERRY),
+    'striking air must not keep a this-turn ferry row'
+  );
+  assert.ok(
+    kept.some((row) => row.unitId === 'opponent-air-2' && row.actionType === ACTION_FERRY),
+    'ferry-only air must keep its ferry row'
+  );
+}
+
+/**
  * Documents the function binding `main` (main).
  *
  * Purpose: Node test driver for this file.
@@ -188,6 +249,7 @@ function main(): void {
   testSelectTopRowsPerUnitApproachIgnoresUrbanCount();
   testSelectTopRowsPerUnitMoveMeleeStillPrefersUrban();
   testSelectTopRowsPerUnitKeepsAirStrikeAheadOfFerry();
+  testOmitThisTurnFerryRowsForStrikingAir();
   console.log('possibleUnitActionsTableAssembly tests passed');
 }
 

@@ -73,7 +73,7 @@ Assessment-tool and combat-estimate hints must **not** appear when a precomputed
 #### `## Unit Status and Threats`
 
 - **Include:** always inside the briefing.
-- **Distance-basis caveat line:** immediately after the heading and before the table, include one line stating that nearest-enemy distances and threat estimates are straight hop counts rather than march or sail paths, and that option-table targets are already this-turn legal destinations. Include it whenever the printed distances are hop counts; omit it otherwise. `variants.md` fixes the gate.
+- **Distance-basis caveat line:** immediately after the heading and before the table. Under fog off at res1, include one line stating that nearest-enemy distances and threat estimates are straight hop counts rather than march or sail paths, and that option-table targets are already this-turn legal destinations. Under fog on at res1, include the intel-staleness sentence and one line stating that nearest-enemy distances are march or sail path lengths when a path exists (otherwise a hop count), and that Best Options Target Hexes are already this-turn legal destinations — copy them even when the printed path is longer than one movement budget. Omit both caveat lines in battle. `variants.md` fixes the gates.
 - **Rows:** one per own unit. **No cap.** The table lists every unit the snapshot includes, at every game size.
 - **Items:** `OWN_UNIT_TABLE`, `UNIT_IDENTITY`, `NEAREST_ENEMY_DISTANCE`, `CONTACT_FLAGS`, `THREAT_SEVERITY`, `ACTION_NEEDED_FLAG`, `INTEL_FRESHNESS`, `INTEL_STALENESS_WINDOW`, `HOP_VS_PATH_CAVEAT`.
 - **Empty-state:** header row plus the line `(No AI units)`.
@@ -82,7 +82,7 @@ Assessment-tool and combat-estimate hints must **not** appear when a precomputed
 #### `## Attention Flags`
 
 - **Shape:** a bullet list, not a table.
-- **Sort and cap:** ranked with critical threats first (including this-turn closers that already have a healthy standing order), then moderate, then standing-order warnings, then the aggregate armed-units bullet; capped at five bullets. When the armed-units bullet is present it always occupies one of those five slots so per-unit critical closers cannot hide the legal-attack worklist. A unit that already has a legal attack is named only in that armed-units bullet, not also as a per-unit closer, so closers without shots are not crowded out by shooters.
+- **Sort and cap:** ranked with critical threats first (including this-turn closers that already have a healthy standing order), then moderate, then standing-order warnings, then receding marches, then the aggregate armed-units bullet; capped at five bullets. When the armed-units bullet is present it always occupies one of those five slots so per-unit critical closers cannot hide the legal-attack worklist. A unit that already has a legal attack is named only in that armed-units bullet, not also as a per-unit closer, so closers without shots are not crowded out by shooters.
 - **Overflow contract:** units past the cap are **not** dropped from the model's view; they remain in the unit table with their action-needed value. The armed-units bullet names at most twelve unit ids and then states how many further units are marked as needing action. Any future cap change must keep both halves of this contract.
 - **Items:** `ATTENTION_FLAGS`, `ACTION_NEEDED_FLAG`.
 - **Include:** always inside the briefing. **Empty-state:** `None.`
@@ -102,7 +102,7 @@ Assessment-tool and combat-estimate hints must **not** appear when a precomputed
 
 - **Include:** when at least one option row exists. **Omit** heading and table otherwise.
 - **Items:** `BEST_OPTIONS_ROWS`, `LEGAL_DEST_OCCUPANCY`, `RANGED_LEGAL_TARGETS`, `AIR_STRIKE_ENVELOPE`.
-- **Model use:** the primary source of destinations and targets; copying a row is always preferred to routing.
+- **Model use:** the primary source of destinations and targets; copying a row is always preferred to routing. A unit listed on an `air strike` row this turn must not also appear on a `ferry` row; strike-or-ferry exclusivity is already decided by the table, not left as a join.
 - **Empty-state consequence:** when the table is absent, destinations must come from the routing tool. The prompt must say this rather than leaving the copy instruction pointing at nothing. See `variants.md`.
 
 #### `## Supplemental Hex Intelligence`
@@ -154,8 +154,8 @@ Assessment-tool and combat-estimate hints must **not** appear when a precomputed
 - **Include:** always inside the briefing.
 - **Items:** `CALLBACK_ACTIVE_LIST`.
 - **Empty-state:** one row whose event cell is `—` and whose detail cell states that no subscriptions exist and that callbacks may be added in the response.
-- **Detail-cell contract:** the detail cell must describe the subscription in terms the model can act on — the event and its parameters, such as the unit id or the cell code it watches. Repeating the event name in both cells carries no information and does not satisfy this contract.
-- **Model use:** decides which subscriptions to keep, since the response replaces the whole list.
+- **Detail-cell contract:** the detail cell must describe the subscription in terms the model can act on — the event and its parameters, such as the unit id or the cell code it watches. Repeating the event name in both cells carries no information and does not satisfy this contract. An unfiltered `infrastructure_destroyed` watch (no `targetType`, no hex) must say that it is unfiltered and that re-subscribing uses the event with no params — not `infrastructure_destroyed(any)`.
+- **Model use:** decides which subscriptions to keep, since the response replaces the whole list. Omitting `callbacks` or sending `[]` clears every subscription.
 
 ### 1.7 `# Scenario Objective (Required)`
 
@@ -231,18 +231,19 @@ Columns are exact and ordered. A later contract test should assert header cells 
 Cell contracts that carry meaning beyond the column name:
 
 1. **Unit status `Hex`** is a briefing code, or an em dash when the unit has no mapped position.
-2. **Unit status `Nearest enemy + distance`** names the enemy unit id and the hop distance, followed by intel quality and, under fog, the turn it was last seen. When no enemy is observed the cell is an em dash, and the scouting directive is what tells the model to act on that.
+2. **Unit status `Nearest enemy + distance`** names the enemy unit id and the distance, followed by intel quality and, under fog, the turn it was last seen. Under fog off the distance is a hop count; under fog on it is a march or sail path length when a path exists (otherwise a hop count). When no enemy is observed the cell is an em dash, and the scouting directive is what tells the model to act on that.
 3. **Unit status `Threat severity`** is one of critical, moderate, low, or an em dash.
-4. **Unit status `Action needed`** is yes or no. It is yes when the unit has a legal shot this turn, or can close to the nearest enemy this turn (`estimatedTurnsToReach` at most one) under a moderate or critical threat, even if a healthy standing order already exists. An air unit holding on defend with no legal shot is not marked yes solely because coaching tells it to ferry. A quiet rear-area unit may be annotated as quiet; the annotation never replaces the yes or no value.
+4. **Unit status `Action needed`** is yes or no. It is yes when the unit has a legal shot this turn, or can close to the nearest enemy this turn (hop count at most the unit's movement budget, or `estimatedTurnsToReach` at most one when hops are unavailable) under a moderate or critical threat, or is on a standing march whose destination recedes from that enemy — even if the standing-order status is otherwise healthy. An air unit holding on defend with no legal shot is not marked yes solely because coaching tells it to ferry. A quiet rear-area unit may be annotated as quiet; the annotation never replaces the yes or no value.
 5. **Best Options `Unit IDs`** may list several unit ids. Every id on the row may use that row's targets. This must be stated in the guidance bullets, not left to inference.
 6. **Best Options `Action`** takes exactly one of: `air strike`, `ranged`, `approach`, `ferry`, `move/melee`. Each maps to one envelope destination, per section 3.3.
-7. **Best Options `Target Hexes`** are already legal this turn for every unit on the row. Approach targets are empty of units. move/melee targets may be enemy-occupied (that is contact). Per-unit rows are capped at five before identical rows are merged; the cap is a presentation limit and the routing tool remains available for anything not listed.
+7. **Best Options `Target Hexes`** are already legal this turn for every unit on the row. Approach targets are empty of units. move/melee targets may be enemy-occupied (that is contact). Per-unit rows are capped at five before identical rows are merged; the cap is a presentation limit and the routing tool remains available for anything not listed. An air unit with an `air strike` row is not also listed on a `ferry` row this turn.
 8. **Controlled hex queues `Available Unit Types`** lists only types that can still be built, except when every available type is at cap, in which case the full list is shown with the at-cap marker. The marker string in this column and the marker quoted in the cap rule must be the same string; they come from one constant.
 9. **Controlled hex queues `Current Queue`** marks a queued type that cannot currently spawn as blocked at cap. The queue table shows the ten cells with the most urban capacity, plus every further cell that has something queued, so no active queue is hidden.
 10. **Units without standing orders `Suggested Destination`** is a legal cell that strictly reduces distance to the nearest enemy, or an em dash when no closing cell exists. It comes from the same approach helper that produces Best Options approach targets, so the two must never disagree; see section 5.
 11. **Air operations `Base Intact` and `Base Controlled`** are yes or no. A unit whose base is not intact or not controlled cannot ferry from it, and the prompt's air coaching must not tell it to.
 12. **Naval transport `Nearest Embark Hex`** is the nearest cell where that unit may legally load, evaluated with the embark rule including the control condition.
-13. **Active callbacks `Details`** describes the subscription's parameters, per section 1.6.
+13. **Active callbacks `Details`** describes the subscription's parameters, per section 1.6. Unfiltered infrastructure watches use the unfiltered wording in that section, never `infrastructure_destroyed(any)`.
+14. **Standing order status `Attention`** is yes or no. It is yes when the order is in a warning status, or when a march or pursue next step recedes from the nearest observed enemy.
 
 ## 3. Strategic response envelope
 
@@ -301,15 +302,15 @@ System-prompt content only. Each item is a rule the model must be told, with the
 6. **Copy option rows by action type.** Use the mapping in section 3.3, and route only for a destination the table does not list for that unit. One row may name several units. Carries `BEST_OPTIONS_ROWS`.
 7. **Friendly stacks are illegal destinations; enemy cells are move/melee contact.** Copy a move/melee Target Hex even when it holds an enemy. Approach Target Hexes are empty of units.
 8. **Give every orderless unit a mission.** For each row of the orderless table, issue a standing order: march or pursue to close, defend to hold. The suggested destination is a ready-made legal march target. Never march a unit to its own cell. Carries `ORDERLESS_UNITS`, `SUGGESTED_DESTINATION`, `MARCH_CURRENT_HEX_RULE`.
-9. **Leave working missions alone, except this-turn contact.** A unit with a healthy standing order needs no new order unless the model wants to override it; the attention column marks the ones that have stalled. A this-turn move/melee Target Hex is such an override — copy it even when the unit is already marching. Carries `STANDING_ORDER_STATE`.
+9. **Leave working missions alone, except this-turn contact and receding marches.** A unit with a healthy standing order needs no new order unless the model wants to override it; the attention column marks the ones that have stalled and the marches whose next move recedes from the nearest enemy. A this-turn move/melee Target Hex is such an override — copy it even when the unit is already marching. After a unit fires, do not leave it on a standing march that recedes from that enemy: assign defend to hold contact, cancel the march, or remarch toward the enemy. Carries `STANDING_ORDER_STATE`.
 10. **Move idle air toward the fight.** An air unit only contributes when something is inside its strike radius, and rebasing costs it nothing else that turn. Any air unit with no strike available should ferry toward the fighting even when it is holding on defend, and no air unit should both strike and ferry. Carries `FERRY_DESTINATIONS`, `AIR_ORDER_RESTRICTIONS`.
 11. **Route naval units to reach land targets.** Naval units cannot enter land cells; to engage a land target, move to the nearest water or coastal cell within range. Carries `NAVAL_MOVEMENT_DOMAIN`.
 12. **Use sealift deliberately.** When land force must cross water, embark at a legal cell, move the transport, then disembark; loading requires a coastal cell, a land seaport, or a controlled seaport on transit water. Carries `EMBARK_LEGALITY`, `EMBARK_HEX`.
 13. **Scout when blind.** With no enemy observed, move to regain contact rather than hold. Carries `ENEMY_ROSTER_OBSERVED`.
 14. **Keep production queued.** When a controlled cell can build and its queue is empty, queue something. Replace a queue blocked by a cap with an available type this turn; when every available type for that cell is capped, leave the queue alone so it resumes when the cap frees. The response must include at least one `set_build_queue` when any controlled hex has an empty queue or a blocked-at-cap queue that still has an alternative type. Carries `PRODUCTION_QUEUES`, `PRODUCTION_CAP_QUEUE_RULE`.
 15. **Shared home cells count for both sides.** When the home regions intersect, the listed shared cells count toward both win conditions, so holding them serves defence and attack at once. Include only when an intersection exists. Carries `HOME_REGION_OVERLAP`.
-16. **Persist intent, not data.** Write a short persistent note naming this turn's objectives and the units assigned to them. Do not persist enemy positions or rosters, which the briefing already supplies fresh each turn. Carries `MEMORY_PERSISTENT`, `MEMORY_WRITE_PATH`.
-17. **Subscribe to what would change the plan.** Callbacks are chosen from the engine's event vocabulary and the response replaces the entire subscription list. Carries `CALLBACK_EVENT_VOCABULARY`, `CALLBACK_REPLACE_SEMANTICS`.
+16. **Persist intent, not data.** Write a short persistent note naming this turn's objectives and the units assigned to them. Always include a `memoryUpdates` write this turn when persistent slots are unused. Do not persist enemy positions or rosters, which the briefing already supplies fresh each turn. Carries `MEMORY_PERSISTENT`, `MEMORY_WRITE_PATH`.
+17. **Subscribe to what would change the plan.** Callbacks are chosen from the engine's event vocabulary and the response replaces the entire subscription list. Omitting `callbacks` or sending `[]` clears every subscription. Carries `CALLBACK_EVENT_VOCABULARY`, `CALLBACK_REPLACE_SEMANTICS`.
 18. **Keep the player-facing line clean.** The message field is a taunt or threat and must not reveal orders, cells, unit ids, or intent. Carries `MESSAGE_DISCIPLINE`.
 19. **Spend the tool budget on unknowns only.** Rounds are limited and exhausting them submits nothing at all; once destinations are chosen, submit. Carries `TOOL_CATALOG`, `TOOL_BUDGET_WARNING`.
 

@@ -9,6 +9,7 @@
 
 import { buildPromptTableLines } from '../promptTableUtils';
 import { compareHexIds } from './possibleUnitActionsPartition';
+import { logDebug } from '../logger';
 
 /**
  * Bucket label used when partitioning enemy-reachable hexes for the briefing table.
@@ -256,6 +257,29 @@ export const ACTION_AIR_STRIKES = 'air strike';
  * Exceptions: None.
  */
 export const ACTION_FERRY = 'ferry';
+
+/**
+ * Drops this-turn ferry rows for air units that already have an air-strike row.
+ *
+ * Purpose: Listing the same unit on ferry and strike rows forces the model to join two tables to obey
+ * strike-or-ferry exclusivity. A unit with a legal strike must not be offered a ferry this turn.
+ * When to use: `collectAggregatedPossibleActionRows` after raw rows are built when `forThisTurn` is true.
+ * Expected outcome: Ferry raw rows removed for every unitId that also has an air-strike raw row.
+ * Exceptions: None; units with only ferry rows are unchanged.
+ */
+export function omitThisTurnFerryRowsForStrikingAir(
+  rows: readonly RawPossibleActionRow[]
+): RawPossibleActionRow[] {
+  const striking = new Set(
+    rows.filter((row) => row.actionType === ACTION_AIR_STRIKES).map((row) => row.unitId)
+  );
+  logDebug('possibleUnitActionsTableAssembly omitThisTurnFerryRowsForStrikingAir', {
+    rowCount: rows.length,
+    strikingCount: striking.size,
+  });
+  if (striking.size === 0) return [...rows];
+  return rows.filter((row) => !(row.actionType === ACTION_FERRY && striking.has(row.unitId)));
+}
 
 /**
  * Urban count used when ranking Best Options rows for the per-unit cap.

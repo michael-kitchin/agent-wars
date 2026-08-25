@@ -42,6 +42,7 @@ Emit order as coded. All headings quoted exactly.
 | (narrative, no heading) | `buildStrategicNarrative` | always | never empty; capped at 5 sentences | yes |
 | `## Unit Status and Threats` | `formatBriefing` | always | n/a | yes |
 | (omniscient hop line, no heading) | `omniscientGridProximityBriefingLine` → `OMNISCIENT_GRID_PROXIMITY_BRIEFING_LINE` (`src/main/tools/assessUnitProximity.ts`) | `state.hexes[0]?.h3Index` exists **and** `usesOmniscientGridProximity` (`fogOfWarEnabled === false` and res1) | omitted entirely | no (dump is fog-on) |
+| (fog path-distance line, no heading) | `FOG_PATH_DISTANCE_BRIEFING_LINE` (`src/main/tools/assessUnitProximity.ts`) | fog on at res1, immediately after the intel-staleness sentence | omitted when fog is off or in battle | yes |
 | (unit status table) | `buildUnitStatusTable` | always | header plus plain line `(No AI units)` | yes |
 | `## Attention Flags` | `formatBriefing` | always | `None.` | yes |
 | `# Operational Map` | `buildStrategicOperationalMapSectionMarkdown` (`src/main/briefing/map/briefing-map-section.ts`) | `operational.trim().length > 0` | `# Operational Map` plus `(No units — map not rendered.)` when neither side has units | yes |
@@ -235,7 +236,7 @@ Failure handling: a tuple that cannot be encoded is left to recursive descent; u
 | `staleHexes` | explored but not visible now | absent |
 | `enemyIntel[]` | last-known enemy positions, `intelState`, `lastSeenTurn`, `staleUntilTurn` | partial (`confidence` / `seen tN` in the unit table); the word `enemyIntel` is a forbidden tactical marker |
 | `playerPerspective` | snapshot viewer | absent (correctly internal) |
-| `fogOfWarEnabled` | fog rules on | partial (only via the omniscient hop line when false) |
+| `fogOfWarEnabled` | fog rules on | yes (staleness sentence plus path-versus-Best-Options line when true; hop-honesty line when false at res1) |
 | `gameSize` | small / medium / large | partial (caps are printed; the size name is not) |
 | `scenarioId` | active scenario | present in the objective block |
 | `humanHomeRegion`, `aiHomeRegion` | region names | present |
@@ -402,7 +403,7 @@ Every row resolves the same way: the prompt spec follows the **engine**.
 | `CAPS_V3_STALE` | Per-side unit caps | `getMaxUnitsPerType` × `GAME_SIZE_MULTIPLIER`: small 12/8/8/6, medium 24/16/16/12, large 48/32/32/24 | `combat-rules-v3.md` states a different, smaller fixed table; `game-size-unit-caps.md` matches the engine | prints engine caps | engine |
 | `TACTICAL_STRUCTURE_V3` | Tactical turn structure | one consult per beat, `tacticalTurnNumber` increments, resolution mirrors the strategic phase order minus production | `combat-rules-v3.md` describes an older structure | prompt describes beats | engine |
 | `WEGO_ORDER_UNSTATED` | Resolution phase order | embark, air strikes, ranged, movement, cargo sync, ferry, melee | `combat-rules-v3.md` lists a five-phase order without embark or cargo sync | prompt now states the engine order | engine |
-| `CALLBACK_DETAILS_THIN` | Active Callbacks `Details` | paramless `infrastructure_destroyed` is stored without type or cell | none | Details now says `infrastructure_destroyed(any)` | engine |
+| `CALLBACK_DETAILS_THIN` | Active Callbacks `Details` | paramless `infrastructure_destroyed` is stored without type or cell | none | Details describes an unfiltered watch and tells the model to re-subscribe with no params | engine |
 | `TEMPO_SWEEP_SILENCE` | Unfired legal shots | `collectTempoRuleAttacks` adds one attack per eligible un-ordered unit; `hold_fire` units and units already attacking are skipped | `tempo-rule-enforcement.md` documents the sweep | prompt says an unfired shot is "damage given up for free" and never mentions the sweep | engine as the recorded fact; the prompt contract keeps the sweep unstated on purpose, and this file records that as a deliberate omission rather than an accident |
 | `HOLD_FIRE_UNGUIDED` | `hold_fire` | suppresses both auto-engagement and the tempo sweep for that unit | none | listed as a legal order type with no stated effect | engine |
 | `OCCUPANCY_UNSTATED` | Destination legality | `getValidDestinations` allows enemy-occupied dests as contact; approach uses unoccupied dests | `orderless-unit-destination-suggestions.md` describes the suggestion helper | prompt now states friendly stacks are illegal and enemy cells are move/melee | engine |
@@ -411,9 +412,9 @@ Every row resolves the same way: the prompt spec follows the **engine**.
 | `TEMPO_FREE_CLAIM` | "every one you leave unfired is damage given up for free" | false for `hold_fire` units and for units the sweep covers | `tempo-rule-enforcement.md` | stated as absolute | engine |
 | `CALLBACK_VOCAB_ABSENT` | Callback event names | `callbackEvaluation.ts` defines the full subscription vocabulary; `territory_changed` is accepted but never fires | none | the model is invited to add callbacks with no list of valid events | engine |
 | `EMBARK_CONTROL_CONDITION` | Embark legality | `canEmbarkAtHex`: coastal or land seaport unconditionally; naval-transit terrain with a seaport only when the hex is controlled by the embarking player | `naval-transport-briefing-embark-rules.md` | embark prose omits the control condition | engine |
-| `OMNISCIENT_GATE_NARROW` | Hop-distance honesty line | gate requires `fogOfWarEnabled === false` **and** res1; a tactical or fog-on snapshot never shows it | `assess-unit-omniscient-grid-proximity.md` | line present only under that gate | engine |
+| `OMNISCIENT_GATE_NARROW` | Hop-distance honesty line | gate requires `fogOfWarEnabled === false` **and** res1 for the hop-count line; fog-on at res1 emits a separate path-versus-Best-Options line | `assess-unit-omniscient-grid-proximity.md` | hop-count line under the omniscient gate; path line under fog-on at res1 | engine |
 | `INFANTRY_RANGE_SPLIT` | Infantry ranged | strategic 0, tactical 2 | `combat-rules-v3.md` treats infantry as melee-only without the tactical split | prompt already splits by mode | engine |
-| `FACE_CROSSING` | Hop distances near icosahedron faces and pentagons | grid-hop helpers fall back to BFS path distance when a hop count is unavailable, so a printed hop count can understate a real route | `h3-face-crossing-distances.md` | the hop-vs-path caveat is only in the omniscient line, which is absent under fog | engine |
+| `FACE_CROSSING` | Hop distances near icosahedron faces and pentagons | grid-hop helpers fall back to BFS path distance when a hop count is unavailable, so a printed hop count can understate a real route | `h3-face-crossing-distances.md` | fog-off hop-versus-path line plus fog-on path-versus-Best-Options line | engine |
 | `DUP_INJECTION` | Memory, standing-order, and production injection text | computed in both `buildSystemPromptForTools` and the `formatBriefing` call path; only one copy is emitted | none | single copy reaches the model | engine; recorded because two call sites is a churn source |
 | `USER_RULE_DUPLICATION` | Rules in the initial user message | no engine opinion | none | production doctrine, Best Options copy rules, `plan_route` restriction, and memory instructions appear in both the system prompt and the user message | not an engine question; the assembly contract resolves it by moving every rule to the system prompt |
 | `UNREACHABLE_USER_BRANCHES` | Two `getInitialUserMessage` branches | `fallbackMovementEnabled = !planningEnabled && !ordersEnabled` makes the memory-only and default branches unreachable | none | dead text | engine |

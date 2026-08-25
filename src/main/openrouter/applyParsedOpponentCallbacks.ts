@@ -3,7 +3,7 @@
  *
  * Purpose: Keeps tactical roster filtering out of the large `requestOrdersFlow` body while preserving strategic replace-all semantics.
  * When to use: Immediately after a successful `parseOrdersResponse` that may include `callbacks`.
- * Expected outcome: Strategic path replaces when non-empty. Tactical path drops invalid unit-scoped ids, then replaces with kept rows (or clears when all dropped).
+ * Expected outcome: Empty or omitted `callbacks` clears every opponent subscription. Non-empty strategic path replaces. Tactical path drops invalid unit-scoped ids, then replaces with kept rows (or clears when all dropped).
  * Exceptions: None.
  */
 
@@ -20,7 +20,7 @@ import { filterCallbackSubscriptionsForTacticalBattleRoster } from './tacticalCa
  *
  * Purpose: Ensures mid-battle subscriptions only reference rostered sub-unit ids while keeping valid sibling entries.
  * When to use: `requestOrdersFlow` after parse/repair succeeds.
- * Expected outcome: Returns the number of subscriptions stored (0 when none applied / all cleared).
+ * Expected outcome: Returns the number of subscriptions stored (0 when the list is omitted, empty, or fully cleared).
  * Exceptions: None.
  */
 export function applyParsedOpponentCallbackSubscriptions(args: {
@@ -35,7 +35,10 @@ export function applyParsedOpponentCallbackSubscriptions(args: {
     tactical: battleSubUnitIds != null,
     battleId: battleId ?? null,
   });
-  if (!callbacks?.length) return 0;
+  if (!callbacks?.length) {
+    clearSubscriptions('opponent');
+    return 0;
+  }
 
   if (battleSubUnitIds == null) {
     replaceSubscriptions('opponent', callbacks, turnNumber);

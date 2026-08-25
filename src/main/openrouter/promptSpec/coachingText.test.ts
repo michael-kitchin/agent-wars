@@ -78,6 +78,7 @@ test('strategic coaching includes every required item when its gate is on', () =
   assert.match(text, /move\/melee/i);
   assert.match(text, /Units Without Standing Orders/i);
   assert.match(text, /healthy standing order/i);
+  assert.match(text, /recedes from the nearest enemy/i);
   assert.match(text, /move\/melee Target Hex is such an override/i);
   assert.match(text, /toward the fighting/i);
   assert.match(text, /even when the unit is holding on defend/i);
@@ -87,7 +88,9 @@ test('strategic coaching includes every required item when its gate is on', () =
   assert.match(text, /replace blocked queues/i);
   assert.match(text, /shared cells count toward both/i);
   assert.match(text, /Do not persist enemy positions/i);
+  assert.match(text, /persistent slots are unused/i);
   assert.match(text, /replaces the entire subscription list/i);
+  assert.match(text, /Omit the array or send \[\]/i);
   assert.match(text, /consulted when a subscribed event fires/i);
   assert.match(text, /taunt or threat/i);
   assert.match(text, /exhausting them submits nothing/i);
@@ -141,6 +144,7 @@ test('tactical coaching includes every required item when its gate is on', () =>
   assert.match(text, /move\/melee/i);
   assert.match(text, /embark/i);
   assert.match(text, /sub-unit ids/i);
+  assert.match(text, /omit the array or send \[\]/i);
   assert.match(text, /cleared when the battle ends/i);
   assert.match(text, /consulted only when a subscribed event fires/i);
   assert.match(text, /taunt or threat/i);

@@ -40,6 +40,7 @@ import {
   FRIENDLY_PLAYER,
   groupRowsByBucket,
   markdownTableLines,
+  omitThisTurnFerryRowsForStrikingAir,
   selectTopRowsPerUnit,
   type PossibleActionTableRow,
   type RawPossibleActionRow,
@@ -895,7 +896,8 @@ export function collectAggregatedPossibleActionRows(args: {
   }
 
   if (rawRows.length === 0) return [];
-  return aggregateRows(rawRows);
+  const rowsForTable = forThisTurn ? omitThisTurnFerryRowsForStrikingAir(rawRows) : rawRows;
+  return aggregateRows(rowsForTable);
 }
 
 /**

@@ -27,7 +27,7 @@ Every item defined in `information-decision-model.md` section 3, with the file a
 | `THREAT_SEVERITY` | both mode files | Unit status table |
 | `INTEL_FRESHNESS` | `variants.md` | Fog on, strategic |
 | `INTEL_STALENESS_WINDOW` | `variants.md` | Fog on, strategic |
-| `HOP_VS_PATH_CAVEAT` | `variants.md` | Fog off, strategic |
+| `HOP_VS_PATH_CAVEAT` | `variants.md` | Fog on and fog off, strategic |
 | `OWN_UNIT_TABLE` | both mode files | Unit status table |
 | `ACTION_NEEDED_FLAG` | `strategic-prompt.md` | Table column contracts |
 | `ATTENTION_FLAGS` | both mode files | Attention flags |
@@ -222,7 +222,7 @@ Each of these is specified as required and is `absent` or `partial` in current o
 | `MEMORY_WRITE_LIMITS` | Legal actions table | absent |
 | `CONSULT_POLICY` | Envelope contract and tactical coaching | absent |
 | Air and naval sections omitted rather than dashed | Both mode files, roster gates | currently emitted as a dash row |
-| Callback detail cell describing parameters | Active callbacks, both modes | present — unfiltered infrastructure watches render as `infrastructure_destroyed(any)` |
+| Callback detail cell describing parameters | Active callbacks, both modes | present — unfiltered infrastructure watches describe an unfiltered watch and tell the model to re-subscribe with no params |
 | Generic goal statement for a missing scenario | Goal statement | absent — today the region wording is emitted unconditionally |
 
 ## 7. Open engine-versus-rules defects
@@ -241,11 +241,11 @@ Carried from `source-inventory.md` section 8. Each is resolved in favour of the 
 | `OCCUPANCY_UNSTATED` | The prompt now states friendly stacks are illegal and enemy cells are move/melee contact |
 | `CASUALTY_ORDER_ABSENT` | The victim-sort rule needs stating |
 | `CALLBACK_VOCAB_ABSENT` | The event list needs stating; the never-firing event should be removed from the vocabulary or implemented |
-| `CALLBACK_DETAILS_THIN` | Details now names parameters, including `infrastructure_destroyed(any)` when the watch is unfiltered |
+| `CALLBACK_DETAILS_THIN` | Details now names parameters; an unfiltered infrastructure watch describes the unfiltered form rather than `infrastructure_destroyed(any)` |
 | `EMBARK_CONTROL_CONDITION` | The embark prose needs the control condition |
-| `OMNISCIENT_GATE_NARROW` | Re-gate the caveat line on the meaning of the distances rather than on the fog flag alone |
+| `OMNISCIENT_GATE_NARROW` | Addressed: fog-off keeps the hop-count honesty line; fog-on emits the path-versus-Best-Options line instead |
 | `INFANTRY_RANGE_SPLIT` | Already correct in the prompt; the older document is the stale side |
-| `FACE_CROSSING` | Hop counts can understate real routes; under fog no caveat is emitted at all, which this package leaves as a known limitation rather than inventing a second caveat |
+| `FACE_CROSSING` | Hop counts can understate real routes; fog-on now carries a path-versus-Best-Options line so a long printed path does not hide a this-turn hop dest |
 | `DUP_INJECTION` | Two call sites compute the same injection text; consolidating is a code change |
 | `USER_RULE_DUPLICATION` | Resolved by this package's contract; implementing it is a code change |
 | `UNREACHABLE_USER_BRANCHES` | Two dead branches; the contract covers them so a flag-derivation change cannot produce uncontracted text |

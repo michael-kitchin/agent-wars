@@ -206,6 +206,8 @@ test('callback contract states that the response replaces the whole subscription
   const tactical = buildCallbackContractClause('tactical');
   assert.match(strategic, /replac/i);
   assert.match(tactical, /replac/i);
+  assert.match(strategic, /omit the array or send \[\]/i);
+  assert.match(tactical, /omit the array or send \[\]/i);
   assert.match(tactical, /tactical beat/i);
   assert.match(tactical, /event-driven/i);
 });

@@ -165,7 +165,7 @@ const ORDERLESS_BULLET =
  * Exceptions: None.
  */
 const LEAVE_MISSIONS_BULLET =
-  '- Units with a healthy standing order do not need explicit orders from you unless you want to override their current mission this turn; the attention column marks the ones that have stalled. A this-turn move/melee Target Hex is such an override — copy it even when the unit is already marching.';
+  '- Units with a healthy standing order do not need explicit orders from you unless you want to override their current mission this turn; the attention column marks stalled orders and marches whose next move recedes from the nearest enemy. A this-turn move/melee Target Hex is such an override — copy it even when the unit is already marching. After a unit fires, do not leave it on a standing march that recedes from that enemy: assign defend to hold contact, cancel the march, or remarch toward the enemy.';
 
 /**
  * Idle air should ferry toward the fight when its base can still launch.
@@ -244,18 +244,18 @@ const SHARED_HOME_BULLET =
  * Exceptions: None.
  */
 const MEMORY_BULLET =
-  '- Write a short persistent note naming this turn\'s objectives and the units assigned to them. Do not persist enemy positions or rosters, which the briefing already supplies fresh each turn.';
+  '- Write a short persistent note naming this turn\'s objectives and the units assigned to them. Always include a memoryUpdates write this turn when persistent slots are unused. Do not persist enemy positions or rosters, which the briefing already supplies fresh each turn.';
 
 /**
  * Callbacks replace the whole subscription list.
  *
  * Purpose: Omitting a still-wanted subscription clears it.
  * When to use: Always in strategic coaching.
- * Expected outcome: Mentions the event vocabulary and that the response replaces the entire subscription list.
+ * Expected outcome: Mentions the event vocabulary, that the response replaces the entire subscription list, and that omit or [] clears.
  * Exceptions: None.
  */
 const CALLBACK_BULLET =
-  '- Subscribe only to events from the engine\'s event vocabulary; the response replaces the entire subscription list, so repeat every subscription you still want.';
+  '- Subscribe only to events from the engine\'s event vocabulary; the response replaces the entire subscription list, so repeat every subscription you still want. Omit the array or send [] to clear every subscription.';
 
 /**
  * A turn without a consultation is a turn the model did not act in.

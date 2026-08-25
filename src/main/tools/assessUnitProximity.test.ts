@@ -11,8 +11,10 @@ import {
   estimatedTurnsFromGridDistance,
   gridHopDistanceBetween,
   gridHopDistancesFrom,
+  FOG_PATH_DISTANCE_BRIEFING_LINE,
   OMNISCIENT_GRID_PROXIMITY_BRIEFING_LINE,
   safeGridHexDistance,
+  usesFogPathDistanceBriefing,
   usesOmniscientGridProximity,
 } from './assessUnitProximity';
 
@@ -51,6 +53,22 @@ function testOmniscientGateRequiresFogOffAndRes1(): void {
   assert.strictEqual(usesOmniscientGridProximity({ h3Index: res1Cell }), false);
   assert.strictEqual(usesOmniscientGridProximity({ fogOfWarEnabled: false, h3Index: res4Cell }), false);
   assert.strictEqual(usesOmniscientGridProximity({ fogOfWarEnabled: false, h3Index: 'not-a-cell' }), false);
+}
+
+/**
+ * Verifies the fog-on path-honesty gate requires fog on and a resolution-1 cell.
+ *
+ * Purpose: The path-versus-Best-Options line must not leak into fog-off or non-strategic geometry.
+ * When to use: After changing `usesFogPathDistanceBriefing`.
+ * Expected outcome: True only for fogOfWarEnabled === true with a res1 index.
+ * Exceptions: None.
+ */
+function testFogPathGateRequiresFogOnAndRes1(): void {
+  assert.strictEqual(usesFogPathDistanceBriefing({ fogOfWarEnabled: true, h3Index: res1Cell }), true);
+  assert.strictEqual(usesFogPathDistanceBriefing({ fogOfWarEnabled: false, h3Index: res1Cell }), false);
+  assert.strictEqual(usesFogPathDistanceBriefing({ h3Index: res1Cell }), false);
+  assert.strictEqual(usesFogPathDistanceBriefing({ fogOfWarEnabled: true, h3Index: res4Cell }), false);
+  assert.strictEqual(usesFogPathDistanceBriefing({ fogOfWarEnabled: true, h3Index: 'not-a-cell' }), false);
 }
 
 /**
@@ -227,6 +245,20 @@ function testOmniscientHonestyLineUsesBestOptionsDestCopy(): void {
 }
 
 /**
+ * Ensures the fog-on Unit Status honesty line distinguishes path length from this-turn hop dests.
+ *
+ * Purpose: Fog-on printed distances can exceed one movement budget while Best Options still lists a legal hop.
+ * When to use: After edits to `FOG_PATH_DISTANCE_BRIEFING_LINE`.
+ * Expected outcome: Mentions path lengths and Best Options dest copy; does not reuse the omniscient hop sentence.
+ * Exceptions: None.
+ */
+function testFogPathHonestyLineUsesBestOptionsDestCopy(): void {
+  assert.ok(FOG_PATH_DISTANCE_BRIEFING_LINE.includes('path lengths'));
+  assert.ok(FOG_PATH_DISTANCE_BRIEFING_LINE.includes('Best Options This Turn'));
+  assert.ok(!FOG_PATH_DISTANCE_BRIEFING_LINE.includes(OMNISCIENT_GRID_PROXIMITY_BRIEFING_LINE));
+}
+
+/**
  * Runs all assessUnitProximity tests.
  *
  * Purpose: Node test entrypoint for main-process discovery.
@@ -236,6 +268,7 @@ function testOmniscientHonestyLineUsesBestOptionsDestCopy(): void {
  */
 function run(): void {
   testOmniscientGateRequiresFogOffAndRes1();
+  testFogPathGateRequiresFogOnAndRes1();
   testSafeGridHexDistanceSameAndAdjacent();
   testGridHopDistancesMatchGridDistanceWhenAvailable();
   testSafeGridHexDistanceInvalidIndexesReturnNull();
@@ -244,6 +277,7 @@ function run(): void {
   testCollectOmniscientNearbyUnitsIncludesPentagonCrossingEnemy();
   testGridHopDistanceBetweenCoversPentagonCrossingPair();
   testOmniscientHonestyLineUsesBestOptionsDestCopy();
+  testFogPathHonestyLineUsesBestOptionsDestCopy();
   console.log('assessUnitProximity.test.ts passed');
 }
 

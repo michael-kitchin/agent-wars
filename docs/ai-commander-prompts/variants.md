@@ -12,11 +12,11 @@ Gate: `state.fogOfWarEnabled` on the snapshot, resolved by `isFogOfWarEnabled` (
 
 | Surface | Contract |
 | --- | --- |
-| system | Enemy rows in every table are limited to what the snapshot lists. Nearest-enemy cells carry intel quality and a last-seen turn. Unexplored terrain renders as unknown on the map, using the undiscovered marker. Own home region cells and the shared cells are force-visible, so home-region bullets are legitimate even for unscouted ground. |
+| system | Enemy rows in every table are limited to what the snapshot lists. Nearest-enemy cells carry intel quality and a last-seen turn. Unexplored terrain renders as unknown on the map, using the undiscovered marker. Own home region cells and the shared cells are force-visible, so home-region bullets are legitimate even for unscouted ground. After the Unit Status heading, emit the intel-staleness sentence and the path-versus-Best-Options line: printed nearest-enemy distances are march or sail path lengths when a path exists (otherwise a hop count), and Best Options Target Hexes are already this-turn legal destinations even when that printed path is longer than one movement budget. |
 | user | unchanged |
 | tools | unchanged |
 | envelope | unchanged |
-| coaching | Include the staleness rule: a last-known position is a report with an age, and a report older than the retention window is dropped rather than shown as old. Include the scouting rule when the observed roster is empty. |
+| coaching | Include the staleness rule: a last-known position is a report with an age, and a report older than the retention window is dropped rather than shown as old. Include the scouting rule when the observed roster is empty. Include the path-versus-Best-Options caution so the model copies listed dests instead of treating a printed path of two-plus turns as unreachable this turn. |
 | empty-state | With no observed enemy, nearest-enemy cells are em dashes and the scouting directive is present. |
 
 ### 1.2 Fog off, strategic
@@ -30,7 +30,7 @@ Gate: `state.fogOfWarEnabled` on the snapshot, resolved by `isFogOfWarEnabled` (
 | coaching | Drop the staleness rule; every report is current. Keep the hop-versus-path caution, because an enemy two hops away across water may be many turns away by sea. |
 | empty-state | An empty observed roster with fog off means the enemy has no units; the scouting directive is still emitted by the roster gate and does no harm, but the goal statement is what tells the model the game is nearly over. |
 
-The caveat line's gate is **the meaning of the numbers**, which in current code is fog off at the strategic resolution. Two consequences a later implementer must preserve: the line never appears in a battle prompt, because the gate requires the strategic resolution; and if distances ever become path-based, the line is removed rather than reworded.
+The caveat lines' gates are **the meaning of the numbers**. Two consequences a later implementer must preserve: neither honesty line appears in a battle prompt, because both gates require the strategic resolution; if fog-off distances ever become path-based, the hop-count line is removed rather than reworded; if fog-on distances ever become hop counts, the path-versus-Best-Options line is removed rather than reworded.
 
 ### 1.3 Tactical, either fog setting
 

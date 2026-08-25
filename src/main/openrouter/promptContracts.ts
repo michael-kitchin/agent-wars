@@ -237,8 +237,15 @@ export function getFinalJsonOrdersExampleBlock(flags: FinalJsonExampleFlags): st
         ],
     airStrikes: [],
     ferryOrders: [],
-    callbacks: [],
-    memoryUpdates: [],
+    callbacks: [{ event: 'infrastructure_destroyed', params: { targetType: 'airport', hex: 'CD' } }],
+    memoryUpdates: [
+      {
+        action: 'write',
+        key: 'turn_objectives',
+        tier: 'persistent',
+        content: 'Close with observed enemies; keep air and naval production moving.',
+      },
+    ],
     productionOrders: [{ action: 'set_build_queue', hex: 'CF', unitType: 'air', count: 1 }],
   };
   const example: Record<string, unknown> = {};

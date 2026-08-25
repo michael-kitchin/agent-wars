@@ -818,6 +818,63 @@ function testAirDefendDoesNotProduceMovementOrder(): void {
   }
 }
 
+/**
+ * Flags a healthy march whose destination recedes from the nearest observed enemy.
+ *
+ * Purpose: Turn 18 left in-range units on receding MARCH orders because Attention was no.
+ * When to use: After edits to `standingOrderRowRecedesFromEnemy` / `getInjectionText`.
+ * Expected outcome: The active standing-order row stays `en_route` and Attention is yes.
+ * Exceptions: Skips when the seeded map lacks a non-air opponent, a human unit, or a two-hop dest.
+ */
+function testGetInjectionTextAttentionYesForRecedingMarch(): void {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-tool5-recede-'));
+  const dbPath = path.join(tempDir, 't.sqlite');
+  try {
+    openGameDatabaseAtPathForTests(dbPath);
+    resetGameForNewMatch();
+    const seeded = getGameState();
+    const opponent = seeded.units.find((u) => u.player === 'opponent' && u.unitType !== 'air');
+    const human = seeded.units.find((u) => u.player === 'human');
+    if (!opponent || !human) {
+      console.log('testGetInjectionTextAttentionYesForRecedingMarch: skip — seed lacks a non-air opponent or human unit');
+      return;
+    }
+    const hexSet = new Set(seeded.hexes.map((h) => h.h3Index));
+    const origin = human.h3Index;
+    const ring1 = gridDisk(origin, 1).filter((h) => h !== origin && hexSet.has(h));
+    const neighbor = ring1[0];
+    const far = gridDisk(origin, 2).find((h) => hexSet.has(h) && h !== origin && !ring1.includes(h));
+    if (!neighbor || !far) {
+      console.log('testGetInjectionTextAttentionYesForRecedingMarch: skip — no two-hop dest on the seeded map');
+      return;
+    }
+    dbRun('UPDATE units SET h3_index = ? WHERE id = ?', [neighbor, opponent.id]);
+    dbRun('UPDATE units SET h3_index = ? WHERE id = ?', [origin, human.id]);
+    const [destLat, destLng] = cellToLatLng(far);
+    dbRun(
+      `INSERT OR REPLACE INTO standing_orders (player_id, unit_id, order_type, params, computed_route, status, created_turn, origin_hex)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        'opponent',
+        opponent.id,
+        'march',
+        JSON.stringify({ type: 'march', destination: [destLat, destLng], avoidEnemies: false, engageEnRoute: false }),
+        null,
+        'en_route',
+        seeded.turnNumber,
+        JSON.stringify(cellToLatLng(neighbor)),
+      ]
+    );
+    const text = getInjectionText('opponent', getGameState());
+    const row = text.split('\n').find((line) => line.includes(`| ${opponent.id} |`));
+    assert.ok(row, `expected a standing-order row for ${opponent.id}`);
+    assert.ok(row!.includes('en_route'), `receding march must remain en_route: ${row}`);
+    assert.ok(row!.includes('| yes |'), `receding march must mark Attention yes: ${row}`);
+  } finally {
+    closeGameDatabaseForTests();
+  }
+}
+
 function run(): void {
   testAssignOrderUnitNotFound();
   testAssignOrderPursueTargetNotFound();
@@ -834,6 +891,7 @@ function run(): void {
   testDefendAutoEngagementAirStrikeSurvivesUnmeasurablePair();
   testMarchEngageEnRouteUsesWeaponRange();
   testAirDefendDoesNotProduceMovementOrder();
+  testGetInjectionTextAttentionYesForRecedingMarch();
   testHumanMarchDefaultsAvoidEnemiesFalse();
   console.log('tool5StandingOrders tests passed');
 }

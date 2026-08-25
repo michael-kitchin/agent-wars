@@ -139,11 +139,11 @@ const SEALIFT_BULLET =
  *
  * Purpose: Strategic unit ids are not valid in a beat, and leftover subscriptions would fire on the wrong roster.
  * When to use: Always in tactical coaching.
- * Expected outcome: Sub-unit ids, replace-whole-list, cleared when the battle ends.
+ * Expected outcome: Sub-unit ids, replace-whole-list including omit/[] clear, and cleared when the battle ends.
  * Exceptions: None.
  */
 const CALLBACK_BULLET =
-  '- Unit-scoped callbacks use sub-unit ids; the response replaces the entire subscription list, and all of them are cleared when the battle ends.';
+  '- Unit-scoped callbacks use sub-unit ids; the response replaces the entire subscription list, so omit the array or send [] to clear every subscription this beat; all of them are also cleared when the battle ends.';
 
 /**
  * An unconsulted beat is a beat the model did not act in.

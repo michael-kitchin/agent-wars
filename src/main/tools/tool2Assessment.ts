@@ -279,6 +279,7 @@ function executeAssessUnit(
     type: string;
     position: LatLng;
     hexDistance: number;
+    gridDistance?: number;
     estimatedTurnsToReach: number | null;
     inRangedRange: boolean;
     inMeleeRange: boolean;
@@ -346,6 +347,7 @@ function executeAssessUnit(
           type: other.unitType,
           position: h3ToLatLng(other.h3Index, latLngByH3, 'cellCenter'),
           hexDistance,
+          gridDistance: gridDist === 999 ? undefined : gridDist,
           estimatedTurnsToReach,
           inRangedRange,
           inMeleeRange,
@@ -410,6 +412,7 @@ function executeAssessUnit(
           type: 'unknown',
           position: h3ToLatLng(intel.lastKnownH3Index, latLngByH3, 'cellCenter'),
           hexDistance,
+          gridDistance: gridDist === 999 ? undefined : gridDist,
           estimatedTurnsToReach: distResult !== null ? distResult.estimatedTurns : null,
           inRangedRange: gridDist <= myRange,
           inMeleeRange: gridDist === 0,

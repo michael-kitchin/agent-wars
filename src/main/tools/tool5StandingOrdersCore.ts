@@ -24,6 +24,7 @@ import {
 } from './tool5StandingOrdersShared';
 import { suggestApproachDestinationsForOrderlessUnits } from './orderlessUnitSuggestions';
 import { expireAndUpdateStatus, generateOrdersForStandingOrders } from './tool5StandingOrdersGeneration';
+import { marchStepRecedesFromEnemy, nearestObservedEnemyH3 } from './standingMarchReceding';
 export { expireAndUpdateStatus, generateOrdersForStandingOrders };
 
 /**
@@ -174,7 +175,9 @@ function toStandingOrderPromptRow(
   row: StandingOrderRow,
   unitTypeById: Map<string, string>,
   coordinateContext: CoordinateContext,
-  resolveToH3: (lat: number, lng: number) => string | undefined
+  resolveToH3: (lat: number, lng: number) => string | undefined,
+  unitH3: string | undefined,
+  enemyH3s: readonly string[]
 ): StandingOrderPromptRow {
   const params = parseOrderParams(row);
   const computed = parseComputedRoute(row);
@@ -203,6 +206,7 @@ function toStandingOrderPromptRow(
     }
     turnsRemainingText = 'pending';
   }
+  const receding = standingOrderRowRecedesFromEnemy(row, unitTypeById.get(row.unit_id), unitH3, enemyH3s, resolveToH3);
   return {
     unitId: row.unit_id,
     unitType: unitTypeById.get(row.unit_id) ?? '—',
@@ -211,8 +215,38 @@ function toStandingOrderPromptRow(
     status: row.status,
     nextMove: nextMoveText,
     turnsRemaining: turnsRemainingText,
-    attention: WARNING_STATUSES.has(row.status) ? 'yes' : 'no',
+    attention: WARNING_STATUSES.has(row.status) || receding ? 'yes' : 'no',
   };
+}
+
+/**
+ * True when this standing-order row's next step increases hop distance to the nearest enemy.
+ *
+ * Purpose: Attention column must flag receding marches, not only stalled statuses.
+ * When to use: `toStandingOrderPromptRow` after next-move and destination text are computed.
+ * Expected outcome: False for air units, non-march/pursue orders, and unmeasurable geometry.
+ * Exceptions: None.
+ */
+function standingOrderRowRecedesFromEnemy(
+  row: StandingOrderRow,
+  unitType: string | undefined,
+  unitH3: string | undefined,
+  enemyH3s: readonly string[],
+  resolveToH3: (lat: number, lng: number) => string | undefined
+): boolean {
+  if (unitType === 'air' || !unitH3) return false;
+  if (row.order_type !== 'march' && row.order_type !== 'pursue') return false;
+  const enemyH3 = nearestObservedEnemyH3(unitH3, enemyH3s);
+  if (!enemyH3) return false;
+  const computed = parseComputedRoute(row);
+  const nextMove = computed?.nextMoveHex;
+  const params = parseOrderParams(row);
+  const dest = Array.isArray(params.destination) ? (params.destination as [number, number]) : null;
+  const stepLl = (Array.isArray(nextMove) ? nextMove : dest) as [number, number] | null;
+  if (!stepLl || stepLl.length < 2) return false;
+  const stepH3 = resolveToH3(Number(stepLl[0]), Number(stepLl[1]));
+  if (!stepH3) return false;
+  return marchStepRecedesFromEnemy(unitH3, stepH3, enemyH3);
 }
 
 /**
@@ -656,10 +690,21 @@ export function getInjectionText(
   const aiUnitIdSet = new Set(aiUnitIds);
   const unitIdsWithOrders = new Set(rows.map((r) => r.unit_id));
   const unitIdsWithoutOrders = aiUnitIds.filter((id) => !unitIdsWithOrders.has(id));
+  const unitH3ById = new Map(aiUnits.map((u) => [u.id, u.h3Index]));
+  const enemyH3s = state.units.filter((u) => u.player !== playerId).map((u) => u.h3Index);
 
   const standingOrderRows = rows
     .filter((row) => aiUnitIdSet.has(row.unit_id))
-    .map((row) => toStandingOrderPromptRow(row, aiUnitTypeById, ctx, resolveToH3))
+    .map((row) =>
+      toStandingOrderPromptRow(
+        row,
+        aiUnitTypeById,
+        ctx,
+        resolveToH3,
+        unitH3ById.get(row.unit_id),
+        enemyH3s
+      )
+    )
     .map((row) => [
       row.unitId,
       row.unitType,

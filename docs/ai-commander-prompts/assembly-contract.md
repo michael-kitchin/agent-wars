@@ -59,7 +59,7 @@ Every cell is binary. `always` means unconditional in that mode; `never` means t
 | `# Commander's Briefing` | when a briefing body is supplied | when a briefing body is supplied | omit the heading and emit the standalone sections instead |
 | Narrative paragraph | always inside the briefing | always inside the briefing | never empty |
 | `## Unit Status and Threats` | always inside the briefing | always inside the briefing | header row plus `(No AI units)` |
-| Distance-basis caveat line | when distances are straight hop counts (fog off at res1) | never | omit |
+| Distance-basis caveat line | fog-off res1: hop-count honesty line; fog-on res1: path-vs-Best-Options line (after the staleness sentence) | never | omit |
 | `## Attention Flags` | always inside the briefing | always inside the briefing | `None.` |
 | `# Operational Map` | always inside the briefing | always inside the briefing | `(No units — map not rendered.)` strategic; `_No tactical cells — map not rendered._` tactical |
 | `### Best Options This Turn` | when at least one option row exists | when at least one option row exists | omit heading and table |
@@ -83,7 +83,7 @@ Every cell is binary. `always` means unconditional in that mode; `never` means t
 Two deviations from current code are deliberate and are the reason those rows read as they do:
 
 - Air and naval status sections must be **omitted** when the opponent has none of that arm, rather than emitted with a single `—` row. A table of dashes consumes context and invites the model to look for air options that do not exist. The gate is roster presence, which the assembler already computes as `hasAir` and `hasNaval`.
-- The distance-basis caveat is contracted on the basis of **what the numbers mean**, not on the fog flag alone. It appears whenever the printed distances are straight hop counts. `variants.md` fixes the exact gate.
+- The distance-basis caveat is contracted on the basis of **what the numbers mean**, not on the fog flag alone. Fog-off at res1 prints hop counts, so the hop-versus-path line is required. Fog-on at res1 prints march or sail path lengths (falling back to hops when no path exists), so a different line is required: those path lengths can exceed one movement budget while Best Options Target Hexes remain this-turn legal hops. `variants.md` fixes both gates. Neither line appears in a battle prompt.
 
 ## 4. Tools versus envelope writes
 
@@ -132,7 +132,7 @@ Envelope-wide rules the prompt must state:
 
 1. The top level is an object. A top-level array is invalid.
 2. `message`, `strategy`, and `orders` are mandatory even when `orders` is empty.
-3. Optional arrays may be omitted or empty; an omitted `callbacks` field clears all subscriptions.
+3. Optional arrays may be omitted or empty. An omitted or empty `callbacks` field clears all subscriptions.
 4. Legacy top-level `movementOrders` and `rangedAttacks` are invalid.
 5. Every `orders` entry carries an `action`; all but the order-cancelling action also carry a `unitId`.
 6. An entry missing a required field for its action is dropped silently, so the model must not rely on partial entries.
@@ -165,7 +165,7 @@ System-prompt content, both modes. Each item states the rule and why the model n
 5. **Friendly-occupied cells are not destinations; enemy-occupied cells are move/melee contact.** A cell holding a friendly unit is not a legal one-step destination. A cell holding an enemy is legal only as a move/melee option — copy that Target Hex into the move field to make contact. Approach Target Hexes are empty of units. Carries `LEGAL_DEST_OCCUPANCY`.
 6. **Copy the listed option.** Targets in the options table are already legal for the units named on that row, and one row may name several units. Copy them; route only for something unlisted. Carries `BEST_OPTIONS_ROWS`.
 7. **Codes are copied exactly.** Two characters, taken from this prompt. Carries `HEX_IDENTITY`.
-8. **Callbacks are a full replacement.** The response's callback list becomes the entire subscription set, so a subscription the model still wants must be repeated. Carries `CALLBACK_REPLACE_SEMANTICS`.
+8. **Callbacks are a full replacement.** The response's callback list becomes the entire subscription set, so a subscription the model still wants must be repeated. Omitting the array or sending `[]` clears every subscription. Carries `CALLBACK_REPLACE_SEMANTICS`.
 9. **`strategy` is for continuity.** One line naming what this period is trying to achieve, so the next consultation inherits intent rather than re-deriving it. Carries `JSON_ENVELOPE`.
 10. **`message` is for the player.** One in-character taunt or threat, and nothing operational: no cells, no unit ids, no intent. Carries `MESSAGE_DISCIPLINE`.
 11. **Doctrine.** Use speed, surprise, and initiative to break enemy cohesion; attack gaps and avoid strengths; create maximum disruption with minimum force. These are judgment aids with no engine symbol behind them and must be presented as doctrine, not as rules.

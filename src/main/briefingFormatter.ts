@@ -19,9 +19,13 @@ import type { PossibleActionsIndexedState } from './openrouter/possibleUnitActio
 import { buildActiveCallbacksSection } from './briefing/activeCallbacksSection';
 import { buildEmptyProductionQueuesSection } from './openrouter/briefingSections';
 import {
+  FOG_PATH_DISTANCE_BRIEFING_LINE,
   OMNISCIENT_GRID_PROXIMITY_BRIEFING_LINE,
+  usesFogPathDistanceBriefing,
   usesOmniscientGridProximity,
 } from './tools/assessUnitProximity';
+import { getMovementBudgetForUnit } from './pathfinding';
+import { marchStepRecedesFromEnemy } from './tools/standingMarchReceding';
 import {
   SECTION_TITLE_ACTIVE_CALLBACKS,
   SECTION_TITLE_COMMANDERS_BRIEFING,
@@ -155,7 +159,7 @@ export function buildStrategicNarrative(
   const critical = unitAssessments.filter((a) => {
     const isCritical = (a.result.threats ?? []).some((t) => t.severity === 'critical');
     if (!isCritical) return false;
-    return standingOrdersActive ? needsAction(a, true) : true;
+    return standingOrdersActive ? needsAction(a, true, true) : true;
   }).length;
   const observedEnemySentence =
     humanUnits.length > 0
@@ -238,23 +242,66 @@ function hasLegalAttackThisTurn(assessment: UnitAssessmentResult): boolean {
 /**
  * True when the nearest observed enemy is at most one march/sail turn away.
  *
- * Purpose: A healthy standing order must not hide a this-turn move/melee close. The assessment already
- * stores `estimatedTurnsToReach` (grid-hop ETA when omniscient, path ETA under fog); Action needed and
- * Attention Flags read that instead of re-deriving Best Options.
+ * Purpose: A healthy standing order must not hide a this-turn move/melee close. Hop count is the same
+ * basis Best Options uses; path ETA under fog can be longer than one turn even when a legal dest exists.
  * When to use: `needsAction` and Attention Flags when standing orders are active.
- * Expected outcome: True for `estimatedTurnsToReach` 0 or 1, or same-hex melee when the turn estimate is absent.
- * Exceptions: Air units typically have a null estimate (no march budget) and therefore return false here
- * unless they occupy the enemy cell.
+ * Expected outcome: True when grid hops fit this turn's movement budget (strategic only), or path ETA is at most one,
+ * or same-hex melee when neither measure is present.
+ * Exceptions: Air units never march; they only count as closing when they already share the enemy cell.
+ * Tactical assessments must not use strategic movement budgets against hop counts.
  */
-function canCloseThisTurn(assessment: UnitAssessmentResult): boolean {
+function canCloseThisTurn(assessment: UnitAssessmentResult, useGridHopBudget: boolean): boolean {
   const nearest = assessment.result.nearbyEnemies?.[0] as
-    | { estimatedTurnsToReach?: unknown; inMeleeRange?: unknown }
+    | {
+        estimatedTurnsToReach?: unknown;
+        inMeleeRange?: unknown;
+        gridDistance?: unknown;
+      }
     | undefined;
   if (!nearest) return false;
+  const unitType = typeof assessment.result.unit?.type === 'string' ? assessment.result.unit.type : '';
+  if (unitType === 'air') return nearest.inMeleeRange === true;
+  if (useGridHopBudget && typeof nearest.gridDistance === 'number' && nearest.gridDistance < 900) {
+    const budget = getMovementBudgetForUnit(unitType || 'infantry');
+    if (budget > 0 && nearest.gridDistance <= budget) return true;
+  }
   if (typeof nearest.estimatedTurnsToReach === 'number') {
     return nearest.estimatedTurnsToReach <= 1;
   }
   return nearest.inMeleeRange === true;
+}
+
+/**
+ * True when a standing march's destination is farther from the nearest enemy than the unit's current cell.
+ *
+ * Purpose: Units with a healthy march away from contact were marked Action needed no and kept sailing.
+ * When to use: `needsAction` after shots and this-turn closes are considered.
+ * Expected outcome: True only for march orders with a destination that recedes in hops.
+ * Exceptions: Missing geometry or unmeasurable hops return false.
+ */
+function standingMarchRecedesFromNearestEnemy(assessment: UnitAssessmentResult): boolean {
+  const order = assessment.result.unit?.currentStandingOrder as
+    | { type?: unknown; orderType?: unknown; destination?: unknown }
+    | null
+    | undefined;
+  if (!order) return false;
+  const orderType = typeof order.type === 'string' ? order.type : typeof order.orderType === 'string' ? order.orderType : '';
+  if (orderType !== 'march') return false;
+  const dest = order.destination;
+  if (!Array.isArray(dest) || dest.length < 2) return false;
+  const unitPos = assessment.result.unit?.position;
+  if (!Array.isArray(unitPos) || unitPos.length < 2) return false;
+  const nearest = assessment.result.nearbyEnemies?.[0] as { position?: unknown } | undefined;
+  const enemyPos = nearest?.position;
+  if (!Array.isArray(enemyPos) || enemyPos.length < 2) return false;
+  try {
+    const unitH3 = latLngToCell(Number(unitPos[0]), Number(unitPos[1]), 1);
+    const destH3 = latLngToCell(Number(dest[0]), Number(dest[1]), 1);
+    const enemyH3 = latLngToCell(Number(enemyPos[0]), Number(enemyPos[1]), 1);
+    return marchStepRecedesFromEnemy(unitH3, destH3, enemyH3);
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -264,19 +311,25 @@ function canCloseThisTurn(assessment: UnitAssessmentResult): boolean {
  * standing order hide a shot or a this-turn close the model should be choosing itself. Idle air holding on
  * defend is left off this flag; coaching still tells the model to ferry those units.
  * When to use: Unit Status rows and Attention Flags assembly.
- * Expected outcome: Always true when the unit has a legal attack or can close this turn under a moderate/critical
- * threat. Otherwise: when standing orders are inactive, moderate/critical threats only; when active, also
- * missing/warning standing orders.
+ * Expected outcome: Always true when the unit has a legal attack, can close this turn under a moderate/critical
+ * threat, or is on a standing march that recedes from the nearest enemy under a moderate/critical threat.
+ * Otherwise: when standing orders are inactive, moderate/critical threats only; when active, also missing/warning
+ * standing orders.
  * Exceptions: None.
  */
-function needsAction(assessment: UnitAssessmentResult, standingOrdersActive: boolean): boolean {
+function needsAction(
+  assessment: UnitAssessmentResult,
+  standingOrdersActive: boolean,
+  useGridHopBudget: boolean
+): boolean {
   // A shot the model could take is always worth surfacing. Auto-fire is a backstop for a turn the model skips,
   // never a reason to tell it a unit needs nothing, or it loses the chance to pick a better target than the
   // nearest one.
   if (hasLegalAttackThisTurn(assessment)) return true;
   // A this-turn close is the other action the engine cannot choose a destination for. A healthy march to a
   // rear hex must not mark the unit as needing nothing while Best Options lists move/melee onto the enemy.
-  if (canCloseThisTurn(assessment) && hasActionableThreat(assessment)) return true;
+  if (canCloseThisTurn(assessment, useGridHopBudget) && hasActionableThreat(assessment)) return true;
+  if (standingMarchRecedesFromNearestEnemy(assessment) && hasActionableThreat(assessment)) return true;
   const actionable = hasActionableThreat(assessment);
   if (!standingOrdersActive) return actionable;
   const order = assessment.result.unit?.currentStandingOrder as { status?: string } | null | undefined;
@@ -290,13 +343,14 @@ function needsAction(assessment: UnitAssessmentResult, standingOrdersActive: boo
  *
  * Purpose: Softens Action needed for units with a healthy standing order and only low threats.
  * When to use: Strategic Unit Status rows when Orders tools are enabled.
- * Expected outcome: false when standing orders are inactive, the unit has a legal attack, or threats are non-low /
- * order missing/warning.
+ * Expected outcome: false when standing orders are inactive, the unit has a legal attack, the march recedes from
+ * the nearest enemy, or threats are non-low / order missing/warning.
  * Exceptions: None.
  */
 function isQuiet(assessment: UnitAssessmentResult, standingOrdersActive: boolean): boolean {
   if (!standingOrdersActive) return false;
   if (hasLegalAttackThisTurn(assessment)) return false;
+  if (standingMarchRecedesFromNearestEnemy(assessment)) return false;
   const order = assessment.result.unit?.currentStandingOrder as { status?: string } | null | undefined;
   const threats = assessment.result.threats ?? [];
   const hasNonLow = threats.some((t) => t.severity !== 'low');
@@ -349,7 +403,7 @@ export function buildUnitStatusTable(
           : severities.includes('moderate')
             ? 'moderate'
             : 'low';
-    const action = needsAction(a, standingOrdersActive) ? 'yes' : 'no';
+    const action = needsAction(a, standingOrdersActive, ctx.mode === 'strategic') ? 'yes' : 'no';
     const selfLabel = formatUnitDisplayRef(a.unitId);
     const actionCell =
       ctx.mode === 'strategic' && isQuiet(a, standingOrdersActive) ? `${action} (quiet)` : action;
@@ -419,7 +473,7 @@ export function buildAttentionFlags(
   const armedUnitRefs: string[] = [];
   const soActive = coordinateMode === 'tactical' ? false : standingOrdersActive;
   for (const a of unitAssessments) {
-    if (!needsAction(a, soActive)) continue;
+    if (!needsAction(a, soActive, coordinateMode === 'strategic')) continue;
     const threats = a.result.threats ?? [];
     const nearest = a.result.nearbyEnemies?.[0];
     if (hasLegalAttackThisTurn(a)) armedUnitRefs.push(formatUnitDisplayRef(a.unitId));
@@ -436,7 +490,7 @@ export function buildAttentionFlags(
     const order = a.result.unit?.currentStandingOrder as { status?: string } | null | undefined;
     // Shooters already occupy the armed-units aggregate. Emitting them again as closers lets naval/air
     // shots fill the reserved threat slots and hide armor that can only move/melee this turn.
-    if (canCloseThisTurn(a) && hasActionableThreat(a) && nearest && !hasLegalAttackThisTurn(a)) {
+    if (canCloseThisTurn(a, coordinateMode === 'strategic') && hasActionableThreat(a) && nearest && !hasLegalAttackThisTurn(a)) {
       const sev = maxThreatSeverity(threats);
       candidates.push({
         rank: severityRank(sev),
@@ -452,6 +506,18 @@ export function buildAttentionFlags(
       candidates.push({
         rank: 2,
         text: `${formatUnitDisplayRef(a.unitId)} standing order is in warning state (${order.status}) — decide follow-on orders.`,
+      });
+    } else if (
+      standingMarchRecedesFromNearestEnemy(a) &&
+      hasActionableThreat(a) &&
+      nearest &&
+      !hasLegalAttackThisTurn(a)
+    ) {
+      candidates.push({
+        rank: 1,
+        text:
+          `${formatUnitDisplayRef(a.unitId)} standing march recedes from the nearest enemy ` +
+          `(${formatUnitDisplayRef(nearest.unitId)}) — override it this turn.`,
       });
     }
   }
@@ -545,10 +611,23 @@ export function formatBriefing(
   sections.push(buildStrategicNarrative(state, precomputed.unitAssessments, standingOrdersActive));
   sections.push(markdownHeading2(SECTION_TITLE_UNIT_STATUS_AND_THREATS));
   const gridProximityLine = omniscientGridProximityBriefingLine(state);
+  const h3Index = state.hexes[0]?.h3Index;
+  const fogPathLine =
+    h3Index && usesFogPathDistanceBriefing({ fogOfWarEnabled: state.fogOfWarEnabled, h3Index })
+      ? FOG_PATH_DISTANCE_BRIEFING_LINE
+      : '';
+  logDebug('briefingFormatter formatBriefing: distance caveat', {
+    turnNumber: state.turnNumber,
+    omniscient: gridProximityLine.length > 0,
+    fogPath: fogPathLine.length > 0,
+  });
   if (gridProximityLine.length > 0) {
     sections.push(gridProximityLine + '\n\n');
-  } else if (state.fogOfWarEnabled === true) {
-    sections.push(buildIntelStalenessRule() + '\n\n');
+  } else {
+    const caveatParts: string[] = [];
+    if (state.fogOfWarEnabled === true) caveatParts.push(buildIntelStalenessRule());
+    if (fogPathLine.length > 0) caveatParts.push(fogPathLine);
+    if (caveatParts.length > 0) sections.push(caveatParts.join('\n\n') + '\n\n');
   }
   sections.push(buildUnitStatusTable(precomputed.unitAssessments, coordCtx, standingOrdersActive));
   sections.push(markdownHeading2(SECTION_TITLE_ATTENTION_FLAGS));

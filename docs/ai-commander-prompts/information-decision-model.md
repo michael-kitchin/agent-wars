@@ -39,7 +39,7 @@ The model is a weak model. Each job below must be answerable from contracted inf
 ### 1.3 Jobs that exist only in a variant
 
 23. **Act with stale intel.** Under fog, treat an enemy position as a last-known report with an age. Needs `INTEL_FRESHNESS`, `INTEL_STALENESS_WINDOW`, `FOG_MODE`.
-24. **Trust hop counts correctly.** Under the omniscient gate, know that printed distances are straight hop counts, not march paths. Needs `HOP_VS_PATH_CAVEAT`.
+24. **Trust printed distances correctly.** Under fog off at res1, printed distances are straight hop counts, not march paths. Under fog on at res1, printed distances are march or sail path lengths when a path exists, while Best Options Target Hexes remain this-turn legal hops. Needs `HOP_VS_PATH_CAVEAT`.
 25. **Do nothing about production, memory, or standing orders when those tools are off.** Needs `TOOL_CATALOG`, `JSON_ENVELOPE`.
 26. **Plan with no options table.** When the options table is absent, derive destinations with the planning tool instead. Needs `TOOL_CATALOG`, `BEST_OPTIONS_ROWS` empty-state.
 27. **Handle every type at cap.** Leave a blocked queue alone rather than churning it. Needs `PRODUCTION_CAP_QUEUE_RULE`.
@@ -49,7 +49,7 @@ The model is a weak model. Each job below must be answerable from contracted inf
 
 What the commander may be told is decided by the snapshot it is given, never by the prompt reaching past it.
 
-1. **Fog on** (`fogOfWarEnabled` true; the default in `isFogOfWarEnabled`). The snapshot passed to prompt assembly is already filtered by `getGameStateForPlayer` for `playerPerspective: 'opponent'`. The prompt may state: own units in full; enemy units only where the snapshot lists them; `exploredHexes` terrain; `enemyIntel` last-known positions with `intelState` and `lastSeenTurn`. The prompt must not state: unexplored terrain (masked to `unknown`), enemy units absent from the snapshot, or `pendingOrders`. Own home region hexes and the intersection are force-visible per `getForcedVisibleHomeRegionHexesForPlayer`, so home-region bullets are legitimate even when the region is not scouted.
+1. **Fog on** (`fogOfWarEnabled` true; the default in `isFogOfWarEnabled`). The snapshot passed to prompt assembly is already filtered by `getGameStateForPlayer` for `playerPerspective: 'opponent'`. The prompt may state: own units in full; enemy units only where the snapshot lists them; `exploredHexes` terrain; `enemyIntel` last-known positions with `intelState` and `lastSeenTurn`. Printed nearest-enemy distances are path lengths when a path exists. The prompt must not state: unexplored terrain (masked to `unknown`), enemy units absent from the snapshot, or `pendingOrders`. Own home region hexes and the intersection are force-visible per `getForcedVisibleHomeRegionHexesForPlayer`, so home-region bullets are legitimate even when the region is not scouted. `HOP_VS_PATH_CAVEAT` is required here as the path-versus-Best-Options line.
 2. **Fog off.** Every hex is visible and explored, and every enemy unit appears with `intelState: 'current'`. `INTEL_FRESHNESS` collapses to "current" for every row, and `HOP_VS_PATH_CAVEAT` becomes required because `usesOmniscientGridProximity` is true at res1.
 3. **Tactical.** Every sub-unit in the footprint is visible to both sides; the narrative states this outright. Fog-off does not make the tactical layer omniscient in the strategic sense: the omniscient gate requires res1 and is therefore never true in a tactical prompt, and `HOP_VS_PATH_CAVEAT` is not emitted there.
 4. **Never disclosed in any mode:** `pendingOrders`, `playerPerspective`, human memory or standing orders, human production queues on hexes the opponent does not control, and any derived quantity that would reveal a hidden enemy position (including per-type vision radii).
@@ -91,7 +91,7 @@ Scope is `strategic`, `tactical`, `both`, or `consult-only`. Status is `required
 | `THREAT_SEVERITY` | Per-unit worst threat severity | `threats[].severity` | fog-filtered | 3, 5 | both | required |
 | `INTEL_FRESHNESS` | Confidence and last-seen turn on an enemy position | `enemyIntel[].intelState`, `lastSeenTurn` | fog-only | 23 | strategic | conditional — `fogOfWarEnabled` true |
 | `INTEL_STALENESS_WINDOW` | How long a last-known position survives before it is dropped | `STALE_INTEL_TURNS` (2) | fog-only | 23 | strategic | conditional — `fogOfWarEnabled` true |
-| `HOP_VS_PATH_CAVEAT` | Printed distances are straight hop counts, not march or sail paths | `OMNISCIENT_GRID_PROXIMITY_BRIEFING_LINE`, `usesOmniscientGridProximity` | n/a | 24 | strategic | conditional — fog off and res1 |
+| `HOP_VS_PATH_CAVEAT` | What a printed nearest-enemy distance means, and that Best Options dests are this-turn legal hops | `OMNISCIENT_GRID_PROXIMITY_BRIEFING_LINE`, `FOG_PATH_DISTANCE_BRIEFING_LINE` | n/a | 24 | strategic | conditional — res1; hop-count line when fog off, path line when fog on |
 
 ### 3.4 Own force state
 

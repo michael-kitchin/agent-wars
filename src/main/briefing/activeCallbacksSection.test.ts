@@ -15,7 +15,9 @@ const strategicCtx: CoordinateContext = { mode: 'strategic' };
 test('infrastructure_destroyed without params describes an unfiltered watch', () => {
   const line = formatCallbackLine({ event: 'infrastructure_destroyed', params: {} }, strategicCtx);
   assert.notEqual(line, 'infrastructure_destroyed');
-  assert.match(line, /any/i);
+  assert.notEqual(line, 'infrastructure_destroyed(any)');
+  assert.match(line, /unfiltered/i);
+  assert.match(line, /no params/i);
 });
 
 test('infrastructure_destroyed Details cell names targetType and cell code', () => {
