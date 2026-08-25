@@ -92,14 +92,16 @@ const MOVEMENT_INSTRUCTION_MEMORY_SUFFIX =
   ' Include a memoryUpdates entry (e.g. write key "strategy" tier "persistent") in your final JSON to record your plan.';
 
 /**
- * Documents the module-scope binding `PRODUCTION_REQUIREMENT_BASE` (PRODUCTION_REQUIREMENT_BASE).
-
- * Purpose: Supports maintainability by documenting why `PRODUCTION_REQUIREMENT_BASE` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
+ * Condition under which the submit clause requires at least one `set_build_queue`.
+ *
+ * Purpose: Empty queues were the only mandated write, so cells queued with a capped type (infantry at
+ * cap while air could still spawn) never became a required work item.
+ * When to use: `buildProductionSubmitClause` when production tools are enabled.
+ * Expected outcome: One sentence fragment covering empty queues and replaceable blocked-at-cap queues.
+ * Exceptions: None. One replacement this turn is enough; every blocked hex need not be listed.
  */
-const PRODUCTION_REQUIREMENT_BASE = 'when at least one controlled hex has availableUnitTypes and an empty queue';
+const PRODUCTION_REQUIREMENT_BASE =
+  'when at least one controlled hex has availableUnitTypes and an empty queue, or a queue blocked at cap while another type can still be built';
 /**
  * Documents the module-scope binding `PRODUCTION_CAP_GUIDANCE` (PRODUCTION_CAP_GUIDANCE).
  *
@@ -274,8 +276,8 @@ export function buildToolUsageGuidance(
   if (hasPrecomputedBriefing) {
     lines.push(
       coordinateMode === 'tactical'
-        ? '- The Commander\'s Briefing above already contains unit status, attention flags, and possible unit actions for this tactical beat. Do NOT call assess_unit, assess_hex, or estimate_combat — that information is already in the briefing. Use the briefing to decide targets and priorities.'
-        : '- The Commander\'s Briefing above already contains unit status, attention flags, possible unit actions, and supplemental hex intelligence for this turn. Do NOT call assess_unit, assess_hex, or estimate_combat — that information is already in the briefing. Use the briefing to decide targets and priorities.'
+        ? '- The Commander\'s Briefing above already contains unit status, attention flags, and possible unit actions for this tactical beat. Use the briefing to decide targets and priorities.'
+        : '- The Commander\'s Briefing above already contains unit status, attention flags, possible unit actions, and supplemental hex intelligence for this turn. Use the briefing to decide targets and priorities.'
     );
   } else {
     if (flags.ordersEnabled || flags.memoryEnabled) {

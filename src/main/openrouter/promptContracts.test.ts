@@ -10,6 +10,7 @@ import {
   buildToolUsageGuidance,
   getInitialUserMessage,
   buildAvailableToolsIntro,
+  buildProductionSubmitClause,
 } from './promptText';
 
 /**
@@ -238,6 +239,65 @@ function testProductionGuidanceSkipsTypesAtDeploymentCap(): void {
   assert.ok(!user.includes('Prefer setting queues on every eligible'));
 }
 
+/**
+ * The envelope must require a queue write when a blocked-at-cap queue still has an alternative type.
+ *
+ * Purpose: Turn 18 had FM/FV/DF queued as infantry at cap with air still buildable; the submit clause only
+ * mandated productionOrders for empty queues, so the model issued none.
+ * When to use: After edits to `buildProductionSubmitClause`.
+ * Expected outcome: The clause names empty queues and queues blocked at cap while another type can still be built.
+ * Exceptions: None.
+ */
+function testProductionSubmitRequiresBlockedQueueReplacement(): void {
+  const flags = getToolFlags(undefined);
+  const clause = buildProductionSubmitClause(flags);
+  assert.ok(/empty queue/i.test(clause), 'still requires a write when a queue is empty');
+  assert.ok(
+    /blocked at cap/i.test(clause) && /still-available type|another type can still be built/i.test(clause),
+    `must also require a write for replaceable blocked queues: ${clause}`
+  );
+}
+
+/**
+ * A precomputed briefing must not name assessment or estimate tools, even as a prohibition.
+ *
+ * Purpose: assembly-contract.md section 4.2: a tool absent from the callable list must not be named as something to call.
+ * Turn 18 still said "Do NOT call assess_unit, assess_hex, or estimate_combat" after those tools were stripped.
+ * When to use: After edits to `buildToolUsageGuidance` briefing-present bullets.
+ * Expected outcome: Briefing-present guidance omits those three names; no-briefing guidance may still name them.
+ * Exceptions: None.
+ */
+function testBriefingGuidanceDoesNotNameUncallableAssessmentTools(): void {
+  const flags = getToolFlags(undefined);
+  const withBriefing = buildToolUsageGuidance(flags, true, 'strategic');
+  assert.ok(!withBriefing.includes('assess_unit'), withBriefing);
+  assert.ok(!withBriefing.includes('assess_hex'), withBriefing);
+  assert.ok(!withBriefing.includes('estimate_combat'), withBriefing);
+  const withoutBriefing = buildToolUsageGuidance(flags, false, 'strategic');
+  assert.ok(
+    withoutBriefing.includes('assess_unit') || withoutBriefing.includes('estimate_combat'),
+    'no-briefing guidance may still name callable assessment tools'
+  );
+}
+
+/**
+ * The illustrative JSON example must not use live roster id prefixes the model can copy onto the map.
+ *
+ * Purpose: Turn 18's example marched opponent-infantry-1 (a real unit) to water cell AB.
+ * When to use: After edits to `getFinalJsonOrdersExampleBlock`.
+ * Expected outcome: Example unit ids use the example- prefix; production example is not infantry.
+ * Exceptions: None.
+ */
+function testExampleBlockUsesPlaceholderIdsNotLiveRosterIds(): void {
+  const block = getFinalJsonOrdersExampleBlock({ includeMemoryUpdates: true, includeProductionOrders: true });
+  assert.ok(!block.includes('opponent-infantry-1'), 'must not use a live infantry id');
+  assert.ok(!block.includes('opponent-armor-2'), 'must not use a live armor id');
+  assert.ok(!block.includes('opponent-naval-1'), 'must not use a live-looking naval id');
+  assert.ok(!block.includes('human-armor-1'), 'must not use a live-looking enemy id');
+  assert.ok(block.includes('example-infantry-1'), 'placeholder infantry id');
+  assert.ok(block.includes('"unitType": "air"') || block.includes('"unitType":"air"'), 'production example must not queue infantry');
+}
+
 function testTacticalCallbacksClauseMentionsBeat(): void {
   const tactical = buildFinalJsonContractInstruction({
     includeMemoryUpdates: false,
@@ -414,6 +474,18 @@ const tests = [
   {
     name: 'production guidance skips types at deployment cap',
     fn: testProductionGuidanceSkipsTypesAtDeploymentCap,
+  },
+  {
+    name: 'production submit requires blocked queue replacement',
+    fn: testProductionSubmitRequiresBlockedQueueReplacement,
+  },
+  {
+    name: 'briefing guidance does not name uncallable assessment tools',
+    fn: testBriefingGuidanceDoesNotNameUncallableAssessmentTools,
+  },
+  {
+    name: 'example block uses placeholder ids not live roster ids',
+    fn: testExampleBlockUsesPlaceholderIdsNotLiveRosterIds,
   },
 ];
 

@@ -482,6 +482,212 @@ function testStrategicNarrativeCriticalSentenceMatchesNeedsAction(): void {
 }
 
 /**
+ * A unit that can close to melee this turn is a worklist row even when a healthy march is already assigned.
+ *
+ * Purpose: Turn 18 marked CF/EC armor Action needed = no while Best Options listed move/melee onto the naval at CQ,
+ * because a healthy FK march hid the this-turn contact. The model left them marching away.
+ * When to use: After edits to `needsAction` / `canCloseThisTurn`.
+ * Expected outcome: Action needed yes, not quiet; unit appears in Attention Flags as a critical threat.
+ * Exceptions: None.
+ */
+function testUnitThatCanCloseThisTurnIsNotHiddenByHealthyMarch(): void {
+  const assessments: UnitAssessmentResult[] = [
+    {
+      unitId: 'opp-closer',
+      result: {
+        status: 'ok',
+        unit: {
+          unitId: 'opp-closer',
+          type: 'armor',
+          position: [1, 1],
+          currentStandingOrder: { orderType: 'march', status: 'en_route' },
+        },
+        nearbyEnemies: [
+          {
+            unitId: 'hum-naval-1',
+            hexDistance: 2,
+            estimatedTurnsToReach: 1,
+            inRangedRange: false,
+            inMeleeRange: false,
+          } as UnitAssessmentResult['result']['nearbyEnemies'][0],
+        ],
+        threats: [{ description: 'under naval fire', severity: 'critical', sourceUnit: 'hum-naval-1' }],
+        canAttackThisTurn: [],
+      } as unknown as UnitAssessmentResult['result'],
+    },
+  ];
+  const table = buildUnitStatusTable(assessments, { mode: 'strategic' as const }, true);
+  const row = table.split('\n').find((l) => l.includes('opp-closer'));
+  assert.ok(row && row.includes('| yes |'), `this-turn closer must read Action needed yes: ${row}`);
+  assert.ok(row && !row.includes('quiet'), `this-turn closer must not be marked quiet: ${row}`);
+  const flags = buildAttentionFlags(assessments, 'strategic', true);
+  assert.ok(flags.includes('opp-closer'), 'this-turn closer belongs in Attention Flags');
+  assert.ok(flags.includes('critical threat'), 'closer is listed as a critical threat, not only as an armed unit');
+}
+
+/**
+ * Attention Flags keep the armed-units aggregate when critical closers would otherwise fill the five-bullet cap.
+ *
+ * Purpose: Per-unit critical bullets used to consume the cap and hide the legal-attack worklist.
+ * When to use: After edits to `buildAttentionFlags` ranking or the reserved armed slot.
+ * Expected outcome: Five bullets; armed aggregate present; at least one this-turn closer named.
+ * Exceptions: None.
+ */
+function testAttentionFlagsReserveArmedSlotWhenClosersFillCap(): void {
+  const assessments: UnitAssessmentResult[] = [];
+  for (let i = 0; i < 5; i++) {
+    assessments.push({
+      unitId: `opp-closer-${i}`,
+      result: {
+        status: 'ok',
+        unit: {
+          unitId: `opp-closer-${i}`,
+          type: 'armor',
+          position: [i, i],
+          currentStandingOrder: { orderType: 'march', status: 'en_route' },
+        },
+        nearbyEnemies: [
+          {
+            unitId: 'hum-1',
+            hexDistance: 2,
+            estimatedTurnsToReach: 1,
+            inRangedRange: false,
+            inMeleeRange: false,
+          } as UnitAssessmentResult['result']['nearbyEnemies'][0],
+        ],
+        threats: [{ description: 'close', severity: 'critical', sourceUnit: 'hum-1' }],
+        canAttackThisTurn: [],
+      } as unknown as UnitAssessmentResult['result'],
+    });
+  }
+  assessments.push({
+    unitId: 'opp-shooter',
+    result: {
+      status: 'ok',
+      unit: {
+        unitId: 'opp-shooter',
+        type: 'naval',
+        position: [9, 9],
+        currentStandingOrder: { orderType: 'defend', status: 'holding' },
+      },
+      nearbyEnemies: [
+        {
+          unitId: 'hum-1',
+          hexDistance: 2,
+          estimatedTurnsToReach: 1,
+          inRangedRange: true,
+          inMeleeRange: false,
+        } as UnitAssessmentResult['result']['nearbyEnemies'][0],
+      ],
+      threats: [{ description: 'in range', severity: 'critical', sourceUnit: 'hum-1' }],
+      canAttackThisTurn: [{ unitId: 'hum-1', attackType: 'ranged', reason: '' }],
+    } as unknown as UnitAssessmentResult['result'],
+  });
+  const flags = buildAttentionFlags(assessments, 'strategic', true);
+  const bullets = flags.split('\n').filter((l) => l.startsWith('- '));
+  assert.equal(bullets.length, 5, `expected 5 attention bullets, got ${bullets.length}: ${flags}`);
+  assert.equal(
+    bullets.filter((b) => b.includes('legal attack')).length,
+    1,
+    'armed-units aggregate must keep one slot when closers would fill the cap'
+  );
+  assert.ok(flags.includes('opp-shooter'), 'shooter is named in the armed aggregate');
+  const threatBullets = bullets.filter((b) => !b.includes('legal attack'));
+  assert.ok(
+    threatBullets.every((b) => !b.includes('opp-shooter')),
+    'shooter must not also occupy a per-unit closer slot'
+  );
+  assert.ok(
+    [0, 1, 2, 3, 4].some((i) => flags.includes(`opp-closer-${i}`)),
+    'at least one this-turn closer is named'
+  );
+}
+
+/**
+ * A healthy march two turns from contact is not a this-turn closer.
+ *
+ * Purpose: Action needed = yes is only for `estimatedTurnsToReach` at most one. Distant critical
+ * threats with a working order must stay off the worklist.
+ * When to use: After edits to `canCloseThisTurn` / `needsAction`.
+ * Expected outcome: Action needed no; Attention Flags omit the unit.
+ * Exceptions: None.
+ */
+function testHealthyMarchTwoTurnsOutStaysOffWorklist(): void {
+  const assessments: UnitAssessmentResult[] = [
+    {
+      unitId: 'opp-far',
+      result: {
+        status: 'ok',
+        unit: {
+          unitId: 'opp-far',
+          type: 'armor',
+          position: [1, 1],
+          currentStandingOrder: { orderType: 'march', status: 'en_route' },
+        },
+        nearbyEnemies: [
+          {
+            unitId: 'hum-naval-1',
+            hexDistance: 4,
+            estimatedTurnsToReach: 2,
+            inRangedRange: false,
+            inMeleeRange: false,
+          } as UnitAssessmentResult['result']['nearbyEnemies'][0],
+        ],
+        threats: [{ description: 'under naval fire', severity: 'critical', sourceUnit: 'hum-naval-1' }],
+        canAttackThisTurn: [],
+      } as unknown as UnitAssessmentResult['result'],
+    },
+  ];
+  const table = buildUnitStatusTable(assessments, { mode: 'strategic' as const }, true);
+  const row = table.split('\n').find((l) => l.includes('opp-far'));
+  assert.ok(row && row.includes('| no |'), `two-turn march must read Action needed no: ${row}`);
+  const flags = buildAttentionFlags(assessments, 'strategic', true);
+  assert.ok(!flags.includes('opp-far'), `two-turn closer must stay off Attention Flags: ${flags}`);
+}
+
+/**
+ * Idle air holding on defend is coaching-only, not an Action needed row.
+ *
+ * Purpose: Turn 18 had twenty-two air units on defend; marking them all yes would flood the worklist.
+ * Ferry toward the fight lives in coaching, not in the Action needed column.
+ * When to use: After edits to `needsAction` for air / missing `estimatedTurnsToReach`.
+ * Expected outcome: Action needed no even with a moderate distant threat and a healthy defend order.
+ * Exceptions: None.
+ */
+function testIdleDefendAirIsNotActionNeeded(): void {
+  const assessments: UnitAssessmentResult[] = [
+    {
+      unitId: 'opp-air-idle',
+      result: {
+        status: 'ok',
+        unit: {
+          unitId: 'opp-air-idle',
+          type: 'air',
+          position: [1, 1],
+          currentStandingOrder: { orderType: 'defend', status: 'holding' },
+        },
+        nearbyEnemies: [
+          {
+            unitId: 'hum-1',
+            hexDistance: 6,
+            estimatedTurnsToReach: null,
+            inRangedRange: false,
+            inMeleeRange: false,
+          } as UnitAssessmentResult['result']['nearbyEnemies'][0],
+        ],
+        threats: [{ description: 'distant', severity: 'moderate', sourceUnit: 'hum-1' }],
+        canAttackThisTurn: [],
+      } as unknown as UnitAssessmentResult['result'],
+    },
+  ];
+  const table = buildUnitStatusTable(assessments, { mode: 'strategic' as const }, true);
+  const row = table.split('\n').find((l) => l.includes('opp-air-idle'));
+  assert.ok(row && row.includes('| no |'), `idle defend air must read Action needed no: ${row}`);
+  const flags = buildAttentionFlags(assessments, 'strategic', true);
+  assert.ok(!flags.includes('opp-air-idle'), `idle defend air must stay off Attention Flags: ${flags}`);
+}
+
+/**
  * Verifies the grid-hops honesty line appears only for fog-off strategic (res1) snapshots.
  *
  * Purpose: Fog-off Unit Status distances are grid hops; the model must be told they are not march paths.
@@ -561,6 +767,22 @@ const tests = [
   {
     name: 'strategic narrative critical sentence matches needsAction',
     fn: testStrategicNarrativeCriticalSentenceMatchesNeedsAction,
+  },
+  {
+    name: 'unit that can close this turn is not hidden by a healthy march',
+    fn: testUnitThatCanCloseThisTurnIsNotHiddenByHealthyMarch,
+  },
+  {
+    name: 'attention flags reserve armed slot when closers fill cap',
+    fn: testAttentionFlagsReserveArmedSlotWhenClosersFillCap,
+  },
+  {
+    name: 'healthy march two turns out stays off the worklist',
+    fn: testHealthyMarchTwoTurnsOutStaysOffWorklist,
+  },
+  {
+    name: 'idle defend air is not Action needed',
+    fn: testIdleDefendAirIsNotActionNeeded,
   },
   {
     name: 'formatBriefing grid proximity honesty line',

@@ -285,14 +285,15 @@ export function buildMemoryWriteLimitsClause(): string {
  * Purpose: Shows assign, move, fire, and cancel — the four strategic verbs the repair schema is
  * allowed to illustrate. consultation-flow.md section 5.1 item 4.
  * When to use: Inside `buildRepairSchemaText` for strategic gates.
- * Expected outcome: Placeholder ids marked as such by the surrounding repair request, not here.
+ * Expected outcome: `example-` ids so a repair round cannot copy live roster prefixes; surrounding
+ * repair text still marks them as placeholders.
  * Exceptions: None.
  */
 const STRATEGIC_REPAIR_ORDERS: readonly Record<string, unknown>[] = [
-  { unitId: 'opponent-armor-1', action: 'assign_order', order: { type: 'march', destination: 'CF' } },
-  { unitId: 'opponent-armor-1', action: 'explicit_move', destination: 'CG' },
-  { unitId: 'opponent-armor-1', action: 'ranged_attack', targetHexCode: 'CH' },
-  { unitId: 'opponent-armor-1', action: 'cancel_order' },
+  { unitId: 'example-armor-1', action: 'assign_order', order: { type: 'march', destination: 'CF' } },
+  { unitId: 'example-armor-1', action: 'explicit_move', destination: 'CG' },
+  { unitId: 'example-armor-1', action: 'ranged_attack', targetHexCode: 'CH' },
+  { unitId: 'example-armor-1', action: 'cancel_order' },
 ];
 
 /**
@@ -346,13 +347,13 @@ export function buildRepairSchemaText(gates: EnvelopeGates): string {
     else if (field === 'strategy') example.strategy = '...';
     else if (field === 'orders') example.orders = orders;
     else if (field === 'airStrikes') {
-      example.airStrikes = [{ unitId: 'opponent-air-1', targetHexCode: 'CI', targetType: 'units' }];
+      example.airStrikes = [{ unitId: 'example-air-1', targetHexCode: 'CI', targetType: 'units' }];
     } else if (field === 'ferryOrders') {
-      example.ferryOrders = [{ unitId: 'opponent-air-2', destination: 'CJ' }];
+      example.ferryOrders = [{ unitId: 'example-air-2', destination: 'CJ' }];
     } else if (field === 'callbacks') example.callbacks = [];
     else if (field === 'memoryUpdates') example.memoryUpdates = [];
     else if (field === 'productionOrders') {
-      example.productionOrders = [{ action: 'set_build_queue', hex: 'CF', unitType: 'infantry', count: 1 }];
+      example.productionOrders = [{ action: 'set_build_queue', hex: 'CF', unitType: 'air', count: 1 }];
     }
   }
   const json = JSON.stringify(example);

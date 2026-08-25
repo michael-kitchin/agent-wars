@@ -161,22 +161,22 @@ const ORDERLESS_BULLET =
  *
  * Purpose: Re-issuing a healthy order wastes the turn and can stall the unit.
  * When to use: When standing-order tools are enabled.
- * Expected outcome: Mentions a healthy standing order and the attention column.
+ * Expected outcome: Mentions a healthy standing order, the attention column, and this-turn move/melee as an override.
  * Exceptions: None.
  */
 const LEAVE_MISSIONS_BULLET =
-  '- Units with a healthy standing order do not need explicit orders from you unless you want to override their current mission this turn; the attention column marks the ones that have stalled.';
+  '- Units with a healthy standing order do not need explicit orders from you unless you want to override their current mission this turn; the attention column marks the ones that have stalled. A this-turn move/melee Target Hex is such an override — copy it even when the unit is already marching.';
 
 /**
  * Idle air should ferry toward the fight when its base can still launch.
  *
  * Purpose: An air unit only contributes inside strike radius; rebasing is free of other actions that turn.
  * When to use: When the opponent has air units.
- * Expected outcome: Ferry toward the fighting only when Base Intact and Base Controlled are yes; never strike and ferry.
+ * Expected outcome: Ferry toward the fighting only when Base Intact and Base Controlled are yes, even on defend; never strike and ferry.
  * Exceptions: None.
  */
 const IDLE_AIR_BULLET =
-  '- For every air unit with no strike listed in Best Options, take its ferry Target Hex toward the fighting, but only when Air Operations Status shows that unit\'s Base Intact and Base Controlled columns as yes. An air unit cannot strike and ferry on the same turn.';
+  '- For every air unit with no strike listed in Best Options, take its ferry Target Hex toward the fighting, but only when Air Operations Status shows that unit\'s Base Intact and Base Controlled columns as yes. Issue that ferry even when the unit is holding on defend. An air unit cannot strike and ferry on the same turn.';
 
 /**
  * Naval units reach land targets from water or coastal cells.

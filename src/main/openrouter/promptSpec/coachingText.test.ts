@@ -78,10 +78,13 @@ test('strategic coaching includes every required item when its gate is on', () =
   assert.match(text, /move\/melee/i);
   assert.match(text, /Units Without Standing Orders/i);
   assert.match(text, /healthy standing order/i);
+  assert.match(text, /move\/melee Target Hex is such an override/i);
   assert.match(text, /toward the fighting/i);
+  assert.match(text, /even when the unit is holding on defend/i);
   assert.match(text, /cannot enter land cells/i);
   assert.match(text, /embark at a legal cell/i);
   assert.match(text, /queue is empty, queue something/i);
+  assert.match(text, /replace blocked queues/i);
   assert.match(text, /shared cells count toward both/i);
   assert.match(text, /Do not persist enemy positions/i);
   assert.match(text, /replaces the entire subscription list/i);

@@ -176,6 +176,10 @@ test('buildRepairSchemaText matches field order and forbids tactical standing-or
   assert.ok(strategicText.includes('cancel_order'));
   assert.ok(strategicText.includes('memoryUpdates'));
   assert.ok(strategicText.includes('productionOrders'));
+  assert.ok(strategicText.includes('example-armor-1'), 'repair schema must use placeholder armor id');
+  assert.ok(strategicText.includes('example-air-1'), 'repair schema must use placeholder air id');
+  assert.ok(!strategicText.includes('opponent-armor-1'), 'repair schema must not use a live-looking armor id');
+  assert.ok(!strategicText.includes('opponent-air-1'), 'repair schema must not use a live-looking air id');
 
   const noStandingText = buildRepairSchemaText({
     ...strategic,

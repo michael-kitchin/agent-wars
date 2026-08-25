@@ -24389,6 +24389,9 @@
     if (units.length <= LOSS_ENTRY_LIST_MAX) {
       return units.map((u) => u.displayName).join(", ");
     }
+    return formatGroupedTypeTotals(units);
+  }
+  function formatGroupedTypeTotals(units) {
     const counts = { naval: 0, air: 0, armor: 0, infantry: 0 };
     for (const u of units) {
       if (u.unitType in counts) counts[u.unitType] += 1;
@@ -24509,7 +24512,7 @@
     const visible = player === "human" || !args.isVictimVisible || args.isVictimVisible(victimId, player);
     if (!visible) return null;
     const displayName = snap?.displayName && snap.displayName.length > 0 ? snap.displayName : args.resolveDisplayName(victimId);
-    return { unitType, displayName };
+    return { unitType, displayName, unitId: victimId };
   }
   function bucketForPlayer(summary, player) {
     return player === "human" ? summary.human : summary.ai;

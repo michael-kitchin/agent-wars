@@ -226,20 +226,20 @@ export function getFinalJsonOrdersExampleBlock(flags: FinalJsonExampleFlags): st
       : 'Close with observed enemies and keep production moving.',
     orders: tactical || !standingOrdersIssuable
       ? [
-          { action: 'explicit_move', unitId: tactical ? 'opp-parent:01' : 'opponent-armor-2', destination: 'AB' },
-          { action: 'ranged_attack', unitId: tactical ? 'opp-parent:02' : 'opponent-naval-1', targetUnitId: tactical ? 'hum-parent:01' : 'human-armor-1' },
+          { action: 'explicit_move', unitId: tactical ? 'opp-parent:01' : 'example-armor-1', destination: 'CD' },
+          { action: 'ranged_attack', unitId: tactical ? 'opp-parent:02' : 'example-naval-1', targetUnitId: tactical ? 'hum-parent:01' : 'example-human-1' },
         ]
       : [
-          { action: 'assign_order', unitId: 'opponent-infantry-1', order: { type: 'march', destination: 'AB' } },
-          { action: 'assign_order', unitId: 'opponent-naval-2', order: { type: 'patrol', waypoints: ['AB', 'CD'] } },
-          { action: 'explicit_move', unitId: 'opponent-armor-2', destination: 'CD' },
-          { action: 'ranged_attack', unitId: 'opponent-naval-1', targetUnitId: 'human-armor-1' },
+          { action: 'assign_order', unitId: 'example-infantry-1', order: { type: 'march', destination: 'CD' } },
+          { action: 'assign_order', unitId: 'example-naval-2', order: { type: 'patrol', waypoints: ['CD', 'CF'] } },
+          { action: 'explicit_move', unitId: 'example-armor-1', destination: 'CF' },
+          { action: 'ranged_attack', unitId: 'example-naval-1', targetUnitId: 'example-human-1' },
         ],
     airStrikes: [],
     ferryOrders: [],
     callbacks: [],
     memoryUpdates: [],
-    productionOrders: [{ action: 'set_build_queue', hex: 'AB', unitType: 'infantry', count: 1 }],
+    productionOrders: [{ action: 'set_build_queue', hex: 'CF', unitType: 'air', count: 1 }],
   };
   const example: Record<string, unknown> = {};
   for (const field of envelopeFieldsForGates(gates)) {

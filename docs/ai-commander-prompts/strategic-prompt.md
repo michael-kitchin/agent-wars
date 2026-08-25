@@ -82,7 +82,7 @@ Assessment-tool and combat-estimate hints must **not** appear when a precomputed
 #### `## Attention Flags`
 
 - **Shape:** a bullet list, not a table.
-- **Sort and cap:** ranked with critical threats first, then moderate, then standing-order warnings, then the aggregate armed-units bullet; capped at five bullets.
+- **Sort and cap:** ranked with critical threats first (including this-turn closers that already have a healthy standing order), then moderate, then standing-order warnings, then the aggregate armed-units bullet; capped at five bullets. When the armed-units bullet is present it always occupies one of those five slots so per-unit critical closers cannot hide the legal-attack worklist. A unit that already has a legal attack is named only in that armed-units bullet, not also as a per-unit closer, so closers without shots are not crowded out by shooters.
 - **Overflow contract:** units past the cap are **not** dropped from the model's view; they remain in the unit table with their action-needed value. The armed-units bullet names at most twelve unit ids and then states how many further units are marked as needing action. Any future cap change must keep both halves of this contract.
 - **Items:** `ATTENTION_FLAGS`, `ACTION_NEEDED_FLAG`.
 - **Include:** always inside the briefing. **Empty-state:** `None.`
@@ -209,7 +209,7 @@ Bullets in this order.
 
 ### 1.13 Response envelope contract and example
 
-Contract text in section 3; the example immediately follows it and must be consistent with it. Both are always included.
+Contract text in section 3; the example immediately follows it and must be consistent with it. Both are always included. The example unit ids must use an `example-` prefix so they cannot collide with live snapshot ids. The parse-repair schema uses the same prefix. The production example must not queue a type that is commonly at cap (prefer air over infantry).
 
 ## 2. Table column contracts
 
@@ -233,7 +233,7 @@ Cell contracts that carry meaning beyond the column name:
 1. **Unit status `Hex`** is a briefing code, or an em dash when the unit has no mapped position.
 2. **Unit status `Nearest enemy + distance`** names the enemy unit id and the hop distance, followed by intel quality and, under fog, the turn it was last seen. When no enemy is observed the cell is an em dash, and the scouting directive is what tells the model to act on that.
 3. **Unit status `Threat severity`** is one of critical, moderate, low, or an em dash.
-4. **Unit status `Action needed`** is yes or no. A quiet rear-area unit may be annotated as quiet; the annotation never replaces the yes or no value.
+4. **Unit status `Action needed`** is yes or no. It is yes when the unit has a legal shot this turn, or can close to the nearest enemy this turn (`estimatedTurnsToReach` at most one) under a moderate or critical threat, even if a healthy standing order already exists. An air unit holding on defend with no legal shot is not marked yes solely because coaching tells it to ferry. A quiet rear-area unit may be annotated as quiet; the annotation never replaces the yes or no value.
 5. **Best Options `Unit IDs`** may list several unit ids. Every id on the row may use that row's targets. This must be stated in the guidance bullets, not left to inference.
 6. **Best Options `Action`** takes exactly one of: `air strike`, `ranged`, `approach`, `ferry`, `move/melee`. Each maps to one envelope destination, per section 3.3.
 7. **Best Options `Target Hexes`** are already legal this turn for every unit on the row. Approach targets are empty of units. move/melee targets may be enemy-occupied (that is contact). Per-unit rows are capped at five before identical rows are merged; the cap is a presentation limit and the routing tool remains available for anything not listed.
@@ -264,7 +264,7 @@ Fields, order, and presence follow `assembly-contract.md` section 5.1. Strategic
 | `airStrikes` entry | `unitId`, exactly one of a target cell code or a target unit id, `targetType` of units, urban, airport, or seaport | Within the strike radius of an intact, controlled base. One air action per unit per turn. |
 | `ferryOrders` entry | `unitId`, `destination` | Airport to airport within the ferry radius. A unit that strikes this turn must not also ferry; a ferry order for a striking unit is discarded. |
 | `memoryUpdates` entry | write or delete with a key, and content plus tier for a write | Keys are short and restricted to letters, digits, hyphen, and underscore; content is length-limited. There is no memory write tool. |
-| `productionOrders` entry | `action`, `hex`, `unitType`, `count` | Count is a whole number from one to ninety-nine. Each entry replaces that cell's whole queue with one type and count. An entry missing `action` or a required field is dropped. |
+| `productionOrders` entry | `action`, `hex`, `unitType`, `count` | Count is a whole number from one to ninety-nine. Each entry replaces that cell's whole queue with one type and count. An entry missing `action` or a required field is dropped. At least one `set_build_queue` is required this turn when any controlled hex has an empty queue, or a queue blocked at cap while another type can still be built. |
 
 ### 3.3 Option row to envelope field mapping
 
@@ -301,12 +301,12 @@ System-prompt content only. Each item is a rule the model must be told, with the
 6. **Copy option rows by action type.** Use the mapping in section 3.3, and route only for a destination the table does not list for that unit. One row may name several units. Carries `BEST_OPTIONS_ROWS`.
 7. **Friendly stacks are illegal destinations; enemy cells are move/melee contact.** Copy a move/melee Target Hex even when it holds an enemy. Approach Target Hexes are empty of units.
 8. **Give every orderless unit a mission.** For each row of the orderless table, issue a standing order: march or pursue to close, defend to hold. The suggested destination is a ready-made legal march target. Never march a unit to its own cell. Carries `ORDERLESS_UNITS`, `SUGGESTED_DESTINATION`, `MARCH_CURRENT_HEX_RULE`.
-9. **Leave working missions alone.** A unit with a healthy standing order needs no new order unless the model wants to override it; the attention column marks the ones that have stalled. Carries `STANDING_ORDER_STATE`.
-10. **Move idle air toward the fight.** An air unit only contributes when something is inside its strike radius, and rebasing costs it nothing else that turn. Any air unit with no strike available should ferry toward the fighting, and no air unit should both strike and ferry. Carries `FERRY_DESTINATIONS`, `AIR_ORDER_RESTRICTIONS`.
+9. **Leave working missions alone, except this-turn contact.** A unit with a healthy standing order needs no new order unless the model wants to override it; the attention column marks the ones that have stalled. A this-turn move/melee Target Hex is such an override — copy it even when the unit is already marching. Carries `STANDING_ORDER_STATE`.
+10. **Move idle air toward the fight.** An air unit only contributes when something is inside its strike radius, and rebasing costs it nothing else that turn. Any air unit with no strike available should ferry toward the fighting even when it is holding on defend, and no air unit should both strike and ferry. Carries `FERRY_DESTINATIONS`, `AIR_ORDER_RESTRICTIONS`.
 11. **Route naval units to reach land targets.** Naval units cannot enter land cells; to engage a land target, move to the nearest water or coastal cell within range. Carries `NAVAL_MOVEMENT_DOMAIN`.
 12. **Use sealift deliberately.** When land force must cross water, embark at a legal cell, move the transport, then disembark; loading requires a coastal cell, a land seaport, or a controlled seaport on transit water. Carries `EMBARK_LEGALITY`, `EMBARK_HEX`.
 13. **Scout when blind.** With no enemy observed, move to regain contact rather than hold. Carries `ENEMY_ROSTER_OBSERVED`.
-14. **Keep production queued.** When a controlled cell can build and its queue is empty, queue something. Replace a queue blocked by a cap with an available type; when every available type for that cell is capped, leave the queue alone so it resumes when the cap frees. Carries `PRODUCTION_QUEUES`, `PRODUCTION_CAP_QUEUE_RULE`.
+14. **Keep production queued.** When a controlled cell can build and its queue is empty, queue something. Replace a queue blocked by a cap with an available type this turn; when every available type for that cell is capped, leave the queue alone so it resumes when the cap frees. The response must include at least one `set_build_queue` when any controlled hex has an empty queue or a blocked-at-cap queue that still has an alternative type. Carries `PRODUCTION_QUEUES`, `PRODUCTION_CAP_QUEUE_RULE`.
 15. **Shared home cells count for both sides.** When the home regions intersect, the listed shared cells count toward both win conditions, so holding them serves defence and attack at once. Include only when an intersection exists. Carries `HOME_REGION_OVERLAP`.
 16. **Persist intent, not data.** Write a short persistent note naming this turn's objectives and the units assigned to them. Do not persist enemy positions or rosters, which the briefing already supplies fresh each turn. Carries `MEMORY_PERSISTENT`, `MEMORY_WRITE_PATH`.
 17. **Subscribe to what would change the plan.** Callbacks are chosen from the engine's event vocabulary and the response replaces the entire subscription list. Carries `CALLBACK_EVENT_VOCABULARY`, `CALLBACK_REPLACE_SEMANTICS`.

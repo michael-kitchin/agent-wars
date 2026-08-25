@@ -10,7 +10,7 @@ import type { PrecomputationResult, UnitAssessmentResult, HexAssessmentEntry } f
 import type { CallbackSubscription } from './callbackSubscriptions';
 import { cellToLatLng, latLngToCell } from 'h3-js';
 import { LATLNG_DECIMAL_PLACES } from './mapData';
-import { logTrace } from './logger';
+import { logDebug, logTrace } from './logger';
 import { buildStrategicOperationalMapSectionMarkdown } from './briefing/map/briefing-map-section';
 import { ensureStrategicCoordinateRegistryInitialized } from './briefing/map/hex-coordinates';
 import { h3ToCode } from './briefing/map/hex-code-translator';
@@ -236,13 +236,37 @@ function hasLegalAttackThisTurn(assessment: UnitAssessmentResult): boolean {
 }
 
 /**
+ * True when the nearest observed enemy is at most one march/sail turn away.
+ *
+ * Purpose: A healthy standing order must not hide a this-turn move/melee close. The assessment already
+ * stores `estimatedTurnsToReach` (grid-hop ETA when omniscient, path ETA under fog); Action needed and
+ * Attention Flags read that instead of re-deriving Best Options.
+ * When to use: `needsAction` and Attention Flags when standing orders are active.
+ * Expected outcome: True for `estimatedTurnsToReach` 0 or 1, or same-hex melee when the turn estimate is absent.
+ * Exceptions: Air units typically have a null estimate (no march budget) and therefore return false here
+ * unless they occupy the enemy cell.
+ */
+function canCloseThisTurn(assessment: UnitAssessmentResult): boolean {
+  const nearest = assessment.result.nearbyEnemies?.[0] as
+    | { estimatedTurnsToReach?: unknown; inMeleeRange?: unknown }
+    | undefined;
+  if (!nearest) return false;
+  if (typeof nearest.estimatedTurnsToReach === 'number') {
+    return nearest.estimatedTurnsToReach <= 1;
+  }
+  return nearest.inMeleeRange === true;
+}
+
+/**
  * Marks units that deserve Attention Flags / Action needed = yes.
  *
  * Purpose: Triage Unit Status and Attention Flags without flooding on distant low threats, while never letting a
- * standing order hide a shot the model should be choosing itself.
+ * standing order hide a shot or a this-turn close the model should be choosing itself. Idle air holding on
+ * defend is left off this flag; coaching still tells the model to ferry those units.
  * When to use: Unit Status rows and Attention Flags assembly.
- * Expected outcome: Always true when the unit has a legal attack. Otherwise: when standing orders are inactive,
- * moderate/critical threats only; when active, also missing/warning standing orders.
+ * Expected outcome: Always true when the unit has a legal attack or can close this turn under a moderate/critical
+ * threat. Otherwise: when standing orders are inactive, moderate/critical threats only; when active, also
+ * missing/warning standing orders.
  * Exceptions: None.
  */
 function needsAction(assessment: UnitAssessmentResult, standingOrdersActive: boolean): boolean {
@@ -250,6 +274,9 @@ function needsAction(assessment: UnitAssessmentResult, standingOrdersActive: boo
   // never a reason to tell it a unit needs nothing, or it loses the chance to pick a better target than the
   // nearest one.
   if (hasLegalAttackThisTurn(assessment)) return true;
+  // A this-turn close is the other action the engine cannot choose a destination for. A healthy march to a
+  // rear hex must not mark the unit as needing nothing while Best Options lists move/melee onto the enemy.
+  if (canCloseThisTurn(assessment) && hasActionableThreat(assessment)) return true;
   const actionable = hasActionableThreat(assessment);
   if (!standingOrdersActive) return actionable;
   const order = assessment.result.unit?.currentStandingOrder as { status?: string } | null | undefined;
@@ -295,6 +322,11 @@ export function buildUnitStatusTable(
    */
   standingOrdersActive = true
 ): string {
+  logDebug('briefingFormatter buildUnitStatusTable', {
+    unitCount: unitAssessments.length,
+    mode: ctx.mode,
+    standingOrdersActive,
+  });
   const header =
     '| Unit ID | Type | Hex | Nearest enemy + distance | Threat severity | Action needed |';
   const sep = '|---------|------|-----|---------------------------|-----------------|---------------|';
@@ -369,6 +401,11 @@ export function buildAttentionFlags(
    */
   standingOrdersActive = true
 ): string {
+  logDebug('briefingFormatter buildAttentionFlags', {
+    unitCount: unitAssessments.length,
+    coordinateMode,
+    standingOrdersActive,
+  });
   // Ranks 0-3 are threat severities; rank 4 is reserved for the available-attack bullet, which must never displace
   // a threat from the five-bullet cap.
   const severityRank = (sev: 'critical' | 'moderate' | 'low' | null): number => {
@@ -397,7 +434,15 @@ export function buildAttentionFlags(
       continue;
     }
     const order = a.result.unit?.currentStandingOrder as { status?: string } | null | undefined;
-    if (!order && hasActionableThreat(a) && nearest) {
+    // Shooters already occupy the armed-units aggregate. Emitting them again as closers lets naval/air
+    // shots fill the reserved threat slots and hide armor that can only move/melee this turn.
+    if (canCloseThisTurn(a) && hasActionableThreat(a) && nearest && !hasLegalAttackThisTurn(a)) {
+      const sev = maxThreatSeverity(threats);
+      candidates.push({
+        rank: severityRank(sev),
+        text: `${formatUnitDisplayRef(a.unitId)} faces a ${sev} threat (nearest enemy: ${formatUnitDisplayRef(nearest.unitId)}, distance ${nearest.hexDistance}).`,
+      });
+    } else if (!order && hasActionableThreat(a) && nearest) {
       const sev = maxThreatSeverity(threats);
       candidates.push({
         rank: severityRank(sev),
@@ -413,7 +458,8 @@ export function buildAttentionFlags(
   if (armedUnitRefs.length > 0) {
     // One bullet for the whole group rather than one each. Per-unit bullets ate the entire five-bullet cap the
     // first time a handful of units had shots, hiding both the sixth shooter and any threat bullet behind them.
-    // Rank 4 keeps it below every threat bullet, so it can only ever take a slot no threat wanted.
+    // Rank 4 is below every threat bullet; the slice below still reserves one of the five slots for it whenever
+    // it exists, so critical closers cannot hide the legal-attack worklist.
     const listed = armedUnitRefs.slice(0, ATTENTION_ARMED_UNITS_LISTED);
     const overflow = armedUnitRefs.length - listed.length;
     candidates.push({
@@ -426,10 +472,12 @@ export function buildAttentionFlags(
   }
   if (candidates.length === 0) return 'None.';
   candidates.sort((a, b) => a.rank - b.rank || a.text.localeCompare(b.text));
-  return candidates
-    .slice(0, 5)
-    .map((c) => `- ${c.text}`)
-    .join('\n');
+  const threatCandidates = candidates.filter((c) => c.rank < 4);
+  const armedCandidate = candidates.find((c) => c.rank === 4);
+  const threatLimit = armedCandidate ? 4 : 5;
+  const selected = threatCandidates.slice(0, threatLimit);
+  if (armedCandidate) selected.push(armedCandidate);
+  return selected.map((c) => `- ${c.text}`).join('\n');
 }
 
 /**

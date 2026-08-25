@@ -56,7 +56,7 @@ function strategicOpening(overrides: Partial<OpeningMessageGates> = {}): Opening
  */
 const SYSTEM_OWNED_RULES: readonly string[] = [
   PRODUCTION_CAP_QUEUE_GUIDANCE,
-  'when at least one controlled hex has availableUnitTypes and an empty queue',
+  'when at least one controlled hex has availableUnitTypes and an empty queue, or a queue blocked at cap while another type can still be built',
   'Prefer setting queues on every eligible',
   'include memoryUpdates in your final JSON for strategy notes',
   'Copy Best Options approach and move/melee Target Hexes into explicit_move',
