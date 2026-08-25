@@ -15,9 +15,8 @@ import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import { logDebug, logTrace } from '../logger';
 import { getValidDestinationsUnoccupied } from '../oneStepMoveDestinations';
 import {
-  nearestEnemyHexesFrom,
+  gridHopDistanceBetween,
   pickApproachHexesTowardNearestEnemy,
-  shortestHopDistanceToAny,
 } from './assessUnitProximity';
 import { canAssignStandingOrderType } from './tool5StandingOrdersShared';
 
@@ -41,11 +40,10 @@ function enemyOccupiedHexes(state: GameStateSnapshot, playerId: string): Readonl
 /**
  * Chooses the single closing destination to show for one unit.
  *
- * Purpose: Best Options lists every closing hex, but a suggestion column has room for one, so it must be the best one
- * and it must be chosen deterministically or the briefing would churn between equivalent hexes turn to turn.
+ * Purpose: Best Options lists every closing hex, but a suggestion column has room for one, so it must be the same
+ * first approach dest Best Options would keep after ranking (unit-to-dest hop, then hex id).
  * When to use: Per orderless unit, with that unit's already-legal unoccupied one-step destinations.
- * Expected outcome: The candidate with the smallest hop distance to the nearest enemy, ties broken by hex id; null when
- * no candidate closes the distance.
+ * Expected outcome: The closest legal closing dest to the unit; null when no candidate closes the distance.
  * Exceptions: None.
  */
 function bestClosingDestination(
@@ -55,12 +53,10 @@ function bestClosingDestination(
 ): string | null {
   const closing = pickApproachHexesTowardNearestEnemy(unitH3, candidates, enemyOccupiedH3);
   if (closing.length === 0) return null;
-  const nearest = nearestEnemyHexesFrom(unitH3, enemyOccupiedH3);
-  if (nearest === null) return null;
   let best: string | null = null;
   let bestDistance = Infinity;
   for (const h3 of closing) {
-    const distance = shortestHopDistanceToAny(h3, nearest.hexes);
+    const distance = gridHopDistanceBetween(unitH3, h3);
     if (distance === null) continue;
     if (distance < bestDistance || (distance === bestDistance && best !== null && h3 < best)) {
       best = h3;

@@ -12,6 +12,12 @@ import { buildActiveCallbacksSection, formatCallbackLine } from './activeCallbac
 
 const strategicCtx: CoordinateContext = { mode: 'strategic' };
 
+test('infrastructure_destroyed without params describes an unfiltered watch', () => {
+  const line = formatCallbackLine({ event: 'infrastructure_destroyed', params: {} }, strategicCtx);
+  assert.notEqual(line, 'infrastructure_destroyed');
+  assert.match(line, /any/i);
+});
+
 test('infrastructure_destroyed Details cell names targetType and cell code', () => {
   ensureStrategicCoordinateRegistryInitialized();
   const h3Index = listStrategicRes1H3Indexes()[0];
@@ -24,6 +30,15 @@ test('infrastructure_destroyed Details cell names targetType and cell code', () 
   assert.ok(line.includes('airport'), 'Details must name targetType');
   assert.ok(line.includes(cell), 'Details must name the cell code');
   assert.equal(line, `infrastructure_destroyed(airport, ${cell})`);
+});
+
+test('infrastructure_destroyed Details keeps a stored briefing code', () => {
+  const line = formatCallbackLine(
+    { event: 'infrastructure_destroyed', params: { targetType: 'seaport', h3Index: 'CI' } },
+    strategicCtx
+  );
+  assert.equal(line, 'infrastructure_destroyed(seaport, CI)');
+  assert.doesNotMatch(line, /specified territory/);
 });
 
 test('Active Callbacks table renders taught subscription parameters', () => {

@@ -215,6 +215,7 @@ export function buildInvalidOutputRulesClause(gates: EnvelopeGates): string {
     'More than one ranged or air action for the same unit in the same period is not honoured.',
     'Raw H3 strings and latitude/longitude pairs are never valid field values.',
     "A ranged action's target must not be the acting unit's own move destination.",
+    'A one-step destination that holds a friendly unit is not legal.',
   ];
   if (gates.coordinateMode === 'tactical') {
     return [
@@ -229,7 +230,6 @@ export function buildInvalidOutputRulesClause(gates: EnvelopeGates): string {
     "A march to the unit's current cell is dropped as already arrived.",
     ...(gates.includeAirActions ? ['Air units cannot be given march, patrol, or pursue orders.'] : []),
     'Infantry cannot be given a strategic ranged_attack.',
-    'A one-step destination that is occupied is not legal.',
   ].join(' ');
 }
 

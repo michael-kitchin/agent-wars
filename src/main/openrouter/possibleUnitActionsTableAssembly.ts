@@ -260,7 +260,7 @@ export const ACTION_FERRY = 'ferry';
 /**
  * Urban count used when ranking Best Options rows for the per-unit cap.
  *
- * Purpose: Approach dests may include friendly-occupied cities (stacking while closing); those must not outrank closer empty hexes via urban count.
+ * Purpose: Approach dests are empty of units; urban count must not outrank a closer empty closing hex.
  * When to use: `compareTableRowsForUnitPriority` only.
  * Expected outcome: `0` for rows whose action types include `approach`; otherwise the row's `urbanHexCount`.
  * Exceptions: None.

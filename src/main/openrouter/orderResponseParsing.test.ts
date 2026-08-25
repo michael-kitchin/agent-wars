@@ -5,7 +5,7 @@
 
 import * as assert from 'assert';
 import { cellToLatLng } from 'h3-js';
-import { ensureStrategicCoordinateRegistryInitialized } from '../briefing/map/hex-coordinates';
+import { ensureStrategicCoordinateRegistryInitialized, listStrategicRes1H3Indexes } from '../briefing/map/hex-coordinates';
 import { buildLatLngCoordinateMap } from '../mapData';
 import type { GameStateSnapshot } from '../gameDb';
 import { dbRun, getGameState } from '../gameDb';
@@ -293,6 +293,38 @@ function testExplicitMoveWhileEmbarkedAutoDebarks(): void {
 }
 
 /**
+ * Stores infrastructure_destroyed watches as H3, not as the briefing code the prompt taught.
+ *
+ * Purpose: Compact and object JSON name `hex` or put a two-character code in `h3Index`; the evaluator matches destroyed-infra events by H3.
+ * When to use: After edits to compact parsing or `rewriteInfrastructureDestroyedParams`.
+ * Expected outcome: `params.h3Index` is the registry H3 for the supplied briefing code; `targetType` is preserved.
+ * Exceptions: Assertion failure if registry init cannot produce a strategic cell code.
+ */
+function testInfrastructureDestroyedCallbackStoresH3NotBriefingCode(): void {
+  ensureStrategicCoordinateRegistryInitialized();
+  const h3 = listStrategicRes1H3Indexes()[0];
+  assert.ok(h3, 'expected at least one strategic cell');
+  const code = h3ToCode(h3, { mode: 'strategic' });
+  const compact = parseFixture(
+    `{"strategy":"hold","orders":[],"callbacks":["infrastructure_destroyed(airport, ${code})"]}`
+  );
+  assert.ok(compact);
+  const compactSub = compact!.callbacks?.find((c) => c.event === 'infrastructure_destroyed');
+  assert.ok(compactSub, 'compact form must store the subscription');
+  assert.strictEqual(compactSub!.params.targetType, 'airport');
+  assert.strictEqual(compactSub!.params.h3Index, h3);
+
+  const objectForm = parseFixture(
+    `{"strategy":"hold","orders":[],"callbacks":[{"event":"infrastructure_destroyed","params":{"targetType":"urban","hex":"${code}"}}]}`
+  );
+  assert.ok(objectForm);
+  const objectSub = objectForm!.callbacks?.find((c) => c.event === 'infrastructure_destroyed');
+  assert.ok(objectSub, 'object form must store the subscription');
+  assert.strictEqual(objectSub!.params.targetType, 'urban');
+  assert.strictEqual(objectSub!.params.h3Index, h3);
+}
+
+/**
  * Documents the module-scope binding `tests` (tests).
 
  * Purpose: Registers named cases for the manual test runner at the bottom of this file.
@@ -308,6 +340,10 @@ const tests = [
   { name: 'parseOrdersResponse rejects top-level JSON array', fn: testRejectsTopLevelJsonArray },
   { name: 'parseOrdersResponse invalid assign_order type drop reason', fn: testInvalidAssignOrderTypeSurfacesDropReason },
   { name: 'parseOrdersResponse tactical skips assign_order and cancel_order', fn: testTacticalModeSkipsAssignAndCancelOrder },
+  {
+    name: 'parseOrdersResponse infrastructure_destroyed stores H3 not briefing code',
+    fn: testInfrastructureDestroyedCallbackStoresH3NotBriefingCode,
+  },
   { name: 'parseOrdersResponse disembark clears assignment and enqueues movement', fn: testDisembarkClearsAssignmentAndEnqueuesMovement },
   { name: 'parseOrdersResponse explicit_move while embarked auto-debarks', fn: testExplicitMoveWhileEmbarkedAutoDebarks },
 ];

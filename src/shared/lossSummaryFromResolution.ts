@@ -213,7 +213,7 @@ function resolveLostUnit(
     snap?.displayName && snap.displayName.length > 0
       ? snap.displayName
       : args.resolveDisplayName(victimId);
-  return { unitType, displayName };
+  return { unitType, displayName, unitId: victimId };
 }
 
 /**

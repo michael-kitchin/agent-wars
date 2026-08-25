@@ -56,6 +56,9 @@ function testStrikeableInfraCountsOnlyHumanControlled(): void {
   assert.equal(cells[6], '1', 'Strikeable Airports must count only the human-controlled hex');
   assert.equal(cells[7], '1', 'Strikeable Seaports must count only the human-controlled hex');
   assert.match(md, /Enemy infrastructure in your current strike envelope: airports=1, seaports=1/);
+  assert.match(md, /infrastructure_destroyed/);
+  assert.match(md, /targetType/i);
+  assert.doesNotMatch(md, /h3Index/);
 }
 
 /**

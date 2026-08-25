@@ -222,7 +222,7 @@ Each of these is specified as required and is `absent` or `partial` in current o
 | `MEMORY_WRITE_LIMITS` | Legal actions table | absent |
 | `CONSULT_POLICY` | Envelope contract and tactical coaching | absent |
 | Air and naval sections omitted rather than dashed | Both mode files, roster gates | currently emitted as a dash row |
-| Callback detail cell describing parameters | Active callbacks, both modes | partial — one event repeats its own name |
+| Callback detail cell describing parameters | Active callbacks, both modes | present — unfiltered infrastructure watches render as `infrastructure_destroyed(any)` |
 | Generic goal statement for a missing scenario | Goal statement | absent — today the region wording is emitted unconditionally |
 
 ## 7. Open engine-versus-rules defects
@@ -233,15 +233,15 @@ Carried from `source-inventory.md` section 8. Each is resolved in favour of the 
 | --- | --- |
 | `CAPS_V3_STALE` | The older combat-rules document contradicts the live caps; it should be corrected or marked superseded on the caps question |
 | `TACTICAL_STRUCTURE_V3` | Same document describes a superseded tactical turn structure |
-| `WEGO_ORDER_UNSTATED` | The prompt must gain the full phase order; the older document's five-phase list omits embark and cargo sync |
+| `WEGO_ORDER_UNSTATED` | The prompt now states the engine order; the older combat-rules document's five-phase list still omits embark and cargo sync |
 | `TEMPO_SWEEP_SILENCE` | Deliberate omission, documented in both mode files; must not be "fixed" by adding a sentence about the engine fallback |
 | `TEMPO_FREE_CLAIM` | The false absolute must be removed from tool guidance in both modes |
 | `STRATEGIC_CONTEXT_OPENING_UNCONDITIONAL` | The unconditional enemy-intent sentence must be removed |
 | `HOLD_FIRE_UNGUIDED` | The withholding order needs stated semantics |
-| `OCCUPANCY_UNSTATED` | The occupancy rule needs stating |
+| `OCCUPANCY_UNSTATED` | The prompt now states friendly stacks are illegal and enemy cells are move/melee contact |
 | `CASUALTY_ORDER_ABSENT` | The victim-sort rule needs stating |
 | `CALLBACK_VOCAB_ABSENT` | The event list needs stating; the never-firing event should be removed from the vocabulary or implemented |
-| `CALLBACK_DETAILS_THIN` | The detail formatter needs a parameter-bearing form for every event |
+| `CALLBACK_DETAILS_THIN` | Details now names parameters, including `infrastructure_destroyed(any)` when the watch is unfiltered |
 | `EMBARK_CONTROL_CONDITION` | The embark prose needs the control condition |
 | `OMNISCIENT_GATE_NARROW` | Re-gate the caveat line on the meaning of the distances rather than on the fog flag alone |
 | `INFANTRY_RANGE_SPLIT` | Already correct in the prompt; the older document is the stale side |

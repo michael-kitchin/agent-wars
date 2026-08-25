@@ -235,21 +235,41 @@ export const CALLBACK_EVENT_VOCAB = new Set([
 ]);
 
 /**
- * Defines the `parseInfrastructureDestroyedCallbackArgs` function shape (function parseInfrastructureDestroyedCallbackArgs(arg: string): Record<string, unknown>).
-
- * Purpose: Supports maintainability by documenting why `parseInfrastructureDestroyedCallbackArgs` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
+ * Turns a briefing hex code into the H3 id the evaluator compares against destroyed-infra events.
+ *
+ * Purpose: The prompt forbids raw H3 in JSON, so subscriptions arrive as two-character codes that must be stored as H3.
+ * When to use: Compact and object-form `infrastructure_destroyed` params.
+ * Expected outcome: An H3 index string, or the original value when it is already an index or lookup fails.
+ * Exceptions: Lookup failure returns `raw` unchanged so a type-only watch still stores.
  */
-function parseInfrastructureDestroyedCallbackArgs(arg: string): Record<string, unknown> {
+function resolveInfrastructureHexToH3(raw: string, context: CoordinateContext): string {
+  if (!HEX_CODE_PATTERN.test(raw)) return raw;
+  try {
+    return codeToH3(raw, context);
+  } catch {
+    return raw;
+  }
+}
+
+/**
+ * Parses compact `infrastructure_destroyed` arguments into evaluator params.
+ *
+ * Purpose: The prompt teaches `targetType` plus a briefing hex; the evaluator matches H3.
+ * When to use: Compact `event(args)` and `event: args` callback forms.
+ * Expected outcome: `targetType` when the first token is urban/airport/seaport; `h3Index` is an H3 id when a briefing code was supplied.
+ * Exceptions: Unknown first tokens are treated as a hex-only watch.
+ */
+function parseInfrastructureDestroyedCallbackArgs(
+  arg: string,
+  context: CoordinateContext
+): Record<string, unknown> {
   const pieces = arg.split(',').map((x) => x.trim()).filter((x) => x.length > 0);
   const first = pieces[0] ?? '';
   const second = pieces[1] ?? '';
   if (first === 'urban' || first === 'airport' || first === 'seaport') {
-    return second ? { targetType: first, h3Index: second } : { targetType: first };
+    return second ? { targetType: first, h3Index: resolveInfrastructureHexToH3(second, context) } : { targetType: first };
   }
-  if (first) return { h3Index: first };
+  if (first) return { h3Index: resolveInfrastructureHexToH3(first, context) };
   return {};
 }
 
@@ -261,7 +281,11 @@ function parseInfrastructureDestroyedCallbackArgs(arg: string): Record<string, u
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-function parseCompactCallbackParams(event: string, arg: string): Record<string, unknown> | null {
+function parseCompactCallbackParams(
+  event: string,
+  arg: string,
+  context: CoordinateContext
+): Record<string, unknown> | null {
   if (event === 'turns') {
     const n = Number(arg);
     if (Number.isFinite(n) && n > 0) return { n: Math.floor(n) };
@@ -270,8 +294,33 @@ function parseCompactCallbackParams(event: string, arg: string): Record<string, 
   if (event === 'unit_destroyed') return { side: arg };
   if (event === 'unit_engaged' || event === 'unit_arrived') return { unitId: arg };
   if (event === 'threat_escalation') return { unitId: arg };
-  if (event === 'infrastructure_destroyed') return parseInfrastructureDestroyedCallbackArgs(arg);
+  if (event === 'infrastructure_destroyed') return parseInfrastructureDestroyedCallbackArgs(arg, context);
   return {};
+}
+
+/**
+ * Rewrites object-form infrastructure_destroyed params so a briefing hex is stored as H3.
+ *
+ * Purpose: Object JSON may use `hex` (prompt name) or `h3Index` holding a two-character code.
+ * When to use: `normalizeCallbacks` object branch.
+ * Expected outcome: `h3Index` is an H3 id when a briefing code was supplied; other fields pass through.
+ * Exceptions: None.
+ */
+function rewriteInfrastructureDestroyedParams(
+  params: Record<string, unknown>,
+  context: CoordinateContext
+): Record<string, unknown> {
+  const hexRaw =
+    typeof params.hex === 'string'
+      ? params.hex
+      : typeof params.h3Index === 'string'
+        ? params.h3Index
+        : '';
+  if (!hexRaw) return params;
+  const next: Record<string, unknown> = { ...params };
+  delete next.hex;
+  next.h3Index = resolveInfrastructureHexToH3(hexRaw, context);
+  return next;
 }
 
 /**
@@ -282,7 +331,7 @@ function parseCompactCallbackParams(event: string, arg: string): Record<string, 
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-function normalizeCallbacks(raw: unknown): CallbackSubscription[] {
+function normalizeCallbacks(raw: unknown, context: CoordinateContext): CallbackSubscription[] {
   if (!Array.isArray(raw)) return [];
   const out: CallbackSubscription[] = [];
   for (const item of raw) {
@@ -294,7 +343,7 @@ function normalizeCallbacks(raw: unknown): CallbackSubscription[] {
         const event = parenMatch[1]!.trim();
         const arg = parenMatch[2]!.trim();
         if (!CALLBACK_EVENT_VOCAB.has(event)) continue;
-        const parsed = parseCompactCallbackParams(event, arg);
+        const parsed = parseCompactCallbackParams(event, arg, context);
         if (parsed != null) out.push({ event, params: parsed });
         continue;
       }
@@ -303,7 +352,7 @@ function normalizeCallbacks(raw: unknown): CallbackSubscription[] {
         const event = colonMatch[1]!.trim();
         const arg = colonMatch[2]!.trim();
         if (!CALLBACK_EVENT_VOCAB.has(event)) continue;
-        const parsed = parseCompactCallbackParams(event, arg);
+        const parsed = parseCompactCallbackParams(event, arg, context);
         if (parsed != null) out.push({ event, params: parsed });
       }
       continue;
@@ -314,9 +363,13 @@ function normalizeCallbacks(raw: unknown): CallbackSubscription[] {
     let event = typeof o.event === 'string' ? o.event.trim() : '';
     if (event.includes('(')) event = event.replace(/\(.*\)/, '').trim() || event;
     if (!event || !CALLBACK_EVENT_VOCAB.has(event)) continue;
-    const params = o.params && typeof o.params === 'object' && !Array.isArray(o.params)
+    const rawParams = o.params && typeof o.params === 'object' && !Array.isArray(o.params)
       ? (o.params as Record<string, unknown>)
       : {};
+    const params =
+      event === 'infrastructure_destroyed'
+        ? rewriteInfrastructureDestroyedParams(rawParams, context)
+        : rawParams;
     out.push({ event, params });
   }
   return out;
@@ -833,7 +886,7 @@ export function parseOrdersResponse(
         } else if (obj.productionOrders !== undefined) {
           productionDropReasons = ['productionOrders dropped: production tool group is disabled.'];
         }
-        const callbacks = normalizeCallbacks(obj.callbacks);
+        const callbacks = normalizeCallbacks(obj.callbacks, context);
         const memoryUpdates = normalizeMemoryUpdates(obj.memoryUpdates);
         const dropReasons = [
           ...assignOrderDropReasons,

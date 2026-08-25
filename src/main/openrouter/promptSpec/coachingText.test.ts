@@ -69,11 +69,13 @@ test('strategic coaching includes every required item when its gate is on', () =
   const text = joined(strategicGates());
   assert.match(text, /all enemy home region hexes/i);
   assert.match(text, /embark, then air strikes/i);
+  assert.match(text, /cargo sync/i);
   assert.match(text, /does not consume the move/i);
   assert.match(text, /suppresses automatic engagement/i);
   assert.match(text, /lowest-defense/i);
   assert.match(text, /Copy a Target Hex from a row listing that unit/i);
-  assert.match(text, /occupied/i);
+  assert.match(text, /friendly/i);
+  assert.match(text, /move\/melee/i);
   assert.match(text, /Units Without Standing Orders/i);
   assert.match(text, /healthy standing order/i);
   assert.match(text, /toward the fighting/i);
@@ -132,7 +134,8 @@ test('tactical coaching includes every required item when its gate is on', () =>
   assert.match(text, /Infantry may fire at its res4 baseline/i);
   assert.match(text, /strike any cell in the footprint/i);
   assert.match(text, /lowest-defense/i);
-  assert.match(text, /occupied/i);
+  assert.match(text, /friendly/i);
+  assert.match(text, /move\/melee/i);
   assert.match(text, /embark/i);
   assert.match(text, /sub-unit ids/i);
   assert.match(text, /cleared when the battle ends/i);

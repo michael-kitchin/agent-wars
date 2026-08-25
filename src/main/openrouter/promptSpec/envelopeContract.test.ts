@@ -225,6 +225,8 @@ test('callback vocabulary clause names every taught event and its parameters', (
   }
   assert.ok(!strategic.includes('territory_changed'));
   assert.ok(!tactical.includes('territory_changed'));
+  assert.ok(!strategic.includes('h3Index'), 'envelope must not teach raw H3 field names');
+  assert.ok(!tactical.includes('h3Index'), 'envelope must not teach raw H3 field names');
   assert.ok(buildCallbackContractClause('strategic').includes(strategic));
 });
 
@@ -244,6 +246,7 @@ test('invalid-output rules name the mode-specific prohibitions', () => {
   assert.match(strategic, /top-level/i);
   assert.ok(strategic.includes('movementOrders'));
   assert.match(strategic, /current (cell|hex)/i);
+  assert.match(strategic, /friendly unit/i);
 
   const tactical = buildInvalidOutputRulesClause({
     coordinateMode: 'tactical',
@@ -253,5 +256,6 @@ test('invalid-output rules name the mode-specific prohibitions', () => {
   });
   assert.ok(tactical.includes('assign_order'));
   assert.ok(tactical.includes('cancel_order'));
+  assert.match(tactical, /friendly unit/i);
   assert.ok(!tactical.includes('infantry cannot'));
 });

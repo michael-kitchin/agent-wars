@@ -10,6 +10,7 @@
 
 import type { CallbackSubscription } from '../callbackSubscriptions';
 import type { CoordinateContext } from './map/coordinateContext';
+import { HEX_CODE_PATTERN } from './map/coordinateContext';
 import { h3ToCode } from './map/hex-code-translator';
 import { logDebug, logTrace } from '../logger';
 
@@ -18,10 +19,11 @@ import { logDebug, logTrace } from '../logger';
  *
  * Purpose: The Details cell must be copyable, so it shows the same two-character code the rest of the prompt uses.
  * When to use: `territory_changed` and `infrastructure_destroyed` parameter formatting.
- * Expected outcome: A briefing code, or a fallback label when the id is not a cell.
+ * Expected outcome: A briefing code, including when the stored value is already a two-character code.
  * Exceptions: Lookup failure returns `'specified territory'`.
  */
 function formatTerritoryTarget(hexId: string, ctx: CoordinateContext): string {
+  if (HEX_CODE_PATTERN.test(hexId)) return hexId;
   try {
     return h3ToCode(hexId, ctx);
   } catch {
@@ -93,7 +95,7 @@ export function formatCallbackLine(sub: CallbackSubscription, ctx: CoordinateCon
     if (targetType && cell) return `infrastructure_destroyed(${targetType}, ${cell})`;
     if (targetType) return `infrastructure_destroyed(${targetType})`;
     if (cell) return `infrastructure_destroyed(${cell})`;
-    return 'infrastructure_destroyed';
+    return 'infrastructure_destroyed(any)';
   }
   const sanitizedParams = sanitizeCallbackParamsForPrompt(sub.params ?? {}, ctx);
   return `${sub.event}(${JSON.stringify(sanitizedParams)})`;

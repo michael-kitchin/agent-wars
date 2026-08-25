@@ -111,7 +111,7 @@ Scope is `strategic`, `tactical`, `both`, or `consult-only`. Status is `required
 | Id | Meaning | Engine source | Visibility | Jobs | Scope | Status |
 | --- | --- | --- | --- | --- | --- | --- |
 | `BEST_OPTIONS_ROWS` | Precomputed legal actions for this period, grouped by action type and target, with the unit ids that may take each | `collectAggregatedPossibleActionRows`, `renderThisTurnOptionsTableMarkdown` | fog-filtered | 3, 5, 10, 17, 18, 26 | both | required |
-| `LEGAL_DEST_OCCUPANCY` | A cell already holding any unit is not a legal one-step destination | `getValidDestinationsUnoccupied` | n/a | 5, 18 | both | required |
+| `LEGAL_DEST_OCCUPANCY` | A friendly-occupied cell is not a legal one-step destination; an enemy-occupied cell is legal as move/melee contact | `getValidDestinations` plus Best Options interest; orderless suggestions use `getValidDestinationsUnoccupied` | n/a | 5, 18 | both | required |
 | `RANGED_LEGAL_TARGETS` | Which enemy cells or units this unit may fire on this period | `appendNearestLegalEngagement`, `collectTacticalLegalRangedTargetRes4Hexes` | fog-filtered | 3, 17 | both | required |
 | `AIR_STRIKE_ENVELOPE` | What each air unit can strike now: enemy units and enemy infrastructure by kind | `buildAirOperationsBriefingBlock`, `AIR_STRIKE_RANGE_HEXES` | fog-filtered | 7, 19 | both | conditional — the opponent has air units |
 | `FERRY_DESTINATIONS` | Where an air unit may rebase this turn | `AIR_FERRY_RANGE_HEXES`, air ops block | own-side | 7 | strategic | conditional — the opponent has air units |

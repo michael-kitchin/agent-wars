@@ -18,7 +18,7 @@ A change to prompt behaviour is a change to this package first and to code secon
 ## 2. Authority order
 
 1. **Live engine behaviour is first authority.** If a fact, stat, range, cap, phase order, or legality rule can be read from a symbol under `src/`, that symbol wins.
-2. **Game-rule documents in `.spec/` are second authority.** They apply where the engine is silent, and are treated as suspect where they contradict a symbol. Contradictions are recorded, not reconciled by preference.
+2. **Game-rule documents in `docs/` and `.spec/` are second authority.** They apply where the engine is silent, and are treated as suspect where they contradict a symbol. Contradictions are recorded, not reconciled by preference.
 3. **Current prompt copy is not authority.** It is an inventory of what we already tell the model. A sentence appearing in today's prompt is evidence that we say it, never evidence that it is true.
 4. Captured prompt dumps in the repository root are examples of emitted shape for one consultation. The strategic and user-message dumps are current enough to cross-check headings; the tactical dump is stale and is not a source for anything.
 5. `devleopment-plan-v3.3.md` is historical architecture and is not prompt authority.
@@ -61,21 +61,21 @@ These documents keep their mechanics content and lose their prompt-content autho
 
 **Active documents, prompt-content claims superseded:**
 
-- `../assess-unit-omniscient-grid-proximity.md` — the distance-basis caveat and its gate.
-- `../naval-transport-briefing-embark-rules.md` — the naval transport section, its columns, and its embark prose.
-- `../orderless-unit-destination-suggestions.md` — the orderless table and its suggested-destination column.
-- `../tempo-rule-enforcement.md` — the tempo coaching text. Its description of the engine's own attack sweep remains the mechanics reference, and this package deliberately keeps that sweep out of the prompt; see `strategic-prompt.md` section 4.
+- `../../.spec/assess-unit-omniscient-grid-proximity.md` — the distance-basis caveat and its gate.
+- `../../.spec/naval-transport-briefing-embark-rules.md` — the naval transport section, its columns, and its embark prose.
+- `../../.spec/orderless-unit-destination-suggestions.md` — the orderless table and its suggested-destination column.
+- `../../.spec/tempo-rule-enforcement.md` — the tempo coaching text. Its description of the engine's own attack sweep remains the mechanics reference, and this package deliberately keeps that sweep out of the prompt; see `strategic-prompt.md` section 4.
 - `../game-size-unit-caps.md` — how caps are printed. The cap values themselves remain a mechanics reference and agree with the engine.
-- `../h3-face-crossing-distances.md` — how distance distortion is disclosed. The geometry remains a mechanics reference.
+- `../../.spec/h3-face-crossing-distances.md` — how distance distortion is disclosed. The geometry remains a mechanics reference.
 
 **Active documents that are not prompt authority at all:**
 
 - `../combat-rules-v3.md` — contradicts the live engine on unit caps and on the tactical turn structure. Mechanics reference only, and only where it agrees with the engine.
 - `../devleopment-plan-v3.3.md` — historical architecture.
 
-**Active document this package does not touch:** `../prompt-debug-log-split.md` keeps full authority. It governs which debug file each consultation writes, not what the prompt says. The staleness noted in section 2 is a property of the tactical file currently on disk, not of that contract.
+**Active document this package does not touch:** `../../.spec/prompt-debug-log-split.md` keeps full authority. It governs which debug file each consultation writes, not what the prompt says. The staleness noted in section 2 is a property of the tactical file currently on disk, not of that contract.
 
-**Completed execution plans:** any plan under `../completed/` that specified prompt sections, wording, or response shape is historical record. Its decisions are either reflected in this package or were superseded by later code; in neither case is it a current authority. The ones most likely to be reached for are the prompt-improvement and prompt-update plans, the strategic and tactical parity plans and their baseline notes, the tactical prompt section parity plan, the strategic prompt unit-table deduplication note, the Best Options notes on occupancy, approach, and single-source reachability, the tool specification and the memory and standing-order tool plans, the production model-support plan, and the deferred-resolution consult note.
+**Completed execution plans:** any plan under `../../.spec/completed/` that specified prompt sections, wording, or response shape is historical record. Its decisions are either reflected in this package or were superseded by later code; in neither case is it a current authority. The ones most likely to be reached for are the prompt-improvement and prompt-update plans, the strategic and tactical parity plans and their baseline notes, the tactical prompt section parity plan, the strategic prompt unit-table deduplication note, the Best Options notes on occupancy, approach, and single-source reachability, the tool specification and the memory and standing-order tool plans, the production model-support plan, and the deferred-resolution consult note.
 
 ## 6. Out of scope
 

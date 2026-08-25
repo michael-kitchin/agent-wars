@@ -161,6 +161,8 @@ export function buildAirOperationsBriefingBlock(
   lines.push(
     `Enemy infrastructure in your current strike envelope: airports=${threatenedHumanAirports}, seaports=${threatenedHumanSeaports}.`
   );
-  lines.push('Callback support: use callback event "infrastructure_destroyed" to be re-consulted after successful infra strikes.');
+  lines.push(
+    'Callback support: subscribe with event "infrastructure_destroyed" and parameters targetType plus the briefing hex code to be re-consulted after successful infra strikes.'
+  );
   return lines.join('\n');
 }

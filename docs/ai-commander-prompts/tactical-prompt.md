@@ -85,7 +85,7 @@ Bullet list, ranked, capped at five, empty form `None.` Tactical emits threat bu
 - **Include:** when at least one option row exists; omit heading and table otherwise.
 - **Columns:** identical to strategic.
 - **Action values in battle:** `air strike`, `ranged`, `approach`, `move/melee`. A `ferry` row is never produced in battle.
-- **"This beat" legality:** move and approach targets are cells reachable this beat under the terrain-weighted budget, computed with the same planner the engine uses when it applies the order. Ranged targets are enemy-occupied cells within reach. Air strike targets are enemy-occupied footprint cells, and are produced only when the parent cell's airport is intact.
+- **"This beat" legality:** move and approach targets are cells reachable this beat under the terrain-weighted budget, computed with the same planner the engine uses when it applies the order. Approach targets are empty of units; move/melee targets may be enemy-occupied. Ranged targets are enemy-occupied cells within reach. Air strike targets are enemy-occupied footprint cells, and are produced only when the parent cell's airport is intact.
 - **Per-unit cap:** five rows per sub-unit before identical rows are merged; identical rows are merged and their sub-unit ids listed together.
 
 #### `## Recent Turn Notes`
@@ -171,7 +171,7 @@ Section 3. Always included; the example must match the contract.
 
 | Action | Required fields | Legality rules the prompt must state |
 | --- | --- | --- |
-| `explicit_move` | `unitId`, `destination` | One tactical cell for this beat. Prefer an option-row target for that sub-unit, or a routing-tool result. A destination beyond the beat budget is clamped to the first reachable leg. Occupied cells are not legal. Embarked cargo debarks automatically before marching. |
+| `explicit_move` | `unitId`, `destination` | One tactical cell for this beat. Prefer an option-row target for that sub-unit, or a routing-tool result. A destination beyond the beat budget is clamped to the first reachable leg. A cell holding a friendly unit is not legal; a cell holding an enemy is legal as move/melee contact. Embarked cargo debarks automatically before marching. |
 | `ranged_attack` | `unitId`, exactly one of a target cell code or a target sub-unit id | Legal for every type with a res4 reach, infantry included. One per sub-unit per beat, resolved from beat-start positions. |
 | `airStrikes` entry | `unitId`, exactly one of a target cell code or a target sub-unit id, `targetType` | Any footprint cell, subject to the parent airport being intact. One air action per sub-unit per beat. |
 | `embark` | `unitId`, `navalUnitId` | Cargo assignment inside the footprint. |
@@ -201,6 +201,7 @@ No `ferry` mapping exists in battle because no `ferry` row is produced.
 5. More than one ranged or air action for the same sub-unit in the same beat is not honoured.
 6. Strategic res1 codes, raw H3 strings, and coordinate pairs are never valid field values.
 7. A ranged target must not be the acting sub-unit's own move destination.
+8. A one-step destination that holds a friendly unit is not legal.
 
 ## 4. Required tactical coaching
 
@@ -211,7 +212,7 @@ No `ferry` mapping exists in battle because no `ferry` row is produced.
 5. **Infantry can shoot here.** State the res4 infantry reach explicitly, because the strategic rule is the opposite and a model carrying it into a beat will waste infantry. Carries `TACTICAL_RANGE_TABLE`.
 6. **Air strikes reach the whole battle but only once.** An air sub-unit may hit any occupied footprint cell, and that is its one action for the beat. It must not be coached to rebase. Carries `AIR_STRIKE_ENVELOPE`, `AIR_ORDER_RESTRICTIONS`.
 7. **Target the weakest defender.** Same casualty rule as strategic. Carries `CASUALTY_PRIORITY`.
-8. **Occupied cells are illegal destinations.** Same as strategic. Carries `LEGAL_DEST_OCCUPANCY`.
+8. **Friendly stacks are illegal destinations; enemy cells are move/melee contact.** Same as strategic.
 9. **Sealift works inside the footprint.** Included only when the naval status section is present. Carries `EMBARK_LEGALITY`, `EMBARK_STATE`.
 10. **Callbacks use sub-unit ids and die with the battle.** Unit-scoped subscriptions name sub-units, the response replaces the whole list, subscriptions are evaluated after each beat under event-driven policy, and all of them are cleared when the battle ends. Carries `CALLBACK_TACTICAL_SCOPE`, `CALLBACK_REPLACE_SEMANTICS`.
 11. **A beat with no prompt is a beat not acted in.** Under event-driven policy the model is consulted only when an event fires; because standing orders are inert in battle, an unconsulted beat is one where its sub-units did nothing. Carries `CONSULT_POLICY`, `STANDING_ORDERS_INERT_IN_BATTLE`.

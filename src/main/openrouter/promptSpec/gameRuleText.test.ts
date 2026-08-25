@@ -61,13 +61,36 @@ function namesStagesInOrder(text: string, stages: readonly string[]): boolean {
   return true;
 }
 
-const RESOLUTION_STAGES = ['embark', 'air strikes', 'ranged', 'movement', 'ferry', 'melee'] as const;
+const STRATEGIC_RESOLUTION_STAGES = [
+  'embark',
+  'air strikes',
+  'ranged',
+  'movement',
+  'cargo sync',
+  'ferry',
+  'melee',
+] as const;
+const TACTICAL_RESOLUTION_STAGES = [
+  'embark',
+  'air strikes',
+  'ranged',
+  'movement',
+  'ferry',
+  'cargo sync',
+  'melee',
+] as const;
 
 test('buildResolutionOrderRule names every resolution stage in engine order', () => {
   const strategic = buildResolutionOrderRule('strategic');
   const tactical = buildResolutionOrderRule('tactical');
-  assert.ok(namesStagesInOrder(strategic, RESOLUTION_STAGES), `strategic order missing a stage: ${strategic}`);
-  assert.ok(namesStagesInOrder(tactical, RESOLUTION_STAGES), `tactical order missing a stage: ${tactical}`);
+  assert.ok(
+    namesStagesInOrder(strategic, STRATEGIC_RESOLUTION_STAGES),
+    `strategic order missing a stage: ${strategic}`
+  );
+  assert.ok(
+    namesStagesInOrder(tactical, TACTICAL_RESOLUTION_STAGES),
+    `tactical order missing a stage: ${tactical}`
+  );
   assert.ok(tactical.toLowerCase().includes('beat'), 'tactical form names the beat');
   assert.ok(
     /no production/i.test(tactical),
@@ -99,11 +122,11 @@ test('buildRangedReachRule distinguishes infantry melee from tactical infantry r
   assert.match(strategic, /infantry is melee-only|Infantry has no strategic ranged/i);
 });
 
-test('buildDestinationOccupancyRule forbids occupied destinations and requires adjacent contact', () => {
+test('buildDestinationOccupancyRule forbids friendly stacks and allows enemy move/melee contact', () => {
   const text = buildDestinationOccupancyRule();
-  assert.match(text, /occupied/i);
-  assert.match(text, /not a legal destination|not legal/i);
-  assert.match(text, /adjacent/i);
+  assert.match(text, /friendly/i);
+  assert.match(text, /move\/melee/i);
+  assert.doesNotMatch(text, /not by moving onto the occupied one/);
 });
 
 test('buildHoldFireRule distinguishes the order from simply omitting an attack', () => {

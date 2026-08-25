@@ -2,7 +2,7 @@
 
 > **For the implementing agent:** work one task at a time, in order. Each task ends with a working tree that builds, lints, and passes the whole test suite. Do not start a task before the previous one is green.
 
-**Goal:** bring the prompt-generating code into conformance with the specification package at `.spec/ai-commander-prompts/`, and leave behind a structure where every sentence the model reads has exactly one home in code and one assertion in a test.
+**Goal:** bring the prompt-generating code into conformance with the specification package at `docs/ai-commander-prompts/`, and leave behind a structure where every sentence the model reads has exactly one home in code and one assertion in a test.
 
 **Architecture:** prompt prose moves out of the assembler and briefing builders into a new `src/main/openrouter/promptSpec/` family of modules that export named text constants and small pure builders. The existing builders keep their jobs — deciding what applies, gathering state, formatting tables — but stop holding prose. A new conformance test suite asserts the specification directly, one test module per contract area.
 
@@ -14,7 +14,7 @@
 
 1. **Read the specification first.** Before each task, read the spec sections that task names. The spec is the authority for *what the text must say*; this plan is the authority for *where the code goes and how it is verified*. This plan deliberately does not restate spec prose, because two copies of a sentence is the exact failure mode the spec exists to end.
 2. **The spec wins over existing prompt text.** A sentence in today's prompt is evidence that we say it, never evidence that it is correct.
-3. **If the spec looks wrong, stop.** Do not edit anything under `.spec/`. Do not "fix" the spec to match the code. Leave the task's code unchanged, write down the file, section, and the conflict you found, and report it. Then move to the next task if it is independent, or stop if it is not.
+3. **If the spec looks wrong, stop.** Do not edit the specification package under `docs/ai-commander-prompts/` or other documents under `.spec/`. Do not "fix" the spec to match the code. Leave the task's code unchanged, write down the file, section, and the conflict you found, and report it. Then move to the next task if it is independent, or stop if it is not.
 4. **Never commit or push.** Leave every change uncommitted for review. Do not run `git commit`, `git add`, or `git push` at any point.
 5. **Test first.** For every behaviour change: write the assertion, run it, watch it fail for the reason you expect, then implement, then run it again.
 
@@ -60,7 +60,7 @@ Every task inherits these. They are not optional and they are not repeated per s
 
 ### Naming rules (read twice)
 
-- **No specification carrier identifiers in code.** The spec labels each required fact with an identifier such as `WEGO_PHASE_ORDER` or `LEGAL_DEST_OCCUPANCY`. Those identifiers must not appear in any source file, comment, test name, or configuration. Name code after the domain: `buildResolutionOrderRule`, `DESTINATION_OCCUPANCY_RULE`. The mapping between the two lives only in `.spec/ai-commander-prompts/crosswalk.md`.
+- **No specification carrier identifiers in code.** The spec labels each required fact with an identifier such as `WEGO_PHASE_ORDER` or `LEGAL_DEST_OCCUPANCY`. Those identifiers must not appear in any source file, comment, test name, or configuration. Name code after the domain: `buildResolutionOrderRule`, `DESTINATION_OCCUPANCY_RULE`. The mapping between the two lives only in `docs/ai-commander-prompts/crosswalk.md`.
 - **No plan identifiers in code.** The task numbers in this document, and words like "phase" used as a label, must not appear in source, comments, tests, or configuration.
 
 ---
@@ -238,7 +238,7 @@ export function buildRepairSchemaText(gates: EnvelopeGates): string;
 - [ ] **Step 6: qualify the air repositioning line.** `AIR_REPOSITIONING_LINE` tells the model to ferry any air unit with no strike listed. Per `strategic-prompt.md` section 2 item 11 and section 4 item 10, a unit whose base is not intact or not controlled cannot ferry from it, and the coaching must not tell it to. Add that qualification, pointing at the two columns of the air operations table that carry the answer.
 - [ ] **Step 7: full gate,** fixing the matrix-test assertions that legitimately asserted the removed strings.
 
-**Done when:** `npm test` is clean and repository-wide searches for `damage given up for free` and `actively searching for your forces` return nothing outside `.spec/`.
+**Done when:** `npm test` is clean and repository-wide searches for `damage given up for free` and `actively searching for your forces` return nothing outside `.spec/` and `docs/` (tests that assert the phrases are absent are allowed).
 
 ---
 
@@ -545,7 +545,7 @@ export function buildRepairRequestMessage(gates: EnvelopeGates): string;
 ## Out of scope
 
 - Engine behaviour: turn resolution, combat, movement, production, visibility, and the callback evaluator. The one engine-adjacent decision already taken is that `territory_changed` stays unimplemented and untaught.
-- Retiring the stale prompt-content claims in `.spec/combat-rules-v3.md`. The spec package already records that document as non-authoritative on caps and tactical structure; correcting it is a separate documentation change.
+- Retiring the stale prompt-content claims in `docs/combat-rules-v3.md`. The spec package already records that document as non-authoritative on caps and tactical structure; correcting it is a separate documentation change.
 - The `h3` face-crossing distance limitation. Hop counts can understate real routes and under fog no caveat is emitted at all. The spec accepts this as a known limitation; do not invent a second caveat.
 - Order validation and parsing internals, beyond the envelope shape the prompt promises.
 - Token budgeting, model selection, and transport retries.

@@ -7,11 +7,11 @@ Every row cites a symbol or file so a later reader can re-verify without re-deri
 ## 1. Authority reminder
 
 1. **Live engine behavior is first authority.** If a fact, stat, range, cap, phase order, or legality rule can be read from a symbol under `src/`, that symbol wins.
-2. **Game-rule documents in `.spec/` are second authority.** They are used where the engine is silent, and are treated as suspect where they contradict a symbol. Contradictions are recorded in section 8, not silently reconciled.
+2. **Game-rule documents in `docs/` and `.spec/` are second authority.** They are used where the engine is silent, and are treated as suspect where they contradict a symbol. Contradictions are recorded in section 8, not silently reconciled.
 3. **Current prompt copy is not authority at all.** It is an inventory of what we already tell the model. A sentence appearing in today's prompt is evidence that we say it, never evidence that it is true.
 4. `debug-last-strategic-prompt.txt` and `debug-last-user-prompt.txt` are used only to cross-check emitted **shape** (which headings appear, in what order). They are one captured consultation, not a contract.
 5. `debug-last-tactical-prompt.txt` **is not used as a source anywhere in this package.** It predates several tactical changes; its section list and wording are stale. The tactical catalog in section 3 is derived from code only.
-6. `.spec/devleopment-plan-v3.3.md` is historical architecture and is not prompt authority.
+6. `docs/devleopment-plan-v3.3.md` is historical architecture and is not prompt authority.
 
 ## 2. Strategic section catalog
 
@@ -401,15 +401,15 @@ Every row resolves the same way: the prompt spec follows the **engine**.
 | --- | --- | --- | --- | --- | --- |
 | `CAPS_V3_STALE` | Per-side unit caps | `getMaxUnitsPerType` × `GAME_SIZE_MULTIPLIER`: small 12/8/8/6, medium 24/16/16/12, large 48/32/32/24 | `combat-rules-v3.md` states a different, smaller fixed table; `game-size-unit-caps.md` matches the engine | prints engine caps | engine |
 | `TACTICAL_STRUCTURE_V3` | Tactical turn structure | one consult per beat, `tacticalTurnNumber` increments, resolution mirrors the strategic phase order minus production | `combat-rules-v3.md` describes an older structure | prompt describes beats | engine |
-| `WEGO_ORDER_UNSTATED` | Resolution phase order | embark, air strikes, ranged, movement, cargo sync, ferry, melee | `combat-rules-v3.md` lists a five-phase order without embark or cargo sync | prompt states only that ranged precedes movement | engine |
+| `WEGO_ORDER_UNSTATED` | Resolution phase order | embark, air strikes, ranged, movement, cargo sync, ferry, melee | `combat-rules-v3.md` lists a five-phase order without embark or cargo sync | prompt now states the engine order | engine |
+| `CALLBACK_DETAILS_THIN` | Active Callbacks `Details` | paramless `infrastructure_destroyed` is stored without type or cell | none | Details now says `infrastructure_destroyed(any)` | engine |
 | `TEMPO_SWEEP_SILENCE` | Unfired legal shots | `collectTempoRuleAttacks` adds one attack per eligible un-ordered unit; `hold_fire` units and units already attacking are skipped | `tempo-rule-enforcement.md` documents the sweep | prompt says an unfired shot is "damage given up for free" and never mentions the sweep | engine as the recorded fact; the prompt contract keeps the sweep unstated on purpose, and this file records that as a deliberate omission rather than an accident |
 | `HOLD_FIRE_UNGUIDED` | `hold_fire` | suppresses both auto-engagement and the tempo sweep for that unit | none | listed as a legal order type with no stated effect | engine |
-| `OCCUPANCY_UNSTATED` | Destination legality | `getValidDestinationsUnoccupied` removes every hex occupied by any unit | `orderless-unit-destination-suggestions.md` describes the suggestion helper | prompt never states that occupied hexes are illegal | engine |
+| `OCCUPANCY_UNSTATED` | Destination legality | `getValidDestinations` allows enemy-occupied dests as contact; approach uses unoccupied dests | `orderless-unit-destination-suggestions.md` describes the suggestion helper | prompt now states friendly stacks are illegal and enemy cells are move/melee | engine |
 | `CASUALTY_ORDER_ABSENT` | Who dies first | lowest `getDefense`, then `CASUALTY_PRIORITY_ORDER` | none | absent | engine |
 | `STRATEGIC_CONTEXT_OPENING_UNCONDITIONAL` | "At least one enemy unit remains in play" | no check against the live roster | none | stated unconditionally, including when zero human units are observed and the scouting directive fires | engine |
 | `TEMPO_FREE_CLAIM` | "every one you leave unfired is damage given up for free" | false for `hold_fire` units and for units the sweep covers | `tempo-rule-enforcement.md` | stated as absolute | engine |
 | `CALLBACK_VOCAB_ABSENT` | Callback event names | `callbackEvaluation.ts` defines the full subscription vocabulary; `territory_changed` is accepted but never fires | none | the model is invited to add callbacks with no list of valid events | engine |
-| `CALLBACK_DETAILS_THIN` | Active Callbacks `Details` | `formatCallbackLine` renders only the event name for `infrastructure_destroyed`, producing `infrastructure_destroyed \| infrastructure_destroyed` | none | uninformative cell | engine |
 | `EMBARK_CONTROL_CONDITION` | Embark legality | `canEmbarkAtHex`: coastal or land seaport unconditionally; naval-transit terrain with a seaport only when the hex is controlled by the embarking player | `naval-transport-briefing-embark-rules.md` | embark prose omits the control condition | engine |
 | `OMNISCIENT_GATE_NARROW` | Hop-distance honesty line | gate requires `fogOfWarEnabled === false` **and** res1; a tactical or fog-on snapshot never shows it | `assess-unit-omniscient-grid-proximity.md` | line present only under that gate | engine |
 | `INFANTRY_RANGE_SPLIT` | Infantry ranged | strategic 0, tactical 2 | `combat-rules-v3.md` treats infantry as melee-only without the tactical split | prompt already splits by mode | engine |

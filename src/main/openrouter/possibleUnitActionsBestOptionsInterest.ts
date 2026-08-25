@@ -321,9 +321,14 @@ export function applyInterestOrApproach(args: {
   if (hasEnemyContact) {
     result = { hexes: args.interest, actionType: ACTION_MOVES_MELEE };
   } else {
+    const occupied = new Set<string>(args.enemyOccupiedH3);
+    for (const [h3, units] of args.indexed.friendlyUnitsByHex) {
+      if ((units?.length ?? 0) > 0) occupied.add(h3);
+    }
+    const unoccupiedLegal = args.legalHexes.filter((h3) => !occupied.has(h3));
     const approach = filterApproachMoveHexesForThisTurnOptionsTable(
       args.unitH3,
-      args.legalHexes,
+      unoccupiedLegal,
       args.enemyOccupiedH3
     );
     if (approach.length > 0) {

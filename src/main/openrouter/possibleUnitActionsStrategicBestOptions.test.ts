@@ -24,6 +24,7 @@ import {
 } from '../testSupport/strategicLandChainFixtures';
 import { collectAggregatedPossibleActionRows } from './possibleUnitActions';
 import { formatLatLng } from './promptText';
+import { suggestApproachDestinationsForOrderlessUnits } from '../tools/orderlessUnitSuggestions';
 
 /**
  * Finds a geodesic chain of hexes land units cannot occupy (open water on the world map).
@@ -538,6 +539,42 @@ function findUnmeasurableFerryDiskPair(): { origin: string; dest: string } {
 }
 
 /**
+ * Ensures approach Target Hexes skip friendly-occupied cells and match the orderless suggestion.
+ *
+ * Purpose: A live strategic dump listed approach onto CL while friendlies already sat there, and the
+ * orderless Suggested Destination was an em dash or a different hex. Both surfaces must copy the same
+ * unoccupied closing dest.
+ * When to use: After changing `applyInterestOrApproach` occupancy or `suggestApproachDestinationsForOrderlessUnits`.
+ * Expected outcome: No approach row onto the friendly hex; the orderless suggestion is one of the remaining approach hexes.
+ * Exceptions: Throws if no geodesic 4-hop land chain exists.
+ */
+function testStrategicBestOptionsApproachSkipsFriendlyOccupiedAndMatchesOrderless(): void {
+  const chain = findGeodesicLandMassChain(4);
+  const state = chainState({
+    chain,
+    units: [
+      { id: 'opponent-inf-mover', player: 'opponent', unitType: 'infantry', h3Index: chain[0]! },
+      { id: 'opponent-inf-block', player: 'opponent', unitType: 'infantry', h3Index: chain[1]! },
+      { id: 'human-inf-far', player: 'human', unitType: 'infantry', h3Index: chain[4]! },
+    ],
+  });
+  const rows = collectStrategicThisTurnRows(state).filter((r) => r.unitId === 'opponent-inf-mover');
+  const approaches = rows.filter((r) => r.actionTypes.includes('approach'));
+  assert.ok(
+    !approaches.some((r) => r.targetH3 === chain[1]),
+    'friendly-occupied hex must not be an approach dest'
+  );
+  assert.ok(approaches.length >= 1, 'expected unoccupied approach dests toward the far human');
+  const suggestions = suggestApproachDestinationsForOrderlessUnits('opponent', state, ['opponent-inf-mover']);
+  const suggested = suggestions.get('opponent-inf-mover');
+  assert.ok(suggested, 'orderless table must offer a closing dest when one exists');
+  assert.ok(
+    approaches.some((r) => r.targetH3 === suggested),
+    'Suggested Destination must be one of this unit\'s Best Options approach hexes'
+  );
+}
+
+/**
  * Ensures a legal ferry destination still appears in Best Options when H3 cannot measure grid distance.
  *
  * Purpose: Turn 12 Air Operations listed ferry dests for bases FI/FM/F4, but Best Options omitted those air units because `gridDistance` threw and row assembly skipped the dest.
@@ -619,6 +656,10 @@ const tests = [
   {
     name: 'collectAggregatedPossibleActionRows strategic Best Options approaches when gridDistance throws',
     fn: testStrategicBestOptionsApproachWhenGridDistanceThrows,
+  },
+  {
+    name: 'collectAggregatedPossibleActionRows strategic Best Options approach skips friendly-occupied and matches orderless',
+    fn: testStrategicBestOptionsApproachSkipsFriendlyOccupiedAndMatchesOrderless,
   },
 ];
 

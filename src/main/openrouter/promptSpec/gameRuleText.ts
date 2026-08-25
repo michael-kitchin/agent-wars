@@ -127,20 +127,20 @@ export function buildCombatStatsLine(mode: PromptCoordinateMode): string {
 }
 
 /**
- * Names the six resolution stages in engine order.
+ * Names the resolution stages in engine order.
  *
- * Purpose: The model cannot reason about firing then closing, or ferry arriving after ground movement,
- * from "ranged uses pre-move positions" alone. strategic-prompt.md section 1.5 item 4; tactical 2.5.
+ * Purpose: The model cannot reason about firing then closing, ferry arriving after ground movement,
+ * or cargo remaining on the transport until sync, from "ranged uses pre-move positions" alone.
  * When to use: Combat paragraph after the casualty rule.
- * Expected outcome: Embark, air strikes, ranged fire, movement, ferry, melee; tactical notes the beat and no production.
+ * Expected outcome: Embark, air strikes, ranged fire, movement, cargo sync, ferry, melee (tactical swaps cargo sync after ferry); tactical notes the beat and no production.
  * Exceptions: None.
  */
 export function buildResolutionOrderRule(mode: PromptCoordinateMode): string {
   logTrace('promptSpec buildResolutionOrderRule', { mode });
   if (mode === 'tactical') {
-    return `This beat resolves as embark, then air strikes, then ranged fire, then movement, then ferry, then melee, with no production step.`;
+    return `This beat resolves as embark, then air strikes, then ranged fire, then movement, then ferry, then cargo sync, then melee, with no production step.`;
   }
-  return 'This turn resolves as embark, then air strikes, then ranged fire, then movement, then ferry arrival, then melee.';
+  return 'This turn resolves as embark, then air strikes, then ranged fire, then movement, then cargo sync, then ferry, then melee.';
 }
 
 /**
@@ -157,16 +157,16 @@ export function buildCasualtySortRule(): string {
 }
 
 /**
- * Occupied cells are not legal one-step destinations.
+ * Friendly stacks are illegal destinations; enemy cells are move/melee contact.
  *
- * Purpose: The options table is already filtered, but an invented destination needs the rule that explains the refusal.
+ * Purpose: Best Options lists enemy-occupied cells as move/melee dests the engine will accept; friendly stacks are not legal.
  * When to use: Combat paragraph after movement budgets.
- * Expected outcome: Occupied cells (friendly or hostile) are illegal; contact is from an adjacent cell.
+ * Expected outcome: Friendly-occupied dests forbidden; copy move/melee onto an enemy cell to make contact.
  * Exceptions: None.
  */
 export function buildDestinationOccupancyRule(): string {
   logTrace('promptSpec buildDestinationOccupancyRule', {});
-  return 'A cell already holding any unit, friendly or hostile, is not a legal destination; contact is made by attacking from an adjacent cell, not by moving onto the occupied one.';
+  return 'A cell holding a friendly unit is not a legal destination. Copy a move/melee Target Hex even when it holds an enemy — that is how contact is made this period. Approach Target Hexes are empty of units.';
 }
 
 /**

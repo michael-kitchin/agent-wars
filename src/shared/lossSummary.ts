@@ -46,10 +46,19 @@ export interface LostUnit {
    *
    * Contract: Stable display string (ordinal/Roman name or tactical sub-unit label).
    * When to use: When `formatLossEntries` lists individual victims (≤ threshold).
-   * Expected outcome: Shown comma-separated in popup and prompt loss lines.
+   * Expected outcome: Shown comma-separated in popup loss lines.
    * Exceptions: None.
    */
   displayName: string;
+  /**
+   * Snapshot unit id for prompt-facing loss lists.
+   *
+   * Contract: Same id the rest of the AI prompt uses; omit on older persisted rows that only stored a display name.
+   * When to use: `formatPlayerLossInline` for recent-turn notes in the system prompt.
+   * Expected outcome: Prompt lists ids, never display names.
+   * Exceptions: None.
+   */
+  unitId?: string;
 }
 
 /**
@@ -192,6 +201,35 @@ export function formatLossEntries(units: readonly LostUnit[]): string {
   if (units.length <= LOSS_ENTRY_LIST_MAX) {
     return units.map((u) => u.displayName).join(', ');
   }
+  return formatGroupedTypeTotals(units);
+}
+
+/**
+ * Formats victim entries for AI prompt loss lines using snapshot ids.
+ *
+ * Purpose: Prompt copy must address units by id; display names are a second handle the model must not see.
+ * When to use: `formatPlayerLossInline` only.
+ * Expected outcome: Comma-separated ids when every row has `unitId` and the list is short; otherwise grouped type totals.
+ * Exceptions: None.
+ */
+function formatLossEntriesForPrompt(units: readonly LostUnit[]): string {
+  if (units.length === 0) return '';
+  if (units.length <= LOSS_ENTRY_LIST_MAX) {
+    const ids = units.map((u) => u.unitId).filter((id): id is string => typeof id === 'string' && id.length > 0);
+    if (ids.length === units.length) return ids.join(', ');
+  }
+  return formatGroupedTypeTotals(units);
+}
+
+/**
+ * Groups victims by type for crowded or id-less prompt lines.
+ *
+ * Purpose: Shared by popup overflow and prompt fallback when ids are missing.
+ * When to use: `formatLossEntries` overflow and `formatLossEntriesForPrompt` fallback.
+ * Expected outcome: `N Naval, N Air, ...` with zero groups omitted.
+ * Exceptions: None.
+ */
+function formatGroupedTypeTotals(units: readonly LostUnit[]): string {
   const counts: Record<LostUnitType, number> = { naval: 0, air: 0, armor: 0, infantry: 0 };
   for (const u of units) {
     if (u.unitType in counts) counts[u.unitType] += 1;
@@ -262,7 +300,13 @@ export function formatPlayerLossLinesMultiline(summary: PlayerLossSummary): Play
  * Exceptions: None.
  */
 export function formatPlayerLossInline(summary: PlayerLossSummary): string {
-  const parts = formatPlayerLossLinesMultiline(summary).map((line) => `${line.causeLabel}: ${line.text}`);
+  const parts: string[] = [];
+  for (const spec of CAUSE_SPECS) {
+    const units = summary[spec.key];
+    if (units.length === 0) continue;
+    const text = formatLossEntriesForPrompt(units);
+    if (text.length > 0) parts.push(`${spec.label}: ${text}`);
+  }
   return parts.join('; ');
 }
 
@@ -291,6 +335,9 @@ export function parsePlayerLossSummaryJson(raw: string | null | undefined): Play
         .map((u) => ({
           displayName: u.displayName,
           unitType: u.unitType as LostUnitType,
+          ...(typeof (u as { unitId?: unknown }).unitId === 'string'
+            ? { unitId: (u as { unitId: string }).unitId }
+            : {}),
         }));
     };
     return {

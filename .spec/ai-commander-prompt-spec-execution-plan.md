@@ -4,6 +4,8 @@
 
 **Goal:** Create one canonical spec package that coding agents can maintain prompt-generating code against, covering the full consultation and every locked runtime variant, so prompt churn stops being driven by tribal knowledge and stale copy.
 
+**Location:** the finished package lives at `docs/ai-commander-prompts/`. The create-under-`ai-commander-prompts/` steps below are historical.
+
 **Architecture:** Exactly nine markdown files under `ai-commander-prompts/`. README is the only entry point. Long chapters stay in their file; do not split or add appendices. The spec is both (1) the information and decision model a weak model needs and (2) the assembly contract for every message the model sees. **All rules and heuristics live in the system prompt.** User and repair messages only give this-consult submit instructions and must not add, weaken, or contradict a rule.
 
 **Out of scope:** Prompt-generating code, tests, and runtime behavior. A later plan will align code to this spec.

@@ -42,12 +42,12 @@ One paragraph, in this order. Every clause is required unless marked.
 1. Dice model: one d6 per shot; an attack hits on a roll at or below the attacking stat, a defensive hit on a roll at or below the defending stat.
 2. Per-type stats and reach: attack, defense, and strategic ranged reach for each of infantry, armor, naval, and air. Reach values come from `strategicRangedRangeHexesForUnitType`; a reach of zero is stated as melee only.
 3. Casualty rule: hits land on the lowest-defense unit in the target stack first, then in the fixed type order infantry, armor, naval, air. (`CASUALTY_PRIORITY`; a gap in today's prompt.)
-4. Resolution order for the turn: embark, then air strikes, then ranged fire, then movement, then ferry arrival, then melee. (`WEGO_PHASE_ORDER`; a gap in today's prompt.)
+4. Resolution order for the turn: embark, then air strikes, then ranged fire, then movement, then cargo sync, then ferry arrival, then melee.
 5. Attacks resolve from turn-start positions, so a unit may fire and move in the same turn and firing never costs a move.
 6. At most one ranged action per unit per turn, using exactly one of a target cell code or a target unit id, and never the unit's own move destination.
 7. Infantry has no strategic ranged action and closes to melee instead.
 8. Movement budgets: one cell for infantry, two for armor and naval, and air never marches. (`MOVE_BUDGET`; a gap in today's prompt.)
-9. Occupied cells are not legal one-step destinations for any unit. (`LEGAL_DEST_OCCUPANCY`; a gap in today's prompt.)
+9. A cell holding a friendly unit is not a legal one-step destination. A cell holding an enemy is legal as a move/melee Target Hex. Approach Target Hexes are empty of units.
 10. Invalid attacks are dropped before submission, so the model should not submit one hoping it is corrected.
 11. Naval clause, included only when the opponent has naval units: naval units fire on land targets at one or two cells, move on water and coastal cells, and reach a land target by routing to the nearest water or coastal cell to it.
 12. Air clause, included only when the opponent has air units: the tempo sentence in item 5 names air strikes alongside ranged attacks.
@@ -114,7 +114,7 @@ Assessment-tool and combat-estimate hints must **not** appear when a precomputed
 
 #### `## Recent Turn Notes`
 
-- **Shape:** up to three prior turns in ascending order; each block gives that turn's message, strategy, and losses on each side.
+- **Shape:** up to three prior turns in ascending order; each block gives that turn's message, strategy, and losses on each side. Loss lines name units by snapshot id, never by display name.
 - **Items:** `RECENT_TURN_NOTES`.
 - **Include:** when at least one of those turns has a message, strategy, or loss. **Omit** otherwise.
 - **Model use:** continuity, so a plan begun two turns ago is not silently abandoned.
@@ -236,7 +236,7 @@ Cell contracts that carry meaning beyond the column name:
 4. **Unit status `Action needed`** is yes or no. A quiet rear-area unit may be annotated as quiet; the annotation never replaces the yes or no value.
 5. **Best Options `Unit IDs`** may list several unit ids. Every id on the row may use that row's targets. This must be stated in the guidance bullets, not left to inference.
 6. **Best Options `Action`** takes exactly one of: `air strike`, `ranged`, `approach`, `ferry`, `move/melee`. Each maps to one envelope destination, per section 3.3.
-7. **Best Options `Target Hexes`** are already legal this turn for every unit on the row, and are already filtered to unoccupied cells for move and approach actions. Per-unit rows are capped at five before identical rows are merged; the cap is a presentation limit and the routing tool remains available for anything not listed.
+7. **Best Options `Target Hexes`** are already legal this turn for every unit on the row. Approach targets are empty of units. move/melee targets may be enemy-occupied (that is contact). Per-unit rows are capped at five before identical rows are merged; the cap is a presentation limit and the routing tool remains available for anything not listed.
 8. **Controlled hex queues `Available Unit Types`** lists only types that can still be built, except when every available type is at cap, in which case the full list is shown with the at-cap marker. The marker string in this column and the marker quoted in the cap rule must be the same string; they come from one constant.
 9. **Controlled hex queues `Current Queue`** marks a queued type that cannot currently spawn as blocked at cap. The queue table shows the ten cells with the most urban capacity, plus every further cell that has something queued, so no active queue is hidden.
 10. **Units without standing orders `Suggested Destination`** is a legal cell that strictly reduces distance to the nearest enemy, or an em dash when no closing cell exists. It comes from the same approach helper that produces Best Options approach targets, so the two must never disagree; see section 5.
@@ -285,7 +285,7 @@ Fields, order, and presence follow `assembly-contract.md` section 5.1. Strategic
 5. Air units cannot be given march, patrol, or pursue orders.
 6. Infantry cannot be given a strategic ranged attack.
 7. A ranged action's target must not be the acting unit's own move destination.
-8. A one-step destination that is occupied is not legal.
+8. A one-step destination that holds a friendly unit is not legal.
 9. More than one ranged or air action for the same unit in the same turn is not honoured.
 10. Raw H3 strings and coordinate pairs are never valid field values.
 
@@ -294,12 +294,12 @@ Fields, order, and presence follow `assembly-contract.md` section 5.1. Strategic
 System-prompt content only. Each item is a rule the model must be told, with the reason it is needed. Wording is left to the implementer; the content is not.
 
 1. **Win paths.** Name the two ways the game ends and which cells matter for each, so territorial effort has a target. Carries `WIN_CONDITIONS`, `HOME_REGION_HEXES`.
-2. **Resolution order.** State the full turn order rather than only that ranged precedes movement, so the model can reason about firing then closing, and about ferry arriving after ground movement. Carries `WEGO_PHASE_ORDER`.
+2. **Resolution order.** State the full turn order, including cargo sync between movement and ferry, so the model can reason about firing then closing, cargo riding the transport, and ferry arriving after ground movement.
 3. **Fire before moving costs nothing.** Every unit with a legal shot should be given one, and the model chooses each target, because the shot resolves from the turn-start position and does not consume the move. Carries `TEMPO_RANGED_SHOT`, `ATTACK_ONE_PER_UNIT`.
 4. **Withholding fire is an explicit order.** A unit that should not engage is given a fire-withholding standing order, which suppresses automatic engagement for that unit until replaced. Leaving a unit without an attack is not the same as ordering it to hold fire. Include only when standing-order tools are enabled, since that is the only way to issue it. Carries `HOLD_FIRE_SEMANTICS`.
 5. **Target the weakest defender.** Hits land on the lowest-defense unit in a stack first, then in the fixed type order, so firing into a mixed stack removes its most fragile unit. Carries `CASUALTY_PRIORITY`.
 6. **Copy option rows by action type.** Use the mapping in section 3.3, and route only for a destination the table does not list for that unit. One row may name several units. Carries `BEST_OPTIONS_ROWS`.
-7. **Occupied cells are illegal destinations.** Contact is made by attacking from an adjacent cell, not by moving onto an occupied one. Carries `LEGAL_DEST_OCCUPANCY`.
+7. **Friendly stacks are illegal destinations; enemy cells are move/melee contact.** Copy a move/melee Target Hex even when it holds an enemy. Approach Target Hexes are empty of units.
 8. **Give every orderless unit a mission.** For each row of the orderless table, issue a standing order: march or pursue to close, defend to hold. The suggested destination is a ready-made legal march target. Never march a unit to its own cell. Carries `ORDERLESS_UNITS`, `SUGGESTED_DESTINATION`, `MARCH_CURRENT_HEX_RULE`.
 9. **Leave working missions alone.** A unit with a healthy standing order needs no new order unless the model wants to override it; the attention column marks the ones that have stalled. Carries `STANDING_ORDER_STATE`.
 10. **Move idle air toward the fight.** An air unit only contributes when something is inside its strike radius, and rebasing costs it nothing else that turn. Any air unit with no strike available should ferry toward the fighting, and no air unit should both strike and ferry. Carries `FERRY_DESTINATIONS`, `AIR_ORDER_RESTRICTIONS`.

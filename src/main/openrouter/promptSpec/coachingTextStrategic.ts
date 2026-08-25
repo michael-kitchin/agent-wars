@@ -128,11 +128,11 @@ const WIN_PATHS_BULLET =
  *
  * Purpose: Firing-then-closing and ferry-after-movement cannot be inferred from "ranged uses pre-move positions" alone.
  * When to use: Always in strategic coaching.
- * Expected outcome: Embark, air strikes, ranged fire, movement, ferry, melee.
+ * Expected outcome: Embark, air strikes, ranged fire, movement, cargo sync, ferry, melee.
  * Exceptions: None.
  */
 const RESOLUTION_ORDER_BULLET =
-  '- This turn resolves as embark, then air strikes, then ranged fire, then movement, then ferry, then melee. A unit that fires can still move, and a ferried air unit arrives after ground movement.';
+  '- This turn resolves as embark, then air strikes, then ranged fire, then movement, then cargo sync, then ferry, then melee. A unit that fires can still move, and a ferried air unit arrives after ground movement.';
 
 /**
  * A legal shot costs no movement, so decline it only deliberately.

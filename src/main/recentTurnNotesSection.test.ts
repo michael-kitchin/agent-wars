@@ -56,7 +56,7 @@ async function testRecentTurnNotesFormatting(): Promise<void> {
 
       2,
 
-      '{"ranged":[{"unitType":"infantry","displayName":"I"}],"melee":[],"returnFire":[],"airStrike":[],"other":[]}',
+      '{"ranged":[{"unitType":"infantry","displayName":"I","unitId":"human-inf-1"}],"melee":[],"returnFire":[],"airStrike":[],"other":[]}',
 
       '{"ranged":[],"melee":[],"returnFire":[],"airStrike":[],"other":[]}'
 
@@ -86,7 +86,9 @@ async function testRecentTurnNotesFormatting(): Promise<void> {
 
     assert.ok(out.includes('Message: (none)'), 'losses-only turn shows (none) message');
 
-    assert.ok(out.includes('Human Losses: Ranged attack: I'));
+    assert.ok(out.includes('Human Losses: Ranged attack: human-inf-1'));
+
+    assert.ok(!out.includes('Ranged attack: I'), 'prompt losses must not use display names');
 
     assert.ok(!out.includes('AI Losses:'), 'empty AI loss line suppressed on turn 2');
 
