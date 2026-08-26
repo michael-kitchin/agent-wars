@@ -100,7 +100,7 @@ const STANDING_ORDERS_INERT_BULLET =
  * Exceptions: None.
  */
 const REACH_BULLET =
-  "- A destination beyond this beat's point budget is clamped to the first reachable leg rather than rejected. Urban and rubble cells cost more.";
+  "- A destination beyond this beat's point budget is clamped to the first reachable leg rather than rejected. Infantry or armor whose current cell is urban or rubble has a 1-point budget this beat.";
 
 /**
  * Infantry has res4 reach, the opposite of the strategic rule.
@@ -172,7 +172,7 @@ function optionCopyOrRoutingBullet(gates: CoachingGates): string {
     const airCopy = gates.hasAirUnits ? '; copy an air strike Target Hex into airStrikes' : '';
     return (
       '- Best Options This Turn Target Hexes are already this-beat legal destinations. ' +
-      'One row can list several unit ids in Unit IDs when those units share the same option; every id listed there may use that row\'s Target Hex. ' +
+      'One row can list several unit ids in Unit IDs when those units share the same option; copy those ids into one unitIds array on a single envelope entry. ' +
       'Copy a Target Hex from a row listing that sub-unit into explicit_move.destination (approach or move/melee)' +
       airCopy +
       '. One row may name several sub-units.' +

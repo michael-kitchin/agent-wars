@@ -74,6 +74,7 @@ test('strategic coaching includes every required item when its gate is on', () =
   assert.match(text, /suppresses automatic engagement/i);
   assert.match(text, /lowest-defense/i);
   assert.match(text, /Copy a Target Hex from a row listing that unit/i);
+  assert.match(text, /unitIds/);
   assert.match(text, /friendly/i);
   assert.match(text, /move\/melee/i);
   assert.match(text, /Units Without Standing Orders/i);
@@ -136,7 +137,10 @@ test('tactical coaching includes every required item when its gate is on', () =>
   assert.match(text, /does not consume the move/i);
   assert.match(text, /Standing orders do not move sub-units/i);
   assert.match(text, /Copy a Target Hex from a row listing that sub-unit/i);
+  assert.match(text, /unitIds/);
   assert.match(text, /clamped to the first reachable leg/i);
+  assert.doesNotMatch(text, /Urban and rubble cells cost more/);
+  assert.match(text, /urban or rubble/i);
   assert.match(text, /Infantry may fire at its res4 baseline/i);
   assert.match(text, /strike any cell in the footprint/i);
   assert.match(text, /lowest-defense/i);

@@ -308,16 +308,16 @@ const STRATEGIC_REPAIR_ORDERS_WITHOUT_STANDING: readonly Record<string, unknown>
   STRATEGIC_REPAIR_ORDERS.filter((row) => row.action !== 'assign_order' && row.action !== 'cancel_order');
 
 /**
- * Compact JSON example row used in the tactical repair schema.
+ * Compact JSON example rows used in the tactical repair schema.
  *
- * Purpose: Tactical repair may illustrate movement and a ranged action only.
+ * Purpose: Tactical repair may illustrate grouped movement and a ranged action only.
  * When to use: Inside `buildRepairSchemaText` for tactical gates.
- * Expected outcome: No standing-order action keys appear in the serialised schema.
+ * Expected outcome: Placeholder `example-` sub-unit ids; grouped `unitIds` on the move row; no standing-order action keys.
  * Exceptions: None.
  */
 const TACTICAL_REPAIR_ORDERS: readonly Record<string, unknown>[] = [
-  { unitId: 'opp-parent:01', action: 'explicit_move', destination: 'AB' },
-  { unitId: 'opp-parent:02', action: 'ranged_attack', targetUnitId: 'hum-parent:01' },
+  { unitIds: ['example-armor-1:01', 'example-armor-1:02'], action: 'explicit_move', destination: 'AB' },
+  { unitId: 'example-armor-1:03', action: 'ranged_attack', targetUnitId: 'example-human-1:01' },
 ];
 
 /**

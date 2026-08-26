@@ -413,6 +413,43 @@ function testAttentionFlagsSeveritySortAndCapFive(): void {
 }
 
 /**
+ * Names the period in the armed-units aggregate using the consultation mode.
+ *
+ * Purpose: A beat briefing that says "this turn" trains the model to think in strategic periods.
+ * When to use: After edits to `buildAttentionFlags` armed-units wording.
+ * Expected outcome: Tactical uses "this beat"; strategic uses "this turn"; air strike is named only when an air shooter is present.
+ * Exceptions: None.
+ */
+function testAttentionFlagsPeriodNounFollowsCoordinateMode(): void {
+  const shooter = (id: string, type: 'armor' | 'air'): UnitAssessmentResult =>
+    ({
+      unitId: id,
+      result: {
+        status: 'ok',
+        unit: { unitId: id, type, position: [0, 0], currentStandingOrder: null },
+        nearbyEnemies: [
+          {
+            unitId: 'hum-1',
+            hexDistance: 1,
+            inRangedRange: true,
+            inMeleeRange: false,
+          } as UnitAssessmentResult['result']['nearbyEnemies'][0],
+        ],
+        threats: [{ description: 'in range', severity: 'moderate', sourceUnit: 'hum-1' }],
+        canAttackThisTurn: [{ unitId: 'hum-1', attackType: 'ranged', reason: '' }],
+      } as unknown as UnitAssessmentResult['result'],
+    });
+  const tactical = buildAttentionFlags([shooter('opp-armor-1', 'armor')], 'tactical', false);
+  assert.ok(tactical.includes('this beat'), `tactical armed bullet must say this beat: ${tactical}`);
+  assert.ok(!tactical.includes('this turn'), `tactical armed bullet must not say this turn: ${tactical}`);
+  assert.ok(!tactical.includes('air strike'), `no-air armed bullet must not name air strike: ${tactical}`);
+  const strategic = buildAttentionFlags([shooter('opp-armor-1', 'armor')], 'strategic', false);
+  assert.ok(strategic.includes('this turn'), `strategic armed bullet must say this turn: ${strategic}`);
+  const withAir = buildAttentionFlags([shooter('opp-air-1', 'air')], 'tactical', false);
+  assert.ok(withAir.includes('air strike'), `air shooter names air strike: ${withAir}`);
+}
+
+/**
  * Ensures the intro critical-threat sentence matches Action needed / Attention Flags when standing orders are healthy.
  *
  * Purpose: Turn 12 said 27 units "require immediate attention" while Action needed was no and Attention Flags were None.
@@ -468,6 +505,10 @@ function testStrategicNarrativeCriticalSentenceMatchesNeedsAction(): void {
   assert.ok(
     !healthyOnly.includes('require immediate attention'),
     `healthy standing orders must not demand immediate attention: ${healthyOnly}`
+  );
+  assert.ok(
+    !healthyOnly.includes('air strikes'),
+    `no-air strategic narrative must not name air strikes: ${healthyOnly}`
   );
   const withGap = buildStrategicNarrative(state, [healthyCritical, unorderedCritical], true);
   assert.ok(
@@ -879,6 +920,10 @@ const tests = [
   {
     name: 'attention flags severity sort and cap five',
     fn: testAttentionFlagsSeveritySortAndCapFive,
+  },
+  {
+    name: 'attention flags period noun follows coordinate mode',
+    fn: testAttentionFlagsPeriodNounFollowsCoordinateMode,
   },
   {
     name: 'strategic narrative critical sentence matches needsAction',

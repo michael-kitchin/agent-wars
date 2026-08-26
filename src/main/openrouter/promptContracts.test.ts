@@ -56,6 +56,10 @@ function testTacticalExampleBlockLeadsWithExplicitMove(): void {
   assert.ok(block.includes('"explicit_move"'));
   assert.ok(!block.includes('"assign_order"'));
   assert.ok(block.includes('This close, hesitation is already a casualty.'));
+  assert.ok(block.includes('example-armor-1:01'), 'tactical example must use example- prefix with a slot');
+  assert.ok(!block.includes('opp-parent:01'), 'tactical example must not use live-looking parent ids');
+  assert.ok(!block.includes('hum-parent:01'), 'tactical example must not use live-looking enemy ids');
+  assert.ok(block.includes('"unitIds"'), 'tactical example teaches grouped unitIds');
   const messageKeyAt = block.indexOf('"message"');
   const strategyKeyAt = block.indexOf('"strategy"');
   assert.ok(messageKeyAt >= 0 && messageKeyAt < strategyKeyAt, 'tactical example JSON must list message before strategy');
@@ -129,6 +133,7 @@ function testTacticalPromptAllowsCopyingBestOptionsHexes(): void {
   const guidance = buildToolUsageGuidance(flags, true, 'tactical');
   assert.ok(guidance.includes('Best Options This Turn'));
   assert.ok(guidance.includes('Target Hexes'));
+  assert.ok(guidance.includes('unitIds'), 'tactical guidance teaches grouped unitIds');
   assert.ok(!guidance.includes('one per unit that needs to move'));
   const move = getMovementOrderInstruction(flags, 'tactical');
   assert.ok(move.includes('Best Options This Turn'));
@@ -156,6 +161,7 @@ function testStrategicPromptAllowsCopyingBestOptionsHexesWithoutStandingOrderOve
   const guidance = buildToolUsageGuidance(flags, true, 'strategic');
   assert.ok(guidance.includes('Best Options This Turn'));
   assert.ok(guidance.includes('Target Hexes'));
+  assert.ok(guidance.includes('unitIds'), 'strategic guidance teaches grouped unitIds');
   assert.ok(!guidance.includes('one per unit that needs to move'));
   assert.ok(!guidance.includes('Issue explicit_move for every'));
   assert.ok(guidance.includes('one-step explicit_move'));
@@ -311,6 +317,10 @@ function testTacticalCallbacksClauseMentionsBeat(): void {
   assert.ok(tactical.includes('event-driven'));
   assert.ok(tactical.includes('"message" (string)'));
   assert.ok(tactical.includes('Do not emit assign_order'));
+  assert.ok(tactical.includes('this beat'), 'tactical strategy field is a plan for this beat');
+  assert.ok(!tactical.includes('plan for this turn'), 'tactical contract must not call the beat a turn');
+  assert.ok(!tactical.includes('ranged-only'), 'envelope must not call fire ranged-only');
+  assert.ok(tactical.includes('unitIds'), 'tactical contract teaches grouped unitIds');
   assert.match(tactical, /replac/i);
   assert.ok(!tactical.includes('Actions: assign_order'), 'tactical contract must not list assign_order as a live action');
   const strategic = buildFinalJsonContractInstruction({
@@ -325,6 +335,8 @@ function testTacticalCallbacksClauseMentionsBeat(): void {
   assert.ok(strategic.includes('Actions: assign_order'));
   assert.ok(strategic.includes('operational-map'));
   assert.ok(strategic.includes('not plan_route orderToHexCode'));
+  assert.ok(!strategic.includes('ranged-only'), 'strategic envelope must not call fire ranged-only');
+  assert.ok(strategic.includes('unitIds'), 'strategic contract teaches grouped unitIds');
 }
 
 function testExampleBlockIncludesOptionalTails(): void {

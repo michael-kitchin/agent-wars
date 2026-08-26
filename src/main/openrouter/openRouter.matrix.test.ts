@@ -370,7 +370,7 @@ async function run(): Promise<void> {
           `air-strike JSON contract guidance missing for mask=${mask}`
         );
         assert.ok(
-          systemPrompt.includes('ferryOrders[] entries use { "unitId": "...", "destination": "<hex code>" }'),
+          systemPrompt.includes('ferryOrders[] entries use { "unitId" or "unitIds", "destination": "<hex code>" }'),
           `ferry JSON contract guidance missing for mask=${mask}`
         );
       } else {

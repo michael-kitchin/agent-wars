@@ -100,8 +100,9 @@ export function buildFinalJsonContractInstruction(args: {
   const submitHeader = `Submit your final JSON only (valid JSON, no comments): { ${fields
     .map((field) => headerSlots[field])
     .join(', ')} }.`;
+  const periodNoun = coordinateMode === 'tactical' ? 'beat' : 'turn';
   const strictSchemaClause =
-    'Strict schema: top-level must be a JSON object with "message" (string), "strategy" (string) and "orders" (array); do not return a top-level array. The "message" field is a one-line in-character taunt or threat addressed to the human player (psychological warfare only: do not reveal real orders, hex codes, unit ids, or operational intent). The "strategy" field is a one-line summary of your plan for this turn.';
+    `Strict schema: top-level must be a JSON object with "message" (string), "strategy" (string) and "orders" (array); do not return a top-level array. The "message" field is a one-line in-character taunt or threat addressed to the human player (psychological warfare only: do not reveal real orders, hex codes, unit ids, or operational intent). The "strategy" field is a one-line summary of your plan for this ${periodNoun}.`;
   const airUnitOrderNote = includeAirActions
     ? ' Air units never move hex by hex, so "march", "patrol", and "pursue" are rejected for them — use airStrikes for attacks, ferryOrders to reposition, or a "defend" order to keep striking targets in range'
     : '';
@@ -114,17 +115,23 @@ export function buildFinalJsonContractInstruction(args: {
   const sealiftActionClause = includeNavalActions
     ? ', transport_move (include "navalUnitId" and "destination" hex code), disembark (include "unitId" and "destination" hex code — clears cargo assignment then moves in one action), embark (include "unitId" and "navalUnitId")'
     : '';
-  const sharedMoveFireClause = `explicit_move (include "destination": briefing hex code for this ${coordinateMode === 'tactical' ? "beat's march" : "turn's move"}; auto-debarks embarked cargo before marching), ranged_attack (include exactly one of targetHexCode or targetUnitId; ranged-only units/actions)${sealiftActionClause}`;
+  const rangedReachClause =
+    coordinateMode === 'tactical'
+      ? 'every type with a res4 reach, infantry included'
+      : 'units with a strategic ranged reach of at least one, never infantry';
+  const sharedMoveFireClause = `explicit_move (include "destination": briefing hex code for this ${coordinateMode === 'tactical' ? "beat's march" : "turn's move"}; auto-debarks embarked cargo before marching), ranged_attack (include exactly one of targetHexCode or targetUnitId; ${rangedReachClause})${sealiftActionClause}`;
+  const actorIdClause =
+    'Each entry includes "action" and "unitId" or "unitIds" (copy several ids from one Best Options row into unitIds instead of one object per unit)';
   const ordersClause =
     coordinateMode === 'tactical'
-      ? `The "orders" array is processed in list order. Each entry includes "action" and usually "unitId". Actions: ${actionList}. ${sharedMoveFireClause}. ${TACTICAL_STANDING_ORDER_PROHIBITION}`
+      ? `The "orders" array is processed in list order. ${actorIdClause}. Actions: ${actionList}. ${sharedMoveFireClause}. ${TACTICAL_STANDING_ORDER_PROHIBITION}`
       : standingOrdersIssuable
-        ? `The "orders" array is processed in list order. Each entry includes "action" and usually "unitId". Actions: ${actionList}. assign_order (include "order": { "type": "defend"|"march"|"pursue"|"patrol"|"hold_fire", ... } — required fields per type: "march" needs "destination" (one two-character briefing hex code); "defend" needs "defendHex" (one hex code); "patrol" needs "waypoints" (an array of two or more hex codes, visited in order then looped — a single "destination" is not a valid patrol); "pursue" needs "targetUnitId" (an enemy unit id string); "hold_fire" needs no extra fields.` +
+        ? `The "orders" array is processed in list order. ${actorIdClause}. Actions: ${actionList}. assign_order (include "order": { "type": "defend"|"march"|"pursue"|"patrol"|"hold_fire", ... } — required fields per type: "march" needs "destination" (one two-character briefing hex code); "defend" needs "defendHex" (one hex code); "patrol" needs "waypoints" (an array of two or more hex codes, visited in order then looped — a single "destination" is not a valid patrol); "pursue" needs "targetUnitId" (an enemy unit id string); "hold_fire" needs no extra fields.` +
           airUnitOrderNote +
           `), cancel_order, ${sharedMoveFireClause}. assign_order place fields are operational-map briefing hex codes, not plan_route orderToHexCode; they may be multi-turn goals. Best Options Target Hexes are this-turn dests only.`
-        : `The "orders" array is processed in list order. Each entry includes "action" and usually "unitId". Actions: ${actionList}. ${sharedMoveFireClause}. Best Options Target Hexes are this-turn dests only.`;
+        : `The "orders" array is processed in list order. ${actorIdClause}. Actions: ${actionList}. ${sharedMoveFireClause}. Best Options Target Hexes are this-turn dests only.`;
   const airClause = includeAirActions
-    ? 'Optional top-level air actions: airStrikes[] entries use { "unitId": "...", exactly one of "targetHexCode" or "targetUnitId", "targetType": "units"|"urban"|"airport"|"seaport" }, ferryOrders[] entries use { "unitId": "...", "destination": "<hex code>" }. '
+    ? 'Optional top-level air actions: airStrikes[] entries use { "unitId" or "unitIds", exactly one of "targetHexCode" or "targetUnitId", "targetType": "units"|"urban"|"airport"|"seaport" }, ferryOrders[] entries use { "unitId" or "unitIds", "destination": "<hex code>" }. '
     : '';
   const callbacksClause = buildCallbackContractClause(coordinateMode);
   const invalidOutputClause = buildInvalidOutputRulesClause(gates);
@@ -226,13 +233,21 @@ export function getFinalJsonOrdersExampleBlock(flags: FinalJsonExampleFlags): st
       : 'Close with observed enemies and keep production moving.',
     orders: tactical || !standingOrdersIssuable
       ? [
-          { action: 'explicit_move', unitId: tactical ? 'opp-parent:01' : 'example-armor-1', destination: 'CD' },
-          { action: 'ranged_attack', unitId: tactical ? 'opp-parent:02' : 'example-naval-1', targetUnitId: tactical ? 'hum-parent:01' : 'example-human-1' },
+          {
+            action: 'explicit_move',
+            unitIds: tactical ? ['example-armor-1:01', 'example-armor-1:02'] : ['example-armor-1', 'example-armor-3'],
+            destination: 'CD',
+          },
+          {
+            action: 'ranged_attack',
+            unitIds: tactical ? ['example-armor-1:01', 'example-armor-1:02'] : ['example-naval-1'],
+            targetUnitId: tactical ? 'example-human-1:01' : 'example-human-1',
+          },
         ]
       : [
           { action: 'assign_order', unitId: 'example-infantry-1', order: { type: 'march', destination: 'CD' } },
           { action: 'assign_order', unitId: 'example-naval-2', order: { type: 'patrol', waypoints: ['CD', 'CF'] } },
-          { action: 'explicit_move', unitId: 'example-armor-1', destination: 'CF' },
+          { action: 'explicit_move', unitIds: ['example-armor-1', 'example-armor-3'], destination: 'CF' },
           { action: 'ranged_attack', unitId: 'example-naval-1', targetUnitId: 'example-human-1' },
         ],
     airStrikes: [],

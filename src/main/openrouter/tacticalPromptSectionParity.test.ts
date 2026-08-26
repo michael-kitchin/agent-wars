@@ -290,6 +290,8 @@ test('formatTacticalBriefing includes always-on sections and omits standing-orde
     assert.ok(!md.includes('# Scenario Objective'));
     assert.ok(!md.includes('# Air Operations Status'), 'air section lives in shell, not briefing override');
     assert.ok(!md.includes('# Naval Transport Status'), 'sealift section lives in shell, not briefing override');
+    assert.ok(!md.includes('air strikes as needed'), 'no-air battle must not name air strikes in the narrative');
+    assert.ok(md.includes('explicit_move') && md.includes('ranged_attack'));
   });
 });
 
@@ -503,10 +505,12 @@ test('tactical system prompt omits Scenario Objective and includes battle goal p
     assert.ok(prompt.includes('# Air Operations Status'));
     assert.ok(prompt.includes('Air rules (tactical)'));
     assert.ok(prompt.includes('airStrikes'));
+    assert.ok(prompt.includes('air strikes as needed'), 'air-present narrative names air strikes');
     assert.ok(prompt.includes('tactical sub-unit ids'));
     assert.ok(prompt.includes('Do not emit assign_order'));
     assert.ok(prompt.includes('Standing orders do not move sub-units'));
     assert.ok(prompt.includes('approach and move/melee Target Hexes into explicit_move'));
+    assert.ok(!prompt.includes('ferry into ferryOrders'), 'tactical plan_route line must not coach ferry');
     assert.ok(!prompt.includes('query_orders'));
     assert.ok(!prompt.includes('# Standing Order Status'));
     assert.ok(!prompt.includes('Your units (ID, type, briefing hex)'));

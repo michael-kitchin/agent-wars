@@ -196,6 +196,49 @@ function testTacticalModeSkipsAssignAndCancelOrder(): void {
 }
 
 /**
+ * Expands a grouped `unitIds` array on move, fire, air, and ferry entries into per-unit orders.
+ *
+ * Purpose: Large rosters cannot fit one JSON object per unit inside the completion budget; Best Options already groups ids.
+ * When to use: After edits to actor-id collection in `processV3OrdersArray` / air / ferry normalizers.
+ * Expected outcome: Two actors on `unitIds` become two movement, ranged, air, and ferry rows; a lone `unitId` still works.
+ * Exceptions: None.
+ */
+function testUnitIdsExpandsGroupedMoveFireAirAndFerry(): void {
+  ensureStrategicCoordinateRegistryInitialized();
+  const dest = h3ToCode(minimalState.hexes[0]!.h3Index, { mode: 'strategic' });
+  const parsed = parseFixture(
+    JSON.stringify({
+      strategy: 'group',
+      orders: [
+        { action: 'explicit_move', unitIds: ['opponent-a', 'opponent-b'], destination: dest },
+        { action: 'ranged_attack', unitIds: ['opponent-a', 'opponent-b'], targetHexCode: dest },
+        { action: 'explicit_move', unitId: 'opponent-c', destination: dest },
+      ],
+      airStrikes: [{ unitIds: ['opponent-air-a', 'opponent-air-b'], targetHexCode: dest, targetType: 'units' }],
+      ferryOrders: [{ unitIds: ['opponent-air-a', 'opponent-air-b'], destination: dest }],
+      callbacks: [],
+    })
+  );
+  assert.ok(parsed);
+  assert.deepStrictEqual(
+    parsed!.movementOrders.map((row) => row.unitId).sort(),
+    ['opponent-a', 'opponent-b', 'opponent-c']
+  );
+  assert.deepStrictEqual(
+    parsed!.rangedAttacks.map((row) => row.unitId).sort(),
+    ['opponent-a', 'opponent-b']
+  );
+  assert.deepStrictEqual(
+    parsed!.airStrikes.map((row) => row.unitId).sort(),
+    ['opponent-air-a', 'opponent-air-b']
+  );
+  assert.deepStrictEqual(
+    parsed!.ferryOrders.map((row) => row.unitId).sort(),
+    ['opponent-air-a', 'opponent-air-b']
+  );
+}
+
+/**
  * Defines the `testDisembarkClearsAssignmentAndEnqueuesMovement` function shape.
 
  * Purpose: LLM movement actions auto-debark embarked opponent cargo before enqueueing movement.
@@ -340,6 +383,7 @@ const tests = [
   { name: 'parseOrdersResponse rejects top-level JSON array', fn: testRejectsTopLevelJsonArray },
   { name: 'parseOrdersResponse invalid assign_order type drop reason', fn: testInvalidAssignOrderTypeSurfacesDropReason },
   { name: 'parseOrdersResponse tactical skips assign_order and cancel_order', fn: testTacticalModeSkipsAssignAndCancelOrder },
+  { name: 'parseOrdersResponse unitIds expands grouped move fire air and ferry', fn: testUnitIdsExpandsGroupedMoveFireAirAndFerry },
   {
     name: 'parseOrdersResponse infrastructure_destroyed stores H3 not briefing code',
     fn: testInfrastructureDestroyedCallbackStoresH3NotBriefingCode,

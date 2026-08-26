@@ -48,6 +48,15 @@ export interface TaughtCallbackEvent {
    * Exceptions: None.
    */
   readonly meaning: string;
+  /**
+   * Modes that may teach this event. Omitted means both.
+   *
+   * Contract: Tactical omits standing-march events because standing orders are inert in battle.
+   * When to use: Events that only fire on the strategic map.
+   * Expected outcome: `buildCallbackVocabularyClause` drops the event when the mode is absent from this list.
+   * Exceptions: None.
+   */
+  readonly modes?: readonly PromptCoordinateMode[];
 }
 
 /**
@@ -78,6 +87,7 @@ export const TAUGHT_CALLBACK_EVENTS: readonly TaughtCallbackEvent[] = Object.fre
     event: 'unit_arrived',
     parameters: 'unitId',
     meaning: 'fires when that unit\'s standing march arrives',
+    modes: ['strategic'],
   },
   {
     event: 'threat_escalation',
@@ -100,8 +110,9 @@ export const TAUGHT_CALLBACK_EVENTS: readonly TaughtCallbackEvent[] = Object.fre
  * Exceptions: None.
  */
 export function buildCallbackVocabularyClause(mode: PromptCoordinateMode): string {
-  logDebug('promptSpec buildCallbackVocabularyClause', { mode, taughtCount: TAUGHT_CALLBACK_EVENTS.length });
-  const items = TAUGHT_CALLBACK_EVENTS.map((row) => `${row.event} (${row.parameters}: ${row.meaning})`).join('; ');
+  const taught = TAUGHT_CALLBACK_EVENTS.filter((row) => !row.modes || row.modes.includes(mode));
+  logDebug('promptSpec buildCallbackVocabularyClause', { mode, taughtCount: taught.length });
+  const items = taught.map((row) => `${row.event} (${row.parameters}: ${row.meaning})`).join('; ');
   const address =
     mode === 'tactical'
       ? ' In battle, unit-scoped events use sub-unit ids, not strategic parent ids.'

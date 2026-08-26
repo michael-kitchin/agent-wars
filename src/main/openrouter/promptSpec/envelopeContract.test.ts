@@ -180,6 +180,8 @@ test('buildRepairSchemaText matches field order and forbids tactical standing-or
   assert.ok(strategicText.includes('example-air-1'), 'repair schema must use placeholder air id');
   assert.ok(!strategicText.includes('opponent-armor-1'), 'repair schema must not use a live-looking armor id');
   assert.ok(!strategicText.includes('opponent-air-1'), 'repair schema must not use a live-looking air id');
+  assert.ok(tacticalText.includes('example-armor-1:01'), 'tactical repair schema must use example- sub-unit ids');
+  assert.ok(!tacticalText.includes('opp-parent:01'), 'tactical repair schema must not use live-looking parent ids');
 
   const noStandingText = buildRepairSchemaText({
     ...strategic,
@@ -226,8 +228,12 @@ test('callback vocabulary clause names every taught event and its parameters', (
   for (const row of TAUGHT_CALLBACK_EVENTS) {
     assert.ok(strategic.includes(row.event), `strategic vocabulary missing ${row.event}`);
     assert.ok(strategic.includes(row.parameters), `strategic vocabulary missing parameters for ${row.event}`);
-    assert.ok(tactical.includes(row.event), `tactical vocabulary missing ${row.event}`);
-    assert.ok(tactical.includes(row.parameters), `tactical vocabulary missing parameters for ${row.event}`);
+    if (row.event === 'unit_arrived') {
+      assert.ok(!tactical.includes(row.event), 'tactical vocabulary omits standing-march unit_arrived');
+    } else {
+      assert.ok(tactical.includes(row.event), `tactical vocabulary missing ${row.event}`);
+      assert.ok(tactical.includes(row.parameters), `tactical vocabulary missing parameters for ${row.event}`);
+    }
   }
   assert.ok(!strategic.includes('territory_changed'));
   assert.ok(!tactical.includes('territory_changed'));

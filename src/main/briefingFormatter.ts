@@ -137,7 +137,7 @@ export function markdownHeading2(title: string): string {
  *
  * Purpose: Short turn-opening sentences for the Commander briefing (contact, optional standing-order gaps, critical threats).
  * When to use: Strategic `formatBriefing` after assessments are ready.
- * Expected outcome: Up to five sentences; omits standing-order coaching when Orders tools are disabled; the critical-threat sentence counts only units that also need Action when standing orders are active.
+ * Expected outcome: Up to five sentences; omits standing-order coaching when Orders tools are disabled; names air strikes only when the opponent roster includes air; the critical-threat sentence counts only units that also need Action when standing orders are active.
  * Exceptions: None.
  */
 export function buildStrategicNarrative(
@@ -165,6 +165,14 @@ export function buildStrategicNarrative(
     humanUnits.length > 0
       ? `Turn ${state.turnNumber}: you command ${aiUnits.length} unit(s); currently observed human units: ${humanUnits.length}.`
       : `Turn ${state.turnNumber}: you command ${aiUnits.length} unit(s); currently observed human units: 0. Enemy forces may still be out of view, so scout and preserve contact.`;
+  const hasAir = aiUnits.some((u) => u.unitType === 'air');
+  logDebug('briefingFormatter buildStrategicNarrative', {
+    turnNumber: state.turnNumber,
+    aiUnitCount: aiUnits.length,
+    hasAir,
+    standingOrdersActive,
+    criticalCount: critical,
+  });
   const sentences: string[] = [];
   sentences.push(observedEnemySentence);
   if (inContact > 0) {
@@ -177,7 +185,9 @@ export function buildStrategicNarrative(
     sentences.push(`${critical} unit(s) face a critical threat and require immediate attention.`);
   }
   sentences.push(
-    'Review the unit status table, attention flags, and operational map below, then issue movement, ranged attacks, and air strikes as permitted this turn.'
+    hasAir
+      ? 'Review the unit status table, attention flags, and operational map below, then issue movement, ranged attacks, and air strikes as permitted this turn.'
+      : 'Review the unit status table, attention flags, and operational map below, then issue movement and ranged attacks as permitted this turn.'
   );
   return sentences.slice(0, 5).join(' ');
 }
@@ -528,10 +538,15 @@ export function buildAttentionFlags(
     // it exists, so critical closers cannot hide the legal-attack worklist.
     const listed = armedUnitRefs.slice(0, ATTENTION_ARMED_UNITS_LISTED);
     const overflow = armedUnitRefs.length - listed.length;
+    const period = coordinateMode === 'tactical' ? 'beat' : 'turn';
+    const hasAirShooter = unitAssessments.some(
+      (row) => row.result.unit?.type === 'air' && hasLegalAttackThisTurn(row)
+    );
+    const attackKinds = hasAirShooter ? 'a ranged_attack or air strike' : 'a ranged_attack';
     candidates.push({
       rank: 4,
       text:
-        `${armedUnitRefs.length} unit(s) have a legal attack this turn — order a ranged_attack or air strike for each ` +
+        `${armedUnitRefs.length} unit(s) have a legal attack this ${period} — order ${attackKinds} for each ` +
         `and choose the targets yourself: ${listed.join(', ')}` +
         `${overflow > 0 ? `, and ${overflow} more marked Action needed = yes` : ''}.`,
     });

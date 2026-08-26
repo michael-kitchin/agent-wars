@@ -10,6 +10,10 @@ import * as path from 'path';
 import { CASUALTY_PRIORITY_ORDER, getMovementBudget } from '../../combatConstants';
 import { STALE_INTEL_TURNS } from '../../game-db/fogState';
 import { AIR_STRIKE_RANGE_HEXES, MOVEMENT_RANGE_BY_UNIT_TYPE, RANGED_RANGE_BY_UNIT_TYPE } from '../../../shared/tacticalRanges';
+import {
+  TACTICAL_TRANSPORT_RAIL_BUDGET_MULTIPLIER,
+  TACTICAL_TRANSPORT_ROAD_BUDGET_MULTIPLIER,
+} from '../../../shared/tacticalRes4TransportLink';
 import { UNIT_COST_BY_TYPE } from '../../productionRules';
 import {
   buildAirEmploymentRule,
@@ -110,9 +114,17 @@ test('buildMovementBudgetRule quotes engine budgets and states that air never ma
   const strategic = buildMovementBudgetRule('strategic');
   assert.ok(strategic.includes(String(getMovementBudget('armor'))));
   assert.match(strategic, /air (never marches|does not march)/i);
+  assert.doesNotMatch(strategic, /urban or rubble/i);
   const tactical = buildMovementBudgetRule('tactical');
   assert.ok(tactical.includes(String(MOVEMENT_RANGE_BY_UNIT_TYPE.armor)));
   assert.match(tactical, /point/i);
+  assert.match(tactical, /urban or rubble/i);
+  assert.match(tactical, /1[- ]point|one[- ]point/i);
+  assert.match(tactical, /road/i);
+  assert.match(tactical, /rail/i);
+  assert.ok(tactical.includes(String(TACTICAL_TRANSPORT_ROAD_BUDGET_MULTIPLIER)));
+  assert.ok(tactical.includes(String(TACTICAL_TRANSPORT_RAIL_BUDGET_MULTIPLIER)));
+  assert.doesNotMatch(tactical, /Urban and rubble cells cost more/);
 });
 
 test('buildRangedReachRule distinguishes infantry melee from tactical infantry reach', () => {

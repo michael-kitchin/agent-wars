@@ -29,6 +29,10 @@ import {
   MOVEMENT_RANGE_BY_UNIT_TYPE,
   RANGED_RANGE_BY_UNIT_TYPE,
 } from '../../../shared/tacticalRanges';
+import {
+  TACTICAL_TRANSPORT_RAIL_BUDGET_MULTIPLIER,
+  TACTICAL_TRANSPORT_ROAD_BUDGET_MULTIPLIER,
+} from '../../../shared/tacticalRes4TransportLink';
 import type { PromptCoordinateMode } from './envelopeContract';
 
 /**
@@ -174,7 +178,7 @@ export function buildDestinationOccupancyRule(): string {
  *
  * Purpose: Multi-turn and intra-beat reach cannot be judged from the options table alone.
  * When to use: Combat paragraph after the infantry reach clause.
- * Expected outcome: Strategic cell counts from `getMovementBudget`; tactical point budgets from `MOVEMENT_RANGE_BY_UNIT_TYPE`.
+ * Expected outcome: Strategic cell counts from `getMovementBudget`; tactical point budgets from `MOVEMENT_RANGE_BY_UNIT_TYPE`, origin urban/rubble collapse, and road/rail multipliers.
  * Exceptions: None.
  */
 export function buildMovementBudgetRule(mode: PromptCoordinateMode): string {
@@ -183,7 +187,10 @@ export function buildMovementBudgetRule(mode: PromptCoordinateMode): string {
     return (
       `Movement this beat is a terrain-weighted point budget: ${MOVEMENT_RANGE_BY_UNIT_TYPE.infantry} points for infantry, ` +
       `${MOVEMENT_RANGE_BY_UNIT_TYPE.armor} for armor, ${MOVEMENT_RANGE_BY_UNIT_TYPE.naval} for naval, and air does not march. ` +
-      'Urban and rubble cells cost more, armor in forest is penalised to the infantry baseline, and a non-air unit always retains at least one point. ' +
+      'Infantry or armor whose current cell is urban or rubble has a 1-point budget this beat, not the type baseline. ' +
+      'Armor in forest is penalised to the infantry baseline. ' +
+      `Road edges multiply remaining points by ${TACTICAL_TRANSPORT_ROAD_BUDGET_MULTIPLIER} and rail edges by ${TACTICAL_TRANSPORT_RAIL_BUDGET_MULTIPLIER}. ` +
+      'A non-air unit always retains at least one point. ' +
       "A destination beyond this beat's budget is clamped to the first reachable leg rather than rejected; when the planner cannot use the destination at all but a neighbouring footprint cell still closes on it, the engine may take that single step instead."
     );
   }

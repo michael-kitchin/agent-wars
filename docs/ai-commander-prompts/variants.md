@@ -208,6 +208,7 @@ Roster-volume rules that hold at every size:
 3. **Option rows are capped per unit before merging**, and identical rows merge with their unit ids listed together. The cap is a presentation limit and the routing tool remains available for anything unlisted.
 4. **The queue table shows the highest-capacity cells plus every cell with something queued**, so no active queue is hidden by the presentation limit.
 5. **No other list may be truncated.** Any new cap requires stating the cap, the sort, and where the remainder remains visible, in the mode file and in this file. A summary that replaces rows with a count is only acceptable if the engine already computes that count; inventing an aggregate to save tokens is not.
+6. **Grouped envelope actors are the volume valve.** The unit table stays uncapped. The completion budget is protected by accepting `unitIds` on move, ranged, air, and ferry entries so one Best Options row becomes one JSON object. Both modes must teach that compact form; a prompt that still requires one object per unit at large roster size is defective.
 
 The largest size is the regression case for context volume. If volume forces a change, it must be a stated cap with a stated remainder, not a silently shorter table.
 

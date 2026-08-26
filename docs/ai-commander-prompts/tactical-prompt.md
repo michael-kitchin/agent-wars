@@ -11,7 +11,7 @@ Shared rules come from `assembly-contract.md`. Differences from the strategic co
 3. **Local goal only.** The goal statement is to engage and defeat the enemy forces present in this battle. The regional win conditions, home regions, and territorial progress must not appear. A model told to win the region during a beat will disengage to chase territory it cannot reach from inside the footprint. Carries `BATTLE_FRAME`.
 4. **Sub-unit addressing.** Units in battle are sub-units, addressed as the parent unit id followed by a colon and a two-digit slot. Enemy sub-unit ids are legal target values. The parent strategic id is never a valid order target in a beat. Carries `SUBUNIT_IDENTITY`.
 5. **Full visibility.** Both sides see every sub-unit in the footprint, and the narrative states this. Fog affects the strategic snapshot, not the battle. The straight-hop distance caveat is not emitted in battle, because its gate requires the strategic resolution. Carries `BATTLE_FRAME`.
-6. **Movement is a point budget.** A sub-unit moves on a terrain-weighted movement-point budget per beat: two points for infantry, four for armor, three for naval, and air does not march. Urban and rubble cells cost more, armor in forest is penalised to the infantry baseline, and a non-air sub-unit always retains at least one point. Carries `TACTICAL_MP_RULES`.
+6. **Movement is a point budget.** A sub-unit moves on a terrain-weighted movement-point budget per beat: two points for infantry, four for armor, three for naval, and air does not march. Infantry or armor whose **current** cell is urban or rubble has a one-point budget this beat, not the type baseline. Armor in forest is penalised to the infantry baseline. Road and rail edges multiply remaining points. A non-air sub-unit always retains at least one point. Carries `TACTICAL_MP_RULES`.
 7. **Infantry has reach here.** At res4 every ground and naval type has a ranged reach: infantry two, armor five, naval ten, before terrain reduces it. This is the opposite of the strategic rule and the prompt must state it explicitly rather than leaving the strategic melee-only sentence in place. Carries `TACTICAL_RANGE_TABLE`.
 8. **Air strikes anywhere in the battle.** An air sub-unit may strike any cell in the footprint; the strategic three-cell strike radius does not apply. Striking still costs the unit its one air action for the beat. Strike options are offered only while the enclosing cell's airport is intact, so an air sub-unit whose parent airport has been destroyed has no strike rows to copy. Carries `AIR_STRIKE_ENVELOPE`, `TACTICAL_RANGE_TABLE`, `AIR_ORDER_RESTRICTIONS`.
 9. **Standing orders are inert.** No standing order moves a sub-unit during a beat. A sub-unit the model does not order is a sub-unit that does not move. Carries `STANDING_ORDERS_INERT_IN_BATTLE`.
@@ -45,7 +45,7 @@ Same clause order as strategic section 1.5, with these substitutions:
 | --- | --- |
 | Per-type reach | Res4 reaches from `RANGED_RANGE_BY_UNIT_TYPE`; air is stated as striking anywhere in the battle rather than as a numeric reach |
 | Infantry clause | Infantry may fire at its res4 baseline, and terrain may reduce it; close to melee when out of reach |
-| Movement budgets | The point budget and terrain weighting from section 1.6, not the strategic per-turn cell counts |
+| Movement budgets | The point budget from section 1.6: type baselines, origin urban/rubble collapsing infantry and armor to one point, forest penalty for armor, and road/rail remaining-point multipliers; not the strategic per-turn cell counts |
 | Resolution order | Embark, air strikes, ranged fire, movement, ferry, melee, applied per beat with no production step |
 | Truncation clause | A destination beyond this beat's budget is clamped to the first reachable leg rather than rejected; when the planner cannot use the destination at all but a neighbouring footprint cell still closes on it, the engine may take that single step instead |
 
@@ -57,7 +57,7 @@ Include when a briefing body is supplied. If the briefing body cannot be built â
 
 #### Narrative paragraph
 
-At most five sentences. The first is always the beat number, own sub-unit count, and enemy sub-unit count with the note that visibility is full. The closing sentence directs the model to the tables and map and names the actions available this beat. Middle sentences report contact and critical threats. **Must not** mention standing orders or orderless units.
+At most five sentences. The first is always the beat number, own sub-unit count, and enemy sub-unit count with the note that visibility is full. The closing sentence directs the model to the tables and map and names only the actions available this beat: `explicit_move` and `ranged_attack` always; air strikes only when the opponent has air sub-units. Middle sentences report contact and critical threats. **Must not** mention standing orders or orderless units.
 
 #### `## Unit Status and Threats`
 
@@ -147,7 +147,7 @@ Tactical variant, bullets in this order:
 - **Intro:** points at the briefing for assessments and options, and states the copy-then-submit rule with the tactical field mapping.
 - **Guidance bullets, in this order:**
   1. The briefing already contains unit status, attention flags, and this beat's options; the assessment and estimate tools must not be called because they are not available.
-  2. Option targets are already this-beat legal; one row may name several sub-units; copy a move or approach target into the move field and an air strike target into the strike list; route only for something unlisted; once destinations are chosen, submit.
+  2. Option targets are already this-beat legal; one row may name several sub-units; copy those ids into one `unitIds` array on a single envelope entry, a move or approach target into the move field, and an air strike target into the strike list when air is present; never map a ferry target in battle; route only for something unlisted; once destinations are chosen, submit.
   3. Standing-order actions are not accepted for sub-unit ids this beat, and standing orders do not move sub-units. Every sub-unit with a move or approach option should be given a move order, plus ranged and air actions as applicable.
   4. The tempo rule for the beat, per section 4 item 2.
   5. The sealift bullet, included only when the naval status section is present.
@@ -159,7 +159,7 @@ One line listing the enemy sub-units in the battle with their types and cells. A
 
 ### 2.13 Response envelope contract and example
 
-Section 3. Always included; the example must match the contract.
+Section 3. Always included; the example must match the contract. Example unit ids use the `example-` prefix with a `:slot` suffix so they cannot collide with live sub-unit ids. The strategy field is a plan for this **beat**, not this turn.
 
 ## 3. Tactical response envelope
 
@@ -171,9 +171,9 @@ Section 3. Always included; the example must match the contract.
 
 | Action | Required fields | Legality rules the prompt must state |
 | --- | --- | --- |
-| `explicit_move` | `unitId`, `destination` | One tactical cell for this beat. Prefer an option-row target for that sub-unit, or a routing-tool result. A destination beyond the beat budget is clamped to the first reachable leg. A cell holding a friendly unit is not legal; a cell holding an enemy is legal as move/melee contact. Embarked cargo debarks automatically before marching. |
-| `ranged_attack` | `unitId`, exactly one of a target cell code or a target sub-unit id | Legal for every type with a res4 reach, infantry included. One per sub-unit per beat, resolved from beat-start positions. |
-| `airStrikes` entry | `unitId`, exactly one of a target cell code or a target sub-unit id, `targetType` | Any footprint cell, subject to the parent airport being intact. One air action per sub-unit per beat. |
+| `explicit_move` | `unitId` or `unitIds`, `destination` | One tactical cell for this beat. Prefer an option-row target for those sub-units, or a routing-tool result. When the option row lists several ids, emit one entry with `unitIds`. A destination beyond the beat budget is clamped to the first reachable leg. A cell holding a friendly unit is not legal; a cell holding an enemy is legal as move/melee contact. Embarked cargo debarks automatically before marching. |
+| `ranged_attack` | `unitId` or `unitIds`, exactly one of a target cell code or a target sub-unit id | Legal for every type with a res4 reach, infantry included â€” not "ranged-only" units. One per sub-unit per beat, resolved from beat-start positions. |
+| `airStrikes` entry | `unitId` or `unitIds`, exactly one of a target cell code or a target sub-unit id, `targetType` | Any footprint cell, subject to the parent airport being intact. One air action per sub-unit per beat. |
 | `embark` | `unitId`, `navalUnitId` | Cargo assignment inside the footprint. |
 | `transport_move` | `navalUnitId`, `destination` | Moves the transport and its cargo. |
 | `disembark` | `unitId`, `destination` | Clears cargo and marches in one action. |
@@ -207,8 +207,8 @@ No `ferry` mapping exists in battle because no `ferry` row is produced.
 
 1. **Fire every beat.** Every sub-unit with a legal shot should be given a ranged action or air strike, with the model choosing each target, because attacks resolve from beat-start positions and never cost the move. Carries `TEMPO_RANGED_SHOT`, `ATTACK_ONE_PER_UNIT`.
 2. **Nothing moves unless ordered.** Standing orders do not move sub-units in battle, so a sub-unit with a move option and no order is idle for the beat. Carries `STANDING_ORDERS_INERT_IN_BATTLE`.
-3. **Copy option rows.** Use the mapping in section 3.3, and route only for a destination the table does not list for that sub-unit. One row may name several sub-units. Carries `BEST_OPTIONS_ROWS`.
-4. **Reach is limited and honest.** A destination beyond this beat's point budget is clamped to the first reachable leg, so ordering a far cell advances the sub-unit rather than failing, but it does not teleport it. Urban and rubble cells cost more. Carries `TACTICAL_MP_RULES`, `FIRST_LEG_TRUNCATION`.
+3. **Copy option rows.** Use the mapping in section 3.3, and route only for a destination the table does not list for that sub-unit. One row may name several sub-units; copy those ids into one `unitIds` array on a single envelope entry. Carries `BEST_OPTIONS_ROWS`.
+4. **Reach is limited and honest.** Infantry or armor already on urban or rubble has a one-point budget this beat. A destination beyond this beat's point budget is clamped to the first reachable leg, so ordering a far cell advances the sub-unit rather than failing, but it does not teleport it. Road and rail edges multiply remaining points. Carries `TACTICAL_MP_RULES`, `FIRST_LEG_TRUNCATION`.
 5. **Infantry can shoot here.** State the res4 infantry reach explicitly, because the strategic rule is the opposite and a model carrying it into a beat will waste infantry. Carries `TACTICAL_RANGE_TABLE`.
 6. **Air strikes reach the whole battle but only once.** An air sub-unit may hit any occupied footprint cell, and that is its one action for the beat. It must not be coached to rebase. Carries `AIR_STRIKE_ENVELOPE`, `AIR_ORDER_RESTRICTIONS`.
 7. **Target the weakest defender.** Same casualty rule as strategic. Carries `CASUALTY_PRIORITY`.

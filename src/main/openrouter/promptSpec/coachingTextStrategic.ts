@@ -308,7 +308,7 @@ function optionCopyOrRoutingBullet(gates: CoachingGates): string {
       : '';
     return (
       '- Best Options This Turn Target Hexes are already this-turn legal destinations. ' +
-      'One row can list several unit ids in Unit IDs when those units share the same option; every id listed there may use that row\'s Target Hex. ' +
+      'One row can list several unit ids in Unit IDs when those units share the same option; copy those ids into one unitIds array on a single envelope entry. ' +
       'Copy a Target Hex from a row listing that unit into explicit_move.destination when you need a one-step move (approach or move/melee)' +
       airCopy +
       '. One row may name several units.' +

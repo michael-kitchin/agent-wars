@@ -124,10 +124,14 @@ export function buildSystemPromptForTools(
     includeScenarioWinPaths: state.scenarioId === 'region_vs_region' && coordinateContext.mode !== 'tactical',
   };
   const toolPromptLines = filtered.map((m) => {
+    let line = m.promptLine;
     if (m.name === 'plan_route' && !hasNaval) {
-      return m.promptLine.replace(NAVAL_PLAN_ROUTE_PROMPT_SUFFIX, '');
+      line = line.replace(NAVAL_PLAN_ROUTE_PROMPT_SUFFIX, '');
     }
-    return m.promptLine;
+    if (m.name === 'plan_route' && tacticalBattleActive) {
+      line = line.replace(', ferry into ferryOrders', '');
+    }
+    return line;
   });
   const toolsIntro = buildAvailableToolsIntro(flags, hasPrecomputedBriefing, coordinateContext.mode, {
     hasAirUnits: hasAir,

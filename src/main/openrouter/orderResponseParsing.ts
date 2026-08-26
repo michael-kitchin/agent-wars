@@ -420,6 +420,66 @@ function hasNonEmptyLegacyTopLevel(obj: Record<string, unknown>): boolean {
 }
 
 /**
+ * Collects actor ids from a single envelope entry.
+ *
+ * Purpose: Best Options rows list several units; the compact JSON form uses `unitIds` so a large roster fits the completion budget.
+ * When to use: `expandGroupedActorEntries` before per-unit order application.
+ * Expected outcome: A non-empty `unitIds` array is the actor set; otherwise a trimmed `unitId`. Duplicates are dropped, order preserved.
+ * Exceptions: None.
+ */
+function actorIdsFromOrderRaw(raw: Record<string, unknown>): string[] {
+  const fromList: string[] = [];
+  if (Array.isArray(raw.unitIds)) {
+    for (const id of raw.unitIds) {
+      if (typeof id === 'string' && id.trim().length > 0) fromList.push(id.trim());
+    }
+  }
+  const uniqueFromList: string[] = [];
+  for (const id of fromList) {
+    if (!uniqueFromList.includes(id)) uniqueFromList.push(id);
+  }
+  if (uniqueFromList.length > 0) return uniqueFromList;
+  const single = typeof raw.unitId === 'string' ? raw.unitId.trim() : '';
+  return single ? [single] : [];
+}
+
+/**
+ * Expands grouped `unitIds` entries into one object per actor with a scalar `unitId`.
+ *
+ * Purpose: Downstream order applicators still consume one actor per object.
+ * When to use: Immediately before `processV3OrdersArray`, air-strike, and ferry normalizers.
+ * Expected outcome: Each grouped entry becomes N copies sharing destination/target fields; ungrouped entries are unchanged.
+ * Exceptions: Non-array input becomes an empty list.
+ */
+function expandGroupedActorEntries(entries: unknown): unknown[] {
+  if (!Array.isArray(entries)) return [];
+  const out: unknown[] = [];
+  let groupedCount = 0;
+  for (const raw of entries) {
+    if (!raw || typeof raw !== 'object') {
+      out.push(raw);
+      continue;
+    }
+    const rec = raw as Record<string, unknown>;
+    const ids = actorIdsFromOrderRaw(rec);
+    if (ids.length === 0) {
+      out.push(raw);
+      continue;
+    }
+    if (ids.length > 1) groupedCount += 1;
+    for (const unitId of ids) {
+      const expanded: Record<string, unknown> = { ...rec, unitId };
+      delete expanded.unitIds;
+      out.push(expanded);
+    }
+  }
+  if (groupedCount > 0) {
+    logDebug('openRouter expandGroupedActorEntries', { groupedCount, expandedCount: out.length, sourceCount: entries.length });
+  }
+  return out;
+}
+
+/**
  * Defines the `resolveExplicitRangedTarget` function shape (function resolveExplicitRangedTarget( target: unknown, state: GameStateSnapshot, resolveToH3: (lat: number, lng: number) => string | undefined ): stri).
 
  * Purpose: Supports maintainability by documenting why `resolveExplicitRangedTarget` exists.
@@ -851,7 +911,7 @@ export function parseOrdersResponse(
           logDebug('openRouter parseOrdersResponse: skipping candidate: orders is not an array');
           continue;
         }
-        const ordersArray: unknown[] = Array.isArray(ordersField) ? ordersField : [];
+        const ordersArray: unknown[] = expandGroupedActorEntries(Array.isArray(ordersField) ? ordersField : []);
         if (hasNonEmptyLegacyTopLevel(obj)) {
           logDebug('openRouter parseOrdersResponse: skipping candidate: non-empty legacy movementOrders/rangedAttacks');
           continue;
@@ -875,8 +935,8 @@ export function parseOrdersResponse(
           resolveToH3,
           context
         );
-        const normalizedAirStrikes = normalizeAirStrikeOrders(obj.airStrikes, state, context);
-        const normalizedFerryOrders = normalizeFerryOrders(obj.ferryOrders, context);
+        const normalizedAirStrikes = normalizeAirStrikeOrders(expandGroupedActorEntries(obj.airStrikes), state, context);
+        const normalizedFerryOrders = normalizeFerryOrders(expandGroupedActorEntries(obj.ferryOrders), context);
         let productionDropReasons: string[] = [];
         let productionAppliedCount = 0;
         if (productionEnabled) {

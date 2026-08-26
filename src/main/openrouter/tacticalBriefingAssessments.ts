@@ -283,7 +283,11 @@ export function buildTacticalBriefingNarrative(
     sentences.push(`${critical} sub-unit(s) face a critical threat and require immediate attention.`);
   }
   sentences.push(
-    'Review the unit status table, attention flags, and operational map below, then issue explicit_move, ranged_attack, and air strikes as needed this beat.'
+    `Review the unit status table, attention flags, and operational map below, then issue ${
+      aiUnits.some((u) => u.unitType === 'air')
+        ? 'explicit_move, ranged_attack, and air strikes'
+        : 'explicit_move and ranged_attack'
+    } as needed this beat.`
   );
   return sentences.slice(0, 5).join(' ');
 }
