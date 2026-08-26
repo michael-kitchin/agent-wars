@@ -271,3 +271,21 @@ test('invalid-output rules name the mode-specific prohibitions', () => {
   assert.match(tactical, /friendly unit/i);
   assert.ok(!tactical.includes('infantry cannot'));
 });
+
+test('invalid-output air-action rule is omitted when air tails are off', () => {
+  const noAir = buildInvalidOutputRulesClause({
+    coordinateMode: 'tactical',
+    includeAirActions: false,
+    includeMemoryUpdates: false,
+    includeProductionOrders: false,
+  });
+  assert.doesNotMatch(noAir, /or air action/);
+  assert.match(noAir, /More than one ranged action/);
+  const withAir = buildInvalidOutputRulesClause({
+    coordinateMode: 'strategic',
+    includeAirActions: true,
+    includeMemoryUpdates: false,
+    includeProductionOrders: false,
+  });
+  assert.match(withAir, /or air action/);
+});

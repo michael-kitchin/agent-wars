@@ -15,6 +15,7 @@ import {
   buildHoldFireRule,
 } from './gameRuleText';
 import type { CoachingGates } from './coachingGates';
+import { buildOptionCopyMappingClause } from './optionCopyText';
 
 /**
  * Five-goal list, doctrine, and message guidance for the strategic context block.
@@ -43,7 +44,7 @@ export function buildStrategicCoachingBullets(gates: CoachingGates): readonly st
   logTrace('promptSpec buildStrategicCoachingBullets', { ...gates });
   const bullets: string[] = [];
   if (gates.includeScenarioWinPaths) bullets.push(WIN_PATHS_BULLET);
-  bullets.push(RESOLUTION_ORDER_BULLET, TEMPO_BULLET);
+  bullets.push(RESOLUTION_ORDER_BULLET, tempoBullet(gates.hasAirUnits));
   if (gates.ordersEnabled) bullets.push(`- ${buildHoldFireRule()}`);
   bullets.push(`- ${buildCasualtySortRule()}`);
   bullets.push(optionCopyOrRoutingBullet(gates));
@@ -139,11 +140,13 @@ const RESOLUTION_ORDER_BULLET =
  *
  * Purpose: The model chooses each target; the engine must not be described as filling in unfired shots.
  * When to use: Always in strategic coaching.
- * Expected outcome: Mentions that firing does not consume the move.
+ * Expected outcome: Names air strike only when an air unit exists; mentions that firing does not consume the move.
  * Exceptions: None.
  */
-const TEMPO_BULLET =
-  '- Every unit with a legal shot should be given a ranged_attack or air strike, and you choose each target, because the shot resolves from the turn-start position and does not consume the move.';
+function tempoBullet(hasAirUnits: boolean): string {
+  const shot = hasAirUnits ? 'a ranged_attack or air strike' : 'a ranged_attack';
+  return `- Every unit with a legal shot should be given ${shot}, and you choose each target, because the shot resolves from the turn-start position and does not consume the move.`;
+}
 
 /**
  * Orderless units need a mission this turn.
@@ -255,7 +258,7 @@ const MEMORY_BULLET =
  * Exceptions: None.
  */
 const CALLBACK_BULLET =
-  '- Subscribe only to events from the engine\'s event vocabulary; the response replaces the entire subscription list, so repeat every subscription you still want. Omit the array or send [] to clear every subscription.';
+  '- Subscribe only to events from the engine\'s event vocabulary; the response replaces the entire subscription list, so repeat every subscription you still want. Omit the array or send [] to clear every subscription. An empty Active Callbacks table means you have no self-chosen triggers; under event-driven policy only engine-forced consultations remain unless you subscribe now.';
 
 /**
  * A turn without a consultation is a turn the model did not act in.
@@ -303,15 +306,13 @@ function optionCopyOrRoutingBullet(gates: CoachingGates): string {
     const routing = gates.planningEnabled
       ? ' Call plan_route only for a destination the table does not list for that unit.'
       : '';
-    const airCopy = gates.hasAirUnits
-      ? '; copy a ferry Target Hex into ferryOrders; copy an air strike Target Hex into airStrikes'
-      : '';
     return (
       '- Best Options This Turn Target Hexes are already this-turn legal destinations. ' +
-      'One row can list several unit ids in Unit IDs when those units share the same option; copy those ids into one unitIds array on a single envelope entry. ' +
-      'Copy a Target Hex from a row listing that unit into explicit_move.destination when you need a one-step move (approach or move/melee)' +
-      airCopy +
-      '. One row may name several units.' +
+      buildOptionCopyMappingClause({
+        actorNoun: 'unit',
+        hasAirUnits: gates.hasAirUnits,
+        includeFerryMapping: gates.hasAirUnits,
+      }) +
       routing
     );
   }

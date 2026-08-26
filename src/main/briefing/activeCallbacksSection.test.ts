@@ -43,6 +43,13 @@ test('infrastructure_destroyed Details keeps a stored briefing code', () => {
   assert.doesNotMatch(line, /specified territory/);
 });
 
+test('empty Active Callbacks row states the event-driven empty-list consequence', () => {
+  const table = buildActiveCallbacksSection([], strategicCtx);
+  assert.match(table, /engine-forced/);
+  assert.match(table, /subscribe/i);
+  assert.doesNotMatch(table, /You may add callbacks in your response JSON to be consulted on specific events/);
+});
+
 test('Active Callbacks table renders taught subscription parameters', () => {
   const table = buildActiveCallbacksSection(
     [

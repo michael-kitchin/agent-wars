@@ -15,6 +15,7 @@ import {
 } from './gameRuleText';
 import type { CoachingGates } from './coachingGates';
 import { MESSAGE_BLOCK, MESSAGE_DISCIPLINE_BULLET, STRATEGY_BLOCK } from './coachingTextStrategic';
+import { buildOptionCopyMappingClause } from './optionCopyText';
 
 /**
  * Engage-priority, doctrine, and message guidance for the tactical context block.
@@ -42,7 +43,7 @@ ${MESSAGE_BLOCK}`;
 export function buildTacticalCoachingBullets(gates: CoachingGates): readonly string[] {
   logTrace('promptSpec buildTacticalCoachingBullets', { ...gates });
   const bullets: string[] = [
-    TEMPO_BULLET,
+    tempoBullet(gates.hasAirUnits),
     STANDING_ORDERS_INERT_BULLET,
     optionCopyOrRoutingBullet(gates),
     REACH_BULLET,
@@ -74,11 +75,13 @@ const TACTICAL_PRIORITY_BLOCK =
  *
  * Purpose: Same tempo rule as strategic, with beat nouns.
  * When to use: Always in tactical coaching.
- * Expected outcome: Mentions that firing does not consume the move.
+ * Expected outcome: Names air strike only when an air sub-unit exists; mentions that firing does not consume the move.
  * Exceptions: None.
  */
-const TEMPO_BULLET =
-  '- Every sub-unit with a legal shot should be given a ranged_attack or air strike, and you choose each target, because attacks resolve from beat-start positions and firing does not consume the move.';
+function tempoBullet(hasAirUnits: boolean): string {
+  const shot = hasAirUnits ? 'a ranged_attack or air strike' : 'a ranged_attack';
+  return `- Every sub-unit with a legal shot should be given ${shot}, and you choose each target, because attacks resolve from beat-start positions and firing does not consume the move.`;
+}
 
 /**
  * Standing orders do not move sub-units in battle.
@@ -143,7 +146,7 @@ const SEALIFT_BULLET =
  * Exceptions: None.
  */
 const CALLBACK_BULLET =
-  '- Unit-scoped callbacks use sub-unit ids; the response replaces the entire subscription list, so omit the array or send [] to clear every subscription this beat; all of them are also cleared when the battle ends.';
+  '- Unit-scoped callbacks use sub-unit ids; the response replaces the entire subscription list, so omit the array or send [] to clear every subscription this beat; all of them are also cleared when the battle ends. An empty Active Callbacks table means you have no self-chosen triggers; under event-driven policy only engine-forced consultations remain unless you subscribe now.';
 
 /**
  * An unconsulted beat is a beat the model did not act in.
@@ -169,13 +172,13 @@ function optionCopyOrRoutingBullet(gates: CoachingGates): string {
     const routing = gates.planningEnabled
       ? ' Call plan_route only for a destination the table does not list for that sub-unit.'
       : '';
-    const airCopy = gates.hasAirUnits ? '; copy an air strike Target Hex into airStrikes' : '';
     return (
       '- Best Options This Turn Target Hexes are already this-beat legal destinations. ' +
-      'One row can list several unit ids in Unit IDs when those units share the same option; copy those ids into one unitIds array on a single envelope entry. ' +
-      'Copy a Target Hex from a row listing that sub-unit into explicit_move.destination (approach or move/melee)' +
-      airCopy +
-      '. One row may name several sub-units.' +
+      buildOptionCopyMappingClause({
+        actorNoun: 'sub-unit',
+        hasAirUnits: gates.hasAirUnits,
+        includeFerryMapping: false,
+      }) +
       routing
     );
   }

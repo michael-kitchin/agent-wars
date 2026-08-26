@@ -118,12 +118,13 @@ function formatReachClause(unitType: string, mode: PromptCoordinateMode): string
  *
  * Purpose: strategic-prompt.md section 1.5 items 1–2. The model cannot choose a target without the stats.
  * When to use: First clause of `buildCombatRulesParagraph`.
- * Expected outcome: The existing "Combat: d6 per shot" sentence with engine stats interpolated.
+ * Expected outcome: The existing "Combat: d6 per shot" sentence with engine stats interpolated; air is omitted when `hasAirUnits` is false.
  * Exceptions: None.
  */
-export function buildCombatStatsLine(mode: PromptCoordinateMode): string {
-  logTrace('promptSpec buildCombatStatsLine', { mode });
-  const summary = ALL_BUILD_UNIT_TYPES.map(
+export function buildCombatStatsLine(mode: PromptCoordinateMode, hasAirUnits = true): string {
+  logDebug('promptSpec buildCombatStatsLine', { mode, hasAirUnits });
+  const types = hasAirUnits ? ALL_BUILD_UNIT_TYPES : ALL_BUILD_UNIT_TYPES.filter((unitType) => unitType !== 'air');
+  const summary = types.map(
     (unitType) =>
       `${unitType}: ${getAttack(unitType)} attack / ${getDefense(unitType)} defense${formatReachClause(unitType, mode)}`
   ).join('; ');
@@ -345,7 +346,7 @@ function buildAttackConstraintsClause(gates: GameRuleTextGates): string {
 export function buildCombatRulesParagraph(gates: GameRuleTextGates): string {
   logDebug('promptSpec buildCombatRulesParagraph', { ...gates });
   const parts: string[] = [
-    buildCombatStatsLine(gates.coordinateMode),
+    buildCombatStatsLine(gates.coordinateMode, gates.hasAirUnits),
     buildCasualtySortRule(),
     buildResolutionOrderRule(gates.coordinateMode),
     'Ranged uses pre-move positions.',

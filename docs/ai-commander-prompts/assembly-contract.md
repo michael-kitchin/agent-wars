@@ -35,7 +35,7 @@ Logical assembly order. Exact heading strings are quoted; unquoted rows are pros
 | 11 | `# Available Tools` | section with numbered tool lines and guidance bullets |
 | 12 | Observed enemy roster line | prose, one line |
 | 13 | Response envelope contract | prose |
-| 14 | Response envelope example | fenced JSON |
+| 14 | Response envelope example | compact JSON, no fence |
 
 Ordering rules that must not be relaxed:
 
@@ -70,7 +70,7 @@ Every cell is binary. `always` means unconditional in that mode; `never` means t
 | `# Your Strategic Memory` | when memory tools are enabled | never | omit |
 | `# Standing Order Status` | when standing-order tools are enabled | never | omit |
 | `## Units Without Standing Orders` | when the standing-order block is present | never | one row of `—` |
-| `## Active Callbacks` | always inside the briefing | always inside the briefing | one row: `—` and the no-subscriptions sentence |
+| `## Active Callbacks` | always inside the briefing | always inside the briefing | one row: `—` and the empty-list sentence that omitting callbacks or sending `[]` leaves no self-chosen triggers, so under event-driven policy only engine-forced consultations remain unless the model subscribes now |
 | `# Scenario Objective (Required)` | when `scenarioId === 'region_vs_region'` | never | omit |
 | `Strategic context:` block | always | always (tactical variant) | n/a |
 | `# Air Operations Status` | when the opponent has at least one air unit | when the opponent has at least one air sub-unit in this battle | omit the section |
@@ -91,7 +91,7 @@ Two deviations from current code are deliberate and are the reason those rows re
 2. **The prompt lists only callable tools.** The numbered list in `# Available Tools` is exactly the enabled set for this consultation. A tool absent from that list must not be named anywhere in the prompt as something to call, including as a prohibition. When a precomputed briefing is attached, assessment and estimate tools are not callable and their names must not appear.
 3. **Never in tactical.** The assessment tools and the combat-estimate tool are stripped in battle, along with the memory, standing-order, and production tool groups. A tactical prompt must not tell the model to call any of them.
 4. **Copy, do not re-derive.** When the options table is present, a destination listed there is already legal for the unit or units named on that row. The prompt must instruct the model to copy such a target directly into the matching envelope field and to call the routing tool only for a destination the table does not list for that unit.
-5. **Action type decides the field.** An option row's action determines where its target goes: approach and move rows into the move field, ferry rows into the ferry list (strategic only; a battle prompt must not name ferry as a mapping), air strike rows into the strike list, ranged rows into a ranged action. The prompt must state this mapping once, in `# Available Tools`, and the envelope contract must not contradict it. When one option row lists several unit ids, that mapping is one envelope entry with `unitIds` copied from the row, not one entry per id.
+5. **Action type decides the field.** An option row's action determines where its target goes: approach and move rows into the move field, ferry rows into the ferry list (strategic only; a battle prompt must not name ferry as a mapping), air strike rows into the strike list when air is present, ranged rows into a ranged action. The prompt must state this mapping once, in `# Available Tools`, and the envelope contract must not contradict it. When one option row lists several unit ids, that mapping is one envelope entry with `unitIds` copied from the row, not one entry per id. A unit listed on several overlapping rows still gets at most one move and one shot: pick one row per action type; do not copy overlapping rows that relist the same unit.
 6. **Stop condition.** Once destinations are chosen the model submits. The prompt must say that re-assessing or re-routing after a destination is chosen is wasted budget, because the round limit is finite and exhausting it produces no orders at all.
 7. **Empty tool set.** When no tool is enabled, `# Available Tools` still appears with `No tools available.` so the model cannot conclude that unlisted tools might work.
 
@@ -136,7 +136,7 @@ Envelope-wide rules the prompt must state:
 4. Legacy top-level `movementOrders` and `rangedAttacks` are invalid.
 5. Every `orders` entry carries an `action`; all but the order-cancelling action also carry a `unitId` or a `unitIds` array. `unitIds` is the compact form for several actors sharing the same action and destination or target, copied from a Best Options `Unit IDs` cell. A non-empty `unitIds` list is the actor set; otherwise `unitId` is. The engine expands the list into per-unit orders. The prompt must tell the model to prefer `unitIds` whenever a row lists more than one id, because one JSON object per unit will not fit a large roster inside the completion budget.
 6. An entry missing a required field for its action is dropped silently, so the model must not rely on partial entries.
-7. Output is JSON only: no prose, no commentary, no code fence around the submitted object.
+7. Output is compact JSON only: no prose, no commentary, no markdown fence, and no extra whitespace around the submitted object.
 
 ### 5.2 Action legality by mode
 
@@ -160,12 +160,12 @@ System-prompt content, both modes. Each item states the rule and why the model n
 
 1. **Period-start resolution.** Attacks resolve from positions held at the start of the period, before movement is applied. A unit may therefore fire and move in the same period, and firing costs it nothing. Carries `WEGO_PHASE_ORDER`, `TEMPO_RANGED_SHOT`, `ATTACK_ONE_PER_UNIT`.
 2. **Resolution order.** The strategic period resolves as embark, air strikes, ranged fire, movement, cargo sync, ferry, then melee. A tactical beat resolves the same list with cargo sync after ferry. The model needs this to understand that a unit it moves into contact will fight in melee this same period, that embarked cargo stays with the transport until sync, and that a ferried air unit arrives after ground movement. Carries `WEGO_PHASE_ORDER`.
-3. **One action per unit.** At most one ranged or air action per unit per period, and an air unit that strikes cannot also rebase. Carries `ATTACK_ONE_PER_UNIT`, `AIR_ORDER_RESTRICTIONS`.
+3. **One action per unit.** At most one ranged action per unit per period, and at most one air action when air is present; an air unit that strikes cannot also rebase. The air half of this sentence is omitted when the opponent has no air units. Carries `ATTACK_ONE_PER_UNIT`, `AIR_ORDER_RESTRICTIONS`.
 4. **Target selection.** Hits fall on the lowest-defense defender first, then in the fixed type order. Firing into a stack therefore removes its weakest unit, which is what makes stacked targets attractive. Carries `CASUALTY_PRIORITY`.
 5. **Friendly-occupied cells are not destinations; enemy-occupied cells are move/melee contact.** A cell holding a friendly unit is not a legal one-step destination. A cell holding an enemy is legal only as a move/melee option — copy that Target Hex into the move field to make contact. Approach Target Hexes are empty of units. Carries `LEGAL_DEST_OCCUPANCY`.
-6. **Copy the listed option.** Targets in the options table are already legal for the units named on that row, and one row may name several units. Copy them into one envelope entry using `unitIds` when the row lists more than one id; route only for something unlisted. Carries `BEST_OPTIONS_ROWS`.
+6. **Copy the listed option.** Targets in the options table are already legal for the units named on that row, and one row may name several units. Copy a ranged row into a ranged action, a move or approach row into the move field, and an air or ferry row into those tails when they are present. Copy them into one envelope entry using `unitIds` when the row lists more than one id; pick one row per unit per action; route only for something unlisted. Carries `BEST_OPTIONS_ROWS`.
 7. **Codes are copied exactly.** Two characters, taken from this prompt. Carries `HEX_IDENTITY`.
-8. **Callbacks are a full replacement.** The response's callback list becomes the entire subscription set, so a subscription the model still wants must be repeated. Omitting the array or sending `[]` clears every subscription. Carries `CALLBACK_REPLACE_SEMANTICS`.
+8. **Callbacks are a full replacement.** The response's callback list becomes the entire subscription set, so a subscription the model still wants must be repeated. Omitting the array or sending `[]` clears every subscription. An empty Active Callbacks table means there are no self-chosen triggers; under event-driven policy only engine-forced consultations remain unless the model subscribes now. Carries `CALLBACK_REPLACE_SEMANTICS`.
 9. **`strategy` is for continuity.** One line naming what this period is trying to achieve, so the next consultation inherits intent rather than re-deriving it. Carries `JSON_ENVELOPE`.
 10. **`message` is for the player.** One in-character taunt or threat, and nothing operational: no cells, no unit ids, no intent. Carries `MESSAGE_DISCIPLINE`.
 11. **Doctrine.** Use speed, surprise, and initiative to break enemy cohesion; attack gaps and avoid strengths; create maximum disruption with minimum force. These are judgment aids with no engine symbol behind them and must be presented as doctrine, not as rules.

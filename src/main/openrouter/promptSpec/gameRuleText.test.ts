@@ -153,6 +153,15 @@ test('buildIntelStalenessRule quotes the engine retention window', () => {
   assert.ok(text.includes(String(STALE_INTEL_TURNS)));
 });
 
+test('combat stats omit the air type when the roster has no air', () => {
+  const noAir = buildCombatRulesParagraph(gates({ coordinateMode: 'tactical', hasAirUnits: false }));
+  assert.doesNotMatch(noAir, /air: \d+ attack/);
+  assert.doesNotMatch(noAir, /strike anywhere/);
+  const withAir = buildCombatRulesParagraph(gates({ coordinateMode: 'tactical', hasAirUnits: true }));
+  assert.match(withAir, /air: \d+ attack/);
+  assert.match(withAir, /strike anywhere/);
+});
+
 test('buildCombatRulesParagraph keeps strike radius out of tactical and MP wording out of strategic', () => {
   const tactical = buildCombatRulesParagraph(
     gates({ coordinateMode: 'tactical', hasAirUnits: true, ordersEnabled: true })

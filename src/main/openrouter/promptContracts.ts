@@ -97,7 +97,7 @@ export function buildFinalJsonContractInstruction(args: {
     memoryUpdates: '"memoryUpdates": [...]',
     productionOrders: '"productionOrders": [...]',
   };
-  const submitHeader = `Submit your final JSON only (valid JSON, no comments): { ${fields
+  const submitHeader = `Submit your final JSON only (one compact JSON object, no markdown fence, no extra whitespace, no comments): { ${fields
     .map((field) => headerSlots[field])
     .join(', ')} }.`;
   const periodNoun = coordinateMode === 'tactical' ? 'beat' : 'turn';
@@ -267,10 +267,9 @@ export function getFinalJsonOrdersExampleBlock(flags: FinalJsonExampleFlags): st
   for (const field of envelopeFieldsForGates(gates)) {
     example[field] = values[field];
   }
-  const json = JSON.stringify(example, null, 2);
+  const json = JSON.stringify(example);
   return (
-    'Example (illustrative only — use briefing hex codes and unit ids from this operational map, not these placeholders):\n```json\n' +
-    json +
-    '\n```'
+    'Example (illustrative only — use briefing hex codes and unit ids from this operational map, not these placeholders). Emit compact JSON with no markdown fence:\n' +
+    json
   );
 }

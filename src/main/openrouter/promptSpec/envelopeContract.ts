@@ -212,7 +212,9 @@ export function buildInvalidOutputRulesClause(gates: EnvelopeGates): string {
     'The top level must be a JSON object; a top-level array is invalid.',
     'Do not use top-level movementOrders or rangedAttacks (legacy).',
     'An entry missing a required field is dropped without comment.',
-    'More than one ranged or air action for the same unit in the same period is not honoured.',
+    gates.includeAirActions
+      ? 'More than one ranged or air action for the same unit in the same period is not honoured.'
+      : 'More than one ranged action for the same unit in the same period is not honoured.',
     'Raw H3 strings and latitude/longitude pairs are never valid field values.',
     "A ranged action's target must not be the acting unit's own move destination.",
     'A one-step destination that holds a friendly unit is not legal.',

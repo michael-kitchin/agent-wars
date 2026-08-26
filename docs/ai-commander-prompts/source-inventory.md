@@ -56,7 +56,7 @@ Emit order as coded. All headings quoted exactly.
 | `## Reminders Triggered This Turn` | same | present whenever the memory block is present | one row of `—` | yes |
 | `# Standing Order Status` | `getInjectionText` (`src/main/tools/tool5StandingOrdersCore.ts`), passed as `standingOrderText` | `standingOrderText.trim().length > 0`; returns `''` when `coordinateContext.mode === 'tactical'` | section omitted | yes |
 | `## Units Without Standing Orders` | same | present whenever the standing-order block is present | one row of `—` | yes |
-| `## Active Callbacks` | `buildActiveCallbacksSection` | always | one row: `—` and `None. You may add callbacks in your response JSON to be consulted on specific events.` | yes |
+| `## Active Callbacks` | `buildActiveCallbacksSection` | always | one row: `—` and the empty-list sentence that omitting callbacks or sending `[]` leaves no self-chosen triggers, so under event-driven policy only engine-forced consultations remain unless the model subscribes now | yes |
 
 Table columns as coded:
 
@@ -208,7 +208,7 @@ Failure handling: a tuple that cannot be encoded is left to recursive descent; u
 
 - `MALFORMED_COMPLETION_RETRY_LIMIT = 2`. Detection: no non-empty `tool_calls` **and** no non-empty string `content`. Exhaustion reason: `AI returned an unusable reply (no tool call and no content) after retries. Please try again.`
 - Corrective message: `Your previous reply contained neither a tool call nor any text content, so it could not be used. Do not repeat that reply. Respond now with exactly one of: a single well-formed tool call, or your final orders as one JSON object matching the schema in the system prompt. Never return an empty message.`
-- Repair template: `Your previous response was not parseable JSON. Reply now with JSON only (no prose, no markdown, no code fences) using exactly this top-level object schema (orders[] only; no movementOrders/rangedAttacks; never a top-level array): {schema}. Omit optional arrays when empty.`
+- Repair template: `Your previous response was not parseable JSON. Reply now with compact JSON only (no prose, no markdown, no code fences, no extra whitespace) using exactly this top-level object schema (orders[] only; no movementOrders/rangedAttacks; never a top-level array): {schema}. Omit optional arrays when empty.`
 - `buildJsonAssistantRepairSchema(includeProductionOrders)` emits keys in this order: `message`, `strategy`, `orders`, `airStrikes`, `ferryOrders`, `callbacks`, `memoryUpdates`, and `productionOrders` only when the flag is true. `requestOrdersFlow` passes `tacticalBattle ? false : flags.productionEnabled`.
 - Repair is attempted once. A second failure fails the consultation with `Invalid response: could not parse orders`.
 - Loop exhaustion (50 rounds) is not a parse failure: it sets the tool-limit flag, records a successful-but-empty consultation, logs an error, and returns zero orders.
@@ -375,7 +375,7 @@ Failure handling: a tuple that cannot be encoded is left to recursive descent; u
 | `Best Options This Turn Target Hexes are already this-turn legal destinations.` | tool guidance | engine-true | `collectAggregatedPossibleActionRows` built from `getValidDestinationsUnoccupied` |
 | `One row can list several unit ids in Unit IDs…` | tool guidance | engine-true | `groupThisTurnOptionRowsByTarget` |
 | `That table's Suggested Destination column already holds a legal hex that closes on the nearest enemy` | tool guidance | engine-true | `suggestApproachDestinationsForOrderlessUnits` → `pickApproachHexesTowardNearestEnemy` |
-| `Tempo rule: every unit that can legally attack this turn should be given a ranged_attack or air strike` | tool guidance | engine-true | attacks are free of movement cost; see `TEMPO_SWEEP_SILENCE` for what is deliberately not said |
+| `Tempo rule: every unit that can legally attack this turn should be given a ranged_attack` (plus `or air strike` only when air is present) | tool guidance | engine-true | attacks are free of movement cost; air wording is omitted when the roster has no air; see `TEMPO_SWEEP_SILENCE` for what is deliberately not said |
 | `every one you leave unfired is damage given up for free` | tool guidance | engine-false as literally written | `collectTempoRuleAttacks` fires for un-ordered units, so an omitted shot is taken by the engine except for units under `hold_fire` and units that already have an attack |
 | `Nearest-enemy distances and threat ETAs are H3 grid hops (straight hex count), not march or sail paths.` | briefing | engine-true | `gridHopDistancesFrom` used by `assessUnitProximity` |
 | `persistent entries appear in every briefing (limit 5); stored are retrieved via memory_read (limit 15)` | tool guidance | engine-true | `PERSISTENT_LIMIT`, `STORED_LIMIT` |

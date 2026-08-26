@@ -96,7 +96,7 @@ Include when at least one prior period in this battle has a message, strategy, o
 
 - **Columns:** `Event`, `Details`.
 - **Ids:** unit-scoped subscriptions use sub-unit ids. Subscriptions naming a unit that is not in this battle's roster are filtered out before the table is built, so every row the model sees is actionable.
-- **Empty-state:** one row whose event cell is `—` and whose detail cell states that no subscriptions exist and that callbacks may be added in the response.
+- **Empty-state:** one row whose event cell is `—` and whose detail cell states that omitting callbacks or sending `[]` leaves no self-chosen triggers, so under event-driven policy only engine-forced consultations remain unless the model subscribes now.
 - **Detail-cell contract:** as strategic — the parameters, not just the event name.
 
 ### 2.7 Always omitted in battle
@@ -147,8 +147,8 @@ Tactical variant, bullets in this order:
 - **Intro:** points at the briefing for assessments and options, and states the copy-then-submit rule with the tactical field mapping.
 - **Guidance bullets, in this order:**
   1. The briefing already contains unit status, attention flags, and this beat's options; the assessment and estimate tools must not be called because they are not available.
-  2. Option targets are already this-beat legal; one row may name several sub-units; copy those ids into one `unitIds` array on a single envelope entry, a move or approach target into the move field, and an air strike target into the strike list when air is present; never map a ferry target in battle; route only for something unlisted; once destinations are chosen, submit.
-  3. Standing-order actions are not accepted for sub-unit ids this beat, and standing orders do not move sub-units. Every sub-unit with a move or approach option should be given a move order, plus ranged and air actions as applicable.
+  2. Option targets are already this-beat legal; one row may name several sub-units; copy those ids into one `unitIds` array on a single envelope entry; a move or approach target into the move field; a ranged target into a `ranged_attack` entry; and an air strike target into the strike list when air is present; never map a ferry target in battle; each sub-unit gets at most one move and one shot, so pick one row per action type and do not copy overlapping rows; route only for something unlisted; once destinations are chosen, submit.
+  3. Standing-order actions are not accepted for sub-unit ids this beat, and standing orders do not move sub-units. A sub-unit with a move option and no order is idle for the beat.
   4. The tempo rule for the beat, per section 4 item 2.
   5. The sealift bullet, included only when the naval status section is present.
 - **Empty-state:** the heading plus `No tools available.`
@@ -159,7 +159,7 @@ One line listing the enemy sub-units in the battle with their types and cells. A
 
 ### 2.13 Response envelope contract and example
 
-Section 3. Always included; the example must match the contract. Example unit ids use the `example-` prefix with a `:slot` suffix so they cannot collide with live sub-unit ids. The strategy field is a plan for this **beat**, not this turn.
+Section 3. Always included; the example must match the contract. Example unit ids use the `example-` prefix with a `:slot` suffix so they cannot collide with live sub-unit ids. The strategy field is a plan for this **beat**, not this turn. The example is compact JSON with no markdown fence.
 
 ## 3. Tactical response envelope
 
@@ -198,23 +198,23 @@ No `ferry` mapping exists in battle because no `ferry` row is produced.
 2. Standing-order assignment and cancellation for sub-unit ids are rejected this beat.
 3. Memory updates and production orders are not accepted.
 4. An entry missing a required field is dropped without comment.
-5. More than one ranged or air action for the same sub-unit in the same beat is not honoured.
+5. More than one ranged action for the same sub-unit in the same beat is not honoured. When air is present, the same one-action limit applies to air strikes.
 6. Strategic res1 codes, raw H3 strings, and coordinate pairs are never valid field values.
 7. A ranged target must not be the acting sub-unit's own move destination.
 8. A one-step destination that holds a friendly unit is not legal.
 
 ## 4. Required tactical coaching
 
-1. **Fire every beat.** Every sub-unit with a legal shot should be given a ranged action or air strike, with the model choosing each target, because attacks resolve from beat-start positions and never cost the move. Carries `TEMPO_RANGED_SHOT`, `ATTACK_ONE_PER_UNIT`.
+1. **Fire every beat.** Every sub-unit with a legal shot should be given a ranged action, and an air strike when air is present, with the model choosing each target, because attacks resolve from beat-start positions and never cost the move. The air half of this sentence is omitted when the opponent has no air sub-units. Carries `TEMPO_RANGED_SHOT`, `ATTACK_ONE_PER_UNIT`.
 2. **Nothing moves unless ordered.** Standing orders do not move sub-units in battle, so a sub-unit with a move option and no order is idle for the beat. Carries `STANDING_ORDERS_INERT_IN_BATTLE`.
-3. **Copy option rows.** Use the mapping in section 3.3, and route only for a destination the table does not list for that sub-unit. One row may name several sub-units; copy those ids into one `unitIds` array on a single envelope entry. Carries `BEST_OPTIONS_ROWS`.
+3. **Copy option rows.** Use the mapping in section 3.3, and route only for a destination the table does not list for that sub-unit. One row may name several sub-units; copy those ids into one `unitIds` array on a single envelope entry. Each sub-unit gets at most one move and one shot: pick one row per action type; do not copy overlapping rows that relist the same sub-unit. Carries `BEST_OPTIONS_ROWS`.
 4. **Reach is limited and honest.** Infantry or armor already on urban or rubble has a one-point budget this beat. A destination beyond this beat's point budget is clamped to the first reachable leg, so ordering a far cell advances the sub-unit rather than failing, but it does not teleport it. Road and rail edges multiply remaining points. Carries `TACTICAL_MP_RULES`, `FIRST_LEG_TRUNCATION`.
 5. **Infantry can shoot here.** State the res4 infantry reach explicitly, because the strategic rule is the opposite and a model carrying it into a beat will waste infantry. Carries `TACTICAL_RANGE_TABLE`.
 6. **Air strikes reach the whole battle but only once.** An air sub-unit may hit any occupied footprint cell, and that is its one action for the beat. It must not be coached to rebase. Carries `AIR_STRIKE_ENVELOPE`, `AIR_ORDER_RESTRICTIONS`.
 7. **Target the weakest defender.** Same casualty rule as strategic. Carries `CASUALTY_PRIORITY`.
 8. **Friendly stacks are illegal destinations; enemy cells are move/melee contact.** Same as strategic.
 9. **Sealift works inside the footprint.** Included only when the naval status section is present. Carries `EMBARK_LEGALITY`, `EMBARK_STATE`.
-10. **Callbacks use sub-unit ids and die with the battle.** Unit-scoped subscriptions name sub-units, the response replaces the whole list, subscriptions are evaluated after each beat under event-driven policy, and all of them are cleared when the battle ends. Carries `CALLBACK_TACTICAL_SCOPE`, `CALLBACK_REPLACE_SEMANTICS`.
+10. **Callbacks use sub-unit ids and die with the battle.** Unit-scoped subscriptions name sub-units, the response replaces the whole list, subscriptions are evaluated after each beat under event-driven policy, and all of them are cleared when the battle ends. An empty Active Callbacks table means there are no self-chosen triggers; omitting callbacks or sending `[]` keeps it empty, so only engine-forced consultations remain unless the model subscribes now. Carries `CALLBACK_TACTICAL_SCOPE`, `CALLBACK_REPLACE_SEMANTICS`.
 11. **A beat with no prompt is a beat not acted in.** Under event-driven policy the model is consulted only when an event fires; because standing orders are inert in battle, an unconsulted beat is one where its sub-units did nothing. Carries `CONSULT_POLICY`, `STANDING_ORDERS_INERT_IN_BATTLE`.
 12. **Keep the player-facing line clean.** Same message discipline as strategic. Carries `MESSAGE_DISCIPLINE`.
 

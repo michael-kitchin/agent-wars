@@ -203,7 +203,7 @@ function testFormatBriefingContainsSections(): void {
   assert.ok(out.includes('# Standing Order Status'), 'standing order block');
   assert.ok(out.includes('MARCH to AB — en_route'), 'SO detail stays in Standing Order Status');
   assert.ok(out.includes('## Active Callbacks'), 'Active Callbacks section');
-  assert.ok(out.includes('None. You may add callbacks'), 'callbacks hint when none');
+  assert.ok(out.includes('engine-forced'), 'empty callbacks state the event-driven consequence');
   assert.ok(!out.includes('undefined'), 'no raw undefined');
 }
 

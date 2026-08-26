@@ -4,6 +4,7 @@ import { getValidDestinations } from '../oneStepMoveDestinations';
 import { PRODUCTION_CAP_QUEUE_GUIDANCE } from '../productionCaps';
 import { logDebug } from '../logger';
 import { buildCoachingBullets, type CoachingGates } from './promptSpec/coachingText';
+import { buildToolsIntroCopySentence } from './promptSpec/optionCopyText';
 import { buildOpeningUserMessage } from './promptSpec/consultationText';
 
 /**
@@ -229,8 +230,8 @@ export function buildAvailableToolsIntro(
     if (!hasBestOptionsTable) {
       return 'Use the Commander\'s Briefing above for assessments and possible unit actions. No options are listed this period. Destinations must come from the routing tool, not from an absent options table.';
     }
-    const airCopy = hasAirUnits ? '; copy air strike Target Hexes into airStrikes' : '';
-    return `Use the Commander's Briefing above for assessments and possible unit actions. Copy Best Options This Turn approach and move/melee Target Hexes into explicit_move${airCopy}; use plan_route only for dests not listed for that sub-unit.`;
+    const copy = buildToolsIntroCopySentence({ coordinateMode: 'tactical', hasAirUnits });
+    return `Use the Commander's Briefing above for assessments and possible unit actions. ${copy} Use plan_route only for dests not listed for that sub-unit.`;
   }
   const extraHints: string[] = [];
   if (flags.ordersEnabled) {
@@ -245,9 +246,9 @@ export function buildAvailableToolsIntro(
       extra
     );
   }
-  const ferryCopy = hasAirUnits ? '; copy ferry Target Hexes into ferryOrders' : '';
+  const copy = buildToolsIntroCopySentence({ coordinateMode: 'strategic', hasAirUnits });
   return (
-    `Use the Commander's Briefing above for assessments and possible unit actions. Copy Best Options This Turn approach and move/melee Target Hexes into explicit_move when you need a one-step move${ferryCopy}. Use plan_route only for dests not listed for that unit.` +
+    `Use the Commander's Briefing above for assessments and possible unit actions. ${copy} Use plan_route only for dests not listed for that unit.` +
     extra
   );
 }

@@ -153,7 +153,7 @@ Assessment-tool and combat-estimate hints must **not** appear when a precomputed
 
 - **Include:** always inside the briefing.
 - **Items:** `CALLBACK_ACTIVE_LIST`.
-- **Empty-state:** one row whose event cell is `—` and whose detail cell states that no subscriptions exist and that callbacks may be added in the response.
+- **Empty-state:** one row whose event cell is `—` and whose detail cell states that omitting callbacks or sending `[]` leaves no self-chosen triggers, so under event-driven policy only engine-forced consultations remain unless the model subscribes now.
 - **Detail-cell contract:** the detail cell must describe the subscription in terms the model can act on — the event and its parameters, such as the unit id or the cell code it watches. Repeating the event name in both cells carries no information and does not satisfy this contract. An unfiltered `infrastructure_destroyed` watch (no `targetType`, no hex) must say that it is unfiltered and that re-subscribing uses the event with no params — not `infrastructure_destroyed(any)`.
 - **Model use:** decides which subscriptions to keep, since the response replaces the whole list. Omitting `callbacks` or sending `[]` clears every subscription.
 
@@ -209,7 +209,7 @@ Bullets in this order.
 
 ### 1.13 Response envelope contract and example
 
-Contract text in section 3; the example immediately follows it and must be consistent with it. Both are always included. The example unit ids must use an `example-` prefix so they cannot collide with live snapshot ids. The parse-repair schema uses the same prefix. The production example must not queue a type that is commonly at cap (prefer air over infantry).
+Contract text in section 3; the example immediately follows it and must be consistent with it. Both are always included. The example unit ids must use an `example-` prefix so they cannot collide with live snapshot ids. The parse-repair schema uses the same prefix. The production example must not queue a type that is commonly at cap (prefer air over infantry). The example is compact JSON with no markdown fence.
 
 ## 2. Table column contracts
 
@@ -283,11 +283,11 @@ Fields, order, and presence follow `assembly-contract.md` section 5.1. Strategic
 2. Legacy top-level movement and ranged-attack arrays are invalid.
 3. An entry missing a required field is dropped without comment.
 4. A march to the unit's current cell is dropped as already arrived.
-5. Air units cannot be given march, patrol, or pursue orders.
+5. Air units cannot be given march, patrol, or pursue orders. Omit when the opponent has no air units.
 6. Infantry cannot be given a strategic ranged attack.
 7. A ranged action's target must not be the acting unit's own move destination.
 8. A one-step destination that holds a friendly unit is not legal.
-9. More than one ranged or air action for the same unit in the same turn is not honoured.
+9. More than one ranged action for the same unit in the same turn is not honoured. When air is present, the same one-action limit applies to air strikes.
 10. Raw H3 strings and coordinate pairs are never valid field values.
 
 ## 4. Required strategic coaching
@@ -296,10 +296,10 @@ System-prompt content only. Each item is a rule the model must be told, with the
 
 1. **Win paths.** Name the two ways the game ends and which cells matter for each, so territorial effort has a target. Carries `WIN_CONDITIONS`, `HOME_REGION_HEXES`.
 2. **Resolution order.** State the full turn order, including cargo sync between movement and ferry, so the model can reason about firing then closing, cargo riding the transport, and ferry arriving after ground movement.
-3. **Fire before moving costs nothing.** Every unit with a legal shot should be given one, and the model chooses each target, because the shot resolves from the turn-start position and does not consume the move. Carries `TEMPO_RANGED_SHOT`, `ATTACK_ONE_PER_UNIT`.
+3. **Fire before moving costs nothing.** Every unit with a legal shot should be given a ranged action, and an air strike when air is present, and the model chooses each target, because the shot resolves from the turn-start position and does not consume the move. The air half of this sentence is omitted when the opponent has no air units. Carries `TEMPO_RANGED_SHOT`, `ATTACK_ONE_PER_UNIT`.
 4. **Withholding fire is an explicit order.** A unit that should not engage is given a fire-withholding standing order, which suppresses automatic engagement for that unit until replaced. Leaving a unit without an attack is not the same as ordering it to hold fire. Include only when standing-order tools are enabled, since that is the only way to issue it. Carries `HOLD_FIRE_SEMANTICS`.
 5. **Target the weakest defender.** Hits land on the lowest-defense unit in a stack first, then in the fixed type order, so firing into a mixed stack removes its most fragile unit. Carries `CASUALTY_PRIORITY`.
-6. **Copy option rows by action type.** Use the mapping in section 3.3, and route only for a destination the table does not list for that unit. One row may name several units; copy those ids into one `unitIds` array on a single envelope entry. Carries `BEST_OPTIONS_ROWS`.
+6. **Copy option rows by action type.** Use the mapping in section 3.3, and route only for a destination the table does not list for that unit. One row may name several units; copy those ids into one `unitIds` array on a single envelope entry. Each unit gets at most one move and one shot: pick one row per action type; do not copy overlapping rows that relist the same unit. Carries `BEST_OPTIONS_ROWS`.
 7. **Friendly stacks are illegal destinations; enemy cells are move/melee contact.** Copy a move/melee Target Hex even when it holds an enemy. Approach Target Hexes are empty of units.
 8. **Give every orderless unit a mission.** For each row of the orderless table, issue a standing order: march or pursue to close, defend to hold. The suggested destination is a ready-made legal march target. Never march a unit to its own cell. Carries `ORDERLESS_UNITS`, `SUGGESTED_DESTINATION`, `MARCH_CURRENT_HEX_RULE`.
 9. **Leave working missions alone, except this-turn contact and receding marches.** A unit with a healthy standing order needs no new order unless the model wants to override it; the attention column marks the ones that have stalled and the marches whose next move recedes from the nearest enemy. A this-turn move/melee Target Hex is such an override — copy it even when the unit is already marching. After a unit fires, do not leave it on a standing march that recedes from that enemy: assign defend to hold contact, cancel the march, or remarch toward the enemy. Carries `STANDING_ORDER_STATE`.
@@ -310,7 +310,7 @@ System-prompt content only. Each item is a rule the model must be told, with the
 14. **Keep production queued.** When a controlled cell can build and its queue is empty, queue something. Replace a queue blocked by a cap with an available type this turn; when every available type for that cell is capped, leave the queue alone so it resumes when the cap frees. The response must include at least one `set_build_queue` when any controlled hex has an empty queue or a blocked-at-cap queue that still has an alternative type. Carries `PRODUCTION_QUEUES`, `PRODUCTION_CAP_QUEUE_RULE`.
 15. **Shared home cells count for both sides.** When the home regions intersect, the listed shared cells count toward both win conditions, so holding them serves defence and attack at once. Include only when an intersection exists. Carries `HOME_REGION_OVERLAP`.
 16. **Persist intent, not data.** Write a short persistent note naming this turn's objectives and the units assigned to them. Always include a `memoryUpdates` write this turn when persistent slots are unused. Do not persist enemy positions or rosters, which the briefing already supplies fresh each turn. Carries `MEMORY_PERSISTENT`, `MEMORY_WRITE_PATH`.
-17. **Subscribe to what would change the plan.** Callbacks are chosen from the engine's event vocabulary and the response replaces the entire subscription list. Omitting `callbacks` or sending `[]` clears every subscription. Carries `CALLBACK_EVENT_VOCABULARY`, `CALLBACK_REPLACE_SEMANTICS`.
+17. **Subscribe to what would change the plan.** Callbacks are chosen from the engine's event vocabulary and the response replaces the entire subscription list. Omitting `callbacks` or sending `[]` clears every subscription. An empty Active Callbacks table means there are no self-chosen triggers; under event-driven policy only engine-forced consultations remain unless the model subscribes now. Carries `CALLBACK_EVENT_VOCABULARY`, `CALLBACK_REPLACE_SEMANTICS`.
 18. **Keep the player-facing line clean.** The message field is a taunt or threat and must not reveal orders, cells, unit ids, or intent. Carries `MESSAGE_DISCIPLINE`.
 19. **Spend the tool budget on unknowns only.** Rounds are limited and exhausting them submits nothing at all; once destinations are chosen, submit. Carries `TOOL_CATALOG`, `TOOL_BUDGET_WARNING`.
 

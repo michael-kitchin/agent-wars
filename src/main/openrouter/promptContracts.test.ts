@@ -23,17 +23,19 @@ import {
  */
 function testExampleBlockParsesWithParser(): void {
   const block = getFinalJsonOrdersExampleBlock({ includeMemoryUpdates: false, includeProductionOrders: false });
-  const jsonMatch = block.match(/```json\s*([\s\S]*?)```/);
-  assert.ok(jsonMatch, 'example should be fenced json');
-  const parsed = JSON.parse(jsonMatch[1]!.trim()) as { message?: string; strategy?: string; orders?: unknown[] };
+  assert.ok(!block.includes('```'), 'example must not be a markdown fence the model will copy');
+  assert.ok(!/\n  "/.test(block), 'example JSON must be compact, not pretty-printed');
+  const jsonStart = block.indexOf('{');
+  assert.ok(jsonStart >= 0, 'example should contain a JSON object');
+  const parsed = JSON.parse(block.slice(jsonStart)) as { message?: string; strategy?: string; orders?: unknown[] };
   assert.strictEqual(parsed.message, 'You will not find safety in delay.');
   assert.strictEqual(typeof parsed.strategy, 'string');
-  const messageKeyAt = jsonMatch[1]!.indexOf('"message"');
-  const strategyKeyAt = jsonMatch[1]!.indexOf('"strategy"');
+  const messageKeyAt = block.indexOf('"message"');
+  const strategyKeyAt = block.indexOf('"strategy"');
   assert.ok(messageKeyAt >= 0 && messageKeyAt < strategyKeyAt, 'example JSON must list message before strategy');
-  const airAt = jsonMatch[1]!.indexOf('"airStrikes"');
-  const ferryAt = jsonMatch[1]!.indexOf('"ferryOrders"');
-  const callbacksAt = jsonMatch[1]!.indexOf('"callbacks"');
+  const airAt = block.indexOf('"airStrikes"');
+  const ferryAt = block.indexOf('"ferryOrders"');
+  const callbacksAt = block.indexOf('"callbacks"');
   assert.ok(airAt >= 0 && airAt < ferryAt && ferryAt < callbacksAt, 'example JSON must list air tails before callbacks');
   assert.ok(Array.isArray(parsed.orders));
   assert.ok(parsed.orders!.length >= 3);
@@ -60,6 +62,8 @@ function testTacticalExampleBlockLeadsWithExplicitMove(): void {
   assert.ok(!block.includes('opp-parent:01'), 'tactical example must not use live-looking parent ids');
   assert.ok(!block.includes('hum-parent:01'), 'tactical example must not use live-looking enemy ids');
   assert.ok(block.includes('"unitIds"'), 'tactical example teaches grouped unitIds');
+  assert.ok(!block.includes('```'), 'tactical example must not be a markdown fence');
+  assert.ok(!/\n  "/.test(block), 'tactical example JSON must be compact');
   const messageKeyAt = block.indexOf('"message"');
   const strategyKeyAt = block.indexOf('"strategy"');
   assert.ok(messageKeyAt >= 0 && messageKeyAt < strategyKeyAt, 'tactical example JSON must list message before strategy');
@@ -139,12 +143,15 @@ function testTacticalPromptAllowsCopyingBestOptionsHexes(): void {
   assert.ok(move.includes('Best Options This Turn'));
   const user = getInitialUserMessage(flags, true, 'tactical');
   assert.ok(!user.includes('Call plan_route for each sub-unit'));
-  assert.ok(user.includes('move or approach'));
+  assert.ok(user.includes('one move or approach row'));
+  assert.ok(user.includes('one ranged row per sub-unit'));
+  assert.ok(!user.includes('Give every sub-unit with a move or approach option a move order'));
   assert.ok(user.includes('Do not emit assign_order or cancel_order for tactical sub-unit ids.'));
   assert.ok(!user.includes('Copy Best Options approach and move/melee Target Hexes into explicit_move'));
   assert.ok(guidance.includes('approach or move/melee'));
   const intro = buildAvailableToolsIntro(flags, true, 'tactical');
   assert.ok(intro.includes('Best Options This Turn'));
+  assert.ok(intro.includes('ranged_attack'), 'tactical intro maps ranged rows');
   assert.ok(!intro.includes('exact routing (plan_route)'));
 }
 
@@ -170,11 +177,13 @@ function testStrategicPromptAllowsCopyingBestOptionsHexesWithoutStandingOrderOve
   assert.ok(move.includes('Best Options This Turn'));
   const user = getInitialUserMessage(flags, true, 'strategic');
   assert.ok(!user.includes('Call plan_route for each unit that needs a move'));
-  assert.ok(user.includes('Copy option targets into the matching envelope field'));
+  assert.ok(user.includes('one option row per unit per action'));
+  assert.ok(user.includes('into the matching envelope field'));
   assert.ok(!user.includes('one-step move'));
   const intro = buildAvailableToolsIntro(flags, true, 'strategic');
   assert.ok(intro.includes('Best Options This Turn'));
   assert.ok(intro.includes('one-step move'));
+  assert.ok(intro.includes('ranged_attack'), 'strategic intro maps ranged rows');
   assert.ok(!intro.includes('exact routing (plan_route)'));
 }
 
@@ -321,6 +330,8 @@ function testTacticalCallbacksClauseMentionsBeat(): void {
   assert.ok(!tactical.includes('plan for this turn'), 'tactical contract must not call the beat a turn');
   assert.ok(!tactical.includes('ranged-only'), 'envelope must not call fire ranged-only');
   assert.ok(tactical.includes('unitIds'), 'tactical contract teaches grouped unitIds');
+  assert.match(tactical, /compact JSON/i);
+  assert.match(tactical, /no markdown fence/i);
   assert.match(tactical, /replac/i);
   assert.ok(!tactical.includes('Actions: assign_order'), 'tactical contract must not list assign_order as a live action');
   const strategic = buildFinalJsonContractInstruction({

@@ -122,6 +122,23 @@ test('tactical opening repeats the standing-order prohibition and strategic open
   assert.ok(!strategic.includes(TACTICAL_STANDING_ORDER_PROHIBITION));
 });
 
+test('opening action clause points at one move row and one ranged row without restating the mapping', () => {
+  const tactical = buildOpeningUserMessage({
+    ...strategicOpening(),
+    coordinateMode: 'tactical',
+    ordersEnabled: false,
+    memoryEnabled: false,
+    productionEnabled: false,
+  });
+  assert.match(tactical, /one move or approach row/i);
+  assert.match(tactical, /one ranged row per sub-unit/i);
+  assert.ok(!tactical.includes('Give every sub-unit with a move or approach option a move order'));
+  assert.ok(!tactical.includes('Copy Best Options approach and move/melee Target Hexes into explicit_move'));
+  const strategic = buildOpeningUserMessage(strategicOpening());
+  assert.match(strategic, /one option row per unit per action/i);
+  assert.ok(strategic.includes('into the matching envelope field'));
+});
+
 test('repair request is schema-only and inlines buildRepairSchemaText', () => {
   const gates: EnvelopeGates = {
     coordinateMode: 'strategic',
@@ -132,8 +149,9 @@ test('repair request is schema-only and inlines buildRepairSchemaText', () => {
   };
   const text = buildRepairRequestMessage(gates);
   assert.match(text, /not parseable JSON/i);
-  assert.match(text, /JSON only/i);
+  assert.match(text, /compact JSON only/i);
   assert.match(text, /no prose, no markdown, no code fences/i);
+  assert.match(text, /no extra whitespace/i);
   assert.match(text, /Omit optional arrays when empty/);
   assert.match(text, /orders\[\] only; no movementOrders\/rangedAttacks; never a top-level array/);
   assert.ok(!text.includes(PRODUCTION_CAP_QUEUE_GUIDANCE));

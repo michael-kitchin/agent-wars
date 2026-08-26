@@ -146,7 +146,9 @@ function formatQuotedEnvelopeFields(gates: EnvelopeGates): string {
  *
  * Purpose: The opening message may point at options or tools, but must not restate the copy-row mapping.
  * When to use: Second sentence of `buildOpeningUserMessage`.
- * Expected outcome: A single clause (or two when the orderless pointer applies).
+ * Expected outcome: A single clause (or two when the orderless pointer applies). Briefing-present
+ * planning names one move/approach row and one ranged row per tactical sub-unit, or one option row
+ * per unit per action strategically.
  * Exceptions: None.
  */
 function buildOpeningActionClause(gates: OpeningMessageGates): string {
@@ -155,10 +157,10 @@ function buildOpeningActionClause(gates: OpeningMessageGates): string {
       if (!gates.hasBestOptionsTable) {
         return 'No options are listed this period; use the routing tool for destinations.';
       }
-      return 'Give every sub-unit with a move or approach option a move order, copying its target; use the routing tool only for an unlisted destination.';
+      return 'Copy one move or approach row and one ranged row per sub-unit; use the routing tool only for an unlisted destination.';
     }
     const optionsClause = gates.hasBestOptionsTable
-      ? 'Copy option targets into the matching envelope field; use the routing tool only for an unlisted destination.'
+      ? 'Copy one option row per unit per action into the matching envelope field; use the routing tool only for an unlisted destination.'
       : 'No options are listed this period; use the routing tool for destinations.';
     const orderlessClause =
       gates.ordersEnabled
@@ -205,13 +207,13 @@ export function buildOpeningUserMessage(gates: OpeningMessageGates): string {
  *
  * Purpose: consultation-flow.md section 5: three submit clauses, the inlined schema, and the two shape constraints.
  * When to use: The repair copy's user turn. Must not be appended to the main transcript.
- * Expected outcome: JSON-only instruction plus `buildRepairSchemaText`; no game rules.
+ * Expected outcome: Compact JSON-only instruction plus `buildRepairSchemaText`; no game rules.
  * Exceptions: None.
  */
 export function buildRepairRequestMessage(gates: EnvelopeGates): string {
   logDebug('promptSpec buildRepairRequestMessage', { ...gates });
   return (
-    'Your previous response was not parseable JSON. Reply now with JSON only (no prose, no markdown, no code fences) ' +
+    'Your previous response was not parseable JSON. Reply now with compact JSON only (no prose, no markdown, no code fences, no extra whitespace) ' +
     `using exactly this top-level object schema: ${buildRepairSchemaText(gates)}. Omit optional arrays when empty.`
   );
 }

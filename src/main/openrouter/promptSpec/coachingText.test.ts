@@ -166,6 +166,30 @@ test('tactical conditional items disappear when their gate is off', () => {
   assert.doesNotMatch(joined(tacticalGates()), /assign_order/i);
 });
 
+test('option copy maps ranged rows and picks one row per actor per action in both modes', () => {
+  const strategic = joined(strategicGates());
+  const tactical = joined(tacticalGates());
+  for (const text of [strategic, tactical]) {
+    assert.match(text, /ranged_attack/);
+    assert.match(text, /at most one/i);
+    assert.match(text, /overlapping/i);
+  }
+  assert.match(strategic, /Copy a Target Hex from a row listing that unit/i);
+  assert.match(tactical, /Copy a Target Hex from a row listing that sub-unit/i);
+});
+
+test('tempo coaching names air strike only when air is present', () => {
+  assert.match(joined(strategicGates({ hasAirUnits: true })), /or air strike/);
+  assert.doesNotMatch(joined(strategicGates({ hasAirUnits: false })), /or air strike/);
+  assert.match(joined(tacticalGates({ hasAirUnits: true })), /or air strike/);
+  assert.doesNotMatch(joined(tacticalGates({ hasAirUnits: false })), /or air strike/);
+});
+
+test('callback coaching states the empty-list event-driven consequence', () => {
+  assert.match(joined(strategicGates()), /engine-forced/);
+  assert.match(joined(tacticalGates()), /engine-forced/);
+});
+
 test('prohibited claims appear in no gate combination', () => {
   const samples: CoachingGates[] = [
     strategicGates(),
