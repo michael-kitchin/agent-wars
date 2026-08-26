@@ -196,7 +196,7 @@ export function buildTacticalOperationalMapSectionMarkdown(args: {
     });
   }
   const grid = projectTacticalRes4FootprintToAsciiGrid(mapHexes, context);
-  const gameByH3 = buildTacticalHexGameStateMap(args.state, mapHexes);
+  const gameByH3 = buildTacticalHexGameStateMap(args.state, args.tacticalBattle, mapHexes);
   const { mapString, displacedFeatures } = renderHexAsciiMap(grid, gameByH3);
 
   const aggRows = collectAggregatedPossibleActionRows({
@@ -213,6 +213,7 @@ export function buildTacticalOperationalMapSectionMarkdown(args: {
     'Each cell: top = tactical hex code, bottom = terrain + overlay.\n' +
     'Terrain: x = land, . = water.\n' +
     'Overlay: * = your units, ! = enemy units, # = contested.\n' +
+    'Features: A/a airport, S/s seaport, B/b both, U/u urban only; uppercase = your control.\n' +
     'Odd rows are indented one space. Use only hex codes from this map or tables.\n\n';
 
   return (
@@ -222,7 +223,21 @@ export function buildTacticalOperationalMapSectionMarkdown(args: {
   );
 }
 
-function buildTacticalHexGameStateMap(state: GameStateSnapshot, mapHexes: string[]): Map<string, HexMapCellState> {
+/**
+ * Builds per-cell land/water, infrastructure, and occupancy state for the tactical ASCII map.
+ *
+ * Purpose: Each res4 child must paint its own kind and urban/seaport/airport letters; copying the enclosing res1
+ * ocean or hardcoding features off made urban armor look like it was at sea.
+ * When to use: Only from `buildTacticalOperationalMapSectionMarkdown` after the grid is projected.
+ * Expected outcome: Terrain matches `state.hexes` for that child; U/S/A/B follow battle flags unless the cell is rubble;
+ * uppercase when the enclosing res1 is AI-controlled.
+ * Exceptions: Missing hex rows default to land; fog hides enemy counts the same way as the strategic map.
+ */
+function buildTacticalHexGameStateMap(
+  state: GameStateSnapshot,
+  battle: TacticalBattleSnapshot,
+  mapHexes: string[]
+): Map<string, HexMapCellState> {
   const terrainByH3 = new Map(state.hexes.map((h) => [h.h3Index, h.terrain]));
   const discovered = new Set<string>([...(state.visibleHexes ?? []), ...(state.exploredHexes ?? [])]);
   const fog = state.fogOfWarEnabled === true;
@@ -232,6 +247,9 @@ function buildTacticalHexGameStateMap(state: GameStateSnapshot, mapHexes: string
     if (u.player === 'human') humanUnitsByH3.set(u.h3Index, (humanUnitsByH3.get(u.h3Index) ?? 0) + 1);
     if (u.player === 'opponent') aiUnitsByH3.set(u.h3Index, (aiUnitsByH3.get(u.h3Index) ?? 0) + 1);
   }
+  const enclosingController =
+    (state.res1Control ?? []).find((r) => r.h3Index === battle.enclosingRes1H3Index)?.controllerPlayerId ?? null;
+  const controlledByAI = enclosingController === 'opponent';
   const out = new Map<string, HexMapCellState>();
   for (const h3 of mapHexes) {
     const rawTerrain = terrainByH3.get(h3) ?? 'land';
@@ -239,11 +257,15 @@ function buildTacticalHexGameStateMap(state: GameStateSnapshot, mapHexes: string
       rawTerrain === 'ocean' || rawTerrain === 'water' || rawTerrain === 'arctic_ocean' ? 'water' : 'land';
     const isDiscovered = !fog || discovered.has(h3);
     const visible = !fog || discovered.has(h3);
+    const rubble = !!battle.res4IsRubbleByH3?.[h3];
+    const urban = !rubble && !!battle.res4IsUrbanByH3?.[h3];
+    const seaport = !rubble && !!battle.res4IsSeaportByH3?.[h3];
+    const airport = !rubble && !!battle.res4IsAirportByH3?.[h3];
     out.set(h3, {
       terrain,
       isDiscovered,
-      features: { hasAirport: false, hasSeaport: false, urbanCount: 0 },
-      controlledByAI: false,
+      features: { hasAirport: airport, hasSeaport: seaport, urbanCount: urban ? 1 : 0 },
+      controlledByAI,
       aiUnitCount: aiUnitsByH3.get(h3) ?? 0,
       enemyUnitCount: visible ? humanUnitsByH3.get(h3) ?? 0 : 0,
     });

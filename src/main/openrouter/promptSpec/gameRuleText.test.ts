@@ -124,14 +124,19 @@ test('buildMovementBudgetRule quotes engine budgets and states that air never ma
   assert.match(tactical, /rail/i);
   assert.ok(tactical.includes(String(TACTICAL_TRANSPORT_ROAD_BUDGET_MULTIPLIER)));
   assert.ok(tactical.includes(String(TACTICAL_TRANSPORT_RAIL_BUDGET_MULTIPLIER)));
+  assert.match(tactical, /friendly/i);
   assert.doesNotMatch(tactical, /Urban and rubble cells cost more/);
 });
 
 test('buildRangedReachRule distinguishes infantry melee from tactical infantry reach', () => {
   const tactical = buildRangedReachRule('tactical');
   assert.ok(tactical.includes(String(RANGED_RANGE_BY_UNIT_TYPE.infantry)));
+  assert.ok(tactical.includes(String(RANGED_RANGE_BY_UNIT_TYPE.armor)));
+  assert.match(tactical, /range 1|capped to 1/i);
+  assert.match(tactical, /mountain/i);
   const strategic = buildRangedReachRule('strategic');
   assert.match(strategic, /infantry is melee-only|Infantry has no strategic ranged/i);
+  assert.doesNotMatch(strategic, /mountain/i);
 });
 
 test('buildDestinationOccupancyRule forbids friendly stacks and allows enemy move/melee contact', () => {

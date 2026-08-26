@@ -106,14 +106,15 @@ const REACH_BULLET =
   "- A destination beyond this beat's point budget is clamped to the first reachable leg rather than rejected. Infantry or armor whose current cell is urban or rubble has a 1-point budget this beat.";
 
 /**
- * Infantry has res4 reach, the opposite of the strategic rule.
+ * Infantry and armor have res4 reach, with terrain caps the strategic rule does not have.
  *
- * Purpose: A model carrying strategic melee-only into a beat will waste infantry.
+ * Purpose: A model carrying strategic melee-only infantry or baseline-5 armor into a beat will order illegal shots.
  * When to use: Always in tactical coaching.
- * Expected outcome: States the res4 infantry baseline from `RANGED_RANGE_BY_UNIT_TYPE`.
+ * Expected outcome: States res4 baselines, the range-1 cap, and mountain LOS.
  * Exceptions: None.
  */
-const INFANTRY_REACH_BULLET = `- Infantry may fire at its res4 baseline of ${RANGED_RANGE_BY_UNIT_TYPE.infantry}, and terrain may reduce it; close to melee when out of reach.`;
+const INFANTRY_REACH_BULLET =
+  `- Infantry and armor fire at res4 baselines of ${RANGED_RANGE_BY_UNIT_TYPE.infantry} and ${RANGED_RANGE_BY_UNIT_TYPE.armor}; forest, urban, rubble, or a road/rail corridor caps them to range 1. Mountain along the line of sight blocks armor, naval, and air. Close to melee when out of reach.`;
 
 /**
  * Air strikes reach the whole battle, once.

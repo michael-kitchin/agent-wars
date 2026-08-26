@@ -167,8 +167,8 @@ function testTacticalSystemPromptAllowsInfantryRanged(): void {
     'tactical combat summary must list infantry ranged baseline'
   );
   assert.ok(
-    prompt.includes('Infantry may use ranged_attack at tactical res4 range'),
-    'tactical coaching must allow infantry ranged_attack'
+    prompt.includes('Infantry and armor fire at their res4 baselines'),
+    'tactical coaching must allow infantry ranged_attack and state terrain caps'
   );
   assert.ok(
     !prompt.includes('infantry: 1 attack / 2 defense, melee only'),

@@ -107,6 +107,20 @@ export function tacticalRes4MovementCategory(battle: TacticalBattleTerrainPick, 
 }
 
 /**
+ * Land vs water glyph for the tactical operational map and AI plan-state hex rows.
+ *
+ * Purpose: Child res4 kinds (wetlands, coastal, plains, …) must not inherit the enclosing res1 ocean as “water”.
+ * When to use: `buildTacticalAiPlanState` so the tactical ASCII map reads land/water from plan-state hex rows.
+ * Expected outcome: `'water'` for open water/ocean/sea; `'land'` for every other occupiable category including coastal and wetlands.
+ * Exceptions: None.
+ */
+export function tacticalRes4BriefingLandWater(battle: TacticalBattleTerrainPick, res4H3: string): 'land' | 'water' {
+  const kind = (effectiveRes4TerrainKindString(battle, res4H3) || '').toLowerCase();
+  if (kind === 'water' || kind === 'ocean' || kind === 'sea') return 'water';
+  return tacticalRes4MovementCategory(battle, res4H3) === 'water' ? 'water' : 'land';
+}
+
+/**
  * Returns true when the res4 cell is treated as **mountain** for implicit ranged LOS blocking.
  *
  * Contract: `tacticalRes4MovementCategory(...) === 'mountains'`.

@@ -133,7 +133,7 @@ Tactical Best Options columns match strategic. Action values present in tactical
 | Goal clause | `buildTacticalBattleGoalClause`: `Your goal is to engage and defeat enemy forces in this battle. Review the rules, below, for how to order this.` |
 | Coordinate preamble | `buildTacticalLatLngPreamble`: res4 children of the enclosing res1 hex; two-character tactical codes; `enemy sub-unit ids for targetUnitId` |
 | Combat range clause | `formatCombatStatRangeClause` tactical branch: air is `, strike anywhere in the battle`; others use `RANGED_RANGE_BY_UNIT_TYPE` (`infantry: 2`, `armor: 5`, `naval: 10`) |
-| Infantry clause | `Infantry may use ranged_attack at tactical res4 range (baseline 2; terrain may reduce it); use movement and melee when out of range.` |
+| Infantry clause | `Infantry and armor fire at their res4 baselines (infantry 2, armor 5); forest, urban, rubble, or a road/rail corridor on the attacker's cell caps infantry and armor to range 1. Mountain along the line of sight blocks armor, naval, and air shots (infantry is exempt). Close to melee when out of range.` |
 | Coaching block | `tacticalContextBlock`: `COACHING_TACTICAL_PRIORITY`, `COACHING_STRATEGY_BLOCK`, `COACHING_MESSAGE_BLOCK`. No `Explored:` / `Controlled:` / home-region bullets. |
 | Scenario objective | `''` (omitted) |
 | Scouting directive | `''` (omitted) |
@@ -333,7 +333,7 @@ Failure handling: a tuple that cannot be encoded is left to recursive descent; u
 | `evaluateRegionControlWinnerAtEndOfTurn` | control win or urban-elimination win | present |
 | `computeHomeRegionHexPartitionsForPrompting` | `aiExclusive`, `humanExclusive`, `intersection`, `equalAsSets` | present |
 | strategic map legend | `x` land, `.` water, `*` yours, `!` enemy, `#` contested, `?` undiscovered, `A/a` airport, `S/s` seaport, `B/b` both, `U/u` urban, uppercase = your control | present |
-| tactical map legend | same minus the `?` and feature tokens | present |
+| tactical map legend | same minus the `?` marker; feature tokens `A/S/B/U` are included | present |
 | `renderDisplacedFeaturesLine` | `Units at featured hexes: {code}({feature})` | present when non-empty |
 
 ## 6. Variant-gate catalog
@@ -363,7 +363,7 @@ Failure handling: a tuple that cannot be encoded is left to recursive descent; u
 | `At most one ranged_attack per unit from turn-start range` | system preamble | engine-true | `runRangedPhase`, `mergeOpponentAttackOrders` |
 | `Ranged uses pre-move positions.` | system preamble | engine-true | phase order in `executeReadyStrategicTurn` (ranged before movement) |
 | `Infantry has no strategic ranged_attack (melee only)` | system preamble (strategic) | engine-true | `strategicRangedRangeHexesForUnitType.infantry === 0` |
-| `Infantry may use ranged_attack at tactical res4 range (baseline 2…)` | system preamble (tactical) | engine-true | `RANGED_RANGE_BY_UNIT_TYPE.infantry === 2` |
+| `Infantry and armor fire at their res4 baselines… caps … to range 1` | system preamble (tactical) | engine-true | `effectiveTacticalRangedMaxRangeForAttacker`; mountain LOS via `tacticalMountainBlocksImplicitLosForAirArmorNavalRanged` |
 | `these attacks resolve from turn-start positions and do not prevent movement in the same turn` | system preamble | engine-true | ranged and air phases precede the movement phase |
 | `Naval units can attack land units at 1 or 2 hexes (range 2).` | system preamble | engine-true | `strategicRangedRangeHexesForUnitType.naval === 2` |
 | `Naval units move on water/coastal hexes.` | `NAVAL_MOVEMENT_PROMPT_RULE` | engine-true | `getNavalStrategicReachableHexes` |

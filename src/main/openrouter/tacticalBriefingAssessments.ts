@@ -5,7 +5,7 @@
 import { cellToLatLng } from 'h3-js';
 import type { UnitAssessmentResult } from '../precomputation';
 import type { TacticalBattleSnapshot, TacticalSubUnitSnapshot } from '../../shared/tacticalBattleTypes';
-import { RANGED_RANGE_BY_UNIT_TYPE } from '../../shared/tacticalRanges';
+import { tacticalRangedDirectFirePassesTerrainAndRange } from '../../shared/tacticalTerrainCombatModifiers';
 import { gridHopDistanceBetween } from '../tools/assessUnitProximity';
 import { pickClosestEnemyTacticalRangedTargetForSubUnit } from '../tacticalBattle/tacticalRangedTargetResolve';
 import { logDebug, logTrace } from '../logger';
@@ -125,6 +125,7 @@ function tacticalCanAttackRows(
  * When to use: Cache miss in `buildLightweightTacticalUnitAssessments`.
  * Expected outcome: Nearby humans scored by grid hops from the unit's effective hex; embarked cargo gets an extra
  * threat; `canAttackThisTurn` names the nearest legally shootable enemy so Unit Status can flag the shot.
+ * `inRangedRange` uses the same range-plus-mountain-LOS helper as apply-phase fire, not the baseline hop cap.
  * Exceptions: None. Humans whose distance stays unmeasurable are omitted rather than given a placeholder distance, so
  * threat severity and the in-range flags never describe a hex pairing the grid could not confirm.
  */
@@ -140,7 +141,7 @@ function assessTacticalOpponentUnit(
   });
   const selfH3 = effectiveH3(unit, byId);
   const [lat, lng] = cellToLatLng(selfH3);
-  const rangedCap = RANGED_RANGE_BY_UNIT_TYPE[unit.unitType] ?? 0;
+  const footprint = new Set(battle.res4ChildH3Indexes);
 
   const nearby = humans
     .flatMap((enemy) => {
@@ -159,7 +160,13 @@ function assessTacticalOpponentUnit(
         {
           unitId: enemy.id,
           hexDistance,
-          inRangedRange: rangedCap > 0 && hexDistance <= rangedCap,
+          inRangedRange: tacticalRangedDirectFirePassesTerrainAndRange(
+            battle,
+            footprint,
+            unit.unitType,
+            selfH3,
+            enemyH3
+          ),
           inMeleeRange: hexDistance <= 1,
           confidence: 'current' as const,
         },

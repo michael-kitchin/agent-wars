@@ -123,7 +123,7 @@ Scope is `strategic`, `tactical`, `both`, or `consult-only`. Status is `required
 | --- | --- | --- | --- | --- | --- | --- |
 | `COMBAT_STATS` | d6 per shot; attack and defense per unit type | `getAttack`, `getDefense` | n/a | 3, 17 | both | required |
 | `STRATEGIC_RANGE_TABLE` | Strategic ranged reach per type, including infantry at zero | `strategicRangedRangeHexesForUnitType` | n/a | 3 | strategic | required |
-| `TACTICAL_RANGE_TABLE` | Res4 ranged reach per type, including infantry at two and air across the footprint | `RANGED_RANGE_BY_UNIT_TYPE` | n/a | 17, 19 | tactical | required |
+| `TACTICAL_RANGE_TABLE` | Res4 ranged reach per type, including infantry at two, the urban/forest/rubble/transport cap to one, and mountain LOS | `RANGED_RANGE_BY_UNIT_TYPE`, `effectiveTacticalRangedMaxRangeForAttacker`, `tacticalMountainBlocksImplicitLosForAirArmorNavalRanged` | n/a | 17, 19 | tactical | required |
 | `ATTACK_ONE_PER_UNIT` | One ranged or air action per unit per period, measured from period-start positions | `runRangedPhase`, `mergeOpponentAttackOrders` | n/a | 2, 3, 17 | both | required |
 | `WEGO_PHASE_ORDER` | Embark, then air strikes, then ranged, then movement, then ferry, then melee | `executeReadyStrategicTurn`, `applyHumanTacticalDraftBeatInStrategicOrder` | n/a | 2, 3, 5, 7 | both | required |
 | `TEMPO_RANGED_SHOT` | A shot costs no movement, so a legal shot declined is output lost | phase order above | n/a | 3, 17 | both | required |

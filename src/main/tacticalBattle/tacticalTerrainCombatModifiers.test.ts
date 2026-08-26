@@ -5,7 +5,7 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { gridPathCells } from 'h3-js';
+import { gridDisk, gridPathCells } from 'h3-js';
 import {
   effectiveTacticalMovementPointBudgetForMarchLeg,
   effectiveTacticalRangedMaxRangeForAttacker,
@@ -14,6 +14,7 @@ import {
   tacticalRes4UrbanRubbleFlagRecordsForFootprint,
   tacticalRes4CellIsUrbanOrRubble,
   tacticalRangedDirectFirePassesTerrainAndRange,
+  tacticalRes4BriefingLandWater,
 } from '../../shared/tacticalTerrainCombatModifiers';
 import { MOVEMENT_RANGE_BY_UNIT_TYPE } from '../../shared/tacticalRanges';
 import {
@@ -173,6 +174,22 @@ test('mountain still blocks LOS across an icosahedron face boundary', () => {
 
   assert.equal(los.traceFailed, false);
   assert.equal(los.blocked, true);
+});
+
+test('tacticalRes4BriefingLandWater classifies wetlands as land even when the parent hex is water', () => {
+  const wetlands = tacticalRes4Cell(12, 34);
+  const ring = [...gridDisk(wetlands, 1)].filter((h) => h !== wetlands);
+  const openWater = ring[0]!;
+  const coastal = ring[1] ?? firstRingCellDistinctFrom(openWater);
+  assert.notEqual(openWater, coastal);
+  const battle = {
+    strategicHexTerrain: 'water',
+    strategicHexTerrainKind: 'ocean',
+    res4TerrainKindByH3: { [wetlands]: 'wetlands', [openWater]: 'water', [coastal]: 'coastal' },
+  };
+  assert.equal(tacticalRes4BriefingLandWater(battle, wetlands), 'land');
+  assert.equal(tacticalRes4BriefingLandWater(battle, coastal), 'land');
+  assert.equal(tacticalRes4BriefingLandWater(battle, openWater), 'water');
 });
 
 test('tacticalRangedDirectFirePassesTerrainAndRange rejects naval shot through mountain footprint', () => {

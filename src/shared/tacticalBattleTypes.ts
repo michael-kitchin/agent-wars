@@ -178,6 +178,15 @@ export interface TacticalBattleSnapshot {
    */
   res4IsSeaportByH3?: Record<string, boolean>;
   /**
+   * Per-res4 airport facility flags inside the footprint (only rows where `res4_feature_overrides.is_airport` is set at snapshot build).
+   *
+   * Contract: Keys are a subset of `res4ChildH3Indexes`; omitted keys mean the cell is not an airport facility tile. Populated from the game DB, not from merged renderer/GIS convenience rows.
+   * When to use: Tactical operational-map A/a/B glyphs; air placement already reads the same override rows at snapshot build.
+   * Expected outcome: Omitted or empty on legacy saves; populated for new `computeTacticalBattleSnapshot` results and refreshed after infrastructure strikes.
+   * Exceptions: None.
+   */
+  res4IsAirportByH3?: Record<string, boolean>;
+  /**
    * Per-res4 urban **infrastructure** cells (not rubble) inside the footprint at snapshot build / refresh.
    *
    * Contract: Keys are a subset of `res4ChildH3Indexes`; true means merged `getRes4TerrainOverridesForRendererFromGame` row has `isUrban` and not `isRubble`.

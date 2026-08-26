@@ -52,10 +52,10 @@ export function tacticalSubUnitCountForStrategicUnitType(unitType: string): numb
 /**
  * Rebuilds per-res4 terrain kinds and seaport facility flags on a tactical snapshot from the live game database.
  *
- * Purpose: Snapshot `res4TerrainKindByH3` / `res4IsSeaportByH3` are frozen at battle start; tactical air infrastructure strikes
+ * Purpose: Snapshot `res4TerrainKindByH3` / `res4IsSeaportByH3` / `res4IsAirportByH3` are frozen at battle start; tactical air infrastructure strikes
  * mutate `res4_feature_overrides` and `res1_infrastructure`, so march planners and the renderer must see rubble and removed ports without exiting tactical mode.
  * When to use: After `applyInfrastructureDestructionEffects` succeeds during human tactical support projection.
- * Expected outcome: Footprint cells match `getRes4TerrainOverridesForRendererFromGame` and `listRes4FeatureOverridesForGame`; stale seaport keys are dropped when no facility rows remain.
+ * Expected outcome: Footprint cells match `getRes4TerrainOverridesForRendererFromGame` and `listRes4FeatureOverridesForGame`; stale seaport and airport keys are dropped when no facility rows remain.
  * Exceptions: None; assumes `battle.res4ChildH3Indexes` still matches the active enclosing res1 cell.
  */
 export function refreshTacticalBattleRes4TerrainFromGameDb(battle: TacticalBattleSnapshot): TacticalBattleSnapshot {
@@ -76,9 +76,11 @@ export function refreshTacticalBattleRes4TerrainFromGameDb(battle: TacticalBattl
     res4TerrainKindByH3[cell] = res4KindByH3.get(cell) ?? parentKind;
   }
   const res4IsSeaportByH3: Record<string, boolean> = {};
+  const res4IsAirportByH3: Record<string, boolean> = {};
   for (const row of listRes4FeatureOverridesForGame()) {
     if (!childSet.has(row.h3Index)) continue;
     if (row.isSeaport) res4IsSeaportByH3[row.h3Index] = true;
+    if (row.isAirport) res4IsAirportByH3[row.h3Index] = true;
   }
   const urbanRubble = tacticalRes4UrbanRubbleFlagRecordsForFootprint(battle.res4ChildH3Indexes, res4Rows);
   const transport = tacticalRes4FootprintTransportOverlayRecords({
@@ -87,12 +89,16 @@ export function refreshTacticalBattleRes4TerrainFromGameDb(battle: TacticalBattl
   });
   const next: TacticalBattleSnapshot = { ...battle, res4TerrainKindByH3, ...urbanRubble };
   delete next.res4IsSeaportByH3;
+  delete next.res4IsAirportByH3;
   delete next.res4IsUrbanByH3;
   delete next.res4IsRubbleByH3;
   delete next.res4RoadSidesByH3;
   delete next.res4RailSidesByH3;
   if (Object.keys(res4IsSeaportByH3).length > 0) {
     next.res4IsSeaportByH3 = res4IsSeaportByH3;
+  }
+  if (Object.keys(res4IsAirportByH3).length > 0) {
+    next.res4IsAirportByH3 = res4IsAirportByH3;
   }
   if (urbanRubble.res4IsUrbanByH3) next.res4IsUrbanByH3 = urbanRubble.res4IsUrbanByH3;
   if (urbanRubble.res4IsRubbleByH3) next.res4IsRubbleByH3 = urbanRubble.res4IsRubbleByH3;
@@ -501,6 +507,7 @@ export function computeTacticalBattleSnapshot(
       strategicHexTerrainKind: hexRow.terrain_kind,
       res4TerrainKindByH3,
       ...(Object.keys(res4IsSeaportByH3).length > 0 ? { res4IsSeaportByH3 } : {}),
+      ...(Object.keys(res4IsAirportByH3).length > 0 ? { res4IsAirportByH3 } : {}),
       ...(urbanRubble.res4IsUrbanByH3 ? { res4IsUrbanByH3: urbanRubble.res4IsUrbanByH3 } : {}),
       ...(urbanRubble.res4IsRubbleByH3 ? { res4IsRubbleByH3: urbanRubble.res4IsRubbleByH3 } : {}),
       ...(transportForPlacement.res4RoadSidesByH3

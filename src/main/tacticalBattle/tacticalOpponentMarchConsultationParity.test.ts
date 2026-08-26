@@ -180,3 +180,53 @@ test('armor on urban: unreachable full goal still moves one step toward ordered 
   assert.notEqual(outcome.appliedToH3Index, orderedToH3);
 });
 
+test('best-effort neighbor does not step onto a friendly-occupied cell', () => {
+  // Same geometry as the unconstrained best-effort case, whose unique approaching stop is friendH3.
+  // Occupancy must drop the order rather than clamp onto that friendly.
+  const fromH3 = '84969b5ffffffff';
+  const orderedToH3 = '84969bbffffffff';
+  const friendH3 = '84969b1ffffffff';
+  const foot = [...new Set([...gridDisk(fromH3, 3)])];
+  const res4Set = new Set(foot);
+  const subUnits = [
+    {
+      id: 'opp:armor-urban',
+      parentUnitId: 'opp-parent',
+      player: 'opponent' as const,
+      unitType: 'armor',
+      h3Index: fromH3,
+      displayName: 'Opp armor',
+    },
+    {
+      id: 'opp:armor-friend',
+      parentUnitId: 'opp-parent',
+      player: 'opponent' as const,
+      unitType: 'armor',
+      h3Index: friendH3,
+      displayName: 'Opp friend',
+    },
+  ];
+  const battle: TacticalBattleSnapshot = {
+    battleId: 'best-effort-friendly',
+    enclosingRes1H3Index: '8196bffffffffff',
+    res4ChildH3Indexes: foot,
+    strategicTurnNumber: 1,
+    tacticalTurnNumber: 13,
+    strategicHexTerrain: 'land',
+    strategicHexTerrainKind: 'plains',
+    res4IsUrbanByH3: { [fromH3]: true },
+    subUnits,
+  };
+  const sub = [...battle.subUnits];
+  const byId = new Map(sub.map((u, i) => [u.id, i] as const));
+  const outcome = tacticalComputeMovementOrderOutcome({
+    byId,
+    sub,
+    order: { unitId: 'opp:armor-urban', toH3Index: orderedToH3 },
+    res4Set,
+    battle,
+  });
+  assert.equal(outcome.ok, false);
+  assert.equal(outcome.reason, 'out_of_range');
+});
+

@@ -6,7 +6,12 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
-import { tacticalRes4PentagonCrossingPair } from '../tacticalBattle/testSupport/tacticalRes4HexFixtures';
+import { cellToParent, gridDisk } from 'h3-js';
+import { gridHopDistanceBetween } from '../tools/assessUnitProximity';
+import {
+  tacticalRes4PentagonCrossingPair,
+  tacticalRes4UnderRes1Corner,
+} from '../tacticalBattle/testSupport/tacticalRes4HexFixtures';
 import { buildLightweightTacticalUnitAssessments } from './tacticalBriefingAssessments';
 
 /**
@@ -63,6 +68,89 @@ test('tactical Unit Status reports the real distance to an enemy gridDistance ca
     nearest.inRangedRange,
     `armor ${hopDistance} res4 hops away is inside its tactical ranged range`
   );
+});
+
+test('tactical Unit Status does not treat urban armor as in range of an enemy three hops away', () => {
+  const origin = tacticalRes4UnderRes1Corner(12, 34, { latEpsilon: 0.01 });
+  const far = [...gridDisk(origin, 3)].find((h) => gridHopDistanceBetween(origin, h) === 3);
+  assert.ok(far, 'need a res4 cell three hops from origin');
+  const res1 = cellToParent(origin, 1);
+  const battle: TacticalBattleSnapshot = {
+    battleId: 'tb-urban-range',
+    enclosingRes1H3Index: res1,
+    res4ChildH3Indexes: [...gridDisk(origin, 3)],
+    strategicTurnNumber: 1,
+    tacticalTurnNumber: 1,
+    strategicHexTerrain: 'land',
+    strategicHexTerrainKind: 'plains',
+    res4TerrainKindByH3: Object.fromEntries([...gridDisk(origin, 3)].map((h) => [h, 'plains'])),
+    res4IsUrbanByH3: { [origin]: true },
+    subUnits: [
+      {
+        id: 'opp-armor:01',
+        parentUnitId: 'opp-armor',
+        player: 'opponent',
+        unitType: 'armor',
+        h3Index: origin,
+        displayName: 'Armor',
+      },
+      {
+        id: 'hum-armor:01',
+        parentUnitId: 'hum-armor',
+        player: 'human',
+        unitType: 'armor',
+        h3Index: far,
+        displayName: 'Human Armor',
+      },
+    ],
+  };
+
+  const assessments = buildLightweightTacticalUnitAssessments(battle);
+  const nearest = assessments[0]?.result.nearbyEnemies[0];
+  assert.ok(nearest);
+  assert.strictEqual(nearest.hexDistance, 3);
+  assert.equal(nearest.inRangedRange, false);
+});
+
+test('tactical Unit Status does not treat mountain-blocked armor as in ranged range', () => {
+  const origin = tacticalRes4UnderRes1Corner(12, 34, { latEpsilon: 0.01 });
+  const neighbor = [...gridDisk(origin, 1)].find((h) => h !== origin);
+  assert.ok(neighbor, 'need a ring-1 neighbor');
+  const res1 = cellToParent(origin, 1);
+  const battle: TacticalBattleSnapshot = {
+    battleId: 'tb-mountain-los',
+    enclosingRes1H3Index: res1,
+    res4ChildH3Indexes: [...gridDisk(origin, 1)],
+    strategicTurnNumber: 1,
+    tacticalTurnNumber: 1,
+    strategicHexTerrain: 'land',
+    strategicHexTerrainKind: 'plains',
+    res4TerrainKindByH3: { [origin]: 'plains', [neighbor]: 'mountain' },
+    subUnits: [
+      {
+        id: 'opp-armor:01',
+        parentUnitId: 'opp-armor',
+        player: 'opponent',
+        unitType: 'armor',
+        h3Index: origin,
+        displayName: 'Armor',
+      },
+      {
+        id: 'hum-armor:01',
+        parentUnitId: 'hum-armor',
+        player: 'human',
+        unitType: 'armor',
+        h3Index: neighbor,
+        displayName: 'Human Armor',
+      },
+    ],
+  };
+
+  const assessments = buildLightweightTacticalUnitAssessments(battle);
+  const nearest = assessments[0]?.result.nearbyEnemies[0];
+  assert.ok(nearest);
+  assert.strictEqual(nearest.hexDistance, 1);
+  assert.equal(nearest.inRangedRange, false);
 });
 
 test('tactical threat severity reflects a close enemy across a face crossing', () => {

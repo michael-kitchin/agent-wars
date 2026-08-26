@@ -141,7 +141,7 @@ test('tactical coaching includes every required item when its gate is on', () =>
   assert.match(text, /clamped to the first reachable leg/i);
   assert.doesNotMatch(text, /Urban and rubble cells cost more/);
   assert.match(text, /urban or rubble/i);
-  assert.match(text, /Infantry may fire at its res4 baseline/i);
+  assert.match(text, /Infantry and armor fire at res4 baselines/i);
   assert.match(text, /strike any cell in the footprint/i);
   assert.match(text, /lowest-defense/i);
   assert.match(text, /friendly/i);
@@ -173,6 +173,7 @@ test('option copy maps ranged rows and picks one row per actor per action in bot
     assert.match(text, /ranged_attack/);
     assert.match(text, /at most one/i);
     assert.match(text, /overlapping/i);
+    assert.match(text, /Never copy a Target Hex from a row that does not list/i);
   }
   assert.match(strategic, /Copy a Target Hex from a row listing that unit/i);
   assert.match(tactical, /Copy a Target Hex from a row listing that sub-unit/i);

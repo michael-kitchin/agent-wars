@@ -192,7 +192,7 @@ export function buildMovementBudgetRule(mode: PromptCoordinateMode): string {
       'Armor in forest is penalised to the infantry baseline. ' +
       `Road edges multiply remaining points by ${TACTICAL_TRANSPORT_ROAD_BUDGET_MULTIPLIER} and rail edges by ${TACTICAL_TRANSPORT_RAIL_BUDGET_MULTIPLIER}. ` +
       'A non-air unit always retains at least one point. ' +
-      "A destination beyond this beat's budget is clamped to the first reachable leg rather than rejected; when the planner cannot use the destination at all but a neighbouring footprint cell still closes on it, the engine may take that single step instead."
+      "A destination beyond this beat's budget is clamped to the first reachable leg rather than rejected; when the planner cannot use the destination at all but a neighbouring footprint cell still closes on it, the engine may take that single step instead, unless that cell holds a friendly unit."
     );
   }
   return (
@@ -202,17 +202,22 @@ export function buildMovementBudgetRule(mode: PromptCoordinateMode): string {
 }
 
 /**
- * Infantry (and mode-specific) ranged reach.
+ * Infantry (and mode-specific) ranged reach, including tactical terrain caps and mountain LOS.
  *
- * Purpose: Strategic infantry is melee-only; tactical infantry has a res4 baseline that terrain may reduce.
+ * Purpose: Strategic infantry is melee-only. Tactical infantry and armor have res4 baselines that forest/urban/rubble/transport cap to 1; mountain blocks armor/naval/air LOS.
  * When to use: Combat paragraph after the one-attack-per-unit clause.
- * Expected outcome: The existing infantry sentence, with the tactical baseline taken from `RANGED_RANGE_BY_UNIT_TYPE`.
+ * Expected outcome: Strategic melee-only sentence, or tactical baselines plus the engine cap and LOS rules.
  * Exceptions: None.
  */
 export function buildRangedReachRule(mode: PromptCoordinateMode): string {
   logTrace('promptSpec buildRangedReachRule', { mode });
   if (mode === 'tactical') {
-    return `Infantry may use ranged_attack at tactical res4 range (baseline ${RANGED_RANGE_BY_UNIT_TYPE.infantry}; terrain may reduce it); use movement and melee when out of range.`;
+    return (
+      `Infantry and armor fire at their res4 baselines (infantry ${RANGED_RANGE_BY_UNIT_TYPE.infantry}, armor ${RANGED_RANGE_BY_UNIT_TYPE.armor}); ` +
+      'forest, urban, rubble, or a road/rail corridor on the attacker\'s cell caps infantry and armor to range 1. ' +
+      'Mountain along the line of sight blocks armor, naval, and air shots (infantry is exempt). ' +
+      'Close to melee when out of range.'
+    );
   }
   return 'Infantry has no strategic ranged_attack (melee only); use movement and melee.';
 }

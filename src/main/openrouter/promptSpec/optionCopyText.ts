@@ -6,7 +6,8 @@
  * so a large roster does not explode the completion.
  * When to use: Coaching option-copy bullets and `# Available Tools` intros.
  * Expected outcome: Approach/move map to explicit_move, ranged maps to ranged_attack, ferry/air only when
- * present, and each actor is copied from at most one row per action.
+ * present, each actor is copied from at most one row per action, and a Target Hex listed only for other
+ * actors is never reused.
  * Exceptions: None.
  */
 
@@ -36,7 +37,8 @@ export function buildOptionCopyMappingClause(args: {
     ferry +
     air +
     `. Each ${actor} gets at most one move and one shot: pick one row per action type and copy its Unit IDs into one unitIds array; ` +
-    `do not copy overlapping rows that relist the same ${actor}.`
+    `do not copy overlapping rows that relist the same ${actor}. ` +
+    `Never copy a Target Hex from a row that does not list that ${actor}; if that ${actor} has no row, call plan_route or leave it idle.`
   );
 }
 
@@ -60,6 +62,7 @@ export function buildToolsIntroCopySentence(args: {
   return (
     `Copy Best Options This Turn approach and move/melee Target Hexes into explicit_move${oneStep}; ` +
     `copy ranged Target Hexes or Target Units into ranged_attack${ferry}${air}; ` +
-    `pick one row per ${actor} per action.`
+    `pick one row per ${actor} per action. ` +
+    `Never copy a Target Hex from a row that does not list that ${actor}.`
   );
 }

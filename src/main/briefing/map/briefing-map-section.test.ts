@@ -8,7 +8,7 @@
  */
 
 import * as assert from 'assert';
-import { cellToChildren, cellToLatLng, latLngToCell } from 'h3-js';
+import { cellToChildren, cellToLatLng, gridDisk, latLngToCell } from 'h3-js';
 import type { GameStateSnapshot } from '../../gameDb';
 import { buildLatLngCoordinateMap } from '../../mapData';
 import type { TacticalBattleSnapshot } from '../../../shared/tacticalBattleTypes';
@@ -255,6 +255,93 @@ function testTacticalOperationalMapIncludesAllRes4Codes(): void {
 }
 
 /**
+ * Locks that a water parent does not paint every res4 child as ocean, and that urban/port tiles show feature letters.
+ *
+ * Purpose: Beat-1 reviews showed the whole footprint as "." because plan-state terrain copied the enclosing res1 ocean.
+ * When to use: After `buildTacticalAiPlanState` or tactical HexMapCellState assembly changes.
+ * Expected outcome: Wetlands child renders land (`x`); water child renders `.`; unoccupied urban shows `U`; unoccupied
+ * airport+seaport shows `B`/`b`.
+ * Exceptions: None.
+ */
+function testTacticalMapShowsChildTerrainAndUrban(): void {
+  const res1 = tacticalRes1Cell(12, 34);
+  const landChild = tacticalRes4UnderRes1Corner(12, 34, { latEpsilon: 0.01 });
+  const ring = [...gridDisk(landChild, 1)].filter((h) => h !== landChild);
+  const waterChild = ring[0]!;
+  const urbanChild = ring[1]!;
+  const portChild = ring[2]!;
+  assert.ok(waterChild && urbanChild && portChild);
+  assert.notEqual(landChild, waterChild);
+  assert.notEqual(landChild, urbanChild);
+  assert.notEqual(waterChild, urbanChild);
+  assert.notEqual(portChild, urbanChild);
+  assert.notEqual(portChild, waterChild);
+  const strategic: GameStateSnapshot = {
+    turnNumber: 1,
+    phase: 'planning',
+    hexes: [{ h3Index: res1, terrain: 'water', terrainKind: 'ocean' }],
+    units: [],
+    pendingOrders: [],
+  };
+  const tactical: TacticalBattleSnapshot = {
+    battleId: 't-terrain-glyphs',
+    enclosingRes1H3Index: res1,
+    res4ChildH3Indexes: [landChild, waterChild, urbanChild, portChild],
+    strategicTurnNumber: 1,
+    tacticalTurnNumber: 1,
+    strategicHexTerrain: 'water',
+    strategicHexTerrainKind: 'ocean',
+    res4TerrainKindByH3: {
+      [landChild]: 'wetlands',
+      [waterChild]: 'water',
+      [urbanChild]: 'plains',
+      [portChild]: 'plains',
+    },
+    res4IsUrbanByH3: { [urbanChild]: true },
+    res4IsAirportByH3: { [portChild]: true },
+    res4IsSeaportByH3: { [portChild]: true },
+    subUnits: [
+      {
+        id: 'su-opp-1',
+        parentUnitId: 'parent-1',
+        player: 'opponent',
+        unitType: 'armor',
+        h3Index: landChild,
+        displayName: 'Opp Armor',
+      },
+    ],
+  };
+  const plan = buildTacticalAiPlanState(strategic, tactical);
+  const hexList = plan.hexes.map((h) => h.h3Index);
+  const { latLngByH3 } = buildLatLngCoordinateMap(hexList);
+  const md = buildTacticalOperationalMapSectionMarkdown({
+    state: plan,
+    latLngByH3,
+    tacticalBattle: tactical,
+  });
+  assert.ok(/Features:.*U\/u urban/i.test(md), 'tactical legend must name urban');
+  const body = firstFenceBody(md);
+  const tacticalCtx = { mode: 'tactical' as const, battleId: tactical.battleId };
+  const landCode = getHexCodeForContext(landChild, tacticalCtx);
+  const waterCode = getHexCodeForContext(waterChild, tacticalCtx);
+  const urbanCode = getHexCodeForContext(urbanChild, tacticalCtx);
+  const portCode = getHexCodeForContext(portChild, tacticalCtx);
+  assert.ok(landCode && waterCode && urbanCode && portCode);
+  const lines = body.split('\n');
+  const glyphUnder = (code: string): string | undefined => {
+    for (let i = 0; i < lines.length; i += 2) {
+      const idx = lines[i]!.indexOf(code);
+      if (idx >= 0) return lines[i + 1]?.slice(idx, idx + 2);
+    }
+    return undefined;
+  };
+  assert.equal(glyphUnder(landCode)?.[0], 'x');
+  assert.equal(glyphUnder(waterCode)?.[0], '.');
+  assert.match(glyphUnder(urbanCode) ?? '', /^x[Uu]$/);
+  assert.match(glyphUnder(portCode) ?? '', /^x[Bb]$/);
+}
+
+/**
  * Defines the `testTacticalAsciiGridUsesManyRowsNotLatitudeRibbon` function shape.
  *
  * Purpose: Ensures tactical maps use H3-local projection so ~343 res4 cells spread across many ASCII rows instead of 1–3 latitude bands.
@@ -293,6 +380,7 @@ const tests = [
   },
   { name: 'strategic fog hides enemy markers in fenced map', fn: testStrategicFogHidesEnemyMarkersOnMap },
   { name: 'tactical operational map includes all res4 codes', fn: testTacticalOperationalMapIncludesAllRes4Codes },
+  { name: 'tactical map uses child land/water and urban overlay', fn: testTacticalMapShowsChildTerrainAndUrban },
   {
     name: 'tactical ascii grid uses many rows (IJ projection not latitude ribbon)',
     fn: testTacticalAsciiGridUsesManyRowsNotLatitudeRibbon,
