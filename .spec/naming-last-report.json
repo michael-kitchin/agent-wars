@@ -1,0 +1,504 @@
+{
+  "repoRoot": "F:\\Projects\\Personal\\agent-wars",
+  "scannedFileCount": 572,
+  "violations": [
+    {
+      "category": "fileCasing",
+      "filePath": "src/main/briefing/map/briefing-map-section.test.ts",
+      "currentName": "briefing-map-section.test.ts",
+      "suggestedName": "briefingMapSection.test.ts",
+      "detail": "TypeScript file names must be camelCase"
+    },
+    {
+      "category": "fileCasing",
+      "filePath": "src/main/briefing/map/briefing-map-section.ts",
+      "currentName": "briefing-map-section.ts",
+      "suggestedName": "briefingMapSection.ts",
+      "detail": "TypeScript file names must be camelCase"
+    },
+    {
+      "category": "fileCasing",
+      "filePath": "src/main/briefing/map/briefing-tables.ts",
+      "currentName": "briefing-tables.ts",
+      "suggestedName": "briefingTables.ts",
+      "detail": "TypeScript file names must be camelCase"
+    },
+    {
+      "category": "fileCasing",
+      "filePath": "src/main/briefing/map/hex-bounding-box.ts",
+      "currentName": "hex-bounding-box.ts",
+      "suggestedName": "hexBoundingBox.ts",
+      "detail": "TypeScript file names must be camelCase"
+    },
+    {
+      "category": "fileCasing",
+      "filePath": "src/main/briefing/map/hex-code-translator.test.ts",
+      "currentName": "hex-code-translator.test.ts",
+      "suggestedName": "hexCodeTranslator.test.ts",
+      "detail": "TypeScript file names must be camelCase"
+    },
+    {
+      "category": "fileCasing",
+      "filePath": "src/main/briefing/map/hex-code-translator.ts",
+      "currentName": "hex-code-translator.ts",
+      "suggestedName": "hexCodeTranslator.ts",
+      "detail": "TypeScript file names must be camelCase"
+    },
+    {
+      "category": "fileCasing",
+      "filePath": "src/main/briefing/map/hex-coordinates.test.ts",
+      "currentName": "hex-coordinates.test.ts",
+      "suggestedName": "hexCoordinates.test.ts",
+      "detail": "TypeScript file names must be camelCase"
+    },
+    {
+      "category": "fileCasing",
+      "filePath": "src/main/briefing/map/hex-coordinates.ts",
+      "currentName": "hex-coordinates.ts",
+      "suggestedName": "hexCoordinates.ts",
+      "detail": "TypeScript file names must be camelCase"
+    },
+    {
+      "category": "fileCasing",
+      "filePath": "src/main/briefing/map/hex-grid-projection.ts",
+      "currentName": "hex-grid-projection.ts",
+      "suggestedName": "hexGridProjection.ts",
+      "detail": "TypeScript file names must be camelCase"
+    },
+    {
+      "category": "fileCasing",
+      "filePath": "src/main/briefing/map/hex-map-renderer.ts",
+      "currentName": "hex-map-renderer.ts",
+      "suggestedName": "hexMapRenderer.ts",
+      "detail": "TypeScript file names must be camelCase"
+    },
+    {
+      "category": "directoryCasing",
+      "filePath": "src/main/game-actions",
+      "currentName": "game-actions",
+      "suggestedName": "gameActions",
+      "detail": "Directory segments under src/ must be camelCase"
+    },
+    {
+      "category": "bannedSuffix",
+      "filePath": "src/main/game-actions/buildQueue.ts",
+      "currentName": "addHexBuildQueueEntryImpl",
+      "suggestedName": "addHexBuildQueueEntry",
+      "detail": "Banned suffix Impl"
+    },
+    {
+      "category": "bannedSuffix",
+      "filePath": "src/main/game-actions/buildQueue.ts",
+      "currentName": "applyBuildQueueTemplateToHexesImpl",
+      "suggestedName": "applyBuildQueueTemplateToHexes",
+      "detail": "Banned suffix Impl"
+    },
+    {
+      "category": "bannedSuffix",
+      "filePath": "src/main/game-actions/buildQueue.ts",
+      "currentName": "getHexBuildQueueImpl",
+      "suggestedName": "getHexBuildQueue",
+      "detail": "Banned suffix Impl"
+    },
+    {
+      "category": "bannedSuffix",
+      "filePath": "src/main/game-actions/buildQueue.ts",
+      "currentName": "removeHexBuildQueueEntryImpl",
+      "suggestedName": "removeHexBuildQueueEntry",
+      "detail": "Banned suffix Impl"
+    },
+    {
+      "category": "bannedSuffix",
+      "filePath": "src/main/game-actions/buildQueue.ts",
+      "currentName": "setHexesKeepBuildingImpl",
+      "suggestedName": "setHexesKeepBuilding",
+      "detail": "Banned suffix Impl"
+    },
+    {
+      "category": "bannedSuffix",
+      "filePath": "src/main/game-actions/buildQueue.ts",
+      "currentName": "updateHexBuildQueueEntryImpl",
+      "suggestedName": "updateHexBuildQueueEntry",
+      "detail": "Banned suffix Impl"
+    },
+    {
+      "category": "bannedSuffix",
+      "filePath": "src/main/game-actions/humanMarchPreview/humanMarchPreviewImpl.ts",
+      "currentName": "humanMarchPreviewImpl.ts",
+      "suggestedName": "humanMarchPreviewResolve.ts",
+      "detail": "Banned suffix Impl in file name"
+    },
+    {
+      "category": "bannedSuffix",
+      "filePath": "src/main/game-actions/humanMarchPreview/humanMarchPreviewImpl.ts",
+      "currentName": "previewHumanMarchOrderImpl",
+      "suggestedName": "previewHumanMarchOrder",
+      "detail": "Banned suffix Impl"
+    },
+    {
+      "category": "bannedSuffix",
+      "filePath": "src/main/game-actions/humanMarchPreview/humanMarchPreviewImpl.ts",
+      "currentName": "previewHumanMarchOrdersImpl",
+      "suggestedName": "previewHumanMarchOrders",
+      "detail": "Banned suffix Impl"
+    },
+    {
+      "category": "bannedSuffix",
+      "filePath": "src/main/game-actions/sealift.ts",
+      "currentName": "getSealiftStackStateImpl",
+      "suggestedName": "getSealiftStackState",
+      "detail": "Banned suffix Impl"
+    },
+    {
+      "category": "bannedSuffix",
+      "filePath": "src/main/game-actions/sealift.ts",
+      "currentName": "updateSealiftSlotImpl",
+      "suggestedName": "updateSealiftSlot",
+      "detail": "Banned suffix Impl"
+    },
+    {
+      "category": "bannedSuffix",
+      "filePath": "src/main/game-actions/submitOrders.ts",
+      "currentName": "submitOrdersImpl",
+      "suggestedName": "submitOrders",
+      "detail": "Banned suffix Impl"
+    },
+    {
+      "category": "directoryCasing",
+      "filePath": "src/main/game-db",
+      "currentName": "game-db",
+      "suggestedName": "gameDb",
+      "detail": "Directory segments under src/ must be camelCase"
+    },
+    {
+      "category": "bannedSuffix",
+      "filePath": "src/main/game-db/controlInfrastructure.ts",
+      "currentName": "getHexController",
+      "suggestedName": "getHexController",
+      "detail": "Banned suffix Controller"
+    },
+    {
+      "category": "bannedSuffix",
+      "filePath": "src/main/game-db/controlInfrastructure.ts",
+      "currentName": "setHexController",
+      "suggestedName": "setHexController",
+      "detail": "Banned suffix Controller"
+    },
+    {
+      "category": "bannedSuffix",
+      "filePath": "src/main/gameDb.ts",
+      "currentName": "getHexController",
+      "suggestedName": "getHexController",
+      "detail": "Banned suffix Controller"
+    },
+    {
+      "category": "bannedSuffix",
+      "filePath": "src/main/gameDb.ts",
+      "currentName": "setHexController",
+      "suggestedName": "setHexController",
+      "detail": "Banned suffix Controller"
+    },
+    {
+      "category": "bannedSuffix",
+      "filePath": "src/main/marchPathUtils.test.ts",
+      "currentName": "marchPathUtils.test.ts",
+      "suggestedName": "marchPathHelpers.test.ts",
+      "detail": "Banned suffix Utils in file name"
+    },
+    {
+      "category": "directoryCasing",
+      "filePath": "src/main/openrouter",
+      "currentName": "openrouter",
+      "suggestedName": "openRouter",
+      "detail": "Brand directory must use camelCase openRouter"
+    },
+    {
+      "category": "bannedSuffix",
+      "filePath": "src/main/promptTableUtils.ts",
+      "currentName": "promptTableUtils.ts",
+      "suggestedName": "promptTableHelpers.ts",
+      "detail": "Banned suffix Utils in file name"
+    },
+    {
+      "category": "numberedTool",
+      "filePath": "src/main/tools/tacticalTool1Pathfinding.test.ts",
+      "currentName": "tacticalTool1Pathfinding.test.ts",
+      "suggestedName": "tacticalPathfinding.test.ts",
+      "detail": "File name encodes a tool-group number"
+    },
+    {
+      "category": "numberedTool",
+      "filePath": "src/main/tools/tacticalTool1Pathfinding.ts",
+      "currentName": "tacticalTool1Pathfinding.ts",
+      "suggestedName": "tacticalPathfinding.ts",
+      "detail": "File name encodes a tool-group number"
+    },
+    {
+      "category": "numberedTool",
+      "filePath": "src/main/tools/tool1Pathfinding.test.ts",
+      "currentName": "tool1Pathfinding.test.ts",
+      "suggestedName": "pathfinding.test.ts",
+      "detail": "File name encodes a tool-group number"
+    },
+    {
+      "category": "numberedTool",
+      "filePath": "src/main/tools/tool1Pathfinding.ts",
+      "currentName": "executeTool1",
+      "detail": "Exported identifier encodes a tool-group number"
+    },
+    {
+      "category": "numberedTool",
+      "filePath": "src/main/tools/tool1Pathfinding.ts",
+      "currentName": "TOOL1_NAMES",
+      "detail": "Exported identifier encodes a tool-group number"
+    },
+    {
+      "category": "numberedTool",
+      "filePath": "src/main/tools/tool1Pathfinding.ts",
+      "currentName": "tool1Pathfinding.ts",
+      "suggestedName": "pathfinding.ts",
+      "detail": "File name encodes a tool-group number"
+    },
+    {
+      "category": "numberedTool",
+      "filePath": "src/main/tools/tool1PathfindingDistanceHelpers.ts",
+      "currentName": "tool1PathfindingDistanceHelpers.ts",
+      "suggestedName": "pathfindingDistanceHelpers.ts",
+      "detail": "File name encodes a tool-group number"
+    },
+    {
+      "category": "numberedTool",
+      "filePath": "src/main/tools/tool1PathfindingPlanRouteHelpers.ts",
+      "currentName": "tool1PathfindingPlanRouteHelpers.ts",
+      "suggestedName": "pathfindingPlanRouteHelpers.ts",
+      "detail": "File name encodes a tool-group number"
+    },
+    {
+      "category": "numberedTool",
+      "filePath": "src/main/tools/tool1PathfindingRouteResolution.ts",
+      "currentName": "tool1PathfindingRouteResolution.ts",
+      "suggestedName": "pathfindingRouteResolution.ts",
+      "detail": "File name encodes a tool-group number"
+    },
+    {
+      "category": "numberedTool",
+      "filePath": "src/main/tools/tool1PathfindingSessionCache.ts",
+      "currentName": "tool1PathfindingSessionCache.ts",
+      "suggestedName": "pathfindingSessionCache.ts",
+      "detail": "File name encodes a tool-group number"
+    },
+    {
+      "category": "numberedTool",
+      "filePath": "src/main/tools/tool1PathfindingStateful.ts",
+      "currentName": "tool1PathfindingStateful.ts",
+      "suggestedName": "pathfindingStateful.ts",
+      "detail": "File name encodes a tool-group number"
+    },
+    {
+      "category": "numberedTool",
+      "filePath": "src/main/tools/tool2Assessment.test.ts",
+      "currentName": "tool2Assessment.test.ts",
+      "suggestedName": "assessment.test.ts",
+      "detail": "File name encodes a tool-group number"
+    },
+    {
+      "category": "numberedTool",
+      "filePath": "src/main/tools/tool2Assessment.ts",
+      "currentName": "executeTool2",
+      "detail": "Exported identifier encodes a tool-group number"
+    },
+    {
+      "category": "numberedTool",
+      "filePath": "src/main/tools/tool2Assessment.ts",
+      "currentName": "TOOL2_NAMES",
+      "detail": "Exported identifier encodes a tool-group number"
+    },
+    {
+      "category": "numberedTool",
+      "filePath": "src/main/tools/tool2Assessment.ts",
+      "currentName": "tool2Assessment.ts",
+      "suggestedName": "assessment.ts",
+      "detail": "File name encodes a tool-group number"
+    },
+    {
+      "category": "numberedTool",
+      "filePath": "src/main/tools/tool3CombatEstimation.test.ts",
+      "currentName": "runTool3Verification",
+      "detail": "Exported identifier encodes a tool-group number"
+    },
+    {
+      "category": "numberedTool",
+      "filePath": "src/main/tools/tool3CombatEstimation.test.ts",
+      "currentName": "tool3CombatEstimation.test.ts",
+      "suggestedName": "combatEstimation.test.ts",
+      "detail": "File name encodes a tool-group number"
+    },
+    {
+      "category": "numberedTool",
+      "filePath": "src/main/tools/tool3CombatEstimation.ts",
+      "currentName": "executeTool3",
+      "detail": "Exported identifier encodes a tool-group number"
+    },
+    {
+      "category": "numberedTool",
+      "filePath": "src/main/tools/tool3CombatEstimation.ts",
+      "currentName": "TOOL3_NAMES",
+      "detail": "Exported identifier encodes a tool-group number"
+    },
+    {
+      "category": "numberedTool",
+      "filePath": "src/main/tools/tool3CombatEstimation.ts",
+      "currentName": "tool3CombatEstimation.ts",
+      "suggestedName": "combatEstimation.ts",
+      "detail": "File name encodes a tool-group number"
+    },
+    {
+      "category": "numberedTool",
+      "filePath": "src/main/tools/tool4Memory.test.ts",
+      "currentName": "tool4Memory.test.ts",
+      "suggestedName": "memory.test.ts",
+      "detail": "File name encodes a tool-group number"
+    },
+    {
+      "category": "numberedTool",
+      "filePath": "src/main/tools/tool4Memory.ts",
+      "currentName": "executeTool4",
+      "detail": "Exported identifier encodes a tool-group number"
+    },
+    {
+      "category": "numberedTool",
+      "filePath": "src/main/tools/tool4Memory.ts",
+      "currentName": "TOOL4_NAMES",
+      "detail": "Exported identifier encodes a tool-group number"
+    },
+    {
+      "category": "numberedTool",
+      "filePath": "src/main/tools/tool4Memory.ts",
+      "currentName": "tool4Memory.ts",
+      "suggestedName": "memory.ts",
+      "detail": "File name encodes a tool-group number"
+    },
+    {
+      "category": "numberedTool",
+      "filePath": "src/main/tools/tool5StandingOrders.test.ts",
+      "currentName": "tool5StandingOrders.test.ts",
+      "suggestedName": "standingOrders.test.ts",
+      "detail": "File name encodes a tool-group number"
+    },
+    {
+      "category": "numberedTool",
+      "filePath": "src/main/tools/tool5StandingOrders.ts",
+      "currentName": "executeTool5",
+      "detail": "Exported identifier encodes a tool-group number"
+    },
+    {
+      "category": "numberedTool",
+      "filePath": "src/main/tools/tool5StandingOrders.ts",
+      "currentName": "TOOL5_NAMES",
+      "detail": "Exported identifier encodes a tool-group number"
+    },
+    {
+      "category": "numberedTool",
+      "filePath": "src/main/tools/tool5StandingOrders.ts",
+      "currentName": "tool5StandingOrders.ts",
+      "suggestedName": "standingOrders.ts",
+      "detail": "File name encodes a tool-group number"
+    },
+    {
+      "category": "numberedTool",
+      "filePath": "src/main/tools/tool5StandingOrdersCore.ts",
+      "currentName": "tool5StandingOrdersCore.ts",
+      "suggestedName": "standingOrdersCore.ts",
+      "detail": "File name encodes a tool-group number"
+    },
+    {
+      "category": "numberedTool",
+      "filePath": "src/main/tools/tool5StandingOrdersGeneration.ts",
+      "currentName": "tool5StandingOrdersGeneration.ts",
+      "suggestedName": "standingOrdersGeneration.ts",
+      "detail": "File name encodes a tool-group number"
+    },
+    {
+      "category": "numberedTool",
+      "filePath": "src/main/tools/tool5StandingOrdersShared.ts",
+      "currentName": "tool5StandingOrdersShared.ts",
+      "suggestedName": "standingOrdersShared.ts",
+      "detail": "File name encodes a tool-group number"
+    },
+    {
+      "category": "numberedTool",
+      "filePath": "src/main/tools/tool6Production.test.ts",
+      "currentName": "tool6Production.test.ts",
+      "suggestedName": "productionTools.test.ts",
+      "detail": "File name encodes a tool-group number"
+    },
+    {
+      "category": "numberedTool",
+      "filePath": "src/main/tools/tool6Production.ts",
+      "currentName": "executeTool6",
+      "detail": "Exported identifier encodes a tool-group number"
+    },
+    {
+      "category": "numberedTool",
+      "filePath": "src/main/tools/tool6Production.ts",
+      "currentName": "TOOL6_NAMES",
+      "detail": "Exported identifier encodes a tool-group number"
+    },
+    {
+      "category": "numberedTool",
+      "filePath": "src/main/tools/tool6Production.ts",
+      "currentName": "tool6Production.ts",
+      "suggestedName": "productionTools.ts",
+      "detail": "File name encodes a tool-group number"
+    },
+    {
+      "category": "bannedSuffix",
+      "filePath": "src/renderer/gameplay/buildQueuePopup.ts",
+      "currentName": "createBuildQueuePopupController",
+      "suggestedName": "createBuildQueuePopupController",
+      "detail": "Banned suffix Controller"
+    },
+    {
+      "category": "bannedSuffix",
+      "filePath": "src/renderer/gameplay/productionOverlayHelpers.ts",
+      "currentName": "formatProductionLabelForAnyController",
+      "suggestedName": "formatProductionLabelForAnyController",
+      "detail": "Banned suffix Controller"
+    },
+    {
+      "category": "bannedSuffix",
+      "filePath": "src/renderer/map/mapUtils.ts",
+      "currentName": "mapUtils.ts",
+      "suggestedName": "mapHelpers.ts",
+      "detail": "Banned suffix Utils in file name"
+    },
+    {
+      "category": "bannedSuffix",
+      "filePath": "src/renderer/openRouter/modelDescriptionTooltip.ts",
+      "currentName": "ModelDescriptionTooltipController",
+      "suggestedName": "ModelDescriptionTooltipController",
+      "detail": "Banned suffix Controller"
+    },
+    {
+      "category": "bannedSuffix",
+      "filePath": "src/shared/mapKeyboardPanLogic.ts",
+      "currentName": "createMapKeyboardPanController",
+      "suggestedName": "createMapKeyboardPanController",
+      "detail": "Banned suffix Controller"
+    },
+    {
+      "category": "bannedSuffix",
+      "filePath": "src/shared/mapKeyboardPanLogic.ts",
+      "currentName": "MapKeyboardPanController",
+      "suggestedName": "MapKeyboardPanController",
+      "detail": "Banned suffix Controller"
+    },
+    {
+      "category": "bannedSuffix",
+      "filePath": "src/shared/marchPathUtils.ts",
+      "currentName": "marchPathUtils.ts",
+      "suggestedName": "marchPathHelpers.ts",
+      "detail": "Banned suffix Utils in file name"
+    }
+  ]
+}
