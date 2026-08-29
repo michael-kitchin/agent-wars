@@ -229,3 +229,72 @@ test('projectTacticalSnapshotAfterHumanMovementOrders moves human sub-unit withi
   const next = projectTacticalSnapshotAfterHumanMovementOrders(snap, [{ unitId: 'hum-su-move', toH3Index: dest }]);
   assert.equal(next.subUnits[0]!.h3Index, dest);
 });
+
+test('projectTacticalSnapshotAfterHumanMovementOrders does not independently move embarked cargo', () => {
+  const res1 = tacticalRes1Cell(14, 15);
+  const navalCell = tacticalRes4UnderRes1Corner(14, 15);
+  const ring = gridDisk(navalCell, 1);
+  const landDest = firstRingCellDistinctFrom(navalCell);
+  const snap: TacticalBattleSnapshot = {
+    battleId: 'tb-hum-emb-cargo',
+    enclosingRes1H3Index: res1,
+    res4ChildH3Indexes: [...ring],
+    ...coastalFootprintTerrain([...ring]),
+    strategicTurnNumber: 1,
+    tacticalTurnNumber: 1,
+    subUnits: [
+      {
+        id: 'hum-nav',
+        parentUnitId: 'pn',
+        player: 'human',
+        unitType: 'naval',
+        h3Index: navalCell,
+        displayName: '1st Fleet (emb)',
+      },
+      {
+        id: 'hum-land',
+        parentUnitId: 'pl',
+        player: 'human',
+        unitType: 'infantry',
+        h3Index: navalCell,
+        displayName: '1st Infantry (emb)',
+        embarkedOnSubUnitId: 'hum-nav',
+      },
+    ],
+  };
+  const next = projectTacticalSnapshotAfterHumanMovementOrders(snap, [
+    { unitId: 'hum-land', toH3Index: landDest },
+  ]);
+  const land = next.subUnits.find((u) => u.id === 'hum-land');
+  assert.equal(land?.h3Index, navalCell);
+  assert.equal(land?.embarkedOnSubUnitId, 'hum-nav');
+});
+
+test('projectTacticalSnapshotAfterHumanMovementOrders ignores opponent-controlled sub-units', () => {
+  const res1 = tacticalRes1Cell(16, 17);
+  const center = tacticalRes4UnderRes1Corner(16, 17);
+  const ring = gridDisk(center, 1);
+  const dest = firstRingCellDistinctFrom(center);
+  const snap: TacticalBattleSnapshot = {
+    battleId: 'tb-hum-ign-opp',
+    enclosingRes1H3Index: res1,
+    res4ChildH3Indexes: [...ring],
+    ...coastalFootprintTerrain([...ring]),
+    strategicTurnNumber: 1,
+    tacticalTurnNumber: 1,
+    subUnits: [
+      {
+        id: 'opp-su-ign',
+        parentUnitId: 'po',
+        player: 'opponent',
+        unitType: 'infantry',
+        h3Index: center,
+        displayName: 'I Infantry (ign)',
+      },
+    ],
+  };
+  const next = projectTacticalSnapshotAfterHumanMovementOrders(snap, [
+    { unitId: 'opp-su-ign', toH3Index: dest },
+  ]);
+  assert.equal(next.subUnits[0]!.h3Index, center);
+});

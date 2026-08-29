@@ -6,6 +6,11 @@ import { logDebug, logTrace } from '../logger';
 import { normalizeMovementTerrain } from '../movementTerrain';
 import { rememberStrategicHexBeforeMove } from '../strategicUnitPreviousHex';
 import { canEmbarkAtHex, canManualDebarkAtHex } from '../../shared/sealiftEmbarkEligibility';
+import {
+  buildSealiftSlotsByNavalId,
+  normalizeSealiftSlots,
+  type SealiftSlotPair,
+} from './sealiftSlotAssignment';
 
 /**
  * Documents the `UnitRow` interface as a named contract surface (interface UnitRow).
@@ -92,34 +97,7 @@ navalUnitId: string;
 landUnitType: 'infantry' | 'armor';
 }
 
-/**
- * Documents the `SealiftSlots` interface as a named contract surface (interface SealiftSlots).
-
- * Purpose: Supports maintainability by documenting why `SealiftSlots` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-interface SealiftSlots {
-    /**
-   * Specifies the contract for the `slot1UnitId` member (slot1UnitId: string | null;).
-
-   * Contract: Describes stable behavior for callers of `slot1UnitId` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-slot1UnitId: string | null;
-    /**
-   * Specifies the contract for the `slot2UnitId` member (slot2UnitId: string | null;).
-
-   * Contract: Describes stable behavior for callers of `slot2UnitId` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-slot2UnitId: string | null;
-}
+type SealiftSlots = SealiftSlotPair;
 
 /**
  * Documents the `HexEmbarkContext` interface as a named contract surface (interface HexEmbarkContext).
@@ -345,83 +323,6 @@ function loadAssignmentsAtHex(h3Index: string): AssignmentRow[] {
 }
 
 /**
- * Defines the `buildSlotsByNavalId` function shape (function buildSlotsByNavalId(navalIds: string[], assignments: AssignmentRow[]): Map<string, SealiftSlots>).
-
- * Purpose: Supports maintainability by documenting why `buildSlotsByNavalId` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function buildSlotsByNavalId(navalIds: string[], assignments: AssignmentRow[]): Map<string, SealiftSlots> {
-  const slotsByNavalId = new Map<string, SealiftSlots>();
-  for (const navalUnitId of navalIds) {
-    slotsByNavalId.set(navalUnitId, { slot1UnitId: null, slot2UnitId: null });
-  }
-  const grouped = new Map<string, AssignmentRow[]>();
-  for (const row of assignments) {
-    const list = grouped.get(row.navalUnitId) ?? [];
-    list.push(row);
-    grouped.set(row.navalUnitId, list);
-  }
-  for (const navalUnitId of navalIds) {
-    const slots = slotsByNavalId.get(navalUnitId)!;
-    const rows = grouped.get(navalUnitId) ?? [];
-    const armor = rows.find((row) => row.landUnitType === 'armor');
-    if (armor) {
-      slots.slot1UnitId = armor.landUnitId;
-      slots.slot2UnitId = null;
-      continue;
-    }
-    const infantry = rows
-      .filter((row) => row.landUnitType === 'infantry')
-      .map((row) => row.landUnitId)
-      .sort((a, b) => a.localeCompare(b));
-    slots.slot1UnitId = infantry[0] ?? null;
-    slots.slot2UnitId = infantry[1] ?? null;
-  }
-  return slotsByNavalId;
-}
-
-/**
- * Defines the `normalizeSlots` function shape (function normalizeSlots().
-
- * Purpose: Supports maintainability by documenting why `normalizeSlots` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function normalizeSlots(
-  navalIds: string[],
-  slotsByNavalId: Map<string, SealiftSlots>,
-  landTypeById: Map<string, 'infantry' | 'armor'>
-): void {
-  const seen = new Set<string>();
-  for (const navalUnitId of navalIds) {
-    const slots = slotsByNavalId.get(navalUnitId);
-    if (!slots) continue;
-    for (const key of ['slot1UnitId', 'slot2UnitId'] as const) {
-      const unitId = slots[key];
-      if (!unitId) continue;
-      if (!landTypeById.has(unitId) || seen.has(unitId)) {
-        slots[key] = null;
-        continue;
-      }
-      seen.add(unitId);
-    }
-    if (!slots.slot1UnitId && slots.slot2UnitId) {
-      slots.slot1UnitId = slots.slot2UnitId;
-      slots.slot2UnitId = null;
-    }
-    if (slots.slot1UnitId && landTypeById.get(slots.slot1UnitId) === 'armor') {
-      slots.slot2UnitId = null;
-    } else if (slots.slot2UnitId && landTypeById.get(slots.slot2UnitId) === 'armor') {
-      slots.slot1UnitId = slots.slot2UnitId;
-      slots.slot2UnitId = null;
-    }
-  }
-}
-
-/**
  * Defines the `writeAssignmentsForHex` function shape (function writeAssignmentsForHex().
 
  * Purpose: Supports maintainability by documenting why `writeAssignmentsForHex` exists.
@@ -512,8 +413,8 @@ export function getSealiftStackStateImpl(h3Index: string): SealiftStackState {
   const landOptions = getHumanLandOptions(unitsAtHex);
   const landTypeById = new Map(landOptions.map((option) => [option.unitId, option.unitType] as const));
   const assignments = loadAssignmentsAtHex(h3Index);
-  const slotsByNavalId = buildSlotsByNavalId(navalIds, assignments);
-  normalizeSlots(navalIds, slotsByNavalId, landTypeById);
+  const slotsByNavalId = buildSealiftSlotsByNavalId(navalIds, assignments);
+  normalizeSealiftSlots(navalIds, slotsByNavalId, landTypeById);
   const navalRows = buildNavalRows(contextMode, h3Index, navalIds, slotsByNavalId, landTypeById);
   const hasEmbarkedUnitsInStack = assignments.length > 0;
   const hasMixedStack = navalIds.length > 0 && landOptions.length > 0;
@@ -593,7 +494,7 @@ export function updateSealiftSlotImpl(args: {
     return { success: false, reason: 'This naval unit already carries armor and has no second slot.' };
   }
 
-  normalizeSlots(navalIds, slotsByNavalId, landTypeById);
+  normalizeSealiftSlots(navalIds, slotsByNavalId, landTypeById);
   writeAssignmentsForHex(args.h3Index, state.landOptions, slotsByNavalId);
   return { success: true, state: getSealiftStackStateImpl(args.h3Index) };
 }

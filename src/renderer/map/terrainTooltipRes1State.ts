@@ -22,6 +22,7 @@ import { computeTerrainEffectsLineHtml } from '../../shared/terrainEffectsForToo
 import { TOOLTIP_SECTION_GAP_HTML } from '../../shared/tooltipSectionGap';
 import type { NamingLookupTarget, TerrainTooltipState } from './terrainTooltipTypes';
 import { shouldRenderRes4Hexes } from './terrainView';
+import { escapeHtmlText, formatGroupedSemicolonNamingLineHtml } from '../../shared/htmlTextFormatting';
 import { getMainLeafletMap } from './worldLeafletMap';
 
 /** Default res4 effect fields for res1 tooltips and error fallbacks. */
@@ -612,15 +613,6 @@ export async function getCachedNamingLineForTarget(target: NamingLookupTarget | 
   }
 }
 
-function escapeHtml(text: string): string {
-  return text
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#39;');
-}
-
 /**
  * Renders the bold LLM hex-code badge (`(XX)` or `(XX.YY)`) that prefixes tooltip copy for the active naming target.
  *
@@ -633,25 +625,7 @@ function formatLlmLocationBoldPrefixHtml(namingTarget: NamingLookupTarget | null
   if (!namingTarget) return '';
   const label = getLlmHexLocationParenLabelForNamingTarget(namingTarget);
   if (!label) return '';
-  return `<strong>${escapeHtml(label)}</strong> `;
-}
-
-function formatGroupedNamingLineHtml(namingLine: string): string {
-  const groups = namingLine
-    .split(';')
-    .map((g) => g.trim())
-    .filter((g) => g.length > 0);
-  if (groups.length === 0) return escapeHtml(namingLine);
-  const formattedGroups = groups.map((group) => {
-    const colonIdx = group.indexOf(':');
-    if (colonIdx < 0) return escapeHtml(group);
-    const heading = group.slice(0, colonIdx).trim();
-    const remainder = group.slice(colonIdx + 1).trim();
-    if (!heading) return escapeHtml(group);
-    if (!remainder) return `<strong>${escapeHtml(heading)}:</strong>`;
-    return `<strong>${escapeHtml(heading)}:</strong> ${escapeHtml(remainder)}`;
-  });
-  return formattedGroups.join('; ');
+  return `<strong>${escapeHtmlText(label)}</strong> `;
 }
 
 function formatTerrainVariantSuffix(state: Pick<TerrainTooltipState, 'isUrban' | 'isRubble'>): string {
@@ -754,7 +728,7 @@ function formatTerrainTooltipHtml(
   }
   const bodyLine = bodyParts.join(TOOLTIP_SECTION_GAP_HTML);
   if (!namingLine) return `${prefix}${bodyLine}`;
-  return `${prefix}${formatGroupedNamingLineHtml(namingLine)}${TOOLTIP_SECTION_GAP_HTML}${bodyLine}`;
+  return `${prefix}${formatGroupedSemicolonNamingLineHtml(namingLine)}${TOOLTIP_SECTION_GAP_HTML}${bodyLine}`;
 }
 
 function terrainTooltipContentKey(

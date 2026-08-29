@@ -3,8 +3,8 @@
   "compilerOptions": {
     "module": "ESNext",
     "target": "ES2022",
-    "outDir": "static",
-    "rootDir": "src/renderer",
+    "noEmit": true,
+    "rootDir": "src",
     "lib": ["ES2022", "DOM", "DOM.Iterable"]
   },
   "include": ["src/renderer/**/*.ts", "src/renderer/**/*.d.ts"]

@@ -39,6 +39,24 @@ export function parseUnitIdList(unitIds: unknown): string[] | null {
 }
 
 /**
+ * Parses a unit-id list plus one H3 string for grouped IPC payloads.
+ *
+ * Purpose: Shares the unit-id and H3 string checks used by target and destination grouped parsers.
+ * When to use: From `parseGroupedTargetPayload` and `parseGroupedDestinationPayload` only.
+ * Expected outcome: `{ unitIds, h3Index }` when both fields are valid; otherwise null. Unit ids are checked first.
+ * Exceptions: None.
+ */
+function parseUnitIdsWithH3(
+  unitIdsRaw: unknown,
+  h3IndexRaw: unknown
+): { unitIds: string[]; h3Index: string } | null {
+  const unitIds = parseUnitIdList(unitIdsRaw);
+  if (unitIds === null) return null;
+  if (typeof h3IndexRaw !== 'string') return null;
+  return { unitIds, h3Index: h3IndexRaw };
+}
+
+/**
  * Defines the `parseGroupedStrikePayload` function shape (export function parseGroupedStrikePayload(payload: { unitIds?: unknown; targetH3Index?: unknown; targetType?: unknown; }): { unitIds: string[]; target).
 
  * Purpose: Supports maintainability by documenting why `parseGroupedStrikePayload` exists.
@@ -66,37 +84,37 @@ export function parseGroupedStrikePayload(payload: {
 }
 
 /**
- * Defines the `parseGroupedTargetPayload` function shape (export function parseGroupedTargetPayload(payload: { unitIds?: unknown; targetH3Index?: unknown; }): { unitIds: string[]; targetH3Index: string } | null).
-
- * Purpose: Supports maintainability by documenting why `parseGroupedTargetPayload` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Parses grouped target IPC payloads (`unitIds` plus `targetH3Index`).
+ *
+ * Purpose: Keeps the public `targetH3Index` field name while sharing unit-id and H3 string checks.
+ * When to use: Grouped target-hex IPC handlers in `main.ts`.
+ * Expected outcome: `{ unitIds, targetH3Index }` when both fields are valid; otherwise null. Unit ids are checked first.
  * Exceptions: None.
  */
 export function parseGroupedTargetPayload(payload: {
   unitIds?: unknown;
   targetH3Index?: unknown;
 }): { unitIds: string[]; targetH3Index: string } | null {
-  const unitIds = parseUnitIdList(payload?.unitIds);
-  if (unitIds === null || typeof payload?.targetH3Index !== 'string') return null;
-  return { unitIds, targetH3Index: payload.targetH3Index };
+  const parsed = parseUnitIdsWithH3(payload?.unitIds, payload?.targetH3Index);
+  if (!parsed) return null;
+  return { unitIds: parsed.unitIds, targetH3Index: parsed.h3Index };
 }
 
 /**
- * Defines the `parseGroupedDestinationPayload` function shape (export function parseGroupedDestinationPayload(payload: { unitIds?: unknown; destinationH3Index?: unknown; }): { unitIds: string[]; destinationH3Index: s).
-
- * Purpose: Supports maintainability by documenting why `parseGroupedDestinationPayload` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Parses grouped destination IPC payloads (`unitIds` plus `destinationH3Index`).
+ *
+ * Purpose: Keeps the public `destinationH3Index` field name while sharing unit-id and H3 string checks.
+ * When to use: Grouped move/destination IPC handlers in `main.ts`.
+ * Expected outcome: `{ unitIds, destinationH3Index }` when both fields are valid; otherwise null. Unit ids are checked first.
  * Exceptions: None.
  */
 export function parseGroupedDestinationPayload(payload: {
   unitIds?: unknown;
   destinationH3Index?: unknown;
 }): { unitIds: string[]; destinationH3Index: string } | null {
-  const unitIds = parseUnitIdList(payload?.unitIds);
-  if (unitIds === null || typeof payload?.destinationH3Index !== 'string') return null;
-  return { unitIds, destinationH3Index: payload.destinationH3Index };
+  const parsed = parseUnitIdsWithH3(payload?.unitIds, payload?.destinationH3Index);
+  if (!parsed) return null;
+  return { unitIds: parsed.unitIds, destinationH3Index: parsed.h3Index };
 }
 
 /**

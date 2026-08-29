@@ -109,6 +109,7 @@ function main() {
       'electron-builder-config.test.cjs',
       'generated-data-packaging.test.cjs',
       'generated-data-pack-assert.test.cjs',
+      'renderer-typecheck-report.test.cjs',
     ]) {
       const extra = path.join(repoRoot, 'scripts', extraName);
       if (fs.existsSync(extra)) {

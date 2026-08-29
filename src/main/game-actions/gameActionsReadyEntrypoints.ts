@@ -17,6 +17,7 @@ import type {
   ResolveMeleeInterceptIpcPayload,
 } from '../../shared/ipcTypes';
 import { dbGetOne } from '../gameDb';
+import { readTurnStateRow } from '../game-db/turnStateReads';
 import { logDebug, logError } from '../logger';
 import { executeResolveMeleeIntercept } from './meleeInterceptStrategicResolve';
 import {
@@ -59,9 +60,7 @@ export function ready(
     const failMelee = failIfMeleeInterceptDecisionPending();
     if (failMelee) return failMelee;
 
-    const turnRow = dbGetOne<{ phase: string; turn_number: number }>(
-      'SELECT phase, turn_number FROM turn_state WHERE id = 1'
-    );
+    const turnRow = readTurnStateRow(dbGetOne);
     if (turnRow?.phase !== VALID_PHASE) {
       logError('ready: not in planning phase', turnRow?.phase);
       return { success: false, reason: 'Not in planning phase' };

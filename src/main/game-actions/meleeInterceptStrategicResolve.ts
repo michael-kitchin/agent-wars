@@ -3,6 +3,7 @@
  */
 
 import { dbGetOne } from '../gameDb';
+import { readTurnStateRow } from '../game-db/turnStateReads';
 import { createCombatRng, runMeleePhase } from '../combatResolution';
 import { logDebug, logError } from '../logger';
 import type { ReadyResult, ResolveMeleeInterceptIpcPayload } from '../../shared/ipcTypes';
@@ -34,9 +35,7 @@ export function executeResolveMeleeIntercept(payload: ResolveMeleeInterceptIpcPa
     logError('resolveMeleeIntercept: token mismatch', {});
     return { success: false, reason: 'Melee decision token is stale or invalid. Refresh game state and try again.' };
   }
-  const turnRow = dbGetOne<{ phase: string; turn_number: number }>(
-    'SELECT phase, turn_number FROM turn_state WHERE id = 1'
-  );
+  const turnRow = readTurnStateRow(dbGetOne);
   if (turnRow?.phase !== 'resolution' || turnRow.turn_number !== pending.turnNumber) {
     logError('resolveMeleeIntercept: unexpected turn_state', { turnRow, expectedTurn: pending.turnNumber });
     clearMeleeInterceptPendingSnapshot();

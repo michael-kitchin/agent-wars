@@ -319,15 +319,14 @@ export type TacticalMovementBlockReason =
   | 'embarked_cargo';
 
 /**
- * Decides whether a single opponent movement order may mutate a tactical sub-unit row in the snapshot clone.
+ * Snapshot fields and lookup tables needed to project one tactical march order.
  *
- * Contract: Does not mutate arrays; uses §12.4 terrain-weighted reachability inside the tactical footprint. Emits debug logs for planner outcomes.
- * When to use: `projectTacticalSnapshotAfterOpponentMovementOrders` loop before applying `h3Index` updates.
- * Expected outcome: Returns `ok: true` with `idx` into the mutable `sub` clone and `appliedToH3Index` (first leg toward
- * the ordered cell, matching `tacticalMarchFirstStopAlongPath` / human Ready), or `ok: false` with a reason and diagnostic context.
- * Exceptions: Invalid H3 indexes may yield `out_of_range` when the tactical march planner cannot find a finite-cost path, when the planner cannot spend movement toward a different ordered cell this beat (`plannerReason: no_progress`), or when the first reachable stop already holds a friendly unit (`plannerReason: friendly_occupied`).
+ * Purpose: Names the march-planner input shared by the human and opponent public helpers.
+ * When to use: Arguments to `tacticalComputeMovementOrderOutcome` and `tacticalComputeHumanMovementOrderOutcome`.
+ * Expected outcome: `battle` carries the footprint, terrain, and transport maps the planner reads; `byId`/`sub`/`order` identify the actor and destination.
+ * Exceptions: None; this type does not validate H3 indexes.
  */
-export function tacticalComputeMovementOrderOutcome(args: {
+type TacticalMovementOrderOutcomeArgs = {
   byId: ReadonlyMap<string, number>;
   sub: readonly TacticalSubUnitSnapshot[];
   order: { unitId: string; toH3Index: string };
@@ -347,16 +346,43 @@ export function tacticalComputeMovementOrderOutcome(args: {
     | 'res4RoadSidesByH3'
     | 'res4RailSidesByH3'
   >;
-}):
+};
+
+/**
+ * Success or diagnostic failure from projecting one tactical march order.
+ *
+ * Purpose: The projection contract returned to snapshot appliers: apply at `idx` or skip with a block reason.
+ * When to use: Return type of `tacticalComputeMovementOrderOutcome` and `tacticalComputeHumanMovementOrderOutcome`.
+ * Expected outcome: `ok: true` with index and applied hex, or `ok: false` with a block reason and diagnostic context.
+ * Exceptions: None.
+ */
+type TacticalMovementOrderOutcome =
   | { ok: true; idx: number; appliedToH3Index: string }
-  | { ok: false; reason: TacticalMovementBlockReason; context: Record<string, unknown> } {
+  | { ok: false; reason: TacticalMovementBlockReason; context: Record<string, unknown> };
+
+/**
+ * Projects one tactical march order for a specific player.
+ *
+ * Purpose: Single implementation of opponent and human movement-order guards.
+ * When to use: Only from the two public delegates in this module.
+ * Expected outcome: Same success/failure shape as the public opponent and human helpers.
+ * Exceptions: Invalid H3 indexes may yield `out_of_range` when the tactical march planner cannot find a finite-cost path, when the planner cannot spend movement toward a different ordered cell this beat (`plannerReason: no_progress`), or when the first reachable stop already holds a friendly unit (`plannerReason: friendly_occupied`).
+ */
+function tacticalComputeMovementOrderOutcomeForPlayer(
+  player: 'human' | 'opponent',
+  args: TacticalMovementOrderOutcomeArgs
+): TacticalMovementOrderOutcome {
   const idx = args.byId.get(args.order.unitId);
   if (idx === undefined) {
     return { ok: false, reason: 'unknown_unit', context: { unitId: args.order.unitId } };
   }
   const u = args.sub[idx]!;
-  if (u.player !== 'opponent') {
-    return { ok: false, reason: 'non_opponent', context: { unitId: args.order.unitId } };
+  if (u.player !== player) {
+    return {
+      ok: false,
+      reason: player === 'opponent' ? 'non_opponent' : 'non_human',
+      context: { unitId: args.order.unitId },
+    };
   }
   if (!args.res4Set.has(args.order.toH3Index)) {
     return {
@@ -365,11 +391,26 @@ export function tacticalComputeMovementOrderOutcome(args: {
       context: { unitId: args.order.unitId, toH3Index: args.order.toH3Index },
     };
   }
-  const opponentDebarkingIndependently =
-    (u.unitType === 'infantry' || u.unitType === 'armor') &&
-    !!u.embarkedOnSubUnitId &&
-    args.order.toH3Index !== u.h3Index;
-  const pathfindUnit = opponentDebarkingIndependently ? { ...u, embarkedOnSubUnitId: undefined } : u;
+  let pathfindUnit = u;
+  if (player === 'human') {
+    if (
+      (u.unitType === 'infantry' || u.unitType === 'armor') &&
+      u.embarkedOnSubUnitId &&
+      args.order.toH3Index !== u.h3Index
+    ) {
+      return {
+        ok: false,
+        reason: 'embarked_cargo',
+        context: { unitId: args.order.unitId, toH3Index: args.order.toH3Index },
+      };
+    }
+  } else {
+    const opponentDebarkingIndependently =
+      (u.unitType === 'infantry' || u.unitType === 'armor') &&
+      !!u.embarkedOnSubUnitId &&
+      args.order.toH3Index !== u.h3Index;
+    pathfindUnit = opponentDebarkingIndependently ? { ...u, embarkedOnSubUnitId: undefined } : u;
+  }
   const moveType = tacticalMovementUnitTypeForPathfinding(pathfindUnit, args.order.toH3Index);
   if (moveType === 'air') {
     return { ok: false, reason: 'air_no_march', context: { unitId: args.order.unitId } };
@@ -399,7 +440,7 @@ export function tacticalComputeMovementOrderOutcome(args: {
       tacticalLogMutate('tacticalMarchPlan bestEffortNeighborTowardOrderedHex', {
         battleId: args.battle.battleId,
         tacticalTurnNumber: args.battle.tacticalTurnNumber,
-        player: 'opponent',
+        player,
         unitId: args.order.unitId,
         subUnitType: u.unitType,
         moveType,
@@ -413,7 +454,7 @@ export function tacticalComputeMovementOrderOutcome(args: {
       tacticalLogMutate('tacticalMarchPlan unreachable', {
         battleId: args.battle.battleId,
         tacticalTurnNumber: args.battle.tacticalTurnNumber,
-        player: 'opponent',
+        player,
         unitId: args.order.unitId,
         subUnitType: u.unitType,
         moveType,
@@ -443,14 +484,14 @@ export function tacticalComputeMovementOrderOutcome(args: {
     battle: args.battle,
     order: args.order,
     budget,
-    player: 'opponent',
+    player,
   });
   if (occupiedReject) return occupiedReject;
   if (appliedToH3Index === u.h3Index && args.order.toH3Index !== u.h3Index) {
     tacticalLogMutate('tacticalMarchPlan noProgress', {
       battleId: args.battle.battleId,
       tacticalTurnNumber: args.battle.tacticalTurnNumber,
-      player: 'opponent',
+      player,
       unitId: args.order.unitId,
       subUnitType: u.unitType,
       moveType,
@@ -471,7 +512,7 @@ export function tacticalComputeMovementOrderOutcome(args: {
     };
   }
   logTacticalMarchPlanOk({
-    player: 'opponent',
+    player,
     battle: args.battle,
     unitId: args.order.unitId,
     subUnitType: u.unitType,
@@ -486,175 +527,32 @@ export function tacticalComputeMovementOrderOutcome(args: {
 }
 
 /**
+ * Decides whether a single opponent movement order may mutate a tactical sub-unit row in the snapshot clone.
+ *
+ * Contract: Does not mutate arrays; uses §12.4 terrain-weighted reachability inside the tactical footprint. Emits debug logs for planner outcomes.
+ * When to use: `projectTacticalSnapshotAfterOpponentMovementOrders` loop before applying `h3Index` updates.
+ * Expected outcome: Returns `ok: true` with `idx` into the mutable `sub` clone and `appliedToH3Index` (first leg toward
+ * the ordered cell, matching `tacticalMarchFirstStopAlongPath` / human Ready), or `ok: false` with a reason and diagnostic context.
+ * Exceptions: Invalid H3 indexes may yield `out_of_range` when the tactical march planner cannot find a finite-cost path, when the planner cannot spend movement toward a different ordered cell this beat (`plannerReason: no_progress`), or when the first reachable stop already holds a friendly unit (`plannerReason: friendly_occupied`).
+ */
+export function tacticalComputeMovementOrderOutcome(
+  args: TacticalMovementOrderOutcomeArgs
+): TacticalMovementOrderOutcome {
+  return tacticalComputeMovementOrderOutcomeForPlayer('opponent', args);
+}
+
+/**
  * Decides whether a single human movement order may mutate a tactical sub-unit row in the snapshot clone.
  *
- * Purpose: Mirrors `tacticalComputeMovementOrderOutcome` for opponent rows but requires `player === 'human'`.
+ * Purpose: Delegates to the shared player-parameterized projection requiring `player === 'human'`.
  * When to use: `projectTacticalSnapshotAfterHumanMovementOrders` before applying `h3Index` updates for the human player.
  * Expected outcome: Same success/failure shape as the opponent helper with `non_human` instead of `non_opponent` and the same `appliedToH3Index` first-leg semantics. Emits debug logs when the planner finds a reachable path.
  * Exceptions: Invalid H3 indexes may yield `out_of_range` when the tactical march planner cannot find a finite-cost path, when the planner cannot spend movement toward a different ordered cell this beat (`plannerReason: no_progress`), or when the first reachable stop already holds a friendly unit (`plannerReason: friendly_occupied`).
  */
-export function tacticalComputeHumanMovementOrderOutcome(args: {
-  byId: ReadonlyMap<string, number>;
-  sub: readonly TacticalSubUnitSnapshot[];
-  order: { unitId: string; toH3Index: string };
-  res4Set: ReadonlySet<string>;
-  battle: Pick<
-    TacticalBattleSnapshot,
-    | 'battleId'
-    | 'tacticalTurnNumber'
-    | 'subUnits'
-    | 'res4ChildH3Indexes'
-    | 'res4TerrainKindByH3'
-    | 'strategicHexTerrain'
-    | 'strategicHexTerrainKind'
-    | 'res4IsSeaportByH3'
-    | 'res4IsUrbanByH3'
-    | 'res4IsRubbleByH3'
-    | 'res4RoadSidesByH3'
-    | 'res4RailSidesByH3'
-  >;
-}):
-  | { ok: true; idx: number; appliedToH3Index: string }
-  | { ok: false; reason: TacticalMovementBlockReason; context: Record<string, unknown> } {
-  const idx = args.byId.get(args.order.unitId);
-  if (idx === undefined) {
-    return { ok: false, reason: 'unknown_unit', context: { unitId: args.order.unitId } };
-  }
-  const u = args.sub[idx]!;
-  if (u.player !== 'human') {
-    return { ok: false, reason: 'non_human', context: { unitId: args.order.unitId } };
-  }
-  if (!args.res4Set.has(args.order.toH3Index)) {
-    return {
-      ok: false,
-      reason: 'outside_footprint',
-      context: { unitId: args.order.unitId, toH3Index: args.order.toH3Index },
-    };
-  }
-  if (
-    (u.unitType === 'infantry' || u.unitType === 'armor') &&
-    u.embarkedOnSubUnitId &&
-    args.order.toH3Index !== u.h3Index
-  ) {
-    return {
-      ok: false,
-      reason: 'embarked_cargo',
-      context: { unitId: args.order.unitId, toH3Index: args.order.toH3Index },
-    };
-  }
-  const moveType = tacticalMovementUnitTypeForPathfinding(u, args.order.toH3Index);
-  if (moveType === 'air') {
-    return { ok: false, reason: 'air_no_march', context: { unitId: args.order.unitId } };
-  }
-  const budget = effectiveTacticalMovementPointBudgetForMarchLeg(args.battle, u, args.sub, moveType);
-  let plan = planTacticalRes4MarchWithSessionCache(args.battle, {
-    fromH3: u.h3Index,
-    toH3: args.order.toH3Index,
-    res4Set: args.res4Set,
-    unitTypeForMovement: moveType,
-    movementPointBudget: Math.max(0, budget),
-  });
-  if (!plan.reachable) {
-    const bestEffortPlan =
-      plan.failureReason === 'no_path'
-        ? tacticalLandMarchBestEffortPlanTowardOrderedHex({
-            battle: args.battle,
-            fromH3: u.h3Index,
-            orderedToH3: args.order.toH3Index,
-            res4Set: args.res4Set,
-            moveType,
-            movementPointBudget: Math.max(0, budget),
-            friendlyOccupiedH3: friendlyOccupiedHexesExceptActor(args.sub, u),
-          })
-        : null;
-    if (bestEffortPlan) {
-      tacticalLogMutate('tacticalMarchPlan bestEffortNeighborTowardOrderedHex', {
-        battleId: args.battle.battleId,
-        tacticalTurnNumber: args.battle.tacticalTurnNumber,
-        player: 'human',
-        unitId: args.order.unitId,
-        subUnitType: u.unitType,
-        moveType,
-        fromH3: u.h3Index,
-        orderedToH3: args.order.toH3Index,
-        firstLegStopH3: bestEffortPlan.firstStopWithinBudget.stopH3,
-        primaryPlannerReason: plan.failureReason,
-      });
-      plan = bestEffortPlan;
-    } else {
-      tacticalLogMutate('tacticalMarchPlan unreachable', {
-        battleId: args.battle.battleId,
-        tacticalTurnNumber: args.battle.tacticalTurnNumber,
-        player: 'human',
-        unitId: args.order.unitId,
-        subUnitType: u.unitType,
-        moveType,
-        fromH3: u.h3Index,
-        toH3: args.order.toH3Index,
-        movementPointBudget: budget,
-        plannerReason: plan.failureReason,
-      });
-      return {
-        ok: false,
-        reason: 'out_of_range',
-        context: {
-          unitId: args.order.unitId,
-          from: u.h3Index,
-          to: args.order.toH3Index,
-          budget,
-          plannerReason: plan.failureReason,
-        },
-      };
-    }
-  }
-  const appliedToH3Index = plan.firstStopWithinBudget.stopH3;
-  const occupiedReject = rejectIfAppliedDestFriendlyOccupied({
-    sub: args.sub,
-    actor: u,
-    appliedToH3Index,
-    battle: args.battle,
-    order: args.order,
-    budget,
-    player: 'human',
-  });
-  if (occupiedReject) return occupiedReject;
-  if (appliedToH3Index === u.h3Index && args.order.toH3Index !== u.h3Index) {
-    tacticalLogMutate('tacticalMarchPlan noProgress', {
-      battleId: args.battle.battleId,
-      tacticalTurnNumber: args.battle.tacticalTurnNumber,
-      player: 'human',
-      unitId: args.order.unitId,
-      subUnitType: u.unitType,
-      moveType,
-      fromH3: u.h3Index,
-      toH3: args.order.toH3Index,
-      movementPointBudget: budget,
-    });
-    return {
-      ok: false,
-      reason: 'out_of_range',
-      context: {
-        unitId: args.order.unitId,
-        from: u.h3Index,
-        to: args.order.toH3Index,
-        budget,
-        plannerReason: 'no_progress',
-      },
-    };
-  }
-  logTacticalMarchPlanOk({
-    player: 'human',
-    battle: args.battle,
-    unitId: args.order.unitId,
-    subUnitType: u.unitType,
-    moveType,
-    fromH3: u.h3Index,
-    toH3: args.order.toH3Index,
-    budget,
-    plan,
-    res4Set: args.res4Set,
-  });
-  return { ok: true, idx, appliedToH3Index };
+export function tacticalComputeHumanMovementOrderOutcome(
+  args: TacticalMovementOrderOutcomeArgs
+): TacticalMovementOrderOutcome {
+  return tacticalComputeMovementOrderOutcomeForPlayer('human', args);
 }
 
 /**

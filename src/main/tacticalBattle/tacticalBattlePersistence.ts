@@ -9,6 +9,7 @@
 
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { dbGetOne, dbRun, isDbReady, saveDatabase } from '../gameDb';
+import { readTurnStateRow } from '../game-db/turnStateReads';
 import { logDebug, logError } from '../logger';
 import { clearTacticalTransportBaselineFromGameConfig } from './tacticalTransportBaseline';
 import { clearTacticalCallbackStashFromGameConfig } from './tacticalCallbackStashPersistence';
@@ -100,7 +101,7 @@ function readTacticalBattleSnapshotFromGameConfig(): TacticalBattleSnapshot | nu
  * Exceptions: None; relies on `dbGetOne` returning undefined for missing rows.
  */
 function isRestoredTacticalSnapshotConsistentWithStrategicDb(snapshot: TacticalBattleSnapshot): boolean {
-  const turnRow = dbGetOne<{ phase: string; turn_number: number }>('SELECT phase, turn_number FROM turn_state WHERE id = 1');
+  const turnRow = readTurnStateRow(dbGetOne);
   if (!turnRow || turnRow.phase !== 'planning' || turnRow.turn_number !== snapshot.strategicTurnNumber) {
     logDebug('isRestoredTacticalSnapshotConsistentWithStrategicDb: turn mismatch', {
       dbPhase: turnRow?.phase,

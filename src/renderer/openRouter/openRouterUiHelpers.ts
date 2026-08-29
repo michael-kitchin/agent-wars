@@ -5,7 +5,6 @@ import {
   type AiStrategyToastFields,
 } from '../../shared/aiStrategyToastContent';
 import { READY_REQUEST_TIMEOUT_MS, TOAST_DURATION_MS } from '../core/constants';
-import { READY_REQUEST_TIMEOUT_MS, TOAST_DURATION_MS } from '../core/constants';
 import { rendererSharedState as S } from '../core/state';
 import { isDeferredResolutionPlaybackConsultPending, isWaitingForPrecomputedAiOrders } from './aiPlanningState';
 import { resolveToolInvocationCountsAfterReady } from '../../shared/openRouterToolInvocationCounts';

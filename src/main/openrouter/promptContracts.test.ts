@@ -24,7 +24,7 @@ import {
 function testExampleBlockParsesWithParser(): void {
   const block = getFinalJsonOrdersExampleBlock({ includeMemoryUpdates: false, includeProductionOrders: false });
   assert.ok(!block.includes('```'), 'example must not be a markdown fence the model will copy');
-  assert.ok(!/\n  "/.test(block), 'example JSON must be compact, not pretty-printed');
+  assert.ok(!/\n {2}"/.test(block), 'example JSON must be compact, not pretty-printed');
   const jsonStart = block.indexOf('{');
   assert.ok(jsonStart >= 0, 'example should contain a JSON object');
   const parsed = JSON.parse(block.slice(jsonStart)) as { message?: string; strategy?: string; orders?: unknown[] };
@@ -63,7 +63,7 @@ function testTacticalExampleBlockLeadsWithExplicitMove(): void {
   assert.ok(!block.includes('hum-parent:01'), 'tactical example must not use live-looking enemy ids');
   assert.ok(block.includes('"unitIds"'), 'tactical example teaches grouped unitIds');
   assert.ok(!block.includes('```'), 'tactical example must not be a markdown fence');
-  assert.ok(!/\n  "/.test(block), 'tactical example JSON must be compact');
+  assert.ok(!/\n {2}"/.test(block), 'tactical example JSON must be compact');
   const messageKeyAt = block.indexOf('"message"');
   const strategyKeyAt = block.indexOf('"strategy"');
   assert.ok(messageKeyAt >= 0 && messageKeyAt < strategyKeyAt, 'tactical example JSON must list message before strategy');

@@ -5,6 +5,7 @@
 import type { EmbarkOrder, SealiftStackState } from '../../shared/ipcTypes';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { canManualDebarkFromHex, syncStrategicSealiftFromTacticalHexEmbarkPairs } from '../game-actions/sealift';
+import { normalizeSealiftSlots, type SealiftSlotPair } from '../game-actions/sealiftSlotAssignment';
 import { isDbReady } from '../gameDb';
 import { getActiveTacticalBattleSnapshotRef, setActiveTacticalBattleSnapshotRef } from './activeTacticalBattleRef';
 import { writeTacticalBattleSnapshotToGameConfig } from './tacticalBattlePersistence';
@@ -15,11 +16,10 @@ import {
 } from './tacticalStrategicOrderPhases';
 import {
   buildTacticalSealiftStackStateFromSnapshot,
-  normalizeTacticalSealiftSlots,
 } from './tacticalSealiftStackState';
 import { tacticalLogMutate, tacticalLogQuery } from './tacticalLogging';
 
-type SealiftSlots = { slot1UnitId: string | null; slot2UnitId: string | null };
+type SealiftSlots = SealiftSlotPair;
 
 /**
  * Clears human infantry/armor embark links for sub-units co-located at one tactical res4 hex (draft for reassignment).
@@ -134,7 +134,7 @@ export function projectTacticalSealiftSlotChange(
     return { success: false, reason: 'This naval unit already carries armor and has no second slot.' };
   }
 
-  normalizeTacticalSealiftSlots(navalIds, slotsByNavalId, landTypeById);
+  normalizeSealiftSlots(navalIds, slotsByNavalId, landTypeById);
 
   let acc = clearHumanLandEmbarksAtHex(snap, args.h3Index);
   const embarkOrders = embarkOrdersFromTacticalSlots(slotsByNavalId);

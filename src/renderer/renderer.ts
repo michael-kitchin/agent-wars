@@ -2835,7 +2835,7 @@ function buildKillToastFormatterBundle(
   state: GameStateSnapshot,
   removedUnits: RemovedUnitSnapshot[] | undefined,
   tacticalSubUnitsForKillLabels?: readonly { id: string; displayName: string }[],
-  killLabelUnits?: import('../../shared/unitDisplayNames').UnitDisplayIdentity[]
+  killLabelUnits?: readonly import('../shared/unitDisplayNames').UnitDisplayIdentity[]
 ): {
   formatKillLine: (kill: { victimId: string; killerIds: string[] }) => string;
   formatUnitName: (unitId: string) => string;

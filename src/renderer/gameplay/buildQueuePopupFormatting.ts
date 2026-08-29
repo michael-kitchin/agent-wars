@@ -1,3 +1,5 @@
+import { escapeHtmlText, formatGroupedSemicolonNamingLineHtml } from '../../shared/htmlTextFormatting';
+
 /**
  * Normalizes a build count input to the one-to-99 digits-only contract.
  *
@@ -24,12 +26,7 @@ export function sanitizeBuildCountInputText(raw: string): string {
  * Exceptions: None.
  */
 export function escapeBuildPopupHtml(text: string): string {
-  return text
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#39;');
+  return escapeHtmlText(text);
 }
 
 /**
@@ -41,18 +38,5 @@ export function escapeBuildPopupHtml(text: string): string {
  * Exceptions: Malformed groups are safely escaped and displayed unchanged.
  */
 export function formatGroupedBuildNamingLineHtml(namingLine: string): string {
-  const groups = namingLine
-    .split(';')
-    .map((group) => group.trim())
-    .filter((group) => group.length > 0);
-  if (groups.length === 0) return escapeBuildPopupHtml(namingLine);
-  return groups.map((group) => {
-    const colonIndex = group.indexOf(':');
-    if (colonIndex < 0) return escapeBuildPopupHtml(group);
-    const heading = group.slice(0, colonIndex).trim();
-    const remainder = group.slice(colonIndex + 1).trim();
-    if (!heading) return escapeBuildPopupHtml(group);
-    if (!remainder) return `<strong>${escapeBuildPopupHtml(heading)}:</strong>`;
-    return `<strong>${escapeBuildPopupHtml(heading)}:</strong> ${escapeBuildPopupHtml(remainder)}`;
-  }).join('; ');
+  return formatGroupedSemicolonNamingLineHtml(namingLine);
 }

@@ -36,6 +36,7 @@ import {
 } from '../openRouter/resolutionPlaybackDeferral';
 import { reconcileSelectionToCurrentState } from '../core/selection';
 import { applyToolInvocationCountsAfterReady } from '../openRouter/openRouterUiHelpers';
+import { collectUnknownBattleContinentNames } from '../../shared/unknownBattleContinentNames';
 
 /**
  * Documents the `ReadyHandlerDeps` interface as a named contract surface (export interface ReadyHandlerDeps).
@@ -688,6 +689,22 @@ function buildCombatActivityFallbackBullets(readyResult: CombatActivityFallbackS
 }
 
 /**
+ * Restores tool invocation counts captured before Ready and refreshes the OpenRouter count labels.
+ *
+ * Purpose: One restore path for Ready aborts that already zeroed `S.toolInvocationCounts`.
+ * When to use: When a Ready or tactical-commit path returns after the pre-click snapshot was taken.
+ * Expected outcome: `S.toolInvocationCounts` matches `snapshot` and labels are updated.
+ * Exceptions: None.
+ */
+function rollbackReadyToolCounts(
+  deps: ReadyHandlerDeps,
+  snapshot: Readonly<typeof S.toolInvocationCounts>
+): void {
+  S.toolInvocationCounts = snapshot;
+  deps.updateOpenRouterToolCountLabels();
+}
+
+/**
  * Defines the `handleReadyButtonClick` function shape (export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<void>).
 
  * Purpose: Supports maintainability by documenting why `handleReadyButtonClick` exists.
@@ -715,8 +732,7 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
   deps.updateReadyButtonState();
   try {
     if (isWaitingForPrecomputedAiOrders()) {
-      S.toolInvocationCounts = toolCountsBeforeReadyClick;
-      deps.updateOpenRouterToolCountLabels();
+      rollbackReadyToolCounts(deps, toolCountsBeforeReadyClick);
       deps.startBackgroundRequestIfAllowed();
       deps.showMapToast('AI planning is still running. Ready will unlock once precomputed orders are available.', { isError: false });
       deps.updateReadyButtonState();
@@ -725,8 +741,7 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
     if (S.tacticalBattleSnapshot && S.tacticalPhasePlanning) {
       const commit = window.gameApi.commitHumanTacticalDraftOrders;
       if (!commit) {
-        S.toolInvocationCounts = toolCountsBeforeReadyClick;
-        deps.updateOpenRouterToolCountLabels();
+        rollbackReadyToolCounts(deps, toolCountsBeforeReadyClick);
         deps.showSidebarError('Tactical commit is not available in this build.');
         deps.updateReadyButtonState();
         return;
@@ -752,8 +767,7 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
         aiPlanningRunEnabled: S.runButtonOn,
       })) as CommitHumanTacticalDraftOrdersIpcResult;
       if (!commitResult.success) {
-        S.toolInvocationCounts = toolCountsBeforeReadyClick;
-        deps.updateOpenRouterToolCountLabels();
+        rollbackReadyToolCounts(deps, toolCountsBeforeReadyClick);
         deps.showSidebarError(commitResult.reason ?? 'Tactical commit failed');
         deps.updateReadyButtonState();
         return;
@@ -915,16 +929,12 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
         const hasUnknownBattle =
           unknownCombatHexes.length > 0 || unknownCasualtyHexes.length > 0 || unknownVictimIds.length > 0;
         if (hasUnknownBattle) {
-          const unknownContinentNames: string[] = [];
-          if (window.gameApi?.getHexContinentNames) {
-            const unknownHexes = [...unknownCombatHexes, ...unknownCasualtyHexes].filter((h3, idx, arr) => arr.indexOf(h3) === idx);
-            for (const h3 of unknownHexes) {
-              const names = await window.gameApi.getHexContinentNames({ h3Index: h3 });
-              for (const n of names) {
-                if (!unknownContinentNames.includes(n)) unknownContinentNames.push(n);
-              }
-            }
-          }
+          const getContinentNames = window.gameApi?.getHexContinentNames;
+          const unknownContinentNames = await collectUnknownBattleContinentNames(
+            unknownCombatHexes,
+            unknownCasualtyHexes,
+            getContinentNames ? (h3Index) => getContinentNames({ h3Index }) : undefined
+          );
           deps.showMapToast(deps.formatUnknownBattleAnnouncement(unknownContinentNames), { isError: false });
         }
       }
@@ -995,8 +1005,7 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
     let readyResult = await deps.callReadyWithTimeout(readyPayload);
     let resolutionPlaybackNotifyKind: 'strategic' | 'melee' = 'strategic';
     if (!readyResult.success) {
-      S.toolInvocationCounts = toolCountsBeforeReadyClick;
-      deps.updateOpenRouterToolCountLabels();
+      rollbackReadyToolCounts(deps, toolCountsBeforeReadyClick);
       deps.showSidebarError(readyResult.reason ?? 'Ready failed');
       deps.updateReadyButtonState();
       return;
@@ -1004,8 +1013,7 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
 
     if (readyResult.awaitingMeleeDecision) {
       if (!window.gameApi.resolveMeleeIntercept) {
-        S.toolInvocationCounts = toolCountsBeforeReadyClick;
-        deps.updateOpenRouterToolCountLabels();
+        rollbackReadyToolCounts(deps, toolCountsBeforeReadyClick);
         deps.showSidebarError('Melee intercept resolve is not available in this build.');
         deps.updateReadyButtonState();
         return;
@@ -1036,8 +1044,7 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
         enabledToolGroups: enabledToolGroupsPayload,
       });
       if (!resolveResult.success) {
-        S.toolInvocationCounts = toolCountsBeforeReadyClick;
-        deps.updateOpenRouterToolCountLabels();
+        rollbackReadyToolCounts(deps, toolCountsBeforeReadyClick);
         deps.showSidebarError(resolveResult.reason ?? 'Melee resolve failed');
         deps.updateReadyButtonState();
         return;
@@ -1165,16 +1172,12 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
       }
       const hasUnknownBattle = unknownCombatHexes.length > 0 || unknownCasualtyHexes.length > 0 || unknownVictimIds.length > 0;
       if (hasUnknownBattle) {
-        const unknownContinentNames: string[] = [];
-        if (window.gameApi?.getHexContinentNames) {
-          const unknownHexes = [...unknownCombatHexes, ...unknownCasualtyHexes].filter((h3, idx, arr) => arr.indexOf(h3) === idx);
-          for (const h3 of unknownHexes) {
-            const names = await window.gameApi.getHexContinentNames({ h3Index: h3 });
-            for (const n of names) {
-              if (!unknownContinentNames.includes(n)) unknownContinentNames.push(n);
-            }
-          }
-        }
+        const getContinentNames = window.gameApi?.getHexContinentNames;
+        const unknownContinentNames = await collectUnknownBattleContinentNames(
+          unknownCombatHexes,
+          unknownCasualtyHexes,
+          getContinentNames ? (h3Index) => getContinentNames({ h3Index }) : undefined
+        );
         deps.showMapToast(deps.formatUnknownBattleAnnouncement(unknownContinentNames), { isError: false });
       }
       S.resolutionMoveAnimationFrameId = requestAnimationFrame(deps.tickResolutionMoveAnimation);

@@ -16272,6 +16272,22 @@
     return null;
   }
 
+  // src/renderer/rendering/renderGeometry.ts
+  function projectedPolygonOverlapsViewport(pts, viewportWidth, viewportHeight) {
+    if (pts.length === 0) return false;
+    let minX = pts[0].x;
+    let maxX = pts[0].x;
+    let minY = pts[0].y;
+    let maxY = pts[0].y;
+    for (const p of pts) {
+      if (p.x < minX) minX = p.x;
+      if (p.x > maxX) maxX = p.x;
+      if (p.y < minY) minY = p.y;
+      if (p.y > maxY) maxY = p.y;
+    }
+    return maxX >= 0 && maxY >= 0 && minX <= viewportWidth && minY <= viewportHeight;
+  }
+
   // src/renderer/map/terrainView.ts
   function computeRes1HexFillFraction() {
     if (!rendererSharedState.gameState || rendererSharedState.gameState.hexes.length === 0) return 0;
@@ -16349,20 +16365,6 @@
       const p = map.latLngToContainerPoint(L.latLng(lat, lng));
       return { x: p.x, y: p.y };
     });
-  }
-  function projectedPolygonOverlapsViewport(pts, viewportWidth, viewportHeight) {
-    if (pts.length === 0) return false;
-    let minX = pts[0].x;
-    let maxX = pts[0].x;
-    let minY = pts[0].y;
-    let maxY = pts[0].y;
-    for (const p of pts) {
-      if (p.x < minX) minX = p.x;
-      if (p.x > maxX) maxX = p.x;
-      if (p.y < minY) minY = p.y;
-      if (p.y > maxY) maxY = p.y;
-    }
-    return maxX >= 0 && maxY >= 0 && minX <= viewportWidth && minY <= viewportHeight;
   }
   function shouldConsiderRes4ChildrenForViewport(parentRes1H3Index, map, L, viewportWidth, viewportHeight) {
     const parentPts = projectHexBoundaryToContainerPoints(parentRes1H3Index, map, L);
@@ -20928,6 +20930,24 @@
     }
   }
 
+  // src/shared/htmlTextFormatting.ts
+  function escapeHtmlText(text) {
+    return text.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#39;");
+  }
+  function formatGroupedSemicolonNamingLineHtml(namingLine) {
+    const groups = namingLine.split(";").map((group) => group.trim()).filter((group) => group.length > 0);
+    if (groups.length === 0) return escapeHtmlText(namingLine);
+    return groups.map((group) => {
+      const colonIndex = group.indexOf(":");
+      if (colonIndex < 0) return escapeHtmlText(group);
+      const heading = group.slice(0, colonIndex).trim();
+      const remainder = group.slice(colonIndex + 1).trim();
+      if (!heading) return escapeHtmlText(group);
+      if (!remainder) return `<strong>${escapeHtmlText(heading)}:</strong>`;
+      return `<strong>${escapeHtmlText(heading)}:</strong> ${escapeHtmlText(remainder)}`;
+    }).join("; ");
+  }
+
   // src/renderer/map/terrainTooltipRes1State.ts
   var EMPTY_TERRAIN_EFFECT_FIELDS = {
     parentTerrain: "",
@@ -21309,28 +21329,11 @@
       return null;
     }
   }
-  function escapeHtml(text) {
-    return text.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#39;");
-  }
   function formatLlmLocationBoldPrefixHtml(namingTarget) {
     if (!namingTarget) return "";
     const label = getLlmHexLocationParenLabelForNamingTarget(namingTarget);
     if (!label) return "";
-    return `<strong>${escapeHtml(label)}</strong> `;
-  }
-  function formatGroupedNamingLineHtml(namingLine) {
-    const groups = namingLine.split(";").map((g) => g.trim()).filter((g) => g.length > 0);
-    if (groups.length === 0) return escapeHtml(namingLine);
-    const formattedGroups = groups.map((group) => {
-      const colonIdx = group.indexOf(":");
-      if (colonIdx < 0) return escapeHtml(group);
-      const heading = group.slice(0, colonIdx).trim();
-      const remainder = group.slice(colonIdx + 1).trim();
-      if (!heading) return escapeHtml(group);
-      if (!remainder) return `<strong>${escapeHtml(heading)}:</strong>`;
-      return `<strong>${escapeHtml(heading)}:</strong> ${escapeHtml(remainder)}`;
-    });
-    return formattedGroups.join("; ");
+    return `<strong>${escapeHtmlText(label)}</strong> `;
   }
   function formatTerrainVariantSuffix(state) {
     const variants = [];
@@ -21404,7 +21407,7 @@
     }
     const bodyLine = bodyParts.join(TOOLTIP_SECTION_GAP_HTML);
     if (!namingLine) return `${prefix}${bodyLine}`;
-    return `${prefix}${formatGroupedNamingLineHtml(namingLine)}${TOOLTIP_SECTION_GAP_HTML}${bodyLine}`;
+    return `${prefix}${formatGroupedSemicolonNamingLineHtml(namingLine)}${TOOLTIP_SECTION_GAP_HTML}${bodyLine}`;
   }
   function terrainTooltipContentKey(state, namingLine, namingTarget) {
     const targetKey = namingTarget == null ? "none" : `${namingTarget.resolution}:${namingTarget.h3Index}`;
@@ -22592,20 +22595,10 @@
     return String(parsed);
   }
   function escapeBuildPopupHtml(text) {
-    return text.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#39;");
+    return escapeHtmlText(text);
   }
   function formatGroupedBuildNamingLineHtml(namingLine) {
-    const groups = namingLine.split(";").map((group) => group.trim()).filter((group) => group.length > 0);
-    if (groups.length === 0) return escapeBuildPopupHtml(namingLine);
-    return groups.map((group) => {
-      const colonIndex = group.indexOf(":");
-      if (colonIndex < 0) return escapeBuildPopupHtml(group);
-      const heading = group.slice(0, colonIndex).trim();
-      const remainder = group.slice(colonIndex + 1).trim();
-      if (!heading) return escapeBuildPopupHtml(group);
-      if (!remainder) return `<strong>${escapeBuildPopupHtml(heading)}:</strong>`;
-      return `<strong>${escapeBuildPopupHtml(heading)}:</strong> ${escapeBuildPopupHtml(remainder)}`;
-    }).join("; ");
+    return formatGroupedSemicolonNamingLineHtml(namingLine);
   }
 
   // src/renderer/gameplay/buildQueueMultiSelect.ts
@@ -24669,6 +24662,22 @@
     };
   }
 
+  // src/shared/unknownBattleContinentNames.ts
+  async function collectUnknownBattleContinentNames(unknownCombatHexes, unknownCasualtyHexes, fetchContinentNames) {
+    const unknownContinentNames = [];
+    if (!fetchContinentNames) return unknownContinentNames;
+    const unknownHexes = [...unknownCombatHexes, ...unknownCasualtyHexes].filter(
+      (h3, idx, arr) => arr.indexOf(h3) === idx
+    );
+    for (const h3 of unknownHexes) {
+      const names = await fetchContinentNames(h3);
+      for (const n of names) {
+        if (!unknownContinentNames.includes(n)) unknownContinentNames.push(n);
+      }
+    }
+    return unknownContinentNames;
+  }
+
   // src/renderer/gameplay/readyHandler.ts
   function buildReadyPayload(args) {
     const { enabledToolGroupsPayload, useEventDriven, usePrecomputed, aiPlanningRunEnabled } = args;
@@ -24823,6 +24832,10 @@
     if (casualtyHexCount > 0) bullets.push(formatHexCount("Casualty outcomes", casualtyHexCount));
     return bullets;
   }
+  function rollbackReadyToolCounts(deps, snapshot) {
+    rendererSharedState.toolInvocationCounts = snapshot;
+    deps.updateOpenRouterToolCountLabels();
+  }
   async function handleReadyButtonClick(deps) {
     if (!window.gameApi) return;
     if (rendererSharedState.gameState?.gameOver) return;
@@ -24841,8 +24854,7 @@
     deps.updateReadyButtonState();
     try {
       if (isWaitingForPrecomputedAiOrders()) {
-        rendererSharedState.toolInvocationCounts = toolCountsBeforeReadyClick;
-        deps.updateOpenRouterToolCountLabels();
+        rollbackReadyToolCounts(deps, toolCountsBeforeReadyClick);
         deps.startBackgroundRequestIfAllowed();
         deps.showMapToast("AI planning is still running. Ready will unlock once precomputed orders are available.", { isError: false });
         deps.updateReadyButtonState();
@@ -24851,8 +24863,7 @@
       if (rendererSharedState.tacticalBattleSnapshot && rendererSharedState.tacticalPhasePlanning) {
         const commit = window.gameApi.commitHumanTacticalDraftOrders;
         if (!commit) {
-          rendererSharedState.toolInvocationCounts = toolCountsBeforeReadyClick;
-          deps.updateOpenRouterToolCountLabels();
+          rollbackReadyToolCounts(deps, toolCountsBeforeReadyClick);
           deps.showSidebarError("Tactical commit is not available in this build.");
           deps.updateReadyButtonState();
           return;
@@ -24876,8 +24887,7 @@
           aiPlanningRunEnabled: rendererSharedState.runButtonOn
         });
         if (!commitResult.success) {
-          rendererSharedState.toolInvocationCounts = toolCountsBeforeReadyClick;
-          deps.updateOpenRouterToolCountLabels();
+          rollbackReadyToolCounts(deps, toolCountsBeforeReadyClick);
           deps.showSidebarError(commitResult.reason ?? "Tactical commit failed");
           deps.updateReadyButtonState();
           return;
@@ -25002,16 +25012,12 @@
           }
           const hasUnknownBattle = unknownCombatHexes2.length > 0 || unknownCasualtyHexes2.length > 0 || unknownVictimIds2.length > 0;
           if (hasUnknownBattle) {
-            const unknownContinentNames = [];
-            if (window.gameApi?.getHexContinentNames) {
-              const unknownHexes = [...unknownCombatHexes2, ...unknownCasualtyHexes2].filter((h3, idx, arr) => arr.indexOf(h3) === idx);
-              for (const h3 of unknownHexes) {
-                const names = await window.gameApi.getHexContinentNames({ h3Index: h3 });
-                for (const n of names) {
-                  if (!unknownContinentNames.includes(n)) unknownContinentNames.push(n);
-                }
-              }
-            }
+            const getContinentNames = window.gameApi?.getHexContinentNames;
+            const unknownContinentNames = await collectUnknownBattleContinentNames(
+              unknownCombatHexes2,
+              unknownCasualtyHexes2,
+              getContinentNames ? (h3Index) => getContinentNames({ h3Index }) : void 0
+            );
             deps.showMapToast(deps.formatUnknownBattleAnnouncement(unknownContinentNames), { isError: false });
           }
         }
@@ -25077,16 +25083,14 @@
       let readyResult = await deps.callReadyWithTimeout(readyPayload);
       let resolutionPlaybackNotifyKind = "strategic";
       if (!readyResult.success) {
-        rendererSharedState.toolInvocationCounts = toolCountsBeforeReadyClick;
-        deps.updateOpenRouterToolCountLabels();
+        rollbackReadyToolCounts(deps, toolCountsBeforeReadyClick);
         deps.showSidebarError(readyResult.reason ?? "Ready failed");
         deps.updateReadyButtonState();
         return;
       }
       if (readyResult.awaitingMeleeDecision) {
         if (!window.gameApi.resolveMeleeIntercept) {
-          rendererSharedState.toolInvocationCounts = toolCountsBeforeReadyClick;
-          deps.updateOpenRouterToolCountLabels();
+          rollbackReadyToolCounts(deps, toolCountsBeforeReadyClick);
           deps.showSidebarError("Melee intercept resolve is not available in this build.");
           deps.updateReadyButtonState();
           return;
@@ -25115,8 +25119,7 @@
           enabledToolGroups: enabledToolGroupsPayload
         });
         if (!resolveResult.success) {
-          rendererSharedState.toolInvocationCounts = toolCountsBeforeReadyClick;
-          deps.updateOpenRouterToolCountLabels();
+          rollbackReadyToolCounts(deps, toolCountsBeforeReadyClick);
           deps.showSidebarError(resolveResult.reason ?? "Melee resolve failed");
           deps.updateReadyButtonState();
           return;
@@ -25227,16 +25230,12 @@
         }
         const hasUnknownBattle = unknownCombatHexes.length > 0 || unknownCasualtyHexes.length > 0 || unknownVictimIds.length > 0;
         if (hasUnknownBattle) {
-          const unknownContinentNames = [];
-          if (window.gameApi?.getHexContinentNames) {
-            const unknownHexes = [...unknownCombatHexes, ...unknownCasualtyHexes].filter((h3, idx, arr) => arr.indexOf(h3) === idx);
-            for (const h3 of unknownHexes) {
-              const names = await window.gameApi.getHexContinentNames({ h3Index: h3 });
-              for (const n of names) {
-                if (!unknownContinentNames.includes(n)) unknownContinentNames.push(n);
-              }
-            }
-          }
+          const getContinentNames = window.gameApi?.getHexContinentNames;
+          const unknownContinentNames = await collectUnknownBattleContinentNames(
+            unknownCombatHexes,
+            unknownCasualtyHexes,
+            getContinentNames ? (h3Index) => getContinentNames({ h3Index }) : void 0
+          );
           deps.showMapToast(deps.formatUnknownBattleAnnouncement(unknownContinentNames), { isError: false });
         }
         rendererSharedState.resolutionMoveAnimationFrameId = requestAnimationFrame(deps.tickResolutionMoveAnimation);

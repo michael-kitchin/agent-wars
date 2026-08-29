@@ -8,6 +8,7 @@ import {
   listRes4FeatureOverridesForGame,
   listUnitsForSnapshot,
 } from '../gameDb';
+import { readTurnStateRow } from '../game-db/turnStateReads';
 import { getRes4RoadRailOverlaysForRenderer } from '../terrainClassificationCache';
 import { tacticalNavalHasMovableNeighborInFootprint } from '../../shared/tacticalRes4MovementPlanner';
 import {
@@ -340,9 +341,7 @@ export function computeTacticalBattleSnapshot(
     if (getResolution(enclosingRes1H3Index) !== WORLD_H3_RESOLUTION) {
       return { snapshot: null, skippedParentDisplayNames: [], failureReason: 'Not a res1 hex index.' };
     }
-    const turnRow = dbGetOne<{ phase: string; turn_number: number }>(
-      'SELECT phase, turn_number FROM turn_state WHERE id = 1'
-    );
+    const turnRow = readTurnStateRow(dbGetOne);
     if (!turnRow) {
       return { snapshot: null, skippedParentDisplayNames: [], failureReason: 'Missing turn state.' };
     }

@@ -6,46 +6,7 @@
 import * as assert from 'assert';
 import * as fs from 'fs';
 import * as path from 'path';
-
-/**
- * Defines the `getFunctionSource` function shape (function getFunctionSource(source: string, functionName: string): string).
-
- * Purpose: Supports maintainability by documenting why `getFunctionSource` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function getFunctionSource(source: string, functionName: string): string {
-  const signaturePattern = new RegExp(`(^|\\n)(?:export\\s+)?(?:async\\s+)?function\\s+${functionName}\\s*\\(`, 'm');
-  const match = signaturePattern.exec(source);
-  const start = match ? match.index + (match[1]?.length ?? 0) : -1;
-  assert.ok(start >= 0, `Expected function ${functionName} to exist`);
-
-  const openBrace = source.indexOf('{', start);
-  assert.ok(openBrace >= 0, `Expected function ${functionName} to have a body`);
-
-  let depth = 0;
-  for (let i = openBrace; i < source.length; i += 1) {
-    const ch = source[i];
-    if (ch === '{') depth += 1;
-    if (ch === '}') depth -= 1;
-    if (depth === 0) return source.slice(start, i + 1);
-  }
-
-  throw new Error(`Unterminated function body for ${functionName}`);
-}
-
-/**
- * Defines the `assertMatches` function shape (function assertMatches(source: string, pattern: RegExp, message: string): void).
-
- * Purpose: Supports maintainability by documenting why `assertMatches` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function assertMatches(source: string, pattern: RegExp, message: string): void {
-  assert.ok(pattern.test(source), message);
-}
+import { assertMatches, getFunctionSource } from './testSupport/rendererSourceAssertions';
 
 /**
  * Defines the `testRedrawAndResizeDelegateToSharedScene` function shape (function testRedrawAndResizeDelegateToSharedScene(): void).
