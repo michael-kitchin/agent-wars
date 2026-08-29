@@ -4,8 +4,8 @@
 
 import * as assert from 'assert';
 import type { CoordinateContext } from './briefing/map/coordinateContext';
-import { ensureStrategicCoordinateRegistryInitialized, listStrategicRes1H3Indexes } from './briefing/map/hex-coordinates';
-import { h3ToCode } from './briefing/map/hex-code-translator';
+import { ensureStrategicCoordinateRegistryInitialized, listStrategicRes1H3Indexes } from './briefing/map/hexCoordinates';
+import { h3ToCode } from './briefing/map/hexCodeTranslator';
 import { normalizeProductionOrders } from './productionOrders';
 
 const strategicCtx: CoordinateContext = { mode: 'strategic' };

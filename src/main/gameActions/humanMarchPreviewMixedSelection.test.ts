@@ -1,6 +1,6 @@
 /**
  * Unit tests for mixed land + naval selection predicates.
- * Run with: node dist/main/game-actions/humanMarchPreviewMixedSelection.test.js
+ * Run with: node dist/main/gameActions/humanMarchPreviewMixedSelection.test.js
  */
 
 import * as assert from 'assert';

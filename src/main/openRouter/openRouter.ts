@@ -20,8 +20,8 @@ import {
 import { MOVEMENT_RANGE_BY_UNIT_TYPE } from '../../shared/tacticalRanges';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { buildStrategicUnitDisplayLabelResolver } from '../../shared/unitDisplayNames';
-import { validateTacticalGroupRangedTarget } from '../game-actions/tacticalGroupRangedTargetValidation';
-import { isEmbarkedLandUnit } from '../game-actions/sealift';
+import { validateTacticalGroupRangedTarget } from '../gameActions/tacticalGroupRangedTargetValidation';
+import { isEmbarkedLandUnit } from '../gameActions/sealift';
 import { formatLatLng as formatLatLngWithPrecision } from './promptText';
 import { requestOrdersFlow } from './requestOrdersFlow';
 import { NAVAL_DESTINATION_MUST_BE_WATER_COASTAL } from '../navalMovementMessages';

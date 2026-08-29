@@ -24,7 +24,7 @@ import {
 } from '../../shared/tacticalTerrainCombatModifiers';
 import { computeGridDistancePure } from '../../shared/h3GridRangePure';
 import { AIR_FERRY_RANGE_HEXES, AIR_STRIKE_RANGE_HEXES } from '../../shared/tacticalRanges';
-import { isWithinAirFerryGridRange, isWithinAirStrikeGridRange } from '../game-actions/gridRange';
+import { isWithinAirFerryGridRange, isWithinAirStrikeGridRange } from '../gameActions/gridRange';
 import { logDebug, logTrace } from '../logger';
 import { logHexControllerParityMismatch } from '../snapshotDbParity';
 import { compareHexIds, partitionHomelandNearestOther } from './possibleUnitActionsPartition';

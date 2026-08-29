@@ -1,10 +1,10 @@
 import { logTrace } from '../logger';
-import { TOOL1_NAMES } from '../tools/tool1Pathfinding';
-import { TOOL2_NAMES } from '../tools/tool2Assessment';
-import { TOOL3_NAMES } from '../tools/tool3CombatEstimation';
-import { TOOL4_NAMES } from '../tools/tool4Memory';
-import { TOOL5_NAMES } from '../tools/tool5StandingOrders';
-import { TOOL6_NAMES } from '../tools/tool6Production';
+import { PATHFINDING_TOOL_NAMES } from '../tools/pathfinding';
+import { ASSESSMENT_TOOL_NAMES } from '../tools/assessment';
+import { COMBAT_ESTIMATION_TOOL_NAMES } from '../tools/combatEstimation';
+import { MEMORY_TOOL_NAMES } from '../tools/memory';
+import { STANDING_ORDER_TOOL_NAMES } from '../tools/standingOrders';
+import { PRODUCTION_TOOL_NAMES } from '../tools/productionTools';
 
 /**
  * Tool group registry and derived capability flags for OpenRouter tool gating.
@@ -57,12 +57,12 @@ toolNames: readonly string[];
  */
 export const TOOL_GROUP_REGISTRY: ToolGroupEntry[] = [
   { id: 'precomputation', label: 'Precomputation', toolNames: [] },
-  { id: 'planning', label: 'Planning', toolNames: TOOL1_NAMES },
-  { id: 'assessment', label: 'Assessment', toolNames: TOOL2_NAMES },
-  { id: 'estimation', label: 'Estimation', toolNames: TOOL3_NAMES },
-  { id: 'memory', label: 'Memory', toolNames: TOOL4_NAMES },
-  { id: 'orders', label: 'Orders', toolNames: TOOL5_NAMES },
-  { id: 'production', label: 'Production', toolNames: TOOL6_NAMES },
+  { id: 'planning', label: 'Planning', toolNames: PATHFINDING_TOOL_NAMES },
+  { id: 'assessment', label: 'Assessment', toolNames: ASSESSMENT_TOOL_NAMES },
+  { id: 'estimation', label: 'Estimation', toolNames: COMBAT_ESTIMATION_TOOL_NAMES },
+  { id: 'memory', label: 'Memory', toolNames: MEMORY_TOOL_NAMES },
+  { id: 'orders', label: 'Orders', toolNames: STANDING_ORDER_TOOL_NAMES },
+  { id: 'production', label: 'Production', toolNames: PRODUCTION_TOOL_NAMES },
 ];
 
 /**
@@ -214,12 +214,12 @@ export function getToolFlags(enabledToolNames: string[] | undefined): ToolFlags 
       ? new Set(TOOL_GROUP_REGISTRY.flatMap((g) => [...g.toolNames]))
       : new Set(enabledToolNames);
   const has = (names: readonly string[]) => names.some((n) => set.has(n));
-  const planningEnabled = has(TOOL1_NAMES);
-  const assessmentEnabled = has(TOOL2_NAMES);
-  const estimationEnabled = has(TOOL3_NAMES);
-  const ordersEnabled = has(TOOL5_NAMES);
-  const memoryEnabled = has(TOOL4_NAMES);
-  const productionEnabled = has(TOOL6_NAMES);
+  const planningEnabled = has(PATHFINDING_TOOL_NAMES);
+  const assessmentEnabled = has(ASSESSMENT_TOOL_NAMES);
+  const estimationEnabled = has(COMBAT_ESTIMATION_TOOL_NAMES);
+  const ordersEnabled = has(STANDING_ORDER_TOOL_NAMES);
+  const memoryEnabled = has(MEMORY_TOOL_NAMES);
+  const productionEnabled = has(PRODUCTION_TOOL_NAMES);
   return {
     planningEnabled,
     assessmentEnabled,

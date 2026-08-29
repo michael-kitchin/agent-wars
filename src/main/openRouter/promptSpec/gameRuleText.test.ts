@@ -1,6 +1,6 @@
 /**
  * Contract tests for engine-fact sentences both consultation modes share.
- * Run: `npm run build:main` then `node dist/main/openrouter/promptSpec/gameRuleText.test.js`
+ * Run: `npm run build:main` then `node dist/main/openRouter/promptSpec/gameRuleText.test.js`
  */
 
 import assert from 'node:assert/strict';
@@ -8,7 +8,7 @@ import { test } from 'node:test';
 import * as fs from 'fs';
 import * as path from 'path';
 import { CASUALTY_PRIORITY_ORDER, getMovementBudget } from '../../combatConstants';
-import { STALE_INTEL_TURNS } from '../../game-db/fogState';
+import { STALE_INTEL_TURNS } from '../../gameDb/fogState';
 import { AIR_STRIKE_RANGE_HEXES, MOVEMENT_RANGE_BY_UNIT_TYPE, RANGED_RANGE_BY_UNIT_TYPE } from '../../../shared/tacticalRanges';
 import {
   TACTICAL_TRANSPORT_RAIL_BUDGET_MULTIPLIER,
@@ -194,7 +194,7 @@ test('buildProductionCostRulesLine interpolates engine costs', () => {
 
 test('the system-prompt assembler delegates combat-rule prose to this module', () => {
   const assembler = fs.readFileSync(
-    path.resolve(process.cwd(), 'src/main/openrouter/openRouterBuildSystemPrompt.ts'),
+    path.resolve(process.cwd(), 'src/main/openRouter/openRouterBuildSystemPrompt.ts'),
     'utf8'
   );
   assert.ok(assembler.includes('buildCombatRulesParagraph'));

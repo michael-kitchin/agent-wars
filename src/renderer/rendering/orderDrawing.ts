@@ -10,7 +10,7 @@ import {
   RANGE_PERIMETER_ALPHA,
   RANGE_PERIMETER_RANGED_COLOR,
 } from '../core/constants';
-import { hexCenterPx, hexCenterPxRelativeTo } from '../map/mapUtils';
+import { hexCenterPx, hexCenterPxRelativeTo } from '../map/mapHelpers';
 import { drawHumanMarchStyleRouteSegments } from './pathDrawing';
 import {
   buildRangeOverlayDashArray,

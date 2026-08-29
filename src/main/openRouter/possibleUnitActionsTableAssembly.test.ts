@@ -239,7 +239,7 @@ function testOmitThisTurnFerryRowsForStrikingAir(): void {
  * Documents the function binding `main` (main).
  *
  * Purpose: Node test driver for this file.
- * When to use: `node dist/main/openrouter/possibleUnitActionsTableAssembly.test.js`.
+ * When to use: `node dist/main/openRouter/possibleUnitActionsTableAssembly.test.js`.
  * Expected outcome: All tests pass; prints success line.
  * Exceptions: Propagates assertion errors.
  */

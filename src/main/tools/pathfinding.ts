@@ -1,5 +1,5 @@
 /**
- * MCP Tool 1: Pathfinding and Movement Planning (plan_route, check_distance).
+ * Pathfinding and movement planning (`plan_route`, `check_distance`).
  * Implements the tool API per the MCP tools spec; uses pathfinding module and game state.
  * Internal geometry uses lat/lng tuples after the OpenRouter layer decodes briefing hex codes; outbound tool payloads to the model are rewritten to hex codes by `encodeOpenRouterToolResultForLlm`.
  */
@@ -21,7 +21,7 @@ import { logDebug, logError } from '../logger';
 import { buildNormalizedTerrainByH3 } from '../movementTerrain';
 import {
   buildTerrainMapsFromHexRows,
-} from '../game-actions/landMovementConstraints';
+} from '../gameActions/landMovementConstraints';
 import {
   PLAN_ROUTE_WARNING_ALREADY_AT_REDIRECTED_HEX,
   PLAN_ROUTE_WARNING_LAND_REDIRECT,
@@ -30,30 +30,30 @@ import { getRes1LandMassByH3 } from '../terrainClassificationCache';
 import type { LandMassByH3 } from '../../shared/landTraversalRes1';
 import {
   nearestWaterHexTo,
-} from './tool1PathfindingDistanceHelpers';
+} from './pathfindingDistanceHelpers';
 import {
   type PathfindingSessionStatefulCache,
-} from './tool1PathfindingStateful';
+} from './pathfindingStateful';
 import {
   buildAlreadyAtDestinationResult,
   buildPlanRouteSuccessResult,
   resolvePlanRouteRequestContext,
-} from './tool1PathfindingPlanRouteHelpers';
+} from './pathfindingPlanRouteHelpers';
 import {
   buildBlockedEnemySetForUnit,
   planRouteNoPathHint,
   resolveRoutePathForUnit,
-} from './tool1PathfindingRouteResolution';
-import { executeTacticalCheckDistance, executeTacticalPlanRoute } from './tacticalTool1Pathfinding';
+} from './pathfindingRouteResolution';
+import { executeTacticalCheckDistance, executeTacticalPlanRoute } from './tacticalPathfinding';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { h3ToLatLng, type LatLng } from './h3LatLng';
 import {
   rememberPlanningPhaseSession,
   reusePlanningPhaseSession,
-} from './tool1PathfindingSessionCache';
+} from './pathfindingSessionCache';
 
 /**
- * Re-exports shared lat/lng tuple type for existing tool1Pathfinding LatLng importers.
+ * Re-exports shared lat/lng tuple type for existing pathfinding LatLng importers.
  *
  * Purpose: Preserves the historical import path after `LatLng` moved to `h3LatLng.ts`.
  * When to use: Prefer the h3LatLng module for new code; keep this re-export for downstream tools.
@@ -172,7 +172,7 @@ export function createPathfindingSession(
     const reused = reusePlanningPhaseSession<PathfindingSession>(state);
     if (reused) return reused;
   }
-  logDebug('tool1Pathfinding createPathfindingSession', {
+  logDebug('pathfinding createPathfindingSession', {
     turnNumber: state.turnNumber,
     hexCount: state.hexes.length,
     unitCount: state.units.length,
@@ -533,7 +533,7 @@ export function executePlanRouteWithSession(
   options: PlanRouteOptions | undefined,
   session: PathfindingSession
 ): PlanRouteOk | PlanRouteError {
-  logDebug('tool1Pathfinding executePlanRouteWithSession', { unitId, destination: destination.join(','), options });
+  logDebug('pathfinding executePlanRouteWithSession', { unitId, destination: destination.join(','), options });
   try {
   const resolvedContext = resolvePlanRouteRequestContext({
     unitId,
@@ -542,10 +542,10 @@ export function executePlanRouteWithSession(
     hexSet: session.hexSet,
     resolveToH3: session.resolveToH3,
     logUnitNotFound: (missingUnitId) => {
-      logDebug('tool1Pathfinding executePlanRoute: unit not found (invalid id or not in snapshot)', { missingUnitId });
+      logDebug('pathfinding executePlanRoute: unit not found (invalid id or not in snapshot)', { missingUnitId });
     },
     logUnitOffMap: (offMapUnitId) => {
-      logError('tool1Pathfinding executePlanRoute: unit not on map', offMapUnitId);
+      logError('pathfinding executePlanRoute: unit not on map', offMapUnitId);
     },
   });
   if ('status' in resolvedContext) return resolvedContext;
@@ -556,7 +556,7 @@ export function executePlanRouteWithSession(
   const blockedEnemyCount = blockedEnemySet?.size ?? 0;
   const blocked = blockedEnemySet;
   const blockedTotalCount = blocked?.size ?? 0;
-  logDebug('tool1Pathfinding executePlanRouteWithSession: blocking summary', {
+  logDebug('pathfinding executePlanRouteWithSession: blocking summary', {
     unitId,
     unitType: unit.unitType,
     unitPlayer: unit.player,
@@ -584,7 +584,7 @@ export function executePlanRouteWithSession(
     routeResolution;
   destH3 = destinationH3;
   if (statefulStats && (unit.unitType === 'infantry' || unit.unitType === 'armor')) {
-    logDebug('tool1Pathfinding executePlanRouteWithSession: stateful search summary', {
+    logDebug('pathfinding executePlanRouteWithSession: stateful search summary', {
       unitId,
       originH3,
       destinationH3: destH3,
@@ -622,7 +622,7 @@ export function executePlanRouteWithSession(
 
   if (!path) {
     const hint = planRouteNoPathHint(passableFor, destH3, session.landMass, session.terrainByH3.get(destH3));
-    logDebug('tool1Pathfinding executePlanRouteWithSession: no path', {
+    logDebug('pathfinding executePlanRouteWithSession: no path', {
       unitId,
       unitType: unit.unitType,
       originH3,
@@ -653,7 +653,7 @@ export function executePlanRouteWithSession(
     partitionPathByTurn,
   });
   } catch (err) {
-    logError('tool1Pathfinding executePlanRoute: exception', {
+    logError('pathfinding executePlanRoute: exception', {
       unitId,
       destination,
       error: String(err),
@@ -679,7 +679,7 @@ export function executeCheckDistance(
   resolveToH3: (lat: number, lng: number) => string | undefined,
   pathfindingSession?: PathfindingSession
 ): CheckDistanceOk | CheckDistanceError {
-  logDebug('tool1Pathfinding executeCheckDistance', {
+  logDebug('pathfinding executeCheckDistance', {
     from: from.join(','),
     to: to.join(','),
     unitType,
@@ -772,24 +772,24 @@ export function executeCheckDistance(
 }
 
 /**
- * Documents the module-scope binding `TOOL1_NAMES` (TOOL1_NAMES).
+ * Documents the module-scope binding `PATHFINDING_TOOL_NAMES` (PATHFINDING_TOOL_NAMES).
 
- * Purpose: Supports maintainability by documenting why `TOOL1_NAMES` exists.
+ * Purpose: Supports maintainability by documenting why `PATHFINDING_TOOL_NAMES` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export const TOOL1_NAMES = ['plan_route', 'check_distance'] as const;
+export const PATHFINDING_TOOL_NAMES = ['plan_route', 'check_distance'] as const;
 
 /**
- * Defines the `executeTool1` function shape (export function executeTool1( toolName: string, args: unknown, state: GameStateSnapshot, latLngByH3: Map<string, LatLng>, resolveToH3: (lat: numb).
+ * Defines the `executePathfinding` function shape (export function executePathfinding( toolName: string, args: unknown, state: GameStateSnapshot, latLngByH3: Map<string, LatLng>, resolveToH3: (lat: numb).
 
- * Purpose: Supports maintainability by documenting why `executeTool1` exists.
+ * Purpose: Supports maintainability by documenting why `executePathfinding` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function executeTool1(
+export function executePathfinding(
   toolName: string,
   args: unknown,
   state: GameStateSnapshot,
@@ -801,7 +801,7 @@ export function executeTool1(
    */
   tacticalBattle?: TacticalBattleSnapshot
 ): Record<string, unknown> {
-  logDebug('tool1Pathfinding executeTool1', {
+  logDebug('pathfinding executePathfinding', {
     toolName,
     stateTurn: state.turnNumber,
     tactical: Boolean(tacticalBattle),
@@ -880,7 +880,7 @@ export function executeTool1(
     }
     return { status: 'error', error: `Unknown tool: ${toolName}` };
   } catch (err) {
-    logError('tool1Pathfinding executeTool1: exception', toolName, err);
+    logError('pathfinding executePathfinding: exception', toolName, err);
     return { status: 'error', error: String(err) };
   }
 }

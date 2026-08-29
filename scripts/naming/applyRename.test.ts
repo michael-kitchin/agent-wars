@@ -3,7 +3,9 @@ import { spawnSync } from 'child_process';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { applyLedgerEntry, FIND_IN_COMMENTS, FIND_IN_STRINGS } from './applyRename.js';
+import { applyLedgerEntry, FIND_IN_COMMENTS, FIND_IN_STRINGS, rewriteDirectorySegmentInTsFiles } from './applyRename.js';
+import { resolveCurrentPath } from './ledger.js';
+import type { RenameLedgerDocument } from './types.js';
 import { gitMvSteps } from './windowsGitMv.js';
 
 assert.equal(FIND_IN_STRINGS, false);
@@ -122,6 +124,52 @@ function makeFixture(kind: 'file' | 'symbol'): string {
   } catch (err) {
     assert.ok(String(err).includes('Unknown ledger id'));
   }
+}
+
+{
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'naming-seg-'));
+  write(root, 'src/main/tacticalBattle/x.ts', "import { a } from '../game-actions/sealift';\n");
+  const edited = rewriteDirectorySegmentInTsFiles(root, 'game-actions', 'gameActions', false);
+  assert.equal(edited.length, 1);
+  const text = fs.readFileSync(path.join(root, 'src/main/tacticalBattle/x.ts'), 'utf8');
+  assert.ok(text.includes('../gameActions/sealift'), text);
+}
+
+{
+  const document: RenameLedgerDocument = {
+    entries: [
+      {
+        id: 'dir-game-actions',
+        kind: 'directory',
+        currentPath: 'src/main/game-actions',
+        currentName: 'game-actions',
+        proposedPath: 'src/main/gameActions',
+        proposedName: 'gameActions',
+        category: 'directoryCasing',
+        rationale: 'test',
+        referencingFileCount: 1,
+        linkedEntryIds: [],
+        status: 'applied',
+      },
+      {
+        id: 'file-impl',
+        kind: 'file',
+        currentPath: 'src/main/game-actions/humanMarchPreview/humanMarchPreviewImpl.ts',
+        currentName: 'humanMarchPreviewImpl.ts',
+        proposedPath: 'src/main/game-actions/humanMarchPreview/humanMarchPreviewResolve.ts',
+        proposedName: 'humanMarchPreviewResolve.ts',
+        category: 'bannedSuffix',
+        rationale: 'test',
+        referencingFileCount: 1,
+        linkedEntryIds: [],
+        status: 'applied',
+      },
+    ],
+  };
+  assert.equal(
+    resolveCurrentPath(document, 'src/main/game-actions/humanMarchPreview/humanMarchPreviewImpl.ts'),
+    'src/main/gameActions/humanMarchPreview/humanMarchPreviewResolve.ts',
+  );
 }
 
 console.log('applyRename.test.ts: ok');

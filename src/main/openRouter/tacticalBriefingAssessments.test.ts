@@ -1,6 +1,6 @@
 /**
  * Lightweight tactical briefing assessments across an icosahedron face crossing.
- * Run: node dist/main/openrouter/tacticalBriefingAssessments.test.js
+ * Run: node dist/main/openRouter/tacticalBriefingAssessments.test.js
  */
 
 import assert from 'node:assert/strict';

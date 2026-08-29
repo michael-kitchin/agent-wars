@@ -9,7 +9,7 @@ import {
 } from '../../shared/lossSummary';
 import { getRecentTurnNotes, type TurnNoteRow, type TurnNotesScope } from '../gameDb';
 import { logTrace } from '../logger';
-import { subHeading } from '../openrouter/promptSpec/sectionHeadings';
+import { subHeading } from '../openRouter/promptSpec/sectionHeadings';
 
 /**
  * Arguments for assembling a recent turn notes prompt section.

@@ -1,6 +1,6 @@
 # Region vs region
 
-The only persisted scenario id in 2.4.0 is `region_vs_region` (`REGION_VS_REGION_SCENARIO_ID` in `src/main/game-db/scenarioState.ts`). New-game home-region selectors write `scenario_region_human` and `scenario_region_ai`. Combat resolution is unchanged; this page is win evaluation, visibility, and UI.
+The only persisted scenario id in 2.4.0 is `region_vs_region` (`REGION_VS_REGION_SCENARIO_ID` in `src/main/gameDb/scenarioState.ts`). New-game home-region selectors write `scenario_region_human` and `scenario_region_ai`. Combat resolution is unchanged; this page is win evaluation, visibility, and UI.
 
 The engine under `src/` wins if this file drifts.
 
@@ -19,7 +19,7 @@ Home regions may overlap. Exclusive sets, the intersection, and contested home h
 
 ## How you win
 
-Evaluated at end of turn after combat, movement, control, and production (`evaluateRegionControlWinnerAtEndOfTurn` in `src/main/game-actions/regionControlWinner.ts`):
+Evaluated at end of turn after combat, movement, control, and production (`evaluateRegionControlWinnerAtEndOfTurn` in `src/main/gameActions/regionControlWinner.ts`):
 
 1. **Control.** You control **every** res1 hex in the **enemy** home region, and the enemy does not symmetrically control yours.
 2. **Urban elimination.** Urban count summed across the enemy home region is **zero**, and your home region still has at least one urban hex. If **both** homes are at zero urban, there is no urban-only winner (play continues until a control win or urban returns).

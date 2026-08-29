@@ -18,7 +18,7 @@ import {
 } from '../gameDb';
 import { logDebug, logError } from '../logger';
 import { DEPLOYMENT_CAP_TYPE_ORDER } from '../productionCaps';
-import { readPersistedMaxUnitsPerType } from '../game-db/gameSizeConfig';
+import { readPersistedMaxUnitsPerType } from '../gameDb/gameSizeConfig';
 import {
   computeKeepBuildingRefillCount,
   getAvailableBuildUnitTypes,

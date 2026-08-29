@@ -3,7 +3,7 @@ import { TACTICAL_ENTRY_HIT_PAD_PX } from '../core/constants';
 import { rendererSharedState as S } from '../core/state';
 import { isHoverOrderPlanningActive } from '../rendering/canvasPreviewPolicy';
 import { computeRes1OverlayTextY } from '../rendering/terrainRendering';
-import { getLeafletGlobal, hexCenterPx } from './mapUtils';
+import { getLeafletGlobal, hexCenterPx } from './mapHelpers';
 import { shouldShowBuildEntryZoom } from './terrainView';
 import { getMainLeafletMap } from './worldLeafletMap';
 

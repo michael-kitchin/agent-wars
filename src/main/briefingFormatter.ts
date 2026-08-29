@@ -11,13 +11,13 @@ import type { CallbackSubscription } from './callbackSubscriptions';
 import { cellToLatLng, latLngToCell } from 'h3-js';
 import { LATLNG_DECIMAL_PLACES } from './mapData';
 import { logDebug, logTrace } from './logger';
-import { buildStrategicOperationalMapSectionMarkdown } from './briefing/map/briefing-map-section';
-import { ensureStrategicCoordinateRegistryInitialized } from './briefing/map/hex-coordinates';
-import { h3ToCode } from './briefing/map/hex-code-translator';
+import { buildStrategicOperationalMapSectionMarkdown } from './briefing/map/briefingMapSection';
+import { ensureStrategicCoordinateRegistryInitialized } from './briefing/map/hexCoordinates';
+import { h3ToCode } from './briefing/map/hexCodeTranslator';
 import type { CoordinateContext } from './briefing/map/coordinateContext';
-import type { PossibleActionsIndexedState } from './openrouter/possibleUnitActions';
+import type { PossibleActionsIndexedState } from './openRouter/possibleUnitActions';
 import { buildActiveCallbacksSection } from './briefing/activeCallbacksSection';
-import { buildEmptyProductionQueuesSection } from './openrouter/briefingSections';
+import { buildEmptyProductionQueuesSection } from './openRouter/briefingSections';
 import {
   FOG_PATH_DISTANCE_BRIEFING_LINE,
   OMNISCIENT_GRID_PROXIMITY_BRIEFING_LINE,
@@ -35,8 +35,8 @@ import {
   SECTION_TITLE_UNIT_STATUS_AND_THREATS,
   SECTION_TITLE_ATTENTION_FLAGS,
   topLevelHeading,
-} from './openrouter/promptSpec/sectionHeadings';
-import { buildIntelStalenessRule } from './openrouter/promptSpec/gameRuleText';
+} from './openRouter/promptSpec/sectionHeadings';
+import { buildIntelStalenessRule } from './openRouter/promptSpec/gameRuleText';
 
 /**
  * Optional shared coordinate/index data to avoid rebuilding within one AI request.

@@ -100,7 +100,7 @@ Scope is `strategic`, `tactical`, `both`, or `consult-only`. Status is `required
 | `OWN_UNIT_TABLE` | One row per own unit with identity, position, nearest threat, and whether it needs a decision | `buildUnitStatusTable` | own-side | 3, 5, 6, 17 | both | required |
 | `ACTION_NEEDED_FLAG` | Per-unit yes/no that this unit needs an order this period | `needsAction` | own-side | 3, 5, 6 | both | required |
 | `ATTENTION_FLAGS` | Short ranked list of the situations most likely to need a decision | `buildAttentionFlags` | own-side | 3, 5, 6 | both | required |
-| `STANDING_ORDER_STATE` | Current order, destination or target, status, next move, attention | `tool5StandingOrdersCore.getInjectionText` | own-side | 6 | strategic | conditional — `flags.ordersEnabled` |
+| `STANDING_ORDER_STATE` | Current order, destination or target, status, next move, attention | `standingOrdersCore.getInjectionText` | own-side | 6 | strategic | conditional — `flags.ordersEnabled` |
 | `ORDERLESS_UNITS` | Which own units have no standing order | same | own-side | 6 | strategic | conditional — `flags.ordersEnabled` |
 | `SUGGESTED_DESTINATION` | A legal cell that closes on the nearest enemy, per orderless march-capable unit | `suggestApproachDestinationsForOrderlessUnits` → `pickApproachHexesTowardNearestEnemy` | fog-filtered | 6, 15 | strategic | conditional — `flags.ordersEnabled` |
 | `EMBARK_STATE` | What is aboard each naval unit and how much capacity is used | `embarkedOnNavalUnitId`, `embarkedOnSubUnitId` | own-side | 8, 20 | both | conditional — the opponent has naval units |
@@ -153,11 +153,11 @@ Scope is `strategic`, `tactical`, `both`, or `consult-only`. Status is `required
 
 | Id | Meaning | Engine source | Visibility | Jobs | Scope | Status |
 | --- | --- | --- | --- | --- | --- | --- |
-| `MEMORY_PERSISTENT` | Notes that reappear in every briefing | `tool4Memory.getInjectionText` | own-side | 12, 13 | strategic | conditional — `flags.memoryEnabled` |
+| `MEMORY_PERSISTENT` | Notes that reappear in every briefing | `memory.getInjectionText` | own-side | 12, 13 | strategic | conditional — `flags.memoryEnabled` |
 | `MEMORY_TRIGGERED` | Stored notes that fired this turn | same | own-side | 13 | strategic | conditional — `flags.memoryEnabled` |
 | `MEMORY_LIMITS` | Five persistent slots, fifteen stored slots, and the current usage | `PERSISTENT_LIMIT`, `STORED_LIMIT` | own-side | 13 | strategic | conditional — `flags.memoryEnabled` |
-| `MEMORY_WRITE_PATH` | Writes and deletes travel in the response envelope; there is no write tool | `TOOL4_NAMES`, `executeTool4` | n/a | 13 | strategic | conditional — `flags.memoryEnabled` |
-| `MEMORY_WRITE_LIMITS` | A key is at most 64 characters from a restricted alphabet and content at most 500 characters | `tool4Memory` validation | n/a | 13 | strategic | conditional — `flags.memoryEnabled` |
+| `MEMORY_WRITE_PATH` | Writes and deletes travel in the response envelope; there is no write tool | `MEMORY_TOOL_NAMES`, `executeMemory` | n/a | 13 | strategic | conditional — `flags.memoryEnabled` |
+| `MEMORY_WRITE_LIMITS` | A key is at most 64 characters from a restricted alphabet and content at most 500 characters | `memory` validation | n/a | 13 | strategic | conditional — `flags.memoryEnabled` |
 | `CALLBACK_ACTIVE_LIST` | Which subscriptions are live right now | `getSubscriptions('opponent')` | own-side | 11, 22 | both | required |
 | `CALLBACK_EVENT_VOCABULARY` | The subscribable event names and their parameters | `evaluateSubscriptionEvents` | n/a | 11 | both | required |
 | `CALLBACK_REPLACE_SEMANTICS` | Each response replaces the whole list; omitting the field clears it | `replaceSubscriptions` | n/a | 11 | both | required |

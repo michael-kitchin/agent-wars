@@ -147,14 +147,14 @@ showMapToast: (message: string, options?: { isError?: boolean }) => void;
 }
 
 /**
- * Defines the `createBuildQueuePopupController` function shape (export function createBuildQueuePopupController(deps: BuildQueuePopupDeps) { async function runBuildQueueMutation(args: { mutate: () => Promise<{ succes).
+ * Defines the `createBuildQueuePopupHandler` function shape (export function createBuildQueuePopupHandler(deps: BuildQueuePopupDeps) { async function runBuildQueueMutation(args: { mutate: () => Promise<{ succes).
 
- * Purpose: Supports maintainability by documenting why `createBuildQueuePopupController` exists.
+ * Purpose: Supports maintainability by documenting why `createBuildQueuePopupHandler` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function createBuildQueuePopupController(deps: BuildQueuePopupDeps) {
+export function createBuildQueuePopupHandler(deps: BuildQueuePopupDeps) {
   /**
    * Serializes asynchronous build-entry selection changes so template seeding cannot race later joins.
    */

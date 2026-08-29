@@ -14,7 +14,7 @@ import type { GameStateSnapshot } from '../gameDb';
 import {
   ensureStrategicCoordinateRegistryInitialized,
   getH3IndexForCode,
-} from '../briefing/map/hex-coordinates';
+} from '../briefing/map/hexCoordinates';
 import { getOrderedHexList, LATLNG_DECIMAL_PLACES } from '../mapData';
 import { ensureTerrainClassificationCacheLoaded, getRes1LandMassByH3 } from '../terrainClassificationCache';
 import { AIR_FERRY_RANGE_HEXES } from '../../shared/tacticalRanges';
@@ -622,7 +622,7 @@ function testStrategicBestOptionsKeepsFerryDestWhenGridDistanceThrows(): void {
  * Documents the module-scope binding `tests` (tests).
  *
  * Purpose: Runs the strategic Best Options occupancy and approach contracts.
- * When to use: `node dist/main/openrouter/possibleUnitActionsStrategicBestOptions.test.js` after `build:main`.
+ * When to use: `node dist/main/openRouter/possibleUnitActionsStrategicBestOptions.test.js` after `build:main`.
  * Expected outcome: Each entry runs to completion or fails the process.
  * Exceptions: None.
  */

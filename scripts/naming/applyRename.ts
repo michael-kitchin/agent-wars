@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as ts from 'typescript';
-import { createNamingLanguageService } from './languageServiceHost.js';
+import { createNamingLanguageHost } from './languageServiceHost.js';
 import {
   getEntry,
   loadLedger,
@@ -29,31 +29,6 @@ export const FIND_IN_COMMENTS = false;
 function findProgramSourceFile(program: ts.Program, abs: string): ts.SourceFile | undefined {
   const norm = abs.replace(/\\/g, '/').toLowerCase();
   return program.getSourceFiles().find((sf) => sf.fileName.replace(/\\/g, '/').toLowerCase() === norm);
-}
-
-/**
- * Collects `.ts` files under `dirAbs` (inclusive if `dirAbs` is a file).
- *
- * Purpose: Directory renames need `getEditsForFileRename` for every moved TypeScript file.
- * When to use: Before computing language-service file-rename edits.
- * Expected outcome: Absolute paths to `.ts` files, excluding `.d.ts`.
- * Exceptions: None.
- */
-function collectTsFilesToMove(dirOrFileAbs: string): string[] {
-  const stat = fs.statSync(dirOrFileAbs);
-  if (stat.isFile()) {
-    return dirOrFileAbs.endsWith('.ts') && !dirOrFileAbs.endsWith('.d.ts') ? [dirOrFileAbs] : [];
-  }
-  const out: string[] = [];
-  const walk = (dir: string): void => {
-    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-      const abs = path.join(dir, entry.name);
-      if (entry.isDirectory()) walk(abs);
-      else if (entry.name.endsWith('.ts') && !entry.name.endsWith('.d.ts')) out.push(abs);
-    }
-  };
-  walk(dirOrFileAbs);
-  return out;
 }
 
 /**
@@ -172,6 +147,45 @@ function rewriteRelativeImportSpecifiers(
 }
 
 /**
+ * Replaces a directory path segment in TypeScript module specifiers and similar quoted paths.
+ *
+ * Purpose: Directory moves (`game-actions` → `gameActions`) appear as a shared path segment, not a 1:1 file specifier.
+ * When to use: After language-service file-rename edits for `kind: directory` entries.
+ * Expected outcome: `../gameActions/sealift` becomes `../gameActions/sealift` without touching unrelated text.
+ * Exceptions: None.
+ */
+export function rewriteDirectorySegmentInTsFiles(
+  repoRoot: string,
+  oldSegment: string,
+  newSegment: string,
+  dryRun: boolean,
+): string[] {
+  const edited: string[] = [];
+  const roots = [path.join(repoRoot, 'src')];
+  const files: string[] = [];
+  const walk = (dir: string): void => {
+    if (!fs.existsSync(dir)) return;
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const abs = path.join(dir, entry.name);
+      if (entry.isDirectory()) walk(abs);
+      else if (entry.name.endsWith('.ts') && !entry.name.endsWith('.d.ts')) files.push(abs);
+    }
+  };
+  for (const root of roots) walk(root);
+  const needle = `${oldSegment}/`;
+  const replacement = `${newSegment}/`;
+  for (const abs of files) {
+    const text = fs.readFileSync(abs, 'utf8');
+    if (!text.includes(needle)) continue;
+    const next = text.split(needle).join(replacement);
+    if (next === text) continue;
+    if (!dryRun) fs.writeFileSync(abs, next, 'utf8');
+    edited.push(abs);
+  }
+  return edited;
+}
+
+/**
  * Applies one ledger entry (or prints a dry-run plan).
  *
  * Purpose: Single-id mutation with language-service safety for identifiers and imports.
@@ -210,7 +224,7 @@ function applySymbol(
 ): ApplyResult {
   const rel = resolveCurrentPath(document, entry.currentPath);
   const abs = path.join(repoRoot, ...rel.split('/'));
-  const service = createNamingLanguageService(repoRoot);
+  const service = createNamingLanguageHost(repoRoot);
   const program = service.getProgram();
   if (!program) throw new Error('Language service has no program');
   const sourceFile = findProgramSourceFile(program, abs);
@@ -256,29 +270,20 @@ function applyPath(
   const newRel = resolveCurrentPath(document, entry.proposedPath);
   const oldAbs = path.join(repoRoot, ...oldRel.split('/'));
   const newAbs = path.join(repoRoot, ...newRel.split('/'));
-  const service = createNamingLanguageService(repoRoot);
+  const service = createNamingLanguageHost(repoRoot);
   const program = service.getProgram();
   if (!program) throw new Error('Language service has no program');
-  const toMove = collectTsFilesToMove(oldAbs);
-  const allChanges: ts.FileTextChanges[] = [];
-  for (const oldFile of toMove) {
-    const newFile = path.join(newAbs, path.relative(oldAbs, oldFile));
-    const target = fs.statSync(oldAbs).isFile() ? newAbs : newFile;
-    const lsOld = findProgramSourceFile(program, oldFile)?.fileName ?? oldFile.replace(/\\/g, '/');
-    const lsNew = target.replace(/\\/g, '/');
+  const editedFiles: string[] = [];
+  if (fs.statSync(oldAbs).isFile()) {
+    const lsOld = findProgramSourceFile(program, oldAbs)?.fileName ?? oldAbs.replace(/\\/g, '/');
+    const lsNew = newAbs.replace(/\\/g, '/');
     const edits = service.getEditsForFileRename(lsOld, lsNew, {}, {});
-    allChanges.push(...edits);
-  }
-  const editedFiles = applyFileTextChanges(allChanges, dryRun);
-  if (allChanges.length === 0) {
-    if (fs.statSync(oldAbs).isFile()) {
-      rewriteRelativeImportSpecifiers(program, oldAbs, newAbs, dryRun, editedFiles);
-    } else {
-      for (const oldFile of toMove) {
-        const newFile = path.join(newAbs, path.relative(oldAbs, oldFile));
-        rewriteRelativeImportSpecifiers(program, oldFile, newFile, dryRun, editedFiles);
-      }
-    }
+    editedFiles.push(...applyFileTextChanges(edits, dryRun));
+    rewriteRelativeImportSpecifiers(program, oldAbs, newAbs, dryRun, editedFiles);
+  } else {
+    editedFiles.push(
+      ...rewriteDirectorySegmentInTsFiles(repoRoot, path.basename(oldAbs), path.basename(newAbs), dryRun),
+    );
   }
   if (!dryRun) {
     gitMvPreserveHistory(repoRoot, oldAbs, newAbs);

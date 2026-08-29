@@ -7,13 +7,13 @@
  * Exceptions: None for empty inputs (returns empty fragments).
  */
 
-import { buildPromptTableLines } from '../../promptTableUtils';
+import { buildPromptTableLines } from '../../promptTableHelpers';
 import { logDebug, logTrace } from '../../logger';
-import type { PossibleActionTableRow } from '../../openrouter/possibleUnitActionsTableAssembly';
-import { deriveThisTurnOptionsActionColumn, selectTopRowsPerUnit } from '../../openrouter/possibleUnitActionsTableAssembly';
+import type { PossibleActionTableRow } from '../../openRouter/possibleUnitActionsTableAssembly';
+import { deriveThisTurnOptionsActionColumn, selectTopRowsPerUnit } from '../../openRouter/possibleUnitActionsTableAssembly';
 import type { CoordinateContext } from './coordinateContext';
-import { h3ToCode } from './hex-code-translator';
-import { SECTION_TITLE_BEST_OPTIONS_THIS_TURN } from '../../openrouter/promptSpec/sectionHeadings';
+import { h3ToCode } from './hexCodeTranslator';
+import { SECTION_TITLE_BEST_OPTIONS_THIS_TURN } from '../../openRouter/promptSpec/sectionHeadings';
 
 /**
  * Defines the `infrastructureCellForThisTurnOptionsRow` function shape (function infrastructureCellForThisTurnOptionsRow(r: PossibleActionTableRow): string).

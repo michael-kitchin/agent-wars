@@ -60,7 +60,7 @@ export function logOrderPlanSanitizeSummary(
  * Returns a human-readable reason when the same strategic unit id appears twice in a movement order list.
  *
  * Purpose: Duplicate rows remain a hard error (user mistake), not a silent drop.
- * When to use: `submitOrdersImpl` before per-row movement validation.
+ * When to use: `executeSubmitOrders` before per-row movement validation.
  * Expected outcome: `null` when every `unitId` is unique.
  * Exceptions: None.
  */
@@ -82,7 +82,7 @@ export function strategicMovementDuplicateReason(
  * Returns a reason when the same unit id appears twice in a ranged-attack list (strategic pending orders).
  *
  * Purpose: Same duplicate contract as movements.
- * When to use: `submitOrdersImpl` before ranged row validation.
+ * When to use: `executeSubmitOrders` before ranged row validation.
  * Expected outcome: `null` when unique.
  * Exceptions: None.
  */
@@ -104,7 +104,7 @@ export function strategicRangedDuplicateReason(
  * Returns a reason when the same unit id appears twice in an air-strike list.
  *
  * Purpose: Duplicate strike rows remain a hard error.
- * When to use: `submitOrdersImpl` before air row validation.
+ * When to use: `executeSubmitOrders` before air row validation.
  * Expected outcome: `null` when unique.
  * Exceptions: None.
  */
@@ -126,7 +126,7 @@ export function strategicAirStrikeDuplicateReason(
  * Returns a reason when the same unit id appears twice in a ferry order list.
  *
  * Purpose: Duplicate ferry rows remain a hard error.
- * When to use: `submitOrdersImpl` before ferry row validation.
+ * When to use: `executeSubmitOrders` before ferry row validation.
  * Expected outcome: `null` when unique.
  * Exceptions: None.
  */

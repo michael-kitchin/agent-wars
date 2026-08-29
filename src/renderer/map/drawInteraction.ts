@@ -13,7 +13,7 @@ import {
   resolutionAnimationElapsedMs,
   type ResolutionPlaybackState,
 } from '../rendering/resolutionPlayback';
-import { hexCenterPx, hitTestHexAtContainerPixel, hitTestTacticalRes4HexAtContainerPixel } from './mapUtils';
+import { hexCenterPx, hitTestHexAtContainerPixel, hitTestTacticalRes4HexAtContainerPixel } from './mapHelpers';
 import { getMainLeafletMap } from './worldLeafletMap';
 import { shouldHideStrategicMapUnitsForRes4Zoom } from './terrainView';
 

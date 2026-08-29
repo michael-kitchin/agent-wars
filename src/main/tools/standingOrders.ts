@@ -1,11 +1,11 @@
 /**
- * MCP Tool 5: Standing Orders (assign_order, query_orders, cancel_order).
+ * Standing-order tools (`assign_order`, `query_orders`, `cancel_order`).
  * Thin facade that keeps public contracts stable while delegating core standing-order logic
- * to `tool5StandingOrdersCore` for maintainability.
+ * to `standingOrdersCore` for maintainability.
  */
 
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
-import type { LatLng } from './tool1Pathfinding';
+import type { LatLng } from './pathfinding';
 import { logDebug, logTrace } from '../logger';
 import {
   executeStandingOrderActionForPlayer,
@@ -13,8 +13,8 @@ import {
   generateOrdersForStandingOrders,
   getInjectionText,
   getStandingOrderForUnit,
-} from './tool5StandingOrdersCore';
-import { holdFireUnitIdsForPlayer } from './tool5StandingOrdersGeneration';
+} from './standingOrdersCore';
+import { holdFireUnitIdsForPlayer } from './standingOrdersGeneration';
 
 /**
  * Documents the module-scope binding `AI_PLAYER_ID` (AI_PLAYER_ID).
@@ -43,17 +43,17 @@ export {
   getStandingOrderForUnit,
   holdFireUnitIdsForPlayer,
 };
-export type { GenerateStandingOrdersOptions } from './tool5StandingOrdersGeneration';
+export type { GenerateStandingOrdersOptions } from './standingOrdersGeneration';
 
 /**
- * Documents the module-scope binding `TOOL5_NAMES` (TOOL5_NAMES).
+ * Documents the module-scope binding `STANDING_ORDER_TOOL_NAMES` (STANDING_ORDER_TOOL_NAMES).
 
- * Purpose: Supports maintainability by documenting why `TOOL5_NAMES` exists.
+ * Purpose: Supports maintainability by documenting why `STANDING_ORDER_TOOL_NAMES` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export const TOOL5_NAMES = ['query_orders'] as const;
+export const STANDING_ORDER_TOOL_NAMES = ['query_orders'] as const;
 
 /**
  * Defines the `assignHumanMarchStandingOrder` function shape (export function assignHumanMarchStandingOrder( unitId: string, destination: [number, number], state: GameStateSnapshot, latLngByH3: Map<string, LatL).
@@ -70,7 +70,7 @@ export function assignHumanMarchStandingOrder(
   latLngByH3: Map<string, LatLng>,
   resolveToH3: (lat: number, lng: number) => string | undefined
 ): Record<string, unknown> {
-  logDebug('tool5StandingOrders assignHumanMarchStandingOrder', { unitId, destination });
+  logDebug('standingOrders assignHumanMarchStandingOrder', { unitId, destination });
   return executeStandingOrderActionForPlayer(
     HUMAN_PLAYER_ID,
     'assign_order',
@@ -94,7 +94,7 @@ export function queryHumanStandingOrders(
   latLngByH3: Map<string, LatLng>,
   resolveToH3: (lat: number, lng: number) => string | undefined
 ): Record<string, unknown> {
-  logTrace('tool5StandingOrders queryHumanStandingOrders');
+  logTrace('standingOrders queryHumanStandingOrders');
   return executeStandingOrderActionForPlayer(HUMAN_PLAYER_ID, 'query_orders', { all: true }, state, latLngByH3, resolveToH3);
 }
 
@@ -112,26 +112,26 @@ export function cancelHumanStandingOrder(
   latLngByH3: Map<string, LatLng>,
   resolveToH3: (lat: number, lng: number) => string | undefined
 ): Record<string, unknown> {
-  logDebug('tool5StandingOrders cancelHumanStandingOrder', { unitId });
+  logDebug('standingOrders cancelHumanStandingOrder', { unitId });
   return executeStandingOrderActionForPlayer(HUMAN_PLAYER_ID, 'cancel_order', { unitId }, state, latLngByH3, resolveToH3);
 }
 
 /**
- * Defines the `executeTool5` function shape (export function executeTool5( toolName: string, args: unknown, state: GameStateSnapshot, latLngByH3: Map<string, LatLng>, resolveToH3: (lat: numb).
+ * Defines the `executeStandingOrders` function shape (export function executeStandingOrders( toolName: string, args: unknown, state: GameStateSnapshot, latLngByH3: Map<string, LatLng>, resolveToH3: (lat: numb).
 
- * Purpose: Supports maintainability by documenting why `executeTool5` exists.
+ * Purpose: Supports maintainability by documenting why `executeStandingOrders` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function executeTool5(
+export function executeStandingOrders(
   toolName: string,
   args: unknown,
   state: GameStateSnapshot,
   latLngByH3: Map<string, LatLng>,
   resolveToH3: (lat: number, lng: number) => string | undefined
 ): Record<string, unknown> {
-  logDebug('tool5StandingOrders executeTool5', { toolName, stateTurn: state.turnNumber });
+  logDebug('standingOrders executeStandingOrders', { toolName, stateTurn: state.turnNumber });
   if (toolName !== 'assign_order' && toolName !== 'query_orders' && toolName !== 'cancel_order') {
     return { status: 'error', error: `Unknown tool: ${toolName}` };
   }

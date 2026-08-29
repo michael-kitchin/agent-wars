@@ -1,6 +1,6 @@
 /**
  * Integration contracts for strategic naval berth/egress on the seeded world map.
- * Run with: node dist/main/game-actions/navalSeaportBerth.test.js
+ * Run with: node dist/main/gameActions/navalSeaportBerth.test.js
  */
 
 import * as assert from 'assert';

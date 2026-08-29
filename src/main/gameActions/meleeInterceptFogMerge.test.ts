@@ -1,6 +1,6 @@
 /**
  * Contract tests for melee-intercept candidate hex visibility merge (execution plan §6.6).
- * Run with: node dist/main/game-actions/meleeInterceptFogMerge.test.js
+ * Run with: node dist/main/gameActions/meleeInterceptFogMerge.test.js
  */
 
 import assert from 'node:assert/strict';

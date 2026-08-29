@@ -15,8 +15,8 @@ import * as path from 'path';
 import Module = require('module');
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import { buildLatLngCoordinateMap, getOrderedHexList } from '../mapData';
-import { ensureStrategicCoordinateRegistryInitialized } from '../briefing/map/hex-coordinates';
-import { h3ToCode } from '../briefing/map/hex-code-translator';
+import { ensureStrategicCoordinateRegistryInitialized } from '../briefing/map/hexCoordinates';
+import { h3ToCode } from '../briefing/map/hexCodeTranslator';
 import { buildSystemPromptForTools } from './openRouterBuildSystemPrompt';
 import { getToolNamesForEnabledGroups } from './openRouterToolGroups';
 
@@ -180,7 +180,7 @@ function testTacticalSystemPromptAllowsInfantryRanged(): void {
  * Defines the `run` function shape (function run(): void).
 
  * Purpose: Node entrypoint for this audit file.
- * When to use: `node dist/main/openrouter/promptHexExclusiveAudit.test.js`.
+ * When to use: `node dist/main/openRouter/promptHexExclusiveAudit.test.js`.
  * Expected outcome: Test passes and prints confirmation.
  * Exceptions: None.
  */

@@ -353,27 +353,27 @@ function validateBuildQueueMutationContext(args: {
 }
 
 /**
- * Defines the `getHexBuildQueueImpl` function shape (export function getHexBuildQueueImpl(h3Index: string, requestingPlayerId = 'human'): HexBuildQueueView).
+ * Defines the `readHexBuildQueue` function shape (export function readHexBuildQueue(h3Index: string, requestingPlayerId = 'human'): HexBuildQueueView).
 
- * Purpose: Supports maintainability by documenting why `getHexBuildQueueImpl` exists.
+ * Purpose: Supports maintainability by documenting why `readHexBuildQueue` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function getHexBuildQueueImpl(h3Index: string, requestingPlayerId = 'human'): HexBuildQueueView {
+export function readHexBuildQueue(h3Index: string, requestingPlayerId = 'human'): HexBuildQueueView {
   logTrace('gameActions getHexBuildQueue', { h3Index, requestingPlayerId });
   return buildQueueViewForRequester(h3Index, requestingPlayerId);
 }
 
 /**
- * Defines the `addHexBuildQueueEntryImpl` function shape (export function addHexBuildQueueEntryImpl(h3Index: string, requestingPlayerId = 'human'): { success: boolean; reason?: string; queue?: HexBuildQueueVie).
+ * Defines the `executeAddHexBuildQueueEntry` function shape (export function executeAddHexBuildQueueEntry(h3Index: string, requestingPlayerId = 'human'): { success: boolean; reason?: string; queue?: HexBuildQueueVie).
 
- * Purpose: Supports maintainability by documenting why `addHexBuildQueueEntryImpl` exists.
+ * Purpose: Supports maintainability by documenting why `executeAddHexBuildQueueEntry` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function addHexBuildQueueEntryImpl(h3Index: string, requestingPlayerId = 'human'): {
+export function executeAddHexBuildQueueEntry(h3Index: string, requestingPlayerId = 'human'): {
   success: boolean;
   reason?: string;
   queue?: HexBuildQueueView;
@@ -404,14 +404,14 @@ export function addHexBuildQueueEntryImpl(h3Index: string, requestingPlayerId = 
 }
 
 /**
- * Defines the `updateHexBuildQueueEntryImpl` function shape (export function updateHexBuildQueueEntryImpl( h3Index: string, entryId: number, unitType: BuildUnitType, count: number, requestingPlayerId = 'hum).
+ * Defines the `executeUpdateHexBuildQueueEntry` function shape (export function executeUpdateHexBuildQueueEntry( h3Index: string, entryId: number, unitType: BuildUnitType, count: number, requestingPlayerId = 'hum).
 
- * Purpose: Supports maintainability by documenting why `updateHexBuildQueueEntryImpl` exists.
+ * Purpose: Supports maintainability by documenting why `executeUpdateHexBuildQueueEntry` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function updateHexBuildQueueEntryImpl(
+export function executeUpdateHexBuildQueueEntry(
   h3Index: string,
   entryId: number,
   unitType: BuildUnitType,
@@ -448,14 +448,14 @@ export function updateHexBuildQueueEntryImpl(
 }
 
 /**
- * Defines the `removeHexBuildQueueEntryImpl` function shape (export function removeHexBuildQueueEntryImpl( h3Index: string, entryId: number, requestingPlayerId = 'human' ): { success: boolean; reason?: string; q).
+ * Defines the `executeRemoveHexBuildQueueEntry` function shape (export function executeRemoveHexBuildQueueEntry( h3Index: string, entryId: number, requestingPlayerId = 'human' ): { success: boolean; reason?: string; q).
 
- * Purpose: Supports maintainability by documenting why `removeHexBuildQueueEntryImpl` exists.
+ * Purpose: Supports maintainability by documenting why `executeRemoveHexBuildQueueEntry` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function removeHexBuildQueueEntryImpl(
+export function executeRemoveHexBuildQueueEntry(
   h3Index: string,
   entryId: number,
   requestingPlayerId = 'human'
@@ -492,7 +492,7 @@ export function removeHexBuildQueueEntryImpl(
  * skips, and a failure for one hex does not roll back successful sibling writes.
  * Exceptions: Exceptions are captured as per-hex failures and logged at error level.
  */
-export function applyBuildQueueTemplateToHexesImpl(
+export function executeApplyBuildQueueTemplateToHexes(
   h3Indexes: string[],
   entries: BuildQueueTemplateEntry[],
   requestingPlayerId = 'human'
@@ -569,7 +569,7 @@ export function applyBuildQueueTemplateToHexesImpl(
  * order when the queue is empty); disabling clears the standing order. Sibling failures do not roll back applied hexes.
  * Exceptions: Per-hex exceptions are captured as failures and logged at error level.
  */
-export function setHexesKeepBuildingImpl(
+export function executeSetHexesKeepBuilding(
   h3Indexes: string[],
   keepBuilding: boolean,
   requestingPlayerId = 'human'

@@ -38,7 +38,7 @@ import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { clipTacticalMarchPathToDestination } from '../../shared/tacticalMarchPlaybackPath.js';
 import { filterTacticalMarchContinuationsToPresentSubUnits } from '../../shared/tacticalMarchContinuations';
 import { committedOpponentTacticalDraftFieldAfterConsume } from '../../shared/ipc/tacticalOpponentPlanMerge';
-import { executePlanRoute } from '../tools/tool1Pathfinding';
+import { executePlanRoute } from '../tools/pathfinding';
 import { normalizeMovementTerrain, isLandSeaportSpawnHex } from '../movementTerrain';
 import { getValidDestinations } from '../oneStepMoveDestinations';
 import {
@@ -51,7 +51,7 @@ import {
   cancelHumanStandingOrder,
   holdFireUnitIdsForPlayer,
   queryHumanStandingOrders,
-} from '../tools/tool5StandingOrders';
+} from '../tools/standingOrders';
 import {
   resolveTacticalRangedTargetForSubUnit,
   withTacticalTempoAttacks,
@@ -76,17 +76,17 @@ import { validateAirStrikeOrder, validateFerryOrder } from './airValidation';
 import { validateTacticalHumanAirStrikeGroup } from './tacticalHumanAirStrikeValidation';
 import { isWithinGridRangeSafe } from './gridRange';
 import {
-  addHexBuildQueueEntryImpl,
-  applyBuildQueueTemplateToHexesImpl,
-  getHexBuildQueueImpl,
-  removeHexBuildQueueEntryImpl,
-  setHexesKeepBuildingImpl,
-  updateHexBuildQueueEntryImpl,
+  executeAddHexBuildQueueEntry,
+  executeApplyBuildQueueTemplateToHexes,
+  readHexBuildQueue,
+  executeRemoveHexBuildQueueEntry,
+  executeSetHexesKeepBuilding,
+  executeUpdateHexBuildQueueEntry,
   type HexBuildQueueView,
 } from './buildQueue';
 import {
-  previewHumanMarchOrderImpl,
-  previewHumanMarchOrdersImpl,
+  resolveHumanMarchOrderPreview,
+  resolveHumanMarchOrderPreviews,
   type HumanOrderGroupPreviewResult,
   type HumanOrderPreviewResult,
 } from './humanMarchPreview';
@@ -102,7 +102,7 @@ import {
   LAND_UNIT_DESTINATION_NOT_LANDMASS_REASON,
 } from '../../shared/landTraversalRes1';
 import { getRes1LandMassByH3 } from '../terrainClassificationCache';
-import { submitOrdersImpl } from './submitOrders';
+import { executeSubmitOrders } from './submitOrders';
 import {
   ORDER_PLAN_SANITIZE_CONTEXT,
   logOrderPlanSanitizeDrop,
@@ -110,10 +110,10 @@ import {
 } from './orderPlanSanitize';
 import {
   applyTacticalEmbarkCommittedOrdersToStrategicDb,
-  getSealiftStackStateImpl,
+  readSealiftStackState,
   isEmbarkedLandUnit,
   isEmbarkedLandUnitOnWater,
-  updateSealiftSlotImpl,
+  executeSealiftSlotUpdate,
 } from './sealift';
 import { getTacticalSealiftStackStateForHex } from '../tacticalBattle/tacticalSealiftStackState';
 import { applyTacticalSealiftSlotChangeInSession } from '../tacticalBattle/tacticalSealiftSlotUpdate';
@@ -1540,7 +1540,7 @@ export function validateGroupFerryTarget(
  * Exceptions: None.
  */
 export function getHexBuildQueue(h3Index: string, requestingPlayerId = HUMAN_PLAYER_ID): HexBuildQueueView {
-  return getHexBuildQueueImpl(h3Index, requestingPlayerId);
+  return readHexBuildQueue(h3Index, requestingPlayerId);
 }
 
 /**
@@ -1556,7 +1556,7 @@ export function addHexBuildQueueEntry(h3Index: string, requestingPlayerId = HUMA
   reason?: string;
   queue?: HexBuildQueueView;
 } {
-  return addHexBuildQueueEntryImpl(h3Index, requestingPlayerId);
+  return executeAddHexBuildQueueEntry(h3Index, requestingPlayerId);
 }
 
 /**
@@ -1574,7 +1574,7 @@ export function updateHexBuildQueueEntry(
   count: number,
   requestingPlayerId = HUMAN_PLAYER_ID
 ): { success: boolean; reason?: string; queue?: HexBuildQueueView } {
-  return updateHexBuildQueueEntryImpl(h3Index, entryId, unitType, count, requestingPlayerId);
+  return executeUpdateHexBuildQueueEntry(h3Index, entryId, unitType, count, requestingPlayerId);
 }
 
 /**
@@ -1590,7 +1590,7 @@ export function removeHexBuildQueueEntry(
   entryId: number,
   requestingPlayerId = HUMAN_PLAYER_ID
 ): { success: boolean; reason?: string; queue?: HexBuildQueueView } {
-  return removeHexBuildQueueEntryImpl(h3Index, entryId, requestingPlayerId);
+  return executeRemoveHexBuildQueueEntry(h3Index, entryId, requestingPlayerId);
 }
 
 /**
@@ -1606,7 +1606,7 @@ export function applyBuildQueueTemplateToHexes(
   entries: BuildQueueTemplateEntry[],
   requestingPlayerId = HUMAN_PLAYER_ID
 ): ApplyBuildQueueTemplateResult {
-  return applyBuildQueueTemplateToHexesImpl(h3Indexes, entries, requestingPlayerId);
+  return executeApplyBuildQueueTemplateToHexes(h3Indexes, entries, requestingPlayerId);
 }
 
 /**
@@ -1622,7 +1622,7 @@ export function setHexesKeepBuilding(
   keepBuilding: boolean,
   requestingPlayerId = HUMAN_PLAYER_ID
 ): SetHexesKeepBuildingResult {
-  return setHexesKeepBuildingImpl(h3Indexes, keepBuilding, requestingPlayerId);
+  return executeSetHexesKeepBuilding(h3Indexes, keepBuilding, requestingPlayerId);
 }
 
 /**
@@ -1634,7 +1634,7 @@ export function setHexesKeepBuilding(
  * Exceptions: None.
  */
 export function previewHumanMarchOrder(unitId: string, hoveredH3Index: string): HumanOrderPreviewResult {
-  return previewHumanMarchOrderImpl(unitId, hoveredH3Index);
+  return resolveHumanMarchOrderPreview(unitId, hoveredH3Index);
 }
 
 /**
@@ -1646,7 +1646,7 @@ export function previewHumanMarchOrder(unitId: string, hoveredH3Index: string): 
  * Exceptions: None.
  */
 export function previewHumanMarchOrders(unitIds: string[], hoveredH3Index: string): HumanOrderGroupPreviewResult {
-  return previewHumanMarchOrdersImpl(unitIds, hoveredH3Index);
+  return resolveHumanMarchOrderPreviews(unitIds, hoveredH3Index);
 }
 
 /**
@@ -1659,7 +1659,7 @@ export function previewHumanMarchOrders(unitIds: string[], hoveredH3Index: strin
  */
 export function getSealiftStackState(h3Index: string): SealiftStackState {
   logTrace('gameActions getSealiftStackState');
-  return getSealiftStackStateImpl(h3Index);
+  return readSealiftStackState(h3Index);
 }
 
 /**
@@ -1697,7 +1697,7 @@ export function updateSealiftSlot(
     if (isTacticalBattleActive()) {
       return { success: false, reason: 'Sealift cannot be changed during a tactical battle.' };
     }
-    const result = updateSealiftSlotImpl({ h3Index, navalUnitId, slotIndex, landUnitId });
+    const result = executeSealiftSlotUpdate({ h3Index, navalUnitId, slotIndex, landUnitId });
     if (result.success && landUnitId) {
       cancelHumanMovementOrdersForUnit(landUnitId);
       logDebug('gameActions updateSealiftSlot: cancelled land-unit movement orders after embark', {
@@ -1774,7 +1774,7 @@ export function updateTacticalSealiftSlot(
  */
 export function submitOrders(payload: SubmitOrdersPayload): SubmitOrdersResult {
   const displayLabelForUnit = buildStrategicUnitDisplayLabelResolver(humanPerspectiveStateSnapshot().units);
-  return submitOrdersImpl(payload, {
+  return executeSubmitOrders(payload, {
     validateOrder: (unitId, toH3Index) => validateOrder(unitId, toH3Index, displayLabelForUnit),
     validateRangedAttack: (unitId, targetH3Index, options) =>
       validateRangedAttack(unitId, targetH3Index, { ...options, displayLabelForUnit }),

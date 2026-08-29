@@ -1,14 +1,14 @@
 /**
- * MCP Tool 4: Strategic Memory. The LLM sees only memory_read; writes and deletes are applied from final JSON
- * memoryUpdates (host calls executeTool4 with memory_write / memory_delete internally).
+ * Strategic memory. The LLM sees only memory_read; writes and deletes are applied from final JSON
+ * memoryUpdates (host calls executeMemory with memory_write / memory_delete internally).
  * All memory logic lives here: expire, recurring trigger, CRUD with tier limits, and injection text.
  * Uses gameDb (dbRun, dbGetOne, dbGetAll, saveDatabase) for persistence.
  */
 
 import { dbRun, dbGetOne, dbGetAll, saveDatabase } from '../gameDb';
 import { logDebug, logError, logTrace } from '../logger';
-import { buildPromptTableLines } from '../promptTableUtils';
-import { SECTION_TITLE_STRATEGIC_MEMORY, topLevelHeading } from '../openrouter/promptSpec/sectionHeadings';
+import { buildPromptTableLines } from '../promptTableHelpers';
+import { SECTION_TITLE_STRATEGIC_MEMORY, topLevelHeading } from '../openRouter/promptSpec/sectionHeadings';
 
 /**
  * Documents the module-scope binding `PERSISTENT_LIMIT` (PERSISTENT_LIMIT).
@@ -214,7 +214,7 @@ tags?: string[];
  * Exceptions: None.
  */
 function expireAndProcessRecurring(playerId: string, currentTurn: number): void {
-  logDebug('tool4Memory expireAndProcessRecurring', { playerId, currentTurn });
+  logDebug('memory expireAndProcessRecurring', { playerId, currentTurn });
   dbRun(
     'DELETE FROM ai_memory WHERE player_id = ? AND expires_turn IS NOT NULL AND expires_turn <= ?',
     [playerId, currentTurn]
@@ -241,7 +241,7 @@ function expireAndProcessRecurring(playerId: string, currentTurn: number): void 
  * Exceptions: None.
  */
 export function getInjectionText(playerId: string, currentTurn: number): string {
-  logTrace('tool4Memory getInjectionText', { playerId, currentTurn });
+  logTrace('memory getInjectionText', { playerId, currentTurn });
   expireAndProcessRecurring(playerId, currentTurn);
 
   const persistent = dbGetAll<MemoryRow>(
@@ -352,7 +352,7 @@ function write(
   options: WriteOptions | undefined,
   currentTurn: number
 ): { status: string; error?: string; key?: string; tier?: string; action?: string; persistentCount?: number; persistentLimit?: number; storedCount?: number; storedLimit?: number } {
-  logDebug('tool4Memory write', { playerId, key, tier, currentTurn });
+  logDebug('memory write', { playerId, key, tier, currentTurn });
 
   if (content.length === 0) {
     return { status: 'error', error: 'Content cannot be empty' };
@@ -501,7 +501,7 @@ function read(
   tier?: 'persistent' | 'stored',
   all?: boolean
 ): { status: string; error?: string; memories?: ReturnType<typeof rowToMemory>[] } {
-  logTrace('tool4Memory read', { playerId, key, tier, all });
+  logTrace('memory read', { playerId, key, tier, all });
 
   if (key != null && key !== '') {
     const row = dbGetOne<MemoryRow>('SELECT * FROM ai_memory WHERE player_id = ? AND key = ?', [playerId, key]);
@@ -549,7 +549,7 @@ function read(
 }
 
 /**
- * Defines the `deleteByKey` function shape (function deleteByKey( playerId: string, key: string ): { status: string; error?: string; key?: string; deleted?: boolean } { logDebug('tool4Memory del).
+ * Defines the `deleteByKey` function shape (function deleteByKey( playerId: string, key: string ): { status: string; error?: string; key?: string; deleted?: boolean } { logDebug('memory del).
 
  * Purpose: Supports maintainability by documenting why `deleteByKey` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
@@ -560,7 +560,7 @@ function deleteByKey(
   playerId: string,
   key: string
 ): { status: string; error?: string; key?: string; deleted?: boolean } {
-  logDebug('tool4Memory deleteByKey', { playerId, key });
+  logDebug('memory deleteByKey', { playerId, key });
   const existing = dbGetOne<MemoryRow>('SELECT 1 FROM ai_memory WHERE player_id = ? AND key = ?', [playerId, key]);
   if (!existing) {
     return { status: 'error', error: `Memory not found: ${key}` };
@@ -571,24 +571,24 @@ function deleteByKey(
 }
 
 /**
- * Documents the module-scope binding `TOOL4_NAMES` (TOOL4_NAMES).
+ * Documents the module-scope binding `MEMORY_TOOL_NAMES` (MEMORY_TOOL_NAMES).
 
- * Purpose: Supports maintainability by documenting why `TOOL4_NAMES` exists.
+ * Purpose: Supports maintainability by documenting why `MEMORY_TOOL_NAMES` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export const TOOL4_NAMES = ['memory_read'] as const;
+export const MEMORY_TOOL_NAMES = ['memory_read'] as const;
 
 /**
- * Defines the `executeTool4` function shape (export function executeTool4( toolName: string, args: unknown, state: { turnNumber: number }, // eslint-disable-next-line @typescript-eslint/no-unus).
+ * Defines the `executeMemory` function shape (export function executeMemory( toolName: string, args: unknown, state: { turnNumber: number }, // eslint-disable-next-line @typescript-eslint/no-unus).
 
- * Purpose: Supports maintainability by documenting why `executeTool4` exists.
+ * Purpose: Supports maintainability by documenting why `executeMemory` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function executeTool4(
+export function executeMemory(
   toolName: string,
   args: unknown,
   state: { turnNumber: number },
@@ -597,7 +597,7 @@ export function executeTool4(
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _resolveToH3: (lat: number, lng: number) => string | undefined
 ): Record<string, unknown> {
-  logDebug('tool4Memory executeTool4', { toolName, stateTurn: state.turnNumber });
+  logDebug('memory executeMemory', { toolName, stateTurn: state.turnNumber });
   const playerId = AI_PLAYER_ID;
   const currentTurn = state.turnNumber;
 
@@ -640,7 +640,7 @@ export function executeTool4(
 
     return { status: 'error', error: `Unknown tool: ${toolName}` };
   } catch (err) {
-    logError('tool4Memory executeTool4: exception', toolName, err);
+    logError('memory executeMemory: exception', toolName, err);
     return { status: 'error', error: String(err) };
   }
 }

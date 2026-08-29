@@ -1,6 +1,6 @@
 /**
  * Contract tests for the shared response-envelope field order, gating, and repair schema.
- * Run: `npm run build:main` then `node dist/main/openrouter/promptSpec/envelopeContract.test.js`
+ * Run: `npm run build:main` then `node dist/main/openRouter/promptSpec/envelopeContract.test.js`
  */
 
 import assert from 'node:assert/strict';
@@ -17,7 +17,7 @@ import {
 } from './envelopeContract';
 import { CALLBACK_EVENT_VOCAB } from '../orderResponseParsing';
 import { buildCallbackVocabularyClause, TAUGHT_CALLBACK_EVENTS } from './callbackVocabularyText';
-import { CONTENT_MAX_LENGTH, KEY_MAX_LENGTH } from '../../tools/tool4Memory';
+import { CONTENT_MAX_LENGTH, KEY_MAX_LENGTH } from '../../tools/memory';
 
 /**
  * Returns every combination of the four envelope gates.

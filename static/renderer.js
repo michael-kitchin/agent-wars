@@ -14402,11 +14402,11 @@
     onMainViewChanged?.();
   }
   function getL() {
-    const Lref = globalThis.L;
-    if (!Lref) throw new Error("Leaflet not loaded: include static/vendor/leaflet/leaflet.js before renderer.js");
-    return Lref;
+    const leafletRef = globalThis.L;
+    if (!leafletRef) throw new Error("Leaflet not loaded: include static/vendor/leaflet/leaflet.js before renderer.js");
+    return leafletRef;
   }
-  function mountRasterBasemap(Lref, map, showAttribution, chainIndex, target) {
+  function mountRasterBasemap(leafletRef, map, showAttribution, chainIndex, target) {
     const chain = getRasterBasemapChain();
     if (chainIndex >= chain.length) {
       showBasemapErrorToast();
@@ -14434,7 +14434,7 @@
       minZoom: spec.minZoom ?? 0
     };
     if (spec.subdomains !== void 0) layerOpts.subdomains = spec.subdomains;
-    const layer = Lref.tileLayer(spec.urlTemplate, layerOpts).addTo(map);
+    const layer = leafletRef.tileLayer(spec.urlTemplate, layerOpts).addTo(map);
     if (target === "main") mainBasemapLayer = layer;
     else miniBasemapLayer = layer;
     const onTileError = () => {
@@ -14451,20 +14451,20 @@
         failedId: spec.id,
         nextIndex: chainIndex + 1
       });
-      mountRasterBasemap(Lref, map, showAttribution, chainIndex + 1, target);
+      mountRasterBasemap(leafletRef, map, showAttribution, chainIndex + 1, target);
     };
     layer.on("tileerror", onTileError);
   }
   function setMainBasemapByProviderId(providerId) {
     if (!mainMap || !miniMap) return;
-    const Lref = getL();
+    const leafletRef = getL();
     const startIdx = getRasterBasemapChainStartIndex(providerId);
-    mountRasterBasemap(Lref, mainMap, true, startIdx, "main");
-    mountRasterBasemap(Lref, miniMap, false, startIdx, "mini");
+    mountRasterBasemap(leafletRef, mainMap, true, startIdx, "main");
+    mountRasterBasemap(leafletRef, miniMap, false, startIdx, "mini");
   }
   function initWorldLeafletMaps(mainContainerId, minimapContainerId, onViewChanged, initialBasemapProviderId) {
     onMainViewChanged = onViewChanged;
-    const Lref = getL();
+    const leafletRef = getL();
     const mainEl = document.getElementById(mainContainerId);
     const miniEl = document.getElementById(minimapContainerId);
     if (!mainEl || !miniEl) {
@@ -14476,11 +14476,11 @@
       });
       return;
     }
-    const worldBounds = Lref.latLngBounds(
-      Lref.latLng(-WEB_MERCATOR_MAX_ABS_LAT, -180),
-      Lref.latLng(WEB_MERCATOR_MAX_ABS_LAT, 180)
+    const worldBounds = leafletRef.latLngBounds(
+      leafletRef.latLng(-WEB_MERCATOR_MAX_ABS_LAT, -180),
+      leafletRef.latLng(WEB_MERCATOR_MAX_ABS_LAT, 180)
     );
-    mainMap = Lref.map(mainEl, {
+    mainMap = leafletRef.map(mainEl, {
       minZoom: 1.5,
       maxZoom: 12,
       zoomSnap: 0.25,
@@ -14497,18 +14497,18 @@
       inertia: false
     });
     const startIdx = getRasterBasemapChainStartIndex(initialBasemapProviderId ?? "carto_light_nolabels");
-    mountRasterBasemap(Lref, mainMap, true, startIdx, "main");
+    mountRasterBasemap(leafletRef, mainMap, true, startIdx, "main");
     mainMap.fitBounds(worldBounds, { padding: [2, 2], animate: false });
     mainMap.doubleClickZoom.disable();
     try {
-      Lref.control.scale({
+      leafletRef.control.scale({
         metric: true,
         imperial: true,
         maxWidth: 120
       }).addTo(mainMap);
     } catch {
     }
-    miniMap = Lref.map(miniEl, {
+    miniMap = leafletRef.map(miniEl, {
       minZoom: 0,
       maxZoom: 2,
       zoomControl: false,
@@ -14519,7 +14519,7 @@
       boxZoom: false,
       keyboard: false
     });
-    mountRasterBasemap(Lref, miniMap, false, startIdx, "mini");
+    mountRasterBasemap(leafletRef, miniMap, false, startIdx, "mini");
     miniMap.fitBounds(worldBounds, { padding: [1, 1], animate: false });
     miniMap.setZoom(miniMap.getZoom());
     mainMap.on("move", notifyMainViewChanged);
@@ -14542,7 +14542,7 @@
   }
   function syncMinimapViewportRect() {
     if (!mainMap || !miniMap) return;
-    const Lref = getL();
+    const leafletRef = getL();
     const mainBounds = mainMap.getBounds();
     const miniBounds = miniMap.getBounds();
     const mainSpan = Math.abs(mainBounds.getNorthEast().lat - mainBounds.getSouthWest().lat) + Math.abs(mainBounds.getNorthEast().lng - mainBounds.getSouthWest().lng);
@@ -14556,7 +14556,7 @@
       return;
     }
     if (!viewportRect) {
-      viewportRect = Lref.rectangle(mainBounds, {
+      viewportRect = leafletRef.rectangle(mainBounds, {
         color: ORDER_LINE_COLOR,
         weight: 2,
         fill: false,
@@ -14586,18 +14586,18 @@
   }
   function hexCenterToOverlayPoint(h3Index, latLngFn) {
     if (!mainMap) return { x: 0, y: 0 };
-    const Lref = getL();
+    const leafletRef = getL();
     const [lat, lng] = latLngFn(h3Index);
-    const p = mainMap.latLngToContainerPoint(Lref.latLng(clampLatForWebMercatorDisplay(lat), lng));
+    const p = mainMap.latLngToContainerPoint(leafletRef.latLng(clampLatForWebMercatorDisplay(lat), lng));
     return { x: p.x, y: p.y };
   }
   function hexCenterToOverlayPointWithReferenceLng(h3Index, referenceLngDegrees, latLngFn) {
     if (!mainMap) return { x: 0, y: 0 };
-    const Lref = getL();
+    const leafletRef = getL();
     const [lat, lng] = latLngFn(h3Index);
     const lngAligned = alignLngToReference(lng, referenceLngDegrees);
     const p = mainMap.latLngToContainerPoint(
-      Lref.latLng(clampLatForWebMercatorDisplay(lat), lngAligned)
+      leafletRef.latLng(clampLatForWebMercatorDisplay(lat), lngAligned)
     );
     return { x: p.x, y: p.y };
   }
@@ -16078,7 +16078,7 @@
   function directionsFromPhysicalKeys(heldPhysical) {
     return new Set(heldPhysical.values());
   }
-  function createMapKeyboardPanController(deps) {
+  function createMapKeyboardPanHandler(deps) {
     const heldPhysical = /* @__PURE__ */ new Map();
     let intervalHandle = null;
     const stopInterval = () => {
@@ -16144,7 +16144,7 @@
     };
   }
 
-  // src/renderer/map/mapUtils.ts
+  // src/renderer/map/mapHelpers.ts
   function shouldIgnoreGlobalKeydown(e) {
     const target = e.target;
     if (!target) return false;
@@ -16177,8 +16177,8 @@
   function panMapByNetAxes(ns, ew) {
     if (isNetPanAxesZero({ ns, ew })) return;
     const map = getMainLeafletMap();
-    const Lref = globalThis.L;
-    if (!map || !Lref) return;
+    const leafletRef = globalThis.L;
+    if (!map || !leafletRef) return;
     const center = map.getCenter();
     let centerH3;
     try {
@@ -16190,12 +16190,12 @@
     if (!neighbor) return;
     const [nextLat, nextLngRaw] = cellToLatLng(neighbor);
     const nextLng = alignLngToReference(nextLngRaw, center.lng);
-    map.setView(Lref.latLng(clampLatForWebMercatorDisplay(nextLat), nextLng), map.getZoom());
+    map.setView(leafletRef.latLng(clampLatForWebMercatorDisplay(nextLat), nextLng), map.getZoom());
   }
   function applyInitialCameraForState(state) {
     const map = getMainLeafletMap();
-    const Lref = globalThis.L;
-    if (!map || !Lref) return;
+    const leafletRef = globalThis.L;
+    if (!map || !leafletRef) return;
     const humanGround = state.units.filter(
       (u) => u.player === "human" && (u.unitType === "infantry" || u.unitType === "armor")
     );
@@ -16213,7 +16213,7 @@
     const centerLng = lngSum / anchors.length;
     const maxZoom = typeof map.getMaxZoom === "function" ? map.getMaxZoom() : 12;
     const targetZoom = Math.min(maxZoom, map.getZoom() + INITIAL_CAMERA_ZOOM_IN_LEVELS);
-    map.setView(Lref.latLng(clampLatForWebMercatorDisplay(centerLat), centerLng), targetZoom);
+    map.setView(leafletRef.latLng(clampLatForWebMercatorDisplay(centerLat), centerLng), targetZoom);
     const ctr = typeof map.getCenter === "function" ? map.getCenter() : null;
     if (ctr) {
       rendererSharedState.strategicScenarioInitialLeafletView = { lat: ctr.lat, lng: ctr.lng, zoom: map.getZoom() };
@@ -16359,15 +16359,15 @@
     rendererSharedState.buildEntryButtonPointerInside = false;
     rendererSharedState.lastBuildEntryLayerKey = null;
   }
-  function projectHexBoundaryToContainerPoints(h3Index, map, L) {
+  function projectHexBoundaryToContainerPoints(h3Index, map, leaflet) {
     const boundary = getHexBoundaryLatLngForLeafletOverlay(h3Index);
     return boundary.map(([lat, lng]) => {
-      const p = map.latLngToContainerPoint(L.latLng(lat, lng));
+      const p = map.latLngToContainerPoint(leaflet.latLng(lat, lng));
       return { x: p.x, y: p.y };
     });
   }
-  function shouldConsiderRes4ChildrenForViewport(parentRes1H3Index, map, L, viewportWidth, viewportHeight) {
-    const parentPts = projectHexBoundaryToContainerPoints(parentRes1H3Index, map, L);
+  function shouldConsiderRes4ChildrenForViewport(parentRes1H3Index, map, leaflet, viewportWidth, viewportHeight) {
+    const parentPts = projectHexBoundaryToContainerPoints(parentRes1H3Index, map, leaflet);
     return projectedPolygonOverlapsViewport(parentPts, viewportWidth, viewportHeight);
   }
   function shouldDrawRes4ChildHexInViewport(pts, viewportWidth, viewportHeight) {
@@ -17318,10 +17318,10 @@
     void unitHexes;
     return !res4On && deps.infraGlyphsAllowedForRes1Hex(h3Index) && (rendererSharedState.terrainInfraRes1Airport.has(h3Index) || rendererSharedState.terrainInfraRes1Seaport.has(h3Index));
   }
-  function computeRes1OverlayTextY(h3Index, map, L, hasOffsetFeatures) {
+  function computeRes1OverlayTextY(h3Index, map, leaflet, hasOffsetFeatures) {
     const center = hexCenterPx(h3Index);
     if (!hasOffsetFeatures) return center.y;
-    const pts = projectHexBoundaryToContainerPoints(h3Index, map, L);
+    const pts = projectHexBoundaryToContainerPoints(h3Index, map, leaflet);
     return center.y + spanForProjectedHex(pts) * 0.24;
   }
   function drawTerrainInfrastructureOverlays(ctx, deps) {
@@ -22893,7 +22893,7 @@
     const tacticalHud = document.getElementById("tactical-battle-hud");
     return !!(popup?.contains(target) || layer?.contains(target) || tacticalLayer?.contains(target) || tacticalHud?.contains(target));
   }
-  function createBuildQueuePopupController(deps) {
+  function createBuildQueuePopupHandler(deps) {
     let buildEntryInteractionChain = Promise.resolve();
     let popupLifecycleRevision = 0;
     async function runBuildQueueMutation(args) {
@@ -24590,7 +24590,7 @@
     ];
   }
 
-  // src/shared/marchPathUtils.ts
+  // src/shared/marchPathHelpers.ts
   function findPathTailFromCurrentPosition(storedPathH3Indexes, currentH3) {
     if (storedPathH3Indexes.length === 0) return null;
     if (storedPathH3Indexes[0] === currentH3) return storedPathH3Indexes;
@@ -25965,7 +25965,7 @@
   }
 
   // src/renderer/map/mapKeyboardPan.ts
-  var mapKeyboardPanController = createMapKeyboardPanController({
+  var mapKeyboardPanController = createMapKeyboardPanHandler({
     pan: (ns, ew) => {
       panMapByNetAxes(ns, ew);
     },
@@ -26795,14 +26795,14 @@
       east: viewport.east + lngPad
     };
   }
-  function buildVectorLayerGroup(_map, rows, L) {
+  function buildVectorLayerGroup(_map, rows, leaflet) {
     const layers = [];
     for (const row of rows) {
       if (!row.points || row.points.length < 2) continue;
       const latlngs = row.points.map((p) => [p[0], p[1]]);
       if (row.kind === "road") {
         layers.push(
-          L.polyline(latlngs, {
+          leaflet.polyline(latlngs, {
             color: "#000000",
             weight: RES4_MAP_OVERLAY_VECTOR_ROAD_OUTLINE_WEIGHT,
             opacity: RES4_MAP_OVERLAY_VECTOR_TRANSPORT_HALO_OPACITY,
@@ -26810,7 +26810,7 @@
           })
         );
         layers.push(
-          L.polyline(latlngs, {
+          leaflet.polyline(latlngs, {
             color: "#ffffff",
             weight: RES4_MAP_OVERLAY_VECTOR_ROAD_CENTER_WEIGHT,
             opacity: 1,
@@ -26819,7 +26819,7 @@
         );
       } else {
         layers.push(
-          L.polyline(latlngs, {
+          leaflet.polyline(latlngs, {
             color: "#ffffff",
             weight: RES4_MAP_OVERLAY_VECTOR_RAIL_HALO_WEIGHT,
             opacity: RES4_MAP_OVERLAY_VECTOR_RAIL_HALO_OPACITY,
@@ -26827,7 +26827,7 @@
           })
         );
         layers.push(
-          L.polyline(latlngs, {
+          leaflet.polyline(latlngs, {
             color: "#000000",
             weight: RES4_MAP_OVERLAY_VECTOR_RAIL_CENTER_WEIGHT,
             opacity: RES4_MAP_OVERLAY_VECTOR_RAIL_CENTER_OPACITY,
@@ -26837,7 +26837,7 @@
         );
       }
     }
-    return L.layerGroup(layers);
+    return leaflet.layerGroup(layers);
   }
   function syncRes4TransportVectorLeafletLayer() {
     const map = getMainLeafletMapForProjection();
@@ -27499,7 +27499,7 @@
   var buildQueuePopupController = null;
   function getBuildQueuePopupController() {
     if (buildQueuePopupController) return buildQueuePopupController;
-    buildQueuePopupController = createBuildQueuePopupController({
+    buildQueuePopupController = createBuildQueuePopupHandler({
       shouldRenderRes4Hexes,
       hideStackCallout,
       clearTerrainTooltipTimer,
@@ -27771,8 +27771,8 @@
       infraGlyphsAllowedForRes4Child
     });
   }
-  function computeRes1OverlayTextY2(h3Index, map, L, hasOffsetFeatures) {
-    return computeRes1OverlayTextY(h3Index, map, L, hasOffsetFeatures);
+  function computeRes1OverlayTextY2(h3Index, map, leaflet, hasOffsetFeatures) {
+    return computeRes1OverlayTextY(h3Index, map, leaflet, hasOffsetFeatures);
   }
   function syncBuildEntryButton() {
     const layer = document.getElementById("build-entry-layer");

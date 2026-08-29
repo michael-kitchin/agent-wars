@@ -7,7 +7,7 @@
  * Exceptions: None.
  */
 
-import { executeTool6 } from '../tools/tool6Production';
+import { executeProductionTools } from '../tools/productionTools';
 import {
   getMaxedUnitTypesForPlayer,
   getPlayerUnitCountsByType,
@@ -19,7 +19,7 @@ import {
 import { getMaxUnitsPerType, parseGameSize } from '../../shared/gameSize';
 import type { GameStateSnapshot } from '../gameDb';
 import { logDebug, logTrace } from '../logger';
-import { buildPromptTableLines } from '../promptTableUtils';
+import { buildPromptTableLines } from '../promptTableHelpers';
 import {
   SECTION_TITLE_CONTROLLED_HEX_QUEUES,
   SECTION_TITLE_PRODUCTION_STATUS,
@@ -355,7 +355,7 @@ export function buildProductionBriefingBlock(args: {
     turnNumber: args.state.turnNumber,
   });
   if (!args.productionEnabled) return '';
-  const snapshot = executeTool6('query_production', { all: true }, args.state, args.latLngByH3, args.resolveToH3) as {
+  const snapshot = executeProductionTools('query_production', { all: true }, args.state, args.latLngByH3, args.resolveToH3) as {
     status?: string;
     production?: { controlledHexQueues?: Array<Record<string, unknown>> };
     error?: string;

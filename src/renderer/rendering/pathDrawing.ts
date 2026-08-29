@@ -12,7 +12,7 @@ import {
   UNIT_RADIUS,
   UNIT_TYPE_LABELS,
 } from '../core/constants';
-import { getLeafletGlobal, hexCenterPx, hexCenterPxRelativeTo } from '../map/mapUtils';
+import { getLeafletGlobal, hexCenterPx, hexCenterPxRelativeTo } from '../map/mapHelpers';
 import { getMainLeafletMap } from '../map/worldLeafletMap';
 import type { HumanOrderPreviewSegment } from '../../shared/ipc/humanOrderPreviewTypes';
 import type { GameStateSnapshot, HumanStandingOrderSnapshot, TacticalPendingMarchRow } from '../../shared/ipcTypes';

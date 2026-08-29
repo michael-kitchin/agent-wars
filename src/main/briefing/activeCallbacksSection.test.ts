@@ -6,8 +6,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { CoordinateContext } from './map/coordinateContext';
-import { ensureStrategicCoordinateRegistryInitialized, listStrategicRes1H3Indexes } from './map/hex-coordinates';
-import { h3ToCode } from './map/hex-code-translator';
+import { ensureStrategicCoordinateRegistryInitialized, listStrategicRes1H3Indexes } from './map/hexCoordinates';
+import { h3ToCode } from './map/hexCodeTranslator';
 import { buildActiveCallbacksSection, formatCallbackLine } from './activeCallbacksSection';
 
 const strategicCtx: CoordinateContext = { mode: 'strategic' };

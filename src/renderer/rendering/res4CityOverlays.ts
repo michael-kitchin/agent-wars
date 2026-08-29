@@ -14,7 +14,7 @@ import {
   shouldRenderRes4Hexes,
   spanForProjectedHex,
 } from '../map/terrainView';
-import { getLeafletGlobal } from '../map/mapUtils';
+import { getLeafletGlobal } from '../map/mapHelpers';
 import { getMainLeafletMapForProjection } from '../map/leafletMainMapProjection';
 import { DETAIL_H3_RESOLUTION } from '../core/constants';
 import { rendererSharedState as S } from '../core/state';

@@ -4,10 +4,10 @@ import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import type { AirStrikeTargetType } from '../../shared/ipcTypes';
 import { dbRun, dbGetAll, saveDatabase } from '../gameDb';
 import { getRange } from '../combatConstants';
-import { validateAirStrikeOrder } from '../game-actions/airValidation';
-import { isWithinAirStrikeGridRange } from '../game-actions/gridRange';
-import { createPathfindingSession, executePlanRouteWithSession, type PathfindingSession } from './tool1Pathfinding';
-import type { LatLng } from './tool1Pathfinding';
+import { validateAirStrikeOrder } from '../gameActions/airValidation';
+import { isWithinAirStrikeGridRange } from '../gameActions/gridRange';
+import { createPathfindingSession, executePlanRouteWithSession, type PathfindingSession } from './pathfinding';
+import type { LatLng } from './pathfinding';
 import { logDebug, logTrace } from '../logger';
 import {
   AIR_INELIGIBLE_ORDER_TYPES,
@@ -15,7 +15,7 @@ import {
   parseOrderParams,
   toComputedRoutePayload,
   type StandingOrderRow,
-} from './tool5StandingOrdersShared';
+} from './standingOrdersShared';
 
 /**
  * Options for `generateOrdersForStandingOrders` so tactical resolution can preview routes without advancing DB state.
@@ -140,7 +140,7 @@ function updateStandingOrderComputedRoute(
  * Exceptions: Propagates database read failures.
  */
 export function holdFireUnitIdsForPlayer(playerId: string): Set<string> {
-  logTrace('tool5StandingOrders holdFireUnitIdsForPlayer', { playerId });
+  logTrace('standingOrders holdFireUnitIdsForPlayer', { playerId });
   return new Set(
     dbGetAll<{ unit_id: string }>(
       "SELECT unit_id FROM standing_orders WHERE player_id = ? AND order_type = 'hold_fire'",
@@ -158,7 +158,7 @@ export function holdFireUnitIdsForPlayer(playerId: string): Set<string> {
  * Exceptions: None.
  */
 export function expireAndUpdateStatus(playerId: string, state: GameStateSnapshot): void {
-  logDebug('tool5StandingOrders expireAndUpdateStatus', { playerId, turnNumber: state.turnNumber });
+  logDebug('standingOrders expireAndUpdateStatus', { playerId, turnNumber: state.turnNumber });
   const existingUnitIds = new Set(state.units.filter((u) => u.player === playerId).map((u) => u.id));
   const rows = dbGetAll<StandingOrderRow>(
     'SELECT * FROM standing_orders WHERE player_id = ?',
@@ -174,7 +174,7 @@ export function expireAndUpdateStatus(playerId: string, state: GameStateSnapshot
     if (AIR_INELIGIBLE_ORDER_TYPES.has(row.order_type)) {
       const orderedUnit = state.units.find((u) => u.id === row.unit_id);
       if (orderedUnit?.unitType === 'air') {
-        logDebug('tool5StandingOrders expireAndUpdateStatus: removed unusable air movement order', {
+        logDebug('standingOrders expireAndUpdateStatus: removed unusable air movement order', {
           playerId,
           unitId: row.unit_id,
           orderType: row.order_type,
@@ -204,7 +204,7 @@ export function expireAndUpdateStatus(playerId: string, state: GameStateSnapshot
         }
         if (destH3 && unit.h3Index === destH3) {
           deleteStandingOrder(playerId, row.unit_id);
-          logDebug('tool5StandingOrders expireAndUpdateStatus: removed arrived march order', {
+          logDebug('standingOrders expireAndUpdateStatus: removed arrived march order', {
             playerId,
             unitId: row.unit_id,
           });
@@ -243,7 +243,7 @@ export function generateOrdersForStandingOrders(
   airStrikes: StandingOrderGeneratedAirStrike[];
 } {
   const mutateProgress = options?.mutateProgress !== false;
-  logDebug('tool5StandingOrders generateOrdersForStandingOrders', {
+  logDebug('standingOrders generateOrdersForStandingOrders', {
     playerId,
     turnNumber: state.turnNumber,
     mutateProgress,
@@ -322,7 +322,7 @@ export function generateOrdersForStandingOrders(
         if (mutateProgress) {
           deleteStandingOrder(playerId, row.unit_id);
         }
-        logDebug('tool5StandingOrders generateOrdersForStandingOrders: removed arrived march order', {
+        logDebug('standingOrders generateOrdersForStandingOrders: removed arrived march order', {
           playerId,
           unitId: row.unit_id,
         });
@@ -461,7 +461,7 @@ export function generateOrdersForStandingOrders(
           }
         }
       } else {
-        logDebug('tool5StandingOrders patrol: unit at waypoint with empty path, advancing index', {
+        logDebug('standingOrders patrol: unit at waypoint with empty path, advancing index', {
           unitId: row.unit_id, waypointIndex, nextIndex: (waypointIndex + 1) % waypoints.length,
         });
         const nextIndex = (waypointIndex + 1) % waypoints.length;

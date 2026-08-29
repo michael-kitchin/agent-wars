@@ -11,7 +11,7 @@
  */
 
 import { logDebug, logTrace } from '../../logger';
-import { CONTENT_MAX_LENGTH, KEY_MAX_LENGTH, KEY_PATTERN } from '../../tools/tool4Memory';
+import { CONTENT_MAX_LENGTH, KEY_MAX_LENGTH, KEY_PATTERN } from '../../tools/memory';
 import { buildCallbackVocabularyClause } from './callbackVocabularyText';
 import type { PromptCoordinateMode } from './promptCoordinateMode';
 

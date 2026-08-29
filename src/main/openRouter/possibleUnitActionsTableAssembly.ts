@@ -7,7 +7,7 @@
  * Exceptions: None for these pure helpers.
  */
 
-import { buildPromptTableLines } from '../promptTableUtils';
+import { buildPromptTableLines } from '../promptTableHelpers';
 import { compareHexIds } from './possibleUnitActionsPartition';
 import { logDebug } from '../logger';
 

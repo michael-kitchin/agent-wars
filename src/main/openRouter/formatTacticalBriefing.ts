@@ -5,7 +5,7 @@
 import type { GameStateSnapshot } from '../gameDb';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { buildRecentTurnNotesSection } from '../briefing/recentTurnNotesSection';
-import { buildTacticalOperationalMapSectionMarkdown } from '../briefing/map/briefing-map-section';
+import { buildTacticalOperationalMapSectionMarkdown } from '../briefing/map/briefingMapSection';
 import type { CoordinateContext } from '../briefing/map/coordinateContext';
 import { getSubscriptions } from '../callbackSubscriptions';
 import { buildActiveCallbacksSection } from '../briefing/activeCallbacksSection';

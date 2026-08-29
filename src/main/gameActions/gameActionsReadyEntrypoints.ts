@@ -17,7 +17,7 @@ import type {
   ResolveMeleeInterceptIpcPayload,
 } from '../../shared/ipcTypes';
 import { dbGetOne } from '../gameDb';
-import { readTurnStateRow } from '../game-db/turnStateReads';
+import { readTurnStateRow } from '../gameDb/turnStateReads';
 import { logDebug, logError } from '../logger';
 import { executeResolveMeleeIntercept } from './meleeInterceptStrategicResolve';
 import {

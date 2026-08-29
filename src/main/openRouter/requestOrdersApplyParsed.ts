@@ -12,8 +12,8 @@ import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import type { GameStateSnapshot } from '../gameDb';
 import { logDebug } from '../logger';
 import { applyParsedOpponentCallbackSubscriptions } from './applyParsedOpponentCallbacks';
-import { createPathfindingSession } from '../tools/tool1Pathfinding';
-import { executeTool5, generateOrdersForStandingOrders } from '../tools/tool5StandingOrders';
+import { createPathfindingSession } from '../tools/pathfinding';
+import { executeStandingOrders, generateOrdersForStandingOrders } from '../tools/standingOrders';
 import { mergeOpponentAttackOrders } from '../tools/tempoRuleAttacks';
 import { buildStrategicOpponentFerryOrders } from '../tools/tempoRuleAirFerry';
 import { applyMovementOrdersToPlanState } from '../tacticalBattle/tacticalPlanStateMovement';
@@ -335,7 +335,7 @@ export function applyParsedRequestOrders(args: ApplyParsedRequestOrdersArgs): Re
   }
   if (flags.ordersEnabled && invalidStandingMovementUnits.size > 0 && !tacticalBattle) {
     for (const unitId of invalidStandingMovementUnits) {
-      executeTool5('cancel_order', { unitId }, state, latLngByH3, resolveToH3);
+      executeStandingOrders('cancel_order', { unitId }, state, latLngByH3, resolveToH3);
     }
   }
 

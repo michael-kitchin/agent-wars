@@ -23,23 +23,23 @@ import { logDebug, logError, logTrace } from './logger';
 import type { AirStrikeOrder, EmbarkOrder, FerryOrder, GameStateSnapshot, MovementOrder, RangedAttackOrder } from '../shared/ipcTypes';
 import type { GameSize } from '../shared/gameSize';
 import type { BuildUnitType } from './productionRules';
-import { seedUnits as seedUnitsFromModule } from './game-db/seeding/seedUnits';
+import { seedUnits as seedUnitsFromModule } from './gameDb/seeding/seedUnits';
 import {
   recoverCorruptDatabaseUi as recoverCorruptDatabaseUiWithFs,
   silentRecoverCorruptDatabase as silentRecoverCorruptDatabaseWithFs,
-} from './game-db/recovery/corruptRecovery';
-import { notifyBetterSqliteNativeLoadFailureAndExitIfApplicable } from './game-db/betterSqliteNativeLoad';
+} from './gameDb/recovery/corruptRecovery';
+import { notifyBetterSqliteNativeLoadFailureAndExitIfApplicable } from './gameDb/betterSqliteNativeLoad';
 import {
   ensureTurnStateRowWhenDbOpen,
   repairStrandedStrategicResolutionPhaseWhenDbOpen,
-} from './game-db/databaseBootstrap';
-import { getFullDdl } from './game-db/schema';
+} from './gameDb/databaseBootstrap';
+import { getFullDdl } from './gameDb/schema';
 import {
   applyGameDbPragmas as applyGameDbPragmasCore,
   validateGameDatabaseOrThrow as validateGameDatabaseOrThrowCore,
-} from './game-db/databaseValidation';
-import { getMapHexSetWithGetAll } from './game-db/mapHexRead';
-import { listUnitsForSnapshotWithGetAll } from './game-db/unitSnapshotRead';
+} from './gameDb/databaseValidation';
+import { getMapHexSetWithGetAll } from './gameDb/mapHexRead';
+import { listUnitsForSnapshotWithGetAll } from './gameDb/unitSnapshotRead';
 import {
   clearBuildQueueAndProgressForHex as clearBuildQueueAndProgressForHexFromModule,
   getBuildProgressPointsForHex as getBuildProgressPointsForHexFromModule,
@@ -64,7 +64,7 @@ import {
   type HexControlRow,
   type Res1InfrastructureRow,
   type Res4FeatureOverrideRow,
-} from './game-db/controlInfrastructure';
+} from './gameDb/controlInfrastructure';
 import {
   addAiLossEventsSinceConsultation as addAiLossEventsSinceConsultationFromModule,
   addOpponentCombatParticipants as addOpponentCombatParticipantsFromModule,
@@ -80,7 +80,7 @@ import {
   setAiPendingOrders as setAiPendingOrdersFromModule,
   setAiToolLimitExceededLastTurn as setAiToolLimitExceededLastTurnFromModule,
   type AiLossEventSinceConsultation,
-} from './game-db/aiState';
+} from './gameDb/aiState';
 import {
   clearTacticalTurnNotes as clearTacticalTurnNotesFromModule,
   getRecentTurnNotes as getRecentTurnNotesFromModule,
@@ -89,33 +89,33 @@ import {
   type TurnConsultationNoteTexts,
   type TurnNoteRow,
   type TurnNotesScope,
-} from './game-db/turnNotesHistory';
+} from './gameDb/turnNotesHistory';
 import {
   consumeFogNewContactsForPlayer as consumeFogNewContactsForPlayerFromModule,
   getGameStateSnapshot as getGameStateSnapshotFromModule,
   getGameStateForPlayer as getGameStateForPlayerFromModule,
   refreshFogOfWarIntelFromCurrentState as refreshFogOfWarIntelFromCurrentStateFromModule,
-} from './game-db/fogState';
-import { mergeMeleeCandidateHexesIntoHumanFogSnapshot } from './game-actions/meleeInterceptPendingState';
-import { mergeActiveTacticalSessionIntoGameStateSnapshot } from './game-db/attachTacticalSessionToGameState';
-import { resolveGameDbFileUnderUserData } from './game-db/canonicalDbPath';
+} from './gameDb/fogState';
+import { mergeMeleeCandidateHexesIntoHumanFogSnapshot } from './gameActions/meleeInterceptPendingState';
+import { mergeActiveTacticalSessionIntoGameStateSnapshot } from './gameDb/attachTacticalSessionToGameState';
+import { resolveGameDbFileUnderUserData } from './gameDb/canonicalDbPath';
 import {
   allocateNextUnitDisplayOrderWithOps,
   clearGameOverWithOps,
   getGameSeedWithOps,
   seedGameSeedIfMissingWithOps,
   setGameOverWithOps,
-} from './game-db/gameConfigKv';
-import { resetGameForNewMatch as resetGameForNewMatchFromModule } from './game-db/resetGame';
+} from './gameDb/gameConfigKv';
+import { resetGameForNewMatch as resetGameForNewMatchFromModule } from './gameDb/resetGame';
 import {
   getScenarioHomeRegionHexes as getScenarioHomeRegionHexesFromModule,
   listScenarioHomeRegions as listScenarioHomeRegionsFromModule,
 } from './regionScenario';
 
 export type { GameStateSnapshot } from '../shared/ipcTypes';
-export type { AiLossEventSinceConsultation } from './game-db/aiState';
-export type { TurnConsultationNoteTexts, TurnNoteRow, TurnNotesScope } from './game-db/turnNotesHistory';
-export type { BuildQueueRow, HexControlRow, Res1InfrastructureRow, Res4FeatureOverrideRow } from './game-db/controlInfrastructure';
+export type { AiLossEventSinceConsultation } from './gameDb/aiState';
+export type { TurnConsultationNoteTexts, TurnNoteRow, TurnNotesScope } from './gameDb/turnNotesHistory';
+export type { BuildQueueRow, HexControlRow, Res1InfrastructureRow, Res4FeatureOverrideRow } from './gameDb/controlInfrastructure';
 
 /**
  * Documents the module-scope binding `EXPECTED_USER_VERSION` (EXPECTED_USER_VERSION).

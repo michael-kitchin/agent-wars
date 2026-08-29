@@ -2,7 +2,7 @@ import type { AirStrikeTargetType, GameStateSnapshot } from '../../shared/ipcTyp
 import type { NamingLookupTarget, TerrainTooltipState } from './terrainTooltipTypes';
 import { HEX_DETAILS_TOOLTIP_DELAY_MS } from '../core/constants';
 import { isHoverOrderPlanningActive } from '../rendering/canvasPreviewPolicy';
-import { hitTestHexAtContainerPixel, hitTestTacticalRes4HexAtContainerPixel } from './mapUtils';
+import { hitTestHexAtContainerPixel, hitTestTacticalRes4HexAtContainerPixel } from './mapHelpers';
 import { withTacticalHumanDraftPrefetchInvalidation } from '../openRouter/openRouterRuntime';
 import { rendererSharedState as S } from '../core/state';
 import { getMainLeafletMap } from './worldLeafletMap';

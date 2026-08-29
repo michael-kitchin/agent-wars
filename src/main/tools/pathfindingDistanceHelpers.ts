@@ -133,7 +133,7 @@ export function nearestReachableWaterHexTo(
     }
   }
   logGridDistanceFailureSummary({
-    context: 'tool1Pathfinding nearestReachableWaterHexTo',
+    context: 'pathfinding nearestReachableWaterHexTo',
     referenceH3: refLandH3,
     failureCount,
     fallbackCount,
@@ -173,7 +173,7 @@ export function nearestWaterHexTo(refH3: string, hexSet: Set<string>, terrainByH
     }
   }
   logGridDistanceFailureSummary({
-    context: 'tool1Pathfinding nearestWaterHexTo',
+    context: 'pathfinding nearestWaterHexTo',
     referenceH3: refH3,
     failureCount,
     fallbackCount,
@@ -206,7 +206,7 @@ export function nearestAdjacentWaterOrCoastalHex(
   try {
     neighbors = gridDisk(originH3, 1);
   } catch (err) {
-    logError('tool1Pathfinding nearestAdjacentWaterOrCoastalHex: gridDisk threw', {
+    logError('pathfinding nearestAdjacentWaterOrCoastalHex: gridDisk threw', {
       originH3,
       error: String(err),
     });
@@ -233,7 +233,7 @@ export function nearestAdjacentWaterOrCoastalHex(
     }
   }
   logGridDistanceFailureSummary({
-    context: 'tool1Pathfinding nearestAdjacentWaterOrCoastalHex',
+    context: 'pathfinding nearestAdjacentWaterOrCoastalHex',
     referenceH3: refTargetH3,
     failureCount,
     fallbackCount,

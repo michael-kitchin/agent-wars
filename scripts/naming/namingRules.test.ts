@@ -43,7 +43,7 @@ assert.equal(isKebabCaseSegment('gameActions'), false);
 }
 
 {
-  const nested = directoryViolations('main/game-actions/humanMarchPreview');
+  const nested = directoryViolations('main/gameActions/humanMarchPreview');
   assert.equal(nested, null);
 }
 

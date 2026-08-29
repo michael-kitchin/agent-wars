@@ -12,12 +12,12 @@ Shipping version as of this writing: **2.4.0** (`package.json`). Phase 0 (hybrid
 | [game-size-unit-caps.md](game-size-unit-caps.md) | Small / Medium / Large per-side caps | **Current.** Matches `getMaxUnitsPerType`. |
 | [region-vs-region.md](region-vs-region.md) | Shipped scenario, home regions, win evaluation | **Current.** Matches `evaluateRegionControlWinnerAtEndOfTurn`. |
 | [hybrid-ai.md](hybrid-ai.md) | Hybrid opponent loop, callbacks, consult bounds | **Current engine behavior.** Prompt copy lives in the prompt package. |
-| [ai-tools.md](ai-tools.md) | The six tool groups the model (and host) can invoke | **Current.** Names from `TOOL_*_NAMES`. |
+| [ai-tools.md](ai-tools.md) | The six tool groups the model (and host) can invoke | **Current.** Names from `PATHFINDING_TOOL_NAMES` and sibling `*_TOOL_NAMES` consts. |
 | [terrain-pipeline.md](terrain-pipeline.md) | What the app loads from `data/generated/` | **Current runtime.** Regeneration runbook stays in `scripts/terrain_pipeline/README.md`. |
 | [game-vision-v2.md](game-vision-v2.md) | Product intent and why the game is shaped this way | **Intent, with an implementation-status note.** Where a roster, fog, or phase claim disagrees with the engine, the combat rules (and the code) win. |
 | [ui-style-guide.md](ui-style-guide.md) | Map-first UI character, chrome, and interaction | **Target aesthetic plus an implementation-status note.** Unbuilt surfaces (save/load UI, diplomacy, async multiplayer) are marked. |
-| [naming-conventions (spec)](../.spec/naming-conventions-contract-v1.md) | File, directory, and exported-symbol naming | **Current contract.** Authoritative; `.spec/naming-rename-ledger-v1.md` is the signed rename work list. |
-| [ai-commander-prompts/](ai-commander-prompts/README.md) | What the AI opponent's model is told today | **Current emission.** Builders under `src/main/openrouter/` win if this package drifts. Prompt copy is not game-rule authority; the engine is. |
+| [naming-conventions.md](naming-conventions.md) | How files, directories, and exported symbols are named | **Living index.** Authoritative rules stay in [`.spec/naming-conventions-contract-v1.md`](../.spec/naming-conventions-contract-v1.md). |
+| [ai-commander-prompts/](ai-commander-prompts/README.md) | What the AI opponent's model is told today | **Current emission.** Builders under `src/main/openRouter/` win if this package drifts. Prompt copy is not game-rule authority; the engine is. |
 | [devleopment-plan-v3.3.md](devleopment-plan-v3.3.md) | Original phased roadmap (filename keeps the historical spelling) | **Historical plan** with a current-progress header. Milestone writeups inside it are not live rules. |
 | [poc-analysis.md](poc-analysis.md) | Phase 0 latency/cost research that justified the hybrid AI | **Historical research.** The hybrid pattern it recommended is now the live architecture. |
 | [market-research.md](market-research.md) | 2025–2026 market landscape | **Dated research.** Not a mechanics or shipping-status document. |

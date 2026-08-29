@@ -1,6 +1,6 @@
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
-import { applyInitialCameraForState } from '../map/mapUtils';
+import { applyInitialCameraForState } from '../map/mapHelpers';
 import { tacticalReleaseRendererSessionForNewStrategicMatch } from '../tactical/tacticalUiOrchestration';
 import { rendererSharedState as S } from './state';
 

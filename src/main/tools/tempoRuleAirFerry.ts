@@ -17,10 +17,10 @@
 import type { FerryOrder, GameStateSnapshot } from '../../shared/ipcTypes';
 import { AIR_STRIKE_RANGE_HEXES } from '../../shared/tacticalRanges';
 import { computeGridDistanceWithPathFallbackPure } from '../../shared/h3GridRangePure';
-import { validateFerryOrder } from '../game-actions/airValidation';
-import { isWithinAirFerryGridRange } from '../game-actions/gridRange';
+import { validateFerryOrder } from '../gameActions/airValidation';
+import { isWithinAirFerryGridRange } from '../gameActions/gridRange';
 import { logDebug, logTrace } from '../logger';
-import { holdFireUnitIdsForPlayer } from './tool5StandingOrdersGeneration';
+import { holdFireUnitIdsForPlayer } from './standingOrdersGeneration';
 
 /**
  * Inputs for `collectTempoRuleFerries`, grouped so the argument list stays short as callers add context.

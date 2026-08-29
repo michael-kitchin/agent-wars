@@ -1,18 +1,18 @@
 /**
  * Contract tests for assistant final-JSON parsing (tolerant schema + balanced `{`…`}` extraction).
- * Run with: node dist/main/openrouter/orderResponseParsing.test.js
+ * Run with: node dist/main/openRouter/orderResponseParsing.test.js
  */
 
 import * as assert from 'assert';
 import { cellToLatLng } from 'h3-js';
-import { ensureStrategicCoordinateRegistryInitialized, listStrategicRes1H3Indexes } from '../briefing/map/hex-coordinates';
+import { ensureStrategicCoordinateRegistryInitialized, listStrategicRes1H3Indexes } from '../briefing/map/hexCoordinates';
 import { buildLatLngCoordinateMap } from '../mapData';
 import type { GameStateSnapshot } from '../gameDb';
 import { dbRun, getGameState } from '../gameDb';
-import { h3ToCode } from '../briefing/map/hex-code-translator';
+import { h3ToCode } from '../briefing/map/hexCodeTranslator';
 import { parseOrdersResponse } from './orderResponseParsing';
 import { withTempGameDb } from '../testSupport/withTempGameDb';
-import { isEmbarkedLandUnit } from '../game-actions/sealift';
+import { isEmbarkedLandUnit } from '../gameActions/sealift';
 
 /**
  * Documents the module-scope binding `minimalState` (minimalState).

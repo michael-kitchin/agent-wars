@@ -13,9 +13,9 @@ import {
 } from '../navalMovementMessages';
 import {
   nearestReachableWaterHexTo,
-} from './tool1PathfindingDistanceHelpers';
-import { findLandPathWithStatefulOptionalAvoidanceRetry, type StatefulSearchStats } from './tool1PathfindingStateful';
-import type { PathfindingSession, PlanRouteError } from './tool1Pathfinding';
+} from './pathfindingDistanceHelpers';
+import { findLandPathWithStatefulOptionalAvoidanceRetry, type StatefulSearchStats } from './pathfindingStateful';
+import type { PathfindingSession, PlanRouteError } from './pathfinding';
 import {
   findNavalStrategicPath,
   getNavalStrategicReachableHexes,
@@ -113,7 +113,7 @@ export function buildBlockedEnemySetForUnit(
   if (!avoidEnemies) return undefined;
   const state = session.state;
   if (state.fogOfWarEnabled && !state.playerPerspective) {
-    logDebug('tool1Pathfinding buildBlockedEnemySetForUnit: skipping enemy avoidance without perspective snapshot', {
+    logDebug('pathfinding buildBlockedEnemySetForUnit: skipping enemy avoidance without perspective snapshot', {
       unitId: unit.id,
       unitPlayer: unit.player,
     });
@@ -181,7 +181,7 @@ function resolveNavalStrategicRoutePath(payload: {
   session: PathfindingSession;
   blocked?: Set<string>;
 }): ResolveRoutePathForUnitOk | PlanRouteError {
-  logDebug('tool1Pathfinding resolveNavalStrategicRoutePath', {
+  logDebug('pathfinding resolveNavalStrategicRoutePath', {
     originH3: payload.originH3,
     destinationH3: payload.destinationH3,
   });

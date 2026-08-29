@@ -14,8 +14,8 @@ import {
   h3ToCode,
   isValidHexCode,
   latLngToCode,
-} from './hex-code-translator';
-import { ensureStrategicCoordinateRegistryInitialized, listStrategicRes1H3Indexes } from './hex-coordinates';
+} from './hexCodeTranslator';
+import { ensureStrategicCoordinateRegistryInitialized, listStrategicRes1H3Indexes } from './hexCoordinates';
 
 /**
  * Defines the `testIsValidHexCodeMatchesRegistry` function shape (function testIsValidHexCodeMatchesRegistry(): void).

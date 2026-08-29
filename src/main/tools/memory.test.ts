@@ -1,10 +1,10 @@
 /**
  * Tool 4 (Strategic Memory) — happy path and essential failure cases per execution plan.
- * Run with: node dist/tools/tool4Memory.test.js
+ * Run with: node dist/tools/memory.test.js
  */
 
 import * as assert from 'assert';
-import { executeTool4 } from './tool4Memory';
+import { executeMemory } from './memory';
 
 /**
  * Documents the module-scope binding `emptyState` (emptyState).
@@ -51,7 +51,7 @@ const noopResolve = (): string | undefined => undefined;
  * Exceptions: None.
  */
 function testMemoryDeleteMissingKey(): void {
-  const result = executeTool4(
+  const result = executeMemory(
     'memory_delete',
     { key: 'nonexistent_key' },
     emptyState,
@@ -71,7 +71,7 @@ function testMemoryDeleteMissingKey(): void {
  * Exceptions: None.
  */
 function testMemoryWriteEmptyContent(): void {
-  const result = executeTool4(
+  const result = executeMemory(
     'memory_write',
     { key: 'k', content: '' },
     emptyState,
@@ -91,7 +91,7 @@ function testMemoryWriteEmptyContent(): void {
  * Exceptions: None.
  */
 function testMemoryWriteContentOver500(): void {
-  const result = executeTool4(
+  const result = executeMemory(
     'memory_write',
     { key: 'k', content: 'x'.repeat(501) },
     emptyState,
@@ -111,7 +111,7 @@ function testMemoryWriteContentOver500(): void {
  * Exceptions: None.
  */
 function testMemoryWriteInvalidKey(): void {
-  const result = executeTool4(
+  const result = executeMemory(
     'memory_write',
     { key: 'bad key', content: 'ok' },
     emptyState,
@@ -131,7 +131,7 @@ function testMemoryWriteInvalidKey(): void {
  * Exceptions: None.
  */
 function testMemoryReadRequiresKeyOrTagsOrTierOrAll(): void {
-  const result = executeTool4(
+  const result = executeMemory(
     'memory_read',
     {},
     emptyState,
@@ -151,7 +151,7 @@ function testMemoryReadRequiresKeyOrTagsOrTierOrAll(): void {
  * Exceptions: None.
  */
 function testMemoryDeleteRequiresKey(): void {
-  const result = executeTool4(
+  const result = executeMemory(
     'memory_delete',
     {},
     emptyState,
@@ -177,7 +177,7 @@ function run(): void {
   testMemoryWriteInvalidKey();
   testMemoryReadRequiresKeyOrTagsOrTierOrAll();
   testMemoryDeleteRequiresKey();
-  console.log('tool4Memory tests passed');
+  console.log('memory tests passed');
 }
 
 run();

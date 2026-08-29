@@ -1,6 +1,6 @@
 # AI commander prompts (what the model is told)
 
-Catalog of every message the AI opponent's model sees today: the system prompt, the opening instruction, tool results, and the two recovery messages. **The builders under `src/main/openrouter/` are first authority.** This package describes those emissions. If a heading, gate, or sentence here disagrees with the builders, the code is correct and this folder should be updated.
+Catalog of every message the AI opponent's model sees today: the system prompt, the opening instruction, tool results, and the two recovery messages. **The builders under `src/main/openRouter/` are first authority.** This package describes those emissions. If a heading, gate, or sentence here disagrees with the builders, the code is correct and this folder should be updated.
 
 Read this file first, then follow the reading order in section 3.
 

@@ -1,5 +1,5 @@
 import { getHexBoundaryLatLngForLeafletOverlay, WEB_MERCATOR_MAX_ABS_LAT } from './hexGrid';
-import { getLeafletGlobal } from './mapUtils';
+import { getLeafletGlobal } from './mapHelpers';
 import { getMainLeafletMap } from './worldLeafletMap';
 import { rendererSharedState as S } from '../core/state';
 import { hidePlanningChromeToasts } from '../openRouter/openRouterUiHelpers';

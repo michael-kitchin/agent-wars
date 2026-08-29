@@ -14,7 +14,7 @@ import {
 import { RANGE_PERIMETER_ALPHA, RANGE_PERIMETER_FLOW_PX_PER_SEC } from '../core/constants';
 import { rendererSharedState as S } from '../core/state';
 import { alignLngToReference } from '../map/hexGrid';
-import { getLeafletGlobal } from '../map/mapUtils';
+import { getLeafletGlobal } from '../map/mapHelpers';
 import { getMainLeafletMap } from '../map/worldLeafletMap';
 import { rangePerimeterStaticLineStyle } from './orderDrawing';
 import { drawClosedPolygonPath, type ScreenPoint } from './polygonOutline';

@@ -262,7 +262,7 @@ export type MapKeyboardPanControllerDeps = {
  * Expected outcome: Physical-key map and timer stay consistent with the keyboard pan contract.
  * Exceptions: None.
  */
-export type MapKeyboardPanController = {
+export type MapKeyboardPanHandler = {
   /**
    * Records a newly pressed physical pan key and pans when the net axes change to nonzero.
    *
@@ -312,9 +312,9 @@ function directionsFromPhysicalKeys(heldPhysical: ReadonlyMap<string, PanAxisKey
  * Expected outcome: Controller methods mutate only internal held/timer state and call `deps.pan` per contract.
  * Exceptions: None.
  */
-export function createMapKeyboardPanController(
+export function createMapKeyboardPanHandler(
   deps: MapKeyboardPanControllerDeps
-): MapKeyboardPanController {
+): MapKeyboardPanHandler {
   const heldPhysical = new Map<string, PanAxisKey>();
   let intervalHandle: ReturnType<typeof setInterval> | null = null;
 

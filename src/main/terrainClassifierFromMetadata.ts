@@ -65,10 +65,10 @@ function classifyInteriorBiome(
   const c11 = r.desert_mean ?? 0;
   if (c10 >= t.arctic_dominant_min) return 'arctic';
   if (forest >= t.forest_dominant_min) return 'forest';
-  const tri_ok = r.tri_mean != null && r.tri_mean >= t.mountain_tri_mean_min;
-  const slope_ok = r.slope_mean != null && r.slope_mean >= t.mountain_slope_mean_min;
-  const elev_ok = r.elevation_max != null && r.elevation_max >= t.mountain_elevation_max_min;
-  if (tri_ok || (slope_ok && elev_ok)) return 'mountain';
+  const triOk = r.tri_mean != null && r.tri_mean >= t.mountain_tri_mean_min;
+  const slopeOk = r.slope_mean != null && r.slope_mean >= t.mountain_slope_mean_min;
+  const elevOk = r.elevation_max != null && r.elevation_max >= t.mountain_elevation_max_min;
+  if (triOk || (slopeOk && elevOk)) return 'mountain';
   if (c11 >= t.desert_barren_min) return 'desert';
   return 'plains';
 }

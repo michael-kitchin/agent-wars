@@ -11,7 +11,7 @@
 import type { CallbackSubscription } from '../callbackSubscriptions';
 import type { CoordinateContext } from './map/coordinateContext';
 import { HEX_CODE_PATTERN } from './map/coordinateContext';
-import { h3ToCode } from './map/hex-code-translator';
+import { h3ToCode } from './map/hexCodeTranslator';
 import { logDebug, logTrace } from '../logger';
 
 /**

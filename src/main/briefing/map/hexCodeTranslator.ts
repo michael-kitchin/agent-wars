@@ -12,7 +12,7 @@ import { LATLNG_DECIMAL_PLACES } from '../../mapData';
 import { logDebug, logError, logTrace } from '../../logger';
 import type { CoordinateContext } from './coordinateContext';
 import { HEX_CODE_PATTERN } from './coordinateContext';
-import { getHexCodeForContext, getH3IndexForCode, isHexCodeValidForContext } from './hex-coordinates';
+import { getHexCodeForContext, getH3IndexForCode, isHexCodeValidForContext } from './hexCoordinates';
 
 /** H3 resolution used when snapping WGS84 points to strategic registry cells (matches `hex-coordinates`). */
 const STRATEGIC_SNAP_RESOLUTION = 1;

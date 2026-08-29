@@ -1,6 +1,6 @@
 /**
  * Tactical ranged rubble persistence including INSERT for transport-only cells.
- * Run: `node dist/main/game-actions/tacticalRangedInfrastructureRubble.test.js`
+ * Run: `node dist/main/gameActions/tacticalRangedInfrastructureRubble.test.js`
  */
 
 import assert from 'node:assert/strict';

@@ -2,7 +2,7 @@
  * Builds tactical pending-march rows with stable path data for continuation beats after Ready commit.
  */
 
-import { findPathTailFromCurrentPosition } from '../../shared/marchPathUtils';
+import { findPathTailFromCurrentPosition } from '../../shared/marchPathHelpers';
 import type { TacticalPendingMarchRow } from '../../shared/ipc/humanOrderPreviewTypes';
 import { buildTacticalMarchDraftDestinationPreview } from '../../shared/tacticalMarchHoverPreview';
 import { filterTacticalMarchContinuationsToPresentSubUnits } from '../../shared/tacticalMarchContinuations';

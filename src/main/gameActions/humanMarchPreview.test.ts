@@ -4,7 +4,7 @@ import { withTempGameDb } from '../testSupport/withTempGameDb';
 import {
   configureHumanMarchPreviewCacheLimitsForTests,
   getHumanMarchPreviewDiagnostics,
-  previewHumanMarchOrdersImpl,
+  resolveHumanMarchOrderPreviews,
   resetHumanMarchPreviewDiagnosticsForTests,
 } from './humanMarchPreview';
 
@@ -37,9 +37,9 @@ function testSessionInvalidatesOnSelectionChange(): void {
     const hovered = state.hexes[0]?.h3Index ?? '';
     assert.ok(hovered, 'expected a hovered destination hex');
 
-    previewHumanMarchOrdersImpl([humanUnits[0]!.id], hovered);
-    previewHumanMarchOrdersImpl([humanUnits[0]!.id], hovered);
-    previewHumanMarchOrdersImpl([humanUnits[1]!.id], hovered);
+    resolveHumanMarchOrderPreviews([humanUnits[0]!.id], hovered);
+    resolveHumanMarchOrderPreviews([humanUnits[0]!.id], hovered);
+    resolveHumanMarchOrderPreviews([humanUnits[1]!.id], hovered);
 
     const diagnostics = getHumanMarchPreviewDiagnostics();
     assert.ok(diagnostics.sessionCreateCount >= 2, 'expected a new session after selection change');
@@ -67,7 +67,7 @@ function testCacheEvictionRespectsConfiguredBounds(): void {
     assert.ok(hoveredHexes.length >= 8, 'expected enough destination hexes for eviction test');
 
     for (const hoveredH3Index of hoveredHexes) {
-      previewHumanMarchOrdersImpl([unit!.id], hoveredH3Index);
+      resolveHumanMarchOrderPreviews([unit!.id], hoveredH3Index);
     }
 
     const diagnostics = getHumanMarchPreviewDiagnostics();
@@ -99,10 +99,10 @@ function testSessionInvalidatesOnVisibleOccupancyChange(): void {
     const hovered = state.hexes[0]?.h3Index ?? '';
     assert.ok(hovered, 'expected a hovered destination hex');
 
-    previewHumanMarchOrdersImpl([humanUnit!.id], hovered);
-    previewHumanMarchOrdersImpl([humanUnit!.id], hovered);
+    resolveHumanMarchOrderPreviews([humanUnit!.id], hovered);
+    resolveHumanMarchOrderPreviews([humanUnit!.id], hovered);
     dbRun('UPDATE units SET h3_index = ? WHERE id = ?', [destinationHex!, movingUnit!.id]);
-    previewHumanMarchOrdersImpl([humanUnit!.id], hovered);
+    resolveHumanMarchOrderPreviews([humanUnit!.id], hovered);
 
     const diagnostics = getHumanMarchPreviewDiagnostics();
     assert.ok(diagnostics.sessionReuseCount >= 1, 'expected session reuse before occupancy changed');
@@ -125,7 +125,7 @@ function testStrategicPreviewOmitsSlowerTerrainImpact(): void {
     assert.ok(landUnit, 'expected a seeded human land unit');
     const hovered = state.hexes.find((hex) => hex.h3Index !== landUnit!.h3Index && hex.terrain !== 'water')?.h3Index;
     assert.ok(hovered, 'expected a non-water destination hex');
-    const result = previewHumanMarchOrdersImpl([landUnit!.id], hovered);
+    const result = resolveHumanMarchOrderPreviews([landUnit!.id], hovered);
     assert.equal(result.slowerTerrainDisplayTitle ?? null, null);
     assert.equal(result.orderPreviewTerrainImpact ?? null, null);
     for (const row of result.previews) {

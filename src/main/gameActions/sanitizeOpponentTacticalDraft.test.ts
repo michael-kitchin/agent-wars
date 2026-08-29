@@ -1,6 +1,6 @@
 /**
  * Contract tests for opponent tactical draft sanitization at Ready commit.
- * Run with: node dist/main/game-actions/sanitizeOpponentTacticalDraft.test.js
+ * Run with: node dist/main/gameActions/sanitizeOpponentTacticalDraft.test.js
  */
 
 import * as assert from 'assert';

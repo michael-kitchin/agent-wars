@@ -1,6 +1,6 @@
 /**
  * Phase 1 regression: ranged/air submission flags count as tactical beat activity without marches or kills.
- * Run: `node dist/main/openrouter/consultationPolicy.tacticalRangedAirActivity.test.js`
+ * Run: `node dist/main/openRouter/consultationPolicyTacticalRangedAirActivity.test.js`
  */
 
 import assert from 'node:assert/strict';

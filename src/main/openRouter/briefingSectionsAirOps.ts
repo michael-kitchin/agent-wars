@@ -10,7 +10,7 @@
 import type { GameStateSnapshot } from '../gameDb';
 import { logDebug } from '../logger';
 import { AIR_FERRY_RANGE_HEXES, AIR_STRIKE_RANGE_HEXES } from '../../shared/tacticalRanges';
-import { buildPromptTableLines } from '../promptTableUtils';
+import { buildPromptTableLines } from '../promptTableHelpers';
 import { getRangeEnvelopeByBase, type RangeEnvelopeCache } from './rangeSupport';
 import { SECTION_TITLE_AIR_OPERATIONS_STATUS, topLevelHeading } from './promptSpec/sectionHeadings';
 

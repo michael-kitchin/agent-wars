@@ -11,7 +11,7 @@
       "rationale": "Directories under src/ must be camelCase.",
       "referencingFileCount": 71,
       "linkedEntryIds": [],
-      "status": "pending"
+      "status": "applied"
     },
     {
       "id": "dir-game-db",
@@ -24,7 +24,7 @@
       "rationale": "Directories under src/ must be camelCase.",
       "referencingFileCount": 40,
       "linkedEntryIds": [],
-      "status": "pending"
+      "status": "applied"
     },
     {
       "id": "dir-openrouter",
@@ -37,7 +37,7 @@
       "rationale": "Brand directory must match renderer openRouter camelCase.",
       "referencingFileCount": 103,
       "linkedEntryIds": [],
-      "status": "pending"
+      "status": "applied"
     },
     {
       "id": "file-briefing-map-section",
@@ -49,8 +49,10 @@
       "category": "fileCasing",
       "rationale": "TypeScript files must be camelCase.",
       "referencingFileCount": 6,
-      "linkedEntryIds": ["file-briefing-map-section-test"],
-      "status": "pending"
+      "linkedEntryIds": [
+        "file-briefing-map-section-test"
+      ],
+      "status": "applied"
     },
     {
       "id": "file-briefing-map-section-test",
@@ -62,8 +64,10 @@
       "category": "fileCasing",
       "rationale": "Colocated test must match the module file stem.",
       "referencingFileCount": 2,
-      "linkedEntryIds": ["file-briefing-map-section"],
-      "status": "pending"
+      "linkedEntryIds": [
+        "file-briefing-map-section"
+      ],
+      "status": "applied"
     },
     {
       "id": "file-briefing-tables",
@@ -76,7 +80,7 @@
       "rationale": "TypeScript files must be camelCase.",
       "referencingFileCount": 2,
       "linkedEntryIds": [],
-      "status": "pending"
+      "status": "applied"
     },
     {
       "id": "file-hex-bounding-box",
@@ -89,7 +93,7 @@
       "rationale": "TypeScript files must be camelCase.",
       "referencingFileCount": 1,
       "linkedEntryIds": [],
-      "status": "pending"
+      "status": "applied"
     },
     {
       "id": "file-hex-code-translator",
@@ -101,8 +105,10 @@
       "category": "fileCasing",
       "rationale": "TypeScript files must be camelCase.",
       "referencingFileCount": 3,
-      "linkedEntryIds": ["file-hex-code-translator-test"],
-      "status": "pending"
+      "linkedEntryIds": [
+        "file-hex-code-translator-test"
+      ],
+      "status": "applied"
     },
     {
       "id": "file-hex-code-translator-test",
@@ -114,8 +120,10 @@
       "category": "fileCasing",
       "rationale": "Colocated test must match the module file stem.",
       "referencingFileCount": 2,
-      "linkedEntryIds": ["file-hex-code-translator"],
-      "status": "pending"
+      "linkedEntryIds": [
+        "file-hex-code-translator"
+      ],
+      "status": "applied"
     },
     {
       "id": "file-hex-coordinates",
@@ -127,8 +135,10 @@
       "category": "fileCasing",
       "rationale": "TypeScript files must be camelCase.",
       "referencingFileCount": 4,
-      "linkedEntryIds": ["file-hex-coordinates-test"],
-      "status": "pending"
+      "linkedEntryIds": [
+        "file-hex-coordinates-test"
+      ],
+      "status": "applied"
     },
     {
       "id": "file-hex-coordinates-test",
@@ -140,8 +150,10 @@
       "category": "fileCasing",
       "rationale": "Colocated test must match the module file stem.",
       "referencingFileCount": 2,
-      "linkedEntryIds": ["file-hex-coordinates"],
-      "status": "pending"
+      "linkedEntryIds": [
+        "file-hex-coordinates"
+      ],
+      "status": "applied"
     },
     {
       "id": "file-hex-grid-projection",
@@ -154,7 +166,7 @@
       "rationale": "TypeScript files must be camelCase.",
       "referencingFileCount": 3,
       "linkedEntryIds": [],
-      "status": "pending"
+      "status": "applied"
     },
     {
       "id": "file-hex-map-renderer",
@@ -167,7 +179,7 @@
       "rationale": "TypeScript files must be camelCase.",
       "referencingFileCount": 3,
       "linkedEntryIds": [],
-      "status": "pending"
+      "status": "applied"
     },
     {
       "id": "file-map-utils",
@@ -180,7 +192,7 @@
       "rationale": "Utils collapses to Helpers.",
       "referencingFileCount": 19,
       "linkedEntryIds": [],
-      "status": "pending"
+      "status": "applied"
     },
     {
       "id": "file-prompt-table-utils",
@@ -193,7 +205,7 @@
       "rationale": "Utils collapses to Helpers.",
       "referencingFileCount": 8,
       "linkedEntryIds": [],
-      "status": "pending"
+      "status": "applied"
     },
     {
       "id": "file-march-path-utils",
@@ -205,8 +217,10 @@
       "category": "bannedSuffix",
       "rationale": "Utils collapses to Helpers.",
       "referencingFileCount": 3,
-      "linkedEntryIds": ["file-march-path-utils-test"],
-      "status": "pending"
+      "linkedEntryIds": [
+        "file-march-path-utils-test"
+      ],
+      "status": "applied"
     },
     {
       "id": "file-march-path-utils-test",
@@ -218,8 +232,10 @@
       "category": "bannedSuffix",
       "rationale": "Colocated test must match the renamed module stem.",
       "referencingFileCount": 1,
-      "linkedEntryIds": ["file-march-path-utils"],
-      "status": "pending"
+      "linkedEntryIds": [
+        "file-march-path-utils"
+      ],
+      "status": "applied"
     },
     {
       "id": "file-human-march-preview-impl",
@@ -232,7 +248,7 @@
       "rationale": "Drop Impl; Resolve avoids colliding with the humanMarchPreview directory.",
       "referencingFileCount": 3,
       "linkedEntryIds": [],
-      "status": "pending"
+      "status": "applied"
     },
     {
       "id": "sym-addHexBuildQueueEntryImpl",
@@ -244,7 +260,7 @@
       "rationale": "Public wrapper already uses the name without Impl.",
       "referencingFileCount": 2,
       "linkedEntryIds": [],
-      "status": "pending"
+      "status": "applied"
     },
     {
       "id": "sym-applyBuildQueueTemplateToHexesImpl",
@@ -256,7 +272,7 @@
       "rationale": "Public wrapper already uses the name without Impl.",
       "referencingFileCount": 2,
       "linkedEntryIds": [],
-      "status": "pending"
+      "status": "applied"
     },
     {
       "id": "sym-getHexBuildQueueImpl",
@@ -268,7 +284,7 @@
       "rationale": "Public wrapper already uses the name without Impl.",
       "referencingFileCount": 2,
       "linkedEntryIds": [],
-      "status": "pending"
+      "status": "applied"
     },
     {
       "id": "sym-removeHexBuildQueueEntryImpl",
@@ -280,7 +296,7 @@
       "rationale": "Public wrapper already uses the name without Impl.",
       "referencingFileCount": 2,
       "linkedEntryIds": [],
-      "status": "pending"
+      "status": "applied"
     },
     {
       "id": "sym-setHexesKeepBuildingImpl",
@@ -292,7 +308,7 @@
       "rationale": "Public wrapper already uses the name without Impl.",
       "referencingFileCount": 2,
       "linkedEntryIds": [],
-      "status": "pending"
+      "status": "applied"
     },
     {
       "id": "sym-updateHexBuildQueueEntryImpl",
@@ -304,7 +320,7 @@
       "rationale": "Public wrapper already uses the name without Impl.",
       "referencingFileCount": 2,
       "linkedEntryIds": [],
-      "status": "pending"
+      "status": "applied"
     },
     {
       "id": "sym-previewHumanMarchOrderImpl",
@@ -315,8 +331,10 @@
       "category": "bannedSuffix",
       "rationale": "Public wrapper already uses the name without Impl.",
       "referencingFileCount": 3,
-      "linkedEntryIds": ["file-human-march-preview-impl"],
-      "status": "pending"
+      "linkedEntryIds": [
+        "file-human-march-preview-impl"
+      ],
+      "status": "applied"
     },
     {
       "id": "sym-previewHumanMarchOrdersImpl",
@@ -327,8 +345,10 @@
       "category": "bannedSuffix",
       "rationale": "Public wrapper already uses the name without Impl.",
       "referencingFileCount": 2,
-      "linkedEntryIds": ["file-human-march-preview-impl"],
-      "status": "pending"
+      "linkedEntryIds": [
+        "file-human-march-preview-impl"
+      ],
+      "status": "applied"
     },
     {
       "id": "sym-getSealiftStackStateImpl",
@@ -340,7 +360,7 @@
       "rationale": "Public wrapper already uses getSealiftStackState.",
       "referencingFileCount": 3,
       "linkedEntryIds": [],
-      "status": "pending"
+      "status": "applied"
     },
     {
       "id": "sym-updateSealiftSlotImpl",
@@ -352,7 +372,7 @@
       "rationale": "Public wrapper already uses the name without Impl.",
       "referencingFileCount": 2,
       "linkedEntryIds": [],
-      "status": "pending"
+      "status": "applied"
     },
     {
       "id": "sym-submitOrdersImpl",
@@ -364,7 +384,7 @@
       "rationale": "Public wrapper already uses submitOrders.",
       "referencingFileCount": 5,
       "linkedEntryIds": [],
-      "status": "pending"
+      "status": "applied"
     },
     {
       "id": "sym-getHexController-controlInfrastructure",
@@ -401,7 +421,9 @@
       "category": "bannedSuffix",
       "rationale": "Re-export of the waived hex-ownership helper.",
       "referencingFileCount": 10,
-      "linkedEntryIds": ["sym-getHexController-controlInfrastructure"],
+      "linkedEntryIds": [
+        "sym-getHexController-controlInfrastructure"
+      ],
       "status": "waived",
       "waiverReason": "Same identifier as the waived implementation export."
     },
@@ -414,7 +436,9 @@
       "category": "bannedSuffix",
       "rationale": "Re-export of the waived hex-ownership helper.",
       "referencingFileCount": 8,
-      "linkedEntryIds": ["sym-setHexController-controlInfrastructure"],
+      "linkedEntryIds": [
+        "sym-setHexController-controlInfrastructure"
+      ],
       "status": "waived",
       "waiverReason": "Same identifier as the waived implementation export."
     },
@@ -441,7 +465,7 @@
       "rationale": "UI orchestration uses Handler, not Controller.",
       "referencingFileCount": 3,
       "linkedEntryIds": [],
-      "status": "pending"
+      "status": "applied"
     },
     {
       "id": "sym-ModelDescriptionTooltipController",
@@ -453,7 +477,7 @@
       "rationale": "UI orchestration uses Handler, not Controller.",
       "referencingFileCount": 2,
       "linkedEntryIds": [],
-      "status": "pending"
+      "status": "applied"
     },
     {
       "id": "sym-createMapKeyboardPanController",
@@ -465,7 +489,7 @@
       "rationale": "UI orchestration uses Handler, not Controller.",
       "referencingFileCount": 3,
       "linkedEntryIds": [],
-      "status": "pending"
+      "status": "applied"
     },
     {
       "id": "sym-MapKeyboardPanController",
@@ -476,8 +500,10 @@
       "category": "bannedSuffix",
       "rationale": "UI orchestration uses Handler, not Controller.",
       "referencingFileCount": 3,
-      "linkedEntryIds": ["sym-createMapKeyboardPanController"],
-      "status": "pending"
+      "linkedEntryIds": [
+        "sym-createMapKeyboardPanController"
+      ],
+      "status": "applied"
     },
     {
       "id": "file-tactical-tool1-pathfinding",
@@ -489,8 +515,10 @@
       "category": "numberedTool",
       "rationale": "Drop milestone numbering; name the responsibility.",
       "referencingFileCount": 4,
-      "linkedEntryIds": ["file-tactical-tool1-pathfinding-test"],
-      "status": "pending"
+      "linkedEntryIds": [
+        "file-tactical-tool1-pathfinding-test"
+      ],
+      "status": "applied"
     },
     {
       "id": "file-tactical-tool1-pathfinding-test",
@@ -502,8 +530,10 @@
       "category": "numberedTool",
       "rationale": "Colocated test must match the renamed module stem.",
       "referencingFileCount": 1,
-      "linkedEntryIds": ["file-tactical-tool1-pathfinding"],
-      "status": "pending"
+      "linkedEntryIds": [
+        "file-tactical-tool1-pathfinding"
+      ],
+      "status": "applied"
     },
     {
       "id": "file-tool1-pathfinding",
@@ -515,8 +545,12 @@
       "category": "numberedTool",
       "rationale": "Drop milestone numbering; name the responsibility.",
       "referencingFileCount": 8,
-      "linkedEntryIds": ["file-tool1-pathfinding-test", "sym-TOOL1_NAMES", "sym-executeTool1"],
-      "status": "pending"
+      "linkedEntryIds": [
+        "file-tool1-pathfinding-test",
+        "sym-TOOL1_NAMES",
+        "sym-executeTool1"
+      ],
+      "status": "applied"
     },
     {
       "id": "file-tool1-pathfinding-test",
@@ -528,8 +562,10 @@
       "category": "numberedTool",
       "rationale": "Colocated test must match the renamed module stem.",
       "referencingFileCount": 1,
-      "linkedEntryIds": ["file-tool1-pathfinding"],
-      "status": "pending"
+      "linkedEntryIds": [
+        "file-tool1-pathfinding"
+      ],
+      "status": "applied"
     },
     {
       "id": "file-tool1-pathfinding-distance-helpers",
@@ -542,7 +578,7 @@
       "rationale": "Drop milestone numbering.",
       "referencingFileCount": 3,
       "linkedEntryIds": [],
-      "status": "pending"
+      "status": "applied"
     },
     {
       "id": "file-tool1-pathfinding-plan-route-helpers",
@@ -555,7 +591,7 @@
       "rationale": "Drop milestone numbering.",
       "referencingFileCount": 3,
       "linkedEntryIds": [],
-      "status": "pending"
+      "status": "applied"
     },
     {
       "id": "file-tool1-pathfinding-route-resolution",
@@ -568,7 +604,7 @@
       "rationale": "Drop milestone numbering.",
       "referencingFileCount": 3,
       "linkedEntryIds": [],
-      "status": "pending"
+      "status": "applied"
     },
     {
       "id": "file-tool1-pathfinding-session-cache",
@@ -581,7 +617,7 @@
       "rationale": "Drop milestone numbering.",
       "referencingFileCount": 3,
       "linkedEntryIds": [],
-      "status": "pending"
+      "status": "applied"
     },
     {
       "id": "file-tool1-pathfinding-stateful",
@@ -594,7 +630,7 @@
       "rationale": "Drop milestone numbering.",
       "referencingFileCount": 3,
       "linkedEntryIds": [],
-      "status": "pending"
+      "status": "applied"
     },
     {
       "id": "sym-executeTool1",
@@ -605,8 +641,10 @@
       "category": "numberedTool",
       "rationale": "Drop tool-group number from the dispatch identifier.",
       "referencingFileCount": 5,
-      "linkedEntryIds": ["file-tool1-pathfinding"],
-      "status": "pending"
+      "linkedEntryIds": [
+        "file-tool1-pathfinding"
+      ],
+      "status": "applied"
     },
     {
       "id": "sym-TOOL1_NAMES",
@@ -617,8 +655,10 @@
       "category": "numberedTool",
       "rationale": "Identifier only; string values stay frozen.",
       "referencingFileCount": 4,
-      "linkedEntryIds": ["file-tool1-pathfinding"],
-      "status": "pending"
+      "linkedEntryIds": [
+        "file-tool1-pathfinding"
+      ],
+      "status": "applied"
     },
     {
       "id": "file-tool2-assessment",
@@ -630,8 +670,12 @@
       "category": "numberedTool",
       "rationale": "Drop milestone numbering.",
       "referencingFileCount": 6,
-      "linkedEntryIds": ["file-tool2-assessment-test", "sym-TOOL2_NAMES", "sym-executeTool2"],
-      "status": "pending"
+      "linkedEntryIds": [
+        "file-tool2-assessment-test",
+        "sym-TOOL2_NAMES",
+        "sym-executeTool2"
+      ],
+      "status": "applied"
     },
     {
       "id": "file-tool2-assessment-test",
@@ -643,8 +687,10 @@
       "category": "numberedTool",
       "rationale": "Colocated test must match the renamed module stem.",
       "referencingFileCount": 1,
-      "linkedEntryIds": ["file-tool2-assessment"],
-      "status": "pending"
+      "linkedEntryIds": [
+        "file-tool2-assessment"
+      ],
+      "status": "applied"
     },
     {
       "id": "sym-executeTool2",
@@ -655,8 +701,10 @@
       "category": "numberedTool",
       "rationale": "Drop tool-group number from the dispatch identifier.",
       "referencingFileCount": 4,
-      "linkedEntryIds": ["file-tool2-assessment"],
-      "status": "pending"
+      "linkedEntryIds": [
+        "file-tool2-assessment"
+      ],
+      "status": "applied"
     },
     {
       "id": "sym-TOOL2_NAMES",
@@ -667,8 +715,10 @@
       "category": "numberedTool",
       "rationale": "Identifier only; string values stay frozen.",
       "referencingFileCount": 3,
-      "linkedEntryIds": ["file-tool2-assessment"],
-      "status": "pending"
+      "linkedEntryIds": [
+        "file-tool2-assessment"
+      ],
+      "status": "applied"
     },
     {
       "id": "file-tool3-combat-estimation",
@@ -680,8 +730,12 @@
       "category": "numberedTool",
       "rationale": "Drop milestone numbering.",
       "referencingFileCount": 5,
-      "linkedEntryIds": ["file-tool3-combat-estimation-test", "sym-TOOL3_NAMES", "sym-executeTool3"],
-      "status": "pending"
+      "linkedEntryIds": [
+        "file-tool3-combat-estimation-test",
+        "sym-TOOL3_NAMES",
+        "sym-executeTool3"
+      ],
+      "status": "applied"
     },
     {
       "id": "file-tool3-combat-estimation-test",
@@ -693,8 +747,10 @@
       "category": "numberedTool",
       "rationale": "Colocated test must match the renamed module stem.",
       "referencingFileCount": 1,
-      "linkedEntryIds": ["file-tool3-combat-estimation"],
-      "status": "pending"
+      "linkedEntryIds": [
+        "file-tool3-combat-estimation"
+      ],
+      "status": "applied"
     },
     {
       "id": "sym-executeTool3",
@@ -705,8 +761,10 @@
       "category": "numberedTool",
       "rationale": "Drop tool-group number from the dispatch identifier.",
       "referencingFileCount": 4,
-      "linkedEntryIds": ["file-tool3-combat-estimation"],
-      "status": "pending"
+      "linkedEntryIds": [
+        "file-tool3-combat-estimation"
+      ],
+      "status": "applied"
     },
     {
       "id": "sym-TOOL3_NAMES",
@@ -717,8 +775,10 @@
       "category": "numberedTool",
       "rationale": "Identifier only; string values stay frozen.",
       "referencingFileCount": 3,
-      "linkedEntryIds": ["file-tool3-combat-estimation"],
-      "status": "pending"
+      "linkedEntryIds": [
+        "file-tool3-combat-estimation"
+      ],
+      "status": "applied"
     },
     {
       "id": "sym-runTool3Verification",
@@ -729,8 +789,10 @@
       "category": "numberedTool",
       "rationale": "Test helper should not encode a tool-group number.",
       "referencingFileCount": 2,
-      "linkedEntryIds": ["file-tool3-combat-estimation-test"],
-      "status": "pending"
+      "linkedEntryIds": [
+        "file-tool3-combat-estimation-test"
+      ],
+      "status": "applied"
     },
     {
       "id": "file-tool4-memory",
@@ -742,8 +804,12 @@
       "category": "numberedTool",
       "rationale": "Drop milestone numbering.",
       "referencingFileCount": 5,
-      "linkedEntryIds": ["file-tool4-memory-test", "sym-TOOL4_NAMES", "sym-executeTool4"],
-      "status": "pending"
+      "linkedEntryIds": [
+        "file-tool4-memory-test",
+        "sym-TOOL4_NAMES",
+        "sym-executeTool4"
+      ],
+      "status": "applied"
     },
     {
       "id": "file-tool4-memory-test",
@@ -755,8 +821,10 @@
       "category": "numberedTool",
       "rationale": "Colocated test must match the renamed module stem.",
       "referencingFileCount": 1,
-      "linkedEntryIds": ["file-tool4-memory"],
-      "status": "pending"
+      "linkedEntryIds": [
+        "file-tool4-memory"
+      ],
+      "status": "applied"
     },
     {
       "id": "sym-executeTool4",
@@ -767,8 +835,10 @@
       "category": "numberedTool",
       "rationale": "Drop tool-group number from the dispatch identifier.",
       "referencingFileCount": 4,
-      "linkedEntryIds": ["file-tool4-memory"],
-      "status": "pending"
+      "linkedEntryIds": [
+        "file-tool4-memory"
+      ],
+      "status": "applied"
     },
     {
       "id": "sym-TOOL4_NAMES",
@@ -779,8 +849,10 @@
       "category": "numberedTool",
       "rationale": "Identifier only; string values stay frozen.",
       "referencingFileCount": 3,
-      "linkedEntryIds": ["file-tool4-memory"],
-      "status": "pending"
+      "linkedEntryIds": [
+        "file-tool4-memory"
+      ],
+      "status": "applied"
     },
     {
       "id": "file-tool5-standing-orders",
@@ -792,8 +864,12 @@
       "category": "numberedTool",
       "rationale": "Drop milestone numbering.",
       "referencingFileCount": 5,
-      "linkedEntryIds": ["file-tool5-standing-orders-test", "sym-TOOL5_NAMES", "sym-executeTool5"],
-      "status": "pending"
+      "linkedEntryIds": [
+        "file-tool5-standing-orders-test",
+        "sym-TOOL5_NAMES",
+        "sym-executeTool5"
+      ],
+      "status": "applied"
     },
     {
       "id": "file-tool5-standing-orders-test",
@@ -805,8 +881,10 @@
       "category": "numberedTool",
       "rationale": "Colocated test must match the renamed module stem.",
       "referencingFileCount": 1,
-      "linkedEntryIds": ["file-tool5-standing-orders"],
-      "status": "pending"
+      "linkedEntryIds": [
+        "file-tool5-standing-orders"
+      ],
+      "status": "applied"
     },
     {
       "id": "file-tool5-standing-orders-core",
@@ -819,7 +897,7 @@
       "rationale": "Drop milestone numbering.",
       "referencingFileCount": 3,
       "linkedEntryIds": [],
-      "status": "pending"
+      "status": "applied"
     },
     {
       "id": "file-tool5-standing-orders-generation",
@@ -832,7 +910,7 @@
       "rationale": "Drop milestone numbering.",
       "referencingFileCount": 3,
       "linkedEntryIds": [],
-      "status": "pending"
+      "status": "applied"
     },
     {
       "id": "file-tool5-standing-orders-shared",
@@ -845,7 +923,7 @@
       "rationale": "Drop milestone numbering.",
       "referencingFileCount": 3,
       "linkedEntryIds": [],
-      "status": "pending"
+      "status": "applied"
     },
     {
       "id": "sym-executeTool5",
@@ -856,8 +934,10 @@
       "category": "numberedTool",
       "rationale": "Drop tool-group number from the dispatch identifier.",
       "referencingFileCount": 4,
-      "linkedEntryIds": ["file-tool5-standing-orders"],
-      "status": "pending"
+      "linkedEntryIds": [
+        "file-tool5-standing-orders"
+      ],
+      "status": "applied"
     },
     {
       "id": "sym-TOOL5_NAMES",
@@ -868,8 +948,10 @@
       "category": "numberedTool",
       "rationale": "Identifier only; string values stay frozen.",
       "referencingFileCount": 3,
-      "linkedEntryIds": ["file-tool5-standing-orders"],
-      "status": "pending"
+      "linkedEntryIds": [
+        "file-tool5-standing-orders"
+      ],
+      "status": "applied"
     },
     {
       "id": "file-tool6-production",
@@ -881,8 +963,12 @@
       "category": "numberedTool",
       "rationale": "Avoid colliding with src/main/productionOrders.ts.",
       "referencingFileCount": 5,
-      "linkedEntryIds": ["file-tool6-production-test", "sym-TOOL6_NAMES", "sym-executeTool6"],
-      "status": "pending"
+      "linkedEntryIds": [
+        "file-tool6-production-test",
+        "sym-TOOL6_NAMES",
+        "sym-executeTool6"
+      ],
+      "status": "applied"
     },
     {
       "id": "file-tool6-production-test",
@@ -894,8 +980,10 @@
       "category": "numberedTool",
       "rationale": "Colocated test must match the renamed module stem.",
       "referencingFileCount": 1,
-      "linkedEntryIds": ["file-tool6-production"],
-      "status": "pending"
+      "linkedEntryIds": [
+        "file-tool6-production"
+      ],
+      "status": "applied"
     },
     {
       "id": "sym-executeTool6",
@@ -906,8 +994,10 @@
       "category": "numberedTool",
       "rationale": "Drop tool-group number from the dispatch identifier.",
       "referencingFileCount": 4,
-      "linkedEntryIds": ["file-tool6-production"],
-      "status": "pending"
+      "linkedEntryIds": [
+        "file-tool6-production"
+      ],
+      "status": "applied"
     },
     {
       "id": "sym-TOOL6_NAMES",
@@ -918,8 +1008,10 @@
       "category": "numberedTool",
       "rationale": "Identifier only; string values stay frozen.",
       "referencingFileCount": 3,
-      "linkedEntryIds": ["file-tool6-production"],
-      "status": "pending"
+      "linkedEntryIds": [
+        "file-tool6-production"
+      ],
+      "status": "applied"
     }
   ]
 }

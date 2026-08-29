@@ -185,13 +185,13 @@ function notifyMainViewChanged(): void {
  * Exceptions: None.
  */
 function getL(): GlobalLeafletFactory {
-  const Lref = (globalThis as unknown as { L?: GlobalLeafletFactory }).L;
-  if (!Lref) throw new Error('Leaflet not loaded: include static/vendor/leaflet/leaflet.js before renderer.js');
-  return Lref;
+  const leafletRef = (globalThis as unknown as { L?: GlobalLeafletFactory }).L;
+  if (!leafletRef) throw new Error('Leaflet not loaded: include static/vendor/leaflet/leaflet.js before renderer.js');
+  return leafletRef;
 }
 
 /**
- * Defines the `mountRasterBasemap` function shape (function mountRasterBasemap(Lref: GlobalLeafletFactory, map: VendorLeafletMap, showAttribution: boolean, chainIndex: number, target: 'main' | 'mini'): void).
+ * Defines the `mountRasterBasemap` function shape (function mountRasterBasemap(leafletRef: GlobalLeafletFactory, map: VendorLeafletMap, showAttribution: boolean, chainIndex: number, target: 'main' | 'mini'): void).
 
  * Purpose: Supports maintainability by documenting why `mountRasterBasemap` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
@@ -199,7 +199,7 @@ function getL(): GlobalLeafletFactory {
  * Exceptions: None.
  */
 function mountRasterBasemap(
-  Lref: GlobalLeafletFactory,
+  leafletRef: GlobalLeafletFactory,
   map: VendorLeafletMap,
   showAttribution: boolean,
   chainIndex: number,
@@ -234,7 +234,7 @@ function mountRasterBasemap(
     minZoom: spec.minZoom ?? 0,
   };
   if (spec.subdomains !== undefined) layerOpts.subdomains = spec.subdomains;
-  const layer: VendorRasterLayer = Lref.tileLayer(spec.urlTemplate, layerOpts).addTo(map);
+  const layer: VendorRasterLayer = leafletRef.tileLayer(spec.urlTemplate, layerOpts).addTo(map);
   if (target === 'main') mainBasemapLayer = layer;
   else miniBasemapLayer = layer;
 
@@ -253,7 +253,7 @@ function mountRasterBasemap(
       failedId: spec.id,
       nextIndex: chainIndex + 1,
     });
-    mountRasterBasemap(Lref, map, showAttribution, chainIndex + 1, target);
+    mountRasterBasemap(leafletRef, map, showAttribution, chainIndex + 1, target);
   };
   layer.on('tileerror', onTileError);
 }
@@ -268,10 +268,10 @@ function mountRasterBasemap(
  */
 export function setMainBasemapByProviderId(providerId: string): void {
   if (!mainMap || !miniMap) return;
-  const Lref = getL();
+  const leafletRef = getL();
   const startIdx = getRasterBasemapChainStartIndex(providerId);
-  mountRasterBasemap(Lref, mainMap, true, startIdx, 'main');
-  mountRasterBasemap(Lref, miniMap, false, startIdx, 'mini');
+  mountRasterBasemap(leafletRef, mainMap, true, startIdx, 'main');
+  mountRasterBasemap(leafletRef, miniMap, false, startIdx, 'mini');
 }
 
 /**
@@ -289,7 +289,7 @@ export function initWorldLeafletMaps(
   initialBasemapProviderId?: string
 ): void {
   onMainViewChanged = onViewChanged;
-  const Lref = getL();
+  const leafletRef = getL();
 
   const mainEl = document.getElementById(mainContainerId);
   const miniEl = document.getElementById(minimapContainerId);
@@ -304,12 +304,12 @@ export function initWorldLeafletMaps(
   }
 
   /* Match EPSG:3857 tile extent so pan limits align with projection (H3 can exceed ±85° in WGS84). */
-  const worldBounds = Lref.latLngBounds(
-    Lref.latLng(-WEB_MERCATOR_MAX_ABS_LAT, -180),
-    Lref.latLng(WEB_MERCATOR_MAX_ABS_LAT, 180)
+  const worldBounds = leafletRef.latLngBounds(
+    leafletRef.latLng(-WEB_MERCATOR_MAX_ABS_LAT, -180),
+    leafletRef.latLng(WEB_MERCATOR_MAX_ABS_LAT, 180)
   );
 
-  mainMap = Lref.map(mainEl, {
+  mainMap = leafletRef.map(mainEl, {
     minZoom: 1.5,
     maxZoom: 12,
     zoomSnap: 0.25,
@@ -327,13 +327,13 @@ export function initWorldLeafletMaps(
   });
 
   const startIdx = getRasterBasemapChainStartIndex(initialBasemapProviderId ?? 'carto_light_nolabels');
-  mountRasterBasemap(Lref, mainMap, true, startIdx, 'main');
+  mountRasterBasemap(leafletRef, mainMap, true, startIdx, 'main');
 
   mainMap.fitBounds(worldBounds, { padding: [2, 2], animate: false });
   mainMap.doubleClickZoom.disable();
   try {
     // Show real-world distance context when Leaflet scale control is available.
-    Lref.control
+    leafletRef.control
       .scale({
         metric: true,
         imperial: true,
@@ -344,7 +344,7 @@ export function initWorldLeafletMaps(
     /* scale control not available in some Leaflet builds */
   }
 
-  miniMap = Lref.map(miniEl, {
+  miniMap = leafletRef.map(miniEl, {
     minZoom: 0,
     maxZoom: 2,
     zoomControl: false,
@@ -356,7 +356,7 @@ export function initWorldLeafletMaps(
     keyboard: false,
   });
 
-  mountRasterBasemap(Lref, miniMap, false, startIdx, 'mini');
+  mountRasterBasemap(leafletRef, miniMap, false, startIdx, 'mini');
 
   miniMap.fitBounds(worldBounds, { padding: [1, 1], animate: false });
   miniMap.setZoom(miniMap.getZoom());
@@ -410,7 +410,7 @@ function showBasemapErrorToast(): void {
  */
 export function syncMinimapViewportRect(): void {
   if (!mainMap || !miniMap) return;
-  const Lref = getL();
+  const leafletRef = getL();
   const mainBounds = mainMap.getBounds();
   const miniBounds = miniMap.getBounds();
 
@@ -432,7 +432,7 @@ export function syncMinimapViewportRect(): void {
   }
 
   if (!viewportRect) {
-    viewportRect = Lref.rectangle(mainBounds, {
+    viewportRect = leafletRef.rectangle(mainBounds, {
       color: ORDER_LINE_COLOR,
       weight: 2,
       fill: false,
@@ -496,9 +496,9 @@ export function hexCenterToOverlayPoint(
   latLngFn: (idx: string) => [number, number]
 ): { x: number; y: number } {
   if (!mainMap) return { x: 0, y: 0 };
-  const Lref = getL();
+  const leafletRef = getL();
   const [lat, lng] = latLngFn(h3Index);
-  const p = mainMap.latLngToContainerPoint(Lref.latLng(clampLatForWebMercatorDisplay(lat), lng));
+  const p = mainMap.latLngToContainerPoint(leafletRef.latLng(clampLatForWebMercatorDisplay(lat), lng));
   return { x: p.x, y: p.y };
 }
 
@@ -516,11 +516,11 @@ export function hexCenterToOverlayPointWithReferenceLng(
   latLngFn: (idx: string) => [number, number]
 ): { x: number; y: number } {
   if (!mainMap) return { x: 0, y: 0 };
-  const Lref = getL();
+  const leafletRef = getL();
   const [lat, lng] = latLngFn(h3Index);
   const lngAligned = alignLngToReference(lng, referenceLngDegrees);
   const p = mainMap.latLngToContainerPoint(
-    Lref.latLng(clampLatForWebMercatorDisplay(lat), lngAligned)
+    leafletRef.latLng(clampLatForWebMercatorDisplay(lat), lngAligned)
   );
   return { x: p.x, y: p.y };
 }

@@ -18,7 +18,7 @@ import {
   gridHopDistanceBetween,
   pickApproachHexesTowardNearestEnemy,
 } from './assessUnitProximity';
-import { canAssignStandingOrderType } from './tool5StandingOrdersShared';
+import { canAssignStandingOrderType } from './standingOrdersShared';
 
 /**
  * Collects enemy-occupied hexes from the same snapshot Best Options reads.

@@ -1,7 +1,7 @@
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import { dbRun, dbGetOne, dbGetAll, saveDatabase } from '../gameDb';
-import { createPathfindingSession, executePlanRouteWithSession } from './tool1Pathfinding';
-import type { LatLng } from './tool1Pathfinding';
+import { createPathfindingSession, executePlanRouteWithSession } from './pathfinding';
+import type { LatLng } from './pathfinding';
 import { terrainIsPassableForDomain } from '../pathfinding';
 import type { PassableDomain } from '../pathfinding';
 import { landUnitCanOccupyHex } from '../../shared/landTraversalRes1';
@@ -9,10 +9,10 @@ import { getRes1LandMassByH3 } from '../terrainClassificationCache';
 import { buildLatLngCoordinateMap } from '../mapData';
 import { logDebug, logError, logTrace } from '../logger';
 import type { CoordinateContext } from '../briefing/map/coordinateContext';
-import { ensureStrategicCoordinateRegistryInitialized } from '../briefing/map/hex-coordinates';
-import { h3ToCode } from '../briefing/map/hex-code-translator';
-import { buildPromptTableLines } from '../promptTableUtils';
-import { SECTION_TITLE_STANDING_ORDER_STATUS, topLevelHeading } from '../openrouter/promptSpec/sectionHeadings';
+import { ensureStrategicCoordinateRegistryInitialized } from '../briefing/map/hexCoordinates';
+import { h3ToCode } from '../briefing/map/hexCodeTranslator';
+import { buildPromptTableLines } from '../promptTableHelpers';
+import { SECTION_TITLE_STANDING_ORDER_STATUS, topLevelHeading } from '../openRouter/promptSpec/sectionHeadings';
 import {
   canAssignStandingOrderType,
   parseComputedRoute,
@@ -21,9 +21,9 @@ import {
   toComputedRoutePayload,
   type AssignOrderParams,
   type StandingOrderRow,
-} from './tool5StandingOrdersShared';
+} from './standingOrdersShared';
 import { suggestApproachDestinationsForOrderlessUnits } from './orderlessUnitSuggestions';
-import { expireAndUpdateStatus, generateOrdersForStandingOrders } from './tool5StandingOrdersGeneration';
+import { expireAndUpdateStatus, generateOrdersForStandingOrders } from './standingOrdersGeneration';
 import { marchStepRecedesFromEnemy, nearestObservedEnemyH3 } from './standingMarchReceding';
 export { expireAndUpdateStatus, generateOrdersForStandingOrders };
 
@@ -265,7 +265,7 @@ function assignOrder(
   latLngByH3: Map<string, LatLng>,
   resolveToH3: (lat: number, lng: number) => string | undefined
 ): Record<string, unknown> {
-  logDebug('tool5StandingOrders assignOrder', { playerId, unitId, orderType: order?.type });
+  logDebug('standingOrders assignOrder', { playerId, unitId, orderType: order?.type });
   const pathfindingSession = createPathfindingSession(state, latLngByH3, resolveToH3);
 
   const unit = state.units.find((u) => u.id === unitId);
@@ -462,7 +462,7 @@ function assignOrder(
   } else {
     // March orders are one-time objectives; drop immediately if the unit is already there.
     dbRun('DELETE FROM standing_orders WHERE player_id = ? AND unit_id = ?', [playerId, unitId]);
-    logDebug('tool5StandingOrders assignOrder: dropped arrived march order', { playerId, unitId });
+    logDebug('standingOrders assignOrder: dropped arrived march order', { playerId, unitId });
   }
   saveDatabase();
 
@@ -498,7 +498,7 @@ function assignOrder(
 }
 
 /**
- * Defines the `queryOrders` function shape (function queryOrders(playerId: string, unitId?: string, all?: boolean): Record<string, unknown> { logTrace('tool5StandingOrders queryOrders', { playerId, uni).
+ * Defines the `queryOrders` function shape (function queryOrders(playerId: string, unitId?: string, all?: boolean): Record<string, unknown> { logTrace('standingOrders queryOrders', { playerId, uni).
 
  * Purpose: Supports maintainability by documenting why `queryOrders` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
@@ -506,7 +506,7 @@ function assignOrder(
  * Exceptions: None.
  */
 function queryOrders(playerId: string, unitId?: string, all?: boolean): Record<string, unknown> {
-  logTrace('tool5StandingOrders queryOrders', { playerId, unitId, all });
+  logTrace('standingOrders queryOrders', { playerId, unitId, all });
 
   if (unitId === undefined && all !== true) {
     return { status: 'error', error: 'query_orders requires unitId or all (true)' };
@@ -564,7 +564,7 @@ function rowToOrderResponse(row: StandingOrderRow): Record<string, unknown> {
 }
 
 /**
- * Defines the `cancelOrder` function shape (function cancelOrder(playerId: string, unitId: string): Record<string, unknown> { logDebug('tool5StandingOrders cancelOrder', { playerId, unitId }); con).
+ * Defines the `cancelOrder` function shape (function cancelOrder(playerId: string, unitId: string): Record<string, unknown> { logDebug('standingOrders cancelOrder', { playerId, unitId }); con).
 
  * Purpose: Supports maintainability by documenting why `cancelOrder` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
@@ -572,7 +572,7 @@ function rowToOrderResponse(row: StandingOrderRow): Record<string, unknown> {
  * Exceptions: None.
  */
 function cancelOrder(playerId: string, unitId: string): Record<string, unknown> {
-  logDebug('tool5StandingOrders cancelOrder', { playerId, unitId });
+  logDebug('standingOrders cancelOrder', { playerId, unitId });
 
   const row = dbGetOne<StandingOrderRow>(
     'SELECT * FROM standing_orders WHERE player_id = ? AND unit_id = ?',
@@ -617,7 +617,7 @@ export function getStandingOrderForUnit(
   status: string;
   targetUnitId?: string;
 } | null {
-  logTrace('tool5StandingOrders getStandingOrderForUnit', { playerId, unitId });
+  logTrace('standingOrders getStandingOrderForUnit', { playerId, unitId });
   const row = dbGetOne<StandingOrderRow>(
     'SELECT * FROM standing_orders WHERE player_id = ? AND unit_id = ?',
     [playerId, unitId]
@@ -657,7 +657,7 @@ export function getInjectionText(
 ): string {
   const ctx: CoordinateContext = coordinateContext ?? { mode: 'strategic' };
   if (ctx.mode === 'tactical') {
-    logDebug('tool5StandingOrders getInjectionText: omitted in tactical mode', {
+    logDebug('standingOrders getInjectionText: omitted in tactical mode', {
       playerId,
       battleId: ctx.battleId ?? null,
     });
@@ -665,7 +665,7 @@ export function getInjectionText(
   }
   expireAndUpdateStatus(playerId, state);
   ensureStrategicCoordinateRegistryInitialized();
-  logDebug('tool5StandingOrders getInjectionText', {
+  logDebug('standingOrders getInjectionText', {
     playerId,
     turnNumber: state.turnNumber,
     coordinateMode: ctx.mode,
@@ -673,7 +673,7 @@ export function getInjectionText(
 
   const hexList = state.hexes.map((h) => h.h3Index);
   const { resolveToH3 } = buildLatLngCoordinateMap(hexList);
-  logTrace('tool5StandingOrders getInjectionText: map context', { hexCount: hexList.length });
+  logTrace('standingOrders getInjectionText: map context', { hexCount: hexList.length });
 
   const rows = dbGetAll<StandingOrderRow>(
     'SELECT * FROM standing_orders WHERE player_id = ? ORDER BY unit_id',
@@ -766,7 +766,7 @@ export function executeStandingOrderActionForPlayer(
   latLngByH3: Map<string, LatLng>,
   resolveToH3: (lat: number, lng: number) => string | undefined
 ): Record<string, unknown> {
-  logDebug('tool5StandingOrders executeStandingOrderActionForPlayer', { playerId, toolName, stateTurn: state.turnNumber });
+  logDebug('standingOrders executeStandingOrderActionForPlayer', { playerId, toolName, stateTurn: state.turnNumber });
   try {
     if (toolName === 'assign_order') {
       const a = args as { unitId?: string; order?: AssignOrderParams };
@@ -795,7 +795,7 @@ export function executeStandingOrderActionForPlayer(
     }
     return cancelOrder(playerId, a.unitId);
   } catch (err) {
-    logError('tool5StandingOrders executeStandingOrderActionForPlayer: exception', playerId, toolName, err);
+    logError('standingOrders executeStandingOrderActionForPlayer: exception', playerId, toolName, err);
     return { status: 'error', error: String(err) };
   }
 }

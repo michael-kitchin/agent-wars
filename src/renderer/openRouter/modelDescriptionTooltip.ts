@@ -37,7 +37,7 @@ export type ModelDescriptionTooltipOptions = {
  * Expected outcome: `clear` hides the tip and cancels any pending dwell timer.
  * Exceptions: None.
  */
-export type ModelDescriptionTooltipController = {
+export type ModelDescriptionTooltipHandler = {
   /**
    * Hides the tooltip and cancels any pending show timer.
 
@@ -121,7 +121,7 @@ function keyOpensNativeList(ev: KeyboardEvent): boolean {
  */
 export function attachModelDescriptionTooltip(
   options: ModelDescriptionTooltipOptions
-): ModelDescriptionTooltipController {
+): ModelDescriptionTooltipHandler {
   const { select, getDescriptionForModelId } = options;
   let delayTimer: ReturnType<typeof setTimeout> | null = null;
   let pointerInside = false;

@@ -8,7 +8,7 @@
  */
 
 import { logDebug, logTrace } from '../../logger';
-import type { HexGrid, GridCell } from './hex-grid-projection';
+import type { HexGrid, GridCell } from './hexGridProjection';
 
 /**
  * Per-hex tactical/strategic snapshot fields required for map symbology.

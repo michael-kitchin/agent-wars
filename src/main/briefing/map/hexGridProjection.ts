@@ -10,7 +10,7 @@
 import { cellToLatLng } from 'h3-js';
 import { logDebug, logTrace } from '../../logger';
 import type { CoordinateContext } from './coordinateContext';
-import { getHexCodeForContext } from './hex-coordinates';
+import { getHexCodeForContext } from './hexCoordinates';
 
 const DEFAULT_CLUSTER_THRESHOLD_DEG = 4;
 

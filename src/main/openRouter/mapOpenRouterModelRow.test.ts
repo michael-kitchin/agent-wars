@@ -1,6 +1,6 @@
 /**
  * Fixture tests for OpenRouter model row mapping.
- * Run with: node dist/main/openrouter/mapOpenRouterModelRow.test.js
+ * Run with: node dist/main/openRouter/mapOpenRouterModelRow.test.js
  */
 
 import assert from 'node:assert/strict';
@@ -103,7 +103,7 @@ function testMissingId(): void {
  * Runs mapper fixture tests.
 
  * Purpose: Node entrypoint for main-process test discovery.
- * When to use: `node dist/main/openrouter/mapOpenRouterModelRow.test.js`.
+ * When to use: `node dist/main/openRouter/mapOpenRouterModelRow.test.js`.
  * Expected outcome: Throws on failure; logs pass when all succeed.
  * Exceptions: Propagates assertion errors.
  */

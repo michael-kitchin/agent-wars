@@ -1,5 +1,5 @@
 /**
- * Contract tests for tactical AI prompt projection. Run with: node dist/main/openrouter/tacticalPromptProjection.test.js
+ * Contract tests for tactical AI prompt projection. Run with: node dist/main/openRouter/tacticalPromptProjection.test.js
  */
 
 import assert from 'node:assert/strict';

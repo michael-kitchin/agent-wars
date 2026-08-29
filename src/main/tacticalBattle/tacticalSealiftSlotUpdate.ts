@@ -1,11 +1,11 @@
 /**
- * Immediate tactical sealift slot edits (embark/debark/reassign) mirroring strategic `updateSealiftSlotImpl` on the active snapshot.
+ * Immediate tactical sealift slot edits (embark/debark/reassign) mirroring strategic `executeSealiftSlotUpdate` on the active snapshot.
  */
 
 import type { EmbarkOrder, SealiftStackState } from '../../shared/ipcTypes';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
-import { canManualDebarkFromHex, syncStrategicSealiftFromTacticalHexEmbarkPairs } from '../game-actions/sealift';
-import { normalizeSealiftSlots, type SealiftSlotPair } from '../game-actions/sealiftSlotAssignment';
+import { canManualDebarkFromHex, syncStrategicSealiftFromTacticalHexEmbarkPairs } from '../gameActions/sealift';
+import { normalizeSealiftSlots, type SealiftSlotPair } from '../gameActions/sealiftSlotAssignment';
 import { isDbReady } from '../gameDb';
 import { getActiveTacticalBattleSnapshotRef, setActiveTacticalBattleSnapshotRef } from './activeTacticalBattleRef';
 import { writeTacticalBattleSnapshotToGameConfig } from './tacticalBattlePersistence';
@@ -67,7 +67,7 @@ export type TacticalSealiftSlotProjectResult =
  *
  * Purpose: Pure projection for tests and for `applyTacticalSealiftSlotChangeInSession` before SQLite writes.
  * When to use: `applyTacticalSealiftSlotChangeInSession` and unit tests that assert embark/debark parity.
- * Expected outcome: Same success/failure reasons as strategic `updateSealiftSlotImpl`, with sub-unit ids throughout.
+ * Expected outcome: Same success/failure reasons as strategic `executeSealiftSlotUpdate`, with sub-unit ids throughout.
  * Exceptions: None; returns `success: false` instead of throwing.
  */
 export function projectTacticalSealiftSlotChange(

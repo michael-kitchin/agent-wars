@@ -9,7 +9,7 @@
 
 import { cellToLatLng } from 'h3-js';
 import { logDebug, logTrace } from '../../logger';
-import { listStrategicRes1H3Indexes } from './hex-coordinates';
+import { listStrategicRes1H3Indexes } from './hexCoordinates';
 
 /**
  * Wraps a longitude delta to (-180, 180] degrees.

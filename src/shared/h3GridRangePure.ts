@@ -1,7 +1,7 @@
 /**
  * Pure H3 grid distance, cell path, and “within range” checks without process logging.
  *
- * Purpose: Shared semantics for `game-actions/gridRange` and tactical terrain ranged filters so validation
+ * Purpose: Shared semantics for `gameActions/gridRange` and tactical terrain ranged filters so validation
  * and apply-phase stripping never diverge on fallback paths (`gridPathCells`, `gridDisk`, neighbor BFS). H3's fast
  * APIs throw for pairs spanning an icosahedron face boundary, and callers that gave up on those pairs rejected legal
  * moves and shots; every fallback here exists to keep those pairs measurable. See

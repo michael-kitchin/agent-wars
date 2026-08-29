@@ -11,7 +11,7 @@
 import { logDebug } from '../logger';
 import type { CoordinateContext } from '../briefing/map/coordinateContext';
 import { HEX_CODE_PATTERN } from '../briefing/map/coordinateContext';
-import { codeToLatLngRounded } from '../briefing/map/hex-code-translator';
+import { codeToLatLngRounded } from '../briefing/map/hexCodeTranslator';
 
 /**
  * Order fields that hold exactly one place as a briefing hex code.
@@ -46,7 +46,7 @@ function tryCodeToLatLng(code: string, context: CoordinateContext): [number, num
  * Purpose: Makes `march`, `defend`, and `patrol` all usable from model output. Before this existed only
  * `destination` was translated, so patrol waypoints reached Tool 5 as raw code strings and were always
  * rejected as off-map.
- * When to use: In the strategic `assign_order` branch of the order parser, immediately before `executeTool5`.
+ * When to use: In the strategic `assign_order` branch of the order parser, immediately before `executeStandingOrders`.
  * Expected outcome: A shallow copy with `destination`, `defendHex`, and each `waypoints` entry converted
  * where they held a valid hex code. Non-object payloads pass through untouched, values that are already
  * coordinate tuples are preserved, and codes that fail to resolve are left as-is so Tool 5 reports the

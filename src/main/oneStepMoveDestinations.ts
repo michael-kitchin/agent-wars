@@ -12,7 +12,7 @@ import {
 } from '../shared/landTraversalRes1';
 import { MOVEMENT_RANGE_BY_UNIT_TYPE } from '../shared/tacticalRanges';
 import { getRes1LandMassByH3 } from './terrainClassificationCache';
-import { isEmbarkedLandUnit } from './game-actions/sealift';
+import { isEmbarkedLandUnit } from './gameActions/sealift';
 import {
   getNavalStrategicReachableHexes,
   navalLookupForHexState,

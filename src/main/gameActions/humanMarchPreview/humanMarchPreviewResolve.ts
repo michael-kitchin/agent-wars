@@ -5,7 +5,7 @@ import {
   getRes1InfrastructureForHex,
   isDbReady,
 } from '../../gameDb';
-import { executePlanRouteWithSession } from '../../tools/tool1Pathfinding';
+import { executePlanRouteWithSession } from '../../tools/pathfinding';
 import { logDebug, logError, logTrace } from '../../logger';
 import { isTacticalBattleActive } from '../../tacticalBattle/tacticalBattleSession';
 import { AIR_FERRY_RANGE_HEXES, MOVEMENT_RANGE_BY_UNIT_TYPE, formatFerryOutOfRangeReason } from '../../../shared/tacticalRanges';
@@ -29,7 +29,7 @@ import {
   getLandMovementBlockReason,
   isLandUnitType,
 } from '../landMovementConstraints';
-import type { PlanRouteError, PlanRouteOk } from '../../tools/tool1Pathfinding';
+import type { PlanRouteError, PlanRouteOk } from '../../tools/pathfinding';
 import type { GameStateSnapshot } from '../../../shared/ipcTypes';
 import {
   buildEnvironmentSignature,
@@ -454,7 +454,7 @@ previews: HumanOrderGroupPreviewUnitResult[];
    * Aggregated slow-terrain label for grouped march hover (parity with `humanOrderPreviewTypes`).
    *
    * Contract: Optional; omitted when no row is slowed.
-   * When to use: Returned from `previewHumanMarchOrdersImpl` after envelope assembly.
+   * When to use: Returned from `resolveHumanMarchOrderPreviews` after envelope assembly.
    * Expected outcome: First non-null per-row title or explicit envelope override.
    * Exceptions: None.
    */
@@ -463,7 +463,7 @@ slowerTerrainDisplayTitle?: string | null;
    * Merged terrain / transport hints for grouped march HTML tooltips (parity with `humanOrderPreviewTypes`).
    *
    * Contract: Union of contributing per-row impacts after envelope assembly.
-   * When to use: Returned from `previewHumanMarchOrdersImpl` after `buildHumanOrderGroupPreviewEnvelope`.
+   * When to use: Returned from `resolveHumanMarchOrderPreviews` after `buildHumanOrderGroupPreviewEnvelope`.
    * Expected outcome: Sorted union of `slower`; omitted on strategic grouped previews.
    * Exceptions: None.
    */
@@ -743,7 +743,7 @@ function computeHumanMarchPreviewForUnit(
  * Defines the `buildHumanMarchPreviewForUnit` function shape (function buildHumanMarchPreviewForUnit().
 
  * Purpose: Thin wrapper so single-unit and grouped preview callers share one entry point into `computeHumanMarchPreviewForUnit` (route/result caches only; no time-based reuse of stale hovers).
- * When to use: From `previewHumanMarchOrderImpl` and grouped preview assembly after session/context validation.
+ * When to use: From `resolveHumanMarchOrderPreview` and grouped preview assembly after session/context validation.
  * Expected outcome: Always reflects the requested `hoveredH3Index` for the given `unitId`.
  * Exceptions: None.
  */
@@ -756,14 +756,14 @@ function buildHumanMarchPreviewForUnit(
 }
 
 /**
- * Defines the `previewHumanMarchOrderImpl` function shape (export function previewHumanMarchOrderImpl(unitId: string, hoveredH3Index: string): HumanOrderPreviewResult).
+ * Defines the `resolveHumanMarchOrderPreview` function shape (export function resolveHumanMarchOrderPreview(unitId: string, hoveredH3Index: string): HumanOrderPreviewResult).
 
- * Purpose: Supports maintainability by documenting why `previewHumanMarchOrderImpl` exists.
+ * Purpose: Supports maintainability by documenting why `resolveHumanMarchOrderPreview` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function previewHumanMarchOrderImpl(unitId: string, hoveredH3Index: string): HumanOrderPreviewResult {
+export function resolveHumanMarchOrderPreview(unitId: string, hoveredH3Index: string): HumanOrderPreviewResult {
   logTrace('gameActions previewHumanMarchOrder', { unitId, hoveredH3Index });
   try {
     previewDiagnostics.requestCount += 1;
@@ -780,14 +780,14 @@ export function previewHumanMarchOrderImpl(unitId: string, hoveredH3Index: strin
 }
 
 /**
- * Defines the `previewHumanMarchOrdersImpl` function shape (export function previewHumanMarchOrdersImpl(unitIds: string[], hoveredH3Index: string): HumanOrderGroupPreviewResult).
+ * Defines the `resolveHumanMarchOrderPreviews` function shape (export function resolveHumanMarchOrderPreviews(unitIds: string[], hoveredH3Index: string): HumanOrderGroupPreviewResult).
 
- * Purpose: Supports maintainability by documenting why `previewHumanMarchOrdersImpl` exists.
+ * Purpose: Supports maintainability by documenting why `resolveHumanMarchOrderPreviews` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function previewHumanMarchOrdersImpl(unitIds: string[], hoveredH3Index: string): HumanOrderGroupPreviewResult {
+export function resolveHumanMarchOrderPreviews(unitIds: string[], hoveredH3Index: string): HumanOrderGroupPreviewResult {
   logTrace('gameActions previewHumanMarchOrders', { unitCount: unitIds.length, hoveredH3Index });
   try {
     previewDiagnostics.requestCount += 1;

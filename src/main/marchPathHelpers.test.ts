@@ -3,7 +3,7 @@
  */
 
 import assert from 'node:assert/strict';
-import { findPathTailFromCurrentPosition } from '../shared/marchPathUtils';
+import { findPathTailFromCurrentPosition } from '../shared/marchPathHelpers';
 
 /**
  * Verifies that a current cell matching the path head returns the full stored path.

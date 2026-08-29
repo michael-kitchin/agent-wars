@@ -1,6 +1,6 @@
 /**
  * Variant-matrix contract tests for fog, tool groups, roster, scenarios, game size, and consultation policy.
- * Run: `npm run build:main` then `node dist/main/openrouter/promptSpec/variantConformance.test.js`
+ * Run: `npm run build:main` then `node dist/main/openRouter/promptSpec/variantConformance.test.js`
  */
 
 import assert from 'node:assert/strict';
@@ -9,7 +9,7 @@ import { latLngToCell } from 'h3-js';
 import type { GameStateSnapshot } from '../../gameDb';
 import type { UnitAssessmentResult } from '../../precomputation';
 import { buildAttentionFlags, formatBriefing } from '../../briefingFormatter';
-import { STALE_INTEL_TURNS } from '../../game-db/fogState';
+import { STALE_INTEL_TURNS } from '../../gameDb/fogState';
 import { getOrderedHexList } from '../../mapData';
 import { PRODUCTION_EMPTY_QUEUES_SENTENCE, buildEmptyProductionQueuesSection } from '../briefingSections';
 import { buildAirOperationsBriefingBlock } from '../briefingSectionsAirOps';

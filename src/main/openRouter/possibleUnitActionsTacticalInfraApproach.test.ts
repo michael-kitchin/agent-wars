@@ -322,7 +322,7 @@ function testTacticalBestOptionsAirStrikesRequireEnclosingAirport(): void {
  * Documents the module-scope binding `tests` (tests).
  *
  * Purpose: Runs the tactical empty-urban vs approach contracts and tactical air Best Options contracts.
- * When to use: `node dist/main/openrouter/possibleUnitActionsTacticalInfraApproach.test.js` after `build:main`.
+ * When to use: `node dist/main/openRouter/possibleUnitActionsTacticalInfraApproach.test.js` after `build:main`.
  * Expected outcome: Each entry runs to completion or fails the process.
  * Exceptions: None.
  */

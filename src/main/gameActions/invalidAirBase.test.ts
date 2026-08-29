@@ -1,6 +1,6 @@
 /**
  * Regression: human air on opponent-controlled contested hex must not be deleted before Fight→tactical.
- * Run: `node dist/main/game-actions/invalidAirBase.test.js`
+ * Run: `node dist/main/gameActions/invalidAirBase.test.js`
  */
 
 import assert from 'node:assert/strict';

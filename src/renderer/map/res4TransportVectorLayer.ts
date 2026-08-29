@@ -15,7 +15,7 @@ import {
   RES4_MAP_OVERLAY_VECTOR_TRANSPORT_HALO_OPACITY,
 } from '../../shared/res4MapOverlayConstants';
 import { shouldRenderRes4Hexes } from './terrainView';
-import { getLeafletGlobal } from './mapUtils';
+import { getLeafletGlobal } from './mapHelpers';
 import { getMainLeafletMapForProjection } from './leafletMainMapProjection';
 
 /**
@@ -184,7 +184,7 @@ function buildVectorLayerGroup(
     containerPointToLatLng: (pt: unknown) => { lat: number; lng: number };
   },
   rows: typeof S.res4TransportVectorOverlayRows,
-  L: {
+  leaflet: {
   layerGroup: (...args: unknown[]) => unknown;
   polyline: (...args: unknown[]) => unknown;
 }): unknown {
@@ -194,7 +194,7 @@ function buildVectorLayerGroup(
     const latlngs = row.points.map((p) => [p[0], p[1]] as LatLngTuple);
     if (row.kind === 'road') {
       layers.push(
-        L.polyline(latlngs, {
+        leaflet.polyline(latlngs, {
           color: '#000000',
           weight: RES4_MAP_OVERLAY_VECTOR_ROAD_OUTLINE_WEIGHT,
           opacity: RES4_MAP_OVERLAY_VECTOR_TRANSPORT_HALO_OPACITY,
@@ -202,7 +202,7 @@ function buildVectorLayerGroup(
         })
       );
       layers.push(
-        L.polyline(latlngs, {
+        leaflet.polyline(latlngs, {
           color: '#ffffff',
           weight: RES4_MAP_OVERLAY_VECTOR_ROAD_CENTER_WEIGHT,
           opacity: 1,
@@ -211,7 +211,7 @@ function buildVectorLayerGroup(
       );
     } else {
       layers.push(
-        L.polyline(latlngs, {
+        leaflet.polyline(latlngs, {
           color: '#ffffff',
           weight: RES4_MAP_OVERLAY_VECTOR_RAIL_HALO_WEIGHT,
           opacity: RES4_MAP_OVERLAY_VECTOR_RAIL_HALO_OPACITY,
@@ -219,7 +219,7 @@ function buildVectorLayerGroup(
         })
       );
       layers.push(
-        L.polyline(latlngs, {
+        leaflet.polyline(latlngs, {
           color: '#000000',
           weight: RES4_MAP_OVERLAY_VECTOR_RAIL_CENTER_WEIGHT,
           opacity: RES4_MAP_OVERLAY_VECTOR_RAIL_CENTER_OPACITY,
@@ -229,7 +229,7 @@ function buildVectorLayerGroup(
       );
     }
   }
-  return L.layerGroup(layers);
+  return leaflet.layerGroup(layers);
 }
 
 /**

@@ -10,7 +10,7 @@
 
 import type { GameStateSnapshot } from '../gameDb';
 import { logDebug, logError, logTrace } from '../logger';
-import { afterResolution, afterTacticalBeatResolution } from '../openrouter/afterResolution';
+import { afterResolution, afterTacticalBeatResolution } from '../openRouter/afterResolution';
 import type {
   ReadyResult,
   RangedAttackOrder,

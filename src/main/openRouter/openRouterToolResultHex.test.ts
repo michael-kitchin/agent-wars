@@ -4,7 +4,7 @@
 
 import * as assert from 'assert';
 import type { CoordinateContext } from '../briefing/map/coordinateContext';
-import { ensureStrategicCoordinateRegistryInitialized, listStrategicRes1H3Indexes } from '../briefing/map/hex-coordinates';
+import { ensureStrategicCoordinateRegistryInitialized, listStrategicRes1H3Indexes } from '../briefing/map/hexCoordinates';
 import { cellToLatLng } from 'h3-js';
 import { encodeOpenRouterToolResultForLlm } from './openRouterToolResultHex';
 
@@ -43,7 +43,7 @@ function makeResolveToH3(hexList: string[]): (lat: number, lng: number) => strin
  * Defines the `testEncodeAssessUnitReplacesPositionTuples` function shape (function testEncodeAssessUnitReplacesPositionTuples(): void).
 
  * Purpose: Guards the optional Phase 5B path for tool 2 success payloads.
- * When to use: `npm run build:main` then `node dist/main/openrouter/openRouterToolResultHex.test.js`.
+ * When to use: `npm run build:main` then `node dist/main/openRouter/openRouterToolResultHex.test.js`.
  * Expected outcome: `position` fields become two-character strings; status stays `ok`.
  * Exceptions: None.
  */

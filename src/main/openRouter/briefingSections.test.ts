@@ -1,6 +1,6 @@
 /**
  * Contract tests for production briefing copy.
- * Run with: node dist/main/openrouter/briefingSections.test.js
+ * Run with: node dist/main/openRouter/briefingSections.test.js
  */
 
 import assert from 'node:assert/strict';

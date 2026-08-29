@@ -1,5 +1,5 @@
 /**
- * MCP Tool 3: Combat Outcome Estimation (estimate_combat).
+ * Combat outcome estimation (`estimate_combat`).
  * Exact analytical computation of combat outcome probabilities using the Poisson-Binomial
  * distribution over independent per-unit hit rolls. Internal payloads use lat/lng tuples; LLM-visible
  * tool results use briefing hex codes after `encodeOpenRouterToolResultForLlm`.
@@ -62,14 +62,14 @@ export function poissonBinomialPMF(probs: number[]): number[] {
 }
 
 /**
- * Documents the module-scope binding `TOOL3_NAMES` (TOOL3_NAMES).
+ * Documents the module-scope binding `COMBAT_ESTIMATION_TOOL_NAMES` (COMBAT_ESTIMATION_TOOL_NAMES).
 
- * Purpose: Supports maintainability by documenting why `TOOL3_NAMES` exists.
+ * Purpose: Supports maintainability by documenting why `COMBAT_ESTIMATION_TOOL_NAMES` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export const TOOL3_NAMES = ['estimate_combat'] as const;
+export const COMBAT_ESTIMATION_TOOL_NAMES = ['estimate_combat'] as const;
 
 /**
  * Defines the `getAssessmentCategory` function shape (export function getAssessmentCategory( pDefenderEliminated: number, pAttackerLosesUnit: number ): 'strongly_favorable' | 'favorable' | 'even' | 'unfavora).
@@ -83,7 +83,7 @@ export function getAssessmentCategory(
   pDefenderEliminated: number,
   pAttackerLosesUnit: number
 ): 'strongly_favorable' | 'favorable' | 'even' | 'unfavorable' | 'strongly_unfavorable' {
-  logTrace('tool3CombatEstimation getAssessmentCategory', { pDefenderEliminated, pAttackerLosesUnit });
+  logTrace('combatEstimation getAssessmentCategory', { pDefenderEliminated, pAttackerLosesUnit });
   if (pDefenderEliminated > 0.75 && pAttackerLosesUnit < 0.25) return 'strongly_favorable';
   if (pAttackerLosesUnit > 0.75 && pDefenderEliminated < 0.25) return 'strongly_unfavorable';
   const diff = pDefenderEliminated - pAttackerLosesUnit;
@@ -128,7 +128,7 @@ export function executeEstimateCombat(
     return { status: 'error', error: 'attackers must have units (string[]) or assumed ({ type, count }[])' };
   }
 
-  logDebug('tool3CombatEstimation executeEstimateCombat', {
+  logDebug('combatEstimation executeEstimateCombat', {
     engagementType,
     targetHex: targetArr,
     attackersSource: attackerSource,
@@ -305,7 +305,7 @@ export function executeEstimateCombat(
         }
       }
       returnFireDetails = whoCan.length > 0 ? whoCan.join('; ') : null;
-      logDebug('tool3CombatEstimation return fire eligibility', {
+      logDebug('combatEstimation return fire eligibility', {
         canReturnFire,
         defenderCount: defenderCombat.length,
         eligibleCount: whoCan.length,
@@ -323,7 +323,7 @@ export function executeEstimateCombat(
   const defenderCount = defenderCombat.length;
   const attackerCount = attackerCombat.length;
 
-  logTrace('tool3CombatEstimation: exact PMF computed', {
+  logTrace('combatEstimation: exact PMF computed', {
     engagementType, attackerCount, defenderCount,
     attackerHitProbCount: attackerHitProbs.length,
     defenderHitProbCount: defenderHitProbs.length,
@@ -386,28 +386,28 @@ export function executeEstimateCombat(
 }
 
 /**
- * Defines the `executeTool3` function shape (export function executeTool3( toolName: string, args: unknown, state: GameStateSnapshot, latLngByH3: LatLngMap, resolveToH3: (lat: number, lng: n).
+ * Defines the `executeCombatEstimation` function shape (export function executeCombatEstimation( toolName: string, args: unknown, state: GameStateSnapshot, latLngByH3: LatLngMap, resolveToH3: (lat: number, lng: n).
 
- * Purpose: Supports maintainability by documenting why `executeTool3` exists.
+ * Purpose: Supports maintainability by documenting why `executeCombatEstimation` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function executeTool3(
+export function executeCombatEstimation(
   toolName: string,
   args: unknown,
   state: GameStateSnapshot,
   latLngByH3: LatLngMap,
   resolveToH3: (lat: number, lng: number) => string | undefined
 ): { status: string; error: string | null; [k: string]: unknown } {
-  logDebug('tool3CombatEstimation executeTool3', { toolName, stateTurn: state.turnNumber });
+  logDebug('combatEstimation executeCombatEstimation', { toolName, stateTurn: state.turnNumber });
   if (toolName !== 'estimate_combat') {
     return { status: 'error', error: `Unknown tool: ${toolName}` };
   }
   try {
     return executeEstimateCombat(args, state, latLngByH3, resolveToH3);
   } catch (err) {
-    logError('tool3CombatEstimation executeTool3', err);
+    logError('combatEstimation executeCombatEstimation', err);
     return { status: 'error', error: err instanceof Error ? err.message : String(err) };
   }
 }

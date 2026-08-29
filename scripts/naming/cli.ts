@@ -3,7 +3,7 @@ import * as path from 'path';
 import { scanRepository } from './discovery.js';
 import { formatViolationSummary, writeReportArtifact } from './report.js';
 import { applyLedgerEntry } from './applyRename.js';
-import { loadLedger } from './ledger.js';
+import { loadLedger, resolveCurrentPath } from './ledger.js';
 
 /**
  * Parses CLI argv for `report`, `check`, or `apply`.
@@ -81,7 +81,9 @@ function main(): void {
     const pending = document.entries.filter((e) => e.status === 'pending');
     const report = scanRepository(repoRoot);
     const waived = new Set(
-      document.entries.filter((e) => e.status === 'waived').map((e) => `${e.currentPath}|${e.currentName}`),
+      document.entries
+        .filter((e) => e.status === 'waived')
+        .map((e) => `${resolveCurrentPath(document, e.currentPath)}|${e.currentName}`),
     );
     const leftover = report.violations.filter((v) => !waived.has(`${v.filePath}|${v.currentName}`));
     if (pending.length > 0 || leftover.length > 0) {

@@ -43,7 +43,7 @@ import {
   type MeleeInterceptReadyPauseSnapshot,
 } from './meleeInterceptPendingState';
 import { collectTraversedHexesByPlayer } from './controlAndProduction';
-import { generateOrdersForStandingOrders } from '../tools/tool5StandingOrders';
+import { generateOrdersForStandingOrders } from '../tools/standingOrders';
 import { isWithinAirFerryGridRange } from './gridRange';
 import { hasIntactAirportAtStrategicAirBase } from '../returnFireAirportLookup';
 

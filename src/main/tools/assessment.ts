@@ -1,5 +1,5 @@
 /**
- * MCP Tool 2: Threat and Situation Assessment (assess_unit, assess_hex).
+ * Threat and situation assessment (`assess_unit`, `assess_hex`).
  * Implements the tool API per the MCP tools spec; uses pathfinding, combat constants, and game state.
  * Internal assessment payloads use lat/lng tuples; values returned to the LLM are redacted to briefing hex codes via `encodeOpenRouterToolResultForLlm`.
  */
@@ -16,7 +16,7 @@ import {
   navalLookupForHexState,
 } from '../navalStrategicPath';
 import { getRange } from '../combatConstants';
-import { getStandingOrderForUnit } from './tool5StandingOrders';
+import { getStandingOrderForUnit } from './standingOrders';
 import { logDebug, logError, logTrace } from '../logger';
 import { h3ToLatLng, type LatLng, type LatLngMap } from './h3LatLng';
 import {
@@ -131,7 +131,7 @@ function getPathDistanceAndTurns(
   state: GameStateSnapshot,
   blocked?: Set<string>
 ): { hexDistance: number; estimatedTurns: number } | null {
-  logTrace('tool2Assessment getPathDistanceAndTurns', { unitType });
+  logTrace('assessment getPathDistanceAndTurns', { unitType });
   const movementBudget = getMovementBudgetForUnit(unitType);
   if (unitType === 'naval') {
     const lookup = navalLookupForHexState(state, state.hexes, state.res1Infrastructure);
@@ -167,36 +167,36 @@ function getPathDistanceAndTurns(
  * Exceptions: None; `executeAssessUnit` treats null as 999 so a path BFS can still run.
  */
 function getGridDistance(h3A: string, h3B: string): number | null {
-  logTrace('tool2Assessment getGridDistance', { h3A, h3B });
+  logTrace('assessment getGridDistance', { h3A, h3B });
   return gridHopDistanceBetween(h3A, h3B);
 }
 
 /**
- * Documents the module-scope binding `TOOL2_NAMES` (TOOL2_NAMES).
+ * Documents the module-scope binding `ASSESSMENT_TOOL_NAMES` (ASSESSMENT_TOOL_NAMES).
 
- * Purpose: Supports maintainability by documenting why `TOOL2_NAMES` exists.
+ * Purpose: Supports maintainability by documenting why `ASSESSMENT_TOOL_NAMES` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export const TOOL2_NAMES = ['assess_unit', 'assess_hex'] as const;
+export const ASSESSMENT_TOOL_NAMES = ['assess_unit', 'assess_hex'] as const;
 
 /**
- * Defines the `executeTool2` function shape (export function executeTool2( toolName: string, args: unknown, state: GameStateSnapshot, latLngByH3: LatLngMap, resolveToH3: (lat: number, lng: n).
+ * Defines the `executeAssessment` function shape (export function executeAssessment( toolName: string, args: unknown, state: GameStateSnapshot, latLngByH3: LatLngMap, resolveToH3: (lat: number, lng: n).
 
- * Purpose: Supports maintainability by documenting why `executeTool2` exists.
+ * Purpose: Supports maintainability by documenting why `executeAssessment` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function executeTool2(
+export function executeAssessment(
   toolName: string,
   args: unknown,
   state: GameStateSnapshot,
   latLngByH3: LatLngMap,
   resolveToH3: (lat: number, lng: number) => string | undefined
 ): { status: string; error: string | null; [k: string]: unknown } {
-  logDebug('tool2Assessment executeTool2', { toolName, stateTurn: state.turnNumber });
+  logDebug('assessment executeAssessment', { toolName, stateTurn: state.turnNumber });
   if (toolName !== 'assess_unit' && toolName !== 'assess_hex') {
     return { status: 'error', error: `Unknown tool: ${toolName}` };
   }
@@ -226,7 +226,7 @@ export function executeTool2(
       return executeAssessHex(pos, forUnitType, state, latLngByH3, resolveToH3);
     }
   } catch (err) {
-    logError('tool2Assessment executeTool2: exception', toolName, err);
+    logError('assessment executeAssessment: exception', toolName, err);
     return { status: 'error', error: String(err) };
   }
   return { status: 'error', error: `Unknown tool: ${toolName}` };
@@ -253,18 +253,18 @@ function executeAssessUnit(
   const terrainByH3 = new Map(state.hexes.map((h) => [h.h3Index, h.terrain]));
   const unit = state.units.find((u) => u.id === unitId);
   if (!unit) {
-    logError('tool2Assessment executeAssessUnit: unit not found', unitId);
+    logError('assessment executeAssessUnit: unit not found', unitId);
     return { status: 'error', error: `Unit not found: ${unitId}` };
   }
   if (!hexSet.has(unit.h3Index)) {
-    logError('tool2Assessment executeAssessUnit: unit not on map', unitId);
+    logError('assessment executeAssessUnit: unit not on map', unitId);
     return { status: 'error', error: `Unit not found: ${unitId}` };
   }
   const omniscientGridProximity = usesOmniscientGridProximity({
     fogOfWarEnabled: state.fogOfWarEnabled,
     h3Index: unit.h3Index,
   });
-  logDebug('tool2Assessment executeAssessUnit', {
+  logDebug('assessment executeAssessUnit', {
     unitId,
     radius,
     stateTurn: state.turnNumber,
@@ -422,13 +422,13 @@ function executeAssessUnit(
         });
       }
     } else {
-      logTrace('tool2Assessment executeAssessUnit: omitting stale enemy intel for opponent perspective', { unitId });
+      logTrace('assessment executeAssessUnit: omitting stale enemy intel for opponent perspective', { unitId });
     }
   }
 
   nearbyEnemies.sort((a, b) => a.hexDistance - b.hexDistance);
   nearbyFriendlies.sort((a, b) => a.hexDistance - b.hexDistance);
-  logTrace('tool2Assessment executeAssessUnit: scan complete', {
+  logTrace('assessment executeAssessUnit: scan complete', {
     unitId, totalOtherUnits: state.units.length - 1, preFiltered: preFilteredCount,
     enemies: nearbyEnemies.length, friendlies: nearbyFriendlies.length,
   });
@@ -468,13 +468,13 @@ function executeAssessHex(
   latLngByH3: LatLngMap,
   resolveToH3: (lat: number, lng: number) => string | undefined
 ): { status: string; error: string | null; [k: string]: unknown } {
-  logDebug('tool2Assessment executeAssessHex', { position: position.join(','), forUnitType, stateTurn: state.turnNumber });
+  logDebug('assessment executeAssessHex', { position: position.join(','), forUnitType, stateTurn: state.turnNumber });
   const hexList = state.hexes.map((h) => h.h3Index);
   const hexSet = new Set(hexList);
   const terrainByH3 = new Map(state.hexes.map((h) => [h.h3Index, h.terrain]));
   const hexH3 = resolveToH3(position[0], position[1]);
   if (!hexH3 || !hexSet.has(hexH3)) {
-    logError('tool2Assessment executeAssessHex: invalid hex', position);
+    logError('assessment executeAssessHex: invalid hex', position);
     return { status: 'error', error: 'Invalid hex position' };
   }
   const terrain = terrainByH3.get(hexH3) ?? 'land';
@@ -525,7 +525,7 @@ function executeAssessHex(
       else if (d === 2) rangedRange2.push(entry);
     }
   } else {
-    logTrace('tool2Assessment executeAssessHex: omitting stale enemy intel for opponent perspective', { hexH3 });
+    logTrace('assessment executeAssessHex: omitting stale enemy intel for opponent perspective', { hexH3 });
   }
 
   let adjacentLand = 0;
@@ -548,7 +548,7 @@ function executeAssessHex(
       if (terrainIsPassableForDomain(t, passableFor)) passableNeighbors++;
     }
   } catch (err) {
-    logError('tool2Assessment executeAssessHex: gridDisk threw', err);
+    logError('assessment executeAssessHex: gridDisk threw', err);
   }
   const adjacentTerrain = { land: adjacentLand, water: adjacentWater };
   const strategicNotes: string[] = [];

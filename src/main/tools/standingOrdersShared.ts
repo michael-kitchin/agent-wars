@@ -1,4 +1,4 @@
-import type { PlanRouteOk } from './tool1Pathfinding';
+import type { PlanRouteOk } from './pathfinding';
 import type { HumanOrderPreviewSegment } from '../../shared/ipc/humanOrderPreviewTypes';
 
 /**

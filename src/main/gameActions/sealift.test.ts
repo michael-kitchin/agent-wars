@@ -1,6 +1,6 @@
 /**
  * Sealift contract tests: happy paths and essential failures only.
- * Run with: node dist/main/game-actions/sealift.test.js
+ * Run with: node dist/main/gameActions/sealift.test.js
  */
 
 import * as assert from 'assert';
@@ -14,10 +14,10 @@ import {
   canManualDebarkFromHex,
   clearEmbarkAssignmentForLandUnit,
   getSealiftStackContextModeForHex,
-  getSealiftStackStateImpl,
+  readSealiftStackState,
   isEmbarkedLandUnit,
   shouldSkipEmbarkedLandIndependentMove,
-  updateSealiftSlotImpl,
+  executeSealiftSlotUpdate,
 } from './sealift';
 import { getRes1ProductionContext } from '../terrainClassificationCache';
 
@@ -518,7 +518,7 @@ function testSealiftStateDisablesDebarkButtonsOnOpenWater(): void {
       'human-naval-water-debark-ui',
     ]);
 
-    const state = getSealiftStackStateImpl(waterHex);
+    const state = readSealiftStackState(waterHex);
     assert.strictEqual(state.contextMode, 'water');
     assert.strictEqual(state.controlsDisabled, true);
     assert.strictEqual(state.debarkAllowedAtHex, false);
@@ -544,7 +544,7 @@ function testSealiftStateEnablesEmbarkAtControlledWaterPort(): void {
     insertUnit('human-armor-water-embark', 'human', 'armor', waterHex);
 
     assert.strictEqual(getSealiftStackContextModeForHex(waterHex), 'coastal_port');
-    const state = getSealiftStackStateImpl(waterHex);
+    const state = readSealiftStackState(waterHex);
     assert.strictEqual(state.contextMode, 'coastal_port');
     assert.strictEqual(state.controlsDisabled, false);
     assert.strictEqual(state.showSealiftSection, true);
@@ -567,7 +567,7 @@ function testSealiftStateDisablesEmbarkAtEnemyWaterPort(): void {
     insertUnit('human-armor-enemy-port', 'human', 'armor', waterHex);
 
     assert.strictEqual(getSealiftStackContextModeForHex(waterHex), 'water');
-    const state = getSealiftStackStateImpl(waterHex);
+    const state = readSealiftStackState(waterHex);
     assert.strictEqual(state.contextMode, 'water');
     assert.strictEqual(state.controlsDisabled, true);
   });
@@ -592,7 +592,7 @@ function testSealiftStateEnablesDebarkAtControlledWaterPort(): void {
       'human-naval-port-debark',
     ]);
 
-    const state = getSealiftStackStateImpl(waterHex);
+    const state = readSealiftStackState(waterHex);
     assert.strictEqual(state.contextMode, 'coastal_port');
     assert.strictEqual(state.controlsDisabled, false);
     assert.strictEqual(state.debarkAllowedAtHex, true);
@@ -604,7 +604,7 @@ function testSealiftStateEnablesDebarkAtControlledWaterPort(): void {
  * Verifies human slot IPC can load armor onto a collocated ship at a controlled water seaport.
  *
  * Purpose: Stack embark must succeed at the same hexes `canEmbarkAtHex` allows.
- * When to use: After edits to `updateSealiftSlotImpl` embark eligibility.
+ * When to use: After edits to `executeSealiftSlotUpdate` embark eligibility.
  * Expected outcome: Success and a transport assignment row for the armor/naval pair.
  * Exceptions: None.
  */
@@ -614,7 +614,7 @@ function testUpdateSealiftSlotEmbarksArmorAtControlledWaterPort(): void {
     prepareWaterHex(waterHex, { seaportCount: 1, controllerPlayerId: 'human' });
     insertUnit('human-naval-slot-water', 'human', 'naval', waterHex);
     insertUnit('human-armor-slot-water', 'human', 'armor', waterHex);
-    const result = updateSealiftSlotImpl({
+    const result = executeSealiftSlotUpdate({
       h3Index: waterHex,
       navalUnitId: 'human-naval-slot-water',
       slotIndex: 1,
@@ -631,7 +631,7 @@ function testUpdateSealiftSlotEmbarksArmorAtControlledWaterPort(): void {
  * Verifies human slot IPC cannot embark on open water.
  *
  * Purpose: Open ocean remains at-sea for sealift assignment changes.
- * When to use: After edits to `updateSealiftSlotImpl` embark eligibility.
+ * When to use: After edits to `executeSealiftSlotUpdate` embark eligibility.
  * Expected outcome: Failure with the at-sea reason string.
  * Exceptions: None.
  */
@@ -641,7 +641,7 @@ function testUpdateSealiftSlotRejectsEmbarkOnOpenWater(): void {
     prepareWaterHex(waterHex, { seaportCount: 0 });
     insertUnit('human-naval-open-slot', 'human', 'naval', waterHex);
     insertUnit('human-armor-open-slot', 'human', 'armor', waterHex);
-    const result = updateSealiftSlotImpl({
+    const result = executeSealiftSlotUpdate({
       h3Index: waterHex,
       navalUnitId: 'human-naval-open-slot',
       slotIndex: 1,
@@ -656,7 +656,7 @@ function testUpdateSealiftSlotRejectsEmbarkOnOpenWater(): void {
  * Verifies human slot IPC cannot embark at an opponent-held water seaport.
  *
  * Purpose: Water seaports still require acting-player control for human embark.
- * When to use: After edits to `updateSealiftSlotImpl` embark eligibility.
+ * When to use: After edits to `executeSealiftSlotUpdate` embark eligibility.
  * Expected outcome: Failure without writing a transport assignment.
  * Exceptions: None.
  */
@@ -666,7 +666,7 @@ function testUpdateSealiftSlotRejectsEmbarkAtEnemyWaterPort(): void {
     prepareWaterHex(waterHex, { seaportCount: 1, controllerPlayerId: 'opponent' });
     insertUnit('human-naval-enemy-slot', 'human', 'naval', waterHex);
     insertUnit('human-armor-enemy-slot', 'human', 'armor', waterHex);
-    const result = updateSealiftSlotImpl({
+    const result = executeSealiftSlotUpdate({
       h3Index: waterHex,
       navalUnitId: 'human-naval-enemy-slot',
       slotIndex: 1,

@@ -13,8 +13,8 @@
 import { cellToLatLng, cellToLocalIj } from 'h3-js';
 import { logDebug } from '../../logger';
 import type { CoordinateContext } from './coordinateContext';
-import { getHexCodeForContext } from './hex-coordinates';
-import type { GridCell, HexGrid } from './hex-grid-projection';
+import { getHexCodeForContext } from './hexCoordinates';
+import type { GridCell, HexGrid } from './hexGridProjection';
 
 /**
  * Converts H3 local IJ (anchored at `origin`) to odd-r offset hex coordinates for ASCII row/col placement.

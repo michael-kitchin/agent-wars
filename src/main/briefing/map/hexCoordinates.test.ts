@@ -14,7 +14,7 @@ import {
   getH3IndexForCode,
   initStrategicCoordinateRegistry,
   listStrategicRes1H3Indexes,
-} from './hex-coordinates';
+} from './hexCoordinates';
 
 /**
  * Documents the module-scope binding `STRATEGIC_CTX` (STRATEGIC_CTX).

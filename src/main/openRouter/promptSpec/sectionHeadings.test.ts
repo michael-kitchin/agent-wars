@@ -1,6 +1,6 @@
 /**
  * Contract tests for briefing and status section titles.
- * Run: `npm run build:main` then `node dist/main/openrouter/promptSpec/sectionHeadings.test.js`
+ * Run: `npm run build:main` then `node dist/main/openRouter/promptSpec/sectionHeadings.test.js`
  */
 
 import assert from 'node:assert/strict';
@@ -86,7 +86,7 @@ test('assemblers import the title module instead of restating the briefing opene
     'utf8'
   );
   const tactical = fs.readFileSync(
-    path.resolve(process.cwd(), 'src/main/openrouter/formatTacticalBriefing.ts'),
+    path.resolve(process.cwd(), 'src/main/openRouter/formatTacticalBriefing.ts'),
     'utf8'
   );
   assert.ok(briefingFormatter.includes('SECTION_TITLE_COMMANDERS_BRIEFING'));

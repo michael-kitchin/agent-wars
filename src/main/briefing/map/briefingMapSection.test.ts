@@ -14,8 +14,8 @@ import { buildLatLngCoordinateMap } from '../../mapData';
 import type { TacticalBattleSnapshot } from '../../../shared/tacticalBattleTypes';
 import { buildTacticalAiPlanState } from '../../tacticalBattle/buildTacticalAiPlanState';
 import { tacticalRes1Cell, tacticalRes4UnderRes1Corner } from '../../tacticalBattle/testSupport/tacticalRes4HexFixtures';
-import { buildStrategicOperationalMapSectionMarkdown, buildTacticalOperationalMapSectionMarkdown } from './briefing-map-section';
-import { ensureStrategicCoordinateRegistryInitialized, getHexCodeForContext, initTacticalCoordinateRegistry, listStrategicRes1H3Indexes } from './hex-coordinates';
+import { buildStrategicOperationalMapSectionMarkdown, buildTacticalOperationalMapSectionMarkdown } from './briefingMapSection';
+import { ensureStrategicCoordinateRegistryInitialized, getHexCodeForContext, initTacticalCoordinateRegistry, listStrategicRes1H3Indexes } from './hexCoordinates';
 import { projectTacticalRes4FootprintToAsciiGrid } from './tacticalAsciiGridProjection';
 
 /**

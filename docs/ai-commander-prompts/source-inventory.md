@@ -7,14 +7,14 @@ Every row cites a symbol or file so a later reader can re-verify. Paths are repo
 ## 1. Authority reminder
 
 1. **Live engine behavior is first authority** for facts, stats, ranges, caps, phase order, and legality.
-2. **Builders under `src/main/openrouter/` are first authority for wording.** This file describes those emissions.
+2. **Builders under `src/main/openRouter/` are first authority for wording.** This file describes those emissions.
 3. `debug-last-strategic-prompt.txt` and `debug-last-user-prompt.txt` cross-check emitted **shape** for one consultation. They are not a contract.
 4. `debug-last-tactical-prompt.txt` **is not used as a source.** Tactical catalogs below are derived from code.
 5. `docs/devleopment-plan-v3.3.md` is historical architecture and is not prompt authority.
 
 ## 2. Strategic section catalog
 
-Assembled by `buildSystemPromptForTools` in `src/main/openrouter/openRouterBuildSystemPrompt.ts`. The briefing body is produced by `formatBriefing` in `src/main/briefingFormatter.ts` and passed in as `briefingOverride`. Combat sentences come from `buildCombatRulesParagraph` in `src/main/openrouter/promptSpec/gameRuleText.ts`. Coaching bullets come from `buildCoachingBullets` → `buildStrategicCoachingBullets`. Envelope text comes from `buildFinalJsonContractInstruction` / `getFinalJsonOrdersExampleBlock`.
+Assembled by `buildSystemPromptForTools` in `src/main/openRouter/openRouterBuildSystemPrompt.ts`. The briefing body is produced by `formatBriefing` in `src/main/briefingFormatter.ts` and passed in as `briefingOverride`. Combat sentences come from `buildCombatRulesParagraph` in `src/main/openRouter/promptSpec/gameRuleText.ts`. Coaching bullets come from `buildCoachingBullets` → `buildStrategicCoachingBullets`. Envelope text comes from `buildFinalJsonContractInstruction` / `getFinalJsonOrdersExampleBlock`.
 
 ### 2.1 Preamble (no headings)
 
@@ -54,10 +54,10 @@ Emit order as coded. All headings quoted exactly (`promptSpec/sectionHeadings.ts
 | `## Recent Turn Notes` | `buildRecentTurnNotesSection` | at least one of the previous 3 turns has a message, strategy, or loss | omitted |
 | `# Production Status` | `buildProductionBriefingBlock` | `flags.productionEnabled` | omitted |
 | `## Controlled Hex Queues` | same | `queues.length > 0` | `No currently controlled hexes with editable production queues.` |
-| `# Your Strategic Memory` | `getInjectionText` (`tool4Memory.ts`) | `flags.memoryEnabled` | omitted |
+| `# Your Strategic Memory` | `getInjectionText` (`memory.ts`) | `flags.memoryEnabled` | omitted |
 | `## Persistent (Active Strategic Context)` | same | whenever the memory block is present | one row of `—` |
 | `## Reminders Triggered This Turn` | same | whenever the memory block is present | one row of `—` |
-| `# Standing Order Status` | `getInjectionText` (`tool5StandingOrdersCore.ts`) | `flags.ordersEnabled`; returns `''` in tactical | omitted |
+| `# Standing Order Status` | `getInjectionText` (`standingOrdersCore.ts`) | `flags.ordersEnabled`; returns `''` in tactical | omitted |
 | `## Units Without Standing Orders` | same | whenever the standing-order block is present | one row of `—` |
 | `## Active Callbacks` | `buildActiveCallbacksSection` | always | one `—` row plus the empty-list sentence |
 

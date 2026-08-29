@@ -8,7 +8,7 @@ import type { GameStateSnapshot } from '../gameDb';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { buildTacticalAiPlanState } from '../tacticalBattle/buildTacticalAiPlanState';
 import { tacticalRes1Cell, tacticalRes4UnderRes1Corner } from '../tacticalBattle/testSupport/tacticalRes4HexFixtures';
-import { executeTool1 } from './tool1Pathfinding';
+import { executePathfinding } from './pathfinding';
 
 /**
  * Builds a two-cell plains tactical footprint with opponent armor adjacent to human infantry.
@@ -85,14 +85,14 @@ function buildAdjacentArmorFixture(): {
  * Ensures tactical plan_route returns first-leg orderToH3 toward an adjacent enemy without land-mass failure.
  *
  * Purpose: Regression for the UI/no-movement bug where strategic land-mass rejected every res4 destination.
- * When to use: After edits to `executeTacticalPlanRoute` / `executeTool1` tactical branch.
+ * When to use: After edits to `executeTacticalPlanRoute` / `executePathfinding` tactical branch.
  * Expected outcome: status ok, orderToH3 is the adjacent human hex (reachable this turn).
  * Exceptions: Assertion failure on contract drift.
  */
 function testTacticalPlanRouteAdjacentEnemyOk(): void {
   const { battle, planState, latLngByH3, resolveToH3, oppId, res4Human } = buildAdjacentArmorFixture();
   const destLl = latLngByH3.get(res4Human)!;
-  const result = executeTool1(
+  const result = executePathfinding(
     'plan_route',
     { unitId: oppId, destination: destLl },
     planState,
@@ -107,17 +107,17 @@ function testTacticalPlanRouteAdjacentEnemyOk(): void {
 }
 
 /**
- * Ensures strategic executeTool1 without tacticalBattle still fails land-mass on res4 planState (no accidental tactical default).
+ * Ensures strategic executePathfinding without tacticalBattle still fails land-mass on res4 planState (no accidental tactical default).
  *
  * Purpose: Guards against routing all plan_route calls through the tactical branch.
- * When to use: After executeTool1 signature changes.
+ * When to use: After executePathfinding signature changes.
  * Expected outcome: Without tacticalBattle, plan_route to the adjacent res4 human hex errors (land-mass).
  * Exceptions: None.
  */
 function testStrategicPlanRouteOnRes4PlanStateStillUsesLandMass(): void {
   const { planState, latLngByH3, resolveToH3, oppId, res4Human } = buildAdjacentArmorFixture();
   const destLl = latLngByH3.get(res4Human)!;
-  const result = executeTool1(
+  const result = executePathfinding(
     'plan_route',
     { unitId: oppId, destination: destLl },
     planState,
@@ -140,7 +140,7 @@ function testTacticalCheckDistanceAdjacentOk(): void {
   const { battle, planState, latLngByH3, resolveToH3, res4Opp, res4Human } = buildAdjacentArmorFixture();
   const fromLl = latLngByH3.get(res4Opp)!;
   const toLl = latLngByH3.get(res4Human)!;
-  const result = executeTool1(
+  const result = executePathfinding(
     'check_distance',
     { from: fromLl, to: toLl, unitType: 'armor' },
     planState,
@@ -186,7 +186,7 @@ function testTacticalPlanRouteRejectsAir(): void {
     ],
   };
   const destLl = latLngByH3.get(res4Human)!;
-  const result = executeTool1(
+  const result = executePathfinding(
     'plan_route',
     { unitId: 'opp-air-1', destination: destLl },
     airPlan,
@@ -249,7 +249,7 @@ function testTacticalPlanRouteRejectsEmbarked(): void {
     ],
   };
   const destLl = latLngByH3.get(res4Human)!;
-  const result = executeTool1(
+  const result = executePathfinding(
     'plan_route',
     { unitId: cargoId, destination: destLl },
     embarkedPlan,

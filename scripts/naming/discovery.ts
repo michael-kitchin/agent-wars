@@ -59,7 +59,7 @@ export function fileStemForCasing(filename: string): string {
  *
  * Purpose: Directory casing is checked once per folder, not once per file.
  * When to use: After normalizing a `src/`-relative file path.
- * Expected outcome: `main/game-actions/foo.ts` yields `main/game-actions` and `main`.
+ * Expected outcome: `main/gameActions/foo.ts` yields `main/game-actions` and `main`.
  * Exceptions: None.
  */
 function srcAncestorDirs(relPosix: string): string[] {
@@ -230,6 +230,16 @@ function collectFileViolations(absFile: string, repoRoot: string, out: Violation
       filePath: rel,
       currentName: path.basename(absFile),
       suggestedName: `${kebabToCamel(stem)}${absFile.endsWith('.test.ts') ? '.test.ts' : '.ts'}`,
+      detail: 'TypeScript file names must be camelCase',
+    });
+    return;
+  }
+  if (!isCamelCaseIdentifier(stem)) {
+    out.push({
+      category: 'fileCasing',
+      filePath: rel,
+      currentName: path.basename(absFile),
+      suggestedName: `${stem.replace(/\./g, '')}${absFile.endsWith('.test.ts') ? '.test.ts' : '.ts'}`,
       detail: 'TypeScript file names must be camelCase',
     });
     return;

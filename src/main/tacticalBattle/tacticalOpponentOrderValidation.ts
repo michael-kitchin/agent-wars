@@ -9,7 +9,7 @@ import { AIR_FERRY_RANGE_HEXES, formatFerryOutOfRangeReason } from '../../shared
 import { tacticalSubUnitLabelForUserMessage } from '../../shared/unitDisplayNames';
 import { dbGetOne, getHexController, getRes1InfrastructureForHex, isDbReady } from '../gameDb';
 import { canEmbarkAtHex } from '../../shared/sealiftEmbarkEligibility';
-import { isWithinAirFerryGridRange } from '../game-actions/gridRange';
+import { isWithinAirFerryGridRange } from '../gameActions/gridRange';
 import { tacticalLogQuery } from './tacticalLogging';
 import { tacticalInvalidResult, tacticalValidResult, type TacticalValidationResult } from './tacticalValidationResult';
 

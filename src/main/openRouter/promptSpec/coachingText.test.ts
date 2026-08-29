@@ -1,6 +1,6 @@
 /**
  * Contract tests for per-mode coaching bullets and the claims they must never make.
- * Run: `npm run build:main` then `node dist/main/openrouter/promptSpec/coachingText.test.js`
+ * Run: `npm run build:main` then `node dist/main/openRouter/promptSpec/coachingText.test.js`
  */
 
 import assert from 'node:assert/strict';

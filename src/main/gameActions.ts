@@ -1,5 +1,5 @@
 /**
- * Public barrel for WEGO turn actions (`game-actions/gameActionsCore.ts`).
+ * Public barrel for WEGO turn actions (`gameActions/gameActionsCore.ts`).
  */
 
-export * from './game-actions/gameActionsCore';
+export * from './gameActions/gameActionsCore';

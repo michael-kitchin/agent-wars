@@ -29,7 +29,7 @@ import {
   firstRingCellDistinctFrom,
 } from '../tacticalBattle/testSupport/tacticalRes4HexFixtures';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
-import { getInjectionText as getStandingOrderInjectionText } from '../tools/tool5StandingOrders';
+import { getInjectionText as getStandingOrderInjectionText } from '../tools/standingOrders';
 import { buildAirOperationsBriefingBlock } from './briefingSectionsAirOps';
 import { buildSealiftBriefingBlock } from './briefingSectionsSealift';
 import { formatTacticalBriefing } from './formatTacticalBriefing';
@@ -51,7 +51,7 @@ import {
 } from '../tacticalBattle/tacticalCallbackStashPersistence';
 import { buildSystemPromptForTools } from './openRouterBuildSystemPrompt';
 import { WIN_CONDITION_REMINDER_FIRST_SENTENCE } from './scenarioGoals';
-import { initTacticalCoordinateRegistry } from '../briefing/map/hex-coordinates';
+import { initTacticalCoordinateRegistry } from '../briefing/map/hexCoordinates';
 
 /**
  * Builds a minimal land-only tactical battle with adjacent opponent and human sub-units.

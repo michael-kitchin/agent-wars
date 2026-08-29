@@ -65,14 +65,14 @@ export function markApplied(document: RenameLedgerDocument, id: string): RenameL
 }
 
 /**
- * Rewrites `currentPath` using already-applied directory entries.
+ * Rewrites a ledger path using already-applied directory entries only.
  *
- * Purpose: File/symbol rows still record pre-rename paths; apply happens after directory batches.
- * When to use: Before reading a file or directory for a pending entry.
- * Expected outcome: Prefix substitutions for each applied `kind: directory` row.
+ * Purpose: Shared prefix substitution so file remaps can compose on top of directory moves.
+ * When to use: Inside `resolveCurrentPath` and when matching waived scan paths.
+ * Expected outcome: `src/main/game-actions/foo.ts` becomes `src/main/gameActions/foo.ts` after that directory apply.
  * Exceptions: None.
  */
-export function resolveCurrentPath(document: RenameLedgerDocument, currentPath: string): string {
+export function resolveDirectoryPrefixes(document: RenameLedgerDocument, currentPath: string): string {
   let resolved = currentPath.replace(/\\/g, '/');
   for (const entry of document.entries) {
     if (entry.kind !== 'directory' || entry.status !== 'applied' || !entry.proposedPath) continue;
@@ -80,6 +80,27 @@ export function resolveCurrentPath(document: RenameLedgerDocument, currentPath: 
     const to = entry.proposedPath.replace(/\\/g, '/');
     if (resolved === from || resolved.startsWith(`${from}/`)) {
       resolved = to + resolved.slice(from.length);
+    }
+  }
+  return resolved;
+}
+
+/**
+ * Rewrites `currentPath` using already-applied directory and file entries.
+ *
+ * Purpose: File/symbol rows still record pre-rename paths; apply happens after earlier batches.
+ * When to use: Before reading a file or directory for a pending entry.
+ * Expected outcome: Directory prefixes plus exact file-path substitutions for applied `kind: file` rows.
+ * Exceptions: None.
+ */
+export function resolveCurrentPath(document: RenameLedgerDocument, currentPath: string): string {
+  let resolved = resolveDirectoryPrefixes(document, currentPath);
+  for (const entry of document.entries) {
+    if (entry.kind !== 'file' || entry.status !== 'applied' || !entry.proposedPath) continue;
+    const from = resolveDirectoryPrefixes(document, entry.currentPath);
+    const to = resolveDirectoryPrefixes(document, entry.proposedPath);
+    if (resolved === from) {
+      resolved = to;
     }
   }
   return resolved;

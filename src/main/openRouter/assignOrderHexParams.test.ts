@@ -1,12 +1,12 @@
 /**
  * Contract tests for translating `assign_order` place fields from briefing hex codes into stored coordinates.
- * Run: `node dist/main/openrouter/assignOrderHexParams.test.js`
+ * Run: `node dist/main/openRouter/assignOrderHexParams.test.js`
  */
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { ensureStrategicCoordinateRegistryInitialized } from '../briefing/map/hex-coordinates';
-import { h3ToCode } from '../briefing/map/hex-code-translator';
+import { ensureStrategicCoordinateRegistryInitialized } from '../briefing/map/hexCoordinates';
+import { h3ToCode } from '../briefing/map/hexCodeTranslator';
 import { buildLatLngCoordinateMap } from '../mapData';
 import { dbGetOne, getGameState } from '../gameDb';
 import { withTempGameDb } from '../testSupport/withTempGameDb';

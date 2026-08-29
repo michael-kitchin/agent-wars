@@ -22,11 +22,11 @@ import {
 } from './gameActions';
 import { getRes1LandMassByH3 } from './terrainClassificationCache';
 import { hexHasSeaport } from './movementTerrain';
-import { resetHumanMarchPreviewDiagnosticsForTests } from './game-actions/humanMarchPreview';
+import { resetHumanMarchPreviewDiagnosticsForTests } from './gameActions/humanMarchPreview';
 import { withTempGameDb } from './testSupport/withTempGameDb';
 import {
   EMBARKED_LAND_UNIT_AT_SEA_MOVE_REASON,
-} from './game-actions/landMovementConstraints';
+} from './gameActions/landMovementConstraints';
 import {
   LAND_UNIT_DESTINATION_NOT_LANDMASS_REASON,
   canLandUnitTraverseEdge,
@@ -34,7 +34,7 @@ import {
 } from '../shared/landTraversalRes1';
 import {
   hexSupportsMixedLandAndNaval,
-} from './game-actions/humanMarchPreviewMixedSelection';
+} from './gameActions/humanMarchPreviewMixedSelection';
 
 const MIXED_LAND_NAVAL_COASTAL_ONLY_REASON = 'Mixed land/naval stacks can only move to coastal hexes.';
 
@@ -1046,7 +1046,7 @@ function testSubmitOrdersAllowsLandMovementFromSingleArcticHex(): void {
  * Defines the `testSubmitOrdersDropsInvalidLandWaterToWaterPortMovement` function shape (function testSubmitOrdersDropsInvalidLandWaterToWaterPortMovement(): void).
 
  * Purpose: Asserts strategic `submitOrders` matches tactical resilience: invalid movement rows are dropped and the commit still succeeds.
- * When to use: Regression guard when changing `submitOrdersImpl` sanitization.
+ * When to use: Regression guard when changing `executeSubmitOrders` sanitization.
  * Expected outcome: `success: true` and no pending march row for the unit after the invalid destination is filtered out.
  * Exceptions: None.
  */
@@ -1091,7 +1091,7 @@ function testPreviewShowsInvalidForLandWaterToWaterPortMovement(): void {
  * Defines the `testSubmitOrdersDropsInvalidLandWaterToArcticPortMovement` function shape (function testSubmitOrdersDropsInvalidLandWaterToArcticPortMovement(): void).
 
  * Purpose: Same resilience contract as `testSubmitOrdersDropsInvalidLandWaterToWaterPortMovement` for land/water-to-arctic port transitions.
- * When to use: Regression guard for `submitOrdersImpl` movement sanitization.
+ * When to use: Regression guard for `executeSubmitOrders` movement sanitization.
  * Expected outcome: Submit succeeds; the disallowed march is not stored in `pending_orders`.
  * Exceptions: None.
  */

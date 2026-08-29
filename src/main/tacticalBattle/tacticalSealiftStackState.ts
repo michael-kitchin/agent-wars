@@ -5,8 +5,8 @@
 import type { SealiftLandUnitOption, SealiftNavalRow, SealiftStackState } from '../../shared/ipcTypes';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { emptySealiftStackState } from '../../shared/sealiftStackState';
-import { buildSealiftSlotsByNavalId, normalizeSealiftSlots } from '../game-actions/sealiftSlotAssignment';
-import { canManualDebarkFromHex, getSealiftStackContextModeForHex } from '../game-actions/sealift';
+import { buildSealiftSlotsByNavalId, normalizeSealiftSlots } from '../gameActions/sealiftSlotAssignment';
+import { canManualDebarkFromHex, getSealiftStackContextModeForHex } from '../gameActions/sealift';
 import { getActiveTacticalBattleSnapshotRef } from './activeTacticalBattleRef';
 import { tacticalLogQuery } from './tacticalLogging';
 

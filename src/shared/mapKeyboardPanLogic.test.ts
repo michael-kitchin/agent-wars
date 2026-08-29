@@ -8,7 +8,7 @@ import { test } from 'node:test';
 import {
   MAP_PAN_BASELINE_INTERVAL_MS,
   MAP_PAN_HOLD_INTERVAL_MS,
-  createMapKeyboardPanController,
+  createMapKeyboardPanHandler,
   panBindingToDirection,
   panCodeToDirection,
   panKeyToDirection,
@@ -102,7 +102,7 @@ function createFakeTimerController() {
   const intervals = new Map<number, { callback: () => void; ms: number; nextDue: number }>();
   let now = 0;
   const panCalls: Array<{ ns: number; ew: number }> = [];
-  const controller = createMapKeyboardPanController({
+  const controller = createMapKeyboardPanHandler({
     pan: (ns, ew) => {
       panCalls.push({ ns, ew });
     },

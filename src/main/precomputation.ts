@@ -7,10 +7,10 @@
  */
 
 import { isDbReady, type GameStateSnapshot } from './gameDb';
-import { isEmbarkedLandUnit } from './game-actions/sealift';
-import { executeTool2 } from './tools/tool2Assessment';
+import { isEmbarkedLandUnit } from './gameActions/sealift';
+import { executeAssessment } from './tools/assessment';
 import { usesOmniscientGridProximity } from './tools/assessUnitProximity';
-import { getStandingOrderForUnit } from './tools/tool5StandingOrders';
+import { getStandingOrderForUnit } from './tools/standingOrders';
 import { logDebug, logError, logTrace } from './logger';
 
 /**
@@ -170,7 +170,7 @@ function unitIsEmbarkedForAssessmentCache(unitId: string): boolean {
  * Cache key for assess_unit results that share nearby-enemy geometry.
  *
  * Purpose: Same hex, type, player, radius, and embark state see the same enemies and threats; only unit id and standing order differ.
- * When to use: `runUnitAssessments` before calling executeTool2.
+ * When to use: `runUnitAssessments` before calling executeAssessment.
  * Expected outcome: Distinct types or embark states on the same hex do not share a key.
  * Exceptions: None.
  */
@@ -286,7 +286,7 @@ export function runUnitAssessments(
       });
       continue;
     }
-    const out = executeTool2(
+    const out = executeAssessment(
       'assess_unit',
       { unitId: unit.id, radius: PRECOMPUTE_ASSESS_UNIT_RADIUS },
       state,
@@ -368,7 +368,7 @@ function runHexAssessments(
   for (const h3 of hexesWithHuman) {
     const position = latLngByH3.get(h3);
     if (!position) continue;
-    const out = executeTool2(
+    const out = executeAssessment(
       'assess_hex',
       { position },
       state,

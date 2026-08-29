@@ -407,7 +407,7 @@ export function buildPlanRouteSuccessResult(payload: {
     endHex: string;
   }>;
 }): PlanRouteOk {
-  logDebug('tool1Pathfinding buildPlanRouteSuccessResult', {
+  logDebug('pathfinding buildPlanRouteSuccessResult', {
     unitId: payload.unitId,
     unitType: payload.unitType,
     originH3: payload.originH3,

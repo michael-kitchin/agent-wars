@@ -1,8 +1,8 @@
 import {
-  createMapKeyboardPanController,
+  createMapKeyboardPanHandler,
   type PanAxisKey,
 } from '../../shared/mapKeyboardPanLogic';
-import { panMapByNetAxes } from './mapUtils';
+import { panMapByNetAxes } from './mapHelpers';
 
 /**
  * Singleton hold-to-continue controller bound to the main Leaflet map.
@@ -12,7 +12,7 @@ import { panMapByNetAxes } from './mapUtils';
  * Expected outcome: Real timers + `panMapByNetAxes` side effects.
  * Exceptions: None.
  */
-const mapKeyboardPanController = createMapKeyboardPanController({
+const mapKeyboardPanController = createMapKeyboardPanHandler({
   pan: (ns, ew) => {
     panMapByNetAxes(ns, ew);
   },

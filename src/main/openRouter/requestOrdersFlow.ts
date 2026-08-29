@@ -4,8 +4,8 @@ import { buildLatLngCoordinateMap } from '../mapData';
 import { logDebug, logError } from '../logger';
 import { parseOrdersResponse } from './orderResponseParsing';
 import { type EnvelopeGates } from './promptSpec/envelopeContract';
-import { createPathfindingSession } from '../tools/tool1Pathfinding';
-import { expireAndUpdateStatus } from '../tools/tool5StandingOrders';
+import { createPathfindingSession } from '../tools/pathfinding';
+import { expireAndUpdateStatus } from '../tools/standingOrders';
 import { runPrecomputation } from '../precomputation';
 import { formatBriefing } from '../briefingFormatter';
 import { formatTacticalBriefing } from './formatTacticalBriefing';
@@ -26,13 +26,13 @@ import {
   OPENROUTER_ORDER_FLOW_COMPLETION_MAX_TOKENS,
   resolveEffectiveOpenRouterCompletionMaxTokens,
 } from './openRouterCreditLimits';
-import { TOOL2_NAMES } from '../tools/tool2Assessment';
-import { TOOL3_NAMES } from '../tools/tool3CombatEstimation';
+import { ASSESSMENT_TOOL_NAMES } from '../tools/assessment';
+import { COMBAT_ESTIMATION_TOOL_NAMES } from '../tools/combatEstimation';
 import { buildTacticalAiPlanState } from '../tacticalBattle/buildTacticalAiPlanState';
-import { buildStrategicOperationalMapSectionMarkdown } from '../briefing/map/briefing-map-section';
+import { buildStrategicOperationalMapSectionMarkdown } from '../briefing/map/briefingMapSection';
 import type { CoordinateContext } from '../briefing/map/coordinateContext';
-import { ensureStrategicCoordinateRegistryInitialized, initTacticalCoordinateRegistry } from '../briefing/map/hex-coordinates';
-import { h3ToCode } from '../briefing/map/hex-code-translator';
+import { ensureStrategicCoordinateRegistryInitialized, initTacticalCoordinateRegistry } from '../briefing/map/hexCoordinates';
+import { h3ToCode } from '../briefing/map/hexCodeTranslator';
 import {
   runRequestOrdersToolLoop,
   type RequestOrdersUsageTotals,
@@ -85,7 +85,7 @@ export async function requestOrdersFlow(
   const signal = options?.signal;
   const onLog = options?.onLog;
   const usePrecomputation = tacticalBattle ? false : options?.usePrecomputation === true;
-  const precomputationExcluded = new Set<string>([...TOOL2_NAMES, ...TOOL3_NAMES]);
+  const precomputationExcluded = new Set<string>([...ASSESSMENT_TOOL_NAMES, ...COMBAT_ESTIMATION_TOOL_NAMES]);
   let enabledToolNames: string[] | undefined =
     usePrecomputation && requestedToolNames !== undefined
       ? requestedToolNames.filter((n) => !precomputationExcluded.has(n))
@@ -93,7 +93,7 @@ export async function requestOrdersFlow(
         ? toolGroupRegistry.flatMap((g) => [...g.toolNames]).filter((n) => !precomputationExcluded.has(n))
         : requestedToolNames;
   if (tacticalBattle) {
-    const assessmentToolNames = new Set<string>([...TOOL2_NAMES, ...TOOL3_NAMES]);
+    const assessmentToolNames = new Set<string>([...ASSESSMENT_TOOL_NAMES, ...COMBAT_ESTIMATION_TOOL_NAMES]);
     const stripTacticalDisallowedTools = (names: string[]): string[] =>
       names.filter((n) => {
         if (assessmentToolNames.has(n)) return false;

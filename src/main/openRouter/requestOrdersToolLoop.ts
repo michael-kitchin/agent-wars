@@ -12,12 +12,12 @@
 import type { GameStateSnapshot } from '../gameDb';
 import { logDebug, logError } from '../logger';
 import type { CoordinateContext } from '../briefing/map/coordinateContext';
-import { createPathfindingSession, executeTool1 } from '../tools/tool1Pathfinding';
-import { executeTool2 } from '../tools/tool2Assessment';
-import { executeTool3 } from '../tools/tool3CombatEstimation';
-import { executeTool4 } from '../tools/tool4Memory';
-import { executeTool5 } from '../tools/tool5StandingOrders';
-import { executeTool6 } from '../tools/tool6Production';
+import { createPathfindingSession, executePathfinding } from '../tools/pathfinding';
+import { executeAssessment } from '../tools/assessment';
+import { executeCombatEstimation } from '../tools/combatEstimation';
+import { executeMemory } from '../tools/memory';
+import { executeStandingOrders } from '../tools/standingOrders';
+import { executeProductionTools } from '../tools/productionTools';
 import { decodeOpenRouterToolArgsForExecution } from './openRouterToolArgsHex';
 import { encodeOpenRouterToolResultForLlm } from './openRouterToolResultHex';
 import { resolveMalformedCompletionRetry } from './malformedCompletionRetry';
@@ -526,16 +526,16 @@ export async function runRequestOrdersToolLoop(
         const toolState = tacticalBattle ? planState : state;
         const result =
           toolName.includes('order') || toolName.includes('standing')
-            ? executeTool5(toolName, execArgs, toolState, latLngByH3, resolveToH3)
+            ? executeStandingOrders(toolName, execArgs, toolState, latLngByH3, resolveToH3)
             : toolName.includes('build') || toolName.includes('production') || toolName.includes('query_production')
-              ? executeTool6(toolName, execArgs, toolState, latLngByH3, resolveToH3)
+              ? executeProductionTools(toolName, execArgs, toolState, latLngByH3, resolveToH3)
               : toolName.includes('memory')
-                ? executeTool4(toolName, execArgs, toolState, latLngByH3, resolveToH3)
+                ? executeMemory(toolName, execArgs, toolState, latLngByH3, resolveToH3)
                 : toolName.includes('estimate')
-                  ? executeTool3(toolName, execArgs, toolState, latLngByH3, resolveToH3)
+                  ? executeCombatEstimation(toolName, execArgs, toolState, latLngByH3, resolveToH3)
                   : toolName.includes('assess')
-                    ? executeTool2(toolName, execArgs, toolState, latLngByH3, resolveToH3)
-                    : executeTool1(
+                    ? executeAssessment(toolName, execArgs, toolState, latLngByH3, resolveToH3)
+                    : executePathfinding(
                         toolName,
                         execArgs,
                         toolState,

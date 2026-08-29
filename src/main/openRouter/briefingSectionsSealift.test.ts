@@ -1,6 +1,6 @@
 /**
  * Contract tests for strategic Naval Transport Status briefing copy.
- * Run with: node dist/main/openrouter/briefingSectionsSealift.test.js
+ * Run with: node dist/main/openRouter/briefingSectionsSealift.test.js
  */
 
 import assert from 'node:assert/strict';

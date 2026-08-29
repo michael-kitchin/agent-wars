@@ -1,6 +1,6 @@
 /**
  * Contract tests for the scenario goal reminder and the generic-objective path.
- * Run: `npm run build:main` then `node dist/main/openrouter/scenarioGoals.test.js`
+ * Run: `npm run build:main` then `node dist/main/openRouter/scenarioGoals.test.js`
  */
 
 import assert from 'node:assert/strict';

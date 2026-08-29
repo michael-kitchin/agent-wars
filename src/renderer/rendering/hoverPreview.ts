@@ -10,7 +10,7 @@ import { clampLatForWebMercatorDisplay } from '../map/hexGrid';
 import { rangePerimeterStaticLineStyle } from './orderDrawing';
 import { drawArrowheadOnly, strokePolylineSkippingWrap } from './pathDrawing';
 import { rendererSharedState as S } from '../core/state';
-import { getLeafletGlobal, hexCenterPx, hexCenterPxRelativeTo } from '../map/mapUtils';
+import { getLeafletGlobal, hexCenterPx, hexCenterPxRelativeTo } from '../map/mapHelpers';
 import { getMainLeafletMap } from '../map/worldLeafletMap';
 
 /**

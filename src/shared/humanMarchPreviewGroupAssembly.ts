@@ -1,7 +1,7 @@
 /**
  * Shared primitives for assembling grouped human march hover previews (`HumanOrderGroupPreviewResult`).
  *
- * Purpose: Keeps strategic (`previewHumanMarchOrdersImpl`) and tactical (`buildTacticalMarchHoverPreview`) aligned on
+ * Purpose: Keeps strategic (`resolveHumanMarchOrderPreviews`) and tactical (`buildTacticalMarchHoverPreview`) aligned on
  * representative selection, envelope assembly, and movement-range aggregation without importing renderer/main code.
  * When to use: Any code path that builds grouped march preview payloads from selected unit ids and per-unit previews.
  * Expected outcome: Deterministic, first-wins de-duplication and stable `validForAll` / `showInvalidMarker` semantics.
@@ -70,7 +70,7 @@ export function representativeMarchPreviewUnitIdsByOriginH3(
  *
  * Purpose: Mixed land/naval stacks must preview every selected unit so `validForAll` reflects the whole selection;
  * homogeneous stacks keep one representative preview line per origin hex.
- * When to use: Strategic `previewHumanMarchOrdersImpl` before building per-unit previews.
+ * When to use: Strategic `resolveHumanMarchOrderPreviews` before building per-unit previews.
  * Expected outcome: All selected ids when `mixedLandAndNaval` is true; otherwise `representativeMarchPreviewUnitIdsByOriginH3`.
  * Exceptions: None.
  */

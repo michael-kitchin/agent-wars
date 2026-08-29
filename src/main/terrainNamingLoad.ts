@@ -518,12 +518,12 @@ function readCityArray(r: Record<string, unknown>, key: string): TerrainNamingCi
  */
 function parseRes1Row(raw: unknown, resolution: number): TerrainNamingRecordRes1 {
   if (!isRecord(raw)) throw new Error('terrain naming: record must be an object');
-  const h3_index = readStr(raw, 'h3_index');
-  if (getResolution(h3_index) !== resolution) {
-    throw new Error(`terrain naming: h3_index ${h3_index} resolution != envelope ${resolution}`);
+  const h3Index = readStr(raw, 'h3_index');
+  if (getResolution(h3Index) !== resolution) {
+    throw new Error(`terrain naming: h3_index ${h3Index} resolution != envelope ${resolution}`);
   }
   return {
-    h3_index,
+    h3_index: h3Index,
     states: readStateArray(raw, 'states'),
     countries: readCountryArray(raw, 'countries'),
     water: readWaterArray(raw, 'water'),
@@ -567,12 +567,12 @@ function parseNamingEnvelope(raw: unknown, expectedResolution: number): TerrainN
   if (resolution !== expectedResolution) {
     throw new Error(`terrain naming: resolution ${resolution} != expected ${expectedResolution}`);
   }
-  const record_count = readIntOrNull(raw, 'record_count');
-  if (record_count === null) throw new Error('terrain naming: "record_count" must be an integer');
+  const recordCount = readIntOrNull(raw, 'record_count');
+  if (recordCount === null) throw new Error('terrain naming: "record_count" must be an integer');
   const recs = raw.records;
   if (!Array.isArray(recs)) throw new Error('terrain naming: records must be an array');
-  if (recs.length !== record_count) {
-    throw new Error(`terrain naming: record_count ${record_count} != len(records) ${recs.length}`);
+  if (recs.length !== recordCount) {
+    throw new Error(`terrain naming: record_count ${recordCount} != len(records) ${recs.length}`);
   }
   const parseRow =
     expectedResolution === 4 ? (r: unknown) => parseRes4Row(r, 4) : (r: unknown) => parseRes1Row(r, 1);
@@ -592,7 +592,7 @@ function parseNamingEnvelope(raw: unknown, expectedResolution: number): TerrainN
   return {
     schema_version: String(raw.schema_version),
     resolution,
-    record_count,
+    record_count: recordCount,
     records,
   };
 }

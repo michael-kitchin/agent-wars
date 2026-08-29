@@ -1,6 +1,6 @@
 /**
  * Pure predicates for post-resolution LLM consultation gating (opponent idle and human-observable paths).
- * Run with: node dist/main/openrouter/afterResolutionConsultationGates.test.js
+ * Run with: node dist/main/openRouter/afterResolutionConsultationGates.test.js
  */
 
 import * as assert from 'assert';

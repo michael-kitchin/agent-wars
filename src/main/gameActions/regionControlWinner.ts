@@ -12,7 +12,7 @@ import {
   getScenarioHomeRegionHexes,
   sumUrbanHexCountForHexes,
 } from '../gameDb';
-import { loadScenarioState, REGION_VS_REGION_SCENARIO_ID } from '../game-db/scenarioState';
+import { loadScenarioState, REGION_VS_REGION_SCENARIO_ID } from '../gameDb/scenarioState';
 import { logDebug, logTrace } from '../logger';
 
 /**

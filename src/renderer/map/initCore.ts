@@ -2,7 +2,7 @@ import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import { unitHasDirectRangedPlanning } from '../../shared/rangePerimeterModel';
 import { panBindingToDirection, panPhysicalKeyId } from '../../shared/mapKeyboardPanLogic';
 import { clearMapKeyboardPan, mapPanKeyDown, mapPanKeyUp } from './mapKeyboardPan';
-import { isEditableKeyboardTarget, shouldIgnoreGlobalKeydown } from './mapUtils';
+import { isEditableKeyboardTarget, shouldIgnoreGlobalKeydown } from './mapHelpers';
 import { rendererSharedState as S } from '../core/state';
 import { hidePlanningChromeToasts } from '../openRouter/openRouterUiHelpers';
 import { isHoverOrderPlanningActive } from '../rendering/canvasPreviewPolicy';

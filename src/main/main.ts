@@ -70,7 +70,7 @@ import {
   getToolNamesForEnabledGroups,
   getToolGroupList,
   TOOL_GROUP_REGISTRY,
-} from './openrouter/openRouter';
+} from './openRouter/openRouter';
 import { logDebug, logError } from './logger';
 import { parseGameSize } from '../shared/gameSize';
 import {

@@ -32,7 +32,7 @@ import { getFilteredToolMetadata } from './openRouterToolCatalog';
 import { getToolFlags } from './openRouterToolGroups';
 import { logDebug } from '../logger';
 import type { CoordinateContext } from '../briefing/map/coordinateContext';
-import { h3ToCode } from '../briefing/map/hex-code-translator';
+import { h3ToCode } from '../briefing/map/hexCodeTranslator';
 import { SECTION_TITLE_AVAILABLE_TOOLS, SECTION_TITLE_BEST_OPTIONS_THIS_TURN, topLevelHeading } from './promptSpec/sectionHeadings';
 import { buildCombatRulesParagraph } from './promptSpec/gameRuleText';
 import { buildContextCoaching, type CoachingGates } from './promptSpec/coachingText';

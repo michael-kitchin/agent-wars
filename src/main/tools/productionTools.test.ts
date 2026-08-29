@@ -9,7 +9,7 @@ import { getHexBuildQueue } from '../gameActions';
 import { getMaxUnitsPerType, parseGameSize } from '../../shared/gameSize';
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import { withTempGameDb } from '../testSupport/withTempGameDb';
-import { executeTool6 } from './tool6Production';
+import { executeProductionTools } from './productionTools';
 
 /**
  * Locates or provisions an opponent-controlled hex with the requested urban count.
@@ -61,7 +61,7 @@ function buildCoordHelpers(state: GameStateSnapshot): {
  * Returns a snapshot whose opponent count for `unitType` is at least the match cap.
  *
  * Purpose: Cap rejection reads `state.units`, not the DB unit table, so tests can pad without inserting rows.
- * When to use: Before `executeTool6` when the live seed is below cap.
+ * When to use: Before `executeProductionTools` when the live seed is below cap.
  * Expected outcome: Same snapshot fields with extra opponent units of that type.
  * Exceptions: None.
  */
@@ -98,7 +98,7 @@ function testSetBuildQueueRejectsCappedTypeWhenAlternativeExists(): void {
     const { latLngByH3, resolveToH3 } = buildCoordHelpers(state);
     const hex = latLngByH3.get(h3Index);
     assert.ok(hex);
-    const armorResult = executeTool6(
+    const armorResult = executeProductionTools(
       'set_build_queue',
       { hex, unitType: 'armor', count: 1 },
       state,
@@ -108,7 +108,7 @@ function testSetBuildQueueRejectsCappedTypeWhenAlternativeExists(): void {
     assert.equal(armorResult.status, 'error');
     assert.match(String(armorResult.error ?? ''), /deployment cap/);
     assert.equal(getHexBuildQueue(h3Index, 'opponent').entries.length, 0);
-    const infantryResult = executeTool6(
+    const infantryResult = executeProductionTools(
       'set_build_queue',
       { hex, unitType: 'infantry', count: 1 },
       state,
@@ -140,7 +140,7 @@ function testSetBuildQueueAllowsCappedTypeWhenNoAlternative(): void {
     const { latLngByH3, resolveToH3 } = buildCoordHelpers(state);
     const hex = latLngByH3.get(h3Index);
     assert.ok(hex);
-    const result = executeTool6(
+    const result = executeProductionTools(
       'set_build_queue',
       { hex, unitType: 'infantry', count: 1 },
       state,
@@ -169,7 +169,7 @@ function testSetBuildQueueAllowsCappedTypeWhenAllAvailableAreMaxed(): void {
     const { latLngByH3, resolveToH3 } = buildCoordHelpers(state);
     const hex = latLngByH3.get(h3Index);
     assert.ok(hex);
-    const result = executeTool6(
+    const result = executeProductionTools(
       'set_build_queue',
       { hex, unitType: 'armor', count: 1 },
       state,
@@ -184,7 +184,7 @@ function run(): void {
   testSetBuildQueueRejectsCappedTypeWhenAlternativeExists();
   testSetBuildQueueAllowsCappedTypeWhenNoAlternative();
   testSetBuildQueueAllowsCappedTypeWhenAllAvailableAreMaxed();
-  console.log('tool6Production.test.ts passed');
+  console.log('productionTools.test.ts passed');
 }
 
 run();

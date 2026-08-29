@@ -106,8 +106,8 @@ export function panMapByNetAxes(ns: -1 | 0 | 1, ew: -1 | 0 | 1): void {
     setView: (center: unknown, zoom: number) => unknown;
     getZoom: () => number;
   } | null;
-  const Lref = (globalThis as unknown as { L?: { latLng: (lat: number, lng: number) => unknown } }).L;
-  if (!map || !Lref) return;
+  const leafletRef = (globalThis as unknown as { L?: { latLng: (lat: number, lng: number) => unknown } }).L;
+  if (!map || !leafletRef) return;
   const center = map.getCenter();
   let centerH3: string;
   try {
@@ -119,7 +119,7 @@ export function panMapByNetAxes(ns: -1 | 0 | 1, ew: -1 | 0 | 1): void {
   if (!neighbor) return;
   const [nextLat, nextLngRaw] = cellToLatLng(neighbor);
   const nextLng = alignLngToReference(nextLngRaw, center.lng);
-  map.setView(Lref.latLng(clampLatForWebMercatorDisplay(nextLat), nextLng), map.getZoom());
+  map.setView(leafletRef.latLng(clampLatForWebMercatorDisplay(nextLat), nextLng), map.getZoom());
 }
 
 /**
@@ -150,8 +150,8 @@ export function applyInitialCameraForState(state: GameStateSnapshot): void {
     getMaxZoom?: () => number;
     setView: (center: unknown, zoom: number) => unknown;
   } | null;
-  const Lref = (globalThis as unknown as { L?: { latLng: (lat: number, lng: number) => unknown } }).L;
-  if (!map || !Lref) return;
+  const leafletRef = (globalThis as unknown as { L?: { latLng: (lat: number, lng: number) => unknown } }).L;
+  if (!map || !leafletRef) return;
 
   const humanGround = state.units.filter(
     (u) => u.player === 'human' && (u.unitType === 'infantry' || u.unitType === 'armor')
@@ -171,7 +171,7 @@ export function applyInitialCameraForState(state: GameStateSnapshot): void {
   const centerLng = lngSum / anchors.length;
   const maxZoom = typeof map.getMaxZoom === 'function' ? map.getMaxZoom() : 12;
   const targetZoom = Math.min(maxZoom, map.getZoom() + INITIAL_CAMERA_ZOOM_IN_LEVELS);
-  map.setView(Lref.latLng(clampLatForWebMercatorDisplay(centerLat), centerLng), targetZoom);
+  map.setView(leafletRef.latLng(clampLatForWebMercatorDisplay(centerLat), centerLng), targetZoom);
   const ctr = typeof map.getCenter === 'function' ? map.getCenter() : null;
   if (ctr) {
     S.strategicScenarioInitialLeafletView = { lat: ctr.lat, lng: ctr.lng, zoom: map.getZoom() };

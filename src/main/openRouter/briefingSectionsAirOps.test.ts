@@ -1,6 +1,6 @@
 /**
  * Contract tests for Air Operations Status briefing copy.
- * Run with: node dist/main/openrouter/briefingSectionsAirOps.test.js
+ * Run with: node dist/main/openRouter/briefingSectionsAirOps.test.js
  */
 
 import assert from 'node:assert/strict';

@@ -1,5 +1,5 @@
 /**
- * Tactical Tool 1 pathfinding: plan_route / check_distance via res4 march planner (not strategic land-mass).
+ * Tactical pathfinding: plan_route / check_distance via res4 march planner (not strategic land-mass).
  */
 
 import { gridDisk } from 'h3-js';
@@ -143,7 +143,7 @@ function nearestNavigableNavalRes4To(
  * Plans a tactical land/naval march and builds a Tool1 plan_route success payload truncated to the first Ready leg.
  *
  * Purpose: Fixes tactical AI plan_route when strategic res1 land-mass rejects every res4 cell.
- * When to use: `executeTool1` when `tacticalBattle` is set for `plan_route`.
+ * When to use: `executePathfinding` when `tacticalBattle` is set for `plan_route`.
  * Expected outcome: `orderToH3` = `firstStopWithinBudget.stopH3` (same truncation as human Ready); avoidEnemies honored with unblock retry.
  * Exceptions: Returns PlanRouteError for air, unknown units, off-footprint cells, or unreachable destinations.
  */
@@ -156,7 +156,7 @@ export function executeTacticalPlanRoute(
   latLngByH3: Map<string, LatLng>,
   resolveToH3: (lat: number, lng: number) => string | undefined
 ): PlanRouteOk | PlanRouteError {
-  logDebug('tacticalTool1Pathfinding executeTacticalPlanRoute', {
+  logDebug('tacticalPathfinding executeTacticalPlanRoute', {
     battleId: battle.battleId,
     unitId,
     destination: destination.join(','),
@@ -271,7 +271,7 @@ export function executeTacticalPlanRoute(
     }
 
     if (!plan.reachable || !plan.pathToDestination || plan.pathToDestination.length < 2) {
-      logDebug('tacticalTool1Pathfinding executeTacticalPlanRoute: no path', {
+      logDebug('tacticalPathfinding executeTacticalPlanRoute: no path', {
         battleId: battle.battleId,
         unitId,
         originH3,
@@ -295,7 +295,7 @@ export function executeTacticalPlanRoute(
     const destLl = h3ToLatLng(destH3, latLngByH3, 'origin');
     const orderLl = h3ToLatLng(firstStop, latLngByH3, 'origin');
 
-    logDebug('tacticalTool1Pathfinding executeTacticalPlanRoute: ok', {
+    logDebug('tacticalPathfinding executeTacticalPlanRoute: ok', {
       battleId: battle.battleId,
       unitId,
       originH3,
@@ -331,7 +331,7 @@ export function executeTacticalPlanRoute(
       reachable: plan.reachableThisTurn,
     };
   } catch (err) {
-    logError('tacticalTool1Pathfinding executeTacticalPlanRoute: exception', { unitId, error: String(err) });
+    logError('tacticalPathfinding executeTacticalPlanRoute: exception', { unitId, error: String(err) });
     return { status: 'error', error: 'Route planning failed due to an internal error. Please retry.' };
   }
 }
@@ -391,7 +391,7 @@ function tacticalBestEffortNeighborPlan(args: {
  * Tactical check_distance using res4 march cost/path instead of strategic land-mass BFS.
  *
  * Purpose: Lets the model compare approach options inside a battle without false “unreachable” from res1 land-mass.
- * When to use: `executeTool1` when `tacticalBattle` is set for `check_distance`.
+ * When to use: `executePathfinding` when `tacticalBattle` is set for `check_distance`.
  * Expected outcome: hexDistance from path length; estimatedTurns from MP cost / budget; reachable when a finite path exists.
  * Exceptions: Returns error for invalid hexes; air unitType yields unreachable ok with zero distances.
  */
@@ -403,7 +403,7 @@ export function executeTacticalCheckDistance(
   latLngByH3: Map<string, LatLng>,
   resolveToH3: (lat: number, lng: number) => string | undefined
 ): CheckDistanceOk | CheckDistanceError {
-  logDebug('tacticalTool1Pathfinding executeTacticalCheckDistance', {
+  logDebug('tacticalPathfinding executeTacticalCheckDistance', {
     battleId: battle.battleId,
     from: from.join(','),
     to: to.join(','),

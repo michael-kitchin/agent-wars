@@ -32,7 +32,7 @@ import {
 } from './tacticalStrategicOrderPhases';
 import type { TacticalMovementBlockReason } from './tacticalSnapshotGuards';
 import { tacticalComputeHumanMovementOrderOutcome, tacticalComputeMovementOrderOutcome } from './tacticalSnapshotGuards';
-import { applyTacticalEmbarkCommittedOrdersToStrategicDb, deleteStrategicParentUnitAndApplyTransportOutcome } from '../game-actions/sealift';
+import { applyTacticalEmbarkCommittedOrdersToStrategicDb, deleteStrategicParentUnitAndApplyTransportOutcome } from '../gameActions/sealift';
 import { tacticalLogError, tacticalLogMutate, tacticalLogQuery } from './tacticalLogging';
 import { validateTacticalHumanEmbarkOrder } from './tacticalOpponentOrderValidation';
 import {
@@ -45,7 +45,7 @@ import {
   stashOpponentCallbackSubscriptionsForTacticalBattle,
   restoreOpponentCallbackSubscriptionsAfterTacticalBattle,
   hydrateOpponentCallbackStashFromGameConfig,
-} from '../openrouter/tacticalCallbackSubscriptionLifecycle';
+} from '../openRouter/tacticalCallbackSubscriptionLifecycle';
 
 /**
  * Returns a user-facing validation error when any opponent tactical march order is illegal on the current snapshot, or null when all pass.

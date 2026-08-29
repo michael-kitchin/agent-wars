@@ -1,6 +1,6 @@
 /**
  * Region-vs-region end-of-turn win evaluation (control + urban elimination).
- * Run: `node dist/main/game-actions/regionControlWinner.test.js`
+ * Run: `node dist/main/gameActions/regionControlWinner.test.js`
  */
 
 import assert from 'node:assert/strict';

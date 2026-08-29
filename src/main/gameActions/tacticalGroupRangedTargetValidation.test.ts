@@ -1,6 +1,6 @@
 /**
  * Tests for `validateTacticalGroupRangedTarget`. Run with:
- * `node dist/main/game-actions/tacticalGroupRangedTargetValidation.test.js`
+ * `node dist/main/gameActions/tacticalGroupRangedTargetValidation.test.js`
  */
 
 import assert from 'node:assert/strict';

@@ -10,7 +10,7 @@ import * as ts from 'typescript';
  * Expected outcome: A service whose host reads files from disk under `repoRoot`.
  * Exceptions: Throws when the tsconfig cannot be read or parsed.
  */
-export function createNamingLanguageService(repoRoot: string): ts.LanguageService {
+export function createNamingLanguageHost(repoRoot: string): ts.LanguageService {
   const configPath = path.join(repoRoot, 'tsconfig.tools-src-ast.json');
   const configFile = ts.readConfigFile(configPath, (p) => fs.readFileSync(p, 'utf8'));
   if (configFile.error) {

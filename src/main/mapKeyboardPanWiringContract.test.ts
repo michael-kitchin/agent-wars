@@ -50,8 +50,8 @@ test('initCore clears map pan on blur, focusin editable, and visibility hidden',
 
 test('main Leaflet map disables built-in keyboard pan', () => {
   const worldMap = readSrc('renderer', 'map', 'worldLeafletMap.ts');
-  const mainMapIdx = worldMap.indexOf('mainMap = Lref.map');
-  assert.ok(mainMapIdx >= 0, 'expected mainMap = Lref.map');
+  const mainMapIdx = worldMap.indexOf('mainMap = leafletRef.map');
+  assert.ok(mainMapIdx >= 0, 'expected mainMap = leafletRef.map');
   const optionsBlock = worldMap.slice(mainMapIdx, mainMapIdx + 600);
   assert.match(optionsBlock, /keyboard:\s*false/);
 });

@@ -9,10 +9,10 @@
 
 import { buildLatLngCoordinateMap } from '../mapData';
 import { logTrace } from '../logger';
-import { createPathfindingSession } from '../tools/tool1Pathfinding';
+import { createPathfindingSession } from '../tools/pathfinding';
 import { buildNormalizedTerrainByH3 } from '../movementTerrain';
 import { buildTerrainMapsFromHexRows } from './landMovementConstraints';
-import type { PathfindingSession } from '../tools/tool1Pathfinding';
+import type { PathfindingSession } from '../tools/pathfinding';
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
 
 /**

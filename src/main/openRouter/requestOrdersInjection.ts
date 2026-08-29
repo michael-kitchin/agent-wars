@@ -11,8 +11,8 @@
 import type { GameStateSnapshot } from '../gameDb';
 import { logDebug } from '../logger';
 import type { CoordinateContext } from '../briefing/map/coordinateContext';
-import { getInjectionText } from '../tools/tool4Memory';
-import { getInjectionText as getStandingOrderInjectionText } from '../tools/tool5StandingOrders';
+import { getInjectionText } from '../tools/memory';
+import { getInjectionText as getStandingOrderInjectionText } from '../tools/standingOrders';
 import { buildProductionBriefingBlock } from './briefingSections';
 
 /**

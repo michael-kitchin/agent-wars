@@ -17,7 +17,7 @@ import {
  * Resolves a roster id to the same display label the renderer uses for tooltips and pending-order UI.
  *
  * Purpose: Duplicate-order and conflict reasons are shown to the player; they must not echo raw `human-infantry-1` ids.
- * When to use: Injected once per `submitOrdersImpl` call alongside movement/ranged validators.
+ * When to use: Injected once per `executeSubmitOrders` call alongside movement/ranged validators.
  * Expected outcome: Stable per-turn labels derived from the same snapshot rows as strategic `buildUnitDisplayNameLookup`.
  * Exceptions: None.
  */
@@ -113,14 +113,14 @@ validPhase: string;
 }
 
 /**
- * Defines the `submitOrdersImpl` function shape (export function submitOrdersImpl(payload: SubmitOrdersPayload, deps: SubmitOrdersDeps): SubmitOrdersResult).
+ * Defines the `executeSubmitOrders` function shape (export function executeSubmitOrders(payload: SubmitOrdersPayload, deps: SubmitOrdersDeps): SubmitOrdersResult).
 
  * Purpose: Persists human strategic pending orders for the current planning phase after validation.
  * When to use: Called from `submitOrders` in `gameActions` with injected validators and display labels.
  * Expected outcome: Duplicate unit ids within a single category still fail the whole submit; per-row validation failures drop only that row, log via `orderPlanSanitize`, and persist the sanitized plan. Ferry rows for a unit that keeps a valid air strike are dropped (strike wins) instead of failing the batch.
  * Exceptions: Database and tactical-guard failures return `success: false`; caught exceptions are logged at error.
  */
-export function submitOrdersImpl(payload: SubmitOrdersPayload, deps: SubmitOrdersDeps): SubmitOrdersResult {
+export function executeSubmitOrders(payload: SubmitOrdersPayload, deps: SubmitOrdersDeps): SubmitOrdersResult {
   const orders = payload.movementOrders ?? [];
   const ranged = payload.rangedAttacks ?? [];
   const airStrikes = payload.airStrikes ?? [];

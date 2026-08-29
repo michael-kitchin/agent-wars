@@ -714,12 +714,12 @@ export function recordHasMajorSeaport(
  */
 function parseRes1Row(raw: unknown, resolution: number): HexMetadataRecordRes1 {
   if (!isRecord(raw)) throw new Error('terrain metadata: record must be an object');
-  const h3_index = readStr(raw, 'h3_index');
-  if (getResolution(h3_index) !== resolution) {
-    throw new Error(`terrain metadata: h3_index ${h3_index} resolution != envelope ${resolution}`);
+  const h3Index = readStr(raw, 'h3_index');
+  if (getResolution(h3Index) !== resolution) {
+    throw new Error(`terrain metadata: h3_index ${h3Index} resolution != envelope ${resolution}`);
   }
   return {
-    h3_index,
+    h3_index: h3Index,
     total_edges: readInt(raw, 'total_edges'),
     all_water: readBool(raw, 'all_water'),
     intersects_water: readBool(raw, 'intersects_water'),
@@ -776,11 +776,11 @@ function parseMetadataEnvelope(raw: unknown, expectedResolution: number): HexMet
   if (resolution !== expectedResolution) {
     throw new Error(`terrain metadata: resolution ${resolution} != expected ${expectedResolution}`);
   }
-  const record_count = readInt(raw, 'record_count');
+  const recordCount = readInt(raw, 'record_count');
   const recs = raw.records;
   if (!Array.isArray(recs)) throw new Error('terrain metadata: records must be an array');
-  if (recs.length !== record_count) {
-    throw new Error(`terrain metadata: record_count ${record_count} != len(records) ${recs.length}`);
+  if (recs.length !== recordCount) {
+    throw new Error(`terrain metadata: record_count ${recordCount} != len(records) ${recs.length}`);
   }
   const parseRow =
     expectedResolution === 4 ? (r: unknown) => parseRes4Row(r, 4) : (r: unknown) => parseRes1Row(r, 1);
@@ -800,7 +800,7 @@ function parseMetadataEnvelope(raw: unknown, expectedResolution: number): HexMet
   return {
     schema_version: String(raw.schema_version),
     resolution,
-    record_count,
+    record_count: recordCount,
     records,
   };
 }

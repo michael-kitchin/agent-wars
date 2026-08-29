@@ -7,7 +7,7 @@ import { BUILD_ENTRY_MAX_COUNT, BUILD_ENTRY_MIN_COUNT, isBuildUnitType, type Bui
 import { logTrace } from './logger';
 import type { CoordinateContext } from './briefing/map/coordinateContext';
 import { HEX_CODE_PATTERN } from './briefing/map/coordinateContext';
-import { isHexCodeValidForContext } from './briefing/map/hex-coordinates';
+import { isHexCodeValidForContext } from './briefing/map/hexCoordinates';
 
 /**
  * Documents the `ProductionOrderAction` type alias (export type ProductionOrderAction).

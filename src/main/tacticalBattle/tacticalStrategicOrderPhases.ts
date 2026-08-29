@@ -28,12 +28,12 @@ import {
   type RangedResolutionShotLine,
 } from '../../shared/rangedResolutionShotLines';
 import type { CombatUnit } from '../combatUnitTypes';
-import { deleteStrategicParentUnitAndApplyTransportOutcome } from '../game-actions/sealift';
-import { applyInfrastructureDestructionEffects } from '../game-actions/airStrikeResolution';
+import { deleteStrategicParentUnitAndApplyTransportOutcome } from '../gameActions/sealift';
+import { applyInfrastructureDestructionEffects } from '../gameActions/airStrikeResolution';
 import {
   applyTacticalRangedRubbleToRes4Cell,
   type TacticalRangedRubbleApplyOptions,
-} from '../game-actions/tacticalRangedInfrastructureRubble';
+} from '../gameActions/tacticalRangedInfrastructureRubble';
 import { listRes4FeatureOverridesForGame } from '../gameDb';
 import { hasIntactAirportAtTacticalAirBase } from '../returnFireAirportLookup';
 import { refreshTacticalBattleRes4TerrainFromGameDb } from './computeTacticalBattleSnapshot';

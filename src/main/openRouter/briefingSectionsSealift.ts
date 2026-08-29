@@ -9,7 +9,7 @@
 
 import type { GameStateSnapshot } from '../gameDb';
 import { logDebug } from '../logger';
-import { buildPromptTableLines } from '../promptTableUtils';
+import { buildPromptTableLines } from '../promptTableHelpers';
 import { canEmbarkAtHex } from '../../shared/sealiftEmbarkEligibility';
 import { gridHopDistancesFrom } from '../tools/assessUnitProximity';
 import { SECTION_TITLE_NAVAL_TRANSPORT_STATUS, topLevelHeading } from './promptSpec/sectionHeadings';

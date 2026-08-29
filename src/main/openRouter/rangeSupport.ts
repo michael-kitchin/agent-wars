@@ -1,6 +1,6 @@
 import { gridDisk } from 'h3-js';
 import { logDebug } from '../logger';
-import { isWithinGridRangeSafe } from '../game-actions/gridRange';
+import { isWithinGridRangeSafe } from '../gameActions/gridRange';
 
 /**
  * Documents the `RangeEnvelopeCache` type alias (export type RangeEnvelopeCache).

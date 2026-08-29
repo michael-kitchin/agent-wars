@@ -11,7 +11,7 @@ import { getHexBoundaryLatLngForLeafletOverlay } from '../map/hexGrid';
 import { getActiveHexStrokeStyle, fillHexTerrain } from './terrainVisualStyles';
 import { drawTerrainInfrastructureGlyphs, RES4_TERRAIN_INFRA_GLYPH_AREA_SCALE } from './terrainInfrastructureOverlay';
 import { DETAIL_H3_RESOLUTION, MULTI_PLAYER_FILL, OWNERSHIP_BORDER_ALPHA, PLAYER_COLORS } from '../core/constants';
-import { getLeafletGlobal, hexCenterPx } from '../map/mapUtils';
+import { getLeafletGlobal, hexCenterPx } from '../map/mapHelpers';
 import {
   projectHexBoundaryToContainerPoints,
   shouldConsiderRes4ChildrenForViewport,
@@ -498,12 +498,12 @@ export function hasVisibleRes1InfrastructureGlyphs(
 export function computeRes1OverlayTextY(
   h3Index: string,
   map: { latLngToContainerPoint: (ll: unknown) => { x: number; y: number } },
-  L: { latLng: (lat: number, lng: number) => unknown },
+  leaflet: { latLng: (lat: number, lng: number) => unknown },
   hasOffsetFeatures: boolean
 ): number {
   const center = hexCenterPx(h3Index);
   if (!hasOffsetFeatures) return center.y;
-  const pts = projectHexBoundaryToContainerPoints(h3Index, map, L);
+  const pts = projectHexBoundaryToContainerPoints(h3Index, map, leaflet);
   return center.y + spanForProjectedHex(pts) * 0.24;
 }
 

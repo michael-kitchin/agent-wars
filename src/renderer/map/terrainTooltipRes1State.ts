@@ -17,7 +17,7 @@ import {
 import { DETAIL_H3_RESOLUTION, WORLD_H3_RESOLUTION } from '../core/constants';
 import { isHexExploredByPlayer } from '../core/selection';
 import { rendererSharedState as S } from '../core/state';
-import { getLeafletGlobal } from './mapUtils';
+import { getLeafletGlobal } from './mapHelpers';
 import { computeTerrainEffectsLineHtml } from '../../shared/terrainEffectsForTooltip';
 import { TOOLTIP_SECTION_GAP_HTML } from '../../shared/tooltipSectionGap';
 import type { NamingLookupTarget, TerrainTooltipState } from './terrainTooltipTypes';

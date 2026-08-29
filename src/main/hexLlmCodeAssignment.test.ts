@@ -18,7 +18,7 @@ import {
   ensureStrategicCoordinateRegistryInitialized,
   getHexCodeForContext,
   initTacticalCoordinateRegistry,
-} from './briefing/map/hex-coordinates';
+} from './briefing/map/hexCoordinates';
 
 const STRATEGIC_CTX = { mode: 'strategic' as const };
 

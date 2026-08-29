@@ -3,7 +3,7 @@
  */
 
 import { dbGetOne } from '../gameDb';
-import { readTurnStateRow } from '../game-db/turnStateReads';
+import { readTurnStateRow } from '../gameDb/turnStateReads';
 import { createCombatRng, runMeleePhase } from '../combatResolution';
 import { logDebug, logError } from '../logger';
 import type { ReadyResult, ResolveMeleeInterceptIpcPayload } from '../../shared/ipcTypes';

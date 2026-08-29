@@ -554,8 +554,8 @@ async function run(): Promise<void> {
     });
     assert.strictEqual(strictResult.success, false, 'strict schema should reject top-level array responses');
 
-    const hexCoordsMod = require('../briefing/map/hex-coordinates') as { ensureStrategicCoordinateRegistryInitialized: () => void };
-    const hexCodeTranslator = require('../briefing/map/hex-code-translator') as {
+    const hexCoordsMod = require('../briefing/map/hexCoordinates') as { ensureStrategicCoordinateRegistryInitialized: () => void };
+    const hexCodeTranslator = require('../briefing/map/hexCodeTranslator') as {
       h3ToCode: (h3Index: string, context: { mode: 'strategic' }) => string;
     };
     hexCoordsMod.ensureStrategicCoordinateRegistryInitialized();
@@ -719,7 +719,7 @@ async function run(): Promise<void> {
       'region_vs_region still uses the home-region win reminder'
     );
 
-    console.log(`openRouter.matrix.test.ts passed (${combosChecked} combinations)`);
+    console.log(`openRouterMatrix.test.ts passed (${combosChecked} combinations)`);
   } finally {
     const openRouter = require('./openRouter') as { setChatTransportOverrideForTests: (override: null) => void };
     openRouter.setChatTransportOverrideForTests(null);

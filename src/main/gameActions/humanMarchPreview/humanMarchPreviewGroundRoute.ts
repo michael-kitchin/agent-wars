@@ -16,7 +16,7 @@ import {
   landUnitCanOccupyHex,
 } from '../../../shared/landTraversalRes1';
 import { isLandUnitType } from '../landMovementConstraints';
-import type { PlanRouteError, PlanRouteOk } from '../../tools/tool1Pathfinding';
+import type { PlanRouteError, PlanRouteOk } from '../../tools/pathfinding';
 import type { HumanMarchPreviewComputationContext } from '../humanMarchPreviewComputationContext';
 import {
   navalLookupForHexState,

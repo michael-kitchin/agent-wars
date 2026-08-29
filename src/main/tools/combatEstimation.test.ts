@@ -1,6 +1,6 @@
 /**
- * Verification for Tool 3 (estimate_combat) and combat single-engagement APIs.
- * Happy path and essential failure cases per execution plan Phase 4. Run with: node dist/tools/tool3CombatEstimation.test.js
+ * Verification for combat estimation (`estimate_combat`) and combat single-engagement APIs.
+ * Happy path and essential failure cases. Run with: node dist/main/tools/combatEstimation.test.js
  */
 
 import * as assert from 'assert';
@@ -9,7 +9,7 @@ import {
   resolveOneMeleeEngagement,
   type CombatUnit,
 } from '../combatResolution';
-import { getAssessmentCategory, executeEstimateCombat, poissonBinomialPMF } from './tool3CombatEstimation';
+import { getAssessmentCategory, executeEstimateCombat, poissonBinomialPMF } from './combatEstimation';
 import type { GameStateSnapshot } from '../gameDb';
 
 /**
@@ -276,14 +276,14 @@ function testExactCombatProbabilities(): void {
 }
 
 /**
- * Defines the `runTool3Verification` function shape (export function runTool3Verification(): void).
+ * Defines the `runCombatEstimationVerification` function shape (export function runCombatEstimationVerification(): void).
 
- * Purpose: Supports maintainability by documenting why `runTool3Verification` exists.
+ * Purpose: Supports maintainability by documenting why `runCombatEstimationVerification` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function runTool3Verification(): void {
+export function runCombatEstimationVerification(): void {
   testGetAssessmentCategory();
   testResolveOneMeleeDeterministic();
   testResolveOneRangedNoReturnFire();
@@ -297,5 +297,5 @@ export function runTool3Verification(): void {
 }
 
 if (typeof require !== 'undefined' && require.main === module) {
-  runTool3Verification();
+  runCombatEstimationVerification();
 }

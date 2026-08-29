@@ -18,7 +18,7 @@ import {
   getMovementBudget,
   getRange,
 } from '../../combatConstants';
-import { STALE_INTEL_TURNS } from '../../game-db/fogState';
+import { STALE_INTEL_TURNS } from '../../gameDb/fogState';
 import { logDebug, logTrace } from '../../logger';
 import { ALL_BUILD_UNIT_TYPES } from '../../../shared/ipc/productionTypes';
 import { BUILD_PREREQUISITES_BY_TYPE, UNIT_COST_BY_TYPE } from '../../productionRules';

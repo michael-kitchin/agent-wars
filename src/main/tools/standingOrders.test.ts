@@ -1,7 +1,7 @@
 /**
  * Tool 5 (Standing Orders) — happy path and essential failure cases per execution plan.
  * Uses established test pattern: error cases with minimal state; happy path when DB is available.
- * Run with: node dist/tools/tool5StandingOrders.test.js
+ * Run with: node dist/tools/standingOrders.test.js
  */
 
 import * as assert from 'assert';
@@ -12,7 +12,7 @@ import { cellToLatLng, gridDisk, gridDistance, latLngToCell } from 'h3-js';
 import { AIR_STRIKE_RANGE_HEXES } from '../../shared/tacticalRanges';
 import { getOrderedHexList } from '../mapData';
 import { safeGridHexDistance } from './assessUnitProximity';
-import { executeTool5, getInjectionText } from './tool5StandingOrders';
+import { executeStandingOrders, getInjectionText } from './standingOrders';
 import {
   dbGetOne,
   dbRun,
@@ -21,7 +21,7 @@ import {
   openGameDatabaseAtPathForTests,
   closeGameDatabaseForTests,
 } from '../gameDb';
-import { executeStandingOrderActionForPlayer, generateOrdersForStandingOrders } from './tool5StandingOrders';
+import { executeStandingOrderActionForPlayer, generateOrdersForStandingOrders } from './standingOrders';
 import type { GameStateSnapshot } from '../gameDb';
 
 /**
@@ -108,7 +108,7 @@ pendingOrders: [],
  * Exceptions: None.
  */
 function testAssignOrderUnitNotFound(): void {
-  const result = executeTool5(
+  const result = executeStandingOrders(
     'assign_order',
     { unitId: 'nonexistent', order: { type: 'hold_fire' } },
     emptyState,
@@ -133,7 +133,7 @@ function testAssignOrderPursueTargetNotFound(): void {
     hexes: [{ h3Index: 'a', terrain: 'land', terrainKind: 'plains' }],
     units: [{ id: 'opponent-armor-1', player: 'opponent', unitType: 'armor', h3Index: 'a' }],
   };
-  const result = executeTool5(
+  const result = executeStandingOrders(
     'assign_order',
     { unitId: 'opponent-armor-1', order: { type: 'pursue', targetUnitId: 'human-armor-99' } },
     stateWithUnit,
@@ -161,7 +161,7 @@ function testAssignOrderPatrolTooFewWaypoints(): void {
     ],
     units: [{ id: 'opponent-armor-1', player: 'opponent', unitType: 'armor', h3Index: 'a' }],
   };
-  const result = executeTool5(
+  const result = executeStandingOrders(
     'assign_order',
     { unitId: 'opponent-armor-1', order: { type: 'patrol', waypoints: [[0, 0]] } },
     stateWithUnit,
@@ -201,7 +201,7 @@ function testAssignOrderAirUnitRejectsMovementOrders(): void {
     { type: 'pursue', targetUnitId: 'human-armor-1' },
   ];
   for (const order of movementOrders) {
-    const result = executeTool5('assign_order', { unitId: 'opponent-air-1', order }, stateWithAirUnit, emptyMap, resolve);
+    const result = executeStandingOrders('assign_order', { unitId: 'opponent-air-1', order }, stateWithAirUnit, emptyMap, resolve);
     assert.strictEqual(result.status, 'error', `air ${order.type} should be rejected`);
     const message = (result as { error?: string }).error ?? '';
     assert.ok(message.includes('Air units cannot take'), `unexpected message for ${order.type}: ${message}`);
@@ -218,7 +218,7 @@ function testAssignOrderAirUnitRejectsMovementOrders(): void {
  * Exceptions: None.
  */
 function testQueryOrdersRequiresUnitIdOrAll(): void {
-  const result = executeTool5('query_orders', {}, emptyState, emptyMap, noopResolve);
+  const result = executeStandingOrders('query_orders', {}, emptyState, emptyMap, noopResolve);
   assert.strictEqual(result.status, 'error');
   assert.ok((result as { error?: string }).error?.includes('query_orders requires'));
 }
@@ -232,7 +232,7 @@ function testQueryOrdersRequiresUnitIdOrAll(): void {
  * Exceptions: None.
  */
 function testCancelOrderWhenNoOrder(): void {
-  const result = executeTool5(
+  const result = executeStandingOrders(
     'cancel_order',
     { unitId: 'opponent-armor-1' },
     emptyState,
@@ -893,7 +893,7 @@ function run(): void {
   testAirDefendDoesNotProduceMovementOrder();
   testGetInjectionTextAttentionYesForRecedingMarch();
   testHumanMarchDefaultsAvoidEnemiesFalse();
-  console.log('tool5StandingOrders tests passed');
+  console.log('standingOrders tests passed');
 }
 
 run();

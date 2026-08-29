@@ -276,7 +276,7 @@ function findLandPathWithLandMassRule(payload: {
     try {
       neighbors = gridDisk(current, 1);
     } catch (err) {
-      logError('tool1Pathfinding findLandPathWithLandMassRule: gridDisk threw', {
+      logError('pathfinding findLandPathWithLandMassRule: gridDisk threw', {
         currentH3: current,
         error: String(err),
       });

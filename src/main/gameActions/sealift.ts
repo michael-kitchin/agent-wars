@@ -261,7 +261,7 @@ function canPlayerEmbarkFromHex(h3Index: string, playerId: string): boolean {
 /**
  * Returns whether a player may manually debark cargo at a hex (stack popup debark button).
  *
- * Purpose: Central debark eligibility for UI and `updateSealiftSlotImpl`; coastal hexes always allow debark, water seaports allow debark when controlled.
+ * Purpose: Central debark eligibility for UI and `executeSealiftSlotUpdate`; coastal hexes always allow debark, water seaports allow debark when controlled.
  * When to use: Before enabling debark controls or accepting debark IPC (`landUnitId === null`).
  * Expected outcome: True for coastal stacks and controlled water seaports; false for open ocean.
  * Exceptions: None.
@@ -282,7 +282,7 @@ export function canManualDebarkFromHex(h3Index: string, playerId: string): boole
  * Classifies a hex for the human stack sealift UI.
  *
  * Purpose: Embark dropdowns enable only where the human may embark; water means no valid embark on that hex.
- * When to use: `getSealiftStackStateImpl` and tactical stack state that reuses this classifier.
+ * When to use: `readSealiftStackState` and tactical stack state that reuses this classifier.
  * Expected outcome: `coastal_port` for native coastal, land seaports, and controlled water seaports; `water` for open ocean and enemy or uncontrolled water seaports; `coastal_no_port` when movement terrain is coastal but embark is not allowed; `unsupported` when the hex is missing or inland without a seaport.
  * Exceptions: None.
  */
@@ -399,14 +399,14 @@ function buildNavalRows(
 }
 
 /**
- * Defines the `getSealiftStackStateImpl` function shape (export function getSealiftStackStateImpl(h3Index: string): SealiftStackState).
+ * Defines the `readSealiftStackState` function shape (export function readSealiftStackState(h3Index: string): SealiftStackState).
 
- * Purpose: Supports maintainability by documenting why `getSealiftStackStateImpl` exists.
+ * Purpose: Supports maintainability by documenting why `readSealiftStackState` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function getSealiftStackStateImpl(h3Index: string): SealiftStackState {
+export function readSealiftStackState(h3Index: string): SealiftStackState {
   const unitsAtHex = getUnitsAtHex(h3Index);
   const contextMode = getSealiftStackContextModeForHex(h3Index);
   const navalIds = getHumanNavalIds(unitsAtHex);
@@ -439,20 +439,20 @@ export function getSealiftStackStateImpl(h3Index: string): SealiftStackState {
  * Expected outcome: Success with refreshed stack state, or a reason when the hex, units, or slot rules forbid the edit. Embark requires `canPlayerEmbarkFromHex`; debark requires `canManualDebarkFromHex`.
  * Exceptions: None; returns `success: false` instead of throwing.
  */
-export function updateSealiftSlotImpl(args: {
+export function executeSealiftSlotUpdate(args: {
   h3Index: string;
   navalUnitId: string;
   slotIndex: 1 | 2;
   landUnitId: string | null;
 }): { success: boolean; reason?: string; state?: SealiftStackState } {
-  logDebug('sealift updateSealiftSlotImpl', {
+  logDebug('sealift executeSealiftSlotUpdate', {
     h3Index: args.h3Index,
     navalUnitId: args.navalUnitId,
     slotIndex: args.slotIndex,
     hasLand: args.landUnitId != null,
   });
   if (!isDbReady()) return { success: false, reason: 'Database not initialized' };
-  const state = getSealiftStackStateImpl(args.h3Index);
+  const state = readSealiftStackState(args.h3Index);
   const navalIds = state.navalRows.map((row) => row.navalUnitId);
   if (!navalIds.includes(args.navalUnitId)) return { success: false, reason: 'Selected naval unit is not in this stack.' };
   const isDebark = args.landUnitId === null;
@@ -496,7 +496,7 @@ export function updateSealiftSlotImpl(args: {
 
   normalizeSealiftSlots(navalIds, slotsByNavalId, landTypeById);
   writeAssignmentsForHex(args.h3Index, state.landOptions, slotsByNavalId);
-  return { success: true, state: getSealiftStackStateImpl(args.h3Index) };
+  return { success: true, state: readSealiftStackState(args.h3Index) };
 }
 
 /**

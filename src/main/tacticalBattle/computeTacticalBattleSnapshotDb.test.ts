@@ -1,12 +1,12 @@
 /**
  * DB-backed contracts for tactical snapshot synthesis: planning gate, res1 validation, placement determinism, session IPC edges.
- * Run with: node dist/main/tacticalBattle/computeTacticalBattleSnapshot.db.test.js
+ * Run with: node dist/main/tacticalBattle/computeTacticalBattleSnapshotDb.test.js
  */
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { CombatUnit } from '../combatUnitTypes';
-import { filterMeleeCandidateHexesWithTacticalEntry, listMeleeCandidateHexes } from '../game-actions/meleeInterceptCandidates';
+import { filterMeleeCandidateHexesWithTacticalEntry, listMeleeCandidateHexes } from '../gameActions/meleeInterceptCandidates';
 import { dbGetOne, dbRun, listUnitsForSnapshot } from '../gameDb';
 import { getOrderedHexList } from '../mapData';
 import { withTempGameDb } from '../testSupport/withTempGameDb';

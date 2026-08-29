@@ -10,7 +10,7 @@ import type { PrecomputationResult, UnitAssessmentResult } from './precomputatio
 import { buildAttentionFlags, buildStrategicNarrative, buildUnitStatusTable, formatBriefing } from './briefingFormatter';
 import { getOrderedHexList } from './mapData';
 import { FOG_PATH_DISTANCE_BRIEFING_LINE, OMNISCIENT_GRID_PROXIMITY_BRIEFING_LINE } from './tools/assessUnitProximity';
-import { buildIntelStalenessRule } from './openrouter/promptSpec/gameRuleText';
+import { buildIntelStalenessRule } from './openRouter/promptSpec/gameRuleText';
 
 /**
  * Documents the module-scope binding `fixtureOriginH3` (fixtureOriginH3).

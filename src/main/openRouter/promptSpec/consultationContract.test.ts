@@ -1,6 +1,6 @@
 /**
  * Contract tests for submit-only opening, repair, and corrective user messages.
- * Run: `npm run build:main` then `node dist/main/openrouter/promptSpec/consultationContract.test.js`
+ * Run: `npm run build:main` then `node dist/main/openRouter/promptSpec/consultationContract.test.js`
  */
 
 import assert from 'node:assert/strict';

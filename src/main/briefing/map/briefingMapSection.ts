@@ -9,27 +9,27 @@
 
 import type { GameStateSnapshot } from '../../gameDb';
 import { logDebug } from '../../logger';
-import { collectAggregatedPossibleActionRows, type PossibleActionsIndexedState } from '../../openrouter/possibleUnitActions';
+import { collectAggregatedPossibleActionRows, type PossibleActionsIndexedState } from '../../openRouter/possibleUnitActions';
 import type { TacticalBattleSnapshot } from '../../../shared/tacticalBattleTypes';
 import type { CoordinateContext } from './coordinateContext';
 import {
   ensureStrategicCoordinateRegistryInitialized,
   initTacticalCoordinateRegistry,
   listStrategicRes1H3Indexes,
-} from './hex-coordinates';
-import { projectToGrid } from './hex-grid-projection';
+} from './hexCoordinates';
+import { projectToGrid } from './hexGridProjection';
 import { projectTacticalRes4FootprintToAsciiGrid } from './tacticalAsciiGridProjection';
-import type { HexMapCellState } from './hex-map-renderer';
-import { renderHexAsciiMap } from './hex-map-renderer';
+import type { HexMapCellState } from './hexMapRenderer';
+import { renderHexAsciiMap } from './hexMapRenderer';
 import {
   renderDisplacedFeaturesLine,
   renderThisTurnOptionsTableMarkdown,
-} from './briefing-tables';
+} from './briefingTables';
 import {
   SECTION_TITLE_BEST_OPTIONS_THIS_TURN,
   SECTION_TITLE_OPERATIONAL_MAP,
   topLevelHeading,
-} from '../../openrouter/promptSpec/sectionHeadings';
+} from '../../openRouter/promptSpec/sectionHeadings';
 
 /**
  * Builds the optional **Best Options This Turn** markdown subsection for operational map prompts.

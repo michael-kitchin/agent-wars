@@ -51,7 +51,7 @@ import {
   hexCenterPx,
   hitTestHexAtContainerPixel,
   hitTestTacticalRes4HexAtContainerPixel,
-} from './map/mapUtils';
+} from './map/mapHelpers';
 import {
   hideBuildEntryLayer,
   shouldHideStrategicMapUnitsForRes4Zoom,
@@ -123,7 +123,7 @@ import {
   tacticalUpdateExitButtonVisibility,
 } from './tactical/tacticalUiOrchestration';
 import {
-  createBuildQueuePopupController,
+  createBuildQueuePopupHandler,
   isBuildPopupOrEntryTarget,
   isBuildQueueSelectInPopupFocused,
 } from './gameplay/buildQueuePopup';
@@ -1081,26 +1081,26 @@ function refreshBuildPopupIfOpen(): void {
 }
 
 /**
- * Documents the module-scope binding `buildQueuePopupController` (buildQueuePopupController: ReturnType<typeof createBuildQueuePopupController> | null).
+ * Documents the module-scope binding `buildQueuePopupController` (buildQueuePopupController: ReturnType<typeof createBuildQueuePopupHandler> | null).
 
  * Purpose: Supports maintainability by documenting why `buildQueuePopupController` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-let buildQueuePopupController: ReturnType<typeof createBuildQueuePopupController> | null = null;
+let buildQueuePopupController: ReturnType<typeof createBuildQueuePopupHandler> | null = null;
 
 /**
- * Defines the `getBuildQueuePopupController` function shape (function getBuildQueuePopupController(): ReturnType<typeof createBuildQueuePopupController>).
+ * Defines the `getBuildQueuePopupController` function shape (function getBuildQueuePopupController(): ReturnType<typeof createBuildQueuePopupHandler>).
 
  * Purpose: Supports maintainability by documenting why `getBuildQueuePopupController` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-function getBuildQueuePopupController(): ReturnType<typeof createBuildQueuePopupController> {
+function getBuildQueuePopupController(): ReturnType<typeof createBuildQueuePopupHandler> {
   if (buildQueuePopupController) return buildQueuePopupController;
-  buildQueuePopupController = createBuildQueuePopupController({
+  buildQueuePopupController = createBuildQueuePopupHandler({
     shouldRenderRes4Hexes,
     hideStackCallout,
     clearTerrainTooltipTimer,
@@ -1727,10 +1727,10 @@ function hasVisibleRes1InfrastructureGlyphs(
 function computeRes1OverlayTextY(
   h3Index: string,
   map: { latLngToContainerPoint: (ll: unknown) => { x: number; y: number } },
-  L: { latLng: (lat: number, lng: number) => unknown },
+  leaflet: { latLng: (lat: number, lng: number) => unknown },
   hasOffsetFeatures: boolean
 ): number {
-  return computeRes1OverlayTextYFromModule(h3Index, map, L, hasOffsetFeatures);
+  return computeRes1OverlayTextYFromModule(h3Index, map, leaflet, hasOffsetFeatures);
 }
 
 /**

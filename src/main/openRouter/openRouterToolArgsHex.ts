@@ -2,7 +2,7 @@
  * Normalizes OpenRouter tool-call arguments from LLM hex codes into internal `[lat,lng]` tuples.
  *
  * Purpose: Keeps tool implementations lat/lng-based while the external contract uses 2-character codes.
- * When to use: Immediately before `executeTool1`/`executeTool2`/`executeTool3`/`executeTool6` in `requestOrdersFlow`.
+ * When to use: Immediately before `executePathfinding`/`executeAssessment`/`executeCombatEstimation`/`executeProductionTools` in `requestOrdersFlow`.
  * Expected outcome: Tool implementations continue to receive the legacy argument shapes they validate today.
  * Exceptions: Throws when a hex code is invalid for the active context (surface as tool error JSON upstream).
  */
@@ -10,7 +10,7 @@
 import { logDebug, logError } from '../logger';
 import type { CoordinateContext } from '../briefing/map/coordinateContext';
 import { HEX_CODE_PATTERN } from '../briefing/map/coordinateContext';
-import { codeToLatLngRounded } from '../briefing/map/hex-code-translator';
+import { codeToLatLngRounded } from '../briefing/map/hexCodeTranslator';
 
 /**
  * Decodes LLM-facing coordinate strings in tool arguments for execution-time APIs.

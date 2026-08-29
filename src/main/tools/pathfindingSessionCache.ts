@@ -147,7 +147,7 @@ export function reusePlanningPhaseSession<T extends object>(state: GameStateSnap
   const slot = planningPhaseSessionByPerspective.get(perspective);
   if (slot?.key !== key) return null;
   planningPhaseSessionMetrics.reused += 1;
-  logDebug('tool1Pathfinding createPathfindingSession: reused planning-phase session', {
+  logDebug('pathfinding createPathfindingSession: reused planning-phase session', {
     turnNumber: state.turnNumber,
     phase: state.phase,
     playerPerspective: state.playerPerspective ?? null,
@@ -173,7 +173,7 @@ export function rememberPlanningPhaseSession(state: GameStateSnapshot, session: 
     key: buildPlanningPhaseSessionKey(state),
     session,
   });
-  logDebug('tool1Pathfinding createPathfindingSession: cached planning-phase session', {
+  logDebug('pathfinding createPathfindingSession: cached planning-phase session', {
     turnNumber: state.turnNumber,
     phase: state.phase,
     playerPerspective: state.playerPerspective ?? null,
@@ -190,7 +190,7 @@ export function rememberPlanningPhaseSession(state: GameStateSnapshot, session: 
  * Exceptions: None.
  */
 export function resetPlanningPhaseSessionCacheForTests(): void {
-  logDebug('tool1Pathfinding resetPlanningPhaseSessionCacheForTests');
+  logDebug('pathfinding resetPlanningPhaseSessionCacheForTests');
   planningPhaseSessionMetrics.turnNumber = -1;
   planningPhaseSessionMetrics.created = 0;
   planningPhaseSessionMetrics.reused = 0;

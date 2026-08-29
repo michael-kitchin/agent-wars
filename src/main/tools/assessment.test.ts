@@ -1,13 +1,13 @@
 /**
  * Tests for assess_unit omniscient grid scan vs path+radius scan.
- * Run with: node dist/main/tools/tool2Assessment.test.js
+ * Run with: node dist/main/tools/assessment.test.js
  */
 
 import * as assert from 'assert';
 import { cellToChildren, gridDisk, gridDistance } from 'h3-js';
 import type { GameStateSnapshot } from '../gameDb';
 import { buildLatLngCoordinateMap, getOrderedHexList } from '../mapData';
-import { executeTool2 } from './tool2Assessment';
+import { executeAssessment } from './assessment';
 
 /**
  * Finds two world-map cells at exact H3 grid distance `dist`.
@@ -166,7 +166,7 @@ function buildAssessState(
  * Exceptions: None.
  */
 function assess(state: GameStateSnapshot, coordMap: ReturnType<typeof buildLatLngCoordinateMap>, unitId: string) {
-  return executeTool2('assess_unit', { unitId, radius: 4 }, state, coordMap.latLngByH3, coordMap.resolveToH3);
+  return executeAssessment('assess_unit', { unitId, radius: 4 }, state, coordMap.latLngByH3, coordMap.resolveToH3);
 }
 
 /**
@@ -517,10 +517,10 @@ function testFogOffOmitsStaleIntelGhost(): void {
 }
 
 /**
- * Runs all tool2Assessment tests.
+ * Runs all assessment tests.
  *
  * Purpose: Node test entrypoint for main-process discovery.
- * When to use: `node dist/main/tools/tool2Assessment.test.js`.
+ * When to use: `node dist/main/tools/assessment.test.js`.
  * Expected outcome: Throws on first failure; logs pass when all succeed.
  * Exceptions: Propagates assertion errors.
  */
@@ -537,7 +537,7 @@ function run(): void {
   testFogOffIncludesPentagonCrossingEnemy();
   testFogOnIncludesInRadiusPentagonCrossingEnemy();
   testFogOffOmitsStaleIntelGhost();
-  console.log('tool2Assessment.test.ts passed');
+  console.log('assessment.test.ts passed');
 }
 
 run();

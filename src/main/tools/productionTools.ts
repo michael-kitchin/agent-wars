@@ -1,5 +1,5 @@
 /**
- * Tool 6: Production queue query/mutation for the opponent AI.
+ * Production queue query/mutation for the opponent AI.
  * Uses gameActions production APIs so JSON and tool-call paths share the same backend validation.
  */
 
@@ -18,7 +18,7 @@ import {
   updateHexBuildQueueEntry,
   type HexBuildQueueView,
 } from '../gameActions';
-import type { LatLng } from './tool1Pathfinding';
+import type { LatLng } from './pathfinding';
 import { logDebug, logError, logTrace } from '../logger';
 import { isTerrainClassificationCacheLoaded } from '../terrainClassificationCache';
 import { getMaxedUnitTypesForPlayer, shouldRejectCappedQueueType, filterQueueableUnitTypes } from '../productionCaps';
@@ -44,14 +44,14 @@ const AI_PLAYER_ID = 'opponent';
  */
 const TOOL6_NAME_LIST = ['query_production', 'set_build_queue'] as const;
 /**
- * Documents the module-scope binding `TOOL6_NAMES` (TOOL6_NAMES).
+ * Documents the module-scope binding `PRODUCTION_TOOL_NAMES` (PRODUCTION_TOOL_NAMES).
 
- * Purpose: Supports maintainability by documenting why `TOOL6_NAMES` exists.
+ * Purpose: Supports maintainability by documenting why `PRODUCTION_TOOL_NAMES` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export const TOOL6_NAMES = TOOL6_NAME_LIST;
+export const PRODUCTION_TOOL_NAMES = TOOL6_NAME_LIST;
 
 /**
  * Defines the `roundCoordinate` function shape (function roundCoordinate(value: number): number).
@@ -150,7 +150,7 @@ function summarizeQueue(
  * Reads opponent-controlled production queues for the AI, with cap-aware available types.
  *
  * Purpose: Briefing and `query_production` share this path so the model is not shown capped types as buildable when another type remains.
- * When to use: `executeTool6` for `query_production`.
+ * When to use: `executeProductionTools` for `query_production`.
  * Expected outcome: `{ status: 'ok', production }` for one hex or `{ controlledHexQueues }`; empty queues with `unavailableReason` when the terrain cache is missing.
  * Exceptions: Returns `{ status: 'error' }` when a requested hex cannot be resolved.
  */
@@ -160,9 +160,9 @@ function queryProduction(
   latLngByH3: Map<string, LatLng>,
   resolveToH3: (lat: number, lng: number) => string | undefined
 ): Record<string, unknown> {
-  logTrace('tool6Production queryProduction', { hasHex: args.hex !== undefined, all: args.all === true });
+  logTrace('productionTools queryProduction', { hasHex: args.hex !== undefined, all: args.all === true });
   if (!isTerrainClassificationCacheLoaded()) {
-    logDebug('tool6Production queryProduction: terrain cache unavailable', { stateTurn: state.turnNumber });
+    logDebug('productionTools queryProduction: terrain cache unavailable', { stateTurn: state.turnNumber });
     return {
       status: 'ok',
       production: { controlledHexQueues: [] as unknown[] },
@@ -189,7 +189,7 @@ function queryProduction(
  * Replaces the opponent queue on one hex with a single unit type and count.
  *
  * Purpose: Tool calls and `productionOrders` JSON share this path so capped types are rejected when the hex can still build another type, while pre-queue remains allowed if every available type is at cap.
- * When to use: `executeTool6` for `set_build_queue`.
+ * When to use: `executeProductionTools` for `set_build_queue`.
  * Expected outcome: `{ status: 'ok', production }` with the updated queue, or `{ status: 'error' }` for invalid hex/type/count, uncontrolled hex, unavailable type, or capped type with an alternative.
  * Exceptions: None beyond the returned error payload.
  */
@@ -200,9 +200,9 @@ function setBuildQueue(
   state: GameStateSnapshot
 ): Record<string, unknown> {
   const requestedType = typeof args.unitType === 'string' ? args.unitType : null;
-  logDebug('tool6Production setBuildQueue', { hasHex: args.hex !== undefined, unitType: requestedType });
+  logDebug('productionTools setBuildQueue', { hasHex: args.hex !== undefined, unitType: requestedType });
   const reject = (error: string, h3Index?: string): Record<string, unknown> => {
-    logDebug('tool6Production setBuildQueue: rejected', {
+    logDebug('productionTools setBuildQueue: rejected', {
       unitType: requestedType,
       h3Index: h3Index ?? null,
       stateTurn: state.turnNumber,
@@ -287,14 +287,14 @@ function setBuildQueue(
  * Expected outcome: `{ status: 'ok' | 'error', ... }` from the named handler, or an unknown-tool error; exceptions are caught and returned as `{ status: 'error' }`.
  * Exceptions: None beyond the returned error payload.
  */
-export function executeTool6(
+export function executeProductionTools(
   toolName: string,
   args: unknown,
   state: GameStateSnapshot,
   latLngByH3: Map<string, LatLng>,
   resolveToH3: (lat: number, lng: number) => string | undefined
 ): Record<string, unknown> {
-  logDebug('tool6Production executeTool6', { toolName, stateTurn: state.turnNumber });
+  logDebug('productionTools executeProductionTools', { toolName, stateTurn: state.turnNumber });
   try {
     const request = (args ?? {}) as {
       hex?: unknown;
@@ -306,7 +306,7 @@ export function executeTool6(
     if (toolName === 'set_build_queue') return setBuildQueue(request, latLngByH3, resolveToH3, state);
     return { status: 'error', error: `Unknown tool: ${toolName}` };
   } catch (err) {
-    logError('tool6Production executeTool6: exception', toolName, err);
+    logError('productionTools executeProductionTools: exception', toolName, err);
     return { status: 'error', error: String(err) };
   }
 }

@@ -7,15 +7,15 @@ import type { GameStateSnapshot } from '../gameDb';
 import { logDebug, logError } from '../logger';
 import type { CoordinateContext } from '../briefing/map/coordinateContext';
 import { HEX_CODE_PATTERN } from '../briefing/map/coordinateContext';
-import { codeToH3, codeToLatLngRounded } from '../briefing/map/hex-code-translator';
+import { codeToH3, codeToLatLngRounded } from '../briefing/map/hexCodeTranslator';
 import { translateAssignOrderHexCodeParams } from './assignOrderHexParams';
 import type { CallbackSubscription } from '../callbackSubscriptions';
-import type { LatLng } from '../tools/tool1Pathfinding';
-import { executeTool5 } from '../tools/tool5StandingOrders';
-import { executeTool6 } from '../tools/tool6Production';
+import type { LatLng } from '../tools/pathfinding';
+import { executeStandingOrders } from '../tools/standingOrders';
+import { executeProductionTools } from '../tools/productionTools';
 import { normalizeProductionOrders } from '../productionOrders';
 import type { AirStrikeOrder, AirStrikeTargetType, EmbarkOrder, FerryOrder } from '../../shared/ipcTypes';
-import { clearEmbarkAssignmentForLandUnit, isEmbarkedLandUnit } from '../game-actions/sealift';
+import { clearEmbarkAssignmentForLandUnit, isEmbarkedLandUnit } from '../gameActions/sealift';
 /**
  * Documents the `MemoryUpdateItem` interface as a named contract surface (export interface MemoryUpdateItem).
 
@@ -665,7 +665,7 @@ function processV3OrdersArray(
       }
       logDebug('openRouter processV3OrdersArray: assign_order', { unitId });
       const orderPayload = translateAssignOrderHexCodeParams(o.order, context, unitId);
-      const assignResult = executeTool5('assign_order', { unitId, order: orderPayload }, state, latLngByH3, resolveToH3);
+      const assignResult = executeStandingOrders('assign_order', { unitId, order: orderPayload }, state, latLngByH3, resolveToH3);
       if (assignResult.status === 'error' && typeof assignResult.error === 'string') {
         const orderType =
           orderPayload && typeof orderPayload === 'object' && !Array.isArray(orderPayload)
@@ -689,7 +689,7 @@ function processV3OrdersArray(
         continue;
       }
       logDebug('openRouter processV3OrdersArray: cancel_order', { unitId });
-      executeTool5('cancel_order', { unitId }, state, latLngByH3, resolveToH3);
+      executeStandingOrders('cancel_order', { unitId }, state, latLngByH3, resolveToH3);
       continue;
     }
     if (action === 'explicit_move') {
@@ -811,7 +811,7 @@ function processProductionOrdersArray(
       continue;
     }
     const args = { hex: hexLatLng, unitType: order.unitType, count: order.count };
-    const result = executeTool6(order.action, args, state, latLngByH3, resolveToH3) as { status?: string; error?: string };
+    const result = executeProductionTools(order.action, args, state, latLngByH3, resolveToH3) as { status?: string; error?: string };
     if (result.status === 'ok') {
       appliedCount += 1;
       continue;
@@ -879,7 +879,7 @@ export function parseOrdersResponse(
 
   for (const raw of candidates) {
     let jsonStr = raw;
-    // Models sometimes return a bare `orders[]` as a JSON array; we must not peel the first `{...}` row and treat it as the full `{ strategy, orders }` envelope (see openRouter.matrix strict-schema test).
+    // Models sometimes return a bare `orders[]` as a JSON array; we must not peel the first `{...}` row and treat it as the full `{ strategy, orders }` envelope (see openRouterMatrix strict-schema test).
     if (raw.trimStart().startsWith('[')) {
       try {
         const topLevel = JSON.parse(stripJsonLikeComments(raw.trim())) as unknown;

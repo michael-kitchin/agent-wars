@@ -1,6 +1,6 @@
 /**
  * Contract tests for malformed-completion detection and the bounded retry budget.
- * Run: `node dist/main/openrouter/malformedCompletionRetry.test.js`
+ * Run: `node dist/main/openRouter/malformedCompletionRetry.test.js`
  */
 
 import assert from 'node:assert/strict';

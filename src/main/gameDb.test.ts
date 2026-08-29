@@ -10,7 +10,7 @@ import * as os from 'os';
 import * as path from 'path';
 import type Database from 'better-sqlite3';
 import { gridDistance } from 'h3-js';
-import { resolveAirStrikePhase } from './game-actions/airStrikeResolution';
+import { resolveAirStrikePhase } from './gameActions/airStrikeResolution';
 import type { AirStrikeTargetType } from '../shared/ipcTypes';
 import { AIR_STRIKE_RANGE_HEXES } from '../shared/tacticalRanges';
 
@@ -39,8 +39,8 @@ const INFRASTRUCTURE_SYNC_TRIGGER_NAMES = [
 function betterSqliteNativeAvailable(): boolean {
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const Database = require('better-sqlite3');
-    const d = new Database(':memory:');
+    const sqliteDatabase = require('better-sqlite3');
+    const d = new sqliteDatabase(':memory:');
     d.close();
     return true;
   } catch {
@@ -49,19 +49,19 @@ function betterSqliteNativeAvailable(): boolean {
 }
 
 /**
- * Defines the `testFreshFileUserVersion` function shape (function testFreshFileUserVersion(gameDb: typeof import('./gameDb'), DatabaseCtor: typeof Database): void).
+ * Defines the `testFreshFileUserVersion` function shape (function testFreshFileUserVersion(gameDb: typeof import('./gameDb'), sqliteDatabaseCtor: typeof Database): void).
 
  * Purpose: Supports maintainability by documenting why `testFreshFileUserVersion` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-function testFreshFileUserVersion(gameDb: typeof import('./gameDb'), DatabaseCtor: typeof Database): void {
+function testFreshFileUserVersion(gameDb: typeof import('./gameDb'), sqliteDatabaseCtor: typeof Database): void {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-gamedb-'));
   const p = path.join(dir, 't.sqlite');
   try {
     gameDb.createFreshGameDatabaseAt(p);
-    const d = new DatabaseCtor(p);
+    const d = new sqliteDatabaseCtor(p);
     gameDb.applyGameDbPragmas(d);
     gameDb.validateGameDatabaseOrThrow(d);
     const uv = d.pragma('user_version', { simple: true }) as number;
@@ -420,25 +420,25 @@ function testHomeRegionVisibilityAndInitialControlContracts(gameDb: typeof impor
 }
 
 /**
- * Defines the `testWrongUserVersionRecovers` function shape (function testWrongUserVersionRecovers(gameDb: typeof import('./gameDb'), DatabaseCtor: typeof Database): void).
+ * Defines the `testWrongUserVersionRecovers` function shape (function testWrongUserVersionRecovers(gameDb: typeof import('./gameDb'), sqliteDatabaseCtor: typeof Database): void).
 
  * Purpose: Supports maintainability by documenting why `testWrongUserVersionRecovers` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-function testWrongUserVersionRecovers(gameDb: typeof import('./gameDb'), DatabaseCtor: typeof Database): void {
+function testWrongUserVersionRecovers(gameDb: typeof import('./gameDb'), sqliteDatabaseCtor: typeof Database): void {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-gamedb-'));
   const p = path.join(dir, 't.sqlite');
   try {
     gameDb.createFreshGameDatabaseAt(p);
     gameDb.closeGameDatabaseForTests();
-    const d = new DatabaseCtor(p);
+    const d = new sqliteDatabaseCtor(p);
     d.pragma('user_version = 99');
     d.close();
     gameDb.openGameDatabaseAtPathForTests(p);
     gameDb.closeGameDatabaseForTests();
-    const d2 = new DatabaseCtor(p);
+    const d2 = new sqliteDatabaseCtor(p);
     const uv = d2.pragma('user_version', { simple: true }) as number;
     assert.strictEqual(uv, gameDb.EXPECTED_USER_VERSION);
     d2.close();
@@ -764,10 +764,10 @@ function run(): void {
     );
   }
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const Database = require('better-sqlite3');
+  const sqliteDatabase = require('better-sqlite3');
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const gameDb = require('./gameDb') as typeof import('./gameDb');
-  testFreshFileUserVersion(gameDb, Database);
+  testFreshFileUserVersion(gameDb, sqliteDatabase);
   testPersistenceTwoOpens(gameDb);
   testResetClearsStandingOrdersAndMemory(gameDb);
   testResetRegeneratesTerrain(gameDb);
@@ -786,7 +786,7 @@ function run(): void {
   testSeededUnitsUseRegionalSpawnContracts(gameDb);
   testFogOfWarToggleVisibilityContract(gameDb);
   testHomeRegionVisibilityAndInitialControlContracts(gameDb);
-  testWrongUserVersionRecovers(gameDb, Database);
+  testWrongUserVersionRecovers(gameDb, sqliteDatabase);
   console.log('gameDb.test.ts passed');
 }
 

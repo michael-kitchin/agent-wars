@@ -23,7 +23,7 @@ import {
   appendNearestLegalEngagement,
   holdFireUnitIdsForPlayer,
   type StandingOrderGeneratedAirStrike,
-} from './tool5StandingOrdersGeneration';
+} from './standingOrdersGeneration';
 
 /**
  * Inputs for `collectTempoRuleAttacks`, grouped so the argument list stays short as callers add context.

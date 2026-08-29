@@ -1,12 +1,12 @@
 /**
  * Verification for Tool 1 (plan_route) essential failure cases.
- * Run with: node dist/tools/tool1Pathfinding.test.js
+ * Run with: node dist/tools/pathfinding.test.js
  */
 
 import * as assert from 'assert';
 import { gridDisk, latLngToCell } from 'h3-js';
-import { createPathfindingSession, executePlanRouteWithSession } from './tool1Pathfinding';
-import { resetPlanningPhaseSessionCacheForTests } from './tool1PathfindingSessionCache';
+import { createPathfindingSession, executePlanRouteWithSession } from './pathfinding';
+import { resetPlanningPhaseSessionCacheForTests } from './pathfindingSessionCache';
 import type { GameStateSnapshot } from '../gameDb';
 import type { Res1LandMassRecord } from '../../shared/landTraversalRes1';
 import { ensureTerrainClassificationCacheLoaded } from '../terrainClassificationCache';
@@ -460,7 +460,7 @@ function run(): void {
   testPlanRouteSessionDeadStateCacheSeparatesBlockedAndUnblockedSearches();
   testPlanningPhaseSessionReuseKeepsHumanAndOpponentSlots();
   testPlanningPhaseSessionCacheResetIsolatesCreates();
-  console.log('tool1Pathfinding tests passed');
+  console.log('pathfinding tests passed');
 }
 
 run();

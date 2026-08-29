@@ -1,6 +1,6 @@
 /**
- * Contracts for strategic duplicate detection helpers used by `submitOrdersImpl`.
- * Run with: node dist/main/game-actions/orderPlanSanitize.test.js
+ * Contracts for strategic duplicate detection helpers used by `executeSubmitOrders`.
+ * Run with: node dist/main/gameActions/orderPlanSanitize.test.js
  */
 
 import * as assert from 'assert';
@@ -45,7 +45,7 @@ function testStrategicDuplicateHelpersUniqueRowsReturnNull(): void {
  * Defines the `testStrategicDuplicateHelpersDetectRepeatedUnitId` function shape.
 
  * Purpose: Essential failure — duplicate rows remain a hard submit error.
- * When to use: Guards message shape expected by `submitOrdersImpl` callers.
+ * When to use: Guards message shape expected by `executeSubmitOrders` callers.
  * Expected outcome: Non-null reason strings containing the display label.
  * Exceptions: None.
  */

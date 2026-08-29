@@ -1,6 +1,6 @@
 /**
  * Contract tests for opponent callback replace-all after an orders parse.
- * Run: `npm run build:main` then `node dist/main/openrouter/applyParsedOpponentCallbacks.test.js`
+ * Run: `npm run build:main` then `node dist/main/openRouter/applyParsedOpponentCallbacks.test.js`
  */
 
 import assert from 'node:assert/strict';

@@ -8,7 +8,7 @@ import {
   WORLD_H3_RESOLUTION,
 } from '../core/constants';
 import { rendererSharedState as S } from '../core/state';
-import { getLeafletGlobal } from './mapUtils';
+import { getLeafletGlobal } from './mapHelpers';
 import { getMainLeafletMap } from './worldLeafletMap';
 import { projectedPolygonOverlapsViewport } from '../rendering/renderGeometry';
 
@@ -145,11 +145,11 @@ export function hideBuildEntryLayer(layer: HTMLElement, clearHtml = true): void 
 export function projectHexBoundaryToContainerPoints(
   h3Index: string,
   map: { latLngToContainerPoint: (ll: unknown) => { x: number; y: number } },
-  L: { latLng: (lat: number, lng: number) => unknown }
+  leaflet: { latLng: (lat: number, lng: number) => unknown }
 ): { x: number; y: number }[] {
   const boundary = getHexBoundaryLatLngForLeafletOverlay(h3Index);
   return boundary.map(([lat, lng]: [number, number]) => {
-    const p = map.latLngToContainerPoint(L.latLng(lat, lng));
+    const p = map.latLngToContainerPoint(leaflet.latLng(lat, lng));
     return { x: p.x, y: p.y };
   });
 }
@@ -165,11 +165,11 @@ export function projectHexBoundaryToContainerPoints(
 export function shouldConsiderRes4ChildrenForViewport(
   parentRes1H3Index: string,
   map: { latLngToContainerPoint: (ll: unknown) => { x: number; y: number } },
-  L: { latLng: (lat: number, lng: number) => unknown },
+  leaflet: { latLng: (lat: number, lng: number) => unknown },
   viewportWidth: number,
   viewportHeight: number
 ): boolean {
-  const parentPts = projectHexBoundaryToContainerPoints(parentRes1H3Index, map, L);
+  const parentPts = projectHexBoundaryToContainerPoints(parentRes1H3Index, map, leaflet);
   return projectedPolygonOverlapsViewport(parentPts, viewportWidth, viewportHeight);
 }
 

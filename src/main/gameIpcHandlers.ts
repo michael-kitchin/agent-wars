@@ -12,7 +12,7 @@ import {
   clearOpponentCombatSinceConsultation,
 } from './gameDb';
 import { buildLatLngCoordinateMap } from './mapData';
-import { generateOrdersForStandingOrders } from './tools/tool5StandingOrders';
+import { generateOrdersForStandingOrders } from './tools/standingOrders';
 import { collectTempoRuleAttacks } from './tools/tempoRuleAttacks';
 import type { AirStrikeTargetType } from '../shared/ipcTypes';
 import { shouldEndTacticalBattleForAnnihilation } from '../shared/tacticalAnnihilation';

@@ -20,14 +20,14 @@ import {
   ready,
   submitOrders,
 } from './gameActions';
-import { pruneBuildQueueForInfrastructureState } from './game-actions/airStrikeResolution';
+import { pruneBuildQueueForInfrastructureState } from './gameActions/airStrikeResolution';
 import {
   collectTraversedHexesByPlayer,
   processProductionAfterControlResolution,
   resolveRes1ControlAfterCombatAndMovement,
-} from './game-actions/controlAndProduction';
+} from './gameActions/controlAndProduction';
 import { getMaxUnitsPerType } from './productionCaps';
-import { persistGameSize } from './game-db/gameSizeConfig';
+import { persistGameSize } from './gameDb/gameSizeConfig';
 import { withTempGameDb } from './testSupport/withTempGameDb';
 
 /**
