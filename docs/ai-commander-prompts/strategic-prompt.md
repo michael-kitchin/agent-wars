@@ -1,6 +1,6 @@
-# Strategic prompt contract
+# Strategic prompt
 
-The full system-prompt contract for a strategic (res1) consultation. Shared rules come from `assembly-contract.md` and are not repeated; this file fixes strategic sections, columns, legal actions, and coaching. Messages after the system prompt are in `consultation-flow.md`; gate behaviour is in `variants.md`.
+The strategic (res1) system prompt as `buildSystemPromptForTools` emits it. Shared assembly comes from `assembly-contract.md`. Messages after the system prompt are in `consultation-flow.md`; gates are in `variants.md`. If this file disagrees with the builders, the builders win.
 
 Heading strings in backticks are exact and must match the generated prompt character for character.
 
@@ -24,7 +24,7 @@ Emit order. Each entry states purpose, the information items it carries, include
 
 ### 1.3 Situational directives
 
-- **Scouting directive.** Include when no enemy unit is observed. One paragraph: move to regain contact along plausible approaches rather than holding position. **Omit** otherwise.
+- **Scouting directive.** Include when no enemy unit is observed. The preamble sentence is `No human units are currently observed. Enemy forces may be out of view.` Coaching adds the move-to-regain-contact bullet. **Omit** the preamble sentence otherwise.
 - **Tool-budget warning.** Include when the previous consultation exhausted its tool-call budget and submitted nothing, and planning or standing-order tools are enabled. State the round limit, that no orders were submitted last turn, and that the model must submit promptly after gathering what it needs. **Omit** otherwise.
 - **Items:** `ENEMY_ROSTER_OBSERVED`, `TOOL_BUDGET_WARNING`.
 - **Model use:** overrides the default of standing still, and caps tool spending.
@@ -41,16 +41,17 @@ One paragraph, in this order. Every clause is required unless marked.
 
 1. Dice model: one d6 per shot; an attack hits on a roll at or below the attacking stat, a defensive hit on a roll at or below the defending stat.
 2. Per-type stats and reach: attack, defense, and strategic ranged reach for each of infantry, armor, naval, and air. Reach values come from `strategicRangedRangeHexesForUnitType`; a reach of zero is stated as melee only.
-3. Casualty rule: hits land on the lowest-defense unit in the target stack first, then in the fixed type order infantry, armor, naval, air. (`CASUALTY_PRIORITY`; a gap in today's prompt.)
-4. Resolution order for the turn: embark, then air strikes, then ranged fire, then movement, then cargo sync, then ferry arrival, then melee.
+3. Casualty rule: hits land on the lowest-defense unit in the target stack first, then in the fixed type order infantry, armor, naval, air (`buildCasualtySortRule`).
+4. Resolution order for the turn: embark, then air strikes, then ranged fire, then movement, then cargo sync, then ferry, then melee (`buildResolutionOrderRule`).
 5. Attacks resolve from turn-start positions, so a unit may fire and move in the same turn and firing never costs a move.
 6. At most one ranged action per unit per turn, using exactly one of a target cell code or a target unit id, and never the unit's own move destination.
 7. Infantry has no strategic ranged action and closes to melee instead.
-8. Movement budgets: one cell for infantry, two for armor and naval, and air never marches. (`MOVE_BUDGET`; a gap in today's prompt.)
-9. A cell holding a friendly unit is not a legal one-step destination. A cell holding an enemy is legal as a move/melee Target Hex. Approach Target Hexes are empty of units.
-10. Invalid attacks are dropped before submission, so the model should not submit one hoping it is corrected.
-11. Naval clause, included only when the opponent has naval units: naval units fire on land targets at one or two cells, move on water and coastal cells, and reach a land target by routing to the nearest water or coastal cell to it.
-12. Air clause, included only when the opponent has air units: the tempo sentence in item 5 names air strikes alongside ranged attacks.
+8. Movement budgets: one cell for infantry, two for armor and naval, and air never marches (`buildMovementBudgetRule`).
+9. A cell holding a friendly unit is not a legal one-step destination. A cell holding an enemy is legal as a move/melee Target Hex. Approach Target Hexes are empty of units (`buildDestinationOccupancyRule`).
+10. Invalid attacks are dropped before submission.
+11. Naval clause, included only when the opponent has naval units: naval units fire on land targets at one or two cells, move on water and coastal cells, and reach a land target by routing to the nearest water or coastal cell.
+12. Air clause, included only when the opponent has air units: the tempo sentence names air strikes alongside ranged attacks, and `buildAirEmploymentRule` states strike radius 3, ferry range 4, and that strike and ferry cannot share a turn.
+13. Hold-fire sentence, included only when standing-order tools are enabled: a fire-withholding standing order suppresses automatic engagement until replaced; omitting an attack is not the same (`buildHoldFireRule`).
 
 - **Items:** `COMBAT_STATS`, `STRATEGIC_RANGE_TABLE`, `ATTACK_ONE_PER_UNIT`, `WEGO_PHASE_ORDER`, `TEMPO_RANGED_SHOT`, `CASUALTY_PRIORITY`, `MOVE_BUDGET`, `LEGAL_DEST_OCCUPANCY`, `NAVAL_MOVEMENT_DOMAIN`.
 - **Include:** always; clauses 11 and 12 are roster-gated. **Empty-state:** not possible.
@@ -314,10 +315,10 @@ System-prompt content only. Each item is a rule the model must be told, with the
 18. **Keep the player-facing line clean.** The message field is a taunt or threat and must not reveal orders, cells, unit ids, or intent. Carries `MESSAGE_DISCIPLINE`.
 19. **Spend the tool budget on unknowns only.** Rounds are limited and exhausting them submits nothing at all; once destinations are chosen, submit. Carries `TOOL_CATALOG`, `TOOL_BUDGET_WARNING`.
 
-Claims that must **not** appear as strategic coaching:
+Claims the builders **omit** from strategic coaching (tests forbid the substrings):
 
-- That every unfired legal shot is damage given up for free. It is false for a unit under a fire-withholding order, and it is the reason item 4 exists. Item 3 states the true version: a shot is free of movement cost, so decline it only deliberately.
-- That the engine will fire, move, or otherwise act for any unit the model leaves unordered. The engine's fallback behaviour is real and is recorded in `source-inventory.md`, but stating it in the prompt removes the model's reason to choose targets at all, and target choice is the part the engine cannot do well. This omission is deliberate, is the one place where the prompt knowingly says less than the engine does, and must not be "fixed" by adding a sentence about the fallback.
+- That every unfired legal shot is damage given up for free. Item 3 states that a shot is free of movement cost and that the model chooses each target. The engine sweep is not described; that omission is deliberate (`TEMPO_SWEEP_SILENCE`).
+- That the engine will fire, move, or otherwise act for any unit the model leaves unordered.
 - Any unconditional claim about what the human player is currently doing or intending.
 - Any instruction to call a tool that is not in this consultation's tool list.
 

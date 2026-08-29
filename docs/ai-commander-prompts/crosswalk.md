@@ -1,6 +1,6 @@
 # Crosswalk
 
-Traceability between the inventory, the information model, and the contracts. Use it to answer three questions: where is this fact specified, where did this existing prompt section go, and what does today's prompt still lack.
+Traceability between the inventory, the information model, and the emitted assembly. Use it to answer where a fact is carried, where an existing section lives, and which engine-versus-copy rows remain.
 
 ## 1. Information items to their contract
 
@@ -124,7 +124,7 @@ Every heading the strategic prompt emits today, from `source-inventory.md` secti
 | `Strategic context:` goals bullets | Kept — 1.8 |
 | `Strategic context:` strategy bullets | Kept as doctrine — 1.8 |
 | `Strategic context:` message bullet | Kept — 1.8 |
-| `Strategic context:` opening sentence about the enemy hunting the model | **Dropped** — unverifiable and self-contradictory when the observed roster is empty; `source-inventory.md` records it as `STRATEGIC_CONTEXT_OPENING_UNCONDITIONAL` |
+| `Strategic context:` opening sentence about the enemy hunting the model | **Not emitted** — removed from `buildStrategicContextCoaching`; matrix tests forbid the substring |
 | `Explored:` and `Controlled:` bullets | Kept — 1.8 |
 | Home-region bullets | Kept — 1.8 |
 | `# Air Operations Status` | Kept, gated on roster instead of emitting a dash row — 1.9 and `variants.md` 3.1 |
@@ -137,7 +137,7 @@ Every heading the strategic prompt emits today, from `source-inventory.md` secti
 | Own-unit listing (briefing-absent path) | Kept — `variants.md` combinations |
 | Adjacent-cells fallback block | Kept — `variants.md` 2.4 |
 | Assessment and estimate coaching hints | Kept, gated to the no-briefing configuration only — 1.5 |
-| Free-damage claim in the tempo bullet | **Dropped** — false for a unit under a fire-withholding order; replaced by coaching items 3 and 4 |
+| Free-damage claim in the tempo bullet | **Not emitted** — tempo bullets say the model chooses each target; matrix tests forbid `damage given up for free` |
 | `### Unit Roster` | Absent from code and dump; explicitly forbidden — 1.6 |
 
 ## 3. Existing tactical sections to their contract
@@ -169,7 +169,7 @@ From `source-inventory.md` section 3, derived from code only.
 | Movement truncation clause | Kept — 2.5 and coaching item 4 |
 | Tactical callbacks clause | Kept — 4 item 10 |
 | Forbidden strategic markers | Kept as a must-not-appear list — 2.7 |
-| Free-damage claim in the beat tempo bullet | **Dropped** — same reason as strategic |
+| Free-damage claim in the beat tempo bullet | **Not emitted** — same as strategic |
 | Everything in the always-omitted table | Kept as omissions with stated reasons — 2.7 |
 
 ## 4. Consultation messages to their contract
@@ -177,7 +177,7 @@ From `source-inventory.md` section 3, derived from code only.
 | Message | Contract |
 | --- | --- |
 | Opening user message, every branch | `consultation-flow.md` 2.1 and 2.2 |
-| Rules currently carried by that message | 2.3, each moved into the system prompt or dropped |
+| Opening message is submit-only | `consultation-flow.md` 2.3 |
 | Tool result, success | 3, items 3 and 4 |
 | Tool result, failure | 3, item 5 |
 | Corrective message after an unusable reply | 4 |
@@ -204,50 +204,54 @@ From `source-inventory.md` section 3, derived from code only.
 | Previous consultation exhausted its tool budget | 6.4 |
 | Briefing present or absent | 7, combinations |
 
-## 6. Gaps: required facts today's prompt omits
+## 6. Facts the builders now carry (formerly listed as gaps)
 
-Each of these is specified as required and is `absent` or `partial` in current output. They are the work list for the follow-on implementation.
+These were absent or partial in an earlier assembler. The builders in `promptSpec/` emit them.
 
-| Item | Where it must appear | Current state |
+| Item | Where it appears | Builder |
 | --- | --- | --- |
-| `WEGO_PHASE_ORDER` | Combat and attack rules, both modes | partial — only "ranged uses pre-move positions" |
-| `CASUALTY_PRIORITY` | Combat and attack rules, both modes | absent |
-| `LEGAL_DEST_OCCUPANCY` | Combat rules and shared coaching | absent as a stated rule |
-| `MOVE_BUDGET` | Strategic combat rules | absent |
-| `TACTICAL_MP_RULES` numbers | Tactical combat rules | partial — weighting mentioned, budgets not |
-| `HOLD_FIRE_SEMANTICS` | Strategic coaching item 4 | absent |
-| `CALLBACK_EVENT_VOCABULARY` | Response envelope contract | absent |
-| `PRODUCTION_INCOME` | Production status | absent |
-| `INTEL_STALENESS_WINDOW` | Unit status, fog on | absent |
-| `MEMORY_WRITE_LIMITS` | Legal actions table | absent |
-| `CONSULT_POLICY` | Envelope contract and tactical coaching | absent |
-| Air and naval sections omitted rather than dashed | Both mode files, roster gates | currently emitted as a dash row |
-| Callback detail cell describing parameters | Active callbacks, both modes | present — unfiltered infrastructure watches describe an unfiltered watch and tell the model to re-subscribe with no params |
-| Generic goal statement for a missing scenario | Goal statement | absent — today the region wording is emitted unconditionally |
+| `WEGO_PHASE_ORDER` | Combat paragraph, both modes | `buildResolutionOrderRule` |
+| `CASUALTY_PRIORITY` | Combat paragraph and coaching | `buildCasualtySortRule` |
+| `LEGAL_DEST_OCCUPANCY` | Combat paragraph and coaching | `buildDestinationOccupancyRule` |
+| `MOVE_BUDGET` | Strategic combat paragraph | `buildMovementBudgetRule` |
+| `TACTICAL_MP_RULES` | Tactical combat paragraph | `buildMovementBudgetRule('tactical')` |
+| `HOLD_FIRE_SEMANTICS` | Combat paragraph and coaching when standing orders are on | `buildHoldFireRule` |
+| `CALLBACK_EVENT_VOCABULARY` | Envelope callback clause | `buildCallbackVocabularyClause` |
+| `PRODUCTION_INCOME` | Production status | `buildProductionIncomeRule` |
+| `INTEL_STALENESS_WINDOW` | Unit status, fog on | `buildIntelStalenessRule` |
+| `MEMORY_WRITE_LIMITS` | Envelope when memory updates are offered | `buildMemoryWriteLimitsClause` |
+| `CONSULT_POLICY` | Coaching unconsulted-period bullets | `UNCONSULTED_TURN_BULLET` / `UNCONSULTED_BEAT_BULLET` (override ids not listed) |
+| Air and naval sections omitted when that arm is absent | Both modes | `buildAirOperationsBriefingBlock` / `buildSealiftBriefingBlock` return `''` |
+| Callback detail cell | Active callbacks | `formatCallbackLine` |
+| Generic goal when scenario id is missing | Goal statement | `GENERIC_OBJECTIVE_SENTENCE` |
 
-## 7. Open engine-versus-rules defects
+## 7. Remaining engine-versus-copy rows
 
-Carried from `source-inventory.md` section 8. Each is resolved in favour of the engine by this package; the row records what still needs a code or document change outside it.
+From `source-inventory.md` section 8. Mechanics follow the engine. Wording follows the builders.
 
-| Id | Still open |
+| Id | Status |
 | --- | --- |
-| `CAPS_V3_STALE` | The older combat-rules document contradicts the live caps; it should be corrected or marked superseded on the caps question |
-| `TACTICAL_STRUCTURE_V3` | Same document describes a superseded tactical turn structure |
-| `WEGO_ORDER_UNSTATED` | The prompt now states the engine order; the older combat-rules document's five-phase list still omits embark and cargo sync |
-| `TEMPO_SWEEP_SILENCE` | Deliberate omission, documented in both mode files; must not be "fixed" by adding a sentence about the engine fallback |
-| `TEMPO_FREE_CLAIM` | The false absolute must be removed from tool guidance in both modes |
-| `STRATEGIC_CONTEXT_OPENING_UNCONDITIONAL` | The unconditional enemy-intent sentence must be removed |
-| `HOLD_FIRE_UNGUIDED` | The withholding order needs stated semantics |
-| `OCCUPANCY_UNSTATED` | The prompt now states friendly stacks are illegal and enemy cells are move/melee contact |
-| `CASUALTY_ORDER_ABSENT` | The victim-sort rule needs stating |
-| `CALLBACK_VOCAB_ABSENT` | The event list needs stating; the never-firing event should be removed from the vocabulary or implemented |
-| `CALLBACK_DETAILS_THIN` | Details now names parameters; an unfiltered infrastructure watch describes the unfiltered form rather than `infrastructure_destroyed(any)` |
-| `EMBARK_CONTROL_CONDITION` | The embark prose needs the control condition |
-| `OMNISCIENT_GATE_NARROW` | Addressed: fog-off keeps the hop-count honesty line; fog-on emits the path-versus-Best-Options line instead |
-| `INFANTRY_RANGE_SPLIT` | Already correct in the prompt; the older document is the stale side |
-| `FACE_CROSSING` | Hop counts can understate real routes; fog-on now carries a path-versus-Best-Options line so a long printed path does not hide a this-turn hop dest |
-| `DUP_INJECTION` | Two call sites compute the same injection text; consolidating is a code change |
-| `USER_RULE_DUPLICATION` | Resolved by this package's contract; implementing it is a code change |
-| `UNREACHABLE_USER_BRANCHES` | Two dead branches; the contract covers them so a flag-derivation change cannot produce uncontracted text |
-| `TOOL_ROUND_CAP_LITERAL` | The loop bound and the warning text hold independent literals |
-| `ENVELOPE_FIELD_ORDER_DRIFT` | The submit header, the illustrative object, and the repair schema must all be brought to the single order in `assembly-contract.md` 5.1 |
+| `CAPS_V3_STALE` | Resolved in docs |
+| `TACTICAL_STRUCTURE_V3` | Resolved in docs |
+| `WEGO_ORDER_UNSTATED` | Resolved in combat paragraph |
+| `INFANTRY_RANGE_SPLIT` | Resolved in combat paragraph |
+| `TEMPO_SWEEP_SILENCE` | Deliberate omission; the prompt does not describe the engine fallback |
+| `TEMPO_FREE_CLAIM` | Resolved: not emitted; tests forbid the substring |
+| `STRATEGIC_CONTEXT_OPENING_UNCONDITIONAL` | Resolved: not emitted; tests forbid the substring |
+| `HOLD_FIRE_UNGUIDED` | Resolved in combat paragraph and coaching |
+| `OCCUPANCY_UNSTATED` | Resolved |
+| `CASUALTY_ORDER_ABSENT` | Resolved |
+| `CALLBACK_VOCAB_ABSENT` | Resolved for taught events; `territory_changed` remains untaught |
+| `CALLBACK_DETAILS_THIN` | Details names parameters |
+| `EMBARK_CONTROL_CONDITION` | Resolved in naval block and sealift bullet |
+| `OMNISCIENT_GATE_NARROW` | Resolved |
+| `FACE_CROSSING` | Resolved |
+| `DUP_INJECTION` | Open as code hygiene (two call sites, one emission) |
+| `USER_RULE_DUPLICATION` | Resolved: opening message is submit-only |
+| `UNREACHABLE_USER_BRANCHES` | Opening remainder is empty-orders; fallback listing is the derived-flag branch |
+| `TOOL_ROUND_CAP_LITERAL` | Resolved: named constant |
+| `ENVELOPE_FIELD_ORDER_DRIFT` | Resolved: `ENVELOPE_FIELD_ORDER` |
+| `AIR_NAVAL_DASH_ROWS` | Resolved: sections omitted |
+| `GENERIC_GOAL_ABSENT` | Resolved |
+| `CONSULT_POLICY_PARTIAL` | Unconsulted-period bullets exist; mandatory override ids are not listed |
+| `TACTICAL_FERRY_ENVELOPE` | Envelope still lists `ferryOrders` in battle when air is present; coaching says do not rebase |

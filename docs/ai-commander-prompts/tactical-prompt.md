@@ -1,6 +1,6 @@
-# Tactical prompt contract
+# Tactical prompt
 
-The full system-prompt contract for a tactical (res4) beat consultation. Derived from current code only. The captured tactical prompt dump in the repository root is stale and is not a source for any requirement in this file.
+The tactical (res4) beat system prompt as the builders emit it. The captured tactical prompt dump in the repository root is stale and is not a source. If this file disagrees with the builders, the builders win.
 
 Shared rules come from `assembly-contract.md`. Differences from the strategic contract are stated as differences; everything not called out here follows `strategic-prompt.md` only where `assembly-contract.md` marks the section as shared.
 
@@ -46,7 +46,7 @@ Same clause order as strategic section 1.5, with these substitutions:
 | Per-type reach | Res4 reaches from `RANGED_RANGE_BY_UNIT_TYPE`; air is stated as striking anywhere in the battle rather than as a numeric reach |
 | Infantry clause | Infantry and armor fire at res4 baselines; forest, urban, rubble, or a road/rail corridor on the attacker caps them to range 1; mountain LOS blocks armor, naval, and air; close to melee when out of reach |
 | Movement budgets | The point budget from section 1.6: type baselines, origin urban/rubble collapsing infantry and armor to one point, forest penalty for armor, and road/rail remaining-point multipliers; not the strategic per-turn cell counts |
-| Resolution order | Embark, air strikes, ranged fire, movement, ferry, melee, applied per beat with no production step |
+| Resolution order | Embark, air strikes, ranged fire, movement, ferry, cargo sync, melee, applied per beat with no production step (`buildResolutionOrderRule`) |
 | Truncation clause | A destination beyond this beat's budget is clamped to the first reachable leg rather than rejected; when the planner cannot use the destination at all but a neighbouring footprint cell still closes on it, the engine may take that single step instead, unless that cell holds a friendly unit |
 
 Carries `COMBAT_STATS`, `TACTICAL_RANGE_TABLE`, `ATTACK_ONE_PER_UNIT`, `WEGO_PHASE_ORDER`, `TEMPO_RANGED_SHOT`, `CASUALTY_PRIORITY`, `TACTICAL_MP_RULES`, `FIRST_LEG_TRUNCATION`, `LEGAL_DEST_OCCUPANCY`.
@@ -133,7 +133,7 @@ Tactical variant, bullets in this order:
 
 - **Include:** when the opponent has at least one air sub-unit in this battle. **Omit** the section otherwise, along with the strike list and every air clause.
 - **Content:** the tactical air rules line — strikes may target enemy sub-units anywhere in this battle footprint, one air action per unit per beat — and a per-unit table of strike targets.
-- **Omitted columns relative to strategic:** ferry destinations and the strikeable-infrastructure columns. Infrastructure is not a strike target class inside a beat, and ferry rows are not offered.
+- **Omitted columns relative to strategic:** ferry destinations and the strikeable-infrastructure columns. Infrastructure is not a strike target class inside a beat, and ferry rows are not offered. The envelope may still list `ferryOrders` when air is present; coaching says do not rebase.
 
 ### 2.10 `# Naval Transport Status`
 
@@ -215,16 +215,16 @@ No `ferry` mapping exists in battle because no `ferry` row is produced.
 8. **Friendly stacks are illegal destinations; enemy cells are move/melee contact.** Same as strategic.
 9. **Sealift works inside the footprint.** Included only when the naval status section is present. Carries `EMBARK_LEGALITY`, `EMBARK_STATE`.
 10. **Callbacks use sub-unit ids and die with the battle.** Unit-scoped subscriptions name sub-units, the response replaces the whole list, subscriptions are evaluated after each beat under event-driven policy, and all of them are cleared when the battle ends. An empty Active Callbacks table means there are no self-chosen triggers; omitting callbacks or sending `[]` keeps it empty, so only engine-forced consultations remain unless the model subscribes now. Carries `CALLBACK_TACTICAL_SCOPE`, `CALLBACK_REPLACE_SEMANTICS`.
-11. **A beat with no prompt is a beat not acted in.** Under event-driven policy the model is consulted only when an event fires; because standing orders are inert in battle, an unconsulted beat is one where its sub-units did nothing. Carries `CONSULT_POLICY`, `STANDING_ORDERS_INERT_IN_BATTLE`.
+11. **A beat with no prompt is a beat not acted in.** Coaching says the model is consulted when a subscribed event fires; mandatory overrides also force consults (those ids are not listed). Standing orders are inert in battle, so an unconsulted beat is one where its sub-units did nothing. Carries `CONSULT_POLICY`, `STANDING_ORDERS_INERT_IN_BATTLE`.
 12. **Keep the player-facing line clean.** Same message discipline as strategic. Carries `MESSAGE_DISCIPLINE`.
 
-Claims that must **not** appear as tactical coaching:
+Claims the builders **omit** from tactical coaching:
 
 - Any regional or home-region objective.
-- Any suggestion that unfired shots will be taken anyway, for the same reason given in `strategic-prompt.md` section 4.
-- Any air-repositioning advice, since no ferry option is offered in battle.
+- Any suggestion that unfired shots will be taken anyway (`TEMPO_SWEEP_SILENCE`).
+- Any air-repositioning advice. Best Options produces no ferry rows; the envelope may still list `ferryOrders` when air is present.
 - Any reference to production, memory, or standing-order assignment as something to do this beat.
-- Engine-internal callback stash and restore behaviour. The model needs to know its subscriptions are cleared when the battle ends; how the pre-battle strategic list is preserved is not its concern and naming it would imply control it does not have.
+- Engine-internal callback stash and restore behaviour. The model is told subscriptions are cleared when the battle ends.
 
 ## 5. Differences from the strategic contract, in one place
 

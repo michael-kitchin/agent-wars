@@ -1,10 +1,30 @@
 # Strategic Development Plan: Grand Strategy Wargame with LLM Opponents
 
-*Version 3.3 — April 2026*
+*Version 3.3 — April 2026 (historical roadmap)*
 
 ---
 
-## Status and Context
+## Current progress (August 2026, engine 2.4.0)
+
+This file is the original phased plan. **It is not live rules.** Combat, caps, vision, costs, and phase order live in [combat-rules-v3.md](combat-rules-v3.md) and `src/`. Prompt text lives in [ai-commander-prompts/](ai-commander-prompts/README.md).
+
+| Planned milestone | Status in the live build |
+| --- | --- |
+| 0.6 Pre-computation and briefing | Complete |
+| 0.7 Callback / event-driven consultation | Complete |
+| 1.1–1.7 Global strategic game (map, fog, economy, air, sealift, region-vs-region) | Complete. Live caps, costs, and vision radii differ from the numbers written inside those milestone sections. |
+| 2.1–2.4 Tactical rendering, movement, combat, LLM play, integration | Complete. Tactical ranged baselines are infantry 2 / armor 5 / naval 10, not the 5/10/20 in the 2.2 writeup. Mountain LOS and terrain MP modifiers are live. |
+| 2.5 Save/load and session management | **Not shipped.** SQLite persists the in-progress match in Electron user data; there is no player-facing save slot, load list, or turn replay UI. |
+| 3.1–3.5 Polish, personalities, diplomacy, sound, async multiplayer | Not started as named milestones. Some 3.1 UI (minimap, map-first chrome, OpenRouter panel, keyboard pan) exists in partial form. |
+| 4.1–4.4 Onboarding, store packaging, community beta, launch | Not started. Desktop packaging via electron-builder exists for developer / side-load builds. |
+
+**Do not copy unit costs, caps, fog radii, tactical ranges, or bail-out formulas from the milestone writeups below.** Those paragraphs were design-time targets.
+
+**Filename:** `devleopment-plan-v3.3.md` keeps the historical spelling so existing links keep working.
+
+---
+
+## Status and Context (as written in April 2026)
 
 Phase 0 milestones 0.1–0.5 are complete. The prototype validates the core concept: LLM opponents playing through MCP-style tool services produce engaging, intentional-feeling play. The AI is challenging by milestone 0.5, tool usage varies interestingly by model, and concurrent AI planning during the human's planning phase keeps small-map games feeling responsive.
 
@@ -20,7 +40,7 @@ This plan begins after milestone 0.5 and incorporates the hybrid AI architecture
 
 **Map resolution decision (settled).** The game uses two H3 zoom levels: global (H3 resolution 1, ~842 hexes at ~610,000 km² each) and tactical (H3 resolution 4, ~343 hexes per global hex at ~1,770 km² each, ~42 km edge-to-edge). This was determined by a rendering performance budget of ~400 hexes on screen. Phase 1 builds the complete game at the global level. Phase 2 adds optional tactical battles at res 4 when opposing units share a res1 hex, plus session persistence. The earlier goal of 1 km² hex resolution has been set aside — res 4's ~42 km hexes provide division-scale tactical play, which is the right grain for the Axis & Allies-inspired unit interactions in the game vision.
 
-**Tactical vs strategic turn resolution.** Ordering, playback parity, reconciliation, and **Phase 5** human march merge (standing orders previewed without DB mutation, then merged at tactical Ready) are documented in [tactical-strategic-turn-resolution-alignment-plan.md](tactical-strategic-turn-resolution-alignment-plan.md), with a focused audit of res1/res4 infrastructure reconciliation in [tactical-infra-reconciliation-audit.md](tactical-infra-reconciliation-audit.md).
+**Tactical vs strategic turn resolution.** Ordering, playback parity, reconciliation, and human march merge (standing orders previewed without DB mutation, then merged at tactical Ready) are documented in [.spec/completed/tactical-strategic-turn-resolution-alignment-plan.md](../.spec/completed/tactical-strategic-turn-resolution-alignment-plan.md), with a focused audit of res1/res4 infrastructure reconciliation in [.spec/completed/tactical-infra-reconciliation-audit.md](../.spec/completed/tactical-infra-reconciliation-audit.md). Live phase order is embark → air → ranged → movement → cargo sync → ferry → melee (tactical beats put cargo sync after ferry). See combat rules §4.
 
 ---
 
@@ -82,14 +102,18 @@ Instead of being called every turn, the LLM subscribes to events from a finite, 
 
 **Mandatory override events (always fire, regardless of LLM subscription):**
 
-- Any AI unit participates in combat for the first time since the last consultation (catches surprise contacts the AI didn't anticipate — distinct from `unit_engaged(unitId)` which the AI subscribes to for specific units it's watching)
+- First consultation of the match (`first_consultation`)
+- Any AI unit participates in combat for the first time since the last consultation (`first_combat`)
+- New contact (`new_contact`)
 - Any AI unit is destroyed
-- Any AI unit without a standing order exists (newly spawned, order completed, order cancelled by engine)
-- An AI unit's standing order enters a blocked or error state
-- An AI air unit's base airport is destroyed or captured
+- Any AI unit without a standing order exists (`unordered_unit`)
+- An AI unit's standing order enters a blocked or warning state
+- Attack mix changed (`attack_mix_changed`)
 - No LLM consultation has occurred for 5 turns (deadman timer)
 
-When no events fire, standing orders execute, the pre-computation layer runs (to update the briefing for the next consultation), and the LLM is not invoked. The AI's per-turn cost drops to zero on quiet turns.
+`territory_changed` is accepted as a subscription name but does not fire. Airport-destroyed-as-mandatory is covered by existing destroy and infrastructure paths rather than a dedicated override type.
+
+When no events fire, standing orders execute and the LLM is not invoked. The AI's per-turn cost drops to zero on quiet turns.
 
 ### LLM Output Format (revised)
 
@@ -241,6 +265,8 @@ Render the global map with basic terrain coloring, smooth pan and zoom, and a mi
 
 ### Milestone 1.3 — Fog of War and Subjective Views
 
+*Historical writeup. Live vision radii are infantry 1, armor 2, naval 2, air 3 (`VISION_RANGE_BY_UNIT_TYPE`), not own-hex-only.*
+
 **Build:** Implement per-player visibility. Each player can only see hexes where they have units — ground units (infantry, armor) and naval units see **only the hex they occupy**, with no adjacent-hex vision. The map outside visibility is either unexplored (never seen — rendered dark) or last-known (previously seen but not currently visible — rendered dimmed, showing terrain but not current enemy units). Each player's game state in SQLite tracks their own subjective knowledge.
 
 This own-hex-only model means fog of war is thick by default. Players are blind beyond their front line. Extended visibility comes exclusively from air units (added in milestone 1.5), which see a 3-hex radius around their base airport. This deliberate separation — ground units see nothing beyond their hex, air units see deep — makes air reconnaissance a transformative strategic asset rather than an incremental improvement over existing unit vision. In milestone 1.3, before air units exist, players must push units forward to discover the map, creating genuine exploration tension.
@@ -252,6 +278,8 @@ This own-hex-only model means fog of war is thick by default. Players are blind 
 **Design note:** The subjective-view architecture is also the foundation for multiplayer. Each player's state is already isolated and independent.
 
 ### Milestone 1.4 — Economy and Production
+
+*Historical writeup. Live costs are 20/40/100/60; Small caps are 12/8/8/6. See combat-rules §2.*
 
 **Build:** Add the production system. The production resource is **res4 urban hex count** per territory — each res1 hex generates production points per turn equal to its res4 urban hex count. This is a production *rate*, not a consumable stockpile — the urban hex count doesn't decrease from building units, only from air strikes (milestone 1.5). Points accumulate toward the cost of the queued unit across multiple turns; when accumulated points meet or exceed the unit cost, the unit spawns. Excess production carries over to the next unit in the queue.
 
@@ -266,6 +294,8 @@ Hex label format: `N1c / N2t` (urban hex count / turns to next spawn), with exce
 **Playtest hypothesis:** Resource scarcity forces meaningful trade-offs. The production system should make the early game feel different from the late game. The AI should make reasonable production decisions — building units appropriate to its strategic situation rather than randomly or always building the most expensive option.
 
 ### Milestone 1.5 — Air Power and Infrastructure Destruction
+
+*Historical writeup. Live air cost is 60; Small cap is 6 air. Vision is not exclusive to air (see 1.3 note).*
 
 **Build:** Add the **air unit** as the fourth unit type and implement the **infrastructure destruction** system. This is the major roster expansion for the global level. Unit caps expand to: 10 infantry, 5 armor, 5 naval, 3 air (23 total). If playtesting shows 23 units degrades LLM briefing quality, fall back to 8/4/4/2 (18 total).
 
@@ -397,6 +427,8 @@ Place sub-units on the map using entry-side injection. Implement the multiplicat
 
 ### Milestone 2.2 — Tactical Movement and Combat
 
+*Historical writeup. Live tactical ranged baselines are infantry 2, armor 5, naval 10. Mountain LOS and terrain MP modifiers are implemented. See combat-rules §12.*
+
 **Build:** Implement the tactical gameplay systems: movement budgets with terrain costs, ranged combat, and melee resolution.
 
 **Movement:** Each sub-unit has a per-turn movement budget consumed as it traverses res4 hexes. Terrain modifies movement cost by unit type (see combat rules §12.4): infantry traverses all land but is slowed by mountains and forests; armor is blocked by mountains, arctic, and wetlands, and slowed by forests and coastal terrain; naval is restricted to water and coastal hexes. Starting movement budgets (res4 hexes per turn on flat terrain): infantry 2, armor 4, naval 3. Air sub-units do not use the movement system — they can strike anywhere in the res1 hex.
@@ -410,6 +442,8 @@ Place sub-units on the map using entry-side injection. Implement the multiplicat
 **Playtest hypothesis:** Tactical combat should feel meaningfully different from strategic resolution while retaining the same core rhythm of plan-commit-resolve. Terrain should create interesting approach problems — armor can't cross those mountains, so infantry needs to clear the pass. Ranged fire should create standoff dynamics where positioning matters. The WEGO structure should produce the same suspenseful moment of resolution as the strategic game — you commit your tactical maneuvers, the AI commits its, and you see what happens.
 
 ### Milestone 2.3 — Bail-Out Resolution and AI Tactical Play
+
+*Historical writeup. Live voluntary exit uses strict less-than-half parent elimination with no extra dice pass. The LLM has no bail-out action.*
 
 **Build:** Implement the bail-out system and the AI's ability to play tactical battles.
 

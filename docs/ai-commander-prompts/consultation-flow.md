@@ -8,7 +8,7 @@ Every message the model sees after the system prompt: the opening instruction, t
 
 Roles in order for a normal consultation:
 
-1. `system` — the prompt contracted by `assembly-contract.md` and the active mode file. Built once.
+1. `system` — the prompt assembled by `buildSystemPromptForTools` per `assembly-contract.md` and the active mode file. Built once.
 2. `user` — the opening instruction, section 2.
 3. Zero or more rounds of: `assistant` carrying tool calls, then one `tool` message per call, section 3.
 4. `assistant` — the response envelope as text.
@@ -55,23 +55,11 @@ One contract per branch of the opening-message builder. The gate column names th
 | Planning tools off, standing-order tools off, fallback movement on | Point at the fallback adjacent-cell listing in the system prompt as the only source of move destinations. Then name the envelope. |
 | Any remaining combination | Point at the briefing and name the envelope with an empty `orders` array as the acceptable answer. |
 
-Two branches of the current builder are unreachable because the fallback-movement flag is derived as the negation of the other two. They are still contracted above under the last row so that a later change to that derivation does not produce a message with no contract.
+`getToolFlags` derives `fallbackMovementEnabled` as the negation of planning and standing-order flags, so the last two rows are the fallback listing versus empty-orders, not dead code.
 
-### 2.3 Rules currently carried by the opening message
+### 2.3 Opening message versus system prompt
 
-Each of these appears in the opening message today. The middle column says where the rule lives under this specification; none of them remains in user text.
-
-| Rule in today's opening message | Where it lives now |
-| --- | --- |
-| Give orderless units standing orders | System prompt: standing-order guidance, `strategic-prompt.md` section 4 item 8. The opening message keeps only the one-clause pointer. |
-| Copy option targets by action type into move, ranged, ferry, or strike fields | System prompt: `# Available Tools` guidance and the envelope mapping tables. The opening message keeps only the one-clause pointer (one move or approach row and one ranged row per actor; strategic: one option row per unit per action). |
-| Route only for destinations not listed for that unit | Same. |
-| Include memory updates for strategy notes | System prompt: memory section and coaching item 16. Dropped from user text; the envelope tail is named, which is sufficient. |
-| Queue production when a controlled cell has an empty queue | System prompt: production section and coaching item 14. Dropped from user text. |
-| Set one type and count per queue; each set replaces the queue | System prompt: production envelope contract. Dropped from user text. |
-| Replace a cap-blocked queue; leave a queue alone when every available type is capped | System prompt: production section. Dropped from user text. The at-cap marker string quoted anywhere must be the same constant the queue table uses. |
-| Prefer queues on every eligible controlled cell | System prompt: production coaching. Dropped from user text. |
-| Do not use standing-order actions in a beat | System prompt: tactical envelope contract. Retained as a prohibition in the tactical opening message only, worded identically. |
+The opening message does **not** carry game rules. Production doctrine, cap rules, option-copy mapping, memory-write instructions, and `plan_route` restrictions live in the system prompt. The opening message keeps only the situation pointer, one action clause, the envelope field list, and (tactical only) `TACTICAL_STANDING_ORDER_PROHIBITION` worded identically to the envelope contract.
 
 ## 3. Tool-result messages
 
@@ -130,7 +118,7 @@ Four ways a consultation ends without producing orders. In none of them does ano
 | Tool rounds exhausted | No orders for the period; the next system prompt carries the tool-budget warning |
 | Wall-clock limit exceeded | Consultation is cancelled; no orders for the period |
 
-Two consequences that belong to the prompt contract rather than to transport:
+Two consequences that belong to the prompt rather than to transport:
 
-1. **The warning is a next-consultation surface.** Its text belongs to the system prompt's situational directives and states the round limit, the fact that nothing was submitted, and the instruction to submit promptly. The limit quoted there must be the same number the loop enforces; two independent literals are a drift risk recorded in `source-inventory.md`.
-2. **No orders is not no consequence.** A period with no orders still resolves. Under the strategic layer the engine's own fallbacks act for unordered units; in battle nothing moves, because standing orders are inert there. The prompt does not tell the model about the strategic fallbacks, for the reason given in `strategic-prompt.md` section 4.
+1. **The warning is a next-consultation surface.** Its text belongs to the system prompt's situational directives and states the round limit, the fact that nothing was submitted, and the instruction to submit promptly. The quoted limit is `REQUEST_ORDERS_MAX_TOOL_ROUNDS`.
+2. **No orders is not no consequence.** A period with no orders still resolves. Under the strategic layer the engine's own fallbacks act for unordered units; in battle nothing moves, because standing orders are inert there. The prompt does not tell the model about the strategic fallbacks (`TEMPO_SWEEP_SILENCE`).

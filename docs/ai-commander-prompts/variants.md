@@ -1,6 +1,6 @@
 # Runtime variants
 
-What changes, surface by surface, for every gate the engine can present. A surface that does not change says `unchanged`; rows are never omitted for being uneventful, because "not mentioned" is how a later implementer ends up guessing.
+What changes, surface by surface, for every gate the engine can present. Rows describe **emitted** behaviour. A surface that does not change says `unchanged`.
 
 Surfaces in every table: **system** (the system prompt), **user** (the opening message), **tools** (the enabled tool list), **envelope** (the response object), **coaching** (rules and heuristics), and **empty-state**.
 
@@ -30,7 +30,7 @@ Gate: `state.fogOfWarEnabled` on the snapshot, resolved by `isFogOfWarEnabled` (
 | coaching | Drop the staleness rule; every report is current. Keep the hop-versus-path caution, because an enemy two hops away across water may be many turns away by sea. |
 | empty-state | An empty observed roster with fog off means the enemy has no units; the scouting directive is still emitted by the roster gate and does no harm, but the goal statement is what tells the model the game is nearly over. |
 
-The caveat lines' gates are **the meaning of the numbers**. Two consequences a later implementer must preserve: neither honesty line appears in a battle prompt, because both gates require the strategic resolution; if fog-off distances ever become path-based, the hop-count line is removed rather than reworded; if fog-on distances ever become hop counts, the path-versus-Best-Options line is removed rather than reworded.
+The caveat lines' gates are **the meaning of the numbers**. Neither honesty line appears in a battle prompt, because both gates require the strategic resolution. If fog-off distances ever become path-based, the hop-count line would be removed rather than reworded; if fog-on distances ever become hop counts, the path-versus-Best-Options line would be removed rather than reworded.
 
 ### 1.3 Tactical, either fog setting
 
@@ -235,7 +235,7 @@ Gate: which consultation entry point runs — every period, or only when an even
 | user | unchanged |
 | tools | unchanged |
 | envelope | unchanged |
-| coaching | State that the model is consulted when a subscribed event fires or when the engine forces a consultation, that the response replaces the entire subscription list, and that a period without a consultation is a period the model did not act in. In battle, add that nothing moves in an unconsulted beat because standing orders are inert there. |
+| coaching | State that the model is consulted when a subscribed event fires or when the engine forces a consultation, that the response replaces the entire subscription list, and that a period without a consultation is a period the model did not act in. Mandatory override ids (`first_consultation`, `deadman`, and the rest) are not listed by name. In battle, add that nothing moves in an unconsulted beat because standing orders are inert there. |
 | empty-state | An empty callback list under event-driven policy means the model has no self-chosen triggers left and will only be consulted when the engine forces it. The coaching must make that consequence explicit rather than leaving an empty list looking free. |
 
 ### 6.3 Tactical beat consulted versus skipped
@@ -262,7 +262,7 @@ Gate: which consultation entry point runs — every period, or only when an even
 
 ## 7. Combinations that must not fight
 
-Each row is a pair of gates that a naive implementation resolves inconsistently. The resolution column is binding.
+Each row is a pair of gates that would otherwise fight. The resolution column matches the builders.
 
 | Combination | Resolution |
 | --- | --- |

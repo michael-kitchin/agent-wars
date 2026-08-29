@@ -1,12 +1,12 @@
 # Information and decision model
 
-What the AI commander has to decide, what it is allowed to know, and which facts the prompt must therefore carry. This file defines **requirements**. Where a section, heading, or column carries a requirement is decided in `assembly-contract.md`, `strategic-prompt.md`, and `tactical-prompt.md`.
+What the AI commander has to decide, what it is allowed to know, and which facts the builders therefore carry. This file names jobs and information items. Where a section, heading, or column carries an item is described in `assembly-contract.md`, `strategic-prompt.md`, and `tactical-prompt.md`, matching the builders. If an item's emission disagrees with code, the builders win.
 
 Item ids defined here are the stable vocabulary for the rest of the package. Cite them; do not rename them.
 
 ## 1. Commander jobs
 
-The model is a weak model. Each job below must be answerable from contracted information without arithmetic across distant tables and without knowledge the prompt does not supply.
+The model is a weak model. Each job below must be answerable from information the builders actually emit, without arithmetic across distant tables and without knowledge the prompt does not supply.
 
 ### 1.1 Strategic turn jobs
 

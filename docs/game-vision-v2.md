@@ -1,6 +1,10 @@
 # Game Vision Document
 
-*Version 3.0 — April 2026*
+*Version 3.1 — August 2026 (intent plus live 2.4.0 implementation)*
+
+This is the product intent document. **Where a roster, fog radius, cost, cap, or phase claim disagrees with the engine, the engine and [combat-rules-v3.md](combat-rules-v3.md) win.** Unbuilt surfaces (player-facing save/load, diplomacy, async multiplayer, Steam/Discord shipping) remain intent.
+
+**Implementation status (2.4.0):** The global strategic game, hybrid OpenRouter AI, fog of war, production, air, sealift, and optional res4 tactical battles are playable. Milestone 2.5 (save/load) is not shipped. Tactical battles are not deferred.
 
 ---
 
@@ -16,11 +20,11 @@ The game plays like Axis & Allies at its core — a simple but diverse unit mix,
 
 **Two-level command: strategic and tactical.** The map operates at two scales built on Uber's H3 hierarchical hex grid. The global level (H3 resolution 1, ~842 hexes at ~610,000 km² each — roughly France-sized) shows the entire Earth and is where you make strategic commitments: allocate forces across theatres, manage the economy, set the overall war plan. The tactical level (H3 resolution 4, ~1,770 km² per hex, ~42 km edge-to-edge) zooms into a single global hex to reveal ~343 child hexes — this is where you fight battles at division scale.
 
-The tactical game is optional and triggered by contact: when your units and enemy units share the same res1 hex, the UI offers a "tactical battle" option. Accepting pauses the strategic game entirely — no other hexes resolve while you're fighting the tactical battle. This is the Total War model: zoom in to fight, or skip it and let the engine resolve the battle using strategic-level dice rolls. You can also bail out mid-battle, in which case the remaining forces resolve automatically with modifiers that account for losses already taken. An immediate bail-out produces results similar to a standard strategic engagement, so there's no incentive to game the system.
+The tactical game is optional and triggered by contact. During planning, a magnifier appears on contested explored res1 hexes. During WEGO resolution, a melee-intercept dialog can offer Fight or Ignore before strategic melee. Accepting pauses the rest of the strategic map. This is the Total War model: zoom in to fight, or skip it and let the engine resolve with strategic-level dice. You can exit mid-battle; remaining sub-units map back to strategic parents with a strict less-than-half survival threshold (exact half survives; see combat rules §12.8–§12.9). There is no extra dice-with-modifiers pass on exit.
 
 This design means the tactical layer doesn't need to be perfect to ship — it's an enhancement to the strategic game, not a dependency. Players who prefer the grand strategic view can ignore it entirely.
 
-**Subjective fog of war.** No player — human or AI — ever sees the true state of the board. You see what your units can see, period. The AI receives only its own subjective view through the same tool services. Different players can have contradictory pictures of the same part of the map, and both can be wrong. This isn't a feature bolted on top — it's the foundation of the game state architecture.
+**Subjective fog of war.** When fog is on, no player — human or AI — sees the true state of the whole board. You see the disk your units can see: infantry 1 hex, armor 2, naval 2, air 3 from base. Last-known enemy positions persist for two turns after contact is lost, then drop. The AI receives only its own subjective view through the same tool services. Fog can be turned off for a match. Tactical battles have universal visibility inside the footprint.
 
 **WEGO simultaneous resolution.** All players issue orders, then all orders resolve at once. This creates a planning-and-anticipation rhythm that maps naturally to how LLMs reason — they're committing to a plan based on incomplete information, exactly like a real commander. It also means the moment of resolution is genuinely suspenseful, because you don't know what anyone else committed to until you see it play out.
 
@@ -58,14 +62,16 @@ At ~610,000 km² per hex, individual divisions don't exist. Units at this scale 
 
 | Unit type | Move | Attack | Defense | Range | Domain | Cost |
 |-----------|------|--------|---------|-------|--------|------|
-| **Infantry** | 1 | 1 | 2 | 0 (melee only) | Land | 10 |
-| **Armor** | 2 | 3 | 2 | 1 (adjacent hex) | Land | 20 |
-| **Naval** | 2 | 2 | 2 | 2 hexes | Water | 50 |
-| **Air** | 0 (ferry only) | 3 | 1 | 3 (strike radius) | Air | 30 |
+| **Infantry** | 1 | 1 | 2 | 0 (melee only) | Land | 20 |
+| **Armor** | 2 | 3 | 2 | 1 (adjacent hex) | Land | 40 |
+| **Naval** | 2 | 2 | 2 | 2 hexes | Water | 100 |
+| **Air** | 0 (ferry only) | 3 | 1 | 3 (strike radius) | Air | 60 |
 
-Unit caps: 10 infantry, 5 armor, 5 naval, 3 air (23 total). Fallback if playtesting shows 23 is too many for LLM briefing quality: 8 infantry, 4 armor, 4 naval, 2 air (18 total).
+Per-side caps scale with match size (Small 12/8/8/6 infantry/armor/naval/air; Medium ×2; Large ×4). See [game-size-unit-caps.md](game-size-unit-caps.md). Build prerequisites: infantry 1 urban hex; armor 2 urban; naval 10 urban + seaport; air 5 urban + airport.
 
 The global roster is validated when: the LLM reasons clearly about force allocation, production decisions feel meaningful, and games at this level alone produce interesting strategic tension for 15–30 turns.
+
+**Live scenario:** [`region_vs_region`](region-vs-region.md). Each side has a home region. Win at end of turn by controlling every res1 hex that intersects the enemy home region, or by eliminating all urban production in the enemy home region while your own home still has urban hexes. Both home-region outlines are always visible. Destroying the last enemy unit also ends the match.
 
 ### Tactical Level: Unit Multiplication
 
@@ -78,19 +84,21 @@ The tactical level does not have a separate unit roster. Instead, strategic unit
 | 1 Air | 3 sub-units | Small number of air wings |
 | 1 Naval | 2 sub-units | Major task force components |
 
+Tactical ranged baselines (res4 steps): infantry 2, armor 5, naval 10, air anywhere in the footprint. Movement-point budgets on flat terrain: infantry 2, armor 4, naval 3.
+
 Sub-units inherit their parent's type identity for purposes of terrain interaction, combat, and movement. The multiplication ratios are starting values subject to playtesting — the goal is enough sub-units to create interesting maneuver decisions without overwhelming the player or the LLM.
 
-When a tactical battle ends (all opponents eliminated or the player bails out), surviving sub-units are mapped back to their parent strategic unit's effective strength for the bail-out resolution modifier or, if the battle concluded decisively, the parent unit is either destroyed or survives at full strength. The mapping-back mechanic is deliberately simple: the sub-unit ratio determines proportional loss. If 8 of 12 infantry sub-units survive, the parent infantry unit survives; if fewer than half survive and the battle is resolved by bail-out, the modifier reflects severe attrition.
+When a tactical battle ends by annihilation, the empty side's parents are already gone. On human voluntary exit, a parent is destroyed when fewer than half of its placed sub-units remain; exact half survives. Strategic units stay binary — alive or dead.
 
 ### The Zoom Transition
 
 When units from opposing sides share a res1 hex, the player may choose to fight a tactical battle. The transition works as follows:
 
-1. **Entry-side injection.** Each strategic unit's sub-units are placed on the res4 hex grid at the edge corresponding to the direction from which the unit entered the res1 hex. The engine tracks which hex side each unit crossed during strategic movement. This rewards strategic positioning — approaching from multiple directions creates tactical advantages.
+1. **Entry-side injection.** Each strategic unit's sub-units are placed on the res4 hex grid at the edge corresponding to the direction from which the unit entered the res1 hex. The engine tracks the previous strategic hex. This rewards strategic positioning — approaching from multiple directions creates tactical advantages.
 
-2. **Tactical play.** The player maneuvers sub-units across the res4 grid using movement budgets, terrain interactions, and ranged fire (see Combat Rules §12 for details). The strategic game is paused.
+2. **Tactical play.** The player maneuvers sub-units across the res4 grid using movement-point budgets, terrain enter costs, road/rail, and ranged fire with mountain LOS (see Combat Rules §12). The rest of the strategic map is paused.
 
-3. **Resolution.** The tactical battle ends when all enemy sub-units are eliminated or the player bails out. On bail-out, remaining sub-units resolve via automatic dice rolls with modifiers that converge toward strategic-level combat odds when no tactical losses have occurred. This prevents the exploit of entering tactical mode for an advantage and immediately bailing out.
+3. **Resolution.** The tactical battle ends when one side is annihilated or the player exits. Voluntary exit maps remaining sub-units back with the less-than-half rule; there is no second dice pass. An immediate exit with a full roster therefore returns the same strategic units that entered.
 
 **Visibility in tactical battles is universal** — all sub-units on both sides are visible regardless of terrain. This is a deliberate simplification that keeps the tactical layer playable and keeps the LLM's decision space tractable.
 
@@ -98,7 +106,7 @@ When units from opposing sides share a res1 hex, the player may choose to fight 
 
 The UI is a conventional desktop application dominated by the map view, not a full-screen game engine display. Think Command: Modern Operations or the old Harpoon series, but significantly stripped down to drive map-focused decision making with a simpler unit mix. Interaction is mouse-driven with keyboard accelerators for common actions, supporting more fluid play for experienced players. Information panels are collapsible and subordinate to the map. This is a deliberate choice — it plays to web technology's strengths for complex information-dense layouts and keeps the player's attention on geography and spatial decisions.
 
-When a tactical battle is triggered, the map view zooms smoothly into the res4 grid of the contested hex. A "return to strategic" button allows the player to bail out at any time. The transition should feel like a general leaning over a regional map — assuming a different level of command, not switching games.
+When a tactical battle is triggered, the map view zooms into the res4 grid of the contested hex. An exit control returns to strategic mapping (voluntary-exit mapping, combat rules §12.8). The transition should feel like a general leaning over a regional map — assuming a different level of command, not switching games.
 
 ## Who This Is For
 
@@ -106,15 +114,17 @@ Strategy wargame players who are frustrated by decades of scripted AI opponents 
 
 ## Multiplayer
 
-The game supports any mix of human and AI players. The primary experience is single-player against one or more LLM opponents, but the architecture is designed so that human players can join through asynchronous turn exchange — essentially modernized play-by-email, with no server infrastructure required. Each human player hosts their own AI opponents locally. Real-time networked multiplayer is not planned for initial release but the WEGO turn structure and per-player subjective state make it architecturally feasible as a future addition.
+The game supports any mix of human and AI players. The primary experience is single-player against one LLM opponent on the real-Earth map (region-vs-region home regions). Human-vs-human async turn exchange and real-time networked multiplayer are not shipped.
 
 ## How I'm Building It
 
-Electron desktop application, TypeScript, SQLite for game state. H3 for spatial indexing at two resolutions (res 1 for global, res 4 for theatre). Canvas or WebGL for map rendering. OpenRouter for LLM integration. AI-assisted development with RooCode and Cursor, spec-driven with playable milestones every two weeks.
+Electron desktop application, TypeScript, SQLite (better-sqlite3) for game state. H3 for spatial indexing at two resolutions (res 1 for global, res 4 for tactical). Leaflet plus canvas overlay for map rendering. OpenRouter for LLM integration (BYOK). Six tool groups (pathfinding, assessment, combat estimation, memory, standing orders, production) — [ai-tools.md](ai-tools.md). Hybrid loop: [hybrid-ai.md](hybrid-ai.md). AI-assisted development with Cursor, spec-driven.
 
-The map data comes from Natural Earth shapefiles preprocessed through PostGIS into H3 cells at both resolutions, with terrain stored using a sparse hierarchical scheme — ocean is null, homogeneous land regions are stored as ranges at coarse resolution, and fine-grained terrain data only exists at res 4 where geographic variation creates tactical significance.
+The map data comes from Natural Earth shapefiles preprocessed into H3 cells at both resolutions, with per-hex terrain metadata, urban/airport/seaport features, and road/rail side masks. Runtime loads generated JSON under `data/generated/`.
 
 ## How I'm Shipping It
+
+*Intent, not current distribution.* Live builds are developer / side-load Electron packages (electron-builder). There is no Steam listing or public GitHub-releases pipeline in this tree yet.
 
 Free builds on GitHub under my name. Paid convenience builds on Steam. The code is not open source — the GitHub repository hosts compiled builds and release notes, not the source. The Steam listing makes it clear that the free version always exists and the paid version is a way to get managed installation and support the project. This follows the model proven by Dwarf Fortress and others. The goal is to build a player base and a reputation as a developer in this space, not to maximize short-term revenue.
 
@@ -126,10 +136,6 @@ A shipped game that people want to play more than once against AI opponents that
 
 ## Development Approach
 
-The game develops in phases. Phase 0 is a throwaway prototype that validates whether LLM opponents produce interesting play on a tiny hex map. Phase 1 builds the real single-player game at the global zoom level on a real-Earth map. Phase 2 polishes the UI, deepens the AI, and adds Early Access features. Phase 3 adds the optional tactical battle layer. Phase 4 ships it.
+The original roadmap treated Phase 0 as a throwaway prototype, Phase 1 as the global game, Phase 2 as polish, Phase 3 as tactical, and Phase 4 as ship. **That numbering is historical.** The live plan in [devleopment-plan-v3.3.md](devleopment-plan-v3.3.md) moved tactical battles into Phase 2 (milestones 2.1–2.5). As of 2.4.0, hybrid AI validation, the global strategic game, and tactical battles through 2.4 are complete. Save/load (2.5) and Phase 3 polish are not shipped.
 
-Every milestone produces something playable and includes a hypothesis about what the player experience should feel like. The architectural validation matters, but the experience validation is the point. If it doesn't feel like a game worth playing, the code quality is irrelevant.
-
-The tactical layer (Phase 3) is deferrable to post-launch if the global-level game is strong enough on its own. The optional bail-out design ensures the strategic game is complete without it. If players consistently express a desire to zoom in and fight battles directly, that's strong signal to prioritize Phase 3. If the strategic game satisfies on its own, the tactical layer becomes a post-launch expansion.
-
-The most important checkpoint is the first complete game against an LLM opponent. If that's not fun, nothing else matters until I understand why.
+Every milestone still aims at something playable. The tactical layer is no longer deferrable in the sense of "not built" — it is in the current build and remains skippable in play.

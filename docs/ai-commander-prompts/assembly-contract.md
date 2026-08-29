@@ -80,10 +80,10 @@ Every cell is binary. `always` means unconditional in that mode; `never` means t
 | Response envelope contract | always | always | n/a |
 | Response envelope example | always | always | n/a |
 
-Two deviations from current code are deliberate and are the reason those rows read as they do:
+Live assembler notes that match the matrix above:
 
-- Air and naval status sections must be **omitted** when the opponent has none of that arm, rather than emitted with a single `—` row. A table of dashes consumes context and invites the model to look for air options that do not exist. The gate is roster presence, which the assembler already computes as `hasAir` and `hasNaval`.
-- The distance-basis caveat is contracted on the basis of **what the numbers mean**, not on the fog flag alone. Fog-off at res1 prints hop counts, so the hop-versus-path line is required. Fog-on at res1 prints march or sail path lengths (falling back to hops when no path exists), so a different line is required: those path lengths can exceed one movement budget while Best Options Target Hexes remain this-turn legal hops. `variants.md` fixes both gates. Neither line appears in a battle prompt.
+- Air and naval status sections are **omitted** when the opponent has none of that arm (`buildAirOperationsBriefingBlock` / `buildSealiftBriefingBlock` return `''`). A dash table is not emitted.
+- The distance-basis caveat follows **what the numbers mean**, not the fog flag alone. Fog-off at res1 prints hop counts, so the hop-versus-path line is emitted. Fog-on at res1 prints march or sail path lengths (falling back to hops when no path exists), so the path-versus-Best-Options line is emitted. Neither line appears in a battle prompt.
 
 ## 4. Tools versus envelope writes
 
@@ -113,7 +113,7 @@ Tool inventory and per-consult availability:
 
 ## 5. Shared response envelope
 
-The envelope is one JSON object. The prompt must state the shape, the field order, which fields are optional, and which actions are legal in this mode. `promptContracts.ts` is the current implementation of this contract; where the two disagree, this section is the requirement.
+The envelope is one JSON object. Field order, optional tails, and legal actions are implemented by `promptSpec/envelopeContract.ts` and `promptContracts.ts`. If this section disagrees with those builders, the builders win.
 
 ### 5.1 Field contract
 
@@ -123,7 +123,7 @@ The envelope is one JSON object. The prompt must state the shape, the field orde
 | `strategy` | string | required, second | One line summarising this period's plan |
 | `orders` | array | required, third | Per-unit actions, processed in list order |
 | `airStrikes` | array | present when the opponent has air units | Strike actions |
-| `ferryOrders` | array | present when the opponent has air units and the mode supports ferrying | Rebase actions |
+| `ferryOrders` | array | present when the opponent has air units | Rebase actions. In battle, coaching says do not rebase; Best Options produces no ferry rows, but the field is still listed. |
 | `callbacks` | array | always offered | Re-consultation subscriptions; the whole list is replaced each response |
 | `memoryUpdates` | array | present when memory tools are enabled | Memory writes and deletes |
 | `productionOrders` | array | present when production tools are enabled | Queue actions |
@@ -148,7 +148,7 @@ Envelope-wide rules the prompt must state:
 | `cancel_order` | legal when standing-order tools are enabled | **forbidden** |
 | `embark`, `transport_move`, `disembark` | legal when the opponent has naval units | legal when the opponent has naval sub-units |
 | `airStrikes` entries | legal when the opponent has air units | legal when the opponent has air sub-units, targeting anywhere in the footprint |
-| `ferryOrders` entries | legal when the opponent has air units | see `tactical-prompt.md`; not offered as an option row |
+| `ferryOrders` entries | legal when the opponent has air units | listed when the opponent has air sub-units; not offered as a Best Options row; coaching says do not rebase |
 | `memoryUpdates` entries | legal when memory tools are enabled | **forbidden** |
 | `productionOrders` entries | legal when production tools are enabled | **forbidden** |
 
@@ -170,10 +170,10 @@ System-prompt content, both modes. Each item states the rule and why the model n
 10. **`message` is for the player.** One in-character taunt or threat, and nothing operational: no cells, no unit ids, no intent. Carries `MESSAGE_DISCIPLINE`.
 11. **Doctrine.** Use speed, surprise, and initiative to break enemy cohesion; attack gaps and avoid strengths; create maximum disruption with minimum force. These are judgment aids with no engine symbol behind them and must be presented as doctrine, not as rules.
 
-Two claims currently in the prompt must **not** appear as shared coaching:
+Two claims the builders **omit** (matrix tests forbid the substrings):
 
-- Any assertion that an unfired legal shot is output lost unconditionally. It is false for a unit under a fire-withholding order, and the mode files carry a corrected version.
-- Any unconditional assertion that enemy units remain in play and are hunting the model's forces. The prompt cannot know that, and it contradicts the scouting directive in the very case where the roster is empty.
+- Any assertion that an unfired legal shot is damage given up for free. Tempo copy says the model chooses each target; firing does not consume the move. The engine sweep is not described (`TEMPO_SWEEP_SILENCE`).
+- Any unconditional assertion that enemy units remain in play and are hunting the model's forces.
 
 ## 7. Carrier assignment for required items
 

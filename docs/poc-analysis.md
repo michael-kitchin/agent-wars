@@ -1,5 +1,11 @@
 # LLM wargame AI is viable — but architecture must evolve to scale
 
+*Historical research (Phase 0, early 2026). Not live mechanics.*
+
+The hybrid architecture this paper recommended — pre-computed briefings, standing orders, and event-driven LLM consultation — is the live 2.4.0 design. Cost and latency numbers below are period research, not current measurements. For what the game actually does, start at [README.md](README.md) and [combat-rules-v3.md](combat-rules-v3.md).
+
+---
+
 **The latency/cost scaling problem does not threaten the fundamental viability of an LLM-powered wargame.** It does, however, require specific architectural changes — primarily adopting a hybrid AI pattern where the LLM serves as a strategic advisor rather than direct tactical controller. This shift, validated by at least six independent projects including Meta's CICERO and the Vox Deorum Civilization V integration, can reduce LLM costs by **90% or more** while preserving the compelling emergent behavior that makes LLM opponents interesting. Simultaneously, API pricing is declining 30–70% year-over-year, and the techniques for managing tool-calling latency are maturing rapidly. The developer's current prototype is well-positioned: the five MCP-style tool services already form the skeleton of a hybrid architecture. The path forward is optimization and selective hybridization, not a fundamental rethink.
 
 ---

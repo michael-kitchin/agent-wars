@@ -1,6 +1,6 @@
 # Grand Strategy and Hex Wargame Market: A 2025–2026 Landscape Analysis
 
-*Prepared March 2026*
+*Prepared March 2026. Dated market research, not an implementation or shipping-status document.*
 
 ---
 

@@ -1,10 +1,14 @@
 # UI Style Guide
 
-*March 2026*
+*March 2026 target aesthetic; implementation-status note August 2026*
 
 ---
 
-This document defines UI aesthetics, control patterns, and application-specific guidelines for the grand strategy wargame. It aligns with the vision (map-dominated desktop app, fog of war, WEGO, LLM opponents) and the development plan’s art direction (Milestone 2.1). Use it for all UI and map chrome so the product reads as a coherent, serious strategy wargame.
+This document defines UI aesthetics, control patterns, and application-specific guidelines for the grand strategy wargame. Use it for all UI and map chrome so the product reads as a coherent, serious strategy wargame.
+
+**Implementation status (2.4.0):** The live app is a map-first Electron window: Leaflet world map + canvas overlay, minimap, hex tooltips, stack callout, build-queue popup, OpenRouter side panel, lower-left toasts, WASD/arrow pan, wheel zoom, NATO-inspired SVG unit glyphs, and tactical-entry magnifiers on contested hexes. There is a single light cartographic theme (no dark-mode switch). Player colors are teal human `#115e59` and rose opponent `#9d174d` on background `#e0dcd4`. Unbuilt in this guide: save/load UI, replay strip, async turn-file exchange, diplomacy panel, in-app reference manual, and a documented full keyboard-shortcut overlay.
+
+When this guide and the running app disagree, the app wins until this file is updated.
 
 ---
 
@@ -34,7 +38,20 @@ This document defines UI aesthetics, control patterns, and application-specific 
   - **Semantic states** (e.g., success/warning/error only where needed).
 - Avoid saturated primaries everywhere; accents should read clearly without dominating the map or panels.
 
-**Suggested palette reference (implementation may use hex, CSS variables, or equivalents):**
+**Implemented palette (2.4.0, `src/renderer/core/constants.ts`). Suggested dual-theme rows below remain a target, not a second shipped theme:**
+
+| Role | Live app | Notes |
+|------|----------|--------|
+| UI / map chrome bg | `#e0dcd4` | `BACKGROUND_COLOR` |
+| Player 1 (human) | `#115e59` | Unit fill |
+| Player 2 (opponent) | `#9d174d` | Distinct from human |
+| Selection / slower / warning | `#a06020` | Range perimeter (ranged) |
+| Air-strike perimeter | `#7a3db5` | Distinct from ground ranged |
+| Combat lightning | `#f0d000` | Resolution overlay |
+| Casualty X | `#c03030` | Removal overlay |
+| Mixed stack fill / stroke | `#b0b0b0` / `#222222` | Multi-player hex |
+
+**Suggested palette reference if a dark theme is added later:**
 
 | Role | Light theme example | Dark theme example | Notes |
 |------|---------------------|---------------------|--------|
@@ -60,7 +77,7 @@ This document defines UI aesthetics, control patterns, and application-specific 
 ### 1.5 Interaction Model
 
 - **Mouse-primary:** Click to select, click to command. Hover for tooltips and contextual hints. No reliance on touch or gesture for core actions.
-- **Keyboard accelerators:** Provide shortcuts for frequent actions (e.g., next unit, end turn, zoom, confirm orders) so experienced players can work quickly. Document them in-app and in the reference manual.
+- **Keyboard accelerators (live):** WASD and arrow keys pan the map. Mouse wheel zooms toward the cursor. Further accelerators (next unit, documented shortcut overlay) are still target, not shipped.
 - **Feedback:** Every meaningful action (order placed, turn committed, unit selected) should have immediate visual (and later, optional audio) feedback so the player never doubts that input was registered.
 
 ---
@@ -72,11 +89,11 @@ This document defines UI aesthetics, control patterns, and application-specific 
 - **Canvas:** The hex map is the main interactive surface. Support pan (e.g., drag or edge-scroll) and zoom (e.g., wheel or pinch) with smooth, predictable behavior. Keep map rendering performant (culling, LOD if applicable).
 - **Hex affordance:** Selected hex and hovered hex should be visually distinct (e.g., highlight or outline) without obscuring terrain. Movement range and valid targets (e.g., for an order) should use clear, consistent highlighting (e.g., fill or border).
 - **Fog of war:** Unexplored (never seen) vs. last-known (previously seen, currently out of sight) must be visually distinct—e.g., darker vs. dimmed, or different treatment (pattern/opacity). Explored and currently visible should look “normal” so the map reads quickly.
-- **Minimap:** Small overview for orientation. Use the same terrain and faction colors at low detail. Indicate viewport and, if applicable, attention/focus regions. Keep it unobtrusive (e.g., corner).
+- **Minimap:** Implemented. Small Leaflet overview with a viewport rectangle. Same terrain coloring at low detail. Corner placement.
 
 ### 2.2 Units and Symbols
 
-- **NATO APP-6–style symbols:** Use standard military unit symbols (APP-6 or equivalent) for land, air, naval (and later space) so the audience can read force composition at a glance. Differentiate unit types by symbol shape; use player color for ownership.
+- **NATO APP-6–inspired symbols:** Live unit markers use SVG glyphs under `symbols/` (infantry, armor, naval, air) tinted with player color. Differentiate unit types by symbol; use player color for ownership.
 - **Unit state:** Selection, movement-in-progress, and pending orders should be obvious (e.g., outline, halo, or icon badge). Strength or health (e.g., bars or numeric) should be readable at default zoom without cluttering the map.
 - **Stacking:** When multiple units occupy one hex, show stack count and/or a compact summary (e.g., icon + number). Detail on click or in the unit panel.
 
@@ -121,15 +138,11 @@ This document defines UI aesthetics, control patterns, and application-specific 
 
 ### 2.10 Replay Controls
 
-- **When:** Available when viewing a past turn (e.g. from save/load or a post-turn replay mode). Allow stepping through the resolution sequence of that turn and, when enabled, viewing the AI’s MCP call log for that turn.
-- **Placement:** Controls (e.g. previous/next step, play/pause, turn selector) in the bottom bar or a small collapsible strip so the map remains dominant. Avoid covering the map with replay chrome.
-- **Feedback:** Current step or phase within the resolution should be visible (e.g. in the top bar or a compact label). Replay is for review and context, not core play—keep controls discoverable but secondary.
+**Not shipped (milestone 2.5).** Target: available when viewing a past turn. Allow stepping through the resolution sequence and, when enabled, viewing the AI’s tool log for that turn. Keep controls in a bar or strip so the map remains dominant.
 
 ### 2.11 Async Multiplayer (Turn File Exchange)
 
-- **Export:** After committing orders, the player can export a turn file. Provide a clear action (e.g. “Export turn file”) and feedback (e.g. path or “Copied to clipboard”). No server; file is shared by the player (e.g. email, cloud drive).
-- **Import / combine:** Support loading one or more turn files from other players and running resolution. Flow: load or add files, then “Resolve turn” (or equivalent). Show which players’ files are present and whether resolution can run.
-- **Waiting state:** When the game is awaiting other players’ turn files, show an unambiguous state (e.g. “Waiting for turn files” in the top bar or a small banner) and what’s missing, if known. Allow saving and closing; on reopen, same waiting state until files are added and resolution is run.
+**Not shipped.** Target: export a turn file after Ready; import others’ files; show a waiting state. No server.
 
 ---
 
@@ -154,53 +167,47 @@ This document defines UI aesthetics, control patterns, and application-specific 
 
 ### 3.4 AI and LLM Transparency
 
-- **Optional by default:** AI observatory and reasoning views are opt-in or gated by a setting so they don’t clutter the default experience.
-- **AI observatory panel:** When enabled, show MCP/tool calls and high-level reasoning in a dedicated panel (e.g., collapsible sidebar or bottom drawer). Use monospace or structured formatting for logs; timestamps and turn context help.
-- **Tone:** Present AI data as “what the AI requested and decided,” not as raw API dumps. Summaries and filters (e.g., by turn, by type of call) improve usefulness for debugging and curiosity.
+- **Optional by default:** The OpenRouter panel (model, key, status, tool-count) is always in the layout but is about *your* API session, not a full “observatory of the last briefing.” Viewing the last briefing/response as a first-class in-game observatory is still target (milestone 3.2). Debug dumps (`debug-last-*-prompt.txt`) exist for developers.
+- **Tone:** Present AI data as “what the AI requested and decided,” not as raw API dumps.
 
-### 3.5 Multi-Resolution and Attention (Future)
+### 3.5 Multi-Resolution and Attention
 
-- **Zoom levels:** When theatre/divisional/brigade zoom exists, the current zoom level should be visible (e.g., in the top bar or a small indicator). Transitions should feel intentional (e.g., smooth zoom or clear “entering divisional view”).
-- **Attention/focus:** If the game shows where the player or AI focused attention, use a restrained overlay (e.g., soft tint or outline) that doesn’t obscure terrain or units. Legend or tooltip should explain the visualization.
+- **Zoom levels (live):** Strategic res1 and tactical res4. Tactical mode clamps pan/zoom to the footprint. Entry is a map magnifier on contested hexes and/or a Fight/Ignore melee-intercept dialog. Exit restores world bounds.
+- **Attention/focus:** If the game later shows where the player or AI focused attention, use a restrained overlay that doesn’t obscure terrain or units.
 
 ### 3.6 Scenarios, Save/Load, and Onboarding
 
-- **Scenario selection:** List scenarios with name, short description, and key parameters (map, sides, victory conditions). Single primary action: “Start game.” Optional “Back” or “Settings.”
-- **Save/Load:** Clear list of saves (name, date, scenario, turn). Overwrite and delete only with confirmation. Auto-save should be visible (e.g., “Auto-saved at start of turn N”).
-- **End-game summary:** After victory or defeat, show a summary (e.g. progression of territory control over the game, key events). Keep it scannable; optional “View replay” or “New game” as primary next actions.
-- **Tutorial/onboarding:** If present, keep steps focused and skippable. Use the same UI components and map so the tutorial matches the real game. Avoid long blocks of text; prefer one concept per step with in-context highlighting.
+- **New game (live):** Overlay with human/AI home-region selectors, Game size dropdown and cap badges, fog-of-war checkbox, and New game. The live scenario id is `region_vs_region`.
+- **Save/Load:** **Not shipped.** Target: named saves, overwrite confirmation, auto-save visibility.
+- **End-game summary:** Live overlay reports winner and offers New game; territory-over-time charts are still target.
+- **Tutorial/onboarding:** Not shipped.
 
 ### 3.7 Diplomacy (When Supported)
 
-- **Placement:** Prefer an inline panel or dedicated sidebar section for diplomacy (relationships, proposals, treaties) so the map stays visible. Reserve modals only for critical confirmations (e.g. declaring war, accepting/breaking an alliance).
-- **Content:** Show relationship state per player (e.g. ally, neutral, at war); list of proposals or pending offers; clear actions (propose alliance, declare war, negotiate peace). AI-driven diplomacy should be visible in the AI observatory when that panel is enabled.
-- **Tone:** Same serious, data-oriented style as the rest of the UI. Treat alliances and betrayals as strategic information, not narrative flair.
+**Not shipped.** Target: inline panel for relationships and proposals; same data-oriented tone as the rest of the UI.
 
 ### 3.8 Theming and Display
 
-- **Light vs. dark:** If both are supported, ensure terrain and accents work in both. Test contrast for text and symbols on all terrain types.
+- **Light vs. dark:** Only the light cartographic theme is shipped. If a dark theme is added, test contrast for text and symbols on all terrain types.
 - **Window size:** Layout should adapt to reasonable desktop sizes (e.g., 1280×720 minimum target). Panels collapse or reflow so the map remains usable; avoid fixed widths that break on small or ultrawide screens.
 
 ---
 
 ## 4. Summary Checklist
 
-- [ ] Map is the dominant frame; panels are secondary and collapsible.
-- [ ] Typography: single sans-serif for UI/data; monospace only for coordinates/IDs/logs.
-- [ ] Terrain: muted, topographic palette; fog of war clearly distinct (unexplored vs. last-known).
-- [ ] Units: NATO-style symbols; player color; clear selection and order state.
-- [ ] Top bar: turn, phase, resources; bottom bar: primary actions (Ready, Confirm, etc.).
-- [ ] Sidebar: selection details, collapsible; same visual system as rest of UI.
-- [ ] Notifications: non-blocking; optional sound; dismissible.
-- [ ] WEGO phase (Planning / Resolving) and commit action are obvious.
-- [ ] AI observatory optional; clear, structured presentation of tool calls and reasoning.
-- [ ] Keyboard shortcuts for common actions; documented in-app and in manual.
-- [ ] Restraint in color and decoration; readability and scannability over flair.
-- [ ] Production/build UI: inline panel, cost/queue/ETA, same visual system.
-- [ ] Replay: step-through controls in bar or strip; turn/step indicator visible.
-- [ ] Async multiplayer: export/import turn files; clear “waiting for turn files” state.
-- [ ] End-game summary consistent with style.
+- [x] Map is the dominant frame; panels are secondary.
+- [x] Terrain: muted, topographic palette; fog of war distinct (unexplored vs. last-known).
+- [x] Units: APP-6-inspired SVG glyphs; player color; stack counts.
+- [x] Minimap; WASD/arrow pan; wheel zoom.
+- [x] Notifications: non-blocking toasts; dismissible.
+- [x] WEGO commit action (Ready) is obvious; tactical Fight/Ignore on intercept.
+- [x] Production/build UI: inline popup on production hexes.
+- [ ] Typography documented as a single named family (live app uses system UI fonts).
+- [ ] Full keyboard-shortcut overlay and in-app manual.
+- [ ] AI observatory of last briefing (OpenRouter panel is session/status, not a briefing viewer).
+- [ ] Replay strip.
+- [ ] Async multiplayer turn files.
+- [ ] Save/load UI.
+- [ ] Dark theme.
 
----
-
-*This style guide should be updated when new UI patterns (e.g., multi-resolution, diplomacy, replay) are introduced, so the product retains a consistent, professional wargame character.*
+*This style guide should be updated when new UI patterns ship, so the product retains a consistent, professional wargame character.*
