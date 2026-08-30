@@ -16087,6 +16087,8 @@
   // src/shared/mapKeyboardPanLogic.ts
   var MAP_PAN_BASELINE_INTERVAL_MS = 200;
   var MAP_PAN_HOLD_INTERVAL_MS = Math.round(MAP_PAN_BASELINE_INTERVAL_MS / 1.5);
+  var STRATEGIC_KEYBOARD_PAN_SPEED = 0.5;
+  var TACTICAL_KEYBOARD_PAN_SPEED = STRATEGIC_KEYBOARD_PAN_SPEED;
   function panKeyToDirection(key) {
     switch (key.toLowerCase()) {
       case "w":
@@ -16146,6 +16148,15 @@
   }
   function isNetPanAxesZero(axes) {
     return axes.ns === 0 && axes.ew === 0;
+  }
+  function netAxesToScreenPanDelta(ns, ew, stepPixels) {
+    if (ns === 0 && ew === 0) return { dx: 0, dy: 0 };
+    if (!Number.isFinite(stepPixels) || stepPixels <= 0) return { dx: 0, dy: 0 };
+    const length = ns !== 0 && ew !== 0 ? stepPixels / Math.SQRT2 : stepPixels;
+    return { dx: ew === 0 ? 0 : ew * length, dy: ns === 0 ? 0 : -ns * length };
+  }
+  function keyboardPanModeSpeed(tactical) {
+    return tactical ? TACTICAL_KEYBOARD_PAN_SPEED : STRATEGIC_KEYBOARD_PAN_SPEED;
   }
   function directionsFromPhysicalKeys(heldPhysical) {
     return new Set(heldPhysical.values());
@@ -16252,17 +16263,27 @@
     const leafletRef = globalThis.L;
     if (!map || !leafletRef) return;
     const center = map.getCenter();
+    const tactical = rendererSharedState.tacticalBattleSnapshot != null;
+    const resolution = tactical ? DETAIL_H3_RESOLUTION : WORLD_H3_RESOLUTION;
     let centerH3;
     try {
-      centerH3 = latLngToCell(center.lat, center.lng, WORLD_H3_RESOLUTION);
+      centerH3 = latLngToCell(center.lat, center.lng, resolution);
     } catch {
       return;
     }
-    const neighbor = getNeighborForPanAxes(centerH3, ns, ew);
+    const neighbor = getNeighborForPanAxes(centerH3, 1, 0) ?? getNeighborForPanAxes(centerH3, 0, 1);
     if (!neighbor) return;
-    const [nextLat, nextLngRaw] = cellToLatLng(neighbor);
-    const nextLng = alignLngToReference(nextLngRaw, center.lng);
-    map.setView(leafletRef.latLng(clampLatForWebMercatorDisplay(nextLat), nextLng), map.getZoom());
+    const [neighborLat, neighborLngRaw] = cellToLatLng(neighbor);
+    const neighborLng = alignLngToReference(neighborLngRaw, center.lng);
+    const centerPt = map.latLngToContainerPoint(leafletRef.latLng(center.lat, center.lng));
+    const neighborPt = map.latLngToContainerPoint(
+      leafletRef.latLng(clampLatForWebMercatorDisplay(neighborLat), neighborLng)
+    );
+    const hexPixels = Math.hypot(neighborPt.x - centerPt.x, neighborPt.y - centerPt.y);
+    const stepPixels = hexPixels * keyboardPanModeSpeed(tactical);
+    const { dx, dy } = netAxesToScreenPanDelta(ns, ew, stepPixels);
+    if (dx === 0 && dy === 0) return;
+    map.panBy([dx, dy], { animate: false });
   }
   function applyInitialCameraForState(state) {
     const map = getMainLeafletMap();

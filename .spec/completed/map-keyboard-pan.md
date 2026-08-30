@@ -1,5 +1,7 @@
 # Map keyboard pan (hold-to-continue)
 
+**Direction and step size** are defined in [map-keyboard-pan-screen-pixels.md](../map-keyboard-pan-screen-pixels.md): WASD moves in screen pixels (up/down/left/right). Each tick is 0.5× one hex at the current zoom (res-1 strategic, res-4 tactical). The hold-to-continue rules below still apply.
+
 ## Behavior
 
 - **Keys:** `W`/`A`/`S`/`D` and `ArrowUp`/`ArrowDown`/`ArrowLeft`/`ArrowRight` pan the main map by one res-1 hex per step. Physical keys are tracked separately (via `event.code`), so holding **W** and **ArrowUp** together keeps panning if only one of them is released.

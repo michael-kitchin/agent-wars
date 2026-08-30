@@ -10,6 +10,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import * as fs from 'fs';
 import * as path from 'path';
+import { getFunctionSource } from './testSupport/rendererSourceAssertions';
 
 /**
  * Reads a source file under `src/` relative to the repository root.
@@ -54,4 +55,24 @@ test('main Leaflet map disables built-in keyboard pan', () => {
   assert.ok(mainMapIdx >= 0, 'expected mainMap = leafletRef.map');
   const optionsBlock = worldMap.slice(mainMapIdx, mainMapIdx + 600);
   assert.match(optionsBlock, /keyboard:\s*false/);
+});
+
+test('panMapByNetAxes pans in screen pixels via panBy, not hex-north setView', () => {
+  const helpers = readSrc('renderer', 'map', 'mapHelpers.ts');
+  const fn = getFunctionSource(helpers, 'panMapByNetAxes');
+  assert.match(fn, /netAxesToScreenPanDelta/);
+  assert.match(fn, /keyboardPanModeSpeed/);
+  assert.match(fn, /DETAIL_H3_RESOLUTION/);
+  assert.match(fn, /WORLD_H3_RESOLUTION/);
+  assert.match(fn, /panBy/);
+  assert.equal(
+    /setView/.test(fn),
+    false,
+    'keyboard pan must not snap the camera to a hex-north neighbor'
+  );
+  assert.equal(
+    /keyboardPanReferenceZoom/.test(fn),
+    false,
+    'tactical pan must use a res-4 hex at the current zoom, not a scaled res-1 step'
+  );
 });

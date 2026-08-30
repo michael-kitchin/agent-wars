@@ -29,6 +29,26 @@ export const MAP_PAN_BASELINE_INTERVAL_MS = 200;
 export const MAP_PAN_HOLD_INTERVAL_MS = Math.round(MAP_PAN_BASELINE_INTERVAL_MS / 1.5);
 
 /**
+ * Pixel-travel multiplier for keyboard pan on the strategic map, relative to one res-1 hex at the current zoom.
+ *
+ * Purpose: Strategic pan felt fast at a full hex per tick; 0.5× keeps hex-relative travel at half that step.
+ * When to use: Multiply the current-zoom hex-pixel step when not in a tactical battle.
+ * Expected outcome: Constant `0.5`.
+ * Exceptions: None.
+ */
+export const STRATEGIC_KEYBOARD_PAN_SPEED = 0.5;
+
+/**
+ * Pixel-travel multiplier for keyboard pan in a tactical battle, relative to one res-4 hex at the current zoom.
+ *
+ * Purpose: Tactical pan uses the same 0.5× multiplier as strategic, measured on a res-4 hex at the current zoom.
+ * When to use: Multiply the current-zoom hex-pixel step while a tactical snapshot is active.
+ * Expected outcome: Same value as `STRATEGIC_KEYBOARD_PAN_SPEED`.
+ * Exceptions: None.
+ */
+export const TACTICAL_KEYBOARD_PAN_SPEED = STRATEGIC_KEYBOARD_PAN_SPEED;
+
+/**
  * Net pan axes after opposite-key cancellation.
  *
  * Purpose: Compact signed axes for neighbor scoring and `pan(ns, ew)` calls.
@@ -196,6 +216,38 @@ export function isNetPanAxesZero(axes: NetPanAxes): boolean {
 }
 
 /**
+ * Converts net pan axes into a Leaflet `panBy` offset in container pixels.
+ *
+ * Purpose: WASD must move the view up/down/left/right on screen, not along H3 north/south.
+ * When to use: After resolving a nonzero net and a pixel step length.
+ * Expected outcome: `W` (`ns = 1`) is negative Y; `S` is positive Y; `A`/`D` are negative/positive X.
+ * Diagonals keep the same hypotenuse as `stepPixels`.
+ * Exceptions: Zero axes or non-finite/non-positive `stepPixels` yield `{ dx: 0, dy: 0 }`.
+ */
+export function netAxesToScreenPanDelta(
+  ns: -1 | 0 | 1,
+  ew: -1 | 0 | 1,
+  stepPixels: number
+): { dx: number; dy: number } {
+  if (ns === 0 && ew === 0) return { dx: 0, dy: 0 };
+  if (!Number.isFinite(stepPixels) || stepPixels <= 0) return { dx: 0, dy: 0 };
+  const length = ns !== 0 && ew !== 0 ? stepPixels / Math.SQRT2 : stepPixels;
+  return { dx: ew === 0 ? 0 : ew * length, dy: ns === 0 ? 0 : -ns * length };
+}
+
+/**
+ * Returns the mode-specific multiplier applied to one on-screen hex of the mode’s resolution.
+ *
+ * Purpose: Strategic and tactical share one pan path; only the measured hex size (res-1 vs res-4) differs.
+ * When to use: After measuring neighbor-center distance in container pixels at the current zoom.
+ * Expected outcome: `0.5` in both modes.
+ * Exceptions: None.
+ */
+export function keyboardPanModeSpeed(tactical: boolean): number {
+  return tactical ? TACTICAL_KEYBOARD_PAN_SPEED : STRATEGIC_KEYBOARD_PAN_SPEED;
+}
+
+/**
  * Maps a single cardinal direction to net axes for wrapper APIs.
  *
  * Purpose: Lets `getNeighborForPan` / `panMapOneRes1Hex` stay as thin wrappers over the axes API.
@@ -226,9 +278,9 @@ export function panAxisKeyToNetAxes(direction: PanAxisKey): NetPanAxes {
  */
 export type MapKeyboardPanControllerDeps = {
   /**
-   * Pans the map one hex toward the given net axes.
+   * Pans the map toward the given net axes.
    *
-   * Purpose: Isolates Leaflet/`setView` from hold-state logic.
+   * Purpose: Isolates Leaflet/`panBy` from hold-state logic.
    * When to use: Invoked on immediate pans and interval ticks when net is nonzero.
    * Expected outcome: Implementation no-ops when axes are zero or the map is unavailable.
    * Exceptions: Should not throw; swallow map errors inside the implementation.

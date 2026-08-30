@@ -8,7 +8,11 @@ import { test } from 'node:test';
 import {
   MAP_PAN_BASELINE_INTERVAL_MS,
   MAP_PAN_HOLD_INTERVAL_MS,
+  STRATEGIC_KEYBOARD_PAN_SPEED,
+  TACTICAL_KEYBOARD_PAN_SPEED,
   createMapKeyboardPanHandler,
+  keyboardPanModeSpeed,
+  netAxesToScreenPanDelta,
   panBindingToDirection,
   panCodeToDirection,
   panKeyToDirection,
@@ -200,6 +204,26 @@ test('interval restart after immediate pan prevents immediate-plus-tick double f
   assert.equal(panCalls.length, 2, 'pending old tick must have been cancelled by restart');
   advance(1);
   assert.equal(panCalls.length, 3);
+});
+
+test('netAxesToScreenPanDelta maps W/S to screen up/down and A/D to left/right', () => {
+  assert.deepEqual(netAxesToScreenPanDelta(1, 0, 100), { dx: 0, dy: -100 });
+  assert.deepEqual(netAxesToScreenPanDelta(-1, 0, 100), { dx: 0, dy: 100 });
+  assert.deepEqual(netAxesToScreenPanDelta(0, -1, 100), { dx: -100, dy: 0 });
+  assert.deepEqual(netAxesToScreenPanDelta(0, 1, 100), { dx: 100, dy: 0 });
+});
+
+test('netAxesToScreenPanDelta diagonals keep the same pixel travel as a cardinal step', () => {
+  const { dx, dy } = netAxesToScreenPanDelta(1, 1, 100);
+  assert.ok(dx > 0 && dy < 0);
+  assert.ok(Math.abs(Math.hypot(dx, dy) - 100) < 1e-9);
+});
+
+test('keyboard pan is 0.5× a current-zoom hex in both modes (res-1 strategic, res-4 tactical)', () => {
+  assert.equal(STRATEGIC_KEYBOARD_PAN_SPEED, 0.5);
+  assert.equal(TACTICAL_KEYBOARD_PAN_SPEED, STRATEGIC_KEYBOARD_PAN_SPEED);
+  assert.equal(keyboardPanModeSpeed(false), 0.5);
+  assert.equal(keyboardPanModeSpeed(true), 0.5);
 });
 
 test('same-direction physical overlap does not stutter; releasing one key keeps pan', () => {

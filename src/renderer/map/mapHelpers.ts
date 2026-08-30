@@ -13,6 +13,8 @@ import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import {
   isNetPanAxesZero,
+  keyboardPanModeSpeed,
+  netAxesToScreenPanDelta,
   panAxisKeyToNetAxes,
   scoreNeighborForPanAxes,
   type PanAxisKey,
@@ -48,10 +50,10 @@ export function isEditableKeyboardTarget(target: EventTarget | null): boolean {
 }
 
 /**
- * Picks the res-1 neighbor that best matches signed north/south and east/west pan axes.
+ * Picks the hex neighbor that best matches signed north/south and east/west pan axes.
  *
  * Purpose: One hex step toward a cardinal or diagonal net vector for hold-to-continue pan.
- * When to use: From `panMapByNetAxes` and as the implementation behind single-axis pan wrappers.
+ * When to use: From `panMapByNetAxes` (res-1 or res-4) and as the implementation behind single-axis pan wrappers.
  * Expected outcome: Neighbor h3 with maximum `scoreNeighborForPanAxes`, or null when axes are zero / no neighbors.
  * Exceptions: None (invalid h3 from `gridDisk` is skipped via empty neighbor lists).
  */
@@ -92,34 +94,44 @@ export function getNeighborForPan(centerH3: string, direction: PanDirection): st
 }
 
 /**
- * Pans the main Leaflet map one res-1 hex toward the given net axes.
+ * Pans the main Leaflet map in screen pixels toward the given net axes.
  *
  * Purpose: View update used by the hold-to-continue keyboard pan controller.
  * When to use: From the renderer pan wire module; no-ops when axes are zero or the map is unavailable.
- * Expected outcome: `setView` on the best neighbor hex center, preserving zoom and lng alignment.
+ * Expected outcome: `panBy` along screen axes by 0.5× one hex at the current zoom (res-1 strategic, res-4 tactical).
  * Exceptions: None (swallows invalid center→h3 conversion).
  */
 export function panMapByNetAxes(ns: -1 | 0 | 1, ew: -1 | 0 | 1): void {
   if (isNetPanAxesZero({ ns, ew })) return;
   const map = getMainLeafletMap() as {
     getCenter: () => { lat: number; lng: number };
-    setView: (center: unknown, zoom: number) => unknown;
-    getZoom: () => number;
+    latLngToContainerPoint: (ll: unknown) => { x: number; y: number };
+    panBy: (offset: [number, number], options?: { animate?: boolean }) => unknown;
   } | null;
   const leafletRef = (globalThis as unknown as { L?: { latLng: (lat: number, lng: number) => unknown } }).L;
   if (!map || !leafletRef) return;
   const center = map.getCenter();
+  const tactical = S.tacticalBattleSnapshot != null;
+  const resolution = tactical ? DETAIL_H3_RESOLUTION : WORLD_H3_RESOLUTION;
   let centerH3: string;
   try {
-    centerH3 = latLngToCell(center.lat, center.lng, WORLD_H3_RESOLUTION);
+    centerH3 = latLngToCell(center.lat, center.lng, resolution);
   } catch {
     return;
   }
-  const neighbor = getNeighborForPanAxes(centerH3, ns, ew);
+  const neighbor = getNeighborForPanAxes(centerH3, 1, 0) ?? getNeighborForPanAxes(centerH3, 0, 1);
   if (!neighbor) return;
-  const [nextLat, nextLngRaw] = cellToLatLng(neighbor);
-  const nextLng = alignLngToReference(nextLngRaw, center.lng);
-  map.setView(leafletRef.latLng(clampLatForWebMercatorDisplay(nextLat), nextLng), map.getZoom());
+  const [neighborLat, neighborLngRaw] = cellToLatLng(neighbor);
+  const neighborLng = alignLngToReference(neighborLngRaw, center.lng);
+  const centerPt = map.latLngToContainerPoint(leafletRef.latLng(center.lat, center.lng));
+  const neighborPt = map.latLngToContainerPoint(
+    leafletRef.latLng(clampLatForWebMercatorDisplay(neighborLat), neighborLng)
+  );
+  const hexPixels = Math.hypot(neighborPt.x - centerPt.x, neighborPt.y - centerPt.y);
+  const stepPixels = hexPixels * keyboardPanModeSpeed(tactical);
+  const { dx, dy } = netAxesToScreenPanDelta(ns, ew, stepPixels);
+  if (dx === 0 && dy === 0) return;
+  map.panBy([dx, dy], { animate: false });
 }
 
 /**
