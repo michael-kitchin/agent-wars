@@ -119,6 +119,7 @@ export function panMapByNetAxes(ns: -1 | 0 | 1, ew: -1 | 0 | 1): void {
   } catch {
     return;
   }
+  /* Neighbor is a length sample only; pan direction comes from `netAxesToScreenPanDelta`. */
   const neighbor = getNeighborForPanAxes(centerH3, 1, 0) ?? getNeighborForPanAxes(centerH3, 0, 1);
   if (!neighbor) return;
   const [neighborLat, neighborLngRaw] = cellToLatLng(neighbor);

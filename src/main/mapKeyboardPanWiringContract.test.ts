@@ -65,6 +65,7 @@ test('panMapByNetAxes pans in screen pixels via panBy, not hex-north setView', (
   assert.match(fn, /DETAIL_H3_RESOLUTION/);
   assert.match(fn, /WORLD_H3_RESOLUTION/);
   assert.match(fn, /panBy/);
+  assert.match(fn, /animate:\s*false/);
   assert.equal(
     /setView/.test(fn),
     false,
