@@ -20762,6 +20762,8 @@
     if (low.includes("out of range") || low.includes("out of ferry range")) return "Blocked: Range";
     if (low.includes("ferry destination must be a human-controlled airport")) return "Blocked: Invalid";
     if (low.includes("ferry destination must have an intact airport")) return "Blocked: Invalid";
+    if (low.includes("destination airport is not intact")) return "Blocked: Invalid";
+    if (low.includes("origin airport is not intact")) return "Blocked: Invalid";
     if (low.includes("air units do not use tactical march")) return "Blocked: Air \u2014 use strike mode or ferry (dbl-click)";
     if (low.includes("line of sight blocked") || low.includes("blocked by mountains")) return "Blocked: Mountain";
     if (low.includes("land, coastal, or wetlands")) return "Blocked: Coastal, Land, Wetlands";
