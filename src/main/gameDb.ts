@@ -101,6 +101,7 @@ import { mergeActiveTacticalSessionIntoGameStateSnapshot } from './gameDb/attach
 import { resolveGameDbFileUnderUserData } from './gameDb/canonicalDbPath';
 import {
   allocateNextUnitDisplayOrderWithOps,
+  allocateNextUnitIdOrdinalWithOps,
   clearGameOverWithOps,
   getGameSeedWithOps,
   seedGameSeedIfMissingWithOps,
@@ -457,6 +458,18 @@ export function allocateNextUnitDisplayOrder(unitType: BuildUnitType, player: st
 }
 
 /**
+ * Allocates the next compact unit-id ordinal for a given player and unit type.
+ *
+ * Purpose: Facade over `allocateNextUnitIdOrdinalWithOps` for seeding and production callers that hold a live DB.
+ * When to use: Immediately before `formatStrategicUnitId` when inserting a `units` row.
+ * Expected outcome: Increments the per-player-per-type identifier counter and returns it.
+ * Exceptions: Throws when the game database is not open.
+ */
+export function allocateNextUnitIdOrdinal(unitType: BuildUnitType, player: string): number {
+  return allocateNextUnitIdOrdinalWithOps({ hasDb: () => db !== null, run, getOne }, unitType, player);
+}
+
+/**
  * Defines the `getGameSeed` function shape (export function getGameSeed(): number).
 
  * Purpose: Supports maintainability by documenting why `getGameSeed` exists.
@@ -745,6 +758,7 @@ function seedUnits(): void {
     getOne,
     getAll,
     allocateNextUnitDisplayOrder,
+    allocateNextUnitIdOrdinal,
     hasDb: () => db !== null,
   });
 }

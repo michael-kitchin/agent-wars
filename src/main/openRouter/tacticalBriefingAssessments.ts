@@ -9,17 +9,20 @@ import { tacticalRangedDirectFirePassesTerrainAndRange } from '../../shared/tact
 import { gridHopDistanceBetween } from '../tools/assessUnitProximity';
 import { pickClosestEnemyTacticalRangedTargetForSubUnit } from '../tacticalBattle/tacticalRangedTargetResolve';
 import { logDebug, logTrace } from '../logger';
+import { parseTacticalSubUnitId } from '../../shared/unitIds';
 
 /**
- * Extracts the strategic parent unit id from a tactical sub-unit id (`parent:slot`).
+ * Extracts the strategic parent unit id from a tactical sub-unit id.
  *
  * Purpose: Some callers still need the strategic parent key while the prompt uses sub-unit ids.
  * When to use: Lightweight tactical briefing helpers that bridge parent vs sub-unit identity.
- * Expected outcome: Parent prefix before the last `:`; full id when no colon is present.
+ * Expected outcome: Compact `-s<slot>` prefix, else the prefix before the last `:`, else the input unchanged.
  * Exceptions: None.
  */
 export function parentUnitIdFromTacticalSubUnitId(subUnitId: string): string {
   logTrace('tacticalBriefingAssessments parentUnitIdFromTacticalSubUnitId', { subUnitId });
+  const compact = parseTacticalSubUnitId(subUnitId);
+  if (compact) return compact.parentUnitId;
   const idx = subUnitId.lastIndexOf(':');
   return idx > 0 ? subUnitId.slice(0, idx) : subUnitId;
 }

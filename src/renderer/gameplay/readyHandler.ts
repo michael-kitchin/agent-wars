@@ -37,6 +37,7 @@ import {
 import { reconcileSelectionToCurrentState } from '../core/selection';
 import { applyToolInvocationCountsAfterReady } from '../openRouter/openRouterUiHelpers';
 import { collectUnknownBattleContinentNames } from '../../shared/unknownBattleContinentNames';
+import { unitIdOwnerFromId } from '../../shared/unitIds';
 
 /**
  * Documents the `ReadyHandlerDeps` interface as a named contract surface (export interface ReadyHandlerDeps).
@@ -507,7 +508,7 @@ function deriveCombatVisibilityClassification(
     allKills
       .filter((k) => {
         const victim = removedById.get(k.victimId);
-        const killerIsFriendly = k.killerIds.some((id) => id.startsWith('human-'));
+        const killerIsFriendly = k.killerIds.some((id) => unitIdOwnerFromId(id) === 'human');
         const victimIsFriendly = victim?.player === 'human';
         return killerIsFriendly || victimIsFriendly;
       })

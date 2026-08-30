@@ -16,7 +16,7 @@ import {
 import type { GuardedDbRunAndGetAllOps } from '../dbOps';
 import type { FlexAirSlotDeps } from './initialFlexAirSlot';
 import { applySacrificeToBaselineCounts, resolveFlexUnitPlacement } from './initialFlexAirSlot';
-import { countPlannedUnitsOfType, insertPlannedUnitsForPlayer, type PlannedUnitOwner, type PlannedUnitTuple } from './plannedUnits';
+import { insertPlannedUnitsForPlayer, type PlannedUnitOwner, type PlannedUnitPlan } from './plannedUnits';
 import { trySeedScenarioRegionVsRegion } from './regionScenarioSeeding';
 import { readPersistedMaxUnitsPerType } from '../gameSizeConfig';
 
@@ -47,6 +47,15 @@ getOne: <T extends Record<string, unknown>>(sql: string, params?: unknown[]) => 
    * Exceptions: None.
    */
 allocateNextUnitDisplayOrder: (unitType: BuildUnitType, player: PlannedUnitOwner) => number;
+    /**
+     * Allocates the next compact unit-id ordinal for a player and type.
+     *
+     * Contract: Independent of display order; throws when the database is not open.
+     * When to use: Threaded through to `insertPlannedUnitsForPlayer`.
+     * Expected outcome: Unique positive integers per player and type.
+     * Exceptions: Throws when the database is not open.
+     */
+    allocateNextUnitIdOrdinal: (unitType: BuildUnitType, player: PlannedUnitOwner) => number;
 }
 
 /**
@@ -57,7 +66,7 @@ allocateNextUnitDisplayOrder: (unitType: BuildUnitType, player: PlannedUnitOwner
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-type SeedUnitEntry = PlannedUnitTuple;
+type SeedUnitEntry = PlannedUnitPlan;
 
 /**
  * Defines the `mergeNavalCandidatePools` function shape (function mergeNavalCandidatePools(pools: SpawnCandidate[][]): SpawnCandidate[]).
@@ -104,8 +113,8 @@ function buildSideUnits(args: {
 }): SeedUnitEntry[] {
   const units: SeedUnitEntry[] = [];
   let idx = 0;
-  for (let i = 0; i < args.counts.infantry; i++) units.push([`${args.player}-infantry-${i + 1}`, 'infantry', args.landSpawns[idx++]!.h3]);
-  for (let i = 0; i < args.counts.armor; i++) units.push([`${args.player}-armor-${i + 1}`, 'armor', args.landSpawns[idx++]!.h3]);
+  for (let i = 0; i < args.counts.infantry; i++) units.push({ unitType: 'infantry', h3Index: args.landSpawns[idx++]!.h3 });
+  for (let i = 0; i < args.counts.armor; i++) units.push({ unitType: 'armor', h3Index: args.landSpawns[idx++]!.h3 });
   for (let i = 0; i < args.counts.naval; i++) {
     let spawn: SpawnCandidate | null = null;
     for (const pool of args.navalPools) {
@@ -116,11 +125,11 @@ function buildSideUnits(args: {
       }
     }
     if (!spawn) throw new Error(`Could not allocate required ${args.player} naval spawn hex`);
-    units.push([`${args.player}-naval-${i + 1}`, 'naval', spawn.h3]);
+    units.push({ unitType: 'naval', h3Index: spawn.h3 });
   }
 
   if (args.sacrificed) {
-    const usedSideHexes = new Set(units.map((u) => u[2]));
+    const usedSideHexes = new Set(units.map((u) => u.h3Index));
     const flex = resolveFlexUnitPlacement({
       deps: args.deps as FlexAirSlotDeps,
       player: args.player,
@@ -132,8 +141,7 @@ function buildSideUnits(args: {
       maxUnitsPerType: args.maxUnitsPerType,
     });
     if (flex) {
-      const ord = countPlannedUnitsOfType(units, flex.unitType) + 1;
-      units.push([`${args.player}-${flex.unitType}-${ord}`, flex.unitType, flex.h3Index]);
+      units.push({ unitType: flex.unitType, h3Index: flex.h3Index });
     }
   }
 

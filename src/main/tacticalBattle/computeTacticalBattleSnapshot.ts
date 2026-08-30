@@ -1,6 +1,7 @@
 import { cellToChildren, cellToLatLng, getResolution } from 'h3-js';
 import type { TacticalBattleSnapshot, TacticalSubUnitSnapshot } from '../../shared/tacticalBattleTypes';
 import { buildUnitDisplayNameLookup, formatTacticalSubUnitDisplayName } from '../../shared/unitDisplayNames';
+import { formatTacticalSubUnitId } from '../../shared/unitIds';
 import { getPreviousStrategicH3IndexForUnit } from '../strategicUnitPreviousHex';
 import {
   dbGetOne,
@@ -467,9 +468,8 @@ export function computeTacticalBattleSnapshot(
           continue;
         }
         placed += 1;
-        const two = String(placed).padStart(2, '0');
         subUnits.push({
-          id: `${parent.id}:${two}`,
+          id: formatTacticalSubUnitId(parent.id, placed),
           parentUnitId: parent.id,
           player: parent.player === 'human' ? 'human' : 'opponent',
           unitType: parent.unitType,

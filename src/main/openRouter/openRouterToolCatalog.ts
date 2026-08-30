@@ -99,7 +99,7 @@ const ALL_TOOL_METADATA: ToolMeta[] = [
     parameters: {
       type: 'object',
       properties: {
-        unitId: { type: 'string', description: 'ID of the unit to route (e.g. opponent-armor-1)' },
+        unitId: { type: 'string', description: 'ID of the unit to route (e.g. a1-t1)' },
         destination: { type: 'string', pattern: '^[A-Z0-9]{2}$', description: 'Target cell as two-character briefing hex code from the operational map' },
         options: {
           type: 'object',
@@ -133,7 +133,7 @@ const ALL_TOOL_METADATA: ToolMeta[] = [
     parameters: {
       type: 'object',
       properties: {
-        unitId: { type: 'string', description: 'ID of the unit to assess (e.g. opponent-armor-1)' },
+        unitId: { type: 'string', description: 'ID of the unit to assess (e.g. a1-t1)' },
         radius: { type: 'number', description: 'How far out to scan in hexes (default 4). Ignored when fog of war is off on the strategic map: all units are included using H3 grid hops.' },
       },
       required: ['unitId'],

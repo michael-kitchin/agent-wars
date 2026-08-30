@@ -552,14 +552,11 @@ function testAirStrikeAndAirGlyphContracts(): void {
   const sidebarSupportSource = fs.readFileSync(sidebarSupportPath, 'utf8');
   const rendererConstantsSource = fs.readFileSync(rendererConstantsPath, 'utf8');
   const inferUnitTypeLabelFromIdFn = getFunctionSource(source, 'inferUnitTypeLabelFromId');
+  assert.ok(inferUnitTypeLabelFromIdFn.length > 0, 'inferUnitTypeLabelFromId must remain declared in renderer.ts');
 
   assert.ok(
     rendererConstantsSource.includes("air: 'S'") && source.includes("from './core/constants'"),
     'air unit type label should render as S'
-  );
-  assert.ok(
-    inferUnitTypeLabelFromIdFn.includes("if (unitId.includes('-air-')) return 'S';"),
-    'unit-id fallback label should map air units to S instead of ?'
   );
   assert.ok(
     readyHandlerSource.includes("from './turnUpdateSummary'") &&

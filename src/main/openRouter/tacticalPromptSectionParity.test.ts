@@ -39,6 +39,7 @@ import {
   parentUnitIdFromTacticalSubUnitId,
 } from './tacticalBriefingAssessments';
 import {
+  looksLikeTacticalSubUnitId,
   resetTacticalCallbackSubscriptionStashForTests,
   restoreOpponentCallbackSubscriptionsAfterTacticalBattle,
   stashOpponentCallbackSubscriptionsForTacticalBattle,
@@ -182,7 +183,14 @@ function withTempDb(fn: () => void): void {
 
 test('parentUnitIdFromTacticalSubUnitId strips slot suffix', () => {
   assert.equal(parentUnitIdFromTacticalSubUnitId('parent-a:01'), 'parent-a');
+  assert.equal(parentUnitIdFromTacticalSubUnitId('h1-t3-s2'), 'h1-t3');
   assert.equal(parentUnitIdFromTacticalSubUnitId('no-slot'), 'no-slot');
+});
+
+test('looksLikeTacticalSubUnitId accepts compact and legacy shapes', () => {
+  assert.equal(looksLikeTacticalSubUnitId('h1-t3-s2'), true);
+  assert.equal(looksLikeTacticalSubUnitId('u1:01'), true);
+  assert.equal(looksLikeTacticalSubUnitId('h1-t3'), false);
 });
 
 test('lightweight assessments report nearest enemy distance and critical adjacency', () => {

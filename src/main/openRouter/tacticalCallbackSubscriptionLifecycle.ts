@@ -4,7 +4,7 @@
  * Purpose: Preserves pre-battle strategic subscriptions across tactical replace-all and process restarts,
  * drops ephemeral sub-unit callbacks on battle end, and filters invalid unit-scoped ids mid-battle.
  * When to use: Stash after tactical start; hydrate on persisted session restore; filter before tactical replaceSubscriptions; restore on every end path.
- * Expected outcome: Pre-battle rows return after end when a stash was captured; missing stash (upgrade) clears only parent:slot unitId/side params.
+ * Expected outcome: Pre-battle rows return after end when a stash was captured; missing stash (upgrade) clears only sub-unit unitId/side params.
  * Exceptions: Logs at error on restore failures without throwing across IPC.
  */
 
@@ -15,6 +15,7 @@ import {
   type CallbackSubscription,
 } from '../callbackSubscriptions';
 import { logDebug, logError, logTrace } from '../logger';
+import { parseTacticalSubUnitId } from '../../shared/unitIds';
 import {
   clearTacticalCallbackStashFromGameConfig,
   readTacticalCallbackStashFromGameConfig,
@@ -42,16 +43,26 @@ const UNIT_ID_SCOPED_CALLBACK_EVENTS = new Set(['unit_engaged', 'unit_arrived', 
 let stashedOpponentSubscriptions: CallbackSubscription[] | null = null;
 
 /**
- * Returns whether `id` matches the tactical sub-unit id shape `${parentUnitId}:${twoDigitSlot}`.
+ * Legacy tactical sub-unit ids persisted as `${parentUnitId}:${twoDigitSlot}`.
+ *
+ * Purpose: Compatibility shim for callback subscriptions stashed before compact `-s<slot>` ids.
+ * When to use: `looksLikeTacticalSubUnitId` only, OR-ed with the compact parser.
+ * Expected outcome: Matches `u1:01` and similar; does not match compact `h1-t3-s2`.
+ * Exceptions: None.
+ */
+const LEGACY_TACTICAL_SUB_UNIT_ID_PATTERN = /^.+:\d{2}$/;
+
+/**
+ * Returns whether `id` looks like a tactical sub-unit identifier.
  *
  * Purpose: Upgrade-path cleanup and heuristic detection of ephemeral battle callbacks without a roster.
  * When to use: Missing-stash end path and tests asserting selective clear.
- * Expected outcome: True only when a trailing `:` is followed by exactly two digits.
+ * Expected outcome: True for compact `-s<slot>` ids and legacy `parent:NN` ids.
  * Exceptions: None.
  */
 export function looksLikeTacticalSubUnitId(id: string): boolean {
   logTrace('tacticalCallbackSubscriptionLifecycle looksLikeTacticalSubUnitId', { id });
-  return /^.+:\d{2}$/.test(id);
+  return parseTacticalSubUnitId(id) !== null || LEGACY_TACTICAL_SUB_UNIT_ID_PATTERN.test(id);
 }
 
 /**

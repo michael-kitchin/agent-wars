@@ -176,11 +176,11 @@ test('buildRepairSchemaText matches field order and forbids tactical standing-or
   assert.ok(strategicText.includes('cancel_order'));
   assert.ok(strategicText.includes('memoryUpdates'));
   assert.ok(strategicText.includes('productionOrders'));
-  assert.ok(strategicText.includes('example-armor-1'), 'repair schema must use placeholder armor id');
-  assert.ok(strategicText.includes('example-air-1'), 'repair schema must use placeholder air id');
+  assert.ok(strategicText.includes('a1-t1'), 'repair schema must use compact armor id');
+  assert.ok(strategicText.includes('a1-a1'), 'repair schema must use compact air id');
   assert.ok(!strategicText.includes('opponent-armor-1'), 'repair schema must not use a live-looking armor id');
   assert.ok(!strategicText.includes('opponent-air-1'), 'repair schema must not use a live-looking air id');
-  assert.ok(tacticalText.includes('example-armor-1:01'), 'tactical repair schema must use example- sub-unit ids');
+  assert.ok(tacticalText.includes('a1-t1-s1'), 'tactical repair schema must use compact sub-unit ids');
   assert.ok(!tacticalText.includes('opp-parent:01'), 'tactical repair schema must not use live-looking parent ids');
 
   const noStandingText = buildRepairSchemaText({

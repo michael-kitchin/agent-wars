@@ -1,89 +1,91 @@
-import { logDebug, logTrace } from '../../logger';
+import { logDebug } from '../../logger';
 import type { BuildUnitType } from '../../productionRules';
+import { formatStrategicUnitId } from '../../../shared/unitIds';
 
 /**
- * Documents the `PlannedUnitTuple` type alias (export type PlannedUnitTuple).
-
- * Purpose: Supports maintainability by documenting why `PlannedUnitTuple` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Planned spawn for one unit before a compact identifier is allocated at insert time.
+ *
+ * Purpose: Seeding chooses type and hex only; the identifier counter owns uniqueness.
+ * When to use: Building a side's spawn list before `insertPlannedUnitsForPlayer`.
+ * Expected outcome: Callers never invent ids.
  * Exceptions: None.
  */
-export type PlannedUnitTuple = [id: string, unitType: BuildUnitType, h3Index: string];
-/**
- * Documents the `PlannedUnitOwner` type alias (export type PlannedUnitOwner).
+export type PlannedUnitPlan = {
+  readonly unitType: BuildUnitType;
+  readonly h3Index: string;
+};
 
- * Purpose: Supports maintainability by documenting why `PlannedUnitOwner` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+/**
+ * Owning side for seeded units.
+ *
+ * Purpose: Matches the `units.player` column and compact player codes `h1` / `a1`.
+ * When to use: Insert deps and `insertPlannedUnitsForPlayer`.
+ * Expected outcome: `'human'` or `'opponent'`.
  * Exceptions: None.
  */
 export type PlannedUnitOwner = 'human' | 'opponent';
 
 /**
- * Documents the `PlannedUnitInsertDeps` interface as a named contract surface (interface PlannedUnitInsertDeps).
-
- * Purpose: Supports maintainability by documenting why `PlannedUnitInsertDeps` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
+ * Database operations required to persist a planned spawn list.
+ *
+ * Purpose: Keep seeding modules free of a direct `gameDb` import.
+ * When to use: Passed from the `gameDb` façade into `insertPlannedUnitsForPlayer`.
+ * Expected outcome: Each plan row becomes one `units` insert with a compact id and a display order.
+ * Exceptions: Identifier allocation throws when the database is not open.
  */
 interface PlannedUnitInsertDeps {
-    /**
-   * Specifies the contract for the `run` member (run: (sql: string, params?: unknown[]) => unknown;).
-
-   * Contract: Describes stable behavior for callers of `run` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+  /**
+   * Runs a parameterized SQL statement against the open game database.
+   *
+   * Contract: Must target the same SQLite file as the identifier and display-order counters.
+   * When to use: Inserting each planned unit.
+   * Expected outcome: The statement is executed immediately (auto-commit).
+   * Exceptions: Propagates SQLite errors, including primary-key collisions.
+   */
+  run: (sql: string, params?: unknown[]) => unknown;
+  /**
+   * Allocates the next formation ordinal for display names.
+   *
+   * Contract: Independent per player and unit type; starts at 1.
+   * When to use: Alongside identifier allocation on each insert.
+   * Expected outcome: Persisted `display_order` for `1st` / `I` labels.
    * Exceptions: None.
    */
-run: (sql: string, params?: unknown[]) => unknown;
-    /**
-   * Specifies the contract for the `allocateNextUnitDisplayOrder` member (allocateNextUnitDisplayOrder: (unitType: BuildUnitType) => number;).
-
-   * Contract: Describes stable behavior for callers of `allocateNextUnitDisplayOrder` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
+  allocateNextUnitDisplayOrder: (unitType: BuildUnitType, player: PlannedUnitOwner) => number;
+  /**
+   * Allocates the next compact unit-id ordinal.
+   *
+   * Contract: Independent per player and unit type; never returns a fallback on a closed DB.
+   * When to use: Immediately before `formatStrategicUnitId` on each insert.
+   * Expected outcome: Positive integer unique for that player and type in this match.
+   * Exceptions: Throws when the database is not open.
    */
-allocateNextUnitDisplayOrder: (unitType: BuildUnitType, player: PlannedUnitOwner) => number;
+  allocateNextUnitIdOrdinal: (unitType: BuildUnitType, player: PlannedUnitOwner) => number;
 }
 
 /**
- * Defines the `countPlannedUnitsOfType` function shape (export function countPlannedUnitsOfType(units: PlannedUnitTuple[], unitType: BuildUnitType): number).
-
- * Purpose: Supports maintainability by documenting why `countPlannedUnitsOfType` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-export function countPlannedUnitsOfType(units: PlannedUnitTuple[], unitType: BuildUnitType): number {
-  logTrace('plannedUnits countPlannedUnitsOfType', { unitType, rowCount: units.length });
-  return units.filter((u) => u[1] === unitType).length;
-}
-
-/**
- * Defines the `insertPlannedUnitsForPlayer` function shape (export function insertPlannedUnitsForPlayer().
-
- * Purpose: Supports maintainability by documenting why `insertPlannedUnitsForPlayer` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
+ * Inserts planned units, minting compact identifiers at write time.
+ *
+ * Purpose: One allocation site so seeding loops cannot drift from the identifier counter.
+ * When to use: After a side's spawn hexes are chosen.
+ * Expected outcome: Each row is `h1-i1` / `a1-t3` style with matching `display_order`.
+ * Exceptions: Propagates formatter and SQLite errors.
  */
 export function insertPlannedUnitsForPlayer(
   deps: PlannedUnitInsertDeps,
   player: PlannedUnitOwner,
-  units: PlannedUnitTuple[]
+  units: readonly PlannedUnitPlan[]
 ): void {
   logDebug('plannedUnits insertPlannedUnitsForPlayer', { player, unitCount: units.length });
-  for (const [id, unitType, h3Index] of units) {
+  for (const plan of units) {
+    const ordinal = deps.allocateNextUnitIdOrdinal(plan.unitType, player);
+    const id = formatStrategicUnitId({ player, unitType: plan.unitType, ordinal });
     deps.run('INSERT INTO units (id, player, unit_type, display_order, h3_index) VALUES (?, ?, ?, ?, ?)', [
       id,
       player,
-      unitType,
-      deps.allocateNextUnitDisplayOrder(unitType, player),
-      h3Index,
+      plan.unitType,
+      deps.allocateNextUnitDisplayOrder(plan.unitType, player),
+      plan.h3Index,
     ]);
   }
 }
-

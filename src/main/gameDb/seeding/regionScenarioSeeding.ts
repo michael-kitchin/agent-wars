@@ -8,7 +8,7 @@ import { loadScenarioState, REGION_VS_REGION_SCENARIO_ID } from '../scenarioStat
 import type { GuardedDbRunAndGetAllOps } from '../dbOps';
 import type { FlexAirSlotDeps } from './initialFlexAirSlot';
 import { applySacrificeToBaselineCounts, resolveFlexUnitPlacement } from './initialFlexAirSlot';
-import { countPlannedUnitsOfType, insertPlannedUnitsForPlayer, type PlannedUnitOwner, type PlannedUnitTuple } from './plannedUnits';
+import { insertPlannedUnitsForPlayer, type PlannedUnitOwner, type PlannedUnitPlan } from './plannedUnits';
 import type { SpawnCandidate } from './spawnSelection';
 
 /**
@@ -38,6 +38,15 @@ getOne: <T extends Record<string, unknown>>(sql: string, params?: unknown[]) => 
    * Exceptions: None.
    */
 allocateNextUnitDisplayOrder: (unitType: BuildUnitType, player: PlannedUnitOwner) => number;
+    /**
+     * Allocates the next compact unit-id ordinal for a player and type.
+     *
+     * Contract: Independent of display order; throws when the database is not open.
+     * When to use: Threaded through to `insertPlannedUnitsForPlayer`.
+     * Expected outcome: Unique positive integers per player and type.
+     * Exceptions: Throws when the database is not open.
+     */
+    allocateNextUnitIdOrdinal: (unitType: BuildUnitType, player: PlannedUnitOwner) => number;
 }
 
 /**
@@ -341,7 +350,7 @@ export function trySeedScenarioRegionVsRegion(deps: RegionScenarioSeedDeps): boo
     const terrain = terrainByH3.get(h3)?.terrain ?? 'land';
     return { h3, lat, lng, terrain };
   });
-  const buildSidePlan = (player: 'human' | 'opponent', regionName: string): { units: PlannedUnitTuple[] } => {
+  const buildSidePlan = (player: 'human' | 'opponent', regionName: string): { units: PlannedUnitPlan[] } => {
     const regionHexes = new Set(getScenarioHomeRegionHexes(regionName));
     const regionCandidates = allCandidates.filter((candidate) => regionHexes.has(candidate.h3));
     const passableLandCandidates = regionCandidates.filter(
@@ -377,11 +386,11 @@ export function trySeedScenarioRegionVsRegion(deps: RegionScenarioSeedDeps): boo
       finalCounts,
       droppedReasons,
     });
-    const units: PlannedUnitTuple[] = [];
-    for (let i = 0; i < infantrySpawns.length; i++) units.push([`${player}-infantry-${i + 1}`, 'infantry', infantrySpawns[i]!]);
-    for (let i = 0; i < armorSpawns.length; i++) units.push([`${player}-armor-${i + 1}`, 'armor', armorSpawns[i]!]);
-    for (let i = 0; i < navalSpawns.length; i++) units.push([`${player}-naval-${i + 1}`, 'naval', navalSpawns[i]!]);
-    const usedH3 = new Set(units.map((u) => u[2]));
+    const units: PlannedUnitPlan[] = [];
+    for (let i = 0; i < infantrySpawns.length; i++) units.push({ unitType: 'infantry', h3Index: infantrySpawns[i]! });
+    for (let i = 0; i < armorSpawns.length; i++) units.push({ unitType: 'armor', h3Index: armorSpawns[i]! });
+    for (let i = 0; i < navalSpawns.length; i++) units.push({ unitType: 'naval', h3Index: navalSpawns[i]! });
+    const usedH3 = new Set(units.map((u) => u.h3Index));
     const flex = resolveFlexUnitPlacement({
       deps: deps as FlexAirSlotDeps,
       player,
@@ -393,8 +402,7 @@ export function trySeedScenarioRegionVsRegion(deps: RegionScenarioSeedDeps): boo
       maxUnitsPerType: caps,
     });
     if (flex) {
-      const ord = countPlannedUnitsOfType(units, flex.unitType) + 1;
-      units.push([`${player}-${flex.unitType}-${ord}`, flex.unitType, flex.h3Index]);
+      units.push({ unitType: flex.unitType, h3Index: flex.h3Index });
     }
     return { units };
   };

@@ -10,6 +10,7 @@
 import { buildPromptTableLines } from '../promptTableHelpers';
 import { compareHexIds } from './possibleUnitActionsPartition';
 import { logDebug } from '../logger';
+import { compareUnitIdsNaturally } from '../../shared/unitIds';
 
 /**
  * Bucket label used when partitioning enemy-reachable hexes for the briefing table.
@@ -503,7 +504,7 @@ export function selectTopRowsPerUnit(
     list.push(row);
     byUnit.set(row.unitId, list);
   }
-  const unitIds = [...byUnit.keys()].sort((a, b) => a.localeCompare(b));
+  const unitIds = [...byUnit.keys()].sort(compareUnitIdsNaturally);
   const out: PossibleActionTableRow[] = [];
   for (const unitId of unitIds) {
     const unitRows = byUnit.get(unitId) ?? [];

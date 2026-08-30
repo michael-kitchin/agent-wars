@@ -3,6 +3,7 @@ import { gridDistance, gridPathCells } from 'h3-js';
 import {
   dbRun,
   dbGetOne,
+  dbGetAll,
   getGameState,
   getKeepBuildingForHex,
   replaceBuildQueueForHex,
@@ -29,6 +30,7 @@ import {
 import { getMaxUnitsPerType } from './productionCaps';
 import { persistGameSize } from './gameDb/gameSizeConfig';
 import { withTempGameDb } from './testSupport/withTempGameDb';
+import { parseStrategicUnitId } from '../shared/unitIds';
 
 /**
  * Defines the `withTempDb` function shape (function withTempDb(runCase: () => void): void).
@@ -812,6 +814,15 @@ function testKeepBuildingSameTurnRefill(): void {
         "SELECT COUNT(*) AS c FROM units WHERE player = 'human' AND unit_type = 'infantry'"
       )?.c ?? 0;
     assert.strictEqual(infantryAfter - infantryBefore, 2);
+    const producedInfantry = dbGetAll<{ id: string }>(
+      "SELECT id FROM units WHERE player = 'human' AND unit_type = 'infantry'"
+    );
+    for (const row of producedInfantry) {
+      const parsed = parseStrategicUnitId(row.id);
+      assert.ok(parsed, `expected compact produced infantry id, got ${row.id}`);
+      assert.strictEqual(parsed.player, 'human');
+      assert.strictEqual(parsed.unitType, 'infantry');
+    }
     const afterOwner = getHexBuildQueue(h3, 'human');
     assert.strictEqual(afterOwner.entries.length, 1);
     assert.strictEqual(afterOwner.entries[0]?.unitType, 'infantry');

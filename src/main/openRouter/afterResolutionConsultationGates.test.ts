@@ -136,9 +136,9 @@ function testHumanHadStrategicResolutionObservableActionsHumanMove(): void {
 /**
  * Defines the `testHumanHadStrategicResolutionObservableActionsKillFallback` function shape.
 
- * Purpose: When the opponent snapshot lists no human `units`, killer ids still match `human-` prefix.
+ * Purpose: When the opponent snapshot lists no human `units`, killer ids still match human ownership.
  * When to use: Fog-masked opponent perspective.
- * Expected outcome: True for `killsByDirectFire` with a `human-*` killer.
+ * Expected outcome: True for `killsByDirectFire` with a `human-*` or compact `h1-*` killer.
  * Exceptions: None.
  */
 function testHumanHadStrategicResolutionObservableActionsKillFallback(): void {
@@ -150,6 +150,16 @@ function testHumanHadStrategicResolutionObservableActionsKillFallback(): void {
       emptyOpponentState()
     ),
     true
+  );
+  assert.strictEqual(
+    humanHadStrategicResolutionObservableActions(
+      {
+        killsByDirectFire: [{ victimId: 'a1-i1', killerIds: ['h1-t1'] }],
+      },
+      emptyOpponentState()
+    ),
+    true,
+    'compact human killer ids must still count when the roster is masked'
   );
 }
 

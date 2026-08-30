@@ -24,6 +24,7 @@ import {
 } from '../../shared/tacticalTerrainCombatModifiers';
 import { computeGridDistancePure } from '../../shared/h3GridRangePure';
 import { AIR_FERRY_RANGE_HEXES, AIR_STRIKE_RANGE_HEXES } from '../../shared/tacticalRanges';
+import { compareUnitIdsNaturally } from '../../shared/unitIds';
 import { isWithinAirFerryGridRange, isWithinAirStrikeGridRange } from '../gameActions/gridRange';
 import { logDebug, logTrace } from '../logger';
 import { logHexControllerParityMismatch } from '../snapshotDbParity';
@@ -638,7 +639,7 @@ export function collectAggregatedPossibleActionRows(args: {
   const { state, latLngByH3, tacticalBattle } = args;
   const indexed = args.indexedState ?? buildIndexedState(state);
   const homeland = enemyHomelandHexSet(state);
-  const opponentUnits = state.units.filter((u) => u.player === FRIENDLY_PLAYER).sort((a, b) => a.id.localeCompare(b.id));
+  const opponentUnits = state.units.filter((u) => u.player === FRIENDLY_PLAYER).sort((a, b) => compareUnitIdsNaturally(a.id, b.id));
   const rawRows: RawPossibleActionRow[] = [];
   const thisTurnFilterStats = forThisTurn
     ? { moveIn: 0, moveOut: 0, rangedIn: 0, rangedOut: 0, airStrikeIn: 0, airStrikeOut: 0 }

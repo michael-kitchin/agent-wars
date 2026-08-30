@@ -12,6 +12,7 @@
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { gridHopDistanceBetween, pickApproachHexesTowardNearestEnemy } from '../tools/assessUnitProximity';
 import { logDebug } from '../logger';
+import { compareUnitIdsNaturally } from '../../shared/unitIds';
 import { ACTION_APPROACH, ACTION_MOVES_MELEE } from './possibleUnitActionsTableAssembly';
 
 /**
@@ -203,7 +204,7 @@ function nearestEnemyUnitIdsSummary(indexed: BestOptionsInterestIndex, fromH3: s
     }
   }
   if (!Number.isFinite(nearestDist) || ids.length === 0) return '—';
-  return [...new Set(ids)].sort((a, b) => a.localeCompare(b)).join(', ');
+  return [...new Set(ids)].sort(compareUnitIdsNaturally).join(', ');
 }
 
 /**

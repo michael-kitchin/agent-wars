@@ -3,7 +3,7 @@
  */
 
 import type { BuildUnitType } from '../productionRules';
-import { logDebug, logTrace } from '../logger';
+import { logDebug, logError, logTrace } from '../logger';
 
 /**
  * Minimal DB surface for `game_config` reads and writes without importing `gameDb.ts`.
@@ -29,6 +29,19 @@ export type GameConfigKvDbOps = {
  */
 function unitDisplaySequenceKey(unitType: BuildUnitType, player: string): string {
   return `unit_display_sequence_${player}_${unitType}`;
+}
+
+/**
+ * Builds the `game_config` key used to monotonically allocate compact unit-id ordinals.
+ *
+ * Purpose: Keeps identifier numbering independent of `display_order` so a display-order bug
+ * cannot mint a duplicate primary key.
+ * When to use: From `allocateNextUnitIdOrdinalWithOps` only.
+ * Expected outcome: Stable keys `unit_id_sequence_<player>_<unitType>`, one sequence per side per type.
+ * Exceptions: None.
+ */
+function unitIdSequenceKey(unitType: BuildUnitType, player: string): string {
+  return `unit_id_sequence_${player}_${unitType}`;
 }
 
 /**
@@ -60,6 +73,30 @@ export function allocateNextUnitDisplayOrderWithOps(ops: GameConfigKvDbOps, unit
   logDebug('gameDb allocateNextUnitDisplayOrder', { unitType, player });
   if (ops.hasDb && !ops.hasDb()) return 1;
   const key = unitDisplaySequenceKey(unitType, player);
+  const row = ops.getOne<{ value: string }>('SELECT value FROM game_config WHERE key = ?', [key]);
+  const current = row ? Number.parseInt(row.value, 10) : 0;
+  const next = Number.isFinite(current) && current > 0 ? current + 1 : 1;
+  ops.run('INSERT OR REPLACE INTO game_config (key, value) VALUES (?, ?)', [key, String(next)]);
+  return next;
+}
+
+/**
+ * Allocates the next compact unit-id ordinal for a given player and buildable unit type.
+ *
+ * Purpose: Identifier numbers must stay unique even if display-order allocation fails or is skipped.
+ * When to use: Unit insertion during seeding and production; always pass the owning player.
+ * Expected outcome: Increments the per-player-per-type stored counter and returns the next positive integer.
+ * Exceptions: Throws when the game database is not open. Unlike display-order allocation, this never
+ * returns a hardcoded `1` on a closed handle, because that would duplicate `units.id`.
+ */
+export function allocateNextUnitIdOrdinalWithOps(ops: GameConfigKvDbOps, unitType: BuildUnitType, player: string): number {
+  logDebug('gameDb allocateNextUnitIdOrdinal', { unitType, player });
+  if (ops.hasDb && !ops.hasDb()) {
+    const err = new Error('Cannot allocate a unit id ordinal: the game database is not open');
+    logError('gameDb allocateNextUnitIdOrdinal: database not open', err);
+    throw err;
+  }
+  const key = unitIdSequenceKey(unitType, player);
   const row = ops.getOne<{ value: string }>('SELECT value FROM game_config WHERE key = ?', [key]);
   const current = row ? Number.parseInt(row.value, 10) : 0;
   const next = Number.isFinite(current) && current > 0 ? current + 1 : 1;

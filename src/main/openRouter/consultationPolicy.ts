@@ -8,6 +8,7 @@
  */
 
 import { logTrace } from '../logger';
+import { unitIdOwnerFromId } from '../../shared/unitIds';
 import type { GameStateSnapshot } from '../gameDb';
 import type { ReadyResult, TacticalCommitResolutionPlayback } from '../../shared/ipcTypes';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
@@ -98,11 +99,11 @@ export function animationRowsIncludePlayer<T extends { player: string }>(
 }
 
 /**
- * Returns true when any kill edge in `buckets` lists a killer id in `killerIdSet`, or optional `human` id-prefix fallback when the set is empty.
+ * Returns true when any kill edge in `buckets` lists a killer id in `killerIdSet`, or optional human-owner fallback when the set is empty.
  *
- * Purpose: Single loop for strategic human kill scanning (set + `human-` prefix when roster is masked out).
+ * Purpose: Single loop for strategic human kill scanning (set + id-owner fallback when roster is masked out).
  * When to use: Only `humanHadStrategicResolutionObservableActions` for direct/return/melee aggregate kills.
- * Expected outcome: False when all buckets empty or no killer matches.
+ * Expected outcome: False when all buckets empty or no killer matches. Compact `h1-*` and legacy `human-*` both count.
  * Exceptions: None.
  */
 export function killBucketsMentionHumanStrategicKillers(
@@ -115,7 +116,7 @@ export function killBucketsMentionHumanStrategicKillers(
     for (const edge of bucket ?? []) {
       for (const killerId of edge.killerIds) {
         if (humanIds.has(killerId)) return true;
-        if (allowHumanPrefixFallback && killerId.startsWith('human-')) return true;
+        if (allowHumanPrefixFallback && unitIdOwnerFromId(killerId) === 'human') return true;
       }
     }
   }

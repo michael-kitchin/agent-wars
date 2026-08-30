@@ -58,7 +58,7 @@ function testTacticalExampleBlockLeadsWithExplicitMove(): void {
   assert.ok(block.includes('"explicit_move"'));
   assert.ok(!block.includes('"assign_order"'));
   assert.ok(block.includes('This close, hesitation is already a casualty.'));
-  assert.ok(block.includes('example-armor-1:01'), 'tactical example must use example- prefix with a slot');
+  assert.ok(block.includes('a1-t1-s1'), 'tactical example must use a compact sub-unit id');
   assert.ok(!block.includes('opp-parent:01'), 'tactical example must not use live-looking parent ids');
   assert.ok(!block.includes('hum-parent:01'), 'tactical example must not use live-looking enemy ids');
   assert.ok(block.includes('"unitIds"'), 'tactical example teaches grouped unitIds');
@@ -300,7 +300,7 @@ function testBriefingGuidanceDoesNotNameUncallableAssessmentTools(): void {
  *
  * Purpose: Turn 18's example marched opponent-infantry-1 (a real unit) to water cell AB.
  * When to use: After edits to `getFinalJsonOrdersExampleBlock`.
- * Expected outcome: Example unit ids use the example- prefix; production example is not infantry.
+ * Expected outcome: Example unit ids use compact grammar; production example is not infantry.
  * Exceptions: None.
  */
 function testExampleBlockUsesPlaceholderIdsNotLiveRosterIds(): void {
@@ -309,7 +309,7 @@ function testExampleBlockUsesPlaceholderIdsNotLiveRosterIds(): void {
   assert.ok(!block.includes('opponent-armor-2'), 'must not use a live armor id');
   assert.ok(!block.includes('opponent-naval-1'), 'must not use a live-looking naval id');
   assert.ok(!block.includes('human-armor-1'), 'must not use a live-looking enemy id');
-  assert.ok(block.includes('example-infantry-1'), 'placeholder infantry id');
+  assert.ok(block.includes('a1-i1'), 'placeholder infantry id');
   assert.ok(block.includes('"unitType": "air"') || block.includes('"unitType":"air"'), 'production example must not queue infantry');
 }
 

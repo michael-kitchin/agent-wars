@@ -12,6 +12,7 @@ import { executeAssessment } from './tools/assessment';
 import { usesOmniscientGridProximity } from './tools/assessUnitProximity';
 import { getStandingOrderForUnit } from './tools/standingOrders';
 import { logDebug, logError, logTrace } from './logger';
+import { compareUnitIdsNaturally } from '../shared/unitIds';
 
 /**
  * Documents the `PrecomputationCoordMap` interface as a named contract surface (export interface PrecomputationCoordMap).
@@ -261,7 +262,7 @@ export function runUnitAssessments(
   const { latLngByH3, resolveToH3 } = coordMap;
   const opponentUnits = state.units
     .filter((u) => u.player === 'opponent')
-    .sort((a, b) => a.id.localeCompare(b.id));
+    .sort((a, b) => compareUnitIdsNaturally(a.id, b.id));
   const representativeH3 = state.hexes[0]?.h3Index ?? opponentUnits[0]?.h3Index ?? '';
   logDebug('precomputation runUnitAssessments', {
     turnNumber: state.turnNumber,

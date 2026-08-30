@@ -25,7 +25,7 @@ export interface TacticalSubUnitSnapshot {
   /**
    * Stable identifier for this tactical sub-unit within the current battle session.
    *
-   * Contract: Unique among `subUnits` for a single tactical snapshot; formatted as `${parentUnitId}:${twoDigitSlot}` (no `battleId` prefix) because parent strategic ids are unique in the battle roster.
+   * Contract: Unique among `subUnits` for a single tactical snapshot; formatted as `${parentUnitId}-s${slot}` with no zero padding and no `battleId` prefix, because parent strategic ids are unique in the battle roster. Legacy `${parentUnitId}:${twoDigitSlot}` ids may still appear in older saves.
    * When to use: Keys for rendering, tactical order targeting, and LLM-facing unit references while the session is active.
    * Expected outcome: Strings are non-empty and stable for the lifetime of the snapshot.
    * Exceptions: None.

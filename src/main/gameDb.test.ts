@@ -13,6 +13,7 @@ import { gridDistance } from 'h3-js';
 import { resolveAirStrikePhase } from './gameActions/airStrikeResolution';
 import type { AirStrikeTargetType } from '../shared/ipcTypes';
 import { AIR_STRIKE_RANGE_HEXES } from '../shared/tacticalRanges';
+import { parseStrategicUnitId } from '../shared/unitIds';
 
 /**
  * Documents the module-scope binding `INFRASTRUCTURE_SYNC_TRIGGER_NAMES` (INFRASTRUCTURE_SYNC_TRIGGER_NAMES).
@@ -220,8 +221,8 @@ function testSeededUnitsUseRegionalSpawnContracts(gameDb: typeof import('./gameD
     const humanRegion = regions[0]!;
     const aiRegion = regions[1] ?? regions[0]!;
     gameDb.resetGameForNewMatch({ humanHomeRegion: humanRegion, aiHomeRegion: aiRegion });
-    const rows = gameDb.dbGetAll<{ h3Index: string; player: string; unitType: string; terrain: string; terrainKind: string }>(
-      `SELECT u.h3_index AS h3Index, u.player AS player, u.unit_type AS unitType, h.terrain AS terrain, h.terrain_kind AS terrainKind
+    const rows = gameDb.dbGetAll<{ h3Index: string; player: string; unitType: string; terrain: string; terrainKind: string; id: string }>(
+      `SELECT u.id AS id, u.h3_index AS h3Index, u.player AS player, u.unit_type AS unitType, h.terrain AS terrain, h.terrain_kind AS terrainKind
        FROM units u
        JOIN hexes h ON h.h3_index = u.h3_index`
     );
@@ -234,6 +235,10 @@ function testSeededUnitsUseRegionalSpawnContracts(gameDb: typeof import('./gameD
     for (const row of rows) {
       const expectedRegionHexes = row.player === 'human' ? humanRegionHexes : aiRegionHexes;
       assert.ok(expectedRegionHexes.has(row.h3Index), `expected ${row.player} unit ${row.h3Index} to spawn in selected region`);
+      const parsed = parseStrategicUnitId(row.id);
+      assert.ok(parsed, `expected compact unit id, got ${row.id}`);
+      assert.strictEqual(parsed.player, row.player);
+      assert.strictEqual(parsed.unitType, row.unitType);
       if (row.unitType === 'naval') {
         assert.ok(row.terrain === 'water' || row.terrain === 'coastal', 'expected naval spawn on water/coastal terrain');
       } else if (row.unitType === 'infantry' || row.unitType === 'armor') {
@@ -718,7 +723,56 @@ function testUnitDisplayOrderIsIndependentPerPlayer(gameDb: typeof import('./gam
   }
 }
 
+/**
+ * Verifies that compact unit-id ordinals stay independent per player and type, and restart on a new match.
+ *
+ * Purpose: Identifier numbers must not share a counter across sides or types, and a new match must
+ * reissue ordinals from 1 after units have been deleted.
+ * When to use: After changes to `allocateNextUnitIdOrdinal` or the `unit_id_sequence_%` reset.
+ * Expected outcome: Human and opponent infantry start at 1 independently; armor is independent of
+ * infantry; `resetGameForNewMatch` returns the next infantry ordinal to 1.
+ * Exceptions: None; uses a temporary SQLite file under `os.tmpdir()`.
+ */
+function testUnitIdOrdinalIsIndependentPerPlayerAndResets(gameDb: typeof import('./gameDb')): void {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-unit-id-ordinal-'));
+  const p = path.join(dir, 't.sqlite');
+  try {
+    gameDb.openGameDatabaseAtPathForTests(p);
+    assert.strictEqual(gameDb.allocateNextUnitIdOrdinal('infantry', 'human'), 1, 'first human infantry id ordinal must be 1');
+    assert.strictEqual(gameDb.allocateNextUnitIdOrdinal('infantry', 'opponent'), 1, 'first opponent infantry id ordinal must also start at 1');
+    assert.strictEqual(gameDb.allocateNextUnitIdOrdinal('infantry', 'human'), 2, 'second human infantry id ordinal must be 2');
+    assert.strictEqual(gameDb.allocateNextUnitIdOrdinal('infantry', 'opponent'), 2, 'second opponent infantry id ordinal must be 2');
+    assert.strictEqual(gameDb.allocateNextUnitIdOrdinal('armor', 'human'), 1, 'human armor id ordinal is independent of infantry');
+    gameDb.resetGameForNewMatch();
+    const compactHumanInfantry = gameDb
+      .dbGetAll<{ id: string }>("SELECT id FROM units WHERE player = 'human' AND unit_type = 'infantry'")
+      .filter((row) => row.id.startsWith('h1-i'));
+    assert.strictEqual(
+      gameDb.allocateNextUnitIdOrdinal('infantry', 'human'),
+      compactHumanInfantry.length + 1,
+      'new match must restart id ordinals at 1, then continue after any compact infantry already seeded'
+    );
+  } finally {
+    gameDb.closeGameDatabaseForTests();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+}
 
+/**
+ * Verifies that compact unit-id ordinal allocation refuses to mint a fallback when the database is closed.
+ *
+ * Purpose: A hardcoded `1` on a closed handle would collide with existing `units.id` values on the next open.
+ * When to use: After changes to `allocateNextUnitIdOrdinalWithOps`.
+ * Expected outcome: Throws with a closed-database message.
+ * Exceptions: None.
+ */
+function testAllocateNextUnitIdOrdinalThrowsWhenDatabaseClosed(gameDb: typeof import('./gameDb')): void {
+  gameDb.closeGameDatabaseForTests();
+  assert.throws(
+    () => gameDb.allocateNextUnitIdOrdinal('infantry', 'human'),
+    (err: unknown) => err instanceof Error && /not open/.test(err.message)
+  );
+}
 
 /**
  * Defines the `testRendererRes4OverridesCacheReflectsDbChanges` function shape (function testRendererRes4OverridesCacheReflectsDbChanges(gameDb)).
@@ -775,6 +829,8 @@ function run(): void {
   testRendererRes4OverridesIncludeInfrastructureFeatureRows(gameDb);
   testRendererRes4OverridesCacheReflectsDbChanges(gameDb);
   testUnitDisplayOrderIsIndependentPerPlayer(gameDb);
+  testUnitIdOrdinalIsIndependentPerPlayerAndResets(gameDb);
+  testAllocateNextUnitIdOrdinalThrowsWhenDatabaseClosed(gameDb);
   testScenarioHomeRegionListIsSortedUnique(gameDb);
   testResetNormalizesInvalidScenarioHomeRegions(gameDb);
   testOpenExistingDatabaseReconcilesRes1InfrastructureDrift(gameDb);

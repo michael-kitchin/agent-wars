@@ -287,15 +287,15 @@ export function buildMemoryWriteLimitsClause(): string {
  * Purpose: Shows assign, move, fire, and cancel — the four strategic verbs the repair schema is
  * allowed to illustrate. consultation-flow.md section 5.1 item 4.
  * When to use: Inside `buildRepairSchemaText` for strategic gates.
- * Expected outcome: `example-` ids so a repair round cannot copy live roster prefixes; surrounding
+ * Expected outcome: Compact AI-owned ids (`a1-t1`) so the model copies the live grammar; surrounding
  * repair text still marks them as placeholders.
  * Exceptions: None.
  */
 const STRATEGIC_REPAIR_ORDERS: readonly Record<string, unknown>[] = [
-  { unitId: 'example-armor-1', action: 'assign_order', order: { type: 'march', destination: 'CF' } },
-  { unitId: 'example-armor-1', action: 'explicit_move', destination: 'CG' },
-  { unitId: 'example-armor-1', action: 'ranged_attack', targetHexCode: 'CH' },
-  { unitId: 'example-armor-1', action: 'cancel_order' },
+  { unitId: 'a1-t1', action: 'assign_order', order: { type: 'march', destination: 'CF' } },
+  { unitId: 'a1-t1', action: 'explicit_move', destination: 'CG' },
+  { unitId: 'a1-t1', action: 'ranged_attack', targetHexCode: 'CH' },
+  { unitId: 'a1-t1', action: 'cancel_order' },
 ];
 
 /**
@@ -314,12 +314,12 @@ const STRATEGIC_REPAIR_ORDERS_WITHOUT_STANDING: readonly Record<string, unknown>
  *
  * Purpose: Tactical repair may illustrate grouped movement and a ranged action only.
  * When to use: Inside `buildRepairSchemaText` for tactical gates.
- * Expected outcome: Placeholder `example-` sub-unit ids; grouped `unitIds` on the move row; no standing-order action keys.
+ * Expected outcome: Compact sub-unit ids; grouped `unitIds` on the move row; no standing-order action keys.
  * Exceptions: None.
  */
 const TACTICAL_REPAIR_ORDERS: readonly Record<string, unknown>[] = [
-  { unitIds: ['example-armor-1:01', 'example-armor-1:02'], action: 'explicit_move', destination: 'AB' },
-  { unitId: 'example-armor-1:03', action: 'ranged_attack', targetUnitId: 'example-human-1:01' },
+  { unitIds: ['a1-t1-s1', 'a1-t1-s2'], action: 'explicit_move', destination: 'AB' },
+  { unitId: 'a1-t1-s3', action: 'ranged_attack', targetUnitId: 'h1-i1-s1' },
 ];
 
 /**
@@ -349,9 +349,9 @@ export function buildRepairSchemaText(gates: EnvelopeGates): string {
     else if (field === 'strategy') example.strategy = '...';
     else if (field === 'orders') example.orders = orders;
     else if (field === 'airStrikes') {
-      example.airStrikes = [{ unitId: 'example-air-1', targetHexCode: 'CI', targetType: 'units' }];
+      example.airStrikes = [{ unitId: 'a1-a1', targetHexCode: 'CI', targetType: 'units' }];
     } else if (field === 'ferryOrders') {
-      example.ferryOrders = [{ unitId: 'example-air-2', destination: 'CJ' }];
+      example.ferryOrders = [{ unitId: 'a1-a2', destination: 'CJ' }];
     } else if (field === 'callbacks') {
       example.callbacks = [{ event: 'infrastructure_destroyed', params: { targetType: 'airport', hex: 'CD' } }];
     } else if (field === 'memoryUpdates') {

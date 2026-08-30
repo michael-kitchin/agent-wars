@@ -1,3 +1,5 @@
+import { parseStrategicUnitId, unitIdOwnerFromId } from './unitIds';
+
 /**
  * Documents the `UnitDisplayIdentity` interface as a named contract surface (export interface UnitDisplayIdentity).
 
@@ -179,9 +181,7 @@ function toRomanNumeral(value: number): string {
  */
 function unitDisplayOwner(unit: Pick<UnitDisplayIdentity, 'id' | 'player'>): 'human' | 'opponent' | 'other' {
   if (unit.player === 'human' || unit.player === 'opponent') return unit.player;
-  if (unit.id.startsWith('opponent-')) return 'opponent';
-  if (unit.id.startsWith('human-')) return 'human';
-  return 'other';
+  return unitIdOwnerFromId(unit.id) ?? 'other';
 }
 
 /**
@@ -201,11 +201,11 @@ function formatUnitNumberLabel(
 }
 
 /**
- * Parses seeded roster ids like `opponent-air-1` into unit type and formation ordinal.
+ * Parses legacy seeded roster ids like `opponent-air-1` into unit type and formation ordinal.
  *
- * Purpose: Restricts id-based fallback labels to scenario seed shapes, not production spawn ids.
+ * Purpose: Legacy-only compatibility for databases created before compact identifiers.
  * When to use: `fallbackDisplayNameFromUnitId` when roster lookup is unavailable.
- * Expected outcome: Returns type and ordinal for seed ids; null for production ids and unknown shapes.
+ * Expected outcome: Returns type and ordinal for legacy seed ids; null for compact ids, production ids, and unknown shapes.
  * Exceptions: None.
  */
 function parseSeedUnitIdParts(unitId: string): { unitType: string; ordinal: number } | null {
@@ -217,11 +217,11 @@ function parseSeedUnitIdParts(unitId: string): { unitType: string; ordinal: numb
 }
 
 /**
- * Reads the global production spawn sequence suffix from ids like `opponent-air-prod-3-276`.
+ * Reads the global production spawn sequence suffix from legacy ids like `opponent-air-prod-3-276`.
  *
- * Purpose: Detects when persisted `displayOrder` was mistakenly aligned with spawn sequence instead of formation ordinal.
+ * Purpose: Legacy-only compatibility: detects when persisted `displayOrder` was mistakenly aligned with spawn sequence instead of formation ordinal.
  * When to use: `resolvePersistedDisplayOrderForUnitLabel` before applying roster display-order labels.
- * Expected outcome: Returns the trailing spawn sequence integer for production ids; null for seed ids.
+ * Expected outcome: Returns the trailing spawn sequence integer for legacy production ids; null for seed ids and compact ids.
  * Exceptions: None.
  */
 function productionSpawnSequenceFromUnitId(unitId: string): number | null {
@@ -465,6 +465,11 @@ export function buildUnitDisplayNameLookup(
  * Exceptions: Unknown id shapes return the id unchanged.
  */
 export function fallbackDisplayNameFromUnitId(unitId: string, locale?: Intl.LocalesArgument): string {
+  const compact = parseStrategicUnitId(unitId);
+  if (compact) {
+    const numberLabel = formatUnitNumberLabel({ id: unitId, player: compact.player }, compact.ordinal, locale);
+    return `${numberLabel} ${getUnitDisplayNoun(compact.unitType)}`;
+  }
   const seed = parseSeedUnitIdParts(unitId);
   if (seed) {
     const numberLabel = formatUnitNumberLabel({ id: unitId }, seed.ordinal, locale);

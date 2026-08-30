@@ -69,6 +69,42 @@ function testFallbackUsesRomanNumeralsForAiAndLeavesUnknownIdsUntouched(): void 
 }
 
 /**
+ * Verifies compact identifiers produce the same formation labels as legacy seed ids.
+ *
+ * Purpose: New matches mint `h1-i1` / `a1-a5` ids; fallback and lookup must still show ordinals and roman numerals.
+ * When to use: After changing compact id parsing in display-name helpers.
+ * Expected outcome: Compact opponent air is roman; compact human infantry is ordinal.
+ * Exceptions: None.
+ */
+function testCompactIdsUseRomanNumeralsForAiAndOrdinalsForHuman(): void {
+  assert.strictEqual(fallbackDisplayNameFromUnitId('a1-a5'), 'V Squadron');
+  assert.strictEqual(fallbackDisplayNameFromUnitId('h1-i1'), '1st Infantry');
+  const lookup = buildUnitDisplayNameLookup([
+    { id: 'a1-t1', unitType: 'armor', displayOrder: 1, player: 'opponent' },
+    { id: 'h1-t1', unitType: 'armor', displayOrder: 1, player: 'human' },
+  ]);
+  assert.strictEqual(lookup.get('a1-t1'), 'I Armored');
+  assert.strictEqual(lookup.get('h1-t1'), '1st Armored');
+}
+
+/**
+ * Verifies a mixed legacy-and-compact roster still sequences formation labels independently.
+ *
+ * Purpose: An existing save that produces a new unit holds both id shapes for the same player and type.
+ * When to use: After changing lookup grouping or compact fallbacks.
+ * Expected outcome: `human-infantry-1` stays `1st Infantry` and `h1-i2` is `2nd Infantry`.
+ * Exceptions: None.
+ */
+function testMixedLegacyAndCompactRosterKeepsFormationSequence(): void {
+  const lookup = buildUnitDisplayNameLookup([
+    { id: 'human-infantry-1', unitType: 'infantry', displayOrder: 1, player: 'human' },
+    { id: 'h1-i2', unitType: 'infantry', displayOrder: 2, player: 'human' },
+  ]);
+  assert.strictEqual(lookup.get('human-infantry-1'), '1st Infantry');
+  assert.strictEqual(lookup.get('h1-i2'), '2nd Infantry');
+}
+
+/**
  * Verifies production roster rows label by per-type display order, not global spawn sequence suffixes.
  *
  * Purpose: Regression guard for AI squadron/armor/infantry/navals produced mid-campaign (`*-prod-*` ids).
@@ -280,6 +316,8 @@ function testTacticalSubUnitLabelForUserMessage(): void {
 function run(): void {
   testBuildLookupUsesRomanNumeralsForAiAndOrdinalsForHuman();
   testFallbackUsesRomanNumeralsForAiAndLeavesUnknownIdsUntouched();
+  testCompactIdsUseRomanNumeralsForAiAndOrdinalsForHuman();
+  testMixedLegacyAndCompactRosterKeepsFormationSequence();
   testProductionUnitsUseDisplayOrderNotSpawnSequence();
   testLookupFallbackOrdinalsStayIndependentPerPlayer();
   testLookupKeepsFormationGapsWhenUnitsAreMissing();

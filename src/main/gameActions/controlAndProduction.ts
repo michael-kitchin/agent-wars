@@ -1,6 +1,7 @@
 import { computeGridPathCellsPure } from '../../shared/h3GridRangePure';
 import {
   allocateNextUnitDisplayOrder,
+  allocateNextUnitIdOrdinal,
   clearBuildQueueAndProgressForHex,
   dbGetAll,
   dbGetOne,
@@ -17,6 +18,7 @@ import {
   setHexController,
 } from '../gameDb';
 import { logDebug, logError } from '../logger';
+import { formatStrategicUnitId, type UnitIdOwner } from '../../shared/unitIds';
 import { DEPLOYMENT_CAP_TYPE_ORDER } from '../productionCaps';
 import { readPersistedMaxUnitsPerType } from '../gameDb/gameSizeConfig';
 import {
@@ -174,9 +176,10 @@ function spawnProducedUnitsForHex(
 ): BuildUnitType[] {
   if (unitTypes.length === 0) return [];
   const turnNumber = currentPlanningTurnNumber();
-  const seqRow = dbGetOne<{ value: string }>("SELECT value FROM game_config WHERE key = 'production_unit_spawn_sequence'");
-  let sequence = seqRow ? parseInt(seqRow.value, 10) : 0;
-  if (!Number.isFinite(sequence)) sequence = 0;
+  if (controllerPlayerId !== 'human' && controllerPlayerId !== 'opponent') {
+    throw new Error(`Cannot spawn produced units: unknown controller ${controllerPlayerId}`);
+  }
+  const owner: UnitIdOwner = controllerPlayerId;
   const deployed: BuildUnitType[] = [];
   const capArray = controllerPlayerId === 'opponent' ? capReachedByPlayer.opponent : capReachedByPlayer.human;
   const capSet = new Set(capArray);
@@ -188,8 +191,9 @@ function spawnProducedUnitsForHex(
       capSet.add(unitType);
       continue;
     }
-    sequence += 1;
-    const unitId = `${controllerPlayerId}-${unitType}-prod-${turnNumber}-${sequence}`;
+    const ordinal = allocateNextUnitIdOrdinal(unitType, owner);
+    const unitId = formatStrategicUnitId({ player: owner, unitType, ordinal });
+    logDebug('controlAndProduction spawnProducedUnitsForHex', { unitId, unitType, owner, h3Index, turnNumber, ordinal });
     const displayOrder = allocateNextUnitDisplayOrder(unitType, controllerPlayerId);
     dbRun('INSERT INTO units (id, player, unit_type, display_order, h3_index) VALUES (?, ?, ?, ?, ?)', [
       unitId,
@@ -202,7 +206,6 @@ function spawnProducedUnitsForHex(
     deployed.push(unitType);
   }
   capArray.splice(0, capArray.length, ...DEPLOYMENT_CAP_TYPE_ORDER.filter((unitType) => capSet.has(unitType)));
-  dbRun(`INSERT OR REPLACE INTO game_config (key, value) VALUES ('production_unit_spawn_sequence', ?)`, [String(sequence)]);
   return deployed;
 }
 

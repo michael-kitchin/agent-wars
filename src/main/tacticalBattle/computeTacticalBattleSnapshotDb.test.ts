@@ -10,6 +10,7 @@ import { filterMeleeCandidateHexesWithTacticalEntry, listMeleeCandidateHexes } f
 import { dbGetOne, dbRun, listUnitsForSnapshot } from '../gameDb';
 import { getOrderedHexList } from '../mapData';
 import { withTempGameDb } from '../testSupport/withTempGameDb';
+import { parseTacticalSubUnitId } from '../../shared/unitIds';
 import { updateTacticalSealiftSlot } from '../gameActions';
 import { computeTacticalBattleSnapshot } from './computeTacticalBattleSnapshot';
 import {
@@ -66,6 +67,11 @@ test('computeTacticalBattleSnapshot is deterministic for identical battle id and
     const pa = a.snapshot.subUnits.map((u) => ({ id: u.id, h3Index: u.h3Index }));
     const pb = b.snapshot.subUnits.map((u) => ({ id: u.id, h3Index: u.h3Index }));
     assert.deepEqual(pa, pb);
+    for (const sub of a.snapshot.subUnits) {
+      const parsed = parseTacticalSubUnitId(sub.id);
+      assert.ok(parsed, `expected compact sub-unit id, got ${sub.id}`);
+      assert.equal(parsed.parentUnitId, sub.parentUnitId);
+    }
   });
 });
 

@@ -235,20 +235,20 @@ export function getFinalJsonOrdersExampleBlock(flags: FinalJsonExampleFlags): st
       ? [
           {
             action: 'explicit_move',
-            unitIds: tactical ? ['example-armor-1:01', 'example-armor-1:02'] : ['example-armor-1', 'example-armor-3'],
+            unitIds: tactical ? ['a1-t1-s1', 'a1-t1-s2'] : ['a1-t1', 'a1-t3'],
             destination: 'CD',
           },
           {
             action: 'ranged_attack',
-            unitIds: tactical ? ['example-armor-1:01', 'example-armor-1:02'] : ['example-naval-1'],
-            targetUnitId: tactical ? 'example-human-1:01' : 'example-human-1',
+            unitIds: tactical ? ['a1-t1-s1', 'a1-t1-s2'] : ['a1-n1'],
+            targetUnitId: tactical ? 'h1-i1-s1' : 'h1-i1',
           },
         ]
       : [
-          { action: 'assign_order', unitId: 'example-infantry-1', order: { type: 'march', destination: 'CD' } },
-          { action: 'assign_order', unitId: 'example-naval-2', order: { type: 'patrol', waypoints: ['CD', 'CF'] } },
-          { action: 'explicit_move', unitIds: ['example-armor-1', 'example-armor-3'], destination: 'CF' },
-          { action: 'ranged_attack', unitId: 'example-naval-1', targetUnitId: 'example-human-1' },
+          { action: 'assign_order', unitId: 'a1-i1', order: { type: 'march', destination: 'CD' } },
+          { action: 'assign_order', unitId: 'a1-n2', order: { type: 'patrol', waypoints: ['CD', 'CF'] } },
+          { action: 'explicit_move', unitIds: ['a1-t1', 'a1-t3'], destination: 'CF' },
+          { action: 'ranged_attack', unitId: 'a1-n1', targetUnitId: 'h1-i1' },
         ],
     airStrikes: [],
     ferryOrders: [],

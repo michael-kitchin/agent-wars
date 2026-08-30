@@ -176,6 +176,8 @@ export function resetGameForNewMatch(
   persistRegionVsRegionScenarioState({ run }, { humanHomeRegion, aiHomeRegion });
   run("DELETE FROM game_config WHERE key = 'game_seed'");
   run("DELETE FROM game_config WHERE key LIKE 'unit_display_sequence_%'");
+  // Identifier ordinals may restart at 1 because `DELETE FROM units` already ran above.
+  run("DELETE FROM game_config WHERE key LIKE 'unit_id_sequence_%'");
   deps.seedGameSeedIfMissing();
   deps.seedHexesFromTerrainMetadata();
   deps.seedInfrastructureStateFromMetadata();

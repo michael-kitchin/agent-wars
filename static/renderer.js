@@ -14641,6 +14641,75 @@
     };
   }
 
+  // src/shared/unitIds.ts
+  var UNIT_TYPE_ID_CODES = {
+    infantry: "i",
+    armor: "t",
+    naval: "n",
+    air: "a"
+  };
+  var STRATEGIC_UNIT_ID_PATTERN = /^([ha])(\d+)-([itna])(\d+)$/;
+  var TACTICAL_SUB_UNIT_ID_PATTERN = /^(.+)-s(\d+)$/;
+  var UNIT_TYPE_FROM_ID_CODE = Object.fromEntries(
+    Object.entries(UNIT_TYPE_ID_CODES).map(([unitType, code]) => [code, unitType])
+  );
+  var NATURAL_UNIT_ID_COLLATOR = new Intl.Collator("en", { numeric: true });
+  function isPositiveInteger(value) {
+    return Number.isInteger(value) && value > 0;
+  }
+  function hasForbiddenLeadingZero(digits) {
+    return digits.startsWith("0");
+  }
+  function parseStrategicUnitId(unitId) {
+    const match = unitId.match(STRATEGIC_UNIT_ID_PATTERN);
+    if (!match) return null;
+    const playerLetter = match[1];
+    const playerIndexDigits = match[2];
+    const typeCode = match[3];
+    const ordinalDigits = match[4];
+    if (hasForbiddenLeadingZero(playerIndexDigits) || hasForbiddenLeadingZero(ordinalDigits)) return null;
+    if (playerIndexDigits !== "1") return null;
+    const unitType = UNIT_TYPE_FROM_ID_CODE[typeCode];
+    if (!unitType) return null;
+    const ordinal = Number.parseInt(ordinalDigits, 10);
+    if (!isPositiveInteger(ordinal)) return null;
+    const player = playerLetter === "h" ? "human" : "opponent";
+    return { player, unitType, ordinal };
+  }
+  function parseTacticalSubUnitId(unitId) {
+    const match = unitId.match(TACTICAL_SUB_UNIT_ID_PATTERN);
+    if (!match) return null;
+    const parentUnitId = match[1];
+    const slotDigits = match[2];
+    if (hasForbiddenLeadingZero(slotDigits)) return null;
+    const slot = Number.parseInt(slotDigits, 10);
+    if (!isPositiveInteger(slot)) return null;
+    return { parentUnitId, slot };
+  }
+  function unitTypeFromUnitId(unitId) {
+    const compact = parseStrategicUnitId(unitId);
+    if (compact) return compact.unitType;
+    if (unitId.includes("-infantry-")) return "infantry";
+    if (unitId.includes("-armor-")) return "armor";
+    if (unitId.includes("-naval-")) return "naval";
+    if (unitId.includes("-air-")) return "air";
+    const sub = parseTacticalSubUnitId(unitId);
+    if (sub) return unitTypeFromUnitId(sub.parentUnitId);
+    return null;
+  }
+  function unitIdOwnerFromId(unitId) {
+    const compact = parseStrategicUnitId(unitId);
+    if (compact) return compact.player;
+    const sub = parseTacticalSubUnitId(unitId);
+    if (sub) {
+      const parentOwner = unitIdOwnerFromId(sub.parentUnitId);
+      if (parentOwner) return parentOwner;
+    }
+    if (unitId.startsWith("opponent-")) return "opponent";
+    if (unitId.startsWith("human-")) return "human";
+    return null;
+  }
+
   // src/shared/unitDisplayNames.ts
   var UNIT_TYPE_NOUN_BY_TYPE = {
     /**
@@ -14723,9 +14792,7 @@
   }
   function unitDisplayOwner(unit) {
     if (unit.player === "human" || unit.player === "opponent") return unit.player;
-    if (unit.id.startsWith("opponent-")) return "opponent";
-    if (unit.id.startsWith("human-")) return "human";
-    return "other";
+    return unitIdOwnerFromId(unit.id) ?? "other";
   }
   function formatUnitNumberLabel(unit, value, locale) {
     return unitDisplayOwner(unit) === "opponent" ? toRomanNumeral(value) : formatOrdinalLabel(value, locale);
@@ -14808,6 +14875,11 @@
     return result;
   }
   function fallbackDisplayNameFromUnitId(unitId, locale) {
+    const compact = parseStrategicUnitId(unitId);
+    if (compact) {
+      const numberLabel = formatUnitNumberLabel({ id: unitId, player: compact.player }, compact.ordinal, locale);
+      return `${numberLabel} ${getUnitDisplayNoun(compact.unitType)}`;
+    }
     const seed = parseSeedUnitIdParts(unitId);
     if (seed) {
       const numberLabel = formatUnitNumberLabel({ id: unitId }, seed.ordinal, locale);
@@ -24715,7 +24787,7 @@
     const friendlyInvolvedKillVictimIds = new Set(
       allKills.filter((k) => {
         const victim = removedById.get(k.victimId);
-        const killerIsFriendly = k.killerIds.some((id) => id.startsWith("human-"));
+        const killerIsFriendly = k.killerIds.some((id) => unitIdOwnerFromId(id) === "human");
         const victimIsFriendly = victim?.player === "human";
         return killerIsFriendly || victimIsFriendly;
       }).map((k) => k.victimId)
@@ -27710,11 +27782,8 @@
     return isHexExploredByPlayer(h3Index);
   }
   function inferUnitTypeLabelFromId(unitId) {
-    if (unitId.includes("-infantry-")) return "I";
-    if (unitId.includes("-armor-")) return "A";
-    if (unitId.includes("-naval-")) return "N";
-    if (unitId.includes("-air-")) return "S";
-    return "?";
+    const unitType = unitTypeFromUnitId(unitId);
+    return unitType ? UNIT_TYPE_LABELS[unitType] ?? "?" : "?";
   }
   function formatUnknownBattleAnnouncement(continentNames) {
     const clean = continentNames.map((s) => s.trim()).filter((s) => s.length > 0).filter((name, idx, arr) => arr.indexOf(name) === idx);

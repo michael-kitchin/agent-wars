@@ -21,6 +21,7 @@ import {
   buildUnitDisplayNameLookup,
   fallbackDisplayNameFromUnitId,
 } from '../shared/unitDisplayNames';
+import { unitTypeFromUnitId } from '../shared/unitIds';
 import {
   buildResolutionPlaybackState as buildResolutionPlaybackStateFromModule,
   resolutionAnimationElapsedMs as resolutionAnimationElapsedMsFromModule,
@@ -33,6 +34,7 @@ import {
   WORLD_H3_RESOLUTION,
   UNIT_DESELECT_GLYPH,
   UNIT_SELECT_GLYPH,
+  UNIT_TYPE_LABELS,
 } from './core/constants';
 import {
   appendOpenRouterLog,
@@ -1574,19 +1576,16 @@ function isHexExploredByPlayer(h3Index: string): boolean {
 }
 
 /**
- * Defines the `inferUnitTypeLabelFromId` function shape (function inferUnitTypeLabelFromId(unitId: string): string).
-
- * Purpose: Supports maintainability by documenting why `inferUnitTypeLabelFromId` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Maps a unit id to the one-letter glyph used for stale-intel markers.
+ *
+ * Purpose: Fog tracking draws type letters when the live roster row is gone.
+ * When to use: `drawStaleEnemyIntel` via the existing call site in `drawGameScene`.
+ * Expected outcome: Compact and legacy ids resolve through `UNIT_TYPE_LABELS`; unknown ids yield `?`.
  * Exceptions: None.
  */
 function inferUnitTypeLabelFromId(unitId: string): string {
-  if (unitId.includes('-infantry-')) return 'I';
-  if (unitId.includes('-armor-')) return 'A';
-  if (unitId.includes('-naval-')) return 'N';
-  if (unitId.includes('-air-')) return 'S';
-  return '?';
+  const unitType = unitTypeFromUnitId(unitId);
+  return unitType ? UNIT_TYPE_LABELS[unitType] ?? '?' : '?';
 }
 
 /**
