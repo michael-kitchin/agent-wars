@@ -1596,7 +1596,7 @@ export function removeHexBuildQueueEntry(
 /**
  * Applies a shared ordered build queue template to multiple controlled production hexes.
  *
- * Purpose: Exposes the best-effort multi-hex production write through the public game-actions facade.
+ * Purpose: Exposes the best-effort multi-hex production write through the public gameActions facade.
  * When to use: Renderer synchronization after build-hex selection joins or shared template edits.
  * Expected outcome: Successful, skipped, and failed hex/type details from the authoritative backend.
  * Exceptions: Implementation exceptions are captured and reported by the delegated action.

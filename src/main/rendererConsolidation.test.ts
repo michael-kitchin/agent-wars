@@ -359,15 +359,17 @@ function testStackSealiftEmbarkedSelectionAndDebarkControls(): void {
     'sealift rendering should mark all embarked slot occupants as non-selectable in the stack popup'
   );
   assert.ok(
-    renderSealiftSectionFn.includes('if (debarkEnabled) {') &&
-      renderSealiftSectionFn.includes('debarkBtn') &&
+    renderSealiftSectionFn.includes('debarkBtn.style.visibility = debarkEnabled ? \'visible\' : \'hidden\'') &&
+      renderSealiftSectionFn.includes('slotRow.appendChild(debarkBtn)') &&
       renderSealiftSectionFn.includes('row.debarkSlot1Enabled'),
-    'sealift rendering should show debark controls when debarkSlot*Enabled (including controlled water ports)'
+    'sealift slot rows should always reserve a debark-control gap and enable it when debarkSlot*Enabled'
   );
   assert.ok(
     setNonSelectableFn.includes('applyStackCalloutSelectionButtonVisibility(calloutEl, nonSelectable);') &&
-      applyVisibilityFn.includes('btn.style.display = nonSelectableUnitIds.has(unitId) ? \'none\' : \'\';'),
-    'non-selectable stack-popup units should hide per-unit select/unselect buttons'
+      applyVisibilityFn.includes(
+        'btn.style.visibility = nonSelectableUnitIds.has(unitId) ? \'hidden\' : \'visible\';'
+      ),
+    'non-selectable stack-popup units should reserve space for per-unit select/unselect buttons while hiding them'
   );
   assert.ok(
     showStackCalloutFn.includes('getSelectableHumanIdsForStackCallout(units)') &&

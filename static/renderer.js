@@ -19960,7 +19960,7 @@
   var GAME_SIZE_MULTIPLIER = {
     small: 1,
     medium: 2,
-    large: 4
+    large: 3
   };
   var UNIT_TYPE_DISPLAY_NAME = {
     infantry: "Infantry",
@@ -27135,7 +27135,7 @@
       if (!unitId) continue;
       const btn = row.querySelector("button.stack-unit-toggle");
       if (!btn) continue;
-      btn.style.display = nonSelectableUnitIds.has(unitId) ? "none" : "";
+      btn.style.visibility = nonSelectableUnitIds.has(unitId) ? "hidden" : "visible";
     }
   }
   function setStackPopupNonSelectableUnitIds(calloutEl, unitIds) {
@@ -27270,56 +27270,55 @@
             requestRedraw();
           });
           slotRow.appendChild(select);
-          if (debarkEnabled) {
-            const debarkBtn = document.createElement("button");
-            debarkBtn.type = "button";
-            debarkBtn.className = "unit-select stack-unit-toggle";
-            debarkBtn.textContent = UNIT_DESELECT_GLYPH;
-            debarkBtn.disabled = !debarkEnabled;
-            debarkBtn.addEventListener("click", async () => {
-              if (tacticalSealiftMode) {
-                const prev = selectedUnitId ?? "";
-                if (prev) {
-                  const result2 = await window.gameApi.updateTacticalSealiftSlot({
-                    h3Index,
-                    navalUnitId: row.navalUnitId,
-                    slotIndex,
-                    landUnitId: null
-                  });
-                  if (!result2.success) {
-                    showMapToast(formatTargetingValidationReason2(result2.reason, "Failed to debark unit."));
-                  } else {
-                    if (result2.tacticalBattle) {
-                      rendererSharedState.tacticalBattleSnapshot = result2.tacticalBattle;
-                    }
-                    const navalIds = new Set((result2.state?.navalRows ?? []).map((r) => r.navalUnitId));
-                    withTacticalHumanDraftPrefetchInvalidation(() => {
-                      rendererSharedState.tacticalPendingMarches = rendererSharedState.tacticalPendingMarches.filter((m) => m.subUnitId !== prev);
-                      rendererSharedState.pendingEmbarkOrders = rendererSharedState.pendingEmbarkOrders.filter((e) => !navalIds.has(e.navalUnitId));
-                    });
-                    updatePendingOrdersSidebar2();
+          const debarkBtn = document.createElement("button");
+          debarkBtn.type = "button";
+          debarkBtn.className = "unit-select stack-unit-toggle";
+          debarkBtn.textContent = UNIT_DESELECT_GLYPH;
+          debarkBtn.disabled = !debarkEnabled;
+          debarkBtn.style.visibility = debarkEnabled ? "visible" : "hidden";
+          debarkBtn.addEventListener("click", async () => {
+            if (tacticalSealiftMode) {
+              const prev = selectedUnitId ?? "";
+              if (prev) {
+                const result2 = await window.gameApi.updateTacticalSealiftSlot({
+                  h3Index,
+                  navalUnitId: row.navalUnitId,
+                  slotIndex,
+                  landUnitId: null
+                });
+                if (!result2.success) {
+                  showMapToast(formatTargetingValidationReason2(result2.reason, "Failed to debark unit."));
+                } else {
+                  if (result2.tacticalBattle) {
+                    rendererSharedState.tacticalBattleSnapshot = result2.tacticalBattle;
                   }
+                  const navalIds = new Set((result2.state?.navalRows ?? []).map((r) => r.navalUnitId));
+                  withTacticalHumanDraftPrefetchInvalidation(() => {
+                    rendererSharedState.tacticalPendingMarches = rendererSharedState.tacticalPendingMarches.filter((m) => m.subUnitId !== prev);
+                    rendererSharedState.pendingEmbarkOrders = rendererSharedState.pendingEmbarkOrders.filter((e) => !navalIds.has(e.navalUnitId));
+                  });
+                  updatePendingOrdersSidebar2();
                 }
-                refreshStackCalloutIfOpen();
-                requestRedraw();
-                return;
-              }
-              const result = await window.gameApi.updateSealiftSlot({
-                h3Index,
-                navalUnitId: row.navalUnitId,
-                slotIndex,
-                landUnitId: null
-              });
-              if (!result.success) {
-                showMapToast(formatTargetingValidationReason2(result.reason, "Failed to debark unit."));
-              } else {
-                await refreshGameStateAfterSealiftChange2();
               }
               refreshStackCalloutIfOpen();
               requestRedraw();
+              return;
+            }
+            const result = await window.gameApi.updateSealiftSlot({
+              h3Index,
+              navalUnitId: row.navalUnitId,
+              slotIndex,
+              landUnitId: null
             });
-            slotRow.appendChild(debarkBtn);
-          }
+            if (!result.success) {
+              showMapToast(formatTargetingValidationReason2(result.reason, "Failed to debark unit."));
+            } else {
+              await refreshGameStateAfterSealiftChange2();
+            }
+            refreshStackCalloutIfOpen();
+            requestRedraw();
+          });
+          slotRow.appendChild(debarkBtn);
           right.appendChild(slotRow);
         };
         addSlotControl(1, row.slot1UnitId, row.controlsDisabled, row.debarkSlot1Enabled);

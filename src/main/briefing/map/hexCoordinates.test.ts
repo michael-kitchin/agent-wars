@@ -95,7 +95,7 @@ function testStrategicRes1FastPathMatchesRoundTrip(): void {
  * Defines the `run` function shape (function run(): void).
 
  * Purpose: Executes this module's tests in declaration order for Node's direct execution model.
- * When to use: Default entry when running `node dist/main/briefing/map/hex-coordinates.test.js`.
+ * When to use: Default entry when running `node dist/main/briefing/map/hexCoordinates.test.js`.
  * Expected outcome: All tests pass and a single success line is printed.
  * Exceptions: None.
  */
@@ -104,7 +104,7 @@ function run(): void {
   testStrategicFullRoundTripForEveryRes1Cell();
   testStrategicRegistryStableAcrossExplicitReInit();
   testStrategicRes1FastPathMatchesRoundTrip();
-  console.log('hex-coordinates.test.ts passed');
+  console.log('hexCoordinates.test.ts passed');
 }
 
 run();

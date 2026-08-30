@@ -1,5 +1,5 @@
 /**
- * Tests for shared march path tail resolution. Run with: node dist/main/marchPathUtils.test.js
+ * Tests for shared march path tail resolution. Run with: node dist/main/marchPathHelpers.test.js
  */
 
 import assert from 'node:assert/strict';
@@ -59,7 +59,7 @@ function testEmptyPathReturnsNull(): void {
  * Runs all march path utility tests in declaration order.
  *
  * Purpose: Single entrypoint for the Node test runner manifest.
- * When to use: Invoked at module load by `node dist/main/marchPathUtils.test.js`.
+ * When to use: Invoked at module load by `node dist/main/marchPathHelpers.test.js`.
  * Expected outcome: Throws on first assertion failure; logs pass message when all cases succeed.
  * Exceptions: Propagates assertion errors from individual test cases.
  */
@@ -68,7 +68,7 @@ function run(): void {
   testMidPathMatchReturnsTail();
   testOffPathReturnsNull();
   testEmptyPathReturnsNull();
-  console.log('marchPathUtils.test.ts passed');
+  console.log('marchPathHelpers.test.ts passed');
 }
 
 run();

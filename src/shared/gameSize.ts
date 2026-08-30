@@ -24,15 +24,15 @@ export const GAME_SIZES: readonly GameSize[] = ['small', 'medium', 'large'];
 /**
  * Integer multipliers applied to the Small unit-cap table.
  *
- * Purpose: Medium is 2× Small and Large is 2× Medium (4× Small) without copying cap tables.
+ * Purpose: Medium is 2× Small and Large is 3× Small without copying cap tables.
  * When to use: Only via `getMaxUnitsPerType`; do not scale costs or starting armies.
- * Expected outcome: `small: 1`, `medium: 2`, `large: 4`.
+ * Expected outcome: `small: 1`, `medium: 2`, `large: 3`.
  * Exceptions: None.
  */
 export const GAME_SIZE_MULTIPLIER: Readonly<Record<GameSize, number>> = {
   small: 1,
   medium: 2,
-  large: 4,
+  large: 3,
 };
 
 /**

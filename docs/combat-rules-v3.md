@@ -31,13 +31,13 @@ Rules are divided into two layers: **strategic** (H3 res1, the primary game) and
 
 ## 2. Unit roster (strategic level)
 
-The game has four unit types. Per-side caps scale with match size (`getMaxUnitsPerType`). Small is the baseline; Medium is 2× Small; Large is 4× Small. Caps, costs, and starting armies do **not** otherwise change with size. See [game-size-unit-caps.md](game-size-unit-caps.md).
+The game has four unit types. Per-side caps scale with match size (`getMaxUnitsPerType`). Small is the baseline; Medium is 2× Small; Large is 3× Small. Caps, costs, and starting armies do **not** otherwise change with size. See [game-size-unit-caps.md](game-size-unit-caps.md).
 
 | Size | Infantry | Armor | Naval | Air |
 |------|---------|-------|-------|-----|
 | Small | 12 | 8 | 8 | 6 |
 | Medium | 24 | 16 | 16 | 12 |
-| Large | 48 | 32 | 32 | 24 |
+| Large | 36 | 24 | 24 | 18 |
 
 | Unit type | Move | Attack | Defense | Strategic range | Domain | Cost | Build prerequisites |
 |-----------|------|--------|---------|-----------------|--------|------|---------------------|

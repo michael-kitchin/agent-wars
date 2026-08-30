@@ -1,5 +1,5 @@
 /**
- * Contract tests for `hex-code-translator` (Phase 5A surface used at the LLM boundary).
+ * Contract tests for `hexCodeTranslator` (LLM-boundary hex-code surface).
  *
  * Purpose: Verifies `isValidHexCode`, `latLngToCode` snapping, and `codeToH3` / `h3ToCode` round-trip helpers.
  * When to use: Run after `build:main` alongside other briefing-map tests.
@@ -39,7 +39,7 @@ function testIsValidHexCodeMatchesRegistry(): void {
  * Defines the `testLatLngToCodeMatchesCellCenterStrategic` function shape (function testLatLngToCodeMatchesCellCenterStrategic(): void).
 
  * Purpose: Confirms `latLngToCode` snaps WGS84 to the same strategic code as `h3ToCode` for a res1 center.
- * When to use: Validates Phase 5A “snap then lookup” semantics for migration helpers.
+ * When to use: Validates “snap then lookup” semantics for migration helpers.
  * Expected outcome: `latLngToCode(cellToLatLng(h3))` equals `h3ToCode(h3)` for res1 registry cells.
  * Exceptions: None.
  */
@@ -71,7 +71,7 @@ function testCodeToH3RoundTripSample(): void {
  * Defines the `run` function shape (function run(): void).
 
  * Purpose: Runs this module’s tests under Node without a separate test runner.
- * When to use: Invoked via `node dist/main/briefing/map/hex-code-translator.test.js`.
+ * When to use: Invoked via `node dist/main/briefing/map/hexCodeTranslator.test.js`.
  * Expected outcome: All assertions pass.
  * Exceptions: None.
  */
@@ -79,7 +79,7 @@ function run(): void {
   testIsValidHexCodeMatchesRegistry();
   testLatLngToCodeMatchesCellCenterStrategic();
   testCodeToH3RoundTripSample();
-  console.log('hex-code-translator.test.ts passed');
+  console.log('hexCodeTranslator.test.ts passed');
 }
 
 run();

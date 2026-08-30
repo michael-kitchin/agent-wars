@@ -30,9 +30,9 @@ describe('parseGameSize', () => {
 });
 
 describe('getMaxUnitsPerType', () => {
-  it('uses the small table as the 1x baseline and doubles twice for medium and large', () => {
+  it('uses the small table as the 1x baseline, doubles for medium, and triples for large', () => {
     assert.deepEqual(GAME_SIZES, ['small', 'medium', 'large']);
-    assert.deepEqual(GAME_SIZE_MULTIPLIER, { small: 1, medium: 2, large: 4 });
+    assert.deepEqual(GAME_SIZE_MULTIPLIER, { small: 1, medium: 2, large: 3 });
     assert.deepEqual(getMaxUnitsPerType('small'), MAX_UNITS_PER_TYPE);
     assert.deepEqual(getMaxUnitsPerType('medium'), {
       infantry: 24,
@@ -41,10 +41,10 @@ describe('getMaxUnitsPerType', () => {
       air: 12,
     });
     assert.deepEqual(getMaxUnitsPerType('large'), {
-      infantry: 48,
-      armor: 32,
-      naval: 32,
-      air: 24,
+      infantry: 36,
+      armor: 24,
+      naval: 24,
+      air: 18,
     });
     assert.deepEqual(getMaxUnitsPerType('world' as GameSize), MAX_UNITS_PER_TYPE);
   });
@@ -58,6 +58,6 @@ describe('gameSizeCapPreviewRows', () => {
       { unitType: 'naval', displayName: 'Naval', cap: 8 },
       { unitType: 'air', displayName: 'Air', cap: 6 },
     ]);
-    assert.equal(gameSizeCapPreviewRows('large')[0]?.cap, 48);
+    assert.equal(gameSizeCapPreviewRows('large')[0]?.cap, 36);
   });
 });

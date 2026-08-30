@@ -14,7 +14,7 @@ import type { HexGrid, GridCell } from './hexGridProjection';
  * Per-hex tactical/strategic snapshot fields required for map symbology.
  *
  * Purpose: Decouples rendering from full `GameStateSnapshot` to keep the renderer testable.
- * When to use: Built in `briefing-map-section` for each `h3Index` in the projected grid.
+ * When to use: Built in `briefingMapSection` for each `h3Index` in the projected grid.
  * Expected outcome: Overlay character resolves deterministically from the priority table in the plan.
  * Exceptions: None.
  */

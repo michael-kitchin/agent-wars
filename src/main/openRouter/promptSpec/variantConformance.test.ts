@@ -285,7 +285,7 @@ test('game size: printed caps come from getMaxUnitsPerType and unrecognised size
   const large = getMaxUnitsPerType('large');
   assert.deepEqual(getMaxUnitsPerType(parseGameSize('not-a-size')), small);
   assert.equal(medium.infantry, small.infantry * 2);
-  assert.equal(large.air, small.air * 4);
+  assert.equal(large.air, small.air * 3);
   for (const size of GAME_SIZES) {
     const caps = getMaxUnitsPerType(size);
     const line = `Deployment caps (per side): infantry ${caps.infantry}, armor ${caps.armor}, naval ${caps.naval}, air ${caps.air}.`;

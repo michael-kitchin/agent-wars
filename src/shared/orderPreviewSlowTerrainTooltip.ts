@@ -2,7 +2,7 @@
  * Copy and light terrain classification for transient “Slower: …” hover hints during valid tactical marches.
  *
  * Purpose: Keeps tactical march preview labels aligned without importing renderer or Electron main modules.
- * When to use: `humanMarchPreviewImpl`, `buildTacticalMarchHoverPreview`, `publishHoverRoutePreview`, and HTML tooltip formatters.
+ * When to use: `humanMarchPreviewResolve`, `buildTacticalMarchHoverPreview`, `publishHoverRoutePreview`, and HTML tooltip formatters.
  * Expected outcome: Structured `OrderPreviewTerrainImpact` for IPC plus HTML fragments with bold section labels; `null` when no slowdown applies.
  * Exceptions: None; invalid inputs yield `null` or empty collections.
  */
@@ -225,7 +225,7 @@ export function strategicMarchPathH3IndicesFromPlan(plan: {
  * Collects every distinct slowing terrain label along a strategic res1 path (first-seen path order).
  *
  * Purpose: Feeds grouped HTML tooltips and `OrderPreviewTerrainImpact` without stopping at the first slow hex.
- * When to use: `humanMarchPreviewImpl` after `PlanRouteOk`; combine with `sortSlowTerrainLabels` for display lists.
+ * When to use: `humanMarchPreviewResolve` after `PlanRouteOk`; combine with `sortSlowTerrainLabels` for display lists.
  * Expected outcome: Title-case terrain tokens in traversal order, de-duplicated.
  * Exceptions: None.
  */

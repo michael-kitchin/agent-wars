@@ -52,7 +52,7 @@ air: 60,
 
  * Purpose: Small-match per-type unit cap table (infantry 12, armor 8, naval 8, air 6).
  * When to use: Only as the baseline for `getMaxUnitsPerType`; do not use as the live match ceiling.
- * Expected outcome: Medium/Large caps are this table multiplied by 2 and 4.
+ * Expected outcome: Medium/Large caps are this table multiplied by 2 and 3.
  * Exceptions: None.
  */
 export const MAX_UNITS_PER_TYPE: Readonly<Record<BuildUnitType, number>> = {

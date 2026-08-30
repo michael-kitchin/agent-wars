@@ -2,7 +2,7 @@
  * Contract tests for AI Operational Map markdown (strategic full-world extent, tactical footprint, fog).
  *
  * Purpose: Locks prompt map scope without coupling to OpenRouter; run via `npm test` after `build:main`.
- * When to use: After changes to `briefing-map-section`, grid projection, or registry selection.
+ * When to use: After changes to `briefingMapSection`, grid projection, or registry selection.
  * Expected outcome: Strategic map includes every res1 code; tactical map includes every res4 code in the battle; fog hides enemy markers when hexes are not visible.
  * Exceptions: None; failures indicate regressions in briefing map assembly.
  */

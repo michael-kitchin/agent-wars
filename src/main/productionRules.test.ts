@@ -117,7 +117,7 @@ function testTurnsToNextSpawnEstimateUsesNextUnitOnly(): void {
  *
  * Purpose: Prevents the Small baseline from drifting from 12/8/8/6 and ensures size multipliers stay exact.
  * When to use: After changing `MAX_UNITS_PER_TYPE` or `getMaxUnitsPerType`.
- * Expected outcome: Shared and main re-exports match; medium is 2× small; large is 4× small.
+ * Expected outcome: Shared and main re-exports match; medium is 2× small; large is 3× small.
  * Exceptions: None.
  */
 function testSmallUnitCapsMatchBaseline(): void {
@@ -135,10 +135,10 @@ function testSmallUnitCapsMatchBaseline(): void {
     air: 12,
   });
   assert.deepStrictEqual(getMaxUnitsPerType('large'), {
-    infantry: 48,
-    armor: 32,
-    naval: 32,
-    air: 24,
+    infantry: 36,
+    armor: 24,
+    naval: 24,
+    air: 18,
   });
 }
 

@@ -35,15 +35,6 @@ import { parseGameSize } from '../../shared/gameSize';
 const AI_PLAYER_ID = 'opponent';
 
 /**
- * Documents the module-scope binding `TOOL6_NAME_LIST` (TOOL6_NAME_LIST).
-
- * Purpose: Supports maintainability by documenting why `TOOL6_NAME_LIST` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-const TOOL6_NAME_LIST = ['query_production', 'set_build_queue'] as const;
-/**
  * Documents the module-scope binding `PRODUCTION_TOOL_NAMES` (PRODUCTION_TOOL_NAMES).
 
  * Purpose: Supports maintainability by documenting why `PRODUCTION_TOOL_NAMES` exists.
@@ -51,7 +42,7 @@ const TOOL6_NAME_LIST = ['query_production', 'set_build_queue'] as const;
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export const PRODUCTION_TOOL_NAMES = TOOL6_NAME_LIST;
+export const PRODUCTION_TOOL_NAMES = ['query_production', 'set_build_queue'] as const;
 
 /**
  * Defines the `roundCoordinate` function shape (function roundCoordinate(value: number): number).

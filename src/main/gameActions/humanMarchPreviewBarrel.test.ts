@@ -1,5 +1,5 @@
 /**
- * Smoke test that the `humanMarchPreview` barrel resolves after the Phase 5 directory split.
+ * Smoke test that the `humanMarchPreview` barrel resolves after the directory split.
  * Run with: `node dist/main/gameActions/humanMarchPreviewBarrel.test.js`
  */
 

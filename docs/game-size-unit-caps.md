@@ -6,11 +6,11 @@ Live values come from `MAX_UNITS_PER_TYPE` (Small) and `GAME_SIZE_MULTIPLIER` in
 
 ## Caps
 
-Caps are per side and per type. Small is the current baseline. Medium is twice Small. Large is twice Medium.
+Caps are per side and per type. Small is the current baseline. Medium is twice Small. Large is three times Small.
 
 - Small: infantry 12, armor 8, naval 8, air 6
 - Medium: infantry 24, armor 16, naval 16, air 12
-- Large: infantry 48, armor 32, naval 32, air 24
+- Large: infantry 36, armor 24, naval 24, air 18
 
 ## Selection
 

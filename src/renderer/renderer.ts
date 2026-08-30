@@ -570,7 +570,7 @@ function applyStackCalloutSelectionButtonVisibility(calloutEl: HTMLElement, nonS
     if (!unitId) continue;
     const btn = row.querySelector('button.stack-unit-toggle') as HTMLButtonElement | null;
     if (!btn) continue;
-    btn.style.display = nonSelectableUnitIds.has(unitId) ? 'none' : '';
+    btn.style.visibility = nonSelectableUnitIds.has(unitId) ? 'hidden' : 'visible';
   }
 }
 
@@ -767,13 +767,13 @@ async function renderSealiftSection(units: GameStateSnapshot['units'], calloutEl
         });
         slotRow.appendChild(select);
 
-        if (debarkEnabled) {
-          const debarkBtn = document.createElement('button');
-          debarkBtn.type = 'button';
-          debarkBtn.className = 'unit-select stack-unit-toggle';
-          debarkBtn.textContent = UNIT_DESELECT_GLYPH;
-          debarkBtn.disabled = !debarkEnabled;
-          debarkBtn.addEventListener('click', async () => {
+        const debarkBtn = document.createElement('button');
+        debarkBtn.type = 'button';
+        debarkBtn.className = 'unit-select stack-unit-toggle';
+        debarkBtn.textContent = UNIT_DESELECT_GLYPH;
+        debarkBtn.disabled = !debarkEnabled;
+        debarkBtn.style.visibility = debarkEnabled ? 'visible' : 'hidden';
+        debarkBtn.addEventListener('click', async () => {
             if (tacticalSealiftMode) {
               const prev = selectedUnitId ?? '';
               if (prev) {
@@ -816,9 +816,8 @@ async function renderSealiftSection(units: GameStateSnapshot['units'], calloutEl
             }
             refreshStackCalloutIfOpen();
             requestRedraw();
-          });
-          slotRow.appendChild(debarkBtn);
-        }
+        });
+        slotRow.appendChild(debarkBtn);
         right.appendChild(slotRow);
       };
 

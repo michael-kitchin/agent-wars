@@ -981,7 +981,7 @@ export function getBuildProgressPointsForHex(h3Index: string): number {
 /**
  * Reads Keep-building standing order for a hex through the game DB handle.
  *
- * Purpose: Facade over controlInfrastructure Keep-building reads for game-actions callers.
+ * Purpose: Facade over controlInfrastructure Keep-building reads for gameActions callers.
  * When to use: Snapshots, prune sync, production refill, and Keep-building mutations.
  * Expected outcome: Same contract as `getKeepBuildingForHex` in controlInfrastructure.
  * Exceptions: None.
@@ -996,7 +996,7 @@ export function getKeepBuildingForHex(h3Index: string): {
 /**
  * Writes Keep-building standing order for a hex through the game DB handle.
  *
- * Purpose: Facade over controlInfrastructure Keep-building writes for game-actions callers.
+ * Purpose: Facade over controlInfrastructure Keep-building writes for gameActions callers.
  * When to use: Arm/disarm, last-type sync, prune invalidation, and refill-path clears.
  * Expected outcome: Same contract as `setKeepBuildingForHex` in controlInfrastructure.
  * Exceptions: Propagates when enabling without a unit type.
