@@ -529,8 +529,8 @@ export function applyHumanTacticalDraftBeatInStrategicOrder(args: {
     }
     const bAfterHumanEmbark = applyTacticalEmbarkPhaseOnBattle(bAfterBothMoves, args.embarkOrders, 'human');
     const bAfterHumanFerry = applyTacticalFerryPhaseOnBattle(bAfterHumanEmbark, args.ferryOrders, 'human');
-    const bAfterOppFerry = applyTacticalFerryPhaseOnBattle(bAfterHumanFerry, opp?.ferryOrders, 'opponent');
-    const bSynced = tacticalBattleWithSyncedEmbarkCargo(bAfterOppFerry);
+    const bAfterOppFerry = applyTacticalFerryPhaseOnBattle(bAfterHumanFerry.battle, opp?.ferryOrders, 'opponent');
+    const bSynced = tacticalBattleWithSyncedEmbarkCargo(bAfterOppFerry.battle);
     const meleePack = applyTacticalMeleeAfterSupportOrders(bSynced, rawNext);
     const battleAdvancedTurn: TacticalBattleSnapshot = {
       ...meleePack.battle,
@@ -549,7 +549,7 @@ export function applyHumanTacticalDraftBeatInStrategicOrder(args: {
       killsByDirectFire: acc.killsByDirectFire,
       killsByAirStrike: acc.killsByAirStrike,
       killsByReturnFire: acc.killsByReturnFire,
-      removedUnits: acc.removedUnits,
+      removedUnits: [...acc.removedUnits, ...bAfterHumanFerry.removedUnits, ...bAfterOppFerry.removedUnits],
       infrastructureDestroyedEvents: acc.infrastructureDestroyedEvents,
       airStrikeAttemptCount: acc.airStrikeAttemptCount,
       airStrikePlaybackMoves: acc.airStrikePlaybackMoves,

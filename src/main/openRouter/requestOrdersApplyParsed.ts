@@ -403,7 +403,7 @@ export function applyParsedRequestOrders(args: ApplyParsedRequestOrdersArgs): Re
         dropReasons.push(`Air unit ${aiOrderUnitLabel(f.unitId)} cannot strike and ferry in the same tactical turn`);
         continue;
       }
-      const fr = validateTacticalOpponentFerryOrder(f, planAfterMove, aiOrderUnitLabel);
+      const fr = validateTacticalOpponentFerryOrder(f, planAfterMove, aiOrderUnitLabel, movementProjected);
       if (fr.valid) {
         validatedFerry.push(f);
         seenFerry.add(f.unitId);

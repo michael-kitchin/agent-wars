@@ -91,7 +91,7 @@ Live assembler notes that match the matrix above:
 2. **The prompt lists only callable tools.** The numbered list in `# Available Tools` is exactly the enabled set for this consultation. A tool absent from that list must not be named anywhere in the prompt as something to call, including as a prohibition. When a precomputed briefing is attached, assessment and estimate tools are not callable and their names must not appear.
 3. **Never in tactical.** The assessment tools and the combat-estimate tool are stripped in battle, along with the memory, standing-order, and production tool groups. A tactical prompt must not tell the model to call any of them.
 4. **Copy, do not re-derive.** When the options table is present, a destination listed there is already legal for the unit or units named on that row. The prompt must instruct the model to copy such a target directly into the matching envelope field and to call the routing tool only for a destination the table does not list for that unit.
-5. **Action type decides the field.** An option row's action determines where its target goes: approach and move rows into the move field, ferry rows into the ferry list (strategic only; a battle prompt must not name ferry as a mapping), air strike rows into the strike list when air is present, ranged rows into a ranged action. The prompt must state this mapping once, in `# Available Tools`, and the envelope contract must not contradict it. When one option row lists several unit ids, that mapping is one envelope entry with `unitIds` copied from the row, not one entry per id. A unit listed on several overlapping rows still gets at most one move and one shot: pick one row per action type; do not copy overlapping rows that relist the same unit. A Target Hex listed only for other units is never a legal copy for this unit; if this unit has no row, route or leave it idle.
+5. **Action type decides the field.** An option row's action determines where its target goes: approach and move rows into the move field, ferry rows into the ferry list, air strike rows into the strike list when air is present, ranged rows into a ranged action. The prompt must state this mapping once, in `# Available Tools`, and the envelope contract must not contradict it. When one option row lists several unit ids, that mapping is one envelope entry with `unitIds` copied from the row, not one entry per id. A unit listed on several overlapping rows still gets at most one move and one shot: pick one row per action type; do not copy overlapping rows that relist the same unit. A Target Hex listed only for other units is never a legal copy for this unit; if this unit has no row, route or leave it idle.
 6. **Stop condition.** Once destinations are chosen the model submits. The prompt must say that re-assessing or re-routing after a destination is chosen is wasted budget, because the round limit is finite and exhausting it produces no orders at all.
 7. **Empty tool set.** When no tool is enabled, `# Available Tools` still appears with `No tools available.` so the model cannot conclude that unlisted tools might work.
 
@@ -123,7 +123,7 @@ The envelope is one JSON object. Field order, optional tails, and legal actions 
 | `strategy` | string | required, second | One line summarising this period's plan |
 | `orders` | array | required, third | Per-unit actions, processed in list order |
 | `airStrikes` | array | present when the opponent has air units | Strike actions |
-| `ferryOrders` | array | present when the opponent has air units | Rebase actions. In battle, coaching says do not rebase; Best Options produces no ferry rows, but the field is still listed. |
+| `ferryOrders` | array | present when the opponent has air units | Rebase actions. In battle, dests are intact airport cells in the footprint; strike-or-ferry exclusivity still applies. |
 | `callbacks` | array | always offered | Re-consultation subscriptions; the whole list is replaced each response |
 | `memoryUpdates` | array | present when memory tools are enabled | Memory writes and deletes |
 | `productionOrders` | array | present when production tools are enabled | Queue actions |
@@ -148,7 +148,7 @@ Envelope-wide rules the prompt must state:
 | `cancel_order` | legal when standing-order tools are enabled | **forbidden** |
 | `embark`, `transport_move`, `disembark` | legal when the opponent has naval units | legal when the opponent has naval sub-units |
 | `airStrikes` entries | legal when the opponent has air units | legal when the opponent has air sub-units, targeting anywhere in the footprint |
-| `ferryOrders` entries | legal when the opponent has air units | listed when the opponent has air sub-units; not offered as a Best Options row; coaching says do not rebase |
+| `ferryOrders` entries | legal when the opponent has air units | legal when the opponent has air sub-units; dests are intact airport cells in the footprint |
 | `memoryUpdates` entries | legal when memory tools are enabled | **forbidden** |
 | `productionOrders` entries | legal when production tools are enabled | **forbidden** |
 

@@ -13,6 +13,7 @@ import type {
 } from '../../shared/ipcTypes';
 import type { InfrastructureDestroyedEvent, RemovedUnitSnapshot } from '../../shared/ipc/readyTypes';
 import type { TacticalBattleSnapshot, TacticalSubUnitSnapshot } from '../../shared/tacticalBattleTypes';
+import { tacticalFerryApplyOutcome } from './tacticalFerryAirportGuards';
 import {
   tacticalMovementTerrainAnchorH3,
   tacticalRangedDirectFirePassesTerrainAndRange,
@@ -34,14 +35,13 @@ import {
   applyTacticalRangedRubbleToRes4Cell,
   type TacticalRangedRubbleApplyOptions,
 } from '../gameActions/tacticalRangedInfrastructureRubble';
-import { listRes4FeatureOverridesForGame } from '../gameDb';
+import { isDbReady, listRes4FeatureOverridesForGame } from '../gameDb';
 import { hasIntactAirportAtTacticalAirBase } from '../returnFireAirportLookup';
 import { refreshTacticalBattleRes4TerrainFromGameDb } from './computeTacticalBattleSnapshot';
 import { tacticalLogMutate, tacticalLogQuery } from './tacticalLogging';
 import {
   tacticalFindSubUnitIndexById,
   tacticalGuardOpponentAirSubUnitForFerry,
-  tacticalRes4FootprintContains,
 } from './tacticalSnapshotGuards';
 
 /**
@@ -718,21 +718,36 @@ export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
 }
 
 /**
+ * Snapshot plus ferry-abort casualties after one player's tactical ferry phase.
+ *
+ * Contract: `removedUnits` are air sub-units destroyed because dest was illegal and the origin airport is gone.
+ * When to use: Ready/support apply after `applyTacticalFerryPhaseOnBattle`.
+ * Expected outcome: Empty `removedUnits` when every hop moved or stayed; battle `subUnits` omit destroyed air.
+ * Exceptions: None.
+ */
+export type TacticalFerryPhaseResult = {
+  battle: TacticalBattleSnapshot;
+  removedUnits: RemovedUnitSnapshot[];
+};
+
+/**
  * Applies air ferry repositioning for one player after movement, mirroring strategic ferry-after-move.
  *
  * Purpose: Keeps tactical ferry phase aligned with `readyStrategicResolutionPipeline` post-move ferry handling.
  * When to use: After `projectTacticalSnapshotAfterHumanMovementOrders` / opponent movement on the same beat.
- * Expected outcome: Air sub-units jump to legal res4 destinations; invalid rows are skipped with trace logs.
+ * Expected outcome: Air jumps to intact airport cells in the footprint; illegal dest with a lost origin destroys
+ * the unit; illegal dest with an intact origin leaves the unit in place.
  * Exceptions: None.
  */
 export function applyTacticalFerryPhaseOnBattle(
   battle: TacticalBattleSnapshot,
   ferryOrders: readonly FerryOrder[] | undefined,
   player: 'human' | 'opponent'
-): TacticalBattleSnapshot {
-  if (!ferryOrders?.length) return battle;
+): TacticalFerryPhaseResult {
+  if (!ferryOrders?.length) return { battle, removedUnits: [] };
   let sub = battle.subUnits.map((u) => ({ ...u }));
-  const res4Set = new Set(battle.res4ChildH3Indexes);
+  const removedUnits: RemovedUnitSnapshot[] = [];
+  const toDestroy = new Set<string>();
   const syncCargoToNavalHex = (): void => {
     const idTo = new Map(sub.map((u) => [u.id, u] as const));
     sub = sub.map((u) => {
@@ -748,12 +763,41 @@ export function applyTacticalFerryPhaseOnBattle(
     const air = sub[fi]!;
     if (air.player !== player || air.unitType !== 'air') continue;
     if (player === 'opponent' && !tacticalGuardOpponentAirSubUnitForFerry(sub, fi)) continue;
-    if (!tacticalRes4FootprintContains(res4Set, f.destinationH3Index)) continue;
-    sub[fi] = { ...air, h3Index: f.destinationH3Index };
+    const outcome = tacticalFerryApplyOutcome(battle, air.h3Index, f.destinationH3Index);
+    if (outcome === 'move') {
+      sub[fi] = { ...air, h3Index: f.destinationH3Index };
+      continue;
+    }
+    if (outcome === 'destroy') {
+      toDestroy.add(air.id);
+      removedUnits.push({
+        id: air.id,
+        player: air.player,
+        unitType: air.unitType,
+        h3Index: air.h3Index,
+        displayName: air.displayName,
+      });
+      tacticalLogQuery('applyTacticalFerryPhaseOnBattle destroy lost origin', {
+        unitId: f.unitId,
+        dest: f.destinationH3Index,
+      });
+    }
+  }
+  if (toDestroy.size > 0) {
+    const subsBefore = sub;
+    sub = sub.filter((u) => !toDestroy.has(u.id));
+    if (isDbReady()) {
+      syncStrategicUnitsDbWhenTacticalParentsEliminated(subsBefore, sub);
+    }
   }
   syncCargoToNavalHex();
-  tacticalLogMutate('applyTacticalFerryPhaseOnBattle', { battleId: battle.battleId, player, count: ferryOrders.length });
-  return { ...battle, subUnits: sub };
+  tacticalLogMutate('applyTacticalFerryPhaseOnBattle', {
+    battleId: battle.battleId,
+    player,
+    count: ferryOrders.length,
+    destroyedCount: removedUnits.length,
+  });
+  return { battle: { ...battle, subUnits: sub }, removedUnits };
 }
 
 /**

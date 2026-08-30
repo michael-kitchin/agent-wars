@@ -1,7 +1,7 @@
 /**
  * Tactical coaching items from tactical-prompt.md section 4, plus the context-block doctrine.
  *
- * Purpose: Battle consultations must not carry strategic win, production, memory, or ferry advice.
+ * Purpose: Battle consultations must not carry strategic win, production, or memory advice.
  * When to use: Only via `buildCoachingBullets` / `buildContextCoaching`.
  * Expected outcome: Eleven-plus required items, gated on air, naval, and the options table.
  * Exceptions: None.
@@ -37,7 +37,7 @@ ${MESSAGE_BLOCK}`;
  *
  * Purpose: Same membership test as strategic, with battle substitutions.
  * When to use: `buildCoachingBullets` in tactical mode.
- * Expected outcome: No home-region, production, memory, ferry, or assign_order coaching.
+ * Expected outcome: No home-region, production, memory, or assign_order coaching.
  * Exceptions: None.
  */
 export function buildTacticalCoachingBullets(gates: CoachingGates): readonly string[] {
@@ -119,13 +119,13 @@ const INFANTRY_REACH_BULLET =
 /**
  * Air strikes reach the whole battle, once.
  *
- * Purpose: The strategic strike radius does not apply, and ferrying is not offered.
+ * Purpose: The strategic strike radius does not apply; strike or ferry to an intact airport, not both.
  * When to use: When the opponent has air sub-units.
- * Expected outcome: Strike any cell in the footprint; do not rebase.
+ * Expected outcome: Strike any cell in the footprint or ferry to an airport cell; cannot do both.
  * Exceptions: None.
  */
 const AIR_STRIKE_BULLET =
-  '- An air sub-unit may strike any cell in the footprint, and that is its one action for the beat. Do not rebase.';
+  '- An air sub-unit may strike any cell in the footprint or ferry to an intact airport cell in the footprint; it cannot strike and ferry in the same beat.';
 
 /**
  * Sealift still works inside the footprint.
@@ -178,7 +178,7 @@ function optionCopyOrRoutingBullet(gates: CoachingGates): string {
       buildOptionCopyMappingClause({
         actorNoun: 'sub-unit',
         hasAirUnits: gates.hasAirUnits,
-        includeFerryMapping: false,
+        includeFerryMapping: gates.hasAirUnits,
       }) +
       routing
     );

@@ -253,7 +253,7 @@ export const ACTION_AIR_STRIKES = 'air strike';
  * Action label for air ferry destinations in possible-actions / Best Options tables.
  *
  * Purpose: Air units reposition airport-to-airport; labeling those dests `move/melee` invites explicit_move / tempo-rule misuse.
- * When to use: `collectAggregatedPossibleActionRows` strategic air-move rows (tactical Best Options omits ferry).
+ * When to use: `collectAggregatedPossibleActionRows` air-move rows (strategic owned airports in range; tactical footprint airports).
  * Expected outcome: Rendered Action column shows `ferry`.
  * Exceptions: None.
  */

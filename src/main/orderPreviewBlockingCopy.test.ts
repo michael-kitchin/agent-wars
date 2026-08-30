@@ -57,6 +57,16 @@ const marchBlockingCases: { reason: string; terrainKind: string | null; expected
     expected: 'Blocked: Invalid',
   },
   {
+    reason: '1st Air (ferry): Destination airport is not intact',
+    terrainKind: null,
+    expected: 'Blocked: Invalid',
+  },
+  {
+    reason: '1st Air (ferry): Origin airport is not intact',
+    terrainKind: null,
+    expected: 'Blocked: Invalid',
+  },
+  {
     reason: 'Air units do not use tactical march',
     terrainKind: 'plains',
     expected: 'Blocked: Air — use strike mode or ferry (dbl-click)',

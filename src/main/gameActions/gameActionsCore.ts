@@ -69,7 +69,6 @@ import { tacticalMovementUnitTypeForPathfinding } from '../../shared/tacticalTer
 import {
   buildStrategicUnitDisplayLabelResolver,
   fallbackDisplayNameFromUnitId,
-  tacticalSubUnitLabelForUserMessage,
 } from '../../shared/unitDisplayNames';
 import { validateTacticalGroupRangedTarget } from './tacticalGroupRangedTargetValidation';
 import { validateAirStrikeOrder, validateFerryOrder } from './airValidation';
@@ -129,6 +128,7 @@ import { tacticalComputeMovementOrderOutcome } from '../tacticalBattle/tacticalS
 import { ready as readyImpl, resolveMeleeIntercept as resolveMeleeInterceptImpl } from './gameActionsReadyEntrypoints';
 import { captureTurnLossNoteFromResolution } from './captureTurnLossNote';
 import { validateHumanMarchOrdersWhenTacticalActive } from './tacticalMarchOrderGuards';
+import { validateTacticalGroupFerryTarget } from '../tacticalBattle/tacticalFerryAirportGuards';
 
 export { evaluateRegionControlWinnerAtEndOfTurn } from './regionControlWinner';
 
@@ -1504,17 +1504,12 @@ export function validateGroupFerryTarget(
     if (isTacticalBattleActive()) {
       const snap = getActiveTacticalBattleSnapshot();
       if (!snap) return { success: false, reason: 'No tactical battle is active.' };
-      const footprint = new Set(snap.res4ChildH3Indexes);
-      if (!footprint.has(destinationH3Index)) return { success: false, reason: 'Destination is outside the tactical battle.' };
-      for (const unitId of uniqueUnitIds) {
-        const label = tacticalSubUnitLabelForUserMessage(snap.subUnits, unitId);
-        const unit = snap.subUnits.find((u) => u.id === unitId);
-        if (!unit || unit.player !== tacticalAttackerPlayer) {
-          return { success: false, reason: `${label}: Unit not in tactical battle.` };
-        }
-        if (unit.unitType !== 'air') return { success: false, reason: `${label}: Only air units can ferry.` };
-      }
-      return { success: true };
+      return validateTacticalGroupFerryTarget(
+        snap,
+        uniqueUnitIds,
+        destinationH3Index,
+        tacticalAttackerPlayer
+      );
     }
     const strategicFerryLabel = buildStrategicUnitDisplayLabelResolver(humanPerspectiveStateSnapshot().units);
     for (const unitId of uniqueUnitIds) {

@@ -518,7 +518,7 @@ test('tactical system prompt omits Scenario Objective and includes battle goal p
     assert.ok(prompt.includes('Do not emit assign_order'));
     assert.ok(prompt.includes('Standing orders do not move sub-units'));
     assert.ok(prompt.includes('approach and move/melee Target Hexes into explicit_move'));
-    assert.ok(!prompt.includes('ferry into ferryOrders'), 'tactical plan_route line must not coach ferry');
+    assert.ok(prompt.includes('ferry into ferryOrders'), 'tactical plan_route line must coach ferry into ferryOrders');
     assert.ok(!prompt.includes('query_orders'));
     assert.ok(!prompt.includes('# Standing Order Status'));
     assert.ok(!prompt.includes('Your units (ID, type, briefing hex)'));

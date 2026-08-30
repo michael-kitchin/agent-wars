@@ -147,6 +147,8 @@ test('tactical coaching includes every required item when its gate is on', () =>
   assert.match(text, /urban or rubble/i);
   assert.match(text, /Infantry and armor fire at res4 baselines/i);
   assert.match(text, /strike any cell in the footprint/i);
+  assert.match(text, /ferryOrders/);
+  assert.match(text, /intact airport/i);
   assert.match(text, /lowest-defense/i);
   assert.match(text, /friendly/i);
   assert.match(text, /stack/i);
@@ -165,6 +167,7 @@ test('tactical coaching includes every required item when its gate is on', () =>
 test('tactical conditional items disappear when their gate is off', () => {
   assert.doesNotMatch(joined(tacticalGates({ hasAirUnits: false })), /strike any cell in the footprint/i);
   assert.doesNotMatch(joined(tacticalGates({ hasAirUnits: false, hasBestOptionsTable: true })), /airStrikes/);
+  assert.doesNotMatch(joined(tacticalGates({ hasAirUnits: false, hasBestOptionsTable: true })), /ferryOrders/);
   assert.doesNotMatch(joined(tacticalGates({ hasNavalUnits: false })), /Naval Transport Status/i);
   assert.doesNotMatch(joined(tacticalGates({ hasBestOptionsTable: false })), /Copy a Target Hex from a row listing that sub-unit/i);
   assert.match(joined(tacticalGates({ hasBestOptionsTable: false, planningEnabled: true })), /routing tool/i);

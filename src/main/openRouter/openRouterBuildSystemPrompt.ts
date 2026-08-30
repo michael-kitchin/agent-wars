@@ -128,9 +128,6 @@ export function buildSystemPromptForTools(
     if (m.name === 'plan_route' && !hasNaval) {
       line = line.replace(NAVAL_PLAN_ROUTE_PROMPT_SUFFIX, '');
     }
-    if (m.name === 'plan_route' && tacticalBattleActive) {
-      line = line.replace(', ferry into ferryOrders', '');
-    }
     return line;
   });
   const toolsIntro = buildAvailableToolsIntro(flags, hasPrecomputedBriefing, coordinateContext.mode, {

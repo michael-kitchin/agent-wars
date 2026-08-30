@@ -61,7 +61,7 @@ export function projectTacticalSnapshotAfterValidatedOpponentOrders(
       ? projectTacticalSnapshotAfterOpponentMovementOrders(airRanged.battle, opts.movementOrders)
       : airRanged.battle;
   const afterFerry = applyTacticalFerryPhaseOnBattle(afterMove, opts.ferryOrders, 'opponent');
-  return tacticalBattleWithSyncedEmbarkCargo(afterFerry);
+  return tacticalBattleWithSyncedEmbarkCargo(afterFerry.battle);
 }
 
 /**
@@ -128,13 +128,13 @@ export function projectTacticalSnapshotAfterValidatedHumanSupportOrders(
   }
   const afterEmbark = applyTacticalEmbarkPhaseOnBattle(acc.battle, opts.embarkOrders, 'human');
   const afterFerry = applyTacticalFerryPhaseOnBattle(afterEmbark, opts.ferryOrders, 'human');
-  const outBattle = tacticalBattleWithSyncedEmbarkCargo(afterFerry);
+  const outBattle = tacticalBattleWithSyncedEmbarkCargo(afterFerry.battle);
   return {
     battle: outBattle,
     killsByDirectFire: acc.killsByDirectFire,
     killsByAirStrike: acc.killsByAirStrike,
     killsByReturnFire: acc.killsByReturnFire,
-    removedUnits: acc.removedUnits,
+    removedUnits: [...acc.removedUnits, ...afterFerry.removedUnits],
     infrastructureDestroyedEvents: acc.infrastructureDestroyedEvents,
     airStrikeAttemptCount: acc.airStrikeAttemptCount,
   };

@@ -57,7 +57,7 @@ export function buildToolsIntroCopySentence(args: {
   logDebug('promptSpec buildToolsIntroCopySentence', args);
   const actor = args.coordinateMode === 'tactical' ? 'sub-unit' : 'unit';
   const oneStep = args.coordinateMode === 'strategic' ? ' when you need a one-step move' : '';
-  const ferry = args.coordinateMode === 'strategic' && args.hasAirUnits ? '; copy ferry Target Hexes into ferryOrders' : '';
+  const ferry = args.hasAirUnits ? '; copy ferry Target Hexes into ferryOrders' : '';
   const air = args.hasAirUnits ? '; copy air strike Target Hexes into airStrikes' : '';
   return (
     `Copy Best Options This Turn approach and move/melee Target Hexes into explicit_move${oneStep}; ` +

@@ -31,7 +31,7 @@ The model is a weak model. Each job below must be answerable from information th
 16. **Fight the local battle, not the war.** Reduce enemy sub-units inside this footprint; regional victory text does not apply. Needs `BATTLE_FRAME`, `SUBUNIT_IDENTITY`.
 17. **Choose this beat's shots.** Same tempo logic at res4 ranges, including infantry. Needs `TACTICAL_RANGE_TABLE`, `TEMPO_RANGED_SHOT`, `RANGED_LEGAL_TARGETS`, `CASUALTY_PRIORITY`.
 18. **Move sub-units within a beat budget.** Pick a destination this beat can actually reach, and know an over-reaching destination is truncated rather than rejected. Needs `TACTICAL_MP_RULES`, `FIRST_LEG_TRUNCATION`, `BEST_OPTIONS_ROWS`.
-19. **Employ air inside the footprint.** Strike any occupied cell in the battle; do not expect strategic ferry behaviour. Needs `AIR_STRIKE_ENVELOPE`, `TACTICAL_RANGE_TABLE`.
+19. **Employ air inside the footprint.** Strike any occupied cell, or ferry to an intact airport cell in the battle; never both. Needs `AIR_STRIKE_ENVELOPE`, `FERRY_DESTINATIONS`, `AIR_ORDER_RESTRICTIONS`.
 20. **Handle cargo in battle.** Embark, transport, disembark at res4. Needs `EMBARK_STATE`, `EMBARK_LEGALITY`.
 21. **Not rely on standing orders.** Know that no standing order will move a sub-unit this beat, so an unordered sub-unit is an idle sub-unit. Needs `STANDING_ORDERS_INERT_IN_BATTLE`.
 22. **Scope callbacks to sub-units.** Use `parent:slot` ids and know the list dies with the battle. Needs `CALLBACK_TACTICAL_SCOPE`, `SUBUNIT_IDENTITY`.

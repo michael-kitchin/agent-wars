@@ -2,7 +2,7 @@
  * Tactical Best Options contracts for empty-city vs approach when the enclosing res1 is uncontrolled,
  * and for this-turn air strikes / ferry (footprint-wide human targets, no ferry rows).
  *
- * Purpose: Empty urban tiles in an uncontrolled battle must not crowd out closing with observed humans, and must not appear as blank ranged shots. Tactical air Best Options must match Air Operations (strike anywhere in the battle at human-occupied cells) and omit ferry dests.
+ * Purpose: Empty urban tiles in an uncontrolled battle must not crowd out closing with observed humans, and must not appear as blank ranged shots. Tactical air Best Options must match Air Operations (strike anywhere in the battle at human-occupied cells) and list airport ferry dests when the air unit has no this-turn strike.
  * When to use: After edits to tactical this-turn interest, approach, ranged, or air Best Options filters.
  * Expected outcome: Far enemies yield approach (not empty-city move/ranged); city capture remains when no enemy is observed; air strikes list far humans and omit empty urban and ferry.
  * Exceptions: Throws when the fixture cannot place an adjacent urban neighbor and a human six steps away under the same parent.
@@ -246,6 +246,10 @@ function tacticalAirBestOptionsBattle(args: {
     strategicHexTerrainKind: 'plains',
     res4TerrainKindByH3: terrain,
     res4IsUrbanByH3: args.includeEmptyUrban && res4EmptyUrban ? { [res4EmptyUrban]: true } : {},
+    res4IsAirportByH3: {
+      [res4Air]: true,
+      ...(args.includeEmptyUrban && res4EmptyUrban ? { [res4EmptyUrban]: true } : {}),
+    },
     subUnits,
   };
   const strategic: GameStateSnapshot = {
@@ -273,7 +277,7 @@ function tacticalAirBestOptionsBattle(args: {
  *
  * Purpose: Air Operations says strike anywhere in the battle; the this-turn table used a 3-hex collector and an airport check on the air unit's res4 cell, so far humans and real plan-state airports were dropped.
  * When to use: After edits to tactical this-turn air-strike collection in `collectAggregatedPossibleActionRows`.
- * Expected outcome: Strike on a human beyond strategic strike range; no strike on empty urban; no ferry rows.
+ * Expected outcome: Strike on a human beyond strategic strike range; no strike on empty urban; no ferry rows because this-turn strike-or-ferry exclusivity drops ferry when a strike is listed.
  * Exceptions: Throws when the fixture cannot place those neighbors.
  */
 function testTacticalBestOptionsAirStrikesUseFootprintAndOmitFerry(): void {
@@ -294,7 +298,33 @@ function testTacticalBestOptionsAirStrikesUseFootprintAndOmitFerry(): void {
   );
   assert.ok(
     !rows.some((r) => r.actionTypes.includes('ferry') || r.actionTypes.includes('move/melee')),
-    'tactical Best Options must not list ferry dests for air'
+    'tactical Best Options must not list ferry dests for air that already has a this-turn strike'
+  );
+}
+
+/**
+ * Ensures tactical Best Options list intact airport ferry dests when the air unit has no this-turn strike.
+ *
+ * Purpose: Tactical ferry is airport-to-airport inside the footprint; the table used to omit every ferry row.
+ * When to use: After edits to tactical air dest collection in `collectAggregatedPossibleActionRows`.
+ * Expected outcome: A `ferry` row to the other intact airport cell; no air-strike rows when no human is present.
+ * Exceptions: Throws when the fixture cannot place an adjacent dest airport.
+ */
+function testTacticalBestOptionsListsAirportFerryDests(): void {
+  const { tactical, plan, res4EmptyUrban } = tacticalAirBestOptionsBattle({
+    includeFarHuman: false,
+    includeEmptyUrban: true,
+    airportCount: 1,
+  });
+  assert.ok(res4EmptyUrban, 'expected a dest airport cell');
+  const rows = collectTacticalThisTurnRows(plan, tactical).filter((r) => r.unitId === 'opp-air-strike');
+  assert.ok(
+    rows.some((r) => r.targetH3 === res4EmptyUrban && r.actionTypes.includes('ferry')),
+    'tactical Best Options must list a ferry dest at the other intact airport'
+  );
+  assert.ok(
+    !rows.some((r) => r.actionTypes.includes('air strike')),
+    'no this-turn air strikes when no human is in the footprint'
   );
 }
 
@@ -338,6 +368,10 @@ const tests = [
   {
     name: 'collectAggregatedPossibleActionRows tactical Best Options air strikes use footprint and omit ferry',
     fn: testTacticalBestOptionsAirStrikesUseFootprintAndOmitFerry,
+  },
+  {
+    name: 'collectAggregatedPossibleActionRows tactical Best Options lists airport ferry dests',
+    fn: testTacticalBestOptionsListsAirportFerryDests,
   },
   {
     name: 'collectAggregatedPossibleActionRows tactical Best Options air strikes require parent airport',

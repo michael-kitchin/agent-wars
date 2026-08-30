@@ -157,7 +157,7 @@ From `source-inventory.md` section 3, derived from code only.
 | `## Unit Status and Threats` | Kept without a standing-order column — 2.6 |
 | `## Attention Flags` | Kept without standing-order bullets — 2.6 |
 | `# Operational Map` with the tactical legend | Kept — 2.6 |
-| `### Best Options This Turn` | Kept, no ferry rows — 2.6 |
+| `### Best Options This Turn` | Kept, including airport ferry dests — 2.6 |
 | `## Recent Turn Notes` | Kept, battle-scoped — 2.6 |
 | `## Active Callbacks` | Kept with sub-unit ids — 2.6 |
 | `Strategic context:` tactical variant | Kept — 2.8 |
@@ -254,4 +254,4 @@ From `source-inventory.md` section 8. Mechanics follow the engine. Wording follo
 | `AIR_NAVAL_DASH_ROWS` | Resolved: sections omitted |
 | `GENERIC_GOAL_ABSENT` | Resolved |
 | `CONSULT_POLICY_PARTIAL` | Unconsulted-period bullets exist; mandatory override ids are not listed |
-| `TACTICAL_FERRY_ENVELOPE` | Envelope still lists `ferryOrders` in battle when air is present; coaching says do not rebase |
+| `TACTICAL_FERRY_ENVELOPE` | Envelope lists `ferryOrders` in battle when air is present; Best Options lists intact airport dests in the footprint |

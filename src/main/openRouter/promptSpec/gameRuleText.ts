@@ -236,7 +236,7 @@ export function buildAirEmploymentRule(gates: GameRuleTextGates): string {
   logTrace('promptSpec buildAirEmploymentRule', { ...gates });
   if (!gates.hasAirUnits) return '';
   if (gates.coordinateMode === 'tactical') {
-    return 'An air unit may strike anywhere in the battle; the strategic strike radius does not apply. Striking still uses its one air action for the beat.';
+    return 'An air unit may strike anywhere in the battle or ferry to an intact airport cell in the footprint; the strategic strike radius and 4-cell ferry hop do not apply. It cannot strike and ferry in the same beat.';
   }
   return (
     `An air unit may strike a target within ${AIR_STRIKE_RANGE_HEXES} cells of its base (strike radius of ${AIR_STRIKE_RANGE_HEXES}) ` +

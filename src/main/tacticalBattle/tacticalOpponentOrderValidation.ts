@@ -4,12 +4,11 @@
 
 import { cellToParent } from 'h3-js';
 import type { AirStrikeOrder, EmbarkOrder, FerryOrder, GameStateSnapshot } from '../../shared/ipcTypes';
-import type { TacticalSubUnitSnapshot } from '../../shared/tacticalBattleTypes';
-import { AIR_FERRY_RANGE_HEXES, formatFerryOutOfRangeReason } from '../../shared/tacticalRanges';
+import type { TacticalBattleSnapshot, TacticalSubUnitSnapshot } from '../../shared/tacticalBattleTypes';
+import { tacticalFerryAirportRejectionReason } from './tacticalFerryAirportGuards';
 import { tacticalSubUnitLabelForUserMessage } from '../../shared/unitDisplayNames';
-import { dbGetOne, getHexController, getRes1InfrastructureForHex, isDbReady } from '../gameDb';
+import { dbGetOne, getRes1InfrastructureForHex, isDbReady } from '../gameDb';
 import { canEmbarkAtHex } from '../../shared/sealiftEmbarkEligibility';
-import { isWithinAirFerryGridRange } from '../gameActions/gridRange';
 import { tacticalLogQuery } from './tacticalLogging';
 import { tacticalInvalidResult, tacticalValidResult, type TacticalValidationResult } from './tacticalValidationResult';
 
@@ -93,36 +92,30 @@ export function validateTacticalOpponentAirStrikeOrder(
 }
 
 /**
- * Validates an opponent ferry order for tactical air sub-units using airport control parity.
+ * Validates an opponent ferry order for tactical air sub-units using res4 airport cells.
  *
- * Contract: Same range and airport-intact checks as `validateFerryOrder` but unit positions come from `state.units`.
+ * Contract: Origin and dest must be intact res4 airport cells on `battle` (not merely a child of a parent res1
+ * that has some airport). Dest must be on the tactical map; no 4-hex range cap and no dest-ownership check.
  * When to use: Tactical AI flow after movement projection.
- * Expected outcome: Valid when origin/destination airports exist, range holds, and destination airport is opponent-controlled.
- * Exceptions: Returns invalid when DB reads fail or destination is outside the tactical hex list.
+ * Expected outcome: Valid when origin/destination airport cells exist and dest is in the tactical hex list.
+ * Exceptions: Returns invalid when the dest is outside the tactical hex list.
  * Parameters: `displayLabelForUnit` must resolve tactical sub-unit ids to `displayName` strings (never raw ids in `reason` text).
  */
 export function validateTacticalOpponentFerryOrder(
   order: FerryOrder,
   state: GameStateSnapshot,
-  displayLabelForUnit: (unitId: string) => string
+  displayLabelForUnit: (unitId: string) => string,
+  battle: TacticalBattleSnapshot
 ): TacticalValidationResult {
   tacticalLogQuery('validateTacticalOpponentFerryOrder', { unitId: order.unitId });
-  if (!isDbReady()) return tacticalInvalidResult('Database not initialized');
   const unit = state.units.find((u) => u.id === order.unitId);
   if (!unit) return tacticalInvalidResult(`Unit not found: ${displayLabelForUnit(order.unitId)}`);
   if (unit.player !== 'opponent') return tacticalInvalidResult('Only opponent units can ferry in tactical AI flow');
   if (unit.unitType !== 'air') return tacticalInvalidResult('Only air units can ferry');
   const hexIds = new Set(state.hexes.map((h) => h.h3Index));
   if (!hexIds.has(order.destinationH3Index)) return tacticalInvalidResult('Destination not on tactical map');
-  const withinFerryRange = isWithinAirFerryGridRange(unit.h3Index, order.destinationH3Index, 'tacticalFerry');
-  if (!withinFerryRange) return tacticalInvalidResult(formatFerryOutOfRangeReason(AIR_FERRY_RANGE_HEXES));
-  const originInfra = getRes1InfrastructureForHex(cellToParent(unit.h3Index, 1));
-  if (originInfra.airportCount <= 0) return tacticalInvalidResult('Origin airport is not intact');
-  const destInfra = getRes1InfrastructureForHex(cellToParent(order.destinationH3Index, 1));
-  if (destInfra.airportCount <= 0) return tacticalInvalidResult('Destination airport is not intact');
-  const destRes1 = cellToParent(order.destinationH3Index, 1);
-  const controller = getHexController(destRes1);
-  if (controller !== unit.player) return tacticalInvalidResult('Destination airport must be controlled by unit owner');
+  const airportReason = tacticalFerryAirportRejectionReason(battle, unit.h3Index, order.destinationH3Index);
+  if (airportReason) return tacticalInvalidResult(airportReason);
   tacticalLogQuery('validateTacticalOpponentFerryOrder ok', { unitId: order.unitId });
   return tacticalValidResult();
 }

@@ -8,13 +8,14 @@
  * Best Options This Turn interest/approach live in `possibleUnitActionsBestOptionsInterest.ts`
  * (enemy ∪ uncontrolled unoccupied infra; empty interest falls back to approach; this-turn air strikes
  * list enemy-occupied or human-controlled infra only strategically, and human-occupied footprint cells
- * tactically when the parent res1 airport is intact; tactical Best Options omits ferry).
+ * tactically when the parent res1 airport is intact; tactical Best Options lists airport-to-airport ferry dests).
  */
 
 import { cellToParent, gridDisk } from 'h3-js';
 import { type GameStateSnapshot, listRes4FeatureOverridesForGame } from '../gameDb';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { collectTacticalLegalMoveDestinationRes4Hexes } from '../../shared/collectTacticalLegalMoveDestinationRes4Hexes';
+import { collectTacticalLegalFerryDestinationHexes } from '../tacticalBattle/tacticalFerryAirportGuards';
 import { unitHasDirectRangedPlanning } from '../../shared/rangePerimeterModel';
 import { getValidDestinations } from '../oneStepMoveDestinations';
 import {
@@ -627,7 +628,7 @@ export function collectAggregatedPossibleActionRows(args: {
 
    * Contract: When true, narrows move/ranged candidate hexes for the operational-map Best Options This Turn table; when false or omitted, preserves legacy full-table row generation.
    * When to use: Set only from `buildStrategicOperationalMapSectionMarkdown` / `buildTacticalOperationalMapSectionMarkdown`.
-   * Expected outcome: Ground move/melee filter for non-air units (strategic and tactical: human/enemy contact, else approach, else uncontrolled unoccupied infra); empty or infra-only interest falls back to approach in both modes; strategic ranged lists only enemy-occupied hexes in range (same as full markdown); tactical ranged Best Options lists only human-occupied cells (legal infra-only shots unchanged); this-turn air strikes list enemy-occupied or human-controlled infra only (strategic) or human-occupied footprint cells when the parent res1 airport is intact (tactical); strategic air ferry dests stay listed and are labeled `ferry`; tactical Best Options omits ferry rows.
+   * Expected outcome: Ground move/melee filter for non-air units (strategic and tactical: human/enemy contact, else approach, else uncontrolled unoccupied infra); empty or infra-only interest falls back to approach in both modes; strategic ranged lists only enemy-occupied hexes in range (same as full markdown); tactical ranged Best Options lists only human-occupied cells (legal infra-only shots unchanged); this-turn air strikes list enemy-occupied or human-controlled infra only (strategic) or human-occupied footprint cells when the parent res1 airport is intact (tactical); air ferry dests stay listed and are labeled `ferry` (strategic: owned airports in range 4; tactical: intact airport cells in the footprint).
    * Exceptions: None.
    */
   forThisTurnOptionsTable?: boolean;
@@ -705,7 +706,7 @@ export function collectAggregatedPossibleActionRows(args: {
 
   const opponentAirCount = opponentUnits.filter((u) => u.unitType === 'air').length;
   if (tacticalBattle && opponentAirCount > 0) {
-    logDebug('possibleUnitActions collectAggregatedPossibleActionRows skipTacticalAirFerryRows', {
+    logDebug('possibleUnitActions collectAggregatedPossibleActionRows tacticalAirFerryRows', {
       opponentAirCount,
     });
   }
@@ -719,7 +720,13 @@ export function collectAggregatedPossibleActionRows(args: {
   for (const unit of opponentUnits) {
     const legalDests = (() => {
       if (unit.unitType === 'air') {
-        if (tacticalBattle) return [];
+        if (tacticalBattle) {
+          return rememberComputedHexList(
+            ferryDestByKey,
+            `${unit.h3Index}|tactical-ferry`,
+            () => collectTacticalLegalFerryDestinationHexes(tacticalBattle, unit.h3Index)
+          );
+        }
         return rememberComputedHexList(
           ferryDestByKey,
           `${unit.h3Index}|${unit.player}`,

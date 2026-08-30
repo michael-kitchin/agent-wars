@@ -117,7 +117,7 @@ Derived from `formatTacticalBriefing`, `tacticalBriefingAssessments.ts`, the tac
 | `## Recent Turn Notes` | `scope: 'tactical'` | at least one qualifying prior row | omitted |
 | `## Active Callbacks` | `buildActiveCallbacksSection` | always | same empty row as strategic |
 
-Tactical unit status uses the same six columns and has **no** standing-order column. Best Options actions in battle: `air strike`, `ranged`, `approach`, `move/melee`. No `ferry` rows.
+Tactical unit status uses the same six columns and has **no** standing-order column. Best Options actions in battle: `air strike`, `ranged`, `approach`, `ferry`, `move/melee`.
 
 ### 3.2 Tactical system-prompt shell
 
@@ -130,7 +130,7 @@ Tactical unit status uses the same six columns and has **no** standing-order col
 | Coaching | `buildTacticalCoachingBullets` plus `Strategic context:` with engage-priority, doctrine, message |
 | Scenario objective | omitted |
 | Scouting directive | omitted |
-| Envelope | no `assign_order` / `cancel_order`; no `memoryUpdates` / `productionOrders`; `airStrikes` / `ferryOrders` still listed when the roster has air, even though coaching says do not rebase |
+| Envelope | no `assign_order` / `cancel_order`; no `memoryUpdates` / `productionOrders`; `airStrikes` / `ferryOrders` listed when the roster has air; Best Options may list airport ferry dests |
 | Tools | planning tools when enabled; assessment, estimation, memory, orders, production stripped (`requestOrdersFlow`) |
 
 Always omitted: `# Standing Order Status`, orderless table, Supplemental Hex Intelligence, Production Status, Strategic Memory, Scenario Objective, Unit Roster, hop-honesty line, Explored/Controlled bullets, `assess_unit` / `estimate_combat` hints.
@@ -268,4 +268,4 @@ Every row still resolves the same way: **the engine wins** for mechanics. Wordin
 | `AIR_NAVAL_DASH_ROWS` | Resolved: builders return `''` when that arm is absent |
 | `GENERIC_GOAL_ABSENT` | Resolved: `GENERIC_OBJECTIVE_SENTENCE` |
 | `CONSULT_POLICY_PARTIAL` | Partial: unconsulted-period bullets exist; mandatory override ids are not listed |
-| `TACTICAL_FERRY_ENVELOPE` | Envelope still lists `ferryOrders` when air is present in battle; coaching says do not rebase; Best Options produces no ferry rows |
+| `TACTICAL_FERRY_ENVELOPE` | Envelope lists `ferryOrders` when air is present in battle; Best Options lists intact airport dests in the footprint; strike-or-ferry exclusivity still drops ferry when a strike is listed |

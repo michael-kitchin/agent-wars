@@ -455,7 +455,7 @@ The tactical game uses **WEGO** simultaneous resolution — the same model as th
 3. **Air strike phase.**
 4. **Ranged phase.**
 5. **Movement phase** (first-leg truncation as in §12.4).
-6. **Ferry** (tactical air ferry is footprint-bounded; not the strategic 4-hex airport hop).
+6. **Ferry** (tactical air ferry is footprint-bounded and only between intact airport cells; not the strategic 4-hex airport hop). If the destination is illegal and the origin airport is gone, the air unit is destroyed; if the origin is still intact, it stays.
 7. **Cargo sync.**
 8. **Melee phase.**
 9. Casualties removed. Next beat, or battle end.
