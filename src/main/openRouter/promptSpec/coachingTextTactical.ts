@@ -51,7 +51,7 @@ export function buildTacticalCoachingBullets(gates: CoachingGates): readonly str
   ];
   if (gates.hasAirUnits) bullets.push(AIR_STRIKE_BULLET);
   bullets.push(`- ${buildCasualtySortRule()}`);
-  bullets.push(`- ${buildDestinationOccupancyRule()}`);
+  bullets.push(`- ${buildDestinationOccupancyRule(gates.coordinateMode)}`);
   if (gates.hasNavalUnits) bullets.push(SEALIFT_BULLET);
   bullets.push(CALLBACK_BULLET);
   bullets.push(UNCONSULTED_BEAT_BULLET);

@@ -302,7 +302,8 @@ function filterApproachMoveHexesForThisTurnOptionsTable(
  *
  * Purpose: Shared this-turn move resolution for strategic and tactical Best Options tables.
  * When to use: After computing `interest` from the mode-specific occupancy/infra filter.
- * Expected outcome: Enemy-contact interest as `move/melee`; otherwise approach when any closing dest exists; infra-only interest as `move/melee` only when approach cannot run.
+ * Expected outcome: Enemy-contact interest as `move/melee`; otherwise approach when any closing dest exists that is
+ * not stay-put occupied and not enemy-occupied; infra-only interest as `move/melee` only when approach cannot run.
  * Exceptions: None.
  */
 export function applyInterestOrApproach(args: {
@@ -316,6 +317,17 @@ export function applyInterestOrApproach(args: {
   enemyOccupiedH3: ReadonlySet<string>;
   /** Indexed snapshot used to name nearest enemies on approach rows. */
   indexed: BestOptionsInterestIndex;
+  /**
+   * Friendly hexes that will still be held this period.
+   *
+   * Contract: Omit this field to occupy every currently friendly hex (tactical). Strategic this-turn passes the
+   * stay-put set, which equals current occupancy when no unit is leaving. A leaver origin must be absent so a
+   * follow-on dest can appear; dests of leavers are occupied only when another stay-put unit is there.
+   * When to use: Strategic this-turn approach after `stayPutFriendlyOccupiedHexes`.
+   * Expected outcome: Approach dests skip these hexes and all enemy-occupied hexes.
+   * Exceptions: None.
+   */
+  stayPutFriendlyH3?: ReadonlySet<string>;
 }): { hexes: string[]; actionType: string; enemySummaryOverride?: string } {
   const hasEnemyContact = args.interest.some((h3) => args.enemyOccupiedH3.has(h3));
   let result: { hexes: string[]; actionType: string; enemySummaryOverride?: string };
@@ -323,8 +335,12 @@ export function applyInterestOrApproach(args: {
     result = { hexes: args.interest, actionType: ACTION_MOVES_MELEE };
   } else {
     const occupied = new Set<string>(args.enemyOccupiedH3);
-    for (const [h3, units] of args.indexed.friendlyUnitsByHex) {
-      if ((units?.length ?? 0) > 0) occupied.add(h3);
+    if (args.stayPutFriendlyH3) {
+      for (const h3 of args.stayPutFriendlyH3) occupied.add(h3);
+    } else {
+      for (const [h3, units] of args.indexed.friendlyUnitsByHex) {
+        if ((units?.length ?? 0) > 0) occupied.add(h3);
+      }
     }
     const unoccupiedLegal = args.legalHexes.filter((h3) => !occupied.has(h3));
     const approach = filterApproachMoveHexesForThisTurnOptionsTable(
@@ -349,6 +365,7 @@ export function applyInterestOrApproach(args: {
     legalCount: args.legalHexes.length,
     interestCount: args.interest.length,
     enemyOccupiedCount: args.enemyOccupiedH3.size,
+    stayPutFriendlyCount: args.stayPutFriendlyH3?.size ?? null,
     hasEnemyContact,
     actionType: result.actionType,
     outCount: result.hexes.length,

@@ -3,18 +3,23 @@
  */
 
 import assert from 'node:assert/strict';
-import { test } from 'node:test';
+import { beforeEach, test } from 'node:test';
 import { gridDisk } from 'h3-js';
-import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
+import type { TacticalBattleSnapshot, TacticalSubUnitSnapshot } from '../../shared/tacticalBattleTypes';
 import {
   projectTacticalSnapshotAfterHumanMovementOrders,
   projectTacticalSnapshotAfterOpponentMovementOrders,
 } from './tacticalMovementApply';
+import { resetTacticalMovementPlanningCacheForTests } from './tacticalMovementPlanningCache';
 import {
   firstRingCellDistinctFrom,
   tacticalRes1Cell,
   tacticalRes4UnderRes1Corner,
 } from './testSupport/tacticalRes4HexFixtures';
+
+beforeEach(() => {
+  resetTacticalMovementPlanningCacheForTests();
+});
 
 /**
  * Supplies §12.4 terrain so ring-based fixtures are passable for infantry and naval without SQLite.
@@ -297,4 +302,92 @@ test('projectTacticalSnapshotAfterHumanMovementOrders ignores opponent-controlle
     { unitId: 'opp-su-ign', toH3Index: dest },
   ]);
   assert.equal(next.subUnits[0]!.h3Index, center);
+});
+
+/**
+ * Builds a land infantry row for stacking projection tests.
+ *
+ * Purpose: Keeps stacking fixtures readable without repeating snapshot field lists.
+ * When to use: Stacking tests in this file only.
+ * Expected outcome: Unembarked infantry at `h3Index`.
+ * Exceptions: None.
+ */
+function landInfantry(id: string, player: TacticalSubUnitSnapshot['player'], h3Index: string): TacticalSubUnitSnapshot {
+  return {
+    id,
+    parentUnitId: `p-${id}`,
+    player,
+    unitType: 'infantry',
+    h3Index,
+    displayName: id,
+  };
+}
+
+test('projectTacticalSnapshotAfterHumanMovementOrders lets two units stack on the same empty dest', () => {
+  const res1 = tacticalRes1Cell(18, 19);
+  const center = tacticalRes4UnderRes1Corner(18, 19);
+  const ring = [...gridDisk(center, 1)];
+  const dest = firstRingCellDistinctFrom(center);
+  const originB = ring.find((h) => h !== center && h !== dest);
+  assert.ok(originB);
+  const snap: TacticalBattleSnapshot = {
+    battleId: 'tb-hum-stack-empty',
+    enclosingRes1H3Index: res1,
+    res4ChildH3Indexes: ring,
+    ...coastalFootprintTerrain(ring),
+    strategicTurnNumber: 1,
+    tacticalTurnNumber: 1,
+    subUnits: [landInfantry('hum-a', 'human', center), landInfantry('hum-b', 'human', originB)],
+  };
+  const next = projectTacticalSnapshotAfterHumanMovementOrders(snap, [
+    { unitId: 'hum-a', toH3Index: dest },
+    { unitId: 'hum-b', toH3Index: dest },
+  ]);
+  assert.equal(next.subUnits.find((u) => u.id === 'hum-a')?.h3Index, dest);
+  assert.equal(next.subUnits.find((u) => u.id === 'hum-b')?.h3Index, dest);
+});
+
+test('projectTacticalSnapshotAfterHumanMovementOrders lets a unit stack onto a hex another friendly already occupies', () => {
+  const res1 = tacticalRes1Cell(21, 22);
+  const occupied = tacticalRes4UnderRes1Corner(21, 22);
+  const ring = [...gridDisk(occupied, 1)];
+  const origin = firstRingCellDistinctFrom(occupied);
+  const snap: TacticalBattleSnapshot = {
+    battleId: 'tb-hum-stack-occupied',
+    enclosingRes1H3Index: res1,
+    res4ChildH3Indexes: ring,
+    ...coastalFootprintTerrain(ring),
+    strategicTurnNumber: 1,
+    tacticalTurnNumber: 1,
+    subUnits: [landInfantry('hum-stay', 'human', occupied), landInfantry('hum-join', 'human', origin)],
+  };
+  const next = projectTacticalSnapshotAfterHumanMovementOrders(snap, [
+    { unitId: 'hum-join', toH3Index: occupied },
+  ]);
+  assert.equal(next.subUnits.find((u) => u.id === 'hum-stay')?.h3Index, occupied);
+  assert.equal(next.subUnits.find((u) => u.id === 'hum-join')?.h3Index, occupied);
+});
+
+test('projectTacticalSnapshotAfterOpponentMovementOrders lets two units stack on the same empty dest', () => {
+  const res1 = tacticalRes1Cell(23, 24);
+  const center = tacticalRes4UnderRes1Corner(23, 24);
+  const ring = [...gridDisk(center, 1)];
+  const dest = firstRingCellDistinctFrom(center);
+  const originB = ring.find((h) => h !== center && h !== dest);
+  assert.ok(originB);
+  const snap: TacticalBattleSnapshot = {
+    battleId: 'tb-opp-stack-empty',
+    enclosingRes1H3Index: res1,
+    res4ChildH3Indexes: ring,
+    ...coastalFootprintTerrain(ring),
+    strategicTurnNumber: 1,
+    tacticalTurnNumber: 1,
+    subUnits: [landInfantry('opp-a', 'opponent', center), landInfantry('opp-b', 'opponent', originB)],
+  };
+  const next = projectTacticalSnapshotAfterOpponentMovementOrders(snap, [
+    { unitId: 'opp-a', toH3Index: dest },
+    { unitId: 'opp-b', toH3Index: dest },
+  ]);
+  assert.equal(next.subUnits.find((u) => u.id === 'opp-a')?.h3Index, dest);
+  assert.equal(next.subUnits.find((u) => u.id === 'opp-b')?.h3Index, dest);
 });

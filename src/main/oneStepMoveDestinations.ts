@@ -253,8 +253,9 @@ function computeValidDestinations(
 /**
  * Returns legal one-step destinations filtered to hexes not currently occupied by any unit.
  *
- * Purpose: Convenience wrapper for AI order generation where units cannot stack on occupied hexes.
- * When to use: Use instead of `getValidDestinations` when the caller needs to exclude occupied hexes from consideration.
+ * Purpose: Suggestion helper for orderless/adjacent-cell listings that prefer empty closing hexes. Friendly
+ * stacking is legal; `getValidDestinations` (order validation) does not apply this filter.
+ * When to use: Use instead of `getValidDestinations` when the caller wants empty dests for briefing suggestions.
  * Expected outcome: Subset of `getValidDestinations` with hexes currently holding any unit removed.
  * Exceptions: Never throws.
  */

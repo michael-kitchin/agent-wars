@@ -203,7 +203,8 @@ export function legalOrderActionsForMode(
  * know what the parser will drop rather than guessing from examples.
  * When to use: Appended to the JSON contract instruction.
  * Expected outcome: Top-level array and legacy field bans in both modes; standing-order and
- * memory/production bans only in tactical; current-cell march ban only in strategic.
+ * memory/production bans only in tactical; current-cell march ban only in strategic; both modes
+ * name stacking as legal.
  * Exceptions: None.
  */
 export function buildInvalidOutputRulesClause(gates: EnvelopeGates): string {
@@ -217,7 +218,7 @@ export function buildInvalidOutputRulesClause(gates: EnvelopeGates): string {
       : 'More than one ranged action for the same unit in the same period is not honoured.',
     'Raw H3 strings and latitude/longitude pairs are never valid field values.',
     "A ranged action's target must not be the acting unit's own move destination.",
-    'A one-step destination that holds a friendly unit is not legal.',
+    'Friendly stacking is legal; a cell holding an enemy is legal as move/melee contact.',
   ];
   if (gates.coordinateMode === 'tactical') {
     return [

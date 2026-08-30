@@ -285,7 +285,7 @@ export function omitThisTurnFerryRowsForStrikingAir(
 /**
  * Urban count used when ranking Best Options rows for the per-unit cap.
  *
- * Purpose: Approach dests are empty of units; urban count must not outrank a closer empty closing hex.
+ * Purpose: Approach dests omit stay-put stacks; urban count must not outrank a closer closing hex.
  * When to use: `compareTableRowsForUnitPriority` only.
  * Expected outcome: `0` for rows whose action types include `approach`; otherwise the row's `urbanHexCount`.
  * Exceptions: None.

@@ -13,13 +13,16 @@ import type { GameStateSnapshot } from './gameDb';
 import {
   getValidDestinations,
   getValidDestinationsComputeCountForTests,
+  getValidDestinationsUnoccupied,
   resetValidDestinationsCacheForTests,
 } from './oneStepMoveDestinations';
 import { MOVEMENT_RANGE_BY_UNIT_TYPE } from '../shared/tacticalRanges';
 import { getOrderedHexList } from './mapData';
 import {
   ensureTerrainClassificationCacheLoaded,
+  getRes1LandMassByH3,
 } from './terrainClassificationCache';
+import { landUnitCanOccupyHex } from '../shared/landTraversalRes1';
 import {
   isLandSeaportHex,
   navalMayOccupyHex,
@@ -223,11 +226,53 @@ function testGetValidDestinationsAssumeDebarkedDoesNotShareSlot(): void {
   );
 }
 
+/**
+ * Order validation dests still include a hex another unit already occupies.
+ *
+ * Purpose: Friendly stacking is legal; `getValidDestinations` is what `validateAiOrder` uses. The unoccupied
+ * wrapper is only for empty-hex briefing suggestions.
+ * When to use: After changing dest occupancy filtering.
+ * Expected outcome: Occupied neighbor stays in `getValidDestinations` and is dropped from `getValidDestinationsUnoccupied`.
+ * Exceptions: None.
+ */
+function testGetValidDestinationsKeepsOccupiedHexes(): void {
+  ensureTerrainClassificationCacheLoaded();
+  resetValidDestinationsCacheForTests();
+  const hexList = getOrderedHexList();
+  const landMass = getRes1LandMassByH3();
+  const emptyState = minimalState(hexList);
+  let origin: string | null = null;
+  let occupied: string | undefined;
+  for (const h3 of hexList) {
+    if (!landUnitCanOccupyHex(h3, landMass)) continue;
+    const dests = getValidDestinations({ id: 'inf-mover', h3Index: h3, unitType: 'infantry' }, emptyState);
+    occupied = dests.find((d) => d !== h3);
+    if (occupied) {
+      origin = h3;
+      break;
+    }
+  }
+  assert.ok(origin && occupied, 'expected a land infantry origin with at least one dest besides itself');
+  resetValidDestinationsCacheForTests();
+  const occupiedState = {
+    ...emptyState,
+    units: [{ id: 'friend-on-dest', player: 'human', unitType: 'infantry', h3Index: occupied }],
+  };
+  const withOcc = getValidDestinations({ id: 'inf-mover', h3Index: origin, unitType: 'infantry' }, occupiedState);
+  assert.ok(withOcc.includes(occupied), 'order validation dests must still include a friendly-occupied hex');
+  const suggestion = getValidDestinationsUnoccupied(
+    { id: 'inf-mover', h3Index: origin, unitType: 'infantry' },
+    occupiedState
+  );
+  assert.ok(!suggestion.includes(occupied), 'suggestion helper still prefers empty hexes');
+}
+
 const tests = [
   { name: 'getValidDestinations matches reference full scan', fn: testGetValidDestinationsMatchesFullScan },
   { name: 'getValidDestinations gridDisk branch returns destinations', fn: testGetValidDestinationsDiskBranchProducesResults },
   { name: 'getValidDestinations reuses stacked same-origin dests', fn: testGetValidDestinationsReusesStackedSameOrigin },
   { name: 'getValidDestinations assume-debarked does not share dest slot', fn: testGetValidDestinationsAssumeDebarkedDoesNotShareSlot },
+  { name: 'getValidDestinations keeps occupied hexes', fn: testGetValidDestinationsKeepsOccupiedHexes },
 ];
 
 /**

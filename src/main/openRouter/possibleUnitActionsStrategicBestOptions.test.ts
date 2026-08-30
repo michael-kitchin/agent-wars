@@ -23,7 +23,10 @@ import {
   findGeodesicLandMassChain,
 } from '../testSupport/strategicLandChainFixtures';
 import { collectAggregatedPossibleActionRows } from './possibleUnitActions';
+import { applyInterestOrApproach } from './possibleUnitActionsBestOptionsInterest';
 import { formatLatLng } from './promptText';
+import { getValidDestinations } from '../oneStepMoveDestinations';
+import { stayPutFriendlyOccupiedHexes } from '../tools/stayPutFriendlyOccupancy';
 import { suggestApproachDestinationsForOrderlessUnits } from '../tools/orderlessUnitSuggestions';
 
 /**
@@ -545,13 +548,13 @@ function findUnmeasurableFerryDiskPair(): { origin: string; dest: string } {
 }
 
 /**
- * Ensures approach Target Hexes skip friendly-occupied cells and match the orderless suggestion.
+ * Ensures approach Target Hexes skip stay-put friendly-occupied cells and match the orderless suggestion.
  *
  * Purpose: A live strategic dump listed approach onto CL while friendlies already sat there, and the
  * orderless Suggested Destination was an em dash or a different hex. Both surfaces must copy the same
- * unoccupied closing dest.
+ * closing dest that is not a stay-put stack.
  * When to use: After changing `applyInterestOrApproach` occupancy or `suggestApproachDestinationsForOrderlessUnits`.
- * Expected outcome: No approach row onto the friendly hex; the orderless suggestion is one of the remaining approach hexes.
+ * Expected outcome: No approach row onto the stay-put friendly hex; the orderless suggestion is one of the remaining approach hexes.
  * Exceptions: Throws if no geodesic 4-hop land chain exists.
  */
 function testStrategicBestOptionsApproachSkipsFriendlyOccupiedAndMatchesOrderless(): void {
@@ -568,7 +571,7 @@ function testStrategicBestOptionsApproachSkipsFriendlyOccupiedAndMatchesOrderles
   const approaches = rows.filter((r) => r.actionTypes.includes('approach'));
   assert.ok(
     !approaches.some((r) => r.targetH3 === chain[1]),
-    'friendly-occupied hex must not be an approach dest'
+    'stay-put friendly-occupied hex must not be an approach dest'
   );
   assert.ok(approaches.length >= 1, 'expected unoccupied approach dests toward the far human');
   const suggestions = suggestApproachDestinationsForOrderlessUnits('opponent', state, ['opponent-inf-mover']);
@@ -578,6 +581,71 @@ function testStrategicBestOptionsApproachSkipsFriendlyOccupiedAndMatchesOrderles
     approaches.some((r) => r.targetH3 === suggested),
     'Suggested Destination must be one of this unit\'s Best Options approach hexes'
   );
+}
+
+/**
+ * Ensures a hex a friendly is leaving this period is an approach dest, including for orderless suggestions.
+ *
+ * Purpose: WEGO follow-on: the engine will accept the dest once the occupant marches away; stay-put occupancy
+ * must not hide that cell from Best Options or the orderless column.
+ * When to use: After changing stay-put occupancy or `applyInterestOrApproach`.
+ * Expected outcome: Approach and orderless include the leaver origin; a stay-put stack on the leaver dest remains omitted.
+ * Exceptions: Throws if no geodesic 4-hop land chain exists.
+ */
+function testStrategicBestOptionsApproachListsHexAFriendlyIsLeaving(): void {
+  const chain = findGeodesicLandMassChain(4);
+  const origin = chain[0]!;
+  const leaverHex = chain[1]!;
+  const leaverDest = chain[2]!;
+  const enemy = chain[4]!;
+  const state = chainState({
+    chain,
+    units: [
+      { id: 'opponent-inf-mover', player: 'opponent', unitType: 'infantry', h3Index: origin },
+      { id: 'opponent-inf-leaver', player: 'opponent', unitType: 'infantry', h3Index: leaverHex },
+      { id: 'human-inf-far', player: 'human', unitType: 'infantry', h3Index: enemy },
+    ],
+  });
+  const thisPeriodMoves = new Map([['opponent-inf-leaver', leaverDest]]);
+  const stayPut = stayPutFriendlyOccupiedHexes(
+    [
+      { id: 'opponent-inf-mover', h3Index: origin },
+      { id: 'opponent-inf-leaver', h3Index: leaverHex },
+    ],
+    thisPeriodMoves
+  );
+  const legalHexes = getValidDestinations(
+    { id: 'opponent-inf-mover', h3Index: origin, unitType: 'infantry' },
+    state
+  ).filter((h3) => h3 !== origin);
+  assert.ok(legalHexes.includes(leaverHex), 'fixture requires the leaver hex to be a one-step dest');
+  const resolved = applyInterestOrApproach({
+    unitH3: origin,
+    legalHexes,
+    interest: [],
+    enemyOccupiedH3: new Set([enemy]),
+    indexed: {
+      enemyUnitsByHex: new Map([[enemy, [{ id: 'human-inf-far', unitType: 'infantry' }]]]),
+      friendlyUnitsByHex: new Map([
+        [origin, [{ id: 'opponent-inf-mover', unitType: 'infantry' }]],
+        [leaverHex, [{ id: 'opponent-inf-leaver', unitType: 'infantry' }]],
+      ]),
+      controlByHex: new Map(),
+      infraByHex: new Map(),
+    },
+    stayPutFriendlyH3: stayPut,
+  });
+  assert.equal(resolved.actionType, 'approach');
+  assert.ok(resolved.hexes.includes(leaverHex), 'hex a friendly is leaving must be an approach dest');
+  const suggestions = suggestApproachDestinationsForOrderlessUnits(
+    'opponent',
+    state,
+    ['opponent-inf-mover'],
+    thisPeriodMoves
+  );
+  const suggested = suggestions.get('opponent-inf-mover');
+  assert.ok(suggested, 'orderless table must offer a closing dest when a leaver origin is eligible');
+  assert.ok(resolved.hexes.includes(suggested), 'Suggested Destination must be one of the stay-put-filtered approach hexes');
 }
 
 /**
@@ -666,6 +734,10 @@ const tests = [
   {
     name: 'collectAggregatedPossibleActionRows strategic Best Options approach skips friendly-occupied and matches orderless',
     fn: testStrategicBestOptionsApproachSkipsFriendlyOccupiedAndMatchesOrderless,
+  },
+  {
+    name: 'applyInterestOrApproach lists a hex a friendly is leaving this period',
+    fn: testStrategicBestOptionsApproachListsHexAFriendlyIsLeaving,
   },
 ];
 

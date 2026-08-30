@@ -131,7 +131,7 @@ Using the **current** positions, after air strike casualties:
 
 ### 4.3 Apply ground and naval movement
 
-Move every ground and naval unit that has a movement order to its destination. Positions are now final for ground and naval units. A cell holding a **friendly** unit is not a legal destination. An **enemy**-occupied cell is legal contact (move/melee).
+Move every ground and naval unit that has a movement order to its destination. Positions are now final for ground and naval units. Friendly stacking is legal. An **enemy**-occupied cell is legal contact (move/melee).
 
 ### 4.4 Cargo sync (strategic; after movement, before ferry)
 
@@ -234,7 +234,7 @@ No player input during steps 2–11 except the melee-intercept dialog at step 9.
 
 ## 6. Edge cases and clarifications
 
-- **Stacking:** If multiple friendly units are in one hex, they all defend together in melee. When they attack (ranged or melee), each unit rolls. No stacking limit is assumed unless specified elsewhere. Friendly-occupied hexes are illegal movement destinations.
+- **Stacking:** If multiple friendly units are in one hex, they all defend together in melee. When they attack (ranged or melee), each unit rolls. No stacking limit is assumed unless specified elsewhere. Friendly stacking is legal on both the strategic and tactical maps. Enemy-occupied cells are legal move/melee contact destinations.
 - **Ranged vs. same hex:** A unit with range 1 or 2 can still participate in melee if it is in the same hex as the enemy. Armor in a hex with enemy infantry both (a) can be resolved in ranged phase as attacker against **other** hexes, and (b) participates in melee in its own hex. Each unit rolls at most once per phase for its declared action.
 - **Coastal bombardment:** Naval at range 2 can target land units in hexes within 2. Armor in a land hex may attack naval units in an adjacent water hex (range 1). Infantry (range 0) cannot attack naval on the strategic map.
 - **Multiple attackers on one hex:** When several hexes attack the same defender hex, resolve as one combined engagement. Assign defender return-fire hits to attacker hexes one at a time: most units remaining (ties: lowest H3 index); within that hex apply casualty priority.
@@ -423,7 +423,7 @@ Tactical movement uses a per-beat **movement-point budget** consumed as sub-unit
 - Road edges multiply remaining points by **2**; rail edges by **3** (`TACTICAL_TRANSPORT_ROAD_BUDGET_MULTIPLIER` / `TACTICAL_TRANSPORT_RAIL_BUDGET_MULTIPLIER`).
 - Urban enter override: infantry/armor enter urban at 1 MP. Rubble land enters cost 2 MP. Naval treats rubble as blocking land.
 
-A destination beyond this beat's budget is **clamped** to the first reachable leg rather than rejected. When the planner cannot use the destination at all but a neighbouring footprint cell still closes on it, the engine may take that single step, unless that cell holds a friendly unit.
+A destination beyond this beat's budget is **clamped** to the first reachable leg rather than rejected. When the planner cannot use the destination at all but a neighbouring footprint cell still closes on it, the engine may take that single step. Friendly stacking on that cell is legal.
 
 ### 12.5 Ranged combat
 

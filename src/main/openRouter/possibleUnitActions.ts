@@ -28,6 +28,11 @@ import { compareUnitIdsNaturally } from '../../shared/unitIds';
 import { isWithinAirFerryGridRange, isWithinAirStrikeGridRange } from '../gameActions/gridRange';
 import { logDebug, logTrace } from '../logger';
 import { logHexControllerParityMismatch } from '../snapshotDbParity';
+import {
+  friendlyOccupantsFromHexIndex,
+  readStandingThisPeriodMoves,
+  stayPutFriendlyOccupiedHexes,
+} from '../tools/stayPutFriendlyOccupancy';
 import { compareHexIds, partitionHomelandNearestOther } from './possibleUnitActionsPartition';
 import {
   ACTION_AIR_STRIKES,
@@ -685,6 +690,18 @@ export function collectAggregatedPossibleActionRows(args: {
   }
 
   const strategicEnemyOccupiedH3 = new Set(indexed.enemyUnitsByHex.keys());
+  const stayPutFriendlyH3 =
+    forThisTurn && !tacticalBattle
+      ? stayPutFriendlyOccupiedHexes(
+          friendlyOccupantsFromHexIndex(indexed.friendlyUnitsByHex),
+          readStandingThisPeriodMoves(FRIENDLY_PLAYER)
+        )
+      : undefined;
+  if (stayPutFriendlyH3) {
+    logDebug('possibleUnitActions collectAggregatedPossibleActionRows stayPut occupancy', {
+      stayPutHexCount: stayPutFriendlyH3.size,
+    });
+  }
 
   const opponentAirCount = opponentUnits.filter((u) => u.unitType === 'air').length;
   if (tacticalBattle && opponentAirCount > 0) {
@@ -745,6 +762,7 @@ export function collectAggregatedPossibleActionRows(args: {
           interest: filterGroundMoveHexesForThisTurnOptionsTable(indexed, moveHexes),
           enemyOccupiedH3: strategicEnemyOccupiedH3,
           indexed,
+          stayPutFriendlyH3,
         });
         moveHexes = resolved.hexes;
         moveActionType = resolved.actionType;

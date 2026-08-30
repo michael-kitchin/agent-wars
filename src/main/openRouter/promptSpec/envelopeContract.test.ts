@@ -258,7 +258,8 @@ test('invalid-output rules name the mode-specific prohibitions', () => {
   assert.match(strategic, /top-level/i);
   assert.ok(strategic.includes('movementOrders'));
   assert.match(strategic, /current (cell|hex)/i);
-  assert.match(strategic, /friendly unit/i);
+  assert.match(strategic, /stack/i);
+  assert.doesNotMatch(strategic, /one-step destination that holds a friendly unit is not legal/i);
 
   const tactical = buildInvalidOutputRulesClause({
     coordinateMode: 'tactical',
@@ -268,7 +269,8 @@ test('invalid-output rules name the mode-specific prohibitions', () => {
   });
   assert.ok(tactical.includes('assign_order'));
   assert.ok(tactical.includes('cancel_order'));
-  assert.match(tactical, /friendly unit/i);
+  assert.match(tactical, /stack/i);
+  assert.doesNotMatch(tactical, /one-step destination that holds a friendly unit is not legal/i);
   assert.ok(!tactical.includes('infantry cannot'));
 });
 

@@ -41,6 +41,41 @@ test('buildTacticalMarchHoverPreview marks in-range neighbor as valid', () => {
   assert.ok((result.previews[0]?.preview.segments[0]?.hexes.length ?? 0) >= 2);
 });
 
+test('buildTacticalMarchHoverPreview treats a friendly-occupied neighbor as a valid dest', () => {
+  const center = latLngToCell(11, 21, 4);
+  const ringCells = [...gridDisk(center, 2)];
+  const neighbor = ringCells.find((h) => h !== center);
+  assert.ok(neighbor);
+  const battle: TacticalBattleSnapshot = {
+    battleId: 'b-stack-hover',
+    enclosingRes1H3Index: center,
+    res4ChildH3Indexes: ringCells,
+    strategicTurnNumber: 1,
+    tacticalTurnNumber: 1,
+    subUnits: [
+      {
+        id: 'su-join',
+        parentUnitId: 'parent-join',
+        player: 'human',
+        unitType: 'infantry',
+        h3Index: center,
+        displayName: 'Inf Join',
+      },
+      {
+        id: 'su-stay',
+        parentUnitId: 'parent-stay',
+        player: 'human',
+        unitType: 'infantry',
+        h3Index: neighbor,
+        displayName: 'Inf Stay',
+      },
+    ],
+  };
+  const result = buildTacticalMarchHoverPreview(battle, ['su-join'], neighbor);
+  assert.equal(result.validForAll, true);
+  assert.equal(result.previews[0]?.preview.valid, true);
+});
+
 test('buildTacticalMarchDraftDestinationPreview matches hover path for one pending march row', () => {
   const center = latLngToCell(12, 22, 4);
   const ringCells = [...gridDisk(center, 2)];

@@ -14,7 +14,7 @@ The model is a weak model. Each job below must be answerable from information th
 2. **Read the resolution order.** Know that this period's attacks resolve from turn-start positions, before movement, so a unit can shoot and move. Needs `WEGO_PHASE_ORDER`, `TEMPO_RANGED_SHOT`, `ATTACK_ONE_PER_UNIT`.
 3. **Choose this turn's shots and their targets.** Decide, per armed unit, whether to fire and at what. Needs `RANGED_LEGAL_TARGETS`, `BEST_OPTIONS_ROWS`, `COMBAT_STATS`, `STRATEGIC_RANGE_TABLE`, `CASUALTY_PRIORITY`, `ACTION_NEEDED_FLAG`.
 4. **Decide when a unit should not fire.** Recognise the one case where withholding is a real choice, and that it is expressed as an order rather than as silence. Needs `HOLD_FIRE_SEMANTICS`.
-5. **Choose where each unit should be next.** Pick a legal, unoccupied destination for units that need to move now. Needs `BEST_OPTIONS_ROWS`, `LEGAL_DEST_OCCUPANCY`, `TERRAIN_CLASS`, `NAVAL_MOVEMENT_DOMAIN`, `MOVE_BUDGET`.
+5. **Choose where each unit should be next.** Pick a legal destination for units that need to move now. Friendly stacking is legal; enemy-occupied cells are move/melee contact. Needs `BEST_OPTIONS_ROWS`, `LEGAL_DEST_OCCUPANCY`, `TERRAIN_CLASS`, `NAVAL_MOVEMENT_DOMAIN`, `MOVE_BUDGET`.
 6. **Choose standing orders over per-turn micromanagement.** Give every orderless march-capable unit a mission instead of re-planning it every turn. Needs `ORDERLESS_UNITS`, `SUGGESTED_DESTINATION`, `ORDER_TYPE_LEGALITY`, `MARCH_CURRENT_HEX_RULE`, `STANDING_ORDER_STATE`.
 7. **Decide air employment.** For each air unit, strike or reposition, never both. Needs `AIR_STRIKE_ENVELOPE`, `FERRY_DESTINATIONS`, `AIR_ORDER_RESTRICTIONS`.
 8. **Move land force across water.** Decide embark, transport, and disembark. Needs `EMBARK_STATE`, `EMBARK_HEX`, `EMBARK_LEGALITY`, `NAVAL_MOVEMENT_DOMAIN`.
@@ -111,7 +111,7 @@ Scope is `strategic`, `tactical`, `both`, or `consult-only`. Status is `required
 | Id | Meaning | Engine source | Visibility | Jobs | Scope | Status |
 | --- | --- | --- | --- | --- | --- | --- |
 | `BEST_OPTIONS_ROWS` | Precomputed legal actions for this period, grouped by action type and target, with the unit ids that may take each | `collectAggregatedPossibleActionRows`, `renderThisTurnOptionsTableMarkdown` | fog-filtered | 3, 5, 10, 17, 18, 26 | both | required |
-| `LEGAL_DEST_OCCUPANCY` | A friendly-occupied cell is not a legal one-step destination; an enemy-occupied cell is legal as move/melee contact | `getValidDestinations` plus Best Options interest; orderless suggestions use `getValidDestinationsUnoccupied` | n/a | 5, 18 | both | required |
+| `LEGAL_DEST_OCCUPANCY` | Friendly stacking is legal; an enemy-occupied cell is legal as move/melee contact; approach dests omit stay-put friendlies; a cell a friendly is leaving this period is a legal dest | `getValidDestinations` plus Best Options interest; orderless suggestions use stay-put occupancy over `getValidDestinations` | n/a | 5, 18 | both | required |
 | `RANGED_LEGAL_TARGETS` | Which enemy cells or units this unit may fire on this period | `appendNearestLegalEngagement`, `collectTacticalLegalRangedTargetRes4Hexes` | fog-filtered | 3, 17 | both | required |
 | `AIR_STRIKE_ENVELOPE` | What each air unit can strike now: enemy units and enemy infrastructure by kind | `buildAirOperationsBriefingBlock`, `AIR_STRIKE_RANGE_HEXES` | fog-filtered | 7, 19 | both | conditional — the opponent has air units |
 | `FERRY_DESTINATIONS` | Where an air unit may rebase this turn | `AIR_FERRY_RANGE_HEXES`, air ops block | own-side | 7 | strategic | conditional — the opponent has air units |
@@ -193,7 +193,7 @@ Scope is `strategic`, `tactical`, `both`, or `consult-only`. Status is `required
 These are `required` or `conditional` above but `absent` or `partial` in today's prompt. Each is a fact the engine already computes; none invents a system.
 
 1. `WEGO_PHASE_ORDER` — the prompt states only that ranged uses pre-move positions. A model cannot reason about firing then moving, or about ferry landing after movement, from that alone.
-2. `LEGAL_DEST_OCCUPANCY` — the options table is already filtered, but the rule is never stated, so a model that invents a destination has no way to know why it was refused.
+2. `LEGAL_DEST_OCCUPANCY` — closed: stacking is legal in both modes; approach omits stay-put friendlies and lists cells a friendly is leaving this period.
 3. `CASUALTY_PRIORITY` — target selection is a core job and the victim-sort rule is nowhere in the prompt.
 4. `HOLD_FIRE_SEMANTICS` — `hold_fire` is offered as a legal order with no statement of what it does.
 5. `CALLBACK_EVENT_VOCABULARY` — the model is invited to subscribe with no list of valid events, so subscriptions are guesses.

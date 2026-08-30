@@ -47,7 +47,7 @@ Same clause order as strategic section 1.5, with these substitutions:
 | Infantry clause | Infantry and armor fire at res4 baselines; forest, urban, rubble, or a road/rail corridor on the attacker caps them to range 1; mountain LOS blocks armor, naval, and air; close to melee when out of reach |
 | Movement budgets | The point budget from section 1.6: type baselines, origin urban/rubble collapsing infantry and armor to one point, forest penalty for armor, and road/rail remaining-point multipliers; not the strategic per-turn cell counts |
 | Resolution order | Embark, air strikes, ranged fire, movement, ferry, cargo sync, melee, applied per beat with no production step (`buildResolutionOrderRule`) |
-| Truncation clause | A destination beyond this beat's budget is clamped to the first reachable leg rather than rejected; when the planner cannot use the destination at all but a neighbouring footprint cell still closes on it, the engine may take that single step instead, unless that cell holds a friendly unit |
+| Truncation clause | A destination beyond this beat's budget is clamped to the first reachable leg rather than rejected; when the planner cannot use the destination at all but a neighbouring footprint cell still closes on it, the engine may take that single step instead. Friendly stacking on that cell is legal. |
 
 Carries `COMBAT_STATS`, `TACTICAL_RANGE_TABLE`, `ATTACK_ONE_PER_UNIT`, `WEGO_PHASE_ORDER`, `TEMPO_RANGED_SHOT`, `CASUALTY_PRIORITY`, `TACTICAL_MP_RULES`, `FIRST_LEG_TRUNCATION`, `LEGAL_DEST_OCCUPANCY`.
 
@@ -85,7 +85,7 @@ Bullet list, ranked, capped at five, empty form `None.` Tactical emits threat bu
 - **Include:** when at least one option row exists; omit heading and table otherwise.
 - **Columns:** identical to strategic.
 - **Action values in battle:** `air strike`, `ranged`, `approach`, `move/melee`. A `ferry` row is never produced in battle.
-- **"This beat" legality:** move and approach targets are cells reachable this beat under the terrain-weighted budget, computed with the same planner the engine uses when it applies the order. Approach targets are empty of units; move/melee targets may be enemy-occupied. Ranged targets are enemy-occupied cells within reach. Air strike targets are enemy-occupied footprint cells, and are produced only when the parent cell's airport is intact.
+- **"This beat" legality:** move and approach targets are cells reachable this beat under the terrain-weighted budget, computed with the same planner the engine uses when it applies the order. Approach targets omit stay-put friendlies; a cell a friendly is leaving this period is listed. move/melee targets may be enemy-occupied. Ranged targets are enemy-occupied cells within reach. Air strike targets are enemy-occupied footprint cells, and are produced only when the parent cell's airport is intact.
 - **Per-unit cap:** five rows per sub-unit before identical rows are merged; identical rows are merged and their sub-unit ids listed together.
 
 #### `## Recent Turn Notes`
@@ -171,7 +171,7 @@ Section 3. Always included; the example must match the contract. Example unit id
 
 | Action | Required fields | Legality rules the prompt must state |
 | --- | --- | --- |
-| `explicit_move` | `unitId` or `unitIds`, `destination` | One tactical cell for this beat. Prefer an option-row target for those sub-units, or a routing-tool result. When the option row lists several ids, emit one entry with `unitIds`. A destination beyond the beat budget is clamped to the first reachable leg. A cell holding a friendly unit is not legal; a cell holding an enemy is legal as move/melee contact. Embarked cargo debarks automatically before marching. |
+| `explicit_move` | `unitId` or `unitIds`, `destination` | One tactical cell for this beat. Prefer an option-row target for those sub-units, or a routing-tool result. When the option row lists several ids, emit one entry with `unitIds`. A destination beyond the beat budget is clamped to the first reachable leg. Friendly stacking is legal; a cell holding an enemy is legal as move/melee contact. Embarked cargo debarks automatically before marching. |
 | `ranged_attack` | `unitId` or `unitIds`, exactly one of a target cell code or a target sub-unit id | Legal for every type with a res4 reach, infantry included — not "ranged-only" units. One per sub-unit per beat, resolved from beat-start positions. |
 | `airStrikes` entry | `unitId` or `unitIds`, exactly one of a target cell code or a target sub-unit id, `targetType` | Any footprint cell, subject to the parent airport being intact. One air action per sub-unit per beat. |
 | `embark` | `unitId`, `navalUnitId` | Cargo assignment inside the footprint. |
@@ -201,18 +201,18 @@ No `ferry` mapping exists in battle because no `ferry` row is produced.
 5. More than one ranged action for the same sub-unit in the same beat is not honoured. When air is present, the same one-action limit applies to air strikes.
 6. Strategic res1 codes, raw H3 strings, and coordinate pairs are never valid field values.
 7. A ranged target must not be the acting sub-unit's own move destination.
-8. A one-step destination that holds a friendly unit is not legal.
+8. Friendly stacking is legal; a cell holding an enemy is legal as move/melee contact.
 
 ## 4. Required tactical coaching
 
 1. **Fire every beat.** Every sub-unit with a legal shot should be given a ranged action, and an air strike when air is present, with the model choosing each target, because attacks resolve from beat-start positions and never cost the move. The air half of this sentence is omitted when the opponent has no air sub-units. Carries `TEMPO_RANGED_SHOT`, `ATTACK_ONE_PER_UNIT`.
 2. **Nothing moves unless ordered.** Standing orders do not move sub-units in battle, so a sub-unit with a move option and no order is idle for the beat. Carries `STANDING_ORDERS_INERT_IN_BATTLE`.
 3. **Copy option rows.** Use the mapping in section 3.3, and route only for a destination the table does not list for that sub-unit. Never copy a Target Hex from a row that does not list that sub-unit; if the sub-unit has no row, call the routing tool or leave it idle. One row may name several sub-units; copy those ids into one `unitIds` array on a single envelope entry. Each sub-unit gets at most one move and one shot: pick one row per action type; do not copy overlapping rows that relist the same sub-unit. Carries `BEST_OPTIONS_ROWS`.
-4. **Reach is limited and honest.** Infantry or armor already on urban or rubble has a one-point budget this beat. A destination beyond this beat's point budget is clamped to the first reachable leg, so ordering a far cell advances the sub-unit rather than failing, but it does not teleport it. The one-step fallback never enters a cell that already holds a friendly unit. Road and rail edges multiply remaining points. Carries `TACTICAL_MP_RULES`, `FIRST_LEG_TRUNCATION`, `LEGAL_DEST_OCCUPANCY`.
+4. **Reach is limited and honest.** Infantry or armor already on urban or rubble has a one-point budget this beat. A destination beyond this beat's point budget is clamped to the first reachable leg, so ordering a far cell advances the sub-unit rather than failing, but it does not teleport it. The one-step fallback may enter a cell that already holds a friendly unit. Road and rail edges multiply remaining points. Carries `TACTICAL_MP_RULES`, `FIRST_LEG_TRUNCATION`, `LEGAL_DEST_OCCUPANCY`.
 5. **Infantry and armor can shoot here, within terrain limits.** State the res4 infantry and armor baselines, the range-1 cap on forest/urban/rubble/transport, and mountain LOS, because the strategic rule is melee-only infantry and a model carrying baseline-5 armor into a beat will order illegal shots. Carries `TACTICAL_RANGE_TABLE`.
 6. **Air strikes reach the whole battle but only once.** An air sub-unit may hit any occupied footprint cell, and that is its one action for the beat. It must not be coached to rebase. Carries `AIR_STRIKE_ENVELOPE`, `AIR_ORDER_RESTRICTIONS`.
 7. **Target the weakest defender.** Same casualty rule as strategic. Carries `CASUALTY_PRIORITY`.
-8. **Friendly stacks are illegal destinations; enemy cells are move/melee contact.** Same as strategic.
+8. **Friendly stacking is legal; enemy cells are move/melee contact.** Same as strategic.
 9. **Sealift works inside the footprint.** Included only when the naval status section is present. Carries `EMBARK_LEGALITY`, `EMBARK_STATE`.
 10. **Callbacks use sub-unit ids and die with the battle.** Unit-scoped subscriptions name sub-units, the response replaces the whole list, subscriptions are evaluated after each beat under event-driven policy, and all of them are cleared when the battle ends. An empty Active Callbacks table means there are no self-chosen triggers; omitting callbacks or sending `[]` keeps it empty, so only engine-forced consultations remain unless the model subscribes now. Carries `CALLBACK_TACTICAL_SCOPE`, `CALLBACK_REPLACE_SEMANTICS`.
 11. **A beat with no prompt is a beat not acted in.** Coaching says the model is consulted when a subscribed event fires; mandatory overrides also force consults (those ids are not listed). Standing orders are inert in battle, so an unconsulted beat is one where its sub-units did nothing. Carries `CONSULT_POLICY`, `STANDING_ORDERS_INERT_IN_BATTLE`.

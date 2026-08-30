@@ -124,7 +124,7 @@ test('buildMovementBudgetRule quotes engine budgets and states that air never ma
   assert.match(tactical, /rail/i);
   assert.ok(tactical.includes(String(TACTICAL_TRANSPORT_ROAD_BUDGET_MULTIPLIER)));
   assert.ok(tactical.includes(String(TACTICAL_TRANSPORT_RAIL_BUDGET_MULTIPLIER)));
-  assert.match(tactical, /friendly/i);
+  assert.doesNotMatch(tactical, /unless that cell holds a friendly/i);
   assert.doesNotMatch(tactical, /Urban and rubble cells cost more/);
 });
 
@@ -139,11 +139,15 @@ test('buildRangedReachRule distinguishes infantry melee from tactical infantry r
   assert.doesNotMatch(strategic, /mountain/i);
 });
 
-test('buildDestinationOccupancyRule forbids friendly stacks and allows enemy move/melee contact', () => {
-  const text = buildDestinationOccupancyRule();
-  assert.match(text, /friendly/i);
-  assert.match(text, /move\/melee/i);
-  assert.doesNotMatch(text, /not by moving onto the occupied one/);
+test('buildDestinationOccupancyRule allows stacking in both modes', () => {
+  const strategic = buildDestinationOccupancyRule('strategic');
+  const tactical = buildDestinationOccupancyRule('tactical');
+  assert.equal(strategic, tactical);
+  assert.match(strategic, /stack/i);
+  assert.doesNotMatch(strategic, /not a legal destination/i);
+  assert.match(strategic, /stay-put/i);
+  assert.match(strategic, /leaving this period/i);
+  assert.match(strategic, /move\/melee/i);
 });
 
 test('buildHoldFireRule distinguishes the order from simply omitting an attack', () => {

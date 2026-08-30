@@ -162,16 +162,18 @@ export function buildCasualtySortRule(): string {
 }
 
 /**
- * Friendly stacks are illegal destinations; enemy cells are move/melee contact.
+ * Friendly stacking is legal; enemy cells are move/melee contact; approach omits stay-put stacks.
  *
- * Purpose: Best Options lists enemy-occupied cells as move/melee dests the engine will accept; friendly stacks are not legal.
+ * Purpose: Best Options lists enemy-occupied cells as move/melee dests the engine will accept. Friendly stacking
+ * is legal in both modes; approach rows omit stay-put friendlies so closing dests are not crowded by idle stacks,
+ * but a cell a friendly is leaving this period is listed.
  * When to use: Combat paragraph after movement budgets.
- * Expected outcome: Friendly-occupied dests forbidden; copy move/melee onto an enemy cell to make contact.
+ * Expected outcome: Stacking-legal sentence plus enemy contact and stay-put vs leaving coaching, identical in both modes.
  * Exceptions: None.
  */
-export function buildDestinationOccupancyRule(): string {
-  logTrace('promptSpec buildDestinationOccupancyRule', {});
-  return 'A cell holding a friendly unit is not a legal destination. Copy a move/melee Target Hex even when it holds an enemy — that is how contact is made this period. Approach Target Hexes are empty of units.';
+export function buildDestinationOccupancyRule(mode: PromptCoordinateMode): string {
+  logTrace('promptSpec buildDestinationOccupancyRule', { mode });
+  return 'Friendly units may stack on the same cell. Copy a move/melee Target Hex even when it holds an enemy — that is how contact is made this period. Approach Target Hexes omit stay-put friendlies; a cell a friendly is leaving this period is a legal dest.';
 }
 
 /**
@@ -192,7 +194,7 @@ export function buildMovementBudgetRule(mode: PromptCoordinateMode): string {
       'Armor in forest is penalised to the infantry baseline. ' +
       `Road edges multiply remaining points by ${TACTICAL_TRANSPORT_ROAD_BUDGET_MULTIPLIER} and rail edges by ${TACTICAL_TRANSPORT_RAIL_BUDGET_MULTIPLIER}. ` +
       'A non-air unit always retains at least one point. ' +
-      "A destination beyond this beat's budget is clamped to the first reachable leg rather than rejected; when the planner cannot use the destination at all but a neighbouring footprint cell still closes on it, the engine may take that single step instead, unless that cell holds a friendly unit."
+      "A destination beyond this beat's budget is clamped to the first reachable leg rather than rejected; when the planner cannot use the destination at all but a neighbouring footprint cell still closes on it, the engine may take that single step instead."
     );
   }
   return (
@@ -357,7 +359,7 @@ export function buildCombatRulesParagraph(gates: GameRuleTextGates): string {
     'Ranged uses pre-move positions.',
     buildAttackConstraintsClause(gates),
     buildMovementBudgetRule(gates.coordinateMode),
-    buildDestinationOccupancyRule(),
+    buildDestinationOccupancyRule(gates.coordinateMode),
   ];
   if (gates.hasNavalUnits) {
     parts.push(buildNavalClause(gates.coordinateMode).trim());

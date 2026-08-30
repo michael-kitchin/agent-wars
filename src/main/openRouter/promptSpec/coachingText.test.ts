@@ -76,6 +76,10 @@ test('strategic coaching includes every required item when its gate is on', () =
   assert.match(text, /Copy a Target Hex from a row listing that unit/i);
   assert.match(text, /unitIds/);
   assert.match(text, /friendly/i);
+  assert.match(text, /stack/i);
+  assert.doesNotMatch(text, /not a legal destination/i);
+  assert.match(text, /stay-put/i);
+  assert.match(text, /leaving this period/i);
   assert.match(text, /move\/melee/i);
   assert.match(text, /Units Without Standing Orders/i);
   assert.match(text, /healthy standing order/i);
@@ -145,6 +149,10 @@ test('tactical coaching includes every required item when its gate is on', () =>
   assert.match(text, /strike any cell in the footprint/i);
   assert.match(text, /lowest-defense/i);
   assert.match(text, /friendly/i);
+  assert.match(text, /stack/i);
+  assert.doesNotMatch(text, /not a legal destination/i);
+  assert.match(text, /stay-put/i);
+  assert.match(text, /leaving this period/i);
   assert.match(text, /move\/melee/i);
   assert.match(text, /embark/i);
   assert.match(text, /sub-unit ids/i);

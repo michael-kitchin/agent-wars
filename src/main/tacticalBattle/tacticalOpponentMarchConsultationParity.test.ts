@@ -180,9 +180,7 @@ test('armor on urban: unreachable full goal still moves one step toward ordered 
   assert.notEqual(outcome.appliedToH3Index, orderedToH3);
 });
 
-test('best-effort neighbor does not step onto a friendly-occupied cell', () => {
-  // Same geometry as the unconstrained best-effort case, whose unique approaching stop is friendH3.
-  // Occupancy must drop the order rather than clamp onto that friendly.
+test('best-effort neighbor may stack onto a friendly-occupied cell', () => {
   const fromH3 = '84969b5ffffffff';
   const orderedToH3 = '84969bbffffffff';
   const friendH3 = '84969b1ffffffff';
@@ -226,7 +224,7 @@ test('best-effort neighbor does not step onto a friendly-occupied cell', () => {
     res4Set,
     battle,
   });
-  assert.equal(outcome.ok, false);
-  assert.equal(outcome.reason, 'out_of_range');
+  assert.equal(outcome.ok, true);
+  if (outcome.ok) assert.equal(outcome.appliedToH3Index, friendH3);
 });
 

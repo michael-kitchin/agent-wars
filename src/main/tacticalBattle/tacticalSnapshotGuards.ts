@@ -77,72 +77,6 @@ function landRes4FootprintRing1Neighbors(fromH3: string, res4Set: ReadonlySet<st
 }
 
 /**
- * Beat-start cells occupied by other units of the same player, excluding the acting unit.
- *
- * Purpose: Occupancy coaching forbids a one-step dest that already holds a friendly; the best-effort neighbor
- * search and the applied first-leg must use the same set.
- * When to use: `tacticalComputeMovementOrderOutcome` and the human twin before best-effort recovery.
- * Expected outcome: The actor's current cell is omitted so staying put is not treated as stacking on itself.
- * Exceptions: None.
- */
-function friendlyOccupiedHexesExceptActor(
-  sub: readonly TacticalSubUnitSnapshot[],
-  actor: Pick<TacticalSubUnitSnapshot, 'id' | 'player' | 'h3Index'>
-): Set<string> {
-  const out = new Set<string>();
-  for (const u of sub) {
-    if (u.player !== actor.player || u.id === actor.id) continue;
-    out.add(u.h3Index);
-  }
-  return out;
-}
-
-/**
- * Rejects a first-leg dest that already holds another unit of the same player.
- *
- * Purpose: Occupancy coaching forbids that dest; the best-effort search skips those cells, but a reachable plan
- * can still stop on one, and that must fail with the same reason the prompt describes.
- * When to use: After a reachable march plan is chosen, before applying `h3Index`.
- * Expected outcome: `null` when the applied cell is empty of other friendlies; otherwise `out_of_range` with
- * `plannerReason: friendly_occupied`.
- * Exceptions: None.
- */
-function rejectIfAppliedDestFriendlyOccupied(args: {
-  sub: readonly TacticalSubUnitSnapshot[];
-  actor: Pick<TacticalSubUnitSnapshot, 'id' | 'player' | 'h3Index' | 'unitType'>;
-  appliedToH3Index: string;
-  battle: Pick<TacticalBattleSnapshot, 'battleId' | 'tacticalTurnNumber'>;
-  order: { unitId: string; toH3Index: string };
-  budget: number;
-  player: 'opponent' | 'human';
-}): { ok: false; reason: 'out_of_range'; context: Record<string, unknown> } | null {
-  if (!friendlyOccupiedHexesExceptActor(args.sub, args.actor).has(args.appliedToH3Index)) return null;
-  tacticalLogMutate('tacticalMarchPlan friendlyOccupied', {
-    battleId: args.battle.battleId,
-    tacticalTurnNumber: args.battle.tacticalTurnNumber,
-    player: args.player,
-    unitId: args.order.unitId,
-    subUnitType: args.actor.unitType,
-    fromH3: args.actor.h3Index,
-    toH3: args.order.toH3Index,
-    movementPointBudget: args.budget,
-    appliedToH3Index: args.appliedToH3Index,
-  });
-  return {
-    ok: false,
-    reason: 'out_of_range',
-    context: {
-      unitId: args.order.unitId,
-      from: args.actor.h3Index,
-      to: args.order.toH3Index,
-      budget: args.budget,
-      plannerReason: 'friendly_occupied',
-      appliedToH3Index: args.appliedToH3Index,
-    },
-  };
-}
-
-/**
  * When marching to the ordered res4 hex is `no_path`, searches one-step destinations (each ring-1 neighbor as a
  * mini-goal) and returns the cheapest plan whose first leg strictly reduces H3 grid distance to `orderedToH3`.
  *
@@ -154,8 +88,8 @@ function rejectIfAppliedDestFriendlyOccupied(args: {
  * the ordered hex is at least two (adjacent failures stay authoritative).
  * Expected outcome: `null` when no neighbor yields a reachable one-beat plan that strictly approaches `orderedToH3`.
  * Exceptions: None; distances come from the shared BFS fallback, so a res4 pair spanning an icosahedron face crossing
- * still yields a candidate instead of disabling recovery for the whole beat. Neighbors occupied by other friendly
- * units are skipped so the fallback cannot violate the occupancy rule.
+ * still yields a candidate instead of disabling recovery for the whole beat. Friendly-occupied neighbors stay
+ * eligible so units may stack.
  */
 function tacticalLandMarchBestEffortPlanTowardOrderedHex(args: {
   battle: TacticalMarchPlanBattleArgs;
@@ -164,8 +98,6 @@ function tacticalLandMarchBestEffortPlanTowardOrderedHex(args: {
   res4Set: ReadonlySet<string>;
   moveType: string;
   movementPointBudget: number;
-  /** Beat-start cells occupied by other friendly units; the fallback must not step onto them. */
-  friendlyOccupiedH3: ReadonlySet<string>;
 }): TacticalMarchPlanResult | null {
   if (args.movementPointBudget < 1) return null;
   if (args.moveType !== 'infantry' && args.moveType !== 'armor') return null;
@@ -175,7 +107,6 @@ function tacticalLandMarchBestEffortPlanTowardOrderedHex(args: {
   let best: TacticalMarchPlanResult | null = null;
   let bestRank = Infinity;
   for (const n of neighbors) {
-    if (args.friendlyOccupiedH3.has(n)) continue;
     const p = planTacticalRes4MarchWithSessionCache(args.battle, {
       fromH3: args.fromH3,
       toH3: n,
@@ -186,7 +117,6 @@ function tacticalLandMarchBestEffortPlanTowardOrderedHex(args: {
     if (!p.reachable) continue;
     const applied = p.firstStopWithinBudget.stopH3;
     if (applied === args.fromH3) continue;
-    if (args.friendlyOccupiedH3.has(applied)) continue;
     const d1 = computeGridDistanceWithPathFallbackPure(applied, args.orderedToH3);
     if (d1 === null || d1 >= d0) continue;
     const cost = Number.isFinite(p.totalCostToDestination) ? p.totalCostToDestination : Number.POSITIVE_INFINITY;
@@ -366,7 +296,7 @@ type TacticalMovementOrderOutcome =
  * Purpose: Single implementation of opponent and human movement-order guards.
  * When to use: Only from the two public delegates in this module.
  * Expected outcome: Same success/failure shape as the public opponent and human helpers.
- * Exceptions: Invalid H3 indexes may yield `out_of_range` when the tactical march planner cannot find a finite-cost path, when the planner cannot spend movement toward a different ordered cell this beat (`plannerReason: no_progress`), or when the first reachable stop already holds a friendly unit (`plannerReason: friendly_occupied`).
+ * Exceptions: Invalid H3 indexes may yield `out_of_range` when the tactical march planner cannot find a finite-cost path, or when the planner cannot spend movement toward a different ordered cell this beat (`plannerReason: no_progress`). Friendly stacking on the applied cell is legal.
  */
 function tacticalComputeMovementOrderOutcomeForPlayer(
   player: 'human' | 'opponent',
@@ -433,7 +363,6 @@ function tacticalComputeMovementOrderOutcomeForPlayer(
             res4Set: args.res4Set,
             moveType,
             movementPointBudget: Math.max(0, budget),
-            friendlyOccupiedH3: friendlyOccupiedHexesExceptActor(args.sub, u),
           })
         : null;
     if (bestEffortPlan) {
@@ -477,16 +406,6 @@ function tacticalComputeMovementOrderOutcomeForPlayer(
     }
   }
   const appliedToH3Index = plan.firstStopWithinBudget.stopH3;
-  const occupiedReject = rejectIfAppliedDestFriendlyOccupied({
-    sub: args.sub,
-    actor: u,
-    appliedToH3Index,
-    battle: args.battle,
-    order: args.order,
-    budget,
-    player,
-  });
-  if (occupiedReject) return occupiedReject;
   if (appliedToH3Index === u.h3Index && args.order.toH3Index !== u.h3Index) {
     tacticalLogMutate('tacticalMarchPlan noProgress', {
       battleId: args.battle.battleId,
@@ -533,7 +452,7 @@ function tacticalComputeMovementOrderOutcomeForPlayer(
  * When to use: `projectTacticalSnapshotAfterOpponentMovementOrders` loop before applying `h3Index` updates.
  * Expected outcome: Returns `ok: true` with `idx` into the mutable `sub` clone and `appliedToH3Index` (first leg toward
  * the ordered cell, matching `tacticalMarchFirstStopAlongPath` / human Ready), or `ok: false` with a reason and diagnostic context.
- * Exceptions: Invalid H3 indexes may yield `out_of_range` when the tactical march planner cannot find a finite-cost path, when the planner cannot spend movement toward a different ordered cell this beat (`plannerReason: no_progress`), or when the first reachable stop already holds a friendly unit (`plannerReason: friendly_occupied`).
+ * Exceptions: Invalid H3 indexes may yield `out_of_range` when the tactical march planner cannot find a finite-cost path, or when the planner cannot spend movement toward a different ordered cell this beat (`plannerReason: no_progress`). Friendly stacking on the applied cell is legal.
  */
 export function tacticalComputeMovementOrderOutcome(
   args: TacticalMovementOrderOutcomeArgs
@@ -547,7 +466,7 @@ export function tacticalComputeMovementOrderOutcome(
  * Purpose: Delegates to the shared player-parameterized projection requiring `player === 'human'`.
  * When to use: `projectTacticalSnapshotAfterHumanMovementOrders` before applying `h3Index` updates for the human player.
  * Expected outcome: Same success/failure shape as the opponent helper with `non_human` instead of `non_opponent` and the same `appliedToH3Index` first-leg semantics. Emits debug logs when the planner finds a reachable path.
- * Exceptions: Invalid H3 indexes may yield `out_of_range` when the tactical march planner cannot find a finite-cost path, when the planner cannot spend movement toward a different ordered cell this beat (`plannerReason: no_progress`), or when the first reachable stop already holds a friendly unit (`plannerReason: friendly_occupied`).
+ * Exceptions: Invalid H3 indexes may yield `out_of_range` when the tactical march planner cannot find a finite-cost path, or when the planner cannot spend movement toward a different ordered cell this beat (`plannerReason: no_progress`). Friendly stacking on the applied cell is legal.
  */
 export function tacticalComputeHumanMovementOrderOutcome(
   args: TacticalMovementOrderOutcomeArgs

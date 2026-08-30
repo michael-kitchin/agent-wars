@@ -13,12 +13,13 @@
 
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import { logDebug, logTrace } from '../logger';
-import { getValidDestinationsUnoccupied } from '../oneStepMoveDestinations';
+import { getValidDestinations } from '../oneStepMoveDestinations';
 import {
   gridHopDistanceBetween,
   pickApproachHexesTowardNearestEnemy,
 } from './assessUnitProximity';
 import { canAssignStandingOrderType } from './standingOrdersShared';
+import { stayPutFriendlyOccupiedHexes, readStandingThisPeriodMoves } from './stayPutFriendlyOccupancy';
 
 /**
  * Collects enemy-occupied hexes from the same snapshot Best Options reads.
@@ -42,7 +43,7 @@ function enemyOccupiedHexes(state: GameStateSnapshot, playerId: string): Readonl
  *
  * Purpose: Best Options lists every closing hex, but a suggestion column has room for one, so it must be the same
  * first approach dest Best Options would keep after ranking (unit-to-dest hop, then hex id).
- * When to use: Per orderless unit, with that unit's already-legal unoccupied one-step destinations.
+ * When to use: Per orderless unit, with that unit's already-legal dests that are not stay-put occupied.
  * Expected outcome: The closest legal closing dest to the unit; null when no candidate closes the distance.
  * Exceptions: None.
  */
@@ -73,25 +74,32 @@ function bestClosingDestination(
  * When to use: Strategic briefing assembly, passing only the ids being listed as orderless — this runs a destination
  * search per distinct unit hex and type, so do not call it for the whole roster.
  * Expected outcome: `unitId -> destination h3`, omitting units that are missing from the snapshot, cannot take a march
- * order at all, have no legal unoccupied one-step destination, or cannot close on any enemy. Suggestions never equal
- * the unit's own hex.
+ * order at all, have no legal stay-put-empty closing dest, or cannot close on any enemy. Suggestions never equal
+ * the unit's own hex. A cell a friendly is leaving this period is eligible; a stay-put stack is not.
  * Exceptions: Never throws; a unit that cannot be scored is omitted rather than given a fabricated destination.
  */
 export function suggestApproachDestinationsForOrderlessUnits(
   playerId: string,
   state: GameStateSnapshot,
-  unitIds: readonly string[]
+  unitIds: readonly string[],
+  thisPeriodMoveByUnitId?: ReadonlyMap<string, string>
 ): ReadonlyMap<string, string> {
   const suggestions = new Map<string, string>();
   if (unitIds.length === 0) return suggestions;
   const enemyOccupiedH3 = enemyOccupiedHexes(state, playerId);
+  const stayPut = stayPutFriendlyOccupiedHexes(
+    state.units.filter((u) => u.player === playerId).map((u) => ({ id: u.id, h3Index: u.h3Index })),
+    thisPeriodMoveByUnitId ?? readStandingThisPeriodMoves(playerId)
+  );
   const unitsById = new Map(state.units.map((u) => [u.id, u]));
   for (const unitId of unitIds) {
     const unit = unitsById.get(unitId);
     if (!unit) continue;
     // Air units reposition by ferry, so offering them a march destination would invite an order assignOrder rejects.
     if (!canAssignStandingOrderType(unit.unitType, 'march')) continue;
-    const candidates = getValidDestinationsUnoccupied(unit, state).filter((h3) => h3 !== unit.h3Index);
+    const candidates = getValidDestinations(unit, state).filter(
+      (h3) => h3 !== unit.h3Index && !stayPut.has(h3) && !enemyOccupiedH3.has(h3)
+    );
     const destination = bestClosingDestination(unit.h3Index, candidates, enemyOccupiedH3);
     if (destination !== null) suggestions.set(unitId, destination);
     logTrace('orderlessUnitSuggestions suggestApproachDestinationsForOrderlessUnits: unit', {
@@ -107,6 +115,7 @@ export function suggestApproachDestinationsForOrderlessUnits(
     turnNumber: state.turnNumber,
     requestedCount: unitIds.length,
     enemyOccupiedCount: enemyOccupiedH3.size,
+    stayPutCount: stayPut.size,
     suggestedCount: suggestions.size,
   });
   return suggestions;

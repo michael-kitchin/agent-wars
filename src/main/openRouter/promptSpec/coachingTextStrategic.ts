@@ -48,7 +48,7 @@ export function buildStrategicCoachingBullets(gates: CoachingGates): readonly st
   if (gates.ordersEnabled) bullets.push(`- ${buildHoldFireRule()}`);
   bullets.push(`- ${buildCasualtySortRule()}`);
   bullets.push(optionCopyOrRoutingBullet(gates));
-  bullets.push(`- ${buildDestinationOccupancyRule()}`);
+  bullets.push(`- ${buildDestinationOccupancyRule(gates.coordinateMode)}`);
   if (gates.ordersEnabled) {
     bullets.push(ORDERLESS_BULLET);
     bullets.push(LEAVE_MISSIONS_BULLET);
