@@ -43,7 +43,7 @@ import {
   type ToolGroupEntry,
 } from './openRouterToolGroups';
 import type { OpenRouterModel } from '../../shared/ipc/openRouterTypes';
-import { mapOpenRouterModelRow } from './mapOpenRouterModelRow';
+import { buildOpenRouterModelList } from './buildOpenRouterModelList';
 
 export type { MemoryUpdateItem } from './orderResponseParsing';
 
@@ -307,14 +307,7 @@ export async function listModels(): Promise<{ models: ModelItem[] } | { error: s
     }
     const json = (await res.json()) as { data?: unknown[] };
     const data = Array.isArray(json.data) ? json.data : [];
-    const models: ModelItem[] = data
-      .map((row) => mapOpenRouterModelRow(row))
-      .filter((m): m is ModelItem => m !== null);
-    models.sort((a, b) => {
-      const nameA = (a.name ?? a.id).toLowerCase();
-      const nameB = (b.name ?? b.id).toLowerCase();
-      return nameA.localeCompare(nameB);
-    });
+    const models: ModelItem[] = buildOpenRouterModelList(data);
     logDebug('openRouter listModels: mapped models', { count: models.length });
     return { models };
   } catch (err) {
