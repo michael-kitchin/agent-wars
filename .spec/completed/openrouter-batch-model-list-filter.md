@@ -1,6 +1,6 @@
 # OpenRouter batch model list filter
 
-The Model-tab dropdown must not list OpenRouter batch slugs. Interactive models without a batch suffix stay. Display-label rules in `.spec/completed/openrouter-model-list-display.md` are unchanged.
+The Model-tab dropdown must not list OpenRouter batch slugs. Interactive models without a batch suffix stay. Display-label rules in `openrouter-model-list-display.md` are unchanged.
 
 ## Match rule
 

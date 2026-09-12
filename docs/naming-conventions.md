@@ -2,9 +2,9 @@
 
 Living index for how files, directories, and exported TypeScript symbols are named in this repository.
 
-**Authoritative rules:** [`.spec/naming-conventions-contract-v1.md`](../.spec/naming-conventions-contract-v1.md). This page does not add or weaken those rules.
+**Authoritative rules:** [naming-conventions-contract-v1.md](naming-conventions-contract-v1.md). This page does not add or weaken those rules.
 
-**Signed rename work list:** [`.spec/naming-rename-ledger-v1.md`](../.spec/naming-rename-ledger-v1.md) and `scripts/naming/renameLedger.json`.
+**Signed rename work list:** [`.spec/completed/naming-rename-ledger-v1.md`](../.spec/completed/naming-rename-ledger-v1.md) and `scripts/naming/renameLedger.json`.
 
 Enforcement:
 

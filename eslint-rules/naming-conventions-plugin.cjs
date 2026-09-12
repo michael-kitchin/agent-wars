@@ -1,5 +1,5 @@
 /**
- * ESLint plugin entry for src/ path casing (see .spec/naming-conventions-contract-v1.md).
+ * ESLint plugin entry for src/ path casing (see docs/naming-conventions-contract-v1.md).
  *
  * Purpose: Registers the file/directory camelCase rule next to other local plugins.
  * When to use: Required from eslint.config.js for TypeScript under src/.

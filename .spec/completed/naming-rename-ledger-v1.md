@@ -2,7 +2,7 @@
 
 *Version 1.0 — August 2026*
 
-Machine-readable source of truth: [`scripts/naming/renameLedger.json`](../scripts/naming/renameLedger.json). 73 scan violations: 68 pending applies, 5 waivers. No judgement-only extra entries; remaining exports already match the concision rubric.
+Machine-readable source of truth: [`scripts/naming/renameLedger.json`](../../scripts/naming/renameLedger.json). 73 scan violations: 68 pending applies, 5 waivers. No judgement-only extra entries; remaining exports already match the concision rubric.
 
 Apply **directories first**, then briefing/map files, then Utils/Impl files, then non-tool symbols, then `src/main/tools/` (files and symbols). The engine rewrites `currentPath` prefixes after applied directory entries.
 
