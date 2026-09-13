@@ -20,6 +20,7 @@ coverage/
 .env
 .env.*
 !.env.example
+.social/companion-staging/
 __pycache__/
 *.pyc
 data/generated/**/*.json
