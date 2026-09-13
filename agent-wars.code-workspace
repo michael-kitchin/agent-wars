@@ -8,6 +8,9 @@
 		},
 		{
 			"path": "../agent-wars-meta"
+		},
+		{
+			"path": "../agent-wars-scratch"
 		}
 	],
 	"settings": {}
