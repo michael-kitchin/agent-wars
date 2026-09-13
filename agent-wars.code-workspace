@@ -5,6 +5,9 @@
 		},
 		{
 			"path": "../../../Data"
+		},
+		{
+			"path": "../agent-wars-meta"
 		}
 	],
 	"settings": {}
