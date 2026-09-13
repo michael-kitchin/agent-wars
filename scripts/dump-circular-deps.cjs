@@ -1,114 +1,46 @@
 #!/usr/bin/env node
+/**
+ * Prints the current runtime import cycles under `src/`, or writes them to a file.
+ *
+ * Used to record a deliberately accepted cycle in the baseline that `check-circular-deps.cjs`
+ * compares against. Both scripts read imports through `lib/importGraph.cjs` so the file this writes
+ * is always in the form the checker expects.
+ *
+ * Usage:
+ *   node scripts/dump-circular-deps.cjs                                    (print to stdout)
+ *   node scripts/dump-circular-deps.cjs scripts/circular-deps-baseline.json (overwrite the baseline)
+ *
+ * Overwriting the baseline accepts every cycle currently present, so review the diff before keeping
+ * it. An empty result is the healthy state and writes an empty array.
+ */
 /* eslint-disable no-console */
+'use strict';
+
 const fs = require('fs');
 const path = require('path');
 
-const IMPORT_RE = /import\s+(?:type\s+)?(?:[\s\S]*?)\s+from\s+['"]([^'"]+)['"]/g;
-const EXPORT_RE = /export\s+[\s\S]*?\s+from\s+['"]([^'"]+)['"]/g;
+const { findRuntimeImportCycles } = require('./lib/importGraph.cjs');
 
-function walk(dir) {
-  const out = [];
-  const entries = fs.readdirSync(dir, { withFileTypes: true });
-  for (const entry of entries) {
-    const abs = path.join(dir, entry.name);
-    if (entry.isDirectory()) {
-      out.push(...walk(abs));
-      continue;
-    }
-    if (!entry.name.endsWith('.ts')) continue;
-    if (entry.name.endsWith('.d.ts')) continue;
-    if (entry.name.endsWith('.test.ts')) continue;
-    out.push(abs);
-  }
-  return out;
-}
+/**
+ * Emits the cycle list as formatted JSON to the path given on the command line, or to stdout.
+ *
+ * A relative destination resolves against the working directory so the documented invocation from
+ * the repository root behaves as written.
+ */
+function main() {
+  const root = process.cwd();
+  const cycles = findRuntimeImportCycles(root);
+  const serialised = `${JSON.stringify(cycles, null, 2)}\n`;
+  const dest = process.argv[2];
 
-function resolveImport(fromFile, specifier) {
-  if (!specifier.startsWith('.')) return null;
-  const base = path.resolve(path.dirname(fromFile), specifier);
-  const candidates = [
-    base,
-    `${base}.ts`,
-    `${base}.tsx`,
-    path.join(base, 'index.ts'),
-    path.join(base, 'index.tsx'),
-  ];
-  for (const c of candidates) {
-    if (fs.existsSync(c) && fs.statSync(c).isFile()) return c;
-  }
-  return null;
-}
-
-function extractDeps(filePath) {
-  const src = fs.readFileSync(filePath, 'utf8');
-  const deps = new Set();
-  let m;
-  while ((m = IMPORT_RE.exec(src)) !== null) {
-    deps.add(m[1]);
-  }
-  while ((m = EXPORT_RE.exec(src)) !== null) {
-    deps.add(m[1]);
-  }
-  return [...deps];
-}
-
-function detectCycles(graph) {
-  const visiting = new Set();
-  const visited = new Set();
-  const stack = [];
-  const cycles = [];
-  const seenCycles = new Set();
-
-  function dfs(node) {
-    if (visited.has(node)) return;
-    visiting.add(node);
-    stack.push(node);
-    for (const next of graph.get(node) ?? []) {
-      if (!graph.has(next)) continue;
-      if (visiting.has(next)) {
-        const idx = stack.indexOf(next);
-        const cycle = stack.slice(idx).concat(next);
-        const key = cycle.join('->');
-        if (!seenCycles.has(key)) {
-          seenCycles.add(key);
-          cycles.push(cycle);
-        }
-        continue;
-      }
-      if (!visited.has(next)) dfs(next);
-    }
-    stack.pop();
-    visiting.delete(node);
-    visited.add(node);
+  if (dest === undefined) {
+    process.stdout.write(serialised);
+    return;
   }
 
-  for (const node of graph.keys()) dfs(node);
-  return cycles;
-}
-
-const root = process.cwd();
-const srcDir = path.join(root, 'src');
-const files = walk(srcDir);
-const graph = new Map();
-for (const file of files) graph.set(file, []);
-for (const file of files) {
-  const specs = extractDeps(file);
-  const deps = [];
-  for (const spec of specs) {
-    const resolved = resolveImport(file, spec);
-    if (resolved) deps.push(resolved);
-  }
-  graph.set(file, deps);
-}
-const cycles = detectCycles(graph);
-const relCycles = cycles.map((cycle) =>
-  cycle.map((p) => path.relative(root, p).replace(/\\/g, '/')).join(' -> ')
-);
-const out = `${JSON.stringify(relCycles, null, 2)}\n`;
-const dest = process.argv[2];
-if (dest) {
   const outPath = path.isAbsolute(dest) ? dest : path.join(root, dest);
-  fs.writeFileSync(outPath, out, 'utf8');
-} else {
-  process.stdout.write(out);
+  fs.writeFileSync(outPath, serialised, 'utf8');
+  console.log(`dump-circular-deps: wrote ${cycles.length} cycle(s) to ${dest}`);
 }
+
+main();

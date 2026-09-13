@@ -1,127 +1,47 @@
 #!/usr/bin/env node
+/**
+ * Fails the build when a new runtime import cycle appears under `src/`.
+ *
+ * A cycle matters because it makes module initialisation order undefined, which shows up as a value
+ * that is undefined at import time rather than as an error at the import. Only cycles that survive
+ * compilation count: type-only imports are erased and cannot cause it. See `lib/importGraph.cjs`.
+ *
+ * The baseline exists so an intentional, understood cycle can be accepted deliberately instead of
+ * blocking every later commit. It is not a place to put a finding you do not want to deal with -- a
+ * new cycle should be fixed by changing an import direction. To record one on purpose, run
+ * `node scripts/dump-circular-deps.cjs scripts/circular-deps-baseline.json` and review the diff.
+ */
 /* eslint-disable no-console */
+'use strict';
+
 const fs = require('fs');
 const path = require('path');
 
-const IMPORT_RE = /import\s+(?:type\s+)?(?:[\s\S]*?)\s+from\s+['"]([^'"]+)['"]/g;
-const EXPORT_RE = /export\s+[\s\S]*?\s+from\s+['"]([^'"]+)['"]/g;
+const { findRuntimeImportCycles } = require('./lib/importGraph.cjs');
 
-// Frozen baseline of known TypeScript import cycles (main process). CI fails only when a *new*
-// cycle appears or an existing one changes shape. To refresh after an intentional graph change,
-// run: node scripts/dump-circular-deps.cjs scripts/circular-deps-baseline.json
+/** Where the deliberately accepted cycles are recorded. */
 const BASELINE_PATH = path.join(__dirname, 'circular-deps-baseline.json');
-const ALLOWED_BASELINE_CYCLES = new Set(JSON.parse(fs.readFileSync(BASELINE_PATH, 'utf8')));
 
-function walk(dir) {
-  const out = [];
-  const entries = fs.readdirSync(dir, { withFileTypes: true });
-  for (const entry of entries) {
-    const abs = path.join(dir, entry.name);
-    if (entry.isDirectory()) {
-      out.push(...walk(abs));
-      continue;
-    }
-    if (!entry.name.endsWith('.ts')) continue;
-    if (entry.name.endsWith('.d.ts')) continue;
-    if (entry.name.endsWith('.test.ts')) continue;
-    out.push(abs);
-  }
-  return out;
-}
-
-function resolveImport(fromFile, specifier) {
-  if (!specifier.startsWith('.')) return null;
-  const base = path.resolve(path.dirname(fromFile), specifier);
-  const candidates = [
-    base,
-    `${base}.ts`,
-    `${base}.tsx`,
-    path.join(base, 'index.ts'),
-    path.join(base, 'index.tsx'),
-  ];
-  for (const c of candidates) {
-    if (fs.existsSync(c) && fs.statSync(c).isFile()) return c;
-  }
-  return null;
-}
-
-function extractDeps(filePath) {
-  const src = fs.readFileSync(filePath, 'utf8');
-  const deps = new Set();
-  let m;
-  while ((m = IMPORT_RE.exec(src)) !== null) {
-    deps.add(m[1]);
-  }
-  while ((m = EXPORT_RE.exec(src)) !== null) {
-    deps.add(m[1]);
-  }
-  return [...deps];
-}
-
-function detectCycles(graph) {
-  const visiting = new Set();
-  const visited = new Set();
-  const stack = [];
-  const cycles = [];
-  const seenCycles = new Set();
-
-  function dfs(node) {
-    if (visited.has(node)) return;
-    visiting.add(node);
-    stack.push(node);
-    for (const next of graph.get(node) ?? []) {
-      if (!graph.has(next)) continue;
-      if (visiting.has(next)) {
-        const idx = stack.indexOf(next);
-        const cycle = stack.slice(idx).concat(next);
-        const key = cycle.join('->');
-        if (!seenCycles.has(key)) {
-          seenCycles.add(key);
-          cycles.push(cycle);
-        }
-        continue;
-      }
-      if (!visited.has(next)) dfs(next);
-    }
-    stack.pop();
-    visiting.delete(node);
-    visited.add(node);
-  }
-
-  for (const node of graph.keys()) dfs(node);
-  return cycles;
-}
-
+/**
+ * Reports runtime import cycles and exits non-zero when any is not in the baseline.
+ *
+ * Prints every offending cycle rather than only the first, because they are usually related and
+ * fixing one import direction often clears several.
+ */
 function main() {
   const root = process.cwd();
-  const srcDir = path.join(root, 'src');
-  const files = walk(srcDir);
-  const graph = new Map();
-  for (const file of files) graph.set(file, []);
-  for (const file of files) {
-    const specs = extractDeps(file);
-    const deps = [];
-    for (const spec of specs) {
-      const resolved = resolveImport(file, spec);
-      if (!resolved) continue;
-      deps.push(resolved);
-    }
-    graph.set(file, deps);
-  }
-  const cycles = detectCycles(graph);
-  const relCycles = cycles.map((cycle) =>
-    cycle
-      .map((p) => path.relative(root, p).replace(/\\/g, '/'))
-      .join(' -> ')
-  );
-  const disallowed = relCycles.filter((cycle) => !ALLOWED_BASELINE_CYCLES.has(cycle));
+  const allowed = new Set(JSON.parse(fs.readFileSync(BASELINE_PATH, 'utf8')));
+  const cycles = findRuntimeImportCycles(root);
+  const disallowed = cycles.filter((cycle) => !allowed.has(cycle));
+
   if (disallowed.length === 0) {
     console.log('check-circular-deps: ok (no circular dependencies)');
-    if (relCycles.length > 0) {
-      console.log(`check-circular-deps: baseline allowed cycles=${relCycles.length}`);
+    if (cycles.length > 0) {
+      console.log(`check-circular-deps: baseline allowed cycles=${cycles.length}`);
     }
     return;
   }
+
   console.error('check-circular-deps: found circular dependencies');
   for (const cycle of disallowed) {
     console.error(` - ${cycle}`);
