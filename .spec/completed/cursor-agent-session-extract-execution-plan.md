@@ -4,7 +4,7 @@
 
 > **For the executing agent:** Work one numbered section at a time. Complete that section’s verification before starting the next. Locked decisions in this document are authoritative. Never `git commit` or `git push`. Identifiers used to name sections of this document must not appear in Python module names, CLI flags, log messages, or output JSON keys.
 
-**Goal:** A stdlib Python CLI that reads Cursor’s local agent stores for the agent-wars workspace family and writes one JSON file per parent agent session (subagents nested) under `f:/Projects/Personal/agent-wars-scratch/cursor-sessions/`.
+**Goal:** A stdlib Python CLI that reads Cursor’s local agent stores for the agent-wars workspace family and writes one JSON file per parent agent session (subagents nested) under `f:/Projects/Personal/agent-wars/.social/analysis/cursor-sessions/`.
 
 **Architecture:** Transcript-first, then keyed SQLite enrichment. Session identity is the composer/transcript UUID. Discovery is the union of (a) parent JSONL folders under the agent-wars project slugs and (b) `composerHeaders` rows whose workspace id is in the allowlist and whose `unifiedMode` is `agent`. Each run replaces the output directory via an atomic swap. The global `state.vscdb` is never copied. Lookups are by primary key or exact `cursorDiskKV` key only.
 
@@ -32,7 +32,7 @@ Copy these into every later artifact that is not this plan. Do not re-decide the
 ## Confirmed decisions
 
 - **Workspace:** agent-wars family on this machine: current multi-root `.code-workspace`, the folder workspace, and the older `.spec/agent-wars.code-workspace`. Folders that share this window (Data, agent-wars-meta, agent-wars-scratch) are covered because their chats live under those workspace ids / project slugs. Other projects (including story-garden) are out.
-- **Code:** `f:/Projects/Personal/agent-wars-scratch/cursor_session_extract/`. **Dumps:** `f:/Projects/Personal/agent-wars-scratch/cursor-sessions/`.
+- **Code:** `f:/Projects/Personal/agent-wars/.social/analysis/cursor_session_extract/`. **Dumps:** `f:/Projects/Personal/agent-wars/.social/analysis/cursor-sessions/`.
 - **Session set:** Every parent session with an `agent-transcripts` JSONL under the agent-wars project slugs (any `unifiedMode`, including plan/debug), **plus** agent-mode composers whose workspace id is in the allowlist even if JSONL is missing. Chat/Ask/Edit/Tab without an agent transcript are skipped. Nested subagents stay inside the parent JSON.
 - **Prompts:** User-typed prompt text in full. Injected material is an **inventory** (name, kind, byte length, token length when stored) — not the bodies.
 - **Tokens:** Prefer stored non-zero bubble counts, then `composerData.promptTokenBreakdown` / context snapshots, then `len(userPrompt)//4`. Always record `method`. `{0,0}` is absent, not zero usage.
@@ -61,7 +61,7 @@ Default project slugs:
 ## Layout
 
 ```
-agent-wars-scratch/cursor_session_extract/
+.social/analysis/cursor_session_extract/
   README.md
   cursor_session_extract/
     __init__.py
@@ -90,20 +90,20 @@ agent-wars-scratch/cursor_session_extract/
     test_run_replace.py
     test_prompt_inventory.py
     fixtures/
-agent-wars-scratch/cursor-sessions/
+.social/analysis/cursor-sessions/
   inventory.json
   index.json
   sessions/<sessionId>.json
 ```
 
-Run from `agent-wars-scratch/cursor_session_extract/`:
+Run from `.social/analysis/cursor_session_extract/`:
 
 ```
 python -m unittest discover -s tests
 python -m cursor_session_extract
 ```
 
-Default `--out` is `agent-wars-scratch/cursor-sessions` (parent of the project root).
+Default `--out` is `.social/analysis/cursor-sessions` (parent of the project root).
 
 ---
 
@@ -346,7 +346,7 @@ Cursor cloud usage API; Tab/autocomplete; checkpoint file bodies; uploading DBs;
 If the known composer id exists locally:
 
 ```
-python -m cursor_session_extract --out f:/Projects/Personal/agent-wars-scratch/cursor-sessions
+python -m cursor_session_extract --out f:/Projects/Personal/agent-wars/.social/analysis/cursor-sessions
 ```
 
 Confirm `sessions/4ecac104-2954-49f7-bb0c-777b844cd75f.json` has a user prompt, a model name when present, `copiedStateDb` false in `inventory.json`, and no assistant reply body in `turns[].userPrompt`.
