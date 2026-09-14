@@ -82,36 +82,6 @@ minZoom?: number;
  */
 export const RASTER_BASEMAP_ORDER: readonly RasterBasemapDefinition[] = [
   {
-    id: 'carto_light_nolabels',
-    displayName: 'Carto Positron (no labels)',
-    urlTemplate: 'https://{s}.basemaps.cartocdn.com/rastertiles/light_nolabels/{z}/{x}/{y}.png',
-    attributionHtml:
-      '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
-    subdomains: 'abcd',
-    maxZoom: 20,
-    minZoom: 0,
-  },
-  {
-    id: 'carto_voyager_nolabels',
-    displayName: 'Carto Voyager (no labels)',
-    urlTemplate: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}.png',
-    attributionHtml:
-      '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
-    subdomains: 'abcd',
-    maxZoom: 20,
-    minZoom: 0,
-  },
-  {
-    id: 'carto_dark_nolabels',
-    displayName: 'Carto Dark (no labels)',
-    urlTemplate: 'https://{s}.basemaps.cartocdn.com/rastertiles/dark_nolabels/{z}/{x}/{y}.png',
-    attributionHtml:
-      '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
-    subdomains: 'abcd',
-    maxZoom: 20,
-    minZoom: 0,
-  },
-  {
     id: 'esri_world_shaded_relief',
     displayName: 'Esri World Shaded Relief',
     urlTemplate:

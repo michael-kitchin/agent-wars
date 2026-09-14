@@ -4,6 +4,7 @@
  */
 
 import { ORDER_LINE_COLOR } from '../core/constants';
+import { basemapNeedsRemountForMaps } from '../../shared/basemapStyleLogic';
 import { getRasterBasemapChain, getRasterBasemapChainStartIndex } from './basemapProvider';
 import {
   WEB_MERCATOR_MAX_ABS_LAT,
@@ -162,6 +163,24 @@ let mainBasemapLayer: VendorRasterLayer | null = null;
  * Exceptions: None.
  */
 let miniBasemapLayer: VendorRasterLayer | null = null;
+/**
+ * Documents the module-scope binding `mountedMainBasemapProviderId` (mountedMainBasemapProviderId: string | null).
+
+ * Purpose: Lets style changes skip a main-map remount when that map already shows the requested XYZ host.
+ * When to use: Combined with the minimap id in `setMainBasemapByProviderId`; set when a main raster layer is added or the chain is exhausted.
+ * Expected outcome: The catalog id of the main map tiles, or null when none are mounted.
+ * Exceptions: None.
+ */
+let mountedMainBasemapProviderId: string | null = null;
+/**
+ * Documents the module-scope binding `mountedMiniBasemapProviderId` (mountedMiniBasemapProviderId: string | null).
+
+ * Purpose: The minimap can HTTP-fallback independently of the main map; skip remount only when both ids match the request.
+ * When to use: Combined with the main id in `setMainBasemapByProviderId`; set when a mini raster layer is added or the chain is exhausted.
+ * Expected outcome: The catalog id of the minimap tiles, or null when none are mounted.
+ * Exceptions: None.
+ */
+let mountedMiniBasemapProviderId: string | null = null;
 
 /**
  * Defines the `notifyMainViewChanged` function shape (function notifyMainViewChanged(): void).
@@ -207,6 +226,8 @@ function mountRasterBasemap(
 ): void {
   const chain = getRasterBasemapChain();
   if (chainIndex >= chain.length) {
+    if (target === 'main') mountedMainBasemapProviderId = null;
+    else mountedMiniBasemapProviderId = null;
     showBasemapErrorToast();
     return;
   }
@@ -235,8 +256,13 @@ function mountRasterBasemap(
   };
   if (spec.subdomains !== undefined) layerOpts.subdomains = spec.subdomains;
   const layer: VendorRasterLayer = leafletRef.tileLayer(spec.urlTemplate, layerOpts).addTo(map);
-  if (target === 'main') mainBasemapLayer = layer;
-  else miniBasemapLayer = layer;
+  if (target === 'main') {
+    mainBasemapLayer = layer;
+    mountedMainBasemapProviderId = spec.id;
+  } else {
+    miniBasemapLayer = layer;
+    mountedMiniBasemapProviderId = spec.id;
+  }
 
   const onTileError = () => {
     if (switched) return;
@@ -247,8 +273,13 @@ function mountRasterBasemap(
     } catch {
       /* ignore */
     }
-    if (target === 'main') mainBasemapLayer = null;
-    else miniBasemapLayer = null;
+    if (target === 'main') {
+      mainBasemapLayer = null;
+      mountedMainBasemapProviderId = null;
+    } else {
+      miniBasemapLayer = null;
+      mountedMiniBasemapProviderId = null;
+    }
     console.warn('[agent-wars] Basemap tile error; trying next provider', {
       failedId: spec.id,
       nextIndex: chainIndex + 1,
@@ -261,13 +292,14 @@ function mountRasterBasemap(
 /**
  * Defines the `setMainBasemapByProviderId` function shape (export function setMainBasemapByProviderId(providerId: string): void).
 
- * Purpose: Supports maintainability by documenting why `setMainBasemapByProviderId` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
+ * Purpose: Swaps main and minimap XYZ layers to a catalog provider, or no-ops when both maps already show it.
+ * When to use: After map init when the terrain style select changes; safe if Leaflet maps are missing.
+ * Expected outcome: Both maps mount from `providerId` (with catalog fallback on HTTP tile errors) unless both already display that id.
+ * Exceptions: Returns without throwing when `mainMap` or `miniMap` is null.
  */
 export function setMainBasemapByProviderId(providerId: string): void {
   if (!mainMap || !miniMap) return;
+  if (!basemapNeedsRemountForMaps(mountedMainBasemapProviderId, mountedMiniBasemapProviderId, providerId)) return;
   const leafletRef = getL();
   const startIdx = getRasterBasemapChainStartIndex(providerId);
   mountRasterBasemap(leafletRef, mainMap, true, startIdx, 'main');
@@ -326,7 +358,7 @@ export function initWorldLeafletMaps(
     inertia: false,
   });
 
-  const startIdx = getRasterBasemapChainStartIndex(initialBasemapProviderId ?? 'carto_light_nolabels');
+  const startIdx = getRasterBasemapChainStartIndex(initialBasemapProviderId ?? 'esri_world_shaded_relief');
   mountRasterBasemap(leafletRef, mainMap, true, startIdx, 'main');
 
   mainMap.fitBounds(worldBounds, { padding: [2, 2], animate: false });
@@ -456,31 +488,38 @@ export function getMainLeafletMap(): VendorLeafletMap | null {
 }
 
 /**
+ * Applies a CSS filter to one Leaflet tile pane and clears leftover per-tile filters.
+ *
+ * Purpose: Wargame invert must darken raster tiles without touching hex overlay, units, or chrome.
+ * When to use: From `setMainBasemapFilter` for the main map and minimap.
+ * Expected outcome: `pane.style.filter` equals `filter`; child `.leaflet-layer` / `.leaflet-tile` filters are cleared.
+ * Exceptions: Returns without throwing when the map or tile pane is missing.
+ */
+function applyTilePaneFilter(map: VendorLeafletMap | null, filter: string): void {
+  try {
+    const pane = map?.getPanes?.()?.tilePane;
+    if (!pane) return;
+    const oldFiltered = pane.querySelectorAll<HTMLElement>('.leaflet-layer, .leaflet-tile');
+    for (const el of oldFiltered) el.style.filter = '';
+    pane.style.filter = filter;
+  } catch {
+    /* tile pane unavailable */
+  }
+}
+
+/**
  * Defines the `setMainBasemapFilter` function shape (export function setMainBasemapFilter(filter: string): void).
 
- * Purpose: Supports maintainability by documenting why `setMainBasemapFilter` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
+ * Purpose: Darkens or clears raster tiles for Wargame without inverting hex overlays, units, or map chrome.
+ * When to use: After map init and on terrain style change, with `basemapCssFilterForStyle`.
+ * Expected outcome: Main and minimap tile panes receive `filter`; leftover `#main-map` container filters are cleared to empty.
+ * Exceptions: Missing tile panes are ignored; the invert string is never assigned to the map container.
  */
 export function setMainBasemapFilter(filter: string): void {
-  // Apply at ONE layer only (tile pane) to avoid compounded filters that wash out the map.
   const mapEl = document.getElementById('main-map');
   if (mapEl) mapEl.style.filter = '';
-  try {
-    const pane = mainMap?.getPanes?.()?.tilePane as HTMLElement | undefined;
-    if (pane) {
-      // Clear any previously applied per-tile filters from older builds.
-      const oldFiltered = pane.querySelectorAll<HTMLElement>('.leaflet-layer, .leaflet-tile');
-      for (const el of oldFiltered) el.style.filter = '';
-      pane.style.filter = filter;
-      return;
-    }
-  } catch {
-    /* fall through to container fallback */
-  }
-  // Fallback for unexpected pane access failure.
-  if (mapEl) mapEl.style.filter = filter;
+  applyTilePaneFilter(mainMap, filter);
+  applyTilePaneFilter(miniMap, filter);
 }
 
 /**

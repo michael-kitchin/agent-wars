@@ -14314,35 +14314,25 @@
   var RANGE_PERIMETER_AIR_STRIKE_DASH_MIN_GAP_PX = 8;
   var RANGE_PERIMETER_FLOW_PX_PER_SEC = 12;
 
+  // src/shared/basemapStyleLogic.ts
+  var ATLAS_BASEMAP_CSS_FILTER = "saturate(0.78) contrast(1.2) brightness(1.03)";
+  var SCIENTIFIC_BASEMAP_CSS_FILTER = "grayscale(1) contrast(1.18) brightness(1.08)";
+  var WARGAME_BASEMAP_CSS_FILTER = "invert(1) hue-rotate(180deg)";
+  function basemapNeedsRemount(currentId, nextId) {
+    return currentId !== nextId;
+  }
+  function basemapNeedsRemountForMaps(mainProviderId, miniProviderId, nextProviderId) {
+    return basemapNeedsRemount(mainProviderId, nextProviderId) || basemapNeedsRemount(miniProviderId, nextProviderId);
+  }
+  function basemapCssFilterForStyle(styleId) {
+    if (styleId === "wargame") return WARGAME_BASEMAP_CSS_FILTER;
+    if (styleId === "atlas") return ATLAS_BASEMAP_CSS_FILTER;
+    if (styleId === "scientific") return SCIENTIFIC_BASEMAP_CSS_FILTER;
+    return "";
+  }
+
   // src/renderer/map/basemapProvider.ts
   var RASTER_BASEMAP_ORDER = [
-    {
-      id: "carto_light_nolabels",
-      displayName: "Carto Positron (no labels)",
-      urlTemplate: "https://{s}.basemaps.cartocdn.com/rastertiles/light_nolabels/{z}/{x}/{y}.png",
-      attributionHtml: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
-      subdomains: "abcd",
-      maxZoom: 20,
-      minZoom: 0
-    },
-    {
-      id: "carto_voyager_nolabels",
-      displayName: "Carto Voyager (no labels)",
-      urlTemplate: "https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}.png",
-      attributionHtml: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
-      subdomains: "abcd",
-      maxZoom: 20,
-      minZoom: 0
-    },
-    {
-      id: "carto_dark_nolabels",
-      displayName: "Carto Dark (no labels)",
-      urlTemplate: "https://{s}.basemaps.cartocdn.com/rastertiles/dark_nolabels/{z}/{x}/{y}.png",
-      attributionHtml: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
-      subdomains: "abcd",
-      maxZoom: 20,
-      minZoom: 0
-    },
     {
       id: "esri_world_shaded_relief",
       displayName: "Esri World Shaded Relief",
@@ -14397,6 +14387,8 @@
   var onMainViewChanged = null;
   var mainBasemapLayer = null;
   var miniBasemapLayer = null;
+  var mountedMainBasemapProviderId = null;
+  var mountedMiniBasemapProviderId = null;
   function notifyMainViewChanged() {
     syncMinimapViewportRect();
     onMainViewChanged?.();
@@ -14409,6 +14401,8 @@
   function mountRasterBasemap(leafletRef, map, showAttribution, chainIndex, target) {
     const chain = getRasterBasemapChain();
     if (chainIndex >= chain.length) {
+      if (target === "main") mountedMainBasemapProviderId = null;
+      else mountedMiniBasemapProviderId = null;
       showBasemapErrorToast();
       return;
     }
@@ -14435,8 +14429,13 @@
     };
     if (spec.subdomains !== void 0) layerOpts.subdomains = spec.subdomains;
     const layer = leafletRef.tileLayer(spec.urlTemplate, layerOpts).addTo(map);
-    if (target === "main") mainBasemapLayer = layer;
-    else miniBasemapLayer = layer;
+    if (target === "main") {
+      mainBasemapLayer = layer;
+      mountedMainBasemapProviderId = spec.id;
+    } else {
+      miniBasemapLayer = layer;
+      mountedMiniBasemapProviderId = spec.id;
+    }
     const onTileError = () => {
       if (switched) return;
       switched = true;
@@ -14445,8 +14444,13 @@
         map.removeLayer(layer);
       } catch {
       }
-      if (target === "main") mainBasemapLayer = null;
-      else miniBasemapLayer = null;
+      if (target === "main") {
+        mainBasemapLayer = null;
+        mountedMainBasemapProviderId = null;
+      } else {
+        miniBasemapLayer = null;
+        mountedMiniBasemapProviderId = null;
+      }
       console.warn("[agent-wars] Basemap tile error; trying next provider", {
         failedId: spec.id,
         nextIndex: chainIndex + 1
@@ -14457,6 +14461,7 @@
   }
   function setMainBasemapByProviderId(providerId) {
     if (!mainMap || !miniMap) return;
+    if (!basemapNeedsRemountForMaps(mountedMainBasemapProviderId, mountedMiniBasemapProviderId, providerId)) return;
     const leafletRef = getL();
     const startIdx = getRasterBasemapChainStartIndex(providerId);
     mountRasterBasemap(leafletRef, mainMap, true, startIdx, "main");
@@ -14496,7 +14501,7 @@
       fadeAnimation: false,
       inertia: false
     });
-    const startIdx = getRasterBasemapChainStartIndex(initialBasemapProviderId ?? "carto_light_nolabels");
+    const startIdx = getRasterBasemapChainStartIndex(initialBasemapProviderId ?? "esri_world_shaded_relief");
     mountRasterBasemap(leafletRef, mainMap, true, startIdx, "main");
     mainMap.fitBounds(worldBounds, { padding: [2, 2], animate: false });
     mainMap.doubleClickZoom.disable();
@@ -14569,20 +14574,21 @@
   function getMainLeafletMap() {
     return mainMap;
   }
+  function applyTilePaneFilter(map, filter) {
+    try {
+      const pane = map?.getPanes?.()?.tilePane;
+      if (!pane) return;
+      const oldFiltered = pane.querySelectorAll(".leaflet-layer, .leaflet-tile");
+      for (const el of oldFiltered) el.style.filter = "";
+      pane.style.filter = filter;
+    } catch {
+    }
+  }
   function setMainBasemapFilter(filter) {
     const mapEl = document.getElementById("main-map");
     if (mapEl) mapEl.style.filter = "";
-    try {
-      const pane = mainMap?.getPanes?.()?.tilePane;
-      if (pane) {
-        const oldFiltered = pane.querySelectorAll(".leaflet-layer, .leaflet-tile");
-        for (const el of oldFiltered) el.style.filter = "";
-        pane.style.filter = filter;
-        return;
-      }
-    } catch {
-    }
-    if (mapEl) mapEl.style.filter = filter;
+    applyTilePaneFilter(mainMap, filter);
+    applyTilePaneFilter(miniMap, filter);
   }
   function hexCenterToOverlayPoint(h3Index, latLngFn) {
     if (!mainMap) return { x: 0, y: 0 };
@@ -16583,7 +16589,7 @@
   var LAND_HOVER_FILL_BASE = "rgba(155, 168, 128, 0.42)";
   var TERRAIN_STYLE_PRESETS = {
     /**
-       * Documents the object literal property `default` (default: { label: 'Default', basemapId: 'carto_light_nolabels', fillAlphaMultiplier: 0.55, hatchAlphaMultiplier: 0.375, fills: {).
+       * Documents the object literal property `default` (default: { label: 'Default', basemapId: 'esri_world_shaded_relief', fillAlphaMultiplier: 0.55, hatchAlphaMultiplier: 0.375, fills: {).
     
        * Purpose: Supports maintainability by documenting why `default` exists.
        * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
@@ -16618,7 +16624,7 @@
       rubbleOverlayHatch: { color: "rgba(110, 22, 18, 0.413)", spacing: 5, lineWidth: 0.85, reverseDiagonal: true, crosshatch: true }
     },
     /**
-       * Documents the object literal property `atlas` (atlas: { label: 'Atlas', basemapId: 'carto_voyager_nolabels', fillAlphaMultiplier: 0.55, hatchAlphaMultiplier: 0.375, fills: { w).
+       * Documents the object literal property `atlas` (atlas: { label: 'Atlas', basemapId: 'esri_world_shaded_relief', fillAlphaMultiplier: 0.55, hatchAlphaMultiplier: 0.375, fills: { w).
     
        * Purpose: Supports maintainability by documenting why `atlas` exists.
        * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
@@ -16627,7 +16633,7 @@
        */
     atlas: {
       label: "Atlas",
-      basemapId: "carto_voyager_nolabels",
+      basemapId: "esri_world_shaded_relief",
       fillAlphaMultiplier: 0.55,
       hatchAlphaMultiplier: 0.375,
       fills: {
@@ -16653,7 +16659,7 @@
       rubbleOverlayHatch: { color: "rgba(110, 22, 18, 0.413)", spacing: 5, lineWidth: 0.85, reverseDiagonal: true, crosshatch: true }
     },
     /**
-       * Documents the object literal property `wargame` (wargame: { label: 'Wargame', basemapId: 'carto_dark_nolabels', fillAlphaMultiplier: 0.55, hatchAlphaMultiplier: 0.375, fills: {).
+       * Documents the object literal property `wargame` (wargame: { label: 'Wargame', basemapId: 'esri_world_shaded_relief', fillAlphaMultiplier: 0.55, hatchAlphaMultiplier: 0.375, fills: {).
     
        * Purpose: Supports maintainability by documenting why `wargame` exists.
        * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
@@ -16662,7 +16668,7 @@
        */
     wargame: {
       label: "Wargame",
-      basemapId: "carto_dark_nolabels",
+      basemapId: "esri_world_shaded_relief",
       fillAlphaMultiplier: 0.55,
       hatchAlphaMultiplier: 0.375,
       fills: {
@@ -16697,7 +16703,7 @@
        */
     scientific: {
       label: "Scientific",
-      basemapId: "carto_light_nolabels",
+      basemapId: "esri_world_shaded_relief",
       fillAlphaMultiplier: 0.55,
       hatchAlphaMultiplier: 0.375,
       fills: {
@@ -26116,12 +26122,13 @@
   function wireInitCore(deps) {
     try {
       initWorldLeafletMaps("main-map", "minimap", () => deps.requestRedraw(), getActiveTerrainStyleBasemapId());
-      setMainBasemapFilter("");
+      setMainBasemapFilter(basemapCssFilterForStyle(getActiveTerrainStyleId()));
       const leg = document.getElementById("terrain-legend");
       if (leg) {
         renderTerrainLegend(leg, {
           onStyleChanged: () => {
             setMainBasemapByProviderId(getActiveTerrainStyleBasemapId());
+            setMainBasemapFilter(basemapCssFilterForStyle(getActiveTerrainStyleId()));
             deps.requestRedraw();
           }
         });

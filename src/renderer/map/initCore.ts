@@ -7,7 +7,8 @@ import { rendererSharedState as S } from '../core/state';
 import { hidePlanningChromeToasts } from '../openRouter/openRouterUiHelpers';
 import { isHoverOrderPlanningActive } from '../rendering/canvasPreviewPolicy';
 import { shouldRefreshStackCalloutOnControlKeydown } from '../../shared/stackCalloutCtrlKeydown';
-import { getActiveTerrainStyleBasemapId, renderTerrainLegend } from '../rendering/terrainVisualStyles';
+import { basemapCssFilterForStyle } from '../../shared/basemapStyleLogic';
+import { getActiveTerrainStyleBasemapId, getActiveTerrainStyleId, renderTerrainLegend } from '../rendering/terrainVisualStyles';
 import { hideOrderBlockHexTooltip } from './orderBlockHexTooltip';
 import { hideOrderSlowerHexTooltip } from './orderSlowerHexTooltip';
 import { getMainLeafletMap, initWorldLeafletMaps, setMainBasemapByProviderId, setMainBasemapFilter } from './worldLeafletMap';
@@ -338,12 +339,13 @@ function dismissTerrainTooltipWhenPointerLeavesMapPanel(deps: InitCoreDeps): voi
 export function wireInitCore(deps: InitCoreDeps): void {
   try {
     initWorldLeafletMaps('main-map', 'minimap', () => deps.requestRedraw(), getActiveTerrainStyleBasemapId());
-    setMainBasemapFilter('');
+    setMainBasemapFilter(basemapCssFilterForStyle(getActiveTerrainStyleId()));
     const leg = document.getElementById('terrain-legend');
     if (leg) {
       renderTerrainLegend(leg, {
         onStyleChanged: () => {
           setMainBasemapByProviderId(getActiveTerrainStyleBasemapId());
+          setMainBasemapFilter(basemapCssFilterForStyle(getActiveTerrainStyleId()));
           deps.requestRedraw();
         },
       });

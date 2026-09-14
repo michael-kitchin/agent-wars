@@ -258,7 +258,7 @@ rubbleOverlayHatch: HatchStyle;
  */
 const TERRAIN_STYLE_PRESETS: Record<TerrainVisualStyleId, TerrainStylePreset> = {
     /**
-   * Documents the object literal property `default` (default: { label: 'Default', basemapId: 'carto_light_nolabels', fillAlphaMultiplier: 0.55, hatchAlphaMultiplier: 0.375, fills: {).
+   * Documents the object literal property `default` (default: { label: 'Default', basemapId: 'esri_world_shaded_relief', fillAlphaMultiplier: 0.55, hatchAlphaMultiplier: 0.375, fills: {).
 
    * Purpose: Supports maintainability by documenting why `default` exists.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
@@ -293,7 +293,7 @@ default: {
     rubbleOverlayHatch: { color: 'rgba(110, 22, 18, 0.413)', spacing: 5, lineWidth: 0.85, reverseDiagonal: true, crosshatch: true },
   },
     /**
-   * Documents the object literal property `atlas` (atlas: { label: 'Atlas', basemapId: 'carto_voyager_nolabels', fillAlphaMultiplier: 0.55, hatchAlphaMultiplier: 0.375, fills: { w).
+   * Documents the object literal property `atlas` (atlas: { label: 'Atlas', basemapId: 'esri_world_shaded_relief', fillAlphaMultiplier: 0.55, hatchAlphaMultiplier: 0.375, fills: { w).
 
    * Purpose: Supports maintainability by documenting why `atlas` exists.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
@@ -302,7 +302,7 @@ default: {
    */
 atlas: {
     label: 'Atlas',
-    basemapId: 'carto_voyager_nolabels',
+    basemapId: 'esri_world_shaded_relief',
     fillAlphaMultiplier: 0.55,
     hatchAlphaMultiplier: 0.375,
     fills: {
@@ -328,7 +328,7 @@ atlas: {
     rubbleOverlayHatch: { color: 'rgba(110, 22, 18, 0.413)', spacing: 5, lineWidth: 0.85, reverseDiagonal: true, crosshatch: true },
   },
     /**
-   * Documents the object literal property `wargame` (wargame: { label: 'Wargame', basemapId: 'carto_dark_nolabels', fillAlphaMultiplier: 0.55, hatchAlphaMultiplier: 0.375, fills: {).
+   * Documents the object literal property `wargame` (wargame: { label: 'Wargame', basemapId: 'esri_world_shaded_relief', fillAlphaMultiplier: 0.55, hatchAlphaMultiplier: 0.375, fills: {).
 
    * Purpose: Supports maintainability by documenting why `wargame` exists.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
@@ -337,7 +337,7 @@ atlas: {
    */
 wargame: {
     label: 'Wargame',
-    basemapId: 'carto_dark_nolabels',
+    basemapId: 'esri_world_shaded_relief',
     fillAlphaMultiplier: 0.55,
     hatchAlphaMultiplier: 0.375,
     fills: {
@@ -372,7 +372,7 @@ wargame: {
    */
 scientific: {
     label: 'Scientific',
-    basemapId: 'carto_light_nolabels',
+    basemapId: 'esri_world_shaded_relief',
     fillAlphaMultiplier: 0.55,
     hatchAlphaMultiplier: 0.375,
     fills: {
