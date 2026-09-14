@@ -1,15 +1,19 @@
 {
 	"folders": [
 		{
+			"name": "agent-wars",
 			"path": "."
 		},
 		{
+			"name": "Data",
 			"path": "../../../Data"
 		},
 		{
+			"name": "agent-wars-meta",
 			"path": "../agent-wars-meta"
 		},
 		{
+			"name": "agent-wars-scratch",
 			"path": "../agent-wars-scratch"
 		}
 	],
