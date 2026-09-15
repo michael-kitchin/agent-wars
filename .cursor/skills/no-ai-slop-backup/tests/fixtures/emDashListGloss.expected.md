@@ -1,0 +1,1 @@
+- **assess_unit** on every AI unit: nearby enemies, friendlies, threats

@@ -1,0 +1,754 @@
+{
+  "cases": [
+    {
+      "id": "prompt-refusal-hit",
+      "fixture": "promptRefusal.md",
+      "slug": "prompt-refusal",
+      "expectMatch": true
+    },
+    {
+      "id": "prompt-refusal-miss",
+      "fixture": "ordinaryProse.md",
+      "slug": "prompt-refusal",
+      "expectMatch": false
+    },
+    {
+      "id": "hex-emdash-translation",
+      "kind": "translation",
+      "rustSource": "\\x{2014}",
+      "flags": "",
+      "mustMatch": "\u2014"
+    },
+    {
+      "id": "multiline-heading-prefix",
+      "kind": "translation",
+      "rustSource": "(?m)^#{1,6} ",
+      "flags": "",
+      "mustMatch": "intro\n# Title\n"
+    },
+    {
+      "id": "emoji-range-translation",
+      "kind": "translation",
+      "rustSource": "[\\x{1F300}-\\x{1FAFF}]",
+      "flags": "",
+      "mustMatch": "😀"
+    },
+    {
+      "id": "headings-start-at-two",
+      "kind": "heading-rewrite",
+      "fixture": "headingsStartAtTwo.md",
+      "expectFixture": "headingsStartAtTwo.expected.md"
+    },
+    {
+      "id": "headings-skip-level",
+      "kind": "heading-rewrite",
+      "fixture": "headingsSkipLevel.md",
+      "expectFixture": "headingsSkipLevel.expected.md"
+    },
+    {
+      "id": "headings-nested-ok",
+      "kind": "heading-rewrite",
+      "fixture": "headingsNestedOk.md",
+      "expectFixture": "headingsNestedOk.md"
+    },
+    {
+      "id": "headings-after-yaml",
+      "kind": "heading-rewrite",
+      "fixture": "headingsAfterYaml.md",
+      "expectFixture": "headingsAfterYaml.expected.md"
+    },
+    {
+      "id": "headings-start-at-three",
+      "kind": "heading-rewrite",
+      "fixture": "headingsStartAtThree.md",
+      "expectFixture": "headingsStartAtThree.expected.md"
+    },
+    {
+      "id": "headings-need-title-case",
+      "kind": "heading-rewrite",
+      "fixture": "headingsNeedTitleCase.md",
+      "expectFixture": "headingsNeedTitleCase.expected.md"
+    },
+    {
+      "id": "title-case-sentence",
+      "kind": "title-case",
+      "input": "what the hours say",
+      "expect": "What the Hours Say"
+    },
+    {
+      "id": "title-case-small-words",
+      "kind": "title-case",
+      "input": "Rules for a Weak Agent",
+      "expect": "Rules for a Weak Agent"
+    },
+    {
+      "id": "title-case-hyphen",
+      "kind": "title-case",
+      "input": "pre-computation, episodic consultation",
+      "expect": "Pre-Computation, Episodic Consultation"
+    },
+    {
+      "id": "title-case-inline-code",
+      "kind": "title-case",
+      "input": "use the `src/` path",
+      "expect": "Use the `src/` Path"
+    },
+    {
+      "id": "title-case-colon",
+      "kind": "title-case",
+      "input": "Phase 1: the real game",
+      "expect": "Phase 1: The Real Game"
+    },
+    {
+      "id": "title-case-parenthetical",
+      "kind": "title-case",
+      "input": "Status and Context (as written in April 2026)",
+      "expect": "Status and Context (As Written in April 2026)"
+    },
+    {
+      "id": "title-case-with-from",
+      "kind": "title-case",
+      "input": "grand strategy wargame with LLM opponents from earth",
+      "expect": "Grand Strategy Wargame with LLM Opponents from Earth"
+    },
+    {
+      "id": "title-case-digit-token",
+      "kind": "title-case",
+      "input": "engine 2.4.0",
+      "expect": "Engine 2.4.0"
+    },
+    {
+      "id": "headings-colon-fragment",
+      "kind": "heading-rewrite",
+      "fixture": "headingsColon.md",
+      "expectFixture": "headingsColon.expected.md"
+    },
+    {
+      "id": "headings-ignore-fenced-code",
+      "kind": "heading-rewrite",
+      "fixture": "headingsInFence.md",
+      "expectFixture": "headingsInFence.expected.md"
+    },
+    {
+      "id": "headings-title-case-outside-fence",
+      "kind": "heading-rewrite",
+      "fixture": "headingsFenceWithTitle.md",
+      "expectFixture": "headingsFenceWithTitle.expected.md"
+    },
+    {
+      "id": "myth-bust-hit",
+      "fixture": "mythBust.md",
+      "slug": "myth-bust-lead",
+      "expectMatch": true
+    },
+    {
+      "id": "myth-bust-im-claiming",
+      "fixture": "mythBustImClaiming.md",
+      "slug": "myth-bust-lead",
+      "expectMatch": true
+    },
+    {
+      "id": "myth-bust-it-isnt-judgment",
+      "fixture": "mythBustItIsnt.md",
+      "slug": "myth-bust-lead",
+      "expectMatch": false
+    },
+    {
+      "id": "myth-bust-exempt",
+      "fixture": "mythBustExempt.md",
+      "slug": "myth-bust-lead",
+      "expectMatch": false
+    },
+    {
+      "id": "myth-bust-factual",
+      "fixture": "mythBustFactual.md",
+      "slug": "myth-bust-lead",
+      "expectMatch": false
+    },
+    {
+      "id": "myth-bust-fixed",
+      "fixture": "mythBustFixed.md",
+      "slug": "myth-bust-lead",
+      "expectMatch": false
+    },
+    {
+      "id": "myth-bust-theres-no",
+      "fixture": "mythBustTheresNo.md",
+      "slug": "myth-bust-lead",
+      "expectMatch": true
+    },
+    {
+      "id": "myth-bust-theres-no-factual",
+      "fixture": "mythBustTheresNoFactual.md",
+      "slug": "myth-bust-lead",
+      "expectMatch": false
+    },
+    {
+      "id": "myth-bust-theres-no-fixed",
+      "fixture": "mythBustTheresNoFixed.md",
+      "slug": "myth-bust-lead",
+      "expectMatch": false
+    },
+    {
+      "id": "myth-bust-quoted-closer",
+      "fixture": "mythBustQuotedCloser.md",
+      "slug": "myth-bust-lead",
+      "expectMatch": true
+    },
+    {
+      "id": "myth-bust-quoted-closer-contracted",
+      "fixture": "mythBustQuotedCloserContracted.md",
+      "slug": "myth-bust-lead",
+      "expectMatch": true
+    },
+    {
+      "id": "myth-bust-quoted-closer-fixed",
+      "fixture": "mythBustQuotedCloserFixed.md",
+      "slug": "myth-bust-lead",
+      "expectMatch": false
+    },
+    {
+      "id": "english-variety-mismatch",
+      "kind": "english-variety",
+      "fixture": "englishVariety.md",
+      "expectMismatch": true
+    },
+    {
+      "id": "english-variety-consistent",
+      "kind": "english-variety",
+      "fixture": "englishVarietyConsistent.md",
+      "expectMismatch": false
+    },
+    {
+      "id": "english-variety-stray-uk",
+      "kind": "english-variety",
+      "fixture": "englishVarietyStrayUk.md",
+      "expectMismatch": true
+    },
+    {
+      "id": "english-variety-stray-uk-two",
+      "kind": "english-variety",
+      "fixture": "englishVarietyStrayUkTwo.md",
+      "expectMismatch": true
+    },
+    {
+      "id": "english-variety-british",
+      "kind": "english-variety",
+      "fixture": "englishVarietyBritish.md",
+      "expectMismatch": false
+    },
+    {
+      "id": "english-variety-quoted-us",
+      "kind": "english-variety",
+      "fixture": "englishVarietyQuotedUs.md",
+      "expectMismatch": true
+    },
+    {
+      "id": "english-variety-quoted-only",
+      "kind": "english-variety",
+      "fixture": "englishVarietyQuotedOnly.md",
+      "expectMismatch": false
+    },
+    {
+      "id": "english-variety-british-quoted-us",
+      "kind": "english-variety",
+      "fixture": "englishVarietyBritishQuotedUs.md",
+      "expectMismatch": false
+    },
+    {
+      "id": "metaphor-hits",
+      "kind": "metaphor-guard",
+      "fixture": "techMetaphor.md",
+      "expectHits": 4
+    },
+    {
+      "id": "metaphor-literals",
+      "kind": "metaphor-guard",
+      "fixture": "techMetaphorLiteral.md",
+      "expectHits": 0
+    },
+    {
+      "id": "metaphor-catalog",
+      "kind": "metaphor-guard",
+      "fixture": "techMetaphorCatalog.md",
+      "expectHits": 0
+    },
+    {
+      "id": "apply-file-heading-and-dash",
+      "kind": "apply-file",
+      "fixture": "applyFileFix.md",
+      "expectFixture": "applyFileFix.expected.md"
+    },
+    {
+      "id": "em-dash-rewrite-heading",
+      "kind": "em-dash-rewrite",
+      "fixture": "emDashHeading.md",
+      "expectFixture": "emDashHeading.expected.md"
+    },
+    {
+      "id": "em-dash-rewrite-list",
+      "kind": "em-dash-rewrite",
+      "fixture": "emDashList.md",
+      "expectFixture": "emDashList.expected.md"
+    },
+    {
+      "id": "em-dash-rewrite-pair",
+      "kind": "em-dash-rewrite",
+      "fixture": "emDashPair.md",
+      "expectFixture": "emDashPair.expected.md"
+    },
+    {
+      "id": "em-dash-rewrite-nested-paren",
+      "kind": "em-dash-rewrite",
+      "fixture": "emDashNestedParen.md",
+      "expectFixture": "emDashNestedParen.expected.md"
+    },
+    {
+      "id": "em-dash-rewrite-table",
+      "kind": "em-dash-rewrite",
+      "fixture": "emDashTable.md",
+      "expectFixture": "emDashTable.expected.md"
+    },
+    {
+      "id": "em-dash-rewrite-safe",
+      "kind": "em-dash-rewrite",
+      "fixture": "emDashSafe.md",
+      "expectFixture": "emDashSafe.expected.md"
+    },
+    {
+      "id": "em-dash-rewrite-unspaced",
+      "kind": "em-dash-rewrite",
+      "fixture": "emDashUnspacedRewrite.md",
+      "expectFixture": "emDashUnspacedRewrite.expected.md"
+    },
+    {
+      "id": "em-dash-rewrite-html-comment",
+      "kind": "em-dash-rewrite",
+      "fixture": "emDashHtmlRewrite.md",
+      "expectFixture": "emDashHtmlRewrite.expected.md"
+    },
+    {
+      "id": "em-dash-rewrite-html-multiline",
+      "kind": "em-dash-rewrite",
+      "fixture": "emDashHtmlMultiline.md",
+      "expectFixture": "emDashHtmlMultiline.expected.md"
+    },
+    {
+      "id": "em-dash-rewrite-these",
+      "kind": "em-dash-rewrite",
+      "fixture": "emDashThese.md",
+      "expectFixture": "emDashThese.expected.md"
+    },
+    {
+      "id": "em-dash-rewrite-list-gloss",
+      "kind": "em-dash-rewrite",
+      "fixture": "emDashListGloss.md",
+      "expectFixture": "emDashListGloss.expected.md"
+    },
+    {
+      "id": "em-dash-rewrite-pair-inner-paren",
+      "kind": "em-dash-rewrite",
+      "fixture": "emDashPairInnerParen.md",
+      "expectFixture": "emDashPairInnerParen.expected.md"
+    },
+    {
+      "id": "em-dash-rewrite-pair-continue",
+      "kind": "em-dash-rewrite",
+      "fixture": "emDashPairContinue.md",
+      "expectFixture": "emDashPairContinue.expected.md"
+    },
+    {
+      "id": "em-dash-rewrite-pair-predicate",
+      "kind": "em-dash-rewrite",
+      "fixture": "emDashPairPredicate.md",
+      "expectFixture": "emDashPairPredicate.expected.md"
+    },
+    {
+      "id": "em-dash-rewrite-inside-parens",
+      "kind": "em-dash-rewrite",
+      "fixture": "emDashInsideParens.md",
+      "expectFixture": "emDashInsideParens.expected.md"
+    },
+    {
+      "id": "apply-file-requires-path",
+      "kind": "apply-file-error"
+    },
+    {
+      "id": "em-dash-unicode",
+      "fixture": "emDashUnicode.md",
+      "slug": "em-dash-spaced",
+      "expectMatch": true
+    },
+    {
+      "id": "em-dash-unspaced",
+      "fixture": "emDashUnspaced.md",
+      "slug": "em-dash-any",
+      "expectMatch": true
+    },
+    {
+      "id": "em-dash-ascii",
+      "fixture": "emDashAscii.md",
+      "slug": "em-dash-ascii",
+      "expectMatch": true
+    },
+    {
+      "id": "em-dash-yaml",
+      "fixture": "emDashYaml.md",
+      "slug": "em-dash-ascii",
+      "expectMatch": false
+    },
+    {
+      "id": "em-dash-flag",
+      "fixture": "emDashFlag.md",
+      "slug": "em-dash-ascii",
+      "expectMatch": false
+    },
+    {
+      "id": "em-dash-range",
+      "fixture": "emDashRange.md",
+      "slug": "em-dash-ascii",
+      "expectMatch": false
+    },
+    {
+      "id": "em-dash-html",
+      "fixture": "emDashHtml.md",
+      "slug": "em-dash-ascii",
+      "expectMatch": false
+    },
+    {
+      "id": "em-dash-fixed",
+      "fixture": "emDashFixed.md",
+      "slug": "em-dash-ascii",
+      "expectMatch": false
+    },
+    {
+      "id": "verdict-house-style-ignored",
+      "kind": "verdict",
+      "counts": { "definitive": 0, "strong": 1, "corroborating": 0, "houseStyle": 8 },
+      "expect": "Some indication"
+    },
+    {
+      "id": "verdict-house-style-only",
+      "kind": "verdict",
+      "counts": { "definitive": 0, "strong": 0, "corroborating": 0, "houseStyle": 10 },
+      "expect": "No signs found"
+    },
+    {
+      "id": "verdict-em-dash-only",
+      "kind": "verdict",
+      "counts": { "definitive": 0, "strong": 1, "corroborating": 0, "houseStyle": 0 },
+      "expect": "Some indication"
+    },
+    {
+      "id": "verdict-house-style-volume",
+      "kind": "verdict",
+      "counts": { "definitive": 0, "strong": 0, "corroborating": 0, "houseStyle": 12 },
+      "expect": "No signs found"
+    },
+    {
+      "id": "missing-contraction-sync",
+      "kind": "missing-contraction-sync",
+      "mustNotMatch": ["there are", "I shall", "ain't", "its", "I'm", "what would"]
+    },
+    {
+      "id": "missing-contraction-hits",
+      "kind": "missing-contraction-guard",
+      "fixture": "missingContraction.md",
+      "expectHits": 7
+    },
+    {
+      "id": "missing-contraction-exempt",
+      "kind": "missing-contraction-guard",
+      "fixture": "missingContractionExempt.md",
+      "expectHits": 0
+    },
+    {
+      "id": "missing-contraction-we-are",
+      "kind": "missing-contraction-rewrite",
+      "input": "we are ready",
+      "expect": "we're ready"
+    },
+    {
+      "id": "missing-contraction-it-is-cap",
+      "kind": "missing-contraction-rewrite",
+      "input": "It is ready",
+      "expect": "It's ready"
+    },
+    {
+      "id": "missing-contraction-do-not-caps",
+      "kind": "missing-contraction-rewrite",
+      "input": "DO NOT copy",
+      "expect": "DON'T copy"
+    },
+    {
+      "id": "missing-contraction-will-not",
+      "kind": "missing-contraction-rewrite",
+      "input": "will not",
+      "expect": "won't"
+    },
+    {
+      "id": "missing-contraction-cannot",
+      "kind": "missing-contraction-rewrite",
+      "input": "cannot",
+      "expect": "can't"
+    },
+    {
+      "id": "missing-contraction-it-is-not",
+      "kind": "missing-contraction-rewrite",
+      "input": "it is not",
+      "expect": "it isn't"
+    },
+    {
+      "id": "missing-contraction-what-would-stays",
+      "kind": "missing-contraction-rewrite",
+      "input": "ask what would have had to happen",
+      "expect": "ask what would have had to happen"
+    },
+    {
+      "id": "missing-contraction-they-are-not",
+      "kind": "missing-contraction-rewrite",
+      "input": "They are not a size bound",
+      "expect": "They aren't a size bound"
+    },
+    {
+      "id": "missing-contraction-there-is-not",
+      "kind": "missing-contraction-rewrite",
+      "input": "there is not",
+      "expect": "there isn't"
+    },
+    {
+      "id": "missing-contraction-they-are-ready",
+      "kind": "missing-contraction-rewrite",
+      "input": "they are ready",
+      "expect": "they're ready"
+    },
+    {
+      "id": "missing-contraction-they-are-not-imply",
+      "kind": "missing-contraction-rewrite",
+      "input": "They are not a size bound and the post must not imply they are.",
+      "expect": "They aren't a size bound and the post mustn't imply they are."
+    },
+    {
+      "id": "missing-contraction-that-is-not",
+      "kind": "missing-contraction-rewrite",
+      "input": "that is not a size bound",
+      "expect": "that isn't a size bound"
+    },
+    {
+      "id": "missing-contraction-i-have-been",
+      "kind": "missing-contraction-rewrite",
+      "input": "I have been",
+      "expect": "I've been"
+    },
+    {
+      "id": "missing-contraction-i-have-a-list",
+      "kind": "missing-contraction-rewrite",
+      "input": "I have a list",
+      "expect": "I have a list"
+    },
+    {
+      "id": "missing-contraction-i-would-go",
+      "kind": "missing-contraction-rewrite",
+      "input": "I would go",
+      "expect": "I'd go"
+    },
+    {
+      "id": "missing-contraction-i-had-a-list",
+      "kind": "missing-contraction-rewrite",
+      "input": "I had a list",
+      "expect": "I had a list"
+    },
+    {
+      "id": "missing-contraction-let-us-consider",
+      "kind": "missing-contraction-rewrite",
+      "input": "Let us consider",
+      "expect": "Let's consider"
+    },
+    {
+      "id": "missing-contraction-please-let-us-know",
+      "kind": "missing-contraction-rewrite",
+      "input": "Please let us know",
+      "expect": "Please let us know"
+    },
+    {
+      "id": "missing-contraction-i-will-not",
+      "kind": "missing-contraction-rewrite",
+      "input": "I will not go",
+      "expect": "I won't go"
+    },
+    {
+      "id": "missing-contraction-had-set",
+      "kind": "missing-contraction-rewrite",
+      "input": "I had set the table",
+      "expect": "I had set the table"
+    },
+    {
+      "id": "missing-contraction-can-not-refrain",
+      "kind": "missing-contraction-rewrite",
+      "input": "You can not skip if you want",
+      "expect": "You can not skip if you want"
+    },
+    {
+      "id": "missing-contraction-can-not-inability",
+      "kind": "missing-contraction-rewrite",
+      "input": "the system can not boot",
+      "expect": "the system can't boot"
+    },
+    {
+      "id": "missing-contraction-fence-kept",
+      "kind": "missing-contraction-rewrite",
+      "input": "```\nit is hidden\n```\nwe are done",
+      "expect": "```\nit is hidden\n```\nwe're done"
+    },
+    {
+      "id": "missing-contraction-tilde-fence",
+      "kind": "missing-contraction-rewrite",
+      "input": "~~~\nit is hidden\n~~~\nwe are done",
+      "expect": "~~~\nit is hidden\n~~~\nwe're done"
+    },
+    {
+      "id": "missing-contraction-html-comment",
+      "kind": "missing-contraction-rewrite",
+      "input": "<!-- it is hidden --> we are done",
+      "expect": "<!-- it is hidden --> we're done"
+    },
+    {
+      "id": "missing-contraction-blockquote-let-us",
+      "kind": "missing-contraction-rewrite",
+      "input": "> Let us consider",
+      "expect": "> Let's consider"
+    },
+    {
+      "id": "missing-contraction-quoted-let-us",
+      "kind": "missing-contraction-rewrite",
+      "input": "\"Let us consider",
+      "expect": "\"Let's consider"
+    },
+    {
+      "id": "missing-contraction-i-am-not",
+      "kind": "missing-contraction-rewrite",
+      "input": "I am not ready",
+      "expect": "I'm not ready"
+    },
+    {
+      "id": "missing-contraction-let-us-after-line",
+      "kind": "missing-contraction-rewrite",
+      "input": "Ready.\nLet us consider",
+      "expect": "Ready.\nLet's consider"
+    },
+    {
+      "id": "missing-contraction-list-let-us",
+      "kind": "missing-contraction-rewrite",
+      "input": "- Let us consider",
+      "expect": "- Let's consider"
+    },
+    {
+      "id": "missing-contraction-nested-fence",
+      "kind": "missing-contraction-rewrite",
+      "input": "~~~\n```\nit is hidden\n```\n~~~\nwe are done",
+      "expect": "~~~\n```\nit is hidden\n```\n~~~\nwe're done"
+    },
+    {
+      "id": "missing-contraction-please-comma",
+      "kind": "missing-contraction-rewrite",
+      "input": "Please,\nLet us consider",
+      "expect": "Please,\nLet us consider"
+    },
+    {
+      "id": "missing-contraction-binding-exempt",
+      "kind": "missing-contraction-guard",
+      "fixture": "missingContractionBinding.md",
+      "expectHits": 0
+    },
+    {
+      "id": "missing-contraction-locative-here-is",
+      "kind": "missing-contraction-rewrite",
+      "input": "Every figure here is measured",
+      "expect": "Every figure here is measured"
+    },
+    {
+      "id": "missing-contraction-object-in-it-is",
+      "kind": "missing-contraction-rewrite",
+      "input": "Every number in it is measured",
+      "expect": "Every number in it is measured"
+    },
+    {
+      "id": "missing-contraction-here-it-is-final",
+      "kind": "missing-contraction-rewrite",
+      "input": "so here it is.",
+      "expect": "so here it is."
+    },
+    {
+      "id": "missing-contraction-way-it-is-can",
+      "kind": "missing-contraction-rewrite",
+      "input": "the way it is can find",
+      "expect": "the way it is can find"
+    },
+    {
+      "id": "missing-contraction-gerund-it-will",
+      "kind": "missing-contraction-rewrite",
+      "input": "an agent following it will edit",
+      "expect": "an agent following it will edit"
+    },
+    {
+      "id": "missing-contraction-produce-it-is",
+      "kind": "missing-contraction-rewrite",
+      "input": "The apparatus that would produce it is specified",
+      "expect": "The apparatus that'd produce it is specified"
+    },
+    {
+      "id": "missing-contraction-they-are-final",
+      "kind": "missing-contraction-rewrite",
+      "input": "imply they are.",
+      "expect": "imply they are."
+    },
+    {
+      "id": "missing-contraction-prep-it-would",
+      "kind": "missing-contraction-rewrite",
+      "input": "subscribing to it would never",
+      "expect": "subscribing to it would never"
+    },
+    {
+      "id": "missing-contraction-next-to-it-is",
+      "kind": "missing-contraction-rewrite",
+      "input": "putting the number next to it is cheaper",
+      "expect": "putting the number next to it is cheaper"
+    },
+    {
+      "id": "missing-contraction-presentational-here-is",
+      "kind": "missing-contraction-rewrite",
+      "input": "Here is the list",
+      "expect": "Here's the list"
+    },
+    {
+      "id": "missing-contraction-so-here-is",
+      "kind": "missing-contraction-rewrite",
+      "input": "so here is the other side",
+      "expect": "so here's the other side"
+    },
+    {
+      "id": "missing-contraction-think-it-is",
+      "kind": "missing-contraction-rewrite",
+      "input": "I think it is true",
+      "expect": "I think it's true"
+    },
+    {
+      "id": "missing-contraction-because-it-is",
+      "kind": "missing-contraction-rewrite",
+      "input": "because it is ready",
+      "expect": "because it's ready"
+    },
+    {
+      "id": "missing-contraction-of-that-is",
+      "kind": "missing-contraction-rewrite",
+      "input": "Most of that is one-shot",
+      "expect": "Most of that's one-shot"
+    },
+    {
+      "id": "missing-contraction-believed-it-had",
+      "kind": "missing-contraction-rewrite",
+      "input": "the agent believed it had implemented",
+      "expect": "the agent believed it'd implemented"
+    }
+  ]
+}
