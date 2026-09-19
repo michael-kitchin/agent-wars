@@ -7,17 +7,6 @@
 		{
 			"name": "Data",
 			"path": "../../../Data"
-		},
-		{
-			"name": "agent-wars-meta",
-			"path": "../agent-wars-meta"
-		},
-		{
-			"name": "agent-wars-scratch",
-			"path": "../agent-wars-scratch"
-		},
-		{
-			"path": "C:/Users/mcoyo/.cursor/skills/no-ai-slop"
 		}
 	],
 	"settings": {}
