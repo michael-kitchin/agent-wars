@@ -62,14 +62,13 @@ function computeRes4FeatureOverrideSignature(ops: BasicDbOps): string {
  *
  * Purpose: Public entry for `controlInfrastructure.getRes4TerrainOverridesForRendererFromGame`.
  * When to use: Every renderer/tactical refresh that needs merged res4 terrain overrides.
- * Expected outcome: Deep-equal rows to an uncached rebuild for the same DB state.
+ * Expected outcome: Deep-equal rows to an uncached rebuild for the same DB state. Cache hits log at TRACE; rebuilds log at DEBUG.
  * Exceptions: Propagates errors from `buildRows`.
  */
 export function getRes4RendererOverrideRowsCached(
   ops: BasicDbOps,
   buildRows: () => Res4RendererOverrideRow[]
 ): Res4RendererOverrideRow[] {
-  logDebug('res4RendererOverrideCache getRes4RendererOverrideRowsCached');
   const signature = computeRes4FeatureOverrideSignature(ops);
   if (rendererOverrideCache?.signature === signature) {
     logTrace('res4RendererOverrideCache getRes4RendererOverrideRowsCached: cache hit', { signature });

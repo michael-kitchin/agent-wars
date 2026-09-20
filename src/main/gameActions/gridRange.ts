@@ -2,7 +2,7 @@ import { gridDisk } from 'h3-js';
 import { DEFAULT_BOUNDED_MEMO_CAPACITY, getBoundedMemo } from '../../shared/boundedMemoCache';
 import { computeGridDistancePure } from '../../shared/h3GridRangePure';
 import { AIR_FERRY_RANGE_HEXES, AIR_STRIKE_RANGE_HEXES } from '../../shared/tacticalRanges';
-import { logDebug, logError, logTrace } from '../logger';
+import { logError, logTrace } from '../logger';
 
 /**
  * Memoizes `gridDisk(origin, maxRange)` sets for the null-distance fallback in `isWithinGridRangeSafe`.
@@ -64,25 +64,25 @@ export function isWithinGridRangeSafe(
 /**
  * Defines the `isWithinAirFerryGridRange` function shape (export function isWithinAirFerryGridRange(originH3: string, destH3: string, context: string): boolean).
 
- * Purpose: Single entry point for **air ferry** grid range checks so all call sites share `AIR_FERRY_RANGE_HEXES` and the same `isWithinGridRangeSafe` logging semantics.
+ * Purpose: Single entry point for **air ferry** grid range checks so all call sites share `AIR_FERRY_RANGE_HEXES` and `isWithinGridRangeSafe` disk-fallback error handling. Logs each probe at TRACE.
  * When to use: Any main-process validation or preview that tests whether an air unit can ferry between two hexes within the configured ferry radius.
  * Expected outcome: Same boolean as `isWithinGridRangeSafe(..., AIR_FERRY_RANGE_HEXES, context)` before this wrapper existed.
  * Exceptions: None.
  */
 export function isWithinAirFerryGridRange(originH3: string, destH3: string, context: string): boolean {
-  logDebug('gridRange isWithinAirFerryGridRange', { originH3, destH3, context });
+  logTrace('gridRange isWithinAirFerryGridRange', { originH3, destH3, context });
   return isWithinGridRangeSafe(originH3, destH3, AIR_FERRY_RANGE_HEXES, context);
 }
 
 /**
  * Defines the `isWithinAirStrikeGridRange` function shape (export function isWithinAirStrikeGridRange(originH3: string, destH3: string, context: string): boolean).
 
- * Purpose: Single entry point for **air strike** grid range checks so all call sites share `AIR_STRIKE_RANGE_HEXES` and the same `isWithinGridRangeSafe` logging semantics.
+ * Purpose: Single entry point for **air strike** grid range checks so all call sites share `AIR_STRIKE_RANGE_HEXES` and `isWithinGridRangeSafe` disk-fallback error handling. Logs each probe at TRACE.
  * When to use: Any main-process validation or briefing scan that tests whether a strike target lies within strike range from a base hex.
  * Expected outcome: Same boolean as `isWithinGridRangeSafe(..., AIR_STRIKE_RANGE_HEXES, context)` before this wrapper existed.
  * Exceptions: None.
  */
 export function isWithinAirStrikeGridRange(originH3: string, destH3: string, context: string): boolean {
-  logDebug('gridRange isWithinAirStrikeGridRange', { originH3, destH3, context });
+  logTrace('gridRange isWithinAirStrikeGridRange', { originH3, destH3, context });
   return isWithinGridRangeSafe(originH3, destH3, AIR_STRIKE_RANGE_HEXES, context);
 }

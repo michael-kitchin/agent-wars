@@ -11,7 +11,7 @@
 
 import { latLngToCell } from 'h3-js';
 import { dbGetAll, isDbReady } from '../gameDb';
-import { logDebug, logError, logTrace } from '../logger';
+import { logError, logTrace } from '../logger';
 import { METADATA_PARENT_RESOLUTION } from '../terrainMetadataLoad';
 import {
   parseStandingOrderComputedRoute,
@@ -76,7 +76,7 @@ export function stayPutFriendlyOccupiedHexes(
  * Exceptions: Returns an empty map when the database is not ready or the query fails.
  */
 export function readStandingThisPeriodMoves(playerId: string): Map<string, string> {
-  logDebug('stayPutFriendlyOccupancy readStandingThisPeriodMoves', { playerId });
+  logTrace('stayPutFriendlyOccupancy readStandingThisPeriodMoves', { playerId });
   const moves = new Map<string, string>();
   if (!isDbReady()) return moves;
   try {
@@ -97,7 +97,7 @@ export function readStandingThisPeriodMoves(playerId: string): Map<string, strin
       }
       moves.set(row.unit_id, destH3);
     }
-    logDebug('stayPutFriendlyOccupancy readStandingThisPeriodMoves: loaded', {
+    logTrace('stayPutFriendlyOccupancy readStandingThisPeriodMoves: loaded', {
       playerId,
       moveCount: moves.size,
     });

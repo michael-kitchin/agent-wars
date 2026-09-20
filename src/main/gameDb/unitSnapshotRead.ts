@@ -7,7 +7,7 @@
  * Exceptions: None; callers must pass a live `getAll` bound to the current DB handle.
  */
 
-import { logDebug, logTrace } from '../logger';
+import { logTrace } from '../logger';
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
 
 /**
@@ -108,7 +108,6 @@ function mapDbUnitSnapshotRow(row: DbUnitSnapshotRow): GameStateSnapshot['units'
 export function listUnitsForSnapshotWithGetAll(
   getAll: <T extends Record<string, unknown>>(sql: string, params?: unknown[]) => T[]
 ): GameStateSnapshot['units'] {
-  logTrace('gameDb unitSnapshotRead listUnitsForSnapshotWithGetAll');
   const rows = getAll<DbUnitSnapshotRow>(
     `SELECT u.id,
             u.player,
@@ -119,6 +118,6 @@ export function listUnitsForSnapshotWithGetAll(
      FROM units u
      LEFT JOIN unit_transport_assignments uta ON uta.land_unit_id = u.id`
   );
-  logDebug('gameDb unitSnapshotRead listUnitsForSnapshotWithGetAll', { rowCount: rows.length });
+  logTrace('gameDb unitSnapshotRead listUnitsForSnapshotWithGetAll', { rowCount: rows.length });
   return rows.map(mapDbUnitSnapshotRow);
 }

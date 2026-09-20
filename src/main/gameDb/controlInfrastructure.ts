@@ -860,7 +860,7 @@ export function getRes4TerrainOverridesForRendererFromGame(ops: ControlDbOps): A
   isSeaport?: boolean;
   isRubble?: boolean;
 }> {
-  logDebug('gameDb getRes4TerrainOverridesForRendererFromGame');
+  logTrace('gameDb getRes4TerrainOverridesForRendererFromGame');
   return getRes4RendererOverrideRowsCached(ops, () => buildRes4TerrainOverridesForRendererFromGameUncached(ops));
 }
 

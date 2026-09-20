@@ -5,7 +5,7 @@
  */
 
 import type { GameStateSnapshot } from '../../shared/ipc/gameStateTypes';
-import { logDebug } from '../logger';
+import { logDebug, logTrace } from '../logger';
 
 /**
  * Cached planning-phase session plus the snapshot signature it was built from.
@@ -136,7 +136,7 @@ function buildPlanningPhaseSessionKey(state: GameStateSnapshot): string {
  *
  * Purpose: Avoid rebuilding 800+ hex maps on every opponent `assign_order` / human preview hop.
  * When to use: From `createPathfindingSession` before allocating a new session.
- * Expected outcome: Same session object on hit; null when perspective is ineligible or the signature changed.
+ * Expected outcome: Same session object on hit; null when perspective is ineligible or the signature changed. Hits log at TRACE.
  * Exceptions: None.
  */
 export function reusePlanningPhaseSession<T extends object>(state: GameStateSnapshot): T | null {
@@ -147,7 +147,7 @@ export function reusePlanningPhaseSession<T extends object>(state: GameStateSnap
   const slot = planningPhaseSessionByPerspective.get(perspective);
   if (slot?.key !== key) return null;
   planningPhaseSessionMetrics.reused += 1;
-  logDebug('pathfinding createPathfindingSession: reused planning-phase session', {
+  logTrace('pathfinding createPathfindingSession: reused planning-phase session', {
     turnNumber: state.turnNumber,
     phase: state.phase,
     playerPerspective: state.playerPerspective ?? null,

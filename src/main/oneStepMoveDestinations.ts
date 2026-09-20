@@ -144,7 +144,7 @@ function destCacheBucketForState(
  *
  * Purpose: Single source of truth for AI order generation and order validation movement legality on the strategic map.
  * When to use: Pass the acting unit and the current game snapshot; set `assumeDebarkedForReachability` when validating opponent movement that will auto-debark before marching.
- * Expected outcome: Land units: hexes reachable via land-mass edges within range. Naval: berth/egress BFS within range.
+ * Expected outcome: Land units: hexes reachable via land-mass edges within range. Naval: berth/egress BFS within range. Cache hit and miss both log at TRACE.
  * Exceptions: Never throws; pentagon edges fall through to a legacy scan for non-naval water-like types only.
  *
  * Tactical Best Options uses `collectTacticalLegalMoveDestinationRes4Hexes` instead (res4 MP reachability with the same
@@ -166,7 +166,7 @@ export function getValidDestinations(
     });
     return [...hit];
   }
-  logDebug('oneStepMoveDestinations getValidDestinations', {
+  logTrace('oneStepMoveDestinations getValidDestinations cache miss', {
     unitId: unit.id,
     unitType: unit.unitType,
     originH3: unit.h3Index,

@@ -8,7 +8,7 @@
  * Exceptions: None; unmeasurable pairs are treated as not receding.
  */
 
-import { logDebug } from '../logger';
+import { logTrace } from '../logger';
 import { gridHopDistanceBetween } from './assessUnitProximity';
 
 /**
@@ -20,7 +20,7 @@ import { gridHopDistanceBetween } from './assessUnitProximity';
  * Exceptions: None.
  */
 export function marchStepRecedesFromEnemy(unitH3: string, stepH3: string, enemyH3: string): boolean {
-  logDebug('standingMarchReceding marchStepRecedesFromEnemy', { unitH3, stepH3, enemyH3 });
+  logTrace('standingMarchReceding marchStepRecedesFromEnemy', { unitH3, stepH3, enemyH3 });
   const here = gridHopDistanceBetween(unitH3, enemyH3);
   const there = gridHopDistanceBetween(stepH3, enemyH3);
   if (here === null || there === null) return false;
@@ -36,7 +36,7 @@ export function marchStepRecedesFromEnemy(unitH3: string, stepH3: string, enemyH
  * Exceptions: None.
  */
 export function nearestObservedEnemyH3(unitH3: string, enemyH3s: readonly string[]): string | null {
-  logDebug('standingMarchReceding nearestObservedEnemyH3', {
+  logTrace('standingMarchReceding nearestObservedEnemyH3', {
     unitH3,
     enemyCount: enemyH3s.length,
   });

@@ -8,7 +8,7 @@
  */
 
 import { gridDisk } from 'h3-js';
-import { logDebug, logError, logTrace } from './logger';
+import { logError, logTrace } from './logger';
 import { getCachedSeaportCountByRes1H3 } from './terrainClassificationCache';
 import {
   estimateNavalStrategicTurns,
@@ -229,7 +229,7 @@ export function mergeCachedSeaportsIntoInfraMap(
   infraMap: Map<string, number>,
   cachedSeaports: ReadonlyMap<string, number> | null
 ): Map<string, number> {
-  logDebug('navalStrategicPath mergeCachedSeaportsIntoInfraMap', {
+  logTrace('navalStrategicPath mergeCachedSeaportsIntoInfraMap', {
     infraHexes: infraMap.size,
     cachedEntries: cachedSeaports?.size ?? 0,
   });
@@ -256,7 +256,7 @@ export function seaportCountByH3ForNavalLookup(
 ): Map<string, number> {
   const cachedSeaports = getCachedSeaportCountByRes1H3();
   const map = mergeCachedSeaportsIntoInfraMap(seaportCountByH3FromInfra(infra), cachedSeaports);
-  logDebug('navalStrategicPath seaportCountByH3ForNavalLookup', {
+  logTrace('navalStrategicPath seaportCountByH3ForNavalLookup', {
     hexCount: hexes.length,
     infraRows: infra?.length ?? 0,
     seaportHexes: map.size,
@@ -291,7 +291,7 @@ export function navalLookupForHexState(
   infra: ReadonlyArray<{ h3Index: string; seaportCount: number }> | undefined
 ): NavalStrategicHexLookup {
   const cached = navalLookupBySession.get(sessionKey);
-  logDebug('navalStrategicPath navalLookupForHexState', {
+  logTrace('navalStrategicPath navalLookupForHexState', {
     hexCount: hexes.length,
     reused: Boolean(cached),
   });
@@ -413,11 +413,11 @@ function reconstructPath(parent: Map<string, string>, originH3: string, destinat
  *
  * Purpose: `plan_route` / `check_distance` / preview must not treat land seaports as water nodes.
  * When to use: Any naval route whose destination may be a land seaport or wet hex.
- * Expected outcome: Inclusive H3 path, or null when unreachable this turn.
- * Exceptions: Logs and returns null if lookup/neighbors throw unexpectedly.
+ * Expected outcome: Inclusive H3 path, or null when unreachable this turn. Logs each query at TRACE.
+ * Exceptions: Logs at ERROR and returns null if lookup/neighbors throw unexpectedly.
  */
 export function findNavalStrategicPath(args: FindNavalStrategicPathArgs): string[] | null {
-  logDebug('navalStrategicPath findNavalStrategicPath', {
+  logTrace('navalStrategicPath findNavalStrategicPath', {
     originH3: args.originH3,
     destinationH3: args.destinationH3,
     maxSteps: args.maxSteps,
@@ -450,11 +450,11 @@ export function findNavalStrategicPath(args: FindNavalStrategicPathArgs): string
  *
  * Purpose: Replaces disk+promoted-coastal destination lists for click, preview, and AI validation.
  * When to use: Pass the same `maxSteps` the matching path search would use.
- * Expected outcome: Set always contains origin when occupiable; inland ports with no wet last step are absent.
- * Exceptions: Logs and returns empty set on unexpected errors.
+ * Expected outcome: Set always contains origin when occupiable; inland ports with no wet last step are absent. Logs each query at TRACE.
+ * Exceptions: Logs at ERROR and returns an empty set on unexpected errors.
  */
 export function getNavalStrategicReachableHexes(args: GetNavalStrategicReachableHexesArgs): Set<string> {
-  logDebug('navalStrategicPath getNavalStrategicReachableHexes', {
+  logTrace('navalStrategicPath getNavalStrategicReachableHexes', {
     originH3: args.originH3,
     maxSteps: args.maxSteps,
   });
@@ -495,7 +495,7 @@ export function navalStrategicHexIsOccupiable(h3: string, lookup: NavalStrategic
  * Purpose: `check_distance` and `assess_unit` must treat a land seaport as a finite destination when a berth path exists.
  * When to use: Naval-only distance queries; pass the same movement budget the caller already uses.
  * Expected outcome: Null when no path exists; otherwise `hexDistance` is path edges and `estimatedTurns`
- * includes a one-step first turn when the origin is a land seaport.
+ * includes a one-step first turn when the origin is a land seaport. Logs each query at TRACE.
  * Exceptions: Same-hex occupiable origin returns distance 0 and 0 turns.
  */
 export function getNavalStrategicDistanceAndTurns(args: {
@@ -527,7 +527,7 @@ export function getNavalStrategicDistanceAndTurns(args: {
     clampLandSeaportOriginToOneStep: false,
   });
   if (!path) {
-    logDebug('navalStrategicPath getNavalStrategicDistanceAndTurns', {
+    logTrace('navalStrategicPath getNavalStrategicDistanceAndTurns', {
       originH3: args.originH3,
       destinationH3: args.destinationH3,
       movementBudget: args.movementBudget,
@@ -538,7 +538,7 @@ export function getNavalStrategicDistanceAndTurns(args: {
   }
   const hexDistance = Math.max(0, path.length - 1);
   const estimatedTurns = estimateNavalStrategicTurns(hexDistance, args.movementBudget, originIsLandSeaport);
-  logDebug('navalStrategicPath getNavalStrategicDistanceAndTurns', {
+  logTrace('navalStrategicPath getNavalStrategicDistanceAndTurns', {
     originH3: args.originH3,
     destinationH3: args.destinationH3,
     movementBudget: args.movementBudget,

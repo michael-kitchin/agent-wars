@@ -8,7 +8,7 @@
  */
 
 import { cellToLatLng } from 'h3-js';
-import { logDebug } from '../logger';
+import { logTrace } from '../logger';
 
 /**
  * Lat/lng pair used in tool geometry and briefing encoding.
@@ -45,7 +45,7 @@ export type H3LatLngFallback = 'cellCenter' | 'origin';
  *
  * Purpose: Centralizes the former per-tool `h3ToLatLng` copies so fallback policy cannot drift unnoticed.
  * When to use: Any tool that needs coordinates for a hex that may or may not be in `latLngByH3`.
- * Expected outcome: Stored pair on hit; `cellToLatLng(h3)` when `fallback` is `'cellCenter'`; `[0, 0]` when `'origin'`.
+ * Expected outcome: Stored pair on hit; `cellToLatLng(h3)` when `fallback` is `'cellCenter'`; `[0, 0]` when `'origin'`. Logs each lookup at TRACE.
  * Exceptions: None.
  */
 export function h3ToLatLng(
@@ -53,9 +53,8 @@ export function h3ToLatLng(
   latLngByH3: ReadonlyMap<string, LatLng>,
   fallback: H3LatLngFallback
 ): LatLng {
-  const hit = latLngByH3.has(h3);
-  logDebug('h3LatLng h3ToLatLng', { h3, fallback, hit });
   const ll = latLngByH3.get(h3);
+  logTrace('h3LatLng h3ToLatLng', { h3, fallback, hit: ll != null });
   if (ll) return [ll[0], ll[1]];
   if (fallback === 'origin') return [0, 0];
   const [lat, lng] = cellToLatLng(h3);

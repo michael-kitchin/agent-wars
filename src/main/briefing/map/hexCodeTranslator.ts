@@ -9,7 +9,7 @@
 
 import { cellToLatLng, latLngToCell } from 'h3-js';
 import { LATLNG_DECIMAL_PLACES } from '../../mapData';
-import { logDebug, logError, logTrace } from '../../logger';
+import { logError, logTrace } from '../../logger';
 import type { CoordinateContext } from './coordinateContext';
 import { HEX_CODE_PATTERN } from './coordinateContext';
 import { getHexCodeForContext, getH3IndexForCode, isHexCodeValidForContext } from './hexCoordinates';
@@ -28,7 +28,7 @@ const TACTICAL_SNAP_RESOLUTION = 4;
  * Exceptions: Throws when the code is unknown.
  */
 export function codeToH3(code: string, context: CoordinateContext): string {
-  logDebug('hex-code-translator codeToH3', { code, mode: context.mode, battleId: context.battleId ?? null });
+  logTrace('hex-code-translator codeToH3', { code, mode: context.mode, battleId: context.battleId ?? null });
   if (!HEX_CODE_PATTERN.test(code)) {
     const err = new Error(`hex-code-translator: invalid hex code format "${code}"`);
     logError('hex-code-translator codeToH3: invalid format', err);
@@ -87,7 +87,7 @@ export function codeToLatLngRounded(code: string, context: CoordinateContext): [
  * Exceptions: Throws when the snapped cell is not in the active registry or H3 snapping fails.
  */
 export function latLngToCode(lat: number, lng: number, context: CoordinateContext): string {
-  logDebug('hex-code-translator latLngToCode', { lat, lng, mode: context.mode, battleId: context.battleId ?? null });
+  logTrace('hex-code-translator latLngToCode', { lat, lng, mode: context.mode, battleId: context.battleId ?? null });
   try {
     const res =
       context.mode === 'strategic'

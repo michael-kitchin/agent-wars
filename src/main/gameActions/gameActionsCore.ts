@@ -650,7 +650,7 @@ export function listHumanStandingOrders(): HumanStandingOrderView[] {
           o.cachedRouteSegments.length > 0;
         if (cacheHit) {
           routeSegments = o.cachedRouteSegments;
-          logDebug('gameActions listHumanStandingOrders: reused cached route segments', {
+          logTrace('gameActions listHumanStandingOrders: reused cached route segments', {
             unitId,
             cachedOriginH3: o.cachedOriginH3,
           });

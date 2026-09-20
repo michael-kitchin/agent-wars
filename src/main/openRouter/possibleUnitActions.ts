@@ -390,7 +390,7 @@ const UNMEASURABLE_DEST_RANK_DISTANCE = 999;
 function tableRowDistance(from: string, to: string, unitId: string): number {
   const d = computeGridDistancePure(from, to);
   if (d !== null) return d;
-  logDebug('possibleUnitActions tableRowDistance: unmeasurable pair, using rank fallback', {
+  logTrace('possibleUnitActions tableRowDistance: unmeasurable pair, using rank fallback', {
     unitId,
     from,
     to,

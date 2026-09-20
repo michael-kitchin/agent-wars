@@ -534,7 +534,7 @@ function getOrCreateHoverSessionContext(
     active.sessionCacheKey === sessionCacheKey
   ) {
     previewDiagnostics.sessionReuseCount += 1;
-    logDebug('gameActions hoverPathfindingSession: reuse', {
+    logTrace('gameActions hoverPathfindingSession: reuse', {
       playerId,
       selectedCount: selectedUnitIds.length,
       selectionSignatureLength: selectionSignature.length,
