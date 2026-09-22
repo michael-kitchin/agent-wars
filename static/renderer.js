@@ -15277,6 +15277,33 @@
        */
     selectedUnitIdsAtMouseDown: [],
     /**
+    * Epoch milliseconds when `selectedUnitIdsAtMouseDown` was last copied from the live selection. `0` means no gesture is open.
+    *
+    * Purpose: Lets the second press of a double-click keep the units the player had selected instead of resnapshotting whatever the first click selected.
+    * When to use: Written by the main-map pointer-down listener. Reset to `0` everywhere the snapshot array is cleared.
+    * Expected outcome: A press inside the gesture window leaves the snapshot array untouched.
+    * Exceptions: None.
+    */
+    gestureSelectionSnapshotAtMs: 0,
+    /**
+    * Client X of the press that took the current gesture snapshot.
+    *
+    * Purpose: A second press far from this point is a new click, not the second half of a double-click, so the snapshot must be retaken.
+    * When to use: Written beside `gestureSelectionSnapshotAtMs`.
+    * Expected outcome: Meaningless while `gestureSelectionSnapshotAtMs` is `0`.
+    * Exceptions: None.
+    */
+    gestureSelectionAnchorClientX: 0,
+    /**
+    * Client Y of the press that took the current gesture snapshot.
+    *
+    * Purpose: Pairs with `gestureSelectionAnchorClientX` for the double-click distance check.
+    * When to use: Written beside `gestureSelectionSnapshotAtMs`.
+    * Expected outcome: Meaningless while `gestureSelectionSnapshotAtMs` is `0`.
+    * Exceptions: None.
+    */
+    gestureSelectionAnchorClientY: 0,
+    /**
        * Documents the object literal property `ctrlKeyActive` (ctrlKeyActive: false).
     
        * Purpose: Supports maintainability by documenting why `ctrlKeyActive` exists.
@@ -15294,6 +15321,33 @@
        * Exceptions: None.
        */
     pendingSelectTimeout: null,
+    /**
+    * Timer that will open the stack callout after a single click, or `null` when no open is waiting.
+    *
+    * Purpose: The callout is layered above the map, so opening it on the first click would swallow the second click of a double-click. Waiting out the single-select delay lets a double-click on a stack icon plan an order instead.
+    * When to use: Written only by `scheduleDeferredStackCallout`; cleared by `clearDeferredStackCalloutTimer`.
+    * Expected outcome: The callout appears only if this timer is allowed to fire.
+    * Exceptions: None.
+    */
+    pendingStackCalloutTimeout: null,
+    /**
+    * Client X of the click that scheduled the pending stack callout.
+    *
+    * Purpose: A press away from this point means the player moved on, so the popup must not still appear there; a press on the same point is the second half of a double-click and must leave it scheduled.
+    * When to use: Written only by `scheduleDeferredStackCallout`; read only by `clearDeferredStackCalloutTimerForPressAway`.
+    * Expected outcome: Meaningless while `pendingStackCalloutTimeout` is `null`.
+    * Exceptions: None.
+    */
+    pendingStackCalloutAnchorClientX: 0,
+    /**
+    * Client Y of the click that scheduled the pending stack callout.
+    *
+    * Purpose: Pairs with `pendingStackCalloutAnchorClientX` for the press-away distance check.
+    * When to use: Written only by `scheduleDeferredStackCallout`; read only by `clearDeferredStackCalloutTimerForPressAway`.
+    * Expected outcome: Meaningless while `pendingStackCalloutTimeout` is `null`.
+    * Exceptions: None.
+    */
+    pendingStackCalloutAnchorClientY: 0,
     /**
        * Documents the object literal property `humanStandingOrders` (humanStandingOrders: [] as HumanStandingOrderSnapshot[]).
     
@@ -19839,6 +19893,11 @@
   function clearSelection() {
     replaceSelection([]);
   }
+  function clearMapSelectionChrome() {
+    clearSelection();
+    rendererSharedState.selectedUnitIdsAtMouseDown = [];
+    rendererSharedState.gestureSelectionSnapshotAtMs = 0;
+  }
   function getVisibleHexSet(state) {
     if (!state) return /* @__PURE__ */ new Set();
     if (!Array.isArray(state.visibleHexes)) return new Set(state.hexes.map((h) => h.h3Index));
@@ -22128,6 +22187,7 @@
   function clearCommittedOrderDraftState(deps) {
     deps.clearSelection();
     rendererSharedState.selectedUnitIdsAtMouseDown = [];
+    rendererSharedState.gestureSelectionSnapshotAtMs = 0;
     rendererSharedState.selectedHexIndex = null;
     rendererSharedState.hideCommittedOrderLinesAfterReady = false;
     rendererSharedState.hoverRoutePreview = null;
@@ -22398,6 +22458,7 @@
         discardStrategicOrderUiStash();
         rendererSharedState.selectedUnitIds = [];
         rendererSharedState.selectedUnitIdsAtMouseDown = [];
+        rendererSharedState.gestureSelectionSnapshotAtMs = 0;
         rendererSharedState.selectedHexIndex = null;
         deps.hideStackCallout();
         resetPrecomputedAiState("null");
@@ -22595,6 +22656,7 @@
     rendererSharedState.hoveredHexH3 = null;
     rendererSharedState.hoveredDetailHexH3 = null;
     rendererSharedState.selectedUnitIdsAtMouseDown = [];
+    rendererSharedState.gestureSelectionSnapshotAtMs = 0;
     rendererSharedState.hideCommittedOrderLinesAfterReady = false;
   }
   function tacticalRendererApplyStartBattleIpcResult(result, fx) {
@@ -25613,6 +25675,53 @@
     console.debug("[parity]", eventKey, details ?? {});
   }
 
+  // src/shared/mapPlanningGesture.ts
+  var MAP_DOUBLE_CLICK_SELECTION_FREEZE_MS = 500;
+  var MAP_DOUBLE_CLICK_ANCHOR_TOLERANCE_PX = 6;
+  function mapSelectionComposition(unitTypes) {
+    if (unitTypes.length === 0) return "empty";
+    let hasAir = false;
+    let hasNonAir = false;
+    for (const unitType of unitTypes) {
+      if (unitType === "air") hasAir = true;
+      else hasNonAir = true;
+    }
+    if (hasAir && hasNonAir) return "mixed";
+    if (hasAir) return "airOnly";
+    return "nonAirOnly";
+  }
+  function resolveMapDoubleClickAction(input) {
+    if (input.targetingModeActive || !input.hasDestination || input.composition === "empty") {
+      return { kind: "ignore" };
+    }
+    if (input.allSelectedUnitsAlreadyAtDestination) {
+      return input.iconHit ? { kind: "ignore" } : { kind: "deselect" };
+    }
+    if (input.composition === "mixed") {
+      return { kind: "rejectMixed" };
+    }
+    if (input.composition === "airOnly") {
+      if (input.ferryEligible === null) return { kind: "needFerryValidation" };
+      if (input.ferryEligible) return { kind: "planFerry" };
+      if (!input.iconHit) return { kind: "deselect" };
+      return { kind: "rejectFerry" };
+    }
+    return { kind: "planMarch" };
+  }
+  function resolveMapGesturePress(input) {
+    const withinWindow = input.snapshotAtMs !== 0 && input.nowMs - input.snapshotAtMs <= MAP_DOUBLE_CLICK_SELECTION_FREEZE_MS;
+    const withinAnchor = Math.abs(input.clientX - input.snapshotAnchorClientX) <= MAP_DOUBLE_CLICK_ANCHOR_TOLERANCE_PX && Math.abs(input.clientY - input.snapshotAnchorClientY) <= MAP_DOUBLE_CLICK_ANCHOR_TOLERANCE_PX;
+    const continuesGesture = withinWindow && withinAnchor && !input.ctrlKey && input.snapshotUnitCount > 0;
+    if (!continuesGesture) {
+      return { refreshSnapshot: true, restoreSnapshotSelection: false, suppressIconRetarget: false };
+    }
+    return {
+      refreshSnapshot: false,
+      restoreSnapshotSelection: input.liveSelectionDiffersFromSnapshot,
+      suppressIconRetarget: true
+    };
+  }
+
   // src/renderer/map/mapClickSelectionPolicy.ts
   var HUMAN_UNIT_SINGLE_SELECT_DEBOUNCE_MS = 250;
   function clearDeferredHumanUnitSingleSelectTimer() {
@@ -25622,8 +25731,33 @@
       rendererSharedState.pendingSelectTimeout = null;
     }
   }
+  function clearDeferredStackCalloutTimer() {
+    if (rendererSharedState.pendingStackCalloutTimeout !== null) {
+      clearTimeout(rendererSharedState.pendingStackCalloutTimeout);
+      rendererSharedState.pendingStackCalloutTimeout = null;
+    }
+  }
+  function clearDeferredStackCalloutTimerForPressAway(clientX, clientY) {
+    if (rendererSharedState.pendingStackCalloutTimeout === null) return;
+    const withinAnchor = Math.abs(clientX - rendererSharedState.pendingStackCalloutAnchorClientX) <= MAP_DOUBLE_CLICK_ANCHOR_TOLERANCE_PX && Math.abs(clientY - rendererSharedState.pendingStackCalloutAnchorClientY) <= MAP_DOUBLE_CLICK_ANCHOR_TOLERANCE_PX;
+    if (withinAnchor) return;
+    clearDeferredStackCalloutTimer();
+  }
+  function scheduleDeferredStackCallout(clientX, clientY, show) {
+    clearDeferredStackCalloutTimer();
+    rendererSharedState.pendingStackCalloutAnchorClientX = clientX;
+    rendererSharedState.pendingStackCalloutAnchorClientY = clientY;
+    rendererSharedState.pendingStackCalloutTimeout = setTimeout(() => {
+      rendererSharedState.pendingStackCalloutTimeout = null;
+      show(clientX, clientY);
+    }, HUMAN_UNIT_SINGLE_SELECT_DEBOUNCE_MS);
+  }
   function applyHumanUnitIconClickSelectionPolicy(args) {
     if (shouldBlockEmbarkedLandUnitSelect(args.unitId)) {
+      return;
+    }
+    if (args.suppressSelectionRetarget) {
+      clearDeferredHumanUnitSingleSelectTimer();
       return;
     }
     if (args.ctrlKey) {
@@ -25672,10 +25806,122 @@
     }, HUMAN_UNIT_SINGLE_SELECT_DEBOUNCE_MS);
   }
 
+  // src/renderer/map/mapDoubleClickHandler.ts
+  function ignoreReasonFor(input) {
+    if (input.targetingModeActive) return "targeting_mode_active";
+    if (!input.hasDestination) return "missing_destination";
+    if (input.composition === "empty") return "missing_selection_at_mouse_down";
+    return "destination_equals_current_positions";
+  }
+  async function handleMainMapDoubleClick(event, deps) {
+    clearDeferredHumanUnitSingleSelectTimer();
+    rendererSharedState.gestureSelectionSnapshotAtMs = 0;
+    const state = rendererSharedState.gameState;
+    if (!state) {
+      emitParityDiagnosticsBreadcrumb("planning.doubleClickIgnored", { reason: "missing_game_state" });
+      return;
+    }
+    const clickHit = deps.clientXYToHit(event.clientX, event.clientY);
+    const destinationH3 = clickHit ?? rendererSharedState.hoveredHexH3 ?? rendererSharedState.selectedHexIndex;
+    const selectedAtMouseDown = deps.getSelectedHumanUnitsAtMouseDown(state);
+    const selectedIds = selectedAtMouseDown.map((unit) => unit.id);
+    const iconHit = destinationH3 !== null && destinationH3 === clickHit && deps.pointerHitsDrawnUnitIcon(event.clientX, event.clientY, destinationH3);
+    const decisionInput = {
+      targetingModeActive: rendererSharedState.rangedModeActive || rendererSharedState.airStrikeModeActive,
+      hasDestination: destinationH3 !== null,
+      composition: mapSelectionComposition(selectedAtMouseDown.map((unit) => unit.unitType)),
+      allSelectedUnitsAlreadyAtDestination: selectedAtMouseDown.length > 0 && selectedAtMouseDown.every((unit) => unit.h3Index === destinationH3),
+      iconHit,
+      ferryEligible: null
+    };
+    let action = resolveMapDoubleClickAction(decisionInput);
+    let ferryRejectionReason;
+    if (action.kind === "ignore") {
+      emitParityDiagnosticsBreadcrumb("planning.doubleClickIgnored", {
+        reason: ignoreReasonFor(decisionInput),
+        selectedCount: selectedAtMouseDown.length
+      });
+      return;
+    }
+    clearDeferredStackCalloutTimer();
+    if (destinationH3 === null) return;
+    if (action.kind === "needFerryValidation") {
+      if (!window.gameApi?.validateGroupFerryTarget) {
+        emitParityDiagnosticsBreadcrumb("planning.doubleClickIgnored", { reason: "ferry_api_missing" });
+        return;
+      }
+      const validation = await window.gameApi.validateGroupFerryTarget({
+        unitIds: selectedIds,
+        destinationH3Index: destinationH3
+      });
+      ferryRejectionReason = validation.reason;
+      action = resolveMapDoubleClickAction({ ...decisionInput, ferryEligible: validation.success });
+    }
+    const acceptedDetails = {
+      tacticalModeActive: !!rendererSharedState.tacticalBattleSnapshot,
+      selectedCount: selectedAtMouseDown.length,
+      destinationH3
+    };
+    switch (action.kind) {
+      case "rejectMixed":
+        emitParityDiagnosticsBreadcrumb("planning.doubleClickRejected", {
+          reason: "mixed_air_non_air_selection",
+          selectedCount: selectedAtMouseDown.length
+        });
+        deps.showMapToast("Cannot issue grouped movement for mixed air and non-air units.", { isError: true });
+        return;
+      case "rejectFerry":
+        emitParityDiagnosticsBreadcrumb("planning.doubleClickRejected", {
+          reason: "ferry_destination_rejected",
+          selectedCount: selectedAtMouseDown.length,
+          destinationH3
+        });
+        deps.showMapToast(
+          deps.formatTargetingValidationReason(
+            ferryRejectionReason,
+            "Selected air units cannot ferry to that destination."
+          ),
+          { isError: true }
+        );
+        return;
+      case "deselect":
+        emitParityDiagnosticsBreadcrumb("planning.doubleClickDeselect", {
+          selectedCount: selectedAtMouseDown.length,
+          destinationH3
+        });
+        clearMapSelectionChrome();
+        deps.updateSidebar();
+        deps.updateRangedSidebar();
+        deps.redraw();
+        return;
+      case "planFerry":
+        emitParityDiagnosticsBreadcrumb("planning.doubleClickAccepted", {
+          ...acceptedDetails,
+          hasAirSelection: true
+        });
+        deps.replacePendingFerryOrdersForSelected(selectedIds, destinationH3);
+        deps.clearCommittedOrderDraftState();
+        deps.updatePendingOrdersSidebar();
+        deps.updateSidebar();
+        deps.redraw();
+        return;
+      case "planMarch":
+        emitParityDiagnosticsBreadcrumb("planning.doubleClickAccepted", {
+          ...acceptedDetails,
+          hasAirSelection: false
+        });
+        await deps.commitGroupedMarchOrders(selectedIds, destinationH3);
+        return;
+      default:
+        return;
+    }
+  }
+
   // src/renderer/map/mainMapInteractions.ts
   function wireMainMapInteractions(deps) {
     const mainMapEl = document.getElementById("main-map");
     if (!mainMapEl) return;
+    let suppressIconRetargetOnNextClick = false;
     function clientXYToHit(clientX, clientY) {
       if (!rendererSharedState.gameState) return null;
       const map = getMainLeafletMap();
@@ -25689,6 +25935,22 @@
       }
       const set = new Set(rendererSharedState.gameState.hexes.map((h) => h.h3Index));
       return hitTestHexAtContainerPixel(x, y, set);
+    }
+    function pointerHitsDrawnUnitIcon(clientX, clientY, h3Index) {
+      if (shouldHideStrategicMapUnitsForRes4Zoom()) return false;
+      if (!rendererSharedState.gameState) return false;
+      const map = getMainLeafletMap();
+      if (!map) return false;
+      const rect = map.getContainer().getBoundingClientRect();
+      const { unitsToDraw, movingIds } = deps.getUnitsForDrawWithMovingIds(rendererSharedState.gameState);
+      const drawnAtHit = unitsToDraw.filter((unit) => unit.h3Index === h3Index && !movingIds?.has(unit.id));
+      if (drawnAtHit.length === 0) return false;
+      return deps.containerPixelHitsDrawnUnitIcon(
+        clientX - rect.left,
+        clientY - rect.top,
+        h3Index,
+        drawnAtHit.length
+      );
     }
     function getSelectedHumanUnitsAtMouseDown(state) {
       const tb = rendererSharedState.tacticalBattleSnapshot;
@@ -25711,26 +25973,6 @@
         return row?.h3Index ?? null;
       }
       return state.units.find((u) => u.id === primaryId)?.h3Index ?? null;
-    }
-    async function commitGroupedAirFerryOrders(selectedIds, destinationH3) {
-      if (!window.gameApi?.validateGroupFerryTarget) return false;
-      const validation = await window.gameApi.validateGroupFerryTarget({
-        unitIds: selectedIds,
-        destinationH3Index: destinationH3
-      });
-      if (!validation.success) {
-        deps.showMapToast(
-          deps.formatTargetingValidationReason(validation.reason, "Selected air units cannot ferry to that destination."),
-          { isError: true }
-        );
-        return true;
-      }
-      deps.replacePendingFerryOrdersForSelected(selectedIds, destinationH3);
-      deps.clearCommittedOrderDraftState();
-      deps.updatePendingOrdersSidebar();
-      deps.updateSidebar();
-      deps.redraw();
-      return true;
     }
     async function commitGroupedMarchOrders(selectedIds, destinationH3) {
       if (!window.gameApi?.assignHumanMarchOrders) return false;
@@ -25849,7 +26091,33 @@
     });
     mainMapEl.addEventListener("pointerdown", (e) => {
       if (e.button !== 0) return;
-      rendererSharedState.selectedUnitIdsAtMouseDown = [...rendererSharedState.selectedUnitIds];
+      const pressAtMs = Date.now();
+      const press = resolveMapGesturePress({
+        snapshotAtMs: rendererSharedState.gestureSelectionSnapshotAtMs,
+        snapshotAnchorClientX: rendererSharedState.gestureSelectionAnchorClientX,
+        snapshotAnchorClientY: rendererSharedState.gestureSelectionAnchorClientY,
+        snapshotUnitCount: rendererSharedState.selectedUnitIdsAtMouseDown.length,
+        liveSelectionDiffersFromSnapshot: selectionUnitIdSetsDiffer(
+          rendererSharedState.selectedUnitIdsAtMouseDown,
+          rendererSharedState.selectedUnitIds
+        ),
+        ctrlKey: e.ctrlKey,
+        clientX: e.clientX,
+        clientY: e.clientY,
+        nowMs: pressAtMs
+      });
+      suppressIconRetargetOnNextClick = press.suppressIconRetarget;
+      if (press.refreshSnapshot) {
+        rendererSharedState.selectedUnitIdsAtMouseDown = [...rendererSharedState.selectedUnitIds];
+        rendererSharedState.gestureSelectionSnapshotAtMs = pressAtMs;
+        rendererSharedState.gestureSelectionAnchorClientX = e.clientX;
+        rendererSharedState.gestureSelectionAnchorClientY = e.clientY;
+      } else {
+        clearDeferredHumanUnitSingleSelectTimer();
+        if (press.restoreSnapshotSelection) {
+          deps.replaceSelection([...rendererSharedState.selectedUnitIdsAtMouseDown]);
+        }
+      }
       deps.clearTerrainTooltipTimer();
       deps.hideTerrainTooltipVisual();
       hideOrderBlockHexTooltip();
@@ -25921,10 +26189,6 @@
         deps.redraw();
         return;
       }
-      const mapForClick = getMainLeafletMap();
-      const clickRect = mapForClick?.getContainer().getBoundingClientRect();
-      const px = clickRect ? e.clientX - clickRect.left : 0;
-      const py = clickRect ? e.clientY - clickRect.top : 0;
       const { unitsToDraw, movingIds } = rendererSharedState.gameState ? deps.getUnitsForDrawWithMovingIds(rendererSharedState.gameState) : { unitsToDraw: [], movingIds: void 0 };
       if (await deps.tryHandleTacticalEntryAtClientXY(e.clientX, e.clientY)) {
         deps.updateSidebar();
@@ -25941,14 +26205,20 @@
       const unitsAtHit = hit ? unitsToDraw.filter((u) => u.h3Index === hit && !movingIds?.has(u.id)) : [];
       const isStack = unitsAtHit.length >= 2;
       const isLoneAi = unitsAtHit.length === 1 && unitsAtHit[0]?.player !== "human";
-      const strategicUnitsHiddenOnMap = shouldHideStrategicMapUnitsForRes4Zoom();
-      const stackIconHit = !strategicUnitsHiddenOnMap && !!hit && unitsAtHit.length > 0 && deps.containerPixelHitsDrawnUnitIcon(px, py, hit, unitsAtHit.length);
-      if (hit && (isStack || isLoneAi) && stackIconHit) {
+      if (hit && (isStack || isLoneAi) && pointerHitsDrawnUnitIcon(e.clientX, e.clientY, hit)) {
         if (isHoverOrderPlanningActive()) {
           return;
         }
-        rendererSharedState.ctrlKeyActive = e.ctrlKey;
-        deps.showStackCallout(unitsAtHit, e.clientX, e.clientY);
+        if (!suppressIconRetargetOnNextClick) {
+          const calloutCtrlKey = e.ctrlKey;
+          scheduleDeferredStackCallout(e.clientX, e.clientY, (calloutClientX, calloutClientY) => {
+            rendererSharedState.ctrlKeyActive = calloutCtrlKey;
+            deps.showStackCallout(unitsAtHit, calloutClientX, calloutClientY);
+            deps.updateSidebar();
+            deps.updateRangedSidebar();
+            deps.redraw();
+          });
+        }
         deps.updateSidebar();
         deps.updateRangedSidebar();
         deps.redraw();
@@ -25957,12 +26227,12 @@
       deps.hideStackCallout();
       if (hit) {
         const unit = deps.getUnitAtHex(hit);
-        const drawnAtHit = unitsToDraw.filter((u) => u.h3Index === hit && !movingIds?.has(u.id));
-        const unitIconHit = !strategicUnitsHiddenOnMap && drawnAtHit.length > 0 && deps.containerPixelHitsDrawnUnitIcon(px, py, hit, drawnAtHit.length);
+        const unitIconHit = pointerHitsDrawnUnitIcon(e.clientX, e.clientY, hit);
         if (unit?.player === "human" && unitIconHit) {
           applyHumanUnitIconClickSelectionPolicy({
             ctrlKey: e.ctrlKey,
             unitId: unit.id,
+            suppressSelectionRetarget: suppressIconRetargetOnNextClick,
             deps: {
               replaceSelection: deps.replaceSelection,
               toggleUnitSelection: deps.toggleUnitSelection,
@@ -25990,75 +26260,32 @@
       deps.updateRangedSidebar();
       deps.redraw();
     });
-    mainMapEl.addEventListener("dblclick", async (e) => {
-      clearDeferredHumanUnitSingleSelectTimer();
-      if (!rendererSharedState.gameState) {
-        emitParityDiagnosticsBreadcrumb("planning.doubleClickIgnored", { reason: "missing_game_state" });
-        return;
-      }
-      const state = rendererSharedState.gameState;
-      if (rendererSharedState.rangedModeActive || rendererSharedState.airStrikeModeActive) {
-        emitParityDiagnosticsBreadcrumb("planning.doubleClickIgnored", {
-          reason: "targeting_mode_active",
-          rangedModeActive: rendererSharedState.rangedModeActive,
-          airStrikeModeActive: rendererSharedState.airStrikeModeActive
-        });
-        return;
-      }
-      const hit = clientXYToHit(e.clientX, e.clientY);
-      const destinationH3 = rendererSharedState.selectedHexIndex ?? rendererSharedState.hoveredHexH3 ?? hit;
-      if (!destinationH3 || rendererSharedState.selectedUnitIdsAtMouseDown.length === 0) {
-        emitParityDiagnosticsBreadcrumb("planning.doubleClickIgnored", {
-          reason: !destinationH3 ? "missing_destination" : "missing_selection_at_mouse_down",
-          selectedAtMouseDownCount: rendererSharedState.selectedUnitIdsAtMouseDown.length
-        });
-        return;
-      }
-      const selectedAtMouseDown = getSelectedHumanUnitsAtMouseDown(state);
-      if (selectedAtMouseDown.length === 0) {
-        emitParityDiagnosticsBreadcrumb("planning.doubleClickIgnored", {
-          reason: "selection_not_human_units",
-          selectedAtMouseDownCount: 0
-        });
-        return;
-      }
-      const selectedIds = selectedAtMouseDown.map((unit) => unit.id);
-      if (selectedAtMouseDown.every((unit) => unit.h3Index === destinationH3)) {
-        emitParityDiagnosticsBreadcrumb("planning.doubleClickIgnored", {
-          reason: "destination_equals_current_positions",
-          selectedCount: selectedAtMouseDown.length
-        });
-        return;
-      }
-      const hasAirSelection = selectedAtMouseDown.some((unit) => unit.unitType === "air");
-      const hasNonAirSelection = selectedAtMouseDown.some((unit) => unit.unitType !== "air");
-      if (hasAirSelection && hasNonAirSelection) {
-        emitParityDiagnosticsBreadcrumb("planning.doubleClickRejected", {
-          reason: "mixed_air_non_air_selection",
-          selectedCount: selectedAtMouseDown.length
-        });
-        deps.showMapToast("Cannot issue grouped movement for mixed air and non-air units.", { isError: true });
-        return;
-      }
-      emitParityDiagnosticsBreadcrumb("planning.doubleClickAccepted", {
-        tacticalModeActive: !!rendererSharedState.tacticalBattleSnapshot,
-        selectedCount: selectedAtMouseDown.length,
-        destinationH3,
-        hasAirSelection
+    mainMapEl.addEventListener("dblclick", (e) => {
+      void handleMainMapDoubleClick(e, {
+        clientXYToHit,
+        pointerHitsDrawnUnitIcon,
+        getSelectedHumanUnitsAtMouseDown,
+        commitGroupedMarchOrders,
+        showMapToast: deps.showMapToast,
+        formatTargetingValidationReason: deps.formatTargetingValidationReason,
+        replacePendingFerryOrdersForSelected: deps.replacePendingFerryOrdersForSelected,
+        clearCommittedOrderDraftState: deps.clearCommittedOrderDraftState,
+        updatePendingOrdersSidebar: deps.updatePendingOrdersSidebar,
+        updateSidebar: deps.updateSidebar,
+        updateRangedSidebar: deps.updateRangedSidebar,
+        redraw: deps.redraw
       });
-      if (hasAirSelection) {
-        if (await commitGroupedAirFerryOrders(selectedIds, destinationH3)) return;
-        return;
-      }
-      await commitGroupedMarchOrders(selectedIds, destinationH3);
     });
     mainMapEl.addEventListener("contextmenu", (e) => {
       e.preventDefault();
-      if (rendererSharedState.selectedUnitIds.length === 0 && !rendererSharedState.hoverRoutePreview) return;
-      deps.clearSelection();
-      rendererSharedState.selectedUnitIdsAtMouseDown = [];
-      rendererSharedState.selectedHexIndex = null;
-      rendererSharedState.hoverRoutePreview = null;
+      clearDeferredHumanUnitSingleSelectTimer();
+      clearDeferredStackCalloutTimer();
+      if (rendererSharedState.selectedUnitIds.length === 0 && !rendererSharedState.hoverRoutePreview) {
+        rendererSharedState.selectedUnitIdsAtMouseDown = [];
+        rendererSharedState.gestureSelectionSnapshotAtMs = 0;
+        return;
+      }
+      clearMapSelectionChrome();
       deps.updateSidebar();
       deps.updateRangedSidebar();
       deps.redraw();
@@ -26210,6 +26437,7 @@
           deps.hideBuildPopup();
           return;
         }
+        clearDeferredStackCalloutTimer();
         const stackCallout = document.getElementById("stack-callout");
         if (stackCallout && !stackCallout.classList.contains("hidden")) {
           e.preventDefault();
@@ -26299,9 +26527,10 @@
     window.addEventListener(
       "pointerdown",
       (e) => {
+        if (deps.isStackCalloutTargetInsideDialog(e.target)) return;
+        clearDeferredStackCalloutTimerForPressAway(e.clientX, e.clientY);
         const stackCallout = document.getElementById("stack-callout");
         if (!stackCallout || stackCallout.classList.contains("hidden")) return;
-        if (deps.isStackCalloutTargetInsideDialog(e.target)) return;
         deps.hideStackCallout();
       },
       true
@@ -27139,6 +27368,7 @@
     return Array.from(byKey.entries()).map(([key, n]) => `${n} ${key}`).sort().join(", ");
   }
   function hideStackCallout() {
+    clearDeferredStackCalloutTimer();
     const el = document.getElementById("stack-callout");
     if (el?.classList.contains("hidden") && !rendererSharedState.stackCalloutModalActive) {
       return;

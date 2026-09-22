@@ -153,6 +153,23 @@ export function clearSelection(): void {
 }
 
 /**
+ * Clears the live selection and the gesture snapshot while leaving queued orders alone.
+ *
+ * Purpose: Right-click and an ineligible empty air double-click must drop the same chrome, and neither
+ * may discard marches, ferries, or other drafts the player already queued.
+ * When to use: Those two gestures only. A successful order commit keeps using `clearCommittedOrderDraftState`.
+ * Expected outcome: Selection, gesture snapshot, selected hex, hover preview, and both targeting modes are
+ * clear; `clearSelection` covers all but the snapshot. Pending order arrays are untouched. Callers cancel
+ * the deferred select and callout timers themselves.
+ * Exceptions: None.
+ */
+export function clearMapSelectionChrome(): void {
+  clearSelection();
+  S.selectedUnitIdsAtMouseDown = [];
+  S.gestureSelectionSnapshotAtMs = 0;
+}
+
+/**
  * Defines the `getVisibleHexSet` function shape (export function getVisibleHexSet(state: GameStateSnapshot | null): Set<string>).
 
  * Purpose: Supports maintainability by documenting why `getVisibleHexSet` exists.

@@ -254,6 +254,7 @@ export function registerNewGameButton(deps: NewGameDeps): void {
       discardStrategicOrderUiStash();
       S.selectedUnitIds = [];
       S.selectedUnitIdsAtMouseDown = [];
+      S.gestureSelectionSnapshotAtMs = 0;
       S.selectedHexIndex = null;
       deps.hideStackCallout();
       resetPrecomputedAiState('null');

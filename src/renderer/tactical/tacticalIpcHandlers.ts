@@ -37,6 +37,7 @@ function clearStrategicPlanningChromeAfterTacticalSnapshotAssigned(): void {
   S.hoveredHexH3 = null;
   S.hoveredDetailHexH3 = null;
   S.selectedUnitIdsAtMouseDown = [];
+  S.gestureSelectionSnapshotAtMs = 0;
   S.hideCommittedOrderLinesAfterReady = false;
 }
 

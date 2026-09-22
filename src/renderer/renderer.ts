@@ -192,6 +192,7 @@ import {
 import { isOrderBlockHexTooltipVisible } from './map/orderBlockHexTooltip';
 import { isOrderSlowerHexTooltipVisible } from './map/orderSlowerHexTooltip';
 import { wireMainMapInteractions as wireMainMapInteractionsFromModule } from './map/mainMapInteractions';
+import { clearDeferredStackCalloutTimer } from './map/mapClickSelectionPolicy';
 import { wireInitCore as wireInitCoreFromModule } from './map/initCore';
 import {
   computeRes1OverlayTextY as computeRes1OverlayTextYFromModule,
@@ -368,6 +369,7 @@ function formatStackTooltip(units: GameStateSnapshot['units']): string {
  * Exceptions: None.
  */
 function hideStackCallout(): void {
+  clearDeferredStackCalloutTimer();
   const el = document.getElementById('stack-callout');
   if (el?.classList.contains('hidden') && !S.stackCalloutModalActive) {
     return;

@@ -5,27 +5,25 @@ import { isHoverOrderPlanningActive } from '../rendering/canvasPreviewPolicy';
 import { hitTestHexAtContainerPixel, hitTestTacticalRes4HexAtContainerPixel } from './mapHelpers';
 import { withTacticalHumanDraftPrefetchInvalidation } from '../openRouter/openRouterRuntime';
 import { rendererSharedState as S } from '../core/state';
+import { clearMapSelectionChrome } from '../core/selection';
 import { getMainLeafletMap } from './worldLeafletMap';
 import { tacticalRendererHitInsideBattleFootprint } from '../tactical/tacticalUiGuards';
 import { buildTacticalPendingMarchRowFromDraft } from '../tactical/tacticalPendingMarchPath';
 import {
   applyHumanUnitIconClickSelectionPolicy,
   clearDeferredHumanUnitSingleSelectTimer,
+  clearDeferredStackCalloutTimer,
+  scheduleDeferredStackCallout,
 } from './mapClickSelectionPolicy';
-import { emitParityDiagnosticsBreadcrumb } from '../core/parityDiagnostics';
+import { resolveMapGesturePress } from '../../shared/mapPlanningGesture';
+import { selectionUnitIdSetsDiffer } from '../../shared/selectionUnitIdSets';
+import {
+  handleMainMapDoubleClick,
+  type DoubleClickSelectedUnit,
+} from './mapDoubleClickHandler';
 import { hideOrderBlockHexTooltip, repositionOrderBlockHexTooltipIfVisible } from './orderBlockHexTooltip';
 import { hideOrderSlowerHexTooltip, repositionOrderSlowerHexTooltipIfVisible } from './orderSlowerHexTooltip';
 import { shouldHideStrategicMapUnitsForRes4Zoom } from './terrainView';
-
-/**
- * Minimal unit row shape used for grouped march / ferry preflight on the map (strategic units or tactical sub-units).
- *
- * Contract: Matches the fields read by dblclick march handling (`id`, `h3Index`, `player`, `unitType`).
- * When to use: `getSelectedHumanUnitsAtMouseDown` so tactical selections do not require synthetic `GameStateSnapshot.units` rows.
- * Expected outcome: Human-owned ids suitable for `assignHumanMarchOrders` IPC in both strategic and tactical modes.
- * Exceptions: None.
- */
-type GroupedMarchSelectedUnit = Pick<GameStateSnapshot['units'][number], 'id' | 'h3Index' | 'player' | 'unitType'>;
 
 /**
  * Documents the `MainMapInteractionDeps` interface as a named contract surface (interface MainMapInteractionDeps).
@@ -350,6 +348,10 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
   const mainMapEl = document.getElementById('main-map');
   if (!mainMapEl) return;
 
+  // Set on each primary press and consumed by the click that follows it, so the second click of a
+  // double-click cannot retarget the selection the order will be planned for.
+  let suppressIconRetargetOnNextClick = false;
+
   function clientXYToHit(clientX: number, clientY: number): string | null {
     if (!S.gameState) return null;
     const map = getMainLeafletMap() as { getContainer: () => HTMLElement } | null;
@@ -368,7 +370,32 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
     return hitTestHexAtContainerPixel(x, y, set);
   }
 
-  function getSelectedHumanUnitsAtMouseDown(state: GameStateSnapshot): GroupedMarchSelectedUnit[] {
+  /**
+   * Returns whether a client pixel lands on a drawn unit or stack icon in `h3Index`.
+   *
+   * Contract: Hidden strategic icons at far zoom and units currently animating a move are misses, which makes those clicks empty clicks.
+   * When to use: Click and double-click handling, wherever an icon hit changes the outcome.
+   * Expected outcome: False when the map is unavailable, no game state is loaded, or nothing is drawn in that hex.
+   * Exceptions: None.
+   */
+  function pointerHitsDrawnUnitIcon(clientX: number, clientY: number, h3Index: string): boolean {
+    if (shouldHideStrategicMapUnitsForRes4Zoom()) return false;
+    if (!S.gameState) return false;
+    const map = getMainLeafletMap() as { getContainer: () => HTMLElement } | null;
+    if (!map) return false;
+    const rect = map.getContainer().getBoundingClientRect();
+    const { unitsToDraw, movingIds } = deps.getUnitsForDrawWithMovingIds(S.gameState);
+    const drawnAtHit = unitsToDraw.filter((unit) => unit.h3Index === h3Index && !movingIds?.has(unit.id));
+    if (drawnAtHit.length === 0) return false;
+    return deps.containerPixelHitsDrawnUnitIcon(
+      clientX - rect.left,
+      clientY - rect.top,
+      h3Index,
+      drawnAtHit.length
+    );
+  }
+
+  function getSelectedHumanUnitsAtMouseDown(state: GameStateSnapshot): DoubleClickSelectedUnit[] {
     const tb = S.tacticalBattleSnapshot;
     if (tb) {
       return S.selectedUnitIdsAtMouseDown
@@ -403,27 +430,6 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
       return row?.h3Index ?? null;
     }
     return state.units.find((u) => u.id === primaryId)?.h3Index ?? null;
-  }
-
-  async function commitGroupedAirFerryOrders(selectedIds: string[], destinationH3: string): Promise<boolean> {
-    if (!window.gameApi?.validateGroupFerryTarget) return false;
-    const validation = await window.gameApi.validateGroupFerryTarget({
-      unitIds: selectedIds,
-      destinationH3Index: destinationH3,
-    });
-    if (!validation.success) {
-      deps.showMapToast(
-        deps.formatTargetingValidationReason(validation.reason, 'Selected air units cannot ferry to that destination.'),
-        { isError: true }
-      );
-      return true;
-    }
-    deps.replacePendingFerryOrdersForSelected(selectedIds, destinationH3);
-    deps.clearCommittedOrderDraftState();
-    deps.updatePendingOrdersSidebar();
-    deps.updateSidebar();
-    deps.redraw();
-    return true;
   }
 
   async function commitGroupedMarchOrders(selectedIds: string[], destinationH3: string): Promise<boolean> {
@@ -562,7 +568,35 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
 
   mainMapEl.addEventListener('pointerdown', (e) => {
     if (e.button !== 0) return;
-    S.selectedUnitIdsAtMouseDown = [...S.selectedUnitIds];
+    const pressAtMs = Date.now();
+    const press = resolveMapGesturePress({
+      snapshotAtMs: S.gestureSelectionSnapshotAtMs,
+      snapshotAnchorClientX: S.gestureSelectionAnchorClientX,
+      snapshotAnchorClientY: S.gestureSelectionAnchorClientY,
+      snapshotUnitCount: S.selectedUnitIdsAtMouseDown.length,
+      liveSelectionDiffersFromSnapshot: selectionUnitIdSetsDiffer(
+        S.selectedUnitIdsAtMouseDown,
+        S.selectedUnitIds
+      ),
+      ctrlKey: e.ctrlKey,
+      clientX: e.clientX,
+      clientY: e.clientY,
+      nowMs: pressAtMs,
+    });
+    suppressIconRetargetOnNextClick = press.suppressIconRetarget;
+    if (press.refreshSnapshot) {
+      S.selectedUnitIdsAtMouseDown = [...S.selectedUnitIds];
+      S.gestureSelectionSnapshotAtMs = pressAtMs;
+      S.gestureSelectionAnchorClientX = e.clientX;
+      S.gestureSelectionAnchorClientY = e.clientY;
+    } else {
+      // A scheduled stack callout is deliberately left alone here: this press is the second half of a
+      // double-click on the same spot, and the double-click handler decides whether the popup still opens.
+      clearDeferredHumanUnitSingleSelectTimer();
+      if (press.restoreSnapshotSelection) {
+        deps.replaceSelection([...S.selectedUnitIdsAtMouseDown]);
+      }
+    }
     deps.clearTerrainTooltipTimer();
     deps.hideTerrainTooltipVisual();
     hideOrderBlockHexTooltip();
@@ -639,10 +673,6 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
       return;
     }
 
-    const mapForClick = getMainLeafletMap() as { getContainer: () => HTMLElement } | null;
-    const clickRect = mapForClick?.getContainer().getBoundingClientRect();
-    const px = clickRect ? e.clientX - clickRect.left : 0;
-    const py = clickRect ? e.clientY - clickRect.top : 0;
     const { unitsToDraw, movingIds } = S.gameState
       ? deps.getUnitsForDrawWithMovingIds(S.gameState)
       : { unitsToDraw: [] as GameStateSnapshot['units'], movingIds: undefined as Set<string> | undefined };
@@ -664,18 +694,20 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
     const unitsAtHit = hit ? unitsToDraw.filter((u) => u.h3Index === hit && !movingIds?.has(u.id)) : [];
     const isStack = unitsAtHit.length >= 2;
     const isLoneAi = unitsAtHit.length === 1 && unitsAtHit[0]?.player !== 'human';
-    const strategicUnitsHiddenOnMap = shouldHideStrategicMapUnitsForRes4Zoom();
-    const stackIconHit =
-      !strategicUnitsHiddenOnMap &&
-      !!hit &&
-      unitsAtHit.length > 0 &&
-      deps.containerPixelHitsDrawnUnitIcon(px, py, hit, unitsAtHit.length);
-    if (hit && (isStack || isLoneAi) && stackIconHit) {
+    if (hit && (isStack || isLoneAi) && pointerHitsDrawnUnitIcon(e.clientX, e.clientY, hit)) {
       if (isHoverOrderPlanningActive()) {
         return;
       }
-      S.ctrlKeyActive = e.ctrlKey;
-      deps.showStackCallout(unitsAtHit, e.clientX, e.clientY);
+      if (!suppressIconRetargetOnNextClick) {
+        const calloutCtrlKey = e.ctrlKey;
+        scheduleDeferredStackCallout(e.clientX, e.clientY, (calloutClientX, calloutClientY) => {
+          S.ctrlKeyActive = calloutCtrlKey;
+          deps.showStackCallout(unitsAtHit, calloutClientX, calloutClientY);
+          deps.updateSidebar();
+          deps.updateRangedSidebar();
+          deps.redraw();
+        });
+      }
       deps.updateSidebar();
       deps.updateRangedSidebar();
       deps.redraw();
@@ -685,15 +717,12 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
     deps.hideStackCallout();
     if (hit) {
       const unit = deps.getUnitAtHex(hit);
-      const drawnAtHit = unitsToDraw.filter((u) => u.h3Index === hit && !movingIds?.has(u.id));
-      const unitIconHit =
-        !strategicUnitsHiddenOnMap &&
-        drawnAtHit.length > 0 &&
-        deps.containerPixelHitsDrawnUnitIcon(px, py, hit, drawnAtHit.length);
+      const unitIconHit = pointerHitsDrawnUnitIcon(e.clientX, e.clientY, hit);
       if (unit?.player === 'human' && unitIconHit) {
         applyHumanUnitIconClickSelectionPolicy({
           ctrlKey: e.ctrlKey,
           unitId: unit.id,
+          suppressSelectionRetarget: suppressIconRetargetOnNextClick,
           deps: {
             replaceSelection: deps.replaceSelection,
             toggleUnitSelection: deps.toggleUnitSelection,
@@ -723,79 +752,33 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
     deps.redraw();
   });
 
-  mainMapEl.addEventListener('dblclick', async (e) => {
-    clearDeferredHumanUnitSingleSelectTimer();
-    if (!S.gameState) {
-      emitParityDiagnosticsBreadcrumb('planning.doubleClickIgnored', { reason: 'missing_game_state' });
-      return;
-    }
-    const state = S.gameState;
-    if (S.rangedModeActive || S.airStrikeModeActive) {
-      emitParityDiagnosticsBreadcrumb('planning.doubleClickIgnored', {
-        reason: 'targeting_mode_active',
-        rangedModeActive: S.rangedModeActive,
-        airStrikeModeActive: S.airStrikeModeActive,
-      });
-      return;
-    }
-    const hit = clientXYToHit(e.clientX, e.clientY);
-    const destinationH3 = S.selectedHexIndex ?? S.hoveredHexH3 ?? hit;
-    if (!destinationH3 || S.selectedUnitIdsAtMouseDown.length === 0) {
-      emitParityDiagnosticsBreadcrumb('planning.doubleClickIgnored', {
-        reason: !destinationH3 ? 'missing_destination' : 'missing_selection_at_mouse_down',
-        selectedAtMouseDownCount: S.selectedUnitIdsAtMouseDown.length,
-      });
-      return;
-    }
-
-    const selectedAtMouseDown = getSelectedHumanUnitsAtMouseDown(state);
-    if (selectedAtMouseDown.length === 0) {
-      emitParityDiagnosticsBreadcrumb('planning.doubleClickIgnored', {
-        reason: 'selection_not_human_units',
-        selectedAtMouseDownCount: 0,
-      });
-      return;
-    }
-    const selectedIds = selectedAtMouseDown.map((unit) => unit.id);
-    if (selectedAtMouseDown.every((unit) => unit.h3Index === destinationH3)) {
-      emitParityDiagnosticsBreadcrumb('planning.doubleClickIgnored', {
-        reason: 'destination_equals_current_positions',
-        selectedCount: selectedAtMouseDown.length,
-      });
-      return;
-    }
-    const hasAirSelection = selectedAtMouseDown.some((unit) => unit.unitType === 'air');
-    const hasNonAirSelection = selectedAtMouseDown.some((unit) => unit.unitType !== 'air');
-    if (hasAirSelection && hasNonAirSelection) {
-      emitParityDiagnosticsBreadcrumb('planning.doubleClickRejected', {
-        reason: 'mixed_air_non_air_selection',
-        selectedCount: selectedAtMouseDown.length,
-      });
-      deps.showMapToast('Cannot issue grouped movement for mixed air and non-air units.', { isError: true });
-      return;
-    }
-
-    emitParityDiagnosticsBreadcrumb('planning.doubleClickAccepted', {
-      tacticalModeActive: !!S.tacticalBattleSnapshot,
-      selectedCount: selectedAtMouseDown.length,
-      destinationH3,
-      hasAirSelection,
+  mainMapEl.addEventListener('dblclick', (e) => {
+    void handleMainMapDoubleClick(e, {
+      clientXYToHit,
+      pointerHitsDrawnUnitIcon,
+      getSelectedHumanUnitsAtMouseDown,
+      commitGroupedMarchOrders,
+      showMapToast: deps.showMapToast,
+      formatTargetingValidationReason: deps.formatTargetingValidationReason,
+      replacePendingFerryOrdersForSelected: deps.replacePendingFerryOrdersForSelected,
+      clearCommittedOrderDraftState: deps.clearCommittedOrderDraftState,
+      updatePendingOrdersSidebar: deps.updatePendingOrdersSidebar,
+      updateSidebar: deps.updateSidebar,
+      updateRangedSidebar: deps.updateRangedSidebar,
+      redraw: deps.redraw,
     });
-    if (hasAirSelection) {
-      if (await commitGroupedAirFerryOrders(selectedIds, destinationH3)) return;
-      return;
-    }
-
-    await commitGroupedMarchOrders(selectedIds, destinationH3);
   });
 
   mainMapEl.addEventListener('contextmenu', (e) => {
     e.preventDefault();
-    if (S.selectedUnitIds.length === 0 && !S.hoverRoutePreview) return;
-    deps.clearSelection();
-    S.selectedUnitIdsAtMouseDown = [];
-    S.selectedHexIndex = null;
-    S.hoverRoutePreview = null;
+    clearDeferredHumanUnitSingleSelectTimer();
+    clearDeferredStackCalloutTimer();
+    if (S.selectedUnitIds.length === 0 && !S.hoverRoutePreview) {
+      S.selectedUnitIdsAtMouseDown = [];
+      S.gestureSelectionSnapshotAtMs = 0;
+      return;
+    }
+    clearMapSelectionChrome();
     deps.updateSidebar();
     deps.updateRangedSidebar();
     deps.redraw();

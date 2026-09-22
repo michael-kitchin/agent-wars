@@ -111,8 +111,8 @@ function testRes4ZoomHidesStrategicMapUnits(): void {
     'resizeAndRedraw should dismiss open stack callout when res4 strategic zoom hides units'
   );
   assert.ok(
-    mainMapInteractionsSource.includes('shouldHideStrategicMapUnitsForRes4Zoom()') &&
-      mainMapInteractionsSource.includes('const strategicUnitsHiddenOnMap = shouldHideStrategicMapUnitsForRes4Zoom();'),
+    mainMapInteractionsSource.includes('function pointerHitsDrawnUnitIcon(') &&
+      mainMapInteractionsSource.includes('if (shouldHideStrategicMapUnitsForRes4Zoom()) return false;'),
     'mainMapInteractions should zero out unit/stack icon hit-testing when res4 strategic zoom hides units'
   );
   assert.ok(
@@ -831,13 +831,13 @@ function testMainMapInteractionsDelegatesHumanUnitIconSelectionToPolicyModule():
 /**
  * Defines the `testParityDiagnosticsBreadcrumbsCoverPlanningAndPositionSourceBoundaries` function shape.
 
- * Purpose: Guards Phase 7 parity diagnostics instrumentation around double-click planning and tactical draft-vs-committed source selection.
- * When to use: Regression signal when refactoring `mainMapInteractions`, `mapClickSelectionPolicy`, or `tacticalDraftMarchOverlay`.
+ * Purpose: Guards parity diagnostics instrumentation around double-click planning and tactical draft-vs-committed source selection.
+ * When to use: Regression signal when refactoring `mapDoubleClickHandler`, `mapClickSelectionPolicy`, or `tacticalDraftMarchOverlay`.
  * Expected outcome: Breadcrumb helper imports and event keys remain wired at the parity-sensitive boundaries.
  * Exceptions: None.
  */
 function testParityDiagnosticsBreadcrumbsCoverPlanningAndPositionSourceBoundaries(): void {
-  const interactionsPath = path.resolve(process.cwd(), 'src', 'renderer', 'map', 'mainMapInteractions.ts');
+  const interactionsPath = path.resolve(process.cwd(), 'src', 'renderer', 'map', 'mapDoubleClickHandler.ts');
   const selectionPolicyPath = path.resolve(process.cwd(), 'src', 'renderer', 'map', 'mapClickSelectionPolicy.ts');
   const tacticalOverlayPath = path.resolve(process.cwd(), 'src', 'renderer', 'tactical', 'tacticalDraftMarchOverlay.ts');
   const interactionsSource = fs.readFileSync(interactionsPath, 'utf8');
@@ -848,7 +848,7 @@ function testParityDiagnosticsBreadcrumbsCoverPlanningAndPositionSourceBoundarie
       interactionsSource.includes("'planning.doubleClickAccepted'") &&
       interactionsSource.includes("'planning.doubleClickIgnored'") &&
       interactionsSource.includes("'planning.doubleClickRejected'"),
-    'main map interactions should emit parity breadcrumbs for double-click planning decisions'
+    'main map double-click handling should emit parity breadcrumbs for planning decisions'
   );
   assert.ok(
     selectionPolicySource.includes('emitParityDiagnosticsBreadcrumb') &&

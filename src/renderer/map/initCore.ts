@@ -9,6 +9,10 @@ import { isHoverOrderPlanningActive } from '../rendering/canvasPreviewPolicy';
 import { shouldRefreshStackCalloutOnControlKeydown } from '../../shared/stackCalloutCtrlKeydown';
 import { basemapCssFilterForStyle } from '../../shared/basemapStyleLogic';
 import { getActiveTerrainStyleBasemapId, getActiveTerrainStyleId, renderTerrainLegend } from '../rendering/terrainVisualStyles';
+import {
+  clearDeferredStackCalloutTimer,
+  clearDeferredStackCalloutTimerForPressAway,
+} from './mapClickSelectionPolicy';
 import { hideOrderBlockHexTooltip } from './orderBlockHexTooltip';
 import { hideOrderSlowerHexTooltip } from './orderSlowerHexTooltip';
 import { getMainLeafletMap, initWorldLeafletMaps, setMainBasemapByProviderId, setMainBasemapFilter } from './worldLeafletMap';
@@ -441,6 +445,9 @@ export function wireInitCore(deps: InitCoreDeps): void {
         deps.hideBuildPopup();
         return;
       }
+      // Also drops a callout that is scheduled but has not opened, so dismissing is not undone a
+      // moment later by the popup appearing on its own.
+      clearDeferredStackCalloutTimer();
       const stackCallout = document.getElementById('stack-callout');
       if (stackCallout && !stackCallout.classList.contains('hidden')) {
         e.preventDefault();
@@ -531,9 +538,12 @@ export function wireInitCore(deps: InitCoreDeps): void {
   window.addEventListener(
     'pointerdown',
     (e) => {
+      if (deps.isStackCalloutTargetInsideDialog(e.target)) return;
+      // Covers presses that never reach the map click handler, such as the tactical entry control or
+      // the sidebar: a callout scheduled elsewhere must not open over wherever the player went instead.
+      clearDeferredStackCalloutTimerForPressAway(e.clientX, e.clientY);
       const stackCallout = document.getElementById('stack-callout');
       if (!stackCallout || stackCallout.classList.contains('hidden')) return;
-      if (deps.isStackCalloutTargetInsideDialog(e.target)) return;
       deps.hideStackCallout();
     },
     true

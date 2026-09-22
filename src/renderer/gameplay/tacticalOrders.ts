@@ -155,6 +155,7 @@ export function clearPendingTacticalOrders(): void {
 export function clearCommittedOrderDraftState(deps: TacticalOrderDeps): void {
   deps.clearSelection();
   S.selectedUnitIdsAtMouseDown = [];
+  S.gestureSelectionSnapshotAtMs = 0;
   S.selectedHexIndex = null;
   S.hideCommittedOrderLinesAfterReady = false;
   S.hoverRoutePreview = null;

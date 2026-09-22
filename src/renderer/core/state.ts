@@ -507,6 +507,33 @@ selectedUnitIds: [] as string[],
    */
 selectedUnitIdsAtMouseDown: [] as string[],
     /**
+   * Epoch milliseconds when `selectedUnitIdsAtMouseDown` was last copied from the live selection. `0` means no gesture is open.
+   *
+   * Purpose: Lets the second press of a double-click keep the units the player had selected instead of resnapshotting whatever the first click selected.
+   * When to use: Written by the main-map pointer-down listener. Reset to `0` everywhere the snapshot array is cleared.
+   * Expected outcome: A press inside the gesture window leaves the snapshot array untouched.
+   * Exceptions: None.
+   */
+gestureSelectionSnapshotAtMs: 0,
+    /**
+   * Client X of the press that took the current gesture snapshot.
+   *
+   * Purpose: A second press far from this point is a new click, not the second half of a double-click, so the snapshot must be retaken.
+   * When to use: Written beside `gestureSelectionSnapshotAtMs`.
+   * Expected outcome: Meaningless while `gestureSelectionSnapshotAtMs` is `0`.
+   * Exceptions: None.
+   */
+gestureSelectionAnchorClientX: 0,
+    /**
+   * Client Y of the press that took the current gesture snapshot.
+   *
+   * Purpose: Pairs with `gestureSelectionAnchorClientX` for the double-click distance check.
+   * When to use: Written beside `gestureSelectionSnapshotAtMs`.
+   * Expected outcome: Meaningless while `gestureSelectionSnapshotAtMs` is `0`.
+   * Exceptions: None.
+   */
+gestureSelectionAnchorClientY: 0,
+    /**
    * Documents the object literal property `ctrlKeyActive` (ctrlKeyActive: false).
 
    * Purpose: Supports maintainability by documenting why `ctrlKeyActive` exists.
@@ -524,6 +551,33 @@ ctrlKeyActive: false,
    * Exceptions: None.
    */
 pendingSelectTimeout: null as ReturnType<typeof setTimeout> | null,
+    /**
+   * Timer that will open the stack callout after a single click, or `null` when no open is waiting.
+   *
+   * Purpose: The callout is layered above the map, so opening it on the first click would swallow the second click of a double-click. Waiting out the single-select delay lets a double-click on a stack icon plan an order instead.
+   * When to use: Written only by `scheduleDeferredStackCallout`; cleared by `clearDeferredStackCalloutTimer`.
+   * Expected outcome: The callout appears only if this timer is allowed to fire.
+   * Exceptions: None.
+   */
+pendingStackCalloutTimeout: null as ReturnType<typeof setTimeout> | null,
+    /**
+   * Client X of the click that scheduled the pending stack callout.
+   *
+   * Purpose: A press away from this point means the player moved on, so the popup must not still appear there; a press on the same point is the second half of a double-click and must leave it scheduled.
+   * When to use: Written only by `scheduleDeferredStackCallout`; read only by `clearDeferredStackCalloutTimerForPressAway`.
+   * Expected outcome: Meaningless while `pendingStackCalloutTimeout` is `null`.
+   * Exceptions: None.
+   */
+pendingStackCalloutAnchorClientX: 0,
+    /**
+   * Client Y of the click that scheduled the pending stack callout.
+   *
+   * Purpose: Pairs with `pendingStackCalloutAnchorClientX` for the press-away distance check.
+   * When to use: Written only by `scheduleDeferredStackCallout`; read only by `clearDeferredStackCalloutTimerForPressAway`.
+   * Expected outcome: Meaningless while `pendingStackCalloutTimeout` is `null`.
+   * Exceptions: None.
+   */
+pendingStackCalloutAnchorClientY: 0,
     /**
    * Documents the object literal property `humanStandingOrders` (humanStandingOrders: [] as HumanStandingOrderSnapshot[]).
 
