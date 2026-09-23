@@ -1,8 +1,10 @@
 ---
-description: "05 — Spec, design, and guidance docs as markdown under .spec"
+description: "05 — Working specs under .spec; living product docs under doc"
 alwaysApply: true
 ---
 
 # 05 — Spec Documents
 
-Please ensure all spec, design, and similar guidance documents are written as markdown files to the `.spec` directory.
+Write working specs, execution plans, design proposals, and debugging notes as markdown files in the `.spec` directory.
+
+Living product documentation belongs in `doc/`. This includes the UX specification suite (`doc/ux-specification.md` and the `doc/ux/` folder) and the mechanics documents indexed by `doc/README.md`. Update those documents in place; do not copy them into `.spec`.
