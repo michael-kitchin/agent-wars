@@ -145,22 +145,22 @@ function testCommittedPathsRemainVisibleDuringResolutionAnimation(): void {
     'drawGameScene should use shared committed-path visibility policy helper'
   );
   assert.ok(
-    shouldDrawCommittedOrderPathsFn.includes('return !S.ctrlKeyActive;'),
-    'shouldDrawCommittedOrderPaths should hide committed paths while ctrl is held for stack selection'
+    shouldDrawCommittedOrderPathsFn.includes('return !S.shiftKeyActive;'),
+    'shouldDrawCommittedOrderPaths should hide committed paths while Shift is held for stack selection'
   );
   assert.ok(
     drawSceneFn.includes(
       'if (shouldDrawCommittedPaths && !S.hideCommittedOrderLinesAfterReady && S.humanStandingOrders.length > 0 && state.units.length)'
     ),
-    'drawGameScene should keep committed paths visible once planned when ctrl is not held'
+    'drawGameScene should keep committed paths visible once planned when Shift is not held'
   );
   assert.ok(
     drawSceneFn.includes('const shouldDrawPathPreview = shouldDrawHoveredPathPreview();'),
     'drawGameScene should use shared hover-preview visibility policy helper'
   );
   assert.ok(
-    shouldDrawHoveredPathPreviewFn.includes('return !S.ctrlKeyActive && S.selectedUnitIds.length > 0;'),
-    'shouldDrawHoveredPathPreview should gate hover path preview by ctrl and active selection'
+    shouldDrawHoveredPathPreviewFn.includes('return !S.shiftKeyActive && S.selectedUnitIds.length > 0;'),
+    'shouldDrawHoveredPathPreview should gate hover path preview by Shift and active selection'
   );
   assert.ok(
     drawSceneFn.includes('drawPendingMarchesHoverAndSupportOrderStack({') &&
@@ -307,20 +307,20 @@ function testProductionLabelContractsForExploredVsUnexploredHexes(): void {
   );
   assert.ok(
     drawHoverPreviewFn.includes('if (!shouldDrawHoveredPathPreview()) return;') &&
-      shouldDrawHoveredPathPreviewFn.includes('return !S.ctrlKeyActive && S.selectedUnitIds.length > 0;'),
-    'drawHoverRoutePreview should use shared policy to suppress path-plan preview while ctrl is held and when nothing is selected'
+      shouldDrawHoveredPathPreviewFn.includes('return !S.shiftKeyActive && S.selectedUnitIds.length > 0;'),
+    'drawHoverRoutePreview should use shared policy to suppress path-plan preview while Shift is held and when nothing is selected'
   );
 }
 
 /**
- * Defines the `testStackCalloutSingleUnitNonCtrlClosesPopup` function shape (function testStackCalloutSingleUnitNonCtrlClosesPopup(): void).
+ * Defines the `testStackCalloutSingleUnitNonShiftClosesPopup` function shape (function testStackCalloutSingleUnitNonShiftClosesPopup(): void).
 
- * Purpose: Supports maintainability by documenting why `testStackCalloutSingleUnitNonCtrlClosesPopup` exists.
+ * Purpose: Supports maintainability by documenting why `testStackCalloutSingleUnitNonShiftClosesPopup` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-function testStackCalloutSingleUnitNonCtrlClosesPopup(): void {
+function testStackCalloutSingleUnitNonShiftClosesPopup(): void {
   const rendererPath = path.resolve(process.cwd(), 'src', 'renderer', 'renderer.ts');
   const source = fs.readFileSync(rendererPath, 'utf8');
   const showStackCalloutFn = getFunctionSource(source, 'showStackCallout');
@@ -328,9 +328,9 @@ function testStackCalloutSingleUnitNonCtrlClosesPopup(): void {
 
   assert.ok(
     showStackCalloutFn.includes('onStackSingleUnitToggleClick(') &&
-      stackSingleUnitHandlerFn.includes('if (!S.ctrlKeyActive) {') &&
+      stackSingleUnitHandlerFn.includes('if (!S.shiftKeyActive) {') &&
       stackSingleUnitHandlerFn.includes('hideStackCallout();'),
-    'stack single-unit handler should close popup after non-ctrl unit button clicks'
+    'stack single-unit handler should close popup after non-Shift unit button clicks'
   );
 }
 
@@ -413,21 +413,21 @@ function testModifierDrivenPopoverCloseRulesCentralized(): void {
   const wireInitCoreFn = getFunctionSource(initCoreSource, 'wireInitCore');
 
   assert.ok(
-    modifierRulesFn.includes("if (reason === 'ctrl_pressed')") &&
+    modifierRulesFn.includes("if (reason === 'shift_pressed')") &&
       !modifierRulesFn.includes('hideBuildPopup();') &&
-      modifierRulesFn.includes("if (reason === 'ctrl_released')") &&
+      modifierRulesFn.includes("if (reason === 'shift_released')") &&
       modifierRulesFn.includes('hideStackCallout();'),
-    'Ctrl press should preserve the build popup for multi-select while Ctrl release closes the stack callout'
+    'Shift press should preserve the build popup for multi-select while Shift release closes the stack callout'
   );
   assert.ok(
-    wireInitCoreFn.includes("applyModifierDrivenPopoverCloseRules('ctrl_pressed')") &&
-      wireInitCoreFn.includes("applyModifierDrivenPopoverCloseRules('ctrl_released')"),
+    wireInitCoreFn.includes("applyModifierDrivenPopoverCloseRules('shift_pressed')") &&
+      wireInitCoreFn.includes("applyModifierDrivenPopoverCloseRules('shift_released')"),
     'init key handlers should delegate popover-close behavior to shared modifier rule helper'
   );
   assert.ok(
-    wireInitCoreFn.includes('shouldRefreshStackCalloutOnControlKeydown(ctrlKeyAlreadyActive)') &&
-      wireInitCoreFn.includes("applyModifierDrivenPopoverCloseRules('ctrl_pressed')"),
-    'Control keydown should rebuild stack-callout chrome only on the inactive-to-active transition'
+    wireInitCoreFn.includes('shouldRefreshStackCalloutOnShiftKeydown(shiftKeyAlreadyActive)') &&
+      wireInitCoreFn.includes("applyModifierDrivenPopoverCloseRules('shift_pressed')"),
+    'Shift keydown should rebuild stack-callout chrome only on the inactive-to-active transition'
   );
 }
 
@@ -1110,7 +1110,7 @@ function run(): void {
   testRes4ZoomHidesStrategicMapUnits();
   testCommittedPathsRemainVisibleDuringResolutionAnimation();
   testProductionLabelContractsForExploredVsUnexploredHexes();
-  testStackCalloutSingleUnitNonCtrlClosesPopup();
+  testStackCalloutSingleUnitNonShiftClosesPopup();
   testStackSealiftEmbarkedSelectionAndDebarkControls();
   testModifierDrivenPopoverCloseRulesCentralized();
   testInfrastructureGlyphSetsComeFromRes4Overrides();

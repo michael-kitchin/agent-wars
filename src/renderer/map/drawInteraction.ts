@@ -50,12 +50,12 @@ buildResolutionPlaybackState: (
     /**
    * Applies the shared build-entry click policy for canvas hit-tested buttons.
    *
-   * Contract: Plain click replaces the build-hex set; Ctrl click toggles membership.
+   * Contract: Plain click replaces the build-hex set; Shift click toggles membership.
    * When to use: After identifying a build-entry hit from client coordinates.
    * Expected outcome: Selection, queue synchronization, and popup state remain aligned.
    * Exceptions: Async failures are surfaced by the popup controller.
    */
-handleBuildEntryClick: (h3Index: string, clientX: number, clientY: number, ctrlKey: boolean) => Promise<void>;
+handleBuildEntryClick: (h3Index: string, clientX: number, clientY: number, shiftKey: boolean) => Promise<void>;
 }
 
 /**
@@ -193,7 +193,7 @@ export function pointInExpandedClientRect(
 }
 
 /**
- * Defines the `tryHandleBuildEntryAtClientXY` function shape (export function tryHandleBuildEntryAtClientXY(clientX: number, clientY: number, deps: DrawInteractionDeps, eventCtrlKey?: boolean): boolean).
+ * Defines the `tryHandleBuildEntryAtClientXY` function shape (export function tryHandleBuildEntryAtClientXY(clientX: number, clientY: number, deps: DrawInteractionDeps, eventShiftKey?: boolean): boolean).
 
  * Purpose: Supports maintainability by documenting why `tryHandleBuildEntryAtClientXY` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
@@ -204,7 +204,7 @@ export function tryHandleBuildEntryAtClientXY(
   clientX: number,
   clientY: number,
   deps: DrawInteractionDeps,
-  eventCtrlKey = false
+  eventShiftKey = false
 ): boolean {
   if (isHoverOrderPlanningActive()) return false;
   const layer = document.getElementById('build-entry-layer');
@@ -215,7 +215,7 @@ export function tryHandleBuildEntryAtClientXY(
     if (!pointInExpandedClientRect(clientX, clientY, r, BUILD_ENTRY_HIT_PAD_PX)) continue;
     const h3 = btn.dataset.h3Index;
     if (!h3) continue;
-    void deps.handleBuildEntryClick(h3, clientX, clientY, eventCtrlKey || S.ctrlKeyActive);
+    void deps.handleBuildEntryClick(h3, clientX, clientY, eventShiftKey || S.shiftKeyActive);
     return true;
   }
   return false;

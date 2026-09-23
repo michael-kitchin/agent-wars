@@ -15225,7 +15225,7 @@
     * Ordered res1 hex ids controlled by the build-popup multi-selection (insertion order).
     *
     * Purpose: Keeps production-hex selection independent from unit selection and the scalar map hex.
-    * When to use: Build-entry button chrome, Ctrl-toggle policy, and multi-hex popup rendering.
+    * When to use: Build-entry button chrome, Shift-toggle policy, and multi-hex popup rendering.
     * Expected outcome: Append on add and filter on remove preserve insertion order; the last entry is the
     * deselect re-anchor. Plain click replaces the set and popup close clears it.
     * Exceptions: Only build-entry button interactions may add or remove members.
@@ -15304,14 +15304,14 @@
     */
     gestureSelectionAnchorClientY: 0,
     /**
-       * Documents the object literal property `ctrlKeyActive` (ctrlKeyActive: false).
-    
-       * Purpose: Supports maintainability by documenting why `ctrlKeyActive` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    ctrlKeyActive: false,
+    * True while Shift is held as the multi-select modifier.
+    *
+    * Purpose: Hides committed paths and hover previews, and switches the stack callout from Select All to Add All / Remove All.
+    * When to use: Set on Shift keydown, cleared on Shift keyup and window blur. Clicks also read `event.shiftKey`.
+    * Expected outcome: `false` whenever Shift is up and the window is focused.
+    * Exceptions: None.
+    */
+    shiftKeyActive: false,
     /**
        * Documents the object literal property `pendingSelectTimeout` (pendingSelectTimeout: null as ReturnType<typeof setTimeout> | null).
     
@@ -16543,10 +16543,10 @@
 
   // src/renderer/rendering/canvasPreviewPolicy.ts
   function shouldDrawCommittedOrderPaths() {
-    return !rendererSharedState.ctrlKeyActive;
+    return !rendererSharedState.shiftKeyActive;
   }
   function shouldDrawHoveredPathPreview() {
-    return !rendererSharedState.ctrlKeyActive && rendererSharedState.selectedUnitIds.length > 0;
+    return !rendererSharedState.shiftKeyActive && rendererSharedState.selectedUnitIds.length > 0;
   }
   function getCommittedOrderUnitsHiddenDuringPreview(shouldDrawPathPreview) {
     if (!shouldDrawPathPreview || !rendererSharedState.hoverRoutePreview) return null;
@@ -23354,13 +23354,13 @@
         clientY: rect.top + rect.height / 2
       };
     }
-    async function processBuildEntryClick(h3Index, clientX, clientY, ctrlKey) {
+    async function processBuildEntryClick(h3Index, clientX, clientY, shiftKey) {
       const lifecycleRevision = popupLifecycleRevision;
       if (isHoverOrderPlanningActive() || deps.shouldRenderRes4Hexes()) return;
       rendererSharedState.selectedHexIndex = h3Index;
       const popup = document.getElementById("build-popup");
       const popupOpen = !!popup && !popup.classList.contains("hidden");
-      if (!ctrlKey) {
+      if (!shiftKey) {
         const togglesSinglePopup = rendererSharedState.selectedBuildHexH3s.length === 1 && rendererSharedState.selectedBuildHexH3s[0] === h3Index && popupOpen && rendererSharedState.buildPopupHexH3 === h3Index;
         if (togglesSinglePopup) {
           hideBuildPopup2();
@@ -23409,8 +23409,8 @@
       if (lifecycleRevision !== popupLifecycleRevision) return;
       showBuildPopup2(h3Index, clientX, clientY);
     }
-    function handleBuildEntryClick2(h3Index, clientX, clientY, ctrlKey) {
-      buildEntryInteractionChain = buildEntryInteractionChain.then(() => processBuildEntryClick(h3Index, clientX, clientY, ctrlKey)).catch((err) => {
+    function handleBuildEntryClick2(h3Index, clientX, clientY, shiftKey) {
+      buildEntryInteractionChain = buildEntryInteractionChain.then(() => processBuildEntryClick(h3Index, clientX, clientY, shiftKey)).catch((err) => {
         console.error("handleBuildEntryClick failed:", err);
         deps.showMapToast("Failed to update build selection.", { isError: true });
       });
@@ -24047,7 +24047,7 @@
   function pointInExpandedClientRect(clientX, clientY, rect, padPx) {
     return clientX >= rect.left - padPx && clientX <= rect.right + padPx && clientY >= rect.top - padPx && clientY <= rect.bottom + padPx;
   }
-  function tryHandleBuildEntryAtClientXY(clientX, clientY, deps, eventCtrlKey = false) {
+  function tryHandleBuildEntryAtClientXY(clientX, clientY, deps, eventShiftKey = false) {
     if (isHoverOrderPlanningActive()) return false;
     const layer = document.getElementById("build-entry-layer");
     if (!layer || layer.classList.contains("hidden")) return false;
@@ -24057,7 +24057,7 @@
       if (!pointInExpandedClientRect(clientX, clientY, r, BUILD_ENTRY_HIT_PAD_PX)) continue;
       const h3 = btn.dataset.h3Index;
       if (!h3) continue;
-      void deps.handleBuildEntryClick(h3, clientX, clientY, eventCtrlKey || rendererSharedState.ctrlKeyActive);
+      void deps.handleBuildEntryClick(h3, clientX, clientY, eventShiftKey || rendererSharedState.shiftKeyActive);
       return true;
     }
     return false;
@@ -24335,7 +24335,7 @@
   }
   function applySelectionFromSidebarUnitButton(unitId, event, deps) {
     if (shouldBlockEmbarkedLandUnitSelect(unitId)) return;
-    const useMultiSelect = event.ctrlKey || rendererSharedState.ctrlKeyActive;
+    const useMultiSelect = event.shiftKey || rendererSharedState.shiftKeyActive;
     if (useMultiSelect) {
       if (shouldBlockToggleSelectionDuringHoverPlanning(unitId)) return;
       deps.toggleUnitSelection(unitId);
@@ -25735,7 +25735,7 @@
   function resolveMapGesturePress(input) {
     const withinWindow = input.snapshotAtMs !== 0 && input.nowMs - input.snapshotAtMs <= MAP_DOUBLE_CLICK_SELECTION_FREEZE_MS;
     const withinAnchor = Math.abs(input.clientX - input.snapshotAnchorClientX) <= MAP_DOUBLE_CLICK_ANCHOR_TOLERANCE_PX && Math.abs(input.clientY - input.snapshotAnchorClientY) <= MAP_DOUBLE_CLICK_ANCHOR_TOLERANCE_PX;
-    const continuesGesture = withinWindow && withinAnchor && !input.ctrlKey && input.snapshotUnitCount > 0;
+    const continuesGesture = withinWindow && withinAnchor && !input.shiftKey && input.snapshotUnitCount > 0;
     if (!continuesGesture) {
       return { refreshSnapshot: true, restoreSnapshotSelection: false, suppressIconRetarget: false };
     }
@@ -25784,12 +25784,12 @@
       clearDeferredHumanUnitSingleSelectTimer();
       return;
     }
-    if (args.ctrlKey) {
+    if (args.shiftKey) {
       if (shouldBlockToggleSelectionDuringHoverPlanning(args.unitId)) {
         return;
       }
       clearDeferredHumanUnitSingleSelectTimer();
-      emitParityDiagnosticsBreadcrumb("selection.ctrlToggle", {
+      emitParityDiagnosticsBreadcrumb("selection.shiftToggle", {
         unitId: args.unitId
       });
       args.deps.toggleUnitSelection(args.unitId);
@@ -26127,7 +26127,7 @@
           rendererSharedState.selectedUnitIdsAtMouseDown,
           rendererSharedState.selectedUnitIds
         ),
-        ctrlKey: e.ctrlKey,
+        shiftKey: e.shiftKey,
         clientX: e.clientX,
         clientY: e.clientY,
         nowMs: pressAtMs
@@ -26222,7 +26222,7 @@
         deps.redraw();
         return;
       }
-      if (deps.tryHandleBuildEntryAtClientXY(e.clientX, e.clientY, e.ctrlKey)) {
+      if (deps.tryHandleBuildEntryAtClientXY(e.clientX, e.clientY, e.shiftKey)) {
         deps.updateSidebar();
         deps.updateRangedSidebar();
         deps.redraw();
@@ -26236,9 +26236,9 @@
           return;
         }
         if (!suppressIconRetargetOnNextClick) {
-          const calloutCtrlKey = e.ctrlKey;
+          const calloutShiftKey = e.shiftKey;
           scheduleDeferredStackCallout(e.clientX, e.clientY, (calloutClientX, calloutClientY) => {
-            rendererSharedState.ctrlKeyActive = calloutCtrlKey;
+            rendererSharedState.shiftKeyActive = calloutShiftKey;
             deps.showStackCallout(unitsAtHit, calloutClientX, calloutClientY);
             deps.updateSidebar();
             deps.updateRangedSidebar();
@@ -26256,7 +26256,7 @@
         const unitIconHit = pointerHitsDrawnUnitIcon(e.clientX, e.clientY, hit);
         if (unit?.player === "human" && unitIconHit) {
           applyHumanUnitIconClickSelectionPolicy({
-            ctrlKey: e.ctrlKey,
+            shiftKey: e.shiftKey,
             unitId: unit.id,
             suppressSelectionRetarget: suppressIconRetargetOnNextClick,
             deps: {
@@ -26336,9 +26336,9 @@
     mapKeyboardPanController.clear();
   }
 
-  // src/shared/stackCalloutCtrlKeydown.ts
-  function shouldRefreshStackCalloutOnControlKeydown(ctrlKeyAlreadyActive) {
-    return !ctrlKeyAlreadyActive;
+  // src/shared/stackCalloutShiftKeydown.ts
+  function shouldRefreshStackCalloutOnShiftKeydown(shiftKeyAlreadyActive) {
+    return !shiftKeyAlreadyActive;
   }
 
   // src/renderer/map/initCore.ts
@@ -26474,19 +26474,19 @@
         }
       }
       if (shouldIgnoreGlobalKeydown(e)) return;
-      if (e.key === "Control" || e.key === "Alt" || e.key === "Meta") {
+      if (e.key === "Shift" || e.key === "Control" || e.key === "Alt" || e.key === "Meta") {
         clearMapKeyboardPan();
-        if (e.key === "Control") {
-          const ctrlKeyAlreadyActive = rendererSharedState.ctrlKeyActive;
-          rendererSharedState.ctrlKeyActive = true;
-          if (shouldRefreshStackCalloutOnControlKeydown(ctrlKeyAlreadyActive)) {
-            deps.applyModifierDrivenPopoverCloseRules("ctrl_pressed");
+        if (e.key === "Shift") {
+          const shiftKeyAlreadyActive = rendererSharedState.shiftKeyActive;
+          rendererSharedState.shiftKeyActive = true;
+          if (shouldRefreshStackCalloutOnShiftKeydown(shiftKeyAlreadyActive)) {
+            deps.applyModifierDrivenPopoverCloseRules("shift_pressed");
           }
         }
         return;
       }
       if (e.repeat) return;
-      if (e.ctrlKey || e.altKey || e.metaKey) return;
+      if (e.shiftKey || e.ctrlKey || e.altKey || e.metaKey) return;
       const key = e.key.toLowerCase();
       if (key === "t") {
         rendererSharedState.hideTerrainFillWhileHeld = true;
@@ -26500,9 +26500,9 @@
       }
     });
     window.addEventListener("keyup", (e) => {
-      if (e.key === "Control") {
-        rendererSharedState.ctrlKeyActive = false;
-        deps.applyModifierDrivenPopoverCloseRules("ctrl_released");
+      if (e.key === "Shift") {
+        rendererSharedState.shiftKeyActive = false;
+        deps.applyModifierDrivenPopoverCloseRules("shift_released");
         return;
       }
       if (e.key.toLowerCase() === "t") {
@@ -26515,7 +26515,7 @@
     window.addEventListener("blur", () => {
       clearMapKeyboardPan();
       dismissTerrainTooltipWhenPointerLeavesMapPanel(deps);
-      rendererSharedState.ctrlKeyActive = false;
+      rendererSharedState.shiftKeyActive = false;
       deps.applyModifierDrivenPopoverCloseRules("window_blur");
       if (!deps.isMapInspectionModeHeld()) return;
       rendererSharedState.hideTerrainFillWhileHeld = false;
@@ -26586,7 +26586,7 @@
       const h3 = btn.dataset.h3Index;
       if (!h3) return;
       if (isHoverOrderPlanningActive()) return;
-      void deps.handleBuildEntryClick(h3, e.clientX, e.clientY, e.ctrlKey || rendererSharedState.ctrlKeyActive);
+      void deps.handleBuildEntryClick(h3, e.clientX, e.clientY, e.shiftKey || rendererSharedState.shiftKeyActive);
     });
     const tacticalEntryLayer = document.getElementById("tactical-entry-layer");
     tacticalEntryLayer?.addEventListener("pointerover", (e) => {
@@ -27436,11 +27436,11 @@
     return clientX >= r.left && clientX <= r.right && clientY >= r.top && clientY <= r.bottom;
   }
   function applyModifierDrivenPopoverCloseRules(reason) {
-    if (reason === "ctrl_pressed") {
+    if (reason === "shift_pressed") {
       refreshStackCalloutIfOpen();
       return;
     }
-    if (reason === "ctrl_released") {
+    if (reason === "shift_released") {
       hideStackCallout();
       return;
     }
@@ -27452,7 +27452,7 @@
     if (el) el.classList.add("stack-modal");
   }
   function onStackSingleUnitToggleClick(unitId, inSelection, allUnitsAtHex, clientX, clientY) {
-    if (!rendererSharedState.ctrlKeyActive) {
+    if (!rendererSharedState.shiftKeyActive) {
       if (inSelection) {
         removeUnitsFromSelection2([unitId]);
       } else {
@@ -27736,7 +27736,7 @@
     });
     header.appendChild(closeBtn);
     const humanIds = sorted.filter((u) => u.player === "human").map((u) => u.id);
-    if (humanIds.length > 0 && !rendererSharedState.ctrlKeyActive) {
+    if (humanIds.length > 0 && !rendererSharedState.shiftKeyActive) {
       const selectAllBtn = document.createElement("button");
       selectAllBtn.type = "button";
       selectAllBtn.className = "unit-select";
@@ -27849,8 +27849,8 @@
   function showBuildPopup(h3Index, clientX, clientY) {
     getBuildQueuePopupController().showBuildPopup(h3Index, clientX, clientY);
   }
-  async function handleBuildEntryClick(h3Index, clientX, clientY, ctrlKey) {
-    await getBuildQueuePopupController().handleBuildEntryClick(h3Index, clientX, clientY, ctrlKey);
+  async function handleBuildEntryClick(h3Index, clientX, clientY, shiftKey) {
+    await getBuildQueuePopupController().handleBuildEntryClick(h3Index, clientX, clientY, shiftKey);
   }
   function refreshBuildPopupIfOpen() {
     getBuildQueuePopupController().refreshBuildPopupIfOpen();
@@ -28347,12 +28347,12 @@
   function containerPixelHitsDrawnUnitIcon2(px, py, h3Index, unitCount) {
     return containerPixelHitsDrawnUnitIcon(px, py, h3Index, unitCount);
   }
-  function tryHandleBuildEntryAtClientXY2(clientX, clientY, eventCtrlKey = false) {
+  function tryHandleBuildEntryAtClientXY2(clientX, clientY, eventShiftKey = false) {
     return tryHandleBuildEntryAtClientXY(clientX, clientY, {
       backgroundColor: BACKGROUND_COLOR,
       buildResolutionPlaybackState: buildResolutionPlaybackState2,
       handleBuildEntryClick
-    }, eventCtrlKey);
+    }, eventShiftKey);
   }
   function refreshStrategicOrderSidebars() {
     updatePendingOrdersSidebar2();

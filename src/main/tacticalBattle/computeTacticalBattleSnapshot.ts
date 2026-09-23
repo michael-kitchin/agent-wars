@@ -23,6 +23,8 @@ import {
   tacticalLandUnitMayOccupyCellWithoutTransport,
   tacticalTerrainTransportResolverFnsFromRoadRailMap,
 } from '../../shared/tacticalTerrainMovement';
+import { logDebug } from '../logger';
+import { claimInitialPlacementHex, type InitialPlacementSide } from '../../shared/initialPlacementSides';
 import { tacticalLogError, tacticalLogMutate, tacticalLogQuery } from './tacticalLogging';
 
 const WORLD_H3_RESOLUTION = 1;
@@ -317,6 +319,39 @@ function orderRes4CellsForPlacement(args: {
 }
 
 /**
+ * Walks ordered opening cells until one is passable and not already held by the other side.
+ *
+ * Purpose: Tactical opening placement uses it so a sub-unit never lands on a cell the other side already holds; same-side stacking still wraps onto this side's cells.
+ * When to use: Inside the parent placement loop, with one occupancy map shared by every parent in the battle.
+ * Expected outcome: The chosen cell and the cursor already advanced past it, or null when the list is empty or the cursor bound is reached.
+ * Exceptions: None.
+ */
+export function takeNextOpeningCell(args: {
+  orderedCells: readonly string[];
+  cellCursor: number;
+  maxCursor: number;
+  passable: (cell: string) => boolean;
+  occupiedByHex: Map<string, InitialPlacementSide>;
+  placingSide: InitialPlacementSide;
+}): { cell: string; nextCursor: number } | null {
+  logDebug('takeNextOpeningCell', {
+    placingSide: args.placingSide,
+    cellCursor: args.cellCursor,
+    cellCount: args.orderedCells.length,
+  });
+  if (args.orderedCells.length === 0) return null;
+  let cursor = args.cellCursor;
+  while (cursor < args.maxCursor) {
+    const cell = args.orderedCells[cursor % args.orderedCells.length]!;
+    cursor += 1;
+    if (!args.passable(cell)) continue;
+    if (!claimInitialPlacementHex(args.occupiedByHex, cell, args.placingSide)) continue;
+    return { cell, nextCursor: cursor };
+  }
+  return null;
+}
+
+/**
  * Builds a complete tactical battle snapshot for the given enclosing res1 hex, or returns null with reasons on failure.
  *
  * Contract: Read-only against SQLite and in-memory previous-hex memory; synthesizes temporary sub-units without writing strategic unit rows.
@@ -424,6 +459,7 @@ export function computeTacticalBattleSnapshot(
     });
     const subUnits: TacticalSubUnitSnapshot[] = [];
     const skippedParentDisplayNames: string[] = [];
+    const occupiedByHex = new Map<string, InitialPlacementSide>();
     for (const parent of inHex) {
       const n = tacticalSubUnitCountForStrategicUnitType(parent.unitType);
       if (n <= 0) continue;
@@ -443,37 +479,40 @@ export function computeTacticalBattleSnapshot(
       const parentName = parentLookup.get(parent.id) ?? parent.id;
       let placed = 0;
       let cellCursor = 0;
+      const placingSide: InitialPlacementSide = parent.player === 'human' ? 'human' : 'opponent';
       while (placed < n) {
-        if (cellCursor >= orderedForParent.length * 3) break;
-        const cell = orderedForParent[cellCursor % orderedForParent.length]!;
-        cellCursor += 1;
-        const effKind = res4KindByH3.get(cell) ?? hexRow.terrain_kind;
-        const seaportHere = !!res4IsSeaportByH3[cell];
-        const airportHere = !!res4IsAirportByH3[cell];
-        if (
-          !isRes4CellPassableForUnitType({
-            unitType: parent.unitType,
-            effectiveKind: effKind,
-            parentTerrain: hexRow.terrain,
-            parentTerrainKind: hexRow.terrain_kind,
-            isSeaportCell: seaportHere,
-            isAirportCell: airportHere,
-            cellH3: cell,
-            childFootprint: childSet,
-            placementTerrain,
-            roadRailByH3,
-            rubbleByH3: urbanRubbleForPlacement.res4IsRubbleByH3,
-          })
-        ) {
-          continue;
-        }
+        const next = takeNextOpeningCell({
+          orderedCells: orderedForParent,
+          cellCursor,
+          maxCursor: orderedForParent.length * 3,
+          passable: (cell) => {
+            const effKind = res4KindByH3.get(cell) ?? hexRow.terrain_kind;
+            return isRes4CellPassableForUnitType({
+              unitType: parent.unitType,
+              effectiveKind: effKind,
+              parentTerrain: hexRow.terrain,
+              parentTerrainKind: hexRow.terrain_kind,
+              isSeaportCell: !!res4IsSeaportByH3[cell],
+              isAirportCell: !!res4IsAirportByH3[cell],
+              cellH3: cell,
+              childFootprint: childSet,
+              placementTerrain,
+              roadRailByH3,
+              rubbleByH3: urbanRubbleForPlacement.res4IsRubbleByH3,
+            });
+          },
+          occupiedByHex,
+          placingSide,
+        });
+        if (!next) break;
+        cellCursor = next.nextCursor;
         placed += 1;
         subUnits.push({
           id: formatTacticalSubUnitId(parent.id, placed),
           parentUnitId: parent.id,
-          player: parent.player === 'human' ? 'human' : 'opponent',
+          player: placingSide,
           unitType: parent.unitType,
-          h3Index: cell,
+          h3Index: next.cell,
           displayName: formatTacticalSubUnitDisplayName(parentName, placed),
         });
       }

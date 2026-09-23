@@ -64,6 +64,15 @@ test('computeTacticalBattleSnapshot is deterministic for identical battle id and
     const a = computeTacticalBattleSnapshot(targetRes1H3, battleId);
     const b = computeTacticalBattleSnapshot(targetRes1H3, battleId);
     assert.ok(a.snapshot && b.snapshot);
+    const players = new Set(a.snapshot.subUnits.map((sub) => sub.player));
+    assert.ok(players.has('human') && players.has('opponent'));
+    const sidesByHex = new Map<string, Set<string>>();
+    for (const sub of a.snapshot.subUnits) {
+      const sides = sidesByHex.get(sub.h3Index) ?? new Set<string>();
+      sides.add(sub.player);
+      sidesByHex.set(sub.h3Index, sides);
+      assert.equal(sides.size, 1, sub.h3Index);
+    }
     const pa = a.snapshot.subUnits.map((u) => ({ id: u.id, h3Index: u.h3Index }));
     const pb = b.snapshot.subUnits.map((u) => ({ id: u.id, h3Index: u.h3Index }));
     assert.deepEqual(pa, pb);

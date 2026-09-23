@@ -121,15 +121,15 @@ export type HumanUnitIconSelectionSideEffects = {
 };
 
 /**
- * Applies human unit icon click selection rules for non-ctrl clicks (debounced single-select + second-click flush).
+ * Applies human unit icon click selection rules for non-shift clicks (debounced single-select + second-click flush).
  *
  * Purpose: Extracted from `mainMapInteractions` to keep tactical/strategic selection drift-proof.
  * When to use: After confirming `unit.player === 'human'` and icon pixel hit-test success.
- * Expected outcome: Ctrl path is handled by the caller; non-ctrl path schedules or flushes deferred selection.
+ * Expected outcome: Shift path is handled by the caller; non-shift path schedules or flushes deferred selection.
  * Exceptions: None.
  */
 export function applyHumanUnitIconClickSelectionPolicy(args: {
-  ctrlKey: boolean;
+  shiftKey: boolean;
   unitId: string;
   /**
    * True when this click is the second press of a double-click, so it must neither replace the
@@ -145,12 +145,12 @@ export function applyHumanUnitIconClickSelectionPolicy(args: {
     clearDeferredHumanUnitSingleSelectTimer();
     return;
   }
-  if (args.ctrlKey) {
+  if (args.shiftKey) {
     if (shouldBlockToggleSelectionDuringHoverPlanning(args.unitId)) {
       return;
     }
     clearDeferredHumanUnitSingleSelectTimer();
-    emitParityDiagnosticsBreadcrumb('selection.ctrlToggle', {
+    emitParityDiagnosticsBreadcrumb('selection.shiftToggle', {
       unitId: args.unitId,
     });
     args.deps.toggleUnitSelection(args.unitId);

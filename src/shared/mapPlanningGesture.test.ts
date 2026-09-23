@@ -100,7 +100,7 @@ describe('resolveMapGesturePress', () => {
     snapshotAnchorClientY: 300,
     snapshotUnitCount: 2,
     liveSelectionDiffersFromSnapshot: false,
-    ctrlKey: false,
+    shiftKey: false,
     clientX: 400,
     clientY: 300,
     nowMs: 1_200,
@@ -141,9 +141,9 @@ describe('resolveMapGesturePress', () => {
     );
   });
 
-  it('takes a fresh snapshot for ctrl presses and when nothing was selected', () => {
+  it('takes a fresh snapshot for shift presses and when nothing was selected', () => {
     const fresh = { refreshSnapshot: true, restoreSnapshotSelection: false, suppressIconRetarget: false };
-    assert.deepEqual(resolveMapGesturePress({ ...secondPressInPlace, ctrlKey: true }), fresh);
+    assert.deepEqual(resolveMapGesturePress({ ...secondPressInPlace, shiftKey: true }), fresh);
     assert.deepEqual(
       resolveMapGesturePress({
         ...secondPressInPlace,

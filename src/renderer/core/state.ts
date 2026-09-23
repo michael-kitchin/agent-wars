@@ -455,7 +455,7 @@ selectedHexIndex: null as string | null,
    * Ordered res1 hex ids controlled by the build-popup multi-selection (insertion order).
    *
    * Purpose: Keeps production-hex selection independent from unit selection and the scalar map hex.
-   * When to use: Build-entry button chrome, Ctrl-toggle policy, and multi-hex popup rendering.
+   * When to use: Build-entry button chrome, Shift-toggle policy, and multi-hex popup rendering.
    * Expected outcome: Append on add and filter on remove preserve insertion order; the last entry is the
    * deselect re-anchor. Plain click replaces the set and popup close clears it.
    * Exceptions: Only build-entry button interactions may add or remove members.
@@ -534,14 +534,14 @@ gestureSelectionAnchorClientX: 0,
    */
 gestureSelectionAnchorClientY: 0,
     /**
-   * Documents the object literal property `ctrlKeyActive` (ctrlKeyActive: false).
-
-   * Purpose: Supports maintainability by documenting why `ctrlKeyActive` exists.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * True while Shift is held as the multi-select modifier.
+   *
+   * Purpose: Hides committed paths and hover previews, and switches the stack callout from Select All to Add All / Remove All.
+   * When to use: Set on Shift keydown, cleared on Shift keyup and window blur. Clicks also read `event.shiftKey`.
+   * Expected outcome: `false` whenever Shift is up and the window is focused.
    * Exceptions: None.
    */
-ctrlKeyActive: false,
+shiftKeyActive: false,
     /**
    * Documents the object literal property `pendingSelectTimeout` (pendingSelectTimeout: null as ReturnType<typeof setTimeout> | null).
 

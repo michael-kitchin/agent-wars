@@ -266,7 +266,7 @@ export function isPendingMovementOrderForDisplay(order: HumanStandingOrderSnapsh
  */
 export function applySelectionFromSidebarUnitButton(unitId: string, event: MouseEvent, deps: SelectionActionDeps): void {
   if (shouldBlockEmbarkedLandUnitSelect(unitId)) return;
-  const useMultiSelect = event.ctrlKey || S.ctrlKeyActive;
+  const useMultiSelect = event.shiftKey || S.shiftKeyActive;
   if (useMultiSelect) {
     if (shouldBlockToggleSelectionDuringHoverPlanning(unitId)) return;
     deps.toggleUnitSelection(unitId);

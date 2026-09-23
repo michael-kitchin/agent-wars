@@ -364,7 +364,7 @@ function formatStackTooltip(units: GameStateSnapshot['units']): string {
  * Closes the stack unit list popup and invalidates in-flight sealift renders.
  *
  * Purpose: Hide stack chrome and prevent a late `getSealiftStackState` result from appending into a closed popup.
- * When to use: Dismissing the stack callout, including hover-planning and Ctrl-release.
+ * When to use: Dismissing the stack callout, including hover-planning and Shift-release.
  * Expected outcome: Popup hidden; `sealiftSectionRenderGeneration` advanced so stale sealift awaits return without appending.
  * Exceptions: None.
  */
@@ -456,22 +456,22 @@ function isClientPointInsideMainMapLeafletContainer(clientX: number, clientY: nu
 }
 
 /**
- * Defines the `applyModifierDrivenPopoverCloseRules` function shape (function applyModifierDrivenPopoverCloseRules(reason: 'ctrl_pressed' | 'ctrl_released' | 'window_blur'): void).
+ * Defines the `applyModifierDrivenPopoverCloseRules` function shape (function applyModifierDrivenPopoverCloseRules(reason: 'shift_pressed' | 'shift_released' | 'window_blur'): void).
 
- * Purpose: Ctrl-pressed rebuilds stack chrome (Select All vs Add All/Remove All); Ctrl-released
+ * Purpose: Shift-pressed rebuilds stack chrome (Select All vs Add All/Remove All); Shift-released
  * closes the stack callout; blur refreshes without assuming the modifier is still down.
- * When to use: Window Control keydown/keyup and window blur. Call `ctrl_pressed` only on the
- * inactive→active Control transition — key-repeat rebuilds cancel clicks on the open popup.
+ * When to use: Window Shift keydown/keyup and window blur. Call `shift_pressed` only on the
+ * inactive→active Shift transition — key-repeat rebuilds cancel clicks on the open popup.
  * Expected outcome: Stack/build popovers follow modifier rules without a full rebuild on every
- * Control repeat while the key is held.
+ * Shift repeat while the key is held.
  * Exceptions: None.
  */
-function applyModifierDrivenPopoverCloseRules(reason: 'ctrl_pressed' | 'ctrl_released' | 'window_blur'): void {
-  if (reason === 'ctrl_pressed') {
+function applyModifierDrivenPopoverCloseRules(reason: 'shift_pressed' | 'shift_released' | 'window_blur'): void {
+  if (reason === 'shift_pressed') {
     refreshStackCalloutIfOpen();
     return;
   }
-  if (reason === 'ctrl_released') {
+  if (reason === 'shift_released') {
     hideStackCallout();
     return;
   }
@@ -507,7 +507,7 @@ function onStackSingleUnitToggleClick(
   clientX: number,
   clientY: number
 ): void {
-  if (!S.ctrlKeyActive) {
+  if (!S.shiftKeyActive) {
     if (inSelection) {
       removeUnitsFromSelection([unitId]);
     } else {
@@ -898,7 +898,7 @@ function showStackCallout(
   header.appendChild(closeBtn);
 
   const humanIds = sorted.filter((u) => u.player === 'human').map((u) => u.id);
-  if (humanIds.length > 0 && !S.ctrlKeyActive) {
+  if (humanIds.length > 0 && !S.shiftKeyActive) {
     const selectAllBtn = document.createElement('button');
     selectAllBtn.type = 'button';
     selectAllBtn.className = 'unit-select';
@@ -966,7 +966,7 @@ function showStackCallout(
 /**
  * Resolves stored stack-callout unit ids to drawable rows for both strategic units and tactical sub-units.
  *
- * Purpose: `refreshStackCalloutIfOpen` runs on Control keydown (`ctrl_pressed`); tactical stacks store sub-unit ids that
+ * Purpose: `refreshStackCalloutIfOpen` runs on Shift keydown (`shift_pressed`); tactical stacks store sub-unit ids that
  * are not rows in `gameState.units`, so resolving only from strategic state incorrectly yields zero rows and closes the popup.
  * When to use: Only from `refreshStackCalloutIfOpen`.
  * Expected outcome: Same unit rows `showStackCallout` would receive when opening from map hit-testing in tactical mode.
@@ -1055,7 +1055,7 @@ function showBuildPopup(h3Index: string, clientX: number, clientY: number): void
 }
 
 /**
- * Routes a build-entry activation through the shared plain/Ctrl selection policy.
+ * Routes a build-entry activation through the shared plain/Shift selection policy.
  *
  * Purpose: Keeps direct DOM clicks and canvas hit-testing on one production-selection implementation.
  * When to use: Every build-entry button activation.
@@ -1066,9 +1066,9 @@ async function handleBuildEntryClick(
   h3Index: string,
   clientX: number,
   clientY: number,
-  ctrlKey: boolean
+  shiftKey: boolean
 ): Promise<void> {
-  await getBuildQueuePopupController().handleBuildEntryClick(h3Index, clientX, clientY, ctrlKey);
+  await getBuildQueuePopupController().handleBuildEntryClick(h3Index, clientX, clientY, shiftKey);
 }
 
 /**
@@ -2096,7 +2096,7 @@ function containerPixelHitsDrawnUnitIcon(
 }
 
 /**
- * Defines the `tryHandleBuildEntryAtClientXY` function shape (function tryHandleBuildEntryAtClientXY(clientX: number, clientY: number, eventCtrlKey?: boolean): boolean).
+ * Defines the `tryHandleBuildEntryAtClientXY` function shape (function tryHandleBuildEntryAtClientXY(clientX: number, clientY: number, eventShiftKey?: boolean): boolean).
 
  * Purpose: Supports maintainability by documenting why `tryHandleBuildEntryAtClientXY` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
@@ -2106,13 +2106,13 @@ function containerPixelHitsDrawnUnitIcon(
 function tryHandleBuildEntryAtClientXY(
   clientX: number,
   clientY: number,
-  eventCtrlKey = false
+  eventShiftKey = false
 ): boolean {
   return tryHandleBuildEntryAtClientXYFromModule(clientX, clientY, {
     backgroundColor: BACKGROUND_COLOR,
     buildResolutionPlaybackState,
     handleBuildEntryClick,
-  }, eventCtrlKey);
+  }, eventShiftKey);
 }
 
 /**
@@ -3150,8 +3150,8 @@ function initOpenRouterUI(): void {
  */
 function init(): void {
   // Contract anchors retained after extraction:
-  // applyModifierDrivenPopoverCloseRules('ctrl_pressed');
-  // applyModifierDrivenPopoverCloseRules('ctrl_released');
+  // applyModifierDrivenPopoverCloseRules('shift_pressed');
+  // applyModifierDrivenPopoverCloseRules('shift_released');
   wireInitCoreFromModule({
     requestRedraw,
     resizeAndRedraw,

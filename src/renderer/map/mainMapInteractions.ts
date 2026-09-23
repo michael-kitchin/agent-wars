@@ -227,14 +227,14 @@ getUnitsForDrawWithMovingIds: (state: GameStateSnapshot) => {
     movingIds: Set<string> | undefined;
   };
     /**
-   * Specifies the contract for the `tryHandleBuildEntryAtClientXY` member (tryHandleBuildEntryAtClientXY: (clientX: number, clientY: number, eventCtrlKey?: boolean) => boolean;).
+   * Specifies the contract for the `tryHandleBuildEntryAtClientXY` member (tryHandleBuildEntryAtClientXY: (clientX: number, clientY: number, eventShiftKey?: boolean) => boolean;).
 
    * Contract: Describes stable behavior for callers of `tryHandleBuildEntryAtClientXY` in this codebase.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-tryHandleBuildEntryAtClientXY: (clientX: number, clientY: number, eventCtrlKey?: boolean) => boolean;
+tryHandleBuildEntryAtClientXY: (clientX: number, clientY: number, eventShiftKey?: boolean) => boolean;
     /**
    * Specifies the contract for the `tryHandleTacticalEntryAtClientXY` member (tryHandleTacticalEntryAtClientXY: (clientX: number, clientY: number) => Promise<boolean>;).
 
@@ -579,7 +579,7 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
         S.selectedUnitIdsAtMouseDown,
         S.selectedUnitIds
       ),
-      ctrlKey: e.ctrlKey,
+      shiftKey: e.shiftKey,
       clientX: e.clientX,
       clientY: e.clientY,
       nowMs: pressAtMs,
@@ -685,7 +685,7 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
       return;
     }
 
-    if (deps.tryHandleBuildEntryAtClientXY(e.clientX, e.clientY, e.ctrlKey)) {
+    if (deps.tryHandleBuildEntryAtClientXY(e.clientX, e.clientY, e.shiftKey)) {
       deps.updateSidebar();
       deps.updateRangedSidebar();
       deps.redraw();
@@ -700,9 +700,9 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
         return;
       }
       if (!suppressIconRetargetOnNextClick) {
-        const calloutCtrlKey = e.ctrlKey;
+        const calloutShiftKey = e.shiftKey;
         scheduleDeferredStackCallout(e.clientX, e.clientY, (calloutClientX, calloutClientY) => {
-          S.ctrlKeyActive = calloutCtrlKey;
+          S.shiftKeyActive = calloutShiftKey;
           deps.showStackCallout(unitsAtHit, calloutClientX, calloutClientY);
           deps.updateSidebar();
           deps.updateRangedSidebar();
@@ -721,7 +721,7 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
       const unitIconHit = pointerHitsDrawnUnitIcon(e.clientX, e.clientY, hit);
       if (unit?.player === 'human' && unitIconHit) {
         applyHumanUnitIconClickSelectionPolicy({
-          ctrlKey: e.ctrlKey,
+          shiftKey: e.shiftKey,
           unitId: unit.id,
           suppressSelectionRetarget: suppressIconRetargetOnNextClick,
           deps: {

@@ -6,9 +6,11 @@ import {
   tacticalLandUnitMayOccupyCellWithoutTransport,
   type TacticalTerrainKindResolver,
 } from '../../shared/tacticalTerrainMovement';
+import type { InitialPlacementSide } from '../../shared/initialPlacementSides';
 import {
   tacticalSnapshotHasPlacedUnitsForBothSides,
   tacticalSubUnitCountForStrategicUnitType,
+  takeNextOpeningCell,
 } from './computeTacticalBattleSnapshot';
 
 test('tacticalSubUnitCountForStrategicUnitType maps known strategic types to positive tactical counts', () => {
@@ -20,6 +22,92 @@ test('tacticalSubUnitCountForStrategicUnitType maps known strategic types to pos
 
 test('tacticalSubUnitCountForStrategicUnitType returns zero for unknown types', () => {
   assert.equal(tacticalSubUnitCountForStrategicUnitType('unknown'), 0);
+});
+
+test('takeNextOpeningCell gives the other side a different cell and lets the same side reuse one', () => {
+  const passable = () => true;
+  const occupiedByHex = new Map<string, InitialPlacementSide>();
+  const humanFirst = takeNextOpeningCell({
+    orderedCells: ['a', 'b'],
+    cellCursor: 0,
+    maxCursor: 6,
+    passable,
+    occupiedByHex,
+    placingSide: 'human',
+  });
+  assert.deepEqual(humanFirst, { cell: 'a', nextCursor: 1 });
+  const opponentNext = takeNextOpeningCell({
+    orderedCells: ['a', 'b'],
+    cellCursor: 0,
+    maxCursor: 6,
+    passable,
+    occupiedByHex,
+    placingSide: 'opponent',
+  });
+  assert.deepEqual(opponentNext, { cell: 'b', nextCursor: 2 });
+  const humanAgain = takeNextOpeningCell({
+    orderedCells: ['a'],
+    cellCursor: 0,
+    maxCursor: 3,
+    passable,
+    occupiedByHex,
+    placingSide: 'human',
+  });
+  assert.deepEqual(humanAgain, { cell: 'a', nextCursor: 1 });
+  assert.equal(occupiedByHex.get('a'), 'human');
+});
+
+test('takeNextOpeningCell returns null when the only passable cell is held by the other side', () => {
+  const occupiedByHex = new Map<string, InitialPlacementSide>();
+  assert.deepEqual(
+    takeNextOpeningCell({
+      orderedCells: ['a'],
+      cellCursor: 0,
+      maxCursor: 3,
+      passable: () => true,
+      occupiedByHex,
+      placingSide: 'human',
+    }),
+    { cell: 'a', nextCursor: 1 }
+  );
+  assert.equal(
+    takeNextOpeningCell({
+      orderedCells: ['a'],
+      cellCursor: 0,
+      maxCursor: 3,
+      passable: () => true,
+      occupiedByHex,
+      placingSide: 'opponent',
+    }),
+    null
+  );
+  assert.equal(occupiedByHex.get('a'), 'human');
+});
+
+test('takeNextOpeningCell skips an impassable cell and rejects an empty list', () => {
+  const occupiedByHex = new Map<string, InitialPlacementSide>();
+  assert.deepEqual(
+    takeNextOpeningCell({
+      orderedCells: ['a', 'b'],
+      cellCursor: 0,
+      maxCursor: 6,
+      passable: (cell: string) => cell !== 'a',
+      occupiedByHex,
+      placingSide: 'human',
+    }),
+    { cell: 'b', nextCursor: 2 }
+  );
+  assert.equal(
+    takeNextOpeningCell({
+      orderedCells: [],
+      cellCursor: 0,
+      maxCursor: 3,
+      passable: () => true,
+      occupiedByHex,
+      placingSide: 'human',
+    }),
+    null
+  );
 });
 
 test('isInfantryOrArmorTacticalSpawnCell rejects water and arctic normalized tiles', () => {

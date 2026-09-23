@@ -1,7 +1,7 @@
 /**
  * Canvas overlay policy for committed march lines vs hover path preview (strategic + tactical).
  *
- * Purpose: Centralizes ctrl/selection/hover gating so `drawGameScene` and hover preview stay aligned.
+ * Purpose: Centralizes shift/selection/hover gating so `drawGameScene` and hover preview stay aligned.
  * When to use: From `renderer.ts` and any draw path that must match sidebar selection semantics.
  * Expected outcome: Boolean helpers reflect `rendererSharedState` only; no DOM or canvas side effects.
  * Exceptions: None.
@@ -12,25 +12,25 @@ import { rendererSharedState as S } from '../core/state';
 /**
  * Whether standing-order / committed paths should be drawn on the overlay canvas.
  *
- * Purpose: Hides committed paths while ctrl is held so stack-selection mode stays readable.
+ * Purpose: Hides committed paths while Shift is held so stack-selection mode stays readable.
  * When to use: Inside `drawGameScene` before `drawStandingOrderLines`.
- * Expected outcome: `false` when ctrl is held; otherwise `true`.
+ * Expected outcome: `false` when Shift is held; otherwise `true`.
  * Exceptions: None.
  */
 export function shouldDrawCommittedOrderPaths(): boolean {
-  return !S.ctrlKeyActive;
+  return !S.shiftKeyActive;
 }
 
 /**
  * Whether the hovered march preview polyline should be drawn for the current selection.
  *
- * Purpose: Suppresses preview when ctrl is held or nothing is selected.
+ * Purpose: Suppresses preview when Shift is held or nothing is selected.
  * When to use: `drawGameScene` and `drawHoverRoutePreview` entry.
- * Expected outcome: `true` only when ctrl is up and at least one unit is selected.
+ * Expected outcome: `true` only when Shift is up and at least one unit is selected.
  * Exceptions: None.
  */
 export function shouldDrawHoveredPathPreview(): boolean {
-  return !S.ctrlKeyActive && S.selectedUnitIds.length > 0;
+  return !S.shiftKeyActive && S.selectedUnitIds.length > 0;
 }
 
 /**
@@ -53,7 +53,7 @@ export function getCommittedOrderUnitsHiddenDuringPreview(
  *
  * Purpose: Gates UI that must not interrupt in-progress march/ferry/ranged/air-strike hover planning.
  * When to use: Selection mutations, tactical entry, and build-queue open handlers while the pointer targets a hex.
- * Expected outcome: `true` when preview lines or invalid markers would draw for the current hover target; false while Ctrl suppresses preview drawing.
+ * Expected outcome: `true` when preview lines or invalid markers would draw for the current hover target; false while Shift suppresses preview drawing.
  * Exceptions: None.
  */
 export function isHoverOrderPlanningActive(): boolean {
@@ -82,7 +82,7 @@ export function shouldBlockSelectionReplaceDuringHoverPlanning(proposedUnitIds: 
 /**
  * Returns whether toggling a unit into the selection should be blocked during hover planning.
  *
- * Purpose: Blocks Ctrl-toggle adds while allowing toggle-off deselect of units already in the selection.
+ * Purpose: Blocks Shift-toggle adds while allowing toggle-off deselect of units already in the selection.
  * When to use: Before `toggleUnitSelection` from map or sidebar handlers.
  * Expected outcome: `true` when the unit is not currently selected and hover planning is active.
  * Exceptions: None.

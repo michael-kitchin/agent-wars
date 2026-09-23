@@ -56,7 +56,7 @@ export type MapGesturePressInput = {
   snapshotAnchorClientY: number;
   snapshotUnitCount: number;
   liveSelectionDiffersFromSnapshot: boolean;
-  ctrlKey: boolean;
+  shiftKey: boolean;
   clientX: number;
   clientY: number;
   nowMs: number;
@@ -149,7 +149,7 @@ export function resolveMapDoubleClickAction(input: MapDoubleClickDecisionInput):
  *
  * Purpose: The second press must plan for the units the player had selected, not for whatever icon sits under the cursor, while two separate clicks in different places keep behaving normally.
  * When to use: On every primary-button press on the main map. Pass `snapshotAtMs` `0` when no gesture is open.
- * Expected outcome: A press continues the gesture only when it is inside the time window, within the pixel tolerance, without Ctrl, and the snapshot holds at least one unit. Continuing presses suppress icon retarget and restore the snapshot when a deferred select already changed the live selection.
+ * Expected outcome: A press continues the gesture only when it is inside the time window, within the pixel tolerance, without Shift, and the snapshot holds at least one unit. Continuing presses suppress icon retarget and restore the snapshot when a deferred select already changed the live selection.
  * Exceptions: None.
  */
 export function resolveMapGesturePress(input: MapGesturePressInput): MapGesturePressDecision {
@@ -158,7 +158,7 @@ export function resolveMapGesturePress(input: MapGesturePressInput): MapGestureP
   const withinAnchor =
     Math.abs(input.clientX - input.snapshotAnchorClientX) <= MAP_DOUBLE_CLICK_ANCHOR_TOLERANCE_PX &&
     Math.abs(input.clientY - input.snapshotAnchorClientY) <= MAP_DOUBLE_CLICK_ANCHOR_TOLERANCE_PX;
-  const continuesGesture = withinWindow && withinAnchor && !input.ctrlKey && input.snapshotUnitCount > 0;
+  const continuesGesture = withinWindow && withinAnchor && !input.shiftKey && input.snapshotUnitCount > 0;
   if (!continuesGesture) {
     return { refreshSnapshot: true, restoreSnapshotSelection: false, suppressIconRetarget: false };
   }

@@ -6,7 +6,7 @@ import { isEditableKeyboardTarget, shouldIgnoreGlobalKeydown } from './mapHelper
 import { rendererSharedState as S } from '../core/state';
 import { hidePlanningChromeToasts } from '../openRouter/openRouterUiHelpers';
 import { isHoverOrderPlanningActive } from '../rendering/canvasPreviewPolicy';
-import { shouldRefreshStackCalloutOnControlKeydown } from '../../shared/stackCalloutCtrlKeydown';
+import { shouldRefreshStackCalloutOnShiftKeydown } from '../../shared/stackCalloutShiftKeydown';
 import { basemapCssFilterForStyle } from '../../shared/basemapStyleLogic';
 import { getActiveTerrainStyleBasemapId, getActiveTerrainStyleId, renderTerrainLegend } from '../rendering/terrainVisualStyles';
 import {
@@ -184,14 +184,14 @@ hideBuildPopup: () => void;
    */
 hideStackCallout: () => void;
     /**
-   * Specifies the contract for the `applyModifierDrivenPopoverCloseRules` member (applyModifierDrivenPopoverCloseRules: (reason: 'ctrl_pressed' | 'ctrl_released' | 'window_blur') => void;).
+   * Specifies the contract for the `applyModifierDrivenPopoverCloseRules` member (applyModifierDrivenPopoverCloseRules: (reason: 'shift_pressed' | 'shift_released' | 'window_blur') => void;).
 
    * Contract: Describes stable behavior for callers of `applyModifierDrivenPopoverCloseRules` in this codebase.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-applyModifierDrivenPopoverCloseRules: (reason: 'ctrl_pressed' | 'ctrl_released' | 'window_blur') => void;
+applyModifierDrivenPopoverCloseRules: (reason: 'shift_pressed' | 'shift_released' | 'window_blur') => void;
     /**
    * Specifies the contract for the `isMapInspectionModeHeld` member (isMapInspectionModeHeld: () => boolean;).
 
@@ -256,14 +256,14 @@ hideTerrainTooltipVisual: () => void;
    */
 showBuildPopup: (h3Index: string, clientX: number, clientY: number) => void;
     /**
-   * Applies plain/Ctrl build-entry selection semantics and popup synchronization.
+   * Applies plain/Shift build-entry selection semantics and popup synchronization.
    *
    * Contract: This is the only build-entry membership-changing path for direct DOM clicks.
    * When to use: Build-entry layer click handler after resolving the target H3 index.
    * Expected outcome: Same behavior as the canvas hit-test path.
    * Exceptions: Async mutation failures are reported by the controller.
    */
-handleBuildEntryClick: (h3Index: string, clientX: number, clientY: number, ctrlKey: boolean) => Promise<void>;
+handleBuildEntryClick: (h3Index: string, clientX: number, clientY: number, shiftKey: boolean) => Promise<void>;
     /**
    * Specifies the contract for the `updateMapInteractionCursor` member (updateMapInteractionCursor: (clientX: number, clientY: number) => void;).
 
@@ -456,19 +456,20 @@ export function wireInitCore(deps: InitCoreDeps): void {
       }
     }
     if (shouldIgnoreGlobalKeydown(e)) return;
-    if (e.key === 'Control' || e.key === 'Alt' || e.key === 'Meta') {
+    if (e.key === 'Shift' || e.key === 'Control' || e.key === 'Alt' || e.key === 'Meta') {
       clearMapKeyboardPan();
-      if (e.key === 'Control') {
-        const ctrlKeyAlreadyActive = S.ctrlKeyActive;
-        S.ctrlKeyActive = true;
-        if (shouldRefreshStackCalloutOnControlKeydown(ctrlKeyAlreadyActive)) {
-          deps.applyModifierDrivenPopoverCloseRules('ctrl_pressed');
+      if (e.key === 'Shift') {
+        const shiftKeyAlreadyActive = S.shiftKeyActive;
+        S.shiftKeyActive = true;
+        if (shouldRefreshStackCalloutOnShiftKeydown(shiftKeyAlreadyActive)) {
+          deps.applyModifierDrivenPopoverCloseRules('shift_pressed');
         }
       }
       return;
     }
     if (e.repeat) return;
-    if (e.ctrlKey || e.altKey || e.metaKey) return;
+    // Ctrl stays here so Ctrl+letter does not pan the map or hide terrain. It is not a game gesture.
+    if (e.shiftKey || e.ctrlKey || e.altKey || e.metaKey) return;
     const key = e.key.toLowerCase();
     if (key === 't') {
       S.hideTerrainFillWhileHeld = true;
@@ -482,9 +483,9 @@ export function wireInitCore(deps: InitCoreDeps): void {
     }
   });
   window.addEventListener('keyup', (e) => {
-    if (e.key === 'Control') {
-      S.ctrlKeyActive = false;
-      deps.applyModifierDrivenPopoverCloseRules('ctrl_released');
+    if (e.key === 'Shift') {
+      S.shiftKeyActive = false;
+      deps.applyModifierDrivenPopoverCloseRules('shift_released');
       return;
     }
     if (e.key.toLowerCase() === 't') {
@@ -498,7 +499,7 @@ export function wireInitCore(deps: InitCoreDeps): void {
   window.addEventListener('blur', () => {
     clearMapKeyboardPan();
     dismissTerrainTooltipWhenPointerLeavesMapPanel(deps);
-    S.ctrlKeyActive = false;
+    S.shiftKeyActive = false;
     deps.applyModifierDrivenPopoverCloseRules('window_blur');
     if (!deps.isMapInspectionModeHeld()) return;
     S.hideTerrainFillWhileHeld = false;
@@ -571,7 +572,7 @@ export function wireInitCore(deps: InitCoreDeps): void {
     const h3 = btn.dataset.h3Index;
     if (!h3) return;
     if (isHoverOrderPlanningActive()) return;
-    void deps.handleBuildEntryClick(h3, e.clientX, e.clientY, e.ctrlKey || S.ctrlKeyActive);
+    void deps.handleBuildEntryClick(h3, e.clientX, e.clientY, e.shiftKey || S.shiftKeyActive);
   });
 
   const tacticalEntryLayer = document.getElementById('tactical-entry-layer');

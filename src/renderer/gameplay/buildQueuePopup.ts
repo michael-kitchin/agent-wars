@@ -456,7 +456,7 @@ export function createBuildQueuePopupHandler(deps: BuildQueuePopupDeps) {
    * Resolves client coordinates for a build-entry button so the popup can re-anchor after selection changes.
    *
    * Purpose: Keeps deselect repositioning on the last remaining selected hex instead of the click that removed one.
-   * When to use: Ctrl-deselect when the selection remains non-empty.
+   * When to use: Shift-deselect when the selection remains non-empty.
    * Expected outcome: Center of the matching `.build-entry-btn`, or the provided fallback when the button is missing.
    * Exceptions: None.
    */
@@ -478,18 +478,18 @@ export function createBuildQueuePopupHandler(deps: BuildQueuePopupDeps) {
   }
 
   /**
-   * Applies the locked plain/Ctrl build-entry selection policy and keeps the popup synchronized.
+   * Applies the locked plain/Shift build-entry selection policy and keeps the popup synchronized.
    *
    * Purpose: Gives DOM-layer and canvas hit-test paths one implementation so their behavior cannot drift.
    * When to use: Every build-entry button activation.
-   * Expected outcome: Plain click replaces; Ctrl toggles; join writes follow last-clicked seeding rules.
+   * Expected outcome: Plain click replaces; Shift toggles; join writes follow last-clicked seeding rules.
    * Exceptions: Hard batch failures are reported but do not discard the user's selection.
    */
   async function processBuildEntryClick(
     h3Index: string,
     clientX: number,
     clientY: number,
-    ctrlKey: boolean
+    shiftKey: boolean
   ): Promise<void> {
     const lifecycleRevision = popupLifecycleRevision;
     if (isHoverOrderPlanningActive() || deps.shouldRenderRes4Hexes()) return;
@@ -497,7 +497,7 @@ export function createBuildQueuePopupHandler(deps: BuildQueuePopupDeps) {
     const popup = document.getElementById('build-popup');
     const popupOpen = !!popup && !popup.classList.contains('hidden');
 
-    if (!ctrlKey) {
+    if (!shiftKey) {
       const togglesSinglePopup =
         S.selectedBuildHexH3s.length === 1 &&
         S.selectedBuildHexH3s[0] === h3Index &&
@@ -557,7 +557,7 @@ export function createBuildQueuePopupHandler(deps: BuildQueuePopupDeps) {
   /**
    * Queues one build-entry activation behind earlier asynchronous join synchronization.
    *
-   * Purpose: Prevents rapid Ctrl+clicks from seeding or applying templates out of selection order.
+   * Purpose: Prevents rapid Shift+clicks from seeding or applying templates out of selection order.
    * When to use: Public controller entry point for every build-entry activation.
    * Expected outcome: Clicks execute in user order; a popup close invalidates pending visual updates.
    * Exceptions: Unexpected errors are logged and reported without breaking later queued clicks.
@@ -566,10 +566,10 @@ export function createBuildQueuePopupHandler(deps: BuildQueuePopupDeps) {
     h3Index: string,
     clientX: number,
     clientY: number,
-    ctrlKey: boolean
+    shiftKey: boolean
   ): Promise<void> {
     buildEntryInteractionChain = buildEntryInteractionChain
-      .then(() => processBuildEntryClick(h3Index, clientX, clientY, ctrlKey))
+      .then(() => processBuildEntryClick(h3Index, clientX, clientY, shiftKey))
       .catch((err) => {
         console.error('handleBuildEntryClick failed:', err);
         deps.showMapToast('Failed to update build selection.', { isError: true });
