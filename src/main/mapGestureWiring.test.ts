@@ -102,6 +102,39 @@ function testDoubleClickPlanningUsesSharedDecisionTable(): void {
  * Expected outcome: The listener clears shared selection chrome and never hit-tests icons.
  * Exceptions: AssertionError when the listener is missing or grows an icon-hit branch.
  */
+/**
+ * Checks that build markers and multi-hex template edits cannot run during playback.
+ *
+ * Purpose: Marker buttons sit outside the main-map click listener, and template handlers write the shared
+ * template before the server call, so the map-click return does not cover either path.
+ * When to use: Regression signal when refactoring build-entry activation or the multi-hex queue editor.
+ * Expected outcome: Marker activation returns before it writes the selected hex, and template handlers consult
+ * playback before replacing the template.
+ * Exceptions: AssertionError naming the missing gate.
+ */
+function testPlaybackIgnoresBuildMarkersAndTemplateEdits(): void {
+  const popupSource = readRendererSource('gameplay', 'buildQueuePopup.ts');
+  assert.ok(
+    /async function processBuildEntryClick\([\s\S]*?\)\s*:\s*Promise<void>\s*\{\s*if \(resolutionPlaybackBlocksMapOrders\(S\.resolutionMoveAnimation\)\) return;/.test(
+      popupSource
+    ),
+    'a build marker click during playback should return before it changes the selected hex or the build selection'
+  );
+  assert.ok(
+    popupSource.includes('function restoreSingleHexQueueIfPlaybackBlocks('),
+    'a single-hex queue control should restore the stored queue when playback ignores the edit'
+  );
+
+  const multiSource = readRendererSource('gameplay', 'buildQueueMultiPopup.ts');
+  const multiRender = getFunctionSource(multiSource, 'renderMultiBuildQueueIntoMount');
+  const gateAt = multiRender.indexOf('buildQueueEditBlockedByPlayback()');
+  const templateWriteAt = multiRender.indexOf('S.buildQueueTemplate =');
+  assert.ok(
+    gateAt >= 0 && templateWriteAt > gateAt,
+    'multi-hex template edits should consult playback before replacing the shared template'
+  );
+}
+
 function testRightClickClearsSelectionWithoutIconException(): void {
   const interactionsSource = readRendererSource('map', 'mainMapInteractions.ts');
   const listenerStart = interactionsSource.indexOf("addEventListener('contextmenu'");
@@ -132,6 +165,7 @@ function run(): void {
   testGestureSelectionSnapshotSurvivesDoubleClick();
   testStackCalloutOpensOnCancellableTimer();
   testDoubleClickPlanningUsesSharedDecisionTable();
+  testPlaybackIgnoresBuildMarkersAndTemplateEdits();
   testRightClickClearsSelectionWithoutIconException();
   console.log('mapGestureWiring.test.ts passed');
 }

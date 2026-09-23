@@ -72,7 +72,6 @@ Shown with the right panel. Ready, Ranged, and the air-strike controls follow th
 ## Known Deviations
 
 - **Phase line during a battle.** Required: while a battle is active, the phase line reads "Phase: Tactical planning" or "Phase: Tactical resolution". Current: it keeps the strategic phase label, such as "Phase: Planning" or "Phase: Resolution", while the turn line shows the tactical turn. Entry point: `src/renderer/core/uiState.ts`.
-- **Failed target click turns targeting off.** Required: a rejected Ranged or Strike target click keeps targeting on. Current: the rejection turns Ranged and Strike targeting off, so the player must press the control again. Entry point: `src/renderer/map/mainMapInteractions.ts`.
 
 ## Open Questions
 

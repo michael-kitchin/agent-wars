@@ -1,5 +1,6 @@
 import { getStrategicRes1HexCode } from '../../shared/hexLlmCodeAssignment';
 import type { BuildUnitType, HexBuildQueueSnapshot } from '../../shared/ipcTypes';
+import { resolutionPlaybackBlocksMapOrders } from '../../shared/mapOrderGestureGate';
 import { estimateTurnsToCompleteQueuedProduction, sumQueuedProductionCost } from '../../shared/productionConfig';
 import { TOOLTIP_OFFSET_PX, UNIT_SELECT_GLYPH } from '../core/constants';
 import { rendererSharedState as S } from '../core/state';
@@ -164,11 +165,20 @@ export function createBuildQueuePopupHandler(deps: BuildQueuePopupDeps) {
    */
   let popupLifecycleRevision = 0;
 
+  /**
+   * Runs one build-queue write and refreshes state when the server accepts it.
+   *
+   * Purpose: Shared failure toast and refresh for single-hex queue edits.
+   * When to use: From popup controls that mutate a queue, including while playback may be running.
+   * Expected outcome: False immediately, with no toast and no write, while resolution playback is running. Otherwise true after a successful mutate, or false after a toasted failure.
+   * Exceptions: Transport errors are caught, logged, toasted, and returned as false.
+   */
   async function runBuildQueueMutation(args: {
     mutate: () => Promise<{ success: boolean; reason?: string }>;
     failureMessage: string;
     refreshState: boolean;
   }): Promise<boolean> {
+    if (resolutionPlaybackBlocksMapOrders(S.resolutionMoveAnimation)) return false;
     try {
       const result = await args.mutate();
       if (!result.success) {
@@ -189,10 +199,11 @@ export function createBuildQueuePopupHandler(deps: BuildQueuePopupDeps) {
    *
    * Purpose: Keeps multi-hex writes on the batch API while preserving hard-failure feedback.
    * When to use: Selection joins and every multi-mode template edit.
-   * Expected outcome: Successful siblings refresh immediately; eligibility skips stay silent.
+   * Expected outcome: False immediately, with no toast and no write, while resolution playback is running. Successful siblings refresh immediately; eligibility skips stay silent.
    * Exceptions: Transport and hard domain failures show one error toast and return `false`.
    */
   async function applyCurrentTemplateToHexes(h3Indexes: string[]): Promise<boolean> {
+    if (resolutionPlaybackBlocksMapOrders(S.resolutionMoveAnimation)) return false;
     if (!window.gameApi?.applyBuildQueueTemplateToHexes) return false;
     try {
       const result = await window.gameApi.applyBuildQueueTemplateToHexes({
@@ -211,6 +222,20 @@ export function createBuildQueuePopupHandler(deps: BuildQueuePopupDeps) {
       deps.showMapToast('Failed to synchronize build queues.', { isError: true });
       return false;
     }
+  }
+
+  /**
+   * Restores a single-hex queue editor when playback should ignore the edit.
+   *
+   * Purpose: A select or count field changes before its handler runs, so returning without a write would leave the rejected value on screen.
+   * When to use: At the start of a single-hex queue control handler, before calling `runBuildQueueMutation`.
+   * Expected outcome: True during playback, after scheduling a re-render from the stored queue. False when the edit may proceed. No toast.
+   * Exceptions: None.
+   */
+  function restoreSingleHexQueueIfPlaybackBlocks(mount: HTMLElement, h3Index: string): boolean {
+    if (!resolutionPlaybackBlocksMapOrders(S.resolutionMoveAnimation)) return false;
+    void renderBuildQueueIntoMount(mount, h3Index);
+    return true;
   }
 
   async function renderBuildQueueIntoMount(mount: HTMLElement, h3Index: string): Promise<void> {
@@ -370,6 +395,7 @@ export function createBuildQueuePopupHandler(deps: BuildQueuePopupDeps) {
         return parseInt(raw, 10);
       };
       typeSelect.addEventListener('change', async () => {
+        if (restoreSingleHexQueueIfPlaybackBlocks(mount, h3Index)) return;
         if (!window.gameApi?.updateHexBuildQueueEntry) return;
         const success = await runBuildQueueMutation({
           mutate: () =>
@@ -394,6 +420,7 @@ export function createBuildQueuePopupHandler(deps: BuildQueuePopupDeps) {
         event.preventDefault();
       });
       countInput.addEventListener('input', async () => {
+        if (restoreSingleHexQueueIfPlaybackBlocks(mount, h3Index)) return;
         if (!window.gameApi?.updateHexBuildQueueEntry) return;
         const count = readCurrentCount();
         const success = await runBuildQueueMutation({
@@ -435,6 +462,7 @@ export function createBuildQueuePopupHandler(deps: BuildQueuePopupDeps) {
       checked: snapshot.keepBuilding,
       disabled: !canArmKeepBuilding(snapshot),
       onChange: async (keepBuilding) => {
+        if (restoreSingleHexQueueIfPlaybackBlocks(mount, h3Index)) return;
         if (!window.gameApi?.setHexesKeepBuilding) return;
         const success = await runBuildQueueMutation({
           mutate: () =>
@@ -482,7 +510,7 @@ export function createBuildQueuePopupHandler(deps: BuildQueuePopupDeps) {
    *
    * Purpose: Gives DOM-layer and canvas hit-test paths one implementation so their behavior cannot drift.
    * When to use: Every build-entry button activation.
-   * Expected outcome: Plain click replaces; Shift toggles; join writes follow last-clicked seeding rules.
+   * Expected outcome: While resolution playback is running, returns without a toast and without changing the selected hex, the build selection, or the popup. Otherwise a plain click replaces, Shift toggles, and join writes follow last-clicked seeding rules.
    * Exceptions: Hard batch failures are reported but do not discard the user's selection.
    */
   async function processBuildEntryClick(
@@ -491,6 +519,7 @@ export function createBuildQueuePopupHandler(deps: BuildQueuePopupDeps) {
     clientY: number,
     shiftKey: boolean
   ): Promise<void> {
+    if (resolutionPlaybackBlocksMapOrders(S.resolutionMoveAnimation)) return;
     const lifecycleRevision = popupLifecycleRevision;
     if (isHoverOrderPlanningActive() || deps.shouldRenderRes4Hexes()) return;
     S.selectedHexIndex = h3Index;

@@ -22772,6 +22772,16 @@
     });
   }
 
+  // src/shared/mapOrderGestureGate.ts
+  function resolutionPlaybackBlocksMapOrders(animation) {
+    return animation != null;
+  }
+  function tacticalHitIsInsideBattle(hasBattle, hit, footprintSaysInside) {
+    if (!hasBattle) return true;
+    if (hit == null) return false;
+    return footprintSaysInside;
+  }
+
   // src/renderer/gameplay/buildQueuePopupFormatting.ts
   function sanitizeBuildCountInputText(raw) {
     const digitsOnly = raw.replaceAll(/\D/g, "").slice(0, 2);
@@ -22902,6 +22912,9 @@
     const turnLabel = minimum === 1 && maximum === 1 ? "turn" : "turns";
     return `<strong>Queue:</strong> $${queueTotalCost.toLocaleString()} / ${turnsDisplay} ${turnLabel}`;
   }
+  function buildQueueEditBlockedByPlayback() {
+    return resolutionPlaybackBlocksMapOrders(rendererSharedState.resolutionMoveAnimation);
+  }
   async function renderMultiBuildQueueIntoMount(deps) {
     const requestSeq = ++rendererSharedState.buildPopupRequestSeq;
     const selectedH3Indexes = [...rendererSharedState.selectedBuildHexH3s];
@@ -22970,6 +22983,7 @@
     buildBtn.className = "unit-select stack-unit-toggle";
     buildBtn.textContent = UNIT_SELECT_GLYPH;
     buildBtn.addEventListener("click", async () => {
+      if (buildQueueEditBlockedByPlayback()) return;
       const defaultUnitType = unionTypes[0];
       if (!defaultUnitType) return;
       rendererSharedState.buildQueueTemplate = [...rendererSharedState.buildQueueTemplate, createBuildQueueTemplateRow(defaultUnitType, 1)];
@@ -23016,6 +23030,10 @@
       });
       row.appendChild(countInput);
       typeSelect.addEventListener("change", async () => {
+        if (buildQueueEditBlockedByPlayback()) {
+          void renderMultiBuildQueueIntoMount(deps);
+          return;
+        }
         const entryIndex = rendererSharedState.buildQueueTemplate.findIndex((row2) => row2.rowKey === rowKey);
         if (entryIndex < 0) return;
         const updated = [...rendererSharedState.buildQueueTemplate];
@@ -23029,6 +23047,10 @@
         void renderMultiBuildQueueIntoMount(deps);
       });
       countInput.addEventListener("input", async () => {
+        if (buildQueueEditBlockedByPlayback()) {
+          void renderMultiBuildQueueIntoMount(deps);
+          return;
+        }
         const entryIndex = rendererSharedState.buildQueueTemplate.findIndex((row2) => row2.rowKey === rowKey);
         if (entryIndex < 0) return;
         const updated = [...rendererSharedState.buildQueueTemplate];
@@ -23046,6 +23068,7 @@
       removeBtn.className = "unit-select";
       removeBtn.textContent = "x";
       removeBtn.addEventListener("click", async () => {
+        if (buildQueueEditBlockedByPlayback()) return;
         rendererSharedState.buildQueueTemplate = rendererSharedState.buildQueueTemplate.filter((row2) => row2.rowKey !== rowKey);
         await deps.applyTemplate([...rendererSharedState.selectedBuildHexH3s]);
         void renderMultiBuildQueueIntoMount(deps);
@@ -23059,6 +23082,10 @@
       checked: areAllKeepBuildingArmed(snapshots),
       disabled: !canArmKeepBuildingForAll(snapshots),
       onChange: async (keepBuilding) => {
+        if (buildQueueEditBlockedByPlayback()) {
+          void renderMultiBuildQueueIntoMount(deps);
+          return;
+        }
         await deps.setKeepBuilding(keepBuilding);
         void renderMultiBuildQueueIntoMount(deps);
       }
@@ -23084,6 +23111,7 @@
     let buildEntryInteractionChain = Promise.resolve();
     let popupLifecycleRevision = 0;
     async function runBuildQueueMutation(args) {
+      if (resolutionPlaybackBlocksMapOrders(rendererSharedState.resolutionMoveAnimation)) return false;
       try {
         const result = await args.mutate();
         if (!result.success) {
@@ -23099,6 +23127,7 @@
       }
     }
     async function applyCurrentTemplateToHexes(h3Indexes) {
+      if (resolutionPlaybackBlocksMapOrders(rendererSharedState.resolutionMoveAnimation)) return false;
       if (!window.gameApi?.applyBuildQueueTemplateToHexes) return false;
       try {
         const result = await window.gameApi.applyBuildQueueTemplateToHexes({
@@ -23117,6 +23146,11 @@
         deps.showMapToast("Failed to synchronize build queues.", { isError: true });
         return false;
       }
+    }
+    function restoreSingleHexQueueIfPlaybackBlocks(mount, h3Index) {
+      if (!resolutionPlaybackBlocksMapOrders(rendererSharedState.resolutionMoveAnimation)) return false;
+      void renderBuildQueueIntoMount(mount, h3Index);
+      return true;
     }
     async function renderBuildQueueIntoMount(mount, h3Index) {
       if (rendererSharedState.selectedBuildHexH3s.length >= 2) {
@@ -23266,6 +23300,7 @@
           return parseInt(raw, 10);
         };
         typeSelect.addEventListener("change", async () => {
+          if (restoreSingleHexQueueIfPlaybackBlocks(mount, h3Index)) return;
           if (!window.gameApi?.updateHexBuildQueueEntry) return;
           const success = await runBuildQueueMutation({
             mutate: () => window.gameApi.updateHexBuildQueueEntry({
@@ -23288,6 +23323,7 @@
           event.preventDefault();
         });
         countInput.addEventListener("input", async () => {
+          if (restoreSingleHexQueueIfPlaybackBlocks(mount, h3Index)) return;
           if (!window.gameApi?.updateHexBuildQueueEntry) return;
           const count = readCurrentCount();
           const success = await runBuildQueueMutation({
@@ -23327,6 +23363,7 @@
         checked: snapshot.keepBuilding,
         disabled: !canArmKeepBuilding(snapshot),
         onChange: async (keepBuilding) => {
+          if (restoreSingleHexQueueIfPlaybackBlocks(mount, h3Index)) return;
           if (!window.gameApi?.setHexesKeepBuilding) return;
           const success = await runBuildQueueMutation({
             mutate: () => window.gameApi.setHexesKeepBuilding({
@@ -23355,6 +23392,7 @@
       };
     }
     async function processBuildEntryClick(h3Index, clientX, clientY, shiftKey) {
+      if (resolutionPlaybackBlocksMapOrders(rendererSharedState.resolutionMoveAnimation)) return;
       const lifecycleRevision = popupLifecycleRevision;
       if (isHoverOrderPlanningActive() || deps.shouldRenderRes4Hexes()) return;
       rendererSharedState.selectedHexIndex = h3Index;
@@ -25674,17 +25712,21 @@
 
   // src/renderer/tactical/tacticalUiGuards.ts
   function tacticalRendererHitInsideBattleFootprint(hit, tb) {
-    if (!tb || !hit) return true;
-    if (hit === tb.enclosingRes1H3Index) return true;
-    if (tb.res4ChildH3Indexes.includes(hit)) return true;
-    try {
-      if (getResolution(hit) === 4) {
-        return cellToParent(hit, 1) === tb.enclosingRes1H3Index;
+    let footprintSaysInside = false;
+    if (typeof hit === "string" && tb) {
+      if (hit === tb.enclosingRes1H3Index || tb.res4ChildH3Indexes.includes(hit)) {
+        footprintSaysInside = true;
+      } else {
+        try {
+          if (getResolution(hit) === 4) {
+            footprintSaysInside = cellToParent(hit, 1) === tb.enclosingRes1H3Index;
+          }
+        } catch {
+          footprintSaysInside = false;
+        }
       }
-    } catch {
-      return false;
     }
-    return false;
+    return tacticalHitIsInsideBattle(tb != null, hit, footprintSaysInside);
   }
 
   // src/renderer/core/parityDiagnostics.ts
@@ -25838,6 +25880,7 @@
     return "destination_equals_current_positions";
   }
   async function handleMainMapDoubleClick(event, deps) {
+    if (resolutionPlaybackBlocksMapOrders(rendererSharedState.resolutionMoveAnimation)) return;
     clearDeferredHumanUnitSingleSelectTimer();
     rendererSharedState.gestureSelectionSnapshotAtMs = 0;
     const state = rendererSharedState.gameState;
@@ -26150,15 +26193,22 @@
       hideOrderSlowerHexTooltip();
     });
     mainMapEl.addEventListener("click", async (e) => {
-      const hit = clientXYToHit(e.clientX, e.clientY);
-      rendererSharedState.selectedHexIndex = hit;
-      deps.clearSidebarError();
-      if (rendererSharedState.tacticalBattleSnapshot && !tacticalRendererHitInsideBattleFootprint(hit, rendererSharedState.tacticalBattleSnapshot)) {
-        if (hit) {
-          deps.showMapToast("That hex is outside the active tactical battle.", { isError: true });
+      if (resolutionPlaybackBlocksMapOrders(rendererSharedState.resolutionMoveAnimation)) {
+        if (await deps.tryHandleTacticalEntryAtClientXY(e.clientX, e.clientY)) {
+          deps.updateSidebar();
+          deps.updateRangedSidebar();
+          deps.redraw();
+          return;
         }
         return;
       }
+      const hit = clientXYToHit(e.clientX, e.clientY);
+      deps.clearSidebarError();
+      if (rendererSharedState.tacticalBattleSnapshot && !tacticalRendererHitInsideBattleFootprint(hit, rendererSharedState.tacticalBattleSnapshot)) {
+        deps.showMapToast("That hex is outside the active tactical battle.", { isError: true });
+        return;
+      }
+      rendererSharedState.selectedHexIndex = hit;
       if (hit && rendererSharedState.airStrikeModeActive && rendererSharedState.selectedUnitIds.length > 0 && rendererSharedState.gameState) {
         if (!window.gameApi?.validateGroupAirStrikeTarget) return;
         const selectedIds = [...rendererSharedState.selectedUnitIds];
@@ -26171,9 +26221,6 @@
           deps.showMapToast(deps.formatTargetingValidationReason(validation.reason, "Selected air units cannot strike that target."), {
             isError: true
           });
-          rendererSharedState.airStrikeModeActive = false;
-          rendererSharedState.hoverRoutePreview = null;
-          rendererSharedState.hoverPreviewRequestSeq++;
           deps.updateRangedSidebar();
           deps.redraw();
           return;
@@ -26197,9 +26244,6 @@
           deps.showMapToast(deps.formatTargetingValidationReason(validation.reason, "Selected units cannot fire at that target."), {
             isError: true
           });
-          rendererSharedState.rangedModeActive = false;
-          rendererSharedState.hoverRoutePreview = null;
-          rendererSharedState.hoverPreviewRequestSeq++;
           deps.updateRangedSidebar();
           deps.redraw();
           return;
@@ -26274,8 +26318,6 @@
           clearDeferredHumanUnitSingleSelectTimer();
         } else {
           clearDeferredHumanUnitSingleSelectTimer();
-          deps.clearSelection();
-          rendererSharedState.hoverRoutePreview = null;
         }
       } else {
         clearDeferredHumanUnitSingleSelectTimer();

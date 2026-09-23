@@ -28,7 +28,7 @@ When no match is loaded, the basemap can still be visible under the new-game ove
 - When the player uses the wheel, the map zooms. Double-click does not zoom.
 - When the player clicks, the gesture follows [selection-model.md](selection-model.md) and [order-lifecycle.md](order-lifecycle.md).
 - When the player clicks outside the battle area during Tactical planning, the map shows an error toast and does not select or order.
-- During Resolution playback, clicks and double-clicks do not select, target, or order. Drag, wheel, hex tooltips, and right-click still work. The current code differs; see Known Deviations in [resolution-playback.md](resolution-playback.md).
+- During Resolution playback, clicks and double-clicks do not select, target, or order. Drag, wheel, hex tooltips, and right-click still work.
 - When the player right-clicks, selection chrome clears and queued orders stay. See [selection-model.md](selection-model.md).
 
 ### Keyboard

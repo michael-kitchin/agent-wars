@@ -15,6 +15,7 @@ import {
   clearDeferredStackCalloutTimer,
   scheduleDeferredStackCallout,
 } from './mapClickSelectionPolicy';
+import { resolutionPlaybackBlocksMapOrders } from '../../shared/mapOrderGestureGate';
 import { resolveMapGesturePress } from '../../shared/mapPlanningGesture';
 import { selectionUnitIdSetsDiffer } from '../../shared/selectionUnitIdSets';
 import {
@@ -605,16 +606,25 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
   });
 
   mainMapEl.addEventListener('click', async (e) => {
-    const hit = clientXYToHit(e.clientX, e.clientY);
-    S.selectedHexIndex = hit;
-    deps.clearSidebarError();
-
-    if (S.tacticalBattleSnapshot && !tacticalRendererHitInsideBattleFootprint(hit, S.tacticalBattleSnapshot)) {
-      if (hit) {
-        deps.showMapToast('That hex is outside the active tactical battle.', { isError: true });
+    if (resolutionPlaybackBlocksMapOrders(S.resolutionMoveAnimation)) {
+      if (await deps.tryHandleTacticalEntryAtClientXY(e.clientX, e.clientY)) {
+        deps.updateSidebar();
+        deps.updateRangedSidebar();
+        deps.redraw();
+        return;
       }
       return;
     }
+
+    const hit = clientXYToHit(e.clientX, e.clientY);
+    deps.clearSidebarError();
+
+    if (S.tacticalBattleSnapshot && !tacticalRendererHitInsideBattleFootprint(hit, S.tacticalBattleSnapshot)) {
+      deps.showMapToast('That hex is outside the active tactical battle.', { isError: true });
+      return;
+    }
+
+    S.selectedHexIndex = hit;
 
     if (hit && S.airStrikeModeActive && S.selectedUnitIds.length > 0 && S.gameState) {
       if (!window.gameApi?.validateGroupAirStrikeTarget) return;
@@ -628,9 +638,6 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
         deps.showMapToast(deps.formatTargetingValidationReason(validation.reason, 'Selected air units cannot strike that target.'), {
           isError: true,
         });
-        S.airStrikeModeActive = false;
-        S.hoverRoutePreview = null;
-        S.hoverPreviewRequestSeq++;
         deps.updateRangedSidebar();
         deps.redraw();
         return;
@@ -655,9 +662,6 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
         deps.showMapToast(deps.formatTargetingValidationReason(validation.reason, 'Selected units cannot fire at that target.'), {
           isError: true,
         });
-        S.rangedModeActive = false;
-        S.hoverRoutePreview = null;
-        S.hoverPreviewRequestSeq++;
         deps.updateRangedSidebar();
         deps.redraw();
         return;
@@ -739,8 +743,6 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
         clearDeferredHumanUnitSingleSelectTimer();
       } else {
         clearDeferredHumanUnitSingleSelectTimer();
-        deps.clearSelection();
-        S.hoverRoutePreview = null;
       }
     } else {
       clearDeferredHumanUnitSingleSelectTimer();

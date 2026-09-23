@@ -3,6 +3,7 @@
  */
 
 import { cellToParent, getResolution } from 'h3-js';
+import { tacticalHitIsInsideBattle } from '../../shared/mapOrderGestureGate';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 
 /**
@@ -45,20 +46,25 @@ export function tacticalRendererShouldBlockStrategicMapOrders(state: TacticalRen
  * Returns true when a hit-tested strategic or res4 hex lies inside the active tactical footprint.
  *
  * Contract: Accepts enclosing res1, any listed res4 child, or any res4 cell whose parent res1 matches the enclosure.
+ * The null-hit rule lives in `tacticalHitIsInsideBattle`.
  * When to use: Main-map click routing to reject out-of-footprint clicks during tactical sessions.
- * Expected outcome: Returns true when no tactical session exists or `hit` is null (caller may still no-op).
- * Exceptions: Malformed `hit` strings yield false when resolution checks throw.
+ * Expected outcome: True when no tactical session exists. During a battle, false for a null hit and for a hex outside the footprint.
+ * Exceptions: During a battle, a malformed hit string yields false when the resolution check throws. With no battle, the hit is not inspected.
  */
 export function tacticalRendererHitInsideBattleFootprint(hit: string | null, tb: TacticalBattleSnapshot | null): boolean {
-  if (!tb || !hit) return true;
-  if (hit === tb.enclosingRes1H3Index) return true;
-  if (tb.res4ChildH3Indexes.includes(hit)) return true;
-  try {
-    if (getResolution(hit) === 4) {
-      return cellToParent(hit, 1) === tb.enclosingRes1H3Index;
+  let footprintSaysInside = false;
+  if (typeof hit === 'string' && tb) {
+    if (hit === tb.enclosingRes1H3Index || tb.res4ChildH3Indexes.includes(hit)) {
+      footprintSaysInside = true;
+    } else {
+      try {
+        if (getResolution(hit) === 4) {
+          footprintSaysInside = cellToParent(hit, 1) === tb.enclosingRes1H3Index;
+        }
+      } catch {
+        footprintSaysInside = false;
+      }
     }
-  } catch {
-    return false;
   }
-  return false;
+  return tacticalHitIsInsideBattle(tb != null, hit, footprintSaysInside);
 }

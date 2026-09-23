@@ -30,7 +30,7 @@ Choosing Fight or Ignore closes the dialog. Escape and a click on the dimmed bac
 
 The player sees units and combat results animate on the current map. A map toast may summarize losses the player can see. Combat the player cannot see is announced as an unknown battle, with continent names when those names are available. Playback runs after Ready, or after a tactical Ready commit, when the resolved turn has movement or combat to show. It ends when the animation finishes.
 
-Playback does not replace the underlying match: the game-state readout can already show the next planning turn while the animation is still running. Until the animation ends, map gestures that change orders or the selection are ignored. Pan, zoom, hex tooltips, and right-click still work, and the right panel keeps its own rules. Details and the current code gap are in [resolution-playback.md](resolution-playback.md). Starting a tactical battle cancels a strategic playback that is still running. Leaving a tactical battle also cancels playback.
+Playback does not replace the underlying match: the game-state readout can already show the next planning turn while the animation is still running. Until the animation ends, map gestures that change orders or the selection are ignored. Pan, zoom, hex tooltips, and right-click still work, and the right panel keeps its own rules. Details are in [resolution-playback.md](resolution-playback.md). Starting a tactical battle cancels a strategic playback that is still running. Leaving a tactical battle also cancels playback.
 
 Ready stays disabled while a deferred opponent consultation is still outstanding after playback was scheduled. The label stays "Ready" during that wait.
 

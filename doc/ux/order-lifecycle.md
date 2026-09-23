@@ -18,7 +18,7 @@ When the player double-clicks with an all-air selection, the game checks whether
 
 ### Ranged attack
 
-When Ranged targeting is on, a click on a hex validates the target for every selected unit. Success queues one ranged attack per selected unit, turns targeting off, and clears the selection. Failure shows an error toast, queues nothing, and leaves targeting on so the player can pick another hex. Cancel turns targeting off. The current code turns targeting off on failure; see Known Deviations in [right-panel-command-bar.md](right-panel-command-bar.md).
+When Ranged targeting is on, a click on a hex validates the target for every selected unit. Success queues one ranged attack per selected unit, turns targeting off, and clears the selection. Failure shows an error toast, queues nothing, and leaves targeting on so the player can pick another hex. Cancel turns targeting off.
 
 ### Air strike
 

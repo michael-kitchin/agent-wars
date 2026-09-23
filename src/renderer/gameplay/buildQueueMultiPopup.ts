@@ -1,4 +1,5 @@
 import { ALL_BUILD_UNIT_TYPES, type BuildUnitType, type HexBuildQueueSnapshot } from '../../shared/ipcTypes';
+import { resolutionPlaybackBlocksMapOrders } from '../../shared/mapOrderGestureGate';
 import { estimateTurnsToCompleteQueuedProduction, sumQueuedProductionCost } from '../../shared/productionConfig';
 import { UNIT_SELECT_GLYPH } from '../core/constants';
 import { rendererSharedState as S } from '../core/state';
@@ -122,6 +123,18 @@ function formatMultiQueueSummary(snapshots: HexBuildQueueSnapshot[]): string {
 }
 
 /**
+ * Returns whether a multi-hex queue edit must be ignored because resolution playback is running.
+ *
+ * Purpose: Template handlers write `buildQueueTemplate` before the server call, which is too late for the write guard to keep the editor unchanged.
+ * When to use: At the start of an add, remove, type, count, or keep-building handler. Re-render when the control has already changed.
+ * Expected outcome: True during playback. False when the edit may change the template and call the server. No toast.
+ * Exceptions: None.
+ */
+function buildQueueEditBlockedByPlayback(): boolean {
+  return resolutionPlaybackBlocksMapOrders(S.resolutionMoveAnimation);
+}
+
+/**
  * Renders the id-independent shared queue editor for two or more selected production hexes.
  *
  * Purpose: Presents summed production, template queue cost, ETA range, and union build types.
@@ -205,6 +218,7 @@ export async function renderMultiBuildQueueIntoMount(deps: MultiBuildQueueRender
   buildBtn.className = 'unit-select stack-unit-toggle';
   buildBtn.textContent = UNIT_SELECT_GLYPH;
   buildBtn.addEventListener('click', async () => {
+    if (buildQueueEditBlockedByPlayback()) return;
     const defaultUnitType = unionTypes[0];
     if (!defaultUnitType) return;
     S.buildQueueTemplate = [...S.buildQueueTemplate, createBuildQueueTemplateRow(defaultUnitType, 1)];
@@ -254,6 +268,10 @@ export async function renderMultiBuildQueueIntoMount(deps: MultiBuildQueueRender
     row.appendChild(countInput);
 
     typeSelect.addEventListener('change', async () => {
+      if (buildQueueEditBlockedByPlayback()) {
+        void renderMultiBuildQueueIntoMount(deps);
+        return;
+      }
       const entryIndex = S.buildQueueTemplate.findIndex((row) => row.rowKey === rowKey);
       if (entryIndex < 0) return;
       const updated = [...S.buildQueueTemplate];
@@ -267,6 +285,10 @@ export async function renderMultiBuildQueueIntoMount(deps: MultiBuildQueueRender
       void renderMultiBuildQueueIntoMount(deps);
     });
     countInput.addEventListener('input', async () => {
+      if (buildQueueEditBlockedByPlayback()) {
+        void renderMultiBuildQueueIntoMount(deps);
+        return;
+      }
       const entryIndex = S.buildQueueTemplate.findIndex((row) => row.rowKey === rowKey);
       if (entryIndex < 0) return;
       const updated = [...S.buildQueueTemplate];
@@ -285,6 +307,7 @@ export async function renderMultiBuildQueueIntoMount(deps: MultiBuildQueueRender
     removeBtn.className = 'unit-select';
     removeBtn.textContent = 'x';
     removeBtn.addEventListener('click', async () => {
+      if (buildQueueEditBlockedByPlayback()) return;
       S.buildQueueTemplate = S.buildQueueTemplate.filter((row) => row.rowKey !== rowKey);
       await deps.applyTemplate([...S.selectedBuildHexH3s]);
       void renderMultiBuildQueueIntoMount(deps);
@@ -298,6 +321,10 @@ export async function renderMultiBuildQueueIntoMount(deps: MultiBuildQueueRender
     checked: areAllKeepBuildingArmed(snapshots),
     disabled: !canArmKeepBuildingForAll(snapshots),
     onChange: async (keepBuilding) => {
+      if (buildQueueEditBlockedByPlayback()) {
+        void renderMultiBuildQueueIntoMount(deps);
+        return;
+      }
       await deps.setKeepBuilding(keepBuilding);
       void renderMultiBuildQueueIntoMount(deps);
     },

@@ -8,7 +8,7 @@ Let the player see a stack, or a lone enemy unit, and change which human units i
 
 ## Availability
 
-Opens in Strategic planning and Tactical planning after a click on a stack or a lone enemy icon, once a short delay elapses. It does not open while a hover order preview is active, while strategic units are hidden because the map is zoomed to battle detail, or during Resolution playback. The current code can open it during playback; see Known Deviations in [resolution-playback.md](resolution-playback.md). It closes when the player dismisses it, presses Escape, clicks outside it, or starts a gesture that hides it. See [input-map.md](input-map.md) and [selection-model.md](selection-model.md).
+Opens in Strategic planning and Tactical planning after a click on a stack or a lone enemy icon, once a short delay elapses. It does not open while a hover order preview is active, while strategic units are hidden because the map is zoomed to battle detail, or during Resolution playback. It closes when the player dismisses it, presses Escape, clicks outside it, or starts a gesture that hides it. See [input-map.md](input-map.md) and [selection-model.md](selection-model.md).
 
 ## Information Displayed
 

@@ -10,6 +10,7 @@
  */
 
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
+import { resolutionPlaybackBlocksMapOrders } from '../../shared/mapOrderGestureGate';
 import {
   mapSelectionComposition,
   resolveMapDoubleClickAction,
@@ -80,14 +81,16 @@ function ignoreReasonFor(input: MapDoubleClickDecisionInput): string {
  * Purpose: Single entry point for move and ferry planning, mixed-selection rejection, and the air deselect
  * gesture, so strategic and tactical behavior stays identical.
  * When to use: From the map `dblclick` listener; call it without awaiting and let it settle on its own.
- * Expected outcome: At most one order is queued or one toast is shown per call. An empty click that cannot
- * plan an air ferry clears the selection without discarding anything already queued for Ready.
+ * Expected outcome: While resolution playback is running, returns before planning or clearing. Otherwise at most
+ * one order is queued or one toast is shown per call. An empty click that cannot plan an air ferry clears the
+ * selection without discarding anything already queued for Ready.
  * Exceptions: None; a missing ferry API is reported as an ignored double-click.
  */
 export async function handleMainMapDoubleClick(
   event: MouseEvent,
   deps: MainMapDoubleClickDeps
 ): Promise<void> {
+  if (resolutionPlaybackBlocksMapOrders(S.resolutionMoveAnimation)) return;
   clearDeferredHumanUnitSingleSelectTimer();
   S.gestureSelectionSnapshotAtMs = 0;
 

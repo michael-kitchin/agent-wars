@@ -71,7 +71,7 @@ A map toast can summarize losses the player can see. Combat outside vision is an
 
 ## Known Deviations
 
-- **Map orders are accepted during playback.** Required: while playback runs, map gestures that change orders or the selection are ignored, and pan, zoom, hex tooltips, and right-click stay available. Current: only some hover previews are suppressed, so the player can select units, target, double-click orders, and edit build queues while the previous turn is still animating. Entry point: `src/renderer/map/mainMapInteractions.ts`.
+None.
 
 ## Open Questions
 
