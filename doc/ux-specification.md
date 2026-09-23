@@ -136,8 +136,6 @@ None.
 Each entry is a requirement that the renderer does not meet yet. Cross-cutting documents link to the element document that holds the entry.
 
 - [tactical-battles-list.md](ux/tactical-battles-list.md): 1
-- [right-panel-command-bar.md](ux/right-panel-command-bar.md): 1
 - [right-panel-selection-and-orders.md](ux/right-panel-selection-and-orders.md): 1
 - [notifications-and-feedback.md](ux/notifications-and-feedback.md): 1
 - [ai-activity-log.md](ux/ai-activity-log.md): 1
-- [tactical-battle-controls.md](ux/tactical-battle-controls.md): 1

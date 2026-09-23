@@ -1,4 +1,5 @@
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
+import { formatSidebarPhaseText } from '../../shared/sidebarPhaseLabel';
 import { rendererSharedState as S } from './state';
 import { initializeScenarioRegionSelectorsOnOverlayOpen } from '../gameplay/newGameRegionUi';
 import { syncGameSizeCapPreview } from '../gameplay/newGameSizeUi';
@@ -40,14 +41,21 @@ export function updateSidebar(
  * Defines the `updateGameStateSidebar` function shape (export function updateGameStateSidebar(state: GameStateSnapshot | null): void).
 
  * Purpose: Refreshes phase and turn lines in the right sidebar from the latest snapshot.
- * When to use: After `applyGameStateSnapshot`, tactical entry/exit, and tactical Ready commit when the visible turn counter should change.
- * Expected outcome: `Turn:` shows `S.tacticalBattleSnapshot.tacticalTurnNumber` while a tactical session is active, otherwise `state.turnNumber`.
+ * When to use: After `applyGameStateSnapshot`, tactical entry/exit, tactical Ready commit, and when beat playback ends.
+ * Expected outcome: The phase line is tactical planning or tactical resolution while a battle snapshot is set, otherwise the strategic label, or an em dash when `state` is null. `Turn:` shows `S.tacticalBattleSnapshot.tacticalTurnNumber` while a tactical session is active, otherwise `state.turnNumber`.
  * Exceptions: None.
  */
 export function updateGameStateSidebar(state: GameStateSnapshot | null): void {
   const phaseEl = document.getElementById('sidebar-phase');
   const turnEl = document.getElementById('sidebar-turn');
-  if (phaseEl) phaseEl.textContent = state ? `Phase: ${formatStrategicPhaseLabelForSidebar(state.phase)}` : '—';
+  if (phaseEl) {
+    phaseEl.textContent = formatSidebarPhaseText({
+      hasGameState: state != null,
+      strategicPhaseLabel: state ? formatStrategicPhaseLabelForSidebar(state.phase) : '',
+      battleActive: S.tacticalBattleSnapshot != null,
+      beatPlaybackActive: S.resolutionMoveAnimation != null,
+    });
+  }
   if (turnEl) {
     if (!state) {
       turnEl.textContent = '—';

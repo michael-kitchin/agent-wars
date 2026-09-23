@@ -15098,9 +15098,9 @@
     /**
        * Documents the object literal property `tacticalPhasePlanning` (tacticalPhasePlanning: true).
     
-       * Purpose: Separates milestone-2.1 tactical planning beats from tactical resolution (AI / async work after advancing the tactical turn).
-       * When to use: `true` while the human may exit tactical mode or press Advance; `false` while `performTacticalAdvanceTurn` waits on IPC and optional background `requestAiOrders`.
-       * Expected outcome: `#tactical-exit-btn` stays disabled whenever this flag is `false` with an active tactical snapshot.
+       * Purpose: Separates a tactical planning beat from the window while an advance-turn request and an optional opponent-order request are in flight.
+       * When to use: `true` while the human may press Advance. Exit Battle also requires this flag, and beat playback disables that control on its own. `false` while `performTacticalAdvanceTurn` waits on IPC and optional background `requestAiOrders`.
+       * Expected outcome: `#tactical-exit-btn` stays disabled when this flag is `false` and a tactical snapshot is active. Beat playback disables that same control while this flag stays `true`.
        * Exceptions: Reconciling snapshots or ending tactical always resets this to `true` once the renderer returns to a coherent tactical or strategic mode.
        */
     tacticalPhasePlanning: true,
@@ -19914,6 +19914,14 @@
     return explored.has(h3Index);
   }
 
+  // src/shared/sidebarPhaseLabel.ts
+  function formatSidebarPhaseText(args) {
+    if (!args.hasGameState) return "\u2014";
+    if (args.battleActive && args.beatPlaybackActive) return "Phase: Tactical resolution";
+    if (args.battleActive) return "Phase: Tactical planning";
+    return `Phase: ${args.strategicPhaseLabel}`;
+  }
+
   // src/renderer/gameplay/newGameRegionUi.ts
   var HUMAN_REGION_SELECT_ID = "new-game-human-region-select";
   var AI_REGION_SELECT_ID = "new-game-ai-region-select";
@@ -20187,7 +20195,14 @@
   function updateGameStateSidebar(state) {
     const phaseEl = document.getElementById("sidebar-phase");
     const turnEl = document.getElementById("sidebar-turn");
-    if (phaseEl) phaseEl.textContent = state ? `Phase: ${formatStrategicPhaseLabelForSidebar(state.phase)}` : "\u2014";
+    if (phaseEl) {
+      phaseEl.textContent = formatSidebarPhaseText({
+        hasGameState: state != null,
+        strategicPhaseLabel: state ? formatStrategicPhaseLabelForSidebar(state.phase) : "",
+        battleActive: rendererSharedState.tacticalBattleSnapshot != null,
+        beatPlaybackActive: rendererSharedState.resolutionMoveAnimation != null
+      });
+    }
     if (turnEl) {
       if (!state) {
         turnEl.textContent = "\u2014";
@@ -20319,7 +20334,8 @@
     const active = !!rendererSharedState.tacticalBattleSnapshot;
     const annihilationDialogOpen = rendererSharedState.tacticalAnnihilationOutcomeDialog != null;
     hud?.classList.toggle("hidden", !active);
-    const disabled = !active || !rendererSharedState.tacticalPhasePlanning;
+    const playbackDisablesExit = rendererSharedState.tacticalBattleSnapshot != null && rendererSharedState.resolutionMoveAnimation != null;
+    const disabled = !active || !rendererSharedState.tacticalPhasePlanning || playbackDisablesExit;
     if (exitBtn) {
       if (annihilationDialogOpen) {
         exitBtn.classList.add("hidden");
@@ -25224,6 +25240,10 @@
         if (commitResult.tacticalBattle) {
           rendererSharedState.tacticalBattleSnapshot = commitResult.tacticalBattle;
         }
+        if (rendererSharedState.resolutionMoveAnimation != null && rendererSharedState.tacticalBattleSnapshot != null) {
+          deps.updateGameStateSidebar(rendererSharedState.gameState);
+          deps.syncTacticalExitButton?.();
+        }
         reconcileSelectionToCurrentState();
         if ("committedOpponentTacticalDraft" in commitResult) {
           rendererSharedState.tacticalOpponentDraft = null;
@@ -28531,7 +28551,8 @@
       buildMeleeInterceptHexPopupHtml: buildMeleeInterceptHexPopupHtmlForRes12,
       openMeleeInterceptModal,
       startTacticalBattleFromInterceptHex: startTacticalBattleFromEntryHex2,
-      scheduleTacticalAnnihilationExit: maybeScheduleTacticalAnnihilationExit
+      scheduleTacticalAnnihilationExit: maybeScheduleTacticalAnnihilationExit,
+      syncTacticalExitButton: tacticalUpdateExitButtonVisibility
     };
   }
   function maybeScheduleTacticalAnnihilationExit() {
@@ -28848,6 +28869,7 @@
     } else {
       rendererSharedState.resolutionMoveAnimation = null;
       rendererSharedState.resolutionMoveAnimationFrameId = null;
+      updateGameStateSidebar2(rendererSharedState.gameState);
       flushResolutionPlaybackCompleteNotifyCallbacks();
       rendererSharedState.hideCommittedOrderLinesAfterReady = false;
       redraw();

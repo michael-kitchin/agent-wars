@@ -2199,7 +2199,7 @@ async function buildMeleeInterceptHexPopupHtmlForRes1(h3Index: string): Promise<
 /**
  * Builds the shared dependency bundle for strategic Ready handling (also used after tactical exit).
  *
- * Purpose: Keeps Ready and tactical-exit paths identical so milestone-2.1 “Ready-equivalent” behavior stays centralized.
+ * Purpose: Keeps Ready and tactical-exit paths on one dependency bundle so both use the same helpers.
  * When to use: Ready button clicks and tactical exit after `endTacticalBattle` IPC succeeds.
  * Expected outcome: A fully populated `ReadyHandlerDeps` object referencing live renderer helpers.
  * Exceptions: None.
@@ -2237,6 +2237,7 @@ function createReadyHandlerDeps(): ReadyHandlerDeps {
     openMeleeInterceptModal,
     startTacticalBattleFromInterceptHex: startTacticalBattleFromEntryHex,
     scheduleTacticalAnnihilationExit: maybeScheduleTacticalAnnihilationExit,
+    syncTacticalExitButton: tacticalUpdateExitButtonVisibility,
   };
 }
 
@@ -2643,9 +2644,9 @@ function redraw(): void {
 /**
  * Defines the `tickResolutionMoveAnimation` function shape (function tickResolutionMoveAnimation(): void).
 
- * Purpose: Supports maintainability by documenting why `tickResolutionMoveAnimation` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Purpose: Advances beat playback one frame and, when the beat ends, restores the sidebar phase line before the last redraw.
+ * When to use: From `requestAnimationFrame` while `S.resolutionMoveAnimation` is set.
+ * Expected outcome: Redraws each frame. When the duration elapses, clears the animation, refreshes the phase line from the cleared playback flag, then redraws so Exit Battle can enable again.
  * Exceptions: None.
  */
 function tickResolutionMoveAnimation(): void {
@@ -2660,6 +2661,7 @@ function tickResolutionMoveAnimation(): void {
   } else {
     S.resolutionMoveAnimation = null;
     S.resolutionMoveAnimationFrameId = null;
+    updateGameStateSidebar(S.gameState);
     flushResolutionPlaybackCompleteNotifyCallbacks();
     // Re-enable committed path rendering at the end of resolution playback.
     S.hideCommittedOrderLinesAfterReady = false;

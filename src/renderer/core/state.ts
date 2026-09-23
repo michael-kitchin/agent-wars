@@ -321,9 +321,9 @@ tacticalEntryButtonPointerInside: false,
     /**
    * Documents the object literal property `tacticalPhasePlanning` (tacticalPhasePlanning: true).
 
-   * Purpose: Separates milestone-2.1 tactical planning beats from tactical resolution (AI / async work after advancing the tactical turn).
-   * When to use: `true` while the human may exit tactical mode or press Advance; `false` while `performTacticalAdvanceTurn` waits on IPC and optional background `requestAiOrders`.
-   * Expected outcome: `#tactical-exit-btn` stays disabled whenever this flag is `false` with an active tactical snapshot.
+   * Purpose: Separates a tactical planning beat from the window while an advance-turn request and an optional opponent-order request are in flight.
+   * When to use: `true` while the human may press Advance. Exit Battle also requires this flag, and beat playback disables that control on its own. `false` while `performTacticalAdvanceTurn` waits on IPC and optional background `requestAiOrders`.
+   * Expected outcome: `#tactical-exit-btn` stays disabled when this flag is `false` and a tactical snapshot is active. Beat playback disables that same control while this flag stays `true`.
    * Exceptions: Reconciling snapshots or ending tactical always resets this to `true` once the renderer returns to a coherent tactical or strategic mode.
    */
 tacticalPhasePlanning: true,

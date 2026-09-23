@@ -59,7 +59,7 @@ These controls exist only in a tactical battle. During a strategic Resolution pl
 
 ## Known Deviations
 
-- **Exit Battle stays enabled during a beat.** Required: Exit Battle is disabled from a tactical Ready commit until that beat's playback ends. Current: the control disables only when the battle is marked as not planning, and nothing sets that mark during a battle, so Exit Battle stays enabled through commit and playback. Entry point: `src/renderer/tactical/tacticalExitButtonDom.ts`.
+None.
 
 ## Open Questions
 

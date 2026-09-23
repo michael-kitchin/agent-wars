@@ -36,7 +36,7 @@ Ready stays disabled while a deferred opponent consultation is still outstanding
 
 ### Tactical planning
 
-The player sees the battle map for one contested hex, the Exit Battle control, and the same right panel. The turn readout shows the tactical turn. The player drafts tactical orders and presses Ready to commit a beat. Exit Battle is enabled while the player drafts. It is disabled from the tactical Ready commit until that beat's playback ends, and hidden while the annihilation dialog is open. The phase line reads "Phase: Tactical planning" while drafting and "Phase: Tactical resolution" while a beat resolves. The current code differs on both points; see Known Deviations in [tactical-battle-controls.md](tactical-battle-controls.md) and [right-panel-command-bar.md](right-panel-command-bar.md).
+The player sees the battle map for one contested hex, the Exit Battle control, and the same right panel. The turn readout shows the tactical turn. The player drafts tactical orders and presses Ready to commit a beat. Exit Battle is enabled while the player drafts. It is disabled from the tactical Ready commit until that beat's playback ends, and hidden while the annihilation dialog is open. The phase line reads "Phase: Tactical planning" while drafting and "Phase: Tactical resolution" while a beat resolves.
 
 Clicks outside the battle area show an error toast and do not issue an order. The right panel stays usable. Strategic drafts are hidden for the duration of the battle and restored when it ends, except drafts whose units no longer exist.
 

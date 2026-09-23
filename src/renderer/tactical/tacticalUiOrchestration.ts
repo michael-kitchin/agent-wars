@@ -96,9 +96,9 @@ export function tacticalApplyStrategicSidebarForTacticalMode(tactical: boolean):
 /**
  * Updates tactical HUD visibility and exit button disabled state from renderer shared state.
  *
- * Contract: Reads `S.tacticalBattleSnapshot` and `S.tacticalPhasePlanning` only; mutates DOM button disabled flags.
- * When to use: After tactical snapshot changes, phase flips, and redraw passes that affect tactical controls.
- * Expected outcome: Exit button disabled whenever not in tactical planning or no snapshot.
+ * Contract: Reads `S.tacticalBattleSnapshot`, `S.tacticalPhasePlanning`, and `S.resolutionMoveAnimation`; mutates DOM button disabled flags. Does not assign `S.tacticalPhasePlanning`.
+ * When to use: After tactical snapshot changes, phase flips, beat playback start or end, and redraw passes that affect tactical controls.
+ * Expected outcome: Exit button disabled when there is no snapshot, when tactical planning is closed, or while beat playback is running.
  * Exceptions: None.
  */
 export function tacticalUpdateExitButtonVisibility(): void {

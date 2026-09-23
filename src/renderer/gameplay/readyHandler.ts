@@ -343,6 +343,15 @@ startTacticalBattleFromInterceptHex: (h3Index: string) => Promise<void>;
    * Exceptions: None.
    */
 scheduleTacticalAnnihilationExit?: () => void;
+    /**
+   * Refreshes Exit Battle from the current battle snapshot and beat playback.
+   *
+   * Contract: Tactical Ready stores playback before later awaits, and the HUD must disable Exit Battle before those awaits return.
+   * When to use: Immediately after a tactical commit stores beat playback, while a later redraw still refreshes the same control.
+   * Expected outcome: The in-battle Exit Battle control is disabled while a battle snapshot and beat playback are both set. Does not change `S.tacticalPhasePlanning`.
+   * Exceptions: Optional. Callers that omit it leave the control unchanged until the next redraw.
+   */
+syncTacticalExitButton?: () => void;
 }
 
 /**
@@ -837,6 +846,10 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
       }
       if (commitResult.tacticalBattle) {
         S.tacticalBattleSnapshot = commitResult.tacticalBattle;
+      }
+      if (S.resolutionMoveAnimation != null && S.tacticalBattleSnapshot != null) {
+        deps.updateGameStateSidebar(S.gameState);
+        deps.syncTacticalExitButton?.();
       }
       // Drop selection / drafts that referenced sub-units removed during this beat before the next planning click.
       reconcileSelectionToCurrentState();
