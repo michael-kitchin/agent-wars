@@ -1,5 +1,5 @@
 import type { AirStrikeTargetType } from '../../shared/ipcTypes';
-import { unitHasDirectRangedPlanning } from '../../shared/rangePerimeterModel';
+import { selectionSupportButtonMode } from '../../shared/selectionSupportButtonMode';
 import {
   formatPendingAirStrikeSidebarLabel,
   formatPendingRangedAttackSidebarLabel,
@@ -252,12 +252,12 @@ export function cancelFerryForUnit(unitId: string, deps: TacticalOrderDeps): voi
 }
 
 /**
- * Defines the `updateRangedSidebar` function shape (export function updateRangedSidebar(deps: TacticalOrderDeps): void).
-
- * Purpose: Supports maintainability by documenting why `updateRangedSidebar` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
+ * Rebuilds the pending ranged and air-strike rows and chooses Ranged, Strike, or neither for the current selection.
+ *
+ * Purpose: The shared button follows `selectionSupportButtonMode`. Clearing a targeting flag here must also drop a hover preview that sampled the old flag.
+ * When to use: After a selection change, a pending-order change, or a targeting-mode toggle.
+ * Expected outcome: Pending rows match the draft arrays. The button is hidden unless every resolved unit can range, or every resolved unit is air. `Cancel` stays while ranged mode is still valid. A true-to-false flag change nulls the hover preview, hides the block and slower tooltips, redraws, and starts one hover refresh.
+ * Exceptions: None. Returns immediately when `#ranged-attacks-list` is missing, and then leaves the button untouched.
  */
 export function updateRangedSidebar(deps: TacticalOrderDeps): void {
   const listEl = document.getElementById('ranged-attacks-list');
@@ -322,11 +322,14 @@ export function updateRangedSidebar(deps: TacticalOrderDeps): void {
       : S.selectedUnitIds
           .map((id) => S.gameState?.units.find((u) => u.id === id))
           .filter((unit): unit is NonNullable<typeof unit> => !!unit);
-    const allAir = selectedUnits.length > 0 && selectedUnits.every((unit) => unit.unitType === 'air');
-    const allHaveRanged =
-      selectedUnits.length > 0 &&
-      selectedUnits.every((unit) => unitHasDirectRangedPlanning(unit.unitType, !!tb));
-    if (allAir) {
+    const rangedWasActive = S.rangedModeActive;
+    const strikeWasActive = S.airStrikeModeActive;
+    const mode = selectionSupportButtonMode(
+      selectedUnits.map((unit) => unit.unitType),
+      !!tb
+    );
+    if (mode === 'strike') {
+      S.rangedModeActive = false;
       btnEl.textContent = 'Strike';
       btnEl.style.display = S.airStrikeModeActive ? 'none' : 'inline-block';
       if (strikeTypeEl) {
@@ -336,7 +339,8 @@ export function updateRangedSidebar(deps: TacticalOrderDeps): void {
       if (strikeCancelEl) {
         strikeCancelEl.style.display = S.airStrikeModeActive ? 'inline-block' : 'none';
       }
-    } else if (allHaveRanged) {
+    } else if (mode === 'ranged') {
+      S.airStrikeModeActive = false;
       btnEl.style.display = 'inline-block';
       btnEl.textContent = S.rangedModeActive ? 'Cancel' : 'Ranged';
       if (strikeTypeEl) strikeTypeEl.style.display = 'none';
@@ -347,6 +351,15 @@ export function updateRangedSidebar(deps: TacticalOrderDeps): void {
       S.airStrikeModeActive = false;
       if (strikeTypeEl) strikeTypeEl.style.display = 'none';
       if (strikeCancelEl) strikeCancelEl.style.display = 'none';
+    }
+    const targetingModeCleared =
+      (rangedWasActive && !S.rangedModeActive) || (strikeWasActive && !S.airStrikeModeActive);
+    if (targetingModeCleared) {
+      S.hoverRoutePreview = null;
+      showOrderBlockHexTooltip(null);
+      hideOrderSlowerHexTooltip();
+      deps.redraw();
+      void refreshHoverRoutePreview(deps);
     }
   }
 }

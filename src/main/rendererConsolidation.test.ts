@@ -1066,9 +1066,9 @@ function testMaintainabilityConsolidationSeams(): void {
   const initCorePath = path.resolve(process.cwd(), 'src', 'renderer', 'map', 'initCore.ts');
   const initCoreSource = fs.readFileSync(initCorePath, 'utf8');
   assert.ok(
-    initCoreSource.includes('unitHasDirectRangedPlanning(unit.unitType, !!tb)') &&
-      tacticalOrdersSource.includes('unitHasDirectRangedPlanning(unit.unitType, !!tb)'),
-    'Ranged button enable/show must use theater-aware planning, not tactical baseline on the strategic map'
+    initCoreSource.includes('selectionSupportButtonMode(') &&
+      tacticalOrdersSource.includes('selectionSupportButtonMode('),
+    'Ranged and Strike button visibility must share selectionSupportButtonMode'
   );
 
   const rendererPath = path.resolve(process.cwd(), 'src', 'renderer', 'renderer.ts');

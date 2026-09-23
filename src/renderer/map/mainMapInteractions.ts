@@ -467,6 +467,7 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
     }
     deps.updatePendingOrdersSidebar();
     deps.updateSidebar();
+    deps.updateRangedSidebar();
     deps.redraw();
     return true;
   }

@@ -20739,6 +20739,16 @@
     }
   }
 
+  // src/shared/selectionSupportButtonMode.ts
+  function selectionSupportButtonMode(unitTypes, tacticalBattleActive) {
+    if (unitTypes.length === 0) return "hidden";
+    if (unitTypes.every((unitType) => unitType === "air")) return "strike";
+    const everyUnitCanRangedAttack = unitTypes.every(
+      (unitType) => unitType !== "air" && unitHasDirectRangedPlanning(unitType, tacticalBattleActive)
+    );
+    return everyUnitCanRangedAttack ? "ranged" : "hidden";
+  }
+
   // src/renderer/gameplay/orderLabelFormatting.ts
   function resolveAttackerH3ForOrderLabel(unitId, state, tacticalPositions) {
     if (tacticalPositions && tacticalPositions.length > 0) {
@@ -22301,9 +22311,14 @@
     if (btnEl) {
       const tb = rendererSharedState.tacticalBattleSnapshot;
       const selectedUnits = tb ? rendererSharedState.selectedUnitIds.map((id) => tb.subUnits.find((u) => u.id === id)).filter((unit) => !!unit) : rendererSharedState.selectedUnitIds.map((id) => rendererSharedState.gameState?.units.find((u) => u.id === id)).filter((unit) => !!unit);
-      const allAir = selectedUnits.length > 0 && selectedUnits.every((unit) => unit.unitType === "air");
-      const allHaveRanged = selectedUnits.length > 0 && selectedUnits.every((unit) => unitHasDirectRangedPlanning(unit.unitType, !!tb));
-      if (allAir) {
+      const rangedWasActive = rendererSharedState.rangedModeActive;
+      const strikeWasActive = rendererSharedState.airStrikeModeActive;
+      const mode = selectionSupportButtonMode(
+        selectedUnits.map((unit) => unit.unitType),
+        !!tb
+      );
+      if (mode === "strike") {
+        rendererSharedState.rangedModeActive = false;
         btnEl.textContent = "Strike";
         btnEl.style.display = rendererSharedState.airStrikeModeActive ? "none" : "inline-block";
         if (strikeTypeEl) {
@@ -22313,7 +22328,8 @@
         if (strikeCancelEl) {
           strikeCancelEl.style.display = rendererSharedState.airStrikeModeActive ? "inline-block" : "none";
         }
-      } else if (allHaveRanged) {
+      } else if (mode === "ranged") {
+        rendererSharedState.airStrikeModeActive = false;
         btnEl.style.display = "inline-block";
         btnEl.textContent = rendererSharedState.rangedModeActive ? "Cancel" : "Ranged";
         if (strikeTypeEl) strikeTypeEl.style.display = "none";
@@ -22324,6 +22340,14 @@
         rendererSharedState.airStrikeModeActive = false;
         if (strikeTypeEl) strikeTypeEl.style.display = "none";
         if (strikeCancelEl) strikeCancelEl.style.display = "none";
+      }
+      const targetingModeCleared = rangedWasActive && !rendererSharedState.rangedModeActive || strikeWasActive && !rendererSharedState.airStrikeModeActive;
+      if (targetingModeCleared) {
+        rendererSharedState.hoverRoutePreview = null;
+        showOrderBlockHexTooltip(null);
+        hideOrderSlowerHexTooltip();
+        deps.redraw();
+        void refreshHoverRoutePreview(deps);
       }
     }
   }
@@ -25903,6 +25927,7 @@
         deps.clearCommittedOrderDraftState();
         deps.updatePendingOrdersSidebar();
         deps.updateSidebar();
+        deps.updateRangedSidebar();
         deps.redraw();
         return;
       case "planMarch":
@@ -26009,6 +26034,7 @@
       }
       deps.updatePendingOrdersSidebar();
       deps.updateSidebar();
+      deps.updateRangedSidebar();
       deps.redraw();
       return true;
     }
@@ -26383,11 +26409,13 @@
         const state = rendererSharedState.gameState;
         const tb = rendererSharedState.tacticalBattleSnapshot;
         const selectedUnits = tb ? rendererSharedState.selectedUnitIds.map((id) => tb.subUnits.find((u) => u.id === id)).filter((unit) => !!unit && unit.player === "human") : rendererSharedState.selectedUnitIds.map((id) => state.units.find((u) => u.id === id)).filter((unit) => !!unit && unit.player === "human");
-        const allAir = selectedUnits.length > 0 && selectedUnits.every((unit) => unit.unitType === "air");
-        const allHaveRanged = selectedUnits.length > 0 && selectedUnits.every((unit) => unitHasDirectRangedPlanning(unit.unitType, !!tb));
-        if (allAir) {
+        const mode = selectionSupportButtonMode(
+          selectedUnits.map((unit) => unit.unitType),
+          !!tb
+        );
+        if (mode === "strike") {
           beginHoverSupportTargetingMode(deps, "air");
-        } else if (allHaveRanged) {
+        } else if (mode === "ranged") {
           beginHoverSupportTargetingMode(deps, "ranged");
         }
       }

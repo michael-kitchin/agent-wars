@@ -201,6 +201,7 @@ export async function handleMainMapDoubleClick(
       deps.clearCommittedOrderDraftState();
       deps.updatePendingOrdersSidebar();
       deps.updateSidebar();
+      deps.updateRangedSidebar();
       deps.redraw();
       return;
 

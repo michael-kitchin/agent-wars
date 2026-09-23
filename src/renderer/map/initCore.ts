@@ -1,5 +1,5 @@
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
-import { unitHasDirectRangedPlanning } from '../../shared/rangePerimeterModel';
+import { selectionSupportButtonMode } from '../../shared/selectionSupportButtonMode';
 import { panBindingToDirection, panPhysicalKeyId } from '../../shared/mapKeyboardPanLogic';
 import { clearMapKeyboardPan, mapPanKeyDown, mapPanKeyUp } from './mapKeyboardPan';
 import { isEditableKeyboardTarget, shouldIgnoreGlobalKeydown } from './mapHelpers';
@@ -384,13 +384,13 @@ export function wireInitCore(deps: InitCoreDeps): void {
         : S.selectedUnitIds
             .map((id) => state.units.find((u) => u.id === id))
             .filter((unit): unit is NonNullable<typeof unit> => !!unit && unit.player === 'human');
-      const allAir = selectedUnits.length > 0 && selectedUnits.every((unit) => unit.unitType === 'air');
-      const allHaveRanged =
-        selectedUnits.length > 0 &&
-        selectedUnits.every((unit) => unitHasDirectRangedPlanning(unit.unitType, !!tb));
-      if (allAir) {
+      const mode = selectionSupportButtonMode(
+        selectedUnits.map((unit) => unit.unitType),
+        !!tb
+      );
+      if (mode === 'strike') {
         beginHoverSupportTargetingMode(deps, 'air');
-      } else if (allHaveRanged) {
+      } else if (mode === 'ranged') {
         beginHoverSupportTargetingMode(deps, 'ranged');
       }
     }
