@@ -9,6 +9,7 @@ import {
   canArmKeepBuildingForAll,
 } from './buildQueueKeepBuilding';
 import {
+  buildQueueTemplateFromSnapshot,
   countEligibleBuildHexes,
   createBuildQueueTemplateRow,
   filterTemplateForBuildHex,
@@ -16,8 +17,19 @@ import {
   formatSelectedBuildHexCodesHtml,
   templateEntriesForTurnEstimate,
   unionAvailableBuildUnitTypes,
+  type BuildQueueTemplateRow,
 } from './buildQueueMultiSelect';
 import { sanitizeBuildCountInputText } from './buildQueuePopupFormatting';
+
+/**
+ * Result of writing the shared build-queue template to selected hexes.
+ *
+ * Purpose: Tells the editor whether the edited template can stay, or which saved queue to put back.
+ * When to use: The return value of a multi-hex template apply.
+ * Expected outcome: `{ ok: true }` after a successful apply, including a silent eligibility skip. `{ ok: false, anyHexWritten: false }` when nothing was written. `{ ok: false, anyHexWritten: true }` when at least one hex was written and the apply still failed.
+ * Exceptions: None.
+ */
+export type BuildQueueTemplateApplyResult = { ok: true } | { ok: false; anyHexWritten: boolean };
 
 /**
  * Dependencies that keep multi-popup rendering independent from popup lifecycle and mutation policy.
@@ -55,10 +67,10 @@ export interface MultiBuildQueueRenderDeps {
    *
    * Contract: Uses authoritative best-effort backend filtering and reports hard errors.
    * When to use: Every multi-row add, update, or remove.
-   * Expected outcome: Eligible queues match the shared template.
-   * Exceptions: Resolves false after handled transport or domain failures.
+   * Expected outcome: `{ ok: true }` when the edited template should stay. `{ ok: false, anyHexWritten: false }` when the pre-edit copy should return. `{ ok: false, anyHexWritten: true }` when the template should be reloaded from the first selected hex.
+   * Exceptions: Playback and a missing batch API resolve `{ ok: false, anyHexWritten: false }` without a toast. Transport and hard domain failures toast inside the apply implementation.
    */
-  applyTemplate: (h3Indexes: string[]) => Promise<boolean>;
+  applyTemplate: (h3Indexes: string[]) => Promise<BuildQueueTemplateApplyResult>;
   /**
    * Arms or clears Keep building on all currently selected build hexes.
    *
@@ -91,6 +103,69 @@ async function loadSelectedBuildSnapshots(h3Indexes: string[]): Promise<HexBuild
     })
   );
   return snapshots.filter((snapshot): snapshot is HexBuildQueueSnapshot => snapshot !== null);
+}
+
+/**
+ * Copies each template row so a later edit cannot change the saved rows.
+ *
+ * Purpose: The pre-edit template must stay intact when the live template is replaced.
+ * When to use: Immediately before an add, type change, count change, or row remove assigns `buildQueueTemplate`.
+ * Expected outcome: A new array of new row objects with the same keys, types, and counts.
+ * Exceptions: None.
+ */
+function copyBuildQueueTemplate(template: BuildQueueTemplateRow[]): BuildQueueTemplateRow[] {
+  return template.map((row) => ({ ...row }));
+}
+
+/**
+ * Puts the shared template back after a failed multi-hex apply.
+ *
+ * Purpose: A rejected edit must not stay on screen. Nothing written leaves the pre-edit copy authoritative. Some written hexes leave the first selected hex's server queue authoritative.
+ * When to use: After `applyTemplate` returns for an add, type change, count change, or row remove.
+ * Expected outcome: Returns true when this edit still owns the template, after keeping a success or restoring a failure. Returns false when a newer assignment replaced `liveTemplate`, and leaves that newer template untouched. Failure with no writes restores `previousTemplate`. Failure with writes uses the first selected hex's snapshot, or `previousTemplate` when that load returns nothing. Does not toast.
+ * Exceptions: A snapshot read failure is logged by `loadSelectedBuildSnapshots` and treated as a missing snapshot.
+ */
+async function restoreTemplateAfterFailedApply(
+  applyResult: BuildQueueTemplateApplyResult,
+  previousTemplate: BuildQueueTemplateRow[],
+  liveTemplate: BuildQueueTemplateRow[]
+): Promise<boolean> {
+  if (S.buildQueueTemplate !== liveTemplate) return false;
+  if (applyResult.ok) return true;
+  if (!applyResult.anyHexWritten) {
+    S.buildQueueTemplate = previousTemplate;
+    return true;
+  }
+  const seedHex = S.selectedBuildHexH3s[0];
+  const snapshots = seedHex ? await loadSelectedBuildSnapshots([seedHex]) : [];
+  if (S.buildQueueTemplate !== liveTemplate) return false;
+  const snapshot = snapshots[0];
+  S.buildQueueTemplate = snapshot ? buildQueueTemplateFromSnapshot(snapshot) : previousTemplate;
+  return true;
+}
+
+/**
+ * Writes one edited template, then restores a queue the server still has when the apply fails.
+ *
+ * Purpose: Add, type, count, and remove must copy the template before replacing it and must not leave a rejected template on screen.
+ * When to use: After the playback guard has allowed the edit and the next template has been built without mutating the current row objects.
+ * Expected outcome: The next template is applied to every selected hex. On `{ ok: false, anyHexWritten: false }`, including a playback guard that wrote nothing, the copy returns and no extra toast is shown. On a partial write, the template reloads from the first selected hex. The editor renders only when this edit still owns the template afterward. A newer edit, close, or selection change that replaced the template is left alone.
+ * Exceptions: Apply failures are toasted by `applyTemplate`. This function does not throw.
+ */
+async function commitEditedTemplate(
+  deps: MultiBuildQueueRenderDeps,
+  nextTemplate: BuildQueueTemplateRow[]
+): Promise<void> {
+  const previousTemplate = copyBuildQueueTemplate(S.buildQueueTemplate);
+  S.buildQueueTemplate = nextTemplate;
+  const applyResult = await deps.applyTemplate([...S.selectedBuildHexH3s]);
+  const stillCurrent = await restoreTemplateAfterFailedApply(
+    applyResult,
+    previousTemplate,
+    nextTemplate
+  );
+  if (!stillCurrent) return;
+  void renderMultiBuildQueueIntoMount(deps);
 }
 
 /**
@@ -221,9 +296,10 @@ export async function renderMultiBuildQueueIntoMount(deps: MultiBuildQueueRender
     if (buildQueueEditBlockedByPlayback()) return;
     const defaultUnitType = unionTypes[0];
     if (!defaultUnitType) return;
-    S.buildQueueTemplate = [...S.buildQueueTemplate, createBuildQueueTemplateRow(defaultUnitType, 1)];
-    await deps.applyTemplate([...S.selectedBuildHexH3s]);
-    void renderMultiBuildQueueIntoMount(deps);
+    await commitEditedTemplate(deps, [
+      ...S.buildQueueTemplate,
+      createBuildQueueTemplateRow(defaultUnitType, 1),
+    ]);
   });
   head.appendChild(title);
   head.appendChild(buildBtn);
@@ -280,9 +356,7 @@ export async function renderMultiBuildQueueIntoMount(deps: MultiBuildQueueRender
         unitType: typeSelect.value as BuildUnitType,
         count: readCurrentCount(),
       };
-      S.buildQueueTemplate = updated;
-      await deps.applyTemplate([...S.selectedBuildHexH3s]);
-      void renderMultiBuildQueueIntoMount(deps);
+      await commitEditedTemplate(deps, updated);
     });
     countInput.addEventListener('input', async () => {
       if (buildQueueEditBlockedByPlayback()) {
@@ -297,9 +371,7 @@ export async function renderMultiBuildQueueIntoMount(deps: MultiBuildQueueRender
         unitType: typeSelect.value as BuildUnitType,
         count: readCurrentCount(),
       };
-      S.buildQueueTemplate = updated;
-      await deps.applyTemplate([...S.selectedBuildHexH3s]);
-      void renderMultiBuildQueueIntoMount(deps);
+      await commitEditedTemplate(deps, updated);
     });
 
     const removeBtn = document.createElement('button');
@@ -308,9 +380,10 @@ export async function renderMultiBuildQueueIntoMount(deps: MultiBuildQueueRender
     removeBtn.textContent = 'x';
     removeBtn.addEventListener('click', async () => {
       if (buildQueueEditBlockedByPlayback()) return;
-      S.buildQueueTemplate = S.buildQueueTemplate.filter((row) => row.rowKey !== rowKey);
-      await deps.applyTemplate([...S.selectedBuildHexH3s]);
-      void renderMultiBuildQueueIntoMount(deps);
+      await commitEditedTemplate(
+        deps,
+        S.buildQueueTemplate.filter((row) => row.rowKey !== rowKey)
+      );
     });
     row.appendChild(removeBtn);
     list.appendChild(row);

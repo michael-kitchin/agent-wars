@@ -34,11 +34,11 @@ When a multi-hex add-row, type change, count change, or row remove edits `S.buil
 **Files:**
 - Modify: `src/renderer/gameplay/buildQueuePopup.ts`
 
-- [ ] **Step 1: Load the open hex**
+- [x] **Step 1: Load the open hex**
 
 In the `priorCount === 1` branch, the code currently calls `getHexBuildQueue({ h3Index })` where `h3Index` is the newly clicked hex. Before appending, read `const seedHex = S.selectedBuildHexH3s[0]`. After the append, call `getHexBuildQueue({ h3Index: seedHex })`. Keep the failure path that removes the new hex and toasts. Keep `applyCurrentTemplateToHexes([...S.selectedBuildHexH3s])` after a successful seed.
 
-- [ ] **Step 2: Verify**
+- [x] **Step 2: Verify**
 
 ```text
 npm run check:renderer-types
@@ -56,15 +56,15 @@ Expected: exit 0.
 
 Neither document has a Known Deviations entry for this. Do not add one. The requirement text already matches this behavior. No count change in `doc/ux-specification.md`.
 
-- [ ] **Step 1: Single hex**
+- [x] **Step 1: Single hex**
 
 In the type `change` listener and the count `input` listener inside `renderBuildQueueIntoMount`, the closed-over `entry` still has the unit type and count from the last successful render. On failure, set the type control and the count control back to `entry.unitType` and `entry.count` before any refetch. `renderBuildQueueIntoMount` returns without changing the mount when `getHexBuildQueue` yields no snapshot, so a refetch alone can leave the rejected values on screen. After that reset, call `await renderBuildQueueIntoMount(mount, h3Index)` once. If a snapshot arrives, the server queue replaces the mount. If it does not, the controls are already on the previous values. Do not re-enter the failure path from the render itself.
 
-- [ ] **Step 2: Multi hex**
+- [x] **Step 2: Multi hex**
 
 In the add-row `click`, type `change`, count `input`, and remove `click` listeners in `buildQueueMultiPopup.ts`, copy `S.buildQueueTemplate` before replacing it, using a new object per row. The add-row listener is the one that appends `createBuildQueueTemplateRow`. Change `applyTemplate` so a false result says whether any hex was written. If nothing was written, assign the copy back, then render. If some hexes were written, replace the template from `getHexBuildQueue` of the first selected hex, then render. If that load returns no snapshot, restore the pre-edit copy, then render. If it succeeds, render the updated template. A playback guard that returns before any write counts as nothing written, so the copy comes back and no toast is added.
 
-- [ ] **Step 3: Verify**
+- [x] **Step 3: Verify**
 
 ```text
 npm run check:renderer-types

@@ -88,8 +88,8 @@ export function formatSelectedBuildHexCodesHtml(h3Indexes: string[]): string {
 /**
  * Converts one persisted queue snapshot to id-independent template rows.
  *
- * Purpose: Seeds the shared template from the last Shift-added hex without retaining per-hex row ids.
- * When to use: Selection size first changes from one to two.
+ * Purpose: Copies one persisted queue into shared template rows without retaining per-hex row ids.
+ * When to use: Seeding from the hex that was already open, or reloading the template from the first selected hex after a partial apply.
  * Expected outcome: Queue order, unit types, and remaining counts are preserved.
  * Exceptions: None.
  */

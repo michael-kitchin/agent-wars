@@ -7,7 +7,10 @@ import { rendererSharedState as S } from '../core/state';
 import { hidePlanningChromeToasts } from '../openRouter/openRouterUiHelpers';
 import { isHoverOrderPlanningActive } from '../rendering/canvasPreviewPolicy';
 import { buildQueueTemplateFromSnapshot, toBuildQueueTemplateEntries } from './buildQueueMultiSelect';
-import { renderMultiBuildQueueIntoMount } from './buildQueueMultiPopup';
+import {
+  renderMultiBuildQueueIntoMount,
+  type BuildQueueTemplateApplyResult,
+} from './buildQueueMultiPopup';
 import {
   appendKeepBuildingCheckbox,
   canArmKeepBuilding,
@@ -199,29 +202,68 @@ export function createBuildQueuePopupHandler(deps: BuildQueuePopupDeps) {
    *
    * Purpose: Keeps multi-hex writes on the batch API while preserving hard-failure feedback.
    * When to use: Selection joins and every multi-mode template edit.
-   * Expected outcome: False immediately, with no toast and no write, while resolution playback is running. Successful siblings refresh immediately; eligibility skips stay silent.
-   * Exceptions: Transport and hard domain failures show one error toast and return `false`.
+   * Expected outcome: `{ ok: false, anyHexWritten: false }` immediately, with no toast and no write, while resolution playback is running or the batch API is missing. A successful apply, including a silent eligibility skip, returns `{ ok: true }`. A hard failure returns `{ ok: false, anyHexWritten }`, and `anyHexWritten` is true when `applied.length > 0`. Written hexes refresh before that failure result.
+   * Exceptions: Transport and hard domain failures show one error toast. A transport failure reports that nothing was written.
    */
-  async function applyCurrentTemplateToHexes(h3Indexes: string[]): Promise<boolean> {
-    if (resolutionPlaybackBlocksMapOrders(S.resolutionMoveAnimation)) return false;
-    if (!window.gameApi?.applyBuildQueueTemplateToHexes) return false;
+  async function applyCurrentTemplateToHexes(h3Indexes: string[]): Promise<BuildQueueTemplateApplyResult> {
+    if (resolutionPlaybackBlocksMapOrders(S.resolutionMoveAnimation)) {
+      return { ok: false, anyHexWritten: false };
+    }
+    if (!window.gameApi?.applyBuildQueueTemplateToHexes) {
+      return { ok: false, anyHexWritten: false };
+    }
     try {
       const result = await window.gameApi.applyBuildQueueTemplateToHexes({
         h3Indexes,
         entries: toBuildQueueTemplateEntries(S.buildQueueTemplate),
       });
-      if (result.applied.length > 0) await deps.refreshGameStateAfterBuildQueueChange();
+      const anyHexWritten = result.applied.length > 0;
+      if (anyHexWritten) await deps.refreshGameStateAfterBuildQueueChange();
       if (!result.success) {
         const failureReason = result.reason ?? result.failed[0]?.reason ?? 'Failed to synchronize build queues.';
         deps.showMapToast(failureReason, { isError: true });
-        return false;
+        return { ok: false, anyHexWritten };
       }
-      return true;
+      return { ok: true };
     } catch (err) {
       console.error('applyCurrentTemplateToHexes failed:', err);
       deps.showMapToast('Failed to synchronize build queues.', { isError: true });
-      return false;
+      return { ok: false, anyHexWritten: false };
     }
+  }
+
+  /**
+   * Puts a single-hex type select and count field back on the last rendered row.
+   *
+   * Purpose: The control changes before the server can reject it, and a refetch that returns no snapshot would leave that rejected value on screen.
+   * When to use: After a type or count mutation returns failure, before re-rendering the mount.
+   * Expected outcome: The select shows `entry.unitType` and the count field shows `entry.count`. Assigning the values does not dispatch a change or input event.
+   * Exceptions: None.
+   */
+  function restoreRejectedBuildQueueControls(
+    typeSelect: HTMLSelectElement,
+    countInput: HTMLInputElement,
+    entry: { unitType: BuildUnitType; count: number }
+  ): void {
+    typeSelect.value = entry.unitType;
+    countInput.value = String(entry.count);
+  }
+
+  /**
+   * Reports whether a failed single-hex edit is still the value on screen.
+   *
+   * Purpose: A count field sends one request per keystroke, so an older failure must not wipe a newer attempt.
+   * When to use: After a type or count mutation returns failure, before restoring the last rendered row.
+   * Expected outcome: True when both controls still show the values submitted by this attempt. False when the player has changed either control since the request was sent.
+   * Exceptions: None.
+   */
+  function rejectedBuildQueueEditStillShown(
+    typeSelect: HTMLSelectElement,
+    countInput: HTMLInputElement,
+    submittedUnitType: BuildUnitType,
+    submittedCountText: string
+  ): boolean {
+    return typeSelect.value === submittedUnitType && countInput.value === submittedCountText;
   }
 
   /**
@@ -397,18 +439,34 @@ export function createBuildQueuePopupHandler(deps: BuildQueuePopupDeps) {
       typeSelect.addEventListener('change', async () => {
         if (restoreSingleHexQueueIfPlaybackBlocks(mount, h3Index)) return;
         if (!window.gameApi?.updateHexBuildQueueEntry) return;
+        const submittedUnitType = typeSelect.value as BuildUnitType;
+        const submittedCount = readCurrentCount();
+        const submittedCountText = countInput.value;
         const success = await runBuildQueueMutation({
           mutate: () =>
             window.gameApi!.updateHexBuildQueueEntry({
               h3Index,
               entryId: entry.id,
-              unitType: typeSelect.value as BuildUnitType,
-              count: readCurrentCount(),
+              unitType: submittedUnitType,
+              count: submittedCount,
             }),
           failureMessage: 'Failed to update build queue entry.',
           refreshState: true,
         });
-        if (!success) return;
+        if (!success) {
+          if (
+            rejectedBuildQueueEditStillShown(
+              typeSelect,
+              countInput,
+              submittedUnitType,
+              submittedCountText
+            )
+          ) {
+            restoreRejectedBuildQueueControls(typeSelect, countInput, entry);
+            await renderBuildQueueIntoMount(mount, h3Index);
+          }
+          return;
+        }
         void renderBuildQueueIntoMount(mount, h3Index);
       });
       row.appendChild(typeSelect);
@@ -422,19 +480,34 @@ export function createBuildQueuePopupHandler(deps: BuildQueuePopupDeps) {
       countInput.addEventListener('input', async () => {
         if (restoreSingleHexQueueIfPlaybackBlocks(mount, h3Index)) return;
         if (!window.gameApi?.updateHexBuildQueueEntry) return;
-        const count = readCurrentCount();
+        const submittedUnitType = typeSelect.value as BuildUnitType;
+        const submittedCount = readCurrentCount();
+        const submittedCountText = countInput.value;
         const success = await runBuildQueueMutation({
           mutate: () =>
             window.gameApi!.updateHexBuildQueueEntry({
               h3Index,
               entryId: entry.id,
-              unitType: typeSelect.value as BuildUnitType,
-              count,
+              unitType: submittedUnitType,
+              count: submittedCount,
             }),
           failureMessage: 'Failed to update build count.',
           refreshState: true,
         });
-        if (!success) return;
+        if (!success) {
+          if (
+            rejectedBuildQueueEditStillShown(
+              typeSelect,
+              countInput,
+              submittedUnitType,
+              submittedCountText
+            )
+          ) {
+            restoreRejectedBuildQueueControls(typeSelect, countInput, entry);
+            await renderBuildQueueIntoMount(mount, h3Index);
+          }
+          return;
+        }
         void renderBuildQueueIntoMount(mount, h3Index);
       });
       row.appendChild(countInput);
@@ -510,7 +583,7 @@ export function createBuildQueuePopupHandler(deps: BuildQueuePopupDeps) {
    *
    * Purpose: Gives DOM-layer and canvas hit-test paths one implementation so their behavior cannot drift.
    * When to use: Every build-entry button activation.
-   * Expected outcome: While resolution playback is running, returns without a toast and without changing the selected hex, the build selection, or the popup. Otherwise a plain click replaces, Shift toggles, and join writes follow last-clicked seeding rules.
+   * Expected outcome: While resolution playback is running, returns without a toast and without changing the selected hex, the build selection, or the popup. Otherwise a plain click replaces and Shift toggles. The first extra hex is seeded from the hex that was already open; a later hex receives the current template.
    * Exceptions: Hard batch failures are reported but do not discard the user's selection.
    */
   async function processBuildEntryClick(
@@ -559,6 +632,7 @@ export function createBuildQueuePopupHandler(deps: BuildQueuePopupDeps) {
     }
 
     const priorCount = S.selectedBuildHexH3s.length;
+    const seedHex = priorCount === 1 ? S.selectedBuildHexH3s[0] : undefined;
     S.selectedBuildHexH3s = [...S.selectedBuildHexH3s, h3Index];
     if (priorCount === 0) {
       S.buildQueueTemplate = [];
@@ -566,7 +640,9 @@ export function createBuildQueuePopupHandler(deps: BuildQueuePopupDeps) {
       return;
     }
     if (priorCount === 1) {
-      const seedSnapshot = await window.gameApi?.getHexBuildQueue({ h3Index });
+      const seedSnapshot = seedHex
+        ? await window.gameApi?.getHexBuildQueue({ h3Index: seedHex })
+        : null;
       if (lifecycleRevision !== popupLifecycleRevision) return;
       if (!seedSnapshot) {
         deps.showMapToast('Failed to load the build queue template.', { isError: true });

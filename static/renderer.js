@@ -22892,6 +22892,35 @@
     );
     return snapshots.filter((snapshot) => snapshot !== null);
   }
+  function copyBuildQueueTemplate(template) {
+    return template.map((row) => ({ ...row }));
+  }
+  async function restoreTemplateAfterFailedApply(applyResult, previousTemplate, liveTemplate) {
+    if (rendererSharedState.buildQueueTemplate !== liveTemplate) return false;
+    if (applyResult.ok) return true;
+    if (!applyResult.anyHexWritten) {
+      rendererSharedState.buildQueueTemplate = previousTemplate;
+      return true;
+    }
+    const seedHex = rendererSharedState.selectedBuildHexH3s[0];
+    const snapshots = seedHex ? await loadSelectedBuildSnapshots([seedHex]) : [];
+    if (rendererSharedState.buildQueueTemplate !== liveTemplate) return false;
+    const snapshot = snapshots[0];
+    rendererSharedState.buildQueueTemplate = snapshot ? buildQueueTemplateFromSnapshot(snapshot) : previousTemplate;
+    return true;
+  }
+  async function commitEditedTemplate(deps, nextTemplate) {
+    const previousTemplate = copyBuildQueueTemplate(rendererSharedState.buildQueueTemplate);
+    rendererSharedState.buildQueueTemplate = nextTemplate;
+    const applyResult = await deps.applyTemplate([...rendererSharedState.selectedBuildHexH3s]);
+    const stillCurrent = await restoreTemplateAfterFailedApply(
+      applyResult,
+      previousTemplate,
+      nextTemplate
+    );
+    if (!stillCurrent) return;
+    void renderMultiBuildQueueIntoMount(deps);
+  }
   function formatMultiQueueSummary(snapshots) {
     if (rendererSharedState.buildQueueTemplate.length === 0) return "<strong>Queue:</strong> (none)";
     const queueTotalCost = sumQueuedProductionCost(rendererSharedState.buildQueueTemplate);
@@ -22986,9 +23015,10 @@
       if (buildQueueEditBlockedByPlayback()) return;
       const defaultUnitType = unionTypes[0];
       if (!defaultUnitType) return;
-      rendererSharedState.buildQueueTemplate = [...rendererSharedState.buildQueueTemplate, createBuildQueueTemplateRow(defaultUnitType, 1)];
-      await deps.applyTemplate([...rendererSharedState.selectedBuildHexH3s]);
-      void renderMultiBuildQueueIntoMount(deps);
+      await commitEditedTemplate(deps, [
+        ...rendererSharedState.buildQueueTemplate,
+        createBuildQueueTemplateRow(defaultUnitType, 1)
+      ]);
     });
     head.appendChild(title);
     head.appendChild(buildBtn);
@@ -23042,9 +23072,7 @@
           unitType: typeSelect.value,
           count: readCurrentCount()
         };
-        rendererSharedState.buildQueueTemplate = updated;
-        await deps.applyTemplate([...rendererSharedState.selectedBuildHexH3s]);
-        void renderMultiBuildQueueIntoMount(deps);
+        await commitEditedTemplate(deps, updated);
       });
       countInput.addEventListener("input", async () => {
         if (buildQueueEditBlockedByPlayback()) {
@@ -23059,9 +23087,7 @@
           unitType: typeSelect.value,
           count: readCurrentCount()
         };
-        rendererSharedState.buildQueueTemplate = updated;
-        await deps.applyTemplate([...rendererSharedState.selectedBuildHexH3s]);
-        void renderMultiBuildQueueIntoMount(deps);
+        await commitEditedTemplate(deps, updated);
       });
       const removeBtn = document.createElement("button");
       removeBtn.type = "button";
@@ -23069,9 +23095,10 @@
       removeBtn.textContent = "x";
       removeBtn.addEventListener("click", async () => {
         if (buildQueueEditBlockedByPlayback()) return;
-        rendererSharedState.buildQueueTemplate = rendererSharedState.buildQueueTemplate.filter((row2) => row2.rowKey !== rowKey);
-        await deps.applyTemplate([...rendererSharedState.selectedBuildHexH3s]);
-        void renderMultiBuildQueueIntoMount(deps);
+        await commitEditedTemplate(
+          deps,
+          rendererSharedState.buildQueueTemplate.filter((row2) => row2.rowKey !== rowKey)
+        );
       });
       row.appendChild(removeBtn);
       list.appendChild(row);
@@ -23127,25 +23154,37 @@
       }
     }
     async function applyCurrentTemplateToHexes(h3Indexes) {
-      if (resolutionPlaybackBlocksMapOrders(rendererSharedState.resolutionMoveAnimation)) return false;
-      if (!window.gameApi?.applyBuildQueueTemplateToHexes) return false;
+      if (resolutionPlaybackBlocksMapOrders(rendererSharedState.resolutionMoveAnimation)) {
+        return { ok: false, anyHexWritten: false };
+      }
+      if (!window.gameApi?.applyBuildQueueTemplateToHexes) {
+        return { ok: false, anyHexWritten: false };
+      }
       try {
         const result = await window.gameApi.applyBuildQueueTemplateToHexes({
           h3Indexes,
           entries: toBuildQueueTemplateEntries(rendererSharedState.buildQueueTemplate)
         });
-        if (result.applied.length > 0) await deps.refreshGameStateAfterBuildQueueChange();
+        const anyHexWritten = result.applied.length > 0;
+        if (anyHexWritten) await deps.refreshGameStateAfterBuildQueueChange();
         if (!result.success) {
           const failureReason = result.reason ?? result.failed[0]?.reason ?? "Failed to synchronize build queues.";
           deps.showMapToast(failureReason, { isError: true });
-          return false;
+          return { ok: false, anyHexWritten };
         }
-        return true;
+        return { ok: true };
       } catch (err) {
         console.error("applyCurrentTemplateToHexes failed:", err);
         deps.showMapToast("Failed to synchronize build queues.", { isError: true });
-        return false;
+        return { ok: false, anyHexWritten: false };
       }
+    }
+    function restoreRejectedBuildQueueControls(typeSelect, countInput, entry) {
+      typeSelect.value = entry.unitType;
+      countInput.value = String(entry.count);
+    }
+    function rejectedBuildQueueEditStillShown(typeSelect, countInput, submittedUnitType, submittedCountText) {
+      return typeSelect.value === submittedUnitType && countInput.value === submittedCountText;
     }
     function restoreSingleHexQueueIfPlaybackBlocks(mount, h3Index) {
       if (!resolutionPlaybackBlocksMapOrders(rendererSharedState.resolutionMoveAnimation)) return false;
@@ -23302,17 +23341,31 @@
         typeSelect.addEventListener("change", async () => {
           if (restoreSingleHexQueueIfPlaybackBlocks(mount, h3Index)) return;
           if (!window.gameApi?.updateHexBuildQueueEntry) return;
+          const submittedUnitType = typeSelect.value;
+          const submittedCount = readCurrentCount();
+          const submittedCountText = countInput.value;
           const success = await runBuildQueueMutation({
             mutate: () => window.gameApi.updateHexBuildQueueEntry({
               h3Index,
               entryId: entry.id,
-              unitType: typeSelect.value,
-              count: readCurrentCount()
+              unitType: submittedUnitType,
+              count: submittedCount
             }),
             failureMessage: "Failed to update build queue entry.",
             refreshState: true
           });
-          if (!success) return;
+          if (!success) {
+            if (rejectedBuildQueueEditStillShown(
+              typeSelect,
+              countInput,
+              submittedUnitType,
+              submittedCountText
+            )) {
+              restoreRejectedBuildQueueControls(typeSelect, countInput, entry);
+              await renderBuildQueueIntoMount(mount, h3Index);
+            }
+            return;
+          }
           void renderBuildQueueIntoMount(mount, h3Index);
         });
         row.appendChild(typeSelect);
@@ -23325,18 +23378,31 @@
         countInput.addEventListener("input", async () => {
           if (restoreSingleHexQueueIfPlaybackBlocks(mount, h3Index)) return;
           if (!window.gameApi?.updateHexBuildQueueEntry) return;
-          const count = readCurrentCount();
+          const submittedUnitType = typeSelect.value;
+          const submittedCount = readCurrentCount();
+          const submittedCountText = countInput.value;
           const success = await runBuildQueueMutation({
             mutate: () => window.gameApi.updateHexBuildQueueEntry({
               h3Index,
               entryId: entry.id,
-              unitType: typeSelect.value,
-              count
+              unitType: submittedUnitType,
+              count: submittedCount
             }),
             failureMessage: "Failed to update build count.",
             refreshState: true
           });
-          if (!success) return;
+          if (!success) {
+            if (rejectedBuildQueueEditStillShown(
+              typeSelect,
+              countInput,
+              submittedUnitType,
+              submittedCountText
+            )) {
+              restoreRejectedBuildQueueControls(typeSelect, countInput, entry);
+              await renderBuildQueueIntoMount(mount, h3Index);
+            }
+            return;
+          }
           void renderBuildQueueIntoMount(mount, h3Index);
         });
         row.appendChild(countInput);
@@ -23424,6 +23490,7 @@
         return;
       }
       const priorCount = rendererSharedState.selectedBuildHexH3s.length;
+      const seedHex = priorCount === 1 ? rendererSharedState.selectedBuildHexH3s[0] : void 0;
       rendererSharedState.selectedBuildHexH3s = [...rendererSharedState.selectedBuildHexH3s, h3Index];
       if (priorCount === 0) {
         rendererSharedState.buildQueueTemplate = [];
@@ -23431,7 +23498,7 @@
         return;
       }
       if (priorCount === 1) {
-        const seedSnapshot = await window.gameApi?.getHexBuildQueue({ h3Index });
+        const seedSnapshot = seedHex ? await window.gameApi?.getHexBuildQueue({ h3Index: seedHex }) : null;
         if (lifecycleRevision !== popupLifecycleRevision) return;
         if (!seedSnapshot) {
           deps.showMapToast("Failed to load the build queue template.", { isError: true });
