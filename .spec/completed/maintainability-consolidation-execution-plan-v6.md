@@ -52,7 +52,7 @@ Notes:
 6. No extraction of `renderSealiftSection` or the stack callout out of `renderer.ts`, and no extraction of the duplicated resolution-playback pass in `drawGameScene`. Those are async DOM, IPC, and canvas paths with no automated behavior coverage.
 7. No dependency upgrades, no `@types/leaflet`, no preload bundling change.
 8. No fixing of the 53 pre-existing renderer type errors beyond the specific defects named in Phase 2. The rest are captured as a baseline.
-9. No plan, phase, or opportunity identifiers in source, comments, configuration, or docs. This `.spec` file is the only place they may appear.
+9. No plan, phase, or opportunity identifiers in source, comments, configuration, or `doc/`. This `.spec` file is the only place they may appear.
 
 ---
 
@@ -143,7 +143,7 @@ Use source-text assertions only to prove code moved. Do not try to simulate canv
 
 ### Documentation impact
 
-`docs/README.md` is authoritative about which docs track which engine symbols (combat constants, unit caps, fog radii, tactical budgets, resolution phase order, tool names). **None of the phases in this plan change any of those symbols or their values, so no file under `docs/` needs editing.** Before reporting a phase complete, confirm you have not renamed or moved a symbol listed in the `docs/README.md` tracking table. If you have, stop and report rather than editing `docs/`.
+`doc/README.md` is authoritative about which docs track which engine symbols (combat constants, unit caps, fog radii, tactical budgets, resolution phase order, tool names). **None of the phases in this plan change any of those symbols or their values, so no file under `doc/` needs editing.** Before reporting a phase complete, confirm you have not renamed or moved a symbol listed in the `doc/README.md` tracking table. If you have, stop and report rather than editing `doc/`.
 
 ---
 
@@ -853,8 +853,8 @@ The tactical copies are behaviourally identical to the strategic originals; the 
 3. Statement order and short-circuit conditions are unchanged.
 4. Orienting comments on every new and changed function, field, and interface member; exactly one block per declaration.
 5. Main-process logging rules satisfied for new functions; no logging added under `src/renderer` or `src/shared`.
-6. No phase, opportunity, or plan identifiers anywhere in source, comments, configuration, or `docs/`.
-7. No symbol named in the `docs/README.md` tracking table was renamed or moved.
+6. No phase, opportunity, or plan identifiers anywhere in source, comments, configuration, or `doc/`.
+7. No symbol named in the `doc/README.md` tracking table was renamed or moved.
 8. Every new module is well under 600 lines; no new or changed parameter list exceeds 6 named parameters.
 9. New renderer source assertions went into new topic-scoped test files, not into `rendererConsolidation.test.ts`.
 10. `npm test`, `npm run build:renderer`, and `npm run check:circular` all green; renderer type-check baseline unchanged except where a phase explicitly regenerates it.

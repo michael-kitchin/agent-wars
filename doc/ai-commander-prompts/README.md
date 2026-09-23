@@ -15,7 +15,7 @@ It records two things:
 
 ## 2. Authority order
 
-1. **Live engine behaviour is first authority.** If a fact, stat, range, cap, phase order, or legality rule can be read from a symbol under `src/`, that symbol wins. Game-rule pages in `docs/` answer to the same symbols.
+1. **Live engine behaviour is first authority.** If a fact, stat, range, cap, phase order, or legality rule can be read from a symbol under `src/`, that symbol wins. Game-rule pages in `doc/` answer to the same symbols.
 2. **Prompt-generating code is first authority for wording.** The system prompt is assembled by `buildSystemPromptForTools` (`openRouterBuildSystemPrompt.ts`). Combat sentences live in `promptSpec/gameRuleText.ts`. Coaching lives in `promptSpec/coachingTextStrategic.ts` and `coachingTextTactical.ts`. Envelope shape lives in `promptSpec/envelopeContract.ts`. Opening and repair user messages live in `promptSpec/consultationText.ts`. Briefing tables live in `briefingFormatter.ts`, `formatTacticalBriefing.ts`, and the section builders they call.
 3. **This package describes that emission.** A sentence here is evidence of what we tell the model only insofar as it matches those builders.
 4. Captured dumps (`debug-last-strategic-prompt.txt`, `debug-last-user-prompt.txt`) are examples of emitted shape for one consultation. The tactical dump on disk may be stale; tactical catalogs below are derived from code.

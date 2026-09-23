@@ -111,7 +111,7 @@ slot       = positive integer, no leading zeros
 ```
 
   Copy that convention into the new shared module. Main-process callers log at their own boundary.
-- **Naming.** Follow `docs/naming-conventions-contract-v1.md`. Files and directories under `src/` are camelCase, exported functions are camelCase, exported types are PascalCase.
+- **Naming.** Follow `doc/naming-conventions-contract-v1.md`. Files and directories under `src/` are camelCase, exported functions are camelCase, exported types are PascalCase.
 - **File size.** `src/renderer/renderer.ts` is already past the 1000-line hard limit. Do not add net lines to it. The renderer edit below is designed to remove more than it adds.
 
 ---

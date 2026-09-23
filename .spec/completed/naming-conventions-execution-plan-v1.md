@@ -129,7 +129,7 @@ Example: the block above `TOOL2_NAMES` says it documents `TOOL2_NAMES`. The engi
 ### Generated and archival
 
 - `static/renderer.js` — regenerate only (`npm run build:renderer`). Never hand-edit.
-- `docs/**` — living; update paths and symbol names when they change.
+- `doc/**` — living; update paths and symbol names when they change.
 - `.spec/completed/**` and `.spec/deprecated/**` — do not rewrite.
 
 ### Working tree
@@ -242,7 +242,7 @@ Proposed const identifiers (values frozen):
 | `TOOL5_NAMES` | `STANDING_ORDER_TOOL_NAMES` |
 | `TOOL6_NAMES` | `PRODUCTION_TOOL_NAMES` |
 
-`docs/ai-tools.md` currently keys groups to `TOOL*_NAMES` and “Tool 1 — pathfinding”. After this batch, update that doc to the new identifiers and drop the numeric headings.
+`doc/ai-tools.md` currently keys groups to `TOOL*_NAMES` and “Tool 1 — pathfinding”. After this batch, update that doc to the new identifiers and drop the numeric headings.
 
 Files already matching the contract (for example `coordinateContext.ts`, `tacticalAsciiGridProjection.ts` in the same map folder) are not violations.
 
@@ -674,7 +674,7 @@ After each:
 
 Also update imports in `src/main/gameActions.ts` (`./game-actions/...` → `./gameActions/...`) and `src/main/gameDb.ts` (`./game-db/...` → `./gameDb/...`) via `getEditsForFileRename`; if any remain, fail the gate (`tsc` will fail).
 
-Update living `docs/**` path mentions for these directories in the same directory's batch (`docs/ai-commander-prompts/README.md` mentions `src/main/openrouter/`).
+Update living `doc/**` path mentions for these directories in the same directory's batch (`doc/ai-commander-prompts/README.md` mentions `src/main/openrouter/`).
 
 ### Verification
 
@@ -726,8 +726,8 @@ Apply all remaining `src/main/tools/` file and symbol entries. LLM string values
 
 Also update:
 
-- `docs/ai-tools.md` (drop “Tool 1” headings; replace `TOOL1_NAMES` with `PATHFINDING_TOOL_NAMES`, etc.)
-- `docs/README.md` if it cites `TOOL_*_NAMES`
+- `doc/ai-tools.md` (drop “Tool 1” headings; replace `TOOL1_NAMES` with `PATHFINDING_TOOL_NAMES`, etc.)
+- `doc/README.md` if it cites `TOOL_*_NAMES`
 - Comment occurrences for `TOOL2_NAMES` and similar
 
 Same gate and human commit. If the batch is large and the gate is red, restore to the last commit and split into pathfinding / assessment / remaining.
@@ -735,7 +735,7 @@ Same gate and human commit. If the batch is large and the gate is red, restore t
 ### Verification
 
 - `isNumberedToolName` no longer matches any **file** under `src/main/tools/` except none.
-- `rg "TOOL[0-9]_NAMES" src` returns no identifier hits (string `'TOOL1_NAMES'` in docs/archive may remain only in `.spec/completed/` which you must not edit).
+- `rg "TOOL[0-9]_NAMES" src` returns no identifier hits (string `'TOOL1_NAMES'` in doc/archive may remain only in `.spec/completed/` which you must not edit).
 - `rg "tool[0-9]" src/main/tools` returns no file names.
 - Values `'plan_route'` etc. still present.
 
@@ -791,8 +791,8 @@ Create `.cursor/rules/14-naming-conventions.mdc` (`alwaysApply: true`) stating: 
 
 ### Docs
 
-- Add a row to `docs/README.md` for the contract.
-- Optionally a short `docs/naming-conventions.md` that points at the contract (living doc, not a second source of rules). If you add it, the contract remains authoritative.
+- Add a row to `doc/README.md` for the contract.
+- Optionally a short `doc/naming-conventions.md` that points at the contract (living doc, not a second source of rules). If you add it, the contract remains authoritative.
 
 ### Verification
 

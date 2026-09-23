@@ -10,7 +10,7 @@ Every row cites a symbol or file so a later reader can re-verify. Paths are repo
 2. **Builders under `src/main/openRouter/` are first authority for wording.** This file describes those emissions.
 3. `debug-last-strategic-prompt.txt` and `debug-last-user-prompt.txt` cross-check emitted **shape** for one consultation. They are not a contract.
 4. `debug-last-tactical-prompt.txt` **is not used as a source.** Tactical catalogs below are derived from code.
-5. `docs/devleopment-plan-v3.3.md` is historical architecture and is not prompt authority.
+5. `doc/devleopment-plan-v3.3.md` is historical architecture and is not prompt authority.
 
 ## 2. Strategic section catalog
 
@@ -245,7 +245,7 @@ Every row still resolves the same way: **the engine wins** for mechanics. Wordin
 
 | Id | Status |
 | --- | --- |
-| `CAPS_V3_STALE` | Resolved in `docs/combat-rules-v3.md` |
+| `CAPS_V3_STALE` | Resolved in `doc/combat-rules-v3.md` |
 | `TACTICAL_STRUCTURE_V3` | Resolved in combat-rules §12.6 |
 | `WEGO_ORDER_UNSTATED` | Resolved: combat paragraph states the engine order |
 | `INFANTRY_RANGE_SPLIT` | Resolved: combat paragraph splits by mode |

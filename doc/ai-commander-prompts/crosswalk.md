@@ -231,8 +231,8 @@ From `source-inventory.md` section 8. Mechanics follow the engine. Wording follo
 
 | Id | Status |
 | --- | --- |
-| `CAPS_V3_STALE` | Resolved in docs |
-| `TACTICAL_STRUCTURE_V3` | Resolved in docs |
+| `CAPS_V3_STALE` | Resolved in doc |
+| `TACTICAL_STRUCTURE_V3` | Resolved in doc |
 | `WEGO_ORDER_UNSTATED` | Resolved in combat paragraph |
 | `INFANTRY_RANGE_SPLIT` | Resolved in combat paragraph |
 | `TEMPO_SWEEP_SILENCE` | Deliberate omission; the prompt does not describe the engine fallback |
