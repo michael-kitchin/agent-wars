@@ -156,7 +156,7 @@ npm run naming:report
 Then:
 
 1. Confirm `naming:report` no longer lists the entries just applied (they are `applied` in the ledger).
-2. Run `git status` and confirm only expected files changed (imports, ledger, baselines, tests, docs).
+2. Run `git status` and confirm only expected files changed (imports, ledger, baselines, tests, `doc/`).
 3. **Stop.** A human reviews and commits. Do not start the next apply until that commit exists.
 
 `npm run rebuild:native:node` runs **once per working session**, not per gate. Native `better-sqlite3` is unaffected by renames.
@@ -805,7 +805,7 @@ Create `.cursor/rules/14-naming-conventions.mdc` (`alwaysApply: true`) stating: 
 - ESLint config + plugin
 - `naming:check` on `npm test`
 - `.cursor/rules/14-naming-conventions.mdc`
-- docs index update
+- doc index update
 
 ---
 

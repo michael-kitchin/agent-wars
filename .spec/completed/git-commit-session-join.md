@@ -30,7 +30,7 @@ Never `git commit` or `git push`. Never write into Cursor application data. Dump
 
 1. `prompt` if `/prompt/`
 2. `buildCi` if `/build|\bci\b|workflow|electron-builder|github actions/`
-3. `docs` if `/\bdocs\b|readme|documentation/`
+3. `docs` if `/\bdocs\b|\bdoc\b|readme|documentation/`
 4. `refactor` if `/refactor/`
 5. `fix` if `/\bfix\b|\bbug\b/`
 6. `feature` otherwise
