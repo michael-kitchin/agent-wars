@@ -70,7 +70,7 @@ Both toasts use the same show, replace, and dismiss behavior in both theaters. T
 
 ## Known Deviations
 
-- **Basemap toast does not auto-hide.** Required: the basemap failure toast hides after the same interval as other map toasts. Current: it writes the map toast directly without starting the hide timer, so it stays until dismissed or replaced. Entry point: `src/renderer/map/worldLeafletMap.ts`.
+None.
 
 ## Open Questions
 

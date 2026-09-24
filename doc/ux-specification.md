@@ -137,5 +137,4 @@ Each entry is a requirement that the renderer does not meet yet. Cross-cutting d
 
 - [tactical-battles-list.md](ux/tactical-battles-list.md): 1
 - [right-panel-selection-and-orders.md](ux/right-panel-selection-and-orders.md): 1
-- [notifications-and-feedback.md](ux/notifications-and-feedback.md): 1
 - [ai-activity-log.md](ux/ai-activity-log.md): 1

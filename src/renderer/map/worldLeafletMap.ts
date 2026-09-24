@@ -5,6 +5,7 @@
 
 import { ORDER_LINE_COLOR } from '../core/constants';
 import { basemapNeedsRemountForMaps } from '../../shared/basemapStyleLogic';
+import { showMapToast } from '../openRouter/openRouterUiHelpers';
 import { getRasterBasemapChain, getRasterBasemapChainStartIndex } from './basemapProvider';
 import {
   WEB_MERCATOR_MAX_ABS_LAT,
@@ -412,24 +413,20 @@ export function initWorldLeafletMaps(
 let basemapErrorShown = false;
 
 /**
- * Defines the `showBasemapErrorToast` function shape (function showBasemapErrorToast(): void).
-
- * Purpose: Supports maintainability by documenting why `showBasemapErrorToast` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Shows the basemap-failure sentence on the map toast at most once per app session.
+ *
+ * Purpose: Tile failures should use the same info style and hide timer as other map toasts.
+ * When to use: From the basemap tile-error path after a provider failure.
+ * Expected outcome: The sentence appears once, in the info style, and hides on the shared timer. Later calls do nothing. A later map toast can replace it and restart the timer. If the toast elements are missing, the session flag is still set and nothing is shown.
  * Exceptions: None.
  */
 function showBasemapErrorToast(): void {
   if (basemapErrorShown) return;
   basemapErrorShown = true;
-  const el = document.getElementById('map-toast');
-  const textEl = document.getElementById('map-toast-text');
-  if (el && textEl) {
-    textEl.textContent =
-      'Some map tiles failed to load (network or provider). The game remains playable; try again later.';
-    el.classList.add('toast-info');
-    el.classList.remove('hidden');
-  }
+  showMapToast(
+    'Some map tiles failed to load (network or provider). The game remains playable; try again later.',
+    { isError: false }
+  );
 }
 
 /**

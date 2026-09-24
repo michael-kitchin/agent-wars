@@ -41,15 +41,15 @@ Tooltip documents:
 - Modify: `doc/ux/notifications-and-feedback.md`
 - Modify: `doc/ux-specification.md`
 
-- [ ] **Step 1: Use the shared toast**
+- [x] **Step 1: Use the shared toast**
 
 Replace the body of `showBasemapErrorToast` that writes `#map-toast` and `#map-toast-text`. Keep the `basemapErrorShown` guard. Call `showMapToast` from `src/renderer/openRouter/openRouterUiHelpers.ts` with the frozen sentence and `{ isError: false }`. `worldLeafletMap.ts` does not import that module today, and that module does not import `worldLeafletMap.ts`, so the import is safe.
 
-- [ ] **Step 2: Docs**
+- [x] **Step 2: Docs**
 
 Remove the basemap-toast Known Deviations entry from `doc/ux/notifications-and-feedback.md`. Rebuild the Known Deviations index in `doc/ux-specification.md` by reading the documents. Do not subtract from a remembered total.
 
-- [ ] **Step 3: Verify**
+- [x] **Step 3: Verify**
 
 ```text
 npm run check:renderer-types
@@ -65,7 +65,7 @@ Expected: both exit 0.
 - Create: `src/shared/resolutionPlaybackPhase.test.ts`
 - Modify: `src/renderer/rendering/resolutionPlayback.ts`
 
-- [ ] **Step 1: Move the phase function and add a failing test**
+- [x] **Step 1: Move the phase function and add a failing test**
 
 Move `getResolutionPlaybackPhase` and `ResolutionPlaybackPhase` into `src/shared/resolutionPlaybackPhase.ts`. The function takes:
 
@@ -90,7 +90,7 @@ export function getResolutionPlaybackPhase(args: {
 
 The test uses `fadeMs` 1000 and `lightningMs` 1000. The returned phase has `movementStart` and `meleeCombatStart`. It does not have `movementEnd`. With only `hasRangedCombat` true, `meleeCombatStart === movementStart`. With only `hasMoves` true, `meleeCombatStart === movementStart + 1000`. Do not add `movementEnd` to the returned type.
 
-- [ ] **Step 2: Verify**
+- [x] **Step 2: Verify**
 
 ```text
 npm run build:main
@@ -106,10 +106,10 @@ Expected: PASS, then both builds exit 0.
 **Files:**
 - Modify: `doc/ux/hex-tooltips.md`
 
-- [ ] **Step 1: Update the requirement text**
+- [x] **Step 1: Update the requirement text**
 
 Apply the two tooltip sentences in Locked Behavior. Do not edit `src/renderer/map/terrainTooltipRes1State.ts`.
 
-- [ ] **Step 2: Verify**
+- [x] **Step 2: Verify**
 
 No command. Read the strategic and tactical rows in `doc/ux/hex-tooltips.md` and confirm the Effects and Control cells match Locked Behavior.

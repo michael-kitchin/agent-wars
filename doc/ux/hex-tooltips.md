@@ -16,8 +16,8 @@ The hex tooltip can appear in Strategic planning, Tactical planning, and Resolut
 
 - A hex name line, including the hex code, when the lookup succeeds. If the lookup fails, that line is omitted.
 - Terrain kind. On the strategic map this can include the mix of terrain inside the hex.
-- Terrain effects that change movement or range. The rules are in the [combat rules](../combat-rules-v3.md).
-- Control or home-region ownership when the player is allowed to see it. Fog of war hides ownership the player has not earned. See the fog section of the [combat rules](../combat-rules-v3.md).
+- A world hex has no effects line, because strategic terrain does not change movement or range. A battle hex shows tactical terrain effects when that hex has any effects. The rules are in the [combat rules](../combat-rules-v3.md).
+- Control or home-region ownership on a world hex, when the player is allowed to see it. Fog of war hides ownership the player has not earned. See the fog section of the [combat rules](../combat-rules-v3.md).
 - Infrastructure the hex has, such as a seaport, road, rail, urban area, or rubble, when that information is known.
 
 ### Blocked tooltip
@@ -62,7 +62,8 @@ The hex tooltip can appear in Strategic planning, Tactical planning, and Resolut
 | Aspect | Strategic | Tactical |
 | --- | --- | --- |
 | Hex | World hex, including a terrain mix | Battle hex |
-| Effects | Strategic terrain effects | Tactical terrain effects |
+| Effects | A world hex has no effects line, because strategic terrain does not change movement or range | Tactical terrain effects |
+| Control | Control or home-region ownership when the player is allowed to see it | A battle hex does not show a control line |
 | Blocked tooltip | Strategic march, ranged, and strike previews | Battle march, ranged, and strike previews |
 | Slower tooltip | Not shown | Legal battle march previews only |
 

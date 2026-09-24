@@ -14331,659 +14331,6 @@
     return "";
   }
 
-  // src/renderer/map/basemapProvider.ts
-  var RASTER_BASEMAP_ORDER = [
-    {
-      id: "esri_world_shaded_relief",
-      displayName: "Esri World Shaded Relief",
-      urlTemplate: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Shaded_Relief/MapServer/tile/{z}/{y}/{x}",
-      attributionHtml: "Tiles &copy; Esri &mdash; Source: Esri, Garmin, GEBCO, NOAA NGDC, and other contributors",
-      maxZoom: 13,
-      minZoom: 0
-    },
-    {
-      id: "osm_mapnik",
-      displayName: "OpenStreetMap Standard",
-      urlTemplate: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-      attributionHtml: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-      subdomains: "abc",
-      maxZoom: 19,
-      minZoom: 0
-    }
-  ];
-  function getRasterBasemapChain() {
-    return RASTER_BASEMAP_ORDER;
-  }
-  function getRasterBasemapChainStartIndex(providerId) {
-    const i = RASTER_BASEMAP_ORDER.findIndex((d) => d.id === providerId);
-    return i >= 0 ? i : 0;
-  }
-
-  // src/renderer/map/hexGrid.ts
-  var WEB_MERCATOR_MAX_ABS_LAT = 85.05112877980659;
-  function clampLatForWebMercatorDisplay(lat) {
-    if (lat > WEB_MERCATOR_MAX_ABS_LAT) return WEB_MERCATOR_MAX_ABS_LAT;
-    if (lat < -WEB_MERCATOR_MAX_ABS_LAT) return -WEB_MERCATOR_MAX_ABS_LAT;
-    return lat;
-  }
-  function alignLngToReference(lng, refLng) {
-    let l = lng;
-    while (l - refLng > 180) l -= 360;
-    while (refLng - l > 180) l += 360;
-    return l;
-  }
-  function getHexBoundaryLatLngForLeafletOverlay(h3Index) {
-    const boundary = cellToBoundary(h3Index);
-    const [, refLng] = cellToLatLng(h3Index);
-    return boundary.map(
-      ([lat, lng]) => [clampLatForWebMercatorDisplay(lat), alignLngToReference(lng, refLng)]
-    );
-  }
-
-  // src/renderer/map/worldLeafletMap.ts
-  var mainMap = null;
-  var miniMap = null;
-  var viewportRect = null;
-  var onMainViewChanged = null;
-  var mainBasemapLayer = null;
-  var miniBasemapLayer = null;
-  var mountedMainBasemapProviderId = null;
-  var mountedMiniBasemapProviderId = null;
-  function notifyMainViewChanged() {
-    syncMinimapViewportRect();
-    onMainViewChanged?.();
-  }
-  function getL() {
-    const leafletRef = globalThis.L;
-    if (!leafletRef) throw new Error("Leaflet not loaded: include static/vendor/leaflet/leaflet.js before renderer.js");
-    return leafletRef;
-  }
-  function mountRasterBasemap(leafletRef, map, showAttribution, chainIndex, target) {
-    const chain = getRasterBasemapChain();
-    if (chainIndex >= chain.length) {
-      if (target === "main") mountedMainBasemapProviderId = null;
-      else mountedMiniBasemapProviderId = null;
-      showBasemapErrorToast();
-      return;
-    }
-    const spec = chain[chainIndex];
-    if (target === "main" && mainBasemapLayer) {
-      try {
-        map.removeLayer(mainBasemapLayer);
-      } catch {
-      }
-      mainBasemapLayer = null;
-    }
-    if (target === "mini" && miniBasemapLayer) {
-      try {
-        map.removeLayer(miniBasemapLayer);
-      } catch {
-      }
-      miniBasemapLayer = null;
-    }
-    let switched = false;
-    const layerOpts = {
-      attribution: showAttribution ? spec.attributionHtml : "",
-      maxZoom: spec.maxZoom ?? 19,
-      minZoom: spec.minZoom ?? 0
-    };
-    if (spec.subdomains !== void 0) layerOpts.subdomains = spec.subdomains;
-    const layer = leafletRef.tileLayer(spec.urlTemplate, layerOpts).addTo(map);
-    if (target === "main") {
-      mainBasemapLayer = layer;
-      mountedMainBasemapProviderId = spec.id;
-    } else {
-      miniBasemapLayer = layer;
-      mountedMiniBasemapProviderId = spec.id;
-    }
-    const onTileError = () => {
-      if (switched) return;
-      switched = true;
-      layer.off("tileerror", onTileError);
-      try {
-        map.removeLayer(layer);
-      } catch {
-      }
-      if (target === "main") {
-        mainBasemapLayer = null;
-        mountedMainBasemapProviderId = null;
-      } else {
-        miniBasemapLayer = null;
-        mountedMiniBasemapProviderId = null;
-      }
-      console.warn("[agent-wars] Basemap tile error; trying next provider", {
-        failedId: spec.id,
-        nextIndex: chainIndex + 1
-      });
-      mountRasterBasemap(leafletRef, map, showAttribution, chainIndex + 1, target);
-    };
-    layer.on("tileerror", onTileError);
-  }
-  function setMainBasemapByProviderId(providerId) {
-    if (!mainMap || !miniMap) return;
-    if (!basemapNeedsRemountForMaps(mountedMainBasemapProviderId, mountedMiniBasemapProviderId, providerId)) return;
-    const leafletRef = getL();
-    const startIdx = getRasterBasemapChainStartIndex(providerId);
-    mountRasterBasemap(leafletRef, mainMap, true, startIdx, "main");
-    mountRasterBasemap(leafletRef, miniMap, false, startIdx, "mini");
-  }
-  function initWorldLeafletMaps(mainContainerId, minimapContainerId, onViewChanged, initialBasemapProviderId) {
-    onMainViewChanged = onViewChanged;
-    const leafletRef = getL();
-    const mainEl = document.getElementById(mainContainerId);
-    const miniEl = document.getElementById(minimapContainerId);
-    if (!mainEl || !miniEl) {
-      console.error("[agent-wars] initWorldLeafletMaps: missing map container elements", {
-        mainContainerId,
-        minimapContainerId,
-        hasMain: !!mainEl,
-        hasMinimap: !!miniEl
-      });
-      return;
-    }
-    const worldBounds = leafletRef.latLngBounds(
-      leafletRef.latLng(-WEB_MERCATOR_MAX_ABS_LAT, -180),
-      leafletRef.latLng(WEB_MERCATOR_MAX_ABS_LAT, 180)
-    );
-    mainMap = leafletRef.map(mainEl, {
-      minZoom: 1.5,
-      maxZoom: 12,
-      zoomSnap: 0.25,
-      zoomDelta: 0.5,
-      wheelPxPerZoomLevel: 80,
-      worldCopyJump: true,
-      maxBounds: worldBounds,
-      maxBoundsViscosity: 1,
-      /* App-owned WASD/arrow screen pan; avoid Leaflet’s default keyboard panBy. */
-      keyboard: false,
-      /* Keep raster tiles and canvas overlay in lockstep (no CSS zoom/pan lag vs hex draw). */
-      zoomAnimation: false,
-      fadeAnimation: false,
-      inertia: false
-    });
-    const startIdx = getRasterBasemapChainStartIndex(initialBasemapProviderId ?? "esri_world_shaded_relief");
-    mountRasterBasemap(leafletRef, mainMap, true, startIdx, "main");
-    mainMap.fitBounds(worldBounds, { padding: [2, 2], animate: false });
-    mainMap.doubleClickZoom.disable();
-    try {
-      leafletRef.control.scale({
-        metric: true,
-        imperial: true,
-        maxWidth: 120
-      }).addTo(mainMap);
-    } catch {
-    }
-    miniMap = leafletRef.map(miniEl, {
-      minZoom: 0,
-      maxZoom: 2,
-      zoomControl: false,
-      attributionControl: false,
-      dragging: false,
-      scrollWheelZoom: false,
-      doubleClickZoom: false,
-      boxZoom: false,
-      keyboard: false
-    });
-    mountRasterBasemap(leafletRef, miniMap, false, startIdx, "mini");
-    miniMap.fitBounds(worldBounds, { padding: [1, 1], animate: false });
-    miniMap.setZoom(miniMap.getZoom());
-    mainMap.on("move", notifyMainViewChanged);
-    mainMap.on("zoom", notifyMainViewChanged);
-    mainMap.on("moveend", notifyMainViewChanged);
-    mainMap.on("zoomend", notifyMainViewChanged);
-    syncMinimapViewportRect();
-  }
-  var basemapErrorShown = false;
-  function showBasemapErrorToast() {
-    if (basemapErrorShown) return;
-    basemapErrorShown = true;
-    const el = document.getElementById("map-toast");
-    const textEl = document.getElementById("map-toast-text");
-    if (el && textEl) {
-      textEl.textContent = "Some map tiles failed to load (network or provider). The game remains playable; try again later.";
-      el.classList.add("toast-info");
-      el.classList.remove("hidden");
-    }
-  }
-  function syncMinimapViewportRect() {
-    if (!mainMap || !miniMap) return;
-    const leafletRef = getL();
-    const mainBounds = mainMap.getBounds();
-    const miniBounds = miniMap.getBounds();
-    const mainSpan = Math.abs(mainBounds.getNorthEast().lat - mainBounds.getSouthWest().lat) + Math.abs(mainBounds.getNorthEast().lng - mainBounds.getSouthWest().lng);
-    const miniSpan = Math.abs(miniBounds.getNorthEast().lat - miniBounds.getSouthWest().lat) + Math.abs(miniBounds.getNorthEast().lng - miniBounds.getSouthWest().lng);
-    const zoomedIn = mainSpan < miniSpan * 0.92;
-    if (!zoomedIn) {
-      if (viewportRect) {
-        viewportRect.remove();
-        viewportRect = null;
-      }
-      return;
-    }
-    if (!viewportRect) {
-      viewportRect = leafletRef.rectangle(mainBounds, {
-        color: ORDER_LINE_COLOR,
-        weight: 2,
-        fill: false,
-        interactive: false
-      }).addTo(miniMap);
-    } else {
-      viewportRect.setBounds(mainBounds);
-    }
-  }
-  function getMainLeafletMap() {
-    return mainMap;
-  }
-  function applyTilePaneFilter(map, filter) {
-    try {
-      const pane = map?.getPanes?.()?.tilePane;
-      if (!pane) return;
-      const oldFiltered = pane.querySelectorAll(".leaflet-layer, .leaflet-tile");
-      for (const el of oldFiltered) el.style.filter = "";
-      pane.style.filter = filter;
-    } catch {
-    }
-  }
-  function setMainBasemapFilter(filter) {
-    const mapEl = document.getElementById("main-map");
-    if (mapEl) mapEl.style.filter = "";
-    applyTilePaneFilter(mainMap, filter);
-    applyTilePaneFilter(miniMap, filter);
-  }
-  function hexCenterToOverlayPoint(h3Index, latLngFn) {
-    if (!mainMap) return { x: 0, y: 0 };
-    const leafletRef = getL();
-    const [lat, lng] = latLngFn(h3Index);
-    const p = mainMap.latLngToContainerPoint(leafletRef.latLng(clampLatForWebMercatorDisplay(lat), lng));
-    return { x: p.x, y: p.y };
-  }
-  function hexCenterToOverlayPointWithReferenceLng(h3Index, referenceLngDegrees, latLngFn) {
-    if (!mainMap) return { x: 0, y: 0 };
-    const leafletRef = getL();
-    const [lat, lng] = latLngFn(h3Index);
-    const lngAligned = alignLngToReference(lng, referenceLngDegrees);
-    const p = mainMap.latLngToContainerPoint(
-      leafletRef.latLng(clampLatForWebMercatorDisplay(lat), lngAligned)
-    );
-    return { x: p.x, y: p.y };
-  }
-  function invalidateLeafletMapSizes() {
-    mainMap?.invalidateSize({ animate: false });
-    miniMap?.invalidateSize({ animate: false });
-    notifyMainViewChanged();
-  }
-
-  // src/renderer/rendering/infrastructureOverlayState.ts
-  var WORLD_H3_RESOLUTION2 = 1;
-  function deriveInfrastructureOverlayState(rows) {
-    const res4TerrainOverridesByH3 = new Map(
-      rows.map((r) => [
-        r.h3Index,
-        {
-          terrainKind: r.terrainKind,
-          isUrban: !!r.isUrban,
-          isAirport: !!r.isAirport,
-          isSeaport: !!r.isSeaport,
-          isRubble: !!r.isRubble
-        }
-      ])
-    );
-    const terrainInfraRes4Airport = new Set(rows.filter((row) => !!row.isAirport).map((row) => row.h3Index));
-    const terrainInfraRes4Seaport = new Set(rows.filter((row) => !!row.isSeaport).map((row) => row.h3Index));
-    const terrainInfraRes1Airport = /* @__PURE__ */ new Set();
-    const terrainInfraRes1Seaport = /* @__PURE__ */ new Set();
-    for (const row of rows) {
-      if (!row.isAirport && !row.isSeaport) continue;
-      const parentH3 = cellToParent(row.h3Index, WORLD_H3_RESOLUTION2);
-      if (row.isAirport) terrainInfraRes1Airport.add(parentH3);
-      if (row.isSeaport) terrainInfraRes1Seaport.add(parentH3);
-    }
-    return {
-      res4TerrainOverridesByH3,
-      terrainInfraRes1Airport,
-      terrainInfraRes1Seaport,
-      terrainInfraRes4Airport,
-      terrainInfraRes4Seaport
-    };
-  }
-
-  // src/shared/unitIds.ts
-  var UNIT_TYPE_ID_CODES = {
-    infantry: "i",
-    armor: "t",
-    naval: "n",
-    air: "a"
-  };
-  var STRATEGIC_UNIT_ID_PATTERN = /^([ha])(\d+)-([itna])(\d+)$/;
-  var TACTICAL_SUB_UNIT_ID_PATTERN = /^(.+)-s(\d+)$/;
-  var UNIT_TYPE_FROM_ID_CODE = Object.fromEntries(
-    Object.entries(UNIT_TYPE_ID_CODES).map(([unitType, code]) => [code, unitType])
-  );
-  var NATURAL_UNIT_ID_COLLATOR = new Intl.Collator("en", { numeric: true });
-  function isPositiveInteger(value) {
-    return Number.isInteger(value) && value > 0;
-  }
-  function hasForbiddenLeadingZero(digits) {
-    return digits.startsWith("0");
-  }
-  function parseStrategicUnitId(unitId) {
-    const match = unitId.match(STRATEGIC_UNIT_ID_PATTERN);
-    if (!match) return null;
-    const playerLetter = match[1];
-    const playerIndexDigits = match[2];
-    const typeCode = match[3];
-    const ordinalDigits = match[4];
-    if (hasForbiddenLeadingZero(playerIndexDigits) || hasForbiddenLeadingZero(ordinalDigits)) return null;
-    if (playerIndexDigits !== "1") return null;
-    const unitType = UNIT_TYPE_FROM_ID_CODE[typeCode];
-    if (!unitType) return null;
-    const ordinal = Number.parseInt(ordinalDigits, 10);
-    if (!isPositiveInteger(ordinal)) return null;
-    const player = playerLetter === "h" ? "human" : "opponent";
-    return { player, unitType, ordinal };
-  }
-  function parseTacticalSubUnitId(unitId) {
-    const match = unitId.match(TACTICAL_SUB_UNIT_ID_PATTERN);
-    if (!match) return null;
-    const parentUnitId = match[1];
-    const slotDigits = match[2];
-    if (hasForbiddenLeadingZero(slotDigits)) return null;
-    const slot = Number.parseInt(slotDigits, 10);
-    if (!isPositiveInteger(slot)) return null;
-    return { parentUnitId, slot };
-  }
-  function unitTypeFromUnitId(unitId) {
-    const compact = parseStrategicUnitId(unitId);
-    if (compact) return compact.unitType;
-    if (unitId.includes("-infantry-")) return "infantry";
-    if (unitId.includes("-armor-")) return "armor";
-    if (unitId.includes("-naval-")) return "naval";
-    if (unitId.includes("-air-")) return "air";
-    const sub = parseTacticalSubUnitId(unitId);
-    if (sub) return unitTypeFromUnitId(sub.parentUnitId);
-    return null;
-  }
-  function unitIdOwnerFromId(unitId) {
-    const compact = parseStrategicUnitId(unitId);
-    if (compact) return compact.player;
-    const sub = parseTacticalSubUnitId(unitId);
-    if (sub) {
-      const parentOwner = unitIdOwnerFromId(sub.parentUnitId);
-      if (parentOwner) return parentOwner;
-    }
-    if (unitId.startsWith("opponent-")) return "opponent";
-    if (unitId.startsWith("human-")) return "human";
-    return null;
-  }
-
-  // src/shared/unitDisplayNames.ts
-  var UNIT_TYPE_NOUN_BY_TYPE = {
-    /**
-       * Documents the object literal property `infantry` (infantry: 'Infantry').
-    
-       * Purpose: Supports maintainability by documenting why `infantry` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    infantry: "Infantry",
-    /**
-       * Documents the object literal property `armor` (armor: 'Armored').
-    
-       * Purpose: Supports maintainability by documenting why `armor` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    armor: "Armored",
-    /**
-       * Documents the object literal property `naval` (naval: 'Fleet').
-    
-       * Purpose: Supports maintainability by documenting why `naval` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    naval: "Fleet",
-    /**
-       * Documents the object literal property `air` (air: 'Squadron').
-    
-       * Purpose: Supports maintainability by documenting why `air` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    air: "Squadron"
-  };
-  var NATURAL_ID_COLLATOR = new Intl.Collator(void 0, { numeric: true, sensitivity: "base" });
-  function capitalizeWord(s) {
-    if (!s) return s;
-    return s.charAt(0).toUpperCase() + s.slice(1);
-  }
-  function ordinalSuffix(value) {
-    const abs = Math.abs(Math.trunc(value));
-    const mod100 = abs % 100;
-    if (mod100 >= 11 && mod100 <= 13) return "th";
-    const mod10 = abs % 10;
-    if (mod10 === 1) return "st";
-    if (mod10 === 2) return "nd";
-    if (mod10 === 3) return "rd";
-    return "th";
-  }
-  function toRomanNumeral(value) {
-    let remaining = Math.max(1, Math.trunc(value));
-    const numerals = [
-      [1e3, "M"],
-      [900, "CM"],
-      [500, "D"],
-      [400, "CD"],
-      [100, "C"],
-      [90, "XC"],
-      [50, "L"],
-      [40, "XL"],
-      [10, "X"],
-      [9, "IX"],
-      [5, "V"],
-      [4, "IV"],
-      [1, "I"]
-    ];
-    let out = "";
-    for (const [unit, symbol] of numerals) {
-      while (remaining >= unit) {
-        out += symbol;
-        remaining -= unit;
-      }
-    }
-    return out;
-  }
-  function unitDisplayOwner(unit) {
-    if (unit.player === "human" || unit.player === "opponent") return unit.player;
-    return unitIdOwnerFromId(unit.id) ?? "other";
-  }
-  function formatUnitNumberLabel(unit, value, locale) {
-    return unitDisplayOwner(unit) === "opponent" ? toRomanNumeral(value) : formatOrdinalLabel(value, locale);
-  }
-  function parseSeedUnitIdParts(unitId) {
-    const match = unitId.match(/^(human|opponent)-(infantry|armor|naval|air)-(\d+)$/);
-    if (!match) return null;
-    const ordinal = Number.parseInt(match[3], 10);
-    if (!Number.isFinite(ordinal) || ordinal <= 0) return null;
-    return { unitType: match[2], ordinal };
-  }
-  function productionSpawnSequenceFromUnitId(unitId) {
-    const match = unitId.match(/^(human|opponent)-(infantry|armor|naval|air)-prod-\d+-(\d+)$/);
-    if (!match) return null;
-    const sequence = Number.parseInt(match[3], 10);
-    return Number.isFinite(sequence) && sequence > 0 ? sequence : null;
-  }
-  function resolvePersistedDisplayOrderForUnitLabel(unit) {
-    if (typeof unit.displayOrder !== "number" || unit.displayOrder <= 0) return void 0;
-    const spawnSequence = productionSpawnSequenceFromUnitId(unit.id);
-    if (spawnSequence !== null && unit.displayOrder === spawnSequence) return void 0;
-    return unit.displayOrder;
-  }
-  function unitDisplaySequenceGroupKey(unit) {
-    return `${unitDisplayOwner(unit)}:${unit.unitType}`;
-  }
-  function uniqueUnitsPreferringPersistedOrder(units) {
-    const byId = /* @__PURE__ */ new Map();
-    for (const unit of units) {
-      const existing = byId.get(unit.id);
-      if (!existing) {
-        byId.set(unit.id, unit);
-        continue;
-      }
-      const existingOrder = resolvePersistedDisplayOrderForUnitLabel(existing);
-      const nextOrder = resolvePersistedDisplayOrderForUnitLabel(unit);
-      if (existingOrder === void 0 && nextOrder !== void 0) byId.set(unit.id, unit);
-    }
-    return [...byId.values()];
-  }
-  function formatOrdinalLabel(value, locale) {
-    const normalized = Math.max(1, Math.trunc(value));
-    const numberText = new Intl.NumberFormat(locale).format(normalized);
-    return `${numberText}${ordinalSuffix(normalized)}`;
-  }
-  function getUnitDisplayNoun(unitType) {
-    return UNIT_TYPE_NOUN_BY_TYPE[unitType] ?? capitalizeWord(unitType || "Unit");
-  }
-  function buildUnitDisplayNameLookup(units, locale) {
-    const byGroup = /* @__PURE__ */ new Map();
-    for (const unit of uniqueUnitsPreferringPersistedOrder(units)) {
-      const key = unitDisplaySequenceGroupKey(unit);
-      const existing = byGroup.get(key);
-      if (existing) existing.push(unit);
-      else byGroup.set(key, [unit]);
-    }
-    const result = /* @__PURE__ */ new Map();
-    for (const group of byGroup.values()) {
-      const unitType = group[0]?.unitType ?? "";
-      const withPersisted = group.filter((u) => resolvePersistedDisplayOrderForUnitLabel(u) !== void 0).sort(
-        (a, b) => resolvePersistedDisplayOrderForUnitLabel(a) - resolvePersistedDisplayOrderForUnitLabel(b) || NATURAL_ID_COLLATOR.compare(a.id, b.id)
-      );
-      const withoutPersisted = group.filter((u) => resolvePersistedDisplayOrderForUnitLabel(u) === void 0).sort((a, b) => NATURAL_ID_COLLATOR.compare(a.id, b.id));
-      const noun = getUnitDisplayNoun(unitType);
-      for (const unit of withPersisted) {
-        const ordinal = resolvePersistedDisplayOrderForUnitLabel(unit);
-        const numberLabel = formatUnitNumberLabel(unit, ordinal, locale);
-        result.set(unit.id, `${numberLabel} ${noun}`);
-      }
-      let fallbackOrdinal = withPersisted.reduce(
-        (max, u) => Math.max(max, resolvePersistedDisplayOrderForUnitLabel(u)),
-        0
-      );
-      for (const unit of withoutPersisted) {
-        fallbackOrdinal += 1;
-        const numberLabel = formatUnitNumberLabel(unit, fallbackOrdinal, locale);
-        result.set(unit.id, `${numberLabel} ${noun}`);
-      }
-    }
-    return result;
-  }
-  function fallbackDisplayNameFromUnitId(unitId, locale) {
-    const compact = parseStrategicUnitId(unitId);
-    if (compact) {
-      const numberLabel = formatUnitNumberLabel({ id: unitId, player: compact.player }, compact.ordinal, locale);
-      return `${numberLabel} ${getUnitDisplayNoun(compact.unitType)}`;
-    }
-    const seed = parseSeedUnitIdParts(unitId);
-    if (seed) {
-      const numberLabel = formatUnitNumberLabel({ id: unitId }, seed.ordinal, locale);
-      return `${numberLabel} ${getUnitDisplayNoun(seed.unitType)}`;
-    }
-    if (productionSpawnSequenceFromUnitId(unitId) !== null) return unitId;
-    return unitId;
-  }
-
-  // src/renderer/rendering/resolutionPlayback.ts
-  var RESOLUTION_FADE_MS = 1e3;
-  var LIGHTNING_DURATION_MS = 1e3;
-  function getResolutionPlaybackPhase(elapsed, hasAirStrikeOutbound, hasAirStrikeCombat, hasAirStrikeCasualties, hasAirStrikeReturn, hasRangedCombat, hasRangedCasualties, hasMeleeCombat, hasMeleeCasualties) {
-    const L = LIGHTNING_DURATION_MS;
-    const M = RESOLUTION_FADE_MS;
-    const airStrikeOutboundStart = 0;
-    const airStrikeOutboundEnd = airStrikeOutboundStart + (hasAirStrikeOutbound ? M : 0);
-    const airStrikeCombatStart = airStrikeOutboundEnd;
-    const airStrikeCombatEnd = airStrikeCombatStart + (hasAirStrikeCombat ? L : 0);
-    const airStrikeCasualtyStart = airStrikeCombatEnd;
-    const airStrikeCasualtyEnd = airStrikeCasualtyStart + (hasAirStrikeCasualties ? L : 0);
-    const airStrikeReturnStart = airStrikeCasualtyEnd;
-    const airStrikeReturnEnd = airStrikeReturnStart + (hasAirStrikeReturn ? M : 0);
-    const rangedCombatStart = airStrikeReturnEnd;
-    const rangedLightningEnd = rangedCombatStart + (hasRangedCombat ? L : 0);
-    const rangedCasualtyStart = rangedLightningEnd;
-    const rangedCasualtyEnd = rangedCasualtyStart + (hasRangedCasualties ? L : 0);
-    const movementStart = rangedCasualtyEnd;
-    const movementEnd = movementStart + M;
-    const meleeCombatStart = movementEnd;
-    const meleeLightningEnd = meleeCombatStart + (hasMeleeCombat ? L : 0);
-    const meleeCasualtyStart = meleeLightningEnd;
-    const meleeCasualtyEnd = meleeCasualtyStart + (hasMeleeCasualties ? L : 0);
-    const totalMs = meleeCasualtyEnd;
-    const airStrikeOutboundProgress = !hasAirStrikeOutbound || elapsed < airStrikeOutboundStart ? 0 : elapsed >= airStrikeOutboundEnd ? 1 : (elapsed - airStrikeOutboundStart) / M;
-    const airStrikeReturnProgress = !hasAirStrikeReturn || elapsed < airStrikeReturnStart ? 0 : elapsed >= airStrikeReturnEnd ? 1 : (elapsed - airStrikeReturnStart) / M;
-    const moveProgress = elapsed < movementStart ? 0 : elapsed >= movementEnd ? 1 : (elapsed - movementStart) / M;
-    return {
-      airStrikeOutboundStart,
-      airStrikeCombatStart,
-      airStrikeCasualtyStart,
-      airStrikeReturnStart,
-      rangedCombatStart,
-      rangedCasualtyStart,
-      movementStart,
-      meleeCombatStart,
-      meleeCasualtyStart,
-      totalMs,
-      airStrikeOutboundProgress,
-      airStrikeReturnProgress,
-      moveProgress,
-      inAirStrikeOutbound: hasAirStrikeOutbound && elapsed >= airStrikeOutboundStart && elapsed < airStrikeOutboundEnd,
-      inAirStrikeLightning: hasAirStrikeCombat && elapsed >= airStrikeCombatStart && elapsed < airStrikeCombatEnd,
-      inAirStrikeCasualty: hasAirStrikeCasualties && elapsed >= airStrikeCasualtyStart && elapsed < airStrikeCasualtyEnd,
-      inAirStrikeReturn: hasAirStrikeReturn && elapsed >= airStrikeReturnStart && elapsed < airStrikeReturnEnd,
-      inRangedLightning: hasRangedCombat && elapsed >= rangedCombatStart && elapsed < rangedLightningEnd,
-      inRangedCasualty: hasRangedCasualties && elapsed >= rangedCasualtyStart && elapsed < rangedCasualtyEnd,
-      inMovement: elapsed >= movementStart && elapsed < movementEnd,
-      inMeleeLightning: hasMeleeCombat && elapsed >= meleeCombatStart && elapsed < meleeLightningEnd,
-      inMeleeCasualty: hasMeleeCasualties && elapsed >= meleeCasualtyStart && elapsed < meleeCasualtyEnd
-    };
-  }
-  function resolutionAnimationElapsedMs(anim) {
-    if (anim.tacticalDeferResolutionClock) return 0;
-    return Date.now() - anim.startTime;
-  }
-  function buildResolutionPlaybackState(anim, elapsed) {
-    const hasAirStrikeOutbound = (anim.airStrikeOutboundMoves?.length ?? 0) > 0;
-    const hasAirStrikeCombat = (anim.airStrikeCombatHexes?.length ?? 0) > 0;
-    const hasAirStrikeCasualties = (anim.airStrikeCasualtyHexes?.length ?? 0) > 0;
-    const hasAirStrikeReturn = (anim.airStrikeReturnMoves?.length ?? 0) > 0;
-    const hasRangedCombat = (anim.rangedCombatHexes?.length ?? 0) > 0 || (anim.combatHexes?.length ?? 0) > 0;
-    const hasRangedCasualties = (anim.rangedCasualtyHexes?.length ?? 0) > 0 || (anim.casualtyHexes?.length ?? 0) > 0;
-    const hasMeleeCombat = (anim.meleeCombatHexes?.length ?? 0) > 0 || (anim.controlLossLightningHexes?.length ?? 0) > 0;
-    const hasMeleeCasualties = (anim.meleeCasualtyHexes?.length ?? 0) > 0;
-    return {
-      hasAirStrikeOutbound,
-      hasAirStrikeCombat,
-      hasAirStrikeCasualties,
-      hasAirStrikeReturn,
-      hasRangedCombat,
-      hasRangedCasualties,
-      hasMeleeCombat,
-      hasMeleeCasualties,
-      phase: getResolutionPlaybackPhase(
-        elapsed,
-        hasAirStrikeOutbound,
-        hasAirStrikeCombat,
-        hasAirStrikeCasualties,
-        hasAirStrikeReturn,
-        hasRangedCombat,
-        hasRangedCasualties,
-        hasMeleeCombat,
-        hasMeleeCasualties
-      )
-    };
-  }
-
   // src/shared/aiStrategyToastContent.ts
   var AI_STRATEGY_TOAST_MESSAGE_TITLE = "Message";
   var AI_STRATEGY_TOAST_STRATEGY_TITLE = "Strategy";
@@ -16142,6 +15489,665 @@
         );
       })
     ]);
+  }
+
+  // src/renderer/map/basemapProvider.ts
+  var RASTER_BASEMAP_ORDER = [
+    {
+      id: "esri_world_shaded_relief",
+      displayName: "Esri World Shaded Relief",
+      urlTemplate: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Shaded_Relief/MapServer/tile/{z}/{y}/{x}",
+      attributionHtml: "Tiles &copy; Esri &mdash; Source: Esri, Garmin, GEBCO, NOAA NGDC, and other contributors",
+      maxZoom: 13,
+      minZoom: 0
+    },
+    {
+      id: "osm_mapnik",
+      displayName: "OpenStreetMap Standard",
+      urlTemplate: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+      attributionHtml: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+      subdomains: "abc",
+      maxZoom: 19,
+      minZoom: 0
+    }
+  ];
+  function getRasterBasemapChain() {
+    return RASTER_BASEMAP_ORDER;
+  }
+  function getRasterBasemapChainStartIndex(providerId) {
+    const i = RASTER_BASEMAP_ORDER.findIndex((d) => d.id === providerId);
+    return i >= 0 ? i : 0;
+  }
+
+  // src/renderer/map/hexGrid.ts
+  var WEB_MERCATOR_MAX_ABS_LAT = 85.05112877980659;
+  function clampLatForWebMercatorDisplay(lat) {
+    if (lat > WEB_MERCATOR_MAX_ABS_LAT) return WEB_MERCATOR_MAX_ABS_LAT;
+    if (lat < -WEB_MERCATOR_MAX_ABS_LAT) return -WEB_MERCATOR_MAX_ABS_LAT;
+    return lat;
+  }
+  function alignLngToReference(lng, refLng) {
+    let l = lng;
+    while (l - refLng > 180) l -= 360;
+    while (refLng - l > 180) l += 360;
+    return l;
+  }
+  function getHexBoundaryLatLngForLeafletOverlay(h3Index) {
+    const boundary = cellToBoundary(h3Index);
+    const [, refLng] = cellToLatLng(h3Index);
+    return boundary.map(
+      ([lat, lng]) => [clampLatForWebMercatorDisplay(lat), alignLngToReference(lng, refLng)]
+    );
+  }
+
+  // src/renderer/map/worldLeafletMap.ts
+  var mainMap = null;
+  var miniMap = null;
+  var viewportRect = null;
+  var onMainViewChanged = null;
+  var mainBasemapLayer = null;
+  var miniBasemapLayer = null;
+  var mountedMainBasemapProviderId = null;
+  var mountedMiniBasemapProviderId = null;
+  function notifyMainViewChanged() {
+    syncMinimapViewportRect();
+    onMainViewChanged?.();
+  }
+  function getL() {
+    const leafletRef = globalThis.L;
+    if (!leafletRef) throw new Error("Leaflet not loaded: include static/vendor/leaflet/leaflet.js before renderer.js");
+    return leafletRef;
+  }
+  function mountRasterBasemap(leafletRef, map, showAttribution, chainIndex, target) {
+    const chain = getRasterBasemapChain();
+    if (chainIndex >= chain.length) {
+      if (target === "main") mountedMainBasemapProviderId = null;
+      else mountedMiniBasemapProviderId = null;
+      showBasemapErrorToast();
+      return;
+    }
+    const spec = chain[chainIndex];
+    if (target === "main" && mainBasemapLayer) {
+      try {
+        map.removeLayer(mainBasemapLayer);
+      } catch {
+      }
+      mainBasemapLayer = null;
+    }
+    if (target === "mini" && miniBasemapLayer) {
+      try {
+        map.removeLayer(miniBasemapLayer);
+      } catch {
+      }
+      miniBasemapLayer = null;
+    }
+    let switched = false;
+    const layerOpts = {
+      attribution: showAttribution ? spec.attributionHtml : "",
+      maxZoom: spec.maxZoom ?? 19,
+      minZoom: spec.minZoom ?? 0
+    };
+    if (spec.subdomains !== void 0) layerOpts.subdomains = spec.subdomains;
+    const layer = leafletRef.tileLayer(spec.urlTemplate, layerOpts).addTo(map);
+    if (target === "main") {
+      mainBasemapLayer = layer;
+      mountedMainBasemapProviderId = spec.id;
+    } else {
+      miniBasemapLayer = layer;
+      mountedMiniBasemapProviderId = spec.id;
+    }
+    const onTileError = () => {
+      if (switched) return;
+      switched = true;
+      layer.off("tileerror", onTileError);
+      try {
+        map.removeLayer(layer);
+      } catch {
+      }
+      if (target === "main") {
+        mainBasemapLayer = null;
+        mountedMainBasemapProviderId = null;
+      } else {
+        miniBasemapLayer = null;
+        mountedMiniBasemapProviderId = null;
+      }
+      console.warn("[agent-wars] Basemap tile error; trying next provider", {
+        failedId: spec.id,
+        nextIndex: chainIndex + 1
+      });
+      mountRasterBasemap(leafletRef, map, showAttribution, chainIndex + 1, target);
+    };
+    layer.on("tileerror", onTileError);
+  }
+  function setMainBasemapByProviderId(providerId) {
+    if (!mainMap || !miniMap) return;
+    if (!basemapNeedsRemountForMaps(mountedMainBasemapProviderId, mountedMiniBasemapProviderId, providerId)) return;
+    const leafletRef = getL();
+    const startIdx = getRasterBasemapChainStartIndex(providerId);
+    mountRasterBasemap(leafletRef, mainMap, true, startIdx, "main");
+    mountRasterBasemap(leafletRef, miniMap, false, startIdx, "mini");
+  }
+  function initWorldLeafletMaps(mainContainerId, minimapContainerId, onViewChanged, initialBasemapProviderId) {
+    onMainViewChanged = onViewChanged;
+    const leafletRef = getL();
+    const mainEl = document.getElementById(mainContainerId);
+    const miniEl = document.getElementById(minimapContainerId);
+    if (!mainEl || !miniEl) {
+      console.error("[agent-wars] initWorldLeafletMaps: missing map container elements", {
+        mainContainerId,
+        minimapContainerId,
+        hasMain: !!mainEl,
+        hasMinimap: !!miniEl
+      });
+      return;
+    }
+    const worldBounds = leafletRef.latLngBounds(
+      leafletRef.latLng(-WEB_MERCATOR_MAX_ABS_LAT, -180),
+      leafletRef.latLng(WEB_MERCATOR_MAX_ABS_LAT, 180)
+    );
+    mainMap = leafletRef.map(mainEl, {
+      minZoom: 1.5,
+      maxZoom: 12,
+      zoomSnap: 0.25,
+      zoomDelta: 0.5,
+      wheelPxPerZoomLevel: 80,
+      worldCopyJump: true,
+      maxBounds: worldBounds,
+      maxBoundsViscosity: 1,
+      /* App-owned WASD/arrow screen pan; avoid Leaflet’s default keyboard panBy. */
+      keyboard: false,
+      /* Keep raster tiles and canvas overlay in lockstep (no CSS zoom/pan lag vs hex draw). */
+      zoomAnimation: false,
+      fadeAnimation: false,
+      inertia: false
+    });
+    const startIdx = getRasterBasemapChainStartIndex(initialBasemapProviderId ?? "esri_world_shaded_relief");
+    mountRasterBasemap(leafletRef, mainMap, true, startIdx, "main");
+    mainMap.fitBounds(worldBounds, { padding: [2, 2], animate: false });
+    mainMap.doubleClickZoom.disable();
+    try {
+      leafletRef.control.scale({
+        metric: true,
+        imperial: true,
+        maxWidth: 120
+      }).addTo(mainMap);
+    } catch {
+    }
+    miniMap = leafletRef.map(miniEl, {
+      minZoom: 0,
+      maxZoom: 2,
+      zoomControl: false,
+      attributionControl: false,
+      dragging: false,
+      scrollWheelZoom: false,
+      doubleClickZoom: false,
+      boxZoom: false,
+      keyboard: false
+    });
+    mountRasterBasemap(leafletRef, miniMap, false, startIdx, "mini");
+    miniMap.fitBounds(worldBounds, { padding: [1, 1], animate: false });
+    miniMap.setZoom(miniMap.getZoom());
+    mainMap.on("move", notifyMainViewChanged);
+    mainMap.on("zoom", notifyMainViewChanged);
+    mainMap.on("moveend", notifyMainViewChanged);
+    mainMap.on("zoomend", notifyMainViewChanged);
+    syncMinimapViewportRect();
+  }
+  var basemapErrorShown = false;
+  function showBasemapErrorToast() {
+    if (basemapErrorShown) return;
+    basemapErrorShown = true;
+    showMapToast(
+      "Some map tiles failed to load (network or provider). The game remains playable; try again later.",
+      { isError: false }
+    );
+  }
+  function syncMinimapViewportRect() {
+    if (!mainMap || !miniMap) return;
+    const leafletRef = getL();
+    const mainBounds = mainMap.getBounds();
+    const miniBounds = miniMap.getBounds();
+    const mainSpan = Math.abs(mainBounds.getNorthEast().lat - mainBounds.getSouthWest().lat) + Math.abs(mainBounds.getNorthEast().lng - mainBounds.getSouthWest().lng);
+    const miniSpan = Math.abs(miniBounds.getNorthEast().lat - miniBounds.getSouthWest().lat) + Math.abs(miniBounds.getNorthEast().lng - miniBounds.getSouthWest().lng);
+    const zoomedIn = mainSpan < miniSpan * 0.92;
+    if (!zoomedIn) {
+      if (viewportRect) {
+        viewportRect.remove();
+        viewportRect = null;
+      }
+      return;
+    }
+    if (!viewportRect) {
+      viewportRect = leafletRef.rectangle(mainBounds, {
+        color: ORDER_LINE_COLOR,
+        weight: 2,
+        fill: false,
+        interactive: false
+      }).addTo(miniMap);
+    } else {
+      viewportRect.setBounds(mainBounds);
+    }
+  }
+  function getMainLeafletMap() {
+    return mainMap;
+  }
+  function applyTilePaneFilter(map, filter) {
+    try {
+      const pane = map?.getPanes?.()?.tilePane;
+      if (!pane) return;
+      const oldFiltered = pane.querySelectorAll(".leaflet-layer, .leaflet-tile");
+      for (const el of oldFiltered) el.style.filter = "";
+      pane.style.filter = filter;
+    } catch {
+    }
+  }
+  function setMainBasemapFilter(filter) {
+    const mapEl = document.getElementById("main-map");
+    if (mapEl) mapEl.style.filter = "";
+    applyTilePaneFilter(mainMap, filter);
+    applyTilePaneFilter(miniMap, filter);
+  }
+  function hexCenterToOverlayPoint(h3Index, latLngFn) {
+    if (!mainMap) return { x: 0, y: 0 };
+    const leafletRef = getL();
+    const [lat, lng] = latLngFn(h3Index);
+    const p = mainMap.latLngToContainerPoint(leafletRef.latLng(clampLatForWebMercatorDisplay(lat), lng));
+    return { x: p.x, y: p.y };
+  }
+  function hexCenterToOverlayPointWithReferenceLng(h3Index, referenceLngDegrees, latLngFn) {
+    if (!mainMap) return { x: 0, y: 0 };
+    const leafletRef = getL();
+    const [lat, lng] = latLngFn(h3Index);
+    const lngAligned = alignLngToReference(lng, referenceLngDegrees);
+    const p = mainMap.latLngToContainerPoint(
+      leafletRef.latLng(clampLatForWebMercatorDisplay(lat), lngAligned)
+    );
+    return { x: p.x, y: p.y };
+  }
+  function invalidateLeafletMapSizes() {
+    mainMap?.invalidateSize({ animate: false });
+    miniMap?.invalidateSize({ animate: false });
+    notifyMainViewChanged();
+  }
+
+  // src/renderer/rendering/infrastructureOverlayState.ts
+  var WORLD_H3_RESOLUTION2 = 1;
+  function deriveInfrastructureOverlayState(rows) {
+    const res4TerrainOverridesByH3 = new Map(
+      rows.map((r) => [
+        r.h3Index,
+        {
+          terrainKind: r.terrainKind,
+          isUrban: !!r.isUrban,
+          isAirport: !!r.isAirport,
+          isSeaport: !!r.isSeaport,
+          isRubble: !!r.isRubble
+        }
+      ])
+    );
+    const terrainInfraRes4Airport = new Set(rows.filter((row) => !!row.isAirport).map((row) => row.h3Index));
+    const terrainInfraRes4Seaport = new Set(rows.filter((row) => !!row.isSeaport).map((row) => row.h3Index));
+    const terrainInfraRes1Airport = /* @__PURE__ */ new Set();
+    const terrainInfraRes1Seaport = /* @__PURE__ */ new Set();
+    for (const row of rows) {
+      if (!row.isAirport && !row.isSeaport) continue;
+      const parentH3 = cellToParent(row.h3Index, WORLD_H3_RESOLUTION2);
+      if (row.isAirport) terrainInfraRes1Airport.add(parentH3);
+      if (row.isSeaport) terrainInfraRes1Seaport.add(parentH3);
+    }
+    return {
+      res4TerrainOverridesByH3,
+      terrainInfraRes1Airport,
+      terrainInfraRes1Seaport,
+      terrainInfraRes4Airport,
+      terrainInfraRes4Seaport
+    };
+  }
+
+  // src/shared/unitIds.ts
+  var UNIT_TYPE_ID_CODES = {
+    infantry: "i",
+    armor: "t",
+    naval: "n",
+    air: "a"
+  };
+  var STRATEGIC_UNIT_ID_PATTERN = /^([ha])(\d+)-([itna])(\d+)$/;
+  var TACTICAL_SUB_UNIT_ID_PATTERN = /^(.+)-s(\d+)$/;
+  var UNIT_TYPE_FROM_ID_CODE = Object.fromEntries(
+    Object.entries(UNIT_TYPE_ID_CODES).map(([unitType, code]) => [code, unitType])
+  );
+  var NATURAL_UNIT_ID_COLLATOR = new Intl.Collator("en", { numeric: true });
+  function isPositiveInteger(value) {
+    return Number.isInteger(value) && value > 0;
+  }
+  function hasForbiddenLeadingZero(digits) {
+    return digits.startsWith("0");
+  }
+  function parseStrategicUnitId(unitId) {
+    const match = unitId.match(STRATEGIC_UNIT_ID_PATTERN);
+    if (!match) return null;
+    const playerLetter = match[1];
+    const playerIndexDigits = match[2];
+    const typeCode = match[3];
+    const ordinalDigits = match[4];
+    if (hasForbiddenLeadingZero(playerIndexDigits) || hasForbiddenLeadingZero(ordinalDigits)) return null;
+    if (playerIndexDigits !== "1") return null;
+    const unitType = UNIT_TYPE_FROM_ID_CODE[typeCode];
+    if (!unitType) return null;
+    const ordinal = Number.parseInt(ordinalDigits, 10);
+    if (!isPositiveInteger(ordinal)) return null;
+    const player = playerLetter === "h" ? "human" : "opponent";
+    return { player, unitType, ordinal };
+  }
+  function parseTacticalSubUnitId(unitId) {
+    const match = unitId.match(TACTICAL_SUB_UNIT_ID_PATTERN);
+    if (!match) return null;
+    const parentUnitId = match[1];
+    const slotDigits = match[2];
+    if (hasForbiddenLeadingZero(slotDigits)) return null;
+    const slot = Number.parseInt(slotDigits, 10);
+    if (!isPositiveInteger(slot)) return null;
+    return { parentUnitId, slot };
+  }
+  function unitTypeFromUnitId(unitId) {
+    const compact = parseStrategicUnitId(unitId);
+    if (compact) return compact.unitType;
+    if (unitId.includes("-infantry-")) return "infantry";
+    if (unitId.includes("-armor-")) return "armor";
+    if (unitId.includes("-naval-")) return "naval";
+    if (unitId.includes("-air-")) return "air";
+    const sub = parseTacticalSubUnitId(unitId);
+    if (sub) return unitTypeFromUnitId(sub.parentUnitId);
+    return null;
+  }
+  function unitIdOwnerFromId(unitId) {
+    const compact = parseStrategicUnitId(unitId);
+    if (compact) return compact.player;
+    const sub = parseTacticalSubUnitId(unitId);
+    if (sub) {
+      const parentOwner = unitIdOwnerFromId(sub.parentUnitId);
+      if (parentOwner) return parentOwner;
+    }
+    if (unitId.startsWith("opponent-")) return "opponent";
+    if (unitId.startsWith("human-")) return "human";
+    return null;
+  }
+
+  // src/shared/unitDisplayNames.ts
+  var UNIT_TYPE_NOUN_BY_TYPE = {
+    /**
+       * Documents the object literal property `infantry` (infantry: 'Infantry').
+    
+       * Purpose: Supports maintainability by documenting why `infantry` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    infantry: "Infantry",
+    /**
+       * Documents the object literal property `armor` (armor: 'Armored').
+    
+       * Purpose: Supports maintainability by documenting why `armor` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    armor: "Armored",
+    /**
+       * Documents the object literal property `naval` (naval: 'Fleet').
+    
+       * Purpose: Supports maintainability by documenting why `naval` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    naval: "Fleet",
+    /**
+       * Documents the object literal property `air` (air: 'Squadron').
+    
+       * Purpose: Supports maintainability by documenting why `air` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    air: "Squadron"
+  };
+  var NATURAL_ID_COLLATOR = new Intl.Collator(void 0, { numeric: true, sensitivity: "base" });
+  function capitalizeWord(s) {
+    if (!s) return s;
+    return s.charAt(0).toUpperCase() + s.slice(1);
+  }
+  function ordinalSuffix(value) {
+    const abs = Math.abs(Math.trunc(value));
+    const mod100 = abs % 100;
+    if (mod100 >= 11 && mod100 <= 13) return "th";
+    const mod10 = abs % 10;
+    if (mod10 === 1) return "st";
+    if (mod10 === 2) return "nd";
+    if (mod10 === 3) return "rd";
+    return "th";
+  }
+  function toRomanNumeral(value) {
+    let remaining = Math.max(1, Math.trunc(value));
+    const numerals = [
+      [1e3, "M"],
+      [900, "CM"],
+      [500, "D"],
+      [400, "CD"],
+      [100, "C"],
+      [90, "XC"],
+      [50, "L"],
+      [40, "XL"],
+      [10, "X"],
+      [9, "IX"],
+      [5, "V"],
+      [4, "IV"],
+      [1, "I"]
+    ];
+    let out = "";
+    for (const [unit, symbol] of numerals) {
+      while (remaining >= unit) {
+        out += symbol;
+        remaining -= unit;
+      }
+    }
+    return out;
+  }
+  function unitDisplayOwner(unit) {
+    if (unit.player === "human" || unit.player === "opponent") return unit.player;
+    return unitIdOwnerFromId(unit.id) ?? "other";
+  }
+  function formatUnitNumberLabel(unit, value, locale) {
+    return unitDisplayOwner(unit) === "opponent" ? toRomanNumeral(value) : formatOrdinalLabel(value, locale);
+  }
+  function parseSeedUnitIdParts(unitId) {
+    const match = unitId.match(/^(human|opponent)-(infantry|armor|naval|air)-(\d+)$/);
+    if (!match) return null;
+    const ordinal = Number.parseInt(match[3], 10);
+    if (!Number.isFinite(ordinal) || ordinal <= 0) return null;
+    return { unitType: match[2], ordinal };
+  }
+  function productionSpawnSequenceFromUnitId(unitId) {
+    const match = unitId.match(/^(human|opponent)-(infantry|armor|naval|air)-prod-\d+-(\d+)$/);
+    if (!match) return null;
+    const sequence = Number.parseInt(match[3], 10);
+    return Number.isFinite(sequence) && sequence > 0 ? sequence : null;
+  }
+  function resolvePersistedDisplayOrderForUnitLabel(unit) {
+    if (typeof unit.displayOrder !== "number" || unit.displayOrder <= 0) return void 0;
+    const spawnSequence = productionSpawnSequenceFromUnitId(unit.id);
+    if (spawnSequence !== null && unit.displayOrder === spawnSequence) return void 0;
+    return unit.displayOrder;
+  }
+  function unitDisplaySequenceGroupKey(unit) {
+    return `${unitDisplayOwner(unit)}:${unit.unitType}`;
+  }
+  function uniqueUnitsPreferringPersistedOrder(units) {
+    const byId = /* @__PURE__ */ new Map();
+    for (const unit of units) {
+      const existing = byId.get(unit.id);
+      if (!existing) {
+        byId.set(unit.id, unit);
+        continue;
+      }
+      const existingOrder = resolvePersistedDisplayOrderForUnitLabel(existing);
+      const nextOrder = resolvePersistedDisplayOrderForUnitLabel(unit);
+      if (existingOrder === void 0 && nextOrder !== void 0) byId.set(unit.id, unit);
+    }
+    return [...byId.values()];
+  }
+  function formatOrdinalLabel(value, locale) {
+    const normalized = Math.max(1, Math.trunc(value));
+    const numberText = new Intl.NumberFormat(locale).format(normalized);
+    return `${numberText}${ordinalSuffix(normalized)}`;
+  }
+  function getUnitDisplayNoun(unitType) {
+    return UNIT_TYPE_NOUN_BY_TYPE[unitType] ?? capitalizeWord(unitType || "Unit");
+  }
+  function buildUnitDisplayNameLookup(units, locale) {
+    const byGroup = /* @__PURE__ */ new Map();
+    for (const unit of uniqueUnitsPreferringPersistedOrder(units)) {
+      const key = unitDisplaySequenceGroupKey(unit);
+      const existing = byGroup.get(key);
+      if (existing) existing.push(unit);
+      else byGroup.set(key, [unit]);
+    }
+    const result = /* @__PURE__ */ new Map();
+    for (const group of byGroup.values()) {
+      const unitType = group[0]?.unitType ?? "";
+      const withPersisted = group.filter((u) => resolvePersistedDisplayOrderForUnitLabel(u) !== void 0).sort(
+        (a, b) => resolvePersistedDisplayOrderForUnitLabel(a) - resolvePersistedDisplayOrderForUnitLabel(b) || NATURAL_ID_COLLATOR.compare(a.id, b.id)
+      );
+      const withoutPersisted = group.filter((u) => resolvePersistedDisplayOrderForUnitLabel(u) === void 0).sort((a, b) => NATURAL_ID_COLLATOR.compare(a.id, b.id));
+      const noun = getUnitDisplayNoun(unitType);
+      for (const unit of withPersisted) {
+        const ordinal = resolvePersistedDisplayOrderForUnitLabel(unit);
+        const numberLabel = formatUnitNumberLabel(unit, ordinal, locale);
+        result.set(unit.id, `${numberLabel} ${noun}`);
+      }
+      let fallbackOrdinal = withPersisted.reduce(
+        (max, u) => Math.max(max, resolvePersistedDisplayOrderForUnitLabel(u)),
+        0
+      );
+      for (const unit of withoutPersisted) {
+        fallbackOrdinal += 1;
+        const numberLabel = formatUnitNumberLabel(unit, fallbackOrdinal, locale);
+        result.set(unit.id, `${numberLabel} ${noun}`);
+      }
+    }
+    return result;
+  }
+  function fallbackDisplayNameFromUnitId(unitId, locale) {
+    const compact = parseStrategicUnitId(unitId);
+    if (compact) {
+      const numberLabel = formatUnitNumberLabel({ id: unitId, player: compact.player }, compact.ordinal, locale);
+      return `${numberLabel} ${getUnitDisplayNoun(compact.unitType)}`;
+    }
+    const seed = parseSeedUnitIdParts(unitId);
+    if (seed) {
+      const numberLabel = formatUnitNumberLabel({ id: unitId }, seed.ordinal, locale);
+      return `${numberLabel} ${getUnitDisplayNoun(seed.unitType)}`;
+    }
+    if (productionSpawnSequenceFromUnitId(unitId) !== null) return unitId;
+    return unitId;
+  }
+
+  // src/shared/resolutionPlaybackPhase.ts
+  function progressAtStage(elapsed, startMs, durationMs) {
+    if (elapsed < startMs) return 0;
+    if (durationMs <= 0 || elapsed >= startMs + durationMs) return 1;
+    return (elapsed - startMs) / durationMs;
+  }
+  function getResolutionPlaybackPhase(args) {
+    const fadeMs = args.fadeMs;
+    const lightningMs = args.lightningMs;
+    const airStrikeOutboundStart = 0;
+    const airStrikeOutboundEnd = airStrikeOutboundStart + (args.hasAirStrikeOutbound ? fadeMs : 0);
+    const airStrikeCombatStart = airStrikeOutboundEnd;
+    const airStrikeCombatEnd = airStrikeCombatStart + (args.hasAirStrikeCombat ? lightningMs : 0);
+    const airStrikeCasualtyStart = airStrikeCombatEnd;
+    const airStrikeCasualtyEnd = airStrikeCasualtyStart + (args.hasAirStrikeCasualties ? lightningMs : 0);
+    const airStrikeReturnStart = airStrikeCasualtyEnd;
+    const airStrikeReturnEnd = airStrikeReturnStart + (args.hasAirStrikeReturn ? fadeMs : 0);
+    const rangedCombatStart = airStrikeReturnEnd;
+    const rangedLightningEnd = rangedCombatStart + (args.hasRangedCombat ? lightningMs : 0);
+    const rangedCasualtyStart = rangedLightningEnd;
+    const rangedCasualtyEnd = rangedCasualtyStart + (args.hasRangedCasualties ? lightningMs : 0);
+    const movementStart = rangedCasualtyEnd;
+    const movementMs = args.hasMoves ? fadeMs : 0;
+    const movementEnd = movementStart + movementMs;
+    const meleeCombatStart = movementEnd;
+    const meleeLightningEnd = meleeCombatStart + (args.hasMeleeCombat ? lightningMs : 0);
+    const meleeCasualtyStart = meleeLightningEnd;
+    const meleeCasualtyEnd = meleeCasualtyStart + (args.hasMeleeCasualties ? lightningMs : 0);
+    const airStrikeOutboundProgress = !args.hasAirStrikeOutbound || args.elapsed < airStrikeOutboundStart ? 0 : args.elapsed >= airStrikeOutboundEnd ? 1 : (args.elapsed - airStrikeOutboundStart) / fadeMs;
+    const airStrikeReturnProgress = !args.hasAirStrikeReturn || args.elapsed < airStrikeReturnStart ? 0 : args.elapsed >= airStrikeReturnEnd ? 1 : (args.elapsed - airStrikeReturnStart) / fadeMs;
+    return {
+      airStrikeOutboundStart,
+      airStrikeCombatStart,
+      airStrikeCasualtyStart,
+      airStrikeReturnStart,
+      rangedCombatStart,
+      rangedCasualtyStart,
+      movementStart,
+      meleeCombatStart,
+      meleeCasualtyStart,
+      totalMs: meleeCasualtyEnd,
+      airStrikeOutboundProgress,
+      airStrikeReturnProgress,
+      moveProgress: progressAtStage(args.elapsed, movementStart, movementMs),
+      inAirStrikeOutbound: args.hasAirStrikeOutbound && args.elapsed >= airStrikeOutboundStart && args.elapsed < airStrikeOutboundEnd,
+      inAirStrikeLightning: args.hasAirStrikeCombat && args.elapsed >= airStrikeCombatStart && args.elapsed < airStrikeCombatEnd,
+      inAirStrikeCasualty: args.hasAirStrikeCasualties && args.elapsed >= airStrikeCasualtyStart && args.elapsed < airStrikeCasualtyEnd,
+      inAirStrikeReturn: args.hasAirStrikeReturn && args.elapsed >= airStrikeReturnStart && args.elapsed < airStrikeReturnEnd,
+      inRangedLightning: args.hasRangedCombat && args.elapsed >= rangedCombatStart && args.elapsed < rangedLightningEnd,
+      inRangedCasualty: args.hasRangedCasualties && args.elapsed >= rangedCasualtyStart && args.elapsed < rangedCasualtyEnd,
+      inMovement: args.hasMoves && movementMs > 0 && args.elapsed >= movementStart && args.elapsed < movementEnd,
+      inMeleeLightning: args.hasMeleeCombat && args.elapsed >= meleeCombatStart && args.elapsed < meleeLightningEnd,
+      inMeleeCasualty: args.hasMeleeCasualties && args.elapsed >= meleeCasualtyStart && args.elapsed < meleeCasualtyEnd
+    };
+  }
+
+  // src/renderer/rendering/resolutionPlayback.ts
+  var RESOLUTION_FADE_MS = 1e3;
+  var LIGHTNING_DURATION_MS = 1e3;
+  function resolutionAnimationElapsedMs(anim) {
+    if (anim.tacticalDeferResolutionClock) return 0;
+    return Date.now() - anim.startTime;
+  }
+  function buildResolutionPlaybackState(anim, elapsed) {
+    const hasAirStrikeOutbound = (anim.airStrikeOutboundMoves?.length ?? 0) > 0;
+    const hasAirStrikeCombat = (anim.airStrikeCombatHexes?.length ?? 0) > 0;
+    const hasAirStrikeCasualties = (anim.airStrikeCasualtyHexes?.length ?? 0) > 0;
+    const hasAirStrikeReturn = (anim.airStrikeReturnMoves?.length ?? 0) > 0;
+    const hasRangedCombat = (anim.rangedCombatHexes?.length ?? 0) > 0 || (anim.combatHexes?.length ?? 0) > 0;
+    const hasRangedCasualties = (anim.rangedCasualtyHexes?.length ?? 0) > 0 || (anim.casualtyHexes?.length ?? 0) > 0;
+    const hasMeleeCombat = (anim.meleeCombatHexes?.length ?? 0) > 0 || (anim.controlLossLightningHexes?.length ?? 0) > 0;
+    const hasMeleeCasualties = (anim.meleeCasualtyHexes?.length ?? 0) > 0;
+    return {
+      hasAirStrikeOutbound,
+      hasAirStrikeCombat,
+      hasAirStrikeCasualties,
+      hasAirStrikeReturn,
+      hasRangedCombat,
+      hasRangedCasualties,
+      hasMeleeCombat,
+      hasMeleeCasualties,
+      phase: getResolutionPlaybackPhase({
+        elapsed,
+        fadeMs: RESOLUTION_FADE_MS,
+        lightningMs: LIGHTNING_DURATION_MS,
+        hasAirStrikeOutbound,
+        hasAirStrikeCombat,
+        hasAirStrikeCasualties,
+        hasAirStrikeReturn,
+        hasRangedCombat,
+        hasRangedCasualties,
+        hasMoves: (anim.moves?.length ?? 0) > 0,
+        hasMeleeCombat,
+        hasMeleeCasualties
+      })
+    };
   }
 
   // src/shared/mapKeyboardPanLogic.ts
