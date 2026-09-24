@@ -26507,6 +26507,9 @@
       deps.requestRedraw();
     }
   }
+  function tacticalBattlesDialogIsOpen() {
+    return document.querySelector('[role="dialog"][aria-label="Tactical battles"]') !== null;
+  }
   function wireInitCore(deps) {
     try {
       initWorldLeafletMaps("main-map", "minimap", () => deps.requestRedraw(), getActiveTerrainStyleBasemapId());
@@ -26594,6 +26597,7 @@
     });
     window.addEventListener("keydown", (e) => {
       if (e.key === "Escape") {
+        if (tacticalBattlesDialogIsOpen()) return;
         const buildPopup = document.getElementById("build-popup");
         if (buildPopup && !buildPopup.classList.contains("hidden")) {
           e.preventDefault();

@@ -333,6 +333,18 @@ function dismissTerrainTooltipWhenPointerLeavesMapPanel(deps: InitCoreDeps): voi
 }
 
 /**
+ * Reports whether the tactical battles list is open.
+ *
+ * Purpose: The window keydown listener calls this so Escape can reach that dialog's Ignore handler without the listener closing a build popup or stack callout first.
+ * When to use: At the start of the window keydown Escape branch, before the build-popup query.
+ * Expected outcome: True when a dialog named "Tactical battles" is in the document; false otherwise. Does not change the page.
+ * Exceptions: None.
+ */
+function tacticalBattlesDialogIsOpen(): boolean {
+  return document.querySelector('[role="dialog"][aria-label="Tactical battles"]') !== null;
+}
+
+/**
  * Defines the `wireInitCore` function shape (export function wireInitCore(deps: InitCoreDeps): void).
 
  * Purpose: Supports maintainability by documenting why `wireInitCore` exists.
@@ -439,6 +451,7 @@ export function wireInitCore(deps: InitCoreDeps): void {
   });
   window.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
+      if (tacticalBattlesDialogIsOpen()) return;
       const buildPopup = document.getElementById('build-popup');
       if (buildPopup && !buildPopup.classList.contains('hidden')) {
         e.preventDefault();

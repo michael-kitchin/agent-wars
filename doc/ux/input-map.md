@@ -40,7 +40,7 @@ Keys other than these do not pan, toggle terrain, or close popups.
 - Hiding the window stops keyboard pan.
 - Holding Shift, Control, Alt, or Meta stops keyboard pan and does not start a new pan.
 - Key repeat does not start another pan or another terrain hold.
-- Escape closes the build popup before the stack callout. While the tactical battles list is open, Escape only chooses Ignore. A build popup or stack callout under the dialog stays as it is. The current code differs; see Known Deviations in [tactical-battles-list.md](tactical-battles-list.md).
+- Escape closes the build popup before the stack callout. While the tactical battles list is open, Escape only chooses Ignore. A build popup or stack callout under the dialog stays as it is.
 - Holding T to hide terrain fill is a deliberate inspection gesture. It is hold-to-hide, not a toggle.
 - The map's own keyboard handling is off, so the pan keys above are the only keyboard pan.
 

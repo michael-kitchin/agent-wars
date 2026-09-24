@@ -8,7 +8,7 @@ Show the current theater and accept the pointer and keyboard gestures that plan 
 
 ## Availability
 
-Shown in Strategic planning, Resolution playback, and Tactical planning. While the tactical battles list is open, the map stays as it was when Ready paused and does not accept input. In New game and Game over, pointer input on the map is off. In Tactical annihilation the map is visible but does not accept input.
+Shown in Strategic planning, Resolution playback, and Tactical planning. While the tactical battles list is open, the map stays as it was when Ready paused, pointer input is off, and pan keys and T still follow [input-map.md](input-map.md). In New game and Game over, pointer input on the map is off. In Tactical annihilation the map is visible, pointer input is off, and pan keys and T still follow [input-map.md](input-map.md).
 
 ## Information Displayed
 
@@ -46,7 +46,7 @@ When no match is loaded, the basemap can still be visible under the new-game ove
 
 - Strategic view: world bounds, strategic units, entry markers when the zoom allows them.
 - Tactical view: battle bounds, battle units, Exit Battle available according to [tactical-battle-controls.md](tactical-battle-controls.md).
-- Input disabled: New game, Game over, Tactical annihilation, or while the tactical battles list is open. The map does not take pointer input.
+- Input disabled: New game, Game over, Tactical annihilation, or while the tactical battles list is open. Pointer input is off. While the tactical battles list is open, and in Tactical annihilation, pan keys and T still follow [input-map.md](input-map.md).
 - Orders blocked: Resolution playback. The map pans, zooms, and shows tooltips, but does not select, target, or order.
 - Terrain fill hidden: T is held.
 

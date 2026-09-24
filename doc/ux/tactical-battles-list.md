@@ -60,7 +60,7 @@ The dialog is a strategic Ready step. Fight is what enters Tactical planning. Th
 
 ## Known Deviations
 
-- **Escape also closes popups.** Required: Escape on this dialog only chooses Ignore. Current: the same keypress also reaches the global Escape handler, which can close a build popup or stack callout under the dialog. Entry point: `src/renderer/map/initCore.ts`.
+None.
 
 ## Open Questions
 
