@@ -24588,7 +24588,7 @@
     if (!container) return;
     container.innerHTML = "";
     if (rendererSharedState.tacticalBattleSnapshot) {
-      if (rendererSharedState.tacticalPendingMarches.length === 0 && rendererSharedState.pendingEmbarkOrders.length === 0) {
+      if (rendererSharedState.tacticalPendingMarches.length === 0 && rendererSharedState.pendingFerryOrders.length === 0) {
         const span = document.createElement("span");
         span.textContent = "None";
         span.style.color = "#666";
@@ -24614,18 +24614,17 @@
         });
         container.appendChild(rowEl);
       }
-      for (const emb of rendererSharedState.pendingEmbarkOrders) {
+      for (const ferry of rendererSharedState.pendingFerryOrders) {
         const rowEl = deps.createSidebarOrderRow({
-          labelText: deps.formatUnitArrowLabel(emb.unitId, fallbackDisplayNameFromUnitId(emb.navalUnitId)),
-          selected: rendererSharedState.selectedUnitIds.includes(emb.unitId),
-          onToggleSelect: (event) => deps.applySelectionFromSidebarUnitButton(emb.unitId, event),
+          labelText: deps.formatUnitArrowLabel(
+            ferry.unitId,
+            formatPendingFerryOrderSidebarLabel(rendererSharedState.gameState, ferry, rendererSharedState.tacticalBattleSnapshot.subUnits)
+          ),
+          selected: rendererSharedState.selectedUnitIds.includes(ferry.unitId),
+          onToggleSelect: (event) => deps.applySelectionFromSidebarUnitButton(ferry.unitId, event),
           onCancel: () => {
-            withTacticalHumanDraftPrefetchInvalidation(() => {
-              rendererSharedState.pendingEmbarkOrders = rendererSharedState.pendingEmbarkOrders.filter((e) => e.unitId !== emb.unitId);
-            });
-            deps.updatePendingOrdersSidebar?.();
+            deps.cancelFerryForUnit(ferry.unitId);
             deps.refreshStackCalloutIfOpen?.();
-            deps.redraw?.();
           },
           compactBlueButtons: true
         });

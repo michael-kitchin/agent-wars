@@ -219,7 +219,7 @@ updatePendingOrdersSidebar?: () => void;
    * Refreshes an open stack callout after tactical embark drafts change from the pending-orders sidebar.
    *
    * Contract: Optional hook so embark cancel can rebuild sealift `<select>` rows without a hard dependency on `renderer.ts`.
-   * When to use: Tactical `pendingEmbarkOrders` cancel path only.
+   * When to use: After a tactical ferry cancel. That cancel also clears a matching embark draft, and an open callout would otherwise keep the old sealift row.
    * Expected outcome: Stack popup sealift section matches cleared drafts when the callout is visible.
    * Exceptions: None.
    */
@@ -482,19 +482,18 @@ export function createSidebarOrderRow(args: {
 }
 
 /**
- * Defines the `updatePendingOrdersSidebar` function shape (export function updatePendingOrdersSidebar(deps: PendingOrdersDeps): void).
-
- * Purpose: Supports maintainability by documenting why `updatePendingOrdersSidebar` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
+ * Rebuilds the Movement orders list from the active theater's drafts.
+ *
+ * When to use: after a march or ferry draft is added, cancelled, or cleared.
+ * Expected outcome: the list shows "None" when that theater has no movement rows, otherwise one row per march and ferry. During a battle, sealift embark drafts are omitted. A missing list element leaves the document unchanged.
+ * Exceptions: Selection and cancel callbacks may throw. A missing list element returns without throwing.
  */
 export function updatePendingOrdersSidebar(deps: PendingOrdersDeps): void {
   const container = document.getElementById('pending-orders-list');
   if (!container) return;
   container.innerHTML = '';
   if (S.tacticalBattleSnapshot) {
-    if (S.tacticalPendingMarches.length === 0 && S.pendingEmbarkOrders.length === 0) {
+    if (S.tacticalPendingMarches.length === 0 && S.pendingFerryOrders.length === 0) {
       const span = document.createElement('span');
       span.textContent = 'None';
       span.style.color = '#666';
@@ -520,18 +519,17 @@ export function updatePendingOrdersSidebar(deps: PendingOrdersDeps): void {
       });
       container.appendChild(rowEl);
     }
-    for (const emb of S.pendingEmbarkOrders) {
+    for (const ferry of S.pendingFerryOrders) {
       const rowEl = deps.createSidebarOrderRow({
-        labelText: deps.formatUnitArrowLabel(emb.unitId, fallbackDisplayNameFromUnitId(emb.navalUnitId)),
-        selected: S.selectedUnitIds.includes(emb.unitId),
-        onToggleSelect: (event) => deps.applySelectionFromSidebarUnitButton(emb.unitId, event),
+        labelText: deps.formatUnitArrowLabel(
+          ferry.unitId,
+          formatPendingFerryOrderSidebarLabel(S.gameState, ferry, S.tacticalBattleSnapshot.subUnits)
+        ),
+        selected: S.selectedUnitIds.includes(ferry.unitId),
+        onToggleSelect: (event) => deps.applySelectionFromSidebarUnitButton(ferry.unitId, event),
         onCancel: () => {
-          withTacticalHumanDraftPrefetchInvalidation(() => {
-            S.pendingEmbarkOrders = S.pendingEmbarkOrders.filter((e) => e.unitId !== emb.unitId);
-          });
-          deps.updatePendingOrdersSidebar?.();
+          deps.cancelFerryForUnit(ferry.unitId);
           deps.refreshStackCalloutIfOpen?.();
-          deps.redraw?.();
         },
         compactBlueButtons: true,
       });

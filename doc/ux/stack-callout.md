@@ -25,7 +25,7 @@ Enemy rows have no selection toggle.
 
 ### Mouse
 
-- When the player clicks a human row's toggle, that unit is added to or removed from the selection.
+- When the player clicks a human row's toggle, a plain click on an unselected row replaces the selection with that unit and closes the callout, a plain click on a selected row removes that unit, and Shift toggles the unit and leaves the callout open.
 - When the player clicks "+ All" without Shift, the selectable human units in the hex become the selection.
 - When Shift is held and the player clicks "+ All", those units are added. "- All" removes them.
 - When the player clicks the close control, the callout closes.

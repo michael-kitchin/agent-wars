@@ -13,9 +13,9 @@ Shown with the right panel. The player can use the lists in Strategic planning a
 ## Information Displayed
 
 - "Selected unit" and either an em dash, one unit name, or that name plus a count of the other selected units.
-- "Movement orders". Each row names the unit and the destination. An empty list shows "None".
-- "Ranged attacks". Each row names the unit and the target. An empty list shows "None".
-- "Air strikes". Each row names the unit and the target. An empty list shows "None".
+- "Movement orders". Each row names the unit and then shows the distance in hexes plus the status, target type, or `ferry`. An empty list shows "None".
+- "Ranged attacks". Each row names the unit and then shows the distance in hexes plus the status, target type, or `ferry`. An empty list shows "None".
+- "Air strikes". Each row names the unit and then shows the distance in hexes plus the status, target type, or `ferry`. An empty list shows "None".
 - The sidebar error line, which stays hidden. Errors use the map toast only. See [notifications-and-feedback.md](notifications-and-feedback.md).
 
 Strategic movement rows include standing movement and ferries. Tactical movement rows include pending marches and ferries. Sealift assignments are not pending orders and are not listed. See [order-lifecycle.md](order-lifecycle.md).
@@ -24,7 +24,7 @@ Strategic movement rows include standing movement and ferries. Tactical movement
 
 ### Mouse
 
-- When the player clicks a row's select control, that unit toggles in the selection. See [selection-model.md](selection-model.md).
+- When the player clicks a row's select control, a plain click calls `replaceSelection` with that unit, and Shift toggles it. See [selection-model.md](selection-model.md).
 - When the player clicks a row's cancel control, that order is removed and the list refreshes. Other orders stay.
 
 ### Keyboard
@@ -65,7 +65,7 @@ Strategic movement rows include standing movement and ferries. Tactical movement
 
 ## Known Deviations
 
-- **Tactical ferries are not listed.** Required: during Tactical planning, each queued ferry has a Movement orders row with select and cancel controls. Current: tactical ferries are submitted on Ready, and the tactical branch of the movement list shows only pending marches, plus an embark list that nothing fills. Entry point: `src/renderer/gameplay/sidebarSupport.ts`.
+None.
 
 ## Open Questions
 

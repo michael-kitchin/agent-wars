@@ -50,15 +50,15 @@ Recommended resolution: do not change the formatters. In `doc/ux/right-panel-sel
 - Modify: `doc/ux-specification.md`
 - Modify: `doc/ux/stack-callout.md` (wording only, from the decision above)
 
-- [ ] **Step 1: Tactical branch**
+- [x] **Step 1: Tactical branch**
 
 In `updatePendingOrdersSidebar`, change the tactical empty check and add the ferry loop from Locked Behavior. Delete the `for (const emb of S.pendingEmbarkOrders)` loop. Leave march rows and the strategic branch untouched.
 
-- [ ] **Step 2: Docs**
+- [x] **Step 2: Docs**
 
 Remove the tactical-ferry Known Deviations entry from `doc/ux/right-panel-selection-and-orders.md`. In `doc/ux/order-lifecycle.md`, delete the sentence that says the current code omits tactical ferries. Apply the two wording changes in Decisions. Rebuild the Known Deviations index in `doc/ux-specification.md` by reading the documents. Do not subtract from a remembered total.
 
-- [ ] **Step 3: Verify**
+- [x] **Step 3: Verify**
 
 ```text
 npm run build:main

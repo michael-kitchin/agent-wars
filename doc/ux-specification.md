@@ -135,5 +135,4 @@ None.
 
 Each entry is a requirement that the renderer does not meet yet. Cross-cutting documents link to the element document that holds the entry.
 
-- [right-panel-selection-and-orders.md](ux/right-panel-selection-and-orders.md): 1
 - [ai-activity-log.md](ux/ai-activity-log.md): 1
