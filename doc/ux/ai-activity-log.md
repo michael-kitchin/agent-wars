@@ -57,7 +57,7 @@ The same log records strategic consultations and tactical consultations. Cancell
 
 ## Known Deviations
 
-- **The log does not clear on a new match.** Required: starting a new match clears the log. Current: lines accumulate for the whole app session; a new match resets only the cost readout. Entry point: `src/renderer/gameplay/newGame.ts`.
+None.
 
 ## Open Questions
 

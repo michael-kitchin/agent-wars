@@ -1,5 +1,6 @@
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import { rendererSharedState as S } from '../core/state';
+import { clearOpenRouterLog } from '../openRouter/openRouterUiHelpers';
 import { resetPrecomputedAiState } from '../openRouter/precomputedAiState';
 import { tacticalReleaseRendererSessionForNewStrategicMatch } from '../tactical/tacticalUiOrchestration';
 import { discardStrategicOrderUiStash } from '../tactical/tacticalStrategicOrderUiStash';
@@ -263,6 +264,7 @@ export function registerNewGameButton(deps: NewGameDeps): void {
       S.backgroundRequestInFlight = false;
       S.eventDrivenInitialConsultationDone = false;
       S.openRouterGameCost = 0;
+      clearOpenRouterLog();
       deps.updateOpenRouterCostLabel();
       deps.updateGameStateSidebar(state);
       await deps.refreshHumanStandingOrders();
@@ -284,10 +286,11 @@ export function registerNewGameButton(deps: NewGameDeps): void {
 
  * Purpose: Supports maintainability by documenting why `openNewGameOverlayFromModelTab` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Expected outcome: During a battle or resolution playback the click returns without cancelling planning, showing the overlay, or disabling the map. Otherwise the new-game overlay opens.
  * Exceptions: None.
  */
 export function openNewGameOverlayFromModelTab(setMainUIControlsEnabled: (enabled: boolean) => void, updateReadyButtonState: () => void): void {
+  if (S.tacticalBattleSnapshot != null || S.resolutionMoveAnimation != null) return;
   window.gameApi?.cancelRequestAiOrders?.();
   resetPrecomputedAiState('null');
   S.pendingDeferredStrategicPostResolutionConsult = false;

@@ -58,6 +58,7 @@ export function toTacticalPostBeatConsultFields(
     hasStrategy: Boolean(strategyText?.trim()),
     hasMessage: Boolean(messageText?.trim()),
     hasToolInvocationCounts: Boolean(post.toolInvocationCounts),
+    cost: typeof post.cost === 'number' && Number.isFinite(post.cost) ? post.cost : undefined,
   });
   return {
     kind: 'tactical',
@@ -66,6 +67,7 @@ export function toTacticalPostBeatConsultFields(
     ...(attach ? { tacticalOpponentPlan: post.tacticalOpponentPlan ?? null } : {}),
     ...optionalConsultToastFields(messageText, strategyText),
     ...(post.toolInvocationCounts ? { toolInvocationCounts: post.toolInvocationCounts } : {}),
+    ...(typeof post.cost === 'number' && Number.isFinite(post.cost) ? { cost: post.cost } : {}),
   };
 }
 
@@ -230,7 +232,7 @@ export async function runEventDrivenAfterResolutionConsultation(args: {
   ) => Promise<RequestAiOrdersResult>;
   timeoutMs: number;
   errorLogMessage: string;
-}): Promise<{ aiStrategy?: string; aiMessage?: string; toolInvocationCounts?: Record<string, number> }> {
+}): Promise<{ aiStrategy?: string; aiMessage?: string; toolInvocationCounts?: Record<string, number>; cost?: number }> {
   if (!args.useEventDrivenConsultation || !args.resolutionSuccess || !args.aiPlanningRunEnabled) {
     return {};
   }
@@ -253,6 +255,9 @@ export async function runEventDrivenAfterResolutionConsultation(args: {
     return {
       ...optionalConsultToastFields(postResolution.message, postResolution.strategy),
       ...(postResolution.toolInvocationCounts ? { toolInvocationCounts: postResolution.toolInvocationCounts } : {}),
+      ...(typeof postResolution.cost === 'number' && Number.isFinite(postResolution.cost)
+        ? { cost: postResolution.cost }
+        : {}),
     };
   } catch (err) {
     logError(args.errorLogMessage, err);
@@ -314,6 +319,7 @@ export async function runEventDrivenAfterTacticalBeatConsultation(args: {
       strategy: post.strategy,
       message: post.message,
       toolInvocationCounts: post.toolInvocationCounts,
+      ...(typeof post.cost === 'number' && Number.isFinite(post.cost) ? { cost: post.cost } : {}),
     };
   } catch (err) {
     logError(args.errorLogMessage, err);

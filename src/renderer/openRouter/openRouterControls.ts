@@ -8,6 +8,7 @@ import {
   writeTacticalBattlesInterceptPromptEnabled,
 } from '../gameplay/tacticalBattlePromptPreference';
 import { applyTacticalPostBeatConsultSideEffects } from '../tactical/applyTacticalPostBeatConsultSideEffects';
+import { updateOpenRouterCostLabel } from './openRouterUiHelpers';
 import { attachModelDescriptionTooltip } from './modelDescriptionTooltip';
 import { resetPrecomputedAiState } from './precomputedAiState';
 
@@ -174,6 +175,10 @@ function initDeferredResolutionPlaybackPushListeners(deps: OpenRouterUiDeps): vo
       S.toolInvocationCounts = { ...S.toolInvocationCounts, ...payload.toolInvocationCounts };
       deps.updateOpenRouterToolCountLabels();
     }
+    if (typeof payload.cost === 'number' && Number.isFinite(payload.cost)) {
+      S.openRouterGameCost += payload.cost;
+      updateOpenRouterCostLabel();
+    }
     deps.appendOpenRouterLog('Post-resolution consultation applied.', false);
     deps.requestRedraw();
     if (S.runButtonOn) deps.startBackgroundRequestIfAllowed();
@@ -289,6 +294,14 @@ export function initOpenRouterUI(deps: OpenRouterUiDeps): void {
   const newBtn = document.getElementById('openrouter-new-btn');
   let persistedSelectedModelId = '';
   let lastPersistedApiKeyValue = '';
+  /**
+   * True when the key field is empty because a saved key is hidden, not because the player cleared typed text.
+   *
+   * When to use: Set only after `getKey()` reports `hasKey` and the input is still empty. An empty blur then calls `setKey('')`.
+   * Expected outcome: A later empty blur clears the saved key and restores the unsaved placeholder. Typed text never sets this flag.
+   * Exceptions: None.
+   */
+  let savedKeyHiddenInEmptyField = false;
   let modelRefreshInFlight = false;
   let startupModelRetryTimer: ReturnType<typeof setTimeout> | null = null;
   let startupModelRetryConsumed = false;
@@ -395,16 +408,34 @@ export function initOpenRouterUI(deps: OpenRouterUiDeps): void {
       if (keyResult?.hasKey && !keyInput.value.trim()) {
         keyInput.placeholder = 'Saved API key';
         lastPersistedApiKeyValue = '';
+        savedKeyHiddenInEmptyField = true;
         refreshModels(true);
       }
     });
+    /**
+     * Saves the key field when its text changed, and clears a hidden saved key when the empty field blurs.
+     *
+     * When to use: Blur, change, or Enter on `#openrouter-key`.
+     * Expected outcome: `setKey` runs only after the value actually changed, or when an empty field still hides a saved key. The placeholder updates after `setKey` resolves.
+     * Exceptions: None. A rejected `setKey` leaves the placeholder unchanged.
+     */
     const persistApiKey = (): void => {
       const value = keyInput.value.trim();
+      if (value === '' && savedKeyHiddenInEmptyField) {
+        savedKeyHiddenInEmptyField = false;
+        lastPersistedApiKeyValue = '';
+        api.setKey('').then(() => {
+          keyInput.placeholder = 'Set key and blur to save';
+          deps.hideMapToast();
+          void deps.syncOpenRouterRunToggleInteractable();
+        });
+        return;
+      }
       if (value === lastPersistedApiKeyValue) return;
       lastPersistedApiKeyValue = value;
       api.setKey(value).then(() => {
         if (!value) {
-          keyInput.placeholder = '';
+          keyInput.placeholder = 'Set key and blur to save';
           deps.hideMapToast();
           void deps.syncOpenRouterRunToggleInteractable();
           return;

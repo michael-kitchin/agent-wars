@@ -623,6 +623,9 @@ export async function handleGameReady(
     if (postConsult.toolInvocationCounts) {
       toolInvocationCounts = postConsult.toolInvocationCounts;
     }
+    if (typeof postConsult.cost === 'number' && Number.isFinite(postConsult.cost)) {
+      turnCost = (turnCost ?? 0) + postConsult.cost;
+    }
   }
 
   const aiRangedByType = computeAiRangedByTypeCounts(state, aiRangedOrders);
@@ -742,6 +745,9 @@ export async function handleResolveMeleeIntercept(
     }
     if (resolvePostConsult.toolInvocationCounts) {
       toolInvocationCounts = resolvePostConsult.toolInvocationCounts;
+    }
+    if (typeof resolvePostConsult.cost === 'number' && Number.isFinite(resolvePostConsult.cost)) {
+      turnCost = resolvePostConsult.cost;
     }
   }
 

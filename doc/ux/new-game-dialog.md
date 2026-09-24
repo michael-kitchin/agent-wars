@@ -28,7 +28,7 @@ Opens in New game and in Game over. See [modes-and-transitions.md](modes-and-tra
 - When the player clicks a randomize control, that side's region becomes a random legal choice.
 - When the player changes game size, the cap badges update to that size.
 - When the player changes fog of war, the next match uses that setting. Opening the overlay checks the box again.
-- When the player clicks Start game or New game, the match starts, drafts and the selection clear, the AI cost readout and the AI activity log clear, and the overlay closes on success. A failure leaves the overlay open. The current code does not clear the log; see Known Deviations in [ai-activity-log.md](ai-activity-log.md).
+- When the player clicks Start game or New game, the match starts, drafts and the selection clear, the AI cost readout and the AI activity log clear, and the overlay closes on success. A failure leaves the overlay open.
 
 ### Keyboard
 

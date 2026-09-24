@@ -72,8 +72,36 @@ async function testSkippedTacticalConsultReturnsEmptyMerge(): Promise<void> {
   assert.deepStrictEqual(skipped, {});
 }
 
+/**
+ * Ensures a finite consult cost is copied onto tactical post-beat IPC fields and omitted when absent.
+ *
+ * Purpose: The match cost readout can add the consult cost only when main actually returned one.
+ * When to use: After edits to `toTacticalPostBeatConsultFields` cost copying.
+ * Expected outcome: `cost` is `0.25` when the merge source has that cost, and the property is absent when cost is missing or `NaN`.
+ * Exceptions: None.
+ */
+function testCopiesFiniteCostAndOmitsMissingCost(): void {
+  const withCost = toTacticalPostBeatConsultFields('bt-1', {
+    attachTacticalOpponentPlanToIpc: false,
+    cost: 0.25,
+  });
+  assert.strictEqual(withCost.cost, 0.25);
+
+  const withoutCost = toTacticalPostBeatConsultFields('bt-1', {
+    attachTacticalOpponentPlanToIpc: false,
+  });
+  assert.strictEqual(Object.prototype.hasOwnProperty.call(withoutCost, 'cost'), false);
+
+  const nanCost = toTacticalPostBeatConsultFields('bt-1', {
+    attachTacticalOpponentPlanToIpc: false,
+    cost: Number.NaN,
+  });
+  assert.strictEqual(Object.prototype.hasOwnProperty.call(nanCost, 'cost'), false);
+}
+
 async function runAll(): Promise<void> {
   testMapsMessageIndependentlyOfStrategy();
+  testCopiesFiniteCostAndOmitsMissingCost();
   await testSkippedTacticalConsultReturnsEmptyMerge();
   console.log('OK readyIpcResolutionMapping tests');
 }

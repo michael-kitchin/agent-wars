@@ -15360,6 +15360,10 @@
     el.appendChild(span);
     el.scrollTop = el.scrollHeight;
   }
+  function clearOpenRouterLog() {
+    const el = document.getElementById("openrouter-log");
+    if (el) el.textContent = "";
+  }
   var MAP_TOAST_SECTION_BULLET_INDENT = "1.25em";
   function appendMapToastBulletLine(target, line, indent) {
     const text = line.startsWith("\u2022") ? line : `\u2022 ${line}`;
@@ -22513,6 +22517,7 @@
         rendererSharedState.backgroundRequestInFlight = false;
         rendererSharedState.eventDrivenInitialConsultationDone = false;
         rendererSharedState.openRouterGameCost = 0;
+        clearOpenRouterLog();
         deps.updateOpenRouterCostLabel();
         deps.updateGameStateSidebar(state);
         await deps.refreshHumanStandingOrders();
@@ -22529,6 +22534,7 @@
     });
   }
   function openNewGameOverlayFromModelTab(setMainUIControlsEnabled3, updateReadyButtonState2) {
+    if (rendererSharedState.tacticalBattleSnapshot != null || rendererSharedState.resolutionMoveAnimation != null) return;
     window.gameApi?.cancelRequestAiOrders?.();
     resetPrecomputedAiState("null");
     rendererSharedState.pendingDeferredStrategicPostResolutionConsult = false;
@@ -23698,6 +23704,10 @@
       rendererSharedState.toolInvocationCounts = { ...rendererSharedState.toolInvocationCounts, ...payload.toolInvocationCounts };
       deps.updateOpenRouterToolCountLabels();
     }
+    if (typeof payload.cost === "number" && Number.isFinite(payload.cost)) {
+      rendererSharedState.openRouterGameCost += payload.cost;
+      updateOpenRouterCostLabel();
+    }
     deps.appendOpenRouterLog("Tactical post-beat consultation applied.", false);
     deps.redraw();
     deps.updateReadyButtonState();
@@ -23835,6 +23845,10 @@
         rendererSharedState.toolInvocationCounts = { ...rendererSharedState.toolInvocationCounts, ...payload.toolInvocationCounts };
         deps.updateOpenRouterToolCountLabels();
       }
+      if (typeof payload.cost === "number" && Number.isFinite(payload.cost)) {
+        rendererSharedState.openRouterGameCost += payload.cost;
+        updateOpenRouterCostLabel();
+      }
       deps.appendOpenRouterLog("Post-resolution consultation applied.", false);
       deps.requestRedraw();
       if (rendererSharedState.runButtonOn) deps.startBackgroundRequestIfAllowed();
@@ -23931,6 +23945,7 @@
     const newBtn = document.getElementById("openrouter-new-btn");
     let persistedSelectedModelId = "";
     let lastPersistedApiKeyValue = "";
+    let savedKeyHiddenInEmptyField = false;
     let modelRefreshInFlight = false;
     let startupModelRetryTimer = null;
     let startupModelRetryConsumed = false;
@@ -24021,16 +24036,27 @@
         if (keyResult?.hasKey && !keyInput.value.trim()) {
           keyInput.placeholder = "Saved API key";
           lastPersistedApiKeyValue = "";
+          savedKeyHiddenInEmptyField = true;
           refreshModels(true);
         }
       });
       const persistApiKey = () => {
         const value = keyInput.value.trim();
+        if (value === "" && savedKeyHiddenInEmptyField) {
+          savedKeyHiddenInEmptyField = false;
+          lastPersistedApiKeyValue = "";
+          api.setKey("").then(() => {
+            keyInput.placeholder = "Set key and blur to save";
+            deps.hideMapToast();
+            void deps.syncOpenRouterRunToggleInteractable();
+          });
+          return;
+        }
         if (value === lastPersistedApiKeyValue) return;
         lastPersistedApiKeyValue = value;
         api.setKey(value).then(() => {
           if (!value) {
-            keyInput.placeholder = "";
+            keyInput.placeholder = "Set key and blur to save";
             deps.hideMapToast();
             void deps.syncOpenRouterRunToggleInteractable();
             return;

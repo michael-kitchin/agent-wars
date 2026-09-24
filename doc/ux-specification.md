@@ -135,4 +135,4 @@ None.
 
 Each entry is a requirement that the renderer does not meet yet. Cross-cutting documents link to the element document that holds the entry.
 
-- [ai-activity-log.md](ux/ai-activity-log.md): 1
+None.

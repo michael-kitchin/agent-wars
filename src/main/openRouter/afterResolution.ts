@@ -134,6 +134,14 @@ message?: string;
    * Exceptions: None.
    */
 toolInvocationCounts?: Record<string, number>;
+    /**
+   * Dollar cost of the successful post-resolution consultation, when the model call reported one.
+   *
+   * When to use: Copy onto the Ready result or the deferred consult push so the match readout can add it.
+   * Expected outcome: A finite number when `requestOrders` returned one; omitted otherwise. Never `NaN`.
+   * Exceptions: None.
+   */
+cost?: number;
 }
 
 /**
@@ -221,12 +229,14 @@ export async function afterResolution(
           movementCount: result.orders.length,
           hasToolInvocationCounts: Boolean(result.toolInvocationCounts),
           hasMessage: Boolean(result.message?.trim()),
+          cost: typeof result.cost === 'number' && Number.isFinite(result.cost) ? result.cost : undefined,
         });
         return {
           consulted: true,
           strategy: result.strategy,
           message: result.message,
           toolInvocationCounts: result.toolInvocationCounts,
+          ...(typeof result.cost === 'number' && Number.isFinite(result.cost) ? { cost: result.cost } : {}),
         };
       }
       logDebug('afterResolution: requestOrders failed', {
@@ -393,6 +403,14 @@ export interface AfterTacticalBeatResolutionResult {
    */
   toolInvocationCounts?: Record<string, number>;
   /**
+   * Dollar cost of the successful tactical post-beat consultation, when the model call reported one.
+   *
+   * When to use: Copy onto the tactical consult merge so the match readout can add it once.
+   * Expected outcome: A finite number when `requestOrders` returned one; omitted otherwise. Never `NaN`.
+   * Exceptions: None.
+   */
+  cost?: number;
+  /**
    * When true, the tactical commit IPC layer must set `tacticalOpponentPlan` (payload or explicit null) so the renderer can replace or clear its buffer.
    *
    * Contract: True only after mandatory/subscription evaluation decided to invoke `requestOrders` (including failed or empty model responses); false when the beat was skipped before any LLM call (same idea as strategic omitting draft updates when no consultation ran).
@@ -496,6 +514,7 @@ export async function afterTacticalBeatResolution(
         rangedCount: tacticalOpponentPlan.rangedAttacks.length,
         hasToolInvocationCounts: Boolean(result.toolInvocationCounts),
         hasMessage: Boolean(result.message?.trim()),
+        cost: typeof result.cost === 'number' && Number.isFinite(result.cost) ? result.cost : undefined,
       });
       return {
         consulted: true,
@@ -504,6 +523,7 @@ export async function afterTacticalBeatResolution(
         message: result.message,
         toolInvocationCounts: result.toolInvocationCounts,
         attachTacticalOpponentPlanToIpc: true,
+        ...(typeof result.cost === 'number' && Number.isFinite(result.cost) ? { cost: result.cost } : {}),
       };
     }
     logDebug('afterTacticalBeatResolution: requestOrders failed', { success: result.success });

@@ -29,7 +29,7 @@ Shown when the Model tab is selected. This is the tab the panel starts on. The m
 - When the player changes the model, that model is saved and the description tooltip clears if the choice is empty.
 - When the player clicks refresh, the model list reloads. A failure is written to the AI activity log.
 - When the player clicks Run and it is enabled, Run toggles. Pressed means opponent planning runs. Turning it on selects the Tools tab, clears any precomputed opponent plan, and may disable Ready until a plan is ready. Turning it off cancels an in-flight planning request and clears the precomputed plan.
-- When the player clicks New, the new-game overlay opens. See [new-game-dialog.md](new-game-dialog.md).
+- When the player clicks New, the new-game overlay opens. See [new-game-dialog.md](new-game-dialog.md). New opens the overlay only during strategic planning. During a battle or resolution playback the click does nothing.
 - When the player changes Tactical battles, later Ready resolutions either show the tactical battles list or skip it. See [tactical-battles-list.md](tactical-battles-list.md).
 - When the pointer rests on the model dropdown, the description tooltip appears after a dwell if the selected model has a description.
 

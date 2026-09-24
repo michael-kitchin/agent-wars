@@ -2,6 +2,7 @@ import type { TacticalPostBeatConsultFields } from '../../shared/ipc/readyTypes'
 import type { AiStrategyToastFields } from '../../shared/aiStrategyToastContent';
 import { nextTacticalOpponentDraftAfterPostBeatPlan } from '../../shared/ipc/tacticalOpponentPlanMerge';
 import { rendererSharedState as S } from '../core/state';
+import { updateOpenRouterCostLabel } from '../openRouter/openRouterUiHelpers';
 
 /**
  * Renderer dependencies for applying tactical post-beat consultation fields after commit IPC returns.
@@ -71,6 +72,10 @@ export function applyTacticalPostBeatConsultSideEffects(
   if (payload.toolInvocationCounts) {
     S.toolInvocationCounts = { ...S.toolInvocationCounts, ...payload.toolInvocationCounts };
     deps.updateOpenRouterToolCountLabels();
+  }
+  if (typeof payload.cost === 'number' && Number.isFinite(payload.cost)) {
+    S.openRouterGameCost += payload.cost;
+    updateOpenRouterCostLabel();
   }
   deps.appendOpenRouterLog('Tactical post-beat consultation applied.', false);
   deps.redraw();

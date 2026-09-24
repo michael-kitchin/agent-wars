@@ -272,6 +272,7 @@ export async function handleNotifyResolutionPlaybackComplete(
       ...(postConsult.aiStrategy ? { aiStrategy: postConsult.aiStrategy } : {}),
       ...(postConsult.aiMessage ? { aiMessage: postConsult.aiMessage } : {}),
       ...(postConsult.toolInvocationCounts ? { toolInvocationCounts: postConsult.toolInvocationCounts } : {}),
+      ...(typeof postConsult.cost === 'number' && Number.isFinite(postConsult.cost) ? { cost: postConsult.cost } : {}),
     };
     sender.send(IPC_GAME.postResolutionConsultation, push);
     return { ok: true };
@@ -285,6 +286,7 @@ export async function handleNotifyResolutionPlaybackComplete(
       ...(postConsult.aiStrategy ? { aiStrategy: postConsult.aiStrategy } : {}),
       ...(postConsult.aiMessage ? { aiMessage: postConsult.aiMessage } : {}),
       ...(postConsult.toolInvocationCounts ? { toolInvocationCounts: postConsult.toolInvocationCounts } : {}),
+      ...(typeof postConsult.cost === 'number' && Number.isFinite(postConsult.cost) ? { cost: postConsult.cost } : {}),
     };
     sender.send(IPC_GAME.postResolutionConsultation, push);
     return { ok: true };

@@ -183,6 +183,18 @@ export function appendOpenRouterLog(line: string, isError = false): void {
 }
 
 /**
+ * Empties the AI activity log so a new match does not keep lines from the previous one.
+ *
+ * When to use: After a successful new game resets `S.openRouterGameCost`, before the cost label refresh.
+ * Expected outcome: `#openrouter-log` has no child nodes. A missing node is a no-op.
+ * Exceptions: None.
+ */
+export function clearOpenRouterLog(): void {
+  const el = document.getElementById('openrouter-log');
+  if (el) el.textContent = '';
+}
+
+/**
  * Defines the `bulletizeToastLines` function shape (export function bulletizeToastLines(message: string): string).
 
  * Purpose: Supports maintainability by documenting why `bulletizeToastLines` exists.

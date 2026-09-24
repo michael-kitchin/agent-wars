@@ -218,6 +218,15 @@ export type TacticalPostBeatConsultFields = {
   aiMessage?: string;
   toolInvocationCounts?: Record<string, number>;
   /**
+   * Dollar cost of this tactical post-beat consultation.
+   *
+   * Contract: Present only when the consult returned a finite number. A missing field is not zero.
+   * When to use: Renderer adds it once to the match cost readout when applying these fields.
+   * Expected outcome: Omitted when the consult did not report a finite cost.
+   * Exceptions: None.
+   */
+  cost?: number;
+  /**
    * True when main abandoned this consult because playback notify metadata did not match.
    *
    * Contract: Omit on successful consultation; renderer must unlatch and resume planning without applying a plan.
@@ -252,6 +261,15 @@ export type TacticalPostBeatConsultMergeSource = {
   message?: string;
   aiMessage?: string;
   toolInvocationCounts?: Record<string, number>;
+  /**
+   * Dollar cost from the tactical post-beat consult, before IPC mapping.
+   *
+   * Contract: Copied onto `TacticalPostBeatConsultFields` only when it is a finite number.
+   * When to use: `toTacticalPostBeatConsultFields`.
+   * Expected outcome: Omitted from the IPC fields when missing or not finite, including `NaN`.
+   * Exceptions: None.
+   */
+  cost?: number;
 };
 
 /**
@@ -1071,6 +1089,15 @@ export type PostResolutionConsultationPushPayload = {
    */
   aiMessage?: string;
   toolInvocationCounts?: Record<string, number>;
+  /**
+   * Dollar cost of the deferred strategic or melee post-resolution consultation.
+   *
+   * Contract: Present only when the consult returned a finite number. A missing field is not zero.
+   * When to use: Renderer adds it once when this push is applied. Inline consults put the same cost on the Ready result instead.
+   * Expected outcome: Omitted when the consult did not report a finite cost.
+   * Exceptions: None.
+   */
+  cost?: number;
   /**
    * True when main abandoned this consult because playback notify metadata did not match.
    *
