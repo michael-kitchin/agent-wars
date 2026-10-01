@@ -1,16 +1,17 @@
 /**
  * Main-map double-click planning for strategic and tactical games.
  *
- * Purpose: Turns one double-click into exactly one outcome — a ferry, a march, a rejection toast, a full
- * deselect, or nothing — using the shared decision table so the two map modes cannot drift apart.
+ * Purpose: Turns one double-click into exactly one outcome — a ranged attack, an air strike, a ferry, a march,
+ * a rejection toast, a full deselect, or nothing — using the shared decision table so the two map modes cannot drift apart.
  * When to use: From the `dblclick` listener wired by `wireMainMapInteractions`.
  * Expected outcome: Orders are planned for the selection captured when the gesture started, never for
  * whichever icon happens to sit under the second click.
  * Exceptions: None; ferry validation failures surface as toasts.
  */
 
-import type { GameStateSnapshot } from '../../shared/ipcTypes';
+import type { AirStrikeTargetType, GameStateSnapshot } from '../../shared/ipcTypes';
 import { resolutionPlaybackBlocksMapOrders } from '../../shared/mapOrderGestureGate';
+import { selectionUnitIdSetsDiffer } from '../../shared/selectionUnitIdSets';
 import {
   mapSelectionComposition,
   resolveMapDoubleClickAction,
@@ -19,6 +20,7 @@ import {
 import { clearMapSelectionChrome } from '../core/selection';
 import { emitParityDiagnosticsBreadcrumb } from '../core/parityDiagnostics';
 import { rendererSharedState as S } from '../core/state';
+import { tacticalRendererHitInsideBattleFootprint } from '../tactical/tacticalUiGuards';
 import {
   clearDeferredHumanUnitSingleSelectTimer,
   clearDeferredStackCalloutTimer,
@@ -53,6 +55,46 @@ export type MainMapDoubleClickDeps = {
   showMapToast: (message: string, options?: { isError?: boolean }) => void;
   formatTargetingValidationReason: (reason: string | undefined, fallbackMessage: string) => string;
   replacePendingFerryOrdersForSelected: (selectedIds: string[], destinationH3Index: string) => void;
+  /**
+   * Queues one air strike per snapshot unit, replacing any previous strike for those ids.
+   *
+   * Purpose: The double-click commit path records the strike the click path used to record.
+   * When to use: After `validateGroupAirStrikeTarget` succeeds.
+   * Expected outcome: `pendingAirStrikes` holds the new rows for `selectedIds` and keeps other units' rows.
+   * Exceptions: None.
+   */
+  replacePendingAirStrikesForSelected: (
+    selectedIds: string[],
+    targetH3Index: string,
+    targetType: AirStrikeTargetType
+  ) => void;
+  /**
+   * Queues one ranged attack per snapshot unit, replacing any previous attack for those ids.
+   *
+   * Purpose: The double-click commit path records the attack the click path used to record.
+   * When to use: After `validateGroupRangedTarget` succeeds.
+   * Expected outcome: `pendingRangedAttacks` holds the new rows for `selectedIds` and keeps other units' rows.
+   * Exceptions: None.
+   */
+  replacePendingRangedAttacksForSelected: (selectedIds: string[], targetH3Index: string) => void;
+  /**
+   * Clears the live selection, both targeting flags, the selected hex, and the hover preview.
+   *
+   * Purpose: A successful attack ends targeting the same way the old click path did. `clearCommittedOrderDraftState` also changes committed-line visibility, so this path must not call it.
+   * When to use: Only after a ranged attack or air strike has been queued.
+   * Expected outcome: Selection chrome for the draft is clear. Queued orders stay queued.
+   * Exceptions: None.
+   */
+  clearSelection: () => void;
+  /**
+   * Hides an open stack callout.
+   *
+   * Purpose: A successful attack used to close the callout from the click path.
+   * When to use: After a ranged attack or air strike has been queued.
+   * Expected outcome: The callout is hidden.
+   * Exceptions: None.
+   */
+  hideStackCallout: () => void;
   clearCommittedOrderDraftState: () => void;
   updatePendingOrdersSidebar: () => void;
   updateSidebar: () => void;
@@ -78,12 +120,13 @@ function ignoreReasonFor(input: MapDoubleClickDecisionInput): string {
 /**
  * Applies the shared double-click decision table to one map double-click.
  *
- * Purpose: Single entry point for move and ferry planning, mixed-selection rejection, and the air deselect
- * gesture, so strategic and tactical behavior stays identical.
+ * Purpose: Single entry point for support-target commits, move and ferry planning, mixed-selection rejection,
+ * and the air deselect gesture, so strategic and tactical behavior stays identical.
  * When to use: From the map `dblclick` listener; call it without awaiting and let it settle on its own.
- * Expected outcome: While resolution playback is running, returns before planning or clearing. Otherwise at most
- * one order is queued or one toast is shown per call. An empty click that cannot plan an air ferry clears the
- * selection without discarding anything already queued for Ready.
+ * Expected outcome: While resolution playback is running, returns before planning or clearing. A targeting
+ * double-click either queues that attack or shows its validation toast, and does not plan a move. Otherwise
+ * at most one order is queued or one toast is shown per call. An empty click that cannot plan an air ferry
+ * clears the selection without discarding anything already queued for Ready.
  * Exceptions: None; a missing ferry API is reported as an ignored double-click.
  */
 export async function handleMainMapDoubleClick(
@@ -113,6 +156,7 @@ export async function handleMainMapDoubleClick(
 
   const decisionInput: MapDoubleClickDecisionInput = {
     targetingModeActive: S.rangedModeActive || S.airStrikeModeActive,
+    pointerHasHit: clickHit !== null,
     hasDestination: destinationH3 !== null,
     composition: mapSelectionComposition(selectedAtMouseDown.map((unit) => unit.unitType)),
     allSelectedUnitsAlreadyAtDestination:
@@ -194,6 +238,122 @@ export async function handleMainMapDoubleClick(
       deps.updateRangedSidebar();
       deps.redraw();
       return;
+
+    case 'planSupportTarget': {
+      // The decision table only returns this kind when the pointer is over a hex. This narrows the type.
+      if (clickHit === null) return;
+      if (
+        S.tacticalBattleSnapshot &&
+        !tacticalRendererHitInsideBattleFootprint(clickHit, S.tacticalBattleSnapshot)
+      ) {
+        emitParityDiagnosticsBreadcrumb('planning.doubleClickIgnored', {
+          reason: 'outside_tactical_footprint',
+          selectedCount: selectedAtMouseDown.length,
+        });
+        return;
+      }
+      S.selectedHexIndex = clickHit;
+      const idsAtStart = [...selectedIds];
+      if (S.airStrikeModeActive) {
+        if (!window.gameApi?.validateGroupAirStrikeTarget) {
+          emitParityDiagnosticsBreadcrumb('planning.doubleClickIgnored', { reason: 'support_target_api_missing' });
+          return;
+        }
+        const targetTypeAtStart = S.airStrikeTargetType;
+        const validation = await window.gameApi.validateGroupAirStrikeTarget({
+          unitIds: idsAtStart,
+          targetH3Index: clickHit,
+          targetType: targetTypeAtStart,
+        });
+        if (!S.airStrikeModeActive || selectionUnitIdSetsDiffer(idsAtStart, S.selectedUnitIds)) {
+          emitParityDiagnosticsBreadcrumb('planning.doubleClickIgnored', {
+            reason: 'targeting_changed_during_validation',
+            selectedCount: idsAtStart.length,
+          });
+          return;
+        }
+        if (!validation.success) {
+          emitParityDiagnosticsBreadcrumb('planning.doubleClickRejected', {
+            reason: 'air_strike_target_rejected',
+            selectedCount: idsAtStart.length,
+            destinationH3: clickHit,
+          });
+          deps.showMapToast(
+            deps.formatTargetingValidationReason(validation.reason, 'Selected air units cannot strike that target.'),
+            { isError: true }
+          );
+          deps.updateRangedSidebar();
+          deps.redraw();
+          return;
+        }
+        emitParityDiagnosticsBreadcrumb('planning.doubleClickAccepted', {
+          ...acceptedDetails,
+          destinationH3: clickHit,
+          hasAirSelection: true,
+        });
+        deps.replacePendingAirStrikesForSelected(idsAtStart, clickHit, targetTypeAtStart);
+        S.airStrikeModeActive = false;
+        deps.clearSelection();
+        S.hoverRoutePreview = null;
+        S.hoverPreviewRequestSeq++;
+        deps.updateRangedSidebar();
+        deps.hideStackCallout();
+        deps.updateSidebar();
+        deps.redraw();
+        return;
+      }
+      if (!S.rangedModeActive) {
+        emitParityDiagnosticsBreadcrumb('planning.doubleClickIgnored', {
+          reason: 'targeting_changed_during_validation',
+          selectedCount: idsAtStart.length,
+        });
+        return;
+      }
+      if (!window.gameApi?.validateGroupRangedTarget) {
+        emitParityDiagnosticsBreadcrumb('planning.doubleClickIgnored', { reason: 'support_target_api_missing' });
+        return;
+      }
+      const validation = await window.gameApi.validateGroupRangedTarget({
+        unitIds: idsAtStart,
+        targetH3Index: clickHit,
+      });
+      if (!S.rangedModeActive || selectionUnitIdSetsDiffer(idsAtStart, S.selectedUnitIds)) {
+        emitParityDiagnosticsBreadcrumb('planning.doubleClickIgnored', {
+          reason: 'targeting_changed_during_validation',
+          selectedCount: idsAtStart.length,
+        });
+        return;
+      }
+      if (!validation.success) {
+        emitParityDiagnosticsBreadcrumb('planning.doubleClickRejected', {
+          reason: 'ranged_target_rejected',
+          selectedCount: idsAtStart.length,
+          destinationH3: clickHit,
+        });
+        deps.showMapToast(
+          deps.formatTargetingValidationReason(validation.reason, 'Selected units cannot fire at that target.'),
+          { isError: true }
+        );
+        deps.updateRangedSidebar();
+        deps.redraw();
+        return;
+      }
+      emitParityDiagnosticsBreadcrumb('planning.doubleClickAccepted', {
+        ...acceptedDetails,
+        destinationH3: clickHit,
+        hasAirSelection: false,
+      });
+      deps.replacePendingRangedAttacksForSelected(idsAtStart, clickHit);
+      S.rangedModeActive = false;
+      deps.clearSelection();
+      S.hoverRoutePreview = null;
+      S.hoverPreviewRequestSeq++;
+      deps.updateRangedSidebar();
+      deps.hideStackCallout();
+      deps.updateSidebar();
+      deps.redraw();
+      return;
+    }
 
     case 'planFerry':
       emitParityDiagnosticsBreadcrumb('planning.doubleClickAccepted', {

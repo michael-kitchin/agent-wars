@@ -11,13 +11,14 @@ export type MapSelectionComposition = 'empty' | 'airOnly' | 'nonAirOnly' | 'mixe
 /**
  * What a main-map double-click should do once the selection snapshot and icon hit are known.
  *
- * Purpose: Keeps ferry, march, reject, ignore, and deselect outcomes in one table shared by both map modes.
+ * Purpose: Keeps support-target, ferry, march, reject, ignore, and deselect outcomes in one table shared by both map modes.
  * When to use: Returned by `resolveMapDoubleClickAction`. On `needFerryValidation`, run the ferry check and resolve again.
  * Expected outcome: Exactly one outcome per call.
  * Exceptions: None.
  */
 export type MapDoubleClickAction =
   | { kind: 'ignore' }
+  | { kind: 'planSupportTarget' }
   | { kind: 'needFerryValidation' }
   | { kind: 'rejectMixed' }
   | { kind: 'planFerry' }
@@ -35,6 +36,15 @@ export type MapDoubleClickAction =
  */
 export type MapDoubleClickDecisionInput = {
   targetingModeActive: boolean;
+  /**
+   * Whether the double-click pointer was over a map hex.
+   *
+   * Purpose: Ranged and air-strike commits use only that hex. March and ferry planning may fall back to the hovered or selected hex, and must not lend that fallback to an attack.
+   * When to use: Set from `clickHit !== null` before calling `resolveMapDoubleClickAction`.
+   * Expected outcome: With targeting on, a true value and a non-empty selection plan a support target. A false value ignores the double-click.
+   * Exceptions: None.
+   */
+  pointerHasHit: boolean;
   hasDestination: boolean;
   composition: MapSelectionComposition;
   allSelectedUnitsAlreadyAtDestination: boolean;
@@ -122,11 +132,15 @@ export function mapSelectionComposition(unitTypes: readonly string[]): MapSelect
  *
  * Purpose: One table for both map modes so icon clicks and empty clicks cannot grow separate branches.
  * When to use: After the destination hex and the gesture-start selection are known.
- * Expected outcome: An empty click on the units' own hex always clears, matching long-standing behavior. Air units otherwise clear on an empty ineligible click and toast on an icon one. Mixed selections reject. Non-air selections plan a march.
+ * Expected outcome: While targeting is on, a pointer hex and a non-empty selection plan a support target; anything else is ignored and movement is not considered. With targeting off, an empty click on the units' own hex clears, air units otherwise clear on an empty ineligible click and toast on an icon one, mixed selections reject, and non-air selections plan a march.
  * Exceptions: None.
  */
 export function resolveMapDoubleClickAction(input: MapDoubleClickDecisionInput): MapDoubleClickAction {
-  if (input.targetingModeActive || !input.hasDestination || input.composition === 'empty') {
+  if (input.targetingModeActive) {
+    if (input.pointerHasHit && input.composition !== 'empty') return { kind: 'planSupportTarget' };
+    return { kind: 'ignore' };
+  }
+  if (!input.hasDestination || input.composition === 'empty') {
     return { kind: 'ignore' };
   }
   if (input.allSelectedUnitsAlreadyAtDestination) {

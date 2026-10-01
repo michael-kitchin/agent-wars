@@ -126,11 +126,16 @@ function testPlaybackIgnoresBuildMarkersAndTemplateEdits(): void {
   );
 
   const multiSource = readRendererSource('gameplay', 'buildQueueMultiPopup.ts');
+  const commit = getFunctionSource(multiSource, 'commitEditedTemplate');
+  assert.ok(
+    commit.includes('S.buildQueueTemplate ='),
+    'commitEditedTemplate should replace the shared template after the caller has allowed the edit'
+  );
   const multiRender = getFunctionSource(multiSource, 'renderMultiBuildQueueIntoMount');
   const gateAt = multiRender.indexOf('buildQueueEditBlockedByPlayback()');
-  const templateWriteAt = multiRender.indexOf('S.buildQueueTemplate =');
+  const commitAt = multiRender.indexOf('commitEditedTemplate(');
   assert.ok(
-    gateAt >= 0 && templateWriteAt > gateAt,
+    gateAt >= 0 && commitAt > gateAt,
     'multi-hex template edits should consult playback before replacing the shared template'
   );
 }
@@ -154,6 +159,40 @@ function testRightClickClearsSelectionWithoutIconException(): void {
 }
 
 /**
+ * Asserts a targeting click is inert and the following double-click is the only place that queues the attack.
+ *
+ * Purpose: The failure mode is a click that turns targeting off, after which the double-click plans a march
+ * from the gesture snapshot. This contract keeps the attack on the double-click.
+ * When to use: From `run`.
+ * Expected outcome: The footprint toast still precedes the targeting return, the click listener does not
+ * validate an attack, and `planSupportTarget` precedes `planFerry` and contains both validators.
+ * Exceptions: AssertionError when the wiring drifts.
+ */
+function testTargetingDoubleClickPlacesTheAttack(): void {
+  const interactions = readRendererSource('map', 'mainMapInteractions.ts');
+  const clickStart = interactions.indexOf("addEventListener('click'");
+  const clickEnd = interactions.indexOf("addEventListener('dblclick'");
+  assert.ok(clickStart >= 0 && clickEnd > clickStart, 'click listener precedes the double-click listener');
+  const clickListener = interactions.slice(clickStart, clickEnd);
+  const footprintAt = clickListener.indexOf('That hex is outside the active tactical battle.');
+  const swallowAt = clickListener.indexOf('S.rangedModeActive || S.airStrikeModeActive');
+  const selectedHexAt = clickListener.indexOf('S.selectedHexIndex = hit');
+  assert.ok(footprintAt >= 0 && swallowAt > footprintAt && selectedHexAt > swallowAt, 'footprint toast precedes the targeting return, which precedes selected-hex assignment');
+  const betweenSwallowAndHex = clickListener.slice(swallowAt, selectedHexAt);
+  assert.ok(betweenSwallowAndHex.includes('return;'), 'targeting click returns before changing the selected hex');
+  assert.equal(clickListener.includes('validateGroupRangedTarget'), false);
+  assert.equal(clickListener.includes('validateGroupAirStrikeTarget'), false);
+
+  const handler = readRendererSource('map', 'mapDoubleClickHandler.ts');
+  const supportAt = handler.indexOf("case 'planSupportTarget':");
+  const ferryAt = handler.indexOf("case 'planFerry':");
+  assert.ok(supportAt >= 0 && ferryAt > supportAt, 'planSupportTarget precedes planFerry');
+  const supportCase = handler.slice(supportAt, ferryAt);
+  assert.ok(supportCase.includes('validateGroupRangedTarget'));
+  assert.ok(supportCase.includes('validateGroupAirStrikeTarget'));
+}
+
+/**
  * Runs every wiring contract in this file.
  *
  * Purpose: Single entry point so the discovery-based test runner can execute the file directly.
@@ -165,6 +204,7 @@ function run(): void {
   testGestureSelectionSnapshotSurvivesDoubleClick();
   testStackCalloutOpensOnCancellableTimer();
   testDoubleClickPlanningUsesSharedDecisionTable();
+  testTargetingDoubleClickPlacesTheAttack();
   testPlaybackIgnoresBuildMarkersAndTemplateEdits();
   testRightClickClearsSelectionWithoutIconException();
   console.log('mapGestureWiring.test.ts passed');

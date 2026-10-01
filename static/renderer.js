@@ -17736,19 +17736,6 @@
     }
     return 1;
   }
-  function tacticalRes4CellHasActiveTransportCorridor(args) {
-    const { cellH3, roadSidesByH3, railSidesByH3, rubbleByH3 } = args;
-    if (rubbleByH3?.[cellH3]) return false;
-    const rs = roadSidesByH3?.[cellH3];
-    const rl = railSidesByH3?.[cellH3];
-    if (!rs && !rl) return false;
-    const n = Math.max(rs?.length ?? 0, rl?.length ?? 0);
-    if (n === 0) return false;
-    for (let i = 0; i < n; i++) {
-      if ((rs?.[i] ?? false) || (rl?.[i] ?? false)) return true;
-    }
-    return false;
-  }
 
   // src/shared/tacticalTerrainMovement.ts
   function normalizeDbTerrainKindToTacticalCategory(effectiveKind, parentTerrain) {
@@ -17971,14 +17958,6 @@
   }
   function tacticalForestUrbanRubbleRangedCapActive(battle, attackerAnchorH3) {
     if (tacticalRes4CellIsUrbanOrRubble(battle, attackerAnchorH3)) return true;
-    if (tacticalRes4CellHasActiveTransportCorridor({
-      cellH3: attackerAnchorH3,
-      roadSidesByH3: battle.res4RoadSidesByH3,
-      railSidesByH3: battle.res4RailSidesByH3,
-      rubbleByH3: battle.res4IsRubbleByH3
-    })) {
-      return true;
-    }
     return tacticalRes4CellIsForestClass(battle, attackerAnchorH3);
   }
   function effectiveTacticalRangedMaxRangeForAttacker(battle, unitType, attackerAnchorH3) {
@@ -25884,7 +25863,11 @@
     return "nonAirOnly";
   }
   function resolveMapDoubleClickAction(input) {
-    if (input.targetingModeActive || !input.hasDestination || input.composition === "empty") {
+    if (input.targetingModeActive) {
+      if (input.pointerHasHit && input.composition !== "empty") return { kind: "planSupportTarget" };
+      return { kind: "ignore" };
+    }
+    if (!input.hasDestination || input.composition === "empty") {
       return { kind: "ignore" };
     }
     if (input.allSelectedUnitsAlreadyAtDestination) {
@@ -26022,6 +26005,7 @@
     const iconHit = destinationH3 !== null && destinationH3 === clickHit && deps.pointerHitsDrawnUnitIcon(event.clientX, event.clientY, destinationH3);
     const decisionInput = {
       targetingModeActive: rendererSharedState.rangedModeActive || rendererSharedState.airStrikeModeActive,
+      pointerHasHit: clickHit !== null,
       hasDestination: destinationH3 !== null,
       composition: mapSelectionComposition(selectedAtMouseDown.map((unit) => unit.unitType)),
       allSelectedUnitsAlreadyAtDestination: selectedAtMouseDown.length > 0 && selectedAtMouseDown.every((unit) => unit.h3Index === destinationH3),
@@ -26088,6 +26072,117 @@
         deps.updateRangedSidebar();
         deps.redraw();
         return;
+      case "planSupportTarget": {
+        if (clickHit === null) return;
+        if (rendererSharedState.tacticalBattleSnapshot && !tacticalRendererHitInsideBattleFootprint(clickHit, rendererSharedState.tacticalBattleSnapshot)) {
+          emitParityDiagnosticsBreadcrumb("planning.doubleClickIgnored", {
+            reason: "outside_tactical_footprint",
+            selectedCount: selectedAtMouseDown.length
+          });
+          return;
+        }
+        rendererSharedState.selectedHexIndex = clickHit;
+        const idsAtStart = [...selectedIds];
+        if (rendererSharedState.airStrikeModeActive) {
+          if (!window.gameApi?.validateGroupAirStrikeTarget) {
+            emitParityDiagnosticsBreadcrumb("planning.doubleClickIgnored", { reason: "support_target_api_missing" });
+            return;
+          }
+          const targetTypeAtStart = rendererSharedState.airStrikeTargetType;
+          const validation2 = await window.gameApi.validateGroupAirStrikeTarget({
+            unitIds: idsAtStart,
+            targetH3Index: clickHit,
+            targetType: targetTypeAtStart
+          });
+          if (!rendererSharedState.airStrikeModeActive || selectionUnitIdSetsDiffer(idsAtStart, rendererSharedState.selectedUnitIds)) {
+            emitParityDiagnosticsBreadcrumb("planning.doubleClickIgnored", {
+              reason: "targeting_changed_during_validation",
+              selectedCount: idsAtStart.length
+            });
+            return;
+          }
+          if (!validation2.success) {
+            emitParityDiagnosticsBreadcrumb("planning.doubleClickRejected", {
+              reason: "air_strike_target_rejected",
+              selectedCount: idsAtStart.length,
+              destinationH3: clickHit
+            });
+            deps.showMapToast(
+              deps.formatTargetingValidationReason(validation2.reason, "Selected air units cannot strike that target."),
+              { isError: true }
+            );
+            deps.updateRangedSidebar();
+            deps.redraw();
+            return;
+          }
+          emitParityDiagnosticsBreadcrumb("planning.doubleClickAccepted", {
+            ...acceptedDetails,
+            destinationH3: clickHit,
+            hasAirSelection: true
+          });
+          deps.replacePendingAirStrikesForSelected(idsAtStart, clickHit, targetTypeAtStart);
+          rendererSharedState.airStrikeModeActive = false;
+          deps.clearSelection();
+          rendererSharedState.hoverRoutePreview = null;
+          rendererSharedState.hoverPreviewRequestSeq++;
+          deps.updateRangedSidebar();
+          deps.hideStackCallout();
+          deps.updateSidebar();
+          deps.redraw();
+          return;
+        }
+        if (!rendererSharedState.rangedModeActive) {
+          emitParityDiagnosticsBreadcrumb("planning.doubleClickIgnored", {
+            reason: "targeting_changed_during_validation",
+            selectedCount: idsAtStart.length
+          });
+          return;
+        }
+        if (!window.gameApi?.validateGroupRangedTarget) {
+          emitParityDiagnosticsBreadcrumb("planning.doubleClickIgnored", { reason: "support_target_api_missing" });
+          return;
+        }
+        const validation = await window.gameApi.validateGroupRangedTarget({
+          unitIds: idsAtStart,
+          targetH3Index: clickHit
+        });
+        if (!rendererSharedState.rangedModeActive || selectionUnitIdSetsDiffer(idsAtStart, rendererSharedState.selectedUnitIds)) {
+          emitParityDiagnosticsBreadcrumb("planning.doubleClickIgnored", {
+            reason: "targeting_changed_during_validation",
+            selectedCount: idsAtStart.length
+          });
+          return;
+        }
+        if (!validation.success) {
+          emitParityDiagnosticsBreadcrumb("planning.doubleClickRejected", {
+            reason: "ranged_target_rejected",
+            selectedCount: idsAtStart.length,
+            destinationH3: clickHit
+          });
+          deps.showMapToast(
+            deps.formatTargetingValidationReason(validation.reason, "Selected units cannot fire at that target."),
+            { isError: true }
+          );
+          deps.updateRangedSidebar();
+          deps.redraw();
+          return;
+        }
+        emitParityDiagnosticsBreadcrumb("planning.doubleClickAccepted", {
+          ...acceptedDetails,
+          destinationH3: clickHit,
+          hasAirSelection: false
+        });
+        deps.replacePendingRangedAttacksForSelected(idsAtStart, clickHit);
+        rendererSharedState.rangedModeActive = false;
+        deps.clearSelection();
+        rendererSharedState.hoverRoutePreview = null;
+        rendererSharedState.hoverPreviewRequestSeq++;
+        deps.updateRangedSidebar();
+        deps.hideStackCallout();
+        deps.updateSidebar();
+        deps.redraw();
+        return;
+      }
       case "planFerry":
         emitParityDiagnosticsBreadcrumb("planning.doubleClickAccepted", {
           ...acceptedDetails,
@@ -26335,57 +26430,10 @@
         deps.showMapToast("That hex is outside the active tactical battle.", { isError: true });
         return;
       }
+      if ((rendererSharedState.rangedModeActive || rendererSharedState.airStrikeModeActive) && rendererSharedState.selectedUnitIds.length > 0 && rendererSharedState.gameState) {
+        return;
+      }
       rendererSharedState.selectedHexIndex = hit;
-      if (hit && rendererSharedState.airStrikeModeActive && rendererSharedState.selectedUnitIds.length > 0 && rendererSharedState.gameState) {
-        if (!window.gameApi?.validateGroupAirStrikeTarget) return;
-        const selectedIds = [...rendererSharedState.selectedUnitIds];
-        const validation = await window.gameApi.validateGroupAirStrikeTarget({
-          unitIds: selectedIds,
-          targetH3Index: hit,
-          targetType: rendererSharedState.airStrikeTargetType
-        });
-        if (!validation.success) {
-          deps.showMapToast(deps.formatTargetingValidationReason(validation.reason, "Selected air units cannot strike that target."), {
-            isError: true
-          });
-          deps.updateRangedSidebar();
-          deps.redraw();
-          return;
-        }
-        deps.replacePendingAirStrikesForSelected(selectedIds, hit, rendererSharedState.airStrikeTargetType);
-        rendererSharedState.airStrikeModeActive = false;
-        deps.clearSelection();
-        rendererSharedState.hoverRoutePreview = null;
-        rendererSharedState.hoverPreviewRequestSeq++;
-        deps.updateRangedSidebar();
-        deps.hideStackCallout();
-        deps.updateSidebar();
-        deps.redraw();
-        return;
-      }
-      if (hit && rendererSharedState.rangedModeActive && rendererSharedState.selectedUnitIds.length > 0 && rendererSharedState.gameState) {
-        if (!window.gameApi?.validateGroupRangedTarget) return;
-        const selectedIds = [...rendererSharedState.selectedUnitIds];
-        const validation = await window.gameApi.validateGroupRangedTarget({ unitIds: selectedIds, targetH3Index: hit });
-        if (!validation.success) {
-          deps.showMapToast(deps.formatTargetingValidationReason(validation.reason, "Selected units cannot fire at that target."), {
-            isError: true
-          });
-          deps.updateRangedSidebar();
-          deps.redraw();
-          return;
-        }
-        deps.replacePendingRangedAttacksForSelected(selectedIds, hit);
-        rendererSharedState.rangedModeActive = false;
-        deps.clearSelection();
-        rendererSharedState.hoverRoutePreview = null;
-        rendererSharedState.hoverPreviewRequestSeq++;
-        deps.updateRangedSidebar();
-        deps.hideStackCallout();
-        deps.updateSidebar();
-        deps.redraw();
-        return;
-      }
       const { unitsToDraw, movingIds } = rendererSharedState.gameState ? deps.getUnitsForDrawWithMovingIds(rendererSharedState.gameState) : { unitsToDraw: [], movingIds: void 0 };
       if (await deps.tryHandleTacticalEntryAtClientXY(e.clientX, e.clientY)) {
         deps.updateSidebar();
@@ -26464,6 +26512,10 @@
         showMapToast: deps.showMapToast,
         formatTargetingValidationReason: deps.formatTargetingValidationReason,
         replacePendingFerryOrdersForSelected: deps.replacePendingFerryOrdersForSelected,
+        replacePendingAirStrikesForSelected: deps.replacePendingAirStrikesForSelected,
+        replacePendingRangedAttacksForSelected: deps.replacePendingRangedAttacksForSelected,
+        clearSelection: deps.clearSelection,
+        hideStackCallout: deps.hideStackCallout,
         clearCommittedOrderDraftState: deps.clearCommittedOrderDraftState,
         updatePendingOrdersSidebar: deps.updatePendingOrdersSidebar,
         updateSidebar: deps.updateSidebar,

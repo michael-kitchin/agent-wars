@@ -624,59 +624,14 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
       return;
     }
 
+    // A click while targeting is on must not queue the attack or clear the selection.
+    // The double-click that follows places the attack. Clearing here would turn targeting
+    // off and let that double-click plan a march from the gesture snapshot.
+    if ((S.rangedModeActive || S.airStrikeModeActive) && S.selectedUnitIds.length > 0 && S.gameState) {
+      return;
+    }
+
     S.selectedHexIndex = hit;
-
-    if (hit && S.airStrikeModeActive && S.selectedUnitIds.length > 0 && S.gameState) {
-      if (!window.gameApi?.validateGroupAirStrikeTarget) return;
-      const selectedIds = [...S.selectedUnitIds];
-      const validation = await window.gameApi.validateGroupAirStrikeTarget({
-        unitIds: selectedIds,
-        targetH3Index: hit,
-        targetType: S.airStrikeTargetType,
-      });
-      if (!validation.success) {
-        deps.showMapToast(deps.formatTargetingValidationReason(validation.reason, 'Selected air units cannot strike that target.'), {
-          isError: true,
-        });
-        deps.updateRangedSidebar();
-        deps.redraw();
-        return;
-      }
-      deps.replacePendingAirStrikesForSelected(selectedIds, hit, S.airStrikeTargetType);
-      S.airStrikeModeActive = false;
-      deps.clearSelection();
-      S.hoverRoutePreview = null;
-      S.hoverPreviewRequestSeq++;
-      deps.updateRangedSidebar();
-      deps.hideStackCallout();
-      deps.updateSidebar();
-      deps.redraw();
-      return;
-    }
-
-    if (hit && S.rangedModeActive && S.selectedUnitIds.length > 0 && S.gameState) {
-      if (!window.gameApi?.validateGroupRangedTarget) return;
-      const selectedIds = [...S.selectedUnitIds];
-      const validation = await window.gameApi.validateGroupRangedTarget({ unitIds: selectedIds, targetH3Index: hit });
-      if (!validation.success) {
-        deps.showMapToast(deps.formatTargetingValidationReason(validation.reason, 'Selected units cannot fire at that target.'), {
-          isError: true,
-        });
-        deps.updateRangedSidebar();
-        deps.redraw();
-        return;
-      }
-      deps.replacePendingRangedAttacksForSelected(selectedIds, hit);
-      S.rangedModeActive = false;
-      deps.clearSelection();
-      S.hoverRoutePreview = null;
-      S.hoverPreviewRequestSeq++;
-      deps.updateRangedSidebar();
-      deps.hideStackCallout();
-      deps.updateSidebar();
-      deps.redraw();
-      return;
-    }
 
     const { unitsToDraw, movingIds } = S.gameState
       ? deps.getUnitsForDrawWithMovingIds(S.gameState)
@@ -764,6 +719,10 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
       showMapToast: deps.showMapToast,
       formatTargetingValidationReason: deps.formatTargetingValidationReason,
       replacePendingFerryOrdersForSelected: deps.replacePendingFerryOrdersForSelected,
+      replacePendingAirStrikesForSelected: deps.replacePendingAirStrikesForSelected,
+      replacePendingRangedAttacksForSelected: deps.replacePendingRangedAttacksForSelected,
+      clearSelection: deps.clearSelection,
+      hideStackCallout: deps.hideStackCallout,
       clearCommittedOrderDraftState: deps.clearCommittedOrderDraftState,
       updatePendingOrdersSidebar: deps.updatePendingOrdersSidebar,
       updateSidebar: deps.updateSidebar,

@@ -20,6 +20,7 @@ describe('mapSelectionComposition', () => {
 describe('resolveMapDoubleClickAction', () => {
   const airAway = {
     targetingModeActive: false,
+    pointerHasHit: true,
     hasDestination: true,
     composition: 'airOnly' as const,
     allSelectedUnitsAlreadyAtDestination: false,
@@ -86,8 +87,31 @@ describe('resolveMapDoubleClickAction', () => {
     );
   });
 
-  it('ignores targeting mode, a missing destination, and an empty selection', () => {
-    assert.deepEqual(resolveMapDoubleClickAction({ ...airAway, targetingModeActive: true }), { kind: 'ignore' });
+  it('plans a support target while targeting is on, including own hex and icon hits', () => {
+    for (const composition of ['airOnly', 'nonAirOnly', 'mixed'] as const) {
+      assert.deepEqual(
+        resolveMapDoubleClickAction({
+          ...airAway,
+          composition,
+          targetingModeActive: true,
+          allSelectedUnitsAlreadyAtDestination: true,
+          iconHit: true,
+        }),
+        { kind: 'planSupportTarget' },
+        `targeting should plan a support target for a ${composition} selection`
+      );
+    }
+  });
+
+  it('ignores a targeting double-click with no pointer hex or an empty selection, and ignores a move with no destination', () => {
+    assert.deepEqual(
+      resolveMapDoubleClickAction({ ...airAway, targetingModeActive: true, pointerHasHit: false, hasDestination: true }),
+      { kind: 'ignore' }
+    );
+    assert.deepEqual(
+      resolveMapDoubleClickAction({ ...airAway, targetingModeActive: true, composition: 'empty' }),
+      { kind: 'ignore' }
+    );
     assert.deepEqual(resolveMapDoubleClickAction({ ...airAway, hasDestination: false }), { kind: 'ignore' });
     assert.deepEqual(resolveMapDoubleClickAction({ ...airAway, composition: 'empty' }), { kind: 'ignore' });
   });
