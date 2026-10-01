@@ -206,7 +206,7 @@ export function buildMovementBudgetRule(mode: PromptCoordinateMode): string {
 /**
  * Infantry (and mode-specific) ranged reach, including tactical terrain caps and mountain LOS.
  *
- * Purpose: Strategic infantry is melee-only. Tactical infantry and armor have res4 baselines that forest/urban/rubble/transport cap to 1; mountain blocks armor/naval/air LOS.
+ * Purpose: Strategic infantry is melee-only. Tactical infantry and armor have res4 baselines; forest, urban, or rubble caps infantry and armor to 1; mountain blocks armor/naval/air LOS.
  * When to use: Combat paragraph after the one-attack-per-unit clause.
  * Expected outcome: Strategic melee-only sentence, or tactical baselines plus the engine cap and LOS rules.
  * Exceptions: None.
@@ -216,7 +216,7 @@ export function buildRangedReachRule(mode: PromptCoordinateMode): string {
   if (mode === 'tactical') {
     return (
       `Infantry and armor fire at their res4 baselines (infantry ${RANGED_RANGE_BY_UNIT_TYPE.infantry}, armor ${RANGED_RANGE_BY_UNIT_TYPE.armor}); ` +
-      'forest, urban, rubble, or a road/rail corridor on the attacker\'s cell caps infantry and armor to range 1. ' +
+      'forest, urban, or rubble on the attacker\'s cell caps infantry and armor to range 1. ' +
       'Mountain along the line of sight blocks armor, naval, and air shots (infantry is exempt). ' +
       'Close to melee when out of range.'
     );

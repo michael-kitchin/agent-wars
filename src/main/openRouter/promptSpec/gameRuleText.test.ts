@@ -133,6 +133,10 @@ test('buildRangedReachRule distinguishes infantry melee from tactical infantry r
   assert.ok(tactical.includes(String(RANGED_RANGE_BY_UNIT_TYPE.infantry)));
   assert.ok(tactical.includes(String(RANGED_RANGE_BY_UNIT_TYPE.armor)));
   assert.match(tactical, /range 1|capped to 1/i);
+  assert.match(tactical, /forest/i);
+  assert.match(tactical, /urban/i);
+  assert.match(tactical, /rubble/i);
+  assert.doesNotMatch(tactical, /road|rail/i);
   assert.match(tactical, /mountain/i);
   const strategic = buildRangedReachRule('strategic');
   assert.match(strategic, /infantry is melee-only|Infantry has no strategic ranged/i);

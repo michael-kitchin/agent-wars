@@ -14195,6 +14195,12 @@
     return rad * 180 / Math.PI;
   }
 
+  // src/shared/aiConsultationLimits.ts
+  var AI_MODEL_REQUEST_TIMEOUT_MS = 9e4;
+  var AI_MODEL_REQUEST_RETRY_COUNT = 1;
+  var AI_CONSULTATION_WALL_CLOCK_MS = 3e5;
+  var AI_CONSULTATION_WAIT_TIMEOUT_MS = AI_CONSULTATION_WALL_CLOCK_MS + 2 * (1 + AI_MODEL_REQUEST_RETRY_COUNT) * AI_MODEL_REQUEST_TIMEOUT_MS;
+
   // src/renderer/core/constants.ts
   var BACKGROUND_COLOR = "#e0dcd4";
   var UNIT_RADIUS = 18;
@@ -14284,6 +14290,7 @@
   var UNIT_DESELECT_GLYPH = "-";
   var TOAST_DURATION_MS = 24e3;
   var READY_REQUEST_TIMEOUT_MS = 12e4;
+  var TACTICAL_ADVANCE_BACKGROUND_AI_TIMEOUT_MS = AI_CONSULTATION_WAIT_TIMEOUT_MS + 5e3;
   var UNIT_ICON_HIT_PAD_PX = 2;
   var BUILD_ENTRY_HIT_PAD_PX = 2;
   var TACTICAL_ENTRY_HIT_PAD_PX = 6;
@@ -15112,9 +15119,9 @@
     /**
        * Documents the object literal property `eventDrivenInitialConsultationDone` (eventDrivenInitialConsultationDone: false).
     
-       * Purpose: Supports maintainability by documenting why `eventDrivenInitialConsultationDone` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Purpose: Event-driven mode consults once up front, then only from post-resolution callbacks. This flag marks that the opening consult finished.
+       * When to use: Set after a successful opening `requestAiOrders` or a successful post-resolution consult. Cleared on new game, Run off, mode switch, and abandoned deferred consult.
+       * Expected outcome: While true, strategic Ready does not wait on a null precompute buffer and does not start a second model call for the same turn.
        * Exceptions: None.
        */
     eventDrivenInitialConsultationDone: false,
@@ -15269,6 +15276,7 @@
       if (!opponentAlive) return false;
       return rendererSharedState.tacticalOpponentDraft === null;
     }
+    if (rendererSharedState.useEventDrivenConsultation && rendererSharedState.eventDrivenInitialConsultationDone) return false;
     return rendererSharedState.precomputedAiOrders === null;
   }
 
@@ -20541,7 +20549,7 @@
   }
 
   // src/renderer/openRouter/openRouterRuntime.ts
-  var BACKGROUND_AI_REQUEST_TIMEOUT_MS = 75e3;
+  var BACKGROUND_AI_REQUEST_TIMEOUT_MS = AI_CONSULTATION_WAIT_TIMEOUT_MS;
   var openRouterRuntimeDepsRef = null;
   function tacticalHumanDraftFingerprintNow() {
     return buildTacticalHumanDraftPrefetchFingerprint({
@@ -23850,8 +23858,8 @@
         updateOpenRouterCostLabel();
       }
       deps.appendOpenRouterLog("Post-resolution consultation applied.", false);
+      if (rendererSharedState.useEventDrivenConsultation) rendererSharedState.eventDrivenInitialConsultationDone = true;
       deps.requestRedraw();
-      if (rendererSharedState.runButtonOn) deps.startBackgroundRequestIfAllowed();
       deps.updateReadyButtonState();
     });
     window.gameApi?.registerPostTacticalBeatConsultationListener?.((fields) => {
@@ -23885,6 +23893,7 @@
       if (rendererSharedState.runButtonOn && oppAlive) deps.startBackgroundRequestIfAllowed();
     } else {
       rendererSharedState.pendingDeferredStrategicPostResolutionConsult = false;
+      rendererSharedState.eventDrivenInitialConsultationDone = false;
       if (rendererSharedState.runButtonOn) deps.startBackgroundRequestIfAllowed();
     }
     deps.requestRedraw();

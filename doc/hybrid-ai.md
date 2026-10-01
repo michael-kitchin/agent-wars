@@ -20,8 +20,14 @@ The OpenRouter panel is session control (key, model, Run, status, tool count). I
 
 ## When a consult happens
 
-- **Every-turn mode:** a consult is requested as part of Ready / beat planning when Run is on and a key/model exist.
-- **Event-driven mode:** after strategic resolution (deferred until resolution playback finishes — `deferredResolutionPlaybackConsult.ts`) and after each tactical beat, `runEventDrivenAfterResolutionConsultation` / `runEventDrivenAfterTacticalBeatConsultation` evaluate subscriptions and mandatory overrides. If nothing fires, standing orders run and the model is not called.
+- **Every-turn mode:** while Run is on, a background `requestAiOrders` fills a precomputed plan during planning. Ready sends that plan. There is no post-resolution model call.
+- **Event-driven mode, strategic:** one model call per turn.
+  - The first consult after a new game, after Run is turned on, or after Events is turned on is a background `requestAiOrders`. Ready waits on it, then sends that precomputed plan.
+  - After resolution, once playback finishes (or there is nothing to animate), `runEventDrivenAfterResolutionConsultation` in `deferredResolutionPlaybackConsult.ts` evaluates subscriptions and mandatory overrides. If it calls the model, those orders are stored as pending orders for the next Ready. That call does not start a second `requestAiOrders`.
+  - The next Ready reads the pending orders. It does not send a precomputed plan.
+  - If the evaluation does not call the model, or the call fails, pending orders are cleared and the next Ready uses standing orders. There is no follow-up model call.
+  - If the deferred consult is abandoned because the playback notice does not match, one background request may run so the turn is not left without a plan.
+- **Event-driven mode, tactical:** after each beat, `runEventDrivenAfterTacticalBeatConsultation` uses the same evaluation. A beat with no trigger does not call the model.
 
 Mandatory overrides (`evaluateMandatoryOverrides` in `callbackEvaluation.ts`): `first_consultation`, `first_combat`, `new_contact`, `unit_destroyed`, `unordered_unit`, `standing_order_blocked`, `attack_mix_changed`, `deadman` (5 turns, `DEADMAN_TURNS`).
 
@@ -34,7 +40,9 @@ Each consult **replaces** the full callback list. Tactical subscriptions use sub
 `requestOrdersFlow` / `requestOrdersToolLoop.ts`:
 
 - At most `REQUEST_ORDERS_MAX_TOOL_ROUNDS` (**50**) tool rounds.
-- Wall clock `REQUEST_ORDERS_MAX_WALL_CLOCK_MS` (**90_000** ms).
+- One model call aborts after `AI_MODEL_REQUEST_TIMEOUT_MS` (**90_000** ms) and is retried once (`AI_MODEL_REQUEST_RETRY_COUNT`). A body that has started and then goes quiet for **15_000** ms is dropped and is not retried. The hard body timer uses the same **90_000** ms, measured from when headers arrive.
+- Wall clock `REQUEST_ORDERS_MAX_WALL_CLOCK_MS` (**300_000** ms), checked before each round. The round already in flight, and the parse-repair call, can run past that mark.
+- Callers wait up to `AI_CONSULTATION_WAIT_TIMEOUT_MS` (**660_000** ms): the wall clock plus those two retried calls. That value is the post-resolution race and the background `requestAiOrders` timer. `READY_REQUEST_TIMEOUT_MS` stays **120_000** ms because event-driven consultation runs after Ready returns.
 - Malformed empty completions retry (`MALFORMED_COMPLETION_RETRY_LIMIT` = 2). Unparseable final JSON gets one repair call with tools off.
 
 Exhausting the tool-round cap records a successful-but-empty consult and warns on the **next** system prompt.

@@ -40,3 +40,5 @@ When you change one of these, update `combat-rules-v3.md` (and any table that qu
 | Resolution phase order | `executeReadyStrategicTurn`, `buildResolutionOrderRule` |
 
 Prompt-generating code is catalogued in [ai-commander-prompts/](ai-commander-prompts/README.md). That package describes today's emitted prompts and answers to the same engine symbols; it does not invent stats. How the consult is scheduled and which tools exist: [hybrid-ai.md](hybrid-ai.md) and [ai-tools.md](ai-tools.md).
+
+Consultation deadlines live in `src/shared/aiConsultationLimits.ts` (`AI_MODEL_REQUEST_TIMEOUT_MS`, `AI_CONSULTATION_WALL_CLOCK_MS`, `AI_CONSULTATION_WAIT_TIMEOUT_MS`). When one of those changes, update [hybrid-ai.md](hybrid-ai.md) in the same change.

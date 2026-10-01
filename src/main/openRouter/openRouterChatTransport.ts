@@ -1,6 +1,10 @@
 import { request as httpsRequest } from 'node:https';
 import { URL } from 'node:url';
 import { brotliDecompressSync, gunzipSync, inflateSync } from 'node:zlib';
+import {
+  AI_MODEL_REQUEST_RETRY_COUNT,
+  AI_MODEL_REQUEST_TIMEOUT_MS,
+} from '../../shared/aiConsultationLimits';
 import { logDebug, logError } from '../logger';
 import {
   formatOpenRouterChatApiError,
@@ -15,7 +19,15 @@ import {
  */
 
 const OPENROUTER_CHAT_URL = 'https://openrouter.ai/api/v1/chat/completions';
-const OPENROUTER_REQUEST_TIMEOUT_MS = 45_000;
+/**
+ * Aborts an OpenRouter chat POST when the full response has not arrived.
+ *
+ * Purpose: Local name for `AI_MODEL_REQUEST_TIMEOUT_MS` so this transport does not grow a second deadline.
+ * When to use: The abort timer and the socket timeout in `defaultPostOpenRouterChatWithTimeoutAndRetry` / `postChatViaHttps`.
+ * Expected outcome: A single model call is destroyed after 90s and retried once.
+ * Exceptions: None.
+ */
+const OPENROUTER_REQUEST_TIMEOUT_MS = AI_MODEL_REQUEST_TIMEOUT_MS;
 /**
  * Documents the module-scope binding `OPENROUTER_RESPONSE_IDLE_TIMEOUT_MS` (OPENROUTER_RESPONSE_IDLE_TIMEOUT_MS).
 
@@ -28,21 +40,21 @@ const OPENROUTER_RESPONSE_IDLE_TIMEOUT_MS = 15_000;
 /**
  * Documents the module-scope binding `OPENROUTER_RESPONSE_HARD_TIMEOUT_MS` (OPENROUTER_RESPONSE_HARD_TIMEOUT_MS).
 
- * Purpose: Supports maintainability by documenting why `OPENROUTER_RESPONSE_HARD_TIMEOUT_MS` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Purpose: Caps how long a response body may take after headers arrive, using the same 90s budget as the request abort.
+ * When to use: The response hard timer in `postChatViaHttps`.
+ * Expected outcome: A body that has started cannot outlive `AI_MODEL_REQUEST_TIMEOUT_MS`.
  * Exceptions: None.
  */
-const OPENROUTER_RESPONSE_HARD_TIMEOUT_MS = 90_000;
+const OPENROUTER_RESPONSE_HARD_TIMEOUT_MS = AI_MODEL_REQUEST_TIMEOUT_MS;
 /**
  * Documents the module-scope binding `OPENROUTER_REQUEST_RETRY_COUNT` (OPENROUTER_REQUEST_RETRY_COUNT).
 
- * Purpose: Supports maintainability by documenting why `OPENROUTER_REQUEST_RETRY_COUNT` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Purpose: Local name for `AI_MODEL_REQUEST_RETRY_COUNT` so the retry loop and the consultation wait budget stay in step.
+ * When to use: The network-attempt loop in `defaultPostOpenRouterChatWithTimeoutAndRetry`.
+ * Expected outcome: One retry after a timeout or retryable failure.
  * Exceptions: None.
  */
-const OPENROUTER_REQUEST_RETRY_COUNT = 1;
+const OPENROUTER_REQUEST_RETRY_COUNT = AI_MODEL_REQUEST_RETRY_COUNT;
 
 /**
  * Defines the `isRetryableStatus` function shape (function isRetryableStatus(status: number): boolean).

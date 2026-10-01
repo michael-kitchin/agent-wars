@@ -114,7 +114,7 @@ const REACH_BULLET =
  * Exceptions: None.
  */
 const INFANTRY_REACH_BULLET =
-  `- Infantry and armor fire at res4 baselines of ${RANGED_RANGE_BY_UNIT_TYPE.infantry} and ${RANGED_RANGE_BY_UNIT_TYPE.armor}; forest, urban, rubble, or a road/rail corridor caps them to range 1. Mountain along the line of sight blocks armor, naval, and air. Close to melee when out of reach.`;
+  `- Infantry and armor fire at res4 baselines of ${RANGED_RANGE_BY_UNIT_TYPE.infantry} and ${RANGED_RANGE_BY_UNIT_TYPE.armor}; forest, urban, or rubble caps them to range 1. Mountain along the line of sight blocks armor, naval, and air. Close to melee when out of reach.`;
 
 /**
  * Air strikes reach the whole battle, once.

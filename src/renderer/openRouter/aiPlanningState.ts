@@ -17,8 +17,10 @@ export function isDeferredResolutionPlaybackConsultPending(): boolean {
 
  * Purpose: True when Run is on and Ready must wait for AI planning (strategic precompute or tactical opponent draft buffer).
  * When to use: `startBackgroundRequestIfAllowed`, Ready click guard, Ready button disabled styling (with distinct deferred latch).
- * Expected outcome: Strategic waits while `precomputedAiOrders === null` (initial or post–successful-Ready reset).
+ * Expected outcome: Every-turn strategic waits while `precomputedAiOrders === null` (initial or post–successful-Ready reset).
  * After a failed background `requestAiOrders`, the renderer uses empty arrays instead of null so Ready is not stuck.
+ * Event-driven strategic waits only until the opening consultation (`eventDrivenInitialConsultationDone`). Later turns use
+ * pending orders from the post-resolution consult, so a null precompute buffer must not start a second model call.
  * Event-driven post-resolution / post-beat LLM work is deferred until resolution playback completes; readiness for that phase
  * is tracked separately via `isDeferredResolutionPlaybackConsultPending` so prefetch and Ready labeling stay accurate.
  * Tactical waits when Run is on, opponent sub-units remain, and there is no buffered opponent plan (`tacticalOpponentDraft`
@@ -32,5 +34,6 @@ export function isWaitingForPrecomputedAiOrders(): boolean {
     if (!opponentAlive) return false;
     return S.tacticalOpponentDraft === null;
   }
+  if (S.useEventDrivenConsultation && S.eventDrivenInitialConsultationDone) return false;
   return S.precomputedAiOrders === null;
 }

@@ -17,7 +17,7 @@ Invariants:
 
 1. **The system prompt is never rewritten mid-consultation.** It is not replaced, re-sent, or appended to. Any fact that must reach the model after the first call arrives as a tool result, and any fact that only becomes known between consultations reaches the model in the *next* system prompt. The previous-consultation tool-budget warning is the one example of that, and it belongs to the system prompt, not here.
 2. **Exactly one opening user message.** Additional user messages appear only in the two recovery cases in sections 4 and 5.
-3. **Tool rounds are bounded.** The loop ends after a fixed number of rounds and is separately bounded by a wall-clock limit. Exhausting either produces no orders for the period, sets the flag that puts the warning in the next system prompt, and records the consultation as having produced nothing. There is no additional prompt in that case.
+3. **Tool rounds are bounded.** The loop ends after 50 rounds (`REQUEST_ORDERS_MAX_TOOL_ROUNDS`). It also stops when 5 minutes have already elapsed at the start of a round (`REQUEST_ORDERS_MAX_WALL_CLOCK_MS`). Exhausting the round cap produces no orders for the period, sets the flag that puts the warning in the next system prompt, and records the consultation as having produced nothing. Exhausting the wall clock fails the consultation with no orders and does not set that warning. There is no additional prompt in either case. Per-call and outer-wait deadlines are in [hybrid-ai.md](../hybrid-ai.md).
 4. **The repair exchange is off to the side.** It runs on a copy of the conversation. Neither the unparseable assistant text nor the repair request and its answer is merged back into the main message list.
 
 ## 2. Opening user message

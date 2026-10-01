@@ -43,18 +43,19 @@ import type {
   ReadyResult,
   ResolveMeleeInterceptIpcPayload,
 } from '../shared/ipcTypes';
+import { AI_CONSULTATION_WAIT_TIMEOUT_MS } from '../shared/aiConsultationLimits';
 import { buildStrategicUnitDisplayLabelResolver } from '../shared/unitDisplayNames';
 export type { RequestAiOrdersResult } from '../shared/ipcTypes';
 
 /**
  * Documents the module-scope binding `POST_RESOLUTION_CONSULT_TIMEOUT_MS` (POST_RESOLUTION_CONSULT_TIMEOUT_MS).
 
- * Purpose: Supports maintainability by documenting why `POST_RESOLUTION_CONSULT_TIMEOUT_MS` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Purpose: Local name for `AI_CONSULTATION_WAIT_TIMEOUT_MS`. A shorter race would abandon the post-resolution consult while the tool loop was still allowed to run.
+ * When to use: `runEventDrivenAfterResolutionConsultation` and `runEventDrivenAfterTacticalBeatConsultation`.
+ * Expected outcome: The waiter lasts as long as one legal consultation, including the in-flight round and the repair call.
  * Exceptions: None.
  */
-export const POST_RESOLUTION_CONSULT_TIMEOUT_MS = 120_000;
+export const POST_RESOLUTION_CONSULT_TIMEOUT_MS = AI_CONSULTATION_WAIT_TIMEOUT_MS;
 
 /**
  * Documents the `ReadyResultMinimal` type alias (export type ReadyResultMinimal).

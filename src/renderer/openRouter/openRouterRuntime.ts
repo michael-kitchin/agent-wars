@@ -7,17 +7,18 @@ import {
   resetPrecomputedAiState,
   unblockPrecomputedAiPlanningAfterBackgroundFailure,
 } from './precomputedAiState';
+import { AI_CONSULTATION_WAIT_TIMEOUT_MS } from '../../shared/aiConsultationLimits';
 import { isDeferredResolutionPlaybackConsultPending, isWaitingForPrecomputedAiOrders } from './aiPlanningState';
 
 /**
  * Documents the module-scope binding `BACKGROUND_AI_REQUEST_TIMEOUT_MS` (BACKGROUND_AI_REQUEST_TIMEOUT_MS).
 
- * Purpose: Supports maintainability by documenting why `BACKGROUND_AI_REQUEST_TIMEOUT_MS` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Purpose: Local name for `AI_CONSULTATION_WAIT_TIMEOUT_MS`. The old 75s timer cancelled the opening consult before the 90s model call could finish.
+ * When to use: The `Promise.race` around background `requestAiOrders` in `startBackgroundRequestIfAllowed`.
+ * Expected outcome: The renderer waits out one legal consultation, then cancels the IPC if it is still running.
  * Exceptions: None.
  */
-const BACKGROUND_AI_REQUEST_TIMEOUT_MS = 75_000;
+const BACKGROUND_AI_REQUEST_TIMEOUT_MS = AI_CONSULTATION_WAIT_TIMEOUT_MS;
 
 /**
  * Documents the `OpenRouterRuntimeDeps` interface as a named contract surface (interface OpenRouterRuntimeDeps).

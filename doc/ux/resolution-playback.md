@@ -28,7 +28,7 @@ A map toast can summarize losses the player can see. Combat outside vision is an
 ### Mouse
 
 - The animation does not have its own controls.
-- While playback runs, map gestures that change orders or the selection are ignored. That covers unit clicks and Shift-clicks, opening the stack callout, Ranged and Strike target clicks, double-click march and ferry, and build marker clicks and build queue edits. Hover order previews are not drawn.
+- While playback runs, map gestures that change orders or the selection are ignored. That covers unit clicks and Shift-clicks, opening the stack callout, Ranged and Strike target double-clicks, double-click march and ferry, and build marker clicks and build queue edits. Hover order previews are not drawn.
 - While playback runs, the player can still drag to pan, zoom with the wheel, read hex tooltips, and right-click to clear selection chrome. A tactical entry marker still starts a battle, which cancels a strategic playback.
 - The right panel is not blocked by playback. Its own rules apply.
 
@@ -39,7 +39,7 @@ A map toast can summarize losses the player can see. Combat outside vision is an
 
 ### Other
 
-- When playback was scheduled together with a deferred opponent consultation, Ready stays disabled until that consultation is released, including after the animation ends.
+- When playback was scheduled together with a deferred opponent consultation, Ready stays disabled until that consultation is released, including after the animation ends. The label stays "Ready". A finished strategic consultation is the opponent plan for the next turn. It does not start another planning request, and Ready does not switch to the AI wait label for a second call.
 - When there is nothing to animate, a waiting consultation is released immediately.
 
 ## States

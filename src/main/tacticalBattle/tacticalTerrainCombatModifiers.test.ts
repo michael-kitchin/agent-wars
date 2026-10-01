@@ -16,12 +16,25 @@ import {
   tacticalRangedDirectFirePassesTerrainAndRange,
   tacticalRes4BriefingLandWater,
 } from '../../shared/tacticalTerrainCombatModifiers';
-import { MOVEMENT_RANGE_BY_UNIT_TYPE } from '../../shared/tacticalRanges';
+import { MOVEMENT_RANGE_BY_UNIT_TYPE, RANGED_RANGE_BY_UNIT_TYPE } from '../../shared/tacticalRanges';
+import { res4GridDiskNeighborsOrdered } from '../../shared/tacticalRes4TransportLink';
 import {
   firstRingCellDistinctFrom,
   tacticalRes4Cell,
   tacticalRes4PentagonCrossingPair,
 } from './testSupport/tacticalRes4HexFixtures';
+
+/**
+ * Builds a road or rail side mask with every neighbor slot set.
+ *
+ * Purpose: Puts a corridor on the attacker cell so a regression that caps range from a road or rail fails the baseline test.
+ * When to use: Fixture setup for an attacker cell that has a road or a rail.
+ * Expected outcome: A boolean array whose length matches the cell's ring and whose entries are all true.
+ * Exceptions: None.
+ */
+function allSidesTrue(cell: string): boolean[] {
+  return Array.from({ length: res4GridDiskNeighborsOrdered(cell).length }, () => true);
+}
 
 const baseBattle = {
   strategicHexTerrain: 'land',
@@ -125,6 +138,39 @@ test('armor in forest caps tactical ranged range to 1', () => {
   };
   assert.equal(effectiveTacticalRangedMaxRangeForAttacker(battle, 'armor', cell), 1);
   assert.equal(effectiveTacticalRangedMaxRangeForAttacker(battle, 'naval', cell), 10);
+});
+
+test('armor and infantry on a road or rail keep tactical ranged baselines', () => {
+  const roadCell = tacticalRes4Cell(60, 70);
+  const railCell = tacticalRes4Cell(60, 71);
+  const roadBattle = {
+    ...baseBattle,
+    res4TerrainKindByH3: { [roadCell]: 'desert', [railCell]: 'desert' },
+    res4RoadSidesByH3: { [roadCell]: allSidesTrue(roadCell) },
+    res4RailSidesByH3: { [railCell]: allSidesTrue(railCell) },
+  };
+  assert.equal(effectiveTacticalRangedMaxRangeForAttacker(roadBattle, 'armor', roadCell), RANGED_RANGE_BY_UNIT_TYPE.armor);
+  assert.equal(effectiveTacticalRangedMaxRangeForAttacker(roadBattle, 'naval', roadCell), RANGED_RANGE_BY_UNIT_TYPE.naval);
+  assert.equal(effectiveTacticalRangedMaxRangeForAttacker(roadBattle, 'infantry', railCell), RANGED_RANGE_BY_UNIT_TYPE.infantry);
+});
+
+test('forest urban and rubble still cap infantry and armor ranged range', () => {
+  const forestCell = tacticalRes4Cell(62, 70);
+  const urbanCell = tacticalRes4Cell(62, 71);
+  const rubbleCell = tacticalRes4Cell(63, 70);
+  const battle = {
+    ...baseBattle,
+    res4TerrainKindByH3: { [forestCell]: 'forest', [urbanCell]: 'plains', [rubbleCell]: 'plains' },
+    res4IsUrbanByH3: { [urbanCell]: true },
+    res4IsRubbleByH3: { [rubbleCell]: true },
+    res4RoadSidesByH3: {
+      [forestCell]: allSidesTrue(forestCell),
+      [rubbleCell]: allSidesTrue(rubbleCell),
+    },
+  };
+  assert.equal(effectiveTacticalRangedMaxRangeForAttacker(battle, 'armor', forestCell), 1);
+  assert.equal(effectiveTacticalRangedMaxRangeForAttacker(battle, 'armor', urbanCell), 1);
+  assert.equal(effectiveTacticalRangedMaxRangeForAttacker(battle, 'infantry', rubbleCell), 1);
 });
 
 test('naval ranged blocked when implicit LOS crosses mountain; infantry not subject to mountain LOS', () => {

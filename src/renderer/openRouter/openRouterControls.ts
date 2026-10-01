@@ -153,7 +153,8 @@ syncOpenRouterRunToggleInteractable: () => Promise<void>;
  *
  * Purpose: Centralizes listener registration next to OpenRouter UI bootstrap so prefetch + Ready gates stay aligned.
  * When to use: Once from `initOpenRouterUI`.
- * Expected outcome: Push payloads apply strategy toasts, tool counts, and tactical opponent drafts after playback notify.
+ * Expected outcome: Push payloads apply strategy toasts and tool counts. A successful strategic consult does not start
+ * another `requestAiOrders`; those orders are already pending for the next Ready.
  * Exceptions: Stale `planningTurnNumber` merges log and clear strategic latch only. `abandoned` pushes unlatch and
  * resume Run prefetch without applying a plan; the player-visible skip line is sent on `openRouter:log`.
  */
@@ -180,8 +181,8 @@ function initDeferredResolutionPlaybackPushListeners(deps: OpenRouterUiDeps): vo
       updateOpenRouterCostLabel();
     }
     deps.appendOpenRouterLog('Post-resolution consultation applied.', false);
+    if (S.useEventDrivenConsultation) S.eventDrivenInitialConsultationDone = true;
     deps.requestRedraw();
-    if (S.runButtonOn) deps.startBackgroundRequestIfAllowed();
     deps.updateReadyButtonState();
   });
   window.gameApi?.registerPostTacticalBeatConsultationListener?.((fields) => {
@@ -217,6 +218,7 @@ function initDeferredResolutionPlaybackPushListeners(deps: OpenRouterUiDeps): vo
  * Purpose: The AI-planning latch must clear even when consultation did not run, or Ready stays disabled.
  * When to use: `abandoned` strategic/melee or tactical consult pushes.
  * Expected outcome: Matching latch false; tactical opponent draft cleared; prefetch starts when Run is on.
+ * Strategic abandon also clears `eventDrivenInitialConsultationDone` so that prefetch is not suppressed by the event-driven wait gate.
  * Exceptions: None.
  */
 function applyAbandonedDeferredConsultRecovery(kind: 'strategic' | 'tactical', deps: OpenRouterUiDeps): void {
@@ -227,6 +229,7 @@ function applyAbandonedDeferredConsultRecovery(kind: 'strategic' | 'tactical', d
     if (S.runButtonOn && oppAlive) deps.startBackgroundRequestIfAllowed();
   } else {
     S.pendingDeferredStrategicPostResolutionConsult = false;
+    S.eventDrivenInitialConsultationDone = false;
     if (S.runButtonOn) deps.startBackgroundRequestIfAllowed();
   }
   deps.requestRedraw();

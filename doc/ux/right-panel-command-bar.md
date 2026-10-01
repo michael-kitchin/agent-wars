@@ -34,7 +34,7 @@ Shown with the right panel. Ready, Ranged, and the air-strike controls follow th
 ### Other
 
 - The Ranged control hides when the selection is empty, mixed, or not entirely capable. See [selection-model.md](selection-model.md).
-- A failed target click shows an error toast and keeps targeting on. The label stays Cancel for Ranged, and the target-type choice and its Cancel stay shown for Strike. See [order-lifecycle.md](order-lifecycle.md).
+- A failed target double-click shows an error toast and keeps targeting on. The label stays Cancel for Ranged, and the target-type choice and its Cancel stay shown for Strike. See [order-lifecycle.md](order-lifecycle.md).
 
 ## States
 
@@ -49,7 +49,7 @@ Shown with the right panel. Ready, Ranged, and the air-strike controls follow th
 - Ready never uses the AI wait label unless Run is on and opponent orders are not ready.
 - The target-type choice is never shown unless strike targeting is on.
 - Strategic infantry never shows Ranged. Tactical infantry can.
-- A failed target click never turns targeting off.
+- A failed target double-click never turns targeting off.
 - During a battle, the phase line and the turn line never describe different theaters.
 
 ## Strategic and Tactical Differences

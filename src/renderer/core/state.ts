@@ -1014,9 +1014,9 @@ useEventDrivenConsultation: true,
     /**
    * Documents the object literal property `eventDrivenInitialConsultationDone` (eventDrivenInitialConsultationDone: false).
 
-   * Purpose: Supports maintainability by documenting why `eventDrivenInitialConsultationDone` exists.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Purpose: Event-driven mode consults once up front, then only from post-resolution callbacks. This flag marks that the opening consult finished.
+   * When to use: Set after a successful opening `requestAiOrders` or a successful post-resolution consult. Cleared on new game, Run off, mode switch, and abandoned deferred consult.
+   * Expected outcome: While true, strategic Ready does not wait on a null precompute buffer and does not start a second model call for the same turn.
    * Exceptions: None.
    */
 eventDrivenInitialConsultationDone: false,

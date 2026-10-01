@@ -141,7 +141,7 @@ Forbidden substrings (`TACTICAL_AI_PROMPT_STRATEGIC_SECTION_MARKERS`): `memoryup
 
 Built in `requestOrdersFlow.ts`. The system prompt is constructed once and is never replaced mid-consultation. The tool-limit warning reaches the model on the **next** consultation's system prompt.
 
-Loop: at most `REQUEST_ORDERS_MAX_TOOL_ROUNDS` (50) rounds (`requestOrdersToolLoop.ts`) and `REQUEST_ORDERS_MAX_WALL_CLOCK_MS` (90000) (`requestOrdersFlowSupport.ts`). The warning quotes `String(REQUEST_ORDERS_MAX_TOOL_ROUNDS)`.
+Loop: at most `REQUEST_ORDERS_MAX_TOOL_ROUNDS` (50) rounds (`requestOrdersToolLoop.ts`) and `REQUEST_ORDERS_MAX_WALL_CLOCK_MS` (300000) (`requestOrdersFlowSupport.ts`). A single model call aborts after `AI_MODEL_REQUEST_TIMEOUT_MS` (90000) and is retried once. The round-cap warning quotes `String(REQUEST_ORDERS_MAX_TOOL_ROUNDS)`. The wall-clock stop does not set that warning.
 
 | Message kind | Source | When appended | Tools on that call | States a rule? |
 | --- | --- | --- | --- | --- |

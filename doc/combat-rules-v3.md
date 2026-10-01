@@ -96,7 +96,7 @@ The game has four unit types. Per-side caps scale with match size (`getMaxUnitsP
 - **Air vs. ground/naval:** Air units strike during the air strike phase (before ranged). When targeting units, defending ground/naval units with **strategic** range ≥ 1 in the target hex may return fire at their attack value — no range-to-base check. Infantry cannot return fire against air on the strategic map. In a tactical battle, defending sub-units with a tactical ranged baseline (including infantry) may counter-fire; see §12.5. When targeting infrastructure, only the infrastructure's fixed counter-fire roll applies.
 - **Ground vs. air (base attack):** Air units do not participate in melee. If an enemy ground unit enters a hex containing an airport with a based air unit, the air unit is destroyed (see §6).
 - **Strategic terrain combat modifiers:** None. Strategic ranged and air strikes are not blocked by terrain or intervening units.
-- **Tactical terrain combat modifiers:** Implemented. See §12.4 and §12.5 (enter-hex costs, origin MP collapse, forest/urban/rubble/road-rail range cap, mountain LOS).
+- **Tactical terrain combat modifiers:** Implemented. See §12.4 and §12.5 (enter-hex costs, origin MP collapse, forest/urban/rubble range cap, road/rail movement multipliers, mountain LOS).
 
 ---
 
@@ -436,7 +436,7 @@ At the tactical level, all unit types have a positive ranged baseline (`RANGED_R
 
 **Terrain caps and LOS** (`tacticalTerrainCombatModifiers.ts`):
 
-- Forest, urban, rubble, or an active road/rail corridor on the **attacker's** cell caps **infantry and armor** to effective range **1**.
+- Forest, urban, or rubble on the **attacker's** cell caps **infantry and armor** to effective range **1**.
 - Mountain along the implicit H3 grid path blocks **armor, naval, and air** shots. **Infantry is exempt.** If no path can be derived, the shot is blocked (fail closed), except icosahedron face-crossing pairs which use a BFS fallback.
 - Return fire uses the same range + LOS rules (planning parity).
 - **Air-strike AA:** tactical infantry may counter-fire when an air strike targets their hex, because infantry has a positive tactical ranged baseline.

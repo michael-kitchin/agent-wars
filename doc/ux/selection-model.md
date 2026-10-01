@@ -13,15 +13,16 @@ One selection drives the right-panel readout, ranged and strike targeting, and d
 - Enemy units are not added to the selection. A stack, or a lone enemy unit, opens the stack callout instead. See [stack-callout.md](stack-callout.md).
 - A land unit that is embarked is not selectable.
 - While a hover order preview is in progress, a click that would replace or toggle the selection is ignored.
+- While Ranged or Strike targeting is on, a click does not change the selection, open the stack callout, or record a new selected hex. The double-click places the attack. See [order-lifecycle.md](order-lifecycle.md).
 - During Resolution playback, map clicks do not replace or toggle the selection. Right-click still clears it. See [resolution-playback.md](resolution-playback.md).
 - Build hexes use a separate selection owned by [build-popup.md](build-popup.md) and [multi-hex-build-popup.md](multi-hex-build-popup.md).
 
 ## Selecting
 
-- When the player clicks a human unit icon without Shift, the selection becomes that unit after a short delay. A second click on a human unit icon before the delay ends selects that unit immediately.
-- When the player Shift-clicks a human unit icon, that unit toggles in the selection and the delayed single-select is cancelled.
+- When Ranged and Strike targeting are off and the player clicks a human unit icon without Shift, the selection becomes that unit after a short delay. A second click on a human unit icon before the delay ends selects that unit immediately.
+- When Ranged and Strike targeting are off and the player Shift-clicks a human unit icon, that unit toggles in the selection and the delayed single-select is cancelled.
 - When the click is the second press of a double-click on the same spot, the click does not retarget the selection. The order is planned for the units selected at the start of the gesture.
-- When the player clicks a stack or a lone enemy icon, and no hover order preview is active, the stack callout opens after the same delay. The second press of a double-click on that spot does not schedule another callout.
+- When Ranged and Strike targeting are off and the player clicks a stack or a lone enemy icon, and no hover order preview is active, the stack callout opens after the same delay. The second press of a double-click on that spot does not schedule another callout.
 - The selected-unit readout shows one unit name, or that name plus a count of the other selected units. It shows an em dash when nothing is selected.
 
 ## Clearing and Keeping a Selection
@@ -38,8 +39,8 @@ One selection drives the right-panel readout, ranged and strike targeting, and d
 - The support control is hidden when the selection is empty, when the selection mixes air with other types, or when any selected unit cannot make a direct ranged attack in the current theater.
 - When every selected unit is air, the control offers Strike.
 - When every selected unit can make a direct ranged attack and none is air, the control offers Ranged. While that targeting mode is on, the label is Cancel.
-- Choosing Ranged or Strike does not change which units are selected. A successful target click then clears the selection.
-- Leaving the mode by Cancel turns the targeting mode off and keeps the selection. A failed target click keeps both the selection and the targeting mode. See [order-lifecycle.md](order-lifecycle.md).
+- Choosing Ranged or Strike does not change which units are selected. A successful target double-click then clears the selection. A single click while targeting is on does not.
+- Leaving the mode by Cancel turns the targeting mode off and keeps the selection. A failed target double-click keeps both the selection and the targeting mode. See [order-lifecycle.md](order-lifecycle.md).
 - An empty selection hides the control and turns both targeting modes off.
 - Strategic and tactical theaters use the same control. Which unit types count as ranged-capable follows the [combat rules](../combat-rules-v3.md) for the active theater. Strategic infantry does not show Ranged. Tactical infantry does.
 

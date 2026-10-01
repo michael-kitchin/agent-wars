@@ -215,30 +215,20 @@ export function tacticalMovementTerrainAnchorH3(
 /**
  * Returns true when armor/infantry **direct** ranged orders use the forest/urban/rubble **max range 1** cap.
  *
- * Contract: True iff forest-class **or** urban **or** rubble **or** active road/rail mask on the attacker anchor cell.
+ * Contract: True iff the anchor is urban, rubble, or forest-class. A road or rail mask does not make it true.
  * When to use: Inside `effectiveTacticalRangedMaxRangeForAttacker`.
- * Expected outcome: False for naval/air (those types are not capped by this rule).
+ * Expected outcome: True for an urban, rubble, or forest-class anchor. False for every other cell, including desert or plains whose only extra feature is a road or rail. The caller applies the result only to infantry and armor.
  * Exceptions: None.
  */
 export function tacticalForestUrbanRubbleRangedCapActive(battle: TacticalBattleTerrainPick, attackerAnchorH3: string): boolean {
   if (tacticalRes4CellIsUrbanOrRubble(battle, attackerAnchorH3)) return true;
-  if (
-    tacticalRes4CellHasActiveTransportCorridor({
-      cellH3: attackerAnchorH3,
-      roadSidesByH3: battle.res4RoadSidesByH3,
-      railSidesByH3: battle.res4RailSidesByH3,
-      rubbleByH3: battle.res4IsRubbleByH3,
-    })
-  ) {
-    return true;
-  }
   return tacticalRes4CellIsForestClass(battle, attackerAnchorH3);
 }
 
 /**
  * Returns the **effective** tactical ranged max range in H3 grid steps for one attacker cell and unit type.
  *
- * Contract: Baseline from `RANGED_RANGE_BY_UNIT_TYPE`; armor/infantry on forest/urban/rubble/active transport return `min(baseline, 1)`.
+ * Contract: Baseline from `RANGED_RANGE_BY_UNIT_TYPE`; infantry and armor on forest, urban, or rubble return `min(baseline, 1)`. Road and rail masks do not change the result.
  * When to use: Tactical `validateGroupRangedTarget` and apply-phase ranged filters.
  * Expected outcome: Non-negative integer; 0 means no ranged for that type.
  * Exceptions: None.

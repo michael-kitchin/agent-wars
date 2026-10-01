@@ -10,19 +10,19 @@ Separate queued orders from the selection and from resolution playback, so a cha
 
 ### March
 
-When the player double-clicks a destination with a non-air selection, and targeting is off, the selection plans a grouped march. If every selected unit is already on that hex and the click missed unit icons, the selection clears instead. A mixed air and non-air selection is rejected and shows an error toast.
+When the player double-clicks a destination with a non-air selection, and targeting is off, the selection plans a grouped march. If every selected unit is already on that hex and the click missed unit icons, the selection clears instead. A mixed air and non-air selection is rejected and shows an error toast. While Ranged or Strike targeting is on, a double-click does not plan a march.
 
 ### Ferry
 
-When the player double-clicks with an all-air selection, the game checks whether a ferry is legal. A legal ferry is queued. An illegal ferry on empty ground clears the selection. An illegal ferry on a unit icon shows an error toast and keeps the selection. Legality is in the [combat rules](../combat-rules-v3.md).
+When the player double-clicks with an all-air selection, and Strike targeting is off, the game checks whether a ferry is legal. A legal ferry is queued. An illegal ferry on empty ground clears the selection. An illegal ferry on a unit icon shows an error toast and keeps the selection. Legality is in the [combat rules](../combat-rules-v3.md). While Strike targeting is on, that double-click places the strike instead.
 
 ### Ranged attack
 
-When Ranged targeting is on, a click on a hex validates the target for every selected unit. Success queues one ranged attack per selected unit, turns targeting off, and clears the selection. Failure shows an error toast, queues nothing, and leaves targeting on so the player can pick another hex. Cancel turns targeting off.
+When Ranged targeting is on, a double-click on a hex validates the target for every selected unit. A single click does not queue the attack and does not change the selection, including a click that misses every hex. Success queues one ranged attack per selected unit, turns targeting off, and clears the selection. Failure shows an error toast, queues nothing, and leaves targeting on so the player can pick another hex. Cancel turns targeting off. A double-click outside the active tactical battle does not queue an attack; the clicks that led to it already show the outside-battle toast.
 
 ### Air strike
 
-When Strike targeting is on, a click validates the target and the chosen target type: Enemy Units, Production, Airports, or Seaports. Success queues the strikes, turns targeting off, and clears the selection. Failure shows an error toast, queues nothing, and leaves strike targeting on, the same as a failed ranged click.
+When Strike targeting is on, a double-click validates the target and the chosen target type: Enemy Units, Production, Airports, or Seaports. A single click does not queue the strike. Success queues the strikes, turns targeting off, and clears the selection. Failure shows an error toast, queues nothing, and leaves strike targeting on, the same as a failed ranged double-click.
 
 ### Sealift
 
@@ -63,7 +63,7 @@ Build orders are queue rows on a hex, not map double-clicks. See [build-popup.md
 - Right-click never cancels queued orders.
 - Entering a tactical battle never deletes strategic drafts. It hides them until the battle ends.
 - Starting a new match clears drafts and discards the stash.
-- A rejected Ranged or Strike target click never turns targeting off. Targeting turns off only on Cancel, a successful target, right-click, a selection that can no longer fire, or entering a battle.
+- A rejected Ranged or Strike target double-click never turns targeting off. Targeting turns off only on Cancel, a successful target double-click, right-click, a selection that can no longer fire, or entering a battle. A single click does not turn it off.
 - Every queued order that Ready will submit is visible in a pending list.
 - Sealift assignment is never a pending order.
 

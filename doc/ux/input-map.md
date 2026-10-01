@@ -12,8 +12,8 @@ Tell an agent which input does what, and which binding wins when two surfaces co
 | --- | --- | --- | --- |
 | Drag | Main map | Pans the map. | [map-surface.md](map-surface.md) |
 | Wheel | Main map | Zooms the map. | [map-surface.md](map-surface.md) |
-| Click | Main map | Selects, targets, or opens a popup, depending on what is under the pointer. | [selection-model.md](selection-model.md) |
-| Double-click | Main map | Plans a march or ferry, or clears the selection. Map zoom-on-double-click is off. | [order-lifecycle.md](order-lifecycle.md) |
+| Click | Main map | Selects or opens a popup. While Ranged or Strike targeting is on, a click does not place the attack and does not change the selection. | [selection-model.md](selection-model.md) |
+| Double-click | Main map | Plans a march or ferry, or clears the selection, when targeting is off. While Ranged or Strike targeting is on, places that attack and does not plan a move. Map zoom-on-double-click is off. | [order-lifecycle.md](order-lifecycle.md) |
 | Right-click | Main map | Clears selection chrome and does not open the browser menu. Queued orders stay. | [selection-model.md](selection-model.md) |
 | Click, drag, wheel, double-click | Minimap | No pan, zoom, or click-to-recenter. The minimap only shows the current view. | [minimap.md](minimap.md) |
 | Click | Tactical battles list backdrop | Chooses Ignore. | [tactical-battles-list.md](tactical-battles-list.md) |

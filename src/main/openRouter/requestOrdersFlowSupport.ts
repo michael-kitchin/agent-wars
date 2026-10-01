@@ -10,6 +10,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import type { CoordinateContextMode } from '../briefing/map/coordinateContext';
+import { AI_CONSULTATION_WALL_CLOCK_MS } from '../../shared/aiConsultationLimits';
 import { logDebug, logError, logTrace } from '../logger';
 
 /**
@@ -52,12 +53,12 @@ const FULL_RESPONSE_LOG_ENV_FLAG = 'AGENT_WARS_LOG_FULL_RESPONSES';
 /**
  * Documents the module-scope binding `REQUEST_ORDERS_MAX_WALL_CLOCK_MS` (REQUEST_ORDERS_MAX_WALL_CLOCK_MS).
 
- * Purpose: Hard stop for wall-clock time spent in the tool-call loop to avoid hung AI turns.
+ * Purpose: Local name for `AI_CONSULTATION_WALL_CLOCK_MS` so the tool loop and the outer waiters share one 5-minute cap.
  * When to use: Main polling loop in `requestOrdersFlow` compares elapsed time against this constant.
- * Expected outcome: Orders request aborts with a timeout-shaped error after ~90s.
+ * Expected outcome: Orders request aborts with a timeout-shaped error after 5 minutes already spent in the loop.
  * Exceptions: None.
  */
-export const REQUEST_ORDERS_MAX_WALL_CLOCK_MS = 90_000;
+export const REQUEST_ORDERS_MAX_WALL_CLOCK_MS = AI_CONSULTATION_WALL_CLOCK_MS;
 
 /**
  * Maximum model rounds in one consultation, including tool calls.
