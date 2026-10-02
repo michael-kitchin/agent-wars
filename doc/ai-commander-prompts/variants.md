@@ -97,6 +97,10 @@ Consequence for the narrative paragraph: the sentence counting units without a s
 
 In battle the memory, standing-order, production, assessment, and estimation groups are **always** off regardless of what the flags would enable strategically. A tactical prompt therefore always follows rows 2.1 through 2.3 and drops the assessment guidance, even when the same game's strategic consultations include all of them. This is not a configuration; it is a mode invariant.
 
+### 2.6 Model without tool support
+
+When the selected model's OpenRouter listing reports `supported_parameters` without `tools`, the enabled tool-name set is emptied before any surface is built, whatever the Tools tab says. The prompt therefore follows rows 2.1 through 2.4 together, the tool list is empty, and the requests carry neither `tools` nor `tool_choice`. The strategic Commander briefing is still attached, as it is for every strategic consultation, and the consultation policy in section 6 is unchanged. A model missing from the cached list, or listed without `supported_parameters`, is treated as supporting tools.
+
 ## 3. Roster composition
 
 Gates: presence of each arm among the opponent's own units, presence of observed enemy units, presence of option rows, and presence of orderless units.

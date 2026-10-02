@@ -7,11 +7,13 @@ import assert from 'node:assert/strict';
 import type { OpenRouterModel } from './ipc/openRouterTypes';
 import {
   OPENROUTER_GATEWAY_REASONING_EFFORTS,
+  abbreviateReasoningEffort,
   isReasoningEffortSelectable,
   listSelectableReasoningEfforts,
   resolveDefaultReasoningEffort,
   resolveEffectiveReasoningEffort,
   resolveRequestedReasoningEffort,
+  sortReasoningEffortsAscending,
 } from './openRouterReasoningEffort';
 
 /**
@@ -89,6 +91,19 @@ function testSelectableThreshold(): void {
 }
 
 /**
+ * Verifies an effort the gateway list does not know still gets a label and a stable place.
+ *
+ * Purpose: A new vendor level must appear in model labels rather than disappear or reorder the known levels.
+ * When to use: After changing `abbreviateReasoningEffort` or `sortReasoningEffortsAscending`.
+ * Expected outcome: The unknown effort is capitalized and sorts after every known effort, which run lowest first.
+ * Exceptions: None.
+ */
+function testUnknownEffortLabelAndOrder(): void {
+  assert.equal(abbreviateReasoningEffort('turbo'), 'Turbo');
+  assert.deepEqual(sortReasoningEffortsAscending(['turbo', 'high', 'none']), ['none', 'high', 'turbo']);
+}
+
+/**
  * Runs reasoning-effort rule tests.
  *
  * Purpose: Node entrypoint for test discovery.
@@ -101,6 +116,7 @@ function run(): void {
   testInvalidOverrideFallsBackToDefault();
   testUnselectableDefaultIsNull();
   testSelectableThreshold();
+  testUnknownEffortLabelAndOrder();
   console.log('openRouterReasoningEffort.test.ts passed');
 }
 

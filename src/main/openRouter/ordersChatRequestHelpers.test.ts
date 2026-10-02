@@ -40,6 +40,20 @@ const OK_RESULT: OpenRouterChatTransportResult = { ok: true, status: 200, header
 const REJECTED_RESULT: OpenRouterChatTransportResult = { ok: false, error: 'bad request', status: 400 };
 
 /**
+ * Failed transport result naming a `tool_choice` refusal.
+ *
+ * Purpose: Simulates Amazon Bedrock's Claude endpoint rejecting OpenRouter's `required` translation.
+ * When to use: Tool-choice fallback cases.
+ * Expected outcome: `ok: false` with `status: 400` and the provider's `tool_choice` message.
+ * Exceptions: None.
+ */
+const TOOL_CHOICE_REJECTED_RESULT: OpenRouterChatTransportResult = {
+  ok: false,
+  error: 'API error: Provider returned error: tool_choice: type "any" are not supported',
+  status: 400,
+};
+
+/**
  * Builds a fake transport that records bodies and returns queued results in order.
  *
  * Purpose: Observes exactly what the helper posts without network access.
@@ -92,6 +106,27 @@ function postFor(post: OpenRouterChatTransport, settings: OrdersChatRequestSetti
     modelId: 'm',
     baseBody: { model: 'm', messages: [], max_tokens: 100 },
     settings,
+    attachResponseFormat: true,
+    requestLabel: 'test',
+  });
+}
+
+/**
+ * Posts a forced-tool round for model `m`: `tool_choice: required` and no schema.
+ *
+ * Purpose: Matches the tool loop's request before the model's first tool call.
+ * When to use: Tool-choice fallback cases.
+ * Expected outcome: The helper's transport result.
+ * Exceptions: None.
+ */
+function postRequiredToolRound(post: OpenRouterChatTransport): Promise<OpenRouterChatTransportResult> {
+  return postOrdersChatRequest({
+    post,
+    key: 'k',
+    modelId: 'm',
+    baseBody: { model: 'm', messages: [], max_tokens: 100, tool_choice: 'required' },
+    settings: structuredSettings(),
+    attachResponseFormat: false,
     requestLabel: 'test',
   });
 }
@@ -111,6 +146,32 @@ async function testCapableModelGetsAllOptions(): Promise<void> {
   assert.equal(bodies.length, 1);
   assert.deepEqual(bodies[0].response_format, RESPONSE_FORMAT);
   assert.deepEqual(bodies[0].plugins, [{ id: 'response-healing' }]);
+  assert.deepEqual(bodies[0].reasoning, { effort: 'high' });
+}
+
+/**
+ * Verifies a request whose caller does not ask for the schema goes out without it.
+ *
+ * Purpose: Rounds that force a tool call must not carry the schema, even for a model that supports it.
+ * When to use: After changing how `attachResponseFormat` gates the schema.
+ * Expected outcome: One post with the reasoning override and neither `response_format` nor `plugins`.
+ * Exceptions: None.
+ */
+async function testSchemaWithheldWhenNotRequested(): Promise<void> {
+  resetOpenRouterModelCapabilitiesForTests();
+  const { post, bodies } = fakeTransport([OK_RESULT]);
+  await postOrdersChatRequest({
+    post,
+    key: 'k',
+    modelId: 'm',
+    baseBody: { model: 'm', messages: [], max_tokens: 100 },
+    settings: structuredSettings('high'),
+    attachResponseFormat: false,
+    requestLabel: 'test',
+  });
+  assert.equal(bodies.length, 1);
+  assert.ok(!('response_format' in bodies[0]));
+  assert.ok(!('plugins' in bodies[0]));
   assert.deepEqual(bodies[0].reasoning, { effort: 'high' });
 }
 
@@ -139,83 +200,43 @@ async function testRejectionRetriesAndMarksModel(): Promise<void> {
 /**
  * Verifies a provider that rejects `tool_choice: required` is retried with `auto` and then stays there.
  *
- * Purpose: Stripping the schema does not fix an endpoint that cannot force a tool call.
+ * Purpose: Some endpoints cannot force a tool call; the forced-tool round carries no schema, so `auto` is the only fix.
  * When to use: After changing the tool-choice fallback.
- * Expected outcome: Three posts. The third has no schema and `tool_choice: auto`. The next call sends `auto` once.
+ * Expected outcome: Two posts, `required` then `auto`, neither with the schema. The next call sends `auto` once.
  * Exceptions: None.
  */
 async function testRequiredToolChoiceRetriesWithAuto(): Promise<void> {
   resetOpenRouterModelCapabilitiesForTests();
-  const toolChoiceRejected: OpenRouterChatTransportResult = {
-    ok: false,
-    error: 'API error: Provider returned error: tool_choice: type "any" are not supported',
-    status: 400,
-  };
-  const first = fakeTransport([REJECTED_RESULT, toolChoiceRejected, OK_RESULT]);
-  const result = await postOrdersChatRequest({
-    post: first.post,
-    key: 'k',
-    modelId: 'm',
-    baseBody: { model: 'm', messages: [], max_tokens: 100, tool_choice: 'required' },
-    settings: structuredSettings(),
-    requestLabel: 'test',
-  });
+  const first = fakeTransport([TOOL_CHOICE_REJECTED_RESULT, OK_RESULT]);
+  const result = await postRequiredToolRound(first.post);
   assert.equal(result.ok, true);
-  assert.equal(first.bodies.length, 3);
-  assert.equal(first.bodies[1].tool_choice, 'required');
-  assert.ok(!('response_format' in first.bodies[1]));
-  assert.equal(first.bodies[2].tool_choice, 'auto');
-  assert.ok(!('response_format' in first.bodies[2]));
+  assert.deepEqual(
+    first.bodies.map((body) => body.tool_choice),
+    ['required', 'auto']
+  );
+  assert.ok(first.bodies.every((body) => !('response_format' in body)));
   const later = fakeTransport([OK_RESULT]);
-  await postOrdersChatRequest({
-    post: later.post,
-    key: 'k',
-    modelId: 'm',
-    baseBody: { model: 'm', messages: [], max_tokens: 100, tool_choice: 'required' },
-    settings: structuredSettings(),
-    requestLabel: 'test',
-  });
+  await postRequiredToolRound(later.post);
   assert.equal(later.bodies.length, 1);
   assert.equal(later.bodies[0].tool_choice, 'auto');
-  assert.ok(!('response_format' in later.bodies[0]));
 }
 
 /**
- * Verifies a failed automatic-tool-choice retry does not disable either option.
+ * Verifies a failed automatic-tool-choice retry does not mark the model.
  *
  * Purpose: The model is marked only after a retry succeeds, so a second failure must not stick.
  * When to use: After changing when the model is marked.
- * Expected outcome: The next call still sends the schema and `tool_choice: required`.
+ * Expected outcome: The call fails, and the next call still sends `tool_choice: required`.
  * Exceptions: None.
  */
 async function testFailedToolChoiceRetryDoesNotMarkModel(): Promise<void> {
   resetOpenRouterModelCapabilitiesForTests();
-  const toolChoiceRejected: OpenRouterChatTransportResult = {
-    ok: false,
-    error: 'API error: Provider returned error: tool_choice: type "any" are not supported',
-    status: 400,
-  };
-  const first = fakeTransport([REJECTED_RESULT, toolChoiceRejected, toolChoiceRejected]);
-  const result = await postOrdersChatRequest({
-    post: first.post,
-    key: 'k',
-    modelId: 'm',
-    baseBody: { model: 'm', messages: [], max_tokens: 100, tool_choice: 'required' },
-    settings: structuredSettings(),
-    requestLabel: 'test',
-  });
+  const first = fakeTransport([TOOL_CHOICE_REJECTED_RESULT, TOOL_CHOICE_REJECTED_RESULT]);
+  const result = await postRequiredToolRound(first.post);
   assert.equal(result.ok, false);
   const later = fakeTransport([OK_RESULT]);
-  await postOrdersChatRequest({
-    post: later.post,
-    key: 'k',
-    modelId: 'm',
-    baseBody: { model: 'm', messages: [], max_tokens: 100, tool_choice: 'required' },
-    settings: structuredSettings(),
-    requestLabel: 'test',
-  });
+  await postRequiredToolRound(later.post);
   assert.equal(later.bodies[0].tool_choice, 'required');
-  assert.deepEqual(later.bodies[0].response_format, RESPONSE_FORMAT);
 }
 
 /**
@@ -246,6 +267,7 @@ async function testFailedRetryDoesNotMarkModel(): Promise<void> {
  */
 async function run(): Promise<void> {
   await testCapableModelGetsAllOptions();
+  await testSchemaWithheldWhenNotRequested();
   await testRejectionRetriesAndMarksModel();
   await testRequiredToolChoiceRetriesWithAuto();
   await testFailedToolChoiceRetryDoesNotMarkModel();

@@ -94,7 +94,7 @@ test('the final malformed retry appends a corrective instruction', async () => {
  * Exceptions: Assertion failure on contract drift.
  */
 test('the final retry asks only for a tool call when one is required', async () => {
-  const outcome = await resolveMalformedCompletionRetry({ ...malformedRound(1), requireToolCall: true });
+  const outcome = await resolveMalformedCompletionRetry({ ...malformedRound(1), answerShape: 'toolCall' });
   assert.equal(outcome.status, 'retry');
   const corrective = outcome.status === 'retry' ? outcome.correctiveMessage : null;
   assert.match(String(corrective), /single well-formed tool call/i);

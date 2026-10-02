@@ -76,8 +76,10 @@ name?: string;
    * OpenRouter request parameters that at least one provider for this model accepts.
    *
    * Contract: Trimmed non-empty strings in API order when set; omitted when the API sent none.
-   * When to use: Capability checks such as whether to send `response_format` (needs `response_format` and `structured_outputs`).
-   * Expected outcome: Membership tests only; an omitted list means no optional parameter is known to be supported.
+   * When to use: Capability checks such as whether to send `response_format` (needs `response_format` and
+   * `structured_outputs`), `tools`, or `tool_choice`.
+   * Expected outcome: Membership tests only. The schema check treats an omitted list as unsupported; the `tools` and
+   * `tool_choice` checks treat it as supported, so unknown models keep their previous request shape.
    * Exceptions: None.
    */
   readonly supported_parameters?: readonly string[];
@@ -101,11 +103,12 @@ name?: string;
     readonly max_completion_tokens?: number;
   };
   /**
-   * Optional reasoning defaults used for the Model-tab reasoning suffix phrase.
+   * Optional reasoning metadata used for the Model-tab reasoning suffix and the reasoning dropdown.
 
    * Contract: `default_effort` is a trimmed string when set; `default_enabled` / `mandatory` are booleans when set.
-   * When to use: `formatModelOptionSuffix` for Model-tab option labels.
-   * Expected outcome: Drives `reasoning: <effort>` / `reasoning: default` when on; omits the part when off/unknown.
+   * When to use: `formatModelOptionSuffix` for Model-tab option labels, and the reasoning-effort helpers.
+   * Expected outcome: The suffix lists the selectable levels when `supported_efforts` makes them known; otherwise it
+   * shows `reasoning: <effort>` / `reasoning: default` when on, and omits the part when off/unknown.
    * Exceptions: None.
    */
   reasoning?: {
@@ -113,8 +116,10 @@ name?: string;
      * Default reasoning effort label from OpenRouter when provided.
 
      * Contract: Trimmed non-empty string when set.
-     * When to use: Value after `reasoning:` when reasoning is on by default or mandatory.
-     * Expected outcome: `reasoning: high` style phrases; omitted value yields `reasoning: default`.
+     * When to use: Marked `*` in the suffix's level list; when no list is known, the value after `reasoning:` when
+     * reasoning is on by default or mandatory.
+     * Expected outcome: `Med*` inside a level list, or a `reasoning: high` style phrase; omitted value yields
+     * `reasoning: default` when no list is known.
      * Exceptions: None.
      */
     default_effort?: string;
@@ -122,17 +127,19 @@ name?: string;
      * Whether reasoning is enabled by default for this model.
 
      * Contract: Strict boolean when set (`=== true` / `=== false` only).
-     * When to use: With `mandatory` to choose the on-style reasoning phrase vs omitting it.
-     * Expected outcome: `true` (or mandatory) → on phrase; off/unknown → omit reasoning part.
+     * When to use: With `mandatory`, when no level list is known, to choose the on-style reasoning phrase vs
+     * omitting it.
+     * Expected outcome: `true` (or mandatory) → on phrase; off/unknown → omit reasoning part. Ignored by the suffix
+     * when a level list is known.
      * Exceptions: None.
      */
     default_enabled?: boolean;
     /**
      * Whether reasoning cannot be disabled for this model.
 
-     * Contract: Strict boolean when set; `true` forces the on-style reasoning suffix phrase.
+     * Contract: Strict boolean when set; `true` removes `none` from the selectable levels.
      * When to use: OpenRouter `reasoning.mandatory` from the models list API.
-     * Expected outcome: Treated like enabled-for-display when formatting the option suffix.
+     * Expected outcome: Treated like enabled-for-display when the suffix has no level list.
      * Exceptions: None.
      */
     mandatory?: boolean;
@@ -141,7 +148,8 @@ name?: string;
      *
      * Contract: An array of trimmed effort names; `null` means every gateway effort is accepted;
      * omitted means effort is not selectable for this model.
-     * When to use: `listSelectableReasoningEfforts` when building the reasoning dropdown or validating requests.
+     * When to use: `listSelectableReasoningEfforts` when building the reasoning dropdown, the model option suffix's
+     * level list, or validating requests.
      * Expected outcome: Callers never send an effort outside this list.
      * Exceptions: None.
      */

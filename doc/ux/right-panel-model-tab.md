@@ -14,7 +14,7 @@ Shown when the Model tab is selected. This is the tab the panel starts on. The m
 
 - An API key field. The placeholder is "Set key and blur to save" until a key is saved, then "Saved API key". The field does not show the saved key as visible text after it is stored; it is a password field.
 - A cost readout for the current match, as a currency amount. A new match resets it to zero.
-- A model dropdown. It starts as "— Select model —" until models load.
+- A model dropdown. It starts as "— Select model —" until models load. Each option shows the model name, then in brackets the combined prompt and completion price per million tokens and the model's reasoning levels, lowest first, abbreviated and separated by slashes, with the default level marked by an asterisk, for example `reasoning: None/Low/Med*/High`. Levels are abbreviated None, Min, Low, Med, High, Xhigh, and Max. A model that reports reasoning without listing levels shows `reasoning: <default level>` or `reasoning: default`.
 - A refresh control labeled "Refresh model list".
 - A Run button. It is disabled, with the tip "Set API key and model to enable", until both a key and a model are set.
 - A New button labeled "New".
@@ -43,6 +43,7 @@ Shown when the Model tab is selected. This is the tab the panel starts on. The m
 ### Other
 
 - If the key or model is removed while Run is pressed, Run turns off and any in-flight planning request is cancelled.
+- When the selected model does not support tool calls, its consultations run without tools, whatever the Tools tab says. See [right-panel-tools-tab.md](right-panel-tools-tab.md).
 
 ## States
 
@@ -57,6 +58,7 @@ Shown when the Model tab is selected. This is the tab the panel starts on. The m
 - The API key value is never written into this document or into the activity log by the key field itself.
 - Unchecking Tactical battles never opens the tactical battles list.
 - The reasoning dropdown never offers a level the selected model does not support, and a saved level the model no longer supports is ignored in favor of the default.
+- The levels in a model option's label are exactly the levels the reasoning dropdown offers for that model, even when the dropdown is disabled because there are fewer than two.
 
 ## Strategic and Tactical Differences
 
@@ -65,6 +67,7 @@ Run, the key, the model, and the cost readout work in both theaters. In Tactical
 ## Related Documents
 
 - [right-panel.md](right-panel.md)
+- [right-panel-tools-tab.md](right-panel-tools-tab.md)
 - [modes-and-transitions.md](modes-and-transitions.md)
 - [notifications-and-feedback.md](notifications-and-feedback.md)
 - [new-game-dialog.md](new-game-dialog.md)
@@ -84,6 +87,7 @@ None.
 - `static/index.html` (`#openrouter-model-panel`, `#openrouter-key`, `#openrouter-cost`, `#openrouter-model`, `#openrouter-refresh-models`, `#openrouter-run-btn`, `#openrouter-new-btn`, `#openrouter-reasoning-effort`, `#openrouter-tactical-battles`, `#model-description-tooltip`)
 - `src/renderer/openRouter/openRouterControls.ts`
 - `src/renderer/openRouter/reasoningEffortSelect.ts`
+- `src/shared/openRouterModelDisplay.ts`
 - `src/shared/openRouterReasoningEffort.ts`
 - `src/renderer/openRouter/openRouterRuntime.ts`
 - `src/renderer/openRouter/openRouterUiHelpers.ts`

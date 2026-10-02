@@ -161,6 +161,43 @@ function testReasoningStatusParts(): void {
 }
 
 /**
+ * Verifies the reasoning level list: lowest first, abbreviated, default marked.
+
+ * Purpose: Locks the list form used whenever the model's selectable levels are known.
+ * When to use: After changing `formatReasoningStatusPart` or the effort abbreviation and ordering helpers.
+ * Expected outcome: Ascending abbreviated levels joined by `/`, `*` on the default, `none` dropped when mandatory,
+ * the full gateway list for `supported_efforts: null`, and the cost part first when present.
+ * Exceptions: None.
+ */
+function testReasoningLevelList(): void {
+  assert.equal(
+    formatModelOptionSuffix(
+      model({ reasoning: { supported_efforts: ['high', 'medium', 'low'], default_effort: 'medium' } })
+    ),
+    ' [reasoning: Low/Med*/High]'
+  );
+  assert.equal(
+    formatModelOptionSuffix(
+      model({ reasoning: { mandatory: true, supported_efforts: null, default_effort: 'high' } })
+    ),
+    ' [reasoning: Min/Low/Med/High*/Xhigh/Max]'
+  );
+  assert.equal(
+    formatModelOptionSuffix(model({ reasoning: { supported_efforts: null } })),
+    ' [reasoning: None/Min/Low/Med/High/Xhigh/Max]'
+  );
+  assert.equal(
+    formatModelOptionSuffix(
+      model({
+        pricing: { prompt: '0.000004', completion: '0.000005' },
+        reasoning: { supported_efforts: ['low', 'high'] },
+      })
+    ),
+    ' [$9.00/M, reasoning: Low/High]'
+  );
+}
+
+/**
  * Verifies full part order cost → reasoning status.
 
  * Purpose: Locks the bracket assembly order from the display contract.
@@ -251,6 +288,7 @@ function run(): void {
   testNeitherPrice();
   testNonFiniteRejected();
   testReasoningStatusParts();
+  testReasoningLevelList();
   testFullComboOrder();
   testCentsRounding();
   testLabelIgnoresDescription();

@@ -166,10 +166,14 @@ test('corrective message has four clauses, is last-retry only, and does not disa
   assert.match(text, /Never return an empty message/i);
   assert.ok(!/do not (use|call) tools|tool_choice|tools disabled/i.test(text));
   assert.equal(MALFORMED_COMPLETION_RETRY_LIMIT, 2);
-  const required = buildMalformedCompletionCorrectiveMessage(true);
+  const required = buildMalformedCompletionCorrectiveMessage('toolCall');
   assert.match(required, /single well-formed tool call/i);
   assert.ok(!required.includes('JSON object'), required);
   assert.match(required, /Never return an empty message/i);
+  const ordersOnly = buildMalformedCompletionCorrectiveMessage('orders');
+  assert.match(ordersOnly, /final orders as one JSON object/i);
+  assert.ok(!/well-formed tool call|exactly one of/i.test(ordersOnly), ordersOnly);
+  assert.match(ordersOnly, /Never return an empty message/i);
 });
 
 test('corrective message is appended only before the final malformed retry', async () => {

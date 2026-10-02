@@ -1,4 +1,10 @@
 import type { OpenRouterModel } from './ipc/openRouterTypes';
+import {
+  abbreviateReasoningEffort,
+  listSelectableReasoningEfforts,
+  resolveDefaultReasoningEffort,
+  sortReasoningEffortsAscending,
+} from './openRouterReasoningEffort';
 
 /**
  * Parses a pricing field into a finite per-token USD number when possible.
@@ -38,12 +44,24 @@ function formatUsdPerMillion(perMillion: number): string {
 /**
  * Builds the reasoning status phrase for a model option suffix when applicable.
 
- * Purpose: Summarizes default/mandatory reasoning for the Model-tab dropdown.
+ * Purpose: Shows which reasoning levels the model offers, so the player can compare models in the Model-tab dropdown.
  * When to use: Inside `formatModelOptionSuffix` after the optional cost part.
- * Expected outcome: `reasoning: <effort>`, `reasoning: default`, or `null` when off/unknown.
+ * Expected outcome: When `listSelectableReasoningEfforts` returns levels, `reasoning: Low/Med/High` style text: lowest
+ * first, abbreviated, slash-separated, with an asterisk appended to the default level. That list drops `none` when
+ * reasoning is mandatory and is the full gateway list for `supported_efforts: null`, and it is shown even when
+ * reasoning is not on by default. Without a list, `reasoning: <effort>` or `reasoning: default` when reasoning is on by
+ * default or mandatory, otherwise `null`.
  * Exceptions: None.
  */
 function formatReasoningStatusPart(model: OpenRouterModel): string | null {
+  const efforts = listSelectableReasoningEfforts(model);
+  if (efforts.length > 0) {
+    const defaultEffort = resolveDefaultReasoningEffort(model);
+    const labels = sortReasoningEffortsAscending(efforts).map(
+      (effort) => `${abbreviateReasoningEffort(effort)}${effort === defaultEffort ? '*' : ''}`
+    );
+    return `reasoning: ${labels.join('/')}`;
+  }
   const reasoning = model.reasoning;
   const enabled = reasoning?.default_enabled === true;
   const mandatory = reasoning?.mandatory === true;
@@ -59,7 +77,8 @@ function formatReasoningStatusPart(model: OpenRouterModel): string | null {
 
  * Purpose: Encodes optional cost and optional reasoning status into Model-tab list lines.
  * When to use: When rendering OpenRouter model `<option>` labels after a successful list fetch.
- * Expected outcome: `""`, `" [$…/M]"`, `" [reasoning: …]"`, or both parts joined; omit empty parts.
+ * Expected outcome: `""`, `" [$…/M]"`, `" [reasoning: Low/Med/High]"` (default level marked with an asterisk), or
+ * both parts joined (for example `" [$9.00/M, reasoning: Low/High]"`); omit empty parts.
  * Exceptions: None.
  */
 export function formatModelOptionSuffix(model: OpenRouterModel): string {

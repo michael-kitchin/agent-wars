@@ -169,6 +169,29 @@ function testEnvironmentFlagDisablesStructuredOutputs(): void {
 }
 
 /**
+ * Verifies tool support follows the model's advertised parameters.
+ *
+ * Purpose: A model without `tools` must be consulted without tools, and one without `tool_choice` must not receive it.
+ * When to use: After changing tool-support gating.
+ * Expected outcome: Each flag is `true` only when its parameter is listed.
+ * Exceptions: None.
+ */
+function testToolSupportFollowsAdvertisedParameters(): void {
+  const toolSupportFor = (supportedParameters: string[]): { toolCalling: boolean; toolChoice: boolean } => {
+    const profile = resolveOrdersRequestProfile({
+      modelId: 'm',
+      model: { id: 'm', supported_parameters: supportedParameters },
+      persistedReasoningEffort: '',
+      baseCompletionMaxTokens: BASE,
+    });
+    return { toolCalling: profile.toolCalling, toolChoice: profile.toolChoice };
+  };
+  assert.deepEqual(toolSupportFor(['tools', 'tool_choice']), { toolCalling: true, toolChoice: true });
+  assert.deepEqual(toolSupportFor(['tools']), { toolCalling: true, toolChoice: false });
+  assert.deepEqual(toolSupportFor(['response_format']), { toolCalling: false, toolChoice: false });
+}
+
+/**
  * Runs request-profile tests.
  *
  * Purpose: Node entrypoint for test discovery.
@@ -182,6 +205,7 @@ function run(): void {
   testDefaultEffortScalesWithoutBeingSent();
   testStructuredOutputsFollowAdvertisedParameters();
   testEnvironmentFlagDisablesStructuredOutputs();
+  testToolSupportFollowsAdvertisedParameters();
   console.log('ordersRequestProfile.test.ts passed');
 }
 

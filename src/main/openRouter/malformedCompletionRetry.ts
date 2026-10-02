@@ -8,6 +8,7 @@
  */
 
 import { logDebug, logError, logTrace } from '../logger';
+import type { OrderFlowAnswerShape } from './orderFlowRoundShape';
 
 /**
  * Maximum number of extra model calls spent recovering from malformed completions within one consultation.
@@ -125,16 +126,23 @@ export function isMalformedModelCompletion(completion: ModelCompletionShape): bo
  * Purpose: A plain re-send usually clears a one-off malformed reply; when it does not, naming the defect
  * gives the model a chance to choose a valid shape instead of repeating itself.
  * When to use: Only for the last retry, so earlier attempts keep the conversation byte-identical.
- * Pass `requireToolCall` when this round's `tool_choice` is `required`, so the note does not offer an envelope
- * the provider will refuse.
- * Expected outcome: A short user-role instruction valid for both strategic and tactical consultations.
+ * Pass the round's `answerShape`, so the note does not offer an envelope the provider will refuse while
+ * `tool_choice` is `required`, or a tool call when no tools are offered.
+ * Expected outcome: A short user-role instruction valid for both strategic and tactical consultations. The answer
+ * clause asks for a tool call, for the orders object, or for exactly one of the two.
  * Exceptions: None.
  */
-export function buildMalformedCompletionCorrectiveMessage(requireToolCall = false): string {
-  logTrace('openRouter buildMalformedCompletionCorrectiveMessage', { requireToolCall });
-  const responseShape = requireToolCall
-    ? 'a single well-formed tool call'
-    : 'exactly one of: a single well-formed tool call, or your final orders as one JSON object matching the schema in the system prompt';
+export function buildMalformedCompletionCorrectiveMessage(
+  answerShape: OrderFlowAnswerShape = 'toolCallOrOrders'
+): string {
+  logTrace('openRouter buildMalformedCompletionCorrectiveMessage', { answerShape });
+  const ordersAnswer = 'your final orders as one JSON object matching the schema in the system prompt';
+  const responseShape =
+    answerShape === 'toolCall'
+      ? 'a single well-formed tool call'
+      : answerShape === 'orders'
+        ? ordersAnswer
+        : `exactly one of: a single well-formed tool call, or ${ordersAnswer}`;
   return (
     'Your previous reply contained neither a tool call nor any text content, so it could not be used. ' +
     'Do not repeat that reply. Respond now with ' +
@@ -177,16 +185,24 @@ export async function resolveMalformedCompletionRetry(args: {
   tacticalBattleId: string | null;
   onLog?: (line: string, isError?: boolean) => void;
   /**
-   * Whether this round's `tool_choice` is `required`.
+   * Which answers this round's request allows.
    *
-   * Contract: Omit or pass `false` when the model may still submit the envelope.
-   * When to use: The tool loop passes the round's choice.
-   * Expected outcome: The final-retry note asks only for a tool call when `true`.
+   * Contract: Omit when the model may answer with either a tool call or the envelope.
+   * When to use: The tool loop passes the round's `answerShape`.
+   * Expected outcome: The final-retry note asks only for an answer of this shape.
    * Exceptions: None.
    */
-  requireToolCall?: boolean;
+  answerShape?: OrderFlowAnswerShape;
 }): Promise<MalformedCompletionRetryOutcome> {
-  const { completion, retryCount, iteration, turnNumber, tacticalBattleId, onLog, requireToolCall = false } = args;
+  const {
+    completion,
+    retryCount,
+    iteration,
+    turnNumber,
+    tacticalBattleId,
+    onLog,
+    answerShape = 'toolCallOrOrders',
+  } = args;
   if (!isMalformedModelCompletion(completion)) return { status: 'usable' };
 
   const diagnostics = {
@@ -212,7 +228,7 @@ export async function resolveMalformedCompletionRetry(args: {
   const nextRetryCount = retryCount + 1;
   const correctiveMessage =
     nextRetryCount === MALFORMED_COMPLETION_RETRY_LIMIT
-      ? buildMalformedCompletionCorrectiveMessage(requireToolCall)
+      ? buildMalformedCompletionCorrectiveMessage(answerShape)
       : null;
   logDebug('openRouter requestOrders: retrying after malformed completion', {
     ...diagnostics,

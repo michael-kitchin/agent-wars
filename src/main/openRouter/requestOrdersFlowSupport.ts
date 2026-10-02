@@ -3,7 +3,7 @@
  *
  * Purpose: Holds shared order-request helpers so `requestOrdersFlow.ts` stays within the file-size limit.
  * When to use: From the order flow, the tool loop, and tests that assert a helper directly.
- * Expected outcome: Log shapes, dedupe, and `tool_choice` selection live in one place.
+ * Expected outcome: Log shapes and dedupe live in one place.
  * Exceptions: `writeFullLogArtifact` catches IO errors and logs at error level.
  */
 
@@ -59,42 +59,6 @@ const FULL_RESPONSE_LOG_ENV_FLAG = 'AGENT_WARS_LOG_FULL_RESPONSES';
  * Exceptions: None.
  */
 export const REQUEST_ORDERS_MAX_WALL_CLOCK_MS = AI_CONSULTATION_WALL_CLOCK_MS;
-
-/**
- * `tool_choice` for one order-flow model round.
- *
- * Purpose: Names the two values the tool loop sends. The repair call uses `none` and does not go through this type.
- * When to use: `resolveOrderFlowToolChoice`.
- * Expected outcome: `required` forces a tool call; `auto` allows a tool call or the final envelope.
- * Exceptions: None.
- */
-export type OrderFlowToolChoice = 'required' | 'auto';
-
-/**
- * Chooses `tool_choice` for one order-flow round.
- *
- * Purpose: A consultation that offers tools must call one before it submits orders. `required` on every round would
- * forbid the envelope, and the loop would exhaust its round cap with no orders.
- * When to use: Each tool-loop round, including malformed-completion retries. Not the repair call.
- * Expected outcome: `required` when `toolCount` is positive, no tool has been called yet, and this model has not rejected
- * `required`; `auto` otherwise.
- * Exceptions: None.
- */
-export function resolveOrderFlowToolChoice(
-  toolCount: number,
-  hasCalledTool: boolean,
-  requiredToolChoiceRejected = false
-): OrderFlowToolChoice {
-  const toolChoice: OrderFlowToolChoice =
-    toolCount > 0 && !hasCalledTool && !requiredToolChoiceRejected ? 'required' : 'auto';
-  logTrace('requestOrdersFlowSupport resolveOrderFlowToolChoice', {
-    toolCount,
-    hasCalledTool,
-    requiredToolChoiceRejected,
-    toolChoice,
-  });
-  return toolChoice;
-}
 
 /**
  * Maximum model rounds in one consultation, including tool calls.
@@ -431,6 +395,24 @@ export function logResponsePreview(label: string, content: string): void {
     chars: content.length,
     fullLogEnvFlag: FULL_RESPONSE_LOG_ENV_FLAG,
   });
+}
+
+/**
+ * Builds a concise comma-separated tool-name list for the OpenRouter sidebar log.
+ *
+ * Purpose: Keeps per-round log lines readable when the model issues many parallel tool calls.
+ * When to use: After each assistant message that includes `tool_calls`.
+ * Expected outcome: Single-line fragment; truncates with a count suffix when the list exceeds `maxNames`.
+ * Exceptions: None.
+ */
+export function summarizeToolCallNamesForAiLog(
+  toolCalls: ReadonlyArray<{ function: { name: string } }>,
+  maxNames: number
+): string {
+  logTrace('requestOrdersFlowSupport summarizeToolCallNamesForAiLog', { toolCallCount: toolCalls.length, maxNames });
+  const names = toolCalls.map((tc) => tc.function.name);
+  if (names.length <= maxNames) return names.join(', ');
+  return `${names.slice(0, maxNames).join(', ')} (+${names.length - maxNames} more)`;
 }
 
 /**

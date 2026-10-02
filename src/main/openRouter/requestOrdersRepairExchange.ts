@@ -67,7 +67,8 @@ export interface ParseRepairExchangeArgs {
    *
    * Contract: Same model as the main loop.
    * When to use: Repair chat `model` field.
-   * Expected outcome: One extra completion with `tool_choice: 'none'`.
+   * Expected outcome: One extra completion, with `tool_choice: 'none'` when tools were offered and the model accepts
+   * `tool_choice`.
    * Exceptions: None.
    */
   readonly modelId: string;
@@ -112,7 +113,8 @@ export interface ParseRepairExchangeArgs {
    *
    * Contract: Same dependency as the main loop.
    * When to use: The single repair post with `requestLabel: 'requestOrders repair'`.
-   * Expected outcome: Tools are omitted; `tool_choice` is `'none'`.
+   * Expected outcome: Tools are omitted; `tool_choice` is `'none'` only when tools were offered and the model
+   * accepts it.
    * Exceptions: None.
    */
   readonly postOpenRouterChatWithTimeoutAndRetry: RequestOrdersFlowDeps['postOpenRouterChatWithTimeoutAndRetry'];
@@ -129,11 +131,22 @@ export interface ParseRepairExchangeArgs {
    * Reasoning and structured-output settings for the repair call.
    *
    * Contract: Same settings object the main loop used.
-   * When to use: Passed to `postOrdersChatRequest` for the repair post.
-   * Expected outcome: The repair call sends the same optional parameters as the main rounds.
+   * When to use: Passed to `postOrdersChatRequest` for the repair post, and read for `tool_choice` support.
+   * Expected outcome: The repair call sends the same reasoning option as the main rounds, and the schema is always
+   * allowed on it.
    * Exceptions: None.
    */
   readonly requestSettings: OrdersChatRequestSettings;
+  /**
+   * Whether the main loop offered tools.
+   *
+   * Contract: `true` when the main loop sent a non-empty tool list.
+   * When to use: Deciding whether the repair call refuses tools with `tool_choice: 'none'`.
+   * Expected outcome: When `false`, no `tool_choice` is sent, because a model without tool support may not be routable
+   * with one.
+   * Exceptions: None.
+   */
+  readonly toolsOffered: boolean;
 }
 
 /**
@@ -145,19 +158,23 @@ export interface ParseRepairExchangeArgs {
  * Exceptions: `JSON.parse` of a successful body may throw; callers should let that surface to the outer catch.
  */
 export async function runParseRepairExchange(args: ParseRepairExchangeArgs): Promise<string | null> {
-  logDebug('openRouter runParseRepairExchange', {
-    messageCount: args.messages.length,
-    unparseableChars: args.unparseableContent.length,
-    tacticalBattleId: args.tacticalBattleId,
-    coordinateMode: args.repairGates.coordinateMode,
-  });
   const {
     onLog,
     postOpenRouterChatWithTimeoutAndRetry,
     usage,
     resolveOrderFlowMaxTokens,
     requestSettings,
+    toolsOffered,
   } = args;
+  const sendNoneToolChoice = toolsOffered && requestSettings.profile.toolChoice;
+  logDebug('openRouter runParseRepairExchange', {
+    messageCount: args.messages.length,
+    unparseableChars: args.unparseableContent.length,
+    tacticalBattleId: args.tacticalBattleId,
+    coordinateMode: args.repairGates.coordinateMode,
+    toolsOffered,
+    sendNoneToolChoice,
+  });
   if (onLog) onLog('Orders JSON was not parseable; sending one repair user message (no tools, separate API call).');
   const repairMessages: RequestOrdersChatMessage[] = [
     ...args.messages,
@@ -172,8 +189,14 @@ export async function runParseRepairExchange(args: ParseRepairExchangeArgs): Pro
     post: postOpenRouterChatWithTimeoutAndRetry,
     key: args.key,
     modelId: args.modelId,
-    baseBody: { model: args.modelId, messages: repairMessages, max_tokens: repairMaxTokens, tool_choice: 'none' },
+    baseBody: {
+      model: args.modelId,
+      messages: repairMessages,
+      max_tokens: repairMaxTokens,
+      ...(sendNoneToolChoice ? { tool_choice: 'none' } : {}),
+    },
     settings: requestSettings,
+    attachResponseFormat: true,
     signal: args.signal,
     onLog,
     requestLabel: 'requestOrders repair',

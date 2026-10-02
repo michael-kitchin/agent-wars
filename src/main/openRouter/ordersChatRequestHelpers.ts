@@ -32,7 +32,8 @@ export interface OrdersChatRequestSettings {
    *
    * Contract: Non-null only when the model supports structured outputs.
    * When to use: Read by `postOrdersChatRequest`.
-   * Expected outcome: Attached with the response-healing plugin unless the model rejected it this session.
+   * Expected outcome: Attached, with the response-healing plugin, to requests whose caller passes
+   * `attachResponseFormat: true`, unless the model rejected it this session.
    * Exceptions: None.
    */
   readonly responseFormat: Readonly<Record<string, unknown>> | null;
@@ -77,10 +78,10 @@ function isRequiredToolChoiceRejection(result: OpenRouterChatTransportResult): b
  * Purpose: One place that adds `reasoning`, `response_format`, and response healing, and recovers when a provider
  * rejects the schema.
  * When to use: Every tool-loop round and the repair call.
- * Expected outcome: Adds `reasoning: { effort }` when the profile has an override. When `responseFormat` is set and
- * the model has not rejected it this session, adds `response_format` and the healing plugin. If that request fails
- * with 400, 404, or 422, retries once without those two fields. If a request that sent `tool_choice: required` fails
- * because the provider rejected that choice, retries once with `auto`. A model is marked only when the retry that
+ * Expected outcome: Adds `reasoning: { effort }` when the profile has an override. When `attachResponseFormat` is true,
+ * `responseFormat` is set, and the model has not rejected it this session, adds `response_format` and the healing
+ * plugin. If that request fails with 400, 404, or 422, retries once without those two fields. If a request that sent
+ * `tool_choice: required` fails because the provider rejected that choice, retries once with `auto`. A model is marked only when the retry that
  * dropped the rejected option succeeds. Both refusals are common, so they reach `onLog` as ordinary lines and the
  * debug log at info level. Returns the transport result of the last request made.
  * Exceptions: None; transport failures resolve as `{ ok: false }`.
@@ -91,11 +92,12 @@ export async function postOrdersChatRequest(args: {
   readonly modelId: string;
   readonly baseBody: Readonly<Record<string, unknown>>;
   readonly settings: OrdersChatRequestSettings;
+  readonly attachResponseFormat: boolean;
   readonly signal?: AbortSignal;
   readonly onLog?: (line: string, isError?: boolean) => void;
   readonly requestLabel: string;
 }): Promise<OpenRouterChatTransportResult> {
-  const { post, key, modelId, baseBody, settings, signal, onLog, requestLabel } = args;
+  const { post, key, modelId, baseBody, settings, attachResponseFormat, signal, onLog, requestLabel } = args;
   const reasoningEffort = settings.profile.reasoningEffort;
   const bodyWithReasoning: Record<string, unknown> =
     reasoningEffort === null ? { ...baseBody } : { ...baseBody, reasoning: { effort: reasoningEffort } };
@@ -104,11 +106,13 @@ export async function postOrdersChatRequest(args: {
     requiredToolChoiceRejected && bodyWithReasoning.tool_choice === 'required'
       ? { ...bodyWithReasoning, tool_choice: 'auto' }
       : bodyWithReasoning;
-  const useStructuredOutputs = settings.responseFormat !== null && !isStructuredOutputsRejectedForModel(modelId);
+  const useStructuredOutputs =
+    attachResponseFormat && settings.responseFormat !== null && !isStructuredOutputsRejectedForModel(modelId);
   logDebug('ordersChatRequestHelpers postOrdersChatRequest', {
     requestLabel,
     modelId,
     reasoningEffort,
+    attachResponseFormat,
     structuredOutputs: useStructuredOutputs,
     toolChoice: requestBody.tool_choice ?? null,
   });

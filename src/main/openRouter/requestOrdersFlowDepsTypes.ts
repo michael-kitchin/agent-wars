@@ -98,11 +98,13 @@ export interface RequestOrdersFlowDeps {
    */
   postOpenRouterChatWithTimeoutAndRetry: OpenRouterChatTransport;
   /**
-   * Resolves the reasoning effort, structured-output support, and completion budget for a model.
+   * Resolves the reasoning effort, structured-output support, tool support, and completion budget for a model.
    *
-   * Contract: Optional; when omitted the flow uses the baseline profile (no `reasoning`, no `response_format`).
-   * When to use: Once per consultation, before the first chat request.
-   * Expected outcome: A profile that request helpers apply to every round and the repair call.
+   * Contract: Optional; when omitted the flow uses the baseline profile (no `reasoning`, no `response_format`, tools and
+   * `tool_choice` assumed supported).
+   * When to use: Once per consultation, before the prompt and tool list are built.
+   * Expected outcome: A profile that decides whether tools are offered and that request helpers apply to every round
+   * and the repair call.
    * Exceptions: None.
    */
   resolveOrdersRequestProfile?: (modelId: string) => OrdersRequestProfile;

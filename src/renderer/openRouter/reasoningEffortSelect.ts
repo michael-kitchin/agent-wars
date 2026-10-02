@@ -1,5 +1,6 @@
 import type { OpenRouterModel } from '../../shared/ipc/openRouterTypes';
 import {
+  capitalizeReasoningEffortName,
   isReasoningEffortSelectable,
   listSelectableReasoningEfforts,
   resolveDefaultReasoningEffort,
@@ -28,18 +29,6 @@ export interface ReasoningEffortSelectBinding {
 }
 
 /**
- * Capitalizes the first letter of a reasoning option name.
- *
- * Purpose: Vendor effort ids arrive in lowercase; the dropdown shows them as names.
- * When to use: Formatting a dropdown option.
- * Expected outcome: `high` becomes `High`. An empty string stays empty.
- * Exceptions: None.
- */
-function capitalizeReasoningOptionName(name: string): string {
-  return name.length === 0 ? name : name.charAt(0).toUpperCase() + name.slice(1);
-}
-
-/**
  * Formats one reasoning option label.
  *
  * Purpose: Keeps the option text consistent between the default and the other levels.
@@ -48,7 +37,7 @@ function capitalizeReasoningOptionName(name: string): string {
  * Exceptions: None.
  */
 function formatReasoningEffortOptionLabel(effort: string, isDefault: boolean): string {
-  const label = capitalizeReasoningOptionName(effort);
+  const label = capitalizeReasoningEffortName(effort);
   return isDefault ? `${label} (default)` : label;
 }
 
@@ -78,7 +67,7 @@ export function attachReasoningEffortSelect(args: {
       currentDefault = defaultEffort;
       select.replaceChildren();
       if (efforts.length === 0 || defaultEffort === null) {
-        select.appendChild(new Option(capitalizeReasoningOptionName('model default'), ''));
+        select.appendChild(new Option(capitalizeReasoningEffortName('model default'), ''));
       }
       efforts.forEach((effort) => {
         select.appendChild(new Option(formatReasoningEffortOptionLabel(effort, effort === defaultEffort), effort));

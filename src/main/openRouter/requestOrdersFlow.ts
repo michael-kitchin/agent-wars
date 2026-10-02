@@ -24,6 +24,7 @@ import { getInitialUserMessage } from './promptText';
 import { SECTION_TITLE_BEST_OPTIONS_THIS_TURN } from './promptSpec/sectionHeadings';
 import { resolveEffectiveOpenRouterCompletionMaxTokens } from './openRouterCreditLimits';
 import { BASELINE_ORDERS_REQUEST_PROFILE } from './ordersRequestProfile';
+import { recordNoToolCallingNoticeForModel } from './openRouterModelCapabilities';
 import type { OrdersChatRequestSettings } from './ordersChatRequestHelpers';
 import { buildOrdersEnvelopeResponseFormat } from './promptSpec/envelopeJsonSchema';
 import { ASSESSMENT_TOOL_NAMES } from '../tools/assessment';
@@ -54,12 +55,14 @@ import { maybeApplyTacticalLightPrecomputeToolAllowlist } from './tacticalLightP
 export type { RequestOrdersError, RequestOrdersOptions, RequestOrdersResult } from './requestOrdersFlowTypes';
 
 /**
- * Defines the `requestOrdersFlow` function shape (export async function requestOrdersFlow( deps: RequestOrdersFlowDeps, state: GameStateSnapshot, modelId: string, options?: RequestOrdersOptions ):).
-
- * Purpose: Supports maintainability by documenting why `requestOrdersFlow` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
+ * Asks the selected model for this turn's opponent orders.
+ *
+ * Purpose: Runs one AI consultation: builds the prompt, runs the tool loop, parses (with one repair), and applies the
+ * orders.
+ * When to use: Called by `requestOrders` with production deps, or by tests with fakes.
+ * Expected outcome: A success result with orders and telemetry, or a failure result. A model without tool support is
+ * consulted as if every tool group were off.
+ * Exceptions: None; failures and cancellation resolve as `{ success: false }`.
  */
 export async function requestOrdersFlow(
   deps: RequestOrdersFlowDeps,
@@ -147,6 +150,18 @@ export async function requestOrdersFlow(
     logDebug('openRouter requestOrders: no opponent units remain, skipping LLM call');
     if (onLog) onLog('No opponent units remain.');
     return { success: true, orders: [] };
+  }
+
+  const requestProfile = resolveOrdersRequestProfile?.(modelId) ?? BASELINE_ORDERS_REQUEST_PROFILE;
+  if (!requestProfile.toolCalling && (enabledToolNames === undefined || enabledToolNames.length > 0)) {
+    logDebug('openRouter requestOrders: model does not support tool calls; consulting without tools', {
+      modelId,
+      droppedToolCount: enabledToolNames === undefined ? 'all' : enabledToolNames.length,
+    });
+    if (onLog && recordNoToolCallingNoticeForModel(modelId)) {
+      onLog('This model does not support tool calls; planning without tools.');
+    }
+    enabledToolNames = [];
   }
 
   const hexList = planState.hexes.map((h) => h.h3Index);
@@ -329,7 +344,6 @@ export async function requestOrdersFlow(
   });
   logDebug('openRouter requestOrders: starting tool loop', { turnNumber: state.turnNumber });
 
-  const requestProfile = resolveOrdersRequestProfile?.(modelId) ?? BASELINE_ORDERS_REQUEST_PROFILE;
   /**
    * Both tactical and strategic final-json passes can emit large `orders[]` (many units + subscriptions + production).
    * Prefer a high completion budget (raised for high reasoning efforts), but clamp to any session affordable cap
@@ -347,7 +361,7 @@ export async function requestOrdersFlow(
   /**
    * JSON envelope gates shared by the structured-output schema and the repair prompt.
    *
-   * Purpose: The schema sent on every round and the repair schema text must describe the same fields.
+   * Purpose: The schema sent on schema-eligible rounds and the repair schema text must describe the same fields.
    * When to use: Building `requestSettings` and the repair exchange.
    * Expected outcome: Matches the system prompt's final JSON contract for this consultation.
    */
@@ -359,9 +373,10 @@ export async function requestOrdersFlow(
     includeStandingOrderActions: flags.ordersEnabled && !tacticalBattle,
   };
   /**
-   * Optional request parameters sent identically on every tool-loop round and the repair call.
+   * Optional request parameters shared by every tool-loop round and the repair call.
    *
-   * Purpose: Resolves reasoning effort and structured outputs once per consultation.
+   * Purpose: Resolves reasoning effort and structured outputs once per consultation; the tool loop decides per round
+   * whether the schema is attached.
    * When to use: Passed to the tool loop and the repair exchange.
    * Expected outcome: Baseline settings for models missing from the capability cache.
    */
@@ -448,6 +463,7 @@ export async function requestOrdersFlow(
         postOpenRouterChatWithTimeoutAndRetry,
         resolveOrderFlowMaxTokens,
         requestSettings,
+        toolsOffered: tools.length > 0,
       });
       if (repairContent) {
         parsed = parseOrdersResponse(

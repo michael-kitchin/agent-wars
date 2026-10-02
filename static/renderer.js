@@ -23520,6 +23520,53 @@
     return { handleBuildEntryClick: handleBuildEntryClick2, hideBuildPopup: hideBuildPopup2, showBuildPopup: showBuildPopup2, refreshBuildPopupIfOpen: refreshBuildPopupIfOpen2 };
   }
 
+  // src/shared/openRouterReasoningEffort.ts
+  var OPENROUTER_GATEWAY_REASONING_EFFORTS = Object.freeze([
+    "max",
+    "xhigh",
+    "high",
+    "medium",
+    "low",
+    "minimal",
+    "none"
+  ]);
+  var REASONING_EFFORT_ABBREVIATIONS = /* @__PURE__ */ new Map([
+    ["none", "None"],
+    ["minimal", "Min"],
+    ["low", "Low"],
+    ["medium", "Med"],
+    ["high", "High"],
+    ["xhigh", "Xhigh"],
+    ["max", "Max"]
+  ]);
+  function capitalizeReasoningEffortName(effort) {
+    return effort.length === 0 ? effort : effort.charAt(0).toUpperCase() + effort.slice(1);
+  }
+  function abbreviateReasoningEffort(effort) {
+    return REASONING_EFFORT_ABBREVIATIONS.get(effort) ?? capitalizeReasoningEffortName(effort);
+  }
+  function sortReasoningEffortsAscending(efforts) {
+    const rank = (effort) => OPENROUTER_GATEWAY_REASONING_EFFORTS.indexOf(effort);
+    return [...efforts].sort((a, b) => rank(b) - rank(a));
+  }
+  function listSelectableReasoningEfforts(model) {
+    const reasoning = model?.reasoning;
+    if (!reasoning || reasoning.supported_efforts === void 0) return [];
+    const source = reasoning.supported_efforts ?? OPENROUTER_GATEWAY_REASONING_EFFORTS;
+    return reasoning.mandatory === true ? source.filter((effort) => effort !== "none") : [...source];
+  }
+  function resolveDefaultReasoningEffort(model) {
+    const defaultEffort = model?.reasoning?.default_effort;
+    return defaultEffort !== void 0 && listSelectableReasoningEfforts(model).includes(defaultEffort) ? defaultEffort : null;
+  }
+  function resolveRequestedReasoningEffort(model, persistedEffort) {
+    const trimmed = persistedEffort.trim();
+    return trimmed && listSelectableReasoningEfforts(model).includes(trimmed) ? trimmed : null;
+  }
+  function isReasoningEffortSelectable(model) {
+    return listSelectableReasoningEfforts(model).length >= 2;
+  }
+
   // src/shared/openRouterModelDisplay.ts
   function parseFinitePrice(value) {
     if (value === null || value === void 0) return null;
@@ -23539,6 +23586,14 @@
     return (Math.round(perMillion * 100) / 100).toFixed(2);
   }
   function formatReasoningStatusPart(model) {
+    const efforts = listSelectableReasoningEfforts(model);
+    if (efforts.length > 0) {
+      const defaultEffort = resolveDefaultReasoningEffort(model);
+      const labels = sortReasoningEffortsAscending(efforts).map(
+        (effort2) => `${abbreviateReasoningEffort(effort2)}${effort2 === defaultEffort ? "*" : ""}`
+      );
+      return `reasoning: ${labels.join("/")}`;
+    }
     const reasoning = model.reasoning;
     const enabled = reasoning?.default_enabled === true;
     const mandatory = reasoning?.mandatory === true;
@@ -23744,40 +23799,9 @@
     return { clear };
   }
 
-  // src/shared/openRouterReasoningEffort.ts
-  var OPENROUTER_GATEWAY_REASONING_EFFORTS = Object.freeze([
-    "max",
-    "xhigh",
-    "high",
-    "medium",
-    "low",
-    "minimal",
-    "none"
-  ]);
-  function listSelectableReasoningEfforts(model) {
-    const reasoning = model?.reasoning;
-    if (!reasoning || reasoning.supported_efforts === void 0) return [];
-    const source = reasoning.supported_efforts ?? OPENROUTER_GATEWAY_REASONING_EFFORTS;
-    return reasoning.mandatory === true ? source.filter((effort) => effort !== "none") : [...source];
-  }
-  function resolveDefaultReasoningEffort(model) {
-    const defaultEffort = model?.reasoning?.default_effort;
-    return defaultEffort !== void 0 && listSelectableReasoningEfforts(model).includes(defaultEffort) ? defaultEffort : null;
-  }
-  function resolveRequestedReasoningEffort(model, persistedEffort) {
-    const trimmed = persistedEffort.trim();
-    return trimmed && listSelectableReasoningEfforts(model).includes(trimmed) ? trimmed : null;
-  }
-  function isReasoningEffortSelectable(model) {
-    return listSelectableReasoningEfforts(model).length >= 2;
-  }
-
   // src/renderer/openRouter/reasoningEffortSelect.ts
-  function capitalizeReasoningOptionName(name) {
-    return name.length === 0 ? name : name.charAt(0).toUpperCase() + name.slice(1);
-  }
   function formatReasoningEffortOptionLabel(effort, isDefault) {
-    const label = capitalizeReasoningOptionName(effort);
+    const label = capitalizeReasoningEffortName(effort);
     return isDefault ? `${label} (default)` : label;
   }
   function attachReasoningEffortSelect(args) {
@@ -23793,7 +23817,7 @@
         currentDefault = defaultEffort;
         select.replaceChildren();
         if (efforts.length === 0 || defaultEffort === null) {
-          select.appendChild(new Option(capitalizeReasoningOptionName("model default"), ""));
+          select.appendChild(new Option(capitalizeReasoningEffortName("model default"), ""));
         }
         efforts.forEach((effort) => {
           select.appendChild(new Option(formatReasoningEffortOptionLabel(effort, effort === defaultEffort), effort));

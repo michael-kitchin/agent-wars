@@ -34,6 +34,16 @@ const structuredOutputsRejectedModelIds = new Set<string>();
 const requiredToolChoiceRejectedModelIds = new Set<string>();
 
 /**
+ * Model ids whose activity-log notice about missing tool support was already shown this session.
+ *
+ * Purpose: A model without tool support is consulted every turn; the player needs the notice once, not every turn.
+ * When to use: Written and read by `recordNoToolCallingNoticeForModel`.
+ * Expected outcome: Cleared only on app restart (or by the test reset).
+ * Exceptions: None.
+ */
+const noToolCallingNoticeModelIds = new Set<string>();
+
+/**
  * Replaces the cached capabilities with a freshly fetched models list.
  *
  * Purpose: Keeps main-process request tuning in step with the list the player chose from.
@@ -103,6 +113,39 @@ export function supportsStructuredOutputs(model: OpenRouterModel | undefined): b
 }
 
 /**
+ * Reports whether a model may be offered tools.
+ *
+ * Purpose: OpenRouter routes only to providers that accept every request parameter, so sending `tools` to a model
+ * without tool support can fail with "no endpoints found". Such a model is consulted with no tools at all.
+ * When to use: When resolving the request profile.
+ * Expected outcome: `true` when `supported_parameters` lists `tools`, and also when the model or its list is unknown.
+ * Unlike `supportsStructuredOutputs`, unknown counts as supported: wrongly reporting "no tools" would strip every tool
+ * and every tool-gated envelope field from the consultation, while treating it as supported keeps the request shape
+ * these models already get.
+ * Exceptions: None.
+ */
+export function supportsToolCalling(model: OpenRouterModel | undefined): boolean {
+  logTrace('openRouterModelCapabilities supportsToolCalling', { modelId: model?.id ?? null });
+  const parameters = model?.supported_parameters;
+  return parameters === undefined || parameters.includes('tools');
+}
+
+/**
+ * Reports whether a model's requests may carry `tool_choice`.
+ *
+ * Purpose: A model can accept `tools` without accepting `tool_choice`; sending it would narrow routing the same way.
+ * When to use: When resolving the request profile.
+ * Expected outcome: `true` when `supported_parameters` lists `tool_choice`, and also when the model or its list is
+ * unknown, for the same reason as `supportsToolCalling`.
+ * Exceptions: None.
+ */
+export function supportsToolChoice(model: OpenRouterModel | undefined): boolean {
+  logTrace('openRouterModelCapabilities supportsToolChoice', { modelId: model?.id ?? null });
+  const parameters = model?.supported_parameters;
+  return parameters === undefined || parameters.includes('tool_choice');
+}
+
+/**
  * Records that a model's provider rejected the structured-output request.
  *
  * Purpose: Stops sending the schema to that model for the rest of the session.
@@ -155,11 +198,27 @@ export function isRequiredToolChoiceRejectedForModel(modelId: string): boolean {
 }
 
 /**
- * Clears the capability cache and the rejection sets.
+ * Records that the missing-tool-support notice is being shown for a model.
+ *
+ * Purpose: Lets the order flow show that activity-log notice once per model per session.
+ * When to use: When a consultation drops its tools because the model does not support them, before logging the notice.
+ * Expected outcome: `true` only on the first call for a model id in this session; `false` afterward, so the caller
+ * shows the notice once.
+ * Exceptions: None.
+ */
+export function recordNoToolCallingNoticeForModel(modelId: string): boolean {
+  const firstThisSession = !noToolCallingNoticeModelIds.has(modelId);
+  noToolCallingNoticeModelIds.add(modelId);
+  logDebug('openRouterModelCapabilities recordNoToolCallingNoticeForModel', { modelId, firstThisSession });
+  return firstThisSession;
+}
+
+/**
+ * Clears the capability cache, the rejection sets, and the notice set.
  *
  * Purpose: Test isolation for modules that read this state.
- * When to use: At the start of each test that depends on capabilities or rejections.
- * Expected outcome: The capability cache and both rejection sets are empty.
+ * When to use: At the start of each test that depends on capabilities, rejections, or notices.
+ * Expected outcome: The capability cache, both rejection sets, and the missing-tool-support notice set are empty.
  * Exceptions: None.
  */
 export function resetOpenRouterModelCapabilitiesForTests(): void {
@@ -167,4 +226,5 @@ export function resetOpenRouterModelCapabilitiesForTests(): void {
   modelsById.clear();
   structuredOutputsRejectedModelIds.clear();
   requiredToolChoiceRejectedModelIds.clear();
+  noToolCallingNoticeModelIds.clear();
 }

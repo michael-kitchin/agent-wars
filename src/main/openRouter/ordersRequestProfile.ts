@@ -5,7 +5,12 @@ import {
   resolveRequestedReasoningEffort,
 } from '../../shared/openRouterReasoningEffort';
 import { OPENROUTER_ORDER_FLOW_COMPLETION_MAX_TOKENS } from './openRouterCreditLimits';
-import { isStructuredOutputsDisabledByEnvironment, supportsStructuredOutputs } from './openRouterModelCapabilities';
+import {
+  isStructuredOutputsDisabledByEnvironment,
+  supportsStructuredOutputs,
+  supportsToolCalling,
+  supportsToolChoice,
+} from './openRouterModelCapabilities';
 
 /**
  * Per-consultation request settings derived from the model's capabilities and the player's reasoning choice.
@@ -46,6 +51,25 @@ export interface OrdersRequestProfile {
    */
   readonly structuredOutputs: boolean;
   /**
+   * Whether the consultation may offer tools.
+   *
+   * Contract: `false` only when the cached model's `supported_parameters` omits `tools`; `true` for unknown models.
+   * When to use: Before building the prompt and tool list.
+   * Expected outcome: When `false`, the flow consults with no tool groups enabled and sends no `tools`.
+   * Exceptions: None.
+   */
+  readonly toolCalling: boolean;
+  /**
+   * Whether requests may carry `tool_choice`.
+   *
+   * Contract: `false` only when the cached model's `supported_parameters` omits `tool_choice`; `true` for unknown
+   * models.
+   * When to use: Choosing each round's `tool_choice` and the repair call's `tool_choice: none`.
+   * Expected outcome: When `false`, no `tool_choice` field is sent and the provider default applies.
+   * Exceptions: None.
+   */
+  readonly toolChoice: boolean;
+  /**
    * Preferred `max_tokens` before the session credit clamp.
    *
    * Contract: At least the base order-flow budget; raised for high efforts when the model's output limit is known.
@@ -61,13 +85,16 @@ export interface OrdersRequestProfile {
  *
  * Purpose: Unknown models get the same request bodies as before capability tuning existed.
  * When to use: When no profile resolver is wired, or the model is not in the capability cache.
- * Expected outcome: No `reasoning`, no `response_format`, and the base order-flow budget.
+ * Expected outcome: No `reasoning`, no `response_format`, tools and `tool_choice` assumed supported, and the base
+ * order-flow budget.
  * Exceptions: None.
  */
 export const BASELINE_ORDERS_REQUEST_PROFILE: OrdersRequestProfile = Object.freeze({
   reasoningEffort: null,
   effectiveReasoningEffort: null,
   structuredOutputs: false,
+  toolCalling: true,
+  toolChoice: true,
   preferredCompletionMaxTokens: OPENROUTER_ORDER_FLOW_COMPLETION_MAX_TOKENS,
 });
 
@@ -127,6 +154,8 @@ export function resolveOrdersRequestProfile(input: {
         reasoningEffort: resolveRequestedReasoningEffort(model, persistedReasoningEffort),
         effectiveReasoningEffort,
         structuredOutputs: supportsStructuredOutputs(model),
+        toolCalling: supportsToolCalling(model),
+        toolChoice: supportsToolChoice(model),
         preferredCompletionMaxTokens: scaleCompletionMaxTokensForReasoningEffort(
           baseCompletionMaxTokens,
           effectiveReasoningEffort,
@@ -142,6 +171,8 @@ export function resolveOrdersRequestProfile(input: {
     effectiveReasoningEffort: profile.effectiveReasoningEffort,
     structuredOutputs: profile.structuredOutputs,
     structuredOutputsDisabledByEnvironment: isStructuredOutputsDisabledByEnvironment(),
+    toolCalling: profile.toolCalling,
+    toolChoice: profile.toolChoice,
     preferredCompletionMaxTokens: profile.preferredCompletionMaxTokens,
   });
   return profile;

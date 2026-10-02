@@ -29,9 +29,10 @@ import {
   REQUEST_ORDERS_MAX_TOOL_ROUNDS,
   REQUEST_ORDERS_MAX_WALL_CLOCK_MS,
   logResponsePreview,
-  resolveOrderFlowToolChoice,
+  summarizeToolCallNamesForAiLog,
   type AiPathfindingSessionMetrics,
 } from './requestOrdersFlowSupport';
+import { resolveOrderFlowRoundShape } from './orderFlowRoundShape';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 
 /**
@@ -262,11 +263,12 @@ export interface RequestOrdersToolLoopArgs {
    */
   readonly resolveOrderFlowMaxTokens: () => number;
   /**
-   * Reasoning and structured-output settings for every round.
+   * Reasoning, structured-output, and tool-support settings for every round.
    *
    * Contract: Same settings object the repair exchange receives.
-   * When to use: Passed to `postOrdersChatRequest` on each round.
-   * Expected outcome: Every round sends identical optional parameters.
+   * When to use: Passed to `postOrdersChatRequest` on each round, and read for `tool_choice` support.
+   * Expected outcome: The reasoning option is identical on every round; the schema is attached only on rounds that
+   * `resolveOrderFlowRoundShape` allows.
    * Exceptions: None.
    */
   readonly requestSettings: OrdersChatRequestSettings;
@@ -312,23 +314,6 @@ export type RequestOrdersToolLoopResult =
       readonly kind: 'budgetExceeded';
       readonly iteration: number;
     };
-
-/**
- * Builds a concise comma-separated tool-name list for the OpenRouter sidebar log.
- *
- * Purpose: Keeps per-round log lines readable when the model issues many parallel tool calls.
- * When to use: After each assistant message that includes `tool_calls`.
- * Expected outcome: Single-line fragment; truncates with a count suffix when the list exceeds `maxNames`.
- * Exceptions: None.
- */
-function summarizeToolCallNamesForAiLog(
-  toolCalls: ReadonlyArray<{ function: { name: string } }>,
-  maxNames: number
-): string {
-  const names = toolCalls.map((tc) => tc.function.name);
-  if (names.length <= maxNames) return names.join(', ');
-  return `${names.slice(0, maxNames).join(', ')} (+${names.length - maxNames} more)`;
-}
 
 /**
  * Runs model rounds until the assistant submits text, the request fails, or the round cap is hit.
@@ -394,21 +379,33 @@ export async function runRequestOrdersToolLoop(
       );
     }
     const completionMaxTokens = resolveOrderFlowMaxTokens();
-    const requiredToolChoiceRejected = isRequiredToolChoiceRejectedForModel(modelId);
-    const toolChoice = resolveOrderFlowToolChoice(tools.length, hasCalledTool, requiredToolChoiceRejected);
-    logDebug('openRouter requestOrders: round tool choice', {
-      iteration,
-      toolChoice,
+    const roundShape = resolveOrderFlowRoundShape({
       toolCount: tools.length,
       hasCalledTool,
-      requiredToolChoiceRejected,
+      requiredToolChoiceRejected: isRequiredToolChoiceRejectedForModel(modelId),
+      toolChoiceSupported: requestSettings.profile.toolChoice,
+    });
+    logDebug('openRouter requestOrders: round request shape', {
+      iteration,
+      toolChoice: roundShape.toolChoice,
+      attachResponseFormat: roundShape.attachResponseFormat,
+      answerShape: roundShape.answerShape,
+      toolCount: tools.length,
+      hasCalledTool,
     });
     const chatResponse = await postOrdersChatRequest({
       post: postOpenRouterChatWithTimeoutAndRetry,
       key,
       modelId,
-      baseBody: { model: modelId, messages, max_tokens: completionMaxTokens, tools, tool_choice: toolChoice },
+      baseBody: {
+        model: modelId,
+        messages,
+        max_tokens: completionMaxTokens,
+        ...(tools.length > 0 ? { tools } : {}),
+        ...(roundShape.toolChoice !== null ? { tool_choice: roundShape.toolChoice } : {}),
+      },
       settings: requestSettings,
+      attachResponseFormat: roundShape.attachResponseFormat,
       signal,
       onLog,
       requestLabel: 'requestOrders',
@@ -483,7 +480,7 @@ export async function runRequestOrdersToolLoop(
       turnNumber,
       tacticalBattleId: tacticalBattle?.battleId ?? null,
       onLog,
-      requireToolCall: toolChoice === 'required',
+      answerShape: roundShape.answerShape,
     });
     if (malformedOutcome.status === 'fail') return { kind: 'fail', error: malformedOutcome.error };
     if (malformedOutcome.status === 'retry') {
