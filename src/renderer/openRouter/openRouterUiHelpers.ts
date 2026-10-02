@@ -6,7 +6,11 @@ import {
 } from '../../shared/aiStrategyToastContent';
 import { READY_REQUEST_TIMEOUT_MS, TOAST_DURATION_MS } from '../core/constants';
 import { rendererSharedState as S } from '../core/state';
-import { isDeferredResolutionPlaybackConsultPending, isWaitingForPrecomputedAiOrders } from './aiPlanningState';
+import {
+  isDeferredResolutionConsultRunning,
+  isDeferredResolutionPlaybackConsultPending,
+  isWaitingForPrecomputedAiOrders,
+} from './aiPlanningState';
 import { resolveToolInvocationCountsAfterReady } from '../../shared/openRouterToolInvocationCounts';
 
 /**
@@ -59,8 +63,10 @@ export function setReadyButtonLabelAiWait(readyBtn: HTMLButtonElement, elapsedMs
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Disables the control while the game is over, while precomputed AI orders are still loading, while
  * deferred post-resolution / post-beat consultation is outstanding (`isDeferredResolutionPlaybackConsultPending`), or
- * while `readyRequestInFlight` is true for an in-progress strategic `game:ready` / melee-resolve IPC; restores label/
- * interval state for the AI-wait countdown when applicable (deferred consult keeps the Ready label without the timer).
+ * while `readyRequestInFlight` is true for an in-progress strategic `game:ready` / melee-resolve IPC. Runs the "AI:"
+ * elapsed timer while opponent planning is outstanding: prefetch waits, and deferred consultations from their
+ * playback-complete notify until their push arrives. During the playback that precedes a deferred consultation, the
+ * label stays "Ready". Log lines, including error lines, never affect the timer.
  * Exceptions: None.
  */
 export function updateReadyButtonState(): void {
@@ -73,7 +79,7 @@ export function updateReadyButtonState(): void {
   readyBtn.disabled =
     gameOver || waitingOnAi || deferredConsult || S.readyRequestInFlight || tacticalAnnihilationDialogOpen;
 
-  if (waitingOnAi) {
+  if (waitingOnAi || isDeferredResolutionConsultRunning()) {
     const now = Date.now();
     if (S.readyBtnAiWaitStartTime === null) {
       S.readyBtnAiWaitStartTime = now;

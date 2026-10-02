@@ -15,8 +15,8 @@ Shown with the right panel in every mode where the panel is visible, whichever t
 - One line per event, prefixed with the local time.
 - Error lines are distinguished from ordinary lines.
 - Lines include consultation results, ignored stale consultations, model-list failures, failures to load or save the reasoning effort, standing-order notices, and a one-line copy of a turn-update toast.
-- An error line also appears when a provider rejects a consultation's structured JSON request. The request is retried once without it, so the line does not mean the consultation failed. Anthropic models currently produce this line once per session, because the envelope schema uses `anyOf` and exceeds Anthropic's schema limits.
-- An error line also appears when a provider rejects a required tool call. The request is retried once with automatic tool choice, so the line does not mean the consultation failed. Claude served by Amazon Bedrock produces this line once per session.
+- An ordinary line, not an error line, appears when a provider rejects a consultation's structured JSON request. The request is retried once without it, so the line does not mean the consultation failed. Anthropic models currently produce this line once per session, because the envelope schema uses `anyOf` and exceeds Anthropic's schema limits. Gemini models also produce it once per session, because Gemini does not accept a required tool call together with a JSON response format.
+- An ordinary line, not an error line, appears when a provider rejects a required tool call. The request is retried once with automatic tool choice, so the line does not mean the consultation failed. Claude served by Amazon Bedrock produces this line once per session.
 - A consultation that still fails shows `API error: …`. When OpenRouter's own message is only "Provider returned error", that line also includes the provider's message, such as a schema or `tool_choice` refusal.
 
 The log does not show the API key.

@@ -859,6 +859,7 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
       }
       if (commitResult.tacticalPostBeatConsultDeferred) {
         S.pendingDeferredTacticalPostBeatConsult = true;
+        S.deferredResolutionConsultNotifySent = false;
       }
       if (!commitResult.tacticalPostBeatConsultDeferred && isTacticalPostBeatConsultOnCommit(commitResult)) {
         applyTacticalPostBeatConsultSideEffects(commitResult, deps);
@@ -968,6 +969,8 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
         if (bid) {
           const sendTacticalNotify = (): void => {
             void window.gameApi?.notifyResolutionPlaybackComplete?.({ kind: 'tactical', battleId: bid });
+            S.deferredResolutionConsultNotifySent = true;
+            deps.updateReadyButtonState();
           };
           if (needsResolutionPlayback) {
             enqueueResolutionPlaybackCompleteNotify(sendTacticalNotify);
@@ -1122,12 +1125,15 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
     const needsAnimation = resolutionMoves.length > 0 || hasRanged || hasMelee || hasLegacy || hasAirStrikeResolution;
     if (readyResult.postResolutionConsultDeferred === true) {
       S.pendingDeferredStrategicPostResolutionConsult = true;
+      S.deferredResolutionConsultNotifySent = false;
       const planningTurn = readyResult.deferredResolutionPlanningTurnNumber ?? state.turnNumber;
       const sendStrategicNotify = (): void => {
         void window.gameApi?.notifyResolutionPlaybackComplete?.({
           kind: resolutionPlaybackNotifyKind,
           planningTurnNumber: planningTurn,
         });
+        S.deferredResolutionConsultNotifySent = true;
+        deps.updateReadyButtonState();
       };
       if (needsAnimation) {
         enqueueResolutionPlaybackCompleteNotify(sendStrategicNotify);

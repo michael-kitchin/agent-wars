@@ -1,4 +1,4 @@
-import { logDebug, logError } from '../logger';
+import { logDebug, logInfo } from '../logger';
 import type { OpenRouterChatTransport, OpenRouterChatTransportResult } from './openRouterChatTransport';
 import {
   isRequiredToolChoiceRejectedForModel,
@@ -81,7 +81,8 @@ function isRequiredToolChoiceRejection(result: OpenRouterChatTransportResult): b
  * the model has not rejected it this session, adds `response_format` and the healing plugin. If that request fails
  * with 400, 404, or 422, retries once without those two fields. If a request that sent `tool_choice: required` fails
  * because the provider rejected that choice, retries once with `auto`. A model is marked only when the retry that
- * dropped the rejected option succeeds. Returns the transport result of the last request made.
+ * dropped the rejected option succeeds. Both refusals are common, so they reach `onLog` as ordinary lines and the
+ * debug log at info level. Returns the transport result of the last request made.
  * Exceptions: None; transport failures resolve as `{ ok: false }`.
  */
 export async function postOrdersChatRequest(args: {
@@ -127,13 +128,13 @@ export async function postOrdersChatRequest(args: {
   ): Promise<OpenRouterChatTransportResult> => {
     const result = await send(body);
     if (result.ok || body.tool_choice !== 'required' || !isRequiredToolChoiceRejection(result)) return result;
-    logError('ordersChatRequestHelpers postOrdersChatRequest: required tool choice rejected', {
+    logInfo('ordersChatRequestHelpers postOrdersChatRequest: required tool choice rejected', {
       requestLabel,
       modelId,
       status: result.status,
       error: result.error,
     });
-    onLog?.('Model rejected a required tool call; retrying once with automatic tool choice.', true);
+    onLog?.('Model rejected a required tool call; retrying once with automatic tool choice.', false);
     const retry = await send({ ...body, tool_choice: 'auto' });
     if (retry.ok) markRequiredToolChoiceRejectedForModel(modelId);
     return retry;
@@ -150,13 +151,13 @@ export async function postOrdersChatRequest(args: {
   if (first.ok || first.status === undefined || !STRUCTURED_OUTPUT_REJECTION_STATUSES.has(first.status)) {
     return first;
   }
-  logError('ordersChatRequestHelpers postOrdersChatRequest: structured output request rejected', {
+  logInfo('ordersChatRequestHelpers postOrdersChatRequest: structured output request rejected', {
     requestLabel,
     modelId,
     status: first.status,
     error: first.error,
   });
-  onLog?.('Model rejected the structured JSON request; retrying once without it.', true);
+  onLog?.('Model rejected the structured JSON request; retrying once without it.', false);
   const retry = await sendRecoveringToolChoice(requestBody);
   if (retry.ok) markStructuredOutputsRejectedForModel(modelId);
   return retry;

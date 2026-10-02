@@ -898,6 +898,18 @@ pendingDeferredStrategicPostResolutionConsult: false,
    */
 pendingDeferredTacticalPostBeatConsult: false,
     /**
+   * True once the renderer has told main that resolution playback finished for the armed deferred consultation.
+   *
+   * Purpose: Main starts the deferred consultation on that notify, so the Ready "AI:" timer starts then rather than
+   * during the playback animation.
+   * When to use: Reset to false wherever a deferred strategic or tactical consultation is armed; set to true when its
+   * playback-complete notify is sent. Read through `isDeferredResolutionConsultRunning`.
+   * Expected outcome: Meaningful only while a deferred consultation is pending; a stale true value is ignored once the
+   * pending flags clear.
+   * Exceptions: None.
+   */
+deferredResolutionConsultNotifySent: false,
+    /**
    * Documents the object literal property `initialCameraApplied` (initialCameraApplied: false).
 
    * Purpose: Supports maintainability by documenting why `initialCameraApplied` exists.

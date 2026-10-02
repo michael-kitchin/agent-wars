@@ -13,6 +13,20 @@ export function isDeferredResolutionPlaybackConsultPending(): boolean {
 }
 
 /**
+ * Reports whether main is running a deferred consultation right now.
+ *
+ * Purpose: Lets Ready show the "AI:" elapsed timer while the deferred consultation runs, without counting the
+ * playback animation that precedes it.
+ * When to use: `updateReadyButtonState` when choosing between the "Ready" and "AI:" labels.
+ * Expected outcome: True from the playback-complete notify until the consultation push (applied, stale, or abandoned)
+ * clears the pending flag.
+ * Exceptions: None.
+ */
+export function isDeferredResolutionConsultRunning(): boolean {
+  return isDeferredResolutionPlaybackConsultPending() && S.deferredResolutionConsultNotifySent;
+}
+
+/**
  * Defines the `isWaitingForPrecomputedAiOrders` function shape (export function isWaitingForPrecomputedAiOrders(): boolean).
 
  * Purpose: True when Run is on and Ready must wait for AI planning (strategic precompute or tactical opponent draft buffer).

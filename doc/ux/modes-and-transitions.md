@@ -18,7 +18,7 @@ The player sees the strategic world map and the right panel. The game-state read
 
 While the Run control is pressed and the opponent's precomputed orders are not ready yet, Ready is disabled and its label becomes "AI:" plus an elapsed time. That wait is every-turn prefetch, and the first event-driven consult after a new game, after Run is turned on, or after Events is turned on. The map stays usable. Pressing Ready in that condition shows a map toast that planning is still running and does not end the turn. After a failed AI planning request, Ready becomes usable again with an empty opponent plan. Drafting, changing, or cancelling orders during that wait does not cancel or restart opponent planning.
 
-Once that first event-driven consult has finished, later strategic turns do not wait on a new precomputed plan. The next turn's orders come from the deferred consultation after resolution, or from standing orders when that consultation does not call the model. Ready keeps the label "Ready" during the deferred consultation and stays disabled until it finishes. See [Resolution playback](#resolution-playback).
+Once that first event-driven consult has finished, later strategic turns do not wait on a new precomputed plan. The next turn's orders come from the deferred consultation after resolution, or from standing orders when that consultation does not call the model. Ready stays disabled until the deferred consultation finishes. Its label is "Ready" during playback, then "AI:" plus an elapsed time while the consultation runs. See [Resolution playback](#resolution-playback).
 
 While a Ready request is in flight, Ready stays disabled and keeps the label "Ready". A failed Ready request shows the reason on the map toast and returns the player to strategic planning.
 
@@ -34,7 +34,7 @@ The player sees units and combat results animate on the current map. A map toast
 
 Playback does not replace the underlying match: the game-state readout can already show the next planning turn while the animation is still running. Until the animation ends, map gestures that change orders or the selection are ignored. Pan, zoom, hex tooltips, and right-click still work, and the right panel keeps its own rules. Details are in [resolution-playback.md](resolution-playback.md). Starting a tactical battle cancels a strategic playback that is still running. Leaving a tactical battle also cancels playback.
 
-Ready stays disabled while a deferred opponent consultation is still outstanding after playback was scheduled. The label stays "Ready" during that wait.
+Ready stays disabled while a deferred opponent consultation is still outstanding after playback was scheduled. The label stays "Ready" until the animation ends. It then shows "AI:" plus an elapsed time until the consultation's result arrives. Log lines, including error lines, do not stop that timer.
 
 ### Tactical planning
 
