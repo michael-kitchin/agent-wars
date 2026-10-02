@@ -196,7 +196,8 @@ Bullets in this order.
 
 ### 1.11 `# Available Tools`
 
-- **Content order:** intro paragraph, numbered lines for exactly the enabled tools, then the guidance bullets from section 4.
+- **Content order:** intro paragraph, numbered lines for exactly the enabled tools, the tool-mechanic bullets (briefing-already-contains, tool-call batching, memory tiers, production query/set; see [source-inventory.md](source-inventory.md) section 2.4), then the guidance bullets from section 4.
+- **Batching bullet:** always present when any tool is listed. Independent calls to the same tool go together in one reply as parallel tool calls; the model waits for a result only when the next call's arguments depend on it.
 - **Items:** `TOOL_CATALOG`.
 - **Include:** always. **Empty-state:** the heading plus `No tools available.`
 - **Tool line contract:** each line names the tool, its parameters, and what it returns. The routing tool's line states that it should be skipped when the destination already appears as an option row for that unit. The routing tool's naval land-target clause is included only when the opponent has naval units.
@@ -261,7 +262,7 @@ Fields, order, and presence follow `assembly-contract.md` section 5.1. Strategic
 | `explicit_move` | `unitId` or `unitIds`, `destination` | One cell for this turn only. The destination must be an option-table target for those units or a routing-tool result. When the option row lists several ids, emit one entry with `unitIds`. It must not be the unit's current cell and must not be occupied. Embarked cargo debarks automatically before marching. |
 | `ranged_attack` | `unitId` or `unitIds`, exactly one of a target cell code or a target unit id | Only for units with a strategic reach of at least one, so never infantry. Not "ranged-only": a unit that can fire may also move in the same turn. One per unit per turn, measured from turn-start positions. The target must not be the unit's own move destination. |
 | `embark` | `unitId`, `navalUnitId` | The land unit must be at a cell where loading is legal. |
-| `transport_move` | `navalUnitId`, `destination` | Moves the transport and its cargo together. |
+| `transport_move` | `unitId` or `unitIds`, `navalUnitId`, `destination` | Moves the transport and its cargo together. |
 | `disembark` | `unitId`, `destination` | Clears the cargo assignment and marches in one action. |
 | `airStrikes` entry | `unitId` or `unitIds`, exactly one of a target cell code or a target unit id, `targetType` of units, urban, airport, or seaport | Within the strike radius of an intact, controlled base. One air action per unit per turn. |
 | `ferryOrders` entry | `unitId` or `unitIds`, `destination` | Airport to airport within the ferry radius. A unit that strikes this turn must not also ferry; a ferry order for a striking unit is discarded. |

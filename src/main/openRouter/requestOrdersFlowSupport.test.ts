@@ -8,6 +8,7 @@ import {
   resolveFullPromptLogFileName,
   buildToolBudgetExceededWarning,
   REQUEST_ORDERS_MAX_TOOL_ROUNDS,
+  resolveOrderFlowToolChoice,
   type PromptLogArtifactKind,
 } from './requestOrdersFlowSupport';
 
@@ -32,6 +33,22 @@ test('resolveFullPromptLogFileName maps each artifact kind to a distinct file', 
     return resolved;
   });
   assert.equal(new Set(fileNames).size, fileNames.length);
+});
+
+/**
+ * Verifies a consultation that offers tools must call one before it can submit orders.
+ *
+ * Purpose: `required` forces the first tool call; staying on `required` would block the envelope.
+ * When to use: After changing `resolveOrderFlowToolChoice`.
+ * Expected outcome: `required` only when tools are offered and none have been called; `auto` after a call and when
+ * there are no tools.
+ * Exceptions: Assertion failure on contract drift.
+ */
+test('tool choice is required until a tool has been called', () => {
+  assert.equal(resolveOrderFlowToolChoice(2, false), 'required');
+  assert.equal(resolveOrderFlowToolChoice(2, true), 'auto');
+  assert.equal(resolveOrderFlowToolChoice(0, false), 'auto');
+  assert.equal(resolveOrderFlowToolChoice(2, false, true), 'auto');
 });
 
 test('tool-budget warning quotes the shared round limit', () => {

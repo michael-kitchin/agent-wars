@@ -121,13 +121,9 @@ function applySessionAffordableMaxTokensToBody(body: Record<string, unknown>): R
  * Expected outcome: Success payload on 2xx; actionable credit/auth errors on terminal failures.
  * Exceptions: Propagates abort/timeout as user-facing cancel/timeout strings.
  */
-async function defaultPostOpenRouterChatWithTimeoutAndRetry(payload: {
-  key: string;
-  body: Record<string, unknown>;
-  signal?: AbortSignal;
-  onLog?: (line: string, isError?: boolean) => void;
-  requestLabel: string;
-}): Promise<{ ok: true; status: number; headers: Record<string, string>; bodyText: string } | { ok: false; error: string }> {
+async function defaultPostOpenRouterChatWithTimeoutAndRetry(
+  payload: OpenRouterChatTransportPayload
+): Promise<OpenRouterChatTransportResult> {
   let lastError = `${payload.requestLabel} failed.`;
   let requestBody = applySessionAffordableMaxTokensToBody(payload.body);
   let creditClampRetried = false;
@@ -171,7 +167,7 @@ async function defaultPostOpenRouterChatWithTimeoutAndRetry(payload: {
       }
       lastError = formatOpenRouterChatApiError(chatResponse.status, chatResponse.bodyText);
       logError(`openRouter ${payload.requestLabel}: API error`, chatResponse.status, chatResponse.bodyText.slice(0, 200));
-      if (chatResponse.status === 401) return { ok: false, error: lastError };
+      if (chatResponse.status === 401) return { ok: false, error: lastError, status: chatResponse.status };
       if (chatResponse.status === 402 && !creditClampRetried) {
         const affordable = parseAffordableMaxTokensFromOpenRouterError(chatResponse.bodyText);
         const currentMax = typeof requestBody.max_tokens === 'number' ? requestBody.max_tokens : null;
@@ -206,7 +202,7 @@ async function defaultPostOpenRouterChatWithTimeoutAndRetry(payload: {
         await delayMs(waitMs);
         continue;
       }
-      return { ok: false, error: lastError };
+      return { ok: false, error: lastError, status: chatResponse.status };
     } catch (err) {
       if (parentSignal?.aborted) return { ok: false, error: 'Cancelled' };
       const timeoutLike = controller.signal.aborted;
@@ -253,20 +249,83 @@ async function defaultPostOpenRouterChatWithTimeoutAndRetry(payload: {
 }
 
 /**
- * Documents the `OpenRouterChatTransport` type alias (type OpenRouterChatTransport).
-
- * Purpose: Supports maintainability by documenting why `OpenRouterChatTransport` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * One chat completion request handed to the transport.
+ *
+ * Purpose: Shared payload shape for the default HTTPS transport, test overrides, and request helpers.
+ * When to use: Building every order-flow chat POST.
+ * Expected outcome: `body` is sent as JSON; `requestLabel` prefixes transport logs.
  * Exceptions: None.
  */
-export type OpenRouterChatTransport = (payload: {
-  key: string;
-  body: Record<string, unknown>;
-  signal?: AbortSignal;
-  onLog?: (line: string, isError?: boolean) => void;
-  requestLabel: string;
-}) => Promise<{ ok: true; status: number; headers: Record<string, string>; bodyText: string } | { ok: false; error: string }>;
+export interface OpenRouterChatTransportPayload {
+  /**
+   * OpenRouter API key for the `Authorization` header.
+   *
+   * Contract: Raw key material; never logged.
+   * When to use: Every request.
+   * Expected outcome: Sent as a bearer token.
+   * Exceptions: None.
+   */
+  readonly key: string;
+  /**
+   * Chat completion request body.
+   *
+   * Contract: JSON-serializable OpenRouter chat body; `max_tokens` may be clamped to the session credit cap.
+   * When to use: Every request.
+   * Expected outcome: Posted as the request JSON.
+   * Exceptions: None.
+   */
+  readonly body: Record<string, unknown>;
+  /**
+   * Cancels the request when the consultation is cancelled.
+   *
+   * Contract: Optional; an aborted signal yields `{ ok: false, error: 'Cancelled' }`.
+   * When to use: Pass the consultation's abort signal.
+   * Expected outcome: In-flight HTTPS requests are destroyed on abort.
+   * Exceptions: None.
+   */
+  readonly signal?: AbortSignal;
+  /**
+   * Player-facing activity log sink.
+   *
+   * Contract: Optional; receives short status lines such as timeouts and credit retries.
+   * When to use: Pass the consultation's activity log callback.
+   * Expected outcome: Lines appear in the AI activity log.
+   * Exceptions: None.
+   */
+  readonly onLog?: (line: string, isError?: boolean) => void;
+  /**
+   * Short label naming this request in logs.
+   *
+   * Contract: Stable phrase such as `requestOrders` or `requestOrders repair`.
+   * When to use: Every request.
+   * Expected outcome: Prefixes transport debug and error logs.
+   * Exceptions: None.
+   */
+  readonly requestLabel: string;
+}
+
+/**
+ * Outcome of one chat completion request after the transport's own retries.
+ *
+ * Purpose: Callers branch on success without catching; failures carry the HTTP status when a response arrived.
+ * When to use: Return type of every `OpenRouterChatTransport`.
+ * Expected outcome: `ok: true` with the raw body on 2xx. `ok: false` with a user-facing error otherwise; `status`
+ * is set only when the failure followed an HTTP response (absent for cancel, timeout, and network errors).
+ * Exceptions: None.
+ */
+export type OpenRouterChatTransportResult =
+  | { ok: true; status: number; headers: Record<string, string>; bodyText: string }
+  | { ok: false; error: string; status?: number };
+
+/**
+ * Function that posts one chat completion request.
+ *
+ * Purpose: Lets the order flow use the HTTPS transport in production and a scripted fake in tests.
+ * When to use: Resolve with `resolveOpenRouterChatTransport`; inject through `RequestOrdersFlowDeps`.
+ * Expected outcome: Never throws for HTTP or network failures; they resolve as `{ ok: false }`.
+ * Exceptions: None.
+ */
+export type OpenRouterChatTransport = (payload: OpenRouterChatTransportPayload) => Promise<OpenRouterChatTransportResult>;
 
 /**
  * Documents the module-scope binding `chatTransportOverride` (chatTransportOverride: OpenRouterChatTransport | null).

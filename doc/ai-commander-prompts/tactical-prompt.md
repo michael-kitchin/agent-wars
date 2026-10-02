@@ -147,10 +147,11 @@ Tactical variant, bullets in this order:
 - **Intro:** points at the briefing for assessments and options, and states the copy-then-submit rule with the tactical field mapping.
 - **Guidance bullets, in this order:**
   1. The briefing already contains unit status, attention flags, and this beat's options; the assessment and estimate tools must not be called because they are not available.
-  2. Option targets are already this-beat legal; one row may name several sub-units; copy those ids into one `unitIds` array on a single envelope entry; a move or approach target into the move field; a ranged target into a `ranged_attack` entry; an air strike target into the strike list when air is present; and a ferry target into `ferryOrders`; each sub-unit gets at most one move and one shot, so pick one row per action type and do not copy overlapping rows; never copy a Target Hex from a row that does not list that sub-unit; route only for something unlisted; once destinations are chosen, submit.
-  3. Standing-order actions are not accepted for sub-unit ids this beat, and standing orders do not move sub-units. A sub-unit with a move option and no order is idle for the beat.
-  4. The tempo rule for the beat, per section 4 item 2.
-  5. The sealift bullet, included only when the naval status section is present.
+  2. Independent calls to the same tool, such as routes for several sub-units, go together in one reply as parallel tool calls; wait for a result only when the next call's arguments depend on it.
+  3. Option targets are already this-beat legal; one row may name several sub-units; copy those ids into one `unitIds` array on a single envelope entry; a move or approach target into the move field; a ranged target into a `ranged_attack` entry; an air strike target into the strike list when air is present; and a ferry target into `ferryOrders`; each sub-unit gets at most one move and one shot, so pick one row per action type and do not copy overlapping rows; never copy a Target Hex from a row that does not list that sub-unit; route only for something unlisted; once destinations are chosen, submit.
+  4. Standing-order actions are not accepted for sub-unit ids this beat, and standing orders do not move sub-units. A sub-unit with a move option and no order is idle for the beat.
+  5. The tempo rule for the beat, per section 4 item 2.
+  6. The sealift bullet, included only when the naval status section is present.
 - **Empty-state:** the heading plus `No tools available.`
 
 ### 2.12 Observed enemy roster line
@@ -175,7 +176,7 @@ Section 3. Always included; the example must match the contract. Example unit id
 | `ranged_attack` | `unitId` or `unitIds`, exactly one of a target cell code or a target sub-unit id | Legal for every type with a res4 reach, infantry included — not "ranged-only" units. One per sub-unit per beat, resolved from beat-start positions. |
 | `airStrikes` entry | `unitId` or `unitIds`, exactly one of a target cell code or a target sub-unit id, `targetType` | Any footprint cell, subject to the parent airport being intact. One air action per sub-unit per beat. |
 | `embark` | `unitId`, `navalUnitId` | Cargo assignment inside the footprint. |
-| `transport_move` | `navalUnitId`, `destination` | Moves the transport and its cargo. |
+| `transport_move` | `unitId` or `unitIds`, `navalUnitId`, `destination` | Moves the transport and its cargo. |
 | `disembark` | `unitId`, `destination` | Clears cargo and marches in one action. |
 | `ferryOrders` entry | `unitId`, `destination` | Intact airport cells in the footprint. A sub-unit that strikes this beat must not also ferry; a ferry order for a striking sub-unit is discarded. |
 

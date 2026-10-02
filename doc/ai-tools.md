@@ -49,7 +49,7 @@ Strategic movement budgets are `getMovementBudget` (infantry 1, armor 2, naval 2
 
 ## Standing orders
 
-`src/main/tools/standingOrders.ts` + `standingOrdersCore.ts`.
+`src/main/tools/standingOrders.ts` + `standingOrdersCore.ts` (the status block injected into the briefing is in `standingOrdersInjectionText.ts`).
 
 - **Model tool:** `query_orders` only.
 - **Order types:** `defend`, `march`, `pursue`, `patrol`, `hold_fire`. Air cannot take `march`, `pursue`, or `patrol` (`AIR_INELIGIBLE_ORDER_TYPES`).

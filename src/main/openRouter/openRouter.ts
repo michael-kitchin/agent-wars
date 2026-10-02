@@ -44,6 +44,9 @@ import {
 } from './openRouterToolGroups';
 import type { OpenRouterModel } from '../../shared/ipc/openRouterTypes';
 import { buildOpenRouterModelList } from './buildOpenRouterModelList';
+import { getOpenRouterModelCapabilities, rememberOpenRouterModels } from './openRouterModelCapabilities';
+import { resolveOrdersRequestProfile, type OrdersRequestProfile } from './ordersRequestProfile';
+import { OPENROUTER_ORDER_FLOW_COMPLETION_MAX_TOKENS } from './openRouterCreditLimits';
 
 export type { MemoryUpdateItem } from './orderResponseParsing';
 
@@ -74,6 +77,15 @@ const OPENROUTER_KEY_DB_CONFIG_KEY = 'openrouter_api_key';
  * Exceptions: None.
  */
 const OPENROUTER_SELECTED_MODEL_DB_CONFIG_KEY = 'openrouter_selected_model';
+/**
+ * `game_config` key holding the player's reasoning-effort override for the selected model.
+ *
+ * Purpose: Persists the Model-tab reasoning choice with the model choice.
+ * When to use: `getSelectedReasoningEffort` / `setSelectedReasoningEffort` only.
+ * Expected outcome: Missing row means "use the model default".
+ * Exceptions: None.
+ */
+const OPENROUTER_SELECTED_REASONING_EFFORT_DB_CONFIG_KEY = 'openrouter_selected_reasoning_effort';
 
 /**
  * Defines the `getConfigPath` function shape (function getConfigPath(): string).
@@ -221,20 +233,57 @@ export function hasKey(): boolean {
 let selectedModelId: string = '';
 
 /**
- * Defines the `setSelectedModel` function shape (export function setSelectedModel(modelId: string): void).
-
- * Purpose: Supports maintainability by documenting why `setSelectedModel` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
+ * Persists the player's model choice.
+ *
+ * Purpose: Keeps the Model-tab selection across restarts; a different model starts on its own default effort.
+ * When to use: When the player picks a model in the Model tab (via IPC).
+ * Expected outcome: Saves or deletes the model row. When the id differs from the current selection, the
+ * reasoning-effort override is cleared too.
+ * Exceptions: Propagates database errors.
  */
 export function setSelectedModel(modelId: string): void {
-  logDebug('openRouter setSelectedModel', { hasModelId: Boolean((modelId ?? '').trim()) });
+  const modelChanged = (modelId ?? '') !== getSelectedModel();
+  logDebug('openRouter setSelectedModel', { hasModelId: Boolean((modelId ?? '').trim()), modelChanged });
   selectedModelId = modelId ?? '';
   if (!selectedModelId.trim()) {
     deleteGameConfigValue(OPENROUTER_SELECTED_MODEL_DB_CONFIG_KEY);
   } else {
     saveGameConfigValue(OPENROUTER_SELECTED_MODEL_DB_CONFIG_KEY, selectedModelId);
+  }
+  if (modelChanged) {
+    setSelectedReasoningEffort('');
+  }
+}
+
+/**
+ * Returns the persisted reasoning-effort override for the selected model.
+ *
+ * Purpose: Restores the Model-tab reasoning dropdown and sizes consultation requests.
+ * When to use: Renderer startup (via IPC) and request-profile resolution for the selected model.
+ * Expected outcome: The saved effort, or `''` ("use the model default") when none is saved. Reads the database
+ * on every call so it never disagrees with the stored row.
+ * Exceptions: Propagates database errors.
+ */
+export function getSelectedReasoningEffort(): string {
+  logTrace('openRouter getSelectedReasoningEffort');
+  return loadGameConfigValue(OPENROUTER_SELECTED_REASONING_EFFORT_DB_CONFIG_KEY) ?? '';
+}
+
+/**
+ * Persists the reasoning-effort override for the selected model.
+ *
+ * Purpose: Keeps the player's reasoning choice across restarts.
+ * When to use: When the player changes the reasoning dropdown, and (with `''`) when the model changes.
+ * Expected outcome: A trimmed non-empty effort is saved; `''` deletes the row so the model default applies.
+ * Exceptions: Propagates database errors.
+ */
+export function setSelectedReasoningEffort(effort: string): void {
+  const trimmed = (effort ?? '').trim();
+  logDebug('openRouter setSelectedReasoningEffort', { effort: trimmed || '(model default)' });
+  if (!trimmed) {
+    deleteGameConfigValue(OPENROUTER_SELECTED_REASONING_EFFORT_DB_CONFIG_KEY);
+  } else {
+    saveGameConfigValue(OPENROUTER_SELECTED_REASONING_EFFORT_DB_CONFIG_KEY, trimmed);
   }
 }
 
@@ -308,6 +357,7 @@ export async function listModels(): Promise<{ models: ModelItem[] } | { error: s
     const json = (await res.json()) as { data?: unknown[] };
     const data = Array.isArray(json.data) ? json.data : [];
     const models: ModelItem[] = buildOpenRouterModelList(data);
+    rememberOpenRouterModels(models);
     logDebug('openRouter listModels: mapped models', { count: models.length });
     return { models };
   } catch (err) {
@@ -424,6 +474,34 @@ function validateAiRangedOrder(
 function formatLatLng(ll: [number, number]): string {
   return formatLatLngWithPrecision(ll, LATLNG_DECIMAL_PLACES);
 }
+
+/**
+ * Resolves the consultation request profile from cached capabilities and the saved reasoning choice.
+ *
+ * Purpose: Production `resolveOrdersRequestProfile` dependency for `requestOrdersFlow`.
+ * When to use: Wired into the flow deps by `requestOrders`.
+ * Expected outcome: Unknown models get the baseline profile without touching the database. Known models use the
+ * saved effort only when they are the selected model, since the saved effort belongs to the selected model.
+ * Exceptions: None. A database error while reading the saved choice is logged and the model default is used,
+ * so an optional setting never fails a consultation.
+ */
+function resolveSelectedModelOrdersRequestProfile(modelId: string): OrdersRequestProfile {
+  const model = getOpenRouterModelCapabilities(modelId);
+  let persistedReasoningEffort = '';
+  if (model !== undefined) {
+    try {
+      persistedReasoningEffort = modelId === getSelectedModel() ? getSelectedReasoningEffort() : '';
+    } catch (err) {
+      logError('openRouter resolveSelectedModelOrdersRequestProfile: saved reasoning effort unreadable', { modelId, err });
+    }
+  }
+  return resolveOrdersRequestProfile({
+    modelId,
+    model,
+    persistedReasoningEffort,
+    baseCompletionMaxTokens: OPENROUTER_ORDER_FLOW_COMPLETION_MAX_TOKENS,
+  });
+}
 /**
  * Defines the `requestOrders` function shape (export async function requestOrders().
 
@@ -452,6 +530,7 @@ export async function requestOrders(
       buildSystemPromptForTools,
       buildToolDefinitions,
       postOpenRouterChatWithTimeoutAndRetry: activeTransport,
+      resolveOrdersRequestProfile: resolveSelectedModelOrdersRequestProfile,
       getGroupIdForToolName,
       validateAiOrder,
       validateAiRangedOrder,

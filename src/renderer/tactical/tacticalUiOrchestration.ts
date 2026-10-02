@@ -69,7 +69,6 @@ export function tacticalReleaseRendererSessionForNewStrategicMatch(nextState: Ga
   S.tacticalOpponentDraft = null;
   S.tacticalPhasePlanning = true;
   // `clearPendingTacticalOrders` replaces manual tactical march/embark clears and aligns with voluntary tactical exit.
-  // No `withTacticalHumanDraftPrefetchInvalidation` concern at call time: snapshot is already null; stale prefetch was cancelled above.
   clearPendingTacticalOrders();
   S.hideCommittedOrderLinesAfterReady = false;
   exitTacticalMapView();
@@ -122,7 +121,6 @@ export function tacticalReconcileBattleAfterStrategicSnapshot(nextState: GameSta
     S.tacticalBattleSnapshot = null;
     S.tacticalOpponentDraft = null;
     S.tacticalPhasePlanning = true;
-    // No `withTacticalHumanDraftPrefetchInvalidation`: same rationale as `tacticalReleaseRendererSessionForNewStrategicMatch`.
     S.tacticalPendingMarches = [];
     S.pendingEmbarkOrders = [];
     exitTacticalMapView();

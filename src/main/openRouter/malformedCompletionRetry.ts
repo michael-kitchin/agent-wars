@@ -7,7 +7,7 @@
  * that consultation. Shared by the strategic and tactical order flows because both drive the same tool loop.
  */
 
-import { logDebug, logError } from '../logger';
+import { logDebug, logError, logTrace } from '../logger';
 
 /**
  * Maximum number of extra model calls spent recovering from malformed completions within one consultation.
@@ -123,16 +123,23 @@ export function isMalformedModelCompletion(completion: ModelCompletionShape): bo
  * Builds the corrective note appended to the conversation before the final retry.
  *
  * Purpose: A plain re-send usually clears a one-off malformed reply; when it does not, naming the defect
- * gives the model a chance to choose the other valid shape instead of repeating itself.
+ * gives the model a chance to choose a valid shape instead of repeating itself.
  * When to use: Only for the last retry, so earlier attempts keep the conversation byte-identical.
+ * Pass `requireToolCall` when this round's `tool_choice` is `required`, so the note does not offer an envelope
+ * the provider will refuse.
  * Expected outcome: A short user-role instruction valid for both strategic and tactical consultations.
  * Exceptions: None.
  */
-export function buildMalformedCompletionCorrectiveMessage(): string {
+export function buildMalformedCompletionCorrectiveMessage(requireToolCall = false): string {
+  logTrace('openRouter buildMalformedCompletionCorrectiveMessage', { requireToolCall });
+  const responseShape = requireToolCall
+    ? 'a single well-formed tool call'
+    : 'exactly one of: a single well-formed tool call, or your final orders as one JSON object matching the schema in the system prompt';
   return (
     'Your previous reply contained neither a tool call nor any text content, so it could not be used. ' +
-    'Do not repeat that reply. Respond now with exactly one of: a single well-formed tool call, or your ' +
-    'final orders as one JSON object matching the schema in the system prompt. Never return an empty message.'
+    'Do not repeat that reply. Respond now with ' +
+    responseShape +
+    '. Never return an empty message.'
   );
 }
 
@@ -169,8 +176,17 @@ export async function resolveMalformedCompletionRetry(args: {
   turnNumber: number;
   tacticalBattleId: string | null;
   onLog?: (line: string, isError?: boolean) => void;
+  /**
+   * Whether this round's `tool_choice` is `required`.
+   *
+   * Contract: Omit or pass `false` when the model may still submit the envelope.
+   * When to use: The tool loop passes the round's choice.
+   * Expected outcome: The final-retry note asks only for a tool call when `true`.
+   * Exceptions: None.
+   */
+  requireToolCall?: boolean;
 }): Promise<MalformedCompletionRetryOutcome> {
-  const { completion, retryCount, iteration, turnNumber, tacticalBattleId, onLog } = args;
+  const { completion, retryCount, iteration, turnNumber, tacticalBattleId, onLog, requireToolCall = false } = args;
   if (!isMalformedModelCompletion(completion)) return { status: 'usable' };
 
   const diagnostics = {
@@ -195,7 +211,9 @@ export async function resolveMalformedCompletionRetry(args: {
 
   const nextRetryCount = retryCount + 1;
   const correctiveMessage =
-    nextRetryCount === MALFORMED_COMPLETION_RETRY_LIMIT ? buildMalformedCompletionCorrectiveMessage() : null;
+    nextRetryCount === MALFORMED_COMPLETION_RETRY_LIMIT
+      ? buildMalformedCompletionCorrectiveMessage(requireToolCall)
+      : null;
   logDebug('openRouter requestOrders: retrying after malformed completion', {
     ...diagnostics,
     nextRetryCount,

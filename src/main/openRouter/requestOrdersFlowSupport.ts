@@ -1,9 +1,9 @@
 /**
  * Metrics aggregation, prompt/response logging helpers, and small list utilities for OpenRouter order requests.
  *
- * Purpose: Shrinks `requestOrdersFlow.ts` without changing runtime behavior of the AI order pipeline.
- * When to use: Only from `requestOrdersFlow` and related tests if a helper needs direct assertion.
- * Expected outcome: Same log shapes and dedupe semantics as when this logic lived inline.
+ * Purpose: Holds shared order-request helpers so `requestOrdersFlow.ts` stays within the file-size limit.
+ * When to use: From the order flow, the tool loop, and tests that assert a helper directly.
+ * Expected outcome: Log shapes, dedupe, and `tool_choice` selection live in one place.
  * Exceptions: `writeFullLogArtifact` catches IO errors and logs at error level.
  */
 
@@ -26,7 +26,7 @@ const FULL_PROMPT_LOG_PREVIEW_CHARS = 1200;
  * Documents the module-scope binding `FULL_PROMPT_LOG_ENV_FLAG` (FULL_PROMPT_LOG_ENV_FLAG).
 
  * Purpose: Names the env var that enables writing full prompt text to disk for support sessions.
- * When to use: `isFullLogEnvEnabled` for prompt artifacts.
+ * When to use: `isEnvFlagEnabled` for prompt artifacts.
  * Expected outcome: Documented in ops notes as `AGENT_WARS_LOG_FULL_PROMPTS`.
  * Exceptions: None.
  */
@@ -44,7 +44,7 @@ const FULL_RESPONSE_LOG_PREVIEW_CHARS = 1200;
  * Documents the module-scope binding `FULL_RESPONSE_LOG_ENV_FLAG` (FULL_RESPONSE_LOG_ENV_FLAG).
 
  * Purpose: Names the env var that enables writing full response bodies to disk.
- * When to use: `isFullLogEnvEnabled` for response artifacts.
+ * When to use: `isEnvFlagEnabled` for response artifacts.
  * Expected outcome: Documented as `AGENT_WARS_LOG_FULL_RESPONSES`.
  * Exceptions: None.
  */
@@ -59,6 +59,42 @@ const FULL_RESPONSE_LOG_ENV_FLAG = 'AGENT_WARS_LOG_FULL_RESPONSES';
  * Exceptions: None.
  */
 export const REQUEST_ORDERS_MAX_WALL_CLOCK_MS = AI_CONSULTATION_WALL_CLOCK_MS;
+
+/**
+ * `tool_choice` for one order-flow model round.
+ *
+ * Purpose: Names the two values the tool loop sends. The repair call uses `none` and does not go through this type.
+ * When to use: `resolveOrderFlowToolChoice`.
+ * Expected outcome: `required` forces a tool call; `auto` allows a tool call or the final envelope.
+ * Exceptions: None.
+ */
+export type OrderFlowToolChoice = 'required' | 'auto';
+
+/**
+ * Chooses `tool_choice` for one order-flow round.
+ *
+ * Purpose: A consultation that offers tools must call one before it submits orders. `required` on every round would
+ * forbid the envelope, and the loop would exhaust its round cap with no orders.
+ * When to use: Each tool-loop round, including malformed-completion retries. Not the repair call.
+ * Expected outcome: `required` when `toolCount` is positive, no tool has been called yet, and this model has not rejected
+ * `required`; `auto` otherwise.
+ * Exceptions: None.
+ */
+export function resolveOrderFlowToolChoice(
+  toolCount: number,
+  hasCalledTool: boolean,
+  requiredToolChoiceRejected = false
+): OrderFlowToolChoice {
+  const toolChoice: OrderFlowToolChoice =
+    toolCount > 0 && !hasCalledTool && !requiredToolChoiceRejected ? 'required' : 'auto';
+  logTrace('requestOrdersFlowSupport resolveOrderFlowToolChoice', {
+    toolCount,
+    hasCalledTool,
+    requiredToolChoiceRejected,
+    toolChoice,
+  });
+  return toolChoice;
+}
 
 /**
  * Maximum model rounds in one consultation, including tool calls.
@@ -213,14 +249,6 @@ export function getAiPathfindingTurnAggregateMetrics(turnNumber: number): AiPath
 }
 
 /**
- * Interprets common truthy string env values for full prompt/response logging toggles.
- *
- * Purpose: Shared parsing for `AGENT_WARS_LOG_FULL_*` flags with optional quoting from shells.
- * When to use: Before writing large artifacts to cwd.
- * Expected outcome: True for 1/true/yes/on (case-insensitive) after trim and optional quote strip.
- * Exceptions: None.
- */
-/**
  * Reports whether full prompt text should be written to disk (`debug-last-*-prompt.txt`).
  *
  * Purpose: Lets `requestOrdersFlow` decide when to attach optional diagnostic-only map content without duplicating env parsing.
@@ -229,27 +257,35 @@ export function getAiPathfindingTurnAggregateMetrics(turnNumber: number): AiPath
  * Exceptions: None.
  */
 export function isAgentWarsFullPromptLoggingEnabled(): boolean {
-  return isFullLogEnvEnabled(FULL_PROMPT_LOG_ENV_FLAG);
+  return isEnvFlagEnabled(FULL_PROMPT_LOG_ENV_FLAG);
 }
 
-function isFullLogEnvEnabled(flagName: string): boolean {
-  let v = process.env[flagName]?.trim();
-  if (v === undefined || v.length === 0) return false;
-  if (
-    (v.startsWith('"') && v.endsWith('"')) ||
-    (v.startsWith("'") && v.endsWith("'"))
-  ) {
-    v = v.slice(1, -1).trim();
-  }
-  const lower = v.toLowerCase();
-  return lower === '1' || lower === 'true' || lower === 'yes' || lower === 'on';
+/**
+ * Interprets common truthy string values of a developer environment flag.
+ *
+ * Purpose: Shared parsing for `AGENT_WARS_*` on/off flags, tolerating quotes that some shells keep.
+ * When to use: Whenever main-process code reads an on/off developer flag; the value is read on every call.
+ * Expected outcome: True for 1/true/yes/on (case-insensitive) after trim and optional quote strip; false when unset.
+ * Exceptions: None.
+ */
+export function isEnvFlagEnabled(flagName: string): boolean {
+  let value = process.env[flagName]?.trim();
+  const quoted =
+    value !== undefined &&
+    value.length > 1 &&
+    ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'")));
+  if (quoted && value !== undefined) value = value.slice(1, -1).trim();
+  const normalized = value?.toLowerCase();
+  const enabled = normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on';
+  logTrace('requestOrdersFlowSupport isEnvFlagEnabled', { flagName, enabled });
+  return enabled;
 }
 
 /**
  * Writes a support artifact into the process cwd for full prompt/response capture sessions.
  *
  * Purpose: Gives operators a stable filename to attach to bug reports when previews are insufficient.
- * When to use: When `isFullLogEnvEnabled` is true for prompts or responses.
+ * When to use: When `isEnvFlagEnabled` is true for prompts or responses.
  * Expected outcome: Returns absolute path on success; logs and returns null on failure.
  * Exceptions: Catches filesystem errors and logs at error level.
  */
@@ -349,7 +385,7 @@ export interface LogPromptPreviewOptions {
  */
 export function logPromptPreview(label: string, content: string, options: LogPromptPreviewOptions): void {
   const fileName = resolveFullPromptLogFileName(options.artifactKind);
-  const fullPromptLoggingEnabled = isFullLogEnvEnabled(FULL_PROMPT_LOG_ENV_FLAG);
+  const fullPromptLoggingEnabled = isEnvFlagEnabled(FULL_PROMPT_LOG_ENV_FLAG);
   if (fullPromptLoggingEnabled) {
     const supplementalDiskOnlyBody = options.supplementalDiskOnlyBody;
     const diskBody =
@@ -382,7 +418,7 @@ export function logPromptPreview(label: string, content: string, options: LogPro
  * Exceptions: None.
  */
 export function logResponsePreview(label: string, content: string): void {
-  const fullResponseLoggingEnabled = isFullLogEnvEnabled(FULL_RESPONSE_LOG_ENV_FLAG);
+  const fullResponseLoggingEnabled = isEnvFlagEnabled(FULL_RESPONSE_LOG_ENV_FLAG);
   if (fullResponseLoggingEnabled) {
     const absPath = writeFullLogArtifact('debug-last-openrouter-response-body.txt', content);
     logDebug(`${label} (full)`, { chars: content.length, writtenTo: absPath ?? '(write failed)' });

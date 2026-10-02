@@ -73,6 +73,34 @@ name?: string;
     completion?: string;
   };
   /**
+   * OpenRouter request parameters that at least one provider for this model accepts.
+   *
+   * Contract: Trimmed non-empty strings in API order when set; omitted when the API sent none.
+   * When to use: Capability checks such as whether to send `response_format` (needs `response_format` and `structured_outputs`).
+   * Expected outcome: Membership tests only; an omitted list means no optional parameter is known to be supported.
+   * Exceptions: None.
+   */
+  readonly supported_parameters?: readonly string[];
+  /**
+   * Limits reported for the model's primary provider.
+   *
+   * Contract: Present only when at least one usable limit was reported.
+   * When to use: Capping completion budgets that scale with reasoning effort.
+   * Expected outcome: Read-only limits; missing values mean the limit is unknown.
+   * Exceptions: None.
+   */
+  readonly top_provider?: {
+    /**
+     * Largest completion (`max_tokens`) the primary provider accepts for this model.
+     *
+     * Contract: Positive integer when set.
+     * When to use: Upper bound for reasoning-scaled completion budgets.
+     * Expected outcome: Missing means unknown, and callers must not scale budgets.
+     * Exceptions: None.
+     */
+    readonly max_completion_tokens?: number;
+  };
+  /**
    * Optional reasoning defaults used for the Model-tab reasoning suffix phrase.
 
    * Contract: `default_effort` is a trimmed string when set; `default_enabled` / `mandatory` are booleans when set.
@@ -108,6 +136,16 @@ name?: string;
      * Exceptions: None.
      */
     mandatory?: boolean;
+    /**
+     * Reasoning efforts the player may choose for this model, in OpenRouter's descending order.
+     *
+     * Contract: An array of trimmed effort names; `null` means every gateway effort is accepted;
+     * omitted means effort is not selectable for this model.
+     * When to use: `listSelectableReasoningEfforts` when building the reasoning dropdown or validating requests.
+     * Expected outcome: Callers never send an effort outside this list.
+     * Exceptions: None.
+     */
+    readonly supported_efforts?: readonly string[] | null;
   };
 }
 

@@ -3,7 +3,6 @@ import type { NamingLookupTarget, TerrainTooltipState } from './terrainTooltipTy
 import { HEX_DETAILS_TOOLTIP_DELAY_MS } from '../core/constants';
 import { isHoverOrderPlanningActive } from '../rendering/canvasPreviewPolicy';
 import { hitTestHexAtContainerPixel, hitTestTacticalRes4HexAtContainerPixel } from './mapHelpers';
-import { withTacticalHumanDraftPrefetchInvalidation } from '../openRouter/openRouterRuntime';
 import { rendererSharedState as S } from '../core/state';
 import { clearMapSelectionChrome } from '../core/selection';
 import { getMainLeafletMap } from './worldLeafletMap';
@@ -338,11 +337,11 @@ refreshHumanStandingOrders: () => Promise<void>;
 }
 
 /**
- * Defines the `wireMainMapInteractions` function shape (export function wireMainMapInteractions(deps: MainMapInteractionDeps): void).
-
- * Purpose: Supports maintainability by documenting why `wireMainMapInteractions` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Attaches the main map's pointer, click, double-click, and context-menu handlers.
+ *
+ * Purpose: Single place where map gestures become hover previews, selection changes, and order drafts in both theaters.
+ * When to use: Once during renderer startup, after `#main-map` exists.
+ * Expected outcome: Handlers are registered on `#main-map`; returns without wiring when the element is missing.
  * Exceptions: None.
  */
 export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
@@ -447,20 +446,18 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
       return true;
     }
     if (S.tacticalBattleSnapshot) {
-      withTacticalHumanDraftPrefetchInvalidation(() => {
-        S.pendingEmbarkOrders = S.pendingEmbarkOrders.filter((e) => !selectedIds.includes(e.unitId));
-        for (const subUnitId of selectedIds) {
-          const idx = S.tacticalPendingMarches.findIndex((row) => row.subUnitId === subUnitId);
-          if (idx >= 0) S.tacticalPendingMarches.splice(idx, 1);
-          S.tacticalPendingMarches.push(
-            buildTacticalPendingMarchRowFromDraft({
-              battle: S.tacticalBattleSnapshot!,
-              subUnitId,
-              destinationH3Index: destinationH3,
-            })
-          );
-        }
-      });
+      S.pendingEmbarkOrders = S.pendingEmbarkOrders.filter((e) => !selectedIds.includes(e.unitId));
+      for (const subUnitId of selectedIds) {
+        const idx = S.tacticalPendingMarches.findIndex((row) => row.subUnitId === subUnitId);
+        if (idx >= 0) S.tacticalPendingMarches.splice(idx, 1);
+        S.tacticalPendingMarches.push(
+          buildTacticalPendingMarchRowFromDraft({
+            battle: S.tacticalBattleSnapshot!,
+            subUnitId,
+            destinationH3Index: destinationH3,
+          })
+        );
+      }
     }
     deps.clearCommittedOrderDraftState();
     if (!S.tacticalBattleSnapshot) {

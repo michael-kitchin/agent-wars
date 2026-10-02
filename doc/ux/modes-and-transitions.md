@@ -16,7 +16,7 @@ The player sees the new-game overlay. The message is "Start the world map game w
 
 The player sees the strategic world map and the right panel. The game-state readout shows "Phase: Planning" and the strategic turn. The player can pan and zoom, select units, draft orders, open build and stack popups, and press Ready when it is enabled. Strategic planning is blocked while the new-game overlay, the game-over overlay, or the tactical annihilation dialog is open, and it is replaced while a tactical battle is active or the tactical battles list is open.
 
-While the Run control is pressed and the opponent's precomputed orders are not ready yet, Ready is disabled and its label becomes "AI:" plus an elapsed time. That wait is every-turn prefetch, and the first event-driven consult after a new game, after Run is turned on, or after Events is turned on. The map stays usable. Pressing Ready in that condition shows a map toast that planning is still running and does not end the turn. After a failed AI planning request, Ready becomes usable again with an empty opponent plan.
+While the Run control is pressed and the opponent's precomputed orders are not ready yet, Ready is disabled and its label becomes "AI:" plus an elapsed time. That wait is every-turn prefetch, and the first event-driven consult after a new game, after Run is turned on, or after Events is turned on. The map stays usable. Pressing Ready in that condition shows a map toast that planning is still running and does not end the turn. After a failed AI planning request, Ready becomes usable again with an empty opponent plan. Drafting, changing, or cancelling orders during that wait does not cancel or restart opponent planning.
 
 Once that first event-driven consult has finished, later strategic turns do not wait on a new precomputed plan. The next turn's orders come from the deferred consultation after resolution, or from standing orders when that consultation does not call the model. Ready keeps the label "Ready" during the deferred consultation and stays disabled until it finishes. See [Resolution playback](#resolution-playback).
 
@@ -44,7 +44,7 @@ Clicks outside the battle area show an error toast and do not issue an order. Th
 
 Tactical planning ends when the player exits, when the battle is reconciled away because the strategic turn no longer matches, or when annihilation opens.
 
-While Run is pressed, opponent sub-units remain, and no opponent plan is buffered yet, Ready is disabled with the same "AI:" elapsed-time label used in strategic planning.
+While Run is pressed, opponent sub-units remain, and no opponent plan is buffered yet, Ready is disabled with the same "AI:" elapsed-time label used in strategic planning. As in strategic planning, editing the tactical draft during that wait does not cancel or restart opponent planning.
 
 ### Tactical annihilation
 

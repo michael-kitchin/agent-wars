@@ -22,10 +22,10 @@ import type { GameStateSnapshot } from '../gameDb';
 import { buildStatusInjectionTexts } from './requestOrdersInjection';
 import { getInitialUserMessage } from './promptText';
 import { SECTION_TITLE_BEST_OPTIONS_THIS_TURN } from './promptSpec/sectionHeadings';
-import {
-  OPENROUTER_ORDER_FLOW_COMPLETION_MAX_TOKENS,
-  resolveEffectiveOpenRouterCompletionMaxTokens,
-} from './openRouterCreditLimits';
+import { resolveEffectiveOpenRouterCompletionMaxTokens } from './openRouterCreditLimits';
+import { BASELINE_ORDERS_REQUEST_PROFILE } from './ordersRequestProfile';
+import type { OrdersChatRequestSettings } from './ordersChatRequestHelpers';
+import { buildOrdersEnvelopeResponseFormat } from './promptSpec/envelopeJsonSchema';
 import { ASSESSMENT_TOOL_NAMES } from '../tools/assessment';
 import { COMBAT_ESTIMATION_TOOL_NAMES } from '../tools/combatEstimation';
 import { buildTacticalAiPlanState } from '../tacticalBattle/buildTacticalAiPlanState';
@@ -74,6 +74,7 @@ export async function requestOrdersFlow(
     buildSystemPromptForTools,
     buildToolDefinitions,
     postOpenRouterChatWithTimeoutAndRetry,
+    resolveOrdersRequestProfile,
     getGroupIdForToolName,
     validateAiOrder,
     validateAiRangedOrder,
@@ -328,18 +329,46 @@ export async function requestOrdersFlow(
   });
   logDebug('openRouter requestOrders: starting tool loop', { turnNumber: state.turnNumber });
 
+  const requestProfile = resolveOrdersRequestProfile?.(modelId) ?? BASELINE_ORDERS_REQUEST_PROFILE;
   /**
    * Both tactical and strategic final-json passes can emit large `orders[]` (many units + subscriptions + production).
-   * Prefer a high completion budget, but clamp to any session affordable cap learned from OpenRouter 402s.
+   * Prefer a high completion budget (raised for high reasoning efforts), but clamp to any session affordable cap
+   * learned from OpenRouter 402s.
    */
   const resolveOrderFlowMaxTokens = (): number =>
-    resolveEffectiveOpenRouterCompletionMaxTokens(OPENROUTER_ORDER_FLOW_COMPLETION_MAX_TOKENS);
+    resolveEffectiveOpenRouterCompletionMaxTokens(requestProfile.preferredCompletionMaxTokens);
   logDebug('openRouter requestOrders: completion token budgets', {
     tacticalAiBattle: tacticalBattle?.battleId ?? null,
-    preferredCompletionMaxTokens: OPENROUTER_ORDER_FLOW_COMPLETION_MAX_TOKENS,
+    reasoningEffort: requestProfile.effectiveReasoningEffort,
+    preferredCompletionMaxTokens: requestProfile.preferredCompletionMaxTokens,
     completionMaxTokens: resolveOrderFlowMaxTokens(),
     repairMaxTokens: resolveOrderFlowMaxTokens(),
   });
+  /**
+   * JSON envelope gates shared by the structured-output schema and the repair prompt.
+   *
+   * Purpose: The schema sent on every round and the repair schema text must describe the same fields.
+   * When to use: Building `requestSettings` and the repair exchange.
+   * Expected outcome: Matches the system prompt's final JSON contract for this consultation.
+   */
+  const envelopeGates: EnvelopeGates = {
+    coordinateMode: coordinateContext.mode,
+    includeAirActions: planState.units.some((u) => u.player === 'opponent' && u.unitType === 'air'),
+    includeMemoryUpdates: flags.memoryEnabled,
+    includeProductionOrders: flags.productionEnabled,
+    includeStandingOrderActions: flags.ordersEnabled && !tacticalBattle,
+  };
+  /**
+   * Optional request parameters sent identically on every tool-loop round and the repair call.
+   *
+   * Purpose: Resolves reasoning effort and structured outputs once per consultation.
+   * When to use: Passed to the tool loop and the repair exchange.
+   * Expected outcome: Baseline settings for models missing from the capability cache.
+   */
+  const requestSettings: OrdersChatRequestSettings = {
+    profile: requestProfile,
+    responseFormat: requestProfile.structuredOutputs ? buildOrdersEnvelopeResponseFormat(envelopeGates) : null,
+  };
 
   const wallClockStart = Date.now();
   const usage: RequestOrdersUsageTotals = { requestCost: 0, totalInputTokens: 0, totalOutputTokens: 0 };
@@ -377,6 +406,7 @@ export async function requestOrdersFlow(
       resolveToH3,
       postOpenRouterChatWithTimeoutAndRetry,
       resolveOrderFlowMaxTokens,
+      requestSettings,
       getOrCreateAiPlanningPathfindingSession,
       aiPathfindingSessionMetrics,
     });
@@ -403,19 +433,12 @@ export async function requestOrdersFlow(
     }
     const content = loopResult.content;
     const productionEnabledForParse = tacticalBattle ? false : flags.productionEnabled;
-    const repairGates: EnvelopeGates = {
-      coordinateMode: coordinateContext.mode,
-      includeAirActions: planState.units.some((u) => u.player === 'opponent' && u.unitType === 'air'),
-      includeMemoryUpdates: flags.memoryEnabled,
-      includeProductionOrders: flags.productionEnabled,
-      includeStandingOrderActions: flags.ordersEnabled && !tacticalBattle,
-    };
     let parsed = parseOrdersResponse(content, resolveToH3, planState, latLngByH3, productionEnabledForParse, coordinateContext);
     if (!parsed) {
       const repairContent = await runParseRepairExchange({
         messages,
         unparseableContent: content,
-        repairGates,
+        repairGates: envelopeGates,
         key,
         modelId,
         signal,
@@ -424,6 +447,7 @@ export async function requestOrdersFlow(
         usage,
         postOpenRouterChatWithTimeoutAndRetry,
         resolveOrderFlowMaxTokens,
+        requestSettings,
       });
       if (repairContent) {
         parsed = parseOrdersResponse(

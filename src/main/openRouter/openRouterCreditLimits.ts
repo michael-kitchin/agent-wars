@@ -249,8 +249,41 @@ export function formatOpenRouterChatApiError(status: number, bodyText: string): 
     }
     return 'OpenRouter credit limit reached. Add credits at https://openrouter.ai or reduce max completion tokens.';
   }
-  if (message) return `API error: ${message}`;
+  if (message) {
+    const providerDetail = extractOpenRouterProviderDetail(bodyText);
+    if (providerDetail && providerDetail !== message) {
+      const clipped = providerDetail.length > 300 ? `${providerDetail.slice(0, 300)}…` : providerDetail;
+      return `API error: ${message}: ${clipped}`;
+    }
+    return `API error: ${message}`;
+  }
   return `API error: ${status}`;
+}
+
+/**
+ * Reads the provider's own error text out of an OpenRouter error body.
+ *
+ * Purpose: OpenRouter often reports only "Provider returned error"; the useful text is in `error.metadata.raw`.
+ * When to use: `formatOpenRouterChatApiError`, so logs and fallback checks can see why the provider refused.
+ * Expected outcome: The inner message when `raw` is JSON with `message` or `error.message`; otherwise the raw string.
+ * Exceptions: Returns null when the body is not JSON or has no raw detail.
+ */
+function extractOpenRouterProviderDetail(bodyText: string): string | null {
+  try {
+    const parsed = JSON.parse(bodyText) as { error?: { metadata?: { raw?: unknown } } };
+    const raw = parsed.error?.metadata?.raw;
+    if (typeof raw !== 'string' || raw.trim().length === 0) return null;
+    try {
+      const inner = JSON.parse(raw) as { message?: unknown; error?: { message?: unknown } };
+      const nested = inner.error?.message ?? inner.message;
+      if (typeof nested === 'string' && nested.trim().length > 0) return nested.trim();
+    } catch {
+      return raw.trim();
+    }
+    return raw.trim();
+  } catch {
+    return null;
+  }
 }
 
 /**

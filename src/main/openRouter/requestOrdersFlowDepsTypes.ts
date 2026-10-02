@@ -10,6 +10,8 @@
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import type { CoordinateContext } from '../briefing/map/coordinateContext';
+import type { OpenRouterChatTransport } from './openRouterChatTransport';
+import type { OrdersRequestProfile } from './ordersRequestProfile';
 
 /**
  * Dependency bundle passed into `requestOrdersFlow` for test doubles and production OpenRouter wiring.
@@ -94,13 +96,16 @@ export interface RequestOrdersFlowDeps {
    * Expected outcome: `bodyText` is raw JSON string from the provider on success.
    * Exceptions: None from transport; network failures surface as `{ ok: false, error }`.
    */
-  postOpenRouterChatWithTimeoutAndRetry: (payload: {
-    key: string;
-    body: Record<string, unknown>;
-    signal?: AbortSignal;
-    onLog?: (line: string, isError?: boolean) => void;
-    requestLabel: string;
-  }) => Promise<{ ok: true; status: number; headers: Record<string, string>; bodyText: string } | { ok: false; error: string }>;
+  postOpenRouterChatWithTimeoutAndRetry: OpenRouterChatTransport;
+  /**
+   * Resolves the reasoning effort, structured-output support, and completion budget for a model.
+   *
+   * Contract: Optional; when omitted the flow uses the baseline profile (no `reasoning`, no `response_format`).
+   * When to use: Once per consultation, before the first chat request.
+   * Expected outcome: A profile that request helpers apply to every round and the repair call.
+   * Exceptions: None.
+   */
+  resolveOrdersRequestProfile?: (modelId: string) => OrdersRequestProfile;
   /**
    * Maps a tool name to its configured group id, if any.
    *

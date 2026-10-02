@@ -294,6 +294,9 @@ export function buildToolUsageGuidance(
       lines.push('- Use plan_route to understand multi-turn moves before issuing orders.');
     }
   }
+  lines.push(
+    '- Batch independent tool calls: when you need the same tool for several units or hexes, request all of those calls together in one reply as parallel tool calls instead of one call per reply. Wait for a result only when the next call\'s arguments depend on it.'
+  );
   if (flags.memoryEnabled && coordinateMode !== 'tactical') {
     lines.push(
       '- memoryUpdates / tiers: "persistent" entries appear in every briefing (limit 5); "stored" are retrieved via memory_read (limit 15).'

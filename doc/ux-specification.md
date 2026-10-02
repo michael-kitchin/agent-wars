@@ -34,7 +34,7 @@ Visual styling and the arrangement of items inside an element are out of scope. 
 | Ready, Ranged, or Strike | [selection-model.md](ux/selection-model.md), [order-lifecycle.md](ux/order-lifecycle.md), [modes-and-transitions.md](ux/modes-and-transitions.md) | [right-panel-command-bar.md](ux/right-panel-command-bar.md) |
 | Selected unit or order lists | [order-lifecycle.md](ux/order-lifecycle.md), [selection-model.md](ux/selection-model.md) | [right-panel-selection-and-orders.md](ux/right-panel-selection-and-orders.md) |
 | The Tools tab | [modes-and-transitions.md](ux/modes-and-transitions.md) | [right-panel-tools-tab.md](ux/right-panel-tools-tab.md) |
-| API key, model, Run, New, or Tactical battles | [modes-and-transitions.md](ux/modes-and-transitions.md), [notifications-and-feedback.md](ux/notifications-and-feedback.md) | [right-panel-model-tab.md](ux/right-panel-model-tab.md) |
+| API key, model, reasoning effort, Run, New, or Tactical battles | [modes-and-transitions.md](ux/modes-and-transitions.md), [notifications-and-feedback.md](ux/notifications-and-feedback.md) | [right-panel-model-tab.md](ux/right-panel-model-tab.md) |
 | The AI activity log | [notifications-and-feedback.md](ux/notifications-and-feedback.md) | [ai-activity-log.md](ux/ai-activity-log.md) |
 | New game or game over | [modes-and-transitions.md](ux/modes-and-transitions.md) | [new-game-dialog.md](ux/new-game-dialog.md) |
 | Turn or beat animation | [modes-and-transitions.md](ux/modes-and-transitions.md), [notifications-and-feedback.md](ux/notifications-and-feedback.md) | [resolution-playback.md](ux/resolution-playback.md) |
@@ -80,7 +80,7 @@ Element documents share a fixed heading set:
 - [right-panel-command-bar.md](ux/right-panel-command-bar.md): game state readout, Ready, Ranged, and air strike controls.
 - [right-panel-selection-and-orders.md](ux/right-panel-selection-and-orders.md): the selected-unit readout and the movement, ranged, and air-strike lists.
 - [right-panel-tools-tab.md](ux/right-panel-tools-tab.md): the Tools tab and its tool list.
-- [right-panel-model-tab.md](ux/right-panel-model-tab.md): API key, model, Run, New, the Tactical battles checkbox, and the model description tooltip.
+- [right-panel-model-tab.md](ux/right-panel-model-tab.md): API key, model, reasoning effort, Run, New, the Tactical battles checkbox, and the model description tooltip.
 - [ai-activity-log.md](ux/ai-activity-log.md): the log of AI interactions and errors.
 - [new-game-dialog.md](ux/new-game-dialog.md): the overlay used to start a game and to show game over.
 - [resolution-playback.md](ux/resolution-playback.md): the animated replay of turn resolution and the inputs it blocks.

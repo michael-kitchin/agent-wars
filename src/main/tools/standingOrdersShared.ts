@@ -2,6 +2,16 @@ import type { PlanRouteOk } from './pathfinding';
 import type { HumanOrderPreviewSegment } from '../../shared/ipc/humanOrderPreviewTypes';
 
 /**
+ * Every standing-order type `assignOrder` accepts.
+ *
+ * Purpose: One list for order validation and for the structured-output schema's `order.type` enum.
+ * When to use: Validating `order.type`, or describing it to the model.
+ * Expected outcome: Frozen vendor-visible strings; adding a type here makes it valid everywhere at once.
+ * Exceptions: None.
+ */
+export const STANDING_ORDER_TYPES: readonly string[] = Object.freeze(['defend', 'march', 'pursue', 'patrol', 'hold_fire']);
+
+/**
  * Standing-order types that steer a unit hex by hex and therefore cannot apply to air units.
  *
  * Purpose: Air units reposition by ferry and attack by air strike; they never march across hexes, so such an

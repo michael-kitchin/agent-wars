@@ -278,13 +278,20 @@
       border-radius: 2px;
       box-sizing: border-box;
     }
-    .openrouter-model-row {
-      display: flex;
+    .openrouter-model-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto auto auto;
       gap: 0.4rem;
+      align-items: center;
     }
-    .openrouter-model-row select {
-      flex: 1;
+    .openrouter-model-grid select {
       min-width: 0;
+    }
+    .openrouter-model-grid-checkbox {
+      grid-column: 2 / -1;
+    }
+    .openrouter-model-grid-checkbox label {
+      white-space: nowrap;
     }
     .openrouter-inline-checkbox {
       display: flex;
@@ -1067,24 +1074,25 @@
         </div>
         <div class="openrouter-row">
           <label for="openrouter-model">Model</label>
-          <div class="openrouter-model-row">
+          <div class="openrouter-model-grid">
             <select id="openrouter-model">
               <option value="">— Select model —</option>
             </select>
             <button type="button" id="openrouter-refresh-models" class="openrouter-refresh-btn" title="Refresh model list" aria-label="Refresh model list"></button>
             <button type="button" id="openrouter-run-btn" class="openrouter-tool-toggle" aria-pressed="false" disabled title="Set API key and model to enable">Run</button>
             <button type="button" id="openrouter-new-btn" class="openrouter-tool-toggle" aria-label="Start a new game">New</button>
-          </div>
-        </div>
-        <div class="openrouter-row">
-          <div class="openrouter-inline-checkbox">
-            <input
-              type="checkbox"
-              id="openrouter-tactical-battles"
-              checked
-              title="When unchecked, the tactical battles list does not appear; melee resolves as if you chose Ignore every time."
-            />
-            <label for="openrouter-tactical-battles">Tactical battles</label>
+            <select id="openrouter-reasoning-effort" aria-label="Reasoning effort" title="Reasoning effort for the selected model" disabled>
+              <option value="">Model default</option>
+            </select>
+            <div class="openrouter-inline-checkbox openrouter-model-grid-checkbox">
+              <input
+                type="checkbox"
+                id="openrouter-tactical-battles"
+                checked
+                title="When unchecked, the tactical battles list does not appear; melee resolves as if you chose Ignore every time."
+              />
+              <label for="openrouter-tactical-battles">Tactical battles</label>
+            </div>
           </div>
         </div>
       </div>

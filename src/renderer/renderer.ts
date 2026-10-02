@@ -134,7 +134,6 @@ import {
   renderOpenRouterToolsList as renderOpenRouterToolsListFromModule,
   startBackgroundRequestIfAllowed as startBackgroundRequestIfAllowedFromModule,
   syncEventDrivenFromTools as syncEventDrivenFromToolsFromModule,
-  withTacticalHumanDraftPrefetchInvalidation,
 } from './openRouter/openRouterRuntime';
 import { resetPrecomputedAiState } from './openRouter/precomputedAiState';
 import { flushResolutionPlaybackCompleteNotifyCallbacks } from './openRouter/resolutionPlaybackDeferral';
@@ -716,14 +715,10 @@ async function renderSealiftSection(units: GameStateSnapshot['units'], calloutEl
           if (tacticalSealiftMode) {
             const prev = select.dataset.prevLand ?? '';
             if (prev) {
-              withTacticalHumanDraftPrefetchInvalidation(() => {
-                S.tacticalPendingMarches = S.tacticalPendingMarches.filter((m) => m.subUnitId !== prev);
-              });
+              S.tacticalPendingMarches = S.tacticalPendingMarches.filter((m) => m.subUnitId !== prev);
             }
             if (selected.length > 0) {
-              withTacticalHumanDraftPrefetchInvalidation(() => {
-                S.tacticalPendingMarches = S.tacticalPendingMarches.filter((m) => m.subUnitId !== selected);
-              });
+              S.tacticalPendingMarches = S.tacticalPendingMarches.filter((m) => m.subUnitId !== selected);
             }
             const result = await window.gameApi.updateTacticalSealiftSlot!({
               h3Index,
@@ -738,9 +733,7 @@ async function renderSealiftSection(units: GameStateSnapshot['units'], calloutEl
                 S.tacticalBattleSnapshot = result.tacticalBattle;
               }
               const navalIds = new Set((result.state?.navalRows ?? []).map((r) => r.navalUnitId));
-              withTacticalHumanDraftPrefetchInvalidation(() => {
-                S.pendingEmbarkOrders = S.pendingEmbarkOrders.filter((e) => !navalIds.has(e.navalUnitId));
-              });
+              S.pendingEmbarkOrders = S.pendingEmbarkOrders.filter((e) => !navalIds.has(e.navalUnitId));
               select.dataset.prevLand = selected;
               if (selected.length > 0) {
                 await refreshHumanStandingOrders();
@@ -794,10 +787,8 @@ async function renderSealiftSection(units: GameStateSnapshot['units'], calloutEl
                     S.tacticalBattleSnapshot = result.tacticalBattle;
                   }
                   const navalIds = new Set((result.state?.navalRows ?? []).map((r) => r.navalUnitId));
-                  withTacticalHumanDraftPrefetchInvalidation(() => {
-                    S.tacticalPendingMarches = S.tacticalPendingMarches.filter((m) => m.subUnitId !== prev);
-                    S.pendingEmbarkOrders = S.pendingEmbarkOrders.filter((e) => !navalIds.has(e.navalUnitId));
-                  });
+                  S.tacticalPendingMarches = S.tacticalPendingMarches.filter((m) => m.subUnitId !== prev);
+                  S.pendingEmbarkOrders = S.pendingEmbarkOrders.filter((e) => !navalIds.has(e.navalUnitId));
                   updatePendingOrdersSidebar();
                 }
               }
@@ -805,8 +796,6 @@ async function renderSealiftSection(units: GameStateSnapshot['units'], calloutEl
               requestRedraw();
               return;
             }
-            // Strategic sealift debark (`updateSealiftSlot`): not a tactical res4 draft mutation, so no tactical prefetch
-            // fingerprint / `withTacticalHumanDraftPrefetchInvalidation` hook (those apply only under `tacticalSealiftMode`).
             const result = await window.gameApi!.updateSealiftSlot({
               h3Index,
               navalUnitId: row.navalUnitId,
@@ -1403,7 +1392,8 @@ let sessionStaticRes4OverlaysLoaded = false;
 /**
  * Fetches static res4 overlay IPC payloads once per session unless `forceReload` is set.
  *
- * Purpose: Split from dynamic terrain-override refresh (Phase 8 performance plan).
+ * Purpose: Static overlays never change within a session, so they load separately from the dynamic terrain-override
+ * refresh and are not refetched on every map refresh.
  * When to use: Before every map refresh; skipped when already loaded and not forced.
  * Expected outcome: City/road-rail/vector renderer state populated via `applyRes4CityOverlayRows`.
  * Exceptions: Logs to console and rethrows on IPC failure (caller catches).

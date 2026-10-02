@@ -160,6 +160,26 @@ function testInvalidAssignOrderTypeSurfacesDropReason(): void {
 }
 
 /**
+ * Verifies a move row with no destination is reported as dropped.
+ *
+ * Purpose: A destinationless move must reach the drop reasons so it shows in drop counts, not vanish silently.
+ * When to use: After edits to `processV3OrdersArray` move handling.
+ * Expected outcome: No movement order; a drop reason names the action and unit.
+ * Exceptions: None.
+ */
+function testMoveWithoutDestinationSurfacesDropReason(): void {
+  const parsed = parseFixture(
+    '{"strategy":"x","orders":[{"action":"explicit_move","unitId":"opponent-1"}],"airStrikes":[],"ferryOrders":[],"callbacks":[]}'
+  );
+  assert.ok(parsed);
+  assert.strictEqual(parsed!.movementOrders.length, 0);
+  assert.ok(
+    parsed!.dropReasons?.some((r) => r.includes('explicit_move opponent-1') && r.includes('destination')),
+    'expected a missing-destination drop reason'
+  );
+}
+
+/**
  * Drops assign_order / cancel_order when parsing under tactical coordinate context.
  *
  * Purpose: Prevents strategic `standing_orders` pollution from sub-unit ids shown in tactical briefings.
@@ -382,6 +402,7 @@ const tests = [
   { name: 'parseOrdersResponse tries fenced json after bad preamble', fn: testSkipsBadCandidateThenParsesFence },
   { name: 'parseOrdersResponse rejects top-level JSON array', fn: testRejectsTopLevelJsonArray },
   { name: 'parseOrdersResponse invalid assign_order type drop reason', fn: testInvalidAssignOrderTypeSurfacesDropReason },
+  { name: 'parseOrdersResponse move without destination drop reason', fn: testMoveWithoutDestinationSurfacesDropReason },
   { name: 'parseOrdersResponse tactical skips assign_order and cancel_order', fn: testTacticalModeSkipsAssignAndCancelOrder },
   { name: 'parseOrdersResponse unitIds expands grouped move fire air and ferry', fn: testUnitIdsExpandsGroupedMoveFireAirAndFerry },
   {

@@ -94,6 +94,7 @@ Live assembler notes that match the matrix above:
 5. **Action type decides the field.** An option row's action determines where its target goes: approach and move rows into the move field, ferry rows into the ferry list, air strike rows into the strike list when air is present, ranged rows into a ranged action. The prompt must state this mapping once, in `# Available Tools`, and the envelope contract must not contradict it. When one option row lists several unit ids, that mapping is one envelope entry with `unitIds` copied from the row, not one entry per id. A unit listed on several overlapping rows still gets at most one move and one shot: pick one row per action type; do not copy overlapping rows that relist the same unit. A Target Hex listed only for other units is never a legal copy for this unit; if this unit has no row, route or leave it idle.
 6. **Stop condition.** Once destinations are chosen the model submits. The prompt must say that re-assessing or re-routing after a destination is chosen is wasted budget, because the round limit is finite and exhausting it produces no orders at all.
 7. **Empty tool set.** When no tool is enabled, `# Available Tools` still appears with `No tools available.` so the model cannot conclude that unlisted tools might work.
+8. **Batch independent calls.** Both modes must tell the model to request independent calls to the same tool together in one reply as parallel tool calls, and to wait for a result only when the next call's arguments depend on it. One call per reply spends a tool round on each call and exhausts the round limit on large rosters.
 
 Tool inventory and per-consult availability:
 
@@ -134,8 +135,8 @@ Envelope-wide rules the prompt must state:
 2. `message`, `strategy`, and `orders` are mandatory even when `orders` is empty.
 3. Optional arrays may be omitted or empty. An omitted or empty `callbacks` field clears all subscriptions.
 4. Legacy top-level `movementOrders` and `rangedAttacks` are invalid.
-5. Every `orders` entry carries an `action`; all but the order-cancelling action also carry a `unitId` or a `unitIds` array. `unitIds` is the compact form for several actors sharing the same action and destination or target, copied from a Best Options `Unit IDs` cell. A non-empty `unitIds` list is the actor set; otherwise `unitId` is. The engine expands the list into per-unit orders. The prompt must tell the model to prefer `unitIds` whenever a row lists more than one id, because one JSON object per unit will not fit a large roster inside the completion budget.
-6. An entry missing a required field for its action is dropped silently, so the model must not rely on partial entries.
+5. Every `orders` entry carries an `action` and a `unitId` or a `unitIds` array. `unitIds` is the compact form for several actors sharing the same action and destination or target, copied from a Best Options `Unit IDs` cell. A non-empty `unitIds` list is the actor set; otherwise `unitId` is. The engine expands the list into per-unit orders. The prompt must tell the model to prefer `unitIds` whenever a row lists more than one id, because one JSON object per unit will not fit a large roster inside the completion budget.
+6. An entry missing a required field for its action is dropped silently, so the model must not rely on partial entries. The engine logs a drop reason for incomplete `orders`, `airStrikes`, `ferryOrders`, and `productionOrders` entries, but nothing about a drop reaches the model.
 7. Output is compact JSON only: no prose, no commentary, no markdown fence, and no extra whitespace around the submitted object.
 
 ### 5.2 Action legality by mode

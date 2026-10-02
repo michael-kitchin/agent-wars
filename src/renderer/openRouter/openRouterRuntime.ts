@@ -1,6 +1,5 @@
 import { isLikelyAbortError } from '../../shared/abortError';
 import { hasAiStrategyToastContent, type AiStrategyToastFields } from '../../shared/aiStrategyToastContent';
-import { buildTacticalHumanDraftPrefetchFingerprint } from '../../shared/tacticalHumanDraftPrefetchFingerprint';
 import { rendererSharedState as S } from '../core/state';
 import {
   applySuccessfulPrecomputedAiResult,
@@ -31,56 +30,6 @@ const BACKGROUND_AI_REQUEST_TIMEOUT_MS = AI_CONSULTATION_WAIT_TIMEOUT_MS;
 let openRouterRuntimeDepsRef: OpenRouterRuntimeDeps | null = null;
 
 /**
- * Builds the Phase 4 tactical human-draft fingerprint from live renderer shared state.
- *
- * Purpose: Keeps fingerprint construction next to prefetch lifecycle without importing `S` into shared pure helpers.
- * When to use: Only from `startBackgroundRequestIfAllowed` / stale checks in this module.
- * Expected outcome: Same string as `buildTacticalHumanDraftPrefetchFingerprint` on current `S` draft slices.
- * Exceptions: None.
- */
-function tacticalHumanDraftFingerprintNow(): string {
-  return buildTacticalHumanDraftPrefetchFingerprint({
-    tacticalPendingMarches: S.tacticalPendingMarches,
-    pendingRangedAttacks: S.pendingRangedAttacks,
-    pendingAirStrikes: S.pendingAirStrikes,
-    pendingFerryOrders: S.pendingFerryOrders,
-    pendingEmbarkOrders: S.pendingEmbarkOrders,
-  });
-}
-
-/**
- * Aborts an in-flight tactical prefetch when the human’s draft rows changed after the request started.
- *
- * Purpose: Phase 4 — avoids applying an opponent plan computed from obsolete human orders; pairs with response-time
- * fingerprint checks for races where cancel arrives too late.
- * When to use: After any mutation to tactical pending marches, ranged, air, ferry, or embark lists while Run prefetch may be active.
- * Expected outcome: `cancelRequestAiOrders` runs only when fingerprint differs from the value captured at request start.
- * Exceptions: None when `startBackgroundRequestIfAllowed` has not run yet (`openRouterRuntimeDepsRef` unset).
- */
-export function invalidateTacticalPrefetchIfHumanDraftChangedSinceRequestStart(): void {
-  if (!S.backgroundRequestInFlight) return;
-  if (!S.tacticalBattleSnapshot || !S.tacticalPhasePlanning) return;
-  const started = S.tacticalPrefetchFingerprintWhenRequestStarted;
-  if (started === null) return;
-  if (tacticalHumanDraftFingerprintNow() === started) return;
-  window.gameApi?.cancelRequestAiOrders?.();
-  openRouterRuntimeDepsRef?.appendOpenRouterLog('Tactical AI prefetch cancelled (human draft changed).', false);
-}
-
-/**
- * Runs synchronous tactical human-draft list mutations, then applies prefetch invalidation in one place.
- *
- * Purpose: Keeps `invalidateTacticalPrefetchIfHumanDraftChangedSinceRequestStart` co-located with every mutation path so new draft edits cannot forget the trailing check.
- * When to use: Wrap only code that mutates `S.tacticalPendingMarches`, `S.pendingRangedAttacks`, `S.pendingAirStrikes`, `S.pendingFerryOrders`, or `S.pendingEmbarkOrders` during tactical planning.
- * Expected outcome: Same cancel/log behavior as calling `invalidateTacticalPrefetchIfHumanDraftChangedSinceRequestStart` immediately after `run` completes.
- * Exceptions: None.
- */
-export function withTacticalHumanDraftPrefetchInvalidation(run: () => void): void {
-  run();
-  invalidateTacticalPrefetchIfHumanDraftChangedSinceRequestStart();
-}
-
-/**
  * Log line when background `requestAiOrders` is cancelled because the main/renderer tactical session ended (reconcile, new game).
  *
  * Purpose: Single source for grep and copy used by `cancelTacticalScopedBackgroundPrefetchForSessionTeardown`.
@@ -105,21 +54,16 @@ export const OPEN_ROUTER_LOG_BACKGROUND_AI_CANCEL_TACTICAL_BATTLE_EXIT =
 /**
  * Cancels any in-flight `requestAiOrders` work from the renderer (tactical prefetch or strategic background planning).
  *
- * Purpose: `cancelTacticalScopedBackgroundPrefetchForSessionTeardown` previously skipped cancellation when
- * `tacticalPrefetchFingerprintWhenRequestStarted` was null, leaving strategic prefetch running during tactical teardown.
- * Exit battle and session reconciliation must always abort main-process AI work and unblock Ready-equivalent latches.
+ * Purpose: Battle exit, session reconciliation, and similar teardown must abort main-process AI work and release the
+ * Ready latch so a late result is never applied to a torn-down session.
  * When to use: Tactical battle exit, `tacticalReleaseRendererSessionForNewStrategicMatch`, `tacticalReconcileBattleAfterStrategicSnapshot`, and other renderer teardown that must not apply late AI results.
  * Expected outcome: No-op when no background request; otherwise `cancelRequestAiOrders`, cleared in-flight flags, log line, `unblockPrecomputedAiPlanningAfterBackgroundFailure`, and Ready UI refresh.
  * Exceptions: None; safe when `openRouterRuntimeDepsRef` is unset (still cancels on main).
  */
 export function cancelInFlightBackgroundAiRequestForRendererTeardown(logLine: string): void {
-  if (!S.backgroundRequestInFlight) {
-    S.tacticalPrefetchFingerprintWhenRequestStarted = null;
-    return;
-  }
+  if (!S.backgroundRequestInFlight) return;
   void window.gameApi?.cancelRequestAiOrders?.();
   S.backgroundRequestInFlight = false;
-  S.tacticalPrefetchFingerprintWhenRequestStarted = null;
   openRouterRuntimeDepsRef?.appendOpenRouterLog(logLine, false);
   unblockPrecomputedAiPlanningAfterBackgroundFailure();
   openRouterRuntimeDepsRef?.updateReadyButtonState();
@@ -128,7 +72,7 @@ export function cancelInFlightBackgroundAiRequestForRendererTeardown(logLine: st
 /**
  * Cancels an in-flight tactical `requestAiOrders` prefetch when the res4 tactical session is torn down on the renderer.
  *
- * Purpose: `invalidateTacticalPrefetchIfHumanDraftChangedSinceRequestStart` only runs while `S.tacticalBattleSnapshot` and planning are true; exiting tactical or reconciling away the battle must still cancel main work so a late success cannot call `applySuccessfulPrecomputedAiResult` against a null snapshot.
+ * Purpose: Exiting tactical play or reconciling the battle away must cancel main-process work so a late success cannot call `applySuccessfulPrecomputedAiResult` against a null snapshot.
  * When to use: Start of `tacticalReleaseRendererSessionForNewStrategicMatch` and `tacticalReconcileBattleAfterStrategicSnapshot` before clearing `S.tacticalBattleSnapshot`.
  * Expected outcome: Delegates to `cancelInFlightBackgroundAiRequestForRendererTeardown` with the session-ended log line.
  * Exceptions: None.
@@ -232,12 +176,16 @@ function strategicPhaseAllowsBackgroundAi(): boolean {
 }
 
 /**
- * Defines the `startBackgroundRequestIfAllowed` function shape (export function startBackgroundRequestIfAllowed(deps: OpenRouterRuntimeDeps): void).
-
- * Purpose: Supports maintainability by documenting why `startBackgroundRequestIfAllowed` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: No `requestAiOrders` while the tactical annihilation game-over modal is open.
- * Exceptions: None.
+ * Starts the background opponent-planning request when Ready is waiting on it.
+ *
+ * Purpose: Starts at most one background `requestAiOrders` when Run is on and Ready is waiting on an opponent plan
+ * (strategic precompute or tactical opponent draft).
+ * When to use: After any state change that may leave Ready waiting on AI planning: Run on, a new game, a successful
+ * Ready or beat commit, the Events toggle.
+ * Expected outcome: Applies a successful result to the precomputed buffers; on failure or cancel, restarts once if still
+ * waiting, otherwise releases Ready with an empty plan. No request while the annihilation dialog is open or a deferred
+ * consult is pending. Editing the player's draft never affects an in-flight request.
+ * Exceptions: None; failures are logged to the activity log and the sidebar.
  */
 export function startBackgroundRequestIfAllowed(deps: OpenRouterRuntimeDeps): void {
   if (S.tacticalAnnihilationOutcomeDialog != null) return;
@@ -251,23 +199,16 @@ export function startBackgroundRequestIfAllowed(deps: OpenRouterRuntimeDeps): vo
   Promise.all([keyPromise, modelPromise]).then(([keyResult, modelId]) => {
     if (!keyResult?.hasKey || !modelId?.trim()) {
       S.backgroundRequestInFlight = false;
-      S.tacticalPrefetchFingerprintWhenRequestStarted = null;
       deps.appendOpenRouterLog('Run is on but API key or model not set.', true);
       deps.updateReadyButtonState();
       return;
     }
     if (!S.runButtonOn || !window.gameApi?.requestAiOrders) {
       S.backgroundRequestInFlight = false;
-      S.tacticalPrefetchFingerprintWhenRequestStarted = null;
       deps.updateReadyButtonState();
       return;
     }
     const enabledToolGroupsPayload = Array.from(S.enabledToolGroups).filter((id) => id !== 'events');
-    if (S.tacticalBattleSnapshot && S.tacticalPhasePlanning) {
-      S.tacticalPrefetchFingerprintWhenRequestStarted = tacticalHumanDraftFingerprintNow();
-    } else {
-      S.tacticalPrefetchFingerprintWhenRequestStarted = null;
-    }
     const requestPromise = window.gameApi.requestAiOrders({ enabledToolGroups: enabledToolGroupsPayload });
     const timeoutPromise = new Promise<never>((_resolve, reject) => {
       setTimeout(() => reject(new Error(`AI planning timed out after ${BACKGROUND_AI_REQUEST_TIMEOUT_MS}ms`)), BACKGROUND_AI_REQUEST_TIMEOUT_MS);
@@ -278,28 +219,6 @@ export function startBackgroundRequestIfAllowed(deps: OpenRouterRuntimeDeps): vo
         if (S.useEventDrivenConsultation && !S.eventDrivenInitialConsultationDone) {
           S.eventDrivenInitialConsultationDone = true;
         }
-        const startedFp = S.tacticalPrefetchFingerprintWhenRequestStarted;
-        const tacticalPlanningCtx = !!(S.tacticalBattleSnapshot && S.tacticalPhasePlanning);
-        const nowFp = tacticalPlanningCtx ? tacticalHumanDraftFingerprintNow() : null;
-        const staleTacticalPrefetch =
-          result.success &&
-          tacticalPlanningCtx &&
-          startedFp !== null &&
-          nowFp !== null &&
-          nowFp !== startedFp &&
-          'tacticalOpponentPlan' in result &&
-          result.tacticalOpponentPlan != null;
-        if (staleTacticalPrefetch) {
-          S.tacticalPrefetchFingerprintWhenRequestStarted = null;
-          deps.appendOpenRouterLog(
-            'Discarded stale tactical prefetch (human draft changed during AI request).',
-            false
-          );
-          deps.updateReadyButtonState();
-          startBackgroundRequestIfAllowed(deps);
-          return;
-        }
-        S.tacticalPrefetchFingerprintWhenRequestStarted = null;
         if (S.runButtonOn && result.success) {
           if (!S.tacticalBattleSnapshot && (result.tacticalBattle != null || result.tacticalOpponentPlan != null)) {
             deps.appendOpenRouterLog('Discarded tactical prefetch (tactical session no longer active).', false);
@@ -332,10 +251,10 @@ export function startBackgroundRequestIfAllowed(deps: OpenRouterRuntimeDeps): vo
           }
         } else if (!result.success) {
           if (result.error === 'Cancelled') {
-            // Intentional cancel triggered by a human draft change; invalidateTacticalPrefetchIfHumanDraftChangedSinceRequestStart
-            // already logged the event — no error toast needed. Restart against the new draft before releasing the
-            // Ready latch: unblocking first installs an empty tactical draft, which makes isWaitingForPrecomputedAiOrders
-            // false and causes the restart to decline, leaving the beat with no opponent orders at all.
+            // A deliberate cancel (Run off, Events toggled, key or model removed, session teardown) ends here, so no
+            // error toast. Restart before releasing the Ready latch: unblocking first installs an empty tactical draft,
+            // which makes isWaitingForPrecomputedAiOrders false and makes the restart decline. When nothing restarts,
+            // unblock so Ready is not stuck.
             startBackgroundRequestIfAllowed(deps);
             if (!S.backgroundRequestInFlight) {
               if (S.runButtonOn) {
@@ -361,7 +280,6 @@ export function startBackgroundRequestIfAllowed(deps: OpenRouterRuntimeDeps): vo
           window.gameApi?.cancelRequestAiOrders?.();
         }
         S.backgroundRequestInFlight = false;
-        S.tacticalPrefetchFingerprintWhenRequestStarted = null;
         if (isAbort && S.tacticalBattleSnapshot && S.tacticalPhasePlanning) {
           deps.appendOpenRouterLog('Tactical AI prefetch aborted.', false);
           deps.updateReadyButtonState();
@@ -377,7 +295,6 @@ export function startBackgroundRequestIfAllowed(deps: OpenRouterRuntimeDeps): vo
       });
   }).catch((err) => {
     S.backgroundRequestInFlight = false;
-    S.tacticalPrefetchFingerprintWhenRequestStarted = null;
     deps.showSidebarError(String(err));
     unblockPrecomputedAiPlanningAfterBackgroundFailure();
     deps.updateReadyButtonState();

@@ -874,11 +874,8 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
         cachedPrecomputed: cachedPrecomputedToolCountsAtReadyStart,
         allowPrecomputedFallback: S.runButtonOn && cachedPrecomputedToolCountsAtReadyStart != null,
       });
-      // Intentionally no `withTacticalHumanDraftPrefetchInvalidation` here: Phase-4 prefetch cancel on *human edits*
-      // during tactical planning uses that wrapper on sidebar/map paths. This block replaces pending rows from the
-      // successful commit IPC (continuations + cleared ranged/air/ferry/embark), not a mid-flight draft tweak.
-      // In-flight tactical prefetch is torn down via `cancelInFlightBackgroundAiRequestForRendererTeardown` when the
-      // res4 session ends (main reconcile or voluntary exit); late `requestAiOrders` resolves are dropped in `openRouterRuntime` if `tacticalBattleSnapshot` is gone.
+      // Replaces pending rows from the successful commit (continuations plus cleared ranged/air/ferry/embark). A late
+      // requestAiOrders result is dropped in openRouterRuntime when tacticalBattleSnapshot is gone.
       const previousPendingMarches = new Map(S.tacticalPendingMarches.map((row) => [row.subUnitId, row]));
       S.tacticalPendingMarches = commitResult.tacticalMarchContinuations?.length
         ? buildTacticalPendingMarchRowsFromContinuations({

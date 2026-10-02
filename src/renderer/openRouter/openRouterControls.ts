@@ -10,6 +10,7 @@ import {
 import { applyTacticalPostBeatConsultSideEffects } from '../tactical/applyTacticalPostBeatConsultSideEffects';
 import { updateOpenRouterCostLabel } from './openRouterUiHelpers';
 import { attachModelDescriptionTooltip } from './modelDescriptionTooltip';
+import { attachReasoningEffortSelect } from './reasoningEffortSelect';
 import { resetPrecomputedAiState } from './precomputedAiState';
 
 /**
@@ -328,6 +329,48 @@ export function initOpenRouterUI(deps: OpenRouterUiDeps): void {
         },
       })
     : null;
+  /**
+   * Saved reasoning-effort override for the selected model; `''` means the model default.
+   *
+   * Purpose: Lets model-list refreshes restore the player's reasoning choice without another IPC round trip.
+   * When to use: Read when rebuilding the reasoning dropdown; written on load, on effort change, and (to `''`) on model change.
+   * Expected outcome: Mirrors the main-process value after startup.
+   * Exceptions: None.
+   */
+  let persistedReasoningEffort = '';
+  /**
+   * True once the player has picked a model in this session.
+   *
+   * Purpose: A slow startup effort load must not restore the previous model's effort onto a newly picked model.
+   * When to use: Checked when `getSelectedReasoningEffort` resolves.
+   * Expected outcome: Late startup results are ignored after a player model change.
+   * Exceptions: None.
+   */
+  let playerChangedModel = false;
+  const reasoningEffortSelectEl = document.getElementById('openrouter-reasoning-effort') as HTMLSelectElement | null;
+  const reasoningEffortSelect = reasoningEffortSelectEl
+    ? attachReasoningEffortSelect({
+        select: reasoningEffortSelectEl,
+        onEffortChange: (persistedEffort) => {
+          persistedReasoningEffort = persistedEffort;
+          api.setSelectedReasoningEffort(persistedEffort).catch((err) => {
+            deps.appendOpenRouterLog(`Reasoning effort: ${String(err)}`, true);
+          });
+        },
+      })
+    : null;
+
+  /**
+   * Rebuilds the reasoning dropdown for whatever model is selected now.
+   *
+   * Purpose: One call site for every event that can change the selected model or the saved effort.
+   * When to use: After model lists load or fail, after the saved effort loads, and after a model change.
+   * Expected outcome: The dropdown shows the selected model's levels, or a disabled "model default" when unknown.
+   * Exceptions: None.
+   */
+  function showReasoningEffortForSelectedModel(): void {
+    reasoningEffortSelect?.showForModel(modelsById.get(modelSelect?.value ?? ''), persistedReasoningEffort);
+  }
 
   function clearStartupModelRetryTimer(): void {
     if (startupModelRetryTimer !== null) {
@@ -365,6 +408,7 @@ export function initOpenRouterUI(deps: OpenRouterUiDeps): void {
       if ('error' in result && result.error) {
         deps.appendOpenRouterLog(`Models: ${result.error}`, true);
         if (retryOnFailure && shouldRetryStartupModelFetch(result.error)) scheduleStartupModelRetry();
+        showReasoningEffortForSelectedModel();
         void deps.syncOpenRouterRunToggleInteractable();
         return;
       }
@@ -380,6 +424,7 @@ export function initOpenRouterUI(deps: OpenRouterUiDeps): void {
       if (targetModelId && Array.from(modelSelect.options).some((o) => o.value === targetModelId)) {
         modelSelect.value = targetModelId;
       }
+      showReasoningEffortForSelectedModel();
       clearStartupModelRetryTimer();
       void deps.syncOpenRouterRunToggleInteractable();
     }).catch((err) => {
@@ -388,6 +433,7 @@ export function initOpenRouterUI(deps: OpenRouterUiDeps): void {
       const message = String(err);
       deps.appendOpenRouterLog(`Models: ${message}`, true);
       if (retryOnFailure && shouldRetryStartupModelFetch(message)) scheduleStartupModelRetry();
+      showReasoningEffortForSelectedModel();
       void deps.syncOpenRouterRunToggleInteractable();
     }).finally(() => {
       modelRefreshInFlight = false;
@@ -405,6 +451,13 @@ export function initOpenRouterUI(deps: OpenRouterUiDeps): void {
     }
     refreshModels(true);
   }).catch(() => refreshModels(true));
+  api.getSelectedReasoningEffort().then((effort) => {
+    if (playerChangedModel) return;
+    persistedReasoningEffort = effort;
+    showReasoningEffortForSelectedModel();
+  }).catch((err) => {
+    deps.appendOpenRouterLog(`Reasoning effort: ${String(err)}`, true);
+  });
 
   if (keyInput) {
     api.getKey().then((keyResult) => {
@@ -458,6 +511,9 @@ export function initOpenRouterUI(deps: OpenRouterUiDeps): void {
   if (modelSelect) {
     modelSelect.addEventListener('change', () => {
       api.setSelectedModel(modelSelect.value);
+      playerChangedModel = true;
+      persistedReasoningEffort = '';
+      showReasoningEffortForSelectedModel();
       if (modelSelect.value) deps.hideMapToast();
       else modelDescriptionTooltip?.clear();
       void deps.syncOpenRouterRunToggleInteractable();

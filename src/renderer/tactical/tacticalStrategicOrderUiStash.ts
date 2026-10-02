@@ -46,8 +46,6 @@ export function stashStrategicOrderDraftsForTacticalSession(): void {
   S.pendingRangedAttacks = [];
   S.pendingAirStrikes = [];
   S.pendingFerryOrders = [];
-  // No `withTacticalHumanDraftPrefetchInvalidation`: entering tactical from strategic replaces sidebar contracts; this is
-  // not a human tweak to an in-progress tactical beat draft. Tactical Run prefetch is not active until res4 planning UI is up.
   S.pendingEmbarkOrders = [];
   S.tacticalPendingMarches = [];
   S.tacticalOpponentDraft = null;
@@ -99,8 +97,6 @@ export function restoreStrategicOrderDraftsAfterTacticalSession(): void {
     livingUnitIds
   );
   strategicOrderDraftStash = null;
-  // No `withTacticalHumanDraftPrefetchInvalidation`: restoring strategic drafts after tactical exit; tactical prefetch
-  // lifecycle does not apply to these arrays until the player is back in res4 tactical planning with Run prefetch rules.
   S.tacticalPendingMarches = [];
   S.pendingEmbarkOrders = [];
 }

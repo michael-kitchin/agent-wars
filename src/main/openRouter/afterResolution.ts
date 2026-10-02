@@ -1,5 +1,5 @@
 /**
- * After-resolution callback evaluation and conditional consultation (Milestone 0.7).
+ * After-resolution callback evaluation and conditional consultation.
  * Runs when event-driven mode is on: evaluates mandatory overrides and subscription events,
  * and consults when those fire, when the opponent had no resolution-time unit actions, or when the human had observable resolution outcomes.
  * Call synchronously after ready() returns so pending orders are set before the next Ready.
@@ -137,6 +137,7 @@ toolInvocationCounts?: Record<string, number>;
     /**
    * Dollar cost of the successful post-resolution consultation, when the model call reported one.
    *
+   * Contract: Optional non-negative dollar amount; set only when the consultation succeeded and reported a cost.
    * When to use: Copy onto the Ready result or the deferred consult push so the match readout can add it.
    * Expected outcome: A finite number when `requestOrders` returned one; omitted otherwise. Never `NaN`.
    * Exceptions: None.
@@ -405,6 +406,7 @@ export interface AfterTacticalBeatResolutionResult {
   /**
    * Dollar cost of the successful tactical post-beat consultation, when the model call reported one.
    *
+   * Contract: Optional non-negative dollar amount; set only when the consultation succeeded and reported a cost.
    * When to use: Copy onto the tactical consult merge so the match readout can add it once.
    * Expected outcome: A finite number when `requestOrders` returned one; omitted otherwise. Never `NaN`.
    * Exceptions: None.

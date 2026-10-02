@@ -20,7 +20,14 @@ function testFullMetadata(): void {
     name: 'GPT-4',
     description: '  A capable model.  ',
     pricing: { prompt: '0.00003', completion: '0.00006' },
-    reasoning: { default_effort: ' medium ', default_enabled: true, mandatory: false },
+    reasoning: {
+      default_effort: ' medium ',
+      default_enabled: true,
+      mandatory: false,
+      supported_efforts: [' high ', 'low', ''],
+    },
+    supported_parameters: ['tools', ' response_format ', 7],
+    top_provider: { max_completion_tokens: 32768.9, context_length: 128000 },
     architecture: { tokenizer: 'ignored' },
   });
   assert.deepEqual(mapped, {
@@ -28,8 +35,28 @@ function testFullMetadata(): void {
     name: 'GPT-4',
     description: 'A capable model.',
     pricing: { prompt: '0.00003', completion: '0.00006' },
-    reasoning: { default_effort: 'medium', default_enabled: true, mandatory: false },
+    reasoning: {
+      default_effort: 'medium',
+      default_enabled: true,
+      mandatory: false,
+      supported_efforts: ['high', 'low'],
+    },
+    supported_parameters: ['tools', 'response_format'],
+    top_provider: { max_completion_tokens: 32768 },
   });
+}
+
+/**
+ * Verifies `supported_efforts: null` survives mapping as `null`.
+ *
+ * Purpose: `null` means "every gateway effort", which differs from an omitted list ("not selectable").
+ * When to use: After changing reasoning mapping.
+ * Expected outcome: A reasoning object holding `supported_efforts: null` is kept.
+ * Exceptions: None.
+ */
+function testNullSupportedEffortsPreserved(): void {
+  const mapped = mapOpenRouterModelRow({ id: 'r', reasoning: { mandatory: true, supported_efforts: null } });
+  assert.deepEqual(mapped?.reasoning, { mandatory: true, supported_efforts: null });
 }
 
 /**
@@ -109,6 +136,7 @@ function testMissingId(): void {
  */
 function run(): void {
   testFullMetadata();
+  testNullSupportedEffortsPreserved();
   testMissingReasoning();
   testNumericPrices();
   testGarbagePricing();

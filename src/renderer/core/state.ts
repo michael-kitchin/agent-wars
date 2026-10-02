@@ -1084,17 +1084,6 @@ precomputedToolInvocationCounts: null as Record<string, number> | null,
    */
 backgroundRequestInFlight: false,
     /**
-   * Fingerprint of human tactical draft lists captured when a tactical background `requestAiOrders` started.
-   *
-   * Purpose: Phase 4 prefetch hygiene — compare against `buildTacticalHumanDraftPrefetchFingerprint` after edits and when
-   * the IPC result arrives so stale opponent plans are discarded or the in-flight request is aborted early.
-   * When to use: Set in `startBackgroundRequestIfAllowed` before `requestAiOrders` when tactical planning is active;
-   * cleared when the response is applied, discarded as stale, or the request aborts.
-   * Expected outcome: `null` when no tactical prefetch is in progress or when strategic-only prefetch runs.
-   * Exceptions: None.
-   */
-tacticalPrefetchFingerprintWhenRequestStarted: null as string | null,
-    /**
    * True from the first line of `handleReadyButtonClick` until its `finally` block (strategic Ready, tactical commit,
    * submit-orders path, or early exit after toasts/errors) so duplicate clicks are ignored and `#ready-btn` stays disabled.
 

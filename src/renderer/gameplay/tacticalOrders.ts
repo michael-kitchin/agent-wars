@@ -4,7 +4,6 @@ import {
   formatPendingAirStrikeSidebarLabel,
   formatPendingRangedAttackSidebarLabel,
 } from './orderLabelFormatting';
-import { withTacticalHumanDraftPrefetchInvalidation } from '../openRouter/openRouterRuntime';
 import { rendererSharedState as S } from '../core/state';
 import { showOrderBlockHexTooltip } from '../map/orderBlockHexTooltip';
 import { hideOrderSlowerHexTooltip } from '../map/orderSlowerHexTooltip';
@@ -43,9 +42,9 @@ export function getRepresentativeSelectedUnitIdsByOrigin(): string[] {
 /**
  * Replaces pending support-order rows for the selected unit ids via a row builder.
  *
- * Purpose: Shared filter/push + draft-prefetch invalidation for ranged, air, and ferry pending arrays.
+ * Purpose: Shared filter/push for ranged, air, and ferry pending arrays.
  * When to use: From `replacePending*ForSelected` only.
- * Expected outcome: Prior rows for `selectedIds` removed; one new row per selected id; prefetch invalidated.
+ * Expected outcome: Prior rows for `selectedIds` removed; one new row per selected id.
  * Exceptions: None.
  */
 function replacePendingOrdersForSelected<T extends { unitId: string }>(
@@ -54,13 +53,11 @@ function replacePendingOrdersForSelected<T extends { unitId: string }>(
   selectedIds: string[],
   buildRow: (unitId: string) => T
 ): void {
-  withTacticalHumanDraftPrefetchInvalidation(() => {
-    const kept = getRows().filter((row) => !selectedIds.includes(row.unitId));
-    for (const unitId of selectedIds) {
-      kept.push(buildRow(unitId));
-    }
-    setRows(kept);
-  });
+  const kept = getRows().filter((row) => !selectedIds.includes(row.unitId));
+  for (const unitId of selectedIds) {
+    kept.push(buildRow(unitId));
+  }
+  setRows(kept);
 }
 
 /**
@@ -125,23 +122,21 @@ export function replacePendingFerryOrdersForSelected(selectedIds: string[], dest
 }
 
 /**
- * Defines the `clearPendingTacticalOrders` function shape (export function clearPendingTacticalOrders(): void).
-
- * Purpose: Supports maintainability by documenting why `clearPendingTacticalOrders` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Empties every draft order list (ranged, air strike, ferry, embark, tactical march) and turns Ranged and Strike targeting off.
+ *
+ * Purpose: One reset for callers that discard all drafts, so no list is forgotten.
+ * When to use: New game, tactical battle exit or session release, and preparing the strategic UI before a tactical battle auto-starts.
+ * Expected outcome: All five lists are empty and both targeting modes are off. Standing orders and any in-flight AI planning are untouched.
  * Exceptions: None.
  */
 export function clearPendingTacticalOrders(): void {
-  withTacticalHumanDraftPrefetchInvalidation(() => {
-    S.pendingRangedAttacks = [];
-    S.rangedModeActive = false;
-    S.pendingAirStrikes = [];
-    S.airStrikeModeActive = false;
-    S.pendingFerryOrders = [];
-    S.pendingEmbarkOrders = [];
-    S.tacticalPendingMarches = [];
-  });
+  S.pendingRangedAttacks = [];
+  S.rangedModeActive = false;
+  S.pendingAirStrikes = [];
+  S.airStrikeModeActive = false;
+  S.pendingFerryOrders = [];
+  S.pendingEmbarkOrders = [];
+  S.tacticalPendingMarches = [];
 }
 
 /**
@@ -183,21 +178,19 @@ export async function cancelOrderForUnit(unitId: string, deps: TacticalOrderDeps
 }
 
 /**
- * Defines the `cancelRangedForUnit` function shape (export function cancelRangedForUnit(unitId: string, deps: TacticalOrderDeps): void).
-
- * Purpose: Supports maintainability by documenting why `cancelRangedForUnit` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Removes one unit's pending ranged attack (and, during a battle, its embark row), turns Ranged targeting off, and refreshes the panels and map.
+ *
+ * Purpose: Backs the cancel control on a pending ranged row in both theaters.
+ * When to use: From the ranged list's row cancel callback.
+ * Expected outcome: Only that unit's rows are removed; other drafts and any in-flight AI planning are unaffected.
  * Exceptions: None.
  */
 export function cancelRangedForUnit(unitId: string, deps: TacticalOrderDeps): void {
-  withTacticalHumanDraftPrefetchInvalidation(() => {
-    S.pendingRangedAttacks = S.pendingRangedAttacks.filter((r) => r.unitId !== unitId);
-    if (S.tacticalBattleSnapshot) {
-      S.pendingEmbarkOrders = S.pendingEmbarkOrders.filter((e) => e.unitId !== unitId);
-    }
-    S.rangedModeActive = false;
-  });
+  S.pendingRangedAttacks = S.pendingRangedAttacks.filter((r) => r.unitId !== unitId);
+  if (S.tacticalBattleSnapshot) {
+    S.pendingEmbarkOrders = S.pendingEmbarkOrders.filter((e) => e.unitId !== unitId);
+  }
+  S.rangedModeActive = false;
   void refreshHoverRoutePreview(deps);
   deps.updateSidebar();
   deps.updatePendingOrdersSidebar();
@@ -207,21 +200,19 @@ export function cancelRangedForUnit(unitId: string, deps: TacticalOrderDeps): vo
 }
 
 /**
- * Defines the `cancelAirStrikeForUnit` function shape (export function cancelAirStrikeForUnit(unitId: string, deps: TacticalOrderDeps): void).
-
- * Purpose: Supports maintainability by documenting why `cancelAirStrikeForUnit` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Removes one unit's pending air strike (and, during a battle, its embark row), turns Strike targeting off, and refreshes the panels and map.
+ *
+ * Purpose: Backs the cancel control on a pending air strike row in both theaters.
+ * When to use: From the air strike list's row cancel callback.
+ * Expected outcome: Only that unit's rows are removed; other drafts and any in-flight AI planning are unaffected.
  * Exceptions: None.
  */
 export function cancelAirStrikeForUnit(unitId: string, deps: TacticalOrderDeps): void {
-  withTacticalHumanDraftPrefetchInvalidation(() => {
-    S.pendingAirStrikes = S.pendingAirStrikes.filter((r) => r.unitId !== unitId);
-    if (S.tacticalBattleSnapshot) {
-      S.pendingEmbarkOrders = S.pendingEmbarkOrders.filter((e) => e.unitId !== unitId);
-    }
-    S.airStrikeModeActive = false;
-  });
+  S.pendingAirStrikes = S.pendingAirStrikes.filter((r) => r.unitId !== unitId);
+  if (S.tacticalBattleSnapshot) {
+    S.pendingEmbarkOrders = S.pendingEmbarkOrders.filter((e) => e.unitId !== unitId);
+  }
+  S.airStrikeModeActive = false;
   void refreshHoverRoutePreview(deps);
   deps.updateSidebar();
   deps.updatePendingOrdersSidebar();
@@ -231,20 +222,18 @@ export function cancelAirStrikeForUnit(unitId: string, deps: TacticalOrderDeps):
 }
 
 /**
- * Defines the `cancelFerryForUnit` function shape (export function cancelFerryForUnit(unitId: string, deps: TacticalOrderDeps): void).
-
- * Purpose: Supports maintainability by documenting why `cancelFerryForUnit` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Removes one unit's pending ferry order (and, during a battle, its embark row) and refreshes the panels and map.
+ *
+ * Purpose: Backs the cancel control on a pending ferry row in both theaters.
+ * When to use: From the movement list's ferry row cancel callback.
+ * Expected outcome: Only that unit's rows are removed; other drafts and any in-flight AI planning are unaffected.
  * Exceptions: None.
  */
 export function cancelFerryForUnit(unitId: string, deps: TacticalOrderDeps): void {
-  withTacticalHumanDraftPrefetchInvalidation(() => {
-    S.pendingFerryOrders = S.pendingFerryOrders.filter((r) => r.unitId !== unitId);
-    if (S.tacticalBattleSnapshot) {
-      S.pendingEmbarkOrders = S.pendingEmbarkOrders.filter((e) => e.unitId !== unitId);
-    }
-  });
+  S.pendingFerryOrders = S.pendingFerryOrders.filter((r) => r.unitId !== unitId);
+  if (S.tacticalBattleSnapshot) {
+    S.pendingEmbarkOrders = S.pendingEmbarkOrders.filter((e) => e.unitId !== unitId);
+  }
   void refreshHoverRoutePreview(deps);
   deps.updateSidebar();
   deps.updatePendingOrdersSidebar();

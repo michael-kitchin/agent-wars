@@ -8,7 +8,7 @@ The engine under `src/` wins if this file drifts.
 
 You supply an OpenRouter API key and pick a **tool-capable** model. The opponent does not see the true board: it gets a briefing built from **its** fog (or omniscient view if fog is off), then it may call a small set of **read** tools, then it submits one JSON envelope of orders. Standing orders and an engine attack sweep carry quiet turns. You can run **event-driven** consultation (consult when callbacks or mandatory overrides fire) or consult every turn. Tactical battles use the same loop once per beat.
 
-The OpenRouter panel is session control (key, model, Run, status, tool count). It is not a full briefing observatory. Developer dumps: `debug-last-strategic-prompt.txt`, `debug-last-user-prompt.txt` (tactical dump on disk may be stale).
+The OpenRouter panel is session control (key, model, reasoning effort, Run, status, tool count). It is not a full briefing observatory. Developer dumps: `debug-last-strategic-prompt.txt`, `debug-last-user-prompt.txt` (tactical dump on disk may be stale).
 
 ## Layers
 
@@ -28,6 +28,7 @@ The OpenRouter panel is session control (key, model, Run, status, tool count). I
   - If the evaluation does not call the model, or the call fails, pending orders are cleared and the next Ready uses standing orders. There is no follow-up model call.
   - If the deferred consult is abandoned because the playback notice does not match, one background request may run so the turn is not left without a plan.
 - **Event-driven mode, tactical:** after each beat, `runEventDrivenAfterTacticalBeatConsultation` uses the same evaluation. A beat with no trigger does not call the model.
+- **Draft edits:** the player's draft orders are not consult input, so editing them never cancels, restarts, or discards a background `requestAiOrders`. Only Run off, a removed key or model, an Events toggle, a new game, battle exit or reconciliation, annihilation, the wait timeout, or a rejected request cancel it.
 
 Mandatory overrides (`evaluateMandatoryOverrides` in `callbackEvaluation.ts`): `first_consultation`, `first_combat`, `new_contact`, `unit_destroyed`, `unordered_unit`, `standing_order_blocked`, `attack_mix_changed`, `deadman` (5 turns, `DEADMAN_TURNS`).
 
@@ -39,11 +40,13 @@ Each consult **replaces** the full callback list. Tactical subscriptions use sub
 
 `requestOrdersFlow` / `requestOrdersToolLoop.ts`:
 
-- At most `REQUEST_ORDERS_MAX_TOOL_ROUNDS` (**50**) tool rounds.
+- At most `REQUEST_ORDERS_MAX_TOOL_ROUNDS` (**50**) tool rounds. While the consultation offers at least one tool, `tool_choice` is `required` until the model calls a tool, then `auto`, so it can submit the envelope or call more tools. A provider that rejects `required` (Amazon Bedrock's Claude endpoint does) is retried once with `auto`, and that model stays on `auto` for the rest of the session. A consultation with no tools uses `auto`. The repair call still refuses tools.
 - One model call aborts after `AI_MODEL_REQUEST_TIMEOUT_MS` (**90_000** ms) and is retried once (`AI_MODEL_REQUEST_RETRY_COUNT`). A body that has started and then goes quiet for **15_000** ms is dropped and is not retried. The hard body timer uses the same **90_000** ms, measured from when headers arrive.
 - Wall clock `REQUEST_ORDERS_MAX_WALL_CLOCK_MS` (**300_000** ms), checked before each round. The round already in flight, and the parse-repair call, can run past that mark.
 - Callers wait up to `AI_CONSULTATION_WAIT_TIMEOUT_MS` (**660_000** ms): the wall clock plus those two retried calls. That value is the post-resolution race and the background `requestAiOrders` timer. `READY_REQUEST_TIMEOUT_MS` stays **120_000** ms because event-driven consultation runs after Ready returns.
 - Malformed empty completions retry (`MALFORMED_COMPLETION_RETRY_LIMIT` = 2). Unparseable final JSON gets one repair call with tools off.
+- Completion budget: `OPENROUTER_ORDER_FLOW_COMPLETION_MAX_TOKENS` (**8192**) per call. When the reasoning effort in force is `high` it is doubled, and for `xhigh` or `max` it is multiplied by four, but only when the models list reports the model's output limit, and never above that limit (`scaleCompletionMaxTokensForReasoningEffort`). The effort in force is the player's saved choice, otherwise the model's default. The session credit clamp learned from a 402 still applies on top.
+- Request options are fixed for the whole consult (see [source-inventory.md](ai-commander-prompts/source-inventory.md) section 4.4). These are the saved reasoning effort, and, for models that support structured outputs, a closed envelope schema plus response healing. Anthropic models get it too. The first request currently fails on the envelope schema, and the schema-free retry can still fail on `required` when Claude is served by Amazon Bedrock. Each refusal is retried once without the rejected option. The developer flag `AGENT_WARS_DISABLE_STRUCTURED_OUTPUTS=1` withholds it from every model for a run. If the provider rejects the schema, the call is retried once without it.
 
 Exhausting the tool-round cap records a successful-but-empty consult and warns on the **next** system prompt.
 

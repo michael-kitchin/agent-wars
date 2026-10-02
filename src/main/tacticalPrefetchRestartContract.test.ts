@@ -1,5 +1,5 @@
 /**
- * Guards the ordering contract that lets a cancelled AI prefetch restart against the human's new draft.
+ * Guards the ordering contract that lets a deliberately cancelled AI planning request (Events toggle and similar) restart before the Ready latch is released.
  *
  * The renderer is not compiled into `dist`, so these assert against its source text the same way
  * `rendererConsolidation.test.ts` does.

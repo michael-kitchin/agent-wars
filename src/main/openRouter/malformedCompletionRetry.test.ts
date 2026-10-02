@@ -85,6 +85,22 @@ test('the final malformed retry appends a corrective instruction', async () => {
   assert.match(String(corrective), /tool call/i);
 });
 
+/**
+ * Verifies a required-tool round does not tell the model to submit the envelope.
+ *
+ * Purpose: `tool_choice: required` refuses a JSON completion, so the retry note must not offer one.
+ * When to use: After changing the corrective message or the retry arguments.
+ * Expected outcome: The note names a tool call and does not mention a JSON object.
+ * Exceptions: Assertion failure on contract drift.
+ */
+test('the final retry asks only for a tool call when one is required', async () => {
+  const outcome = await resolveMalformedCompletionRetry({ ...malformedRound(1), requireToolCall: true });
+  assert.equal(outcome.status, 'retry');
+  const corrective = outcome.status === 'retry' ? outcome.correctiveMessage : null;
+  assert.match(String(corrective), /single well-formed tool call/i);
+  assert.ok(!String(corrective).includes('JSON object'));
+});
+
 test('the consultation fails once the retry budget is exhausted', async () => {
   const logged: string[] = [];
   const outcome = await resolveMalformedCompletionRetry(

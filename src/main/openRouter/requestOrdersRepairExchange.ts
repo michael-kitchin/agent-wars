@@ -12,6 +12,7 @@ import { logDebug, logError } from '../logger';
 import { type EnvelopeGates } from './promptSpec/envelopeContract';
 import { buildRepairRequestMessage } from './promptSpec/consultationText';
 import type { RequestOrdersFlowDeps } from './requestOrdersFlowDepsTypes';
+import { postOrdersChatRequest, type OrdersChatRequestSettings } from './ordersChatRequestHelpers';
 import type { RequestOrdersChatMessage } from './requestOrdersFlowTypes';
 import { logResponsePreview } from './requestOrdersFlowSupport';
 import type { RequestOrdersUsageTotals } from './requestOrdersToolLoop';
@@ -124,6 +125,15 @@ export interface ParseRepairExchangeArgs {
    * Exceptions: None.
    */
   readonly resolveOrderFlowMaxTokens: () => number;
+  /**
+   * Reasoning and structured-output settings for the repair call.
+   *
+   * Contract: Same settings object the main loop used.
+   * When to use: Passed to `postOrdersChatRequest` for the repair post.
+   * Expected outcome: The repair call sends the same optional parameters as the main rounds.
+   * Exceptions: None.
+   */
+  readonly requestSettings: OrdersChatRequestSettings;
 }
 
 /**
@@ -146,6 +156,7 @@ export async function runParseRepairExchange(args: ParseRepairExchangeArgs): Pro
     postOpenRouterChatWithTimeoutAndRetry,
     usage,
     resolveOrderFlowMaxTokens,
+    requestSettings,
   } = args;
   if (onLog) onLog('Orders JSON was not parseable; sending one repair user message (no tools, separate API call).');
   const repairMessages: RequestOrdersChatMessage[] = [
@@ -157,9 +168,12 @@ export async function runParseRepairExchange(args: ParseRepairExchangeArgs): Pro
     },
   ];
   const repairMaxTokens = resolveOrderFlowMaxTokens();
-  const repairResponse = await postOpenRouterChatWithTimeoutAndRetry({
+  const repairResponse = await postOrdersChatRequest({
+    post: postOpenRouterChatWithTimeoutAndRetry,
     key: args.key,
-    body: { model: args.modelId, messages: repairMessages, max_tokens: repairMaxTokens, tool_choice: 'none' },
+    modelId: args.modelId,
+    baseBody: { model: args.modelId, messages: repairMessages, max_tokens: repairMaxTokens, tool_choice: 'none' },
+    settings: requestSettings,
     signal: args.signal,
     onLog,
     requestLabel: 'requestOrders repair',
@@ -180,6 +194,7 @@ export async function runParseRepairExchange(args: ParseRepairExchangeArgs): Pro
     logError('openRouter requestOrders repair: model output truncated at max_tokens (repair JSON may be incomplete)', {
       tacticalAiBattle: args.tacticalBattleId,
       repairMaxTokens,
+      reasoningEffort: requestSettings.profile.effectiveReasoningEffort,
       finishReason: repairHead.finish_reason,
       nativeFinish: repairHead.native_finish_reason,
     });

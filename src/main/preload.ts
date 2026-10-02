@@ -105,6 +105,8 @@ const IPC_OPENROUTER = {
   setKey: 'openRouter:setKey',
   listModels: 'openRouter:listModels',
   setSelectedModel: 'openRouter:setSelectedModel',
+  getSelectedReasoningEffort: 'openRouter:getSelectedReasoningEffort',
+  setSelectedReasoningEffort: 'openRouter:setSelectedReasoningEffort',
 } as const;
 
 /**
@@ -606,6 +608,10 @@ openRouter: {
       ipcRenderer.invoke(IPC_OPENROUTER.listModels),
     setSelectedModel: (modelId: string): Promise<void> =>
       ipcRenderer.invoke(IPC_OPENROUTER.setSelectedModel, modelId),
+    getSelectedReasoningEffort: (): Promise<string> =>
+      ipcRenderer.invoke(IPC_OPENROUTER.getSelectedReasoningEffort),
+    setSelectedReasoningEffort: (effort: string): Promise<void> =>
+      ipcRenderer.invoke(IPC_OPENROUTER.setSelectedReasoningEffort, effort),
     getToolGroupList: (): Promise<{ id: string; label: string }[]> =>
       ipcRenderer.invoke(IPC_OPENROUTER.getToolGroupList),
   },

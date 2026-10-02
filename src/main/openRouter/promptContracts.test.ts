@@ -296,6 +296,20 @@ function testBriefingGuidanceDoesNotNameUncallableAssessmentTools(): void {
 }
 
 /**
+ * Ensures tool guidance asks the model to batch independent tool calls in one reply.
+ *
+ * Purpose: One tool call per reply multiplies round trips; the batching bullet must reach both modes.
+ * When to use: After edits to `buildToolUsageGuidance` mechanic bullets.
+ * Expected outcome: Strategic briefing-present and tactical no-briefing guidance both carry the batching bullet.
+ * Exceptions: Assertion failure on contract drift.
+ */
+function testToolGuidanceAsksForBatchedToolCalls(): void {
+  const flags = getToolFlags(undefined);
+  assert.ok(buildToolUsageGuidance(flags, true, 'strategic').includes('Batch independent tool calls'));
+  assert.ok(buildToolUsageGuidance(flags, false, 'tactical').includes('Batch independent tool calls'));
+}
+
+/**
  * The illustrative JSON example must not use live roster id prefixes the model can copy onto the map.
  *
  * Purpose: Turn 18's example marched opponent-infantry-1 (a real unit) to water cell AB.
@@ -497,6 +511,10 @@ const tests = [
   {
     name: 'strategic prompt does not march to current hex',
     fn: testStrategicPromptDoesNotMarchToCurrentHex,
+  },
+  {
+    name: 'tool guidance asks for batched tool calls',
+    fn: testToolGuidanceAsksForBatchedToolCalls,
   },
   {
     name: 'production guidance skips types at deployment cap',

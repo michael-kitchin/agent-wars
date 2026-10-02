@@ -92,3 +92,23 @@ test('formatOpenRouterChatApiError keeps reducible afford-402 actionable without
   assert.match(formatted, /can only afford 7896/i);
   assert.doesNotMatch(formatted, /insufficient credits\. Add credits/i);
 });
+
+/**
+ * Verifies a wrapped provider error keeps the provider's own message.
+ *
+ * Purpose: Fallback checks and the activity log need the text behind "Provider returned error".
+ * When to use: After changing `formatOpenRouterChatApiError`.
+ * Expected outcome: The formatted string includes the raw `tool_choice` refusal.
+ * Exceptions: Assertion failure on contract drift.
+ */
+test('formatOpenRouterChatApiError includes the provider raw message', () => {
+  const body = JSON.stringify({
+    error: {
+      message: 'Provider returned error',
+      code: 400,
+      metadata: { raw: JSON.stringify({ message: 'tool_choice: type "any" are not supported for this model.' }) },
+    },
+  });
+  const formatted = formatOpenRouterChatApiError(400, body);
+  assert.match(formatted, /tool_choice/);
+});

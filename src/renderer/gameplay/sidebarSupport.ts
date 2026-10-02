@@ -6,7 +6,6 @@ import {
 import { buildUnitDisplayNameLookup, fallbackDisplayNameFromUnitId, type UnitDisplayIdentity } from '../../shared/unitDisplayNames';
 import { formatPendingFerryOrderSidebarLabel } from './orderLabelFormatting';
 import { UNIT_DESELECT_GLYPH, UNIT_SELECT_GLYPH } from '../core/constants';
-import { withTacticalHumanDraftPrefetchInvalidation } from '../openRouter/openRouterRuntime';
 import { rendererSharedState as S } from '../core/state';
 import { shouldBlockEmbarkedLandUnitSelect } from '../core/selection';
 import {
@@ -509,9 +508,7 @@ export function updatePendingOrdersSidebar(deps: PendingOrdersDeps): void {
         selected: S.selectedUnitIds.includes(row.subUnitId),
         onToggleSelect: (event) => deps.applySelectionFromSidebarUnitButton(row.subUnitId, event),
         onCancel: () => {
-          withTacticalHumanDraftPrefetchInvalidation(() => {
-            S.tacticalPendingMarches = S.tacticalPendingMarches.filter((r) => r.subUnitId !== row.subUnitId);
-          });
+          S.tacticalPendingMarches = S.tacticalPendingMarches.filter((r) => r.subUnitId !== row.subUnitId);
           deps.updatePendingOrdersSidebar?.();
           deps.redraw?.();
         },

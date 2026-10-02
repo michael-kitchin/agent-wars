@@ -22,11 +22,14 @@ import { decodeOpenRouterToolArgsForExecution } from './openRouterToolArgsHex';
 import { encodeOpenRouterToolResultForLlm } from './openRouterToolResultHex';
 import { resolveMalformedCompletionRetry } from './malformedCompletionRetry';
 import type { RequestOrdersFlowDeps } from './requestOrdersFlowDepsTypes';
+import { isRequiredToolChoiceRejectedForModel } from './openRouterModelCapabilities';
+import { postOrdersChatRequest, type OrdersChatRequestSettings } from './ordersChatRequestHelpers';
 import type { RequestOrdersChatMessage } from './requestOrdersFlowTypes';
 import {
   REQUEST_ORDERS_MAX_TOOL_ROUNDS,
   REQUEST_ORDERS_MAX_WALL_CLOCK_MS,
   logResponsePreview,
+  resolveOrderFlowToolChoice,
   type AiPathfindingSessionMetrics,
 } from './requestOrdersFlowSupport';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
@@ -88,7 +91,7 @@ export interface RequestOrdersToolLoopArgs {
    */
   readonly messages: RequestOrdersChatMessage[];
   /**
-   * Tool definitions sent on every auto tool_choice round.
+   * Tool definitions sent on every tool round.
    *
    * Contract: Matches `enabledToolNameSet`.
    * When to use: Chat request `tools` field.
@@ -244,7 +247,7 @@ export interface RequestOrdersToolLoopArgs {
    * Chat transport with timeout and retry.
    *
    * Contract: Same dependency the orchestrator injected.
-   * When to use: Every auto tool_choice round.
+   * When to use: Every tool round.
    * Expected outcome: `requestLabel` is `requestOrders`.
    * Exceptions: None.
    */
@@ -258,6 +261,15 @@ export interface RequestOrdersToolLoopArgs {
    * Exceptions: None.
    */
   readonly resolveOrderFlowMaxTokens: () => number;
+  /**
+   * Reasoning and structured-output settings for every round.
+   *
+   * Contract: Same settings object the repair exchange receives.
+   * When to use: Passed to `postOrdersChatRequest` on each round.
+   * Expected outcome: Every round sends identical optional parameters.
+   * Exceptions: None.
+   */
+  readonly requestSettings: OrdersChatRequestSettings;
   /**
    * Lazy pathfinding session for strategic planning tools.
    *
@@ -356,11 +368,13 @@ export async function runRequestOrdersToolLoop(
     resolveToH3,
     postOpenRouterChatWithTimeoutAndRetry,
     resolveOrderFlowMaxTokens,
+    requestSettings,
     getOrCreateAiPlanningPathfindingSession,
     aiPathfindingSessionMetrics,
   } = args;
   let iteration = 0;
   let malformedRetryCount = 0;
+  let hasCalledTool = false;
   while (iteration < REQUEST_ORDERS_MAX_TOOL_ROUNDS) {
     if (Date.now() - wallClockStart > REQUEST_ORDERS_MAX_WALL_CLOCK_MS) {
       const timeoutMsg = 'AI planning took too long and was cancelled. Please try again.';
@@ -380,17 +394,21 @@ export async function runRequestOrdersToolLoop(
       );
     }
     const completionMaxTokens = resolveOrderFlowMaxTokens();
-    const body: Record<string, unknown> = {
-      model: modelId,
-      messages,
-      max_tokens: completionMaxTokens,
-      tools,
-      tool_choice: 'auto',
-    };
-
-    const chatResponse = await postOpenRouterChatWithTimeoutAndRetry({
+    const requiredToolChoiceRejected = isRequiredToolChoiceRejectedForModel(modelId);
+    const toolChoice = resolveOrderFlowToolChoice(tools.length, hasCalledTool, requiredToolChoiceRejected);
+    logDebug('openRouter requestOrders: round tool choice', {
+      iteration,
+      toolChoice,
+      toolCount: tools.length,
+      hasCalledTool,
+      requiredToolChoiceRejected,
+    });
+    const chatResponse = await postOrdersChatRequest({
+      post: postOpenRouterChatWithTimeoutAndRetry,
       key,
-      body,
+      modelId,
+      baseBody: { model: modelId, messages, max_tokens: completionMaxTokens, tools, tool_choice: toolChoice },
+      settings: requestSettings,
       signal,
       onLog,
       requestLabel: 'requestOrders',
@@ -436,6 +454,7 @@ export async function runRequestOrdersToolLoop(
         iteration,
         tacticalAiBattle: tacticalBattle?.battleId ?? null,
         completionMaxTokens,
+        reasoningEffort: requestSettings.profile.effectiveReasoningEffort,
         finishReason,
         nativeFinish,
       });
@@ -464,6 +483,7 @@ export async function runRequestOrdersToolLoop(
       turnNumber,
       tacticalBattleId: tacticalBattle?.battleId ?? null,
       onLog,
+      requireToolCall: toolChoice === 'required',
     });
     if (malformedOutcome.status === 'fail') return { kind: 'fail', error: malformedOutcome.error };
     if (malformedOutcome.status === 'retry') {
@@ -475,6 +495,7 @@ export async function runRequestOrdersToolLoop(
     }
 
     if (toolCalls && toolCalls.length > 0) {
+      hasCalledTool = true;
       if (onLog) {
         onLog(
           `AI round ${iteration}: model requested ${toolCalls.length} tool call(s)${usageFrag}: ${summarizeToolCallNamesForAiLog(toolCalls, 24)}.`

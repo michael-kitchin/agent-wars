@@ -1,7 +1,7 @@
 /**
  * Standing-order tools (`assign_order`, `query_orders`, `cancel_order`).
  * Thin facade that keeps public contracts stable while delegating core standing-order logic
- * to `standingOrdersCore` for maintainability.
+ * to `standingOrdersCore` and the prompt status block to `standingOrdersInjectionText`.
  */
 
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
@@ -11,9 +11,9 @@ import {
   executeStandingOrderActionForPlayer,
   expireAndUpdateStatus,
   generateOrdersForStandingOrders,
-  getInjectionText,
   getStandingOrderForUnit,
 } from './standingOrdersCore';
+import { getInjectionText } from './standingOrdersInjectionText';
 import { holdFireUnitIdsForPlayer } from './standingOrdersGeneration';
 
 /**

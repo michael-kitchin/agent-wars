@@ -4,18 +4,16 @@
  */
 
 import type { GameStateSnapshot } from '../gameDb';
-import { logDebug, logError } from '../logger';
+import { logDebug } from '../logger';
 import type { CoordinateContext } from '../briefing/map/coordinateContext';
 import { HEX_CODE_PATTERN } from '../briefing/map/coordinateContext';
 import { codeToH3, codeToLatLngRounded } from '../briefing/map/hexCodeTranslator';
-import { translateAssignOrderHexCodeParams } from './assignOrderHexParams';
 import type { CallbackSubscription } from '../callbackSubscriptions';
 import type { LatLng } from '../tools/pathfinding';
-import { executeStandingOrders } from '../tools/standingOrders';
 import { executeProductionTools } from '../tools/productionTools';
 import { normalizeProductionOrders } from '../productionOrders';
 import type { AirStrikeOrder, AirStrikeTargetType, EmbarkOrder, FerryOrder } from '../../shared/ipcTypes';
-import { clearEmbarkAssignmentForLandUnit, isEmbarkedLandUnit } from '../gameActions/sealift';
+import { processV3OrdersArray } from './envelopeOrderRows';
 /**
  * Documents the `MemoryUpdateItem` interface as a named contract surface (export interface MemoryUpdateItem).
 
@@ -480,29 +478,6 @@ function expandGroupedActorEntries(entries: unknown): unknown[] {
 }
 
 /**
- * Defines the `resolveExplicitRangedTarget` function shape (function resolveExplicitRangedTarget( target: unknown, state: GameStateSnapshot, resolveToH3: (lat: number, lng: number) => string | undefined ): stri).
-
- * Purpose: Supports maintainability by documenting why `resolveExplicitRangedTarget` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function resolveExplicitRangedTarget(target: unknown, state: GameStateSnapshot, context: CoordinateContext): string | undefined {
-  if (typeof target === 'string') {
-    if (HEX_CODE_PATTERN.test(target)) {
-      try {
-        return codeToH3(target, context);
-      } catch {
-        return undefined;
-      }
-    }
-    const u = state.units.find((x) => x.id === target);
-    return u?.h3Index;
-  }
-  return undefined;
-}
-
-/**
  * Defines the `normalizeOrderEntries` function shape (function normalizeOrderEntries<T>( entries: unknown, options: { expectedObjectDropReason: string; missingFieldsDropReason: string; normaliz).
 
  * Purpose: Supports maintainability by documenting why `normalizeOrderEntries` exists.
@@ -614,174 +589,6 @@ function normalizeFerryOrders(
     },
   });
   return { ferryOrders: normalized.items, dropReasons: normalized.dropReasons };
-}
-
-/**
- * Defines the `processV3OrdersArray` function shape (function processV3OrdersArray( entries: unknown[], state: GameStateSnapshot, latLngByH3: Map<string, LatLng>, resolveToH3: (lat: number, lng: number).
-
- * Purpose: Supports maintainability by documenting why `processV3OrdersArray` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function processV3OrdersArray(
-  entries: unknown[],
-  state: GameStateSnapshot,
-  latLngByH3: Map<string, LatLng>,
-  resolveToH3: (lat: number, lng: number) => string | undefined,
-  context: CoordinateContext
-): {
-  movementOrders: { unitId: string; toH3Index: string }[];
-  rangedAttacks: { unitId: string; targetH3Index: string }[];
-  embarkOrders: EmbarkOrder[];
-  dropReasons: string[];
-} {
-  const movementOrders: { unitId: string; toH3Index: string }[] = [];
-  const rangedAttacks: { unitId: string; targetH3Index: string }[] = [];
-  const embarkOrders: EmbarkOrder[] = [];
-  const dropReasons: string[] = [];
-  for (const raw of entries) {
-    if (!raw || typeof raw !== 'object') continue;
-    const o = raw as {
-      action?: unknown;
-      unitId?: unknown;
-      navalUnitId?: unknown;
-      order?: unknown;
-      destination?: unknown;
-      targetHexCode?: unknown;
-      targetUnitId?: unknown;
-    };
-    const action = o.action;
-    const unitId = typeof o.unitId === 'string' ? o.unitId : '';
-    if (!unitId) continue;
-
-    if (action === 'assign_order') {
-      if (context.mode === 'tactical') {
-        dropReasons.push(
-          `assign_order ${unitId}: standing orders cannot be assigned to tactical sub-unit ids; use explicit_move / ranged_attack / air strikes this beat`
-        );
-        logDebug('openRouter processV3OrdersArray: assign_order skipped in tactical mode', { unitId });
-        continue;
-      }
-      logDebug('openRouter processV3OrdersArray: assign_order', { unitId });
-      const orderPayload = translateAssignOrderHexCodeParams(o.order, context, unitId);
-      const assignResult = executeStandingOrders('assign_order', { unitId, order: orderPayload }, state, latLngByH3, resolveToH3);
-      if (assignResult.status === 'error' && typeof assignResult.error === 'string') {
-        const orderType =
-          orderPayload && typeof orderPayload === 'object' && !Array.isArray(orderPayload)
-            ? (orderPayload as { type?: unknown }).type
-            : undefined;
-        logError('openRouter processV3OrdersArray: assign_order rejected', {
-          unitId,
-          orderType: typeof orderType === 'string' ? orderType : undefined,
-          error: assignResult.error,
-        });
-        dropReasons.push(`assign_order ${unitId}: ${assignResult.error}`);
-      }
-      continue;
-    }
-    if (action === 'cancel_order') {
-      if (context.mode === 'tactical') {
-        dropReasons.push(
-          `cancel_order ${unitId}: standing orders cannot be cancelled via tactical sub-unit ids this beat`
-        );
-        logDebug('openRouter processV3OrdersArray: cancel_order skipped in tactical mode', { unitId });
-        continue;
-      }
-      logDebug('openRouter processV3OrdersArray: cancel_order', { unitId });
-      executeStandingOrders('cancel_order', { unitId }, state, latLngByH3, resolveToH3);
-      continue;
-    }
-    if (action === 'explicit_move') {
-      const dest = o.destination;
-      if (typeof dest !== 'string' || !HEX_CODE_PATTERN.test(dest)) {
-        logDebug('openRouter processV3OrdersArray: explicit_move missing destination code', { unitId });
-        continue;
-      }
-      let h3: string | undefined;
-      try {
-        h3 = codeToH3(dest, context);
-      } catch {
-        h3 = undefined;
-      }
-      if (h3) {
-        if (isEmbarkedLandUnit(unitId)) {
-          logDebug('openRouter processV3OrdersArray: explicit_move auto-debarks embarked unit', { unitId, dest });
-          clearEmbarkAssignmentForLandUnit(unitId);
-        }
-        movementOrders.push({ unitId, toH3Index: h3 });
-      } else logDebug('openRouter processV3OrdersArray: explicit_move unresolved', { unitId, dest });
-      continue;
-    }
-    if (action === 'ranged_attack') {
-      const hexCode = o.targetHexCode;
-      const unitTarget = o.targetUnitId;
-      const hasHex = typeof hexCode === 'string' && HEX_CODE_PATTERN.test(hexCode);
-      const hasUnit = typeof unitTarget === 'string' && unitTarget.trim().length > 0;
-      if (hasHex === hasUnit) {
-        logDebug('openRouter processV3OrdersArray: ranged_attack requires exactly one target selector', { unitId });
-        continue;
-      }
-      const unitTargetId = typeof unitTarget === 'string' ? unitTarget.trim() : '';
-      const targetH3 = hasHex
-        ? resolveExplicitRangedTarget(hexCode, state, context)
-        : resolveExplicitRangedTarget(unitTargetId, state, context);
-      if (targetH3) rangedAttacks.push({ unitId, targetH3Index: targetH3 });
-      else logDebug('openRouter processV3OrdersArray: ranged_attack unresolved', { unitId });
-      continue;
-    }
-    if (action === 'transport_move') {
-      const navalUnitId = typeof o.navalUnitId === 'string' ? o.navalUnitId : '';
-      const dest = o.destination;
-      if (!navalUnitId || typeof dest !== 'string' || !HEX_CODE_PATTERN.test(dest)) {
-        logDebug('openRouter processV3OrdersArray: transport_move missing fields', { unitId, navalUnitId });
-        continue;
-      }
-      let h3: string | undefined;
-      try {
-        h3 = codeToH3(dest, context);
-      } catch {
-        h3 = undefined;
-      }
-      if (h3) movementOrders.push({ unitId: navalUnitId, toH3Index: h3 });
-      else logDebug('openRouter processV3OrdersArray: transport_move unresolved', { navalUnitId, dest });
-      continue;
-    }
-    if (action === 'disembark') {
-      const dest = o.destination;
-      if (typeof dest !== 'string' || !HEX_CODE_PATTERN.test(dest)) {
-        logDebug('openRouter processV3OrdersArray: disembark missing destination code', { unitId });
-        continue;
-      }
-      if (!isEmbarkedLandUnit(unitId)) {
-        dropReasons.push(`disembark ${unitId}: unit is not embarked`);
-        logDebug('openRouter processV3OrdersArray: disembark rejected while not embarked', { unitId });
-        continue;
-      }
-      let h3: string | undefined;
-      try {
-        h3 = codeToH3(dest, context);
-      } catch {
-        h3 = undefined;
-      }
-      if (h3) {
-        clearEmbarkAssignmentForLandUnit(unitId);
-        movementOrders.push({ unitId, toH3Index: h3 });
-      } else logDebug('openRouter processV3OrdersArray: disembark unresolved', { unitId, dest });
-      continue;
-    }
-    if (action === 'embark') {
-      const navalUnitId = typeof o.navalUnitId === 'string' ? o.navalUnitId.trim() : '';
-      if (!navalUnitId) {
-        logDebug('openRouter processV3OrdersArray: embark missing navalUnitId', { unitId });
-        continue;
-      }
-      embarkOrders.push({ unitId, navalUnitId });
-      continue;
-    }
-    logDebug('openRouter processV3OrdersArray: skipped unknown action', { action, unitId });
-  }
-  return { movementOrders, rangedAttacks, embarkOrders, dropReasons };
 }
 
 /**
@@ -928,7 +735,7 @@ export function parseOrdersResponse(
           });
         }
         const message = typeof obj.message === 'string' ? obj.message.trim() : '';
-        const { movementOrders, rangedAttacks, embarkOrders, dropReasons: assignOrderDropReasons } = processV3OrdersArray(
+        const { movementOrders, rangedAttacks, embarkOrders, dropReasons: orderRowDropReasons } = processV3OrdersArray(
           ordersArray,
           state,
           latLngByH3,
@@ -949,7 +756,7 @@ export function parseOrdersResponse(
         const callbacks = normalizeCallbacks(obj.callbacks, context);
         const memoryUpdates = normalizeMemoryUpdates(obj.memoryUpdates);
         const dropReasons = [
-          ...assignOrderDropReasons,
+          ...orderRowDropReasons,
           ...productionDropReasons,
           ...normalizedAirStrikes.dropReasons,
           ...normalizedFerryOrders.dropReasons,

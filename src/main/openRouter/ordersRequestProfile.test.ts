@@ -1,0 +1,188 @@
+/**
+ * Tests for consultation request-profile resolution.
+ * Run with: node dist/main/openRouter/ordersRequestProfile.test.js
+ */
+
+import assert from 'node:assert/strict';
+import type { OpenRouterModel } from '../../shared/ipc/openRouterTypes';
+import { BASELINE_ORDERS_REQUEST_PROFILE, resolveOrdersRequestProfile } from './ordersRequestProfile';
+
+/**
+ * Base order-flow budget used by every case.
+ *
+ * Purpose: Keeps expected budgets readable as multiples of one number.
+ * When to use: As `baseCompletionMaxTokens` in this file.
+ * Expected outcome: 8192, the production order-flow base.
+ * Exceptions: None.
+ */
+const BASE = 8192;
+
+/**
+ * Builds a reasoning-capable model fixture.
+ *
+ * Purpose: Keeps cases focused on effort, default, and output limit.
+ * When to use: Inside this file's assertions.
+ * Expected outcome: A model offering every gateway effort plus the given overrides.
+ * Exceptions: None.
+ */
+function reasoningModel(overrides: Partial<OpenRouterModel> = {}): OpenRouterModel {
+  return { id: 'r', reasoning: { supported_efforts: null }, ...overrides };
+}
+
+/**
+ * Verifies a model missing from the capability cache gets the baseline profile.
+ *
+ * Purpose: Unknown models must keep the request bodies they had before capability tuning.
+ * When to use: After changing `resolveOrdersRequestProfile`.
+ * Expected outcome: Deep-equals the baseline.
+ * Exceptions: None.
+ */
+function testUnknownModelGetsBaseline(): void {
+  assert.deepEqual(
+    resolveOrdersRequestProfile({ modelId: 'x', model: undefined, persistedReasoningEffort: 'high', baseCompletionMaxTokens: BASE }),
+    BASELINE_ORDERS_REQUEST_PROFILE
+  );
+}
+
+/**
+ * Verifies a valid override is sent and scales the budget within the model's output limit.
+ *
+ * Purpose: High efforts need more room; the model limit caps the increase.
+ * When to use: After changing budget scaling.
+ * Expected outcome: `high` doubles to 16384; `max` with a 20000 limit stops at 20000.
+ * Exceptions: None.
+ */
+function testOverrideScalesBudgetWithinModelLimit(): void {
+  const high = resolveOrdersRequestProfile({
+    modelId: 'r',
+    model: reasoningModel({ top_provider: { max_completion_tokens: 128000 } }),
+    persistedReasoningEffort: 'high',
+    baseCompletionMaxTokens: BASE,
+  });
+  assert.equal(high.reasoningEffort, 'high');
+  assert.equal(high.preferredCompletionMaxTokens, 16384);
+  const max = resolveOrdersRequestProfile({
+    modelId: 'r',
+    model: reasoningModel({ top_provider: { max_completion_tokens: 20000 } }),
+    persistedReasoningEffort: 'max',
+    baseCompletionMaxTokens: BASE,
+  });
+  assert.equal(max.preferredCompletionMaxTokens, 20000);
+}
+
+/**
+ * Verifies the model default drives scaling without being sent.
+ *
+ * Purpose: Budget scaling uses the effective effort, but only an override is sent as `reasoning.effort`.
+ * When to use: After changing effective-effort handling.
+ * Expected outcome: `xhigh` default gives 32768 with a known limit and 8192 without one.
+ * Exceptions: None.
+ */
+function testDefaultEffortScalesWithoutBeingSent(): void {
+  const withLimit = resolveOrdersRequestProfile({
+    modelId: 'r',
+    model: reasoningModel({
+      reasoning: { default_effort: 'xhigh', supported_efforts: null },
+      top_provider: { max_completion_tokens: 128000 },
+    }),
+    persistedReasoningEffort: '',
+    baseCompletionMaxTokens: BASE,
+  });
+  assert.equal(withLimit.reasoningEffort, null);
+  assert.equal(withLimit.effectiveReasoningEffort, 'xhigh');
+  assert.equal(withLimit.preferredCompletionMaxTokens, 32768);
+  const withoutLimit = resolveOrdersRequestProfile({
+    modelId: 'r',
+    model: reasoningModel({ reasoning: { default_effort: 'xhigh', supported_efforts: null } }),
+    persistedReasoningEffort: '',
+    baseCompletionMaxTokens: BASE,
+  });
+  assert.equal(withoutLimit.preferredCompletionMaxTokens, BASE);
+}
+
+/**
+ * Runs one assertion with `AGENT_WARS_DISABLE_STRUCTURED_OUTPUTS` forced to a value, then restores it.
+ *
+ * Purpose: These cases must not depend on the developer's shell, which may have the flag set.
+ * When to use: The structured-output cases in this file.
+ * Expected outcome: `value` of `undefined` unsets the flag for the callback; any other value is assigned.
+ * Exceptions: Restores the previous value even when the callback throws.
+ */
+function withStructuredOutputsFlag(value: string | undefined, assertWhileSet: () => void): void {
+  const flagName = 'AGENT_WARS_DISABLE_STRUCTURED_OUTPUTS';
+  const previous = process.env[flagName];
+  if (value === undefined) delete process.env[flagName];
+  else process.env[flagName] = value;
+  try {
+    assertWhileSet();
+  } finally {
+    if (previous === undefined) delete process.env[flagName];
+    else process.env[flagName] = previous;
+  }
+}
+
+/**
+ * Verifies structured outputs follow the model's advertised parameters for every provider.
+ *
+ * Purpose: The schema goes to every model that advertises both parameters, Anthropic included; rejections are left
+ * to the request fallback.
+ * When to use: After changing structured-output gating.
+ * Expected outcome: Gemini and Anthropic models advertising both parameters get `true`; a model advertising only
+ * `response_format` gets `false`. The developer flag is unset for this case, whatever the shell has.
+ * Exceptions: None.
+ */
+function testStructuredOutputsFollowAdvertisedParameters(): void {
+  withStructuredOutputsFlag(undefined, () => {
+    const structuredOutputsFor = (modelId: string, supportedParameters: string[]): boolean =>
+      resolveOrdersRequestProfile({
+        modelId,
+        model: { id: modelId, supported_parameters: supportedParameters },
+        persistedReasoningEffort: '',
+        baseCompletionMaxTokens: BASE,
+      }).structuredOutputs;
+    const both = ['response_format', 'structured_outputs'];
+    assert.equal(structuredOutputsFor('google/gemini-3.5-flash-lite', both), true);
+    assert.equal(structuredOutputsFor('anthropic/claude-sonnet-5.5', both), true);
+    assert.equal(structuredOutputsFor('openai/gpt-5.5', ['response_format']), false);
+  });
+}
+
+/**
+ * Verifies the developer environment flag withholds the schema from a model that would otherwise get it.
+ *
+ * Purpose: The flag exists to compare runs with and without the schema, so it must override model capabilities.
+ * When to use: After changing structured-output gating.
+ * Expected outcome: `false` while the flag is `1`, and `true` while it is `0`. The previous value is restored either way.
+ * Exceptions: None.
+ */
+function testEnvironmentFlagDisablesStructuredOutputs(): void {
+  const model = { id: 'google/gemini-3.5-flash-lite', supported_parameters: ['response_format', 'structured_outputs'] };
+  const structuredOutputs = (): boolean =>
+    resolveOrdersRequestProfile({
+      modelId: model.id,
+      model,
+      persistedReasoningEffort: '',
+      baseCompletionMaxTokens: BASE,
+    }).structuredOutputs;
+  withStructuredOutputsFlag('1', () => assert.equal(structuredOutputs(), false));
+  withStructuredOutputsFlag('0', () => assert.equal(structuredOutputs(), true));
+}
+
+/**
+ * Runs request-profile tests.
+ *
+ * Purpose: Node entrypoint for test discovery.
+ * When to use: `node dist/main/openRouter/ordersRequestProfile.test.js`.
+ * Expected outcome: Throws on failure; logs pass when all succeed.
+ * Exceptions: Propagates assertion errors.
+ */
+function run(): void {
+  testUnknownModelGetsBaseline();
+  testOverrideScalesBudgetWithinModelLimit();
+  testDefaultEffortScalesWithoutBeingSent();
+  testStructuredOutputsFollowAdvertisedParameters();
+  testEnvironmentFlagDisablesStructuredOutputs();
+  console.log('ordersRequestProfile.test.ts passed');
+}
+
+run();

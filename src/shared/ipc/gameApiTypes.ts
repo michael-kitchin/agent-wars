@@ -506,6 +506,24 @@ openRouter?: {
     setKey: (key: string) => Promise<void>;
     listModels: () => Promise<{ models?: OpenRouterModel[]; error?: string }>;
     setSelectedModel: (modelId: string) => Promise<void>;
+    /**
+     * Reads the persisted reasoning-effort override for the selected model.
+     *
+     * Contract: Resolves to the saved effort, or `''` when the model default applies.
+     * When to use: Model-tab startup, to restore the reasoning dropdown.
+     * Expected outcome: A string; never rejects for a missing value.
+     * Exceptions: Rejects only on IPC or database failure.
+     */
+    getSelectedReasoningEffort: () => Promise<string>;
+    /**
+     * Persists the reasoning-effort override for the selected model.
+     *
+     * Contract: `''` clears the override so the model default applies; other values are saved trimmed.
+     * When to use: When the player changes the reasoning dropdown.
+     * Expected outcome: Resolves after the value is stored.
+     * Exceptions: Rejects only on IPC or database failure.
+     */
+    setSelectedReasoningEffort: (effort: string) => Promise<void>;
     getToolGroupList: () => Promise<{ id: string; label: string }[]>;
   };
 }
