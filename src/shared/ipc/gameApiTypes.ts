@@ -34,6 +34,7 @@ import type {
   TacticalPostBeatConsultFields,
 } from './readyTypes';
 import type { SealiftStackState } from './sealiftTypes';
+import type { HexNamingCaption } from '../hexNamingCaption';
 
 /**
  * Invoke result for `game:commitHumanTacticalDraftOrders` (success or validation failure).
@@ -127,15 +128,15 @@ getRes4RoadRailOverlays: () => Promise<Res4RoadRailOverlayRow[]>;
    * Exceptions: None beyond IPC transport failures.
    */
 getRes4TransportVectorOverlays: () => Promise<Res4TransportVectorOverlayRow[]>;
-    /**
-   * Specifies the contract for the `getHexNamingTooltipLine` member (getHexNamingTooltipLine: (payload: HexNamingTooltipLineRequest) => Promise<string | null>;).
-
-   * Contract: Describes stable behavior for callers of `getHexNamingTooltipLine` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
+  /**
+   * Returns the structured naming caption (text plus country spans) for a res1 or res4 hex.
+   *
+   * Contract: `text` is the plain caption; spans mark headings and country names for flags. `null` when the hex has no naming data.
+   * When to use: Hover tooltips, the build popup, and the melee-intercept hex cell, via the renderer's caption cache.
+   * Expected outcome: Format with `formatHexNamingCaptionHtml`.
+   * Exceptions: Rejects on IPC transport failures.
    */
-getHexNamingTooltipLine: (payload: HexNamingTooltipLineRequest) => Promise<string | null>;
+  getHexNamingTooltipLine: (payload: HexNamingTooltipLineRequest) => Promise<HexNamingCaption | null>;
     /**
    * Specifies the contract for the `getHexContinentNames` member (getHexContinentNames: (payload: HexContinentNamesRequest) => Promise<string[]>;).
 

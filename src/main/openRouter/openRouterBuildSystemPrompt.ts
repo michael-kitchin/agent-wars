@@ -35,6 +35,7 @@ import type { CoordinateContext } from '../briefing/map/coordinateContext';
 import { h3ToCode } from '../briefing/map/hexCodeTranslator';
 import { SECTION_TITLE_AVAILABLE_TOOLS, SECTION_TITLE_BEST_OPTIONS_THIS_TURN, topLevelHeading } from './promptSpec/sectionHeadings';
 import { buildCombatRulesParagraph } from './promptSpec/gameRuleText';
+import { originBonusSettingsFromSnapshot } from '../../shared/originBonusRules';
 import { buildContextCoaching, type CoachingGates } from './promptSpec/coachingText';
 import { buildToolBudgetExceededWarning } from './requestOrdersFlowSupport';
 
@@ -288,6 +289,7 @@ ${contextCoaching}
     hasAirUnits: hasAir,
     hasNavalUnits: hasNaval,
     ordersEnabled: standingOrdersIssuable,
+    originBonusSettings: originBonusSettingsFromSnapshot(state),
   });
   const combatRulesWithToolHints = combatTargetHint
     ? combatRulesParagraph.replace(

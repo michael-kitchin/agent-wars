@@ -1,5 +1,5 @@
 import * as assert from 'assert';
-import { gridDistance, gridPathCells } from 'h3-js';
+import { cellToParent, gridDistance, gridPathCells } from 'h3-js';
 import {
   dbRun,
   dbGetOne,
@@ -582,7 +582,7 @@ function testProductionBlocksWhenFirstEnqueuedUnitTypeAtCap(): void {
  *
  * Purpose: Match size must change the live deployment ceiling, not only snapshot metadata.
  * When to use: After changing production cap reads or `game_size` persistence.
- * Expected outcome: 12 infantry still spawn on Medium; 24 infantry block and accumulate points.
+ * Expected outcome: 12 infantry still spawn on Medium, with a birth origin in the producing hex; 24 infantry block and accumulate points.
  * Exceptions: None.
  */
 function testProductionSpawnsPastSmallCapWhenMedium(): void {
@@ -618,6 +618,15 @@ function testProductionSpawnsPastSmallCapWhenMedium(): void {
       "SELECT COUNT(*) AS c FROM units WHERE player = 'human' AND unit_type = 'infantry'"
     )?.c ?? 0;
     assert.strictEqual(infantryAfterUnder, smallCap + 1);
+    const unitsAfterSpawn = getGameState().units;
+    const legacyUnit = unitsAfterSpawn.find((u) => u.id === 'human-infantry-medium-under-0');
+    assert.strictEqual(legacyUnit?.origin, undefined, 'rows inserted without birth columns carry no origin');
+    const spawned = unitsAfterSpawn.find(
+      (u) => u.player === 'human' && u.unitType === 'infantry' && !u.id.startsWith('human-infantry-medium-under-')
+    );
+    assert.strictEqual(spawned?.origin?.birthH3Index, targetHex, 'produced unit is born in the producing hex');
+    const birthCell = spawned?.origin?.birthRes4H3Index;
+    if (birthCell) assert.strictEqual(cellToParent(birthCell, 1), targetHex, 'birth cell lies inside the producing hex');
 
     dbRun("DELETE FROM units WHERE player = 'human' AND unit_type = 'infantry'");
     const mediumCap = getMaxUnitsPerType('medium').infantry;

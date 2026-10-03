@@ -73,6 +73,7 @@ import {
   isHoverOrderPlanningActive,
   shouldBlockSelectionReplaceDuringHoverPlanning,
   shouldBlockToggleSelectionDuringHoverPlanning,
+  shouldDismissStackCalloutForHoverPlanning,
   shouldDrawCommittedOrderPaths,
   shouldDrawHoveredPathPreview,
 } from './rendering/canvasPreviewPolicy';
@@ -107,6 +108,8 @@ import {
 import { drawResolutionCombatAndCasualtyOverlays } from './rendering/resolutionCombatOverlays';
 import { drawStaleEnemyIntel, drawUnits } from './rendering/unitDrawing';
 import { rendererSharedState as S } from './core/state';
+import { rememberUnitOrigins, setUnitNameContent } from './core/unitOriginFlags';
+import { installUnitOriginTooltip } from './core/unitOriginTooltip';
 import { mergePendingTacticalEmbarkOrdersIntoSealiftState } from './tactical/tacticalEmbarkSealiftMerge';
 import {
   tacticalMaybeScheduleAnnihilationExit,
@@ -218,7 +221,6 @@ import {
   applySelectionFromSidebarUnitButton as applySelectionFromSidebarUnitButtonFromModule,
   buildKillToastFormatterBundle as buildKillToastFormatterBundleFromModule,
   clearSidebarError as clearSidebarErrorFromModule,
-  createSidebarOrderRow as createSidebarOrderRowFromModule,
   formatPendingOrderSidebarLabel as formatPendingOrderSidebarLabelFromModule,
   formatUnitArrowLabel as formatUnitArrowLabelFromModule,
   isPendingMovementOrderForDisplay as isPendingMovementOrderForDisplayFromModule,
@@ -226,6 +228,7 @@ import {
   syncUiAfterSelectionChange as syncUiAfterSelectionChangeFromModule,
   updatePendingOrdersSidebar as updatePendingOrdersSidebarFromModule,
 } from './gameplay/sidebarSupport';
+import { createSidebarOrderRow as createSidebarOrderRowFromModule, type SidebarOrderRowArgs } from './gameplay/sidebarOrderRow';
 
 /**
  * Bridges renderer shared tactical fields into tactical exit/advance helpers without those modules importing `renderer.ts`.
@@ -427,12 +430,14 @@ function shouldSuppressTerrainTooltip(): boolean {
  *
  * Purpose: Keeps map inspection popovers from covering or competing with march/ferry/attack hover planning.
  * When to use: After hover preview refresh and before opening stack/build popovers during planning gestures.
- * Expected outcome: No-op when hover planning is inactive; otherwise stack callout, build popup, and terrain tooltip are cleared.
+ * Expected outcome: No-op when hover planning is inactive. Otherwise the build popup and terrain tooltip are cleared. The stack callout is cleared only when the preview is aimed at a hex the selection does not already occupy.
  * Exceptions: None.
  */
 function dismissMapDetailPopoversIfHoverPlanningActive(): void {
   if (!isHoverOrderPlanningActive()) return;
-  hideStackCallout();
+  if (shouldDismissStackCalloutForHoverPlanning()) {
+    hideStackCallout();
+  }
   hideBuildPopup();
   clearTerrainTooltipTimer();
   hideTerrainTooltipVisual();
@@ -681,7 +686,7 @@ async function renderSealiftSection(units: GameStateSnapshot['units'], calloutEl
       rowEl.className = 'stack-sealift-row';
       const left = document.createElement('span');
       left.className = 'stack-sealift-naval';
-      left.textContent = formatUnitDisplayName(row.navalUnitId);
+      setUnitNameContent(left, row.navalUnitId, formatUnitDisplayName(row.navalUnitId));
       rowEl.appendChild(left);
 
       const right = document.createElement('div');
@@ -827,19 +832,19 @@ async function renderSealiftSection(units: GameStateSnapshot['units'], calloutEl
 }
 
 /**
- * Defines the `showStackCallout` function shape (function showStackCallout().
-
- * Purpose: Supports maintainability by documenting why `showStackCallout` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
+ * Opens the stack callout for the units in one hex at the click point.
+ *
+ * Purpose: Shows each unit in that hex, including a single unit, with its origin flag and selection controls.
+ * When to use: From the deferred map-click callout, after the single-click delay.
+ * Expected outcome: The popup is shown unless strategic units are hidden at this zoom, or a hover order preview is aimed at a hex other than the one every selected unit already occupies. A preview of that hex does not block the popup.
+ * Exceptions: Returns without throwing when the callout elements are missing.
  */
 function showStackCallout(
   units: GameStateSnapshot['units'],
   clientX: number,
   clientY: number
 ): void {
-  if (isHoverOrderPlanningActive()) return;
+  if (shouldDismissStackCalloutForHoverPlanning()) return;
   if (shouldHideStrategicMapUnitsForRes4Zoom()) {
     hideStackCallout();
     return;
@@ -920,7 +925,7 @@ function showStackCallout(
     li.setAttribute('data-unit-id', u.id);
     const label = document.createElement('span');
     label.className = 'unit-label';
-    label.textContent = formatUnitDisplayName(u.id);
+    setUnitNameContent(label, u.id, formatUnitDisplayName(u.id));
     li.appendChild(label);
     if (u.player === 'human') {
       const btn = document.createElement('button');
@@ -987,8 +992,16 @@ function resolveUnitsForStackCalloutRefresh(unitIds: string[], state: GameStateS
     .filter((unit): unit is NonNullable<typeof unit> => !!unit);
 }
 
+/**
+ * Rebuilds an open stack callout from the unit ids stored on it.
+ *
+ * Purpose: Shift-pressed and selection changes must refresh Select All versus Add All without leaving a stale row list.
+ * When to use: After a selection or sealift change, and on the Shift keydown that first presses the key.
+ * Expected outcome: No-op when the callout is hidden. Closes it when a hover preview is aimed at another hex, or when strategic units are hidden at battle-detail zoom. Otherwise reopens the same rows.
+ * Exceptions: None. A stored id list that fails to parse closes the callout.
+ */
 function refreshStackCalloutIfOpen(): void {
-  if (isHoverOrderPlanningActive()) {
+  if (shouldDismissStackCalloutForHoverPlanning()) {
     hideStackCallout();
     return;
   }
@@ -1336,14 +1349,16 @@ function getPrimarySelectedUnitId(): string | null {
 }
 
 /**
- * Defines the `rebuildUnitDisplayNameLookup` function shape (function rebuildUnitDisplayNameLookup(state: GameStateSnapshot | null): void).
-
- * Purpose: Supports maintainability by documenting why `rebuildUnitDisplayNameLookup` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Rebuilds the unit display-name lookup and remembers unit birth origins from a snapshot.
+ *
+ * Purpose: Keeps unit labels (names and origin flags) in step with the latest game state.
+ * When to use: For every applied snapshot and for the new-game snapshot.
+ * Expected outcome: `S.unitDisplayNameById` covers the snapshot's units plus any active tactical sub-units;
+ *   origins are added to the accumulating origin cache. A `null` state leaves only tactical names.
  * Exceptions: None.
  */
 function rebuildUnitDisplayNameLookup(state: GameStateSnapshot | null): void {
+  if (state) rememberUnitOrigins(state.units);
   const base = state ? buildUnitDisplayNameLookup(state.units) : new Map<string, string>();
   const tb = S.tacticalBattleSnapshot;
   if (tb) {
@@ -2860,20 +2875,14 @@ function syncUiAfterSelectionChange(
 }
 
 /**
- * Defines the `createSidebarOrderRow` function shape (function createSidebarOrderRow(args: { labelText: string; selected: boolean; onToggleSelect: (event: MouseEvent) => void; onCancel: () => void; c).
-
- * Purpose: Supports maintainability by documenting why `createSidebarOrderRow` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Builds one sidebar order row through the shared sidebar helper.
+ *
+ * Purpose: The single row builder handed to the pending-orders and ranged-orders dependency bundles.
+ * When to use: As the `createSidebarOrderRow` dependency.
+ * Expected outcome: An unattached row element; the label carries a unit flag when `args.unitId` is given.
  * Exceptions: None.
  */
-function createSidebarOrderRow(args: {
-  labelText: string;
-  selected: boolean;
-  onToggleSelect: (event: MouseEvent) => void;
-  onCancel: () => void;
-  compactBlueButtons?: boolean;
-}): HTMLDivElement {
+function createSidebarOrderRow(args: SidebarOrderRowArgs): HTMLDivElement {
   return createSidebarOrderRowFromModule(args);
 }
 
@@ -3141,6 +3150,7 @@ function initOpenRouterUI(): void {
  * Exceptions: None.
  */
 function init(): void {
+  installUnitOriginTooltip();
   // Contract anchors retained after extraction:
   // applyModifierDrivenPopoverCloseRules('shift_pressed');
   // applyModifierDrivenPopoverCloseRules('shift_released');

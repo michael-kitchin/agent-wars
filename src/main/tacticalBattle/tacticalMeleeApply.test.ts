@@ -11,6 +11,9 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { gridDisk } from 'h3-js';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
+import type { UnitOrigin } from '../../shared/unitOriginTypes';
+import { dbRun, isDbReady } from '../gameDb';
+import { persistOriginBonusSettings } from '../gameDb/originBonusConfig';
 import { applyTacticalMeleeAfterSupportOrders } from './tacticalMeleeApply';
 import { firstRingCellDistinctFrom, tacticalRes1Cell, tacticalRes4UnderRes1Corner } from './testSupport/tacticalRes4HexFixtures';
 import { withTempGameDb } from '../testSupport/withTempGameDb';
@@ -58,6 +61,56 @@ test('tactical melee adjudicates co-located opposing sub-units on the same res4 
         'playback contract: removals must carry kill edges for tacticalResolutionPlayback / strategic-style toasts'
       );
     }
+  });
+});
+
+test('tactical melee adds the terrain bonus only while the terrain flag is on', () => {
+  withTempGameDb('aw-tactical-melee-origin-', () => {
+    const res1 = tacticalRes1Cell(4, 4);
+    const h0 = tacticalRes4UnderRes1Corner(4, 4);
+    const coastalBorn: UnitOrigin = {
+      birthH3Index: res1,
+      birthRes4H3Index: h0,
+      birthTerrainKind: 'coastal',
+      birthIsUrban: false,
+      birthCountryName: null,
+      birthCountryCode: null,
+    };
+    const snap: TacticalBattleSnapshot = {
+      battleId: 'tb-melee-origin',
+      enclosingRes1H3Index: res1,
+      res4ChildH3Indexes: [...gridDisk(h0, 1)],
+      strategicTurnNumber: 1,
+      tacticalTurnNumber: 1,
+      res4TerrainKindByH3: { [h0]: 'coastal' },
+      subUnits: [
+        {
+          id: 'hum-n',
+          parentUnitId: 'human-naval-1',
+          player: 'human',
+          unitType: 'naval',
+          h3Index: h0,
+          displayName: '1st Fleet (01)',
+          origin: coastalBorn,
+        },
+        {
+          id: 'opp-n',
+          parentUnitId: 'opponent-naval-1',
+          player: 'opponent',
+          unitType: 'naval',
+          h3Index: h0,
+          displayName: 'I Fleet (01)',
+        },
+      ],
+    };
+    const rollThree = () => (3 - 0.5) / 6;
+    persistOriginBonusSettings({ run: dbRun, hasDb: isDbReady }, { countryBonusEnabled: false, terrainBonusEnabled: true });
+    assert.deepEqual(
+      applyTacticalMeleeAfterSupportOrders(snap, rollThree).meleeRemovedUnits.map((u) => u.id),
+      ['opp-n']
+    );
+    persistOriginBonusSettings({ run: dbRun, hasDb: isDbReady }, { countryBonusEnabled: false, terrainBonusEnabled: false });
+    assert.deepEqual(applyTacticalMeleeAfterSupportOrders(snap, rollThree).meleeRemovedUnits, []);
   });
 });
 

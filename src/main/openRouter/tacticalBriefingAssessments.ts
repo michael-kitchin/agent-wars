@@ -10,6 +10,9 @@ import { gridHopDistanceBetween } from '../tools/assessUnitProximity';
 import { pickClosestEnemyTacticalRangedTargetForSubUnit } from '../tacticalBattle/tacticalRangedTargetResolve';
 import { logDebug, logTrace } from '../logger';
 import { parseTacticalSubUnitId } from '../../shared/unitIds';
+import { ORIGIN_BONUS_OFF } from '../../shared/originBonusRules';
+import type { OriginBonusSettings } from '../../shared/originBonusTypes';
+import { tacticalOriginBonusUnitFields, type OriginBonusUnitFields } from '../tools/originBonusAssessment';
 
 /**
  * Extracts the strategic parent unit id from a tactical sub-unit id.
@@ -65,13 +68,15 @@ function tacticalAssessmentStackKey(
  *
  * Purpose: Avoid repeating grid-distance scans for stacked same-type pawns while still emitting one Unit Status row each.
  * When to use: Cache hit in `buildLightweightTacticalUnitAssessments`.
- * Expected outcome: Cloned nearbyEnemies/threats; unit id and lat/lng belong to the stacked sub-unit.
+ * Expected outcome: Cloned nearbyEnemies/threats; unit id, lat/lng, and origin bonus fields belong to the stacked sub-unit
+ *   (stack mates can have different origins).
  * Exceptions: None.
  */
 function cloneTacticalAssessmentForStackedUnit(
   cached: UnitAssessmentResult,
   unit: TacticalSubUnitSnapshot,
-  byId: Map<string, TacticalSubUnitSnapshot>
+  byId: Map<string, TacticalSubUnitSnapshot>,
+  originBonusFor: (unit: TacticalSubUnitSnapshot) => OriginBonusUnitFields
 ): UnitAssessmentResult {
   logTrace('tacticalBriefingAssessments cloneTacticalAssessmentForStackedUnit', {
     cachedUnitId: cached.unitId,
@@ -87,6 +92,7 @@ function cloneTacticalAssessmentForStackedUnit(
         ...cached.result.unit,
         unitId: unit.id,
         position: [lat, lng],
+        ...originBonusFor(unit),
       },
       nearbyEnemies: cached.result.nearbyEnemies.map((enemy) => ({ ...enemy })),
       threats: cached.result.threats.map((threat) => ({ ...threat })),
@@ -221,16 +227,21 @@ function assessTacticalOpponentUnit(
  * When to use: `formatTacticalBriefing` before assembling Commander sections.
  * Expected outcome: One assessment per opponent sub-unit with nearest enemy, threat severity, and any legal shot;
  * `currentStandingOrder` is always null (standing orders do not apply in tactical beats). Same-hex same-type stacks
- * reuse one scan.
+ * reuse one scan. With an origin bonus flag on, each `unit` block also carries the same origin bonus fields `assess_unit`
+ * reports, which turns on the Unit Status Bonus column.
  * Exceptions: None.
  */
 export function buildLightweightTacticalUnitAssessments(
-  tacticalBattle: TacticalBattleSnapshot
+  tacticalBattle: TacticalBattleSnapshot,
+  originBonusSettings: OriginBonusSettings = ORIGIN_BONUS_OFF
 ): UnitAssessmentResult[] {
   logDebug('tacticalBriefingAssessments buildLightweightTacticalUnitAssessments', {
     battleId: tacticalBattle.battleId,
     subUnitCount: tacticalBattle.subUnits.length,
+    ...originBonusSettings,
   });
+  const originBonusFor = (unit: TacticalSubUnitSnapshot): OriginBonusUnitFields =>
+    tacticalOriginBonusUnitFields(originBonusSettings, tacticalBattle, unit);
   const byId = new Map(tacticalBattle.subUnits.map((u) => [u.id, u]));
   const humans = tacticalBattle.subUnits.filter((u) => u.player === 'human');
   const opponents = tacticalBattle.subUnits.filter((u) => u.player === 'opponent');
@@ -243,10 +254,14 @@ export function buildLightweightTacticalUnitAssessments(
     const cached = assessmentByStackKey.get(stackKey);
     if (cached) {
       reusedAssessments += 1;
-      results.push(cloneTacticalAssessmentForStackedUnit(cached, unit, byId));
+      results.push(cloneTacticalAssessmentForStackedUnit(cached, unit, byId, originBonusFor));
       continue;
     }
-    const entry = assessTacticalOpponentUnit(unit, byId, humans, tacticalBattle);
+    const scanned = assessTacticalOpponentUnit(unit, byId, humans, tacticalBattle);
+    const entry: UnitAssessmentResult = {
+      ...scanned,
+      result: { ...scanned.result, unit: { ...scanned.result.unit, ...originBonusFor(unit) } },
+    };
     assessmentByStackKey.set(stackKey, entry);
     uniqueAssessments += 1;
     results.push(entry);

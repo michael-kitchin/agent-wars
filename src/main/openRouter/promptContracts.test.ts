@@ -293,6 +293,8 @@ function testBriefingGuidanceDoesNotNameUncallableAssessmentTools(): void {
     withoutBriefing.includes('assess_unit') || withoutBriefing.includes('estimate_combat'),
     'no-briefing guidance may still name callable assessment tools'
   );
+  assert.match(withoutBriefing, /differ by type and birth country/);
+  assert.doesNotMatch(withoutBriefing, /results will be identical/);
 }
 
 /**

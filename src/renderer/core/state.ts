@@ -405,15 +405,6 @@ res1FeatureCountsByH3: new Map<
   >(),
 
     /**
-   * Documents the object literal property `namingLineByLookupKey` (namingLineByLookupKey: new Map<string, string | null>()).
-
-   * Purpose: Supports maintainability by documenting why `namingLineByLookupKey` exists.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-namingLineByLookupKey: new Map<string, string | null>(),
-    /**
    * Documents the object literal property `terrainTooltipHtmlByContentKey` (terrainTooltipHtmlByContentKey: new Map<string, string>()).
 
    * Purpose: Supports maintainability by documenting why `terrainTooltipHtmlByContentKey` exists.

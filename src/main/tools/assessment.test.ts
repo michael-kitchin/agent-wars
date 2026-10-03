@@ -517,6 +517,51 @@ function testFogOffOmitsStaleIntelGhost(): void {
 }
 
 /**
+ * Verifies the country bonus fields of `assess_unit` and `assess_hex` follow the snapshot flag.
+ *
+ * Purpose: The AI needs to know where its units roll with +1; with the flag off, results must be unchanged.
+ * When to use: After changing assessment origin bonus fields.
+ * Expected outcome: On, the unit block has `originBonusHere: ['country']` and `birthCountry`, and the hex has `country`; off, none of the three keys.
+ * Exceptions: None.
+ */
+function testCountryBonusFieldsFollowFlag(): void {
+  const { state, coordMap } = buildAssessState(
+    [res1Origin],
+    [
+      {
+        id: 'opponent-armor-1',
+        player: 'opponent',
+        unitType: 'armor',
+        h3Index: res1Origin,
+        origin: {
+          birthH3Index: res1Origin,
+          birthRes4H3Index: null,
+          birthTerrainKind: 'plains',
+          birthIsUrban: false,
+          birthCountryName: 'France',
+          birthCountryCode: 'FR',
+        },
+      },
+    ]
+  );
+  const hexes = state.hexes.map((h) => ({ ...h, countryName: 'France' }));
+  const on: GameStateSnapshot = { ...state, hexes, countryBonusEnabled: true };
+  const position = coordMap.latLngByH3.get(res1Origin)!;
+  const assessHex = (s: GameStateSnapshot) =>
+    executeAssessment('assess_hex', { position }, s, coordMap.latLngByH3, coordMap.resolveToH3);
+
+  const unitOn = assess(on, coordMap, 'opponent-armor-1').unit as Record<string, unknown>;
+  assert.deepStrictEqual(unitOn.originBonusHere, ['country']);
+  assert.strictEqual(unitOn.birthCountry, 'France');
+  assert.strictEqual(assessHex(on).country, 'France');
+
+  const off: GameStateSnapshot = { ...state, hexes };
+  const unitOff = assess(off, coordMap, 'opponent-armor-1').unit as Record<string, unknown>;
+  assert.ok(!('originBonusHere' in unitOff) && !('birthCountry' in unitOff));
+  assert.ok(!('country' in assessHex(off)));
+}
+
+/**
  * Runs all assessment tests.
  *
  * Purpose: Node test entrypoint for main-process discovery.
@@ -537,6 +582,7 @@ function run(): void {
   testFogOffIncludesPentagonCrossingEnemy();
   testFogOnIncludesInRadiusPentagonCrossingEnemy();
   testFogOffOmitsStaleIntelGhost();
+  testCountryBonusFieldsFollowFlag();
   console.log('assessment.test.ts passed');
 }
 

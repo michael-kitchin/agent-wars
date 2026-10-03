@@ -1,6 +1,8 @@
 import { logDebug } from '../../logger';
 import type { BuildUnitType } from '../../productionRules';
 import { formatStrategicUnitId } from '../../../shared/unitIds';
+import type { UnitOrigin } from '../../../shared/unitOriginTypes';
+import { insertUnitRow } from '../unitInsert';
 
 /**
  * Planned spawn for one unit before a compact identifier is allocated at insert time.
@@ -61,6 +63,15 @@ interface PlannedUnitInsertDeps {
    * Exceptions: Throws when the database is not open.
    */
   allocateNextUnitIdOrdinal: (unitType: BuildUnitType, player: PlannedUnitOwner) => number;
+  /**
+   * Resolves the birth origin of a unit about to be inserted.
+   *
+   * Contract: Never throws; returns at least the birth hex.
+   * When to use: Once per inserted unit, after its id is minted.
+   * Expected outcome: Origin stored in the unit's `birth_*` columns.
+   * Exceptions: None.
+   */
+  resolveBirthOrigin: (unitId: string, h3Index: string) => UnitOrigin;
 }
 
 /**
@@ -68,7 +79,7 @@ interface PlannedUnitInsertDeps {
  *
  * Purpose: One allocation site so seeding loops cannot drift from the identifier counter.
  * When to use: After a side's spawn hexes are chosen.
- * Expected outcome: Each row is `h1-i1` / `a1-t3` style with matching `display_order`.
+ * Expected outcome: Each row is `h1-i1` / `a1-t3` style with matching `display_order` and a birth origin.
  * Exceptions: Propagates formatter and SQLite errors.
  */
 export function insertPlannedUnitsForPlayer(
@@ -80,12 +91,13 @@ export function insertPlannedUnitsForPlayer(
   for (const plan of units) {
     const ordinal = deps.allocateNextUnitIdOrdinal(plan.unitType, player);
     const id = formatStrategicUnitId({ player, unitType: plan.unitType, ordinal });
-    deps.run('INSERT INTO units (id, player, unit_type, display_order, h3_index) VALUES (?, ?, ?, ?, ?)', [
+    insertUnitRow(deps.run, {
       id,
       player,
-      plan.unitType,
-      deps.allocateNextUnitDisplayOrder(plan.unitType, player),
-      plan.h3Index,
-    ]);
+      unitType: plan.unitType,
+      displayOrder: deps.allocateNextUnitDisplayOrder(plan.unitType, player),
+      h3Index: plan.h3Index,
+      origin: deps.resolveBirthOrigin(id, plan.h3Index),
+    });
   }
 }

@@ -65,6 +65,41 @@ export function isHoverOrderPlanningActive(): boolean {
 }
 
 /**
+ * Whether hover planning should close or refuse the stack callout.
+ *
+ * Purpose: Clicking a unit selects it and opens the callout while the pointer is still on that unit's hex, and the selection refresh then publishes a preview of that same hex. Treating that preview as destination planning cancels the callout the click just asked for.
+ * When to use: Before `hideStackCallout` or before returning from `showStackCallout` / `refreshStackCalloutIfOpen` on account of hover planning.
+ * Expected outcome: `false` when planning is inactive, and when every selected unit already occupies the hovered hex. `true` when planning is aimed at any other hex.
+ * Exceptions: None.
+ */
+export function shouldDismissStackCalloutForHoverPlanning(): boolean {
+  if (!isHoverOrderPlanningActive()) return false;
+  return !everySelectedUnitOccupiesHoveredHex();
+}
+
+/**
+ * Whether every selected unit is already on the hex under the pointer.
+ *
+ * Purpose: Distinguishes a preview of the unit the player just clicked from a preview aimed at a march or attack destination.
+ * When to use: Only from `shouldDismissStackCalloutForHoverPlanning`.
+ * Expected outcome: `true` only when the hovered hex is set and each selected id occupies it, using battle sub-units during a tactical battle and strategic units otherwise. A missing id or an empty selection returns `false`.
+ * Exceptions: None.
+ */
+function everySelectedUnitOccupiesHoveredHex(): boolean {
+  const hovered = S.hoveredHexH3;
+  if (!hovered || S.selectedUnitIds.length === 0) return false;
+  const tactical = S.tacticalBattleSnapshot;
+  if (tactical) {
+    return S.selectedUnitIds.every((id) =>
+      tactical.subUnits.some((unit) => unit.id === id && unit.h3Index === hovered)
+    );
+  }
+  const units = S.gameState?.units;
+  if (!units) return false;
+  return S.selectedUnitIds.every((id) => units.some((unit) => unit.id === id && unit.h3Index === hovered));
+}
+
+/**
  * Returns whether a proposed `replaceSelection` would add units not already selected during hover planning.
  *
  * Purpose: Allows deselect and subset removal while blocking exclusive swaps and multi-select expansion.

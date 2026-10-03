@@ -91,7 +91,7 @@ Element documents share a fixed heading set:
 ## Glossary
 
 - Hex: one cell of the world or battle grid.
-- Stack: two or more units in the same hex, or the callout that lists them.
+- Stack: two or more units in the same hex. The stack callout lists the units in one hex, including a single unit.
 - Selection: the human units the player has chosen. The selected hex is tracked separately.
 - Targeting mode: Ranged or Strike, while the next map click chooses a target.
 - Order: a march, ferry, ranged attack, air strike, or build queue entry. Sealift embark and debark apply immediately and are not orders in this sense.

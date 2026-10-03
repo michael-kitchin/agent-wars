@@ -26,9 +26,9 @@ function testCityReductionPicksLowestScalerank(): void {
     {
       h3_index: '8401341ffffffff',
       cities: [
-        { name: 'Small', state: null, country: null, population: 100, scalerank: 2 },
-        { name: 'BigCity', state: null, country: null, population: 9, scalerank: 0 },
-        { name: 'Mid', state: null, country: null, population: 50, scalerank: 1 },
+        { name: 'Small', state: null, country: null, population: 100, scalerank: 2, countryCode: null },
+        { name: 'BigCity', state: null, country: null, population: 9, scalerank: 0, countryCode: null },
+        { name: 'Mid', state: null, country: null, population: 50, scalerank: 1, countryCode: null },
       ],
       states: [],
       countries: [],
@@ -52,9 +52,9 @@ function testCityTieJoinsAndSorts(): void {
     {
       h3_index: '8401349ffffffff',
       cities: [
-        { name: 'B', state: null, country: null, population: 5, scalerank: 1 },
-        { name: 'A', state: null, country: null, population: 5, scalerank: 1 },
-        { name: 'Z', state: null, country: null, population: 10, scalerank: 2 },
+        { name: 'B', state: null, country: null, population: 5, scalerank: 1, countryCode: null },
+        { name: 'A', state: null, country: null, population: 5, scalerank: 1, countryCode: null },
+        { name: 'Z', state: null, country: null, population: 10, scalerank: 2, countryCode: null },
       ],
       states: [],
       countries: [],
@@ -77,7 +77,7 @@ function testCityReductionIgnoresOutOfRangeScalerank(): void {
   const records: TerrainNamingRecordRes4[] = [
     {
       h3_index: '840134bffffffff',
-      cities: [{ name: 'OnlyFive', state: null, country: null, population: 1, scalerank: 5 }],
+      cities: [{ name: 'OnlyFive', state: null, country: null, population: 1, scalerank: 5, countryCode: null }],
       states: [],
       countries: [],
       water: [],
@@ -150,7 +150,7 @@ function testRoadRailParseRejectsNonBoolean(): void {
 /**
  * Defines the `testOverlayIpcGettersReturnEmptyWhenCacheCleared` function shape (function testOverlayIpcGettersReturnEmptyWhenCacheCleared(): void).
 
- * Purpose: Mirrors Phase 2 IPC non-fatal fallback when classification cache is not populated.
+ * Purpose: Locks the non-fatal IPC fallback when the classification cache is not populated.
  * When to use: `npm test` main-process suite.
  * Expected outcome: Both getters yield empty arrays without throwing.
  * Exceptions: None.

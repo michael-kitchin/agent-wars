@@ -8,8 +8,9 @@
  * Exceptions: None; failures are returned as `error` values.
  */
 
-import { getAttack, getDefense } from '../combatConstants';
+import { attackHitThreshold, defenseHitThreshold } from '../combatHitThresholds';
 import type { CombatUnit } from '../combatUnitTypes';
+import type { OriginHitBonus } from '../../shared/originBonusTypes';
 import { gridHopDistanceBetween } from './assessUnitProximity';
 import type { CombatEstimationEngagementType, CombatEstimationTheater } from './combatEstimationTheater';
 import { h3ToLatLng, type LatLng, type LatLngMap } from './h3LatLng';
@@ -121,12 +122,21 @@ export interface AttackerSummaryRow {
   /**
    * Attack value used for hit chances.
    *
-   * Contract: From `getAttack`.
+   * Contract: From `attackHitThreshold`, so it includes any origin bonus.
    * When to use: Result payloads.
    * Expected outcome: Non-negative integer.
    * Exceptions: None.
    */
   readonly attackValue: number;
+  /**
+   * Origin bonus included in `attackValue`.
+   *
+   * Contract: Present only when the attacker qualifies where it would roll; never on assumed attackers.
+   * When to use: Result payloads.
+   * Expected outcome: Always 1 when present.
+   * Exceptions: None.
+   */
+  readonly originBonus?: OriginHitBonus;
   /**
    * Combat cell center of a real attacker.
    *
@@ -168,12 +178,46 @@ export interface DefenderSummaryRow {
   /**
    * Defense value shown to the model.
    *
-   * Contract: From `getDefense`.
+   * Contract: From `defenseHitThreshold`, so it includes any origin bonus.
    * When to use: Result payloads.
    * Expected outcome: Non-negative integer.
    * Exceptions: None.
    */
   readonly defenseValue: number;
+  /**
+   * Origin bonus included in `defenseValue` and in this defender's return-fire chance.
+   *
+   * Contract: Present only when the defender qualifies at the target; never on assumed defenders.
+   * When to use: Result payloads.
+   * Expected outcome: Always 1 when present.
+   * Exceptions: None.
+   */
+  readonly originBonus?: OriginHitBonus;
+}
+
+/**
+ * Sets a real unit's origin bonus as judged at the cell where it would roll.
+ *
+ * Purpose: Melee attackers roll at the target, unlike their current cell, so the estimate cannot reuse `withOriginHitBonus`.
+ * When to use: Real attackers and defenders only; assumed units never qualify.
+ * Expected outcome: The same object when the bonus is 0, otherwise a copy with `originHitBonus: 1`; `h3Index` is unchanged.
+ * Exceptions: None.
+ */
+function withEstimateOriginBonus(unit: CombatUnit, theater: CombatEstimationTheater, rollH3Index: string): CombatUnit {
+  const bonus = theater.originHitBonusAt(unit.id, rollH3Index);
+  return bonus === 0 ? unit : { ...unit, originHitBonus: bonus };
+}
+
+/**
+ * Builds the optional `originBonus` field of a summary row.
+ *
+ * Purpose: Keeps bonus-free rows byte-for-byte unchanged.
+ * When to use: Spread into attacker and defender summary rows.
+ * Expected outcome: `{ originBonus: 1 }` or `{}`.
+ * Exceptions: None.
+ */
+function originBonusSummaryField(unit: CombatUnit): { readonly originBonus?: OriginHitBonus } {
+  return unit.originHitBonus === 1 ? { originBonus: 1 } : {};
 }
 
 /**
@@ -278,10 +322,11 @@ function buildRealAttackers(ids: readonly string[], ctx: CombatSideContext): Att
     if (rejection) return { error: rejection };
     combat.push(found.unit);
   }
-  const usable =
+  const usable = (
     ctx.engagementType === 'ranged'
       ? combat.filter((u) => ctx.theater.canFireAt(u.unitType, u.h3Index, ctx.targetHexH3))
-      : combat;
+      : combat
+  ).map((u) => withEstimateOriginBonus(u, ctx.theater, ctx.engagementType === 'melee' ? ctx.targetHexH3 : u.h3Index));
   if (usable.length === 0) {
     const u = combat[0]!;
     const dist = gridHopDistanceBetween(u.h3Index, ctx.targetHexH3);
@@ -289,14 +334,16 @@ function buildRealAttackers(ids: readonly string[], ctx: CombatSideContext): Att
     const fireReach = ctx.theater.describeFireReach(u.unitType, u.h3Index);
     return { error: `Attacker ${u.id} (${fireReach}) cannot reach target hex at ${reach}${ctx.theater.blockedShotRules}` };
   }
-  const excluded = combat.filter((u) => !usable.includes(u)).map((u) => u.id);
+  const usableIds = new Set(usable.map((u) => u.id));
+  const excluded = combat.filter((u) => !usableIds.has(u.id)).map((u) => u.id);
   if (excluded.length > 0) ctx.warnings.push(`Excluded out-of-range attackers: ${excluded.join(', ')}`);
   return {
     combat: usable,
     summary: usable.map((u) => ({
       unitId: u.id,
       type: u.unitType,
-      attackValue: getAttack(u.unitType),
+      attackValue: attackHitThreshold(u),
+      ...originBonusSummaryField(u),
       position: h3ToLatLng(u.h3Index, ctx.latLngByH3, 'cellCenter'),
     })),
   };
@@ -333,7 +380,7 @@ export function buildAttackers(raw: CombatSideArgs, ctx: CombatSideContext): Att
   );
   return {
     combat,
-    summary: combat.map((u) => ({ unitId: u.id, type: u.unitType, attackValue: getAttack(u.unitType) })),
+    summary: combat.map((u) => ({ unitId: u.id, type: u.unitType, attackValue: attackHitThreshold(u) })),
   };
 }
 
@@ -357,14 +404,16 @@ export function buildDefenders(raw: CombatSideArgs | undefined, ctx: CombatSideC
   const toSummary = (u: CombatUnit): DefenderSummaryRow => ({
     unitId: u.id,
     type: u.unitType,
-    defenseValue: getDefense(u.unitType),
+    defenseValue: defenseHitThreshold(u),
+    ...originBonusSummaryField(u),
   });
+  const atTarget = (u: CombatUnit): CombatUnit => withEstimateOriginBonus(u, ctx.theater, ctx.targetHexH3);
   if (raw?.units && raw.units.length > 0) {
     const combat: CombatUnit[] = [];
     for (const id of raw.units) {
       const found = ctx.theater.findUnit(id, ctx.engagementType);
       if (!found.unit) return { error: found.error };
-      combat.push({ ...found.unit, h3Index: ctx.targetHexH3 });
+      combat.push(atTarget({ ...found.unit, h3Index: ctx.targetHexH3 }));
     }
     return { combat, summary: combat.map(toSummary), automatic: false };
   }
@@ -381,7 +430,7 @@ export function buildDefenders(raw: CombatSideArgs | undefined, ctx: CombatSideC
     return { combat, summary: combat.map(toSummary), automatic: false };
   }
   const cell = ctx.theater.listUnitsAt(ctx.targetHexH3, ctx.engagementType);
-  const combat = cell.participants.filter((u) => u.player !== AI_PLAYER_ID);
+  const combat = cell.participants.filter((u) => u.player !== AI_PLAYER_ID).map(atTarget);
   const excludedIds = cell.excluded.filter((u) => u.player !== AI_PLAYER_ID).map((u) => u.id);
   if (excludedIds.length > 0) {
     ctx.warnings.push(`Excluded units that sit out ${ctx.engagementType} combat: ${excludedIds.join(', ')}`);

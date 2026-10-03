@@ -21,6 +21,8 @@ import { logDebug, logError, logTrace } from '../logger';
 import { h3ToLatLng, type LatLng, type LatLngMap } from './h3LatLng';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { executeTacticalAssessUnit } from './tacticalAssessUnit';
+import { originBonusSettingsFromSnapshot } from '../../shared/originBonusRules';
+import { strategicOriginBonusHexFields, strategicOriginBonusUnitFields } from './originBonusAssessment';
 import {
   collectOmniscientNearbyUnits,
   gridHopDistanceBetween,
@@ -221,7 +223,8 @@ export function executeAssessment(
         radius = Math.floor(a.radius);
       }
       if (tacticalBattle) {
-        return executeTacticalAssessUnit({ unitId, radius, battle: tacticalBattle, latLngByH3 });
+        const originBonusSettings = originBonusSettingsFromSnapshot(state);
+        return executeTacticalAssessUnit({ unitId, radius, battle: tacticalBattle, latLngByH3, originBonusSettings });
       }
       return executeAssessUnit(unitId, radius, state, latLngByH3, resolveToH3);
     }
@@ -248,11 +251,12 @@ export function executeAssessment(
 }
 
 /**
- * Defines the `executeAssessUnit` function shape (function executeAssessUnit( unitId: string, radius: number, state: GameStateSnapshot, latLngByH3: LatLngMap, // eslint-disable-next-line @typescr).
-
- * Purpose: Supports maintainability by documenting why `executeAssessUnit` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Runs the strategic `assess_unit` tool for one unit.
+ *
+ * Purpose: Gives the AI one unit's surroundings, threats, supply, orders, and origin bonus status in one call.
+ * When to use: From `executeAssessment` outside tactical battles; `state` should already be the AI's fogged view.
+ * Expected outcome: `status: 'ok'` with a `unit` block; it carries `originBonusHere` and `birthCountry` only while
+ *   the country bonus is on. `status: 'error'` when the unit is not found.
  * Exceptions: None.
  */
 function executeAssessUnit(
@@ -460,6 +464,7 @@ function executeAssessUnit(
       terrain,
       movementBudget,
       currentStandingOrder,
+      ...strategicOriginBonusUnitFields(state, unit),
     },
     nearbyEnemies,
     nearbyFriendlies,
@@ -469,11 +474,12 @@ function executeAssessUnit(
 }
 
 /**
- * Defines the `executeAssessHex` function shape (function executeAssessHex( position: LatLng, forUnitType: string | undefined, state: GameStateSnapshot, latLngByH3: LatLngMap, resolveToH3: (lat:).
-
- * Purpose: Supports maintainability by documenting why `executeAssessHex` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Runs the strategic `assess_hex` tool for one map position.
+ *
+ * Purpose: Gives the AI one hex's terrain, passability, occupants, control, and country in one call.
+ * When to use: From `executeAssessment` outside tactical battles, after the briefing hex code is decoded to `position`.
+ * Expected outcome: `status: 'ok'` with the hex fields; `country` appears only while the country bonus is on.
+ *   `status: 'error'` when `position` does not resolve to a map hex.
  * Exceptions: None.
  */
 function executeAssessHex(
@@ -580,6 +586,7 @@ function executeAssessHex(
     error: null,
     position: h3ToLatLng(hexH3, latLngByH3, 'cellCenter'),
     terrain,
+    ...strategicOriginBonusHexFields(state, hexH3),
     passableBy,
     unitsAtHex,
     unitsInRange: { rangedRange1, rangedRange2, meleeRange },

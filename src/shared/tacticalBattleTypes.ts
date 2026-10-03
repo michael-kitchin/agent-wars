@@ -3,6 +3,8 @@
  * Kept renderer/main aligned via IPC payloads.
  */
 
+import type { UnitOrigin } from './unitOriginTypes';
+
 /**
  * Identifies which player owns a tactical sub-unit for rendering and rules parity.
  *
@@ -85,6 +87,15 @@ export interface TacticalSubUnitSnapshot {
    * Exceptions: None.
    */
   embarkedOnSubUnitId?: string | null;
+  /**
+   * Birth origin of the parent strategic unit, copied onto each sub-unit when the battle snapshot is created.
+   *
+   * Contract: Deeply equal to the parent's `origin`; absent when the parent had none or the battle predates this field.
+   * When to use: Origin bonus checks (country and terrain) for this sub-unit's rolls and assessments.
+   * Expected outcome: A sub-unit without it never qualifies for an origin bonus.
+   * Exceptions: None.
+   */
+  origin?: UnitOrigin;
 }
 
 /**
@@ -177,6 +188,15 @@ export interface TacticalBattleSnapshot {
    * Exceptions: None.
    */
   res4IsSeaportByH3?: Record<string, boolean>;
+  /**
+   * Birth country name per res4 cell inside the footprint, the same value used for unit births.
+   *
+   * Contract: Keys are a subset of `res4ChildH3Indexes` and list only cells that have a country. Set when the battle snapshot is created.
+   * When to use: The country test of origin bonuses for a tactical cell.
+   * Expected outcome: Omitted on legacy saves and when no footprint cell has a country; a missing cell has no country.
+   * Exceptions: None.
+   */
+  res4CountryNameByH3?: Record<string, string>;
   /**
    * Per-res4 airport facility flags inside the footprint (only rows where `res4_feature_overrides.is_airport` is set at snapshot build).
    *

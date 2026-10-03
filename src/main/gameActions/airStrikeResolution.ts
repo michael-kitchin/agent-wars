@@ -17,6 +17,7 @@ import { getAvailableBuildUnitTypes } from '../productionRules';
 import { casualtyPriorityIndex, getAttack, getDefense, getRange } from '../combatConstants';
 import type { AirStrikeAnimationMove, AirStrikeOrder, AirStrikeTargetType, InfrastructureDestroyedEvent } from '../../shared/ipcTypes';
 import type { CombatUnit } from '../combatUnitTypes';
+import type { OriginHitBonusLookup } from '../originBonus/originHitBonusLookup';
 import { validateAirStrikeOrder } from './airValidation';
 import { isEmbarkedLandUnitOnWater } from './sealift';
 
@@ -316,11 +317,11 @@ function recordRemovedUnit(
 }
 
 /**
- * Defines the `resolveAirStrikeAgainstUnits` function shape (function resolveAirStrikeAgainstUnits( attacker: { id: string; player: string; unit_type: string; h3_index: string; display_order: number | null }, target).
-
- * Purpose: Supports maintainability by documenting why `resolveAirStrikeAgainstUnits` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Resolves one strategic air strike against the enemy units in a hex.
+ *
+ * Purpose: Applies the pre-rolled attack hit to the lowest-defense victim, then rolls counter-fire from eligible defenders.
+ * When to use: From `resolveAirStrikePhase` for `units` targets.
+ * Expected outcome: Deletes the victim and/or the attacker; counter-fire thresholds include each defender's origin bonus from `originHitBonusAt` at its own hex, while the victim pick keeps printed defense values.
  * Exceptions: None.
  */
 function resolveAirStrikeAgainstUnits(
@@ -328,7 +329,8 @@ function resolveAirStrikeAgainstUnits(
   targetH3Index: string,
   attackHit: boolean,
   rollD6: () => number,
-  acc: AirStrikePhaseAccumulator
+  acc: AirStrikePhaseAccumulator,
+  originHitBonusAt: OriginHitBonusLookup
 ): { success: boolean; attackerLost: boolean } {
   const defenders = dbGetAll<{ id: string; player: string; unit_type: string; h3_index: string; display_order: number | null }>(
     'SELECT id, player, unit_type, h3_index, display_order FROM units WHERE h3_index = ? AND player != ?',
@@ -351,7 +353,7 @@ function resolveAirStrikeAgainstUnits(
 
   for (const defender of eligibleDefenders) {
     if (getRange(defender.unit_type) < 1) continue;
-    if (rollD6() > getAttack(defender.unit_type)) continue;
+    if (rollD6() > getAttack(defender.unit_type) + originHitBonusAt(defender.id, defender.h3_index)) continue;
     dbRun('DELETE FROM units WHERE id = ?', [attacker.id]);
     recordRemovedUnit(acc, attacker, { removedAtH3Index: targetH3Index });
     attackerLost = true;
@@ -405,16 +407,17 @@ function resolveAirStrikeAgainstInfrastructure(
 }
 
 /**
- * Defines the `resolveAirStrikePhase` function shape (export function resolveAirStrikePhase( airOrders: AirStrikeOrder[], next: () => number ): { removedUnitIds: string[]; removedUnits: CombatUnit[];).
-
- * Purpose: Supports maintainability by documenting why `resolveAirStrikePhase` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Resolves every strategic air strike of the turn against units or infrastructure.
+ *
+ * Purpose: First rolling phase of strategic resolution.
+ * When to use: From `executeReadyStrategicTurn`, with the turn's seeded RNG and its origin bonus lookup; tests that ignore bonuses pass `noOriginHitBonus`.
+ * Expected outcome: Removed units, strike hexes, animation moves, and counts. Each attack roll adds the air unit's origin bonus at its base hex; unit counter-fire adds each defender's bonus at its hex. Infrastructure counter-fire is unchanged.
  * Exceptions: None.
  */
 export function resolveAirStrikePhase(
   airOrders: AirStrikeOrder[],
-  next: () => number
+  next: () => number,
+  originHitBonusAt: OriginHitBonusLookup
 ): {
   removedUnitIds: string[];
   removedUnits: CombatUnit[];
@@ -461,9 +464,9 @@ export function resolveAirStrikePhase(
     );
     if (!attacker) continue;
     attemptCount += 1;
-    const attackHit = rollD6() <= getAttack('air');
+    const attackHit = rollD6() <= getAttack('air') + originHitBonusAt(attacker.id, attacker.h3_index);
     if (order.targetType === 'units') {
-      const result = resolveAirStrikeAgainstUnits(attacker, order.targetH3Index, attackHit, rollD6, acc);
+      const result = resolveAirStrikeAgainstUnits(attacker, order.targetH3Index, attackHit, rollD6, acc, originHitBonusAt);
       strikeMoves.push({
         unitId: attacker.id,
         player: attacker.player,

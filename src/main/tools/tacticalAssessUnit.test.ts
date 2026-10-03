@@ -94,6 +94,35 @@ test('battle assess_unit: radius limits the units reported', () => {
   assert.equal(result.nearbyEnemies!.length, 0);
 });
 
+test('battle assess_unit: reports the terrain bonus on a matching cell', () => {
+  const fx = buildTacticalToolFixture({
+    battleId: 'assess-terrain-bonus',
+    terrainByCell: { near: 'forest' },
+    originBonusSettings: { countryBonusEnabled: false, terrainBonusEnabled: true },
+    units: [
+      {
+        id: 'opp-inf',
+        player: 'opponent',
+        unitType: 'infantry',
+        cell: 'near',
+        origin: {
+          birthH3Index: 'unused',
+          birthRes4H3Index: null,
+          birthTerrainKind: 'forest',
+          birthIsUrban: false,
+          birthCountryName: null,
+          birthCountryCode: null,
+        },
+      },
+      { id: 'hum-arm', player: 'human', unitType: 'armor', cell: 'far' },
+    ],
+  });
+  const unit = assess(fx, 'assess_unit', { unitId: 'opp-inf' }).unit as Record<string, unknown> | undefined;
+  assert.deepEqual(unit?.originBonusHere, ['terrain']);
+  assert.equal(unit?.birthTerrain, 'forest');
+  assert.equal('birthCountry' in (unit ?? {}), false);
+});
+
 test('battle assess_unit and assess_hex: essential errors', () => {
   const fx = lineFixture('assess-errors');
   assert.equal(assess(fx, 'assess_unit', { unitId: 'missing' }).status, 'error');

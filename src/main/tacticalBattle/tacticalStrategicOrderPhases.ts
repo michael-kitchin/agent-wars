@@ -20,9 +20,11 @@ import {
   tacticalRes4HasStrikeableInfrastructure,
 } from '../../shared/tacticalTerrainCombatModifiers';
 import { tacticalRes4CellHasActiveTransportCorridor } from '../../shared/tacticalRes4TransportLink';
-import { unitHasTacticalRangedBaseline } from '../../shared/tacticalRanges';
-import { casualtyPriorityIndex, getAttack, getDefense } from '../combatConstants';
+import { getAttack } from '../combatConstants';
 import { runRangedPhase } from '../combatResolution';
+import { withOriginHitBonus, type OriginHitBonusLookup } from '../originBonus/originHitBonusLookup';
+import { buildTacticalOriginHitBonusLookupFromDb } from '../originBonus/originHitBonusLookupDb';
+import { markTacticalSubUnitCasualty, resolveTacticalAirStrikeAgainstUnitsOnSubUnits } from './tacticalAirStrikeUnits';
 import {
   dedupeRangedResolutionShotLines,
   directShotLinesFromOrders,
@@ -115,112 +117,19 @@ export function syncStrategicUnitsDbWhenTacticalParentsEliminated(
 }
 
 /**
- * Lists tactical sub-unit ids to remove for one casualty, including cargo embarked on that naval sub.
- *
- * Purpose: Keeps naval sub-unit loss aligned with sealift cargo without expanding to sibling sub-units.
- * When to use: `markTacticalSubUnitCasualty` when building the removal set for one strike victim.
- * Expected outcome: Victim id plus zero or more embarked land ids when the victim is naval.
- * Exceptions: None.
- */
-function expandedRemovalIdsForVictim(subUnits: readonly TacticalSubUnitSnapshot[], victimId: string): string[] {
-  const victim = subUnits.find((u) => u.id === victimId);
-  const out = new Set<string>([victimId]);
-  if (victim?.unitType === 'naval') {
-    for (const u of subUnits) {
-      if (u.embarkedOnSubUnitId === victimId) out.add(u.id);
-    }
-  }
-  return [...out];
-}
-
-/**
- * Marks one tactical sub-unit (and land cargo embarked on that naval sub) for snapshot removal.
- *
- * Purpose: Enforces per-sub-unit tactical casualties without removing sibling sub-units of the same strategic parent.
- * When to use: Air strike and AA paths before `flushAirCasualties`; infra counterattacks pass empty killers to skip kill ledger rows.
- * Expected outcome: `toRemove` gains the victim id(s); kill ledger rows are added only when `killerSubUnitIds` is non-empty.
- * Exceptions: None.
- */
-function markTacticalSubUnitCasualty(
-  subUnits: readonly TacticalSubUnitSnapshot[],
-  toRemove: Set<string>,
-  victimSubUnitId: string,
-  killerSubUnitIds: string[],
-  killLedger: { victimId: string; killerIds: string[] }[]
-): void {
-  for (const id of expandedRemovalIdsForVictim(subUnits, victimSubUnitId)) {
-    if (toRemove.has(id)) continue;
-    toRemove.add(id);
-    if (killerSubUnitIds.length > 0) {
-      killLedger.push({ victimId: id, killerIds: killerSubUnitIds });
-    }
-  }
-}
-
-/**
- * Resolves one air-vs-`units` strike on a tactical snapshot using per-sub-unit casualty rules.
- *
- * Purpose: Keeps tactical air casualties and AA return fire aligned with strategic dice while only removing the struck sub-unit (plus cargo on that naval sub).
- * When to use: Inside `applyTacticalAirStrikeThenRangedPhaseOnBattle` for each `targetType === 'units'` order after the hit roll.
- * Expected outcome: Mutates `toRemove` and kill ledgers; strategic parent delete is deferred to `syncStrategicUnitsDbWhenTacticalParentsEliminated`.
- * Exceptions: None; skips silently when the attacker row is missing from `sub`.
- */
-function resolveTacticalAirStrikeAgainstUnitsOnSubUnits(
-  battle: TacticalBattleSnapshot,
-  sub: TacticalSubUnitSnapshot[],
-  attacker: TacticalSubUnitSnapshot,
-  targetH3Index: string,
-  rollD6: () => number,
-  toRemove: Set<string>,
-  killsByAirStrike: { victimId: string; killerIds: string[] }[],
-  killsByReturnFire: { victimId: string; killerIds: string[] }[]
-): void {
-  const defenders = sub.filter((u) => u.h3Index === targetH3Index && u.player !== attacker.player);
-  const eligibleForAa = defenders.filter(
-    (d) =>
-      (d.unitType !== 'infantry' && d.unitType !== 'armor') ||
-      !tacticalEmbarkedLandExcludedFromRangedInput(battle, sub, d)
-  );
-  const attackHit = rollD6() <= getAttack('air');
-  if (attackHit && defenders.length > 0) {
-    const victim = [...defenders].sort(
-      (a, b) =>
-        getDefense(a.unitType) - getDefense(b.unitType) ||
-        casualtyPriorityIndex(a.unitType) - casualtyPriorityIndex(b.unitType)
-    )[0]!;
-    markTacticalSubUnitCasualty(sub, toRemove, victim.id, [attacker.id], killsByAirStrike);
-    tacticalLogMutate('resolveTacticalAirStrikeAgainstUnitsOnSubUnits ground target destroyed', {
-      targetH3Index,
-      victimSubUnitId: victim.id,
-      victimParentUnitId: victim.parentUnitId,
-      attackerSubUnitId: attacker.id,
-    });
-  }
-  for (const defender of eligibleForAa) {
-    if (toRemove.has(attacker.id)) break;
-    if (toRemove.has(defender.id)) continue;
-    if (!unitHasTacticalRangedBaseline(defender.unitType)) continue;
-    if (rollD6() > getAttack(defender.unitType)) continue;
-    markTacticalSubUnitCasualty(sub, toRemove, attacker.id, [defender.id], killsByReturnFire);
-    tacticalLogMutate('resolveTacticalAirStrikeAgainstUnitsOnSubUnits attacker lost to AA', {
-      targetH3Index,
-      attackerSubUnitId: attacker.id,
-      defenderSubUnitId: defender.id,
-    });
-    break;
-  }
-}
-
-/**
  * Maps live tactical sub-units to `CombatUnit` rows for `runRangedPhase`, excluding land embarked on naval in water cells.
  *
  * Purpose: Keeps tactical ranged dice resolution aligned with strategic `rangedInputUnits` filtering.
  * When to use: Immediately before `runRangedPhase` inside `applyTacticalAirStrikeThenRangedPhaseOnBattle`.
- * Expected outcome: One row per eligible sub-unit with stable `displayOrder` tie-breaks.
+ * Expected outcome: One row per eligible sub-unit with stable `displayOrder` tie-breaks and its origin bonus at its own cell.
  * Exceptions: None.
  */
-function tacticalSubUnitsToRangedCombatUnits(battle: TacticalBattleSnapshot, subUnits: readonly TacticalSubUnitSnapshot[]): CombatUnit[] {
-  return subUnits
+function tacticalSubUnitsToRangedCombatUnits(
+  battle: TacticalBattleSnapshot,
+  subUnits: readonly TacticalSubUnitSnapshot[],
+  originHitBonusAt: OriginHitBonusLookup
+): CombatUnit[] {
+  const rows = subUnits
     .filter((u) => !tacticalEmbarkedLandExcludedFromRangedInput(battle, subUnits, u))
     .map((u, i) => ({
       id: u.id,
@@ -229,6 +138,7 @@ function tacticalSubUnitsToRangedCombatUnits(battle: TacticalBattleSnapshot, sub
       h3Index: u.h3Index,
       displayOrder: i,
     }));
+  return withOriginHitBonus(rows, originHitBonusAt);
 }
 
 /**
@@ -351,7 +261,8 @@ export type TacticalAirRangedResolutionScope = 'singlePlayer' | 'mergedHumanThen
  *
  * Purpose: Matches strategic `executeReadyStrategicTurn` ordering: full air strike phase, then ranged, before movement.
  * When to use: After opponent embark on the same snapshot clone; use `mergedHumanThenOpponent` when concatenating human-then-opponent air and ranged lists like strategic `allAirStrikes` / `allRanged`.
- * Expected outcome: Snapshot reflects air and ranged casualties; kill buckets match strategic toast semantics.
+ * Expected outcome: Snapshot reflects air and ranged casualties; kill buckets match strategic toast semantics. Air, ranged, and counter-fire
+ *   rolls add each roller's origin bonus at its own cell, read from the persisted match flags and this `battle`.
  * Exceptions: None; consumes `next` draws for air infra rolls and ranged/melee downstream callers must continue the same PRNG.
  */
 export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
@@ -369,6 +280,7 @@ export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
     rangedPlayer,
     resolutionScope,
   });
+  const originHitBonusAt = buildTacticalOriginHitBonusLookupFromDb(battle);
   let sub = battle.subUnits.map((u) => ({ ...u }));
   const infrastructureDestroyedEvents: InfrastructureDestroyedEvent[] = [];
   const killsByDirectFire: { victimId: string; killerIds: string[] }[] = [];
@@ -413,16 +325,17 @@ export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
       strikeHexesSet.add(s.targetH3Index);
       const fromH3Index = attacker.h3Index;
       const rollD6Strike = (): number => Math.floor(next() * 6) + 1;
-      resolveTacticalAirStrikeAgainstUnitsOnSubUnits(
+      resolveTacticalAirStrikeAgainstUnitsOnSubUnits({
         battle,
         sub,
         attacker,
-        s.targetH3Index,
-        rollD6Strike,
+        targetH3Index: s.targetH3Index,
+        rollD6: rollD6Strike,
+        originHitBonusAt,
         toRemove,
         killsByAirStrike,
-        killsByReturnFire
-      );
+        killsByReturnFire,
+      });
       flushAirCasualties();
       strikeMoves.push({
         unitId: attacker.id,
@@ -451,7 +364,7 @@ export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
       });
       continue;
     }
-    if (rollD6() > getAttack('air')) {
+    if (rollD6() > getAttack('air') + originHitBonusAt(attacker.id, attacker.h3Index)) {
       strikeMoves.push({
         unitId: attacker.id,
         player: attacker.player,
@@ -565,7 +478,7 @@ export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
   if (rangedOrdersCombat.length > 0) {
     const subBeforeRanged = workBattle.subUnits.map((u) => ({ ...u }));
     const byIdBefore = new Map(subBeforeRanged.map((u) => [u.id, u] as const));
-    const rangedInput = tacticalSubUnitsToRangedCombatUnits(workBattle, workBattle.subUnits);
+    const rangedInput = tacticalSubUnitsToRangedCombatUnits(workBattle, workBattle.subUnits, originHitBonusAt);
     const rangedResult = runRangedPhase(
       rangedInput,
       workBattle.res4ChildH3Indexes,
@@ -643,7 +556,7 @@ export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
     for (const o of rangedOrdersInfraOnly) {
       const atk = workBattle.subUnits.find((u) => u.id === o.unitId);
       if (!atk) continue;
-      if (rollRangedInfraStrikeD6() > getAttack(atk.unitType)) continue;
+      if (rollRangedInfraStrikeD6() > getAttack(atk.unitType) + originHitBonusAt(atk.id, atk.h3Index)) continue;
       const hex = o.targetH3Index;
       if (rubbledInfraHexes.has(hex)) continue;
       if (!tacticalRes4HasStrikeableInfrastructure(workBattle, hex, res4RowsForBattle)) continue;

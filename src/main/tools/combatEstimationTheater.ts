@@ -26,6 +26,13 @@ import {
 } from '../tacticalBattle/tacticalCombatInput';
 import { gridHopDistanceBetween } from './assessUnitProximity';
 import { logTrace } from '../logger';
+import { originBonusSettingsFromSnapshot, strategicHexCountryNameAt } from '../../shared/originBonusRules';
+import type { OriginBonusSettings } from '../../shared/originBonusTypes';
+import {
+  createStrategicOriginHitBonusLookup,
+  createTacticalOriginHitBonusLookup,
+  type OriginHitBonusLookup,
+} from '../originBonus/originHitBonusLookup';
 
 /**
  * Engagement kinds `estimate_combat` predicts.
@@ -160,6 +167,15 @@ export interface CombatEstimationTheater {
    * Exceptions: None.
    */
   describeFireReach(unitType: string, fromH3: string): string;
+  /**
+   * Origin bonus for a real unit rolling at a cell.
+   *
+   * Contract: Same matching rules as live dice in this theater; unknown ids give 0.
+   * When to use: Side builders, with the cell where the unit would roll.
+   * Expected outcome: 0 or 1.
+   * Exceptions: None.
+   */
+  readonly originHitBonusAt: OriginHitBonusLookup;
 }
 
 /**
@@ -227,6 +243,11 @@ export function buildStrategicCombatEstimationTheater(state: GameStateSnapshot):
         ? `strike range ${AIR_STRIKE_RANGE_HEXES}, airport intact`
         : `range ${getRange(unitType)}`;
     },
+    originHitBonusAt: createStrategicOriginHitBonusLookup({
+      settings: originBonusSettingsFromSnapshot(state),
+      units: state.units,
+      countryNameAt: (res1H3Index) => strategicHexCountryNameAt(state, res1H3Index),
+    }),
   };
 }
 
@@ -237,10 +258,13 @@ export function buildStrategicCombatEstimationTheater(state: GameStateSnapshot):
  * carrier's cell); and the battle resolution rule that land cargo embarked at sea sits out ranged combat but not melee.
  * When to use: Every `estimate_combat` call during a tactical battle.
  * Expected outcome: A theater over `battle.subUnits`. Air attackers are rejected because battle air strikes use
- * different dice than ranged fire.
+ * different dice than ranged fire. Origin bonuses follow `settings` and the battle's frozen cell data.
  * Exceptions: None.
  */
-export function buildTacticalCombatEstimationTheater(battle: TacticalBattleSnapshot): CombatEstimationTheater {
+export function buildTacticalCombatEstimationTheater(
+  battle: TacticalBattleSnapshot,
+  settings: OriginBonusSettings
+): CombatEstimationTheater {
   logTrace('combatEstimationTheater buildTacticalCombatEstimationTheater', {
     battleId: battle.battleId,
     subUnitCount: battle.subUnits.length,
@@ -284,5 +308,6 @@ export function buildTacticalCombatEstimationTheater(battle: TacticalBattleSnaps
         ? 'anywhere in the battle, airport intact'
         : `battle range ${effectiveTacticalRangedMaxRangeForAttacker(battle, unitType, fromH3)}`;
     },
+    originHitBonusAt: createTacticalOriginHitBonusLookup({ settings, battle }),
   };
 }

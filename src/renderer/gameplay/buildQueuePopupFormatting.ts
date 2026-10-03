@@ -1,4 +1,4 @@
-import { escapeHtmlText, formatGroupedSemicolonNamingLineHtml } from '../../shared/htmlTextFormatting';
+import { escapeHtmlText } from '../../shared/htmlTextFormatting';
 
 /**
  * Normalizes a build count input to the one-to-99 digits-only contract.
@@ -27,16 +27,4 @@ export function sanitizeBuildCountInputText(raw: string): string {
  */
 export function escapeBuildPopupHtml(text: string): string {
   return escapeHtmlText(text);
-}
-
-/**
- * Emphasizes headings in a semicolon-delimited strategic naming line.
- *
- * Purpose: Preserves the existing grouped naming presentation without leaving parsing in the popup controller.
- * When to use: Single-hex build popup descriptions returned by the naming tooltip API.
- * Expected outcome: Escaped HTML with text before each colon wrapped in `strong`.
- * Exceptions: Malformed groups are safely escaped and displayed unchanged.
- */
-export function formatGroupedBuildNamingLineHtml(namingLine: string): string {
-  return formatGroupedSemicolonNamingLineHtml(namingLine);
 }

@@ -129,3 +129,33 @@ test('battle ranged: cargo embarked at sea is not a ranged defender', () => {
   assert.equal(result.defenderSummary!.totalUnits, 1);
   assert.ok(result.warnings?.some((w) => w.includes('hum-inf')));
 });
+
+test('battle: a defender on its birth terrain shows the terrain bonus', () => {
+  const { fx, at } = setup({
+    battleId: 'estimate-terrain-bonus',
+    terrainByCell: { far: 'forest' },
+    originBonusSettings: { countryBonusEnabled: false, terrainBonusEnabled: true },
+    units: [
+      { id: 'opp-arm', player: 'opponent', unitType: 'armor', cell: 'near' },
+      {
+        id: 'hum-inf',
+        player: 'human',
+        unitType: 'infantry',
+        cell: 'far',
+        origin: {
+          birthH3Index: 'unused',
+          birthRes4H3Index: null,
+          birthTerrainKind: 'forests',
+          birthIsUrban: false,
+          birthCountryName: null,
+          birthCountryCode: null,
+        },
+      },
+    ],
+  });
+  const result = estimate(fx, { engagementType: 'melee', attackers: { units: ['opp-arm'] }, targetHex: at('far') }) as EstimateResult & {
+    defenderSummary?: { units: { unitId: string; defenseValue: number; originBonus?: number }[] };
+  };
+  assert.equal(result.status, 'ok');
+  assert.deepEqual(result.defenderSummary!.units, [{ unitId: 'hum-inf', type: 'infantry', defenseValue: 3, originBonus: 1 }]);
+});

@@ -12,7 +12,7 @@ Tell an agent which input does what, and which binding wins when two surfaces co
 | --- | --- | --- | --- |
 | Drag | Main map | Pans the map. | [map-surface.md](map-surface.md) |
 | Wheel | Main map | Zooms the map. | [map-surface.md](map-surface.md) |
-| Click | Main map | Selects or opens a popup. While Ranged or Strike targeting is on, a click does not place the attack and does not change the selection. | [selection-model.md](selection-model.md) |
+| Click | Main map | Selects and opens map popups. A lone human unit's icon selects that unit and opens the unit list. A stack opens the list without changing the selection. While Ranged or Strike targeting is on, a click does not place the attack and does not change the selection. | [selection-model.md](selection-model.md) |
 | Double-click | Main map | Plans a march or ferry, or clears the selection, when targeting is off. While Ranged or Strike targeting is on, places that attack and does not plan a move. Map zoom-on-double-click is off. | [order-lifecycle.md](order-lifecycle.md) |
 | Right-click | Main map | Clears selection chrome and does not open the browser menu. Queued orders stay. | [selection-model.md](selection-model.md) |
 | Click, drag, wheel, double-click | Minimap | No pan, zoom, or click-to-recenter. The minimap only shows the current view. | [minimap.md](minimap.md) |
@@ -25,7 +25,7 @@ Tell an agent which input does what, and which binding wins when two surfaces co
 | --- | --- | --- | --- |
 | W, A, S, D, and the arrow keys | Not typing in a field, and no Shift, Control, Alt, or Meta | Pans the map. Holding a key keeps panning. Opposite keys cancel. W and Up are the same direction and can be held together. | [map-surface.md](map-surface.md) |
 | T | Same as pan | Hides terrain fill while held, then restores it on release. | [map-surface.md](map-surface.md) |
-| Shift | Key down or up | Closes modifier-driven popovers. Shift-click on the map toggles selection. | [selection-model.md](selection-model.md) |
+| Shift | Key down or up | Key down refreshes an open stack callout. Key up closes it, including one that is scheduled but not open yet. Shift-click on a unit icon toggles selection and schedules the callout. | [selection-model.md](selection-model.md) |
 | Escape | Build popup open | Closes the build popup and does not also close the stack callout. | [build-popup.md](build-popup.md) |
 | Escape | Stack callout open, build popup closed | Closes the stack callout, including one that is scheduled but not open yet. | [stack-callout.md](stack-callout.md) |
 | Escape | Tactical battles list open | Chooses Ignore and does nothing else. | [tactical-battles-list.md](tactical-battles-list.md) |

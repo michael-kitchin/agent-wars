@@ -3,9 +3,11 @@ import { test } from 'node:test';
 import { readRendererSource } from './testSupport/rendererSourceAssertions';
 
 test('terrain tooltip uses shared HTML escaping', () => {
-  const source = readRendererSource('map', 'terrainTooltipRes1State.ts');
-  assert.ok(!source.includes('function escapeHtml('), 'local escapeHtml should be gone');
-  assert.ok(source.includes('escapeHtmlText'), 'should import or call escapeHtmlText');
+  const assembly = readRendererSource('map', 'terrainTooltipRes1State.ts');
+  const html = readRendererSource('map', 'terrainTooltipHtml.ts');
+  assert.ok(!assembly.includes('function escapeHtml('), 'local escapeHtml should be gone');
+  assert.ok(!html.includes('function escapeHtml('), 'tooltip HTML should not define a local escapeHtml');
+  assert.ok(html.includes('escapeHtmlText'), 'tooltip HTML should import or call escapeHtmlText');
 });
 
 test('terrainView imports projectedPolygonOverlapsViewport from renderGeometry', () => {

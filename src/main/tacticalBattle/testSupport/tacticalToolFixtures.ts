@@ -10,7 +10,9 @@
 
 import { cellToCenterChild, cellToLatLng, cellToParent, gridDisk, gridDistance } from 'h3-js';
 import type { GameStateSnapshot } from '../../gameDb';
+import type { OriginBonusSettings } from '../../../shared/originBonusTypes';
 import type { TacticalBattleSnapshot, TacticalSubUnitSnapshot } from '../../../shared/tacticalBattleTypes';
+import type { UnitOrigin } from '../../../shared/unitOriginTypes';
 import { buildTacticalAiPlanState } from '../buildTacticalAiPlanState';
 import { tacticalRes1Cell } from './tacticalRes4HexFixtures';
 
@@ -78,6 +80,15 @@ export interface TacticalToolFixtureUnit {
    * Exceptions: None.
    */
   readonly embarkedOnSubUnitId?: string;
+  /**
+   * Birth record of the sub-unit's parent.
+   *
+   * Contract: Optional; omitted means the sub-unit never qualifies for an origin bonus.
+   * When to use: Origin bonus scenarios.
+   * Expected outcome: Copied to the sub-unit's `origin`.
+   * Exceptions: None.
+   */
+  readonly origin?: UnitOrigin;
 }
 
 /**
@@ -116,6 +127,15 @@ export interface TacticalToolFixtureOptions {
    * Exceptions: None.
    */
   readonly terrainByCell?: Readonly<Partial<Record<TacticalToolFixtureCell, string>>>;
+  /**
+   * Match origin bonus flags.
+   *
+   * Contract: Optional; omitted leaves both snapshot flags unset, which reads as off.
+   * When to use: Origin bonus scenarios.
+   * Expected outcome: Both flags are copied onto the plan state.
+   * Exceptions: None.
+   */
+  readonly originBonusSettings?: OriginBonusSettings;
 }
 
 /**
@@ -217,6 +237,7 @@ export function buildTacticalToolFixture(options: TacticalToolFixtureOptions): T
     h3Index: cells[u.cell],
     displayName: u.id,
     embarkedOnSubUnitId: u.embarkedOnSubUnitId ?? null,
+    ...(u.origin ? { origin: u.origin } : {}),
   }));
   const battle: TacticalBattleSnapshot = {
     battleId: options.battleId,
@@ -235,6 +256,7 @@ export function buildTacticalToolFixture(options: TacticalToolFixtureOptions): T
     hexes: [{ h3Index: res1, terrain: 'land', terrainKind: 'plains' }],
     units: [],
     pendingOrders: [],
+    ...(options.originBonusSettings ?? {}),
   };
   const planState = buildTacticalAiPlanState(strategic, battle);
   const latLngByH3 = new Map<string, [number, number]>();

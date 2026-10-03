@@ -21,6 +21,9 @@ import { logDebug, logError } from '../logger';
 import { formatStrategicUnitId, type UnitIdOwner } from '../../shared/unitIds';
 import { DEPLOYMENT_CAP_TYPE_ORDER } from '../productionCaps';
 import { readPersistedMaxUnitsPerType } from '../gameDb/gameSizeConfig';
+import type { BasicDbOps } from '../gameDb/dbOps';
+import { insertUnitRow } from '../gameDb/unitInsert';
+import { resolveUnitBirthOrigin } from '../unitOrigin/unitBirthOrigin';
 import {
   computeKeepBuildingRefillCount,
   getAvailableBuildUnitTypes,
@@ -147,6 +150,16 @@ const CONTROL_UNIT_TYPES = ['infantry', 'armor', 'naval'] as const;
 const CONTROL_UNIT_TYPE_SET = new Set<string>(CONTROL_UNIT_TYPES);
 
 /**
+ * Database operations on the live game database, shaped for ops-taking helpers.
+ *
+ * Purpose: Lets production resolve unit birth origins without rebuilding an ops object per unit.
+ * When to use: Passed to `resolveUnitBirthOrigin` when spawning produced units.
+ * Expected outcome: Delegates to the `gameDb` facade functions.
+ * Exceptions: None; underlying SQLite errors propagate.
+ */
+const GAME_DB_OPS: BasicDbOps = { run: dbRun, getOne: dbGetOne, getAll: dbGetAll };
+
+/**
  * Defines the `currentPlanningTurnNumber` function shape (function currentPlanningTurnNumber(): number).
 
  * Purpose: Supports maintainability by documenting why `currentPlanningTurnNumber` exists.
@@ -195,13 +208,14 @@ function spawnProducedUnitsForHex(
     const unitId = formatStrategicUnitId({ player: owner, unitType, ordinal });
     logDebug('controlAndProduction spawnProducedUnitsForHex', { unitId, unitType, owner, h3Index, turnNumber, ordinal });
     const displayOrder = allocateNextUnitDisplayOrder(unitType, controllerPlayerId);
-    dbRun('INSERT INTO units (id, player, unit_type, display_order, h3_index) VALUES (?, ?, ?, ?, ?)', [
-      unitId,
-      controllerPlayerId,
+    insertUnitRow(dbRun, {
+      id: unitId,
+      player: controllerPlayerId,
       unitType,
       displayOrder,
       h3Index,
-    ]);
+      origin: resolveUnitBirthOrigin(GAME_DB_OPS, { unitId, birthH3Index: h3Index }),
+    });
     unitCountsByPlayerType.set(key, currentCount + 1);
     deployed.push(unitType);
   }

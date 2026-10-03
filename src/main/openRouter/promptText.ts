@@ -295,7 +295,7 @@ export function buildToolUsageGuidance(
         : '- The Commander\'s Briefing above already contains unit status, attention flags, possible unit actions, and supplemental hex intelligence for this turn. Use the briefing to decide targets and priorities.'
     );
     if (coordinateMode === 'tactical' && flags.assessmentEnabled) {
-      lines.push('- Use assess_unit on sub-units near the enemy to understand the tactical picture. Skip assessment for sub-units far from all enemies. If several sub-units share a cell, assess only one — the results will be identical.');
+      lines.push('- Use assess_unit on sub-units near the enemy to understand the tactical picture. Skip assessment for sub-units far from all enemies. Sub-units of one parent on the same cell match, so assess one of them; assess another sub-unit on that cell when its parent differs.');
     }
     if (coordinateMode === 'tactical' && flags.estimationEnabled) {
       lines.push('- Use estimate_combat before any ranged or melee attack. Do not guess at combat odds.');
@@ -305,7 +305,7 @@ export function buildToolUsageGuidance(
       lines.push('- Start by reviewing your standing order statuses and persistent strategic memory (both are shown above).');
     }
     if (flags.assessmentEnabled) {
-      lines.push('- Use assess_unit on units near the enemy to understand the tactical picture. Skip assessment for rear-echelon units far from all enemies — their situation rarely changes turn to turn. If multiple units share the same hex, assess only one — the results will be identical.');
+      lines.push('- Use assess_unit on units near the enemy to understand the tactical picture. Skip assessment for rear-echelon units far from all enemies — their situation rarely changes turn to turn. Units that share a hex can differ by type and birth country, so assess each one.');
     }
     if (flags.estimationEnabled) {
       lines.push('- Use estimate_combat before any attack. Do not guess at combat odds.');

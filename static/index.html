@@ -414,10 +414,16 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 0.35rem;
+      flex-wrap: wrap;
+      gap: 1rem;
       margin: 0 0 0.9rem 0;
       font-size: 0.95rem;
       color: #222;
+    }
+    .game-over-options label {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
     }
     .game-over-region-row {
       display: flex;
@@ -557,6 +563,21 @@
     /* Body-level peer of #sidebar so the Model-tab tip is not trapped under canvas stacking. */
     #model-description-tooltip {
       z-index: 6505;
+    }
+    /* Above the map toast (7000) and overlays because unit flags also appear in the toast. */
+    #unit-origin-tooltip {
+      white-space: pre-line;
+      z-index: 7100;
+    }
+    /* Text-sized country flag before country names (hex captions) and unit names. */
+    .country-flag {
+      display: inline-block;
+      width: 1.125em;
+      height: 0.75em;
+      object-fit: contain;
+      vertical-align: -0.05em;
+      margin-right: 0.3em;
+      filter: drop-shadow(0 0 0.5px rgba(0, 0, 0, 0.6));
     }
     .build-entry-layer {
       position: absolute;
@@ -1000,10 +1021,11 @@
             <div class="game-over-size-name">Air</div>
           </div>
         </div>
-        <label class="game-over-options" for="new-game-fog-checkbox">
-          <input type="checkbox" id="new-game-fog-checkbox" checked />
-          Fog of war
-        </label>
+        <div class="game-over-options">
+          <label for="new-game-fog-checkbox"><input type="checkbox" id="new-game-fog-checkbox" checked /> Fog of war</label>
+          <label for="new-game-country-bonus-checkbox"><input type="checkbox" id="new-game-country-bonus-checkbox" checked /> Country bonus</label>
+          <label for="new-game-terrain-bonus-checkbox"><input type="checkbox" id="new-game-terrain-bonus-checkbox" checked /> Terrain bonus</label>
+        </div>
         <button type="button" id="new-game-btn">Start game</button>
       </div>
     </div>
@@ -1102,6 +1124,7 @@
     </div>
   </aside>
   <div id="model-description-tooltip" class="hex-tooltip model-description-tooltip hidden" aria-hidden="true"></div>
+  <div id="unit-origin-tooltip" class="hex-tooltip unit-origin-tooltip hidden" aria-hidden="true"></div>
   <script src="vendor/leaflet/leaflet.js"></script>
   <script type="module" src="renderer.js"></script>
 </body>

@@ -6,6 +6,9 @@ import {
 } from '../../shared/aiStrategyToastContent';
 import { READY_REQUEST_TIMEOUT_MS, TOAST_DURATION_MS } from '../core/constants';
 import { rendererSharedState as S } from '../core/state';
+import { createUnitOriginFlagImage } from '../core/unitOriginFlags';
+import { splitLossCauseLineForUnitFlags } from '../../shared/lossToastUnitSegments';
+import type { UnitOrigin } from '../../shared/unitOriginTypes';
 import {
   isDeferredResolutionConsultRunning,
   isDeferredResolutionPlaybackConsultPending,
@@ -231,21 +234,65 @@ export function bulletizeToastLines(message: string): string {
 export const MAP_TOAST_SECTION_BULLET_INDENT = '1.25em';
 
 /**
- * Appends one bullet line, optionally indented when it belongs under a section header.
+ * Options for `showMapToast`.
  *
- * Purpose: Implements the plan's indented sub-bullet layout under Human/AI/Other headers.
- * When to use: From `appendMapToastMessageBody` for non-header lines.
- * Expected outcome: Block-level row with left margin when `indent` is true.
+ * Purpose: One shared shape for the toast's styling and optional unit-flag decoration.
+ * When to use: When calling `showMapToast` or declaring a dependency that forwards these options.
+ * Expected outcome: Omitted fields keep the default error styling and plain-text bullets.
  * Exceptions: None.
  */
-function appendMapToastBulletLine(target: HTMLElement, line: string, indent: boolean): void {
+export type MapToastOptions = {
+  /**
+   * Whether the toast uses error styling.
+   *
+   * Contract: Only an explicit `false` selects the informational style.
+   * When to use: Pass `false` for routine turn updates.
+   * Expected outcome: The `toast-info` class is toggled accordingly.
+   * Exceptions: None.
+   */
+  readonly isError?: boolean;
+  /**
+   * Birth origins keyed by victim display name, for flags in loss bullets.
+   *
+   * Contract: Optional; when present and non-empty, named victims in loss-cause bullets get their country flag.
+   * When to use: For toasts built from a turn loss summary.
+   * Expected outcome: Matching names gain a flag; all other text renders exactly as without this map.
+   * Exceptions: None.
+   */
+  readonly unitOriginByDisplayName?: ReadonlyMap<string, UnitOrigin>;
+};
+
+/**
+ * Appends one bullet line, optionally indented and with flags before named loss victims.
+ *
+ * Purpose: Implements the indented sub-bullet layout under Human/AI/Other headers.
+ * When to use: From `appendMapToastMessageBody` for non-header lines.
+ * Expected outcome: Block-level row with left margin when `indent` is true. With a non-empty
+ *   `unitOriginByDisplayName`, victim names on loss-cause lines are preceded by their flags; otherwise the row
+ *   is a single text node.
+ * Exceptions: None.
+ */
+function appendMapToastBulletLine(
+  target: HTMLElement,
+  line: string,
+  indent: boolean,
+  unitOriginByDisplayName?: ReadonlyMap<string, UnitOrigin>
+): void {
   const text = line.startsWith('•') ? line : `• ${line}`;
   const span = document.createElement('span');
   span.style.display = 'block';
   if (indent) {
     span.style.marginLeft = MAP_TOAST_SECTION_BULLET_INDENT;
   }
-  span.textContent = text;
+  if (unitOriginByDisplayName && unitOriginByDisplayName.size > 0) {
+    for (const segment of splitLossCauseLineForUnitFlags(text, new Set(unitOriginByDisplayName.keys()))) {
+      const origin = segment.unitDisplayName ? unitOriginByDisplayName.get(segment.unitDisplayName) : undefined;
+      if (origin) span.appendChild(createUnitOriginFlagImage(origin));
+      span.appendChild(document.createTextNode(segment.text));
+    }
+  } else {
+    span.textContent = text;
+  }
   target.appendChild(span);
 }
 
@@ -270,9 +317,14 @@ export function appendMapToastSectionHeader(target: HTMLElement, title: string):
  * Purpose: Supports Human Losses / AI Losses / Updates section layout in `#map-toast`.
  * When to use: From `showMapToast` instead of plain text bulletization.
  * Expected outcome: Section headers render with a trailing colon; a blank line separates each section after the first.
+ *   When `unitOriginByDisplayName` is given, named loss victims get flags (see `appendMapToastBulletLine`).
  * Exceptions: None.
  */
-export function appendMapToastMessageBody(target: HTMLElement, message: string): void {
+export function appendMapToastMessageBody(
+  target: HTMLElement,
+  message: string,
+  unitOriginByDisplayName?: ReadonlyMap<string, UnitOrigin>
+): void {
   const lines = message
     .split('\n')
     .map((line) => line.trim())
@@ -289,7 +341,7 @@ export function appendMapToastMessageBody(target: HTMLElement, message: string):
       appendMapToastSectionHeader(target, line.slice(3));
       continue;
     }
-    appendMapToastBulletLine(target, line, inSection);
+    appendMapToastBulletLine(target, line, inSection, unitOriginByDisplayName);
   }
 }
 
@@ -314,14 +366,15 @@ function showToast(
 }
 
 /**
- * Defines the `showMapToast` function shape (export function showMapToast(message: string, options?:).
-
- * Purpose: Supports maintainability by documenting why `showMapToast` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Shows the lower-right map toast with a sectioned, bulleted message, replacing any toast already shown.
+ *
+ * Purpose: The single entry point for turn updates, validation messages, and other map notices.
+ * When to use: Whenever the player needs a transient notice on the map.
+ * Expected outcome: The toast shows `message` (see `appendMapToastMessageBody`) and hides after the standard
+ *   duration. `options.unitOriginByDisplayName` adds flags before named loss victims.
  * Exceptions: None.
  */
-export function showMapToast(message: string, options?: { isError?: boolean }): void {
+export function showMapToast(message: string, options?: MapToastOptions): void {
   if (S.toastHideTimer !== null) {
     clearTimeout(S.toastHideTimer);
     S.toastHideTimer = null;
@@ -333,7 +386,7 @@ export function showMapToast(message: string, options?: { isError?: boolean }): 
       el,
       textEl,
       (target) => {
-        appendMapToastMessageBody(target, message);
+        appendMapToastMessageBody(target, message, options?.unitOriginByDisplayName);
       },
       options?.isError === false
     );

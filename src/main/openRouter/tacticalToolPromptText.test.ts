@@ -10,6 +10,8 @@ const BATTLE_TOOLS = ['plan_route', 'check_distance', 'assess_unit', 'estimate_c
 test('battle guidance names assess_unit and estimate_combat when enabled, never assess_hex', () => {
   const guidance = buildToolUsageGuidance(getToolFlags(BATTLE_TOOLS), true, 'tactical');
   assert.match(guidance, /assess_unit on sub-units/);
+  assert.match(guidance, /one parent on the same cell/);
+  assert.doesNotMatch(guidance, /results will be identical/);
   assert.match(guidance, /estimate_combat before any ranged or melee attack/);
   assert.ok(!guidance.includes('assess_hex'), guidance);
 });

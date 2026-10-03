@@ -12,6 +12,7 @@ import { RANGED_RANGE_BY_UNIT_TYPE } from '../../../shared/tacticalRanges';
 import {
   buildCasualtySortRule,
   buildDestinationOccupancyRule,
+  tacticalLandEnterCostRule,
 } from './gameRuleText';
 import type { CoachingGates } from './coachingGates';
 import { MESSAGE_BLOCK, MESSAGE_DISCIPLINE_BULLET, STRATEGY_BLOCK } from './coachingTextStrategic';
@@ -99,11 +100,12 @@ const STANDING_ORDERS_INERT_BULLET =
  *
  * Purpose: Ordering a far cell advances the sub-unit rather than failing, but does not teleport it.
  * When to use: Always in tactical coaching.
- * Expected outcome: Mentions clamping to the first reachable leg.
+ * Expected outcome: Mentions clamping to the first reachable leg, the one-point urban or rubble budget, and the shared land enter-cost rule.
  * Exceptions: None.
  */
 const REACH_BULLET =
-  "- A destination beyond this beat's point budget is clamped to the first reachable leg rather than rejected. Infantry or armor whose current cell is urban or rubble has a 1-point budget this beat.";
+  "- A destination beyond this beat's point budget is clamped to the first reachable leg rather than rejected. Infantry or armor whose current cell is urban or rubble has a 1-point budget this beat. " +
+  tacticalLandEnterCostRule();
 
 /**
  * Infantry and armor have res4 reach, with terrain caps the strategic rule does not have.

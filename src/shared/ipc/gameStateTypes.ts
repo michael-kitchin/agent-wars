@@ -1,6 +1,7 @@
 import type { BuildUnitType } from './productionTypes';
 import type { TacticalBattleSnapshot } from './tacticalTypes';
 import type { GameSize } from '../gameSize';
+import type { UnitOrigin } from '../unitOriginTypes';
 
 /**
  * Documents the `GameStateSnapshot` interface as a named contract surface (export interface GameStateSnapshot).
@@ -19,7 +20,20 @@ export interface GameStateSnapshot {
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-hexes: { h3Index: string; terrain: string; terrainKind: string }[];
+hexes: {
+    h3Index: string;
+    terrain: string;
+    terrainKind: string;
+    /**
+     * Majority country name of this res1 hex: the country of most of its res4 cells, ties broken by name.
+     *
+     * Contract: Present only when the match has the country bonus on; `null` when no cell in the hex has a country.
+     * When to use: The country test of origin bonuses on the strategic map.
+     * Expected outcome: Static geography, not intel, so fog masking keeps it.
+     * Exceptions: None.
+     */
+    countryName?: string | null;
+  }[];
     /**
    * Specifies the contract for the `units` member (units: tactical-capable unit rows including optional embarkedOnSubUnitId).
 
@@ -52,6 +66,15 @@ units: {
      * Exceptions: None.
      */
     embarkedOnSubUnitId?: string | null;
+    /**
+     * Birth metadata: birth hex, birth cell, terrain, whether that cell is urban, and country.
+     *
+     * Contract: Absent for rows created without it (tests, older inserts). Drives origin bonuses only when the match has the country or terrain bonus on.
+     * When to use: Renderer unit flags, the origin tooltip, and origin bonus checks.
+     * Expected outcome: Set on every unit inserted by seeding or production.
+     * Exceptions: None.
+     */
+    origin?: UnitOrigin;
   }[];
     /**
    * Specifies the contract for the `visibleHexes` member (visibleHexes?: string[];).
@@ -123,6 +146,24 @@ fogOfWarEnabled?: boolean;
    * Exceptions: None; missing means Small.
    */
 gameSize?: GameSize;
+    /**
+   * Whether this match has the country bonus on.
+   *
+   * Contract: Always a boolean on snapshots built from a persisted match; omitted on test fixtures, which means off.
+   * When to use: Read through `originBonusSettingsFromSnapshot` before any origin bonus check.
+   * Expected outcome: When true, a unit in its birth country adds 1 to the threshold of every hit roll it makes.
+   * Exceptions: None.
+   */
+countryBonusEnabled?: boolean;
+    /**
+   * Whether this match has the terrain bonus on.
+   *
+   * Contract: Always a boolean on snapshots built from a persisted match; omitted on test fixtures, which means off.
+   * When to use: Read through `originBonusSettingsFromSnapshot` before any origin bonus check.
+   * Expected outcome: When true, a tactical sub-unit on its birth terrain kind adds 1 to the threshold of every hit roll it makes.
+   * Exceptions: None.
+   */
+terrainBonusEnabled?: boolean;
     /**
    * Specifies the contract for the `scenarioId` member (scenarioId?: 'region_vs_region';).
 

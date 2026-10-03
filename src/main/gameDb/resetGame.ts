@@ -2,6 +2,7 @@ import { logDebug } from '../logger';
 import { getScenarioHomeRegionHexes, resolveScenarioHomeRegions } from '../regionScenario';
 import type { GuardedDbRunAndGetAllOps } from './dbOps';
 import { persistGameSize } from './gameSizeConfig';
+import { persistOriginBonusSettings } from './originBonusConfig';
 import { parseGameSize, type GameSize } from '../../shared/gameSize';
 import { logHomeRegionControlParity } from './seeding/initialFlexAirSlot';
 import { persistRegionVsRegionScenarioState } from './scenarioState';
@@ -151,21 +152,89 @@ function seedInitialHexControlFromHomeRegions(
 }
 
 /**
- * Defines the `resetGameForNewMatch` function shape (export function resetGameForNewMatch( deps: ResetGameDeps, options?: { fogOfWarEnabled?: boolean; humanHomeRegion?: string; aiHomeRegion?: string; gameSize?: GameSize } ): vo).
-
- * Purpose: Supports maintainability by documenting why `resetGameForNewMatch` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * New-match choices from the new-game dialog.
+ *
+ * Purpose: One named shape shared by the `gameDb` facade and this module.
+ * When to use: `resetGameForNewMatch` callers.
+ * Expected outcome: Every field is optional; see each field for its default.
  * Exceptions: None.
  */
-export function resetGameForNewMatch(
-  deps: ResetGameDeps,
-  options?: { fogOfWarEnabled?: boolean; humanHomeRegion?: string; aiHomeRegion?: string; gameSize?: GameSize }
-): void {
+export interface ResetGameForNewMatchOptions {
+  /**
+   * Whether fog of war is on.
+   *
+   * Contract: Anything but `false` means on.
+   * When to use: The new-game dialog's Fog of war checkbox.
+   * Expected outcome: Persisted as `fog_of_war_enabled`.
+   * Exceptions: None.
+   */
+  readonly fogOfWarEnabled?: boolean;
+  /**
+   * Requested human home region name.
+   *
+   * Contract: Resolved by `resolveScenarioHomeRegions`; missing or unknown picks a default.
+   * When to use: The new-game dialog's region selector.
+   * Expected outcome: Persisted in scenario state.
+   * Exceptions: None.
+   */
+  readonly humanHomeRegion?: string;
+  /**
+   * Requested AI home region name.
+   *
+   * Contract: Resolved by `resolveScenarioHomeRegions`; missing or unknown picks a default.
+   * When to use: The new-game dialog's region selector.
+   * Expected outcome: Persisted in scenario state.
+   * Exceptions: None.
+   */
+  readonly aiHomeRegion?: string;
+  /**
+   * Match size that scales unit caps.
+   *
+   * Contract: Parsed with `parseGameSize`; missing or invalid means Small.
+   * When to use: The new-game dialog's size selector.
+   * Expected outcome: Persisted as `game_size`.
+   * Exceptions: None.
+   */
+  readonly gameSize?: GameSize;
+  /**
+   * Whether the country bonus is on.
+   *
+   * Contract: Only `true` means on; missing means off, so callers that predate the flag keep the old dice.
+   * When to use: The new-game dialog's Country bonus checkbox.
+   * Expected outcome: Persisted as `country_bonus_enabled`.
+   * Exceptions: None.
+   */
+  readonly countryBonusEnabled?: boolean;
+  /**
+   * Whether the terrain bonus is on.
+   *
+   * Contract: Only `true` means on; missing means off, so callers that predate the flag keep the old dice.
+   * When to use: The new-game dialog's Terrain bonus checkbox.
+   * Expected outcome: Persisted as `terrain_bonus_enabled`.
+   * Exceptions: None.
+   */
+  readonly terrainBonusEnabled?: boolean;
+}
+
+/**
+ * Wipes the current match and seeds a new one from the new-game choices.
+ *
+ * Purpose: The single reset path behind the new-game dialog, so every per-match table and setting starts clean.
+ * When to use: Through the `gameDb` facade when the player starts a match.
+ * Expected outcome: Persists fog, size, both origin bonus flags (only `true` means on), and home regions; reseeds
+ *   hexes, infrastructure, units, and control; clears orders, AI state, intel, and any tactical session; saves.
+ *   No-op apart from logging when there is no database.
+ * Exceptions: Propagates SQLite errors from `deps.run`.
+ */
+export function resetGameForNewMatch(deps: ResetGameDeps, options?: ResetGameForNewMatchOptions): void {
   const fogOfWarEnabled = options?.fogOfWarEnabled !== false;
   const gameSize = parseGameSize(options?.gameSize);
+  const originBonusSettings = {
+    countryBonusEnabled: options?.countryBonusEnabled === true,
+    terrainBonusEnabled: options?.terrainBonusEnabled === true,
+  };
   const { humanHomeRegion, aiHomeRegion } = resolveScenarioHomeRegions(options);
-  logDebug('gameDb resetGameForNewMatch', { fogOfWarEnabled, gameSize, humanHomeRegion, aiHomeRegion });
+  logDebug('gameDb resetGameForNewMatch', { fogOfWarEnabled, gameSize, humanHomeRegion, aiHomeRegion, ...originBonusSettings });
   if (!deps.hasDb()) return;
   const { run } = deps;
   run('DELETE FROM units');
@@ -173,6 +242,7 @@ export function resetGameForNewMatch(
   run("INSERT OR REPLACE INTO game_config (key, value) VALUES ('map_size', 'world')");
   run('INSERT OR REPLACE INTO game_config (key, value) VALUES (?, ?)', ['fog_of_war_enabled', fogOfWarEnabled ? '1' : '0']);
   persistGameSize({ run, hasDb: deps.hasDb }, gameSize);
+  persistOriginBonusSettings({ run, hasDb: deps.hasDb }, originBonusSettings);
   persistRegionVsRegionScenarioState({ run }, { humanHomeRegion, aiHomeRegion });
   run("DELETE FROM game_config WHERE key = 'game_seed'");
   run("DELETE FROM game_config WHERE key LIKE 'unit_display_sequence_%'");

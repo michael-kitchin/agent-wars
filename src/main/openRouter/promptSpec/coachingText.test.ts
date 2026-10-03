@@ -143,6 +143,9 @@ test('tactical coaching includes every required item when its gate is on', () =>
   assert.match(text, /Copy a Target Hex from a row listing that sub-unit/i);
   assert.match(text, /unitIds/);
   assert.match(text, /clamped to the first reachable leg/i);
+  assert.match(text, /for every terrain, for infantry and armor/);
+  assert.match(text, /does not open blocked terrain/);
+  assert.doesNotMatch(text, /blocked terrain\. A unit may enter that cell/);
   assert.doesNotMatch(text, /Urban and rubble cells cost more/);
   assert.match(text, /urban or rubble/i);
   assert.match(text, /Infantry and armor fire at res4 baselines/i);

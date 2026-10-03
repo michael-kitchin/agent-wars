@@ -14,6 +14,8 @@ import type { GuardedDbOps } from './dbOps';
 import { getScenarioHomeRegionHexes } from '../regionScenario';
 import { loadScenarioState, REGION_VS_REGION_SCENARIO_ID } from './scenarioState';
 import { readPersistedGameSize } from './gameSizeConfig';
+import { readPersistedOriginBonusSettings } from './originBonusConfig';
+import { getRes1MajorityCountryNamesFromSnapshot } from '../unitOrigin/res4BirthCountryCache';
 
 /**
  * How many turns a last-known enemy position remains visible after contact is lost.
@@ -162,12 +164,13 @@ function getCurrentTurnNumberFromDb(ops: FogDbOps): number {
 }
 
 /**
- * Defines the `getGameStateSnapshot` function shape (export function getGameStateSnapshot(deps: FogDeps): GameStateSnapshot).
-
- * Purpose: Supports maintainability by documenting why `getGameStateSnapshot` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
+ * Builds the unfiltered game-state snapshot from the database.
+ *
+ * Purpose: The base every player view, AI consultation, and renderer update starts from.
+ * When to use: Through `getGameStateForPlayer` for player-facing views; directly only when omniscient state is intended.
+ * Expected outcome: All hexes, units, turn, scenario, size, and both origin bonus flags. With the country bonus on,
+ *   each hex also carries its majority `countryName` (`null` when it has none).
+ * Exceptions: Propagates SQLite errors from `deps.ops`.
  */
 export function getGameStateSnapshot(deps: FogDeps): GameStateSnapshot {
   const { ops } = deps;
@@ -179,9 +182,16 @@ export function getGameStateSnapshot(deps: FogDeps): GameStateSnapshot {
   const hexCount = ops.getOne<{ c: number }>('SELECT COUNT(*) AS c FROM hexes');
   const hasHexes = !!hexCount && hexCount.c > 0;
   const ordered = hasHexes ? getOrderedHexList() : [];
-  const hexRows: { h3Index: string; terrain: string; terrainKind: string }[] = ordered.map((h3Index) => {
+  const originBonusSettings = readPersistedOriginBonusSettings(ops);
+  const countryNames = originBonusSettings.countryBonusEnabled ? getRes1MajorityCountryNamesFromSnapshot() : null;
+  const hexRows: GameStateSnapshot['hexes'] = ordered.map((h3Index) => {
     const row = ops.getOne<{ terrain: string; terrain_kind: string }>('SELECT terrain, terrain_kind FROM hexes WHERE h3_index = ?', [h3Index]);
-    return { h3Index, terrain: row?.terrain ?? 'land', terrainKind: row?.terrain_kind ?? 'plains' };
+    return {
+      h3Index,
+      terrain: row?.terrain ?? 'land',
+      terrainKind: row?.terrain_kind ?? 'plains',
+      ...(countryNames ? { countryName: countryNames.get(h3Index) ?? null } : {}),
+    };
   });
   const unitRows = deps.listUnitsForSnapshot();
   const turnRow = ops.getOne<{ phase: string; turnNumber: number }>('SELECT phase, turn_number AS turnNumber FROM turn_state WHERE id = 1');
@@ -240,6 +250,7 @@ export function getGameStateSnapshot(deps: FogDeps): GameStateSnapshot {
     gameOver: gameOver || undefined,
     winner,
     gameSize: readPersistedGameSize(ops),
+    ...originBonusSettings,
   };
   return withFogMetadata(withScenarioMetadata(snapshot, ops), isFogOfWarEnabled(ops));
 }

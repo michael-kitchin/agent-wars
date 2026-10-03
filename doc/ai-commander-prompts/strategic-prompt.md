@@ -42,19 +42,20 @@ One paragraph, in this order. Every clause is required unless marked.
 1. Dice model: one d6 per shot; an attack hits on a roll at or below the attacking stat, a defensive hit on a roll at or below the defending stat.
 2. Per-type stats and reach: attack, defense, and strategic ranged reach for each of infantry, armor, naval, and air. Reach values come from `strategicRangedRangeHexesForUnitType`; a reach of zero is stated as melee only.
 3. Casualty rule: hits land on the lowest-defense unit in the target stack first, then in the fixed type order infantry, armor, naval, air (`buildCasualtySortRule`).
-4. Resolution order for the turn: embark, then air strikes, then ranged fire, then movement, then cargo sync, then ferry, then melee (`buildResolutionOrderRule`).
-5. Attacks resolve from turn-start positions, so a unit may fire and move in the same turn and firing never costs a move.
-6. At most one ranged action per unit per turn, using exactly one of a target cell code or a target unit id, and never the unit's own move destination.
-7. Infantry has no strategic ranged action and closes to melee instead.
-8. Movement budgets: one cell for infantry, two for armor and naval, and air never marches (`buildMovementBudgetRule`).
-9. Friendly units may stack on the same cell. A cell holding an enemy is legal as a move/melee Target Hex. Approach Target Hexes omit stay-put friendlies; a cell a friendly is leaving this period is a legal dest (`buildDestinationOccupancyRule`).
-10. Invalid attacks are dropped before submission.
-11. Naval clause, included only when the opponent has naval units: naval units fire on land targets at one or two cells, move on water and coastal cells, and reach a land target by routing to the nearest water or coastal cell.
-12. Air clause, included only when the opponent has air units: the tempo sentence names air strikes alongside ranged attacks, and `buildAirEmploymentRule` states strike radius 3, ferry range 4, and that strike and ferry cannot share a turn.
-13. Hold-fire sentence, included only when standing-order tools are enabled: a fire-withholding standing order suppresses automatic engagement until replaced; omitting an attack is not the same (`buildHoldFireRule`).
+4. Origin bonus, included only when the country bonus is on: a unit in a hex whose country is its birth country adds 1 to every value it rolls there, including ranged fire, return fire, melee, and air-strike counter-fire; an air unit qualifies by its base when the opponent has air units; casualty order still uses the printed defense values (`buildOriginBonusRule`).
+5. Resolution order for the turn: embark, then air strikes, then ranged fire, then movement, then cargo sync, then ferry, then melee (`buildResolutionOrderRule`).
+6. Attacks resolve from turn-start positions, so a unit may fire and move in the same turn and firing never costs a move.
+7. At most one ranged action per unit per turn, using exactly one of a target cell code or a target unit id, and never the unit's own move destination.
+8. Infantry has no strategic ranged action and closes to melee instead.
+9. Movement budgets: one cell for infantry, two for armor and naval, and air never marches (`buildMovementBudgetRule`).
+10. Friendly units may stack on the same cell. A cell holding an enemy is legal as a move/melee Target Hex. Approach Target Hexes omit stay-put friendlies; a cell a friendly is leaving this period is a legal dest (`buildDestinationOccupancyRule`).
+11. Invalid attacks are dropped before submission.
+12. Naval clause, included only when the opponent has naval units: naval units fire on land targets at one or two cells, move on water and coastal cells, and reach a land target by routing to the nearest water or coastal cell.
+13. Air clause, included only when the opponent has air units: the tempo sentence names air strikes alongside ranged attacks, and `buildAirEmploymentRule` states strike radius 3, ferry range 4, and that strike and ferry cannot share a turn.
+14. Hold-fire sentence, included only when standing-order tools are enabled: a fire-withholding standing order suppresses automatic engagement until replaced; omitting an attack is not the same (`buildHoldFireRule`).
 
-- **Items:** `COMBAT_STATS`, `STRATEGIC_RANGE_TABLE`, `ATTACK_ONE_PER_UNIT`, `WEGO_PHASE_ORDER`, `TEMPO_RANGED_SHOT`, `CASUALTY_PRIORITY`, `MOVE_BUDGET`, `LEGAL_DEST_OCCUPANCY`, `NAVAL_MOVEMENT_DOMAIN`.
-- **Include:** always; clauses 11 and 12 are roster-gated. **Empty-state:** not possible.
+- **Items:** `COMBAT_STATS`, `STRATEGIC_RANGE_TABLE`, `ATTACK_ONE_PER_UNIT`, `WEGO_PHASE_ORDER`, `TEMPO_RANGED_SHOT`, `CASUALTY_PRIORITY`, `ORIGIN_BONUS`, `MOVE_BUDGET`, `LEGAL_DEST_OCCUPANCY`, `NAVAL_MOVEMENT_DOMAIN`.
+- **Include:** always; clauses 12 and 13 are roster-gated and clause 4 is gated by the country bonus flag. **Empty-state:** not possible.
 - **Model use:** every firing and movement decision in the turn.
 
 Assessment-tool and combat-estimate hints must **not** appear when a precomputed briefing is attached, because those tools are not callable in that configuration.
@@ -76,6 +77,7 @@ Assessment-tool and combat-estimate hints must **not** appear when a precomputed
 - **Include:** always inside the briefing.
 - **Distance-basis caveat line:** immediately after the heading and before the table. Under fog off at res1, include one line stating that nearest-enemy distances and threat estimates are straight hop counts rather than march or sail paths, and that option-table targets are already this-turn legal destinations. Under fog on at res1, include the intel-staleness sentence and one line stating that nearest-enemy distances are march or sail path lengths when a path exists (otherwise a hop count), and that Best Options Target Hexes are already this-turn legal destinations — copy them even when the printed path is longer than one movement budget. Omit both caveat lines in battle. `variants.md` fixes the gates.
 - **Rows:** one per own unit. **No cap.** The table lists every unit the snapshot includes, at every game size.
+- **Bonus column:** when the country bonus is on, a `Bonus` column follows `Hex`, reading `+1 country` for a unit that qualifies where it stands and `—` otherwise. With the flag off the table is unchanged. Carries `ORIGIN_BONUS`.
 - **Items:** `OWN_UNIT_TABLE`, `UNIT_IDENTITY`, `NEAREST_ENEMY_DISTANCE`, `CONTACT_FLAGS`, `THREAT_SEVERITY`, `ACTION_NEEDED_FLAG`, `INTEL_FRESHNESS`, `INTEL_STALENESS_WINDOW`, `HOP_VS_PATH_CAVEAT`.
 - **Empty-state:** header row plus the line `(No AI units)`.
 - **Model use:** the roster to work through; the action-needed column is the worklist.

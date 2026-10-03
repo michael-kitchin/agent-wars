@@ -22,6 +22,7 @@ import type { GuardedDbRunAndGetAllOps } from '../dbOps';
 import type { FlexAirSlotDeps } from './initialFlexAirSlot';
 import { applySacrificeToBaselineCounts, resolveFlexUnitPlacement } from './initialFlexAirSlot';
 import { insertPlannedUnitsForPlayer, type PlannedUnitOwner, type PlannedUnitPlan } from './plannedUnits';
+import type { UnitOrigin } from '../../../shared/unitOriginTypes';
 import { trySeedScenarioRegionVsRegion } from './regionScenarioSeeding';
 import { readPersistedMaxUnitsPerType } from '../gameSizeConfig';
 
@@ -61,6 +62,15 @@ allocateNextUnitDisplayOrder: (unitType: BuildUnitType, player: PlannedUnitOwner
      * Exceptions: Throws when the database is not open.
      */
     allocateNextUnitIdOrdinal: (unitType: BuildUnitType, player: PlannedUnitOwner) => number;
+  /**
+   * Resolves the birth origin of a unit about to be inserted.
+   *
+   * Contract: Never throws; returns at least the birth hex.
+   * When to use: Threaded through to `insertPlannedUnitsForPlayer`.
+   * Expected outcome: Origin stored in the unit's `birth_*` columns.
+   * Exceptions: None.
+   */
+  resolveBirthOrigin: (unitId: string, h3Index: string) => UnitOrigin;
 }
 
 /**

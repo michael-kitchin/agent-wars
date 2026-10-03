@@ -9,6 +9,7 @@
 
 import { logTrace } from '../logger';
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
+import type { UnitOrigin } from '../../shared/unitOriginTypes';
 
 /**
  * Raw `units` table row shape used when listing units for strategic snapshots.
@@ -73,6 +74,80 @@ interface DbUnitSnapshotRow extends Record<string, unknown> {
    * Exceptions: None.
    */
   embarked_on_naval_unit_id: string | null;
+  /**
+   * Birth res1 hex, or SQL null for rows inserted without origin data.
+   *
+   * Contract: Non-empty when the row has an origin.
+   * When to use: Decides whether the snapshot unit gets an `origin`.
+   * Expected outcome: Maps to `origin.birthH3Index`.
+   * Exceptions: None.
+   */
+  birth_h3_index: string | null;
+  /**
+   * Birth res4 cell, or SQL null.
+   *
+   * Contract: A res4 child of `birth_h3_index` when set.
+   * When to use: Maps to `origin.birthRes4H3Index`.
+   * Expected outcome: Preserved verbatim.
+   * Exceptions: None.
+   */
+  birth_res4_h3_index: string | null;
+  /**
+   * Birth terrain kind, or SQL null.
+   *
+   * Contract: A pipeline terrain kind when set.
+   * When to use: Maps to `origin.birthTerrainKind`.
+   * Expected outcome: Preserved verbatim.
+   * Exceptions: None.
+   */
+  birth_terrain_kind: string | null;
+  /**
+   * 1 when the birth cell was intact urban, 0 when not, or SQL null when the row has no origin.
+   *
+   * Contract: Stored as an integer because SQLite has no boolean type.
+   * When to use: Maps to `origin.birthIsUrban`.
+   * Expected outcome: `true` only for `1`.
+   * Exceptions: None.
+   */
+  birth_is_urban: number | null;
+  /**
+   * Birth country name, or SQL null.
+   *
+   * Contract: Canonical country name when set.
+   * When to use: Maps to `origin.birthCountryName`.
+   * Expected outcome: Preserved verbatim.
+   * Exceptions: None.
+   */
+  birth_country_name: string | null;
+  /**
+   * Birth country ISO alpha-2 code, or SQL null.
+   *
+   * Contract: Two uppercase letters when set.
+   * When to use: Maps to `origin.birthCountryCode`.
+   * Expected outcome: Preserved verbatim.
+   * Exceptions: None.
+   */
+  birth_country_code: string | null;
+}
+
+/**
+ * Maps a row's birth columns to a unit origin.
+ *
+ * Purpose: Keeps legacy rows (no birth hex) free of an `origin` field.
+ * When to use: From `mapDbUnitSnapshotRow`.
+ * Expected outcome: An origin when `birth_h3_index` is a non-empty string; otherwise `undefined`.
+ * Exceptions: None.
+ */
+function unitOriginFromRow(row: DbUnitSnapshotRow): UnitOrigin | undefined {
+  if (typeof row.birth_h3_index !== 'string' || row.birth_h3_index.length === 0) return undefined;
+  return {
+    birthH3Index: row.birth_h3_index,
+    birthRes4H3Index: row.birth_res4_h3_index ?? null,
+    birthTerrainKind: row.birth_terrain_kind ?? null,
+    birthIsUrban: row.birth_is_urban === 1,
+    birthCountryName: row.birth_country_name ?? null,
+    birthCountryCode: row.birth_country_code ?? null,
+  };
 }
 
 /**
@@ -94,6 +169,8 @@ function mapDbUnitSnapshotRow(row: DbUnitSnapshotRow): GameStateSnapshot['units'
   if (typeof row.embarked_on_naval_unit_id === 'string' && row.embarked_on_naval_unit_id.length > 0) {
     unit.embarkedOnNavalUnitId = row.embarked_on_naval_unit_id;
   }
+  const origin = unitOriginFromRow(row);
+  if (origin) unit.origin = origin;
   return unit;
 }
 
@@ -114,6 +191,12 @@ export function listUnitsForSnapshotWithGetAll(
             u.unit_type,
             u.h3_index,
             u.display_order,
+            u.birth_h3_index,
+            u.birth_res4_h3_index,
+            u.birth_terrain_kind,
+            u.birth_is_urban,
+            u.birth_country_name,
+            u.birth_country_code,
             uta.naval_unit_id AS embarked_on_naval_unit_id
      FROM units u
      LEFT JOIN unit_transport_assignments uta ON uta.land_unit_id = u.id`

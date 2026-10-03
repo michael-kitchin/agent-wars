@@ -1,6 +1,6 @@
 /**
  * Engine-fact sentences both consultation modes need: dice, stats, resolution order,
- * casualty sort, occupancy, movement budgets, ranged reach, air employment, hold-fire,
+ * casualty sort, origin bonus, occupancy, movement budgets, ranged reach, air employment, hold-fire,
  * production income, and intel staleness.
  *
  * Purpose: These facts used to live inline in the assembler or not at all. Every number
@@ -33,6 +33,8 @@ import {
   TACTICAL_TRANSPORT_RAIL_BUDGET_MULTIPLIER,
   TACTICAL_TRANSPORT_ROAD_BUDGET_MULTIPLIER,
 } from '../../../shared/tacticalRes4TransportLink';
+import { ORIGIN_HIT_BONUS } from '../../../shared/originBonusRules';
+import type { OriginBonusSettings } from '../../../shared/originBonusTypes';
 import type { PromptCoordinateMode } from './envelopeContract';
 
 /**
@@ -80,6 +82,15 @@ export interface GameRuleTextGates {
    * Exceptions: None.
    */
   readonly ordersEnabled: boolean;
+  /**
+   * Origin bonus flags chosen at new-game time.
+   *
+   * Contract: The origin bonus sentence appears only when a flag that applies in this mode is on.
+   * When to use: Set from `originBonusSettingsFromSnapshot` on the same snapshot the briefing uses.
+   * Expected outcome: `ORIGIN_BONUS_OFF` omits the sentence.
+   * Exceptions: None.
+   */
+  readonly originBonusSettings: OriginBonusSettings;
 }
 
 /**
@@ -162,6 +173,45 @@ export function buildCasualtySortRule(): string {
 }
 
 /**
+ * Origin bonus sentence for the flags that apply in this mode.
+ *
+ * Purpose: With a flag on, units roll better at home; the model must know this to weigh fights and estimates.
+ * When to use: Combat paragraph right after the casualty rule.
+ * Expected outcome: Null when no flag applies (terrain alone does nothing on the strategic map); otherwise the
+ * applicable clauses, the no-stacking note when both apply, the air base note when air exists, and the
+ * unchanged casualty order.
+ * Exceptions: None.
+ */
+export function buildOriginBonusRule(gates: GameRuleTextGates): string | null {
+  logTrace('promptSpec buildOriginBonusRule', { ...gates });
+  const { countryBonusEnabled, terrainBonusEnabled } = gates.originBonusSettings;
+  const tactical = gates.coordinateMode === 'tactical';
+  const terrainApplies = tactical && terrainBonusEnabled;
+  if (!countryBonusEnabled && !terrainApplies) return null;
+  const place = tactical ? 'cell' : 'hex';
+  const onPlace = tactical ? 'on a cell' : 'in a hex';
+  const rollClause = `adds ${ORIGIN_HIT_BONUS} to every attack or defense value it rolls there`;
+  const parts: string[] = [];
+  if (countryBonusEnabled) {
+    const strategicDetail = tactical
+      ? ''
+      : ', including ranged fire, return fire, melee, and air-strike counter-fire';
+    parts.push(`Country bonus is on: a unit ${onPlace} whose country is its birth country ${rollClause}${strategicDetail}.`);
+  }
+  if (terrainApplies) {
+    parts.push(
+      `Terrain bonus is on: a unit on a cell whose terrain kind matches its birth terrain kind ${rollClause}; urban and rubble do not change a cell's terrain kind.`
+    );
+  }
+  if (countryBonusEnabled && terrainApplies) {
+    parts.push(`The two bonuses do not stack; the most is +${ORIGIN_HIT_BONUS}.`);
+  }
+  if (gates.hasAirUnits) parts.push(`An air unit qualifies by the ${place} of its base, whatever it strikes.`);
+  parts.push('Casualty order still uses the printed defense values.');
+  return parts.join(' ');
+}
+
+/**
  * Friendly stacking is legal; enemy cells are move/melee contact; approach omits stay-put stacks.
  *
  * Purpose: Best Options lists enemy-occupied cells as move/melee dests the engine will accept. Friendly stacking
@@ -177,11 +227,29 @@ export function buildDestinationOccupancyRule(mode: PromptCoordinateMode): strin
 }
 
 /**
+ * Infantry and armor enter costs for an intact line, a roadless urban cell, and rubble.
+ *
+ * Purpose: The combat paragraph and the tactical coaching bullet must state the same enter costs.
+ * When to use: From `buildMovementBudgetRule` and `REACH_BULLET`.
+ * Expected outcome: The line-entry sentence refers to the intact road or rail cell, which may be terrain the unit could not otherwise enter. Rubble does not open blocked terrain.
+ * Exceptions: None.
+ */
+export function tacticalLandEnterCostRule(): string {
+  logTrace('promptSpec tacticalLandEnterCostRule', {});
+  return (
+    `Entering an intact road cell costs 1/${TACTICAL_TRANSPORT_ROAD_BUDGET_MULTIPLIER} point and an intact rail cell costs 1/${TACTICAL_TRANSPORT_RAIL_BUDGET_MULTIPLIER} point, for every terrain, for infantry and armor. ` +
+    'That cell may be entered from a neighbor that is not on the line, including terrain the unit could not otherwise enter, and a blocked line cell may be left only onto terrain the unit can enter without a line or onto another intact line cell. ' +
+    'Entering an urban cell with no road or rail costs 1. ' +
+    'Rubble with no road or rail costs 2. Rubble on a road or rail costs 1 where the unit could already enter, and does not open blocked terrain.'
+  );
+}
+
+/**
  * Per-type movement budget for this consultation mode.
  *
  * Purpose: Multi-turn and intra-beat reach cannot be judged from the options table alone.
  * When to use: Combat paragraph after the infantry reach clause.
- * Expected outcome: Strategic cell counts from `getMovementBudget`; tactical point budgets from `MOVEMENT_RANGE_BY_UNIT_TYPE`, origin urban/rubble collapse, and flat road/rail enter costs.
+ * Expected outcome: Strategic cell counts from `getMovementBudget`; tactical point budgets from `MOVEMENT_RANGE_BY_UNIT_TYPE`, origin urban/rubble collapse, and enter costs for an intact line, a roadless urban cell, and rubble. The line-entry sentence refers to the road or rail cell.
  * Exceptions: None.
  */
 export function buildMovementBudgetRule(mode: PromptCoordinateMode): string {
@@ -192,9 +260,7 @@ export function buildMovementBudgetRule(mode: PromptCoordinateMode): string {
       `${MOVEMENT_RANGE_BY_UNIT_TYPE.armor} for armor, ${MOVEMENT_RANGE_BY_UNIT_TYPE.naval} for naval, and air does not march. ` +
       'Infantry or armor whose current cell is urban or rubble has a 1-point budget this beat, not the type baseline. ' +
       'Armor in forest is penalised to the infantry baseline. ' +
-      `Entering an intact road cell costs 1/${TACTICAL_TRANSPORT_ROAD_BUDGET_MULTIPLIER} point and an intact rail cell costs 1/${TACTICAL_TRANSPORT_RAIL_BUDGET_MULTIPLIER} point, for every terrain. ` +
-      'Rubble with no road or rail costs 2. Rubble on a road or rail costs 1 where the unit could already enter, and does not open blocked terrain. ' +
-      'A unit may enter that cell from a neighbor that is not on the line, and may leave it only onto terrain it can enter without a line or onto another intact line cell. ' +
+      `${tacticalLandEnterCostRule()} ` +
       'A non-air unit always retains at least one point. ' +
       "A destination beyond this beat's budget is clamped to the first reachable leg rather than rejected; when the planner cannot use the destination at all but a neighbouring footprint cell still closes on it, the engine may take that single step instead."
     );
@@ -309,7 +375,7 @@ export function buildIntelStalenessRule(): string {
 /**
  * Naval fire, movement domain, and land-target routing.
  *
- * Purpose: strategic-prompt.md section 1.5 item 11. Reach is `getRange('naval')`, not a copied numeral.
+ * Purpose: strategic-prompt.md section 1.5 item 12. Reach is `getRange('naval')`, not a copied numeral.
  * When to use: Combat paragraph when `hasNavalUnits` is true.
  * Expected outcome: Fire within engine range, water/coastal movement, route to the nearest water or coastal cell.
  * Exceptions: None.
@@ -327,7 +393,7 @@ function buildNavalClause(mode: PromptCoordinateMode): string {
 /**
  * One-attack-per-unit and target-field constraints, plus the period-start tempo sentence.
  *
- * Purpose: strategic-prompt.md section 1.5 items 5–6. Air strikes join the tempo sentence only when air is present.
+ * Purpose: strategic-prompt.md section 1.5 items 6–7. Air strikes join the tempo sentence only when air is present.
  * When to use: Inside `buildCombatRulesParagraph`.
  * Expected outcome: Existing targetHexCode/targetUnitId wording and the "does not prevent movement" tempo clause.
  * Exceptions: None.
@@ -349,14 +415,17 @@ function buildAttackConstraintsClause(gates: GameRuleTextGates): string {
  * Purpose: Replaces the inline `Combat: ...` template in `buildSystemPromptForTools` so every clause
  * has one home. Clause order follows strategic-prompt.md section 1.5, with tactical substitutions from 2.5.
  * When to use: Once per assembled system prompt, after roster and tool flags are known.
- * Expected outcome: Hold-fire only when `ordersEnabled`; air and naval clauses only when those units exist.
+ * Expected outcome: Hold-fire only when `ordersEnabled`; air and naval clauses only when those units exist;
+ * the origin bonus sentence only when a flag applies in this mode.
  * Exceptions: None.
  */
 export function buildCombatRulesParagraph(gates: GameRuleTextGates): string {
   logDebug('promptSpec buildCombatRulesParagraph', { ...gates });
+  const originBonus = buildOriginBonusRule(gates);
   const parts: string[] = [
     buildCombatStatsLine(gates.coordinateMode, gates.hasAirUnits),
     buildCasualtySortRule(),
+    ...(originBonus ? [originBonus] : []),
     buildResolutionOrderRule(gates.coordinateMode),
     'Ranged uses pre-move positions.',
     buildAttackConstraintsClause(gates),

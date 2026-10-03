@@ -33,6 +33,7 @@ When you change one of these, update `combat-rules-v3.md` (and any table that qu
 | Unit costs and build prerequisites | `src/shared/productionConfig.ts`, `src/main/productionRules.ts` |
 | Per-side caps by game size | `src/shared/productionConfig.ts` (`MAX_UNITS_PER_TYPE`), `src/shared/gameSize.ts` |
 | Fog vision radii | `VISION_RANGE_BY_UNIT_TYPE` in `src/main/visibility.ts` |
+| Origin bonus size and matching | `ORIGIN_HIT_BONUS` and `originBonusSources` in `src/shared/originBonusRules.ts` |
 | Tactical ranged and movement budgets | `src/shared/tacticalRanges.ts` |
 | Tactical terrain enter costs | `tacticalEnterHexMovementCost` in `src/shared/tacticalTerrainMovement.ts` |
 | Tactical combat modifiers (LOS, range caps, MP) | `src/shared/tacticalTerrainCombatModifiers.ts` |

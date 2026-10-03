@@ -14,6 +14,17 @@ Typical runtime inputs (names may grow; the extract/assert scripts are the check
 - Per-hex feature metadata (urban, airport, seaport counts and flags)
 - Road/rail side masks and optional vector overlays
 - Landmass connectivity used by strategic land pathfinding
+- Hex naming data (`terrain_res1_naming.json` and `terrain_res4_naming.json`) for hex tooltips and unit origins
+
+## Hex naming data
+
+The naming files list the countries, states, cities, and water bodies that overlap each res-1 and res-4 hex, taken from Natural Earth. Naming schema `1.2.0` adds `country_code` to every country, state, and city row: an uppercase ISO 3166-1 alpha-2 code, or `null` when Natural Earth has none (disputed and special areas such as Somaliland). The loader rejects any other value. Country codes come from `ISO_A2_EH`, falling back to `ISO_A2`, and resolve through `ADM0_A3` so states and cities use the same code as their country. Water names that Natural Earth spells in all capitals (`INDIAN OCEAN`) are converted to title case, so they match the other water names.
+
+Regenerate with `python -m scripts.naming_pipeline.generate_hex_naming run`, then `npm run generated:zip`. Only the `.json.zip` files are tracked.
+
+The main process uses the codes for the flags in hex tooltips and for each new unit's country of origin. The flag images are vendored in `static/flags/`; see [`static/flags/README.md`](../static/flags/README.md).
+
+A birth cell's country is its largest city (population, then lower scalerank, then name). With no city that names a country, it is the country row with the most states in the cell, then lower scalerank, then name. With no country row, it is the country of the most prominent state. The stored name is the canonical country name for that ISO code. A cell with none of those rows has no country.
 
 Main-process classification (`terrainClassificationCache.ts` and related) turns that cache into hex kinds, infrastructure counts, and overlay records. SQLite is seeded from the cache; res-4 feature overrides (rubble after strikes, destroyed ports) live in the match DB and overlay the pack.
 

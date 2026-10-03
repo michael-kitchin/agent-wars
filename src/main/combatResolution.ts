@@ -5,7 +5,8 @@
  * then infantry → armor → naval. Uses seeded RNG for determinism.
  */
 
-import { getAttack, getDefense, casualtyPriorityIndex } from './combatConstants';
+import { getDefense, casualtyPriorityIndex } from './combatConstants';
+import { attackHitThreshold, defenseHitThreshold } from './combatHitThresholds';
 import { createSeededRng } from './seededRng';
 import { logDebug } from './logger';
 import type { RangedAttackOrder } from './gameActions';
@@ -114,14 +115,14 @@ export function resolveOneRangedEngagement(
   const attackerHexes = [...new Set(attackerUnits.map((u) => u.h3Index))];
   let attackerHits = 0;
   for (const u of attackerUnits) {
-    if (rollD6() <= getAttack(u.unitType)) attackerHits++;
+    if (rollD6() <= attackHitThreshold(u)) attackerHits++;
   }
   let defenderHits = 0;
   if (!options?.skipReturnFire) {
     for (const u of defenderUnits) {
       const defender = { unitType: u.unitType, h3Index: u.h3Index || defenderHexH3 };
       const canReturnFire = canDefenderReturnFireAtAnyAttackerHex(defender, attackerHexes, returnFireContext);
-      if (canReturnFire && rollD6() <= getAttack(u.unitType)) defenderHits++;
+      if (canReturnFire && rollD6() <= attackHitThreshold(u)) defenderHits++;
     }
   }
 
@@ -167,11 +168,12 @@ export function resolveOneRangedEngagement(
 }
 
 /**
- * Defines the `resolveOneMeleeEngagement` function shape (export function resolveOneMeleeEngagement().
-
- * Purpose: Supports maintainability by documenting why `resolveOneMeleeEngagement` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Resolves one melee round between two sides sharing a hex or cell.
+ *
+ * Purpose: The single dice rule for melee: one side rolls attack values and the other defense values.
+ * When to use: From `runMeleePhase`, after it has chosen which side rolls attack; `rollD6` returns integers 1–6.
+ * Expected outcome: Each unit rolls once against `attackHitThreshold` or `defenseHitThreshold` (origin bonus
+ *   included). Each side's hits remove that many enemies, lowest printed defense first, then casualty priority.
  * Exceptions: None.
  */
 export function resolveOneMeleeEngagement(
@@ -184,11 +186,11 @@ export function resolveOneMeleeEngagement(
 
   let atkHits = 0;
   for (const u of attackerUnits) {
-    if (rollD6() <= getAttack(u.unitType)) atkHits++;
+    if (rollD6() <= attackHitThreshold(u)) atkHits++;
   }
   let defHits = 0;
   for (const u of defenderUnits) {
-    if (rollD6() <= getDefense(u.unitType)) defHits++;
+    if (rollD6() <= defenseHitThreshold(u)) defHits++;
   }
 
   const defSorted = [...defenderUnits].sort(

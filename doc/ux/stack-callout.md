@@ -4,20 +4,21 @@ The list of units in one hex.
 
 ## Purpose
 
-Let the player see a stack, or a lone enemy unit, and change which human units in that hex are selected.
+Let the player see the units in a hex, including a single unit, and change which human units in that hex are selected.
 
 ## Availability
 
-Opens in Strategic planning and Tactical planning after a click on a stack or a lone enemy icon, once a short delay elapses. It does not open while a hover order preview is active, while strategic units are hidden because the map is zoomed to battle detail, or during Resolution playback. It closes when the player dismisses it, presses Escape, clicks outside it, or starts a gesture that hides it. See [input-map.md](input-map.md) and [selection-model.md](selection-model.md).
+Opens in Strategic planning and Tactical planning after a click on a unit icon, including a single human unit, once a short delay elapses. A lone human unit that can be selected is still selected, or Shift-toggled, by that same click. An embarked land unit stays unselected. It does not open while a hover order preview is already active, while strategic units are hidden because the map is zoomed to battle detail, or during Resolution playback. The preview that starts because this click selected a unit on the hex under the pointer does not cancel the scheduled callout and does not close it after it opens. A later click while that preview is still active does not open the callout again. Moving the pointer onto another hex while a preview is active does close it. It also closes when the player dismisses it, presses Escape, clicks outside it, or starts a gesture that hides it. See [input-map.md](input-map.md) and [selection-model.md](selection-model.md).
 
 ## Information Displayed
 
-- One row per unit in the hex, sorted by side, type, and name. Each row shows the unit name.
+- One row per unit in the hex, sorted by side, type, and name. Each row shows the unit name, preceded by the unit's country-of-origin flag for both human and enemy units. A battle unit shows the flag of the strategic unit it came from. A unit whose origin country is unknown shows a gray placeholder flag, and a unit with no recorded origin shows no flag.
+- Hovering a unit flag shows a tooltip after the same short dwell as the hex tooltip, with two lines: `Origin: <country> (<XX>)` and `Terrain: <terrain>`. `<XX>` is the code of the world hex where the unit was built, including for an enemy unit, and it is omitted when that hex has no code. An unknown country reads `Origin: Unknown`, with the hex code in parentheses when there is one. `<terrain>` is the birth cell's terrain, the world hex's terrain when the unit has no birth cell, or `Unknown` when neither is known. When an origin bonus applies to the unit where it stands now, a third line reads `Bonus: +1 (country)`, `Bonus: +1 (terrain)`, or `Bonus: +1 (country, terrain)` ([combat rules §4.9](../combat-rules-v3.md)). The line is computed when the label is built, so it can lag one refresh behind a move. The tooltip hides when that flag is no longer visible.
 - Human rows include a toggle that shows whether that unit is in the selection.
 - When the hex has human units and Shift is not held, a "+ All" control selects the selectable human units.
 - When Shift is held and the hex has human units, "+ All" adds them and "- All" removes them.
 - A close control.
-- A sealift section when the hex has a sealift action. See [order-lifecycle.md](order-lifecycle.md).
+- A sealift section when the hex has a sealift action. See [order-lifecycle.md](order-lifecycle.md). Each fleet label carries the ship's origin flag. The embark option lists have no flags.
 
 Enemy rows have no selection toggle.
 
@@ -50,7 +51,7 @@ Enemy rows have no selection toggle.
 
 - Enemy units in the callout never become selected.
 - Select-all and add-all both read "+ All". They are never shown at the same time: Shift decides which one is showing.
-- The callout never opens during a hover order preview.
+- The callout does not open while a hover order preview is already active. A preview of the hex the selected units already occupy, started by the click that opened the callout, does not cancel or close it. A later click while that preview remains active does not open the callout again.
 - Embarked land units stay unselectable from the callout, the same as from the map.
 
 ## Strategic and Tactical Differences
@@ -74,8 +75,12 @@ None.
 
 ## Code Entry Points
 
-- `static/index.html` (`#stack-callout`, `#stack-callout-list`)
+- `static/index.html` (`#stack-callout`, `#stack-callout-list`, `#unit-origin-tooltip`)
 - `src/renderer/renderer.ts`
 - `src/renderer/map/mainMapInteractions.ts`
 - `src/renderer/map/mapClickSelectionPolicy.ts`
 - `src/renderer/map/initCore.ts`
+- `src/renderer/core/unitOriginFlags.ts`
+- `src/renderer/core/unitOriginTooltip.ts`
+- `src/renderer/rendering/canvasPreviewPolicy.ts`
+- `src/shared/unitOriginTooltipText.ts`

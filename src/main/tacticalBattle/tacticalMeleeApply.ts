@@ -5,6 +5,8 @@
 import { createCombatRng, runMeleePhase } from '../combatResolution';
 import type { CombatUnit } from '../combatUnitTypes';
 import { getGameSeed } from '../gameDb';
+import { withOriginHitBonus } from '../originBonus/originHitBonusLookup';
+import { buildTacticalOriginHitBonusLookupFromDb } from '../originBonus/originHitBonusLookupDb';
 import type { RemovedUnitSnapshot } from '../../shared/ipc/readyTypes';
 import type { TacticalBattleSnapshot, TacticalSubUnitSnapshot } from '../../shared/tacticalBattleTypes';
 import { tacticalLogMutate, tacticalLogQuery } from './tacticalLogging';
@@ -56,6 +58,7 @@ function tacticalSubUnitsAsCombatUnits(subUnits: readonly TacticalSubUnitSnapsho
  * persisting indefinitely without combat; kill lines and removal snapshots feed the same toast path as strategic Ready.
  * When to use: End of `applyHumanTacticalDraftBeatInStrategicOrder` / `commitHumanTacticalDraftOrders` after air+ranged, march, optional human embark, ferry, and cargo sync.
  * Expected outcome: Updated `battle.subUnits` with melee casualties removed; empty melee arrays when no contested res4 hexes.
+ *   Each melee roll adds the roller's origin bonus at its cell, read from the persisted match flags and this `battle`.
  * Exceptions: None; delegates RNG to `createCombatRng` and melee logic to `runMeleePhase` when `combatNext` is omitted.
  */
 export function applyTacticalMeleeAfterSupportOrders(
@@ -73,7 +76,10 @@ export function applyTacticalMeleeAfterSupportOrders(
     subCount: battle.subUnits.length,
     res4CellCount: battle.res4ChildH3Indexes.length,
   });
-  const combatUnits = tacticalSubUnitsAsCombatUnits(battle.subUnits);
+  const combatUnits = withOriginHitBonus(
+    tacticalSubUnitsAsCombatUnits(battle.subUnits),
+    buildTacticalOriginHitBonusLookupFromDb(battle)
+  );
   const next =
     combatNext ??
     createCombatRng(

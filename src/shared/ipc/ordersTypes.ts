@@ -360,6 +360,24 @@ aiHomeRegion?: string;
    * Exceptions: None; invalid values become Small.
    */
 gameSize?: GameSize;
+    /**
+   * Whether the new match has the country bonus on.
+   *
+   * Contract: A missing field means off; the new-game dialog always sends an explicit boolean.
+   * When to use: `game:newGame` from the new-game dialog's Country bonus checkbox.
+   * Expected outcome: Persisted as `game_config.country_bonus_enabled`.
+   * Exceptions: None.
+   */
+countryBonusEnabled?: boolean;
+    /**
+   * Whether the new match has the terrain bonus on.
+   *
+   * Contract: A missing field means off; the new-game dialog always sends an explicit boolean.
+   * When to use: `game:newGame` from the new-game dialog's Terrain bonus checkbox.
+   * Expected outcome: Persisted as `game_config.terrain_bonus_enabled`.
+   * Exceptions: None.
+   */
+terrainBonusEnabled?: boolean;
 }
 
 /**

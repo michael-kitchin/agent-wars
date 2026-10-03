@@ -25,11 +25,16 @@ import {
 import {
   loadTerrainRes1NamingBundled,
   loadTerrainRes4NamingBundled,
-  namingLineForRes1Record,
-  namingLineForRes4Record,
   type TerrainNamingRecordRes1,
   type TerrainNamingRecordRes4,
 } from './terrainNamingLoad';
+import {
+  buildNamingCaptionsByH3,
+  namingCaptionForRes1Record,
+  namingCaptionForRes4Record,
+} from './terrainNamingCaption';
+import type { HexNamingCaption } from '../shared/hexNamingCaption';
+import { clearRes4BirthCountryCache, storeRes4BirthCountryCache } from './unitOrigin/res4BirthCountryCache';
 import {
   assertLandMassMatchesHexList,
   buildRes1LandMassByH3,
@@ -83,24 +88,22 @@ res1KindByH3: ReadonlyMap<string, PipelineTerrainKind>;
    * Exceptions: None.
    */
 res4OverrideRows: ReadonlyArray<{ h3Index: string; terrainKind: PipelineTerrainKind; isUrban: boolean }>;
-    /**
-   * Specifies the contract for the `namingLinesRes1ByH3` member (namingLinesRes1ByH3: ReadonlyMap<string, string>;).
-
-   * Contract: Describes stable behavior for callers of `namingLinesRes1ByH3` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+  /**
+   * Precomputed naming caption per res1 hex.
+   * Contract: Hexes without naming rows are absent; identical captions share one object.
+   * When to use: Hex naming IPC lookups at resolution 1.
+   * Expected outcome: Caption text plus country spans for flags.
    * Exceptions: None.
    */
-namingLinesRes1ByH3: ReadonlyMap<string, string>;
-    /**
-   * Specifies the contract for the `namingLinesRes4ByH3` member (namingLinesRes4ByH3: ReadonlyMap<string, string>;).
-
-   * Contract: Describes stable behavior for callers of `namingLinesRes4ByH3` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+  readonly namingCaptionsRes1ByH3: ReadonlyMap<string, HexNamingCaption>;
+  /**
+   * Precomputed naming caption per res4 cell.
+   * Contract: Cells without naming rows are absent; identical captions share one object.
+   * When to use: Hex naming IPC lookups at resolution 4.
+   * Expected outcome: Caption text plus country spans for flags.
    * Exceptions: None.
    */
-namingLinesRes4ByH3: ReadonlyMap<string, string>;
+  readonly namingCaptionsRes4ByH3: ReadonlyMap<string, HexNamingCaption>;
     /**
    * Specifies the contract for the `continentNamesRes1ByH3` member (continentNamesRes1ByH3: ReadonlyMap<string, string[]>;).
 
@@ -347,16 +350,11 @@ function buildSnapshot(): TerrainClassificationSnapshot {
       res4OverrideRows.push({ h3Index, terrainKind: childKind, isUrban });
     }
   }
-  const namingLinesRes1ByH3 = new Map<string, string>();
-  for (const row of namingRes1Env.records) {
-    const line = namingLineForRes1Record(row);
-    if (line) namingLinesRes1ByH3.set(row.h3_index, line);
-  }
-  const namingLinesRes4ByH3 = new Map<string, string>();
-  for (const row of namingRes4Env.records as TerrainNamingRecordRes4[]) {
-    const line = namingLineForRes4Record(row);
-    if (line) namingLinesRes4ByH3.set(row.h3_index, line);
-  }
+  const namingCaptionsRes1ByH3 = buildNamingCaptionsByH3(namingRes1Env.records, namingCaptionForRes1Record);
+  const namingCaptionsRes4ByH3 = buildNamingCaptionsByH3(
+    namingRes4Env.records as TerrainNamingRecordRes4[],
+    namingCaptionForRes4Record
+  );
   const res4CityOverlayByH3 = reduceRes4CityOverlayLabelsByH3(namingRes4Env.records as TerrainNamingRecordRes4[]);
   const res4RoadRailOverlayByH3 = loadTerrainRes4RoadRailSidesBundled();
   const res4TransportVectorOverlayRows = loadTerrainRes4RoadRailVectorsBundled();
@@ -384,18 +382,19 @@ function buildSnapshot(): TerrainClassificationSnapshot {
     res1MajorSeaportHexes: res1MajorSeaports.length,
     res4MajorAirportHexes: res4MajorAirports.length,
     res4MajorSeaportHexes: res4MajorSeaports.length,
-    res1NamingHexes: namingLinesRes1ByH3.size,
-    res4NamingHexes: namingLinesRes4ByH3.size,
+    res1NamingHexes: namingCaptionsRes1ByH3.size,
+    res4NamingHexes: namingCaptionsRes4ByH3.size,
     res4CityOverlayHexes: res4CityOverlayByH3.size,
     res4RoadRailOverlayHexes: res4RoadRailOverlayByH3.size,
     res4TransportVectorRows: res4TransportVectorOverlayRows.length,
     res1LandMassHexes: res1LandMassByH3.size,
   });
+  storeRes4BirthCountryCache(namingRes1Env.records as TerrainNamingRecordRes1[], namingRes4Env.records as TerrainNamingRecordRes4[]);
   return {
     res1KindByH3,
     res4OverrideRows,
-    namingLinesRes1ByH3,
-    namingLinesRes4ByH3,
+    namingCaptionsRes1ByH3,
+    namingCaptionsRes4ByH3,
     continentNamesRes1ByH3,
     urbanHexCountByRes1H3,
     airportCountByRes1H3,
@@ -502,16 +501,16 @@ export function getRes4TerrainOverridesForRenderer(): Array<{
 }
 
 /**
- * Defines the `getHexNamingTooltipLineForRenderer` function shape (export function getHexNamingTooltipLineForRenderer( payload: { h3Index: string; resolution: 1 | 4 } ): string | null { logTrace('terrainClassificationCac).
-
- * Purpose: Supports maintainability by documenting why `getHexNamingTooltipLineForRenderer` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
+ * Looks up the precomputed naming caption for a res1 or res4 hex.
+ *
+ * Purpose: Backs the `game:getHexNamingTooltipLine` IPC handler.
+ * When to use: After `ensureTerrainClassificationCacheLoaded()`.
+ * Expected outcome: The shared caption object, or `null` when the hex has no naming data.
+ * Exceptions: Throws when the cache has not been loaded.
  */
 export function getHexNamingTooltipLineForRenderer(
   payload: { h3Index: string; resolution: 1 | 4 }
-): string | null {
+): HexNamingCaption | null {
   logTrace('terrainClassificationCache getHexNamingTooltipLineForRenderer', payload);
   if (!cached) {
     const err = new Error('terrainClassificationCache: load ensureTerrainClassificationCacheLoaded() first');
@@ -670,4 +669,5 @@ export function getCachedSeaportCountByRes1H3(): ReadonlyMap<string, number> | n
 export function clearTerrainClassificationCacheForTests(): void {
   logDebug('terrainClassificationCache clearTerrainClassificationCacheForTests');
   cached = null;
+  clearRes4BirthCountryCache();
 }

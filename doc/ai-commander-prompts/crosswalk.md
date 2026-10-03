@@ -49,6 +49,7 @@ Every item defined in `information-decision-model.md` section 3, with the file a
 | `WEGO_PHASE_ORDER` | `assembly-contract.md` | Shared coaching |
 | `TEMPO_RANGED_SHOT` | `assembly-contract.md` | Shared coaching |
 | `CASUALTY_PRIORITY` | `assembly-contract.md` | Shared coaching |
+| `ORIGIN_BONUS` | both mode files | Combat and attack rules; Unit Status `Bonus` column |
 | `HOLD_FIRE_SEMANTICS` | `strategic-prompt.md` | Required coaching item 4 |
 | `MOVE_BUDGET` | `strategic-prompt.md` | Combat and attack rules |
 | `TACTICAL_MP_RULES` | `tactical-prompt.md` | Battle framing; combat rules |
@@ -203,6 +204,7 @@ From `source-inventory.md` section 3, derived from code only.
 | Tactical beat consulted or skipped | 6.3 |
 | Previous consultation exhausted its tool budget | 6.4 |
 | Briefing present or absent | 7, combinations |
+| Country bonus and terrain bonus flags | 8 |
 
 ## 6. Facts the builders now carry (formerly listed as gaps)
 
@@ -212,6 +214,7 @@ These were absent or partial in an earlier assembler. The builders in `promptSpe
 | --- | --- | --- |
 | `WEGO_PHASE_ORDER` | Combat paragraph, both modes | `buildResolutionOrderRule` |
 | `CASUALTY_PRIORITY` | Combat paragraph and coaching | `buildCasualtySortRule` |
+| `ORIGIN_BONUS` | Combat paragraph when a flag applies in the mode | `buildOriginBonusRule` |
 | `LEGAL_DEST_OCCUPANCY` | Combat paragraph and coaching | `buildDestinationOccupancyRule` |
 | `MOVE_BUDGET` | Strategic combat paragraph | `buildMovementBudgetRule` |
 | `TACTICAL_MP_RULES` | Tactical combat paragraph | `buildMovementBudgetRule('tactical')` |

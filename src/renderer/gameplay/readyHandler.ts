@@ -23,6 +23,7 @@ import { readTacticalBattlesInterceptPromptEnabled } from './tacticalBattlePromp
 import { tacticalKillEdgesForStrategicStyleTurnUpdate } from '../../shared/tacticalToastKillSlice';
 import type { ResolutionMove, ResolutionPlaybackMove } from '../core/types';
 import { rendererSharedState as S } from '../core/state';
+import { buildUnitOriginByLossDisplayName } from '../core/unitOriginFlags';
 import { tacticalOpponentPlanPayloadHasAnyOrders } from '../../shared/ipc/tacticalOpponentPlanMerge';
 import { resetPrecomputedAiState } from '../openRouter/precomputedAiState';
 import {
@@ -35,7 +36,7 @@ import {
   enqueueResolutionPlaybackCompleteNotify,
 } from '../openRouter/resolutionPlaybackDeferral';
 import { reconcileSelectionToCurrentState } from '../core/selection';
-import { applyToolInvocationCountsAfterReady } from '../openRouter/openRouterUiHelpers';
+import { applyToolInvocationCountsAfterReady, type MapToastOptions } from '../openRouter/openRouterUiHelpers';
 import { collectUnknownBattleContinentNames } from '../../shared/unknownBattleContinentNames';
 import { unitIdOwnerFromId } from '../../shared/unitIds';
 
@@ -177,14 +178,14 @@ updateOpenRouterCostLabel: () => void;
    */
 appendOpenRouterLog: (line: string, isError?: boolean) => void;
     /**
-   * Specifies the contract for the `showMapToast` member (showMapToast: (message: string, options?: { isError?: boolean }) => void;).
-
-   * Contract: Describes stable behavior for callers of `showMapToast` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Shows the lower-right map toast.
+   *
+   * Contract: Same behavior as `showMapToast` in `openRouterUiHelpers.ts`, including unit flags for named loss victims.
+   * When to use: For turn update summaries and Ready-flow notices.
+   * Expected outcome: The toast replaces any visible toast and hides after the standard duration.
    * Exceptions: None.
    */
-showMapToast: (message: string, options?: { isError?: boolean }) => void;
+showMapToast: (message: string, options?: MapToastOptions) => void;
     /**
    * Specifies the contract for the `getVisibleHexSet` member (getVisibleHexSet: (state: GameStateSnapshot | null) => Set<string>;).
 
@@ -935,7 +936,8 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
           combatFallbackBullets,
         });
         if (updateText) {
-          deps.showMapToast(updateText, { isError: false });
+          const unitOriginByDisplayName = buildUnitOriginByLossDisplayName(turnLossSummary);
+          deps.showMapToast(updateText, { isError: false, unitOriginByDisplayName });
           deps.appendOpenRouterLog(`Update: ${updateText.replace(/\n/g, ' | ')}`);
         }
         const hasUnknownBattle =
@@ -1184,7 +1186,8 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
         combatFallbackBullets,
       });
       if (updateText) {
-        deps.showMapToast(updateText, { isError: false });
+        const unitOriginByDisplayName = buildUnitOriginByLossDisplayName(turnLossSummary);
+        deps.showMapToast(updateText, { isError: false, unitOriginByDisplayName });
         deps.appendOpenRouterLog(`Update: ${updateText.replace(/\n/g, ' | ')}`);
       }
       const hasUnknownBattle = unknownCombatHexes.length > 0 || unknownCasualtyHexes.length > 0 || unknownVictimIds.length > 0;

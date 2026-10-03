@@ -10,6 +10,7 @@ import {
   listUnitsForSnapshot,
 } from '../gameDb';
 import { readTurnStateRow } from '../gameDb/turnStateReads';
+import { res4CountryNamesForCells } from '../unitOrigin/res4BirthCountryCache';
 import { getRes4RoadRailOverlaysForRenderer } from '../terrainClassificationCache';
 import { tacticalNavalHasMovableNeighborInFootprint } from '../../shared/tacticalRes4MovementPlanner';
 import {
@@ -25,6 +26,7 @@ import {
 } from '../../shared/tacticalTerrainMovement';
 import { logDebug } from '../logger';
 import { claimInitialPlacementHex, type InitialPlacementSide } from '../../shared/initialPlacementSides';
+import { hashStringToUint32 } from '../../shared/stableHash';
 import { tacticalLogError, tacticalLogMutate, tacticalLogQuery } from './tacticalLogging';
 
 const WORLD_H3_RESOLUTION = 1;
@@ -139,23 +141,6 @@ export function tacticalSnapshotHasPlacedUnitsForBothSides(
     if (human && opponent) return true;
   }
   return false;
-}
-
-/**
- * Hashes a battle id string into a 32-bit seed for deterministic tactical placement tie-breaks.
- *
- * Purpose: Stabilizes sibling ordering across machines for the same battle id string.
- * When to use: Seeding `mulberry32` for res4 placement scoring jitter.
- * Expected outcome: Deterministic unsigned 32-bit integer for a given `battleId`.
- * Exceptions: None.
- */
-function hashBattleIdToSeed(battleId: string): number {
-  let h = 2166136261 >>> 0;
-  for (let i = 0; i < battleId.length; i++) {
-    h ^= battleId.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return h >>> 0;
 }
 
 /**
@@ -309,7 +294,7 @@ function orderRes4CellsForPlacement(args: {
     const prev = latLngCenterForH3(args.previousRes1);
     entry = normalizeVec(prev.lat - center.lat, prev.lng - center.lng);
   }
-  const rng = mulberry32(hashBattleIdToSeed(args.battleId));
+  const rng = mulberry32(hashStringToUint32(args.battleId));
   const scored = args.children.map((h3) => {
     const c = latLngCenterForH3(h3);
     const v = normalizeVec(c.lat - center.lat, c.lng - center.lng);
@@ -522,6 +507,7 @@ export function computeTacticalBattleSnapshot(
           unitType: parent.unitType,
           h3Index: next.cell,
           displayName: formatTacticalSubUnitDisplayName(parentName, placed),
+          ...(parent.origin ? { origin: parent.origin } : {}),
         });
       }
       if (placed < n) {
@@ -543,6 +529,7 @@ export function computeTacticalBattleSnapshot(
       res4TerrainKindByH3[cell] = res4KindByH3.get(cell) ?? hexRow.terrain_kind;
     }
     const urbanRubble = urbanRubbleForPlacement;
+    const res4CountryNameByH3 = res4CountryNamesForCells(children);
     const snapshot: TacticalBattleSnapshot = {
       battleId,
       enclosingRes1H3Index,
@@ -552,6 +539,7 @@ export function computeTacticalBattleSnapshot(
       strategicHexTerrain: hexRow.terrain,
       strategicHexTerrainKind: hexRow.terrain_kind,
       res4TerrainKindByH3,
+      ...(res4CountryNameByH3 ? { res4CountryNameByH3 } : {}),
       ...(Object.keys(res4IsSeaportByH3).length > 0 ? { res4IsSeaportByH3 } : {}),
       ...(Object.keys(res4IsAirportByH3).length > 0 ? { res4IsAirportByH3 } : {}),
       ...(urbanRubble.res4IsUrbanByH3 ? { res4IsUrbanByH3: urbanRubble.res4IsUrbanByH3 } : {}),

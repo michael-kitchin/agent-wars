@@ -300,9 +300,13 @@ function registerIpcHandlers(): void {
   ipcMain.handle(IPC_GAME.newGame, (_event, payload: NewGameIpcPayload | undefined) => {
     const fogOfWarEnabled = payload?.fogOfWarEnabled !== false;
     const gameSize = parseGameSize(payload?.gameSize);
+    const countryBonusEnabled = payload?.countryBonusEnabled === true;
+    const terrainBonusEnabled = payload?.terrainBonusEnabled === true;
     logDebug('main game:newGame', {
       fogOfWarEnabled,
       gameSize,
+      countryBonusEnabled,
+      terrainBonusEnabled,
       requestedHumanHomeRegion: payload?.humanHomeRegion ?? '',
       requestedAiHomeRegion: payload?.aiHomeRegion ?? '',
     });
@@ -311,6 +315,8 @@ function registerIpcHandlers(): void {
       gameSize,
       humanHomeRegion: payload?.humanHomeRegion,
       aiHomeRegion: payload?.aiHomeRegion,
+      countryBonusEnabled,
+      terrainBonusEnabled,
     });
     clearDeferredPlaybackConsultPending();
     clearStrategicPreviousHexMemory();

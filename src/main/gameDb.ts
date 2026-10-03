@@ -20,8 +20,8 @@ import {
 } from './terrainClassificationCache';
 import { pipelineTerrainToPassability } from './terrainPassability';
 import { logDebug, logError, logTrace } from './logger';
+import { resolveUnitBirthOrigin } from './unitOrigin/unitBirthOrigin';
 import type { AirStrikeOrder, EmbarkOrder, FerryOrder, GameStateSnapshot, MovementOrder, RangedAttackOrder } from '../shared/ipcTypes';
-import type { GameSize } from '../shared/gameSize';
 import type { BuildUnitType } from './productionRules';
 import { seedUnits as seedUnitsFromModule } from './gameDb/seeding/seedUnits';
 import {
@@ -107,7 +107,7 @@ import {
   seedGameSeedIfMissingWithOps,
   setGameOverWithOps,
 } from './gameDb/gameConfigKv';
-import { resetGameForNewMatch as resetGameForNewMatchFromModule } from './gameDb/resetGame';
+import { resetGameForNewMatch as resetGameForNewMatchFromModule, type ResetGameForNewMatchOptions } from './gameDb/resetGame';
 import {
   getScenarioHomeRegionHexes as getScenarioHomeRegionHexesFromModule,
   listScenarioHomeRegions as listScenarioHomeRegionsFromModule,
@@ -119,14 +119,14 @@ export type { TurnConsultationNoteTexts, TurnNoteRow, TurnNotesScope } from './g
 export type { BuildQueueRow, HexControlRow, Res1InfrastructureRow, Res4FeatureOverrideRow } from './gameDb/controlInfrastructure';
 
 /**
- * Documents the module-scope binding `EXPECTED_USER_VERSION` (EXPECTED_USER_VERSION).
-
- * Purpose: Supports maintainability by documenting why `EXPECTED_USER_VERSION` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * SQLite `user_version` that the current schema DDL produces.
+ *
+ * Purpose: Detects match databases created by an older schema.
+ * When to use: Bump whenever `getFullDdl` changes; fresh databases are stamped with it.
+ * Expected outcome: On first launch after a bump, the old match database fails validation, is renamed aside, and a fresh one is created.
  * Exceptions: None.
  */
-export const EXPECTED_USER_VERSION = 14;
+export const EXPECTED_USER_VERSION = 16;
 
 /**
  * Documents the module-scope binding `GAME_DB_FILE_NAME` (GAME_DB_FILE_NAME).
@@ -760,6 +760,7 @@ function seedUnits(): void {
     allocateNextUnitDisplayOrder,
     allocateNextUnitIdOrdinal,
     hasDb: () => db !== null,
+    resolveBirthOrigin: (unitId, h3Index) => resolveUnitBirthOrigin({ run, getOne, getAll }, { unitId, birthH3Index: h3Index }),
   });
 }
 
@@ -1526,19 +1527,14 @@ export function clearTacticalTurnNotes(battleId?: string): void {
 }
 
 /**
- * Defines the `resetGameForNewMatch` function shape (export function resetGameForNewMatch(options?:).
-
- * Purpose: Supports maintainability by documenting why `resetGameForNewMatch` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
+ * Starts a new match with the new-game dialog's choices.
+ *
+ * Purpose: Facade that binds this module's database helpers to `resetGame.ts`.
+ * When to use: The `game:newGame` IPC handler.
+ * Expected outcome: See `resetGameForNewMatch` in `gameDb/resetGame.ts`; missing bonus flags mean off.
+ * Exceptions: Propagates SQLite errors.
  */
-export function resetGameForNewMatch(options?: {
-  fogOfWarEnabled?: boolean;
-  humanHomeRegion?: string;
-  aiHomeRegion?: string;
-  gameSize?: GameSize;
-}): void {
+export function resetGameForNewMatch(options?: ResetGameForNewMatchOptions): void {
   resetGameForNewMatchFromModule(
     {
       hasDb: () => db !== null,

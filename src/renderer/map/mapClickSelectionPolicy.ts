@@ -80,10 +80,10 @@ export function clearDeferredStackCalloutTimerForPressAway(clientX: number, clie
 }
 
 /**
- * Opens a stack or lone-enemy callout after the same delay used for human single-select.
+ * Opens the unit callout after the same delay used for human single-select.
  *
  * Purpose: Keeps the popup from covering the cursor before a double-click can reach the map, while keeping single-click behavior recognisable.
- * When to use: From the main-map click handler for a stack or lone-enemy icon hit, only on the click that started a new gesture.
+ * When to use: From the main-map click handler for a stationary unit icon hit, including one human unit, only on the click that started a new gesture.
  * Expected outcome: `show` runs once after `HUMAN_UNIT_SINGLE_SELECT_DEBOUNCE_MS`, at the click point it was scheduled for, unless the timer is cleared first.
  * Exceptions: None. `show` owns its own DOM failure handling.
  */

@@ -270,6 +270,7 @@ export function updateRangedSidebar(deps: TacticalOrderDeps): void {
           r.unitId,
           formatPendingRangedAttackSidebarLabel(S.gameState, r, tacticalPositions)
         ),
+        unitId: r.unitId,
         selected: S.selectedUnitIds.includes(r.unitId),
         onToggleSelect: (event) => deps.applySelectionFromSidebarUnitButton(r.unitId, event),
         onCancel: () => cancelRangedForUnit(r.unitId, deps),
@@ -292,6 +293,7 @@ export function updateRangedSidebar(deps: TacticalOrderDeps): void {
             strike.unitId,
             formatPendingAirStrikeSidebarLabel(S.gameState, strike, tacticalPositions)
           ),
+          unitId: strike.unitId,
           selected: S.selectedUnitIds.includes(strike.unitId),
           onToggleSelect: (event) => deps.applySelectionFromSidebarUnitButton(strike.unitId, event),
           onCancel: () => cancelAirStrikeForUnit(strike.unitId, deps),

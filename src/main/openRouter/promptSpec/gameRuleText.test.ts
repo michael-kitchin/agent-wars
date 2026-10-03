@@ -15,6 +15,7 @@ import {
   TACTICAL_TRANSPORT_ROAD_BUDGET_MULTIPLIER,
 } from '../../../shared/tacticalRes4TransportLink';
 import { UNIT_COST_BY_TYPE } from '../../productionRules';
+import { ORIGIN_BONUS_OFF } from '../../../shared/originBonusRules';
 import {
   buildAirEmploymentRule,
   buildCasualtySortRule,
@@ -23,6 +24,7 @@ import {
   buildHoldFireRule,
   buildIntelStalenessRule,
   buildMovementBudgetRule,
+  buildOriginBonusRule,
   buildProductionCostRulesLine,
   buildRangedReachRule,
   buildResolutionOrderRule,
@@ -43,6 +45,7 @@ function gates(overrides: Partial<GameRuleTextGates> = {}): GameRuleTextGates {
     hasAirUnits: false,
     hasNavalUnits: false,
     ordersEnabled: false,
+    originBonusSettings: ORIGIN_BONUS_OFF,
     ...overrides,
   };
 }
@@ -110,6 +113,34 @@ test('buildCasualtySortRule uses lowest defence and the engine type order', () =
   assert.ok(text.includes(typeOrder), `casualty rule must list ${typeOrder}`);
 });
 
+test('buildOriginBonusRule appears only when a flag applies in the mode', () => {
+  const countryOnly = { countryBonusEnabled: true, terrainBonusEnabled: false };
+  const terrainOnly = { countryBonusEnabled: false, terrainBonusEnabled: true };
+  assert.equal(buildOriginBonusRule(gates()), null);
+  assert.equal(buildOriginBonusRule(gates({ coordinateMode: 'tactical' })), null);
+  assert.equal(buildOriginBonusRule(gates({ originBonusSettings: terrainOnly })), null);
+
+  const strategic = buildOriginBonusRule(gates({ originBonusSettings: countryOnly }));
+  assert.match(strategic ?? '', /^Country bonus is on: a unit in a hex whose country is its birth country adds 1/);
+  assert.match(strategic ?? '', /Casualty order still uses the printed defense values\.$/);
+  assert.doesNotMatch(strategic ?? '', /air unit qualifies/);
+  const strategicAir = buildOriginBonusRule(gates({ originBonusSettings: countryOnly, hasAirUnits: true }));
+  assert.match(strategicAir ?? '', /An air unit qualifies by the hex of its base/);
+
+  assert.ok(buildCombatRulesParagraph(gates({ originBonusSettings: countryOnly })).includes(strategic ?? '\u0000'));
+});
+
+test('tactical buildOriginBonusRule notes no stacking only when both flags are on', () => {
+  const tactical = (countryBonusEnabled: boolean, terrainBonusEnabled: boolean) =>
+    buildOriginBonusRule(
+      gates({ coordinateMode: 'tactical', originBonusSettings: { countryBonusEnabled, terrainBonusEnabled } })
+    ) ?? '';
+  assert.match(tactical(false, true), /^Terrain bonus is on: a unit on a cell/);
+  assert.doesNotMatch(tactical(false, true), /do not stack/);
+  assert.doesNotMatch(tactical(true, false), /do not stack/);
+  assert.match(tactical(true, true), /Country bonus is on: a unit on a cell.*Terrain bonus is on.*do not stack; the most is \+1\./);
+});
+
 test('buildMovementBudgetRule quotes engine budgets and states that air never marches', () => {
   const strategic = buildMovementBudgetRule('strategic');
   assert.ok(strategic.includes(String(getMovementBudget('armor'))));
@@ -122,6 +153,13 @@ test('buildMovementBudgetRule quotes engine budgets and states that air never ma
   assert.match(tactical, /1[- ]point|one[- ]point/i);
   assert.match(tactical, /road/i);
   assert.match(tactical, /rail/i);
+  assert.match(
+    tactical,
+    /intact road cell costs 1\/2 point and an intact rail cell costs 1\/3 point, for every terrain, for infantry and armor\. That cell may be entered from a neighbor/
+  );
+  assert.match(tactical, /Entering an urban cell with no road or rail costs 1/);
+  assert.match(tactical, /Rubble on a road or rail costs 1 where the unit could already enter, and does not open blocked terrain/);
+  assert.doesNotMatch(tactical, /blocked terrain\. A unit may enter that cell/);
   assert.ok(tactical.includes(String(TACTICAL_TRANSPORT_ROAD_BUDGET_MULTIPLIER)));
   assert.ok(tactical.includes(String(TACTICAL_TRANSPORT_RAIL_BUDGET_MULTIPLIER)));
   assert.doesNotMatch(tactical, /unless that cell holds a friendly/i);

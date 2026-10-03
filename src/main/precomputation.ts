@@ -11,6 +11,8 @@ import { isEmbarkedLandUnit } from './gameActions/sealift';
 import { executeAssessment } from './tools/assessment';
 import { usesOmniscientGridProximity } from './tools/assessUnitProximity';
 import { getStandingOrderForUnit } from './tools/standingOrders';
+import { strategicOriginBonusUnitFields } from './tools/originBonusAssessment';
+import type { OriginBonusSource } from '../shared/originBonusTypes';
 import { logDebug, logError, logTrace } from './logger';
 import { compareUnitIdsNaturally } from '../shared/unitIds';
 
@@ -71,7 +73,21 @@ unitId: string;
    */
 result: {
     status: 'ok';
-    unit: { unitId: string; type: string; position: [number, number]; currentStandingOrder: unknown };
+    unit: {
+      unitId: string;
+      type: string;
+      position: [number, number];
+      currentStandingOrder: unknown;
+      /**
+       * Reasons this unit's rolls get the origin bonus where it stands.
+       *
+       * Contract: Present only when a flag that applies to the mode is on; empty when the unit does not qualify.
+       * When to use: The briefing's Unit Status Bonus column.
+       * Expected outcome: Subset of `['country', 'terrain']`.
+       * Exceptions: None.
+       */
+      originBonusHere?: readonly OriginBonusSource[];
+    };
     nearbyEnemies: Array<{
       unitId: string;
       hexDistance: number;
@@ -196,12 +212,14 @@ function unitAssessmentStackKey(unit: {
  *
  * Purpose: Avoid repeating path BFS for 20 armor on one city while still emitting one briefing row per unit id.
  * When to use: Cache hit in `runUnitAssessments`.
- * Expected outcome: Cloned nearbyEnemies/threats; standing order and unit id belong to the stacked unit; donor appears as a distance-0 friendly.
+ * Expected outcome: Cloned nearbyEnemies/threats; standing order, unit id, and origin bonus fields belong to the stacked unit (stack mates can
+ *   have different birth countries); donor appears as a distance-0 friendly.
  * Exceptions: None.
  */
 function cloneAssessmentForStackedUnit(
   cached: UnitAssessmentResult,
-  unit: { id: string; player: string }
+  unit: GameStateSnapshot['units'][number],
+  state: GameStateSnapshot
 ): UnitAssessmentResult['result'] {
   logTrace('precomputation cloneAssessmentForStackedUnit', {
     cachedUnitId: cached.unitId,
@@ -239,6 +257,7 @@ function cloneAssessmentForStackedUnit(
       unitId: unit.id,
       position: unitPosition,
       currentStandingOrder: getStandingOrderForUnit(unit.player, unit.id),
+      ...strategicOriginBonusUnitFields(state, unit),
     },
     nearbyEnemies: cached.result.nearbyEnemies.map((enemy) => ({ ...enemy })),
     threats: cached.result.threats.map((threat) => ({ ...threat })),
@@ -283,7 +302,7 @@ export function runUnitAssessments(
       reusedAssessments += 1;
       results.push({
         unitId: unit.id,
-        result: cloneAssessmentForStackedUnit(cached, unit),
+        result: cloneAssessmentForStackedUnit(cached, unit, state),
       });
       continue;
     }

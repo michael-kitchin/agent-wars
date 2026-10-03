@@ -1,3 +1,5 @@
+import type { SidebarOrderRowArgs } from './sidebarOrderRow';
+
 /**
  * Documents the `TacticalOrderDeps` interface as a named contract surface (interface TacticalOrderDeps).
  *
@@ -89,20 +91,14 @@ export interface TacticalOrderDeps {
    */
   showMapToast: (message: string, options?: { isError?: boolean }) => void;
   /**
-   * Specifies the contract for the `createSidebarOrderRow` member (createSidebarOrderRow: (args: { labelText: string; selected: boolean; onToggleSelect: (event: MouseEvent) => void; onCancel: () => void;).
+   * Builds one sidebar order row for a ranged attack or air strike.
    *
-   * Contract: Describes stable behavior for callers of `createSidebarOrderRow` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Contract: Same behavior as `createSidebarOrderRow` in `sidebarSupport.ts`.
+   * When to use: For each pending ranged attack or air strike in the sidebar lists.
+   * Expected outcome: An unattached row element; the label carries a unit flag when `unitId` is given.
    * Exceptions: None.
    */
-  createSidebarOrderRow: (args: {
-    labelText: string;
-    selected: boolean;
-    onToggleSelect: (event: MouseEvent) => void;
-    onCancel: () => void;
-    compactBlueButtons?: boolean;
-  }) => HTMLElement;
+  createSidebarOrderRow: (args: SidebarOrderRowArgs) => HTMLElement;
   /**
    * Specifies the contract for the `formatUnitArrowLabel` member (formatUnitArrowLabel: (unitId: string, targetLabel: string) => string;).
    *

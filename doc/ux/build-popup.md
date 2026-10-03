@@ -12,7 +12,7 @@ Build markers appear in Strategic planning on explored hexes where the player ca
 
 ## Information Displayed
 
-- The hex name or hex code, when that lookup succeeds.
+- The hex name or hex code, when that lookup succeeds. Country names in the hex name carry a small flag, the same as in the [hex tooltip](hex-tooltips.md).
 - Production per turn, or none when the hex has no production.
 - Queue cost and turns to complete, or none when the queue is empty. Turns show as unknown when they cannot be estimated. Costs and prerequisites are in the [combat rules](../combat-rules-v3.md). Per-side caps are in [game size and unit caps](../game-size-unit-caps.md).
 - The title "Build Queue" when the hex can build.

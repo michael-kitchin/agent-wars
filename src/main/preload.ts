@@ -38,6 +38,7 @@ import type {
   TacticalBattleSnapshot,
 } from '../shared/tacticalBattleTypes';
 import type { CommitHumanTacticalDraftOrdersIpcResult } from '../shared/ipc/gameApiTypes';
+import type { HexNamingCaption } from '../shared/hexNamingCaption';
 /**
  * Preload-local IPC channel map for game handlers.
  *
@@ -205,15 +206,15 @@ getRes4RoadRailOverlays: (): Promise<Res4RoadRailOverlayRow[]> =>
    */
 getRes4TransportVectorOverlays: (): Promise<Res4TransportVectorOverlayRow[]> =>
     ipcRenderer.invoke(IPC_GAME.getRes4TransportVectorOverlays),
-    /**
-   * Documents the object literal property `getHexNamingTooltipLine` (getHexNamingTooltipLine: (payload: HexNamingTooltipLineRequest): Promise<string | null> => ipcRenderer.invoke('game:getHexNamingTooltipLine', payload)).
-
-   * Purpose: Supports maintainability by documenting why `getHexNamingTooltipLine` exists.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
+  /**
+   * Fetches the structured naming caption (text plus country spans) for a res1 or res4 hex.
+   *
+   * Purpose: Feeds hover tooltips, the build popup, and the melee-intercept hex cell, which add flags from the spans.
+   * When to use: Through the renderer's caption cache rather than per hover.
+   * Expected outcome: Resolves to the caption, or `null` when the hex has no naming data.
+   * Exceptions: Rejects on IPC transport failures.
    */
-getHexNamingTooltipLine: (payload: HexNamingTooltipLineRequest): Promise<string | null> =>
+  getHexNamingTooltipLine: (payload: HexNamingTooltipLineRequest): Promise<HexNamingCaption | null> =>
     ipcRenderer.invoke(IPC_GAME.getHexNamingTooltipLine, payload),
     /**
    * Documents the object literal property `getHexContinentNames` (getHexContinentNames: (payload: HexContinentNamesRequest): Promise<string[]> => ipcRenderer.invoke('game:getHexContinentNames', payload)).

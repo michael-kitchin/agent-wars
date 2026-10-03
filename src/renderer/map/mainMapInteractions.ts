@@ -649,10 +649,31 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
     }
 
     const unitsAtHit = hit ? unitsToDraw.filter((u) => u.h3Index === hit && !movingIds?.has(u.id)) : [];
-    const isStack = unitsAtHit.length >= 2;
-    const isLoneAi = unitsAtHit.length === 1 && unitsAtHit[0]?.player !== 'human';
-    if (hit && (isStack || isLoneAi) && pointerHitsDrawnUnitIcon(e.clientX, e.clientY, hit)) {
+    const unitIconHit = hit !== null && pointerHitsDrawnUnitIcon(e.clientX, e.clientY, hit);
+    const loneHumanUnit = unitsAtHit.length === 1 && unitsAtHit[0]?.player === 'human' ? unitsAtHit[0] : undefined;
+    const humanUnitIconSelectionDeps = {
+      replaceSelection: deps.replaceSelection,
+      toggleUnitSelection: deps.toggleUnitSelection,
+      refreshHoverRoutePreview: deps.refreshHoverRoutePreview,
+      updateSidebar: deps.updateSidebar,
+      updateRangedSidebar: deps.updateRangedSidebar,
+      redraw: deps.redraw,
+    };
+    if (hit && unitsAtHit.length >= 1 && unitIconHit) {
+      if (loneHumanUnit) {
+        applyHumanUnitIconClickSelectionPolicy({
+          shiftKey: e.shiftKey,
+          unitId: loneHumanUnit.id,
+          suppressSelectionRetarget: suppressIconRetargetOnNextClick,
+          deps: humanUnitIconSelectionDeps,
+        });
+      }
+      // A hover preview that is already showing must not open another callout.
+      // Selection above still runs: it allows a Shift toggle-off and blocks a selection swap itself.
       if (isHoverOrderPlanningActive()) {
+        deps.updateSidebar();
+        deps.updateRangedSidebar();
+        deps.redraw();
         return;
       }
       if (!suppressIconRetargetOnNextClick) {
@@ -674,20 +695,12 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
     deps.hideStackCallout();
     if (hit) {
       const unit = deps.getUnitAtHex(hit);
-      const unitIconHit = pointerHitsDrawnUnitIcon(e.clientX, e.clientY, hit);
       if (unit?.player === 'human' && unitIconHit) {
         applyHumanUnitIconClickSelectionPolicy({
           shiftKey: e.shiftKey,
           unitId: unit.id,
           suppressSelectionRetarget: suppressIconRetargetOnNextClick,
-          deps: {
-            replaceSelection: deps.replaceSelection,
-            toggleUnitSelection: deps.toggleUnitSelection,
-            refreshHoverRoutePreview: deps.refreshHoverRoutePreview,
-            updateSidebar: deps.updateSidebar,
-            updateRangedSidebar: deps.updateRangedSidebar,
-            redraw: deps.redraw,
-          },
+          deps: humanUnitIconSelectionDeps,
         });
       } else if (unit?.player === 'human' && !unitIconHit) {
         clearDeferredHumanUnitSingleSelectTimer();

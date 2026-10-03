@@ -11,6 +11,7 @@ import * as path from 'path';
 import type Database from 'better-sqlite3';
 import { gridDistance } from 'h3-js';
 import { resolveAirStrikePhase } from './gameActions/airStrikeResolution';
+import { noOriginHitBonus } from './originBonus/originHitBonusLookup';
 import type { AirStrikeTargetType } from '../shared/ipcTypes';
 import { AIR_STRIKE_RANGE_HEXES } from '../shared/tacticalRanges';
 import { parseStrategicUnitId } from '../shared/unitIds';
@@ -685,7 +686,8 @@ function testAirStrikeInfrastructureDestructionPreservesRes1Res4Parity(
           targetType,
         },
       ],
-      next
+      next,
+      noOriginHitBonus
     );
     const event = result.infrastructureDestroyedEvents.find((entry) => entry.h3Index === targetH3Index && entry.targetType === targetType);
     assert.ok(event, `expected infrastructure destruction event for ${targetType}`);

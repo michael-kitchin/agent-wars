@@ -22,6 +22,8 @@ import type {
   AirStrikeTargetType,
 } from '../../shared/ipcTypes';
 import { resolveAirStrikePhase } from './airStrikeResolution';
+import { withOriginHitBonus } from '../originBonus/originHitBonusLookup';
+import { buildStrategicOriginHitBonusLookupFromDb } from '../originBonus/originHitBonusLookupDb';
 import {
   applyEmbarkOrdersForPlayer,
   applyTransportOutcomeForRemovedStrategicUnits,
@@ -195,23 +197,27 @@ export function executeReadyStrategicTurn(
   };
   logDebug('ready: combat resolution', { turnNumber, gameSeed, combatSeed: seed });
 
-  const airStrikeResult = resolveAirStrikePhase(allAirStrikes, next);
+  const originHitBonusAt = buildStrategicOriginHitBonusLookupFromDb();
+  const airStrikeResult = resolveAirStrikePhase(allAirStrikes, next, originHitBonusAt);
   const airStrikeTransportLosses = applyTransportOutcomeForRemovedStrategicUnits(
     airStrikeResult.removedUnitIds,
     airStrikeResult.removedUnits
   );
-  const rangedInputUnits = listUnitsForSnapshot()
-    .filter((u) => {
-      if (u.unitType !== 'infantry' && u.unitType !== 'armor') return true;
-      return !isEmbarkedLandUnitOnWater(u.id);
-    })
-    .map((u) => ({
-      id: u.id,
-      player: u.player,
-      unitType: u.unitType,
-      h3Index: u.h3Index,
-      displayOrder: u.displayOrder,
-    }));
+  const rangedInputUnits = withOriginHitBonus(
+    listUnitsForSnapshot()
+      .filter((u) => {
+        if (u.unitType !== 'infantry' && u.unitType !== 'armor') return true;
+        return !isEmbarkedLandUnitOnWater(u.id);
+      })
+      .map((u) => ({
+        id: u.id,
+        player: u.player,
+        unitType: u.unitType,
+        h3Index: u.h3Index,
+        displayOrder: u.displayOrder,
+      })),
+    originHitBonusAt
+  );
   const rangedResult = runRangedPhase(rangedInputUnits, hexList, allRanged, next, {
     theater: 'strategic',
     hasIntactAirportAtAirBase: hasIntactAirportAtStrategicAirBase,
@@ -326,19 +332,22 @@ export function executeReadyStrategicTurn(
 
   const unitsAfterMove = listUnitsForSnapshot();
   const rangedRemovedSet = new Set(rangedResult.removedUnitIds);
-  const combatUnitsAfter: CombatUnit[] = unitsAfterMove
-    .filter((u) => !rangedRemovedSet.has(u.id))
-    .filter((u) => {
-      if (u.unitType !== 'infantry' && u.unitType !== 'armor') return true;
-      return !isEmbarkedLandUnitOnWater(u.id);
-    })
-    .map((u) => ({
-      id: u.id,
-      player: u.player,
-      unitType: u.unitType,
-      h3Index: u.h3Index,
-      displayOrder: u.displayOrder,
-    }));
+  const combatUnitsAfter: CombatUnit[] = withOriginHitBonus(
+    unitsAfterMove
+      .filter((u) => !rangedRemovedSet.has(u.id))
+      .filter((u) => {
+        if (u.unitType !== 'infantry' && u.unitType !== 'armor') return true;
+        return !isEmbarkedLandUnitOnWater(u.id);
+      })
+      .map((u) => ({
+        id: u.id,
+        player: u.player,
+        unitType: u.unitType,
+        h3Index: u.h3Index,
+        displayOrder: u.displayOrder,
+      })),
+    originHitBonusAt
+  );
 
   const rawMeleeHexes = listMeleeCandidateHexes(combatUnitsAfter, hexList);
   const candidateHexes = filterMeleeCandidateHexesWithTacticalEntry(rawMeleeHexes, {

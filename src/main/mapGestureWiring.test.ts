@@ -159,6 +159,33 @@ function testRightClickClearsSelectionWithoutIconException(): void {
 }
 
 /**
+ * Checks that a stationary unit icon opens the callout, and a lone human unit is still selected first.
+ *
+ * Purpose: A lone human token used to select without opening the popup, so its origin flag never appeared.
+ * When to use: Regression signal when refactoring the main-map click listener.
+ * Expected outcome: The callout gate is any stationary unit, selection runs before the callout is scheduled,
+ *   and `hideStackCallout` stays after that schedule so it cannot cancel the popup just queued.
+ * Exceptions: AssertionError when the wiring drifts.
+ */
+function testLoneHumanUnitIconOpensCalloutAndSelects(): void {
+  const interactions = readRendererSource('map', 'mainMapInteractions.ts');
+  const clickStart = interactions.indexOf("addEventListener('click'");
+  const clickEnd = interactions.indexOf("addEventListener('dblclick'");
+  assert.ok(clickStart >= 0 && clickEnd > clickStart, 'click listener precedes the double-click listener');
+  const clickListener = interactions.slice(clickStart, clickEnd);
+  assert.equal(clickListener.includes('isLoneAi'), false, 'a single unit icon should open the callout whether or not it is an enemy');
+  assert.ok(clickListener.includes('unitsAtHit.length >= 1 && unitIconHit'), 'any stationary unit icon should schedule the callout');
+  const policyAt = clickListener.indexOf('applyHumanUnitIconClickSelectionPolicy(');
+  const scheduleAt = clickListener.indexOf('scheduleDeferredStackCallout(');
+  const hideAt = clickListener.indexOf('deps.hideStackCallout()');
+  assert.ok(
+    policyAt >= 0 && scheduleAt > policyAt && hideAt > scheduleAt,
+    'lone-human selection is scheduled before the callout, and hideStackCallout cannot cancel that callout'
+  );
+  assert.ok(clickListener.includes('unitId: loneHumanUnit.id'), 'the selected id is the stationary token, not whichever unit getUnitAtHex finds first');
+}
+
+/**
  * Asserts a targeting click is inert and the following double-click is the only place that queues the attack.
  *
  * Purpose: The failure mode is a click that turns targeting off, after which the double-click plans a march
@@ -204,6 +231,7 @@ function run(): void {
   testGestureSelectionSnapshotSurvivesDoubleClick();
   testStackCalloutOpensOnCancellableTimer();
   testDoubleClickPlanningUsesSharedDecisionTable();
+  testLoneHumanUnitIconOpensCalloutAndSelects();
   testTargetingDoubleClickPlacesTheAttack();
   testPlaybackIgnoresBuildMarkersAndTemplateEdits();
   testRightClickClearsSelectionWithoutIconException();

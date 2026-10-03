@@ -284,3 +284,17 @@ Each row is a pair of gates that would otherwise fight. The resolution column ma
 | Air unit whose base is not intact or not controlled | It cannot ferry. The air table's base columns carry this, and the coaching must not tell such a unit to reposition. |
 | Tactical destination beyond the beat budget | The order is clamped to the first reachable leg, not rejected. The coaching states the clamp so the model does not read partial movement as a failed order. |
 | Distances are hop counts **and** the mode is tactical | The caveat line is omitted, because its gate requires the strategic resolution. Res4 step counts inside one footprint do not carry the same distortion. |
+| Terrain bonus on **and** country bonus off **and** strategic | No surface changes. Terrain matching is battle-only, so the strategic prompt must not mention an origin bonus. |
+
+## 8. Origin bonuses
+
+Gate: `state.countryBonusEnabled` and `state.terrainBonusEnabled`, read through `originBonusSettingsFromSnapshot` into `GameRuleTextGates.originBonusSettings`. On the strategic map only the country bonus applies; in battle either flag applies. With no applicable flag, every surface is byte-for-byte unchanged.
+
+| Surface | Contract |
+| --- | --- |
+| system | The combat paragraph adds `buildOriginBonusRule` after the casualty rule. The Unit Status table gains a `Bonus` column after `Hex`. With the country bonus on, Supplemental Hex Intelligence bullets append the hex's country. |
+| user | unchanged |
+| tools | Names, descriptions, and schemas unchanged. `estimate_combat` reports effective values and `originBonus`; `assess_unit` adds `originBonusHere`, `birthCountry`, and in battle `birthTerrain`; `assess_hex` adds `country`. |
+| envelope | unchanged |
+| coaching | unchanged |
+| empty-state | A unit that does not qualify reads `—` in the `Bonus` column and `[]` in `originBonusHere`. |

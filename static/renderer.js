@@ -14531,15 +14531,6 @@
        */
     res1FeatureCountsByH3: /* @__PURE__ */ new Map(),
     /**
-       * Documents the object literal property `namingLineByLookupKey` (namingLineByLookupKey: new Map<string, string | null>()).
-    
-       * Purpose: Supports maintainability by documenting why `namingLineByLookupKey` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    namingLineByLookupKey: /* @__PURE__ */ new Map(),
-    /**
        * Documents the object literal property `terrainTooltipHtmlByContentKey` (terrainTooltipHtmlByContentKey: new Map<string, string>()).
     
        * Purpose: Supports maintainability by documenting why `terrainTooltipHtmlByContentKey` exists.
@@ -15266,6 +15257,983 @@
     lastAppliedMapInteractionCursor: ""
   };
 
+  // src/shared/htmlTextFormatting.ts
+  function escapeHtmlText(text) {
+    return text.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#39;");
+  }
+
+  // src/shared/countryFlags.ts
+  var AVAILABLE_COUNTRY_FLAG_CODES = /* @__PURE__ */ new Set([
+    "AD",
+    "AE",
+    "AF",
+    "AG",
+    "AI",
+    "AL",
+    "AM",
+    "AO",
+    "AQ",
+    "AR",
+    "AS",
+    "AT",
+    "AU",
+    "AW",
+    "AX",
+    "AZ",
+    "BA",
+    "BB",
+    "BD",
+    "BE",
+    "BF",
+    "BG",
+    "BH",
+    "BI",
+    "BJ",
+    "BL",
+    "BM",
+    "BN",
+    "BO",
+    "BQ",
+    "BR",
+    "BS",
+    "BT",
+    "BV",
+    "BW",
+    "BY",
+    "BZ",
+    "CA",
+    "CC",
+    "CD",
+    "CF",
+    "CG",
+    "CH",
+    "CI",
+    "CK",
+    "CL",
+    "CM",
+    "CN",
+    "CO",
+    "CR",
+    "CU",
+    "CV",
+    "CW",
+    "CX",
+    "CY",
+    "CZ",
+    "DE",
+    "DJ",
+    "DK",
+    "DM",
+    "DO",
+    "DZ",
+    "EC",
+    "EE",
+    "EG",
+    "EH",
+    "ER",
+    "ES",
+    "ET",
+    "EU",
+    "FI",
+    "FJ",
+    "FK",
+    "FM",
+    "FO",
+    "FR",
+    "GA",
+    "GB",
+    "GD",
+    "GE",
+    "GF",
+    "GG",
+    "GH",
+    "GI",
+    "GL",
+    "GM",
+    "GN",
+    "GP",
+    "GQ",
+    "GR",
+    "GS",
+    "GT",
+    "GU",
+    "GW",
+    "GY",
+    "HK",
+    "HM",
+    "HN",
+    "HR",
+    "HT",
+    "HU",
+    "ID",
+    "IE",
+    "IL",
+    "IM",
+    "IN",
+    "IO",
+    "IQ",
+    "IR",
+    "IS",
+    "IT",
+    "JE",
+    "JM",
+    "JO",
+    "JP",
+    "KE",
+    "KG",
+    "KH",
+    "KI",
+    "KM",
+    "KN",
+    "KP",
+    "KR",
+    "KW",
+    "KY",
+    "KZ",
+    "LA",
+    "LB",
+    "LC",
+    "LI",
+    "LK",
+    "LR",
+    "LS",
+    "LT",
+    "LU",
+    "LV",
+    "LY",
+    "MA",
+    "MC",
+    "MD",
+    "ME",
+    "MF",
+    "MG",
+    "MH",
+    "MK",
+    "ML",
+    "MM",
+    "MN",
+    "MO",
+    "MP",
+    "MQ",
+    "MR",
+    "MS",
+    "MT",
+    "MU",
+    "MV",
+    "MW",
+    "MX",
+    "MY",
+    "MZ",
+    "NA",
+    "NC",
+    "NE",
+    "NF",
+    "NG",
+    "NI",
+    "NL",
+    "NO",
+    "NP",
+    "NR",
+    "NU",
+    "NZ",
+    "OM",
+    "PA",
+    "PE",
+    "PF",
+    "PG",
+    "PH",
+    "PK",
+    "PL",
+    "PM",
+    "PN",
+    "PR",
+    "PS",
+    "PT",
+    "PW",
+    "PY",
+    "QA",
+    "RE",
+    "RO",
+    "RS",
+    "RU",
+    "RW",
+    "SA",
+    "SB",
+    "SC",
+    "SD",
+    "SE",
+    "SG",
+    "SH",
+    "SI",
+    "SJ",
+    "SK",
+    "SL",
+    "SM",
+    "SN",
+    "SO",
+    "SR",
+    "SS",
+    "ST",
+    "SV",
+    "SX",
+    "SY",
+    "SZ",
+    "TC",
+    "TD",
+    "TF",
+    "TG",
+    "TH",
+    "TJ",
+    "TK",
+    "TL",
+    "TM",
+    "TN",
+    "TO",
+    "TR",
+    "TT",
+    "TV",
+    "TW",
+    "TZ",
+    "UA",
+    "UG",
+    "UM",
+    "US",
+    "UY",
+    "UZ",
+    "VA",
+    "VC",
+    "VE",
+    "VG",
+    "VI",
+    "VN",
+    "VU",
+    "WF",
+    "WS",
+    "XK",
+    "YE",
+    "YT",
+    "ZA",
+    "ZM",
+    "ZW"
+  ]);
+  var UNKNOWN_COUNTRY_FLAG_PATH = "flag-unknown.svg";
+  var COUNTRY_FLAG_CLASS_NAME = "country-flag";
+  function countryFlagAssetPath(countryCode) {
+    const code = countryCode?.trim().toUpperCase() ?? "";
+    return AVAILABLE_COUNTRY_FLAG_CODES.has(code) ? `flags/${code.toLowerCase()}.svg` : UNKNOWN_COUNTRY_FLAG_PATH;
+  }
+  function countryFlagImgHtml(countryCode) {
+    const src = escapeHtmlText(countryFlagAssetPath(countryCode));
+    return `<img class="${COUNTRY_FLAG_CLASS_NAME}" src="${src}" alt="" aria-hidden="true" draggable="false">`;
+  }
+
+  // src/shared/lossSummary.ts
+  var LOSS_ENTRY_LIST_MAX = 5;
+  var GROUP_LABEL_BY_TYPE = {
+    naval: "Naval",
+    air: "Air",
+    armor: "Armored",
+    infantry: "Infantry"
+  };
+  var GROUP_ORDER = ["naval", "air", "armor", "infantry"];
+  function emptyPlayerLossSummary() {
+    return { ranged: [], melee: [], returnFire: [], airStrike: [], other: [] };
+  }
+  function emptyTurnLossSummary() {
+    return { human: emptyPlayerLossSummary(), ai: emptyPlayerLossSummary() };
+  }
+  function playerHasAnyLoss(summary) {
+    return summary.ranged.length > 0 || summary.melee.length > 0 || summary.returnFire.length > 0 || summary.airStrike.length > 0 || summary.other.length > 0;
+  }
+  function formatLossEntries(units) {
+    if (units.length === 0) return "";
+    if (units.length <= LOSS_ENTRY_LIST_MAX) {
+      return units.map((u) => u.displayName).join(", ");
+    }
+    return formatGroupedTypeTotals(units);
+  }
+  function formatGroupedTypeTotals(units) {
+    const counts = { naval: 0, air: 0, armor: 0, infantry: 0 };
+    for (const u of units) {
+      if (u.unitType in counts) counts[u.unitType] += 1;
+    }
+    const parts = [];
+    for (const t of GROUP_ORDER) {
+      const n = counts[t];
+      if (n > 0) parts.push(`${n.toLocaleString()} ${GROUP_LABEL_BY_TYPE[t]}`);
+    }
+    return parts.join(", ");
+  }
+  var CAUSE_SPECS = [
+    { key: "ranged", label: "Ranged attack" },
+    { key: "melee", label: "Melee attack" },
+    { key: "returnFire", label: "Return fire" },
+    { key: "airStrike", label: "Air strike" },
+    { key: "other", label: "Other losses" }
+  ];
+  var LOSS_CAUSE_LABELS = CAUSE_SPECS.map((spec) => spec.label);
+  var LOSS_CAUSE_KEYS = CAUSE_SPECS.map((spec) => spec.key);
+  function formatPlayerLossLinesMultiline(summary) {
+    const lines = [];
+    for (const spec of CAUSE_SPECS) {
+      const units = summary[spec.key];
+      if (units.length === 0) continue;
+      const text = formatLossEntries(units);
+      if (text.length > 0) lines.push({ causeLabel: spec.label, text });
+    }
+    return lines;
+  }
+
+  // src/shared/unitIds.ts
+  var UNIT_TYPE_ID_CODES = {
+    infantry: "i",
+    armor: "t",
+    naval: "n",
+    air: "a"
+  };
+  var STRATEGIC_UNIT_ID_PATTERN = /^([ha])(\d+)-([itna])(\d+)$/;
+  var TACTICAL_SUB_UNIT_ID_PATTERN = /^(.+)-s(\d+)$/;
+  var UNIT_TYPE_FROM_ID_CODE = Object.fromEntries(
+    Object.entries(UNIT_TYPE_ID_CODES).map(([unitType, code]) => [code, unitType])
+  );
+  var NATURAL_UNIT_ID_COLLATOR = new Intl.Collator("en", { numeric: true });
+  function isPositiveInteger(value) {
+    return Number.isInteger(value) && value > 0;
+  }
+  function hasForbiddenLeadingZero(digits) {
+    return digits.startsWith("0");
+  }
+  function parseStrategicUnitId(unitId) {
+    const match = unitId.match(STRATEGIC_UNIT_ID_PATTERN);
+    if (!match) return null;
+    const playerLetter = match[1];
+    const playerIndexDigits = match[2];
+    const typeCode = match[3];
+    const ordinalDigits = match[4];
+    if (hasForbiddenLeadingZero(playerIndexDigits) || hasForbiddenLeadingZero(ordinalDigits)) return null;
+    if (playerIndexDigits !== "1") return null;
+    const unitType = UNIT_TYPE_FROM_ID_CODE[typeCode];
+    if (!unitType) return null;
+    const ordinal = Number.parseInt(ordinalDigits, 10);
+    if (!isPositiveInteger(ordinal)) return null;
+    const player = playerLetter === "h" ? "human" : "opponent";
+    return { player, unitType, ordinal };
+  }
+  function parseTacticalSubUnitId(unitId) {
+    const match = unitId.match(TACTICAL_SUB_UNIT_ID_PATTERN);
+    if (!match) return null;
+    const parentUnitId = match[1];
+    const slotDigits = match[2];
+    if (hasForbiddenLeadingZero(slotDigits)) return null;
+    const slot = Number.parseInt(slotDigits, 10);
+    if (!isPositiveInteger(slot)) return null;
+    return { parentUnitId, slot };
+  }
+  function unitTypeFromUnitId(unitId) {
+    const compact = parseStrategicUnitId(unitId);
+    if (compact) return compact.unitType;
+    if (unitId.includes("-infantry-")) return "infantry";
+    if (unitId.includes("-armor-")) return "armor";
+    if (unitId.includes("-naval-")) return "naval";
+    if (unitId.includes("-air-")) return "air";
+    const sub = parseTacticalSubUnitId(unitId);
+    if (sub) return unitTypeFromUnitId(sub.parentUnitId);
+    return null;
+  }
+  function unitIdOwnerFromId(unitId) {
+    const compact = parseStrategicUnitId(unitId);
+    if (compact) return compact.player;
+    const sub = parseTacticalSubUnitId(unitId);
+    if (sub) {
+      const parentOwner = unitIdOwnerFromId(sub.parentUnitId);
+      if (parentOwner) return parentOwner;
+    }
+    if (unitId.startsWith("opponent-")) return "opponent";
+    if (unitId.startsWith("human-")) return "human";
+    return null;
+  }
+
+  // src/shared/hexLlmCodeAssignment.ts
+  var STRATEGIC_RESOLUTION = 1;
+  var DETAIL_RESOLUTION = 4;
+  var CODE_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  var strategicH3ToCodeSingleton = null;
+  function indexToCode(index) {
+    if (index < 0 || index >= CODE_ALPHABET.length * CODE_ALPHABET.length) {
+      throw new Error(`hexLlmCodeAssignment: code index out of range (${index})`);
+    }
+    const hi = Math.floor(index / CODE_ALPHABET.length);
+    const lo = index % CODE_ALPHABET.length;
+    return `${CODE_ALPHABET[hi]}${CODE_ALPHABET[lo]}`;
+  }
+  function sortCellsForStableLlmCodes(cells) {
+    const decorated = cells.map((h3) => {
+      const [lat, lng] = cellToLatLng(h3);
+      return { h3, lat, lng };
+    });
+    decorated.sort((a, b) => {
+      if (a.lat !== b.lat) return b.lat - a.lat;
+      if (a.lng !== b.lng) return a.lng - b.lng;
+      return a.h3.localeCompare(b.h3);
+    });
+    return decorated.map((d) => d.h3);
+  }
+  function buildStrategicRes1H3ToCodeMap() {
+    const res0 = getRes0Cells();
+    const res1Set = /* @__PURE__ */ new Set();
+    for (const r0 of res0) {
+      for (const child of cellToChildren(r0, STRATEGIC_RESOLUTION)) {
+        res1Set.add(child);
+      }
+    }
+    const sorted = sortCellsForStableLlmCodes([...res1Set]);
+    const h3ToCode = /* @__PURE__ */ new Map();
+    for (let i = 0; i < sorted.length; i++) {
+      h3ToCode.set(sorted[i], indexToCode(i));
+    }
+    return h3ToCode;
+  }
+  function getStrategicRes1H3ToCodeMap() {
+    if (!strategicH3ToCodeSingleton) {
+      strategicH3ToCodeSingleton = buildStrategicRes1H3ToCodeMap();
+    }
+    return strategicH3ToCodeSingleton;
+  }
+  function getStrategicRes1HexCode(h3Index) {
+    return getStrategicRes1H3ToCodeMap().get(h3Index);
+  }
+  function getRes4ChildCodeWithinParent(parentRes1H3Index, childRes4H3Index, childResolution = DETAIL_RESOLUTION) {
+    const children = sortCellsForStableLlmCodes(cellToChildren(parentRes1H3Index, childResolution));
+    const idx = children.indexOf(childRes4H3Index);
+    if (idx < 0) return void 0;
+    return indexToCode(idx);
+  }
+  function getLlmHexLocationParenLabelForNamingTarget(target) {
+    if (target.resolution === 1) {
+      const c = getStrategicRes1HexCode(target.h3Index);
+      return c ? `(${c})` : null;
+    }
+    const parent = cellToParent(target.h3Index, STRATEGIC_RESOLUTION);
+    const parentCode = getStrategicRes1HexCode(parent);
+    const childCode = getRes4ChildCodeWithinParent(parent, target.h3Index);
+    return parentCode && childCode ? `(${parentCode}.${childCode})` : null;
+  }
+
+  // src/shared/terrainKindLabel.ts
+  function formatTerrainKindLabel(kind) {
+    if (!kind) return "Unknown";
+    return kind.charAt(0).toUpperCase() + kind.slice(1);
+  }
+
+  // src/shared/unitOriginTooltipText.ts
+  function unitOriginsPresentTheSame(left, right) {
+    return left.birthH3Index === right.birthH3Index && left.birthRes4H3Index === right.birthRes4H3Index && left.birthTerrainKind === right.birthTerrainKind && left.birthIsUrban === right.birthIsUrban && left.birthCountryName === right.birthCountryName && left.birthCountryCode === right.birthCountryCode;
+  }
+  function formatUnitOriginTooltipText(origin, bonusLine) {
+    const hexCode = getStrategicRes1HexCode(origin.birthH3Index);
+    const codeSuffix = hexCode ? ` (${hexCode})` : "";
+    return [
+      `Origin: ${origin.birthCountryName ?? "Unknown"}${codeSuffix}`,
+      `Terrain: ${formatTerrainKindLabel(origin.birthTerrainKind)}`,
+      ...bonusLine ? [bonusLine] : []
+    ].join("\n");
+  }
+
+  // src/shared/pipelineTerrain.ts
+  var PIPELINE_TERRAIN_KINDS = [
+    "water",
+    "coastal",
+    "wetlands",
+    "plains",
+    "forest",
+    "mountain",
+    "desert",
+    "arctic"
+  ];
+  var KIND_SET = new Set(PIPELINE_TERRAIN_KINDS);
+  function isPipelineTerrainKind(s) {
+    return KIND_SET.has(s);
+  }
+
+  // src/shared/tacticalRanges.ts
+  var MOVEMENT_RANGE_BY_UNIT_TYPE = Object.freeze({
+    infantry: 2,
+    armor: 4,
+    naval: 3,
+    air: 0
+  });
+  var RANGED_RANGE_BY_UNIT_TYPE = Object.freeze({
+    infantry: 2,
+    armor: 5,
+    naval: 10,
+    air: 99
+  });
+  function unitHasTacticalRangedBaseline(unitType) {
+    return (RANGED_RANGE_BY_UNIT_TYPE[unitType] ?? 0) >= 1;
+  }
+  var AIR_STRIKE_RANGE_HEXES = 3;
+
+  // src/shared/tacticalRes4TransportLink.ts
+  var orderedRingMemo = /* @__PURE__ */ new Map();
+  var ORDERED_RING_MEMO_CAPACITY = 1e3;
+  function res4GridDiskNeighborsOrdered(fromH3) {
+    const cached = orderedRingMemo.get(fromH3);
+    if (cached !== void 0) return cached;
+    let ring;
+    try {
+      ring = [...gridDisk(fromH3, 1)].filter((h) => h !== fromH3);
+    } catch {
+      ring = [];
+    }
+    if (orderedRingMemo.size >= ORDERED_RING_MEMO_CAPACITY) {
+      const oldest = orderedRingMemo.keys().next().value;
+      if (oldest !== void 0) orderedRingMemo.delete(oldest);
+    }
+    orderedRingMemo.set(fromH3, ring);
+    return ring;
+  }
+  function res4NeighborsInFootprint(h, res4Set) {
+    const out = [];
+    try {
+      for (const n of gridDisk(h, 1)) {
+        if (n !== h && res4Set.has(n)) out.push(n);
+      }
+    } catch {
+      return out;
+    }
+    return out;
+  }
+  function tacticalRes4TransportMaskHasAnyRoadOrRail(masks, ringLen) {
+    const { roadSides, railSides } = masks;
+    if (roadSides.length !== ringLen || railSides.length !== ringLen) return false;
+    for (let i = 0; i < ringLen; i++) {
+      if (roadSides[i] || railSides[i]) return true;
+    }
+    return false;
+  }
+  function tacticalRes4TransportCellHasValidAnySideOverlay(h3, roadRailByH3) {
+    const masks = roadRailByH3.get(h3);
+    if (!masks) return false;
+    const ring = res4GridDiskNeighborsOrdered(h3);
+    return tacticalRes4TransportMaskHasAnyRoadOrRail(masks, ring.length);
+  }
+  function tacticalRes4TransportMarchAdjacentPairAllowsStep(args) {
+    const { fromH3, toH3, roadRailByH3, rubbleByH3 } = args;
+    if (rubbleByH3?.[fromH3] || rubbleByH3?.[toH3]) return false;
+    const ring = res4GridDiskNeighborsOrdered(fromH3);
+    if (ring.indexOf(toH3) < 0) return false;
+    return tacticalRes4TransportCellHasValidAnySideOverlay(fromH3, roadRailByH3) && tacticalRes4TransportCellHasValidAnySideOverlay(toH3, roadRailByH3);
+  }
+  var TACTICAL_TRANSPORT_ROAD_BUDGET_MULTIPLIER = 2;
+  var TACTICAL_TRANSPORT_RAIL_BUDGET_MULTIPLIER = 3;
+
+  // src/shared/tacticalTerrainMovement.ts
+  function normalizeDbTerrainKindToTacticalCategory(effectiveKind, parentTerrain) {
+    const k = (effectiveKind || "").toLowerCase();
+    const pt = (parentTerrain || "").toLowerCase();
+    if (k === "water") return "water";
+    if (k === "coastal") return "coastal";
+    if (k === "forest" || k === "forests") return "forests";
+    if (k === "mountain" || k === "mountains") return "mountains";
+    if (k === "wetland" || k === "wetlands") return "wetlands";
+    if (k === "desert") return "desert";
+    if (k === "arctic") return "arctic";
+    if (k === "plains" || k === "land") return "plains";
+    if (k.length > 0) return "plains";
+    if (pt === "water" || pt === "sea" || pt === "ocean") return "water";
+    return "plains";
+  }
+  function nativeRes4TerrainKindIsWaterOrCoastalForNavalRouting(kind) {
+    const k = (kind || "").toLowerCase();
+    return k === "water" || k === "coastal" || k === "ocean" || k === "sea";
+  }
+  function isInfantryOrArmorTacticalSpawnCell(args) {
+    const k = args.resolvedKindForCell || args.parentTerrainKind;
+    const cat = normalizeDbTerrainKindToTacticalCategory(k, args.parentTerrain);
+    return cat !== "water" && cat !== "arctic";
+  }
+  function tacticalLandUnitMayOccupyCellWithoutTransport(unitType, cellH3, terrain) {
+    if (unitType !== "infantry" && unitType !== "armor") return false;
+    if (terrain.isUrbanRes4?.(cellH3) || terrain.isRubbleRes4?.(cellH3)) return true;
+    const raw = terrain.effectiveKindForRes4Hex(cellH3);
+    const cat = normalizeDbTerrainKindToTacticalCategory(raw, terrain.parentTerrain);
+    return Number.isFinite(tacticalEnterHexMovementCost(unitType, cat));
+  }
+  function isNavalRes4TacticalCellNavigable(args) {
+    const { resolvedKindForCell, parentTerrain, parentTerrainKind, isSeaportCell } = args;
+    if (isSeaportCell) return true;
+    if (nativeRes4TerrainKindIsWaterOrCoastalForNavalRouting(resolvedKindForCell)) return true;
+    void parentTerrainKind;
+    const cat = normalizeDbTerrainKindToTacticalCategory(resolvedKindForCell, parentTerrain);
+    return cat === "water" || cat === "coastal";
+  }
+  function buildRoadRailMapFromRes4RoadRailRecords(roadBy, railBy) {
+    const roadRailByH3 = /* @__PURE__ */ new Map();
+    const transportKeys = /* @__PURE__ */ new Set([...Object.keys(roadBy), ...Object.keys(railBy)]);
+    for (const h3 of transportKeys) {
+      const r = roadBy[h3];
+      const l = railBy[h3];
+      if (!r && !l) continue;
+      const n = Math.max(r?.length ?? 0, l?.length ?? 0);
+      if (n === 0) continue;
+      const roadSides = r ?? Array.from({ length: n }, () => false);
+      const railSides = l ?? Array.from({ length: n }, () => false);
+      if (roadSides.length !== railSides.length) continue;
+      roadRailByH3.set(h3, { roadSides, railSides });
+    }
+    return roadRailByH3;
+  }
+  function tacticalTerrainTransportResolverFnsFromRoadRailMap(roadRailByH3, rubbleByH3) {
+    if (roadRailByH3.size === 0) {
+      return { transportFromTo: void 0, landTransportMarchContext: void 0 };
+    }
+    const transportFromTo = (fromH3, toH3) => tacticalRes4TransportMarchAdjacentPairAllowsStep({
+      fromH3,
+      toH3,
+      roadRailByH3,
+      rubbleByH3
+    });
+    return {
+      transportFromTo,
+      landTransportMarchContext: { roadRailByH3, rubbleByH3 }
+    };
+  }
+  function tacticalEnterHexMovementCost(unitType, category) {
+    if (unitType === "infantry") {
+      switch (category) {
+        case "plains":
+        case "desert":
+        case "wetlands":
+        case "arctic":
+        case "coastal":
+          return 1;
+        case "forests":
+        case "mountains":
+          return 2;
+        case "water":
+          return Infinity;
+        default:
+          return 1;
+      }
+    }
+    if (unitType === "armor") {
+      switch (category) {
+        case "plains":
+        case "desert":
+          return 1;
+        case "forests":
+        case "coastal":
+          return 2;
+        case "mountains":
+        case "wetlands":
+        case "arctic":
+        case "water":
+          return Infinity;
+        default:
+          return 1;
+      }
+    }
+    if (unitType === "naval") {
+      switch (category) {
+        case "water":
+        case "coastal":
+          return 1;
+        default:
+          return Infinity;
+      }
+    }
+    return Infinity;
+  }
+  function buildTacticalTerrainKindResolverFromSnapshot(battle) {
+    const parentTerrain = battle.strategicHexTerrain ?? "land";
+    const parentKind = battle.strategicHexTerrainKind ?? "plains";
+    const map = battle.res4TerrainKindByH3 ?? {};
+    const seaportMap = battle.res4IsSeaportByH3 ?? {};
+    const urbanMap = battle.res4IsUrbanByH3 ?? {};
+    const rubbleMap = battle.res4IsRubbleByH3 ?? {};
+    const roadBy = battle.res4RoadSidesByH3 ?? {};
+    const railBy = battle.res4RailSidesByH3 ?? {};
+    const roadRailByH3 = buildRoadRailMapFromRes4RoadRailRecords(roadBy, railBy);
+    const { transportFromTo: transportFromToFn, landTransportMarchContext } = tacticalTerrainTransportResolverFnsFromRoadRailMap(roadRailByH3, rubbleMap);
+    return {
+      parentTerrain,
+      parentTerrainKind: parentKind,
+      transportFromTo: transportFromToFn,
+      landTransportMarchContext,
+      effectiveKindForRes4Hex(h3) {
+        const raw = map[h3];
+        if (raw == null) return parentKind;
+        const trimmed = String(raw).trim();
+        return trimmed.length > 0 ? trimmed : parentKind;
+      },
+      isSeaportRes4(h3) {
+        return !!seaportMap[h3];
+      },
+      isUrbanRes4(h3) {
+        return !!urbanMap[h3];
+      },
+      isRubbleRes4(h3) {
+        return !!rubbleMap[h3];
+      }
+    };
+  }
+  function tacticalMovementUnitTypeForPathfinding(unit, _toH3Index) {
+    void _toH3Index;
+    if (unit.unitType === "air") return "air";
+    const embarked = (unit.unitType === "infantry" || unit.unitType === "armor") && !!unit.embarkedOnSubUnitId && unit.embarkedOnSubUnitId.length > 0;
+    if (embarked) {
+      return "naval";
+    }
+    return unit.unitType;
+  }
+  function tacticalTerrainLayerSignature(battle) {
+    const parentTerrain = battle.strategicHexTerrain ?? "";
+    const parentKind = battle.strategicHexTerrainKind ?? "";
+    const map = battle.res4TerrainKindByH3;
+    const sp = battle.res4IsSeaportByH3;
+    const spBody = !sp ? "" : Object.entries(sp).filter(([, v]) => v).map(([h3]) => h3).sort((a, b) => a.localeCompare(b)).join(";");
+    const urban = battle.res4IsUrbanByH3;
+    const urbanBody = !urban ? "" : Object.entries(urban).filter(([, v]) => v).map(([h3]) => h3).sort((a, b) => a.localeCompare(b)).join(";");
+    const rubble = battle.res4IsRubbleByH3;
+    const rubbleBody = !rubble ? "" : Object.entries(rubble).filter(([, v]) => v).map(([h3]) => h3).sort((a, b) => a.localeCompare(b)).join(";");
+    const road = battle.res4RoadSidesByH3;
+    const rail = battle.res4RailSidesByH3;
+    const trKeys = /* @__PURE__ */ new Set([...road ? Object.keys(road) : [], ...rail ? Object.keys(rail) : []]);
+    const trBody = trKeys.size === 0 ? "" : [...trKeys].sort((a, b) => a.localeCompare(b)).map((h3) => {
+      const r = road?.[h3] ?? [];
+      const l = rail?.[h3] ?? [];
+      const n = Math.max(r.length, l.length);
+      let s = `${h3}:`;
+      for (let i = 0; i < n; i++) {
+        s += (r[i] ? "1" : "0") + (l[i] ? "1" : "0");
+      }
+      return s;
+    }).join(";");
+    if (!map || Object.keys(map).length === 0) {
+      return `${parentTerrain}|${parentKind}||sp:${spBody}|u:${urbanBody}|rb:${rubbleBody}|tr:${trBody}`;
+    }
+    const body = Object.entries(map).sort(([a], [b]) => a.localeCompare(b)).map(([h3, kind]) => `${h3}:${kind}`).join(";");
+    return `${parentTerrain}|${parentKind}|${body}|sp:${spBody}|u:${urbanBody}|rb:${rubbleBody}|tr:${trBody}`;
+  }
+
+  // src/shared/tacticalTerrainCombatModifiers.ts
+  function effectiveRes4TerrainKindString(battle, res4H3) {
+    const fromMap = battle.res4TerrainKindByH3?.[res4H3];
+    if (fromMap !== void 0 && fromMap !== null && String(fromMap).trim().length > 0) {
+      return String(fromMap);
+    }
+    return battle.strategicHexTerrainKind ?? "plains";
+  }
+  function tacticalRes4MovementCategory(battle, res4H3) {
+    const kind = effectiveRes4TerrainKindString(battle, res4H3);
+    const parentTerrain = battle.strategicHexTerrain ?? "land";
+    return normalizeDbTerrainKindToTacticalCategory(kind, parentTerrain);
+  }
+  function tacticalRes4CellIsMountain(battle, res4H3) {
+    return tacticalRes4MovementCategory(battle, res4H3) === "mountains";
+  }
+  function tacticalRes4CellIsUrbanOrRubble(battle, res4H3) {
+    return !!battle.res4IsRubbleByH3?.[res4H3] || !!battle.res4IsUrbanByH3?.[res4H3];
+  }
+  function tacticalRes4CellIsForestClass(battle, res4H3) {
+    return tacticalRes4MovementCategory(battle, res4H3) === "forests";
+  }
+  function tacticalMovementTerrainAnchorH3(u, subUnits) {
+    const emb = u.embarkedOnSubUnitId;
+    if (emb && (u.unitType === "infantry" || u.unitType === "armor")) {
+      const naval = subUnits.find((x) => x.id === emb && x.unitType === "naval");
+      if (naval) return naval.h3Index;
+    }
+    return u.h3Index;
+  }
+  function tacticalForestUrbanRubbleRangedCapActive(battle, attackerAnchorH3) {
+    if (tacticalRes4CellIsUrbanOrRubble(battle, attackerAnchorH3)) return true;
+    return tacticalRes4CellIsForestClass(battle, attackerAnchorH3);
+  }
+  function effectiveTacticalRangedMaxRangeForAttacker(battle, unitType, attackerAnchorH3) {
+    const baseline = RANGED_RANGE_BY_UNIT_TYPE[unitType] ?? 0;
+    if ((unitType === "infantry" || unitType === "armor") && tacticalForestUrbanRubbleRangedCapActive(battle, attackerAnchorH3)) {
+      return Math.min(baseline, 1);
+    }
+    return baseline;
+  }
+  function effectiveTacticalMovementPointBudgetForMarchLeg(battle, subUnit, allSubUnits, moveType) {
+    const anchor = tacticalMovementTerrainAnchorH3(subUnit, allSubUnits);
+    const base = MOVEMENT_RANGE_BY_UNIT_TYPE[moveType] ?? MOVEMENT_RANGE_BY_UNIT_TYPE[subUnit.unitType] ?? 1;
+    let budget;
+    if (subUnit.unitType === "infantry" || subUnit.unitType === "armor") {
+      if (tacticalRes4CellIsUrbanOrRubble(battle, anchor)) {
+        budget = Math.max(0, 1);
+      } else if (subUnit.unitType === "armor" && tacticalRes4CellIsForestClass(battle, anchor)) {
+        const inf = MOVEMENT_RANGE_BY_UNIT_TYPE.infantry ?? 2;
+        budget = Math.max(0, inf);
+      } else {
+        budget = Math.max(0, base);
+      }
+    } else {
+      budget = Math.max(0, base);
+    }
+    if (budget === 0 && moveType !== "air" && subUnit.unitType !== "air") {
+      return 1;
+    }
+    return budget;
+  }
+
+  // src/shared/originBonusRules.ts
+  var ORIGIN_HIT_BONUS = 1;
+  var ORIGIN_BONUS_OFF = Object.freeze({
+    countryBonusEnabled: false,
+    terrainBonusEnabled: false
+  });
+  var TERRAIN_KIND_ALIASES = Object.freeze({
+    ocean: "water",
+    sea: "water",
+    forests: "forest",
+    mountains: "mountain",
+    wetland: "wetlands"
+  });
+  function normalizeOriginTerrainKind(raw) {
+    const kind = (raw ?? "").trim().toLowerCase();
+    if (kind.length === 0) return null;
+    const aliased = TERRAIN_KIND_ALIASES[kind] ?? kind;
+    return isPipelineTerrainKind(aliased) ? aliased : null;
+  }
+  function originBonusSettingsFromSnapshot(state) {
+    return {
+      countryBonusEnabled: state.countryBonusEnabled === true,
+      terrainBonusEnabled: state.terrainBonusEnabled === true
+    };
+  }
+  function originBonusSources(input) {
+    const { settings, theater, origin, place } = input;
+    if (!origin) return [];
+    const sources = [];
+    if (settings.countryBonusEnabled && origin.birthCountryName !== null && origin.birthCountryName === place.countryName) {
+      sources.push("country");
+    }
+    if (theater === "tactical" && settings.terrainBonusEnabled) {
+      const birthKind = normalizeOriginTerrainKind(origin.birthTerrainKind);
+      if (birthKind !== null && birthKind === normalizeOriginTerrainKind(place.terrainKind)) sources.push("terrain");
+    }
+    return sources;
+  }
+  function formatOriginBonusTooltipLine(sources) {
+    return sources.length > 0 ? `Bonus: +${ORIGIN_HIT_BONUS} (${sources.join(", ")})` : null;
+  }
+  function tacticalOriginBonusPlace(battle, res4H3Index) {
+    return {
+      countryName: battle.res4CountryNameByH3?.[res4H3Index] ?? null,
+      terrainKind: effectiveRes4TerrainKindString(battle, res4H3Index)
+    };
+  }
+  var countryNameByHexesArray = /* @__PURE__ */ new WeakMap();
+  function strategicHexCountryNameAt(state, res1H3Index) {
+    let byH3 = countryNameByHexesArray.get(state.hexes);
+    if (!byH3) {
+      byH3 = new Map(state.hexes.map((h) => [h.h3Index, h.countryName ?? null]));
+      countryNameByHexesArray.set(state.hexes, byH3);
+    }
+    return byH3.get(res1H3Index) ?? null;
+  }
+  function strategicOriginBonusPlace(state, res1H3Index) {
+    return { countryName: strategicHexCountryNameAt(state, res1H3Index), terrainKind: null };
+  }
+
+  // src/renderer/core/unitOriginBonusLine.ts
+  function originBonusTooltipLineForUnit(unitId, origin) {
+    const state = rendererSharedState.gameState;
+    if (!state) return null;
+    const settings = originBonusSettingsFromSnapshot(state);
+    if (!settings.countryBonusEnabled && !settings.terrainBonusEnabled) return null;
+    const battle = rendererSharedState.tacticalBattleSnapshot;
+    const subUnit = battle?.subUnits.find((u) => u.id === unitId);
+    if (battle && subUnit) {
+      return formatOriginBonusTooltipLine(
+        originBonusSources({
+          settings,
+          theater: "tactical",
+          origin,
+          place: tacticalOriginBonusPlace(battle, subUnit.h3Index)
+        })
+      );
+    }
+    const unit = state.units.find((u) => u.id === unitId);
+    if (!unit) return null;
+    return formatOriginBonusTooltipLine(
+      originBonusSources({
+        settings,
+        theater: "strategic",
+        origin,
+        place: strategicOriginBonusPlace(state, unit.h3Index)
+      })
+    );
+  }
+
+  // src/renderer/core/unitOriginFlags.ts
+  var unitOriginById = /* @__PURE__ */ new Map();
+  function rememberUnitOrigins(units) {
+    for (const unit of units) {
+      if (unit.origin) unitOriginById.set(unit.id, unit.origin);
+    }
+  }
+  function clearRememberedUnitOrigins() {
+    unitOriginById.clear();
+  }
+  function resolveUnitOrigin(unitId) {
+    const direct = unitOriginById.get(unitId);
+    if (direct) return direct;
+    const parentUnitId = parseTacticalSubUnitId(unitId)?.parentUnitId;
+    return parentUnitId ? unitOriginById.get(parentUnitId) ?? null : null;
+  }
+  function createUnitOriginFlagImage(origin, bonusLine) {
+    const img = document.createElement("img");
+    img.className = COUNTRY_FLAG_CLASS_NAME;
+    img.src = countryFlagAssetPath(origin.birthCountryCode);
+    img.alt = "";
+    img.setAttribute("aria-hidden", "true");
+    img.draggable = false;
+    img.dataset.unitOriginTooltip = formatUnitOriginTooltipText(origin, bonusLine);
+    return img;
+  }
+  function setUnitNameContent(target, unitId, text) {
+    target.replaceChildren();
+    const origin = resolveUnitOrigin(unitId);
+    if (origin) target.appendChild(createUnitOriginFlagImage(origin, originBonusTooltipLineForUnit(unitId, origin)));
+    target.appendChild(document.createTextNode(text));
+  }
+  function buildUnitOriginByLossDisplayName(summary) {
+    const originByName = /* @__PURE__ */ new Map();
+    const ambiguousNames = /* @__PURE__ */ new Set();
+    const victims = [summary.human, summary.ai].flatMap((player) => LOSS_CAUSE_KEYS.flatMap((key) => player[key]));
+    for (const victim of victims) {
+      const origin = victim.unitId ? resolveUnitOrigin(victim.unitId) : null;
+      if (!origin) continue;
+      const existing = originByName.get(victim.displayName);
+      if (existing && !unitOriginsPresentTheSame(existing, origin)) ambiguousNames.add(victim.displayName);
+      else originByName.set(victim.displayName, origin);
+    }
+    for (const name of ambiguousNames) originByName.delete(name);
+    return originByName;
+  }
+
+  // src/shared/lossToastUnitSegments.ts
+  var VICTIM_SEPARATOR = ", ";
+  var BULLET_PREFIX = "\u2022 ";
+  function splitLossCauseLineForUnitFlags(line, knownDisplayNames) {
+    const bullet = line.startsWith(BULLET_PREFIX) ? BULLET_PREFIX : "";
+    const body = line.slice(bullet.length);
+    const label = LOSS_CAUSE_LABELS.find((candidate) => body.startsWith(`${candidate}: `));
+    if (!label) return [{ text: line, unitDisplayName: null }];
+    const prefix = `${bullet}${label}: `;
+    const tokens = body.slice(label.length + 2).split(VICTIM_SEPARATOR);
+    const segments = [{ text: prefix, unitDisplayName: null }];
+    tokens.forEach((token, index) => {
+      if (index > 0) segments.push({ text: VICTIM_SEPARATOR, unitDisplayName: null });
+      segments.push({ text: token, unitDisplayName: knownDisplayNames.has(token) ? token : null });
+    });
+    return segments;
+  }
+
   // src/renderer/openRouter/aiPlanningState.ts
   function isDeferredResolutionPlaybackConsultPending() {
     return rendererSharedState.pendingDeferredStrategicPostResolutionConsult || rendererSharedState.pendingDeferredTacticalPostBeatConsult;
@@ -15377,14 +16345,22 @@
     if (el) el.textContent = "";
   }
   var MAP_TOAST_SECTION_BULLET_INDENT = "1.25em";
-  function appendMapToastBulletLine(target, line, indent) {
+  function appendMapToastBulletLine(target, line, indent, unitOriginByDisplayName) {
     const text = line.startsWith("\u2022") ? line : `\u2022 ${line}`;
     const span = document.createElement("span");
     span.style.display = "block";
     if (indent) {
       span.style.marginLeft = MAP_TOAST_SECTION_BULLET_INDENT;
     }
-    span.textContent = text;
+    if (unitOriginByDisplayName && unitOriginByDisplayName.size > 0) {
+      for (const segment of splitLossCauseLineForUnitFlags(text, new Set(unitOriginByDisplayName.keys()))) {
+        const origin = segment.unitDisplayName ? unitOriginByDisplayName.get(segment.unitDisplayName) : void 0;
+        if (origin) span.appendChild(createUnitOriginFlagImage(origin));
+        span.appendChild(document.createTextNode(segment.text));
+      }
+    } else {
+      span.textContent = text;
+    }
     target.appendChild(span);
   }
   function appendMapToastSectionHeader(target, title) {
@@ -15393,7 +16369,7 @@
     strong.textContent = title.endsWith(":") ? title : `${title}:`;
     target.appendChild(strong);
   }
-  function appendMapToastMessageBody(target, message) {
+  function appendMapToastMessageBody(target, message, unitOriginByDisplayName) {
     const lines = message.split("\n").map((line) => line.trim()).filter((line) => line.length > 0);
     let inSection = false;
     let isFirstSection = true;
@@ -15407,7 +16383,7 @@
         appendMapToastSectionHeader(target, line.slice(3));
         continue;
       }
-      appendMapToastBulletLine(target, line, inSection);
+      appendMapToastBulletLine(target, line, inSection, unitOriginByDisplayName);
     }
   }
   function showToast(el, textEl, textContentBuilder, isInfo) {
@@ -15428,7 +16404,7 @@
         el,
         textEl,
         (target) => {
-          appendMapToastMessageBody(target, message);
+          appendMapToastMessageBody(target, message, options?.unitOriginByDisplayName);
         },
         options?.isError === false
       );
@@ -15818,75 +16794,6 @@
       terrainInfraRes4Airport,
       terrainInfraRes4Seaport
     };
-  }
-
-  // src/shared/unitIds.ts
-  var UNIT_TYPE_ID_CODES = {
-    infantry: "i",
-    armor: "t",
-    naval: "n",
-    air: "a"
-  };
-  var STRATEGIC_UNIT_ID_PATTERN = /^([ha])(\d+)-([itna])(\d+)$/;
-  var TACTICAL_SUB_UNIT_ID_PATTERN = /^(.+)-s(\d+)$/;
-  var UNIT_TYPE_FROM_ID_CODE = Object.fromEntries(
-    Object.entries(UNIT_TYPE_ID_CODES).map(([unitType, code]) => [code, unitType])
-  );
-  var NATURAL_UNIT_ID_COLLATOR = new Intl.Collator("en", { numeric: true });
-  function isPositiveInteger(value) {
-    return Number.isInteger(value) && value > 0;
-  }
-  function hasForbiddenLeadingZero(digits) {
-    return digits.startsWith("0");
-  }
-  function parseStrategicUnitId(unitId) {
-    const match = unitId.match(STRATEGIC_UNIT_ID_PATTERN);
-    if (!match) return null;
-    const playerLetter = match[1];
-    const playerIndexDigits = match[2];
-    const typeCode = match[3];
-    const ordinalDigits = match[4];
-    if (hasForbiddenLeadingZero(playerIndexDigits) || hasForbiddenLeadingZero(ordinalDigits)) return null;
-    if (playerIndexDigits !== "1") return null;
-    const unitType = UNIT_TYPE_FROM_ID_CODE[typeCode];
-    if (!unitType) return null;
-    const ordinal = Number.parseInt(ordinalDigits, 10);
-    if (!isPositiveInteger(ordinal)) return null;
-    const player = playerLetter === "h" ? "human" : "opponent";
-    return { player, unitType, ordinal };
-  }
-  function parseTacticalSubUnitId(unitId) {
-    const match = unitId.match(TACTICAL_SUB_UNIT_ID_PATTERN);
-    if (!match) return null;
-    const parentUnitId = match[1];
-    const slotDigits = match[2];
-    if (hasForbiddenLeadingZero(slotDigits)) return null;
-    const slot = Number.parseInt(slotDigits, 10);
-    if (!isPositiveInteger(slot)) return null;
-    return { parentUnitId, slot };
-  }
-  function unitTypeFromUnitId(unitId) {
-    const compact = parseStrategicUnitId(unitId);
-    if (compact) return compact.unitType;
-    if (unitId.includes("-infantry-")) return "infantry";
-    if (unitId.includes("-armor-")) return "armor";
-    if (unitId.includes("-naval-")) return "naval";
-    if (unitId.includes("-air-")) return "air";
-    const sub = parseTacticalSubUnitId(unitId);
-    if (sub) return unitTypeFromUnitId(sub.parentUnitId);
-    return null;
-  }
-  function unitIdOwnerFromId(unitId) {
-    const compact = parseStrategicUnitId(unitId);
-    if (compact) return compact.player;
-    const sub = parseTacticalSubUnitId(unitId);
-    if (sub) {
-      const parentOwner = unitIdOwnerFromId(sub.parentUnitId);
-      if (parentOwner) return parentOwner;
-    }
-    if (unitId.startsWith("opponent-")) return "opponent";
-    if (unitId.startsWith("human-")) return "human";
-    return null;
   }
 
   // src/shared/unitDisplayNames.ts
@@ -16577,6 +17484,23 @@
   function isHoverOrderPlanningActive() {
     return shouldDrawHoveredPathPreview() && rendererSharedState.hoverRoutePreview !== null && rendererSharedState.hoveredHexH3 !== null;
   }
+  function shouldDismissStackCalloutForHoverPlanning() {
+    if (!isHoverOrderPlanningActive()) return false;
+    return !everySelectedUnitOccupiesHoveredHex();
+  }
+  function everySelectedUnitOccupiesHoveredHex() {
+    const hovered = rendererSharedState.hoveredHexH3;
+    if (!hovered || rendererSharedState.selectedUnitIds.length === 0) return false;
+    const tactical = rendererSharedState.tacticalBattleSnapshot;
+    if (tactical) {
+      return rendererSharedState.selectedUnitIds.every(
+        (id) => tactical.subUnits.some((unit) => unit.id === id && unit.h3Index === hovered)
+      );
+    }
+    const units = rendererSharedState.gameState?.units;
+    if (!units) return false;
+    return rendererSharedState.selectedUnitIds.every((id) => units.some((unit) => unit.id === id && unit.h3Index === hovered));
+  }
   function shouldBlockSelectionReplaceDuringHoverPlanning(proposedUnitIds) {
     if (!isHoverOrderPlanningActive()) return false;
     if (proposedUnitIds.length === 0) return false;
@@ -16641,19 +17565,6 @@
     if (input.controllerPlayerId === "opponent") return "normalControlledByOpponent";
     return "none";
   }
-
-  // src/shared/pipelineTerrain.ts
-  var PIPELINE_TERRAIN_KINDS = [
-    "water",
-    "coastal",
-    "wetlands",
-    "plains",
-    "forest",
-    "mountain",
-    "desert",
-    "arctic"
-  ];
-  var KIND_SET = new Set(PIPELINE_TERRAIN_KINDS);
 
   // src/renderer/rendering/terrainVisualStyles.ts
   var patternCache = /* @__PURE__ */ new Map();
@@ -17636,330 +18547,6 @@
       return true;
     }
     return false;
-  }
-
-  // src/shared/tacticalRanges.ts
-  var MOVEMENT_RANGE_BY_UNIT_TYPE = Object.freeze({
-    infantry: 2,
-    armor: 4,
-    naval: 3,
-    air: 0
-  });
-  var RANGED_RANGE_BY_UNIT_TYPE = Object.freeze({
-    infantry: 2,
-    armor: 5,
-    naval: 10,
-    air: 99
-  });
-  function unitHasTacticalRangedBaseline(unitType) {
-    return (RANGED_RANGE_BY_UNIT_TYPE[unitType] ?? 0) >= 1;
-  }
-  var AIR_STRIKE_RANGE_HEXES = 3;
-
-  // src/shared/tacticalRes4TransportLink.ts
-  var orderedRingMemo = /* @__PURE__ */ new Map();
-  var ORDERED_RING_MEMO_CAPACITY = 1e3;
-  function res4GridDiskNeighborsOrdered(fromH3) {
-    const cached = orderedRingMemo.get(fromH3);
-    if (cached !== void 0) return cached;
-    let ring;
-    try {
-      ring = [...gridDisk(fromH3, 1)].filter((h) => h !== fromH3);
-    } catch {
-      ring = [];
-    }
-    if (orderedRingMemo.size >= ORDERED_RING_MEMO_CAPACITY) {
-      const oldest = orderedRingMemo.keys().next().value;
-      if (oldest !== void 0) orderedRingMemo.delete(oldest);
-    }
-    orderedRingMemo.set(fromH3, ring);
-    return ring;
-  }
-  function res4NeighborsInFootprint(h, res4Set) {
-    const out = [];
-    try {
-      for (const n of gridDisk(h, 1)) {
-        if (n !== h && res4Set.has(n)) out.push(n);
-      }
-    } catch {
-      return out;
-    }
-    return out;
-  }
-  function tacticalRes4TransportMaskHasAnyRoadOrRail(masks, ringLen) {
-    const { roadSides, railSides } = masks;
-    if (roadSides.length !== ringLen || railSides.length !== ringLen) return false;
-    for (let i = 0; i < ringLen; i++) {
-      if (roadSides[i] || railSides[i]) return true;
-    }
-    return false;
-  }
-  function tacticalRes4TransportCellHasValidAnySideOverlay(h3, roadRailByH3) {
-    const masks = roadRailByH3.get(h3);
-    if (!masks) return false;
-    const ring = res4GridDiskNeighborsOrdered(h3);
-    return tacticalRes4TransportMaskHasAnyRoadOrRail(masks, ring.length);
-  }
-  function tacticalRes4TransportMarchAdjacentPairAllowsStep(args) {
-    const { fromH3, toH3, roadRailByH3, rubbleByH3 } = args;
-    if (rubbleByH3?.[fromH3] || rubbleByH3?.[toH3]) return false;
-    const ring = res4GridDiskNeighborsOrdered(fromH3);
-    if (ring.indexOf(toH3) < 0) return false;
-    return tacticalRes4TransportCellHasValidAnySideOverlay(fromH3, roadRailByH3) && tacticalRes4TransportCellHasValidAnySideOverlay(toH3, roadRailByH3);
-  }
-  var TACTICAL_TRANSPORT_ROAD_BUDGET_MULTIPLIER = 2;
-  var TACTICAL_TRANSPORT_RAIL_BUDGET_MULTIPLIER = 3;
-
-  // src/shared/tacticalTerrainMovement.ts
-  function normalizeDbTerrainKindToTacticalCategory(effectiveKind, parentTerrain) {
-    const k = (effectiveKind || "").toLowerCase();
-    const pt = (parentTerrain || "").toLowerCase();
-    if (k === "water") return "water";
-    if (k === "coastal") return "coastal";
-    if (k === "forest" || k === "forests") return "forests";
-    if (k === "mountain" || k === "mountains") return "mountains";
-    if (k === "wetland" || k === "wetlands") return "wetlands";
-    if (k === "desert") return "desert";
-    if (k === "arctic") return "arctic";
-    if (k === "plains" || k === "land") return "plains";
-    if (k.length > 0) return "plains";
-    if (pt === "water" || pt === "sea" || pt === "ocean") return "water";
-    return "plains";
-  }
-  function nativeRes4TerrainKindIsWaterOrCoastalForNavalRouting(kind) {
-    const k = (kind || "").toLowerCase();
-    return k === "water" || k === "coastal" || k === "ocean" || k === "sea";
-  }
-  function isInfantryOrArmorTacticalSpawnCell(args) {
-    const k = args.resolvedKindForCell || args.parentTerrainKind;
-    const cat = normalizeDbTerrainKindToTacticalCategory(k, args.parentTerrain);
-    return cat !== "water" && cat !== "arctic";
-  }
-  function tacticalLandUnitMayOccupyCellWithoutTransport(unitType, cellH3, terrain) {
-    if (unitType !== "infantry" && unitType !== "armor") return false;
-    if (terrain.isUrbanRes4?.(cellH3) || terrain.isRubbleRes4?.(cellH3)) return true;
-    const raw = terrain.effectiveKindForRes4Hex(cellH3);
-    const cat = normalizeDbTerrainKindToTacticalCategory(raw, terrain.parentTerrain);
-    return Number.isFinite(tacticalEnterHexMovementCost(unitType, cat));
-  }
-  function isNavalRes4TacticalCellNavigable(args) {
-    const { resolvedKindForCell, parentTerrain, parentTerrainKind, isSeaportCell } = args;
-    if (isSeaportCell) return true;
-    if (nativeRes4TerrainKindIsWaterOrCoastalForNavalRouting(resolvedKindForCell)) return true;
-    void parentTerrainKind;
-    const cat = normalizeDbTerrainKindToTacticalCategory(resolvedKindForCell, parentTerrain);
-    return cat === "water" || cat === "coastal";
-  }
-  function buildRoadRailMapFromRes4RoadRailRecords(roadBy, railBy) {
-    const roadRailByH3 = /* @__PURE__ */ new Map();
-    const transportKeys = /* @__PURE__ */ new Set([...Object.keys(roadBy), ...Object.keys(railBy)]);
-    for (const h3 of transportKeys) {
-      const r = roadBy[h3];
-      const l = railBy[h3];
-      if (!r && !l) continue;
-      const n = Math.max(r?.length ?? 0, l?.length ?? 0);
-      if (n === 0) continue;
-      const roadSides = r ?? Array.from({ length: n }, () => false);
-      const railSides = l ?? Array.from({ length: n }, () => false);
-      if (roadSides.length !== railSides.length) continue;
-      roadRailByH3.set(h3, { roadSides, railSides });
-    }
-    return roadRailByH3;
-  }
-  function tacticalTerrainTransportResolverFnsFromRoadRailMap(roadRailByH3, rubbleByH3) {
-    if (roadRailByH3.size === 0) {
-      return { transportFromTo: void 0, landTransportMarchContext: void 0 };
-    }
-    const transportFromTo = (fromH3, toH3) => tacticalRes4TransportMarchAdjacentPairAllowsStep({
-      fromH3,
-      toH3,
-      roadRailByH3,
-      rubbleByH3
-    });
-    return {
-      transportFromTo,
-      landTransportMarchContext: { roadRailByH3, rubbleByH3 }
-    };
-  }
-  function tacticalEnterHexMovementCost(unitType, category) {
-    if (unitType === "infantry") {
-      switch (category) {
-        case "plains":
-        case "desert":
-        case "wetlands":
-        case "arctic":
-        case "coastal":
-          return 1;
-        case "forests":
-        case "mountains":
-          return 2;
-        case "water":
-          return Infinity;
-        default:
-          return 1;
-      }
-    }
-    if (unitType === "armor") {
-      switch (category) {
-        case "plains":
-        case "desert":
-          return 1;
-        case "forests":
-        case "coastal":
-          return 2;
-        case "mountains":
-        case "wetlands":
-        case "arctic":
-        case "water":
-          return Infinity;
-        default:
-          return 1;
-      }
-    }
-    if (unitType === "naval") {
-      switch (category) {
-        case "water":
-        case "coastal":
-          return 1;
-        default:
-          return Infinity;
-      }
-    }
-    return Infinity;
-  }
-  function buildTacticalTerrainKindResolverFromSnapshot(battle) {
-    const parentTerrain = battle.strategicHexTerrain ?? "land";
-    const parentKind = battle.strategicHexTerrainKind ?? "plains";
-    const map = battle.res4TerrainKindByH3 ?? {};
-    const seaportMap = battle.res4IsSeaportByH3 ?? {};
-    const urbanMap = battle.res4IsUrbanByH3 ?? {};
-    const rubbleMap = battle.res4IsRubbleByH3 ?? {};
-    const roadBy = battle.res4RoadSidesByH3 ?? {};
-    const railBy = battle.res4RailSidesByH3 ?? {};
-    const roadRailByH3 = buildRoadRailMapFromRes4RoadRailRecords(roadBy, railBy);
-    const { transportFromTo: transportFromToFn, landTransportMarchContext } = tacticalTerrainTransportResolverFnsFromRoadRailMap(roadRailByH3, rubbleMap);
-    return {
-      parentTerrain,
-      parentTerrainKind: parentKind,
-      transportFromTo: transportFromToFn,
-      landTransportMarchContext,
-      effectiveKindForRes4Hex(h3) {
-        const raw = map[h3];
-        if (raw == null) return parentKind;
-        const trimmed = String(raw).trim();
-        return trimmed.length > 0 ? trimmed : parentKind;
-      },
-      isSeaportRes4(h3) {
-        return !!seaportMap[h3];
-      },
-      isUrbanRes4(h3) {
-        return !!urbanMap[h3];
-      },
-      isRubbleRes4(h3) {
-        return !!rubbleMap[h3];
-      }
-    };
-  }
-  function tacticalMovementUnitTypeForPathfinding(unit, _toH3Index) {
-    void _toH3Index;
-    if (unit.unitType === "air") return "air";
-    const embarked = (unit.unitType === "infantry" || unit.unitType === "armor") && !!unit.embarkedOnSubUnitId && unit.embarkedOnSubUnitId.length > 0;
-    if (embarked) {
-      return "naval";
-    }
-    return unit.unitType;
-  }
-  function tacticalTerrainLayerSignature(battle) {
-    const parentTerrain = battle.strategicHexTerrain ?? "";
-    const parentKind = battle.strategicHexTerrainKind ?? "";
-    const map = battle.res4TerrainKindByH3;
-    const sp = battle.res4IsSeaportByH3;
-    const spBody = !sp ? "" : Object.entries(sp).filter(([, v]) => v).map(([h3]) => h3).sort((a, b) => a.localeCompare(b)).join(";");
-    const urban = battle.res4IsUrbanByH3;
-    const urbanBody = !urban ? "" : Object.entries(urban).filter(([, v]) => v).map(([h3]) => h3).sort((a, b) => a.localeCompare(b)).join(";");
-    const rubble = battle.res4IsRubbleByH3;
-    const rubbleBody = !rubble ? "" : Object.entries(rubble).filter(([, v]) => v).map(([h3]) => h3).sort((a, b) => a.localeCompare(b)).join(";");
-    const road = battle.res4RoadSidesByH3;
-    const rail = battle.res4RailSidesByH3;
-    const trKeys = /* @__PURE__ */ new Set([...road ? Object.keys(road) : [], ...rail ? Object.keys(rail) : []]);
-    const trBody = trKeys.size === 0 ? "" : [...trKeys].sort((a, b) => a.localeCompare(b)).map((h3) => {
-      const r = road?.[h3] ?? [];
-      const l = rail?.[h3] ?? [];
-      const n = Math.max(r.length, l.length);
-      let s = `${h3}:`;
-      for (let i = 0; i < n; i++) {
-        s += (r[i] ? "1" : "0") + (l[i] ? "1" : "0");
-      }
-      return s;
-    }).join(";");
-    if (!map || Object.keys(map).length === 0) {
-      return `${parentTerrain}|${parentKind}||sp:${spBody}|u:${urbanBody}|rb:${rubbleBody}|tr:${trBody}`;
-    }
-    const body = Object.entries(map).sort(([a], [b]) => a.localeCompare(b)).map(([h3, kind]) => `${h3}:${kind}`).join(";");
-    return `${parentTerrain}|${parentKind}|${body}|sp:${spBody}|u:${urbanBody}|rb:${rubbleBody}|tr:${trBody}`;
-  }
-
-  // src/shared/tacticalTerrainCombatModifiers.ts
-  function effectiveRes4TerrainKindString(battle, res4H3) {
-    const fromMap = battle.res4TerrainKindByH3?.[res4H3];
-    if (fromMap !== void 0 && fromMap !== null && String(fromMap).trim().length > 0) {
-      return String(fromMap);
-    }
-    return battle.strategicHexTerrainKind ?? "plains";
-  }
-  function tacticalRes4MovementCategory(battle, res4H3) {
-    const kind = effectiveRes4TerrainKindString(battle, res4H3);
-    const parentTerrain = battle.strategicHexTerrain ?? "land";
-    return normalizeDbTerrainKindToTacticalCategory(kind, parentTerrain);
-  }
-  function tacticalRes4CellIsMountain(battle, res4H3) {
-    return tacticalRes4MovementCategory(battle, res4H3) === "mountains";
-  }
-  function tacticalRes4CellIsUrbanOrRubble(battle, res4H3) {
-    return !!battle.res4IsRubbleByH3?.[res4H3] || !!battle.res4IsUrbanByH3?.[res4H3];
-  }
-  function tacticalRes4CellIsForestClass(battle, res4H3) {
-    return tacticalRes4MovementCategory(battle, res4H3) === "forests";
-  }
-  function tacticalMovementTerrainAnchorH3(u, subUnits) {
-    const emb = u.embarkedOnSubUnitId;
-    if (emb && (u.unitType === "infantry" || u.unitType === "armor")) {
-      const naval = subUnits.find((x) => x.id === emb && x.unitType === "naval");
-      if (naval) return naval.h3Index;
-    }
-    return u.h3Index;
-  }
-  function tacticalForestUrbanRubbleRangedCapActive(battle, attackerAnchorH3) {
-    if (tacticalRes4CellIsUrbanOrRubble(battle, attackerAnchorH3)) return true;
-    return tacticalRes4CellIsForestClass(battle, attackerAnchorH3);
-  }
-  function effectiveTacticalRangedMaxRangeForAttacker(battle, unitType, attackerAnchorH3) {
-    const baseline = RANGED_RANGE_BY_UNIT_TYPE[unitType] ?? 0;
-    if ((unitType === "infantry" || unitType === "armor") && tacticalForestUrbanRubbleRangedCapActive(battle, attackerAnchorH3)) {
-      return Math.min(baseline, 1);
-    }
-    return baseline;
-  }
-  function effectiveTacticalMovementPointBudgetForMarchLeg(battle, subUnit, allSubUnits, moveType) {
-    const anchor = tacticalMovementTerrainAnchorH3(subUnit, allSubUnits);
-    const base = MOVEMENT_RANGE_BY_UNIT_TYPE[moveType] ?? MOVEMENT_RANGE_BY_UNIT_TYPE[subUnit.unitType] ?? 1;
-    let budget;
-    if (subUnit.unitType === "infantry" || subUnit.unitType === "armor") {
-      if (tacticalRes4CellIsUrbanOrRubble(battle, anchor)) {
-        budget = Math.max(0, 1);
-      } else if (subUnit.unitType === "armor" && tacticalRes4CellIsForestClass(battle, anchor)) {
-        const inf = MOVEMENT_RANGE_BY_UNIT_TYPE.infantry ?? 2;
-        budget = Math.max(0, inf);
-      } else {
-        budget = Math.max(0, base);
-      }
-    } else {
-      budget = Math.max(0, base);
-    }
-    if (budget === 0 && moveType !== "air" && subUnit.unitType !== "air") {
-      return 1;
-    }
-    return budget;
   }
 
   // src/shared/numericPriorityMinHeap.ts
@@ -20109,6 +20696,29 @@
     syncGameSizeCapPreview();
   }
 
+  // src/renderer/gameplay/newGameOptionsUi.ts
+  var NEW_GAME_OPTION_CHECKBOX_IDS = {
+    fogOfWarEnabled: "new-game-fog-checkbox",
+    countryBonusEnabled: "new-game-country-bonus-checkbox",
+    terrainBonusEnabled: "new-game-terrain-bonus-checkbox"
+  };
+  function optionCheckbox(id) {
+    return document.getElementById(id);
+  }
+  function readNewGameOptionFlags() {
+    return {
+      fogOfWarEnabled: optionCheckbox(NEW_GAME_OPTION_CHECKBOX_IDS.fogOfWarEnabled)?.checked !== false,
+      countryBonusEnabled: optionCheckbox(NEW_GAME_OPTION_CHECKBOX_IDS.countryBonusEnabled)?.checked === true,
+      terrainBonusEnabled: optionCheckbox(NEW_GAME_OPTION_CHECKBOX_IDS.terrainBonusEnabled)?.checked === true
+    };
+  }
+  function resetNewGameOptionCheckboxes() {
+    for (const id of Object.values(NEW_GAME_OPTION_CHECKBOX_IDS)) {
+      const checkbox = optionCheckbox(id);
+      if (checkbox) checkbox.checked = true;
+    }
+  }
+
   // src/renderer/core/uiState.ts
   function formatStrategicPhaseLabelForSidebar(phase) {
     if (!phase) return phase;
@@ -20118,8 +20728,13 @@
     const selectedUnitEl = document.getElementById("sidebar-selected-unit");
     if (selectedUnitEl) {
       const primary = getPrimarySelectedUnitId2();
-      if (rendererSharedState.selectedUnitIds.length <= 1) selectedUnitEl.textContent = primary ? formatUnitDisplayName2(primary) : "\u2014";
-      else selectedUnitEl.textContent = `${primary ? formatUnitDisplayName2(primary) : "\u2014"} (+${rendererSharedState.selectedUnitIds.length - 1})`;
+      if (!primary) {
+        selectedUnitEl.textContent = rendererSharedState.selectedUnitIds.length <= 1 ? "\u2014" : `\u2014 (+${rendererSharedState.selectedUnitIds.length - 1})`;
+        return;
+      }
+      const extraCount = rendererSharedState.selectedUnitIds.length - 1;
+      const suffix = extraCount > 0 ? ` (+${extraCount})` : "";
+      setUnitNameContent(selectedUnitEl, primary, `${formatUnitDisplayName2(primary)}${suffix}`);
     }
   }
   function updateGameStateSidebar(state) {
@@ -20162,7 +20777,6 @@
     const overlay = document.getElementById("game-over-overlay");
     const messageEl = document.getElementById("game-over-message");
     const newGameBtn = document.getElementById("new-game-btn");
-    const fogCheckbox = document.getElementById("new-game-fog-checkbox");
     const rangedBtn = document.getElementById("ranged-attack-btn");
     const noGame = !state || state.hexes.length === 0;
     const gameOver = !!state?.gameOver;
@@ -20176,7 +20790,7 @@
       return;
     }
     overlay?.classList.remove("hidden");
-    if (fogCheckbox) fogCheckbox.checked = true;
+    resetNewGameOptionCheckboxes();
     if (wasHidden) {
       void initializeScenarioRegionSelectorsOnOverlayOpen();
     }
@@ -20768,70 +21382,26 @@
     return `<strong>Blocked:</strong> ${escapeHtmlForOrderPreviewTooltip(m[1].trim())}`;
   }
 
-  // src/shared/hexLlmCodeAssignment.ts
-  var STRATEGIC_RESOLUTION = 1;
-  var DETAIL_RESOLUTION = 4;
-  var CODE_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-  var strategicH3ToCodeSingleton = null;
-  function indexToCode(index) {
-    if (index < 0 || index >= CODE_ALPHABET.length * CODE_ALPHABET.length) {
-      throw new Error(`hexLlmCodeAssignment: code index out of range (${index})`);
-    }
-    const hi = Math.floor(index / CODE_ALPHABET.length);
-    const lo = index % CODE_ALPHABET.length;
-    return `${CODE_ALPHABET[hi]}${CODE_ALPHABET[lo]}`;
-  }
-  function sortCellsForStableLlmCodes(cells) {
-    const decorated = cells.map((h3) => {
-      const [lat, lng] = cellToLatLng(h3);
-      return { h3, lat, lng };
-    });
-    decorated.sort((a, b) => {
-      if (a.lat !== b.lat) return b.lat - a.lat;
-      if (a.lng !== b.lng) return a.lng - b.lng;
-      return a.h3.localeCompare(b.h3);
-    });
-    return decorated.map((d) => d.h3);
-  }
-  function buildStrategicRes1H3ToCodeMap() {
-    const res0 = getRes0Cells();
-    const res1Set = /* @__PURE__ */ new Set();
-    for (const r0 of res0) {
-      for (const child of cellToChildren(r0, STRATEGIC_RESOLUTION)) {
-        res1Set.add(child);
+  // src/shared/hexNamingCaption.ts
+  var EMPTY_HEX_NAMING_CAPTION_SPANS = Object.freeze([]);
+  function formatHexNamingCaptionHtml(caption) {
+    const { text } = caption;
+    let html = "";
+    let cursor = 0;
+    for (const span of caption.spans) {
+      html += escapeHtmlText(text.slice(cursor, span.start));
+      const flag = span.isCountry ? countryFlagImgHtml(span.countryCode) : "";
+      const name = escapeHtmlText(text.slice(span.start, span.end));
+      if (span.role === "heading") {
+        const hasColon = text[span.end] === ":";
+        html += `<strong>${flag}${name}${hasColon ? ":" : ""}</strong>`;
+        cursor = hasColon ? span.end + 1 : span.end;
+      } else {
+        html += `${flag}${name}`;
+        cursor = span.end;
       }
     }
-    const sorted = sortCellsForStableLlmCodes([...res1Set]);
-    const h3ToCode = /* @__PURE__ */ new Map();
-    for (let i = 0; i < sorted.length; i++) {
-      h3ToCode.set(sorted[i], indexToCode(i));
-    }
-    return h3ToCode;
-  }
-  function getStrategicRes1H3ToCodeMap() {
-    if (!strategicH3ToCodeSingleton) {
-      strategicH3ToCodeSingleton = buildStrategicRes1H3ToCodeMap();
-    }
-    return strategicH3ToCodeSingleton;
-  }
-  function getStrategicRes1HexCode(h3Index) {
-    return getStrategicRes1H3ToCodeMap().get(h3Index);
-  }
-  function getRes4ChildCodeWithinParent(parentRes1H3Index, childRes4H3Index, childResolution = DETAIL_RESOLUTION) {
-    const children = sortCellsForStableLlmCodes(cellToChildren(parentRes1H3Index, childResolution));
-    const idx = children.indexOf(childRes4H3Index);
-    if (idx < 0) return void 0;
-    return indexToCode(idx);
-  }
-  function getLlmHexLocationParenLabelForNamingTarget(target) {
-    if (target.resolution === 1) {
-      const c = getStrategicRes1HexCode(target.h3Index);
-      return c ? `(${c})` : null;
-    }
-    const parent = cellToParent(target.h3Index, STRATEGIC_RESOLUTION);
-    const parentCode = getStrategicRes1HexCode(parent);
-    const childCode = getRes4ChildCodeWithinParent(parent, target.h3Index);
-    return parentCode && childCode ? `(${parentCode}.${childCode})` : null;
+    return html + escapeHtmlText(text.slice(cursor));
   }
 
   // src/shared/terrainEffectsForTooltip.ts
@@ -20995,25 +21565,116 @@
     }
   }
 
-  // src/shared/htmlTextFormatting.ts
-  function escapeHtmlText(text) {
-    return text.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#39;");
+  // src/renderer/map/terrainTooltipHtml.ts
+  function formatLlmLocationBoldPrefixHtml(namingTarget) {
+    if (!namingTarget) return "";
+    const label = getLlmHexLocationParenLabelForNamingTarget(namingTarget);
+    if (!label) return "";
+    return `<strong>${escapeHtmlText(label)}</strong> `;
   }
-  function formatGroupedSemicolonNamingLineHtml(namingLine) {
-    const groups = namingLine.split(";").map((group) => group.trim()).filter((group) => group.length > 0);
-    if (groups.length === 0) return escapeHtmlText(namingLine);
-    return groups.map((group) => {
-      const colonIndex = group.indexOf(":");
-      if (colonIndex < 0) return escapeHtmlText(group);
-      const heading = group.slice(0, colonIndex).trim();
-      const remainder = group.slice(colonIndex + 1).trim();
-      if (!heading) return escapeHtmlText(group);
-      if (!remainder) return `<strong>${escapeHtmlText(heading)}:</strong>`;
-      return `<strong>${escapeHtmlText(heading)}:</strong> ${escapeHtmlText(remainder)}`;
-    }).join("; ");
+  function formatTerrainVariantSuffix(state) {
+    const variants = [];
+    if (state.isUrban) variants.push("Urban");
+    if (state.isRubble) variants.push("Rubble");
+    return variants.length > 0 ? `, ${variants.join(", ")}` : "";
+  }
+  function resolveStrategicHexForControlLine(namingTarget) {
+    if (!namingTarget) return null;
+    if (namingTarget.resolution === 1) return namingTarget.h3Index;
+    try {
+      return cellToParent(namingTarget.h3Index, WORLD_H3_RESOLUTION);
+    } catch {
+      return null;
+    }
+  }
+  function getTooltipControlLabel(namingTarget) {
+    if (!rendererSharedState.gameState) return "Unknown";
+    const strategicHex = resolveStrategicHexForControlLine(namingTarget);
+    if (!strategicHex) return "Unknown";
+    const controller = (rendererSharedState.gameState.res1Control ?? []).find((row) => row.h3Index === strategicHex)?.controllerPlayerId ?? null;
+    const ownerLabel = controller === "human" ? "Human" : controller === "opponent" ? "AI" : "Unknown";
+    const homeRegionIdentity = resolveHomeRegionOwnerIdentity({
+      h3Index: strategicHex,
+      humanHomeRegionHexes: rendererSharedState.gameState.humanHomeRegionHexes,
+      aiHomeRegionHexes: rendererSharedState.gameState.aiHomeRegionHexes,
+      intersectingHomeRegionHexes: rendererSharedState.gameState.intersectingHomeRegionHexes
+    });
+    if (homeRegionIdentity != null) {
+      return `${ownerLabel} ${formatHomeRegionAssignmentControlSuffix(homeRegionIdentity)}`;
+    }
+    const visibleHexes = Array.isArray(rendererSharedState.gameState.visibleHexes) ? new Set(rendererSharedState.gameState.visibleHexes) : new Set(rendererSharedState.gameState.hexes.map((h) => h.h3Index));
+    const perspective = rendererSharedState.gameState.playerPerspective === "opponent" ? "opponent" : "human";
+    const ownershipVisible = isHexOwnershipVisibleToPerspective({
+      h3Index: strategicHex,
+      playerPerspective: perspective,
+      visibleHexes,
+      humanHomeRegionHexes: rendererSharedState.gameState.humanHomeRegionHexes,
+      aiHomeRegionHexes: rendererSharedState.gameState.aiHomeRegionHexes,
+      intersectingHomeRegionHexes: rendererSharedState.gameState.intersectingHomeRegionHexes
+    });
+    if (!ownershipVisible) return "Unknown";
+    return ownerLabel;
+  }
+  function formatTerrainTooltipHtml(state, namingCaption, namingTarget) {
+    const prefix = formatLlmLocationBoldPrefixHtml(namingTarget);
+    const showControlLine = namingTarget?.resolution === 1;
+    const controlLine = showControlLine ? `<strong>Control:</strong> ${getTooltipControlLabel(namingTarget)}` : null;
+    const terrainLabel = formatTerrainKindLabel(state.terrainKind);
+    const terrainValue = state.res1TerrainSummary ?? `${terrainLabel}${formatTerrainVariantSuffix(state)}`;
+    const terrainLine = `<strong>Terrain:</strong> ${terrainValue}`;
+    const bodyParts = controlLine ? [controlLine, terrainLine] : [terrainLine];
+    if (state.res1FeaturesSummary != null) bodyParts.push(`<strong>Features:</strong> ${state.res1FeaturesSummary}`);
+    else if (state.features.length > 0) bodyParts.push(`<strong>Features:</strong> ${state.features.join(", ")}`);
+    if (namingTarget?.resolution === 4) {
+      const effectsLineHtml = computeTerrainEffectsLineHtml({
+        terrainKind: state.terrainKind,
+        parentTerrain: state.parentTerrain,
+        parentTerrainKind: state.parentTerrainKind,
+        isUrban: state.isUrban,
+        isRubble: state.isRubble,
+        isSeaport: state.isSeaport,
+        hasRoad: state.hasRoad,
+        hasRail: state.hasRail
+      });
+      if (effectsLineHtml) bodyParts.push(`<strong>Effects:</strong> ${effectsLineHtml}`);
+    }
+    if (state.urbanHexCount != null) {
+      const productionLine = state.urbanHexCount > 0 ? `<strong>Production:</strong> $${state.urbanHexCount.toLocaleString()} / turn` : `<strong>Production:</strong> (none)`;
+      bodyParts.push(productionLine);
+    }
+    const bodyLine = bodyParts.join(TOOLTIP_SECTION_GAP_HTML);
+    if (!namingCaption || namingCaption.text === "") return `${prefix}${bodyLine}`;
+    return `${prefix}${formatHexNamingCaptionHtml(namingCaption)}${TOOLTIP_SECTION_GAP_HTML}${bodyLine}`;
+  }
+  function terrainTooltipContentKey(state, namingCaption, namingTarget) {
+    const targetKey = namingTarget == null ? "none" : `${namingTarget.resolution}:${namingTarget.h3Index}`;
+    const namingKey = namingCaption?.text ?? "";
+    const urbanKey = state.isUrban ? "1" : "0";
+    const rubbleKey = state.isRubble ? "1" : "0";
+    const featuresKey = state.features.join("|");
+    const urbanHexCountKey = state.urbanHexCount == null ? "x" : String(state.urbanHexCount);
+    const res1TerrainSummaryKey = state.res1TerrainSummary ?? "";
+    const res1FeaturesSummaryKey = state.res1FeaturesSummary ?? "";
+    const controlKey = getTooltipControlLabel(namingTarget);
+    const parentTerrainKey = state.parentTerrain;
+    const parentTerrainKindKey = state.parentTerrainKind;
+    const seaportKey = state.isSeaport ? "1" : "0";
+    const roadKey = state.hasRoad ? "1" : "0";
+    const railKey = state.hasRail ? "1" : "0";
+    return `${targetKey}::${namingKey}::${state.terrainKind}::${urbanKey}::${rubbleKey}::${featuresKey}::${urbanHexCountKey}::${res1TerrainSummaryKey}::${res1FeaturesSummaryKey}::${controlKey}::${parentTerrainKey}::${parentTerrainKindKey}::${seaportKey}::${roadKey}::${railKey}`;
+  }
+  function getCachedTerrainTooltipHtml(state, namingCaption, namingTarget) {
+    const key = terrainTooltipContentKey(state, namingCaption, namingTarget);
+    const cachedHtml = rendererSharedState.terrainTooltipHtmlByContentKey.get(key);
+    if (cachedHtml !== void 0) return cachedHtml;
+    const html = formatTerrainTooltipHtml(state, namingCaption, namingTarget);
+    rendererSharedState.terrainTooltipHtmlByContentKey.set(key, html);
+    if (rendererSharedState.terrainTooltipHtmlByContentKey.size > 4096) rendererSharedState.terrainTooltipHtmlByContentKey.clear();
+    return html;
   }
 
   // src/renderer/map/terrainTooltipRes1State.ts
+  var namingLineByLookupKey = /* @__PURE__ */ new Map();
   var EMPTY_TERRAIN_EFFECT_FIELDS = {
     parentTerrain: "",
     parentTerrainKind: "",
@@ -21057,10 +21718,6 @@
       el.classList.add("hidden");
       el.setAttribute("aria-hidden", "true");
     }
-  }
-  function formatTerrainKindLabel(kind) {
-    if (!kind) return "Unknown";
-    return kind.charAt(0).toUpperCase() + kind.slice(1);
   }
   function terrainStateForRes1Hex(h3) {
     if (!rendererSharedState.gameState) return { terrainKind: "Unknown", isUrban: false, isRubble: false };
@@ -21382,123 +22039,17 @@
   async function getCachedNamingLineForTarget(target) {
     const key = namingLookupKey(target);
     if (!key || !target) return null;
-    if (rendererSharedState.namingLineByLookupKey.has(key)) return rendererSharedState.namingLineByLookupKey.get(key) ?? null;
+    if (namingLineByLookupKey.has(key)) return namingLineByLookupKey.get(key) ?? null;
     if (!window.gameApi?.getHexNamingTooltipLine) return null;
     try {
-      const line = await window.gameApi.getHexNamingTooltipLine(target);
-      rendererSharedState.namingLineByLookupKey.set(key, line ?? null);
-      return line ?? null;
+      const caption = await window.gameApi.getHexNamingTooltipLine(target);
+      namingLineByLookupKey.set(key, caption ?? null);
+      return caption ?? null;
     } catch (err) {
       console.error("getHexNamingTooltipLine failed:", err);
-      rendererSharedState.namingLineByLookupKey.set(key, null);
+      namingLineByLookupKey.set(key, null);
       return null;
     }
-  }
-  function formatLlmLocationBoldPrefixHtml(namingTarget) {
-    if (!namingTarget) return "";
-    const label = getLlmHexLocationParenLabelForNamingTarget(namingTarget);
-    if (!label) return "";
-    return `<strong>${escapeHtmlText(label)}</strong> `;
-  }
-  function formatTerrainVariantSuffix(state) {
-    const variants = [];
-    if (state.isUrban) variants.push("Urban");
-    if (state.isRubble) variants.push("Rubble");
-    return variants.length > 0 ? `, ${variants.join(", ")}` : "";
-  }
-  function resolveStrategicHexForControlLine(namingTarget) {
-    if (!namingTarget) return null;
-    if (namingTarget.resolution === 1) return namingTarget.h3Index;
-    try {
-      return cellToParent(namingTarget.h3Index, WORLD_H3_RESOLUTION);
-    } catch {
-      return null;
-    }
-  }
-  function getTooltipControlLabel(namingTarget) {
-    if (!rendererSharedState.gameState) return "Unknown";
-    const strategicHex = resolveStrategicHexForControlLine(namingTarget);
-    if (!strategicHex) return "Unknown";
-    const controller = (rendererSharedState.gameState.res1Control ?? []).find((row) => row.h3Index === strategicHex)?.controllerPlayerId ?? null;
-    const ownerLabel = controller === "human" ? "Human" : controller === "opponent" ? "AI" : "Unknown";
-    const homeRegionIdentity = resolveHomeRegionOwnerIdentity({
-      h3Index: strategicHex,
-      humanHomeRegionHexes: rendererSharedState.gameState.humanHomeRegionHexes,
-      aiHomeRegionHexes: rendererSharedState.gameState.aiHomeRegionHexes,
-      intersectingHomeRegionHexes: rendererSharedState.gameState.intersectingHomeRegionHexes
-    });
-    if (homeRegionIdentity != null) {
-      return `${ownerLabel} ${formatHomeRegionAssignmentControlSuffix(homeRegionIdentity)}`;
-    }
-    const visibleHexes = Array.isArray(rendererSharedState.gameState.visibleHexes) ? new Set(rendererSharedState.gameState.visibleHexes) : new Set(rendererSharedState.gameState.hexes.map((h) => h.h3Index));
-    const perspective = rendererSharedState.gameState.playerPerspective === "opponent" ? "opponent" : "human";
-    const ownershipVisible = isHexOwnershipVisibleToPerspective({
-      h3Index: strategicHex,
-      playerPerspective: perspective,
-      visibleHexes,
-      humanHomeRegionHexes: rendererSharedState.gameState.humanHomeRegionHexes,
-      aiHomeRegionHexes: rendererSharedState.gameState.aiHomeRegionHexes,
-      intersectingHomeRegionHexes: rendererSharedState.gameState.intersectingHomeRegionHexes
-    });
-    if (!ownershipVisible) return "Unknown";
-    return ownerLabel;
-  }
-  function formatTerrainTooltipHtml(state, namingLine, namingTarget) {
-    const prefix = formatLlmLocationBoldPrefixHtml(namingTarget);
-    const showControlLine = namingTarget?.resolution === 1;
-    const controlLine = showControlLine ? `<strong>Control:</strong> ${getTooltipControlLabel(namingTarget)}` : null;
-    const terrainLabel = formatTerrainKindLabel(state.terrainKind);
-    const terrainValue = state.res1TerrainSummary ?? `${terrainLabel}${formatTerrainVariantSuffix(state)}`;
-    const terrainLine = `<strong>Terrain:</strong> ${terrainValue}`;
-    const bodyParts = controlLine ? [controlLine, terrainLine] : [terrainLine];
-    if (state.res1FeaturesSummary != null) bodyParts.push(`<strong>Features:</strong> ${state.res1FeaturesSummary}`);
-    else if (state.features.length > 0) bodyParts.push(`<strong>Features:</strong> ${state.features.join(", ")}`);
-    if (namingTarget?.resolution === 4) {
-      const effectsLineHtml = computeTerrainEffectsLineHtml({
-        terrainKind: state.terrainKind,
-        parentTerrain: state.parentTerrain,
-        parentTerrainKind: state.parentTerrainKind,
-        isUrban: state.isUrban,
-        isRubble: state.isRubble,
-        isSeaport: state.isSeaport,
-        hasRoad: state.hasRoad,
-        hasRail: state.hasRail
-      });
-      if (effectsLineHtml) bodyParts.push(`<strong>Effects:</strong> ${effectsLineHtml}`);
-    }
-    if (state.urbanHexCount != null) {
-      const productionLine = state.urbanHexCount > 0 ? `<strong>Production:</strong> $${state.urbanHexCount.toLocaleString()} / turn` : `<strong>Production:</strong> (none)`;
-      bodyParts.push(productionLine);
-    }
-    const bodyLine = bodyParts.join(TOOLTIP_SECTION_GAP_HTML);
-    if (!namingLine) return `${prefix}${bodyLine}`;
-    return `${prefix}${formatGroupedSemicolonNamingLineHtml(namingLine)}${TOOLTIP_SECTION_GAP_HTML}${bodyLine}`;
-  }
-  function terrainTooltipContentKey(state, namingLine, namingTarget) {
-    const targetKey = namingTarget == null ? "none" : `${namingTarget.resolution}:${namingTarget.h3Index}`;
-    const namingKey = namingLine ?? "";
-    const urbanKey = state.isUrban ? "1" : "0";
-    const rubbleKey = state.isRubble ? "1" : "0";
-    const featuresKey = state.features.join("|");
-    const urbanHexCountKey = state.urbanHexCount == null ? "x" : String(state.urbanHexCount);
-    const res1TerrainSummaryKey = state.res1TerrainSummary ?? "";
-    const res1FeaturesSummaryKey = state.res1FeaturesSummary ?? "";
-    const controlKey = getTooltipControlLabel(namingTarget);
-    const parentTerrainKey = state.parentTerrain;
-    const parentTerrainKindKey = state.parentTerrainKind;
-    const seaportKey = state.isSeaport ? "1" : "0";
-    const roadKey = state.hasRoad ? "1" : "0";
-    const railKey = state.hasRail ? "1" : "0";
-    return `${targetKey}::${namingKey}::${state.terrainKind}::${urbanKey}::${rubbleKey}::${featuresKey}::${urbanHexCountKey}::${res1TerrainSummaryKey}::${res1FeaturesSummaryKey}::${controlKey}::${parentTerrainKey}::${parentTerrainKindKey}::${seaportKey}::${roadKey}::${railKey}`;
-  }
-  function getCachedTerrainTooltipHtml(state, namingLine, namingTarget) {
-    const key = terrainTooltipContentKey(state, namingLine, namingTarget);
-    const cachedHtml = rendererSharedState.terrainTooltipHtmlByContentKey.get(key);
-    if (cachedHtml !== void 0) return cachedHtml;
-    const html = formatTerrainTooltipHtml(state, namingLine, namingTarget);
-    rendererSharedState.terrainTooltipHtmlByContentKey.set(key, html);
-    if (rendererSharedState.terrainTooltipHtmlByContentKey.size > 4096) rendererSharedState.terrainTooltipHtmlByContentKey.clear();
-    return html;
   }
 
   // src/renderer/map/transientPointerTooltipTtl.ts
@@ -22162,6 +22713,7 @@
             r.unitId,
             formatPendingRangedAttackSidebarLabel(rendererSharedState.gameState, r, tacticalPositions)
           ),
+          unitId: r.unitId,
           selected: rendererSharedState.selectedUnitIds.includes(r.unitId),
           onToggleSelect: (event) => deps.applySelectionFromSidebarUnitButton(r.unitId, event),
           onCancel: () => cancelRangedForUnit(r.unitId, deps),
@@ -22184,6 +22736,7 @@
               strike.unitId,
               formatPendingAirStrikeSidebarLabel(rendererSharedState.gameState, strike, tacticalPositions)
             ),
+            unitId: strike.unitId,
             selected: rendererSharedState.selectedUnitIds.includes(strike.unitId),
             onToggleSelect: (event) => deps.applySelectionFromSidebarUnitButton(strike.unitId, event),
             onCancel: () => cancelAirStrikeForUnit(strike.unitId, deps),
@@ -22338,10 +22891,9 @@
     document.getElementById("new-game-btn")?.addEventListener("click", async () => {
       if (!window.gameApi?.newGame) return;
       try {
-        const fogCheckbox = document.getElementById("new-game-fog-checkbox");
         const selectedRegions = getSelectedScenarioRegions();
         const state = await window.gameApi.newGame({
-          fogOfWarEnabled: fogCheckbox?.checked !== false,
+          ...readNewGameOptionFlags(),
           humanHomeRegion: selectedRegions.humanHomeRegion,
           aiHomeRegion: selectedRegions.aiHomeRegion,
           gameSize: readSelectedGameSizeFromDocument()
@@ -22350,6 +22902,7 @@
         rendererSharedState.gameState = state;
         rendererSharedState.strategicScenarioInitialLeafletView = null;
         tacticalReleaseRendererSessionForNewStrategicMatch(state);
+        clearRememberedUnitOrigins();
         deps.rebuildUnitDisplayNameLookup(state);
         deps.reconcileSelectionToCurrentState();
         rendererSharedState.clientStaleEnemyIntelByUnitId.clear();
@@ -22404,13 +22957,12 @@
     const overlay = document.getElementById("game-over-overlay");
     const messageEl = document.getElementById("game-over-message");
     const newGameBtn = document.getElementById("new-game-btn");
-    const fogCheckbox = document.getElementById("new-game-fog-checkbox");
     if (messageEl) {
       messageEl.textContent = "Start a new world map game when ready.";
       messageEl.style.display = "";
     }
     if (newGameBtn) newGameBtn.textContent = "Start game";
-    if (fogCheckbox) fogCheckbox.checked = true;
+    resetNewGameOptionCheckboxes();
     void initializeScenarioRegionSelectorsOnOverlayOpen();
     syncGameSizeCapPreview();
     overlay?.classList.remove("hidden");
@@ -22455,6 +23007,110 @@
       drawCasualtyOverlay(ctx, width, height, knownCasualtyHexes, hexList, pulseOpacity);
       drawUnknownBattleMarkers(ctx, unknownCasualtyHexes, pulseOpacity);
     }
+  }
+
+  // src/renderer/core/unitOriginTooltip.ts
+  var UNIT_ORIGIN_TOOLTIP_SELECTOR = "[data-unit-origin-tooltip]";
+  var installed = false;
+  var activeAnchor = null;
+  var showTimer = null;
+  var lastPointer = { x: 0, y: 0 };
+  var anchorWatch = null;
+  function anchorStillVisible(anchor) {
+    return anchor.isConnected && anchor.getClientRects().length > 0;
+  }
+  function stopAnchorWatch() {
+    if (anchorWatch === null) return;
+    cancelAnimationFrame(anchorWatch);
+    anchorWatch = null;
+  }
+  function watchAnchor() {
+    stopAnchorWatch();
+    anchorWatch = requestAnimationFrame(() => {
+      anchorWatch = null;
+      if (!activeAnchor) return;
+      if (!anchorStillVisible(activeAnchor)) {
+        hideUnitOriginTooltip();
+        return;
+      }
+      watchAnchor();
+    });
+  }
+  function getTooltipEl() {
+    return document.getElementById("unit-origin-tooltip");
+  }
+  function findAnchor(target) {
+    return target instanceof Element ? target.closest(UNIT_ORIGIN_TOOLTIP_SELECTOR) : null;
+  }
+  function positionTooltip(el) {
+    el.style.left = `${lastPointer.x + TOOLTIP_OFFSET_PX}px`;
+    el.style.top = `${lastPointer.y + TOOLTIP_OFFSET_PX}px`;
+  }
+  function hideUnitOriginTooltip() {
+    stopAnchorWatch();
+    if (showTimer !== null) {
+      clearTimeout(showTimer);
+      showTimer = null;
+    }
+    activeAnchor = null;
+    const el = getTooltipEl();
+    if (!el) return;
+    el.classList.add("hidden");
+    el.setAttribute("aria-hidden", "true");
+    el.textContent = "";
+  }
+  function showForActiveAnchor() {
+    showTimer = null;
+    const anchor = activeAnchor;
+    const text = anchor && anchorStillVisible(anchor) ? anchor.dataset.unitOriginTooltip : void 0;
+    const el = getTooltipEl();
+    if (!text || !el) {
+      hideUnitOriginTooltip();
+      return;
+    }
+    el.textContent = text;
+    positionTooltip(el);
+    el.classList.remove("hidden");
+    el.setAttribute("aria-hidden", "false");
+    el.setAttribute("role", "tooltip");
+  }
+  function beginHover(anchor) {
+    hideUnitOriginTooltip();
+    activeAnchor = anchor;
+    showTimer = setTimeout(showForActiveAnchor, HEX_DETAILS_TOOLTIP_DELAY_MS);
+    watchAnchor();
+  }
+  function trackPointer(event) {
+    lastPointer.x = event.clientX;
+    lastPointer.y = event.clientY;
+  }
+  function installUnitOriginTooltip() {
+    if (installed) return;
+    installed = true;
+    document.addEventListener("pointerover", (event) => {
+      trackPointer(event);
+      const anchor = findAnchor(event.target);
+      if (anchor && anchor !== activeAnchor) beginHover(anchor);
+    });
+    document.addEventListener("pointerout", (event) => {
+      if (!activeAnchor || findAnchor(event.target) !== activeAnchor) return;
+      const next = event.relatedTarget;
+      if (next instanceof Node && activeAnchor.contains(next)) return;
+      hideUnitOriginTooltip();
+    });
+    document.addEventListener("pointermove", (event) => {
+      trackPointer(event);
+      if (!activeAnchor) return;
+      if (!anchorStillVisible(activeAnchor)) {
+        hideUnitOriginTooltip();
+        return;
+      }
+      const el = getTooltipEl();
+      if (el && !el.classList.contains("hidden")) positionTooltip(el);
+    });
+    document.addEventListener("pointerdown", hideUnitOriginTooltip);
+    window.addEventListener("scroll", hideUnitOriginTooltip, true);
+    window.addEventListener("blur", hideUnitOriginTooltip);
   }
 
   // src/renderer/tactical/tacticalEmbarkSealiftMerge.ts
@@ -22680,9 +23336,6 @@
   }
   function escapeBuildPopupHtml(text) {
     return escapeHtmlText(text);
-  }
-  function formatGroupedBuildNamingLineHtml(namingLine) {
-    return formatGroupedSemicolonNamingLineHtml(namingLine);
   }
 
   // src/renderer/gameplay/buildQueueMultiSelect.ts
@@ -23102,11 +23755,11 @@
       if (!window.gameApi?.getHexBuildQueue) return;
       const requestSeq = ++rendererSharedState.buildPopupRequestSeq;
       let snapshot = null;
-      let namingLine = null;
+      let namingCaption = null;
       try {
         snapshot = await window.gameApi.getHexBuildQueue({ h3Index });
         if (window.gameApi.getHexNamingTooltipLine) {
-          namingLine = await window.gameApi.getHexNamingTooltipLine({ h3Index, resolution: 1 });
+          namingCaption = await window.gameApi.getHexNamingTooltipLine({ h3Index, resolution: 1 });
         }
       } catch (err) {
         console.error("getHexBuildQueue failed:", err);
@@ -23124,12 +23777,11 @@
       mount.appendChild(closeRow);
       const section = document.createElement("div");
       section.className = "build-queue-section";
-      const trimmedNamingLine = namingLine?.trim() ?? "";
       const res1Code = getStrategicRes1HexCode(h3Index);
       const llmPrefixHtml = res1Code ? `<strong>(${escapeBuildPopupHtml(res1Code)})</strong> ` : "";
-      if (trimmedNamingLine.length > 0) {
+      if (namingCaption && namingCaption.text.trim().length > 0) {
         const descriptionLine = document.createElement("div");
-        descriptionLine.innerHTML = `${llmPrefixHtml}${formatGroupedBuildNamingLineHtml(trimmedNamingLine)}`;
+        descriptionLine.innerHTML = `${llmPrefixHtml}${formatHexNamingCaptionHtml(namingCaption)}`;
         section.appendChild(descriptionLine);
         const descriptionSpacer = document.createElement("div");
         descriptionSpacer.style.height = "0.5em";
@@ -23628,18 +24280,18 @@
   }
 
   // src/renderer/openRouter/modelDescriptionTooltip.ts
-  function getTooltipEl() {
+  function getTooltipEl2() {
     return document.getElementById("model-description-tooltip");
   }
   function hideTooltipVisual() {
-    const el = getTooltipEl();
+    const el = getTooltipEl2();
     if (!el) return;
     el.classList.add("hidden");
     el.setAttribute("aria-hidden", "true");
     el.textContent = "";
   }
   function showTooltipAt(clientX, clientY, text) {
-    const el = getTooltipEl();
+    const el = getTooltipEl2();
     if (!el) return;
     el.textContent = text;
     el.style.left = `${clientX + TOOLTIP_OFFSET_PX}px`;
@@ -23716,7 +24368,7 @@
     select.addEventListener("pointermove", (ev) => {
       lastClientX = ev.clientX;
       lastClientY = ev.clientY;
-      const el = getTooltipEl();
+      const el = getTooltipEl2();
       if (el && !el.classList.contains("hidden")) {
         el.style.left = `${lastClientX + TOOLTIP_OFFSET_PX}px`;
         el.style.top = `${lastClientY + TOOLTIP_OFFSET_PX}px`;
@@ -24556,37 +25208,6 @@
     }
     deps.redraw();
   }
-  function createSidebarOrderRow(args) {
-    const row = document.createElement("div");
-    row.style.display = "flex";
-    row.style.alignItems = "center";
-    row.style.gap = "0.5rem";
-    row.style.marginBottom = "0.35rem";
-    const label = document.createElement("span");
-    label.textContent = args.labelText;
-    label.style.flex = "1";
-    label.style.fontSize = "0.9em";
-    const selectBtn = document.createElement("button");
-    selectBtn.type = "button";
-    selectBtn.className = args.compactBlueButtons ? "unit-select compact-blue-btn compact-square-btn" : "unit-select";
-    selectBtn.textContent = args.selected ? UNIT_DESELECT_GLYPH : UNIT_SELECT_GLYPH;
-    selectBtn.style.flexShrink = "0";
-    selectBtn.style.fontSize = "0.8em";
-    selectBtn.addEventListener("click", (event) => {
-      args.onToggleSelect(event);
-    });
-    const cancelBtn = document.createElement("button");
-    cancelBtn.type = "button";
-    cancelBtn.className = args.compactBlueButtons ? "unit-select compact-blue-btn compact-square-btn" : "unit-select";
-    cancelBtn.textContent = "\xD7";
-    cancelBtn.style.flexShrink = "0";
-    cancelBtn.style.fontSize = "0.8em";
-    cancelBtn.addEventListener("click", args.onCancel);
-    row.appendChild(label);
-    row.appendChild(selectBtn);
-    row.appendChild(cancelBtn);
-    return row;
-  }
   function updatePendingOrdersSidebar(deps) {
     const container = document.getElementById("pending-orders-list");
     if (!container) return;
@@ -24605,6 +25226,7 @@
             row.subUnitId,
             formatTacticalDraftMarchPendingOrderTargetLabel(rendererSharedState.tacticalBattleSnapshot, row.subUnitId, row.destinationH3Index)
           ),
+          unitId: row.subUnitId,
           selected: rendererSharedState.selectedUnitIds.includes(row.subUnitId),
           onToggleSelect: (event) => deps.applySelectionFromSidebarUnitButton(row.subUnitId, event),
           onCancel: () => {
@@ -24622,6 +25244,7 @@
             ferry.unitId,
             formatPendingFerryOrderSidebarLabel(rendererSharedState.gameState, ferry, rendererSharedState.tacticalBattleSnapshot.subUnits)
           ),
+          unitId: ferry.unitId,
           selected: rendererSharedState.selectedUnitIds.includes(ferry.unitId),
           onToggleSelect: (event) => deps.applySelectionFromSidebarUnitButton(ferry.unitId, event),
           onCancel: () => {
@@ -24645,6 +25268,7 @@
     for (const order of pendingOrders) {
       const row = deps.createSidebarOrderRow({
         labelText: deps.formatPendingOrderSidebarLabel(order),
+        unitId: order.unitId,
         selected: rendererSharedState.selectedUnitIds.includes(order.unitId),
         onToggleSelect: (event) => deps.applySelectionFromSidebarUnitButton(order.unitId, event),
         onCancel: () => {
@@ -24657,6 +25281,7 @@
     for (const ferry of rendererSharedState.pendingFerryOrders) {
       const row = deps.createSidebarOrderRow({
         labelText: deps.formatUnitArrowLabel(ferry.unitId, formatPendingFerryOrderSidebarLabel(rendererSharedState.gameState, ferry)),
+        unitId: ferry.unitId,
         selected: rendererSharedState.selectedUnitIds.includes(ferry.unitId),
         onToggleSelect: (event) => deps.applySelectionFromSidebarUnitButton(ferry.unitId, event),
         onCancel: () => deps.cancelFerryForUnit(ferry.unitId),
@@ -24672,61 +25297,6 @@
   function clearSidebarError() {
     const el = document.getElementById("sidebar-error");
     if (el) el.style.display = "none";
-  }
-
-  // src/shared/lossSummary.ts
-  var LOSS_ENTRY_LIST_MAX = 5;
-  var GROUP_LABEL_BY_TYPE = {
-    naval: "Naval",
-    air: "Air",
-    armor: "Armored",
-    infantry: "Infantry"
-  };
-  var GROUP_ORDER = ["naval", "air", "armor", "infantry"];
-  function emptyPlayerLossSummary() {
-    return { ranged: [], melee: [], returnFire: [], airStrike: [], other: [] };
-  }
-  function emptyTurnLossSummary() {
-    return { human: emptyPlayerLossSummary(), ai: emptyPlayerLossSummary() };
-  }
-  function playerHasAnyLoss(summary) {
-    return summary.ranged.length > 0 || summary.melee.length > 0 || summary.returnFire.length > 0 || summary.airStrike.length > 0 || summary.other.length > 0;
-  }
-  function formatLossEntries(units) {
-    if (units.length === 0) return "";
-    if (units.length <= LOSS_ENTRY_LIST_MAX) {
-      return units.map((u) => u.displayName).join(", ");
-    }
-    return formatGroupedTypeTotals(units);
-  }
-  function formatGroupedTypeTotals(units) {
-    const counts = { naval: 0, air: 0, armor: 0, infantry: 0 };
-    for (const u of units) {
-      if (u.unitType in counts) counts[u.unitType] += 1;
-    }
-    const parts = [];
-    for (const t of GROUP_ORDER) {
-      const n = counts[t];
-      if (n > 0) parts.push(`${n.toLocaleString()} ${GROUP_LABEL_BY_TYPE[t]}`);
-    }
-    return parts.join(", ");
-  }
-  var CAUSE_SPECS = [
-    { key: "ranged", label: "Ranged attack" },
-    { key: "melee", label: "Melee attack" },
-    { key: "returnFire", label: "Return fire" },
-    { key: "airStrike", label: "Air strike" },
-    { key: "other", label: "Other losses" }
-  ];
-  function formatPlayerLossLinesMultiline(summary) {
-    const lines = [];
-    for (const spec of CAUSE_SPECS) {
-      const units = summary[spec.key];
-      if (units.length === 0) continue;
-      const text = formatLossEntries(units);
-      if (text.length > 0) lines.push({ causeLabel: spec.label, text });
-    }
-    return lines;
   }
 
   // src/shared/consolidatedTurnUpdateToast.ts
@@ -25327,7 +25897,8 @@
             combatFallbackBullets
           });
           if (updateText) {
-            deps.showMapToast(updateText, { isError: false });
+            const unitOriginByDisplayName = buildUnitOriginByLossDisplayName(turnLossSummary);
+            deps.showMapToast(updateText, { isError: false, unitOriginByDisplayName });
             deps.appendOpenRouterLog(`Update: ${updateText.replace(/\n/g, " | ")}`);
           }
           const hasUnknownBattle = unknownCombatHexes2.length > 0 || unknownCasualtyHexes2.length > 0 || unknownVictimIds2.length > 0;
@@ -25550,7 +26121,8 @@
           combatFallbackBullets
         });
         if (updateText) {
-          deps.showMapToast(updateText, { isError: false });
+          const unitOriginByDisplayName = buildUnitOriginByLossDisplayName(turnLossSummary);
+          deps.showMapToast(updateText, { isError: false, unitOriginByDisplayName });
           deps.appendOpenRouterLog(`Update: ${updateText.replace(/\n/g, " | ")}`);
         }
         const hasUnknownBattle = unknownCombatHexes.length > 0 || unknownCasualtyHexes.length > 0 || unknownVictimIds.length > 0;
@@ -25805,9 +26377,9 @@
   // src/renderer/gameplay/meleeInterceptHexTooltip.ts
   async function buildMeleeInterceptHexPopupHtmlForRes1(h3Index, deps) {
     const namingTarget = { h3Index, resolution: 1 };
-    const namingLine = await deps.getCachedNamingLineForTarget(namingTarget);
+    const namingCaption = await deps.getCachedNamingLineForTarget(namingTarget);
     const state = deps.terrainTooltipStateForRes1Hex(h3Index);
-    return deps.getCachedTerrainTooltipHtml(state, namingLine, namingTarget);
+    return deps.getCachedTerrainTooltipHtml(state, namingCaption, namingTarget);
   }
 
   // src/renderer/tactical/tacticalUiGuards.ts
@@ -26440,10 +27012,29 @@
         return;
       }
       const unitsAtHit = hit ? unitsToDraw.filter((u) => u.h3Index === hit && !movingIds?.has(u.id)) : [];
-      const isStack = unitsAtHit.length >= 2;
-      const isLoneAi = unitsAtHit.length === 1 && unitsAtHit[0]?.player !== "human";
-      if (hit && (isStack || isLoneAi) && pointerHitsDrawnUnitIcon(e.clientX, e.clientY, hit)) {
+      const unitIconHit = hit !== null && pointerHitsDrawnUnitIcon(e.clientX, e.clientY, hit);
+      const loneHumanUnit = unitsAtHit.length === 1 && unitsAtHit[0]?.player === "human" ? unitsAtHit[0] : void 0;
+      const humanUnitIconSelectionDeps = {
+        replaceSelection: deps.replaceSelection,
+        toggleUnitSelection: deps.toggleUnitSelection,
+        refreshHoverRoutePreview: deps.refreshHoverRoutePreview,
+        updateSidebar: deps.updateSidebar,
+        updateRangedSidebar: deps.updateRangedSidebar,
+        redraw: deps.redraw
+      };
+      if (hit && unitsAtHit.length >= 1 && unitIconHit) {
+        if (loneHumanUnit) {
+          applyHumanUnitIconClickSelectionPolicy({
+            shiftKey: e.shiftKey,
+            unitId: loneHumanUnit.id,
+            suppressSelectionRetarget: suppressIconRetargetOnNextClick,
+            deps: humanUnitIconSelectionDeps
+          });
+        }
         if (isHoverOrderPlanningActive()) {
+          deps.updateSidebar();
+          deps.updateRangedSidebar();
+          deps.redraw();
           return;
         }
         if (!suppressIconRetargetOnNextClick) {
@@ -26464,20 +27055,12 @@
       deps.hideStackCallout();
       if (hit) {
         const unit = deps.getUnitAtHex(hit);
-        const unitIconHit = pointerHitsDrawnUnitIcon(e.clientX, e.clientY, hit);
         if (unit?.player === "human" && unitIconHit) {
           applyHumanUnitIconClickSelectionPolicy({
             shiftKey: e.shiftKey,
             unitId: unit.id,
             suppressSelectionRetarget: suppressIconRetargetOnNextClick,
-            deps: {
-              replaceSelection: deps.replaceSelection,
-              toggleUnitSelection: deps.toggleUnitSelection,
-              refreshHoverRoutePreview: deps.refreshHoverRoutePreview,
-              updateSidebar: deps.updateSidebar,
-              updateRangedSidebar: deps.updateRangedSidebar,
-              redraw: deps.redraw
-            }
+            deps: humanUnitIconSelectionDeps
           });
         } else if (unit?.player === "human" && !unitIconHit) {
           clearDeferredHumanUnitSingleSelectTimer();
@@ -27570,6 +28153,40 @@
     }
   }
 
+  // src/renderer/gameplay/sidebarOrderRow.ts
+  function createSidebarOrderRow(args) {
+    const row = document.createElement("div");
+    row.style.display = "flex";
+    row.style.alignItems = "center";
+    row.style.gap = "0.5rem";
+    row.style.marginBottom = "0.35rem";
+    const label = document.createElement("span");
+    if (args.unitId) setUnitNameContent(label, args.unitId, args.labelText);
+    else label.textContent = args.labelText;
+    label.style.flex = "1";
+    label.style.fontSize = "0.9em";
+    const selectBtn = document.createElement("button");
+    selectBtn.type = "button";
+    selectBtn.className = args.compactBlueButtons ? "unit-select compact-blue-btn compact-square-btn" : "unit-select";
+    selectBtn.textContent = args.selected ? UNIT_DESELECT_GLYPH : UNIT_SELECT_GLYPH;
+    selectBtn.style.flexShrink = "0";
+    selectBtn.style.fontSize = "0.8em";
+    selectBtn.addEventListener("click", (event) => {
+      args.onToggleSelect(event);
+    });
+    const cancelBtn = document.createElement("button");
+    cancelBtn.type = "button";
+    cancelBtn.className = args.compactBlueButtons ? "unit-select compact-blue-btn compact-square-btn" : "unit-select";
+    cancelBtn.textContent = "\xD7";
+    cancelBtn.style.flexShrink = "0";
+    cancelBtn.style.fontSize = "0.8em";
+    cancelBtn.addEventListener("click", args.onCancel);
+    row.appendChild(label);
+    row.appendChild(selectBtn);
+    row.appendChild(cancelBtn);
+    return row;
+  }
+
   // src/renderer/renderer.ts
   var tacticalExitSessionAccessor = {
     getBattleSnapshot: () => rendererSharedState.tacticalBattleSnapshot,
@@ -27641,7 +28258,9 @@
   }
   function dismissMapDetailPopoversIfHoverPlanningActive() {
     if (!isHoverOrderPlanningActive()) return;
-    hideStackCallout();
+    if (shouldDismissStackCalloutForHoverPlanning()) {
+      hideStackCallout();
+    }
     hideBuildPopup();
     clearTerrainTooltipTimer();
     hideTerrainTooltipVisual();
@@ -27767,7 +28386,7 @@
         rowEl.className = "stack-sealift-row";
         const left = document.createElement("span");
         left.className = "stack-sealift-naval";
-        left.textContent = formatUnitDisplayName(row.navalUnitId);
+        setUnitNameContent(left, row.navalUnitId, formatUnitDisplayName(row.navalUnitId));
         rowEl.appendChild(left);
         const right = document.createElement("div");
         right.className = "stack-sealift-slots";
@@ -27902,7 +28521,7 @@
     }
   }
   function showStackCallout(units, clientX, clientY) {
-    if (isHoverOrderPlanningActive()) return;
+    if (shouldDismissStackCalloutForHoverPlanning()) return;
     if (shouldHideStrategicMapUnitsForRes4Zoom()) {
       hideStackCallout();
       return;
@@ -27978,7 +28597,7 @@
       li.setAttribute("data-unit-id", u.id);
       const label = document.createElement("span");
       label.className = "unit-label";
-      label.textContent = formatUnitDisplayName(u.id);
+      setUnitNameContent(label, u.id, formatUnitDisplayName(u.id));
       li.appendChild(label);
       if (u.player === "human") {
         const btn = document.createElement("button");
@@ -28022,7 +28641,7 @@
     return unitIds.map((id) => state.units.find((u) => u.id === id)).filter((unit) => !!unit);
   }
   function refreshStackCalloutIfOpen() {
-    if (isHoverOrderPlanningActive()) {
+    if (shouldDismissStackCalloutForHoverPlanning()) {
       hideStackCallout();
       return;
     }
@@ -28203,6 +28822,7 @@
     return rendererSharedState.selectedUnitIds[0] ?? null;
   }
   function rebuildUnitDisplayNameLookup(state) {
+    if (state) rememberUnitOrigins(state.units);
     const base = state ? buildUnitDisplayNameLookup(state.units) : /* @__PURE__ */ new Map();
     const tb = rendererSharedState.tacticalBattleSnapshot;
     if (tb) {
@@ -29141,6 +29761,7 @@
     });
   }
   function init() {
+    installUnitOriginTooltip();
     wireInitCore({
       requestRedraw,
       resizeAndRedraw,

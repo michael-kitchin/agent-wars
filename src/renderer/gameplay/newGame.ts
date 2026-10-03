@@ -1,5 +1,6 @@
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import { rendererSharedState as S } from '../core/state';
+import { clearRememberedUnitOrigins } from '../core/unitOriginFlags';
 import { clearOpenRouterLog } from '../openRouter/openRouterUiHelpers';
 import { resetPrecomputedAiState } from '../openRouter/precomputedAiState';
 import { tacticalReleaseRendererSessionForNewStrategicMatch } from '../tactical/tacticalUiOrchestration';
@@ -10,6 +11,7 @@ import {
   randomizeScenarioRegionSelect,
 } from './newGameRegionUi';
 import { readSelectedGameSizeFromDocument, registerGameSizeSelect, syncGameSizeCapPreview } from './newGameSizeUi';
+import { readNewGameOptionFlags, resetNewGameOptionCheckboxes } from './newGameOptionsUi';
 
 /**
  * Defines the `registerRegionRandomizeButtons` function shape (function registerRegionRandomizeButtons(): void).
@@ -212,12 +214,13 @@ setMainUIControlsEnabled: (enabled: boolean) => void;
 };
 
 /**
- * Defines the `registerNewGameButton` function shape (export function registerNewGameButton(deps: NewGameDeps): void).
-
- * Purpose: Supports maintainability by documenting why `registerNewGameButton` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
+ * Wires the new-game dialog's controls and its Start button.
+ *
+ * Purpose: Starts a match from the dialog's choices and resets every renderer cache the old match left behind.
+ * When to use: Once at renderer startup.
+ * Expected outcome: Clicking Start sends fog, both origin bonus flags, home regions, and game size to `newGame`,
+ *   then reloads the map, sidebars, and overlay from the returned state. Failures are logged to the console.
+ * Exceptions: None; click handler errors are caught.
  */
 export function registerNewGameButton(deps: NewGameDeps): void {
   void initializeScenarioRegionSelectorsOnOverlayOpen();
@@ -226,10 +229,9 @@ export function registerNewGameButton(deps: NewGameDeps): void {
   document.getElementById('new-game-btn')?.addEventListener('click', async () => {
     if (!window.gameApi?.newGame) return;
     try {
-      const fogCheckbox = document.getElementById('new-game-fog-checkbox') as HTMLInputElement | null;
       const selectedRegions = getSelectedScenarioRegions();
       const state = (await window.gameApi.newGame({
-        fogOfWarEnabled: fogCheckbox?.checked !== false,
+        ...readNewGameOptionFlags(),
         humanHomeRegion: selectedRegions.humanHomeRegion,
         aiHomeRegion: selectedRegions.aiHomeRegion,
         gameSize: readSelectedGameSizeFromDocument(),
@@ -238,6 +240,7 @@ export function registerNewGameButton(deps: NewGameDeps): void {
       S.gameState = state;
       S.strategicScenarioInitialLeafletView = null;
       tacticalReleaseRendererSessionForNewStrategicMatch(state);
+      clearRememberedUnitOrigins();
       deps.rebuildUnitDisplayNameLookup(state);
       deps.reconcileSelectionToCurrentState();
       S.clientStaleEnemyIntelByUnitId.clear();
@@ -282,11 +285,13 @@ export function registerNewGameButton(deps: NewGameDeps): void {
 }
 
 /**
- * Defines the `openNewGameOverlayFromModelTab` function shape (export function openNewGameOverlayFromModelTab(setMainUIControlsEnabled: (enabled: boolean) => void, updateReadyButtonState: () => void): void).
-
- * Purpose: Supports maintainability by documenting why `openNewGameOverlayFromModelTab` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: During a battle or resolution playback the click returns without cancelling planning, showing the overlay, or disabling the map. Otherwise the new-game overlay opens.
+ * Opens the new-game dialog mid-match from the Model tab.
+ *
+ * Purpose: Lets the player abandon the current match; stops pending AI work first so it cannot land on the new one.
+ * When to use: The Model tab's New game button.
+ * Expected outcome: During a battle or resolution playback the click returns without cancelling planning, showing
+ *   the overlay, or disabling the map. Otherwise AI requests are cancelled, every option checkbox is checked again,
+ *   and the new-game overlay opens.
  * Exceptions: None.
  */
 export function openNewGameOverlayFromModelTab(setMainUIControlsEnabled: (enabled: boolean) => void, updateReadyButtonState: () => void): void {
@@ -301,13 +306,12 @@ export function openNewGameOverlayFromModelTab(setMainUIControlsEnabled: (enable
   const overlay = document.getElementById('game-over-overlay');
   const messageEl = document.getElementById('game-over-message');
   const newGameBtn = document.getElementById('new-game-btn');
-  const fogCheckbox = document.getElementById('new-game-fog-checkbox') as HTMLInputElement | null;
   if (messageEl) {
     messageEl.textContent = 'Start a new world map game when ready.';
     messageEl.style.display = '';
   }
   if (newGameBtn) newGameBtn.textContent = 'Start game';
-  if (fogCheckbox) fogCheckbox.checked = true;
+  resetNewGameOptionCheckboxes();
   void initializeScenarioRegionSelectorsOnOverlayOpen();
   syncGameSizeCapPreview();
   overlay?.classList.remove('hidden');

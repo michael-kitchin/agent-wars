@@ -7,6 +7,9 @@ This pipeline builds naming metadata from Natural Earth shapefiles:
 - Cities: ne_10m_populated_places.shp (res-4 only)
 - Lakes: ne_10m_lakes.shp
 - Marine polys (oceans/seas): ne_10m_geography_marine_polys.shp
+
+Country, state, and city rows carry `country_code` (ISO 3166-1 alpha-2, uppercase,
+or null when Natural Earth has no code); see `country_codes.py`.
 """
 
 from __future__ import annotations
@@ -30,9 +33,13 @@ from shapely.geometry import Point, shape
 from shapely.geometry.base import BaseGeometry
 from shapely.ops import transform
 
+from .country_codes import build_country_code_by_adm0_a3, resolve_country_code
+from .naming_tables import init_naming_tables as _init_tables
+from .water_names import normalize_water_name as _normalize_water_name
+
 LOGGER = logging.getLogger(__name__)
 
-SCHEMA_VERSION = "1.1.0"
+SCHEMA_VERSION = "1.2.0"
 DEFAULT_DATA_ROOT = Path("F:/Data")
 DEFAULT_OUTPUT_RES1 = Path("data/generated/terrain_res1_naming.json")
 DEFAULT_OUTPUT_RES4 = Path("data/generated/terrain_res4_naming.json")
@@ -45,9 +52,9 @@ MARINE_POLYS_SHP = "ne_10m_geography_marine_polys.shp"
 
 WGS84 = CRS.from_epsg(4326)
 REQUIRED_FIELDS_BY_LAYER: dict[str, tuple[str, ...]] = {
-    "countries": ("name", "continent", "subregion", "pop_est", "scalerank"),
-    "states": ("name", "admin", "scalerank"),
-    "cities": ("name", "adm1name", "adm0name", "pop_max", "scalerank"),
+    "countries": ("name", "continent", "subregion", "pop_est", "scalerank", "adm0_a3", "iso_a2", "iso_a2_eh"),
+    "states": ("name", "admin", "scalerank", "adm0_a3"),
+    "cities": ("name", "adm1name", "adm0name", "pop_max", "scalerank", "adm0_a3", "iso_a2"),
     "water": ("name", "scalerank"),
 }
 
@@ -178,69 +185,6 @@ def _open_temp_db() -> tuple[sqlite3.Connection, Path]:
     return conn, temp_dir
 
 
-def _init_tables(conn: sqlite3.Connection) -> None:
-    conn.executescript(
-        """
-        CREATE TABLE states_res1 (
-            cell TEXT NOT NULL,
-            name TEXT NOT NULL,
-            country TEXT NOT NULL,
-            scalerank INTEGER,
-            UNIQUE(cell, name, country, scalerank)
-        );
-        CREATE TABLE states_res4 (
-            cell TEXT NOT NULL,
-            name TEXT NOT NULL,
-            country TEXT NOT NULL,
-            scalerank INTEGER,
-            UNIQUE(cell, name, country, scalerank)
-        );
-        CREATE TABLE countries_res1 (
-            cell TEXT NOT NULL,
-            name TEXT NOT NULL,
-            continent TEXT,
-            region TEXT,
-            population REAL,
-            scalerank INTEGER,
-            UNIQUE(cell, name, continent, region, population, scalerank)
-        );
-        CREATE TABLE countries_res4 (
-            cell TEXT NOT NULL,
-            name TEXT NOT NULL,
-            continent TEXT,
-            region TEXT,
-            population REAL,
-            scalerank INTEGER,
-            UNIQUE(cell, name, continent, region, population, scalerank)
-        );
-        CREATE TABLE cities_res4 (
-            cell TEXT NOT NULL,
-            name TEXT NOT NULL,
-            state TEXT,
-            country TEXT,
-            population REAL,
-            scalerank INTEGER,
-            UNIQUE(cell, name, state, country, population, scalerank)
-        );
-        CREATE TABLE water_res1 (
-            cell TEXT NOT NULL,
-            name TEXT NOT NULL,
-            type TEXT NOT NULL,
-            scalerank INTEGER,
-            UNIQUE(cell, name, type)
-        );
-        CREATE TABLE water_res4 (
-            cell TEXT NOT NULL,
-            name TEXT NOT NULL,
-            type TEXT NOT NULL,
-            scalerank INTEGER,
-            UNIQUE(cell, name, type)
-        );
-        """
-    )
-    conn.commit()
-
-
 def _resolve_field_names(
     schema_props: dict[str, Any],
     required_fields: tuple[str, ...],
@@ -288,10 +232,32 @@ def _validate_layer_fields(shapefile_path: Path, required_fields: tuple[str, ...
         raise ValueError(f"Shapefile {shapefile_path} {exc}") from exc
 
 
+def _load_country_code_by_adm0_a3(countries_path: Path) -> dict[str, str | None]:
+    """
+    Why this exists:
+        States and cities only carry `ADM0_A3`; their codes come from the countries layer.
+    When to use:
+        Once in `run_pipeline`, before inserting countries, states, and cities.
+    What to expect:
+        Returns `ADM0_A3` -> uppercase alpha-2 code (or `None`); raises if fields are missing.
+    """
+
+    with fiona.open(countries_path) as src:
+        schema_props = (src.schema or {}).get("properties") or {}
+        fields = _resolve_field_names(schema_props, ("adm0_a3", "iso_a2_eh", "iso_a2"))
+        return build_country_code_by_adm0_a3(
+            (
+                (props.get(fields["adm0_a3"]), props.get(fields["iso_a2_eh"]), props.get(fields["iso_a2"]))
+                for props in ((feature.get("properties") or {}) for feature in src)
+            )
+        )
+
+
 def _insert_countries(
     conn: sqlite3.Connection,
     countries_path: Path,
     *,
+    code_by_adm0_a3: dict[str, str | None],
     res4_cell_filter: set[str] | None = None,
 ) -> None:
     if not countries_path.is_file():
@@ -311,6 +277,7 @@ def _insert_countries(
                 region = props.get(fields["subregion"])
                 population = _to_float(props.get(fields["pop_est"]))
                 scalerank = _to_int(props.get(fields["scalerank"]))
+                code = resolve_country_code(props.get(fields["adm0_a3"]), props.get(fields["iso_a2"]), code_by_adm0_a3)
 
                 geom_wgs84 = _feature_geometry_wgs84(feature.get("geometry"), xy_transform)
                 if geom_wgs84 is None:
@@ -322,17 +289,17 @@ def _insert_countries(
                     cells_res4 = [cell for cell in cells_res4 if cell in res4_cell_filter]
                 conn.executemany(
                     """
-                    INSERT OR IGNORE INTO countries_res1(cell, name, continent, region, population, scalerank)
-                    VALUES (?, ?, ?, ?, ?, ?)
+                    INSERT OR IGNORE INTO countries_res1(cell, name, continent, region, population, scalerank, country_code)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
                     """,
-                    [(cell, str(name), continent, region, population, scalerank) for cell in cells_res1],
+                    [(cell, str(name), continent, region, population, scalerank, code) for cell in cells_res1],
                 )
                 conn.executemany(
                     """
-                    INSERT OR IGNORE INTO countries_res4(cell, name, continent, region, population, scalerank)
-                    VALUES (?, ?, ?, ?, ?, ?)
+                    INSERT OR IGNORE INTO countries_res4(cell, name, continent, region, population, scalerank, country_code)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
                     """,
-                    [(cell, str(name), continent, region, population, scalerank) for cell in cells_res4],
+                    [(cell, str(name), continent, region, population, scalerank, code) for cell in cells_res4],
                 )
                 if idx % 25 == 0:
                     LOGGER.debug("Processed %d country features.", idx)
@@ -342,6 +309,7 @@ def _insert_states(
     conn: sqlite3.Connection,
     states_path: Path,
     *,
+    code_by_adm0_a3: dict[str, str | None],
     res4_cell_filter: set[str] | None = None,
 ) -> None:
     if not states_path.is_file():
@@ -359,6 +327,7 @@ def _insert_states(
                 if not name or not country:
                     continue
                 scalerank = _to_int(props.get(fields["scalerank"]))
+                code = resolve_country_code(props.get(fields["adm0_a3"]), None, code_by_adm0_a3)
 
                 geom_wgs84 = _feature_geometry_wgs84(feature.get("geometry"), xy_transform)
                 if geom_wgs84 is None:
@@ -370,17 +339,17 @@ def _insert_states(
                     cells_res4 = [cell for cell in cells_res4 if cell in res4_cell_filter]
                 conn.executemany(
                     """
-                    INSERT OR IGNORE INTO states_res1(cell, name, country, scalerank)
-                    VALUES (?, ?, ?, ?)
+                    INSERT OR IGNORE INTO states_res1(cell, name, country, scalerank, country_code)
+                    VALUES (?, ?, ?, ?, ?)
                     """,
-                    [(cell, str(name), str(country), scalerank) for cell in cells_res1],
+                    [(cell, str(name), str(country), scalerank, code) for cell in cells_res1],
                 )
                 conn.executemany(
                     """
-                    INSERT OR IGNORE INTO states_res4(cell, name, country, scalerank)
-                    VALUES (?, ?, ?, ?)
+                    INSERT OR IGNORE INTO states_res4(cell, name, country, scalerank, country_code)
+                    VALUES (?, ?, ?, ?, ?)
                     """,
-                    [(cell, str(name), str(country), scalerank) for cell in cells_res4],
+                    [(cell, str(name), str(country), scalerank, code) for cell in cells_res4],
                 )
                 if idx % 100 == 0:
                     LOGGER.debug("Processed %d state features.", idx)
@@ -390,6 +359,7 @@ def _insert_cities(
     conn: sqlite3.Connection,
     cities_path: Path,
     *,
+    code_by_adm0_a3: dict[str, str | None],
     res4_cell_filter: set[str] | None = None,
 ) -> None:
     if not cities_path.is_file():
@@ -419,12 +389,13 @@ def _insert_cities(
                 if res4_cell_filter is not None and cell not in res4_cell_filter:
                     continue
 
+                code = resolve_country_code(props.get(fields["adm0_a3"]), props.get(fields["iso_a2"]), code_by_adm0_a3)
                 conn.execute(
                     """
-                    INSERT OR IGNORE INTO cities_res4(cell, name, state, country, population, scalerank)
-                    VALUES (?, ?, ?, ?, ?, ?)
+                    INSERT OR IGNORE INTO cities_res4(cell, name, state, country, population, scalerank, country_code)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
                     """,
-                    (cell, str(name), state, country, population, scalerank),
+                    (cell, str(name), state, country, population, scalerank, code),
                 )
                 if idx % 1000 == 0:
                     LOGGER.debug("Processed %d city features.", idx)
@@ -459,6 +430,7 @@ def _insert_water(
                 name = props.get(fields["name"])
                 if not name or not str(name).strip():
                     continue
+                name = _normalize_water_name(str(name))
                 scalerank = _to_int(props.get(fields["scalerank"]))
 
                 geom_wgs84 = _feature_geometry_wgs84(feature.get("geometry"), xy_transform)
@@ -518,7 +490,9 @@ def _write_res1_json(conn: sqlite3.Connection, cells: list[str], out_path: Path)
     states_cursor = _make_group_cursor(
         conn.execute(
             """
-            SELECT cell, json_object('name', name, 'country', country, 'scalerank', scalerank)
+            SELECT cell, json_object(
+                'name', name, 'country', country, 'scalerank', scalerank, 'country_code', country_code
+            )
             FROM states_res1
             ORDER BY cell ASC, scalerank ASC, name ASC
             """
@@ -532,7 +506,8 @@ def _write_res1_json(conn: sqlite3.Connection, cells: list[str], out_path: Path)
                 'continent', continent,
                 'region', region,
                 'population', population,
-                'scalerank', scalerank
+                'scalerank', scalerank,
+                'country_code', country_code
             )
             FROM countries_res1
             ORDER BY cell ASC, scalerank ASC, name ASC
@@ -583,7 +558,8 @@ def _write_res4_json(conn: sqlite3.Connection, cells: list[str], out_path: Path)
                 'state', state,
                 'country', country,
                 'population', population,
-                'scalerank', scalerank
+                'scalerank', scalerank,
+                'country_code', country_code
             )
             FROM cities_res4
             ORDER BY cell ASC, scalerank ASC, name ASC
@@ -593,7 +569,9 @@ def _write_res4_json(conn: sqlite3.Connection, cells: list[str], out_path: Path)
     states_cursor = _make_group_cursor(
         conn.execute(
             """
-            SELECT cell, json_object('name', name, 'country', country, 'scalerank', scalerank)
+            SELECT cell, json_object(
+                'name', name, 'country', country, 'scalerank', scalerank, 'country_code', country_code
+            )
             FROM states_res4
             ORDER BY cell ASC, scalerank ASC, name ASC
             """
@@ -607,7 +585,8 @@ def _write_res4_json(conn: sqlite3.Connection, cells: list[str], out_path: Path)
                 'continent', continent,
                 'region', region,
                 'population', population,
-                'scalerank', scalerank
+                'scalerank', scalerank,
+                'country_code', country_code
             )
             FROM countries_res4
             ORDER BY cell ASC, scalerank ASC, name ASC
@@ -690,9 +669,10 @@ def run_pipeline(
         LOGGER.debug("Using temporary SQLite database at %s.", temp_dir)
         _init_tables(conn)
         res4_cell_filter = set(res4_cells) if max_child_cells is not None else None
-        _insert_countries(conn, countries_path, res4_cell_filter=res4_cell_filter)
-        _insert_states(conn, states_path, res4_cell_filter=res4_cell_filter)
-        _insert_cities(conn, cities_path, res4_cell_filter=res4_cell_filter)
+        code_by_adm0_a3 = _load_country_code_by_adm0_a3(countries_path)
+        _insert_countries(conn, countries_path, code_by_adm0_a3=code_by_adm0_a3, res4_cell_filter=res4_cell_filter)
+        _insert_states(conn, states_path, code_by_adm0_a3=code_by_adm0_a3, res4_cell_filter=res4_cell_filter)
+        _insert_cities(conn, cities_path, code_by_adm0_a3=code_by_adm0_a3, res4_cell_filter=res4_cell_filter)
         _insert_water(conn, lakes_path, "lake", res4_cell_filter=res4_cell_filter)
         _insert_water(conn, marine_polys_path, "ocean", res4_cell_filter=res4_cell_filter)
 

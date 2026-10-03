@@ -177,7 +177,7 @@ When this guide and the running app disagree, the app wins until this file is up
 
 ### 3.6 Scenarios, Save/Load, and Onboarding
 
-- **New game (live):** Overlay with human/AI home-region selectors, Game size dropdown and cap badges, fog-of-war checkbox, and New game. The live scenario id is `region_vs_region`.
+- **New game (live):** Overlay with human/AI home-region selectors, Game size dropdown and cap badges, one row of Fog of war, Country bonus, and Terrain bonus checkboxes, and New game. The live scenario id is `region_vs_region`.
 - **Save/Load:** **Not shipped.** Target: named saves, overwrite confirmation, auto-save visibility.
 - **End-game summary:** Live overlay reports winner and offers New game; territory-over-time charts are still target.
 - **Tutorial/onboarding:** Not shipped.

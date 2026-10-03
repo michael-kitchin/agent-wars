@@ -5,8 +5,8 @@ import {
 } from '../../shared/pendingMovementSidebarLabels';
 import { buildUnitDisplayNameLookup, fallbackDisplayNameFromUnitId, type UnitDisplayIdentity } from '../../shared/unitDisplayNames';
 import { formatPendingFerryOrderSidebarLabel } from './orderLabelFormatting';
-import { UNIT_DESELECT_GLYPH, UNIT_SELECT_GLYPH } from '../core/constants';
 import { rendererSharedState as S } from '../core/state';
+import type { SidebarOrderRowArgs } from './sidebarOrderRow';
 import { shouldBlockEmbarkedLandUnitSelect } from '../core/selection';
 import {
   shouldBlockSelectionReplaceDuringHoverPlanning,
@@ -146,20 +146,14 @@ isPendingMovementOrderForDisplay: (order: HumanStandingOrderSnapshot) => boolean
    */
 formatPendingOrderSidebarLabel: (order: HumanStandingOrderSnapshot) => string;
     /**
-   * Specifies the contract for the `createSidebarOrderRow` member (createSidebarOrderRow: (args: { labelText: string; selected: boolean; onToggleSelect: (event: MouseEvent) => void; onCancel: () => void;).
-
-   * Contract: Describes stable behavior for callers of `createSidebarOrderRow` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Builds one sidebar order row.
+   *
+   * Contract: Same behavior as the exported `createSidebarOrderRow`.
+   * When to use: For each pending movement or ferry order in the list.
+   * Expected outcome: An unattached row element; the label carries a unit flag when `unitId` is given.
    * Exceptions: None.
    */
-createSidebarOrderRow: (args: {
-    labelText: string;
-    selected: boolean;
-    onToggleSelect: (event: MouseEvent) => void;
-    onCancel: () => void;
-    compactBlueButtons?: boolean;
-  }) => HTMLElement;
+createSidebarOrderRow: (args: SidebarOrderRowArgs) => HTMLElement;
     /**
    * Specifies the contract for the `applySelectionFromSidebarUnitButton` member (applySelectionFromSidebarUnitButton: (unitId: string, event: MouseEvent) => void;).
 
@@ -435,52 +429,6 @@ export function syncUiAfterSelectionChange(
 }
 
 /**
- * Defines the `createSidebarOrderRow` function shape (export function createSidebarOrderRow(args: { labelText: string; selected: boolean; onToggleSelect: (event: MouseEvent) => void; onCancel: () => voi).
-
- * Purpose: Supports maintainability by documenting why `createSidebarOrderRow` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-export function createSidebarOrderRow(args: {
-  labelText: string;
-  selected: boolean;
-  onToggleSelect: (event: MouseEvent) => void;
-  onCancel: () => void;
-  compactBlueButtons?: boolean;
-}): HTMLDivElement {
-  const row = document.createElement('div');
-  row.style.display = 'flex';
-  row.style.alignItems = 'center';
-  row.style.gap = '0.5rem';
-  row.style.marginBottom = '0.35rem';
-  const label = document.createElement('span');
-  label.textContent = args.labelText;
-  label.style.flex = '1';
-  label.style.fontSize = '0.9em';
-  const selectBtn = document.createElement('button');
-  selectBtn.type = 'button';
-  selectBtn.className = args.compactBlueButtons ? 'unit-select compact-blue-btn compact-square-btn' : 'unit-select';
-  selectBtn.textContent = args.selected ? UNIT_DESELECT_GLYPH : UNIT_SELECT_GLYPH;
-  selectBtn.style.flexShrink = '0';
-  selectBtn.style.fontSize = '0.8em';
-  selectBtn.addEventListener('click', (event) => {
-    args.onToggleSelect(event as MouseEvent);
-  });
-  const cancelBtn = document.createElement('button');
-  cancelBtn.type = 'button';
-  cancelBtn.className = args.compactBlueButtons ? 'unit-select compact-blue-btn compact-square-btn' : 'unit-select';
-  cancelBtn.textContent = '×';
-  cancelBtn.style.flexShrink = '0';
-  cancelBtn.style.fontSize = '0.8em';
-  cancelBtn.addEventListener('click', args.onCancel);
-  row.appendChild(label);
-  row.appendChild(selectBtn);
-  row.appendChild(cancelBtn);
-  return row;
-}
-
-/**
  * Rebuilds the Movement orders list from the active theater's drafts.
  *
  * When to use: after a march or ferry draft is added, cancelled, or cleared.
@@ -505,6 +453,7 @@ export function updatePendingOrdersSidebar(deps: PendingOrdersDeps): void {
           row.subUnitId,
           formatTacticalDraftMarchPendingOrderTargetLabel(S.tacticalBattleSnapshot, row.subUnitId, row.destinationH3Index)
         ),
+        unitId: row.subUnitId,
         selected: S.selectedUnitIds.includes(row.subUnitId),
         onToggleSelect: (event) => deps.applySelectionFromSidebarUnitButton(row.subUnitId, event),
         onCancel: () => {
@@ -522,6 +471,7 @@ export function updatePendingOrdersSidebar(deps: PendingOrdersDeps): void {
           ferry.unitId,
           formatPendingFerryOrderSidebarLabel(S.gameState, ferry, S.tacticalBattleSnapshot.subUnits)
         ),
+        unitId: ferry.unitId,
         selected: S.selectedUnitIds.includes(ferry.unitId),
         onToggleSelect: (event) => deps.applySelectionFromSidebarUnitButton(ferry.unitId, event),
         onCancel: () => {
@@ -545,6 +495,7 @@ export function updatePendingOrdersSidebar(deps: PendingOrdersDeps): void {
   for (const order of pendingOrders) {
     const row = deps.createSidebarOrderRow({
       labelText: deps.formatPendingOrderSidebarLabel(order),
+      unitId: order.unitId,
       selected: S.selectedUnitIds.includes(order.unitId),
       onToggleSelect: (event) => deps.applySelectionFromSidebarUnitButton(order.unitId, event),
       onCancel: () => {
@@ -557,6 +508,7 @@ export function updatePendingOrdersSidebar(deps: PendingOrdersDeps): void {
   for (const ferry of S.pendingFerryOrders) {
     const row = deps.createSidebarOrderRow({
       labelText: deps.formatUnitArrowLabel(ferry.unitId, formatPendingFerryOrderSidebarLabel(S.gameState, ferry)),
+      unitId: ferry.unitId,
       selected: S.selectedUnitIds.includes(ferry.unitId),
       onToggleSelect: (event) => deps.applySelectionFromSidebarUnitButton(ferry.unitId, event),
       onCancel: () => deps.cancelFerryForUnit(ferry.unitId),

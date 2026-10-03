@@ -2,6 +2,7 @@
  * Shared HTML assembly for melee-intercept modal rows so res1 hex previews match map tooltip content.
  */
 
+import type { HexNamingCaption } from '../../shared/hexNamingCaption';
 import type { NamingLookupTarget, TerrainTooltipState } from '../map/terrainTooltipTypes';
 
 /**
@@ -13,11 +14,11 @@ import type { NamingLookupTarget, TerrainTooltipState } from '../map/terrainTool
  * Exceptions: None; naming lookup failures still yield terrain-only bodies via `getCachedTerrainTooltipHtml`.
  */
 export type MeleeInterceptRes1HexTooltipDeps = {
-  getCachedNamingLineForTarget: (target: NamingLookupTarget | null) => Promise<string | null>;
+  getCachedNamingLineForTarget: (target: NamingLookupTarget | null) => Promise<HexNamingCaption | null>;
   terrainTooltipStateForRes1Hex: (h3Index: string) => TerrainTooltipState;
   getCachedTerrainTooltipHtml: (
     state: TerrainTooltipState,
-    namingLine: string | null,
+    namingCaption: HexNamingCaption | null,
     namingTarget: NamingLookupTarget | null
   ) => string;
 };
@@ -35,7 +36,7 @@ export async function buildMeleeInterceptHexPopupHtmlForRes1(
   deps: MeleeInterceptRes1HexTooltipDeps
 ): Promise<string> {
   const namingTarget: NamingLookupTarget = { h3Index, resolution: 1 };
-  const namingLine = await deps.getCachedNamingLineForTarget(namingTarget);
+  const namingCaption = await deps.getCachedNamingLineForTarget(namingTarget);
   const state = deps.terrainTooltipStateForRes1Hex(h3Index);
-  return deps.getCachedTerrainTooltipHtml(state, namingLine, namingTarget);
+  return deps.getCachedTerrainTooltipHtml(state, namingCaption, namingTarget);
 }

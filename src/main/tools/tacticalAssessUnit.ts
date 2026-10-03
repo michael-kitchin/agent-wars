@@ -20,6 +20,8 @@ import { logDebug } from '../logger';
 import { gridHopDistanceBetween } from './assessUnitProximity';
 import { h3ToLatLng, type LatLng, type LatLngMap } from './h3LatLng';
 import { estimateTacticalMarch, type TacticalMarchEstimate } from './tacticalMarchEstimate';
+import { tacticalOriginBonusUnitFields } from './originBonusAssessment';
+import type { OriginBonusSettings } from '../../shared/originBonusTypes';
 
 /**
  * Inputs for `executeTacticalAssessUnit`.
@@ -66,6 +68,15 @@ export interface TacticalAssessUnitArgs {
    * Exceptions: None.
    */
   readonly latLngByH3: LatLngMap;
+  /**
+   * Match origin bonus flags.
+   *
+   * Contract: Required, so every caller decides; pass `ORIGIN_BONUS_OFF` when bonuses do not apply.
+   * When to use: Every call; the tool loop reads them from the plan state.
+   * Expected outcome: Controls the origin bonus fields of the `unit` block.
+   * Exceptions: None.
+   */
+  readonly originBonusSettings: OriginBonusSettings;
 }
 
 /**
@@ -341,6 +352,7 @@ export function executeTacticalAssessUnit(args: TacticalAssessUnitArgs): {
       movementPointsThisBeat: selfBudget,
       rangedRangeThisBeat: selfRange,
       embarkedOnSubUnitId: self.embarkedOnSubUnitId ?? null,
+      ...tacticalOriginBonusUnitFields(args.originBonusSettings, battle, self),
     },
     nearbyEnemies: enemies.map((e) => e.row),
     nearbyFriendlies,

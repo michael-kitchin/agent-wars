@@ -12,7 +12,7 @@ The model is a weak model. Each job below must be answerable from information th
 
 1. **Judge win progress.** Decide whether this turn should push enemy home hexes, protect own home production, or fight in the field. Needs `WIN_CONDITIONS`, `HOME_REGION_HEXES`, `HOME_CONTROL_PROGRESS`, `SCENARIO_ID`.
 2. **Read the resolution order.** Know that this period's attacks resolve from turn-start positions, before movement, so a unit can shoot and move. Needs `WEGO_PHASE_ORDER`, `TEMPO_RANGED_SHOT`, `ATTACK_ONE_PER_UNIT`.
-3. **Choose this turn's shots and their targets.** Decide, per armed unit, whether to fire and at what. Needs `RANGED_LEGAL_TARGETS`, `BEST_OPTIONS_ROWS`, `COMBAT_STATS`, `STRATEGIC_RANGE_TABLE`, `CASUALTY_PRIORITY`, `ACTION_NEEDED_FLAG`.
+3. **Choose this turn's shots and their targets.** Decide, per armed unit, whether to fire and at what. Needs `RANGED_LEGAL_TARGETS`, `BEST_OPTIONS_ROWS`, `COMBAT_STATS`, `STRATEGIC_RANGE_TABLE`, `CASUALTY_PRIORITY`, `ORIGIN_BONUS`, `ACTION_NEEDED_FLAG`.
 4. **Decide when a unit should not fire.** Recognise the one case where withholding is a real choice, and that it is expressed as an order rather than as silence. Needs `HOLD_FIRE_SEMANTICS`.
 5. **Choose where each unit should be next.** Pick a legal destination for units that need to move now. Friendly stacking is legal; enemy-occupied cells are move/melee contact. Needs `BEST_OPTIONS_ROWS`, `LEGAL_DEST_OCCUPANCY`, `TERRAIN_CLASS`, `NAVAL_MOVEMENT_DOMAIN`, `MOVE_BUDGET`.
 6. **Choose standing orders over per-turn micromanagement.** Give every orderless march-capable unit a mission instead of re-planning it every turn. Needs `ORDERLESS_UNITS`, `SUGGESTED_DESTINATION`, `ORDER_TYPE_LEGALITY`, `MARCH_CURRENT_HEX_RULE`, `STANDING_ORDER_STATE`.
@@ -29,7 +29,7 @@ The model is a weak model. Each job below must be answerable from information th
 ### 1.2 Tactical beat jobs
 
 16. **Fight the local battle, not the war.** Reduce enemy sub-units inside this footprint; regional victory text does not apply. Needs `BATTLE_FRAME`, `SUBUNIT_IDENTITY`.
-17. **Choose this beat's shots.** Same tempo logic at res4 ranges, including infantry. Needs `TACTICAL_RANGE_TABLE`, `TEMPO_RANGED_SHOT`, `RANGED_LEGAL_TARGETS`, `CASUALTY_PRIORITY`.
+17. **Choose this beat's shots.** Same tempo logic at res4 ranges, including infantry. Needs `TACTICAL_RANGE_TABLE`, `TEMPO_RANGED_SHOT`, `RANGED_LEGAL_TARGETS`, `CASUALTY_PRIORITY`, `ORIGIN_BONUS`.
 18. **Move sub-units within a beat budget.** Pick a destination this beat can actually reach, and know an over-reaching destination is truncated rather than rejected. Needs `TACTICAL_MP_RULES`, `FIRST_LEG_TRUNCATION`, `BEST_OPTIONS_ROWS`.
 19. **Employ air inside the footprint.** Strike any occupied cell, or ferry to an intact airport cell in the battle; never both. Needs `AIR_STRIKE_ENVELOPE`, `FERRY_DESTINATIONS`, `AIR_ORDER_RESTRICTIONS`.
 20. **Handle cargo in battle.** Embark, transport, disembark at res4. Needs `EMBARK_STATE`, `EMBARK_LEGALITY`.
@@ -128,6 +128,7 @@ Scope is `strategic`, `tactical`, `both`, or `consult-only`. Status is `required
 | `WEGO_PHASE_ORDER` | Embark, then air strikes, then ranged, then movement, then ferry, then melee | `executeReadyStrategicTurn`, `applyHumanTacticalDraftBeatInStrategicOrder` | n/a | 2, 3, 5, 7 | both | required |
 | `TEMPO_RANGED_SHOT` | A shot costs no movement, so a legal shot declined is output lost | phase order above | n/a | 3, 17 | both | required |
 | `CASUALTY_PRIORITY` | Hits land on the lowest-defense defender first, then in the fixed type order | `combatResolution.ts` victim sort, `CASUALTY_PRIORITY_ORDER` | n/a | 3, 17 | both | required |
+| `ORIGIN_BONUS` | A unit rolling where its birth country (both modes) or birth terrain kind (battle only) matches the place adds 1 to its attack or defense value; the bonuses do not stack and casualty order keeps the printed values | `originBonusSources`, `ORIGIN_HIT_BONUS`, `buildOriginBonusRule` | n/a | 3, 17 | both | conditional — a flag that applies in the mode is on (country bonus on the strategic map; either flag in battle) |
 | `HOLD_FIRE_SEMANTICS` | A `hold_fire` order suppresses automatic engagement for that unit until replaced | `holdFireUnitIdsForPlayer`, `assignOrder` | n/a | 4 | strategic | conditional — `flags.ordersEnabled`, since the order can only be issued through a standing order |
 | `MOVE_BUDGET` | Strategic movement is one cell for infantry and two for armor and naval; air does not march | `MOVEMENT_BUDGET` | n/a | 5 | strategic | required |
 | `TACTICAL_MP_RULES` | Beat movement is a terrain-weighted point budget, reduced in urban and rubble, never below one for non-air. An intact road cell costs half a point and an intact rail cell costs one third in every terrain. Rubble with no line costs 2. Rubble on a line costs 1 only where the unit could already enter. The unit may enter a line cell from off the line and may leave only onto passable terrain or another intact line cell | `MOVEMENT_RANGE_BY_UNIT_TYPE`, `effectiveTacticalMovementPointBudgetForMarchLeg`, `TACTICAL_TRANSPORT_ROAD_BUDGET_MULTIPLIER`, `TACTICAL_TRANSPORT_RAIL_BUDGET_MULTIPLIER` | n/a | 18 | tactical | required |
@@ -222,6 +223,7 @@ These are `required` or `conditional` above but `absent` or `partial` in today's
 | `expireAndUpdateStatus` housekeeping | Engine cleanup; the resulting statuses are already shown |
 | Raw H3 indexes and latitude/longitude as order values | Rejected by the parser and by tool argument decoding |
 | Player-facing unit labels (`displayName`) | Ids are the addressable handle; two names for one unit invites mis-addressed orders |
+| Unit birth origin (hex, cell, terrain, urban, country) | The birth hex and cell never appear, and an enemy's birth hex is not part of the briefing. With a bonus flag on, the per-unit `originBonusHere`, `birthCountry`, and (in battle) `birthTerrain`, plus the hex `country`, are shown because they change hit odds (`ORIGIN_BONUS`) |
 | Production, memory, and standing orders in tactical prompts | No beat resolution reads them, and the forbidden-marker guard exists to keep them out |
 | Tactical light-precompute allowlist | Disabled by default and changes no model-visible text when off |
 | Combat RNG seed and per-roll detail | Not actionable and would invite the model to predict rolls |

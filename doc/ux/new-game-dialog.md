@@ -17,7 +17,7 @@ Opens in New game and in Game over. See [modes-and-transitions.md](modes-and-tra
 - An AI home-region choice and a randomize control labeled "Randomize AI home region".
 - A game-size choice.
 - Cap badges for infantry, armor, naval, and air. The numbers are in [game size and unit caps](../game-size-unit-caps.md).
-- A fog-of-war checkbox, checked whenever the overlay opens.
+- One row of three checkboxes, in this order: Fog of war, Country bonus, and Terrain bonus. All three are checked whenever the overlay opens. The bonus rules are in [combat rules §4.9](../combat-rules-v3.md).
 - A button labeled "Start game" when no match is loaded or when New opened the overlay, and "New game" when the match is over.
 
 ## Inputs and Responses
@@ -27,7 +27,7 @@ Opens in New game and in Game over. See [modes-and-transitions.md](modes-and-tra
 - When the player changes either home region, that side's home region updates. The two home regions may be the same. Nothing in the overlay prevents that.
 - When the player clicks a randomize control, that side's region becomes a random legal choice.
 - When the player changes game size, the cap badges update to that size.
-- When the player changes fog of war, the next match uses that setting. Opening the overlay checks the box again.
+- When the player changes Fog of war, Country bonus, or Terrain bonus, the next match uses that setting. Opening the overlay checks all three boxes again.
 - When the player clicks Start game or New game, the match starts, drafts and the selection clear, the AI cost readout and the AI activity log clear, and the overlay closes on success. A failure leaves the overlay open.
 
 ### Keyboard
@@ -49,7 +49,7 @@ Opens in New game and in Game over. See [modes-and-transitions.md](modes-and-tra
 
 - The overlay never closes itself. Only a successful start closes it.
 - The startup, New, and game-over messages stay distinct from each other.
-- Fog of war is checked every time the overlay opens, including game over.
+- Fog of war, Country bonus, and Terrain bonus are all checked every time the overlay opens, including game over.
 - Starting a match clears the previous selection and drafts.
 
 ## Strategic and Tactical Differences
@@ -73,8 +73,9 @@ None.
 
 ## Code Entry Points
 
-- `static/index.html` (`#game-over-overlay`, `#game-over-message`, `#new-game-human-region-select`, `#new-game-human-region-randomize`, `#new-game-ai-region-select`, `#new-game-ai-region-randomize`, `#new-game-size-select`, `#new-game-size-cap-infantry`, `#new-game-size-cap-armor`, `#new-game-size-cap-naval`, `#new-game-size-cap-air`, `#new-game-fog-checkbox`, `#new-game-btn`)
+- `static/index.html` (`#game-over-overlay`, `#game-over-message`, `#new-game-human-region-select`, `#new-game-human-region-randomize`, `#new-game-ai-region-select`, `#new-game-ai-region-randomize`, `#new-game-size-select`, `#new-game-size-cap-infantry`, `#new-game-size-cap-armor`, `#new-game-size-cap-naval`, `#new-game-size-cap-air`, `#new-game-fog-checkbox`, `#new-game-country-bonus-checkbox`, `#new-game-terrain-bonus-checkbox`, `#new-game-btn`)
 - `src/renderer/gameplay/newGame.ts`
+- `src/renderer/gameplay/newGameOptionsUi.ts`
 - `src/renderer/gameplay/newGameRegionUi.ts`
 - `src/renderer/gameplay/newGameSizeUi.ts`
 - `src/renderer/core/uiState.ts`

@@ -1,8 +1,10 @@
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import { formatSidebarPhaseText } from '../../shared/sidebarPhaseLabel';
 import { rendererSharedState as S } from './state';
+import { setUnitNameContent } from './unitOriginFlags';
 import { initializeScenarioRegionSelectorsOnOverlayOpen } from '../gameplay/newGameRegionUi';
 import { syncGameSizeCapPreview } from '../gameplay/newGameSizeUi';
+import { resetNewGameOptionCheckboxes } from '../gameplay/newGameOptionsUi';
 
 /**
  * Title-cases the strategic phase id from main (`planning` / `resolution`) for the sidebar line.
@@ -18,11 +20,12 @@ function formatStrategicPhaseLabelForSidebar(phase: string): string {
 }
 
 /**
- * Defines the `updateSidebar` function shape (export function updateSidebar().
-
- * Purpose: Supports maintainability by documenting why `updateSidebar` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Refreshes the selected-unit line in the right sidebar.
+ *
+ * Purpose: Shows which unit the player has selected, with its origin flag.
+ * When to use: After any selection change or snapshot that can change unit names.
+ * Expected outcome: The primary unit's flag and name, followed by ` (+N)` when more units are selected;
+ *   an em dash when nothing is selected.
  * Exceptions: None.
  */
 export function updateSidebar(
@@ -32,8 +35,13 @@ export function updateSidebar(
   const selectedUnitEl = document.getElementById('sidebar-selected-unit');
   if (selectedUnitEl) {
     const primary = getPrimarySelectedUnitId();
-    if (S.selectedUnitIds.length <= 1) selectedUnitEl.textContent = primary ? formatUnitDisplayName(primary) : '—';
-    else selectedUnitEl.textContent = `${primary ? formatUnitDisplayName(primary) : '—'} (+${S.selectedUnitIds.length - 1})`;
+    if (!primary) {
+      selectedUnitEl.textContent = S.selectedUnitIds.length <= 1 ? '—' : `— (+${S.selectedUnitIds.length - 1})`;
+      return;
+    }
+    const extraCount = S.selectedUnitIds.length - 1;
+    const suffix = extraCount > 0 ? ` (+${extraCount})` : '';
+    setUnitNameContent(selectedUnitEl, primary, `${formatUnitDisplayName(primary)}${suffix}`);
   }
 }
 
@@ -92,11 +100,12 @@ export function setMainUIControlsEnabled(enabled: boolean): void {
 }
 
 /**
- * Defines the `updateGameOverUI` function shape (export function updateGameOverUI().
-
- * Purpose: Supports maintainability by documenting why `updateGameOverUI` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Shows or hides the new-game overlay to match the current state.
+ *
+ * Purpose: Keeps the overlay up while there is no game or the game is over, and the main controls disabled with it.
+ * When to use: After every state refresh.
+ * Expected outcome: With a live game the overlay hides and controls are enabled. Otherwise the overlay shows a
+ *   win, loss, or start message, and the option checkboxes are checked again on every call while it shows.
  * Exceptions: None.
  */
 export function updateGameOverUI(
@@ -106,7 +115,6 @@ export function updateGameOverUI(
   const overlay = document.getElementById('game-over-overlay');
   const messageEl = document.getElementById('game-over-message');
   const newGameBtn = document.getElementById('new-game-btn');
-  const fogCheckbox = document.getElementById('new-game-fog-checkbox') as HTMLInputElement | null;
   const rangedBtn = document.getElementById('ranged-attack-btn') as HTMLButtonElement | null;
 
   const noGame = !state || state.hexes.length === 0;
@@ -123,7 +131,7 @@ export function updateGameOverUI(
   }
 
   overlay?.classList.remove('hidden');
-  if (fogCheckbox) fogCheckbox.checked = true;
+  resetNewGameOptionCheckboxes();
   if (wasHidden) {
     void initializeScenarioRegionSelectorsOnOverlayOpen();
   }

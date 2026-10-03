@@ -15,11 +15,8 @@ import {
   appendKeepBuildingCheckbox,
   canArmKeepBuilding,
 } from './buildQueueKeepBuilding';
-import {
-  escapeBuildPopupHtml,
-  formatGroupedBuildNamingLineHtml,
-  sanitizeBuildCountInputText,
-} from './buildQueuePopupFormatting';
+import { escapeBuildPopupHtml, sanitizeBuildCountInputText } from './buildQueuePopupFormatting';
+import { formatHexNamingCaptionHtml, type HexNamingCaption } from '../../shared/hexNamingCaption';
 
 /**
  * Re-exports build-count sanitizer for existing `buildQueuePopup` import paths.
@@ -305,11 +302,11 @@ export function createBuildQueuePopupHandler(deps: BuildQueuePopupDeps) {
     if (!window.gameApi?.getHexBuildQueue) return;
     const requestSeq = ++S.buildPopupRequestSeq;
     let snapshot: HexBuildQueueSnapshot | null = null;
-    let namingLine: string | null = null;
+    let namingCaption: HexNamingCaption | null = null;
     try {
       snapshot = await window.gameApi.getHexBuildQueue({ h3Index });
       if (window.gameApi.getHexNamingTooltipLine) {
-        namingLine = await window.gameApi.getHexNamingTooltipLine({ h3Index, resolution: 1 });
+        namingCaption = await window.gameApi.getHexNamingTooltipLine({ h3Index, resolution: 1 });
       }
     } catch (err) {
       console.error('getHexBuildQueue failed:', err);
@@ -329,12 +326,11 @@ export function createBuildQueuePopupHandler(deps: BuildQueuePopupDeps) {
 
     const section = document.createElement('div');
     section.className = 'build-queue-section';
-    const trimmedNamingLine = namingLine?.trim() ?? '';
     const res1Code = getStrategicRes1HexCode(h3Index);
     const llmPrefixHtml = res1Code ? `<strong>(${escapeBuildPopupHtml(res1Code)})</strong> ` : '';
-    if (trimmedNamingLine.length > 0) {
+    if (namingCaption && namingCaption.text.trim().length > 0) {
       const descriptionLine = document.createElement('div');
-      descriptionLine.innerHTML = `${llmPrefixHtml}${formatGroupedBuildNamingLineHtml(trimmedNamingLine)}`;
+      descriptionLine.innerHTML = `${llmPrefixHtml}${formatHexNamingCaptionHtml(namingCaption)}`;
       section.appendChild(descriptionLine);
       const descriptionSpacer = document.createElement('div');
       descriptionSpacer.style.height = '0.5em';

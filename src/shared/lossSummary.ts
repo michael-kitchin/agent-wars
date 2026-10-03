@@ -273,6 +273,26 @@ const CAUSE_SPECS: ReadonlyArray<{ key: keyof PlayerLossSummary; label: string }
 ];
 
 /**
+ * The five loss-cause labels, in display order.
+ *
+ * Purpose: Lets UI code recognize `<label>: ...` loss lines without restating the label literals.
+ * When to use: When parsing formatted loss lines, for example to decorate victim names in the map toast.
+ * Expected outcome: `Ranged attack`, `Melee attack`, `Return fire`, `Air strike`, `Other losses`.
+ * Exceptions: None.
+ */
+export const LOSS_CAUSE_LABELS: ReadonlyArray<string> = CAUSE_SPECS.map((spec) => spec.label);
+
+/**
+ * The five loss-cause bucket keys of `PlayerLossSummary`, in display order.
+ *
+ * Purpose: Lets callers walk every victim bucket without restating the key list.
+ * When to use: When every `LostUnit` of a summary must be visited.
+ * Expected outcome: `ranged`, `melee`, `returnFire`, `airStrike`, `other`.
+ * Exceptions: None.
+ */
+export const LOSS_CAUSE_KEYS: ReadonlyArray<keyof PlayerLossSummary> = CAUSE_SPECS.map((spec) => spec.key);
+
+/**
  * Builds non-empty cause lines for one player's losses (multiline popup use).
  *
  * Purpose: Produces ordered cause sub-bullets under a player section header.

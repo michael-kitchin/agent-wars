@@ -13,7 +13,17 @@ import { resolveTerrainRes1NamingPath, resolveTerrainRes4NamingPath } from './te
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export const EXPECTED_HEX_NAMING_SCHEMA_VERSION = '1.1.0';
+export const EXPECTED_HEX_NAMING_SCHEMA_VERSION = '1.2.0';
+
+/**
+ * Shape of a valid `country_code` value in naming JSON.
+ *
+ * Purpose: Rejects lowercase, `-99`, or other malformed codes at load time instead of at render time.
+ * When to use: Inside `readCountryCodeOrNull` only.
+ * Expected outcome: Matches exactly two uppercase ASCII letters.
+ * Exceptions: None.
+ */
+const COUNTRY_CODE_PATTERN = /^[A-Z]{2}$/;
 /**
  * Documents the module-scope binding `TOOLTIP_NAME_LIST_MAX_ITEMS` (TOOLTIP_NAME_LIST_MAX_ITEMS).
 
@@ -60,6 +70,15 @@ country: string;
    * Exceptions: None.
    */
 scalerank: number | null;
+  /**
+   * ISO 3166-1 alpha-2 code of the state's country, from Natural Earth.
+   *
+   * Contract: Uppercase two letters, or `null` when Natural Earth has no code (disputed areas).
+   * When to use: Country flags in naming captions and birth-country resolution.
+   * Expected outcome: Stable per country across all rows.
+   * Exceptions: None.
+   */
+  countryCode: string | null;
 }
 
 /**
@@ -116,16 +135,17 @@ population: number | null;
    * Exceptions: None.
    */
 scalerank: number | null;
+  /**
+   * ISO 3166-1 alpha-2 code of the city's country, from Natural Earth.
+   *
+   * Contract: Uppercase two letters, or `null` when Natural Earth has no code.
+   * When to use: Country flags in naming captions and birth-country resolution.
+   * Expected outcome: Matches the code on the country's own rows when Natural Earth agrees.
+   * Exceptions: None.
+   */
+  countryCode: string | null;
 }
 
-/**
- * Documents the `TerrainNamingCountryRow` interface as a named contract surface (export interface TerrainNamingCountryRow).
-
- * Purpose: Supports maintainability by documenting why `TerrainNamingCountryRow` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
 /**
  * One lake or ocean polygon intersecting a hex from Natural Earth water shapefiles.
  *
@@ -164,6 +184,14 @@ export interface TerrainNamingWaterRow {
   scalerank: number | null;
 }
 
+/**
+ * One Natural Earth country intersecting a hex.
+ *
+ * Contract: Parsed from naming JSON `countries` arrays; `countryCode` is validated by the loader.
+ * When to use: Country captions, caption coverage checks, and birth-country resolution.
+ * Expected outcome: One row per intersecting country, in pipeline order.
+ * Exceptions: None.
+ */
 export interface TerrainNamingCountryRow {
     /**
    * Specifies the contract for the `name` member (name: string;).
@@ -210,6 +238,15 @@ population: number | null;
    * Exceptions: None.
    */
 scalerank: number | null;
+  /**
+   * ISO 3166-1 alpha-2 code of this country, from Natural Earth (`ISO_A2_EH`, else `ISO_A2`).
+   *
+   * Contract: Uppercase two letters, or `null` when Natural Earth has no code (disputed areas).
+   * When to use: Country flags in naming captions and canonical birth-country names.
+   * Expected outcome: One code per country.
+   * Exceptions: None.
+   */
+  countryCode: string | null;
 }
 
 /**
@@ -417,6 +454,26 @@ function readOptionalStrOrNull(r: Record<string, unknown>, key: string): string 
 }
 
 /**
+ * Reads a required `country_code` field from one naming row.
+ *
+ * Purpose: Validates the ISO code that drives country flags, failing fast on stale or malformed data.
+ * When to use: For every country, state, and city row in `readCountryArray`, `readStateArray`, and `readCityArray`.
+ * Expected outcome: The uppercase two-letter code, or `null` when the JSON value is `null`.
+ * Exceptions: Throws when the key is missing or the value is not `null` or two uppercase letters.
+ */
+function readCountryCodeOrNull(el: Record<string, unknown>, index: number, arrayKey: string): string | null {
+  if (!Object.prototype.hasOwnProperty.call(el, 'country_code')) {
+    throw new Error(`terrain naming: ${arrayKey}[${index}].country_code is missing`);
+  }
+  const v = el.country_code;
+  if (v === null) return null;
+  if (typeof v !== 'string' || !COUNTRY_CODE_PATTERN.test(v)) {
+    throw new Error(`terrain naming: ${arrayKey}[${index}].country_code must be two uppercase letters or null`);
+  }
+  return v;
+}
+
+/**
  * Defines the `readStateArray` function shape (function readStateArray(r: Record<string, unknown>, key: string): TerrainNamingStateRow[]).
 
  * Purpose: Supports maintainability by documenting why `readStateArray` exists.
@@ -433,6 +490,7 @@ function readStateArray(r: Record<string, unknown>, key: string): TerrainNamingS
       name: readStr(el, 'name'),
       country: readStr(el, 'country'),
       scalerank: readIntOrNull(el, 'scalerank'),
+      countryCode: readCountryCodeOrNull(el, i, key),
     };
   });
 }
@@ -456,18 +514,11 @@ function readCountryArray(r: Record<string, unknown>, key: string): TerrainNamin
       region: readOptionalStrOrNull(el, 'region'),
       population: readNumOrNull(el, 'population'),
       scalerank: readRequiredIntOrNull(el, 'scalerank'),
+      countryCode: readCountryCodeOrNull(el, i, key),
     };
   });
 }
 
-/**
- * Defines the `readCityArray` function shape (function readCityArray(r: Record<string, unknown>, key: string): TerrainNamingCityRow[]).
-
- * Purpose: Supports maintainability by documenting why `readCityArray` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
 /**
  * Parses the `water` array from a naming JSON record.
  *
@@ -493,6 +544,14 @@ function readWaterArray(r: Record<string, unknown>, key: string): TerrainNamingW
   });
 }
 
+/**
+ * Parses the `cities` array from a res4 naming JSON record.
+ *
+ * Purpose: Validates city rows, including the country code used for flags and birth countries.
+ * When to use: From `parseRes4Row`.
+ * Expected outcome: Array of `TerrainNamingCityRow`; `state` and `country` may be `null`.
+ * Exceptions: Throws when the value is not an array, a row is not an object, or a field is invalid.
+ */
 function readCityArray(r: Record<string, unknown>, key: string): TerrainNamingCityRow[] {
   const v = r[key];
   if (!Array.isArray(v)) throw new Error(`terrain naming: "${key}" must be an array`);
@@ -504,6 +563,7 @@ function readCityArray(r: Record<string, unknown>, key: string): TerrainNamingCi
       country: readOptionalStrOrNull(el, 'country'),
       population: readNumOrNull(el, 'population'),
       scalerank: readIntOrNull(el, 'scalerank'),
+      countryCode: readCountryCodeOrNull(el, i, key),
     };
   });
 }
@@ -630,365 +690,6 @@ export function namesForFirstOccurringScalerankList(
     names.push(row.name);
   }
   return names;
-}
-
-/**
- * Defines the `sortRowsByScalerankAscending` function shape (function sortRowsByScalerankAscending<T extends).
-
- * Purpose: Supports maintainability by documenting why `sortRowsByScalerankAscending` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function sortRowsByScalerankAscending<T extends { scalerank: number | null }>(rows: ReadonlyArray<T>): T[] {
-  return rows
-    .map((row, index) => ({ row, index }))
-    .sort((a, b) => {
-      const aRank = a.row.scalerank ?? Number.MAX_SAFE_INTEGER;
-      const bRank = b.row.scalerank ?? Number.MAX_SAFE_INTEGER;
-      if (aRank !== bRank) return aRank - bRank;
-      return a.index - b.index;
-    })
-    .map((item) => item.row);
-}
-
-/**
- * Defines the `groupedLabel` function shape (function groupedLabel<T>().
-
- * Purpose: Supports maintainability by documenting why `groupedLabel` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function groupedLabel<T>(
-  rows: ReadonlyArray<T>,
-  groupKey: (row: T) => string,
-  itemLabel: (row: T, groupRows: ReadonlyArray<T>) => string
-): string {
-  const groupOrder: string[] = [];
-  const grouped = new Map<string, T[]>();
-  for (const row of rows) {
-    const key = groupKey(row);
-    let list = grouped.get(key);
-    if (!list) {
-      list = [];
-      grouped.set(key, list);
-      groupOrder.push(key);
-    }
-    list.push(row);
-  }
-  return groupOrder
-    .map((key) => {
-      const groupRows = grouped.get(key) ?? [];
-      const body = groupRows.map((row) => itemLabel(row, groupRows)).join(', ');
-      return `${key}: ${body}`;
-    })
-    .join('; ');
-}
-
-/**
- * Defines the `formatGroupedCitiesForTooltip` function shape (function formatGroupedCitiesForTooltip(rows: ReadonlyArray<TerrainNamingCityRow>): string).
-
- * Purpose: Supports maintainability by documenting why `formatGroupedCitiesForTooltip` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function formatGroupedCitiesForTooltip(rows: ReadonlyArray<TerrainNamingCityRow>): string {
-  const countryOrder: string[] = [];
-  const citiesByCountry = new Map<string, TerrainNamingCityRow[]>();
-  for (const row of rows) {
-    const country = row.country ?? 'Unknown Country';
-    let cityRows = citiesByCountry.get(country);
-    if (!cityRows) {
-      cityRows = [];
-      citiesByCountry.set(country, cityRows);
-      countryOrder.push(country);
-    }
-    cityRows.push(row);
-  }
-  return countryOrder
-    .map((country) => {
-      const cityRows = citiesByCountry.get(country) ?? [];
-      const stateOrder: string[] = [];
-      const citiesByState = new Map<string, string[]>();
-      for (const cityRow of cityRows) {
-        const stateKey = cityRow.state ?? '';
-        let stateCities = citiesByState.get(stateKey);
-        if (!stateCities) {
-          stateCities = [];
-          citiesByState.set(stateKey, stateCities);
-          stateOrder.push(stateKey);
-        }
-        stateCities.push(cityRow.name);
-      }
-      const groupedCityLabels = stateOrder
-        .map((stateKey) => {
-          const cityNames = citiesByState.get(stateKey) ?? [];
-          const joinedCities = cityNames.join(', ');
-          return stateKey ? `${joinedCities} (${stateKey})` : joinedCities;
-        })
-        .filter((label) => label.length > 0);
-      return `${country}: ${groupedCityLabels.join(', ')}`;
-    })
-    .join('; ');
-}
-
-/**
- * Defines the `formatGroupedStatesForTooltip` function shape (function formatGroupedStatesForTooltip(rows: ReadonlyArray<TerrainNamingStateRow>): string).
-
- * Purpose: Supports maintainability by documenting why `formatGroupedStatesForTooltip` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function formatGroupedStatesForTooltip(rows: ReadonlyArray<TerrainNamingStateRow>): string {
-  return groupedLabel(
-    rows,
-    (row) => row.country || 'Unknown Country',
-    (row) => row.name
-  );
-}
-
-/**
- * Defines the `formatGroupedCountriesForTooltip` function shape (function formatGroupedCountriesForTooltip(rows: ReadonlyArray<TerrainNamingCountryRow>): string).
-
- * Purpose: Supports maintainability by documenting why `formatGroupedCountriesForTooltip` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function formatGroupedCountriesForTooltip(rows: ReadonlyArray<TerrainNamingCountryRow>): string {
-  return groupedLabel(
-    rows,
-    (row) => row.continent ?? 'Unknown Continent',
-    (row) => row.name
-  );
-}
-
-/**
- * Defines the `citiesCoverAllStates` function shape (function citiesCoverAllStates().
-
- * Purpose: Supports maintainability by documenting why `citiesCoverAllStates` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function citiesCoverAllStates(
-  cityRows: ReadonlyArray<TerrainNamingCityRow>,
-  associatedStates: ReadonlyArray<TerrainNamingStateRow>
-): boolean {
-  if (associatedStates.length === 0) return true;
-  const coveredStates = new Set(
-    cityRows
-      .map((row) => row.state)
-      .filter((state): state is string => typeof state === 'string' && state.length > 0)
-  );
-  for (const stateRow of associatedStates) {
-    if (!coveredStates.has(stateRow.name)) return false;
-  }
-  return true;
-}
-
-/**
- * Defines the `citiesCoverAllCountries` function shape (function citiesCoverAllCountries().
-
- * Purpose: Supports maintainability by documenting why `citiesCoverAllCountries` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function citiesCoverAllCountries(
-  cityRows: ReadonlyArray<TerrainNamingCityRow>,
-  associatedCountries: ReadonlyArray<TerrainNamingCountryRow>
-): boolean {
-  if (associatedCountries.length === 0) return true;
-  const coveredCountries = new Set(
-    cityRows
-      .map((row) => row.country)
-      .filter((country): country is string => typeof country === 'string' && country.length > 0)
-  );
-  for (const countryRow of associatedCountries) {
-    if (!coveredCountries.has(countryRow.name)) return false;
-  }
-  return true;
-}
-
-/**
- * Defines the `statesCoverAllCountries` function shape (function statesCoverAllCountries( stateRows: ReadonlyArray<TerrainNamingStateRow>, associatedCountries: ReadonlyArray<TerrainNamingCountryRow> ): boolean).
-
- * Purpose: Supports maintainability by documenting why `statesCoverAllCountries` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function statesCoverAllCountries(
-  stateRows: ReadonlyArray<TerrainNamingStateRow>,
-  associatedCountries: ReadonlyArray<TerrainNamingCountryRow>
-): boolean {
-  if (associatedCountries.length === 0) return true;
-  const coveredCountries = new Set(stateRows.map((row) => row.country || 'Unknown Country'));
-  for (const countryRow of associatedCountries) {
-    if (!coveredCountries.has(countryRow.name)) return false;
-  }
-  return true;
-}
-
-/**
- * Defines the `statesCoverAllContinents` function shape (function statesCoverAllContinents( stateRows: ReadonlyArray<TerrainNamingStateRow>, associatedCountries: ReadonlyArray<TerrainNamingCountryRow> ): boolea).
-
- * Purpose: Supports maintainability by documenting why `statesCoverAllContinents` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function statesCoverAllContinents(
-  stateRows: ReadonlyArray<TerrainNamingStateRow>,
-  associatedCountries: ReadonlyArray<TerrainNamingCountryRow>
-): boolean {
-  if (associatedCountries.length === 0) return true;
-  const coveredCountries = new Set(stateRows.map((row) => row.country || 'Unknown Country'));
-  const allContinents = new Set(associatedCountries.map((row) => row.continent ?? 'Unknown Continent'));
-  const coveredContinents = new Set(
-    associatedCountries
-      .filter((row) => coveredCountries.has(row.name))
-      .map((row) => row.continent ?? 'Unknown Continent')
-  );
-  for (const continent of allContinents) {
-    if (!coveredContinents.has(continent)) return false;
-  }
-  return true;
-}
-
-/**
- * Defines the `preferredNamingLineForRes4Record` function shape (export function preferredNamingLineForRes4Record(record: TerrainNamingRecordRes4): string | null).
-
- * Purpose: Supports maintainability by documenting why `preferredNamingLineForRes4Record` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-export function preferredNamingLineForRes4Record(record: TerrainNamingRecordRes4): string | null {
-  const firstRankCities = sortRowsByScalerankAscending(record.cities).slice(0, TOOLTIP_NAME_LIST_MAX_ITEMS);
-  if (
-    firstRankCities.length > 0 &&
-    citiesCoverAllStates(firstRankCities, record.states) &&
-    citiesCoverAllCountries(firstRankCities, record.countries)
-  ) {
-    return formatGroupedCitiesForTooltip(firstRankCities);
-  }
-  const firstRankStates = sortRowsByScalerankAscending(record.states).slice(0, TOOLTIP_NAME_LIST_MAX_ITEMS);
-  if (
-    firstRankStates.length > 0 &&
-    statesCoverAllCountries(firstRankStates, record.countries) &&
-    statesCoverAllContinents(firstRankStates, record.countries)
-  ) {
-    return formatGroupedStatesForTooltip(firstRankStates);
-  }
-  if (record.countries.length > 0) return formatGroupedCountriesForTooltip(sortRowsByScalerankAscending(record.countries));
-  return null;
-}
-
-/**
- * Defines the `preferredNamingLineForRes1Record` function shape (export function preferredNamingLineForRes1Record(record: TerrainNamingRecordRes1): string | null).
-
- * Purpose: Supports maintainability by documenting why `preferredNamingLineForRes1Record` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-/**
- * Formats lake/ocean rows into a grouped water caption string shared by res1 and res4.
- *
- * Purpose: Keep water tooltip grouping identical at both resolutions.
- * When to use: From `waterNamingLineForRes1Record` and `waterNamingLineForRes4Record`.
- * Expected outcome: Comma-separated scalerank groups (descending rank; null rank first), or `null` when empty.
- * Exceptions: None.
- */
-function formatGroupedWaterNamingLine(water: ReadonlyArray<TerrainNamingWaterRow>): string | null {
-  if (water.length === 0) return null;
-  const byRank = new Map<number | null, string[]>();
-  for (const row of water) {
-    const rank = row.scalerank ?? null;
-    let names = byRank.get(rank);
-    if (!names) {
-      names = [];
-      byRank.set(rank, names);
-    }
-    names.push(row.name);
-  }
-  const ranks = Array.from(byRank.keys()).sort((a, b) => {
-    const aSort = a === null ? Number.POSITIVE_INFINITY : a;
-    const bSort = b === null ? Number.POSITIVE_INFINITY : b;
-    return bSort - aSort;
-  });
-  const groupStrings = ranks.map((rank) => {
-    const names = [...(byRank.get(rank) ?? [])].sort((x, y) => x.localeCompare(y));
-    return names.join(', ');
-  });
-  if (groupStrings.length === 0) return null;
-  return groupStrings.join(', ');
-}
-
-/**
- * Builds the water-body caption for a res1 hex from lake/ocean naming JSON rows.
- *
- * Purpose: Water fallback when state/country geographic naming is unavailable.
- * When to use: As fallback from `namingLineForRes1Record` after `preferredNamingLineForRes1Record` returns null.
- * Expected outcome: Same comma-grouped water format as res4, or `null` when `water` is empty.
- * Exceptions: None.
- */
-export function waterNamingLineForRes1Record(record: TerrainNamingRecordRes1): string | null {
-  return formatGroupedWaterNamingLine(record.water);
-}
-
-/**
- * Builds the water-body caption for a res4 hex from lake/ocean naming JSON rows.
- *
- * Purpose: Water fallback when city/state/country geographic naming is unavailable.
- * When to use: As fallback from `namingLineForRes4Record` after `preferredNamingLineForRes4Record` returns null.
- * Expected outcome: Comma-separated scalerank groups, or `null` when empty.
- * Exceptions: None.
- */
-export function waterNamingLineForRes4Record(record: TerrainNamingRecordRes1): string | null {
-  return formatGroupedWaterNamingLine(record.water);
-}
-
-/**
- * Resolves the res1 tooltip naming line: geographic (state/country) first, then water bodies.
- *
- * Purpose: Single entrypoint for res1 caption selection in the terrain classification cache.
- * When to use: From `buildSnapshot` when precomputing `namingLinesRes1ByH3`.
- * Expected outcome: Geographic line when available; otherwise water-body names from `water` JSON; else `null`.
- * Exceptions: None.
- */
-export function namingLineForRes1Record(record: TerrainNamingRecordRes1): string | null {
-  return preferredNamingLineForRes1Record(record) ?? waterNamingLineForRes1Record(record);
-}
-
-/**
- * Resolves the res4 tooltip naming line: geographic (city/state/country) first, then water bodies.
- *
- * Purpose: Single entrypoint for res4 caption selection in the terrain classification cache.
- * When to use: From `buildSnapshot` when precomputing `namingLinesRes4ByH3`.
- * Expected outcome: Geographic line when available; otherwise water-body names from `water` JSON; else `null`.
- * Exceptions: None.
- */
-export function namingLineForRes4Record(record: TerrainNamingRecordRes4): string | null {
-  return preferredNamingLineForRes4Record(record) ?? waterNamingLineForRes4Record(record);
-}
-
-export function preferredNamingLineForRes1Record(record: TerrainNamingRecordRes1): string | null {
-  const firstRankStates = sortRowsByScalerankAscending(record.states).slice(0, TOOLTIP_NAME_LIST_MAX_ITEMS);
-  if (
-    firstRankStates.length > 0 &&
-    statesCoverAllCountries(firstRankStates, record.countries) &&
-    statesCoverAllContinents(firstRankStates, record.countries)
-  ) {
-    return formatGroupedStatesForTooltip(firstRankStates);
-  }
-  if (record.countries.length > 0) return formatGroupedCountriesForTooltip(sortRowsByScalerankAscending(record.countries));
-  return null;
 }
 
 /**

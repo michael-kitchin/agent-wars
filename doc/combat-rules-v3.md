@@ -18,7 +18,7 @@ Rules are divided into two layers: **strategic** (H3 res1, the primary game) and
 ## 1. Design principles
 
 - **Simultaneous resolution:** The engine resolves all combat and movement in a defined phase sequence. No mid-combat input, except the melee-intercept choice to enter a tactical battle or continue strategic melee.
-- **Dice-based hits:** Each unit rolls one d6; a hit is scored when the result is **less than or equal to** that unit's attack or defense value (A&A style).
+- **Dice-based hits:** Each unit rolls one d6; a hit is scored when the result is **less than or equal to** that unit's attack or defense value (A&A style), plus 1 when an optional origin bonus applies (§4.9).
 - **Automatic casualty assignment:** Hits remove units by **lowest defense first**, then type order **infantry → armor → naval → air** (`CASUALTY_PRIORITY_ORDER`).
 - **Resolution order (strategic):** embark → air strikes → ranged → ground/naval movement → cargo sync → ferry → melee. Production, control, and fog refresh run after melee.
 - **Resolution order (tactical beat):** embark → air strikes → ranged → movement → ferry → cargo sync → melee. No production step.
@@ -56,6 +56,8 @@ The game has four unit types. Per-side caps scale with match size (`getMaxUnitsP
   Examples: a hex with 5 urban hexes produces one infantry (cost 20) every 4 turns. A hex with 10 urban hexes and a seaport queues a naval unit (cost 100): it spawns on turn 10 when accumulated production first reaches 100.
 
   Air strikes that destroy urban hexes (3 res4 hexes per hit) permanently reduce the production rate.
+
+  Each new unit records where it was born: its res1 hex, and one res4 cell inside that hex when the hex has land. An intact urban cell is chosen when the hex has one; otherwise any land cell. Rubble is not intact urban. A hex with no land cell records no cell, uses that hex's own terrain, and has no country. The chosen cell also stores its terrain, whether it is intact urban, and its country from the naming data ([terrain pipeline](terrain-pipeline.md)). The origin drives the flag and origin tooltip on unit names. It also drives the optional origin bonuses (§4.9): with both bonus flags off, the origin has no rules effect and AI prompts do not mention it.
 
 - **Strategic movement** is a flat hex budget (`getMovementBudget`): infantry 1, armor 2, naval 2, air 0. Terrain does **not** modify strategic movement costs. Naval movement is restricted to water and coastal hexes (`NAVAL_MOVEMENT_PROMPT_RULE`).
 
@@ -173,6 +175,20 @@ No "continue or retreat." If both sides remain in the same hex after melee, they
 - **Hit:** For **attack** (including return fire), hit if `roll ≤ attack value`. For **defense** (melee only), hit if `roll ≤ defense value`.
 - **Return fire (ranged phase):** A defending unit returns fire only if at least one attacker hex is a legal reverse shot under planning rules. **Strategic ground** (infantry/armor/naval): strategic ranged range + H3 grid distance. Infantry strategic range is 0, so infantry never returns fire on the strategic map. **Tactical ground:** tactical ranged baselines with terrain caps and mountain LOS (same as direct-fire validation), including infantry. **Air** in the ranged phase: strike-planning rules — intact airport at base, and on the strategic map within air strike range of the attacker hex; in a tactical battle, airport only (engagement hexes are already in footprint). Air-strike phase counter-fire (§8) is separate and still has **no** range-to-base check.
 - **Casualty assignment:** When a side receives N hits, remove N of its units using **lowest defense first**. Ties: **infantry → armor → naval → air**.
+
+#### Origin bonuses (optional)
+
+Two new-game options, **Country bonus** and **Terrain bonus**, are checked by default. When a unit qualifies where it stands at the moment of a roll, it adds **1** to its attack or defense value for that roll (hit if `roll ≤ value + 1`). The number of dice never changes.
+
+- **Country bonus (strategic and tactical):** the unit's birth country equals the country of the place where it rolls. Countries match by canonical name, not by code. On the strategic map, a hex's country is its **majority country**: the country with the most res4 cells inside the hex, with ties going to the name that sorts first. A hex with no counted cells has no country. In a battle, a cell's country is that cell's own country, the same value used for unit births.
+- **Terrain bonus (tactical only):** the unit's birth terrain kind equals the cell's effective terrain kind. Urban and rubble are flags, not kinds, and never affect the match. The strategic map ignores this flag.
+- **No stacking:** a unit that qualifies on both counts still adds only 1.
+- **Who qualifies:** a unit without a recorded origin, or with a missing birth country or terrain, never qualifies for that test. Tactical sub-units use their parent unit's origin.
+- **Where a unit stands:** air strikes and ranged fire use pre-move positions; melee uses the melee hex or cell. An air unit is judged at its base, whatever it strikes. Cargo shares its carrier's position.
+- **Rolls that change:** ranged fire and return fire (including standing-order defend fire), both melee rolls, air strikes on units and on infrastructure, air-strike counter-fire by defending units, and tactical ranged fire at infrastructure.
+- **Rolls and rules that do not change:** infrastructure's fixed counter-fire, every casualty sort and air-strike victim pick (they keep the printed defense values), movement, ranges, enter costs, ferry range, sub-unit counts, and production.
+
+`estimate_combat` uses the same effective values. `assess_unit`, `assess_hex`, the briefing Unit Status table, and the AI combat rules paragraph report the bonus only while a flag that applies in that mode is on ([ai-tools.md](ai-tools.md)).
 
 ### 4.10 Elimination
 
@@ -317,6 +333,8 @@ Destroyed urban hexes, airports, and seaports do not rebuild. This applies globa
 | Airport | 3 (50%) | AA defenses (fixed roll, unaffected by hex occupation) | ≤ 2 (33%) |
 | Seaport | 3 (50%) | Seaport defenses (fixed roll, unaffected by hex occupation) | ≤ 1 (17%) |
 
+The values in §8 are the printed values. With an origin bonus on (§4.9), a qualifying air unit's strike roll and a qualifying defender's counter-fire roll each add 1. Infrastructure counter-fire never changes.
+
 ---
 
 ## 9. Sealift and naval transport
@@ -356,6 +374,7 @@ If a naval unit carrying cargo is destroyed, all embarked units are destroyed wi
 ## 11. Summary (strategic level)
 
 - **A&A-style:** One die per unit, hit when roll ≤ attack (when attacking) or ≤ defense (when defending in melee).
+- **Origin bonuses (optional):** +1 to that value for a unit rolling in its birth country; in battles, also on its birth terrain kind. The two never stack.
 - **Caps:** Small 12/8/8/6 infantry/armor/naval/air, scaled by game size. Costs 20 / 40 / 100 / 60.
 - **Air strikes:** Air units strike first (range 3 from base airport), targeting units or infrastructure. One action per turn: strike or ferry (range 4).
 - **Infrastructure destruction:** Urban hexes, airports, and seaports can be permanently destroyed by air strikes. No rebuilding.
@@ -442,7 +461,7 @@ At the tactical level, all unit types have a positive ranged baseline (`RANGED_R
 - **Air-strike AA:** tactical infantry may counter-fire when an air strike targets their hex, because infantry has a positive tactical ranged baseline.
 - Legal targets include enemy-occupied cells **and** strikeable infrastructure (urban, airport, seaport, or active non-rubble road/rail).
 
-Ranged attacks use the same A&A-style dice as strategic combat. Casualty assignment follows the standard fixed priority.
+Ranged attacks use the same A&A-style dice as strategic combat. Casualty assignment follows the standard fixed priority. With the origin bonuses on, a unit on a cell matching its birth country or birth terrain kind adds 1 to its rolls there (§4.9, "Origin bonuses").
 
 **Tactical ranged target selection:** When standing-order or draft ranged rows are expanded from strategic parent units to tactical sub-units, targets must resolve to **enemy-occupied (or strikeable-infra) res4 cells** that pass tactical range and mountain LOS — not the res1-centroid footprint anchor. Sanitization re-targets invalid opponent draft rows to the closest legal enemy cell before dropping them. Naval may bombard adjacent land sub-units when range and LOS allow.
 

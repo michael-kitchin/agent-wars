@@ -15,6 +15,7 @@ The hex tooltip can appear in Strategic planning, Tactical planning, and Resolut
 ### Hex tooltip
 
 - A hex name line, including the hex code, when the lookup succeeds. If the lookup fails, that line is omitted.
+- In the hex name line, a small country flag comes before each country name. A country with no ISO code or no flag file shows a gray placeholder flag. These flags have no tooltip of their own. Continent, state, city, and water names have no flag, and neither does the "Unknown Country" fallback heading.
 - Terrain kind. On the strategic map this can include the mix of terrain inside the hex.
 - A world hex has no effects line, because strategic terrain does not change movement or range. A battle hex shows tactical terrain effects when that hex has any effects. The rules are in the [combat rules](../combat-rules-v3.md).
 - Control or home-region ownership on a world hex, when the player is allowed to see it. Fog of war hides ownership the player has not earned. See the fog section of the [combat rules](../combat-rules-v3.md).
@@ -86,6 +87,7 @@ None.
 
 - `static/index.html` (`#hex-tooltip`, `#order-block-tooltip`, `#order-slower-tooltip`)
 - `src/renderer/map/terrainTooltipRes1State.ts`
+- `src/renderer/map/terrainTooltipHtml.ts`
 - `src/renderer/map/terrainTooltipTypes.ts`
 - `src/renderer/map/orderBlockHexTooltip.ts`
 - `src/renderer/map/orderSlowerHexTooltip.ts`
@@ -93,3 +95,5 @@ None.
 - `src/renderer/map/transientPointerTooltipTtl.ts`
 - `src/renderer/gameplay/meleeInterceptHexTooltip.ts`
 - `src/shared/terrainEffectsForTooltip.ts`
+- `src/shared/hexNamingCaption.ts`
+- `src/shared/countryFlags.ts`

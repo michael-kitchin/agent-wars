@@ -11,6 +11,7 @@ import {
 } from '../combatResolution';
 import { getAssessmentCategory, executeEstimateCombat, poissonBinomialPMF } from './combatEstimation';
 import type { GameStateSnapshot } from '../gameDb';
+import type { UnitOrigin } from '../../shared/unitOriginTypes';
 
 /**
  * Defines the `makeUnit` function shape (function makeUnit(id: string, player: string, unitType: string, h3Index: string): CombatUnit).
@@ -355,6 +356,96 @@ function testExecuteEstimateCombatMalformedSideArgs(): void {
 }
 
 /**
+ * Builds a French-born origin for origin bonus estimates.
+ *
+ * Purpose: Only the birth country matters on the strategic map.
+ * When to use: Origin bonus cases below.
+ * Expected outcome: A complete `UnitOrigin`.
+ * Exceptions: None.
+ */
+function frenchOrigin(birthH3Index: string): UnitOrigin {
+  return {
+    birthH3Index,
+    birthRes4H3Index: null,
+    birthTerrainKind: 'plains',
+    birthIsUrban: false,
+    birthCountryName: 'France',
+    birthCountryCode: 'FR',
+  };
+}
+
+/**
+ * Verifies ranged estimates report the country bonus of an attacker standing in its birth country.
+ *
+ * Purpose: Estimates must use the same effective values as live dice.
+ * When to use: After changing estimate thresholds or the strategic theater lookup.
+ * Expected outcome: With the flag on, armor shows attack 4 and `originBonus: 1`; with it off, attack 3 and no key.
+ * Exceptions: None.
+ */
+function testRangedEstimateReportsCountryBonus(): void {
+  const h3 = '891f1d48b9fffff';
+  const state = (countryBonusEnabled: boolean): GameStateSnapshot => ({
+    hexes: [{ h3Index: h3, terrain: 'land', terrainKind: 'plains', countryName: 'France' }],
+    units: [
+      { id: 'opponent-armor-1', player: 'opponent', unitType: 'armor', h3Index: h3, origin: frenchOrigin(h3) },
+      { id: 'human-infantry-1', player: 'human', unitType: 'infantry', h3Index: h3 },
+    ],
+    phase: 'planning',
+    turnNumber: 1,
+    pendingOrders: [],
+    countryBonusEnabled,
+  });
+  const latLngByH3 = new Map<string, [number, number]>([[h3, [0.5, 0.5]]]);
+  const args = { engagementType: 'ranged', attackers: { units: ['opponent-armor-1'] }, targetHex: [0.5, 0.5] };
+  type Summary = { attackerSummary?: { units: { attackValue: number; originBonus?: number }[] } };
+  const on = executeEstimateCombat(args, state(true), latLngByH3, () => h3) as Summary;
+  assert.strictEqual(on.attackerSummary?.units[0]?.attackValue, 4);
+  assert.strictEqual(on.attackerSummary?.units[0]?.originBonus, 1);
+  const off = executeEstimateCombat(args, state(false), latLngByH3, () => h3) as Summary;
+  assert.strictEqual(off.attackerSummary?.units[0]?.attackValue, 3);
+  assert.ok(!('originBonus' in off.attackerSummary!.units[0]!));
+}
+
+/**
+ * Verifies melee attackers are judged at the target hex, where melee happens.
+ *
+ * Purpose: A melee attacker moves into the target before rolling.
+ * When to use: After changing how estimates place melee attackers.
+ * Expected outcome: An attacker standing outside its birth country still gets the bonus at a target inside it.
+ * Exceptions: None.
+ */
+function testMeleeEstimateJudgesAttackerAtTarget(): void {
+  const from = '891f1d48b8fffff';
+  const target = '891f1d48b9fffff';
+  const state: GameStateSnapshot = {
+    hexes: [
+      { h3Index: from, terrain: 'land', terrainKind: 'plains', countryName: 'Spain' },
+      { h3Index: target, terrain: 'land', terrainKind: 'plains', countryName: 'France' },
+    ],
+    units: [
+      { id: 'opponent-armor-1', player: 'opponent', unitType: 'armor', h3Index: from, origin: frenchOrigin(target) },
+      { id: 'human-infantry-1', player: 'human', unitType: 'infantry', h3Index: target },
+    ],
+    phase: 'planning',
+    turnNumber: 1,
+    pendingOrders: [],
+    countryBonusEnabled: true,
+  };
+  const latLngByH3 = new Map<string, [number, number]>([
+    [from, [0.4, 0.4]],
+    [target, [0.5, 0.5]],
+  ]);
+  const result = executeEstimateCombat(
+    { engagementType: 'melee', attackers: { units: ['opponent-armor-1'] }, targetHex: [0.5, 0.5] },
+    state,
+    latLngByH3,
+    () => target
+  ) as { attackerSummary?: { units: { attackValue: number; originBonus?: number }[] } };
+  assert.strictEqual(result.attackerSummary?.units[0]?.attackValue, 4);
+  assert.strictEqual(result.attackerSummary?.units[0]?.originBonus, 1);
+}
+
+/**
  * Defines the `runCombatEstimationVerification` function shape (export function runCombatEstimationVerification(): void).
 
  * Purpose: Supports maintainability by documenting why `runCombatEstimationVerification` exists.
@@ -374,6 +465,8 @@ export function runCombatEstimationVerification(): void {
   testExecuteEstimateCombatUncontested();
   testExecuteEstimateCombatUnitNotFound();
   testExecuteEstimateCombatInvalidHex();
+  testRangedEstimateReportsCountryBonus();
+  testMeleeEstimateJudgesAttackerAtTarget();
   console.log('Tool 3 verification: all checks passed.');
 }
 

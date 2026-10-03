@@ -18,6 +18,8 @@ Shown with the right panel. The player can use the lists in Strategic planning a
 - "Air strikes". Each row names the unit and then shows the distance in hexes plus the status, target type, or `ferry`. An empty list shows "None".
 - The sidebar error line, which stays hidden. Errors use the map toast only. See [notifications-and-feedback.md](notifications-and-feedback.md).
 
+The selected unit's name and each row's unit name are preceded by the unit's origin flag, under the same rules as the [stack callout](stack-callout.md), including a battle unit using the strategic unit it came from. An em dash has no flag. A unit with no recorded origin shows no flag.
+
 Strategic movement rows include standing movement and ferries. Tactical movement rows include pending marches and ferries. Sealift assignments are not pending orders and are not listed. See [order-lifecycle.md](order-lifecycle.md).
 
 ## Inputs and Responses
@@ -75,6 +77,8 @@ None.
 
 - `static/index.html` (`#sidebar-selected-unit`, `#pending-orders-list`, `#ranged-attacks-list`, `#air-strikes-list`, `#sidebar-error`)
 - `src/renderer/gameplay/sidebarSupport.ts`
+- `src/renderer/gameplay/sidebarOrderRow.ts`
+- `src/renderer/core/unitOriginFlags.ts`
 - `src/renderer/gameplay/orderLabelFormatting.ts`
 - `src/renderer/gameplay/tacticalOrders.ts`
 - `src/renderer/core/uiState.ts`

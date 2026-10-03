@@ -20,6 +20,12 @@ export function getFullDdl(): string {
       unit_type TEXT NOT NULL CHECK (unit_type IN ('infantry', 'armor', 'naval', 'air')),
       display_order INTEGER,
       h3_index TEXT NOT NULL,
+      birth_h3_index TEXT,
+      birth_res4_h3_index TEXT,
+      birth_terrain_kind TEXT,
+      birth_is_urban INTEGER,
+      birth_country_name TEXT,
+      birth_country_code TEXT,
       FOREIGN KEY (h3_index) REFERENCES hexes(h3_index)
     );
 

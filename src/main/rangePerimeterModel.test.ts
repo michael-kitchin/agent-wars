@@ -82,7 +82,7 @@ function testStrategicVsTacticalRangedPlanningGate(): void {
 function testAirStrikeAaTheaterSplitInSource(): void {
   const strategic = fs.readFileSync(path.resolve(process.cwd(), 'src', 'main', 'gameActions', 'airStrikeResolution.ts'), 'utf8');
   const tactical = fs.readFileSync(
-    path.resolve(process.cwd(), 'src', 'main', 'tacticalBattle', 'tacticalStrategicOrderPhases.ts'),
+    path.resolve(process.cwd(), 'src', 'main', 'tacticalBattle', 'tacticalAirStrikeUnits.ts'),
     'utf8'
   );
   assert.ok(

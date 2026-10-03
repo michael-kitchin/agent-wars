@@ -100,6 +100,18 @@ test('computeTacticalBattleSnapshot records placed baseline counts by parent id'
   });
 });
 
+test('computeTacticalBattleSnapshot copies each parent origin onto its sub-units', () => {
+  tacticalDbFixtureWithTempDbContestedPlanning('aw-tactical-snap-origin-', ({ targetRes1H3 }) => {
+    const result = computeTacticalBattleSnapshot(targetRes1H3, 'origin-copy-probe');
+    assert.ok(result.snapshot, result.failureReason ?? 'expected snapshot');
+    const originByParentId = new Map(listUnitsForSnapshot().map((u) => [u.id, u.origin]));
+    assert.ok(result.snapshot.subUnits.some((sub) => sub.origin), 'expected at least one sub-unit with an origin');
+    for (const sub of result.snapshot.subUnits) {
+      assert.deepEqual(sub.origin, originByParentId.get(sub.parentUnitId), sub.id);
+    }
+  });
+});
+
 test('startTacticalBattleForEnclosingRes1Hex rejects a second start while session is active', () => {
   tacticalDbFixtureWithTempDbContestedPlanning('aw-tactical-snap-dup-', ({ targetRes1H3 }) => {
     const first = startTacticalBattleForEnclosingRes1Hex(targetRes1H3);

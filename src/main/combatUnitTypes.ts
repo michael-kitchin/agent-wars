@@ -1,3 +1,5 @@
+import type { OriginHitBonus } from '../shared/originBonusTypes';
+
 /**
  * Documents the `CombatUnit` interface as a named contract surface (export interface CombatUnit).
 
@@ -52,4 +54,13 @@ h3Index: string;
    * Exceptions: None.
    */
 displayOrder?: number;
+    /**
+   * Origin bonus added to this unit's hit thresholds in the current combat phase.
+   *
+   * Contract: Set when the unit array is built for a phase, from the unit's position in that phase; present only when it is 1, and absent means 0.
+   * When to use: Read through `attackHitThreshold` / `defenseHitThreshold`; set through `withOriginHitBonus`.
+   * Expected outcome: Each roll this unit makes hits on one more face; casualty order ignores it.
+   * Exceptions: None.
+   */
+readonly originHitBonus?: OriginHitBonus;
 }

@@ -28,6 +28,7 @@ import {
   buildLightweightTacticalUnitAssessments,
   buildTacticalBriefingNarrative,
 } from './tacticalBriefingAssessments';
+import { originBonusSettingsFromSnapshot } from '../../shared/originBonusRules';
 
 /**
  * Builds the full tactical briefing override for `buildSystemPromptForTools`.
@@ -53,7 +54,7 @@ export function formatTacticalBriefing(args: {
     battleId: tacticalBattle.battleId,
     tacticalTurnNumber: tacticalBattle.tacticalTurnNumber,
   };
-  const assessments = buildLightweightTacticalUnitAssessments(tacticalBattle);
+  const assessments = buildLightweightTacticalUnitAssessments(tacticalBattle, originBonusSettingsFromSnapshot(planState));
   const sections: string[] = [];
 
   sections.push(markdownHeading1(SECTION_TITLE_COMMANDERS_BRIEFING));

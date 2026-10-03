@@ -11,6 +11,7 @@ import type {
   Res4TransportVectorOverlayRow,
 } from '../shared/ipc/terrainHexTypes';
 import type { TerrainClassificationSnapshot } from './terrainClassificationCache';
+import type { HexNamingCaption } from '../shared/hexNamingCaption';
 
 /**
  * Maps res4 override rows into renderer payload rows with `isRubble` defaulted.
@@ -28,17 +29,15 @@ export function res4TerrainOverridesRowsForRenderer(
 }
 
 /**
- * Resolves the naming tooltip line for a hex from the snapshot naming maps.
+ * Resolves the naming caption for a hex from the snapshot caption maps.
  * When to use: `getHexNamingTooltipLineForRenderer` when the cache is loaded.
  */
 export function hexNamingTooltipLineFromSnapshot(
   snapshot: TerrainClassificationSnapshot,
   payload: { h3Index: string; resolution: 1 | 4 }
-): string | null {
-  if (payload.resolution === 1) {
-    return snapshot.namingLinesRes1ByH3.get(payload.h3Index) ?? null;
-  }
-  return snapshot.namingLinesRes4ByH3.get(payload.h3Index) ?? null;
+): HexNamingCaption | null {
+  const captions = payload.resolution === 1 ? snapshot.namingCaptionsRes1ByH3 : snapshot.namingCaptionsRes4ByH3;
+  return captions.get(payload.h3Index) ?? null;
 }
 
 /**

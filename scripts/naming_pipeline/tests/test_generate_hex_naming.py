@@ -8,6 +8,7 @@ from pathlib import Path
 
 from scripts.naming_pipeline.generate_hex_naming import (
     _init_tables,
+    _normalize_water_name,
     _resolve_field_names,
     _validate_inputs,
     _write_res1_json,
@@ -45,6 +46,10 @@ class GenerateHexNamingTests(unittest.TestCase):
                     ('8400001ffffffff', 'Metro', 'Delta', 'Yland', 900000, 2),
                     ('8400001ffffffff', 'Acity', 'Delta', 'Yland', 100000, 1),
                     ('8400001ffffffff', 'Acity', 'Delta', 'Yland', 100000, 1);
+
+                    UPDATE states_res1 SET country_code = 'XA' WHERE name = 'Beta';
+                    UPDATE countries_res1 SET country_code = 'AL' WHERE name = 'Aland';
+                    UPDATE cities_res4 SET country_code = 'YL' WHERE name = 'Metro';
                     """
                 )
                 conn.commit()
@@ -57,11 +62,15 @@ class GenerateHexNamingTests(unittest.TestCase):
                 self.assertEqual(1, res1["record_count"])
                 self.assertEqual(["Beta", "Alpha"], [s["name"] for s in res1["records"][0]["states"]])
                 self.assertEqual(["Aland", "Zedland"], [c["name"] for c in res1["records"][0]["countries"]])
+                self.assertEqual(["XA", None], [s["country_code"] for s in res1["records"][0]["states"]])
+                self.assertEqual(["AL", None], [c["country_code"] for c in res1["records"][0]["countries"]])
 
                 res4 = json.loads(out_res4.read_text(encoding="utf-8"))
                 self.assertEqual(4, res4["resolution"])
                 self.assertEqual(1, res4["record_count"])
                 self.assertEqual(["Acity", "Metro"], [c["name"] for c in res4["records"][0]["cities"]])
+                self.assertEqual([None, "YL"], [c["country_code"] for c in res4["records"][0]["cities"]])
+                self.assertIn("country_code", res4["records"][0]["states"][0])
                 self.assertEqual(["Delta", "Gamma"], [s["name"] for s in res4["records"][0]["states"]])
                 self.assertEqual(["Yland"], [c["name"] for c in res4["records"][0]["countries"]])
             finally:
@@ -108,6 +117,11 @@ class GenerateHexNamingTests(unittest.TestCase):
                 self.assertEqual([], res4["records"][0]["cities"])
             finally:
                 conn.close()
+
+    def test_normalize_water_name_title_cases_all_caps_only(self) -> None:
+        self.assertEqual("Indian Ocean", _normalize_water_name("INDIAN OCEAN"))
+        self.assertEqual("Bay of Bengal", _normalize_water_name("BAY OF BENGAL"))
+        self.assertEqual("Gulf of St. Lawrence", _normalize_water_name("Gulf of St. Lawrence"))
 
     def test_validate_inputs_fails_when_shapefiles_missing(self) -> None:
         with tempfile.TemporaryDirectory() as td:

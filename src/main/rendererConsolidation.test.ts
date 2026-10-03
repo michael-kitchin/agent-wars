@@ -658,12 +658,14 @@ function testRes4RubbleTooltipAndTerrainVariantContracts(): void {
   const rendererSource = fs.readFileSync(rendererPath, 'utf8');
   const terrainTooltipStatePath = path.resolve(process.cwd(), 'src', 'renderer', 'map', 'terrainTooltipRes1State.ts');
   const terrainTooltipStateSource = fs.readFileSync(terrainTooltipStatePath, 'utf8');
+  const terrainTooltipHtmlPath = path.resolve(process.cwd(), 'src', 'renderer', 'map', 'terrainTooltipHtml.ts');
+  const terrainTooltipHtmlSource = fs.readFileSync(terrainTooltipHtmlPath, 'utf8');
   const terrainStylesPath = path.resolve(process.cwd(), 'src', 'renderer', 'rendering', 'terrainVisualStyles.ts');
   const terrainStylesSource = fs.readFileSync(terrainStylesPath, 'utf8');
   const drawTerrainHexesFn = getFunctionSource(rendererSource, 'drawTerrainHexes');
   const featureLabelsForRes4ChildFn = getFunctionSource(terrainTooltipStateSource, 'featureLabelsForRes4Child');
   const terrainStateForPointerFn = getFunctionSource(terrainTooltipStateSource, 'terrainStateForPointer');
-  const formatTerrainTooltipHtmlFn = getFunctionSource(terrainTooltipStateSource, 'formatTerrainTooltipHtml');
+  const formatTerrainTooltipHtmlFn = getFunctionSource(terrainTooltipHtmlSource, 'formatTerrainTooltipHtml');
 
   assert.ok(
     drawTerrainHexesFn.includes('if (res4Active) return;'),
@@ -796,7 +798,7 @@ function testTacticalEntryLayerPlanningAndContestedContracts(): void {
 /**
  * Defines the `testStrategicAndTacticalBranchesShareOrderOverlayPipeline` function shape.
 
- * Purpose: Guards Phase 5 overlay consolidation so tactical/strategic `drawGameScene` paths cannot drop pending support overlays independently.
+ * Purpose: Guards the shared order-overlay pipeline so tactical/strategic `drawGameScene` paths cannot drop pending support overlays independently.
  * When to use: Regression signal when refactoring `drawGameScene` or `orderOverlayStages`.
  * Expected outcome: Both branches call `drawPendingMarchesHoverAndSupportOrderStack` from the shared module (which stages hover preview then support overlays).
  * Exceptions: None.
@@ -816,7 +818,7 @@ function testStrategicAndTacticalBranchesShareOrderOverlayPipeline(): void {
 /**
  * Defines the `testMainMapInteractionsDelegatesHumanUnitIconSelectionToPolicyModule` function shape.
 
- * Purpose: Guards Phase 4 click-selection consolidation for human unit icon hits on the main map.
+ * Purpose: Guards the shared click-selection policy for human unit icon hits on the main map.
  * When to use: Regression signal when refactoring `mainMapInteractions` selection branches.
  * Expected outcome: Icon hit path delegates to `applyHumanUnitIconClickSelectionPolicy` and clears use the shared timer helper.
  * Exceptions: None.
@@ -984,6 +986,21 @@ function testHoverOrderPlanningInteractionLock(): void {
       rendererSource.includes('dismissMapDetailPopoversForHoverPlanning'),
     'renderer should wire hover-planning dismiss through tactical order deps and local helpers'
   );
+  assert.ok(
+    policySource.includes('function shouldDismissStackCalloutForHoverPlanning'),
+    'a preview of the selected units\' own hex must not count as destination planning for the stack callout'
+  );
+  for (const functionName of [
+    'dismissMapDetailPopoversIfHoverPlanningActive',
+    'showStackCallout',
+    'refreshStackCalloutIfOpen',
+  ]) {
+    const body = getFunctionSource(rendererSource, functionName);
+    assert.ok(
+      body.includes('shouldDismissStackCalloutForHoverPlanning()'),
+      `${functionName} should leave the stack callout up when the pointer is still on the selected units' hex`
+    );
+  }
   assert.ok(
     tacticalEntrySource.includes('isHoverOrderPlanningActive()') &&
       drawInteractionSource.includes('isHoverOrderPlanningActive()') &&

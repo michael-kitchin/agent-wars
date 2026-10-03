@@ -6,7 +6,8 @@
  */
 
 import type { GameStateSnapshot } from '../gameDb';
-import { getAttack, getDefense } from '../combatConstants';
+import { attackHitThreshold, defenseHitThreshold } from '../combatHitThresholds';
+import { originBonusSettingsFromSnapshot } from '../../shared/originBonusRules';
 import { type CombatUnit } from '../combatResolution';
 import { logDebug, logError, logTrace } from '../logger';
 import { canDefenderReturnFireAtAnyAttackerHex } from '../../shared/returnFireEligibility';
@@ -319,7 +320,7 @@ function evaluateReturnFire(
   return {
     canReturnFire: eligible.length > 0,
     details: whoCan.length > 0 ? whoCan.join('; ') : null,
-    hitProbs: eligible.map((u) => getAttack(u.unitType) / 6),
+    hitProbs: eligible.map((u) => attackHitThreshold(u) / 6),
   };
 }
 
@@ -449,7 +450,7 @@ export function executeEstimateCombat(
   }
 
   const theater = tacticalBattle
-    ? buildTacticalCombatEstimationTheater(tacticalBattle)
+    ? buildTacticalCombatEstimationTheater(tacticalBattle, originBonusSettingsFromSnapshot(state))
     : buildStrategicCombatEstimationTheater(state);
   const warnings: string[] = [];
   const ctx: CombatSideContext = { theater, engagementType, targetHexH3, latLngByH3, warnings };
@@ -476,8 +477,8 @@ export function executeEstimateCombat(
 
   const attackerCount = attackers.combat.length;
   const defenderCount = defenders.combat.length;
-  const attackProbs = (units: readonly CombatUnit[]) => units.map((u) => getAttack(u.unitType) / 6);
-  const defenseProbs = (units: readonly CombatUnit[]) => units.map((u) => getDefense(u.unitType) / 6);
+  const attackProbs = (units: readonly CombatUnit[]) => units.map((u) => attackHitThreshold(u) / 6);
+  const defenseProbs = (units: readonly CombatUnit[]) => units.map((u) => defenseHitThreshold(u) / 6);
   const expectedFrag = (p: EngagementPrediction) =>
     `Expected outcome: ${p.attackerLossesExpected.toFixed(2)} attacker losses, ${p.defenderLossesExpected.toFixed(2)} defender losses.`;
 
@@ -493,7 +494,7 @@ export function executeEstimateCombat(
     }
     prediction = computeEngagementPrediction(attackProbs(attackers.combat), returnFire.hitProbs, attackerCount, defenderCount);
     const leadType = attackers.combat[0]?.unitType ?? 'attacker';
-    const leadAttack = attackerCount > 0 ? getAttack(attackers.combat[0]!.unitType) : 0;
+    const leadAttack = attackerCount > 0 ? attackHitThreshold(attackers.combat[0]!) : 0;
     const hitPct = Math.round((leadAttack / 6) * 100);
     const returnFrag = returnFire.canReturnFire && returnFire.details ? ` ${returnFire.details}.` : '';
     reasoning = `${leadType} attacks at value ${leadAttack} (${hitPct}% hit chance).${returnFrag} ${expectedFrag(prediction)}`;

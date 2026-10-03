@@ -10,7 +10,7 @@ One selection drives the right-panel readout, ranged and strike targeting, and d
 
 - Human units whose icon the pointer hits. A single click replaces the selection with that unit after a short delay, so a double-click can still apply to the units selected when the gesture started.
 - Shift-click toggles one human unit in or out of the selection immediately.
-- Enemy units are not added to the selection. A stack, or a lone enemy unit, opens the stack callout instead. See [stack-callout.md](stack-callout.md).
+- Enemy units are not added to the selection. A unit icon opens the stack callout, including one human unit, which is still selected or Shift-toggled. See [stack-callout.md](stack-callout.md).
 - A land unit that is embarked is not selectable.
 - While a hover order preview is in progress, a click that would replace or toggle the selection is ignored.
 - While Ranged or Strike targeting is on, a click does not change the selection, open the stack callout, or record a new selected hex. The double-click places the attack. See [order-lifecycle.md](order-lifecycle.md).
@@ -19,10 +19,10 @@ One selection drives the right-panel readout, ranged and strike targeting, and d
 
 ## Selecting
 
-- When Ranged and Strike targeting are off and the player clicks a human unit icon without Shift, the selection becomes that unit after a short delay. A second click on a human unit icon before the delay ends selects that unit immediately.
-- When Ranged and Strike targeting are off and the player Shift-clicks a human unit icon, that unit toggles in the selection and the delayed single-select is cancelled.
+- When Ranged and Strike targeting are off and the player clicks a human unit icon without Shift, the selection becomes that unit after a short delay, and the stack callout opens after the same delay. A second click on a human unit icon before the delay ends selects that unit immediately.
+- When Ranged and Strike targeting are off and the player Shift-clicks a human unit icon, that unit toggles in the selection and the delayed single-select is cancelled. The stack callout is scheduled for the same delay. Releasing Shift before it opens cancels it. See [input-map.md](input-map.md).
 - When the click is the second press of a double-click on the same spot, the click does not retarget the selection. The order is planned for the units selected at the start of the gesture.
-- When Ranged and Strike targeting are off and the player clicks a stack or a lone enemy icon, and no hover order preview is active, the stack callout opens after the same delay. The second press of a double-click on that spot does not schedule another callout.
+- When Ranged and Strike targeting are off and the player clicks a unit icon, and no hover order preview is already active, the stack callout opens after the same delay. The preview that then appears because the pointer is still on the selected units' hex does not cancel or close that callout. A later click while that preview remains active does not open it again. Moving the pointer onto another hex while a preview is active does. The second press of a double-click on that spot does not schedule another callout. A double-click that plans an order cancels the one already scheduled.
 - The selected-unit readout shows one unit name, or that name plus a count of the other selected units. It shows an em dash when nothing is selected.
 
 ## Clearing and Keeping a Selection

@@ -37,6 +37,7 @@ import {
   topLevelHeading,
 } from './openRouter/promptSpec/sectionHeadings';
 import { buildIntelStalenessRule } from './openRouter/promptSpec/gameRuleText';
+import { formatOriginBonusTableCell } from '../shared/originBonusRules';
 
 /**
  * Optional shared coordinate/index data to avoid rebuilding within one AI request.
@@ -376,6 +377,7 @@ function isQuiet(assessment: UnitAssessmentResult, standingOrdersActive: boolean
  * Purpose: One dense per-unit type/threat/nearest/action table; standing-order detail lives in `# Standing Order Status` when Orders are enabled.
  * When to use: Strategic `formatBriefing` and tactical `formatTacticalBriefing` after assessments are ready.
  * Expected outcome: GFM table with Type; no standing-order column (avoids duplicating Standing Order Status / former Unit Roster).
+ *   A Bonus column follows Hex only when some assessment carries `originBonusHere`; otherwise the table is unchanged.
  * Exceptions: None; empty assessments yield an empty-state row.
  */
 export function buildUnitStatusTable(
@@ -391,9 +393,9 @@ export function buildUnitStatusTable(
     mode: ctx.mode,
     standingOrdersActive,
   });
-  const header =
-    '| Unit ID | Type | Hex | Nearest enemy + distance | Threat severity | Action needed |';
-  const sep = '|---------|------|-----|---------------------------|-----------------|---------------|';
+  const showBonus = unitAssessments.some((a) => Array.isArray(a.result.unit?.originBonusHere));
+  const header = `| Unit ID | Type | Hex |${showBonus ? ' Bonus |' : ''} Nearest enemy + distance | Threat severity | Action needed |`;
+  const sep = `|---------|------|-----|${showBonus ? '-------|' : ''}---------------------------|-----------------|---------------|`;
   const rows: string[] = [];
   for (const a of unitAssessments) {
     const pos = Array.isArray(a.result.unit?.position)
@@ -417,18 +419,20 @@ export function buildUnitStatusTable(
     const selfLabel = formatUnitDisplayRef(a.unitId);
     const actionCell =
       ctx.mode === 'strategic' && isQuiet(a, standingOrdersActive) ? `${action} (quiet)` : action;
-    rows.push(`| ${selfLabel} | ${type} | ${pos} | ${nearestStr} | ${severity} | ${actionCell} |`);
+    const bonusCell = showBonus ? ` ${formatOriginBonusTableCell(a.result.unit?.originBonusHere ?? [])} |` : '';
+    rows.push(`| ${selfLabel} | ${type} | ${pos} |${bonusCell} ${nearestStr} | ${severity} | ${actionCell} |`);
   }
   if (rows.length === 0) return `${header}\n${sep}\n(No AI units)\n`;
   return `${[header, sep, ...rows].join('\n')}\n`;
 }
 
 /**
- * Defines the `buildSupplementalHexIntelligenceBlock` function shape (function buildSupplementalHexIntelligenceBlock(hexAssessments: HexAssessmentEntry[]): string).
-
- * Purpose: Supports maintainability by documenting why `buildSupplementalHexIntelligenceBlock` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Formats the precomputed `assess_hex` results as one bullet per hex.
+ *
+ * Purpose: Shows the AI terrain and passability for hexes of interest without spending tool calls.
+ * When to use: Strategic briefings, after precomputation has run the hex assessments.
+ * Expected outcome: A section with one bullet per entry; `; country X` is added only when the assessment
+ *   carried a country, meaning the country bonus is on. Empty string when there are no entries.
  * Exceptions: None.
  */
 function buildSupplementalHexIntelligenceBlock(hexAssessments: HexAssessmentEntry[], ctx: CoordinateContext): string {
@@ -441,7 +445,8 @@ function buildSupplementalHexIntelligenceBlock(hexAssessments: HexAssessmentEntr
     const passableBy = Array.isArray(r.passableBy) ? (r.passableBy as string[]).join(', ') : '';
     const notes = Array.isArray(r.strategicNotes) ? (r.strategicNotes as string[]).filter((x) => typeof x === 'string') : [];
     const noteStr = notes.length > 0 ? ` notes: ${notes.join('; ')}` : '';
-    bullets.push(`- ${posStr}: terrain ${terrain}; passableBy: ${passableBy || 'unknown'}${noteStr}`);
+    const countryStr = typeof r.country === 'string' ? `; country ${r.country}` : '';
+    bullets.push(`- ${posStr}: terrain ${terrain}; passableBy: ${passableBy || 'unknown'}${countryStr}${noteStr}`);
   }
   return markdownHeading2(SECTION_TITLE_SUPPLEMENTAL_HEX_INTELLIGENCE) + bullets.join('\n');
 }

@@ -8,22 +8,27 @@
  */
 
 import { cellToChildren, cellToParent, latLngToCell } from 'h3-js';
-import { getLlmHexLocationParenLabelForNamingTarget } from '../../shared/hexLlmCodeAssignment';
-import {
-  formatHomeRegionAssignmentControlSuffix,
-  isHexOwnershipVisibleToPerspective,
-  resolveHomeRegionOwnerIdentity,
-} from '../../shared/homeRegionRules';
 import { DETAIL_H3_RESOLUTION, WORLD_H3_RESOLUTION } from '../core/constants';
 import { isHexExploredByPlayer } from '../core/selection';
 import { rendererSharedState as S } from '../core/state';
 import { getLeafletGlobal } from './mapHelpers';
-import { computeTerrainEffectsLineHtml } from '../../shared/terrainEffectsForTooltip';
-import { TOOLTIP_SECTION_GAP_HTML } from '../../shared/tooltipSectionGap';
 import type { NamingLookupTarget, TerrainTooltipState } from './terrainTooltipTypes';
 import { shouldRenderRes4Hexes } from './terrainView';
-import { escapeHtmlText, formatGroupedSemicolonNamingLineHtml } from '../../shared/htmlTextFormatting';
+import type { HexNamingCaption } from '../../shared/hexNamingCaption';
+import { formatTerrainKindLabel } from '../../shared/terrainKindLabel';
 import { getMainLeafletMap } from './worldLeafletMap';
+
+export { getCachedTerrainTooltipHtml } from './terrainTooltipHtml';
+
+/**
+ * Cached hex naming captions keyed by `resolution:h3Index`.
+ *
+ * Purpose: Avoids repeating the naming IPC call on every hover.
+ * When to use: Through `getCachedNamingLineForTarget` only.
+ * Expected outcome: Caption with country spans, or `null` when the hex has no naming data or the lookup failed.
+ * Exceptions: None.
+ */
+const namingLineByLookupKey = new Map<string, HexNamingCaption | null>();
 
 /** Default res4 effect fields for res1 tooltips and error fallbacks. */
 const EMPTY_TERRAIN_EFFECT_FIELDS: Pick<
@@ -123,11 +128,6 @@ export function hideTerrainTooltipVisual(): void {
     el.classList.add('hidden');
     el.setAttribute('aria-hidden', 'true');
   }
-}
-
-function formatTerrainKindLabel(kind: string): string {
-  if (!kind) return 'Unknown';
-  return kind.charAt(0).toUpperCase() + kind.slice(1);
 }
 
 function terrainStateForRes1Hex(h3: string): { terrainKind: string; isUrban: boolean; isRubble: boolean } {
@@ -590,188 +590,25 @@ function namingLookupKey(target: NamingLookupTarget | null): string | null {
 }
 
 /**
- * Fetches (with memoization) the naming line used in the terrain tooltip header.
+ * Fetches (with memoization) the naming caption used in the terrain tooltip header.
  *
  * Purpose: Avoids duplicate IPC for identical naming targets during pointer hover.
- * When to use: From `showTerrainTooltip` after computing `namingLookupTargetForPointer`.
- * Expected outcome: Cached string or null when IPC is unavailable or fails.
+ * When to use: From `showTerrainTooltip` and the melee-intercept hex cell after computing the naming target.
+ * Expected outcome: Cached caption (text plus country spans), or null when IPC is unavailable or fails.
  * Exceptions: Logs `console.error` on IPC rejection paths.
  */
-export async function getCachedNamingLineForTarget(target: NamingLookupTarget | null): Promise<string | null> {
+export async function getCachedNamingLineForTarget(target: NamingLookupTarget | null): Promise<HexNamingCaption | null> {
   const key = namingLookupKey(target);
   if (!key || !target) return null;
-  if (S.namingLineByLookupKey.has(key)) return S.namingLineByLookupKey.get(key) ?? null;
+  if (namingLineByLookupKey.has(key)) return namingLineByLookupKey.get(key) ?? null;
   if (!window.gameApi?.getHexNamingTooltipLine) return null;
   try {
-    const line = await window.gameApi.getHexNamingTooltipLine(target);
-    S.namingLineByLookupKey.set(key, line ?? null);
-    return line ?? null;
+    const caption = await window.gameApi.getHexNamingTooltipLine(target);
+    namingLineByLookupKey.set(key, caption ?? null);
+    return caption ?? null;
   } catch (err) {
     console.error('getHexNamingTooltipLine failed:', err);
-    S.namingLineByLookupKey.set(key, null);
+    namingLineByLookupKey.set(key, null);
     return null;
   }
-}
-
-/**
- * Renders the bold LLM hex-code badge (`(XX)` or `(XX.YY)`) that prefixes tooltip copy for the active naming target.
- *
- * Purpose: Aligns hover copy with briefing coordinate labels without an IPC call.
- * When to use: From `formatTerrainTooltipHtml` when a naming target is known (matches naming IPC resolution).
- * Expected outcome: Empty string when codes cannot be resolved; otherwise escaped HTML with a trailing space.
- * Exceptions: None.
- */
-function formatLlmLocationBoldPrefixHtml(namingTarget: NamingLookupTarget | null): string {
-  if (!namingTarget) return '';
-  const label = getLlmHexLocationParenLabelForNamingTarget(namingTarget);
-  if (!label) return '';
-  return `<strong>${escapeHtmlText(label)}</strong> `;
-}
-
-function formatTerrainVariantSuffix(state: Pick<TerrainTooltipState, 'isUrban' | 'isRubble'>): string {
-  const variants: string[] = [];
-  if (state.isUrban) variants.push('Urban');
-  if (state.isRubble) variants.push('Rubble');
-  return variants.length > 0 ? `, ${variants.join(', ')}` : '';
-}
-
-/**
- * Resolves the strategic hex id for control-tooltip rendering from the current naming target.
- *
- * Purpose: Lets tooltip control lines use res1 ownership even when pointer sampling is on res4 cells.
- * When to use: Only from control-line helpers in this module.
- * Expected outcome: Returns a res1 h3 index or null when no stable mapping is available.
- * Exceptions: Invalid h3 conversion returns null.
- */
-function resolveStrategicHexForControlLine(namingTarget: NamingLookupTarget | null): string | null {
-  if (!namingTarget) return null;
-  if (namingTarget.resolution === 1) return namingTarget.h3Index;
-  try {
-    return cellToParent(namingTarget.h3Index, WORLD_H3_RESOLUTION);
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Computes human-facing control label text for terrain tooltip content.
- *
- * Purpose: Shows perspective-aware ownership (`Human`/`AI`) while respecting hidden ownership as unknown.
- * When to use: Tooltip HTML formatting and cache-key derivation for res1/res4 terrain popups.
- * Expected outcome: Returns `Human`, `AI`, or `?`.
- * Exceptions: Missing game state/control rows return `?`.
- */
-function getTooltipControlLabel(namingTarget: NamingLookupTarget | null): string {
-  if (!S.gameState) return 'Unknown';
-  const strategicHex = resolveStrategicHexForControlLine(namingTarget);
-  if (!strategicHex) return 'Unknown';
-  const controller = (S.gameState.res1Control ?? []).find((row) => row.h3Index === strategicHex)?.controllerPlayerId ?? null;
-  const ownerLabel = controller === 'human' ? 'Human' : controller === 'opponent' ? 'AI' : 'Unknown';
-  const homeRegionIdentity = resolveHomeRegionOwnerIdentity({
-    h3Index: strategicHex,
-    humanHomeRegionHexes: S.gameState.humanHomeRegionHexes,
-    aiHomeRegionHexes: S.gameState.aiHomeRegionHexes,
-    intersectingHomeRegionHexes: S.gameState.intersectingHomeRegionHexes,
-  });
-  if (homeRegionIdentity != null) {
-    return `${ownerLabel} ${formatHomeRegionAssignmentControlSuffix(homeRegionIdentity)}`;
-  }
-  const visibleHexes = Array.isArray(S.gameState.visibleHexes)
-    ? new Set(S.gameState.visibleHexes)
-    : new Set(S.gameState.hexes.map((h) => h.h3Index));
-  const perspective = S.gameState.playerPerspective === 'opponent' ? 'opponent' : 'human';
-  const ownershipVisible = isHexOwnershipVisibleToPerspective({
-    h3Index: strategicHex,
-    playerPerspective: perspective,
-    visibleHexes,
-    humanHomeRegionHexes: S.gameState.humanHomeRegionHexes,
-    aiHomeRegionHexes: S.gameState.aiHomeRegionHexes,
-    intersectingHomeRegionHexes: S.gameState.intersectingHomeRegionHexes,
-  });
-  if (!ownershipVisible) return 'Unknown';
-  return ownerLabel;
-}
-
-function formatTerrainTooltipHtml(
-  state: TerrainTooltipState,
-  namingLine: string | null,
-  namingTarget: NamingLookupTarget | null
-): string {
-  const prefix = formatLlmLocationBoldPrefixHtml(namingTarget);
-  const showControlLine = namingTarget?.resolution === 1;
-  const controlLine = showControlLine ? `<strong>Control:</strong> ${getTooltipControlLabel(namingTarget)}` : null;
-  const terrainLabel = formatTerrainKindLabel(state.terrainKind);
-  const terrainValue = state.res1TerrainSummary ?? `${terrainLabel}${formatTerrainVariantSuffix(state)}`;
-  const terrainLine = `<strong>Terrain:</strong> ${terrainValue}`;
-  const bodyParts: string[] = controlLine ? [controlLine, terrainLine] : [terrainLine];
-  if (state.res1FeaturesSummary != null) bodyParts.push(`<strong>Features:</strong> ${state.res1FeaturesSummary}`);
-  else if (state.features.length > 0) bodyParts.push(`<strong>Features:</strong> ${state.features.join(', ')}`);
-  if (namingTarget?.resolution === 4) {
-    const effectsLineHtml = computeTerrainEffectsLineHtml({
-      terrainKind: state.terrainKind,
-      parentTerrain: state.parentTerrain,
-      parentTerrainKind: state.parentTerrainKind,
-      isUrban: state.isUrban,
-      isRubble: state.isRubble,
-      isSeaport: state.isSeaport,
-      hasRoad: state.hasRoad,
-      hasRail: state.hasRail,
-    });
-    if (effectsLineHtml) bodyParts.push(`<strong>Effects:</strong> ${effectsLineHtml}`);
-  }
-  if (state.urbanHexCount != null) {
-    const productionLine =
-      state.urbanHexCount > 0
-        ? `<strong>Production:</strong> $${state.urbanHexCount.toLocaleString()} / turn`
-        : `<strong>Production:</strong> (none)`;
-    bodyParts.push(productionLine);
-  }
-  const bodyLine = bodyParts.join(TOOLTIP_SECTION_GAP_HTML);
-  if (!namingLine) return `${prefix}${bodyLine}`;
-  return `${prefix}${formatGroupedSemicolonNamingLineHtml(namingLine)}${TOOLTIP_SECTION_GAP_HTML}${bodyLine}`;
-}
-
-function terrainTooltipContentKey(
-  state: TerrainTooltipState,
-  namingLine: string | null,
-  namingTarget: NamingLookupTarget | null
-): string {
-  const targetKey =
-    namingTarget == null ? 'none' : `${namingTarget.resolution}:${namingTarget.h3Index}`;
-  const namingKey = namingLine ?? '';
-  const urbanKey = state.isUrban ? '1' : '0';
-  const rubbleKey = state.isRubble ? '1' : '0';
-  const featuresKey = state.features.join('|');
-  const urbanHexCountKey = state.urbanHexCount == null ? 'x' : String(state.urbanHexCount);
-  const res1TerrainSummaryKey = state.res1TerrainSummary ?? '';
-  const res1FeaturesSummaryKey = state.res1FeaturesSummary ?? '';
-  const controlKey = getTooltipControlLabel(namingTarget);
-  const parentTerrainKey = state.parentTerrain;
-  const parentTerrainKindKey = state.parentTerrainKind;
-  const seaportKey = state.isSeaport ? '1' : '0';
-  const roadKey = state.hasRoad ? '1' : '0';
-  const railKey = state.hasRail ? '1' : '0';
-  return `${targetKey}::${namingKey}::${state.terrainKind}::${urbanKey}::${rubbleKey}::${featuresKey}::${urbanHexCountKey}::${res1TerrainSummaryKey}::${res1FeaturesSummaryKey}::${controlKey}::${parentTerrainKey}::${parentTerrainKindKey}::${seaportKey}::${roadKey}::${railKey}`;
-}
-
-/**
- * Returns memoized HTML for a terrain tooltip state + optional naming header line.
- *
- * Purpose: Prevents expensive HTML rebuilds when the pointer jitters within the same logical tooltip.
- * When to use: From `showTerrainTooltip` after awaiting naming line lookup.
- * Expected outcome: Stable HTML string for identical `(state, namingLine, namingTarget)` tuples until caches clear.
- * Exceptions: None.
- */
-export function getCachedTerrainTooltipHtml(
-  state: TerrainTooltipState,
-  namingLine: string | null,
-  namingTarget: NamingLookupTarget | null
-): string {
-  const key = terrainTooltipContentKey(state, namingLine, namingTarget);
-  const cachedHtml = S.terrainTooltipHtmlByContentKey.get(key);
-  if (cachedHtml !== undefined) return cachedHtml;
-  const html = formatTerrainTooltipHtml(state, namingLine, namingTarget);
-  S.terrainTooltipHtmlByContentKey.set(key, html);
-  if (S.terrainTooltipHtmlByContentKey.size > 4096) S.terrainTooltipHtmlByContentKey.clear();
-  return html;
 }
