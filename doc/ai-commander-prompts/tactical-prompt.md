@@ -114,7 +114,7 @@ Each row states what is omitted and why the model must not be given it.
 | Straight-hop distance caveat | Its gate requires the strategic resolution |
 | Unit-roster subsection | Duplicate of the unit table |
 | Air-repositioning coaching | Strategic idle-air “ferry toward the fighting” coaching; battle lists airport ferry dests and strike-or-ferry exclusivity instead |
-| Assessment and combat-estimate guidance | Those tools are stripped in battle |
+| Strategic assessment and combat-estimate hints | Battle guidance has its own `assess_unit` and `estimate_combat` bullets (section 2.11), and `assess_hex` is stripped in battle |
 | Scouting directive | Visibility in the footprint is complete |
 
 **Forbidden strings.** A tactical prompt must not contain any of these, in any casing: `memoryUpdates`, `productionOrders`, `query_production`, `enemyIntel`, `set_build_queue`. These are the markers a strategic surface leaves behind when it leaks into a battle prompt, and their presence is a defect regardless of how the surrounding sentence reads.
@@ -143,15 +143,18 @@ Tactical variant, bullets in this order:
 
 ### 2.11 `# Available Tools`
 
-- **Enabled set in battle:** the routing tool and the distance tool, when planning tools are enabled. Everything else is stripped.
-- **Intro:** points at the briefing for assessments and options, and states the copy-then-submit rule with the tactical field mapping.
+- **Enabled set in battle:** the routing tool and the distance tool when planning tools are enabled, `assess_unit` when assessment tools are enabled, and `estimate_combat` when estimation tools are enabled. `assess_hex` and the memory, standing-order, and production tools are stripped.
+- **Tool lines:** `assess_unit` and `estimate_combat` use battle-specific lines. `assess_unit` reports which enemies the sub-unit can shoot and which can shoot it this beat, whether it can make melee contact this beat, and beats to reach each nearby unit. `estimate_combat` predicts ranged or melee engagements under battle range, terrain, and line-of-sight rules from beat-start positions, and does not cover air strikes.
+- **Intro:** points at the briefing for assessments and options, and states the copy-then-submit rule with the tactical field mapping. It names the routing tool only when planning tools are enabled.
 - **Guidance bullets, in this order:**
-  1. The briefing already contains unit status, attention flags, and this beat's options; the assessment and estimate tools must not be called because they are not available.
-  2. Independent calls to the same tool, such as routes for several sub-units, go together in one reply as parallel tool calls; wait for a result only when the next call's arguments depend on it.
-  3. Option targets are already this-beat legal; one row may name several sub-units; copy those ids into one `unitIds` array on a single envelope entry; a move or approach target into the move field; a ranged target into a `ranged_attack` entry; an air strike target into the strike list when air is present; and a ferry target into `ferryOrders`; each sub-unit gets at most one move and one shot, so pick one row per action type and do not copy overlapping rows; never copy a Target Hex from a row that does not list that sub-unit; route only for something unlisted; once destinations are chosen, submit.
-  4. Standing-order actions are not accepted for sub-unit ids this beat, and standing orders do not move sub-units. A sub-unit with a move option and no order is idle for the beat.
-  5. The tempo rule for the beat, per section 4 item 2.
-  6. The sealift bullet, included only when the naval status section is present.
+  1. The briefing already contains unit status, attention flags, and this beat's options.
+  2. When assessment tools are enabled: use `assess_unit` on sub-units near the enemy, skip sub-units far from all enemies, and assess only one sub-unit per shared cell.
+  3. When estimation tools are enabled: use `estimate_combat` before any ranged or melee attack instead of guessing at odds.
+  4. Independent calls to the same tool, such as routes for several sub-units, go together in one reply as parallel tool calls; wait for a result only when the next call's arguments depend on it.
+  5. Option targets are already this-beat legal; one row may name several sub-units; copy those ids into one `unitIds` array on a single envelope entry; a move or approach target into the move field; a ranged target into a `ranged_attack` entry; an air strike target into the strike list when air is present; and a ferry target into `ferryOrders`; each sub-unit gets at most one move and one shot, so pick one row per action type and do not copy overlapping rows; never copy a Target Hex from a row that does not list that sub-unit; route only for something unlisted; once destinations are chosen, submit.
+  6. Standing-order actions are not accepted for sub-unit ids this beat, and standing orders do not move sub-units. A sub-unit with a move option and no order is idle for the beat.
+  7. The tempo rule for the beat, per section 4 item 2.
+  8. The sealift bullet, included only when the naval status section is present.
 - **Empty-state:** the heading plus `No tools available.`
 
 ### 2.12 Observed enemy roster line
@@ -241,5 +244,5 @@ Claims the builders **omit** from tactical coaching:
 | Production and memory | present when their tools are enabled | never |
 | Visibility | fog-dependent | complete inside the footprint |
 | Distance caveat line | present when distances are hop counts | never |
-| Tools | up to nine | routing and distance only |
+| Tools | up to nine | routing, distance, `assess_unit`, and `estimate_combat` (no air strikes), per tool-group toggles |
 | Envelope tails | air, ferry, callbacks, memory, production | air, ferry, callbacks |

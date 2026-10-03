@@ -22,7 +22,7 @@ Implement a reliable tactical-battle entry flow that starts from contested `res1
 1. At strategic planning-phase start, if human and AI parent units coexist in a `res1` hex, a tactical-entry button appears in that hex overlay.
 2. Tactical-entry button is square, has magnifying-glass icon, is about 2x build-button height, horizontally centered, and vertically offset above center by the same magnitude that build button sits below center.
 3. Clicking tactical-entry smoothly zooms into enclosed `res4` tactical map for that `res1` hex.
-4. Tactical mode creates temporary sub-units from parent units using fixed ratios: infantry x12, armor x6, air x3, naval x2.
+4. Tactical mode creates temporary sub-units from parent units using fixed ratios: infantry x8, armor x4, air x3, naval x4.
 5. Tactical sub-units are exempt from strategic unit caps and exist only during tactical battle lifecycle.
 6. Tactical view has no fog-of-war: both sides always see all `res4` hexes and all sub-units.
 7. Tactical rules reuse strategic movement/stack/attack/air strike/embark/debark constraints but compute range/path/movement over `res4`.

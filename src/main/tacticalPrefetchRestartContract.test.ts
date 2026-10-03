@@ -64,6 +64,25 @@ test('a cancelled prefetch restarts before the Ready latch is released', () => {
   );
 });
 
+test('a finished strategic consult starts the battle opponent plan it had been holding', () => {
+  const source = readRendererSource('openRouter', 'openRouterControls.ts');
+  const listener = extractBalancedBlockAfter(source, 'registerPostResolutionConsultationListener');
+  const applied = listener.indexOf("appendOpenRouterLog('Post-resolution consultation applied.'");
+  const stale = listener.indexOf("appendOpenRouterLog('Ignored stale post-resolution consultation push.'");
+  assert.ok(applied >= 0 && stale >= 0, 'both consult outcomes must stay in the strategic listener');
+  for (const at of [applied, stale]) {
+    const tail = listener.slice(at);
+    const start = tail.indexOf('startTacticalOpponentPlanAfterStrategicConsult(deps)');
+    const ready = tail.indexOf('deps.updateReadyButtonState()');
+    assert.ok(start >= 0 && ready >= 0 && start < ready, tail.slice(0, 400));
+  }
+  assert.match(
+    extractBalancedBlockAfter(source, 'function startTacticalOpponentPlanAfterStrategicConsult'),
+    /if \(!S\.tacticalBattleSnapshot \|\| !S\.tacticalPhasePlanning\) return;/,
+    'without a battle in planning, this must not start a request'
+  );
+});
+
 test('releasing the Ready latch is what would suppress a restart', () => {
   const waiting = readRendererSource('openRouter', 'aiPlanningState.ts');
   assert.match(

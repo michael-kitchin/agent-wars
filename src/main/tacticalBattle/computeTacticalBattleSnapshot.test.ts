@@ -14,10 +14,10 @@ import {
 } from './computeTacticalBattleSnapshot';
 
 test('tacticalSubUnitCountForStrategicUnitType maps known strategic types to positive tactical counts', () => {
-  assert.equal(tacticalSubUnitCountForStrategicUnitType('infantry'), 12);
-  assert.equal(tacticalSubUnitCountForStrategicUnitType('armor'), 6);
+  assert.equal(tacticalSubUnitCountForStrategicUnitType('infantry'), 8);
+  assert.equal(tacticalSubUnitCountForStrategicUnitType('armor'), 4);
   assert.equal(tacticalSubUnitCountForStrategicUnitType('air'), 3);
-  assert.equal(tacticalSubUnitCountForStrategicUnitType('naval'), 2);
+  assert.equal(tacticalSubUnitCountForStrategicUnitType('naval'), 4);
 });
 
 test('tacticalSubUnitCountForStrategicUnitType returns zero for unknown types', () => {

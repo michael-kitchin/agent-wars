@@ -79,10 +79,10 @@ The tactical level does not have a separate unit roster. Instead, strategic unit
 
 | Strategic Unit | Tactical Sub-Units | Rationale |
 |---------------|-------------------|-----------|
-| 1 Infantry | 12 sub-units | Large formations, many divisions to maneuver |
-| 1 Armor | 6 sub-units | Fewer but more powerful formations |
+| 1 Infantry | 8 sub-units | Largest formation; cheapest strategic unit |
+| 1 Armor | 4 sub-units | Half an infantry formation; each sub-unit hits harder |
 | 1 Air | 3 sub-units | Small number of air wings |
-| 1 Naval | 2 sub-units | Major task force components |
+| 1 Naval | 4 sub-units | Enough hulls that losing one does not leave the parent on exact half |
 
 Tactical ranged baselines (res4 steps): infantry 2, armor 5, naval 10, air anywhere in the footprint. Movement-point budgets on flat terrain: infantry 2, armor 4, naval 3.
 

@@ -163,7 +163,7 @@ Within each phase, process engagements in a **deterministic order** (attacker/de
 
 - Air strike phase: each striking air unit rolls once. Counter-fire depends on target type (see §8).
 - Ranged phase: each eligible attacker rolls once per eligible target hex. **Return fire:** a defending unit returns fire only when it could legally plan the reverse shot at that attacker hex (planning parity). Each eligible defender rolls once (**attack** value).
-- Melee phase: one round of rolls, then apply hits.
+- Melee phase: one round of rolls, then apply hits. In a two-side melee, the side with the lower participant ID rolls **attack** values and the other side rolls **defense** values. Participant IDs are random, so which side rolls which is random each resolution and does not depend on who moved in; `estimate_combat` averages both cases ([ai-tools.md](ai-tools.md)).
 
 No "continue or retreat." If both sides remain in the same hex after melee, they fight again in the **next** turn's resolution.
 
@@ -387,10 +387,10 @@ Strategic units entering the tactical battle are decomposed into sub-units on th
 
 | Strategic Unit | Sub-Units | Movement budget (flat terrain) | Ranged baseline (res4 steps) |
 |---------------|-----------|----------------------------------|------------------------------|
-| Infantry | 12 | 2 | 2 |
-| Armor | 6 | 4 | 5 |
+| Infantry | 8 | 2 | 2 |
+| Armor | 4 | 4 | 5 |
 | Air | 3 | 0 (does not march) | entire footprint (cap 99) |
-| Naval | 2 | 3 | 10 |
+| Naval | 4 | 3 | 10 |
 
 Sub-units inherit their parent's unit type for combat resolution. Each sub-unit fights as one unit in the A&A-style dice system (same attack/defense values as the strategic parent). Standing orders do **not** move sub-units during a beat; they can still generate DEFEND fire.
 

@@ -19,6 +19,8 @@ import { getRange } from '../combatConstants';
 import { getStandingOrderForUnit } from './standingOrders';
 import { logDebug, logError, logTrace } from '../logger';
 import { h3ToLatLng, type LatLng, type LatLngMap } from './h3LatLng';
+import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
+import { executeTacticalAssessUnit } from './tacticalAssessUnit';
 import {
   collectOmniscientNearbyUnits,
   gridHopDistanceBetween,
@@ -182,21 +184,28 @@ function getGridDistance(h3A: string, h3B: string): number | null {
 export const ASSESSMENT_TOOL_NAMES = ['assess_unit', 'assess_hex'] as const;
 
 /**
- * Defines the `executeAssessment` function shape (export function executeAssessment( toolName: string, args: unknown, state: GameStateSnapshot, latLngByH3: LatLngMap, resolveToH3: (lat: number, lng: n).
-
- * Purpose: Supports maintainability by documenting why `executeAssessment` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
+ * Dispatches assessment tool calls (`assess_unit`, `assess_hex`).
+ *
+ * Purpose: Tool-loop and precomputation entry point for the assessment group with shared argument parsing.
+ * When to use: Strategic callers omit `tacticalBattle`; the tool loop passes it during a battle so `assess_unit`
+ * uses battle rules.
+ * Expected outcome: The assessment result. In a battle, `assess_hex` is refused with an error because battle tools
+ * do not cover it. Unknown tools and missing `unitId` or `position` yield `status: 'error'`.
+ * Exceptions: None; exceptions are logged and converted to error results.
  */
 export function executeAssessment(
   toolName: string,
   args: unknown,
   state: GameStateSnapshot,
   latLngByH3: LatLngMap,
-  resolveToH3: (lat: number, lng: number) => string | undefined
+  resolveToH3: (lat: number, lng: number) => string | undefined,
+  tacticalBattle?: TacticalBattleSnapshot
 ): { status: string; error: string | null; [k: string]: unknown } {
-  logDebug('assessment executeAssessment', { toolName, stateTurn: state.turnNumber });
+  logDebug('assessment executeAssessment', {
+    toolName,
+    stateTurn: state.turnNumber,
+    tacticalBattleId: tacticalBattle?.battleId ?? null,
+  });
   if (toolName !== 'assess_unit' && toolName !== 'assess_hex') {
     return { status: 'error', error: `Unknown tool: ${toolName}` };
   }
@@ -211,7 +220,13 @@ export function executeAssessment(
       if (typeof a?.radius === 'number' && a.radius > 0 && Number.isFinite(a.radius)) {
         radius = Math.floor(a.radius);
       }
+      if (tacticalBattle) {
+        return executeTacticalAssessUnit({ unitId, radius, battle: tacticalBattle, latLngByH3 });
+      }
       return executeAssessUnit(unitId, radius, state, latLngByH3, resolveToH3);
+    }
+    if (tacticalBattle) {
+      return { status: 'error', error: 'assess_hex is not available during tactical battles.' };
     }
     if (toolName === 'assess_hex') {
       const a = args as { position?: unknown; forUnitType?: unknown };

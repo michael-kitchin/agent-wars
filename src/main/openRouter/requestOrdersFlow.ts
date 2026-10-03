@@ -51,6 +51,7 @@ import {
   type AiPathfindingSessionMetrics,
 } from './requestOrdersFlowSupport';
 import { maybeApplyTacticalLightPrecomputeToolAllowlist } from './tacticalLightPrecompute';
+import { filterToolNamesForTacticalBattle } from './openRouterToolGroups';
 
 export type { RequestOrdersError, RequestOrdersOptions, RequestOrdersResult } from './requestOrdersFlowTypes';
 
@@ -97,17 +98,10 @@ export async function requestOrdersFlow(
         ? toolGroupRegistry.flatMap((g) => [...g.toolNames]).filter((n) => !precomputationExcluded.has(n))
         : requestedToolNames;
   if (tacticalBattle) {
-    const assessmentToolNames = new Set<string>([...ASSESSMENT_TOOL_NAMES, ...COMBAT_ESTIMATION_TOOL_NAMES]);
-    const stripTacticalDisallowedTools = (names: string[]): string[] =>
-      names.filter((n) => {
-        if (assessmentToolNames.has(n)) return false;
-        const g = getGroupIdForToolName(n);
-        return g !== 'memory' && g !== 'production' && g !== 'orders';
-      });
-    enabledToolNames =
-      enabledToolNames !== undefined
-        ? stripTacticalDisallowedTools(enabledToolNames)
-        : stripTacticalDisallowedTools(toolGroupRegistry.flatMap((g) => [...g.toolNames]));
+    enabledToolNames = filterToolNamesForTacticalBattle(
+      enabledToolNames ?? toolGroupRegistry.flatMap((g) => [...g.toolNames]),
+      getGroupIdForToolName
+    );
     enabledToolNames = maybeApplyTacticalLightPrecomputeToolAllowlist(tacticalBattle.battleId, enabledToolNames);
     logDebug('openRouter requestOrders tactical tool filter applied', {
       battleId: tacticalBattle.battleId,

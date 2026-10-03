@@ -46,7 +46,7 @@ Shown with the right panel. Ready, Ranged, and the air-strike controls follow th
 
 ## Invariants
 
-- Ready never uses the AI wait label unless opponent planning is outstanding: Run is on and opponent orders are not ready, or a deferred consultation is running after playback. Turning Run off does not cancel a deferred consultation, so its label keeps counting until the result arrives.
+- Ready never uses the AI wait label unless opponent planning is outstanding: Run is on and opponent orders are not ready, or a deferred consultation is running after playback. Turning Run off does not cancel a deferred consultation, so its label keeps counting until that consultation ends. When a battle is already in planning, the label keeps counting until the battle's opponent plan is buffered.
 - The target-type choice is never shown unless strike targeting is on.
 - Strategic infantry never shows Ranged. Tactical infantry can.
 - A failed target double-click never turns targeting off.

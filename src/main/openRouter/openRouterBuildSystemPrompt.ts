@@ -100,7 +100,7 @@ export function buildSystemPromptForTools(
     .join('; ');
 
   const tacticalBattleActive = coordinateContext.mode === 'tactical';
-  const filtered = getFilteredToolMetadata(enabledToolNames);
+  const filtered = getFilteredToolMetadata(enabledToolNames, coordinateContext.mode);
   const hasNaval = opponentUnits.some((u) => u.unitType === 'naval');
   const hasAir = opponentUnits.some((u) => u.unitType === 'air');
   const hasPrecomputedBriefing = briefingOverride != null && briefingOverride.length > 0;

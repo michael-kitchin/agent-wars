@@ -550,9 +550,9 @@ export async function runRequestOrdersToolLoop(
               : toolName.includes('memory')
                 ? executeMemory(toolName, execArgs, toolState, latLngByH3, resolveToH3)
                 : toolName.includes('estimate')
-                  ? executeCombatEstimation(toolName, execArgs, toolState, latLngByH3, resolveToH3)
+                  ? executeCombatEstimation(toolName, execArgs, toolState, latLngByH3, resolveToH3, tacticalBattle)
                   : toolName.includes('assess')
-                    ? executeAssessment(toolName, execArgs, toolState, latLngByH3, resolveToH3)
+                    ? executeAssessment(toolName, execArgs, toolState, latLngByH3, resolveToH3, tacticalBattle)
                     : executePathfinding(
                         toolName,
                         execArgs,

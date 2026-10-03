@@ -250,7 +250,9 @@ function testExactCombatProbabilities(): void {
   latLngByH3.set(h3, [0.5, 0.5]);
   const resolveToH3 = () => h3;
 
-  // 1 armor (attack 3, p=3/6=0.5) melee vs 1 infantry (defense 2, p=2/6=1/3)
+  // 1 armor (attack 3, defense 2) melee vs 1 infantry (attack 1, defense 2). Melee roles are random, so the
+  // prediction averages "armor rolls 3/6 vs infantry 2/6" and "armor rolls 2/6 vs infantry 1/6".
+  type RoleCase = { probabilityDefenderEliminated: number; probabilityAttackerLosesUnit: number };
   const result = executeEstimateCombat(
     {
       engagementType: 'melee',
@@ -266,13 +268,90 @@ function testExactCombatProbabilities(): void {
     defenderLossesExpected: number;
     attackerLossesExpected: number;
     assessment: string;
-  }};
+  }; meleeRoleOutcomes?: { attackersRollAttack: RoleCase; attackersRollDefense: RoleCase } };
   assert.strictEqual(result.status, 'ok');
-  assert.ok(Math.abs(result.prediction!.probabilityDefenderEliminated - 0.5) < eps);
-  assert.ok(Math.abs(result.prediction!.probabilityAttackerLosesUnit - 1 / 3) < eps);
-  assert.ok(Math.abs(result.prediction!.defenderLossesExpected - 0.5) < eps);
-  assert.ok(Math.abs(result.prediction!.attackerLossesExpected - 1 / 3) < eps);
+  assert.ok(Math.abs(result.prediction!.probabilityDefenderEliminated - 5 / 12) < eps);
+  assert.ok(Math.abs(result.prediction!.probabilityAttackerLosesUnit - 1 / 4) < eps);
+  assert.ok(Math.abs(result.prediction!.defenderLossesExpected - 5 / 12) < eps);
+  assert.ok(Math.abs(result.prediction!.attackerLossesExpected - 1 / 4) < eps);
   assert.strictEqual(result.prediction!.assessment, 'even');
+  const roles = result.meleeRoleOutcomes!;
+  assert.ok(Math.abs(roles.attackersRollAttack.probabilityDefenderEliminated - 1 / 2) < eps);
+  assert.ok(Math.abs(roles.attackersRollAttack.probabilityAttackerLosesUnit - 1 / 3) < eps);
+  assert.ok(Math.abs(roles.attackersRollDefense.probabilityDefenderEliminated - 1 / 3) < eps);
+  assert.ok(Math.abs(roles.attackersRollDefense.probabilityAttackerLosesUnit - 1 / 6) < eps);
+}
+
+/**
+ * Verifies strategic estimates leave land units embarked at sea out of combat, like strategic resolution.
+ *
+ * Purpose: Pins the embarked-at-sea filter for automatic defenders and for attacker ids.
+ * When to use: After changing strategic estimate unit filters.
+ * Expected outcome: Only the carrier defends; naming the cargo as an attacker is an error.
+ * Exceptions: None.
+ */
+function testStrategicEmbarkedAtSeaExcluded(): void {
+  const h3 = '891f1d48b9fffff';
+  const state: GameStateSnapshot = {
+    hexes: [{ h3Index: h3, terrain: 'water', terrainKind: 'water' }],
+    units: [
+      { id: 'human-naval-1', player: 'human', unitType: 'naval', h3Index: h3 },
+      { id: 'human-infantry-1', player: 'human', unitType: 'infantry', h3Index: h3, embarkedOnNavalUnitId: 'human-naval-1' },
+    ],
+    phase: 'planning',
+    turnNumber: 1,
+    pendingOrders: [],
+  };
+  const latLngByH3 = new Map<string, [number, number]>([[h3, [0.5, 0.5]]]);
+  const resolveToH3 = () => h3;
+  const ranged = executeEstimateCombat(
+    { engagementType: 'ranged', attackers: { assumed: [{ type: 'naval', count: 1 }] }, targetHex: [0.5, 0.5] },
+    state,
+    latLngByH3,
+    resolveToH3
+  ) as { status: string; defenderSummary?: { totalUnits: number } };
+  assert.strictEqual(ranged.status, 'ok');
+  assert.strictEqual(ranged.defenderSummary?.totalUnits, 1);
+  const asAttacker = executeEstimateCombat(
+    { engagementType: 'melee', attackers: { units: ['human-infantry-1'] }, targetHex: [0.5, 0.5] },
+    state,
+    latLngByH3,
+    resolveToH3
+  );
+  assert.strictEqual(asAttacker.status, 'error');
+  assert.ok((asAttacker.error as string).includes('embarked'));
+}
+
+/**
+ * Verifies malformed side arguments from the model fall back to the valid part instead of misreading it.
+ *
+ * Purpose: Model JSON is untrusted; a non-array `units` must not be iterated, and counts must be whole numbers.
+ * When to use: After changing `estimate_combat` argument parsing.
+ * Expected outcome: A string `units` is ignored in favor of `assumed`, and a count of 2.7 places two attackers.
+ * Exceptions: None.
+ */
+function testExecuteEstimateCombatMalformedSideArgs(): void {
+  const h3 = '891f1d48b9fffff';
+  const state: GameStateSnapshot = {
+    hexes: [{ h3Index: h3, terrain: 'land', terrainKind: 'plains' }],
+    units: [{ id: 'human-infantry-1', player: 'human', unitType: 'infantry', h3Index: h3 }],
+    phase: 'planning',
+    turnNumber: 1,
+    pendingOrders: [],
+  };
+  const latLngByH3 = new Map<string, [number, number]>([[h3, [0.5, 0.5]]]);
+  const result = executeEstimateCombat(
+    {
+      engagementType: 'melee',
+      attackers: { units: 'opponent-armor-1', assumed: [{ type: 'armor', count: 2.7 }] },
+      targetHex: [0.5, 0.5],
+    },
+    state,
+    latLngByH3,
+    () => h3
+  ) as { status: string; attackerSummary?: { totalUnits: number } };
+  assert.strictEqual(result.status, 'ok');
+  assert.strictEqual(result.attackerSummary?.totalUnits, 2);
 }
 
 /**
@@ -290,6 +369,8 @@ export function runCombatEstimationVerification(): void {
   testResolveOneRangedAirWithoutAirportNoReturnFire();
   testPoissonBinomialPMF();
   testExactCombatProbabilities();
+  testStrategicEmbarkedAtSeaExcluded();
+  testExecuteEstimateCombatMalformedSideArgs();
   testExecuteEstimateCombatUncontested();
   testExecuteEstimateCombatUnitNotFound();
   testExecuteEstimateCombatInvalidHex();

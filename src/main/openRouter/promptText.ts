@@ -204,6 +204,15 @@ export interface ToolsIntroRosterGates {
   readonly hasBestOptionsTable?: boolean;
 }
 
+/**
+ * Builds the intro sentence above the numbered `# Available Tools` list.
+ *
+ * Purpose: Tells the model when to rely on the briefing and when to call tools, naming only tools it can call.
+ * When to use: `buildSystemPromptForTools` after computing flags, briefing presence, and roster gates.
+ * Expected outcome: A generic "listed tools only" line when neither planning nor assessment is enabled; otherwise
+ * mode- and briefing-specific guidance. Battle intros name `plan_route` and the routing tool only when planning is on.
+ * Exceptions: None.
+ */
 export function buildAvailableToolsIntro(
   flags: PromptToolFlags,
   hasPrecomputedBriefing = false,
@@ -227,11 +236,16 @@ export function buildAvailableToolsIntro(
     );
   }
   if (coordinateMode === 'tactical') {
+    const briefingLead = 'Use the Commander\'s Briefing above for assessments and possible unit actions.';
     if (!hasBestOptionsTable) {
-      return 'Use the Commander\'s Briefing above for assessments and possible unit actions. No options are listed this period. Destinations must come from the routing tool, not from an absent options table.';
+      const routing = flags.planningEnabled
+        ? ' Destinations must come from the routing tool, not from an absent options table.'
+        : '';
+      return `${briefingLead} No options are listed this period.${routing}`;
     }
     const copy = buildToolsIntroCopySentence({ coordinateMode: 'tactical', hasAirUnits });
-    return `Use the Commander's Briefing above for assessments and possible unit actions. ${copy} Use plan_route only for dests not listed for that sub-unit.`;
+    const routing = flags.planningEnabled ? ' Use plan_route only for dests not listed for that sub-unit.' : '';
+    return `${briefingLead} ${copy}${routing}`;
   }
   const extraHints: string[] = [];
   if (flags.ordersEnabled) {
@@ -280,6 +294,12 @@ export function buildToolUsageGuidance(
         ? '- The Commander\'s Briefing above already contains unit status, attention flags, and possible unit actions for this tactical beat. Use the briefing to decide targets and priorities.'
         : '- The Commander\'s Briefing above already contains unit status, attention flags, possible unit actions, and supplemental hex intelligence for this turn. Use the briefing to decide targets and priorities.'
     );
+    if (coordinateMode === 'tactical' && flags.assessmentEnabled) {
+      lines.push('- Use assess_unit on sub-units near the enemy to understand the tactical picture. Skip assessment for sub-units far from all enemies. If several sub-units share a cell, assess only one — the results will be identical.');
+    }
+    if (coordinateMode === 'tactical' && flags.estimationEnabled) {
+      lines.push('- Use estimate_combat before any ranged or melee attack. Do not guess at combat odds.');
+    }
   } else {
     if (flags.ordersEnabled || flags.memoryEnabled) {
       lines.push('- Start by reviewing your standing order statuses and persistent strategic memory (both are shown above).');

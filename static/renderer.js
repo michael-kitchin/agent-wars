@@ -23829,6 +23829,10 @@
   }
 
   // src/renderer/openRouter/openRouterControls.ts
+  function startTacticalOpponentPlanAfterStrategicConsult(deps) {
+    if (!rendererSharedState.tacticalBattleSnapshot || !rendererSharedState.tacticalPhasePlanning) return;
+    deps.startBackgroundRequestIfAllowed();
+  }
   function initDeferredResolutionPlaybackPushListeners(deps) {
     window.gameApi?.registerPostResolutionConsultationListener?.((payload) => {
       if (payload.abandoned === true) {
@@ -23838,6 +23842,7 @@
       if (!rendererSharedState.gameState || payload.planningTurnNumber !== rendererSharedState.gameState.turnNumber) {
         deps.appendOpenRouterLog("Ignored stale post-resolution consultation push.", false);
         rendererSharedState.pendingDeferredStrategicPostResolutionConsult = false;
+        startTacticalOpponentPlanAfterStrategicConsult(deps);
         deps.updateReadyButtonState();
         return;
       }
@@ -23854,6 +23859,7 @@
       deps.appendOpenRouterLog("Post-resolution consultation applied.", false);
       if (rendererSharedState.useEventDrivenConsultation) rendererSharedState.eventDrivenInitialConsultationDone = true;
       deps.requestRedraw();
+      startTacticalOpponentPlanAfterStrategicConsult(deps);
       deps.updateReadyButtonState();
     });
     window.gameApi?.registerPostTacticalBeatConsultationListener?.((fields) => {

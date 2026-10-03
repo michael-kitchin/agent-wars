@@ -31,26 +31,34 @@ const WORLD_H3_RESOLUTION = 1;
 const TACTICAL_H3_RESOLUTION = 4;
 
 /**
- * Maps each strategic parent unit type to how many tactical sub-units are synthesized for milestone 2.1.
+ * Maps one strategic parent type to the number of tactical sub-units placed for it.
  *
- * Purpose: Single source for placement counts so snapshot sizing and annihilation rules stay aligned.
- * When to use: From `computeTacticalBattleSnapshot` when expanding each parent into tactical rows.
- * Expected outcome: Positive counts for infantry/armor/air/naval; zero for unknown types.
+ * Purpose: Only multiplication table. Placement and the voluntary-exit fallback (when a snapshot stored no baseline) both use it.
+ * When to use: Once per parent while building a battle snapshot, and from the exit fallback.
+ * Expected outcome: Infantry 8, armor 4, air 3, naval 4. Any other type returns 0.
  * Exceptions: None.
  */
 export function tacticalSubUnitCountForStrategicUnitType(unitType: string): number {
+  let count = 0;
   switch (unitType) {
     case 'infantry':
-      return 12;
+      count = 8;
+      break;
     case 'armor':
-      return 6;
+      count = 4;
+      break;
     case 'air':
-      return 3;
+      count = 3;
+      break;
     case 'naval':
-      return 2;
+      count = 4;
+      break;
     default:
-      return 0;
+      count = 0;
+      break;
   }
+  tacticalLogQuery('computeTacticalBattleSnapshot tacticalSubUnitCountForStrategicUnitType', { unitType, count });
+  return count;
 }
 
 /**

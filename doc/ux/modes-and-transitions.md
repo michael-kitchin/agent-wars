@@ -44,7 +44,7 @@ Clicks outside the battle area show an error toast and do not issue an order. Th
 
 Tactical planning ends when the player exits, when the battle is reconciled away because the strategic turn no longer matches, or when annihilation opens.
 
-While Run is pressed, opponent sub-units remain, and no opponent plan is buffered yet, Ready is disabled with the same "AI:" elapsed-time label used in strategic planning. As in strategic planning, editing the tactical draft during that wait does not cancel or restart opponent planning.
+While Run is pressed, opponent sub-units remain, and no opponent plan is buffered yet, Ready is disabled with the same "AI:" elapsed-time label used in strategic planning. As in strategic planning, editing the tactical draft during that wait does not cancel or restart opponent planning. Entering from Fight holds that request while the strategic post-resolution consult is still running. The battle request starts when that consult's result is applied, and when the push is discarded because the turn no longer matches. Ready keeps the AI wait label until the battle plan is buffered.
 
 ### Tactical annihilation
 

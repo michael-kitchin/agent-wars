@@ -86,7 +86,7 @@ Consequence for the narrative paragraph: the sentence counting units without a s
 
 | Surface | Contract |
 | --- | --- |
-| system | With planning off and standing orders also off, include the fallback adjacent-cell listing: one line per own unit giving its current cell as a hold option plus the legal empty neighbours. With assessment or estimation off, drop their guidance bullets; those bullets are also dropped whenever a briefing is attached, since the tools are unavailable in that configuration regardless of flags. |
+| system | With planning off and standing orders also off, include the fallback adjacent-cell listing: one line per own unit giving its current cell as a hold option plus the legal empty neighbours. With assessment or estimation off, drop their guidance bullets. In a strategic consultation those bullets are also dropped whenever a briefing is attached, since the tools are unavailable in that configuration regardless of flags. A battle keeps its own `assess_unit` and `estimate_combat` bullets with the briefing attached, each gated on its group. |
 | user | Point at the fallback listing as the only source of move destinations when it is present; otherwise point at the tools. |
 | tools | The routing and distance tools disappear with the planning group; the assessment and estimate tools disappear with theirs. |
 | envelope | unchanged in shape. Movement remains legal, but the destination rule changes to the fallback listing. |
@@ -95,7 +95,7 @@ Consequence for the narrative paragraph: the sentence counting units without a s
 
 ### 2.5 Tactical mode and tool flags
 
-In battle the memory, standing-order, production, assessment, and estimation groups are **always** off regardless of what the flags would enable strategically. A tactical prompt therefore always follows rows 2.1 through 2.3 and drops the assessment guidance, even when the same game's strategic consultations include all of them. This is not a configuration; it is a mode invariant.
+In battle the memory, standing-order, and production groups are **always** off regardless of what the flags would enable strategically, and `assess_hex` is always stripped. A tactical prompt therefore always follows rows 2.1 through 2.3, even when the same game's strategic consultations include all of them. This is not a configuration; it is a mode invariant. The planning, assessment, and estimation groups follow their flags in battle as they do strategically: `assess_unit` and `estimate_combat` are offered with battle rules when their groups are on, and row 2.4 applies when they are off.
 
 ### 2.6 Model without tool support
 

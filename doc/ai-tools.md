@@ -9,8 +9,8 @@ The engine under `src/` wins if this file drifts.
 | Group id | Tools on the model | Notes |
 | --- | --- | --- |
 | `planning` | `plan_route`, `check_distance` | `PATHFINDING_TOOL_NAMES` |
-| `assessment` | `assess_unit`, `assess_hex` | `ASSESSMENT_TOOL_NAMES`. Omitted from the consult tool list when a precomputed briefing is present (`requestOrdersFlow` excludes them). |
-| `estimation` | `estimate_combat` | `COMBAT_ESTIMATION_TOOL_NAMES`. Same omission when a briefing is present. |
+| `assessment` | `assess_unit`, `assess_hex` | `ASSESSMENT_TOOL_NAMES`. Omitted from a strategic consult tool list when a precomputed briefing is present (`requestOrdersFlow` excludes them). In battle, `assess_unit` stays when the group is on and `assess_hex` is stripped (`filterToolNamesForTacticalBattle`). |
+| `estimation` | `estimate_combat` | `COMBAT_ESTIMATION_TOOL_NAMES`. Same strategic omission when a briefing is present. Offered in battle when the group is on. |
 | `memory` | `memory_read` | `MEMORY_TOOL_NAMES`. Writes are `memoryUpdates` in the envelope, not tools. |
 | `orders` | `query_orders` | `STANDING_ORDER_TOOL_NAMES`. Assign/cancel are envelope actions; `executeStandingOrderActionForPlayer` still implements `assign_order` / `cancel_order` for the host and for parsed JSON. |
 | `production` | `query_production`, `set_build_queue` | `PRODUCTION_TOOL_NAMES`. Strategic only. `set_build_queue` is a **write** tool; queues can also arrive as `productionOrders` in the envelope. |
@@ -32,13 +32,18 @@ Strategic movement budgets are `getMovementBudget` (infantry 1, armor 2, naval 2
 `src/main/tools/assessment.ts`.
 
 - **`assess_unit`:** Nearby enemies/friendlies, threat severity, standing-order status, `canAttackThisTurn`. Distances are hop counts when fog is off at res1 (`usesOmniscientGridProximity`); fog-on uses path lengths when a path exists.
-- **`assess_hex`:** Terrain, passability, occupants, notes. Pre-computation runs this on human-occupied (and other relevant) hexes for Supplemental Hex Intelligence.
+- **`assess_unit` in battle** (`tacticalAssessUnit.ts`): the sub-unit's terrain, `movementPointsThisBeat`, and `rangedRangeThisBeat`; per nearby enemy, `inRangedRange` / `inEnemyRangedRange` under battle range, terrain, and line-of-sight rules (air needs an intact airport), `canEnterCellThisBeat`, and `estimatedBeatsToReach` / `estimatedBeatsToReachYou` from the battle march planner (`tacticalMarchEstimate.ts`); threats and `canAttackThisBeat`. `radius` counts battle cells (default 4). Distances are battle-cell hops. Cargo shares its carrier's cell, cannot march, and when embarked at sea neither fires nor is a ranged target. Air sub-units do not march, so their beats-to-reach fields are null. A `canAttackThisBeat` row with no attack names the rule that blocks it: no intact airport for air, cargo embarked at sea on either side, or distance against battle range.
+- **`assess_hex`:** Terrain, passability, occupants, notes. Pre-computation runs this on human-occupied (and other relevant) hexes for Supplemental Hex Intelligence. Not available in battle: a call that reaches the engine returns an error.
 
 ## Combat estimation
 
 `src/main/tools/combatEstimation.ts`.
 
 - **`estimate_combat`:** Analytical hit probabilities (Poisson-binomial over A&A d6 rolls) for a proposed matchup. Return fire uses planning-parity eligibility. Ad-hoc when the model still has the tool; the briefing no longer dumps a full estimate table.
+- **Arguments** (`normalizeCombatSideArgs` in `combatEstimationSides.ts`): `attackers` and the optional `defenders` each take real `units` ids or hypothetical `assumed` `{ type, count }` entries, and non-empty `units` wins. Non-string ids and `assumed` entries without a string `type` and a finite `count` are ignored; counts round down, never go below zero, and may arrive as numeric strings. `attackers` must keep at least one id or entry.
+- **Sides:** real ranged attackers that cannot reach the target are dropped with a warning, and the call fails when none can. Assumed attackers stand on the target cell, so ranged return fire is not evaluated for them (a warning says so). Without `defenders`, every non-AI unit on the target cell defends; units there that sit out the engagement (such as cargo embarked at sea) are named in a warning, and an empty cell yields an `uncontested` prediction.
+- **Melee roles:** melee resolution picks at random which side rolls attack values and which rolls defense values, so melee predictions average both cases and report each in `meleeRoleOutcomes` (`attackersRollAttack`, `attackersRollDefense`).
+- **Theaters** (`combatEstimationTheater.ts`): strategic estimates leave land units embarked at sea out of ranged and melee, like strategic resolution. Battle estimates use battle range, terrain, and line-of-sight rules and the battle return-fire context (`tacticalCombatInput.ts`), place cargo on its carrier's cell, leave cargo embarked at sea out of ranged combat only, and reject air attackers because battle air strikes use different dice.
 
 ## Memory
 

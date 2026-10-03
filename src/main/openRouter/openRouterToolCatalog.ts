@@ -129,12 +129,12 @@ const ALL_TOOL_METADATA: ToolMeta[] = [
   },
   {
     name: 'assess_unit',
-    description: 'Tactical briefing on one of your units: nearby enemies and friendlies, threats, and what you can attack this turn.',
+    description: 'Tactical briefing on one of your units: nearby enemies and friendlies, threats, and what you can attack now (this turn, or this beat in a battle).',
     parameters: {
       type: 'object',
       properties: {
         unitId: { type: 'string', description: 'ID of the unit to assess (e.g. a1-t1)' },
-        radius: { type: 'number', description: 'How far out to scan in hexes (default 4). Ignored when fog of war is off on the strategic map: all units are included using H3 grid hops.' },
+        radius: { type: 'number', description: 'How far out to scan in hexes (default 4); battle cells during a battle. Ignored when fog of war is off on the strategic map: all units are included using H3 grid hops.' },
       },
       required: ['unitId'],
     },
@@ -155,7 +155,7 @@ const ALL_TOOL_METADATA: ToolMeta[] = [
   },
   {
     name: 'estimate_combat',
-    description: 'Predict the outcome of a single ranged or melee engagement. Returns win probability, expected casualties, and a tactical assessment. Always check before committing to an attack.',
+    description: 'Predict the outcome of a single ranged or melee engagement. Returns win probability, expected casualties, and a tactical assessment. Melee results average both random attacker/defender role assignments. During a battle, air strikes are not covered. Always check before committing to an attack.',
     parameters: {
       type: 'object',
       properties: {
@@ -245,18 +245,44 @@ const ALL_TOOL_METADATA: ToolMeta[] = [
 ];
 
 /**
- * Defines the `getFilteredToolMetadata` function shape (function getFilteredToolMetadata(enabledToolNames?: string[]): ToolMeta[]).
-
- * Purpose: Supports maintainability by documenting why `getFilteredToolMetadata` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Battle-specific `# Available Tools` lines, keyed by frozen tool name.
+ *
+ * Purpose: Battle tools follow battle rules (cells, beats, battle range and line of sight), so their prompt lines
+ * say so instead of reusing strategic-turn wording.
+ * When to use: `getFilteredToolMetadata` in tactical mode.
+ * Expected outcome: Tools without an entry keep their shared prompt line.
  * Exceptions: None.
  */
-export function getFilteredToolMetadata(enabledToolNames?: string[]): ToolMeta[] {
-  logTrace('openRouter getFilteredToolMetadata', { hasList: enabledToolNames !== undefined, count: enabledToolNames?.length ?? 0 });
-  if (enabledToolNames === undefined) return [...ALL_TOOL_METADATA];
-  const set = new Set(enabledToolNames);
-  return ALL_TOOL_METADATA.filter((m) => set.has(m.name));
+const TACTICAL_TOOL_PROMPT_LINES: Readonly<Record<string, string>> = {
+  assess_unit:
+    'assess_unit(unitId, radius?) - Battle briefing on one sub-unit: enemies and friendlies within radius cells, which enemies it can shoot and which can shoot it this beat, whether it can make melee contact this beat, and beats to reach each unit.',
+  estimate_combat:
+    'estimate_combat(engagementType, attackers, targetHex, defenders?) - Predict a ranged or melee engagement under battle range, terrain, and line-of-sight rules, from beat-start positions. Returns win probability, expected casualties, and an assessment. Does not cover air strikes. Always check before committing to an attack.',
+};
+
+/**
+ * Returns metadata for the enabled tools, with prompt lines for the consultation mode.
+ *
+ * Purpose: Single source for the numbered tool list in the system prompt.
+ * When to use: `buildSystemPromptForTools` (pass the coordinate mode) and `buildToolDefinitions`.
+ * Expected outcome: Catalog order; all tools when `enabledToolNames` is undefined. In tactical mode, tools with a
+ * battle prompt line use it; schemas and descriptions are shared across modes.
+ * Exceptions: None.
+ */
+export function getFilteredToolMetadata(
+  enabledToolNames?: string[],
+  coordinateMode: 'strategic' | 'tactical' = 'strategic'
+): ToolMeta[] {
+  logTrace('openRouter getFilteredToolMetadata', {
+    hasList: enabledToolNames !== undefined,
+    count: enabledToolNames?.length ?? 0,
+    coordinateMode,
+  });
+  const set = enabledToolNames === undefined ? undefined : new Set(enabledToolNames);
+  return ALL_TOOL_METADATA.filter((m) => !set || set.has(m.name)).map((m) => {
+    const battleLine = coordinateMode === 'tactical' ? TACTICAL_TOOL_PROMPT_LINES[m.name] : undefined;
+    return battleLine ? { ...m, promptLine: battleLine } : m;
+  });
 }
 
 /**

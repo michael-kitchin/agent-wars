@@ -88,8 +88,8 @@ Live assembler notes that match the matrix above:
 ## 4. Tools versus envelope writes
 
 1. **Reads may be tools. Writes are envelope-only.** Every state change the model wants travels in the response envelope. The only tool that writes is the production queue setter, and the envelope offers the same action, so the model is never forced into a tool call to act.
-2. **The prompt lists only callable tools.** The numbered list in `# Available Tools` is exactly the enabled set for this consultation. A tool absent from that list must not be named anywhere in the prompt as something to call, including as a prohibition. When a precomputed briefing is attached, assessment and estimate tools are not callable and their names must not appear.
-3. **Never in tactical.** The assessment tools and the combat-estimate tool are stripped in battle, along with the memory, standing-order, and production tool groups. A tactical prompt must not tell the model to call any of them.
+2. **The prompt lists only callable tools.** The numbered list in `# Available Tools` is exactly the enabled set for this consultation. A tool absent from that list must not be named anywhere in the prompt as something to call, including as a prohibition. When a strategic consultation has a precomputed briefing attached, assessment and estimate tools are not callable and their names must not appear.
+3. **Battle tool set.** A battle offers the routing and distance tools, `assess_unit`, and `estimate_combat`, each following the user's tool-group toggles. `assess_hex` and the memory, standing-order, and production tool groups are stripped in battle, and a tactical prompt must not tell the model to call any of them. Battle `assess_unit` and `estimate_combat` use battle range, terrain, line-of-sight, and march rules; battle `estimate_combat` does not cover air strikes.
 4. **Copy, do not re-derive.** When the options table is present, a destination listed there is already legal for the unit or units named on that row. The prompt must instruct the model to copy such a target directly into the matching envelope field and to call the routing tool only for a destination the table does not list for that unit.
 5. **Action type decides the field.** An option row's action determines where its target goes: approach and move rows into the move field, ferry rows into the ferry list, air strike rows into the strike list when air is present, ranged rows into a ranged action. The prompt must state this mapping once, in `# Available Tools`, and the envelope contract must not contradict it. When one option row lists several unit ids, that mapping is one envelope entry with `unitIds` copied from the row, not one entry per id. A unit listed on several overlapping rows still gets at most one move and one shot: pick one row per action type; do not copy overlapping rows that relist the same unit. A Target Hex listed only for other units is never a legal copy for this unit; if this unit has no row, route or leave it idle.
 6. **Stop condition.** Once destinations are chosen the model submits. The prompt must say that re-assessing or re-routing after a destination is chosen is wasted budget, because the round limit is finite and exhausting it produces no orders at all.
@@ -102,9 +102,9 @@ Tool inventory and per-consult availability:
 | --- | --- | --- | --- |
 | `plan_route` | planning | when planning tools are enabled | when planning tools are enabled |
 | `check_distance` | planning | when planning tools are enabled | when planning tools are enabled |
-| `assess_unit` | assessment | when assessment tools are enabled and no precomputed briefing is attached | never |
+| `assess_unit` | assessment | when assessment tools are enabled and no precomputed briefing is attached | when assessment tools are enabled |
 | `assess_hex` | assessment | when assessment tools are enabled and no precomputed briefing is attached | never |
-| `estimate_combat` | estimation | when estimation tools are enabled and no precomputed briefing is attached | never |
+| `estimate_combat` | estimation | when estimation tools are enabled and no precomputed briefing is attached | when estimation tools are enabled |
 | `memory_read` | memory | when memory tools are enabled | never |
 | `query_orders` | orders | when standing-order tools are enabled | never |
 | `query_production` | production | when production tools are enabled | never |

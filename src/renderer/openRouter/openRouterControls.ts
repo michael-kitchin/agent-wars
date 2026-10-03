@@ -142,22 +142,32 @@ syncOpenRouterRunToggleInteractable: () => Promise<void>;
 }
 
 /**
- * Defines the `initOpenRouterUI` function shape (export function initOpenRouterUI(deps: OpenRouterUiDeps): void).
-
- * Purpose: Supports maintainability by documenting why `initOpenRouterUI` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Starts the battle opponent-plan request once a deferred strategic consult is no longer holding the gate.
+ *
+ * Purpose: Entering a battle from melee Fight skips that request while the post-resolution consult is outstanding.
+ * When to use: After a strategic consult push clears `pendingDeferredStrategicPostResolutionConsult`, including a stale
+ * push that only clears the latch.
+ * Expected outcome: No-op outside tactical planning. Inside a battle, `startBackgroundRequestIfAllowed` still declines
+ * when a plan is buffered, Run is off, no opponent units remain, another deferred consult is pending, or a request is
+ * already in flight. Otherwise one background `requestAiOrders` for the battle.
  * Exceptions: None.
  */
+function startTacticalOpponentPlanAfterStrategicConsult(deps: OpenRouterUiDeps): void {
+  if (!S.tacticalBattleSnapshot || !S.tacticalPhasePlanning) return;
+  deps.startBackgroundRequestIfAllowed();
+}
+
 /**
  * Wires main-process pushes for deferred strategic/tactical LLM consultation into renderer shared state.
  *
  * Purpose: Centralizes listener registration next to OpenRouter UI bootstrap so prefetch + Ready gates stay aligned.
  * When to use: Once from `initOpenRouterUI`.
  * Expected outcome: Push payloads apply strategy toasts and tool counts. A successful strategic consult does not start
- * another `requestAiOrders`; those orders are already pending for the next Ready.
- * Exceptions: Stale `planningTurnNumber` merges log and clear strategic latch only. `abandoned` pushes unlatch and
- * resume Run prefetch without applying a plan; the player-visible skip line is sent on `openRouter:log`.
+ * another strategic `requestAiOrders`; those orders are already pending for the next Ready. When a tactical battle is
+ * already in planning, the battle's opponent-plan request starts then, because it was held while this consult ran.
+ * Exceptions: Stale `planningTurnNumber` merges log, clear the strategic latch, and still start that battle request.
+ * `abandoned` pushes unlatch and resume Run prefetch without applying a plan; the player-visible skip line is sent on
+ * `openRouter:log`.
  */
 function initDeferredResolutionPlaybackPushListeners(deps: OpenRouterUiDeps): void {
   window.gameApi?.registerPostResolutionConsultationListener?.((payload: PostResolutionConsultationPushPayload) => {
@@ -168,6 +178,7 @@ function initDeferredResolutionPlaybackPushListeners(deps: OpenRouterUiDeps): vo
     if (!S.gameState || payload.planningTurnNumber !== S.gameState.turnNumber) {
       deps.appendOpenRouterLog('Ignored stale post-resolution consultation push.', false);
       S.pendingDeferredStrategicPostResolutionConsult = false;
+      startTacticalOpponentPlanAfterStrategicConsult(deps);
       deps.updateReadyButtonState();
       return;
     }
@@ -184,6 +195,7 @@ function initDeferredResolutionPlaybackPushListeners(deps: OpenRouterUiDeps): vo
     deps.appendOpenRouterLog('Post-resolution consultation applied.', false);
     if (S.useEventDrivenConsultation) S.eventDrivenInitialConsultationDone = true;
     deps.requestRedraw();
+    startTacticalOpponentPlanAfterStrategicConsult(deps);
     deps.updateReadyButtonState();
   });
   window.gameApi?.registerPostTacticalBeatConsultationListener?.((fields) => {
@@ -237,6 +249,14 @@ function applyAbandonedDeferredConsultRecovery(kind: 'strategic' | 'tactical', d
   deps.updateReadyButtonState();
 }
 
+/**
+ * Wires the OpenRouter panel and the deferred-consultation push listeners.
+ *
+ * Purpose: One bootstrap for the Tools and Model tabs plus the pushes that release Ready after a deferred consult.
+ * When to use: Once during renderer startup.
+ * Expected outcome: Tabs, model list, and consultation listeners are registered.
+ * Exceptions: None; a missing OpenRouter API leaves the listeners that were registered and returns.
+ */
 export function initOpenRouterUI(deps: OpenRouterUiDeps): void {
   initDeferredResolutionPlaybackPushListeners(deps);
   const api = window.gameApi?.openRouter;

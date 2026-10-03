@@ -126,6 +126,48 @@ export function getGroupIdForToolName(toolName: string): string | undefined {
 }
 
 /**
+ * Individual tools never offered during a tactical battle, even when their group is enabled.
+ *
+ * Purpose: `assess_hex` has no battle implementation, while the rest of its assessment group (`assess_unit`) does.
+ * When to use: `filterToolNamesForTacticalBattle`.
+ * Expected outcome: Frozen LLM tool names.
+ * Exceptions: None.
+ */
+export const TACTICAL_BATTLE_EXCLUDED_TOOL_NAMES: readonly string[] = ['assess_hex'];
+
+/**
+ * Tool groups never offered during a tactical battle.
+ *
+ * Purpose: Memory, standing orders, and production are strategic-turn concepts with no meaning inside a battle beat.
+ * When to use: `filterToolNamesForTacticalBattle`.
+ * Expected outcome: Group ids from `TOOL_GROUP_REGISTRY`.
+ * Exceptions: None.
+ */
+export const TACTICAL_BATTLE_EXCLUDED_GROUP_IDS: readonly string[] = ['memory', 'orders', 'production'];
+
+/**
+ * Narrows an enabled tool list to the tools that work during a tactical battle.
+ *
+ * Purpose: Battles honor the user's tool-group toggles for planning, assessment, and estimation while dropping tools
+ * that have no battle implementation.
+ * When to use: Building the tool list for a tactical AI consultation; pass the same group lookup the caller uses.
+ * Expected outcome: Input order preserved; tools in excluded groups and individually excluded tools are removed.
+ * Exceptions: None.
+ */
+export function filterToolNamesForTacticalBattle(
+  toolNames: readonly string[],
+  groupIdForToolName: (toolName: string) => string | undefined
+): string[] {
+  const kept = toolNames.filter((name) => {
+    if (TACTICAL_BATTLE_EXCLUDED_TOOL_NAMES.includes(name)) return false;
+    const groupId = groupIdForToolName(name);
+    return groupId === undefined || !TACTICAL_BATTLE_EXCLUDED_GROUP_IDS.includes(groupId);
+  });
+  logTrace('openRouter filterToolNamesForTacticalBattle', { requested: toolNames.length, kept });
+  return kept;
+}
+
+/**
  * Documents the `ToolFlags` interface as a named contract surface (export interface ToolFlags).
 
  * Purpose: Supports maintainability by documenting why `ToolFlags` exists.

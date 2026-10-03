@@ -14,6 +14,7 @@ import {
 import type { GameStateSnapshot } from '../gameDb';
 import { logDebug, logError } from '../logger';
 import { h3ToLatLng, type LatLng } from './h3LatLng';
+import { estimateTacticalMarch, estimateTacticalTurnsRequired } from './tacticalMarchEstimate';
 
 /** Minimal plan_route options used by the tactical Tool1 branch (mirrors strategic `PlanRouteOptions`). */
 type TacticalPlanRouteOptions = { avoidEnemies?: boolean; maxTurns?: number };
@@ -86,20 +87,6 @@ function buildTacticalRouteRes4Set(
     out.add(h3);
   }
   return out;
-}
-
-/**
- * Estimates tactical beats to destination from total MP cost and per-beat budget.
- *
- * Purpose: check_distance / plan_route turnsRequired without strategic step-based partitioning.
- * When to use: After a successful `planTacticalRes4March` with finite total cost.
- * Expected outcome: At least 1 when a multi-cell path exists; 0 when already at destination.
- * Exceptions: None.
- */
-function estimateTacticalTurnsRequired(totalCost: number, budget: number, pathLen: number): number {
-  if (pathLen <= 1) return 0;
-  if (!(budget > 0) || !Number.isFinite(totalCost)) return pathLen - 1;
-  return Math.max(1, Math.ceil(totalCost / budget));
 }
 
 /**
@@ -437,29 +424,13 @@ export function executeTacticalCheckDistance(
   if (fromH3 === toH3Resolved) {
     return { status: 'ok', from: fromLl, to: h3ToLatLng(toH3Resolved, latLngByH3, 'origin'), hexDistance: 0, estimatedTurns: 0, reachable: true };
   }
-  const budget = effectiveTacticalMovementPointBudgetForMarchLeg(
-    battle,
-    { unitType, h3Index: fromH3 },
-    battle.subUnits,
-    unitType
-  );
-  const plan = planTacticalRes4MarchWithSessionCache(battle, {
-    fromH3,
-    toH3: toH3Resolved,
-    res4Set: footprint,
-    unitTypeForMovement: unitType,
-    movementPointBudget: Math.max(0, budget),
-  });
-  if (!plan.reachable || !plan.pathToDestination) {
-    return { status: 'ok', from: fromLl, to: h3ToLatLng(toH3Resolved, latLngByH3, 'origin'), hexDistance: 0, estimatedTurns: 0, reachable: false };
-  }
-  const pathLen = plan.pathToDestination.length;
+  const estimate = estimateTacticalMarch(battle, { unitType, h3Index: fromH3 }, toH3Resolved, footprint);
   return {
     status: 'ok',
     from: fromLl,
     to: h3ToLatLng(toH3Resolved, latLngByH3, 'origin'),
-    hexDistance: Math.max(0, pathLen - 1),
-    estimatedTurns: estimateTacticalTurnsRequired(plan.totalCostToDestination, budget, pathLen),
-    reachable: true,
+    hexDistance: estimate.pathStepCount,
+    estimatedTurns: estimate.estimatedBeats,
+    reachable: estimate.reachable,
   };
 }

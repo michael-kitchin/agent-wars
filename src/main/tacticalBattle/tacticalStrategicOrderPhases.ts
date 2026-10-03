@@ -36,8 +36,8 @@ import {
   type TacticalRangedRubbleApplyOptions,
 } from '../gameActions/tacticalRangedInfrastructureRubble';
 import { isDbReady, listRes4FeatureOverridesForGame } from '../gameDb';
-import { hasIntactAirportAtTacticalAirBase } from '../returnFireAirportLookup';
 import { refreshTacticalBattleRes4TerrainFromGameDb } from './computeTacticalBattleSnapshot';
+import { buildTacticalReturnFireContext, tacticalEmbarkedLandExcludedFromRangedInput } from './tacticalCombatInput';
 import { tacticalLogMutate, tacticalLogQuery } from './tacticalLogging';
 import {
   tacticalFindSubUnitIndexById,
@@ -209,28 +209,6 @@ function resolveTacticalAirStrikeAgainstUnitsOnSubUnits(
     });
     break;
   }
-}
-
-/**
- * Returns whether a land sub-unit should be excluded from ranged combat input like strategic embarked-at-sea infantry.
- *
- * Purpose: Mirrors `isEmbarkedLandUnitOnWater` using tactical terrain and sealift links instead of the strategic DB.
- * When to use: Building `CombatUnit[]` for `runRangedPhase` on a tactical snapshot.
- * Expected outcome: True only for infantry/armor embarked on a naval unit whose cell resolves to water terrain.
- * Exceptions: None.
- */
-function tacticalEmbarkedLandExcludedFromRangedInput(
-  battle: TacticalBattleSnapshot,
-  subUnits: readonly TacticalSubUnitSnapshot[],
-  u: TacticalSubUnitSnapshot
-): boolean {
-  if (u.unitType !== 'infantry' && u.unitType !== 'armor') return false;
-  const emb = u.embarkedOnSubUnitId;
-  if (!emb) return false;
-  const naval = subUnits.find((x) => x.id === emb);
-  if (!naval || naval.unitType !== 'naval') return false;
-  const kind = battle.res4TerrainKindByH3?.[naval.h3Index] ?? battle.strategicHexTerrainKind ?? 'plains';
-  return kind === 'water';
 }
 
 /**
@@ -588,13 +566,13 @@ export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
     const subBeforeRanged = workBattle.subUnits.map((u) => ({ ...u }));
     const byIdBefore = new Map(subBeforeRanged.map((u) => [u.id, u] as const));
     const rangedInput = tacticalSubUnitsToRangedCombatUnits(workBattle, workBattle.subUnits);
-    const tacticalFootprint = new Set(workBattle.res4ChildH3Indexes);
-    const rangedResult = runRangedPhase(rangedInput, workBattle.res4ChildH3Indexes, rangedOrdersCombat, next, {
-      theater: 'tactical',
-      tacticalBattle: workBattle,
-      tacticalFootprint,
-      hasIntactAirportAtAirBase: hasIntactAirportAtTacticalAirBase,
-    });
+    const rangedResult = runRangedPhase(
+      rangedInput,
+      workBattle.res4ChildH3Indexes,
+      rangedOrdersCombat,
+      next,
+      buildTacticalReturnFireContext(workBattle)
+    );
     rangedResolutionShotLines = dedupeRangedResolutionShotLines([
       ...rangedResolutionShotLines,
       ...(rangedResult.rangedResolutionShotLines ?? []),

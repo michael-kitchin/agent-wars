@@ -131,9 +131,9 @@ Tactical unit status uses the same six columns and has **no** standing-order col
 | Scenario objective | omitted |
 | Scouting directive | omitted |
 | Envelope | no `assign_order` / `cancel_order`; no `memoryUpdates` / `productionOrders`; `airStrikes` / `ferryOrders` listed when the roster has air; Best Options may list airport ferry dests |
-| Tools | planning tools when enabled; assessment, estimation, memory, orders, production stripped (`requestOrdersFlow`) |
+| Tools | planning, `assess_unit`, and `estimate_combat` when their groups are enabled, with battle prompt lines (`getFilteredToolMetadata` tactical mode) and battle guidance bullets (`buildToolUsageGuidance`); `assess_hex`, memory, orders, production stripped (`filterToolNamesForTacticalBattle`) |
 
-Always omitted: `# Standing Order Status`, orderless table, Supplemental Hex Intelligence, Production Status, Strategic Memory, Scenario Objective, Unit Roster, hop-honesty line, Explored/Controlled bullets, `assess_unit` / `estimate_combat` hints.
+Always omitted: `# Standing Order Status`, orderless table, Supplemental Hex Intelligence, Production Status, Strategic Memory, Scenario Objective, Unit Roster, hop-honesty line, Explored/Controlled bullets, the strategic no-briefing `assess_unit` / `estimate_combat` hints.
 
 Forbidden substrings (`TACTICAL_AI_PROMPT_STRATEGIC_SECTION_MARKERS`): `memoryupdates`, `productionorders`, `query_production`, `enemyintel`, `set_build_queue`.
 
@@ -234,7 +234,7 @@ Every tool round and the repair call go through `postOrdersChatRequest`. `resolv
 
 Unchanged in spirit from the assembler flags: fog, `getToolFlags`, `hasAir` / `hasNaval`, empty observed roster, Best Options row count, orderless units, `scenarioId`, `gameSize`, `coordinateContext.mode`, briefing present, previous-consult tool-round exhaustion. Air and naval **sections** now omit entirely when that arm is absent (not a dash row). Envelope air tails omit when `hasAir` is false; sealift actions omit when `hasNaval` is false.
 
-Tactical `requestOrdersFlow` always strips assessment, estimation, memory, orders, and production tools.
+Tactical `requestOrdersFlow` always strips `assess_hex` and the memory, orders, and production tools (`filterToolNamesForTacticalBattle`). `assess_unit` and `estimate_combat` stay when their groups are enabled and run with battle rules.
 
 ## 7. Coaching claim catalog
 

@@ -407,7 +407,7 @@ Scenarios should vary in how much infrastructure is available at start — a sce
 
 **Design decisions already resolved:** Several questions that would normally require prototyping have been answered during design:
 
-- **Unit relationship:** Multiplication. Strategic units decompose into fixed-ratio sub-units (infantry ×12, armor ×6, air ×3, naval ×2). No separate tactical roster. No open design question.
+- **Unit relationship:** Multiplication. Strategic units decompose into fixed-ratio sub-units (infantry ×8, armor ×4, air ×3, naval ×4). No separate tactical roster. No open design question.
 - **Entry-side injection:** Sub-units appear at the res4 edge corresponding to the direction the parent strategic unit entered the res1 hex. The engine already tracks hex-side crossing during strategic movement.
 - **Visibility:** Universal. No fog of war at the tactical level. Both sides see everything.
 - **Turn structure:** WEGO simultaneous resolution at the tactical level — the same model as the strategic game. Both sides commit orders, then all orders resolve at once. This maintains identity consistency across zoom levels and eliminates the reactive advantage IGOUGO would give human players over the LLM opponent.
@@ -421,7 +421,7 @@ These resolved decisions significantly reduce Phase 2 risk and scope compared to
 
 Build the zoom-in and zoom-out transitions, the tactical-level rendering path, the UI state management for tracking that the strategic game is paused, and a "Return to Strategic" button. The terrain should be visually readable at a glance — the player needs to see movement obstacles and ranged-fire lanes without studying a legend.
 
-Place sub-units on the map using entry-side injection. Implement the multiplication ratios (infantry ×12, armor ×6, air ×3, naval ×2) and position sub-units at the appropriate res4 edge hexes based on the parent unit's recorded entry side.
+Place sub-units on the map using entry-side injection. Implement the multiplication ratios (infantry ×8, armor ×4, air ×3, naval ×4) and position sub-units at the appropriate res4 edge hexes based on the parent unit's recorded entry side.
 
 **Playtest hypothesis:** The zoom transition should feel like assuming a different level of command — like a general leaning over a regional map after studying the global one. The terrain at res 4 should reveal geographic detail that was invisible at res 1: the Strait of Gibraltar as a narrow passage, the Swiss Alps as a barrier with passable valleys, coastal approaches that invite flanking maneuvers. Entry-side injection should visually confirm strategic positioning decisions — approaching from two sides should look like a two-pronged advance on the tactical map.
 
@@ -463,7 +463,7 @@ The AI may also choose to bail out of a tactical battle if it determines continu
 
 **Build:** Full integration pass. Tactical battles triggered from all scenario types. Bail-out resolution verified against strategic resolution for consistency. Test edge cases: tactical battle with only air units, tactical battle where one side has naval and the other doesn't, tactical battle where all units entered from the same side.
 
-Balance pass on: multiplication ratios (do 12 infantry sub-units produce interesting maneuver?), movement budgets (does it take the right number of turns to cross the battlefield?), ranged attack values (do standoff dynamics emerge?), and the bail-out modifier formula (does immediate bail-out ≈ strategic resolution?).
+Balance pass on: multiplication ratios (do 8 infantry sub-units produce interesting maneuver?), movement budgets (does it take the right number of turns to cross the battlefield?), ranged attack values (do standoff dynamics emerge?), and the bail-out modifier formula (does immediate bail-out ≈ strategic resolution?).
 
 Ensure scenarios from milestone 1.7 work correctly with tactical battles available. The end-game summary gains tactical battle statistics: how many were fought, how many were bailed out of, average sub-unit losses per battle.
 
@@ -588,7 +588,7 @@ Tactical battle sound design should be distinct from strategic resolution — wh
 
 **Cost and latency monitoring** is a new cross-cutting concern. From 0.6 onward, every AI consultation should log: trigger event, pre-computation time, prompt token count, completion token count, ad-hoc tool calls, total wall-clock time, and estimated cost. This data is essential for tuning the system and is the foundation for the in-game cost display that BYOK players will expect. In Phase 2, tactical AI consultations are a new cost category — if tactical battles trigger frequent LLM calls, per-game costs could spike. Monitor and consider capping the number of AI tactical consultations per battle.
 
-**Unit roster iteration** is a cross-cutting design concern from 1.5 onward. The global roster (infantry/armor/naval from 1.4, air added in 1.5) follows the standard validation process: start minimal, expand only through playtesting, test LLM comprehension, and ensure asymmetric matchups. The tactical level does not have a separate roster — it uses multiplication of strategic units — but the multiplication ratios (infantry ×12, armor ×6, air ×3, naval ×2) and tactical-level stats (movement budgets, ranged values) are subject to the same playtesting discipline. Resist the urge to add new tactical-only unit types unless playtesting clearly reveals a gap.
+**Unit roster iteration** is a cross-cutting design concern from 1.5 onward. The global roster (infantry/armor/naval from 1.4, air added in 1.5) follows the standard validation process: start minimal, expand only through playtesting, test LLM comprehension, and ensure asymmetric matchups. The tactical level does not have a separate roster — it uses multiplication of strategic units — but the multiplication ratios (infantry ×8, armor ×4, air ×3, naval ×4) and tactical-level stats (movement budgets, ranged values) are subject to the same playtesting discipline. Resist the urge to add new tactical-only unit types unless playtesting clearly reveals a gap.
 
 ---
 
