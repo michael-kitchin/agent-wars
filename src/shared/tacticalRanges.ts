@@ -34,7 +34,7 @@ export const MOVEMENT_RANGE_BY_UNIT_TYPE: Readonly<Record<string, number>> = Obj
  * Tactical ranged attack ranges in res4 grid steps (combat rules §12.5).
  *
  * Contract: **Baseline** max range per unit type; `src/shared/tacticalTerrainCombatModifiers.ts` may cap range to 1
- * from forest/urban/rubble cells and block air/armor/naval shots whose implicit LOS crosses mountain.
+ * from forest/urban/rubble cells and block armor/naval shots whose implicit LOS crosses mountain. Air strikes and ferry are not blocked by mountains.
  * Air uses a large within-footprint cap because strikes are allowed anywhere inside the parent res1 cell.
  * When to use: Tactical ranged targeting validation and UI gating.
  * Expected outcome: Infantry 2, armor 5, naval 10, air 99 (effectively unlimited within the tactical map) before terrain modifiers.

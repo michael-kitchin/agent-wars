@@ -77,8 +77,7 @@ export type TacticalTerrainKindResolver = {
    *
    * Contract: Present when the snapshot contributes any normalized `res4RoadSidesByH3` / `res4RailSidesByH3` rows; absent when
    * there is no transport overlay (planner falls back to `transportFromTo` only).
-   * When to use: `planTacticalRes4March` land branch to require march pair steps plus loose interior continuity on traversed
-   * corridor cells (both endpoints any road/rail per step).
+   * When to use: Land march pricing reads the destination cell's mask from this map. `transportFromTo` still reports the older both-cell pair, which spawn and diagnostics use.
    * Expected outcome: Same `Map` instance backing `transportFromTo` pair tests for that snapshot build.
    * Exceptions: None.
    */

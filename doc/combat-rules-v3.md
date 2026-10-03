@@ -96,7 +96,7 @@ The game has four unit types. Per-side caps scale with match size (`getMaxUnitsP
 - **Air vs. ground/naval:** Air units strike during the air strike phase (before ranged). When targeting units, defending ground/naval units with **strategic** range ≥ 1 in the target hex may return fire at their attack value — no range-to-base check. Infantry cannot return fire against air on the strategic map. In a tactical battle, defending sub-units with a tactical ranged baseline (including infantry) may counter-fire; see §12.5. When targeting infrastructure, only the infrastructure's fixed counter-fire roll applies.
 - **Ground vs. air (base attack):** Air units do not participate in melee. If an enemy ground unit enters a hex containing an airport with a based air unit, the air unit is destroyed (see §6).
 - **Strategic terrain combat modifiers:** None. Strategic ranged and air strikes are not blocked by terrain or intervening units.
-- **Tactical terrain combat modifiers:** Implemented. See §12.4 and §12.5 (enter-hex costs, origin MP collapse, forest/urban/rubble range cap, road/rail movement multipliers, mountain LOS).
+- **Tactical terrain combat modifiers:** Implemented. See §12.4 and §12.5 (enter-hex costs, origin MP collapse, forest/urban/rubble range cap, road/rail enter costs, mountain LOS).
 
 ---
 
@@ -240,7 +240,7 @@ No player input during steps 2–11 except the melee-intercept dialog at step 9.
 - **Multiple attackers on one hex:** When several hexes attack the same defender hex, resolve as one combined engagement. Assign defender return-fire hits to attacker hexes one at a time: most units remaining (ties: lowest H3 index); within that hex apply casualty priority.
 - **Arbitrary number of players:** Participant IDs are assigned once per side; melee with three or more sides uses round-robin sub-engagements. The live match is two sides (`human` / `opponent`).
 - **Line of sight / blocking (strategic):** Ranged and air strikes are not blocked by terrain or intervening units. Any enemy-occupied hex within the attacker's range is a valid target.
-- **Line of sight (tactical):** Mountain along the implicit grid path blocks armor, naval, and air shots. Infantry is exempt. See §12.5.
+- **Line of sight (tactical):** Mountain along the implicit grid path blocks armor and naval shots. Infantry is exempt. Air strikes and ferry are not blocked by mountains. See §12.5.
 - **Reproducibility:** A single RNG seed for the entire game so that replay is deterministic.
 - **Air unit base capture:** If an enemy ground unit enters a hex containing an airport with a based air unit, the air unit is destroyed during the post-melee check. The air unit does not fight in melee.
 - **Air unit destroyed during air strike phase:** If air unit A strikes air unit B's airport and destroys it, and air unit B has not yet resolved its own strike (higher H3 index), air unit B is destroyed before it can act.
@@ -420,8 +420,8 @@ Tactical movement uses a per-beat **movement-point budget** consumed as sub-unit
 - Infantry or armor whose **current** cell is urban or rubble: budget **1** this beat, not the type baseline.
 - Armor whose current cell is forest: budget equals the **infantry** baseline (2).
 - A non-air unit always retains at least 1 point.
-- Road edges multiply remaining points by **2**; rail edges by **3** (`TACTICAL_TRANSPORT_ROAD_BUDGET_MULTIPLIER` / `TACTICAL_TRANSPORT_RAIL_BUDGET_MULTIPLIER`).
-- Urban enter override: infantry/armor enter urban at 1 MP. Rubble land enters cost 2 MP. Naval treats rubble as blocking land.
+- Entering an intact road cell costs half a point and an intact rail cell costs one third, for every terrain, for infantry and armor. The destination cell sets the rate (`1 / TACTICAL_TRANSPORT_ROAD_BUDGET_MULTIPLIER` and `1 / TACTICAL_TRANSPORT_RAIL_BUDGET_MULTIPLIER`). A unit may enter that cell from a neighbor that is not on the line, and may leave only onto terrain it can enter off the line or onto another intact line cell.
+- Urban enter override: infantry/armor enter urban at 1 MP when the cell has no road or rail. Rubble with no road or rail still costs 2 MP. Rubble on a road or rail costs 1 MP where the unit could already enter, and does not open water for infantry or mountains, wetlands, arctic, or water for armor. Naval treats rubble as blocking land.
 
 A destination beyond this beat's budget is **clamped** to the first reachable leg rather than rejected. When the planner cannot use the destination at all but a neighbouring footprint cell still closes on it, the engine may take that single step. Friendly stacking on that cell is legal.
 
@@ -437,7 +437,7 @@ At the tactical level, all unit types have a positive ranged baseline (`RANGED_R
 **Terrain caps and LOS** (`tacticalTerrainCombatModifiers.ts`):
 
 - Forest, urban, or rubble on the **attacker's** cell caps **infantry and armor** to effective range **1**.
-- Mountain along the implicit H3 grid path blocks **armor, naval, and air** shots. **Infantry is exempt.** If no path can be derived, the shot is blocked (fail closed), except icosahedron face-crossing pairs which use a BFS fallback.
+- Mountain along the implicit H3 grid path blocks **armor and naval** shots. **Infantry is exempt.** Air strikes and ferry are not blocked by mountains. If no path can be derived, the shot is blocked (fail closed), except icosahedron face-crossing pairs which use a BFS fallback.
 - Return fire uses the same range + LOS rules (planning parity).
 - **Air-strike AA:** tactical infantry may counter-fire when an air strike targets their hex, because infantry has a positive tactical ranged baseline.
 - Legal targets include enemy-occupied cells **and** strikeable infrastructure (urban, airport, seaport, or active non-rubble road/rail).

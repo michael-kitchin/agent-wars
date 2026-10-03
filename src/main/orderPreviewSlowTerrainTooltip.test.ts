@@ -413,6 +413,50 @@ test('collectTacticalMarchTerrainImpact sets roadRail without duplicating Road/R
   assert.deepEqual(impact.slower, []);
 });
 
+test('collectTacticalMarchTerrainImpact marks a mountain road when only the mountain has the road', () => {
+  const a = tacticalRes4Cell(90, 100);
+  const b = firstRingCellDistinctFrom(a);
+  const paired = pairedTransportSidesForAdjacentHexes(a, b, 'road');
+  delete paired.res4RoadSidesByH3[a];
+  delete paired.res4RailSidesByH3[a];
+  const impact = collectTacticalMarchTerrainImpact({
+    battle: {
+      battleId: 'tb-dest-road',
+      enclosingRes1H3Index: '8f283082dcb519f',
+      res4ChildH3Indexes: [a, b],
+      strategicTurnNumber: 1,
+      tacticalTurnNumber: 1,
+      strategicHexTerrain: 'land',
+      strategicHexTerrainKind: 'plains',
+      res4TerrainKindByH3: { [a]: 'plains', [b]: 'mountain' },
+      res4RoadSidesByH3: paired.res4RoadSidesByH3,
+      res4RailSidesByH3: paired.res4RailSidesByH3,
+      subUnits: [
+        {
+          id: 'u1',
+          parentUnitId: 'p1',
+          player: 'human',
+          unitType: 'armor',
+          h3Index: a,
+          displayName: 'A',
+        },
+      ],
+    },
+    subUnit: {
+      id: 'u1',
+      parentUnitId: 'p1',
+      player: 'human',
+      unitType: 'armor',
+      h3Index: a,
+      displayName: 'A',
+    },
+    moveType: 'armor',
+    pathH3: [a, b],
+  });
+  assert.equal(impact.roadRail, true);
+  assert.deepEqual(impact.slower, []);
+});
+
 test('collectTacticalRangedSlowTerrainLabels preserves first-seen order across units', () => {
   const anchorA = tacticalRes4Cell(40, 50);
   const anchorB = tacticalRes4Cell(41, 51);

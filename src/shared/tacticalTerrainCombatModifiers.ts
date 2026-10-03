@@ -3,9 +3,10 @@
  *
  * ## Tactical terrain combat modifiers — locked semantics
  *
- * 1. **Mountain ranged block (air, armor, naval):** Tactical ranged uses implicit **line of sight (LOS)** via
+ * 1. **Mountain ranged block (armor, naval):** Tactical ranged uses implicit **line of sight (LOS)** via
  *    `computeGridPathCellsPure(attackerH3, targetH3)` on res4 indexes. If **any** cell on that trace is **mountain**, the
- *    attack is not allowed for air, armor, or naval. **Infantry** is excluded from this rule. Battles inside the twelve
+ *    attack is not allowed for armor or naval. **Infantry** is excluded. Air strikes and ferry do not use this helper.
+ *    A caller that passes unit type air still receives the block. Battles inside the twelve
  *    res1 hexes that contain a pentagon have res4 pairs where H3's straight-line `gridPathCells` throws; those are traced
  *    by the BFS fallback so clear terrain stays shootable. Only a pair with **no** derivable path at all is treated as
  *    **blocked** (fail closed). Ranged-phase return fire for ground units reuses this module via
@@ -278,7 +279,7 @@ export function tacticalMountainLosBlockedState(
 }
 
 /**
- * Returns true when **implicit LOS** is blocked by **mountain** (or LOS trace failed) for air, armor, or naval.
+ * Returns true when **implicit LOS** is blocked by **mountain** (or LOS trace failed) for armor or naval, and also for air if that unit type is passed in. Air strikes and ferry do not call this.
  *
  * Contract: Thin boolean over `tacticalMountainLosBlockedState`.
  * When to use: Apply-phase ranged filters where logging is unnecessary.

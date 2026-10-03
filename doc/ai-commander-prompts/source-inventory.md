@@ -204,7 +204,7 @@ Every tool round and the repair call go through `postOrdersChatRequest`. `resolv
 | `ATTACK` / `DEFENSE` / `getRange` | present |
 | `RANGED_RANGE_BY_UNIT_TYPE` | present in tactical |
 | `getMovementBudget` | present in strategic combat paragraph |
-| `MOVEMENT_RANGE_BY_UNIT_TYPE` plus origin urban/rubble, armor-in-forest, road/rail multipliers | present in tactical combat paragraph |
+| `MOVEMENT_RANGE_BY_UNIT_TYPE` plus origin urban/rubble, armor-in-forest, flat road and rail enter costs, and rubble on or off a line | present in tactical combat paragraph |
 | `CASUALTY_PRIORITY_ORDER` / lowest-defense-first | present (`buildCasualtySortRule`) |
 | `executeReadyStrategicTurn` phase order | present (`buildResolutionOrderRule`) |
 | `AIR_STRIKE_RANGE_HEXES` / `AIR_FERRY_RANGE_HEXES` | present when air is on the roster |

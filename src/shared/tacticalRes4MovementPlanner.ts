@@ -11,8 +11,6 @@ import {
 } from './tacticalTerrainMovement';
 import {
   landInfantryArmorEnterCost,
-  landTerrainBlocksWithoutTransport,
-  landTransportStepMovementPointsAfterAuthorization,
   planInfantryArmorLandContinuityMarch,
 } from './tacticalRes4LandMarchContinuity';
 import {
@@ -23,7 +21,6 @@ import {
 import {
   res4NeighborsInFootprint,
   type Res4FootprintNeighborLookup,
-  tacticalRes4TransportMarchAdjacentPairAllowsStep,
 } from './tacticalRes4TransportLink';
 
 /**
@@ -139,11 +136,11 @@ export function tacticalNavalHasMovableNeighborInFootprint(args: {
 }
 
 /**
- * Computes movement points spent to enter a single res4 cell for the active unit type.
+ * Computes movement points spent to enter a single res4 cell for naval march search.
  *
- * Purpose: Centralizes the §12.4 enter-hex cost lookup for both search and first-stop truncation.
- * When to use: Whenever a candidate neighbor is evaluated during tactical march planning.
- * Expected outcome: Positive finite cost for legal enters; `Infinity` when the unit type may not occupy that terrain.
+ * Purpose: Naval reachability uses this directly. Infantry and armor marches use `landInfantryArmorEnterCost`; this delegates to that function if a land type is passed so the two prices cannot diverge.
+ * When to use: Naval neighbor expansion in `planTacticalRes4March` and `collectSimpleEnterCostReachableWithinBudget`.
+ * Expected outcome: Naval enter cost from `tacticalNavalEnterNeighborCost`. A land step with an origin matches `landInfantryArmorEnterCost`.
  * Exceptions: None.
  */
 function enterCostForHex(
@@ -155,42 +152,21 @@ function enterCostForHex(
   if (unitTypeForMovement === 'naval') {
     return tacticalNavalEnterNeighborCost(fromH3, h, terrain);
   }
-  if (unitTypeForMovement === 'infantry' || unitTypeForMovement === 'armor') {
-    if (terrain.isRubbleRes4?.(h)) return 2;
+  if ((unitTypeForMovement === 'infantry' || unitTypeForMovement === 'armor') && fromH3 != null) {
+    return landInfantryArmorEnterCost({
+      toH3: h,
+      unitTypeForMovement,
+      terrain,
+      fromH3,
+      prevOfFrom: null,
+      marchGoalH3: h,
+      res4Set: new Set([fromH3, h]),
+    });
   }
   const raw = terrain.effectiveKindForRes4Hex(h);
   const cat = normalizeDbTerrainKindToTacticalCategory(raw, terrain.parentTerrain);
   const base = tacticalEnterHexMovementCost(unitTypeForMovement, cat);
   const urbanDest = !!(unitTypeForMovement === 'infantry' || unitTypeForMovement === 'armor') && !!terrain.isUrbanRes4?.(h);
-  if (
-    (unitTypeForMovement === 'infantry' || unitTypeForMovement === 'armor') &&
-    fromH3 != null &&
-    terrain.transportFromTo?.(fromH3, h)
-  ) {
-    const blocking = landTerrainBlocksWithoutTransport(unitTypeForMovement, terrain, h);
-    const ctx = terrain.landTransportMarchContext;
-    const transportReciprocalOk =
-      !blocking ||
-      (ctx != null
-        ? tacticalRes4TransportMarchAdjacentPairAllowsStep({
-            fromH3,
-            toH3: h,
-            roadRailByH3: ctx.roadRailByH3,
-            rubbleByH3: ctx.rubbleByH3,
-          })
-        : !!terrain.transportFromTo?.(h, fromH3));
-    if (transportReciprocalOk) {
-      return landTransportStepMovementPointsAfterAuthorization({
-        unitTypeForMovement,
-        fromH3,
-        toH3: h,
-        blockingDestination: blocking,
-        terrain,
-        tacticalCategoryForDestination: cat,
-        isUrbanDestination: urbanDest,
-      });
-    }
-  }
   if (urbanDest) return 1;
   return base;
 }

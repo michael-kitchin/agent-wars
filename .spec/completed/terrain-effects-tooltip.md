@@ -39,7 +39,7 @@ Mixed symbols for one unit/category: join in order `x`, `-`, `+` with `/`, then 
 ### Range (Infantry, Armored, Naval, Air)
 
 1. Forest category, urban, or rubble: `- Range` for Infantry and Armored (anchor cap).
-2. Mountains category: `x Range` for Air, Armored, Naval (LOS property).
+2. Mountains category: `x Range` for Armored and Naval (LOS property). Air strikes and ferry are not blocked by mountains.
 3. Do **not** show range cap from road/rail transport alone.
 
 ### Output
@@ -54,7 +54,7 @@ Mixed symbols for one unit/category: join in order `x`, `-`, `+` with `/`, then 
 |------|-----------------|
 | Infantry, Armored | Not water/arctic category; always on urban/rubble |
 | Naval | Seaport, or category water/coastal |
-| Air | Not occupiable; still receives mountain `x Range` |
+| Air | Not occupiable; mountains do not add an air range block |
 
 ## Expected output matrix
 
@@ -66,11 +66,12 @@ Mixed symbols for one unit/category: join in order `x`, `-`, `+` with `/`, then 
 | Coastal + road/rail | `(+) All Movement` |
 | Forest | `(-) All Movement, (-) All Range` |
 | Forest + road/rail | `(-) All Range, (+) All Movement` |
-| Mountain | `(-) Infantry Movement, (x) Air Range, (x) Armored Movement, (x) Armored Range, (x) Naval Range` |
-| Mountain + road/rail | `(+) All Movement, (x) Air Range, (x) Armored Range, (x) Naval Range` |
+| Mountain | `(-) Infantry Movement, (x) Armored Movement, (x) Armored Range, (x) Naval Range` |
+| Mountain + road/rail | `(+) All Movement, (x) Armored Range, (x) Naval Range` |
 | Wetlands / Arctic | `(x) Armored Movement` |
 | Wetlands / Arctic + road/rail | `(+) All Movement` |
 | Desert / Water | _(omit)_ |
 | Urban | `(-) All Movement, (-) All Range` |
-| Urban on Mountain | `(-) All Movement, (-) Infantry Range, (x) Air Range, (x) Naval Range, (x/-) Armored Range` |
-| Rubble (+ road masks) | `(-) All Movement, (-) All Range` |
+| Urban on Mountain | `(-) All Movement, (-) Infantry Range, (x) Naval Range, (x/-) Armored Range` |
+| Rubble | `(-) All Movement, (-) All Range` |
+| Rubble + road/rail on plains | `(-) All Range` |

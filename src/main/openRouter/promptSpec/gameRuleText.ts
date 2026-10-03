@@ -181,7 +181,7 @@ export function buildDestinationOccupancyRule(mode: PromptCoordinateMode): strin
  *
  * Purpose: Multi-turn and intra-beat reach cannot be judged from the options table alone.
  * When to use: Combat paragraph after the infantry reach clause.
- * Expected outcome: Strategic cell counts from `getMovementBudget`; tactical point budgets from `MOVEMENT_RANGE_BY_UNIT_TYPE`, origin urban/rubble collapse, and road/rail multipliers.
+ * Expected outcome: Strategic cell counts from `getMovementBudget`; tactical point budgets from `MOVEMENT_RANGE_BY_UNIT_TYPE`, origin urban/rubble collapse, and flat road/rail enter costs.
  * Exceptions: None.
  */
 export function buildMovementBudgetRule(mode: PromptCoordinateMode): string {
@@ -192,7 +192,9 @@ export function buildMovementBudgetRule(mode: PromptCoordinateMode): string {
       `${MOVEMENT_RANGE_BY_UNIT_TYPE.armor} for armor, ${MOVEMENT_RANGE_BY_UNIT_TYPE.naval} for naval, and air does not march. ` +
       'Infantry or armor whose current cell is urban or rubble has a 1-point budget this beat, not the type baseline. ' +
       'Armor in forest is penalised to the infantry baseline. ' +
-      `Road edges multiply remaining points by ${TACTICAL_TRANSPORT_ROAD_BUDGET_MULTIPLIER} and rail edges by ${TACTICAL_TRANSPORT_RAIL_BUDGET_MULTIPLIER}. ` +
+      `Entering an intact road cell costs 1/${TACTICAL_TRANSPORT_ROAD_BUDGET_MULTIPLIER} point and an intact rail cell costs 1/${TACTICAL_TRANSPORT_RAIL_BUDGET_MULTIPLIER} point, for every terrain. ` +
+      'Rubble with no road or rail costs 2. Rubble on a road or rail costs 1 where the unit could already enter, and does not open blocked terrain. ' +
+      'A unit may enter that cell from a neighbor that is not on the line, and may leave it only onto terrain it can enter without a line or onto another intact line cell. ' +
       'A non-air unit always retains at least one point. ' +
       "A destination beyond this beat's budget is clamped to the first reachable leg rather than rejected; when the planner cannot use the destination at all but a neighbouring footprint cell still closes on it, the engine may take that single step instead."
     );
@@ -217,7 +219,7 @@ export function buildRangedReachRule(mode: PromptCoordinateMode): string {
     return (
       `Infantry and armor fire at their res4 baselines (infantry ${RANGED_RANGE_BY_UNIT_TYPE.infantry}, armor ${RANGED_RANGE_BY_UNIT_TYPE.armor}); ` +
       'forest, urban, or rubble on the attacker\'s cell caps infantry and armor to range 1. ' +
-      'Mountain along the line of sight blocks armor, naval, and air shots (infantry is exempt). ' +
+      'Mountain along the line of sight blocks armor and naval shots (infantry is exempt). Air strikes and ferry are not blocked by mountains. ' +
       'Close to melee when out of range.'
     );
   }

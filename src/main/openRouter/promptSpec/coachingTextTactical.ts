@@ -110,11 +110,11 @@ const REACH_BULLET =
  *
  * Purpose: A model carrying strategic melee-only infantry or baseline-5 armor into a beat will order illegal shots.
  * When to use: Always in tactical coaching.
- * Expected outcome: States res4 baselines, the range-1 cap, and mountain LOS.
+ * Expected outcome: States res4 baselines, the range-1 cap, mountain line of sight for armor and naval, and that air strikes and ferry are not blocked by mountains.
  * Exceptions: None.
  */
 const INFANTRY_REACH_BULLET =
-  `- Infantry and armor fire at res4 baselines of ${RANGED_RANGE_BY_UNIT_TYPE.infantry} and ${RANGED_RANGE_BY_UNIT_TYPE.armor}; forest, urban, or rubble caps them to range 1. Mountain along the line of sight blocks armor, naval, and air. Close to melee when out of reach.`;
+  `- Infantry and armor fire at res4 baselines of ${RANGED_RANGE_BY_UNIT_TYPE.infantry} and ${RANGED_RANGE_BY_UNIT_TYPE.armor}; forest, urban, or rubble caps them to range 1. Mountain along the line of sight blocks armor and naval. Air strikes and ferry are not blocked by mountains. Close to melee when out of reach.`;
 
 /**
  * Air strikes reach the whole battle, once.

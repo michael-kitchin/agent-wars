@@ -308,11 +308,16 @@ function buildTerrainEffectGroupedMap(input: TerrainEffectsInput): Map<string, S
     }
   }
 
+  const movementOccupiable = [...occupiableMovementUnits(cat, input)];
+  if (hasTransport && !movementOccupiable.includes('Infantry')) {
+    movementOccupiable.push('Infantry', 'Armored');
+  }
+
   const rangeByUnit = new Map<UnitLabel, Set<EffectSymbol>>();
   applyRangeSymbols(rangeByUnit, cat, input);
 
   const grouped = new Map<string, Set<EffectSymbol>>();
-  collapseCategoryEntries(grouped, 'Movement', movementByUnit, occupiableMovementUnits(cat, input));
+  collapseCategoryEntries(grouped, 'Movement', movementByUnit, movementOccupiable);
   collapseCategoryEntries(grouped, 'Range', rangeByUnit, occupiableRangeUnits(cat, input));
   return grouped;
 }
@@ -352,7 +357,7 @@ function formatSymbolSet(symbols: ReadonlySet<EffectSymbol>): string {
  *
  * Purpose: Encodes base enter cost, urban/rubble overrides, exception D, and exception C transport.
  * When to use: While building the movement symbol map in `computeTerrainEffectsLine`.
- * Expected outcome: At most one symbol per unit after transport override; `null` when no movement effect applies.
+ * Expected outcome: `+` on an intact road or rail. Rubble on terrain the unit cannot enter is `x` (hidden on water). Rubble on a road the unit can already enter has no movement symbol. Rubble with no road stays `-`. `null` when no movement effect applies.
  * Exceptions: None.
  */
 function movementSymbolForUnit(
@@ -365,7 +370,17 @@ function movementSymbolForUnit(
     return '+';
   }
 
-  if (input.isUrban || input.isRubble) {
+  if (input.isRubble && (unitType === 'infantry' || unitType === 'armor')) {
+    const rubbleCost = tacticalEnterHexMovementCost(unitType, cat);
+    if (rubbleCost === Infinity) {
+      if (shouldSuppressMovementBlock(unitType, cat)) return null;
+      return 'x';
+    }
+    if (input.hasRoad || input.hasRail) return null;
+    return '-';
+  }
+
+  if (input.isUrban) {
     if (unitType === 'infantry' || unitType === 'armor') return '-';
     return null;
   }
@@ -405,7 +420,7 @@ function shouldSuppressMovementBlock(
  *
  * Purpose: Populates the range symbol map alongside movement in `computeTerrainEffectsLine`.
  * When to use: After movement symbols are computed.
- * Expected outcome: Infantry/Armored `-` on forest/urban/rubble; Air/Armored/Naval `x` on mountains.
+ * Expected outcome: Infantry/Armored `-` on forest/urban/rubble; Armored/Naval `x` on mountains. Air strikes and ferry are not blocked by mountains.
  * Exceptions: None.
  */
 function applyRangeSymbols(
@@ -420,7 +435,6 @@ function applyRangeSymbols(
     addSymbol(rangeByUnit, 'Armored', '-');
   }
   if (cat === 'mountains') {
-    addSymbol(rangeByUnit, 'Air', 'x');
     addSymbol(rangeByUnit, 'Armored', 'x');
     addSymbol(rangeByUnit, 'Naval', 'x');
   }

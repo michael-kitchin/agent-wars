@@ -19,6 +19,7 @@ import {
 import type { TacticalBattleTerrainPick } from './tacticalTerrainCombatModifiers';
 import type { TacticalBattleSnapshot, TacticalSubUnitSnapshot } from './tacticalBattleTypes';
 import { MOVEMENT_RANGE_BY_UNIT_TYPE, RANGED_RANGE_BY_UNIT_TYPE } from './tacticalRanges';
+import { landInfantryArmorEnterCost } from './tacticalRes4LandMarchContinuity';
 import {
   buildTacticalTerrainKindResolverFromSnapshot,
   normalizeDbTerrainKindToTacticalCategory,
@@ -292,7 +293,7 @@ export type TacticalMarchTerrainImpact = {
  *
  * Purpose: Replaces “first only” `pickTacticalMarchSlowTerrainDisplayTitle` with a union suitable for HTML tooltips.
  * When to use: `buildTacticalMarchHoverPreview` / `buildPreviewForSubUnit` after `planTacticalRes4March` succeeds.
- * Expected outcome: Anchor throttle labels (when `eff < baseline`) plus per-hex path labels (same branch precedence as the legacy picker); `roadRail` true if any step qualifies (including when anchor already supplied `slower`).
+ * Expected outcome: Anchor throttle labels (when `eff < baseline`) plus per-hex path labels. `roadRail` is true when a step's actual enter cost is the road or rail rate and the off-road cost would have been higher, including when only the destination cell has the line.
  * Exceptions: None; air/naval and trivial paths yield empty `slower` and `roadRail: false`.
  */
 export function collectTacticalMarchTerrainImpact(args: {
@@ -326,6 +327,8 @@ export function collectTacticalMarchTerrainImpact(args: {
   }
 
   const terrainForTransport = buildTacticalTerrainKindResolverFromSnapshot(battle);
+  const footprint = new Set(battle.res4ChildH3Indexes);
+  const marchGoalH3 = pathH3[pathH3.length - 1]!;
   for (let i = 1; i < pathH3.length; i++) {
     const prev = pathH3[i - 1]!;
     const h = pathH3[i]!;
@@ -342,7 +345,17 @@ export function collectTacticalMarchTerrainImpact(args: {
     const cat = normalizeDbTerrainKindToTacticalCategory(String(rawKind).toLowerCase(), parent);
     const cost = tacticalEnterHexMovementCost(moveType, cat);
     const plainsCost = tacticalEnterHexMovementCost(moveType, 'plains');
-    if (terrainForTransport.transportFromTo?.(prev, h) && (cost > plainsCost || !Number.isFinite(cost))) {
+    const stepCost = landInfantryArmorEnterCost({
+      toH3: h,
+      unitTypeForMovement: moveType,
+      terrain: terrainForTransport,
+      fromH3: prev,
+      prevOfFrom: i >= 2 ? pathH3[i - 2]! : null,
+      marchGoalH3,
+      res4Set: footprint,
+    });
+    const usedLineRate = Number.isFinite(stepCost) && stepCost < 1;
+    if (usedLineRate && (cost > plainsCost || !Number.isFinite(cost))) {
       roadRail = true;
       continue;
     }

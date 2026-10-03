@@ -71,17 +71,17 @@ test('forest with transport keeps range cap and adds movement bonus', () => {
   );
 });
 
-test('mountain blocks armor movement and air armor naval range', () => {
+test('mountain blocks armor movement and armor and naval range', () => {
   assert.equal(
     computeTerrainEffectsLine(fx({ terrainKind: 'mountain' })),
-    '(-) Infantry Movement, (x) Air Range, (x) Armored Movement, (x) Armored Range, (x) Naval Range'
+    '(-) Infantry Movement, (x) Armored Movement, (x) Armored Range, (x) Naval Range'
   );
 });
 
 test('mountain with transport clears land movement penalties and adds bonus for all', () => {
   assert.equal(
     computeTerrainEffectsLine(fx({ terrainKind: 'mountain', hasRail: true })),
-    '(+) All Movement, (x) Air Range, (x) Armored Range, (x) Naval Range'
+    '(+) All Movement, (x) Armored Range, (x) Naval Range'
   );
 });
 
@@ -107,7 +107,7 @@ test('urban shows movement and range slowdown for all land units', () => {
 test('urban on mountain mixes range symbols for armored', () => {
   assert.equal(
     computeTerrainEffectsLine(fx({ terrainKind: 'mountain', isUrban: true })),
-    '(-) All Movement, (-) Infantry Range, (x) Air Range, (x) Naval Range, (x/-) Armored Range'
+    '(-) All Movement, (-) Infantry Range, (x) Naval Range, (x/-) Armored Range'
   );
 });
 
@@ -118,7 +118,32 @@ test('rubble shows movement and range slowdown and suppresses transport bonus', 
   );
   assert.equal(
     computeTerrainEffectsLine(fx({ isRubble: true, hasRoad: true, hasRail: true })),
-    '(-) All Movement, (-) All Range'
+    '(-) All Range'
+  );
+});
+
+test('water with a road shows plus movement and water without a road stays blank', () => {
+  assert.equal(
+    computeTerrainEffectsLine(fx({ terrainKind: 'water', parentTerrain: 'water', hasRoad: true })),
+    '(+) All Movement'
+  );
+  assert.equal(
+    computeTerrainEffectsLine(fx({ terrainKind: 'water', parentTerrain: 'water' })),
+    null
+  );
+});
+
+test('rubble mountain with a road blocks armor and does not slow infantry', () => {
+  assert.equal(
+    computeTerrainEffectsLine(fx({ terrainKind: 'mountain', isRubble: true, hasRoad: true })),
+    '(-) Infantry Range, (x) Armored Movement, (x) Naval Range, (x/-) Armored Range'
+  );
+});
+
+test('rubble wetlands block armor movement', () => {
+  assert.equal(
+    computeTerrainEffectsLine(fx({ terrainKind: 'wetlands', isRubble: true })),
+    '(-) All Range, (-) Infantry Movement, (x) Armored Movement'
   );
 });
 

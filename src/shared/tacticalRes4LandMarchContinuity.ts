@@ -1,11 +1,10 @@
 /**
  * Land infantry/armor tactical march helpers: transport continuity and stateful shortest-path search.
  *
- * Purpose: Keeps `tacticalRes4MovementPlanner` under file-size limits while isolating road/rail corridor rules that depend on
- * the incoming hex (`prev`) as well as the current step head cell.
+ * Purpose: Keeps `tacticalRes4MovementPlanner` under file-size limits. Enter cost follows the destination cell. Leaving a blocked cell still checks the next cell so one road cell does not open the surrounding terrain.
  * When to use: Only from `planTacticalRes4March` for `infantry` / `armor` unit rows with a `TacticalTerrainKindResolver`.
- * Expected outcome: Same paths/costs as a single-state Dijkstra when no transport overlay exists; with overlays, steps use
- * march pair rules (both endpoints any road/rail) and loose interior continuity instead of slot-aligned corridor masks only.
+ * Expected outcome: Same paths/costs as a single-state Dijkstra when no transport overlay exists; with overlays, entering an intact
+ * road cell costs half a point and entering an intact rail cell costs one third, including from a neighbor that is not on the line.
  * Exceptions: None; malformed H3 inputs yield empty neighbor lists via `gridDisk` catch paths.
  */
 
@@ -22,11 +21,13 @@ import {
   type NumericPriorityHeapEntry,
 } from './numericPriorityMinHeap';
 import {
+  res4GridDiskNeighborsOrdered,
   res4NeighborsInFootprint,
   type Res4FootprintNeighborLookup,
+  TACTICAL_TRANSPORT_RAIL_BUDGET_MULTIPLIER,
+  TACTICAL_TRANSPORT_ROAD_BUDGET_MULTIPLIER,
   tacticalRes4TransportMarchAdjacentPairAllowsStep,
-  tacticalRes4TransportMarchInteriorContinuity,
-  tacticalRes4TransportStepSpeedMultiplier,
+  tacticalRes4TransportMaskHasAnyRoadOrRail,
   type TacticalRes4TransportMasks,
 } from './tacticalRes4TransportLink';
 
@@ -100,86 +101,47 @@ function legacyLandTransportPlainsEnterAllowed(args: {
 }
 
 /**
- * Returns true when infantry/armor may apply the transport plains enter-cost override for `fromH3` → `toH3` under continuity rules.
+ * Returns true when the destination is an intact road or rail cell.
  *
- * Purpose: Non-blocking steps require `tacticalRes4TransportMarchAdjacentPairAllowsStep` (both endpoints any road/rail) plus
- * `tacticalRes4TransportMarchInteriorContinuity` when `prevOfFrom` is set. **Blocking** destinations use the same adjacent pair
- * rule (symmetric). **Transit** onto a blocking non-goal cell needs a witness neighbor `w` with march interior continuity on `toH3`.
- * When to use: Land march `enterCost` after rubble/urban fast paths.
- * Expected outcome: Transport plains apply only when these predicates pass; blocked goals fail when either endpoint lacks overlay bits.
+ * Purpose: The cell being entered is enough. The origin does not need its own overlay, and the unit may stop without a witness exit.
+ * When to use: `landTransportPlainsEnterAllowed` and when leaving a blocked cell onto another line cell.
+ * Expected outcome: True when the destination has any road or rail side and is not rubble. Rubble is priced separately and is never a half-point or one-third step.
+ * Exceptions: None.
+ */
+function destinationIsIntactLineCell(args: {
+  toH3: string;
+  roadRailByH3: ReadonlyMap<string, TacticalRes4TransportMasks>;
+  rubbleByH3: Readonly<Record<string, boolean>>;
+}): boolean {
+  const { toH3, roadRailByH3, rubbleByH3 } = args;
+  if (rubbleByH3[toH3]) return false;
+  return destinationLineBudgetMultiplier(toH3, roadRailByH3) > 1;
+}
+
+/**
+ * Returns true when infantry or armor may pay the road or rail rate to enter `toH3`.
+ *
+ * Purpose: An intact line cell is enterable from a neighbor that is not itself on the line. Leaving that cell is priced by the next step, not by a witness on this one.
+ * When to use: Land march enter cost after the rubble fast path.
+ * Expected outcome: True only when `destinationIsIntactLineCell` is true. A blocked cell with no road or rail stays closed.
  * Exceptions: None.
  */
 function landTransportPlainsEnterAllowed(args: {
-  unitTypeForMovement: string;
-  fromH3: string;
   toH3: string;
-  prevOfFrom: string | null;
-  marchGoalH3: string;
-  terrain: TacticalTerrainKindResolver;
   roadRailByH3: ReadonlyMap<string, TacticalRes4TransportMasks>;
   rubbleByH3: Readonly<Record<string, boolean>>;
-  footprintNeighborsOf: (h: string) => readonly string[];
 }): boolean {
-  const blocking = landTerrainBlocksWithoutTransport(args.unitTypeForMovement, args.terrain, args.toH3);
-  const { prevOfFrom, marchGoalH3, fromH3, toH3 } = args;
-  const { roadRailByH3, rubbleByH3 } = args;
-  if (!blocking) {
-    if (
-      !tacticalRes4TransportMarchAdjacentPairAllowsStep({
-        fromH3,
-        toH3,
-        roadRailByH3,
-        rubbleByH3,
-      })
-    ) {
-      return false;
-    }
-    if (prevOfFrom === null) return true;
-    return tacticalRes4TransportMarchInteriorContinuity({
-      prevH3: prevOfFrom,
-      currH3: fromH3,
-      nextH3: toH3,
-      roadRailByH3,
-      rubbleByH3,
-    });
-  }
-  if (
-    !tacticalRes4TransportMarchAdjacentPairAllowsStep({
-      fromH3,
-      toH3,
-      roadRailByH3,
-      rubbleByH3,
-    })
-  ) {
-    return false;
-  }
-  if (toH3 === marchGoalH3) return true;
-  for (const w of args.footprintNeighborsOf(toH3)) {
-    if (w === fromH3) continue;
-    if (
-      tacticalRes4TransportMarchInteriorContinuity({
-        prevH3: fromH3,
-        currH3: toH3,
-        nextH3: w,
-        roadRailByH3,
-        rubbleByH3,
-      })
-    ) {
-      return true;
-    }
-  }
-  return false;
+  return destinationIsIntactLineCell(args);
 }
 
 /**
  * Returns true when land Dijkstra may relax edge `h` → `nb` after arriving at `h` from `prev`.
  *
- * Purpose: Prevents **transiting** through a hex that is impassable without transport (e.g. armor in `mountains`, infantry in `water`)
- * unless road/rail masks on `h` admit a corridor `prev → h → nb`. March start and goal cells skip this check so blocked destinations
- * still follow `landTransportPlainsEnterAllowed` / first-step witness rules only.
+ * Purpose: Prevents **transiting** through a hex that is impassable without a road or rail (armor in mountains, infantry in water)
+ * onto another blocked cell that is not itself an intact line. A passable neighbor, such as plains, is a legal exit. March start and goal cells skip this check.
  * When to use: Neighbor expansion inside `planInfantryArmorLandContinuityMarch` for `infantry` / `armor` only; also single-source
  * reachability collectors that must match that search.
- * Expected outcome: False when `h` is blocked, `prev` is set, `h` is neither start nor goal, and `tacticalRes4TransportMarchInteriorContinuity` fails (or legacy `transportFromTo` lacks both legs).
+ * Expected outcome: False when `h` is blocked, `prev` is set, `h` is neither start nor goal, `nb` is also blocked, and `nb` is not an intact line cell.
  * Exceptions: None.
  */
 export function blockedHexLandTransitAllowsRelaxation(args: {
@@ -196,27 +158,46 @@ export function blockedHexLandTransitAllowsRelaxation(args: {
   if (prev == null) return true;
   if (h === marchStartH3 || h === marchGoalH3) return true;
   if (!landTerrainBlocksWithoutTransport(unitTypeForMovement, terrain, h)) return true;
+  if (!landTerrainBlocksWithoutTransport(unitTypeForMovement, terrain, nb)) return true;
   const ctx = terrain.landTransportMarchContext;
   if (ctx != null) {
-    return tacticalRes4TransportMarchInteriorContinuity({
-      prevH3: prev,
-      currH3: h,
-      nextH3: nb,
+    return destinationIsIntactLineCell({
+      toH3: nb,
       roadRailByH3: ctx.roadRailByH3,
       rubbleByH3: ctx.rubbleByH3,
     });
   }
-  return !!(terrain.transportFromTo?.(h, prev) && terrain.transportFromTo?.(h, nb));
+  return !!(terrain.transportFromTo?.(h, nb));
 }
 
 /**
- * Returns §12.4 movement points for one **authorized** transport step after base transport MPs and road/rail budget scaling.
+ * Returns the road (2) or rail (3) divisor for the cell being entered, or 1 when that cell has no intact line.
  *
- * Purpose: Single formula for transport enter pricing shared by `classifyLandInfantryArmorEnterStep` and legacy `enterCostForHex` shims.
- * When to use: Only when continuity / reciprocal rules already allow transport pricing for `fromH3` → `toH3`.
- * Expected outcome: Blocking destinations use infantry **1** / armor **2** base MPs; non-blocking steps use §12.4 cost for
- * `tacticalCategoryForDestination`, except **urban** destinations use plains-equivalent base so armor stays finite on harsh kinds;
- * result divides by `tacticalRes4TransportStepSpeedMultiplier` when `landTransportMarchContext` is present, else multiplier **1** (legacy).
+ * Purpose: March cost follows the destination overlay. Rail on the destination wins over a road on the destination. The origin cell does not change the rate.
+ * When to use: Pricing an authorized infantry or armor step, and deciding whether rubble on passable land keeps a line at cost 1.
+ * Expected outcome: `TACTICAL_TRANSPORT_RAIL_BUDGET_MULTIPLIER` when any rail side is set, else `TACTICAL_TRANSPORT_ROAD_BUDGET_MULTIPLIER` when any road side is set, else 1.
+ * Exceptions: None. A missing mask row or a length mismatch yields 1.
+ */
+function destinationLineBudgetMultiplier(
+  toH3: string,
+  roadRailByH3: ReadonlyMap<string, TacticalRes4TransportMasks>
+): number {
+  const masks = roadRailByH3.get(toH3);
+  if (!masks) return 1;
+  const ringLen = res4GridDiskNeighborsOrdered(toH3).length;
+  if (!tacticalRes4TransportMaskHasAnyRoadOrRail(masks, ringLen)) return 1;
+  for (let i = 0; i < ringLen; i++) {
+    if (masks.railSides[i]) return TACTICAL_TRANSPORT_RAIL_BUDGET_MULTIPLIER;
+  }
+  return TACTICAL_TRANSPORT_ROAD_BUDGET_MULTIPLIER;
+}
+
+/**
+ * Returns the movement points for one authorized infantry or armor transport step.
+ *
+ * Purpose: Shared by `classifyLandInfantryArmorEnterStep` and the legacy `enterCostForHex` shim so those paths cannot price a line differently.
+ * When to use: Only after continuity rules already allow transport pricing for the step.
+ * Expected outcome: When the destination has a road or rail mask, the cost is 1 divided by `destinationLineBudgetMultiplier` for every terrain. Terrain enter cost and the armor blocking base are not used. Without mask context, the previous terrain-based cost is kept.
  * Exceptions: None.
  */
 export function landTransportStepMovementPointsAfterAuthorization(args: {
@@ -225,23 +206,26 @@ export function landTransportStepMovementPointsAfterAuthorization(args: {
   toH3: string;
   blockingDestination: boolean;
   terrain: TacticalTerrainKindResolver;
-  /** §12.4 category for `toH3`; ignored when `blockingDestination` is true (fixed blocking bases apply). */
+  /** §12.4 category for `toH3`. Used only when the destination has no road or rail mask. */
   tacticalCategoryForDestination: TacticalMovementCategory;
   /**
-   * When true, non-blocking base MPs use plains-equivalent §12.4 costs so urban infrastructure destinations remain finite for armor on
-   * mountain-class kinds with urban overlay.
+   * When true and the destination has no road or rail mask, base MPs use the plains enter cost so urban cells stay finite.
    */
   isUrbanDestination: boolean;
 }): number {
   const {
     unitTypeForMovement,
-    fromH3,
     toH3,
     blockingDestination,
     terrain,
     tacticalCategoryForDestination,
     isUrbanDestination,
   } = args;
+  const ctx = terrain.landTransportMarchContext;
+  if (ctx != null) {
+    const lineMultiplier = destinationLineBudgetMultiplier(toH3, ctx.roadRailByH3);
+    if (lineMultiplier > 1) return 1 / lineMultiplier;
+  }
   const baseTransportMp = blockingDestination
     ? unitTypeForMovement === 'armor'
       ? 2
@@ -249,17 +233,7 @@ export function landTransportStepMovementPointsAfterAuthorization(args: {
     : isUrbanDestination
       ? tacticalEnterHexMovementCost(unitTypeForMovement, 'plains')
       : tacticalEnterHexMovementCost(unitTypeForMovement, tacticalCategoryForDestination);
-  const ctx = terrain.landTransportMarchContext;
-  const mult =
-    ctx != null
-      ? tacticalRes4TransportStepSpeedMultiplier({
-          fromH3,
-          toH3,
-          roadRailByH3: ctx.roadRailByH3,
-          rubbleByH3: ctx.rubbleByH3,
-        })
-      : 1;
-  return baseTransportMp / mult;
+  return baseTransportMp;
 }
 
 /**
@@ -267,7 +241,7 @@ export function landTransportStepMovementPointsAfterAuthorization(args: {
  *
  * Contract: Diagnostic-only; matches `classifyLandInfantryArmorEnterStep` branches.
  * When to use: Debug logs and tests that assert mountain steps use transport vs urban vs base costs.
- * Expected outcome: `transport_plains` / `transport_blocking` when the road/rail continuity bundle (or legacy `transportFromTo`) authorizes transport pricing.
+ * Expected outcome: `transport_plains` / `transport_blocking` when the destination is an intact road or rail cell, or legacy `transportFromTo` authorizes the step.
  * Exceptions: None.
  */
 export type LandInfantryArmorEnterAppliedReason =
@@ -310,8 +284,8 @@ export type LandInfantryArmorEnterStepClassification = {
  *
  * Purpose: Single implementation shared by `landInfantryArmorEnterCost` and structured logging so cost and explanations cannot drift.
  * When to use: Any time code needs terrain category, transport flags, or rule label for the step, not only the numeric cost.
- * Expected outcome: Transport steps use terrain-native (or plains-equivalent for urban) non-blocking base MPs, or blocking-transport
- * base MPs, divided by road (2.0) / rail (3.0) multipliers when mask rows exist.
+ * Expected outcome: An intact destination road costs half a point and an intact destination rail costs one third, for every terrain.
+ * Rubble on terrain the unit cannot enter off a line stays blocked. Rubble on a line the unit can already enter costs 1. Rubble with no line costs 2.
  * Exceptions: None.
  */
 export function classifyLandInfantryArmorEnterStep(args: {
@@ -322,11 +296,12 @@ export function classifyLandInfantryArmorEnterStep(args: {
   prevOfFrom: string | null;
   marchGoalH3: string;
   res4Set: ReadonlySet<string>;
-  /** Precomputed footprint adjacency; when omitted, falls back to `res4NeighborsInFootprint` per step. */
+  /**
+   * Kept so search and path logging pass one argument object. Step price uses the destination cell, not adjacency.
+   */
   footprintNeighbors?: Res4FootprintNeighborLookup;
 }): LandInfantryArmorEnterStepClassification {
-  const { toH3, unitTypeForMovement, terrain, fromH3, prevOfFrom, marchGoalH3, res4Set } = args;
-  const neighborsOf = args.footprintNeighbors ?? ((h: string) => res4NeighborsInFootprint(h, res4Set));
+  const { toH3, unitTypeForMovement, terrain, fromH3 } = args;
   const raw = terrain.effectiveKindForRes4Hex(toH3);
   const cat = normalizeDbTerrainKindToTacticalCategory(raw, terrain.parentTerrain);
   const base = tacticalEnterHexMovementCost(unitTypeForMovement, cat);
@@ -349,22 +324,23 @@ export function classifyLandInfantryArmorEnterStep(args: {
   const transportContinuityAllowed =
     ctx != null
       ? landTransportPlainsEnterAllowed({
-          unitTypeForMovement,
-          fromH3,
           toH3,
-          prevOfFrom,
-          marchGoalH3,
-          terrain,
           roadRailByH3: ctx.roadRailByH3,
           rubbleByH3: ctx.rubbleByH3,
-          footprintNeighborsOf: neighborsOf,
         })
       : legacyLandTransportPlainsEnterAllowed({ terrain, fromH3, toH3, unitTypeForMovement });
   const blockingTerrainWithoutTransport = blockingDestination;
 
   if (rubbleOverride) {
+    const lineMultiplier = ctx != null ? destinationLineBudgetMultiplier(toH3, ctx.roadRailByH3) : 1;
+    const rubbleBlocksEntry = !Number.isFinite(base);
+    const appliedCost = rubbleBlocksEntry
+      ? Number.POSITIVE_INFINITY
+      : lineMultiplier > 1
+        ? tacticalEnterHexMovementCost(unitTypeForMovement, 'plains')
+        : 2;
     return {
-      appliedCost: 2,
+      appliedCost,
       appliedReason: 'rubble',
       effectiveKindRaw: raw,
       tacticalCategory: cat,
@@ -373,7 +349,7 @@ export function classifyLandInfantryArmorEnterStep(args: {
       rubbleOverride: true,
       transportEdgeActive,
       transportContinuityAllowed: false,
-      blockingTerrainWithoutTransport: false,
+      blockingTerrainWithoutTransport: rubbleBlocksEntry,
       transportEffectiveBudgetMultiplier: 1,
     };
   }
@@ -393,15 +369,8 @@ export function classifyLandInfantryArmorEnterStep(args: {
       transportEffectiveBudgetMultiplier: 1,
     };
   }
-  const transportEffectiveBudgetMultiplier =
-    useTransport && ctx != null
-      ? tacticalRes4TransportStepSpeedMultiplier({
-          fromH3,
-          toH3,
-          roadRailByH3: ctx.roadRailByH3,
-          rubbleByH3: ctx.rubbleByH3,
-        })
-      : 1;
+  const destinationLineMultiplier = ctx != null ? destinationLineBudgetMultiplier(toH3, ctx.roadRailByH3) : 1;
+  const transportEffectiveBudgetMultiplier = useTransport && destinationLineMultiplier > 1 ? destinationLineMultiplier : 1;
   const appliedCost = useTransport
     ? landTransportStepMovementPointsAfterAuthorization({
         unitTypeForMovement,
