@@ -215,16 +215,18 @@ function testRunUnitAssessmentsFogOffIncludesDistantHuman(): void {
  *
  * Purpose: Precomputation must not skip stacked units, and must not copy armor results onto co-located infantry.
  * When to use: After changing runUnitAssessments same-hex cache.
- * Expected outcome: Two armor rows with matching enemy distances; infantry on the same hex is a distinct scan; friendlies exclude self.
+ * Expected outcome: Two armor rows with matching enemy distances and their own weather tags; infantry on the same hex is a distinct scan; friendlies exclude self.
  * Exceptions: None.
  */
 function testRunUnitAssessmentsReusesSameHexSameType(): void {
   const { state, coordMap } = buildFixtureState(10);
   const origin = state.hexes[0]!.h3Index;
   const neighbor = state.hexes[1]!.h3Index;
+  state.weatherBonusEnabled = true;
+  state.startMonth = 1;
   state.units = [
-    { id: 'opponent-armor-1', player: 'opponent', unitType: 'armor', h3Index: origin },
-    { id: 'opponent-armor-2', player: 'opponent', unitType: 'armor', h3Index: origin },
+    { id: 'opponent-armor-1', player: 'opponent', unitType: 'armor', h3Index: origin, weatherTags: ['heat'] },
+    { id: 'opponent-armor-2', player: 'opponent', unitType: 'armor', h3Index: origin, weatherTags: ['snow'] },
     { id: 'opponent-infantry-1', player: 'opponent', unitType: 'infantry', h3Index: origin },
     { id: 'human-infantry-1', player: 'human', unitType: 'infantry', h3Index: neighbor },
   ];
@@ -236,6 +238,9 @@ function testRunUnitAssessmentsReusesSameHexSameType(): void {
   assert.ok(armor1 && armor2 && infantry);
   assert.strictEqual(armor1!.result.unit.unitId, 'opponent-armor-1');
   assert.strictEqual(armor2!.result.unit.unitId, 'opponent-armor-2');
+  assert.deepStrictEqual(armor1!.result.unit.weatherTags, ['heat']);
+  assert.deepStrictEqual(armor2!.result.unit.weatherTags, ['snow']);
+  assert.strictEqual(armor1!.result.unit.weatherHere, armor2!.result.unit.weatherHere);
   const armor1Human = armor1!.result.nearbyEnemies.find((e) => e.unitId === 'human-infantry-1');
   const armor2Human = armor2!.result.nearbyEnemies.find((e) => e.unitId === 'human-infantry-1');
   assert.ok(armor1Human && armor2Human, 'stacked armor must both see the human');

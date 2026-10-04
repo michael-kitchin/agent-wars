@@ -4,6 +4,7 @@
  */
 
 import type { UnitOrigin } from './unitOriginTypes';
+import type { WeatherState } from './weatherBonusTypes';
 
 /**
  * Identifies which player owns a tactical sub-unit for rendering and rules parity.
@@ -96,6 +97,15 @@ export interface TacticalSubUnitSnapshot {
    * Exceptions: None.
    */
   origin?: UnitOrigin;
+  /**
+   * Acclimation tags copied from the parent strategic unit.
+   *
+   * Contract: Present when the match has the weather bonus on. Empty when the parent has no birth hex.
+   * When to use: Tactical movement and dice for this sub-unit.
+   * Expected outcome: The same tags as the parent.
+   * Exceptions: None.
+   */
+  weatherTags?: WeatherState[];
 }
 
 /**
@@ -143,6 +153,24 @@ export interface TacticalBattleSnapshot {
    * Exceptions: None.
    */
   strategicTurnNumber: number;
+  /**
+   * Display weather of the enclosing res1 hex for this battle's month.
+   *
+   * Contract: Present when the match has the weather bonus on. Every beat of the battle uses this one value.
+   * When to use: The turn line, tactical movement, and tactical dice.
+   * Expected outcome: Mild, rain, snow, or heat.
+   * Exceptions: None.
+   */
+  weather?: WeatherState;
+  /**
+   * Whether the match that opened this battle has the weather bonus on.
+   *
+   * Contract: Omitted when off. True when the strategic snapshot had the flag on.
+   * When to use: Before applying tactical weather penalties.
+   * Expected outcome: Matches the strategic match flag at battle start.
+   * Exceptions: None.
+   */
+  weatherBonusEnabled?: boolean;
   /**
    * Tactical turn counter for future resolution milestones.
    *

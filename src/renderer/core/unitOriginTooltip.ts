@@ -1,4 +1,5 @@
 import { HEX_DETAILS_TOOLTIP_DELAY_MS, TOOLTIP_OFFSET_PX } from './constants';
+import { paintTerrainSwatches } from '../rendering/terrainVisualStyles';
 
 /**
  * Attribute selector for elements that carry unit origin tooltip text (unit flag images).
@@ -164,6 +165,7 @@ function hideUnitOriginTooltip(): void {
   el.classList.add('hidden');
   el.setAttribute('aria-hidden', 'true');
   el.textContent = '';
+  el.innerHTML = '';
 }
 
 /**
@@ -184,7 +186,8 @@ function showForActiveAnchor(): void {
     hideUnitOriginTooltip();
     return;
   }
-  el.textContent = text;
+  el.innerHTML = text;
+  paintTerrainSwatches(el);
   positionTooltip(el);
   el.classList.remove('hidden');
   el.setAttribute('aria-hidden', 'false');

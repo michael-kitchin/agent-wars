@@ -65,6 +65,24 @@ export interface OriginBonusSettings {
    * Exceptions: None.
    */
   readonly terrainBonusEnabled: boolean;
+  /**
+   * Whether the weather bonus is on.
+   *
+   * Contract: Optional so existing settings literals stay valid. Missing means off.
+   * When to use: Before any weather penalty.
+   * Expected outcome: `true` applies movement and attack penalties to units that lack the matching tag.
+   * Exceptions: None.
+   */
+  readonly weatherBonusEnabled?: boolean;
+  /**
+   * Calendar month of turn 1, 1 for January through 12 for December.
+   *
+   * Contract: Optional. Missing or invalid means January.
+   * When to use: With the strategic turn number to pick the current month.
+   * Expected outcome: A value `parseStartMonth` accepts.
+   * Exceptions: None.
+   */
+  readonly startMonth?: number;
 }
 
 /**

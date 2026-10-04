@@ -42,6 +42,20 @@ test('the Bonus column appears when an assessment carries origin bonus reasons',
   assert.ok(rowB?.includes('| — |'), rowB);
 });
 
+test('the Weather column names the weather where the unit stands and its tags', () => {
+  const tagged = assessment('opp-a');
+  tagged.result.unit.weatherHere = 'mild';
+  tagged.result.unit.weatherTags = ['heat'];
+  const plain = assessment('opp-b');
+  plain.result.unit.weatherHere = 'snow';
+  plain.result.unit.weatherTags = [];
+  const table = buildUnitStatusTable([tagged, plain], { mode: 'strategic' }, true);
+  const [header, , rowA, rowB] = table.split('\n');
+  assert.ok(header?.includes('| Weather |'));
+  assert.ok(rowA?.includes('| Mild (Heat) |'), rowA);
+  assert.ok(rowB?.includes('| Snow |'), rowB);
+});
+
 test('the table is unchanged when no assessment carries origin bonus reasons', () => {
   const table = buildUnitStatusTable([assessment('opp-a')], { mode: 'strategic' }, true);
   assert.equal(

@@ -8,7 +8,9 @@
  */
 import type { TacticalBattleSnapshot, TacticalSubUnitSnapshot } from '../../shared/tacticalBattleTypes';
 import { unitHasTacticalRangedBaseline } from '../../shared/tacticalRanges';
-import { casualtyPriorityIndex, getAttack, getDefense } from '../combatConstants';
+import { casualtyPriorityIndex, getDefense } from '../combatConstants';
+import { attackHitThreshold } from '../combatHitThresholds';
+import { weatherAttackPenalty } from '../../shared/weatherBonusRules';
 import type { OriginHitBonusLookup } from '../originBonus/originHitBonusLookup';
 import { tacticalEmbarkedLandExcludedFromRangedInput } from './tacticalCombatInput';
 import { tacticalLogMutate } from './tacticalLogging';
@@ -180,7 +182,18 @@ export function resolveTacticalAirStrikeAgainstUnitsOnSubUnits(input: TacticalAi
       (d.unitType !== 'infantry' && d.unitType !== 'armor') ||
       !tacticalEmbarkedLandExcludedFromRangedInput(battle, sub, d)
   );
-  const attackHit = rollD6() <= getAttack('air') + originHitBonusAt(attacker.id, attacker.h3Index);
+  const attackHit = rollD6() <= attackHitThreshold({
+    unitType: 'air',
+    originHitBonus: originHitBonusAt(attacker.id, attacker.h3Index),
+    weatherAttackPenalty: weatherAttackPenalty({
+      unitType: 'air',
+      kind: 'airStrike',
+      weatherAtUnit: battle.weather,
+      weatherAtTarget: battle.weather,
+      tags: attacker.weatherTags,
+      enabled: battle.weatherBonusEnabled === true,
+    }),
+  });
   if (attackHit && defenders.length > 0) {
     const victim = [...defenders].sort(
       (a, b) =>
@@ -199,7 +212,17 @@ export function resolveTacticalAirStrikeAgainstUnitsOnSubUnits(input: TacticalAi
     if (toRemove.has(attacker.id)) break;
     if (toRemove.has(defender.id)) continue;
     if (!unitHasTacticalRangedBaseline(defender.unitType)) continue;
-    if (rollD6() > getAttack(defender.unitType) + originHitBonusAt(defender.id, defender.h3Index)) continue;
+    if (rollD6() > attackHitThreshold({
+      unitType: defender.unitType,
+      originHitBonus: originHitBonusAt(defender.id, defender.h3Index),
+      weatherAttackPenalty: weatherAttackPenalty({
+        unitType: defender.unitType,
+        kind: 'ranged',
+        weatherAtUnit: battle.weather,
+        tags: defender.weatherTags,
+        enabled: battle.weatherBonusEnabled === true,
+      }),
+    })) continue;
     markTacticalSubUnitCasualty(sub, toRemove, attacker.id, [defender.id], killsByReturnFire);
     tacticalLogMutate('resolveTacticalAirStrikeAgainstUnitsOnSubUnits attacker lost to AA', {
       targetH3Index,

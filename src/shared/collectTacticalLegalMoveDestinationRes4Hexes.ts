@@ -37,6 +37,8 @@ export function collectTacticalLegalMoveDestinationRes4Hexes(
     | 'res4IsRubbleByH3'
     | 'res4RoadSidesByH3'
     | 'res4RailSidesByH3'
+    | 'weather'
+    | 'weatherBonusEnabled'
   >,
   moverSubUnitId: string
 ): string[] {
@@ -119,6 +121,9 @@ export function collectTacticalLegalMoveDestinationRes4HexesBruteForceForTests(
       movementPointBudget: budget,
       terrain,
       footprintNeighbors,
+      weatherEnabled: battle.weatherBonusEnabled === true,
+      weather: battle.weather,
+      weatherTags: u.weatherTags,
     });
     if (plan.reachableThisTurn) out.push(toH3);
   }

@@ -1,4 +1,5 @@
 import { escapeHtmlForOrderPreviewTooltip } from './orderPreviewSlowTerrainTooltip';
+import { formatTerrainNameListHtml } from './terrainSwatchHtml';
 
 /**
  * Pure copy + classification for “Blocked: …” hover hints during march / ranged / air-strike order preview.
@@ -176,12 +177,12 @@ export function blockingHoverMessageFromMarchInvalidReason(
  *
  * Purpose: Matches order-slower tooltip styling while keeping `#order-block-tooltip` on `innerHTML` with safe markup.
  * When to use: Renderer `showOrderBlockHexTooltip` after `resolveOrderBlockHexTooltipMessage` returns a blocking string.
- * Expected outcome: `<strong>Blocked:</strong> Range` for `Blocked: Range`; non-`Blocked:` input is fully escaped.
+ * Expected outcome: `<strong>Blocked:</strong> Range` for `Blocked: Range`. A map-key terrain name in the suffix gets a swatch. Other input is escaped.
  * Exceptions: None; empty string yields empty string.
  */
 export function blockingHoverMessageHtmlFromPlainMessage(message: string): string {
   const t = message.trim();
   const m = t.match(/^blocked:\s*(.*)$/i);
   if (!m) return escapeHtmlForOrderPreviewTooltip(t);
-  return `<strong>Blocked:</strong> ${escapeHtmlForOrderPreviewTooltip(m[1]!.trim())}`;
+  return `<strong>Blocked:</strong> ${formatTerrainNameListHtml(m[1]!.trim())}`;
 }

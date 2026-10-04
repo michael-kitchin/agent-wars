@@ -85,8 +85,11 @@ export function tacticalMarchFirstStopAlongPath(
     | 'res4IsRubbleByH3'
     | 'res4RoadSidesByH3'
     | 'res4RailSidesByH3'
+    | 'weather'
+    | 'weatherBonusEnabled'
   >,
-  unitTypeForMovement = 'infantry'
+  unitTypeForMovement = 'infantry',
+  weatherTags?: readonly import('../../shared/weatherBonusTypes').WeatherState[] | null
 ): { stopH3: string; consumedFullPath: boolean; pathH3Prefix?: string[] } {
   tacticalLogQuery('tacticalMarchFirstStopAlongPath', {
     fromRes4H3Index,
@@ -103,6 +106,9 @@ export function tacticalMarchFirstStopAlongPath(
     res4Set,
     unitTypeForMovement,
     movementPointBudget,
+    weatherEnabled: battle?.weatherBonusEnabled === true,
+    weather: battle?.weather,
+    weatherTags,
   };
   const plan =
     battle && battle.battleId && battle.subUnits

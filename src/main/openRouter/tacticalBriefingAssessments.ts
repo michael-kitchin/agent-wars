@@ -64,19 +64,38 @@ function tacticalAssessmentStackKey(
 }
 
 /**
+ * Weather column fields for one tactical sub-unit.
+ *
+ * Purpose: Unit Status names the battle's weather and this sub-unit's tags while the weather option is on.
+ * When to use: Lightweight assessments and stack clones.
+ * Expected outcome: `{ weatherTags, weatherHere }` when the battle flag is on, otherwise `{}`.
+ * Exceptions: None.
+ */
+function weatherFieldsForBriefing(
+  battle: TacticalBattleSnapshot,
+  unit: TacticalSubUnitSnapshot
+): { weatherTags?: readonly string[]; weatherHere?: string } {
+  if (battle.weatherBonusEnabled !== true) return {};
+  return {
+    weatherTags: unit.weatherTags ? [...unit.weatherTags] : [],
+    ...(battle.weather ? { weatherHere: battle.weather } : {}),
+  };
+}
+
+/**
  * Rewrites a cached tactical assessment for another sub-unit stacked on the same cell.
  *
  * Purpose: Avoid repeating grid-distance scans for stacked same-type pawns while still emitting one Unit Status row each.
  * When to use: Cache hit in `buildLightweightTacticalUnitAssessments`.
- * Expected outcome: Cloned nearbyEnemies/threats; unit id, lat/lng, and origin bonus fields belong to the stacked sub-unit
- *   (stack mates can have different origins).
+ * Expected outcome: Cloned nearby rows; unit id, position, origin bonus, and weather tags belong to the stacked sub-unit.
  * Exceptions: None.
  */
 function cloneTacticalAssessmentForStackedUnit(
   cached: UnitAssessmentResult,
   unit: TacticalSubUnitSnapshot,
   byId: Map<string, TacticalSubUnitSnapshot>,
-  originBonusFor: (unit: TacticalSubUnitSnapshot) => OriginBonusUnitFields
+  originBonusFor: (unit: TacticalSubUnitSnapshot) => OriginBonusUnitFields,
+  battle: TacticalBattleSnapshot
 ): UnitAssessmentResult {
   logTrace('tacticalBriefingAssessments cloneTacticalAssessmentForStackedUnit', {
     cachedUnitId: cached.unitId,
@@ -93,6 +112,7 @@ function cloneTacticalAssessmentForStackedUnit(
         unitId: unit.id,
         position: [lat, lng],
         ...originBonusFor(unit),
+        ...weatherFieldsForBriefing(battle, unit),
       },
       nearbyEnemies: cached.result.nearbyEnemies.map((enemy) => ({ ...enemy })),
       threats: cached.result.threats.map((threat) => ({ ...threat })),
@@ -212,6 +232,7 @@ function assessTacticalOpponentUnit(
         type: unit.unitType,
         position: [lat, lng],
         currentStandingOrder: null,
+        ...weatherFieldsForBriefing(battle, unit),
       },
       nearbyEnemies: nearby,
       threats,
@@ -254,7 +275,7 @@ export function buildLightweightTacticalUnitAssessments(
     const cached = assessmentByStackKey.get(stackKey);
     if (cached) {
       reusedAssessments += 1;
-      results.push(cloneTacticalAssessmentForStackedUnit(cached, unit, byId, originBonusFor));
+      results.push(cloneTacticalAssessmentForStackedUnit(cached, unit, byId, originBonusFor, tacticalBattle));
       continue;
     }
     const scanned = assessTacticalOpponentUnit(unit, byId, humans, tacticalBattle);

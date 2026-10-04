@@ -3,6 +3,7 @@ import test from 'node:test';
 import {
   computeTerrainEffectsLine,
   computeTerrainEffectsLineHtml,
+  joinHexEffectsLine,
   formatTerrainEffectEntries,
   formatTerrainEffectEntriesHtml,
   formatTerrainEffectSymbolPrefixHtml,
@@ -193,4 +194,17 @@ test('formatTerrainEffectsLineHtml preserves plain effect entry text', () => {
 test('computeTerrainEffectsLineHtml matches plain ordering and text', () => {
   const input = fx({ terrainKind: 'mountain', isUrban: true });
   assert.equal(computeTerrainEffectsLineHtml(input), computeTerrainEffectsLine(input));
+});
+
+test('the Effects line adds snow, rain, or heat after terrain effects and omits mild', () => {
+  const snow = joinHexEffectsLine(null, 'snow');
+  assert.ok(snow?.startsWith('<img class="weather-icon"'));
+  assert.ok(snow?.includes('weather/snow.svg'));
+  assert.ok(snow?.endsWith('Snow'));
+  assert.equal(joinHexEffectsLine(null, 'mild'), null);
+  assert.equal(joinHexEffectsLine(null, null), null);
+  const withTerrain = joinHexEffectsLine('(-) All Movement', 'rain');
+  assert.ok(withTerrain?.startsWith('(-) All Movement, '));
+  assert.ok(withTerrain?.includes('Rain'));
+  assert.equal(joinHexEffectsLine('(-) All Movement', 'mild'), '(-) All Movement');
 });

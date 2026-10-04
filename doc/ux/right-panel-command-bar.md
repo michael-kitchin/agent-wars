@@ -13,7 +13,7 @@ Shown with the right panel. Ready, Ranged, and the air-strike controls follow th
 ## Information Displayed
 
 - The heading "Selected hex".
-- Game state: "Phase:" and "Turn:". With no match loaded, both lines are an em dash. Outside a battle, the phase line shows the strategic phase label and the turn line shows the strategic turn. While a battle is active, the phase line shows the tactical phase: "Phase: Tactical planning" while the player drafts a beat, and "Phase: Tactical resolution" while a beat resolves or plays back. The turn line shows the tactical turn.
+- Game state: "Phase:" and "Turn:". With no match loaded, both lines are an em dash. Outside a battle, the phase line shows the strategic phase label and the turn line shows the strategic turn. With the weather bonus on, that line is `Turn: N · January` (the match's current month) and still one line. While a battle is active, the phase line shows the tactical phase: "Phase: Tactical planning" while the player drafts a beat, and "Phase: Tactical resolution" while a beat resolves or plays back. The turn line shows the tactical turn, and with the weather bonus on it also shows the month and a weather icon with the enclosing hex's weather, still one line.
 - The Ready button. Its label is "Ready", or "AI:" plus the elapsed wait, while opponent planning is still running.
 - The Ranged control. Its label is "Ranged", "Cancel", or "Strike".
 - While Strike targeting is on, a target-type choice: Enemy Units, Production, Airports, or Seaports, and a Cancel button for that targeting.

@@ -300,13 +300,17 @@ export function planTacticalRes4MarchWithSessionCache(
     res4Set: ReadonlySet<string>;
     unitTypeForMovement: string;
     movementPointBudget: number;
+    weatherEnabled?: boolean;
+    weather?: import('../../shared/weatherBonusTypes').WeatherState | null;
+    weatherTags?: readonly import('../../shared/weatherBonusTypes').WeatherState[] | null;
   }
 ): TacticalMarchPlanResult {
   ensureTerrainAndFootprintCache(battle, args.res4Set);
   const terrain = cachedTerrain ?? buildTacticalTerrainKindResolverFromSnapshot(battle);
   const footprintNeighbors = footprintNeighborsRestrictedToSet(args.res4Set);
   const setTag = res4SetMemoTag(args.res4Set, cachedFullFootprintSize);
-  const qk = `${args.fromH3}|${args.toH3}|${args.unitTypeForMovement}|${args.movementPointBudget}|${setTag}`;
+  const tagKey = (args.weatherTags ?? []).join(',');
+  const qk = `${args.fromH3}|${args.toH3}|${args.unitTypeForMovement}|${args.movementPointBudget}|${setTag}|${args.weatherEnabled ? args.weather ?? '' : ''}|${tagKey}`;
   const hit = planMemo.get(qk);
   if (hit) {
     tacticalLogQuery('planTacticalRes4MarchWithSessionCache hit', { qk });

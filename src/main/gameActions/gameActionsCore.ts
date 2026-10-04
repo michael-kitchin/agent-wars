@@ -63,7 +63,8 @@ import type {
   SetHexesKeepBuildingResult,
 } from '../../shared/ipcTypes';
 import type { BuildUnitType } from '../productionRules';
-import { MOVEMENT_RANGE_BY_UNIT_TYPE, formatTargetOutOfRangeReason } from '../../shared/tacticalRanges';
+import { formatTargetOutOfRangeReason } from '../../shared/tacticalRanges';
+import { strategicRangeOnState } from '../weather/weatherMatch';
 import { effectiveTacticalMovementPointBudgetForMarchLeg } from '../../shared/tacticalTerrainCombatModifiers';
 import { tacticalMovementUnitTypeForPathfinding } from '../../shared/tacticalTerrainMovement';
 import {
@@ -477,14 +478,19 @@ function validateOrder(
     });
     return { valid: false, reason: 'Invalid hex or distance; try starting a new game.' };
   }
-  const range = MOVEMENT_RANGE_BY_UNIT_TYPE[unit.unit_type] ?? 1;
+  const perspective = humanPerspectiveStateSnapshot();
+  const snapUnit = perspective.units.find((candidate) => candidate.id === unitId);
+  const range = strategicRangeOnState(
+    { unitType: unit.unit_type, h3Index: unit.h3_index, weatherTags: snapUnit?.weatherTags },
+    perspective
+  );
   if (dist > range) return { valid: false, reason: `${unit.unit_type} can move at most ${range} hex(es)` };
   /* dist === 0 (same hex) is allowed: "hold" / no move is valid. */
 
   if (unit.unit_type === 'naval') {
     const navalDests = getValidDestinations(
       { id: unitId, h3Index: unit.h3_index, unitType: 'naval' },
-      humanPerspectiveStateSnapshot()
+      perspective
     );
     if (!navalDests.includes(toH3Index)) {
       const originTerrain = getMovementTerrainForH3(unit.h3_index);
@@ -965,6 +971,7 @@ export function commitHumanTacticalDraftOrders(args: {
       ...(preBattle.res4IsRubbleByH3 ? { res4IsRubbleByH3: preBattle.res4IsRubbleByH3 } : {}),
       ...(preBattle.res4RoadSidesByH3 ? { res4RoadSidesByH3: preBattle.res4RoadSidesByH3 } : {}),
       ...(preBattle.res4RailSidesByH3 ? { res4RailSidesByH3: preBattle.res4RailSidesByH3 } : {}),
+      ...(preBattle.weatherBonusEnabled ? { weatherBonusEnabled: true as const, weather: preBattle.weather } : {}),
     };
     const appliedMovementOrders: { unitId: string; toH3Index: string }[] = [];
     const tacticalMarchContinuations: { subUnitId: string; destinationH3Index: string }[] = [];
@@ -989,7 +996,8 @@ export function commitHumanTacticalDraftOrders(args: {
         maxEdges,
         res4Set,
         terrainBattle,
-        moveType
+        moveType,
+        sub.weatherTags
       );
       humanMarchPlanByUnitId.set(o.unitId, marchPlan);
       const { stopH3, consumedFullPath } = marchPlan;
@@ -1079,7 +1087,8 @@ export function commitHumanTacticalDraftOrders(args: {
             oppMaxEdges,
             res4Set,
             terrainBattle,
-            oppMoveType
+            oppMoveType,
+            su.weatherTags
           );
           pathH3Indexes = clipTacticalMarchPathToDestination(to, oppMarch.pathH3Prefix);
         }

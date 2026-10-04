@@ -192,6 +192,7 @@ import {
   terrainTooltipStateForRes1Hex,
 } from './map/terrainTooltipRes1State';
 import { isOrderBlockHexTooltipVisible } from './map/orderBlockHexTooltip';
+import { paintTerrainSwatches } from './rendering/terrainVisualStyles';
 import { isOrderSlowerHexTooltipVisible } from './map/orderSlowerHexTooltip';
 import { wireMainMapInteractions as wireMainMapInteractionsFromModule } from './map/mainMapInteractions';
 import { clearDeferredStackCalloutTimer } from './map/mapClickSelectionPolicy';
@@ -1266,6 +1267,7 @@ async function showTerrainTooltip(
   const el = document.getElementById('hex-tooltip');
   if (!el) return;
   el.innerHTML = getCachedTerrainTooltipHtml(state, namingLine, namingTarget);
+  paintTerrainSwatches(el);
   el.style.left = `${clientX + TOOLTIP_OFFSET_PX}px`;
   el.style.top = `${clientY + TOOLTIP_OFFSET_PX}px`;
   el.classList.remove('hidden');

@@ -14,7 +14,12 @@ import {
 } from '../gameDb';
 import { logDebug } from '../logger';
 import { getAvailableBuildUnitTypes } from '../productionRules';
-import { casualtyPriorityIndex, getAttack, getDefense, getRange } from '../combatConstants';
+import { casualtyPriorityIndex, getDefense, getRange } from '../combatConstants';
+import { attackHitThreshold } from '../combatHitThresholds';
+import { readPersistedOriginBonusSettings } from '../gameDb/originBonusConfig';
+import { weatherPenaltyForRoll } from '../weather/weatherMatch';
+import { weatherTagsForBirthHex } from '../weather/weatherPackLoad';
+import type { WeatherAttackKind } from '../../shared/weatherBonusTypes';
 import type { AirStrikeAnimationMove, AirStrikeOrder, AirStrikeTargetType, InfrastructureDestroyedEvent } from '../../shared/ipcTypes';
 import type { CombatUnit } from '../combatUnitTypes';
 import type { OriginHitBonusLookup } from '../originBonus/originHitBonusLookup';
@@ -324,6 +329,36 @@ function recordRemovedUnit(
  * Expected outcome: Deletes the victim and/or the attacker; counter-fire thresholds include each defender's origin bonus from `originHitBonusAt` at its own hex, while the victim pick keeps printed defense values.
  * Exceptions: None.
  */
+/**
+ * Returns the weather penalty for one strategic unit's roll.
+ *
+ * Purpose: Air strikes and their counter-fire share the match flag, the turn, and the unit's birth tags.
+ * When to use: Immediately before `attackHitThreshold` in this file.
+ * Expected outcome: 0 when the weather bonus is off. Otherwise the shared penalty for that kind of attack.
+ * Exceptions: None beyond pack load failures.
+ */
+function penaltyForDbUnit(input: {
+  unitId: string;
+  unitType: string;
+  h3Index: string;
+  kind: WeatherAttackKind;
+  targetH3Index?: string;
+}): 0 | 1 {
+  const settings = readPersistedOriginBonusSettings({ getOne: dbGetOne, hasDb: () => true });
+  const turnNumber = dbGetOne<{ turn_number: number }>('SELECT turn_number FROM turn_state WHERE id = 1')?.turn_number ?? 1;
+  const birth = dbGetOne<{ birth_h3_index: string | null }>('SELECT birth_h3_index FROM units WHERE id = ?', [input.unitId])?.birth_h3_index;
+  return weatherPenaltyForRoll({
+    unitType: input.unitType,
+    kind: input.kind,
+    enabled: settings.weatherBonusEnabled === true,
+    turnNumber,
+    startMonth: settings.startMonth ?? 1,
+    unitH3Index: input.h3Index,
+    targetH3Index: input.targetH3Index,
+    tags: weatherTagsForBirthHex(birth),
+  });
+}
+
 function resolveAirStrikeAgainstUnits(
   attacker: { id: string; player: string; unit_type: string; h3_index: string; display_order: number | null },
   targetH3Index: string,
@@ -353,7 +388,16 @@ function resolveAirStrikeAgainstUnits(
 
   for (const defender of eligibleDefenders) {
     if (getRange(defender.unit_type) < 1) continue;
-    if (rollD6() > getAttack(defender.unit_type) + originHitBonusAt(defender.id, defender.h3_index)) continue;
+    if (rollD6() > attackHitThreshold({
+      unitType: defender.unit_type,
+      originHitBonus: originHitBonusAt(defender.id, defender.h3_index),
+      weatherAttackPenalty: penaltyForDbUnit({
+        unitId: defender.id,
+        unitType: defender.unit_type,
+        h3Index: defender.h3_index,
+        kind: 'ranged',
+      }),
+    })) continue;
     dbRun('DELETE FROM units WHERE id = ?', [attacker.id]);
     recordRemovedUnit(acc, attacker, { removedAtH3Index: targetH3Index });
     attackerLost = true;
@@ -464,7 +508,17 @@ export function resolveAirStrikePhase(
     );
     if (!attacker) continue;
     attemptCount += 1;
-    const attackHit = rollD6() <= getAttack('air') + originHitBonusAt(attacker.id, attacker.h3_index);
+    const attackHit = rollD6() <= attackHitThreshold({
+      unitType: 'air',
+      originHitBonus: originHitBonusAt(attacker.id, attacker.h3_index),
+      weatherAttackPenalty: penaltyForDbUnit({
+        unitId: attacker.id,
+        unitType: 'air',
+        h3Index: attacker.h3_index,
+        targetH3Index: order.targetH3Index,
+        kind: 'airStrike',
+      }),
+    });
     if (order.targetType === 'units') {
       const result = resolveAirStrikeAgainstUnits(attacker, order.targetH3Index, attackHit, rollD6, acc, originHitBonusAt);
       strikeMoves.push({

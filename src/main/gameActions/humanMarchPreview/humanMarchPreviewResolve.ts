@@ -8,11 +8,11 @@ import {
 import { executePlanRouteWithSession } from '../../tools/pathfinding';
 import { logDebug, logError, logTrace } from '../../logger';
 import { isTacticalBattleActive } from '../../tacticalBattle/tacticalBattleSession';
-import { AIR_FERRY_RANGE_HEXES, MOVEMENT_RANGE_BY_UNIT_TYPE, formatFerryOutOfRangeReason } from '../../../shared/tacticalRanges';
+import { formatFerryOutOfRangeReason } from '../../../shared/tacticalRanges';
+import { strategicFerryRangeOnState, strategicRangeOnState } from '../../weather/weatherMatch';
 import {
   buildHumanOrderGroupPreviewEnvelope,
   groupedStrategicMarchPreviewUnitIds,
-  minMovementRangeAmongUnitTypes,
   uniqueStrategicMarchPreviewUnitIds,
 } from '../../../shared/humanMarchPreviewGroupAssembly';
 import type { OrderPreviewTerrainImpact } from '../../../shared/ipc/humanOrderPreviewTypes';
@@ -649,12 +649,13 @@ function computeHumanMarchPreviewForUnit(
         segments: [],
       };
     }
-    const withinFerryRange = isWithinAirFerryGridRange(unit.h3Index, hoveredH3Index, 'preview ferry');
+    const ferryRange = strategicFerryRangeOnState(unit, hoveredH3Index, context.state);
+    const withinFerryRange = isWithinAirFerryGridRange(unit.h3Index, hoveredH3Index, 'preview ferry', ferryRange);
     if (!withinFerryRange) {
       return {
         valid: false,
         showInvalidMarker: true,
-        invalidReason: `${formatFerryOutOfRangeReason(AIR_FERRY_RANGE_HEXES)}.`,
+        invalidReason: `${formatFerryOutOfRangeReason(ferryRange)}.`,
         segments: [],
       };
     }
@@ -858,11 +859,8 @@ export function resolveHumanMarchOrderPreviews(unitIds: string[], hoveredH3Index
       preview: buildHumanMarchPreviewForUnit(context, unitId, hoveredH3Index),
     }));
     const hoveredHex = state.hexes.find((h) => h.h3Index === hoveredH3Index);
-    const slowestMovementRange = minMovementRangeAmongUnitTypes(
-      selectedUnits.map((unit) => unit.unitType),
-      MOVEMENT_RANGE_BY_UNIT_TYPE,
-      1
-    );
+    const selectedRanges = selectedUnits.map((unit) => strategicRangeOnState(unit, state));
+    const slowestMovementRange = selectedRanges.length === 0 ? 0 : Math.min(...selectedRanges);
     const sharedMixedTerrain =
       !!hoveredHex && hexSupportsMixedLandAndNaval({ ...hoveredHex, hasSeaport: hexHasSeaport(hoveredHex.h3Index) });
     if (hasMixedSelection && !sharedMixedTerrain) {

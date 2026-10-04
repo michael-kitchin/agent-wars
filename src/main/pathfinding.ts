@@ -8,6 +8,8 @@
 import { gridDisk } from 'h3-js';
 import { logDebug, logError, logTrace } from './logger';
 import { getMovementBudget } from './combatConstants';
+import { strategicMovementHexesFor } from '../shared/weatherBonusRules';
+import type { WeatherState } from '../shared/weatherBonusTypes';
 import {
   canLandUnitTraverseEdge,
   landUnitCanOccupyHex,
@@ -330,12 +332,25 @@ export function getDistanceAndTurns(
 /**
  * Defines the `getMovementBudgetForUnit` function shape (export function getMovementBudgetForUnit(unitType: string): number).
 
- * Purpose: Supports maintainability by documenting why `getMovementBudgetForUnit` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Purpose: Printed strategic hexes, or the weather-reduced count when the caller has this turn's weather.
+ * When to use: Route ETAs and assess_unit. Omit `weather` when the flag is off or the caller has no hex.
+ * Expected outcome: Infantry 1, armor 2, naval 2, air 0, unless untagged armor or naval is slowed.
  * Exceptions: None.
  */
-export function getMovementBudgetForUnit(unitType: string): number {
-  logTrace('pathfinding getMovementBudgetForUnit', unitType);
-  return getMovementBudget(unitType);
+export function getMovementBudgetForUnit(
+  unitType: string,
+  weather?: {
+    enabled: boolean;
+    weather: WeatherState | null | undefined;
+    tags: readonly WeatherState[] | null | undefined;
+  }
+): number {
+  logTrace('pathfinding getMovementBudgetForUnit', { unitType, enabled: weather?.enabled === true });
+  if (!weather) return getMovementBudget(unitType);
+  return strategicMovementHexesFor({
+    unitType,
+    weather: weather.weather,
+    tags: weather.tags,
+    enabled: weather.enabled,
+  });
 }

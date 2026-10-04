@@ -10,7 +10,7 @@ Name the modes a player can be in, what starts and ends each one, and what plann
 
 ### New game
 
-The player sees the new-game overlay. The message is "Start the world map game when ready." when no match is loaded, and "Start a new world map game when ready." when the player opened the overlay from the Model tab during a match. The button reads "Start game". The player can choose home regions, game size, fog of war, country bonus, and terrain bonus, then start. The map and the right panel do not accept input. Ready is disabled. This mode ends when Start game succeeds and a match is loaded.
+The player sees the new-game overlay. The message is "Start the world map game when ready." when no match is loaded, and "Start a new world map game when ready." when the player opened the overlay from the Model tab during a match. The button reads "Start game". The player can choose home regions, game size, fog of war, country bonus, terrain bonus, weather bonus, and a starting month, then start. The map and the right panel do not accept input. Ready is disabled. This mode ends when Start game succeeds and a match is loaded.
 
 ### Strategic planning
 

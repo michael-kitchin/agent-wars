@@ -14,10 +14,10 @@ import {
   getReachableHexes,
   partitionPathByTurn,
   getDistanceAndTurns,
-  getMovementBudgetForUnit,
 } from '../pathfinding';
 import type { PassableDomain } from '../pathfinding';
 import { logDebug, logError } from '../logger';
+import { strategicRangeOnState } from '../weather/weatherMatch';
 import { buildNormalizedTerrainByH3 } from '../movementTerrain';
 import {
   buildTerrainMapsFromHexRows,
@@ -578,6 +578,7 @@ export function executePlanRouteWithSession(
     terrainByH3: session.terrainByH3,
     session,
     blocked,
+    weatherTags: unit.weatherTags,
   });
   if ('status' in routeResolution) return routeResolution;
   const { passableFor, destinationH3, path, movementBudget, firstTurnMovementBudget, warnings, statefulStats } =
@@ -696,7 +697,11 @@ export function executeCheckDistance(
   }
 
   const passableFor: PassableDomain = unitType === 'naval' ? 'water' : 'land';
-  const movementBudget = getMovementBudgetForUnit(unitType);
+  const occupant = state.units.find((unit) => unit.h3Index === fromH3 && unit.unitType === unitType);
+  const movementBudget = strategicRangeOnState(
+    { unitType, h3Index: fromH3, weatherTags: occupant?.weatherTags },
+    state
+  );
   const navalLookup =
     unitType === 'naval'
       ? navalLookupForHexState(

@@ -12,6 +12,9 @@ import { executeAssessment } from './tools/assessment';
 import { usesOmniscientGridProximity } from './tools/assessUnitProximity';
 import { getStandingOrderForUnit } from './tools/standingOrders';
 import { strategicOriginBonusUnitFields } from './tools/originBonusAssessment';
+import { strategicRangeOnState } from './weather/weatherMatch';
+import { weatherAttackPenalty } from '../shared/weatherBonusRules';
+import type { WeatherState } from '../shared/weatherBonusTypes';
 import type { OriginBonusSource } from '../shared/originBonusTypes';
 import { logDebug, logError, logTrace } from './logger';
 import { compareUnitIdsNaturally } from '../shared/unitIds';
@@ -87,6 +90,33 @@ result: {
        * Exceptions: None.
        */
       originBonusHere?: readonly OriginBonusSource[];
+      /**
+       * Acclimation tags for this unit.
+       *
+       * Contract: Present only when the weather bonus is on.
+       * When to use: The parenthetical in the briefing's Unit Status Weather column.
+       * Expected outcome: Zero to two of snow, rain, and heat.
+       * Exceptions: None.
+       */
+      weatherTags?: readonly string[];
+      /**
+       * Display weather of the hex or battle where this unit stands.
+       *
+       * Contract: Present on assessments taken while the weather bonus is on.
+       * When to use: The word before any tags in the Unit Status Weather column.
+       * Expected outcome: Mild, rain, snow, or heat for this month.
+       * Exceptions: None.
+       */
+      weatherHere?: string;
+      /**
+       * Strategic hexes this unit can march this turn.
+       *
+       * Contract: Present on strategic assessments. Weather can reduce armor and naval below the printed count.
+       * When to use: Unit Status and this-turn contact checks.
+       * Expected outcome: Infantry 1, armor 2, naval 2, or 1 when untagged armor or naval is slowed.
+       * Exceptions: None.
+       */
+      movementBudget?: number;
     };
     nearbyEnemies: Array<{
       unitId: string;
@@ -208,12 +238,61 @@ function unitAssessmentStackKey(unit: {
 }
 
 /**
+ * Weather fields for a unit that reused a stack mate's assessment.
+ *
+ * Purpose: The cached row belongs to the first unit on the hex. A stack mate can have different birth tags, which changes its movement and whether heat or snow cuts its attack.
+ * When to use: From `cloneAssessmentForStackedUnit`, only when the cached row already carries weather tags.
+ * Expected outcome: This unit's tags, its movement on this hex, and whether its ranged fire or an air strike from this hex is penalized.
+ * Exceptions: None beyond a weather-pack load failure.
+ */
+function stackedUnitWeatherFields(
+  state: GameStateSnapshot,
+  unit: GameStateSnapshot['units'][number],
+  weatherHere: string | undefined
+): {
+  weatherTags: readonly WeatherState[];
+  movementBudget: number;
+  rangedAttackPenalized: boolean;
+  airStrikePenalizedAtBase: boolean;
+} {
+  logTrace('precomputation stackedUnitWeatherFields', { unitId: unit.id, h3Index: unit.h3Index });
+  const tags = unit.weatherTags ?? [];
+  const here =
+    weatherHere === 'mild' || weatherHere === 'rain' || weatherHere === 'snow' || weatherHere === 'heat'
+      ? weatherHere
+      : null;
+  return {
+    weatherTags: tags,
+    movementBudget: strategicRangeOnState(
+      { unitType: unit.unitType, h3Index: unit.h3Index, weatherTags: tags },
+      state
+    ),
+    rangedAttackPenalized:
+      weatherAttackPenalty({
+        unitType: unit.unitType,
+        kind: 'ranged',
+        weatherAtUnit: here,
+        tags,
+        enabled: true,
+      }) === 1,
+    airStrikePenalizedAtBase:
+      weatherAttackPenalty({
+        unitType: unit.unitType,
+        kind: 'airStrike',
+        weatherAtUnit: here,
+        tags,
+        enabled: true,
+      }) === 1,
+  };
+}
+
+/**
  * Rewrites a cached assess_unit payload for another unit stacked on the same hex.
  *
  * Purpose: Avoid repeating path BFS for 20 armor on one city while still emitting one briefing row per unit id.
  * When to use: Cache hit in `runUnitAssessments`.
- * Expected outcome: Cloned nearbyEnemies/threats; standing order, unit id, and origin bonus fields belong to the stacked unit (stack mates can
- *   have different birth countries); donor appears as a distance-0 friendly.
+ * Expected outcome: Cloned nearbyEnemies/threats; standing order, unit id, origin bonus, and weather tags belong to the stacked unit (stack mates can
+ *   have different birth countries and tags). The hex weather is shared. The donor appears as a distance-0 friendly.
  * Exceptions: None.
  */
 function cloneAssessmentForStackedUnit(
@@ -258,6 +337,9 @@ function cloneAssessmentForStackedUnit(
       position: unitPosition,
       currentStandingOrder: getStandingOrderForUnit(unit.player, unit.id),
       ...strategicOriginBonusUnitFields(state, unit),
+      ...(Array.isArray(cached.result.unit.weatherTags)
+        ? stackedUnitWeatherFields(state, unit, cached.result.unit.weatherHere)
+        : {}),
     },
     nearbyEnemies: cached.result.nearbyEnemies.map((enemy) => ({ ...enemy })),
     threats: cached.result.threats.map((threat) => ({ ...threat })),

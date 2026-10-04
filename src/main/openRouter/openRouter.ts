@@ -17,7 +17,7 @@ import { getRes1LandMassByH3 } from '../terrainClassificationCache';
 import {
   getValidDestinations,
 } from '../oneStepMoveDestinations';
-import { MOVEMENT_RANGE_BY_UNIT_TYPE } from '../../shared/tacticalRanges';
+import { strategicRangeOnState } from '../weather/weatherMatch';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { buildStrategicUnitDisplayLabelResolver } from '../../shared/unitDisplayNames';
 import { validateTacticalGroupRangedTarget } from '../gameActions/tacticalGroupRangedTargetValidation';
@@ -394,7 +394,10 @@ function validateAiOrder(
     order.toH3Index !== unit.h3Index;
   const destinationOptions = assumeDebarkedForReachability ? { assumeDebarkedForReachability: true } : undefined;
   if (dist !== null) {
-    const range = MOVEMENT_RANGE_BY_UNIT_TYPE[unit.unitType] ?? 1;
+    const range = strategicRangeOnState(
+      { unitType: unit.unitType, h3Index: unit.h3Index, weatherTags: unit.weatherTags },
+      state
+    );
     if (dist > range) return { valid: false, reason: `${unit.unitType} can move at most ${range} hex(es)` };
     /* dist === 0 (same hex) is allowed: "hold" / no move is valid. */
   } else {

@@ -4,6 +4,7 @@
 
 import type { PipelineTerrainKind } from '../../shared/pipelineTerrain';
 import { PIPELINE_TERRAIN_KINDS } from '../../shared/pipelineTerrain';
+import { TERRAIN_SWATCH_CLASS_NAME } from '../../shared/terrainSwatchHtml';
 
 /**
  * Documents the module-scope binding `patternCache` (patternCache).
@@ -604,11 +605,28 @@ export function setActiveTerrainStyle(id: TerrainVisualStyleId): void {
 }
 
 /**
- * Defines the `terrainKindFillStyle` function shape (export function terrainKindFillStyle(kind: string, options?:).
+ * Paints each terrain swatch in a tooltip from the style selected now.
+ *
+ * Purpose: Tooltip markup names the kind. The fill is read when the tooltip is shown, so a style change
+ *   applies the next time that tooltip opens.
+ * When to use: Immediately after assigning tooltip HTML that may contain `.terrain-swatch` spans.
+ * Expected outcome: Each span's background matches the map key for its `data-terrain-kind`. An open tooltip is left as it was.
+ * Exceptions: None.
+ */
+export function paintTerrainSwatches(root: ParentNode): void {
+  root.querySelectorAll<HTMLElement>(`span.${TERRAIN_SWATCH_CLASS_NAME}`).forEach((node) => {
+    const kind = node.dataset.terrainKind;
+    if (!kind) return;
+    node.style.background = terrainKindFillStyle(kind);
+  });
+}
 
- * Purpose: Supports maintainability by documenting why `terrainKindFillStyle` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+/**
+ * Returns the map-key fill for one terrain kind under the active style.
+ *
+ * Purpose: Legend rows and tooltip swatches use the same color.
+ * When to use: When drawing a legend chip or painting a `.terrain-swatch`.
+ * Expected outcome: An rgba color. An unknown kind uses the unknown fill. Urban overlay uses that preset's urban color.
  * Exceptions: None.
  */
 export function terrainKindFillStyle(kind: string, options?: { urbanOverlay?: boolean }): string {

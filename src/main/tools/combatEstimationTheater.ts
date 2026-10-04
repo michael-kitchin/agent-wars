@@ -10,6 +10,8 @@
 
 import type { GameStateSnapshot } from '../gameDb';
 import type { CombatUnit } from '../combatUnitTypes';
+import { weatherPenaltyForRoll } from '../weather/weatherMatch';
+import { weatherAttackPenalty } from '../../shared/weatherBonusRules';
 import { getRange } from '../combatConstants';
 import { hasIntactAirportAtStrategicAirBase } from '../returnFireAirportLookup';
 import type { ReturnFireEligibilityContext } from '../../shared/returnFireEligibility';
@@ -130,6 +132,15 @@ export interface CombatEstimationTheater {
    * Expected outcome: A `CombatEstimationUnitLookup`.
    * Exceptions: None.
    */
+  /**
+   * Weather penalty for one estimated attack.
+   *
+   * Contract: 0 for melee and when the weather bonus is off.
+   * When to use: Before `attackHitThreshold` on ranged attackers, including air strikes estimated as ranged.
+   * Expected outcome: 0 or 1, matching resolution.
+   * Exceptions: None.
+   */
+  weatherAttackPenaltyFor(unit: CombatUnit, targetH3: string, engagement: CombatEstimationEngagementType): 0 | 1;
   findUnit(unitId: string, engagementType: CombatEstimationEngagementType): CombatEstimationUnitLookup;
   /**
    * Lists units standing on one cell for an engagement.
@@ -215,9 +226,23 @@ export function buildStrategicCombatEstimationTheater(state: GameStateSnapshot):
     player: u.player,
     unitType: u.unitType,
     h3Index: u.h3Index,
+    ...(u.weatherTags ? { weatherTags: u.weatherTags } : {}),
   });
   return {
     theater: 'strategic',
+    weatherAttackPenaltyFor(unit, targetH3, engagement) {
+      if (engagement !== 'ranged') return 0;
+      return weatherPenaltyForRoll({
+        unitType: unit.unitType,
+        kind: unit.unitType === 'air' ? 'airStrike' : 'ranged',
+        enabled: state.weatherBonusEnabled === true,
+        turnNumber: state.turnNumber,
+        startMonth: state.startMonth ?? 1,
+        unitH3Index: unit.h3Index,
+        targetH3Index: targetH3,
+        tags: unit.weatherTags,
+      });
+    },
     returnFireContext: { theater: 'strategic', hasIntactAirportAtAirBase: hasIntactAirportAtStrategicAirBase },
     blockedShotRules: '',
     findUnit(unitId, engagementType) {
@@ -277,9 +302,20 @@ export function buildTacticalCombatEstimationTheater(
     player: u.player,
     unitType: u.unitType,
     h3Index: tacticalMovementTerrainAnchorH3(u, battle.subUnits),
+    ...(u.weatherTags ? { weatherTags: u.weatherTags } : {}),
   });
   return {
     theater: 'tactical',
+    weatherAttackPenaltyFor(unit, _targetH3, engagement) {
+      if (engagement !== 'ranged') return 0;
+      return weatherAttackPenalty({
+        unitType: unit.unitType,
+        kind: 'ranged',
+        weatherAtUnit: battle.weather,
+        tags: unit.weatherTags,
+        enabled: battle.weatherBonusEnabled === true,
+      });
+    },
     returnFireContext: buildTacticalReturnFireContext(battle),
     blockedShotRules: ' under battle range, terrain, and line-of-sight rules',
     findUnit(unitId, engagementType) {

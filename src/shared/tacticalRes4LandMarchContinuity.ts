@@ -15,6 +15,8 @@ import {
   type TacticalMovementCategory,
   type TacticalTerrainKindResolver,
 } from './tacticalTerrainMovement';
+import type { WeatherState } from './weatherBonusTypes';
+import { tacticalWeatherOpenGroundCost } from './weatherBonusRules';
 import {
   popNumericPriorityMinHeap,
   pushNumericPriorityMinHeap,
@@ -300,6 +302,33 @@ export function classifyLandInfantryArmorEnterStep(args: {
    * Kept so search and path logging pass one argument object. Step price uses the destination cell, not adjacency.
    */
   footprintNeighbors?: Res4FootprintNeighborLookup;
+  /**
+   * When true, untagged infantry pay 2 to enter open ground in snow or rain.
+   *
+   * Contract: Omitted means the printed terrain cost.
+   * When to use: Marches in a battle whose match has the weather bonus on.
+   * Expected outcome: Roads, urban, and rubble keep their own costs.
+   * Exceptions: None.
+   */
+  weatherEnabled?: boolean;
+  /**
+   * Weather of the enclosing hex for this battle.
+   *
+   * Contract: Ignored unless `weatherEnabled` is true.
+   * When to use: With `weatherTags`.
+   * Expected outcome: Snow or rain can raise the open-ground cost.
+   * Exceptions: None.
+   */
+  weather?: WeatherState | null;
+  /**
+   * The marching unit's acclimation tags.
+   *
+   * Contract: A matching tag keeps the printed open-ground cost.
+   * When to use: With `weather`.
+   * Expected outcome: Empty or omitted means the unit is not acclimated.
+   * Exceptions: None.
+   */
+  weatherTags?: readonly WeatherState[] | null;
 }): LandInfantryArmorEnterStepClassification {
   const { toH3, unitTypeForMovement, terrain, fromH3 } = args;
   const raw = terrain.effectiveKindForRes4Hex(toH3);
@@ -371,6 +400,14 @@ export function classifyLandInfantryArmorEnterStep(args: {
   }
   const destinationLineMultiplier = ctx != null ? destinationLineBudgetMultiplier(toH3, ctx.roadRailByH3) : 1;
   const transportEffectiveBudgetMultiplier = useTransport && destinationLineMultiplier > 1 ? destinationLineMultiplier : 1;
+  const openGroundCost = tacticalWeatherOpenGroundCost({
+    unitType: unitTypeForMovement,
+    category: cat,
+    baseCost: base,
+    weather: args.weather,
+    tags: args.weatherTags,
+    enabled: args.weatherEnabled === true,
+  });
   const appliedCost = useTransport
     ? landTransportStepMovementPointsAfterAuthorization({
         unitTypeForMovement,
@@ -381,7 +418,7 @@ export function classifyLandInfantryArmorEnterStep(args: {
         tacticalCategoryForDestination: cat,
         isUrbanDestination: urbanOverride,
       })
-    : base;
+    : openGroundCost;
   return {
     appliedCost,
     appliedReason: useTransport
@@ -419,6 +456,9 @@ export function landInfantryArmorEnterCost(args: {
   res4Set: ReadonlySet<string>;
   /** Precomputed footprint adjacency; when omitted, falls back to `res4NeighborsInFootprint` per step. */
   footprintNeighbors?: Res4FootprintNeighborLookup;
+  weatherEnabled?: boolean;
+  weather?: WeatherState | null;
+  weatherTags?: readonly WeatherState[] | null;
 }): number {
   return classifyLandInfantryArmorEnterStep(args).appliedCost;
 }
@@ -566,6 +606,9 @@ export function planInfantryArmorLandContinuityMarch(args: {
   terrain: TacticalTerrainKindResolver;
   /** Precomputed footprint adjacency; when omitted, falls back to `res4NeighborsInFootprint` per state. */
   footprintNeighbors?: Res4FootprintNeighborLookup;
+  weatherEnabled?: boolean;
+  weather?: WeatherState | null;
+  weatherTags?: readonly WeatherState[] | null;
 }): { path: string[]; totalCost: number } | null {
   const { fromH3, toH3, res4Set, unitTypeForMovement, terrain } = args;
   const neighborsOf = args.footprintNeighbors ?? ((h: string) => res4NeighborsInFootprint(h, res4Set));
@@ -605,6 +648,9 @@ export function planInfantryArmorLandContinuityMarch(args: {
         marchGoalH3: toH3,
         res4Set,
         footprintNeighbors: neighborsOf,
+        weatherEnabled: args.weatherEnabled,
+        weather: args.weather,
+        weatherTags: args.weatherTags,
       });
       if (!Number.isFinite(w) || w <= 0) continue;
       const nd = d + w;

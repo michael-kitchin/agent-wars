@@ -15,6 +15,8 @@ import { getScenarioHomeRegionHexes } from '../regionScenario';
 import { loadScenarioState, REGION_VS_REGION_SCENARIO_ID } from './scenarioState';
 import { readPersistedGameSize } from './gameSizeConfig';
 import { readPersistedOriginBonusSettings } from './originBonusConfig';
+import { calendarMonthName, parseStartMonth } from '../../shared/weatherBonusRules';
+import { displayWeatherForHex, weatherTagsForBirthHex } from '../weather/weatherPackLoad';
 import { getRes1MajorityCountryNamesFromSnapshot } from '../unitOrigin/res4BirthCountryCache';
 
 /**
@@ -238,11 +240,19 @@ export function getGameStateSnapshot(deps: FogDeps): GameStateSnapshot {
   const infrastructureRows = deps.listRes1InfrastructureRows();
   const gameOver = gameOverRow?.value === '1';
   const winner = winnerRow?.value ?? undefined;
+  const weatherOn = originBonusSettings.weatherBonusEnabled === true;
+  const startMonth = parseStartMonth(originBonusSettings.startMonth);
+  const turnNumber = turnRow?.turnNumber ?? 1;
+  const { weatherBonusEnabled: _weatherFlag, startMonth: _startMonth, ...originFlags } = originBonusSettings;
   const snapshot = {
-    hexes: hexRows,
-    units: unitRows,
+    hexes: weatherOn
+      ? hexRows.map((hex) => ({ ...hex, weather: displayWeatherForHex(hex.h3Index, turnNumber, startMonth) }))
+      : hexRows,
+    units: weatherOn
+      ? unitRows.map((unit) => ({ ...unit, weatherTags: weatherTagsForBirthHex(unit.origin?.birthH3Index) }))
+      : unitRows,
     phase: turnRow?.phase ?? 'planning',
-    turnNumber: turnRow?.turnNumber ?? 1,
+    turnNumber,
     pendingOrders: orderRows,
     res1Control: controlRows,
     res1BuildQueueTotals: queueTotalRows,
@@ -250,7 +260,8 @@ export function getGameStateSnapshot(deps: FogDeps): GameStateSnapshot {
     gameOver: gameOver || undefined,
     winner,
     gameSize: readPersistedGameSize(ops),
-    ...originBonusSettings,
+    ...originFlags,
+    ...(weatherOn ? { weatherBonusEnabled: true as const, startMonth, monthName: calendarMonthName(turnNumber, startMonth) } : {}),
   };
   return withFogMetadata(withScenarioMetadata(snapshot, ops), isFogOfWarEnabled(ops));
 }
@@ -453,7 +464,12 @@ export function getGameStateForPlayer(
   const staleHexes = [...exploredHexes].filter((h3) => !visibleHexes.has(h3));
   const filteredHexes = options?.maskUnexploredTerrain === false
     ? state.hexes
-    : state.hexes.map((h) => (exploredHexes.has(h.h3Index) ? h : { ...h, terrain: 'unknown', terrainKind: 'unknown' }));
+    : state.hexes.map((h) => {
+        if (exploredHexes.has(h.h3Index)) return h;
+        const hidden = { ...h, terrain: 'unknown' as const, terrainKind: 'unknown' };
+        delete hidden.weather;
+        return hidden;
+      });
   const filteredUnits = state.units.filter((u) => u.player === playerId || visibleHexes.has(u.h3Index));
   const intelRows = ops.getAll<{
     enemy_unit_id: string;

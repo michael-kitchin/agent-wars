@@ -15,6 +15,7 @@ const GENERATED_TERRAIN_JSON_FILES = Object.freeze([
   'terrain_res1_naming.json',
   'terrain_res4_naming.json',
   'terrain_res1_landmass.json',
+  'terrain_res1_weather.json',
   'terrain_res4_road_rail_sides.json',
   'terrain_res4_road_rail_vectors.json',
 ]);

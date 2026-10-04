@@ -2,6 +2,7 @@ import type { BuildUnitType } from './productionTypes';
 import type { TacticalBattleSnapshot } from './tacticalTypes';
 import type { GameSize } from '../gameSize';
 import type { UnitOrigin } from '../unitOriginTypes';
+import type { WeatherState } from '../weatherBonusTypes';
 
 /**
  * Documents the `GameStateSnapshot` interface as a named contract surface (export interface GameStateSnapshot).
@@ -33,6 +34,15 @@ hexes: {
      * Exceptions: None.
      */
     countryName?: string | null;
+    /**
+     * Display weather of this res1 hex for the current month.
+     *
+     * Contract: Present only when the weather bonus is on and this hex is explored. Omitted under fog.
+     * When to use: Hex tooltips and strategic movement penalties.
+     * Expected outcome: One of mild, rain, snow, or heat.
+     * Exceptions: None.
+     */
+    weather?: WeatherState;
   }[];
     /**
    * Specifies the contract for the `units` member (units: tactical-capable unit rows including optional embarkedOnSubUnitId).
@@ -75,6 +85,15 @@ units: {
      * Exceptions: None.
      */
     origin?: UnitOrigin;
+    /**
+     * Acclimation tags from the unit's birth hex.
+     *
+     * Contract: Present only when the weather bonus is on. Empty when the unit has no birth hex or no tag.
+     * When to use: Movement, dice, tooltips, and assessments.
+     * Expected outcome: Zero to two of snow, rain, and heat, in that order.
+     * Exceptions: None.
+     */
+    weatherTags?: WeatherState[];
   }[];
     /**
    * Specifies the contract for the `visibleHexes` member (visibleHexes?: string[];).
@@ -164,6 +183,33 @@ countryBonusEnabled?: boolean;
    * Exceptions: None.
    */
 terrainBonusEnabled?: boolean;
+    /**
+   * Whether this match has the weather bonus on.
+   *
+   * Contract: Omitted when off, so a flag-off snapshot does not grow new fields. Present and true when on.
+   * When to use: Before showing the month or applying a weather penalty.
+   * Expected outcome: True only for a match that checked Weather bonus.
+   * Exceptions: None.
+   */
+weatherBonusEnabled?: boolean;
+    /**
+   * Calendar month of turn 1, 1 for January through 12 for December.
+   *
+   * Contract: Present with `weatherBonusEnabled`.
+   * When to use: With `turnNumber` when a later turn needs the month.
+   * Expected outcome: A parsed start month.
+   * Exceptions: None.
+   */
+startMonth?: number;
+    /**
+   * Full English name of the current month.
+   *
+   * Contract: Present with `weatherBonusEnabled`. January on turn 1 of a January match.
+   * When to use: The turn line and prompts.
+   * Expected outcome: One of the twelve month names.
+   * Exceptions: None.
+   */
+monthName?: string;
     /**
    * Specifies the contract for the `scenarioId` member (scenarioId?: 'region_vs_region';).
 

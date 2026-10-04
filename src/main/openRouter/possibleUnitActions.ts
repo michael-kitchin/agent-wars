@@ -27,6 +27,7 @@ import { computeGridDistancePure } from '../../shared/h3GridRangePure';
 import { AIR_FERRY_RANGE_HEXES, AIR_STRIKE_RANGE_HEXES } from '../../shared/tacticalRanges';
 import { compareUnitIdsNaturally } from '../../shared/unitIds';
 import { isWithinAirFerryGridRange, isWithinAirStrikeGridRange } from '../gameActions/gridRange';
+import { strategicFerryRangeOnState } from '../weather/weatherMatch';
 import { logDebug, logTrace } from '../logger';
 import { logHexControllerParityMismatch } from '../snapshotDbParity';
 import {
@@ -491,8 +492,9 @@ function tacticalParentAirportIntact(indexed: IndexedState, airH3: string): bool
  */
 
 function collectLegalFerryDestinationHexes(
-  unit: { id: string; h3Index: string; player: string; unitType: string },
-  indexed: IndexedState
+  unit: { id: string; h3Index: string; player: string; unitType: string; weatherTags?: readonly import('../../shared/weatherBonusTypes').WeatherState[] },
+  indexed: IndexedState,
+  state: GameStateSnapshot
 ): string[] {
   if (unit.unitType !== 'air') return [];
   if (!airBaseHasIntactAirport(indexed, unit.h3Index)) return [];
@@ -503,13 +505,14 @@ function collectLegalFerryDestinationHexes(
     candidates = [];
     for (const h3 of indexed.hexSet) {
       if (h3 === unit.h3Index) continue;
-      if (isWithinAirFerryGridRange(unit.h3Index, h3, 'possibleUnitActions ferry disk fallback')) {
+      if (isWithinAirFerryGridRange(unit.h3Index, h3, 'possibleUnitActions ferry disk fallback', strategicFerryRangeOnState(unit, h3, state))) {
         candidates.push(h3);
       }
     }
   }
   const out = new Set<string>();
   for (const h3 of candidates) {
+    if (!isWithinAirFerryGridRange(unit.h3Index, h3, 'possibleUnitActions ferry', strategicFerryRangeOnState(unit, h3, state))) continue;
     if (getInfra(indexed, h3).airport <= 0) continue;
     const snapshotController = indexed.controlByHex.get(h3) ?? null;
     if (snapshotController !== unit.player) continue;
@@ -729,8 +732,8 @@ export function collectAggregatedPossibleActionRows(args: {
         }
         return rememberComputedHexList(
           ferryDestByKey,
-          `${unit.h3Index}|${unit.player}`,
-          () => collectLegalFerryDestinationHexes(unit, indexed)
+          `${unit.h3Index}|${unit.player}|${unit.weatherTags?.join(',') ?? ''}`,
+          () => collectLegalFerryDestinationHexes(unit, indexed, args.state)
         );
       }
       if (tacticalBattle) {

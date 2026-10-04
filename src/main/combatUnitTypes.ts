@@ -63,4 +63,22 @@ displayOrder?: number;
    * Exceptions: None.
    */
 readonly originHitBonus?: OriginHitBonus;
+  /**
+   * Points removed from this unit's printed attack before the origin bonus.
+   *
+   * Purpose: Armor ranged fire and air strikes lose one point in weather the unit lacks.
+   * When to use: Set only on ranged and air-strike rows. Melee rows leave it unset.
+   * Expected outcome: `attackHitThreshold` floors the printed attack at 1, then adds the origin bonus.
+   * Exceptions: None.
+   */
+  readonly weatherAttackPenalty?: 0 | 1;
+  /**
+   * Acclimation tags carried into a roll.
+   *
+   * Purpose: A tag cancels the weather penalty for that state.
+   * When to use: Estimates and any combat row built from a snapshot unit.
+   * Expected outcome: Empty or omitted means the unit has no tag.
+   * Exceptions: None.
+   */
+  readonly weatherTags?: readonly import('../shared/weatherBonusTypes').WeatherState[];
 }

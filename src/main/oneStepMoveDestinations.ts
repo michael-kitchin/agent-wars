@@ -10,7 +10,7 @@ import { passabilityAllowsNavalUnit } from '../shared/pipelineTerrain';
 import {
   getLandMassReachableHexes,
 } from '../shared/landTraversalRes1';
-import { MOVEMENT_RANGE_BY_UNIT_TYPE } from '../shared/tacticalRanges';
+import { strategicRangeOnState } from './weather/weatherMatch';
 import { getRes1LandMassByH3 } from './terrainClassificationCache';
 import { isEmbarkedLandUnit } from './gameActions/sealift';
 import {
@@ -78,7 +78,8 @@ const destCacheByState = new WeakMap<
  * Exceptions: None.
  */
 function validDestinationsCacheKey(
-  unit: { id?: string; h3Index: string; unitType: string },
+  unit: { id?: string; h3Index: string; unitType: string; weatherTags?: GameStateSnapshot['units'][number]['weatherTags'] },
+  state: GameStateSnapshot,
   options?: { assumeDebarkedForReachability?: boolean }
 ): string {
   logTrace('oneStepMoveDestinations validDestinationsCacheKey', {
@@ -89,7 +90,12 @@ function validDestinationsCacheKey(
   const wantLand = unit.unitType === 'infantry' || unit.unitType === 'armor';
   const embarked = Boolean(wantLand && unit.id && isDbReady() && isEmbarkedLandUnit(unit.id));
   const debark = options?.assumeDebarkedForReachability ? '1' : '0';
-  return `${unit.h3Index}|${unit.unitType}|emb:${embarked ? '1' : '0'}|debark:${debark}`;
+  const row = unit.id ? state.units.find((candidate) => candidate.id === unit.id) : undefined;
+  const range = strategicRangeOnState(
+    { unitType: unit.unitType, h3Index: unit.h3Index, weatherTags: unit.weatherTags ?? row?.weatherTags },
+    state
+  );
+  return `${unit.h3Index}|${unit.unitType}|range:${range}|emb:${embarked ? '1' : '0'}|debark:${debark}`;
 }
 
 /**
@@ -155,7 +161,7 @@ export function getValidDestinations(
   state: GameStateSnapshot,
   options?: { assumeDebarkedForReachability?: boolean }
 ): string[] {
-  const key = validDestinationsCacheKey(unit, options);
+  const key = validDestinationsCacheKey(unit, state, options);
   const bucket = destCacheBucketForState(state);
   const hit = bucket.get(key);
   if (hit) {
@@ -190,7 +196,11 @@ function computeValidDestinations(
   state: GameStateSnapshot,
   options?: { assumeDebarkedForReachability?: boolean }
 ): string[] {
-  const range = MOVEMENT_RANGE_BY_UNIT_TYPE[unit.unitType] ?? 1;
+  const row = unit.id ? state.units.find((candidate) => candidate.id === unit.id) : undefined;
+  const range = strategicRangeOnState(
+    { unitType: unit.unitType, h3Index: unit.h3Index, weatherTags: row?.weatherTags },
+    state
+  );
   const wantLand = unit.unitType === 'infantry' || unit.unitType === 'armor';
   const hexSet = new Set(state.hexes.map((h) => h.h3Index));
 

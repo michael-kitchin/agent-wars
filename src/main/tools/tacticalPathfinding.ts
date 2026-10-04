@@ -230,6 +230,9 @@ export function executeTacticalPlanRoute(
         res4Set,
         unitTypeForMovement: unit.unitType,
         movementPointBudget: Math.max(0, budget),
+        weatherEnabled: battle.weatherBonusEnabled === true,
+        weather: battle.weather,
+        weatherTags: sub?.weatherTags,
       });
 
     let plan = tryPlan(buildTacticalRouteRes4Set(battle, originH3, destH3, avoidEnemies, unit.player));

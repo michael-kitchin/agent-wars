@@ -15,6 +15,7 @@ Shown with the map. It stays available in Strategic planning and Tactical planni
 - The title "Terrain".
 - One row per terrain kind, in this order: water, coastal, wetlands, plains, forest, mountain, desert, arctic.
 - A Terrain style dropdown. The choices are Default, Atlas, Wargame, and Scientific.
+- The same fill is drawn, at the size of a country flag, before each of these terrain names in the hex tooltip, the unit tooltip, and the blocked and slower order tooltips. An open tooltip keeps the fills it opened with.
 
 ## Inputs and Responses
 

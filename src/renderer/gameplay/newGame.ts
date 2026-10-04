@@ -11,7 +11,7 @@ import {
   randomizeScenarioRegionSelect,
 } from './newGameRegionUi';
 import { readSelectedGameSizeFromDocument, registerGameSizeSelect, syncGameSizeCapPreview } from './newGameSizeUi';
-import { readNewGameOptionFlags, resetNewGameOptionCheckboxes } from './newGameOptionsUi';
+import { readNewGameOptionFlags, readNewGameStartMonth, resetNewGameOptionCheckboxes } from './newGameOptionsUi';
 
 /**
  * Defines the `registerRegionRandomizeButtons` function shape (function registerRegionRandomizeButtons(): void).
@@ -232,6 +232,7 @@ export function registerNewGameButton(deps: NewGameDeps): void {
       const selectedRegions = getSelectedScenarioRegions();
       const state = (await window.gameApi.newGame({
         ...readNewGameOptionFlags(),
+        startMonth: readNewGameStartMonth(),
         humanHomeRegion: selectedRegions.humanHomeRegion,
         aiHomeRegion: selectedRegions.aiHomeRegion,
         gameSize: readSelectedGameSizeFromDocument(),

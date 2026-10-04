@@ -41,6 +41,7 @@ import {
   loadTerrainRes1LandMassBundled,
 } from './terrainLandMassLoad';
 import type { Res1LandMassRecord } from '../shared/landTraversalRes1';
+import { ensureWeatherPackLoaded } from './weather/weatherPackLoad';
 import { reduceRes4CityOverlayLabelsByH3 } from './terrainRes4CityOverlayReduce';
 import { loadTerrainRes4RoadRailSidesBundled } from './terrainRoadRailSidesLoad';
 import { loadTerrainRes4RoadRailVectorsBundled } from './terrainRoadRailVectorsLoad';
@@ -370,6 +371,7 @@ function buildSnapshot(): TerrainClassificationSnapshot {
   }
 
   const landMassEnv = loadTerrainRes1LandMassBundled();
+  ensureWeatherPackLoaded();
   const res1LandMassByH3 = buildRes1LandMassByH3(landMassEnv);
   const expectedRes1Hexes = res1Env.records.map((row) => row.h3_index);
   assertLandMassMatchesHexList(res1LandMassByH3, expectedRes1Hexes);

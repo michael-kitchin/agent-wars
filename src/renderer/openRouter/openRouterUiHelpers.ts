@@ -6,7 +6,7 @@ import {
 } from '../../shared/aiStrategyToastContent';
 import { READY_REQUEST_TIMEOUT_MS, TOAST_DURATION_MS } from '../core/constants';
 import { rendererSharedState as S } from '../core/state';
-import { createUnitOriginFlagImage } from '../core/unitOriginFlags';
+import { createAbsentUnitOriginFlagImage } from '../core/unitOriginFlags';
 import { splitLossCauseLineForUnitFlags } from '../../shared/lossToastUnitSegments';
 import type { UnitOrigin } from '../../shared/unitOriginTypes';
 import {
@@ -287,7 +287,7 @@ function appendMapToastBulletLine(
   if (unitOriginByDisplayName && unitOriginByDisplayName.size > 0) {
     for (const segment of splitLossCauseLineForUnitFlags(text, new Set(unitOriginByDisplayName.keys()))) {
       const origin = segment.unitDisplayName ? unitOriginByDisplayName.get(segment.unitDisplayName) : undefined;
-      if (origin) span.appendChild(createUnitOriginFlagImage(origin));
+      if (origin && segment.unitDisplayName) span.appendChild(createAbsentUnitOriginFlagImage(origin, segment.unitDisplayName));
       span.appendChild(document.createTextNode(segment.text));
     }
   } else {

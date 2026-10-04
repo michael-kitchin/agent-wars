@@ -25,6 +25,7 @@ import {
   usesOmniscientGridProximity,
 } from './tools/assessUnitProximity';
 import { getMovementBudgetForUnit } from './pathfinding';
+import { formatBriefingWeatherCell } from '../shared/weatherBonusRules';
 import { marchStepRecedesFromEnemy } from './tools/standingMarchReceding';
 import {
   SECTION_TITLE_ACTIVE_CALLBACKS,
@@ -273,7 +274,8 @@ function canCloseThisTurn(assessment: UnitAssessmentResult, useGridHopBudget: bo
   const unitType = typeof assessment.result.unit?.type === 'string' ? assessment.result.unit.type : '';
   if (unitType === 'air') return nearest.inMeleeRange === true;
   if (useGridHopBudget && typeof nearest.gridDistance === 'number' && nearest.gridDistance < 900) {
-    const budget = getMovementBudgetForUnit(unitType || 'infantry');
+    const stamped = assessment.result.unit?.movementBudget;
+    const budget = typeof stamped === 'number' ? stamped : getMovementBudgetForUnit(unitType || 'infantry');
     if (budget > 0 && nearest.gridDistance <= budget) return true;
   }
   if (typeof nearest.estimatedTurnsToReach === 'number') {
@@ -377,7 +379,7 @@ function isQuiet(assessment: UnitAssessmentResult, standingOrdersActive: boolean
  * Purpose: One dense per-unit type/threat/nearest/action table; standing-order detail lives in `# Standing Order Status` when Orders are enabled.
  * When to use: Strategic `formatBriefing` and tactical `formatTacticalBriefing` after assessments are ready.
  * Expected outcome: GFM table with Type; no standing-order column (avoids duplicating Standing Order Status / former Unit Roster).
- *   A Bonus column follows Hex only when some assessment carries `originBonusHere`; otherwise the table is unchanged.
+ *   A Bonus column follows Hex only when some assessment carries `originBonusHere`. A Weather column follows that only when some assessment carries `weatherTags`. The cell names the weather where the unit stands, with birth tags in parentheses. Otherwise the table is unchanged.
  * Exceptions: None; empty assessments yield an empty-state row.
  */
 export function buildUnitStatusTable(
@@ -394,8 +396,9 @@ export function buildUnitStatusTable(
     standingOrdersActive,
   });
   const showBonus = unitAssessments.some((a) => Array.isArray(a.result.unit?.originBonusHere));
-  const header = `| Unit ID | Type | Hex |${showBonus ? ' Bonus |' : ''} Nearest enemy + distance | Threat severity | Action needed |`;
-  const sep = `|---------|------|-----|${showBonus ? '-------|' : ''}---------------------------|-----------------|---------------|`;
+  const showWeather = unitAssessments.some((a) => Array.isArray(a.result.unit?.weatherTags));
+  const header = `| Unit ID | Type | Hex |${showBonus ? ' Bonus |' : ''}${showWeather ? ' Weather |' : ''} Nearest enemy + distance | Threat severity | Action needed |`;
+  const sep = `|---------|------|-----|${showBonus ? '-------|' : ''}${showWeather ? '---------|' : ''}---------------------------|-----------------|---------------|`;
   const rows: string[] = [];
   for (const a of unitAssessments) {
     const pos = Array.isArray(a.result.unit?.position)
@@ -420,7 +423,15 @@ export function buildUnitStatusTable(
     const actionCell =
       ctx.mode === 'strategic' && isQuiet(a, standingOrdersActive) ? `${action} (quiet)` : action;
     const bonusCell = showBonus ? ` ${formatOriginBonusTableCell(a.result.unit?.originBonusHere ?? [])} |` : '';
-    rows.push(`| ${selfLabel} | ${type} | ${pos} |${bonusCell} ${nearestStr} | ${severity} | ${actionCell} |`);
+    const weatherTags = a.result.unit?.weatherTags;
+    const weatherHere = a.result.unit?.weatherHere;
+    const weatherCell = showWeather
+      ? ` ${formatBriefingWeatherCell({
+          weatherHere: typeof weatherHere === 'string' ? weatherHere : null,
+          tags: Array.isArray(weatherTags) ? weatherTags : [],
+        })} |`
+      : '';
+    rows.push(`| ${selfLabel} | ${type} | ${pos} |${bonusCell}${weatherCell} ${nearestStr} | ${severity} | ${actionCell} |`);
   }
   if (rows.length === 0) return `${header}\n${sep}\n(No AI units)\n`;
   return `${[header, sep, ...rows].join('\n')}\n`;

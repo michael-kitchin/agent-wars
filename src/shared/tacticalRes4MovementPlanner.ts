@@ -2,6 +2,8 @@
  * Res4 tactical march planning: least movement-point paths inside a footprint (combat rules §12.4).
  */
 
+import type { WeatherState } from './weatherBonusTypes';
+import { tacticalWeatherOpenGroundCost } from './weatherBonusRules';
 import type { TacticalTerrainKindResolver } from './tacticalTerrainMovement';
 import {
   isNavalRes4TacticalCellNavigable,
@@ -147,7 +149,12 @@ function enterCostForHex(
   h: string,
   unitTypeForMovement: string,
   terrain: TacticalTerrainKindResolver,
-  fromH3: string | null
+  fromH3: string | null,
+  weatherEnter?: {
+    weatherEnabled?: boolean;
+    weather?: WeatherState | null;
+    weatherTags?: readonly WeatherState[] | null;
+  }
 ): number {
   if (unitTypeForMovement === 'naval') {
     return tacticalNavalEnterNeighborCost(fromH3, h, terrain);
@@ -161,6 +168,9 @@ function enterCostForHex(
       prevOfFrom: null,
       marchGoalH3: h,
       res4Set: new Set([fromH3, h]),
+      weatherEnabled: weatherEnter?.weatherEnabled,
+      weather: weatherEnter?.weather,
+      weatherTags: weatherEnter?.weatherTags,
     });
   }
   const raw = terrain.effectiveKindForRes4Hex(h);
@@ -168,7 +178,14 @@ function enterCostForHex(
   const base = tacticalEnterHexMovementCost(unitTypeForMovement, cat);
   const urbanDest = !!(unitTypeForMovement === 'infantry' || unitTypeForMovement === 'armor') && !!terrain.isUrbanRes4?.(h);
   if (urbanDest) return 1;
-  return base;
+  return tacticalWeatherOpenGroundCost({
+    unitType: unitTypeForMovement,
+    category: cat,
+    baseCost: base,
+    weather: weatherEnter?.weather,
+    tags: weatherEnter?.weatherTags,
+    enabled: weatherEnter?.weatherEnabled === true,
+  });
 }
 
 /**
@@ -210,6 +227,9 @@ export function planTacticalRes4March(args: {
   terrain: TacticalTerrainKindResolver;
   /** Precomputed footprint adjacency; when omitted, falls back to `res4NeighborsInFootprint` per state. */
   footprintNeighbors?: Res4FootprintNeighborLookup;
+  weatherEnabled?: boolean;
+  weather?: WeatherState | null;
+  weatherTags?: readonly WeatherState[] | null;
 }): TacticalMarchPlanResult {
   const { fromH3, toH3, res4Set, unitTypeForMovement, movementPointBudget, terrain } = args;
   const neighborsOf = args.footprintNeighbors ?? ((h: string) => res4NeighborsInFootprint(h, res4Set));
@@ -253,6 +273,9 @@ export function planTacticalRes4March(args: {
       unitTypeForMovement,
       terrain,
       footprintNeighbors: neighborsOf,
+      weatherEnabled: args.weatherEnabled,
+      weather: args.weather,
+      weatherTags: args.weatherTags,
     });
     if (!landResult) {
       return {
@@ -278,6 +301,9 @@ export function planTacticalRes4March(args: {
         marchGoalH3: toH3,
         res4Set,
         footprintNeighbors: neighborsOf,
+        weatherEnabled: args.weatherEnabled,
+        weather: args.weather,
+        weatherTags: args.weatherTags,
       });
       if (!Number.isFinite(stepCost)) {
         return {
@@ -322,7 +348,11 @@ export function planTacticalRes4March(args: {
     if (d !== dist.get(h)) continue;
     if (h === toH3) break;
     for (const nb of neighborsOf(h)) {
-      const w = enterCostForHex(nb, unitTypeForMovement, terrain, h);
+      const w = enterCostForHex(nb, unitTypeForMovement, terrain, h, {
+        weatherEnabled: args.weatherEnabled,
+        weather: args.weather,
+        weatherTags: args.weatherTags,
+      });
       if (!Number.isFinite(w) || w <= 0) continue;
       const nd = d + w;
       const prev = dist.get(nb);
@@ -358,7 +388,11 @@ export function planTacticalRes4March(args: {
   let cum = 0;
   let stopIdx = 0;
   for (let i = 1; i < path.length; i++) {
-    const stepCost = enterCostForHex(path[i]!, unitTypeForMovement, terrain, path[i - 1]!);
+    const stepCost = enterCostForHex(path[i]!, unitTypeForMovement, terrain, path[i - 1]!, {
+      weatherEnabled: args.weatherEnabled,
+      weather: args.weather,
+      weatherTags: args.weatherTags,
+    });
     if (!Number.isFinite(stepCost)) {
       return {
         reachable: false,
@@ -405,6 +439,9 @@ export function collectSimpleEnterCostReachableWithinBudget(args: {
   movementPointBudget: number;
   terrain: TacticalTerrainKindResolver;
   footprintNeighbors?: Res4FootprintNeighborLookup;
+  weatherEnabled?: boolean;
+  weather?: WeatherState | null;
+  weatherTags?: readonly WeatherState[] | null;
 }): string[] {
   const { fromH3, res4Set, unitTypeForMovement, movementPointBudget, terrain } = args;
   const neighborsOf = args.footprintNeighbors ?? ((h: string) => res4NeighborsInFootprint(h, res4Set));
@@ -419,7 +456,11 @@ export function collectSimpleEnterCostReachableWithinBudget(args: {
     if (d !== dist.get(h)) continue;
     if (d > movementPointBudget) continue;
     for (const nb of neighborsOf(h)) {
-      const w = enterCostForHex(nb, unitTypeForMovement, terrain, h);
+      const w = enterCostForHex(nb, unitTypeForMovement, terrain, h, {
+        weatherEnabled: args.weatherEnabled,
+        weather: args.weather,
+        weatherTags: args.weatherTags,
+      });
       if (!Number.isFinite(w) || w <= 0) continue;
       const nd = d + w;
       if (nd > movementPointBudget) continue;

@@ -1,7 +1,7 @@
 import * as assert from 'assert';
 import { withTempGameDb } from '../testSupport/withTempGameDb';
 import { dbGetOne, getGameStateForPlayer, resetGameForNewMatch } from '../gameDb';
-import { COUNTRY_BONUS_CONFIG_KEY, TERRAIN_BONUS_CONFIG_KEY } from './originBonusConfig';
+import { COUNTRY_BONUS_CONFIG_KEY, START_MONTH_CONFIG_KEY, TERRAIN_BONUS_CONFIG_KEY, WEATHER_BONUS_CONFIG_KEY } from './originBonusConfig';
 
 /**
  * Reads one persisted `game_config` value.
@@ -43,6 +43,16 @@ function testFlagsPersistOnResetAndReachSnapshots(): void {
     resetGameForNewMatch();
     assert.strictEqual(configValue(COUNTRY_BONUS_CONFIG_KEY), '0');
     assert.strictEqual(configValue(TERRAIN_BONUS_CONFIG_KEY), '0');
+    assert.strictEqual(configValue(WEATHER_BONUS_CONFIG_KEY), '0');
+    assert.strictEqual(configValue(START_MONTH_CONFIG_KEY), '1');
+
+    resetGameForNewMatch({ weatherBonusEnabled: true, startMonth: 6 });
+    assert.strictEqual(configValue(WEATHER_BONUS_CONFIG_KEY), '1');
+    assert.strictEqual(configValue(START_MONTH_CONFIG_KEY), '6');
+    const weatherOn = getGameStateForPlayer('human');
+    assert.strictEqual(weatherOn.weatherBonusEnabled, true);
+    assert.strictEqual(weatherOn.monthName, 'June');
+    assert.ok(weatherOn.units.every((unit) => Array.isArray(unit.weatherTags)));
   });
 }
 

@@ -15,6 +15,7 @@ Typical runtime inputs (names may grow; the extract/assert scripts are the check
 - Road/rail side masks and optional vector overlays
 - Landmass connectivity used by strategic land pathfinding
 - Hex naming data (`terrain_res1_naming.json` and `terrain_res4_naming.json`) for hex tooltips and unit origins
+- Res-1 monthly weather (`terrain_res1_weather.json`) for the optional weather bonus
 
 ## Hex naming data
 
@@ -27,6 +28,14 @@ The main process uses the codes for the flags in hex tooltips and for each new u
 A birth cell's country is its largest city (population, then lower scalerank, then name). With no city that names a country, it is the country row with the most states in the cell, then lower scalerank, then name. With no country row, it is the country of the most prominent state. The stored name is the canonical country name for that ISO code. A cell with none of those rows has no country.
 
 Main-process classification (`terrainClassificationCache.ts` and related) turns that cache into hex kinds, infrastructure counts, and overlay records. SQLite is seeded from the cache; res-4 feature overrides (rubble after strikes, destroyed ports) live in the match DB and overlay the pack.
+
+## Weather
+
+`terrain_res1_weather.json` holds twelve months for every res-1 hex. January is month 0. Each month stores the weather the player sees (`mild`, `rain`, `snow`, or `heat`) and whether that month counts as heat for acclimation. A hot wet month is stored as rain that still counts as heat.
+
+The file is fixed climatology from WorldClim 2.1 10-arc-minute temperature and precipitation, sampled at each land hex's centroid. Classification uses the thresholds in `weatherBonusRules.ts`: snow at or below 0°C, otherwise rain at or above 120 mm, otherwise heat at or above 23°C, otherwise mild. A water hex copies the nearest land hex within two res1 steps. Open ocean beyond that, and a land centroid with no sample, is mild all year. Startup fails if the pack is missing or empty, the same way it fails for the other terrain files. An unknown hex reads as twelve mild months.
+
+How to regenerate the pack stays in `scripts/weather_pipeline/`. Only the `.json.zip` is tracked. The rules that turn those months into tags and penalties are in [combat rules §4.9](combat-rules-v3.md). The renderer never reads the pack. Main stamps the current month's weather and each unit's tags onto the snapshot.
 
 ## Resolutions
 
@@ -42,6 +51,6 @@ Parent-child mapping is H3's native hierarchy (res 1 → res 4 spans three steps
 
 ## Related
 
-- Movement and combat vs terrain: [combat-rules-v3.md](combat-rules-v3.md) §12
+- Movement, combat, and weather: [combat-rules-v3.md](combat-rules-v3.md) §4.9 and §12
 - Root README “Terrain generation pipeline” section
 - Python tests: `npm run terrain:test`

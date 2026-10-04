@@ -17,7 +17,7 @@ Opens in New game and in Game over. See [modes-and-transitions.md](modes-and-tra
 - An AI home-region choice and a randomize control labeled "Randomize AI home region".
 - A game-size choice.
 - Cap badges for infantry, armor, naval, and air. The numbers are in [game size and unit caps](../game-size-unit-caps.md).
-- One row of three checkboxes, in this order: Fog of war, Country bonus, and Terrain bonus. All three are checked whenever the overlay opens. The bonus rules are in [combat rules §4.9](../combat-rules-v3.md).
+- One row of checkboxes, in this order: Fog of war, Country bonus, Terrain bonus, and Weather bonus. All are checked whenever the overlay opens. Below that row, a Starting month control lists the full English month names and resets to January whenever the overlay opens. The bonus rules are in [combat rules §4.9](../combat-rules-v3.md).
 - A button labeled "Start game" when no match is loaded or when New opened the overlay, and "New game" when the match is over.
 
 ## Inputs and Responses
@@ -27,7 +27,7 @@ Opens in New game and in Game over. See [modes-and-transitions.md](modes-and-tra
 - When the player changes either home region, that side's home region updates. The two home regions may be the same. Nothing in the overlay prevents that.
 - When the player clicks a randomize control, that side's region becomes a random legal choice.
 - When the player changes game size, the cap badges update to that size.
-- When the player changes Fog of war, Country bonus, or Terrain bonus, the next match uses that setting. Opening the overlay checks all three boxes again.
+- When the player changes Fog of war, Country bonus, Terrain bonus, Weather bonus, or the starting month, the next match uses that setting. Opening the overlay checks every box again and resets the month to January.
 - When the player clicks Start game or New game, the match starts, drafts and the selection clear, the AI cost readout and the AI activity log clear, and the overlay closes on success. A failure leaves the overlay open.
 
 ### Keyboard
@@ -49,7 +49,7 @@ Opens in New game and in Game over. See [modes-and-transitions.md](modes-and-tra
 
 - The overlay never closes itself. Only a successful start closes it.
 - The startup, New, and game-over messages stay distinct from each other.
-- Fog of war, Country bonus, and Terrain bonus are all checked every time the overlay opens, including game over.
+- Fog of war, Country bonus, Terrain bonus, and Weather bonus are all checked every time the overlay opens, including game over. The starting month resets to January.
 - Starting a match clears the previous selection and drafts.
 
 ## Strategic and Tactical Differences
@@ -73,7 +73,7 @@ None.
 
 ## Code Entry Points
 
-- `static/index.html` (`#game-over-overlay`, `#game-over-message`, `#new-game-human-region-select`, `#new-game-human-region-randomize`, `#new-game-ai-region-select`, `#new-game-ai-region-randomize`, `#new-game-size-select`, `#new-game-size-cap-infantry`, `#new-game-size-cap-armor`, `#new-game-size-cap-naval`, `#new-game-size-cap-air`, `#new-game-fog-checkbox`, `#new-game-country-bonus-checkbox`, `#new-game-terrain-bonus-checkbox`, `#new-game-btn`)
+- `static/index.html` (`#game-over-overlay`, `#game-over-message`, `#new-game-human-region-select`, `#new-game-human-region-randomize`, `#new-game-ai-region-select`, `#new-game-ai-region-randomize`, `#new-game-size-select`, `#new-game-size-cap-infantry`, `#new-game-size-cap-armor`, `#new-game-size-cap-naval`, `#new-game-size-cap-air`, `#new-game-fog-checkbox`, `#new-game-country-bonus-checkbox`, `#new-game-terrain-bonus-checkbox`, `#new-game-weather-bonus-checkbox`, `#new-game-start-month`, `#new-game-btn`)
 - `src/renderer/gameplay/newGame.ts`
 - `src/renderer/gameplay/newGameOptionsUi.ts`
 - `src/renderer/gameplay/newGameRegionUi.ts`

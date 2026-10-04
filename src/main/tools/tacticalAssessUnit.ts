@@ -21,6 +21,7 @@ import { gridHopDistanceBetween } from './assessUnitProximity';
 import { h3ToLatLng, type LatLng, type LatLngMap } from './h3LatLng';
 import { estimateTacticalMarch, type TacticalMarchEstimate } from './tacticalMarchEstimate';
 import { tacticalOriginBonusUnitFields } from './originBonusAssessment';
+import { weatherAttackPenalty } from '../../shared/weatherBonusRules';
 import type { OriginBonusSettings } from '../../shared/originBonusTypes';
 
 /**
@@ -353,6 +354,27 @@ export function executeTacticalAssessUnit(args: TacticalAssessUnitArgs): {
       rangedRangeThisBeat: selfRange,
       embarkedOnSubUnitId: self.embarkedOnSubUnitId ?? null,
       ...tacticalOriginBonusUnitFields(args.originBonusSettings, battle, self),
+      ...(battle.weatherBonusEnabled === true
+        ? {
+            weatherTags: self.weatherTags ?? [],
+            weatherHere: battle.weather ?? null,
+            rangedAttackPenalized: weatherAttackPenalty({
+              unitType: self.unitType,
+              kind: 'ranged',
+              weatherAtUnit: battle.weather,
+              tags: self.weatherTags,
+              enabled: true,
+            }) === 1,
+            airStrikePenalizedAtBase: weatherAttackPenalty({
+              unitType: self.unitType,
+              kind: 'airStrike',
+              weatherAtUnit: battle.weather,
+              weatherAtTarget: battle.weather,
+              tags: self.weatherTags,
+              enabled: true,
+            }) === 1,
+          }
+        : {}),
     },
     nearbyEnemies: enemies.map((e) => e.row),
     nearbyFriendlies,

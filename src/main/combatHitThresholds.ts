@@ -8,6 +8,7 @@
  */
 import type { OriginHitBonus } from '../shared/originBonusTypes';
 import { getAttack, getDefense } from './combatConstants';
+import { logTrace } from './logger';
 
 /**
  * The fields a hit threshold depends on.
@@ -36,6 +37,15 @@ export interface HitThresholdUnit {
    * Exceptions: None.
    */
   readonly originHitBonus?: OriginHitBonus;
+  /**
+   * Points removed from the printed attack before the origin bonus.
+   *
+   * Contract: Only `1` changes the threshold. Absent and `0` leave the printed attack.
+   * When to use: Ranged and air-strike rows. Defense ignores it.
+   * Expected outcome: The printed attack is at least 1 after the penalty, then the origin bonus is added.
+   * Exceptions: None.
+   */
+  readonly weatherAttackPenalty?: 0 | 1;
 }
 
 /**
@@ -43,11 +53,15 @@ export interface HitThresholdUnit {
  *
  * Purpose: Attack, ranged fire, and return-fire hit tests.
  * When to use: As `rollD6() <= attackHitThreshold(unit)`.
- * Expected outcome: `getAttack(unitType)` plus the origin bonus.
+ * Expected outcome: Printed attack, minus a weather penalty, floored at 1, plus the origin bonus.
  * Exceptions: None.
  */
 export function attackHitThreshold(unit: HitThresholdUnit): number {
-  return getAttack(unit.unitType) + (unit.originHitBonus ?? 0);
+  const printed = getAttack(unit.unitType);
+  const penalty = unit.weatherAttackPenalty === 1 ? 1 : 0;
+  const threshold = Math.max(1, printed - penalty) + (unit.originHitBonus ?? 0);
+  logTrace('combatHitThresholds attackHitThreshold', { unitType: unit.unitType, penalty, threshold });
+  return threshold;
 }
 
 /**

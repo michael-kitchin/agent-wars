@@ -24,7 +24,7 @@ The map toast and the AI strategy toast can appear in Strategic planning, Resolu
 ## Information Displayed
 
 - The map toast shows one message. Informational messages and error messages are distinguished. The body is the message text, not a fixed sentence list.
-- In a turn-update toast, each victim named on a loss line is preceded by that unit's origin flag, which shows the two origin lines of the tooltip in the [stack callout](stack-callout.md), never the bonus line. Grouped totals such as "3 Infantry", the Updates section, and every other toast line have no flags. If two victims share a display name but came from different places, that name gets no flag.
+- In a turn-update toast, each victim named on a loss line is preceded by that unit's origin flag. The flag uses the same tooltip as the [stack callout](stack-callout.md). Country and Terrain do not apply, because the unit is no longer standing anywhere. Weather tags still show when that option is on and the unit has any. Grouped totals such as "3 Infantry", the Updates section, and every other toast line have no flags. If two victims share a display name but came from different places, that name gets no flag.
 - A basemap failure uses the map toast once: some tiles failed to load, and the game remains playable. It hides after the same interval as other map toasts, on dismiss, or when a later map toast replaces it.
 - The AI strategy toast shows a Message section, a Strategy section, or both, in that order. A section whose text is empty or whitespace is omitted. If both are empty, the toast hides.
 - The sidebar error line shows nothing and stays hidden.

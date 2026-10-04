@@ -8,6 +8,7 @@
  */
 
 import { latLngToCell } from 'h3-js';
+import { formatTerrainNameListHtml } from './terrainSwatchHtml';
 import {
   effectiveRes4TerrainKindString,
   effectiveTacticalMovementPointBudgetForMarchLeg,
@@ -20,6 +21,7 @@ import type { TacticalBattleTerrainPick } from './tacticalTerrainCombatModifiers
 import type { TacticalBattleSnapshot, TacticalSubUnitSnapshot } from './tacticalBattleTypes';
 import { MOVEMENT_RANGE_BY_UNIT_TYPE, RANGED_RANGE_BY_UNIT_TYPE } from './tacticalRanges';
 import { landInfantryArmorEnterCost } from './tacticalRes4LandMarchContinuity';
+import { formatWeatherLabel, tacticalWeatherOpenGroundCost } from './weatherBonusRules';
 import {
   buildTacticalTerrainKindResolverFromSnapshot,
   normalizeDbTerrainKindToTacticalCategory,
@@ -40,6 +42,8 @@ const SLOW_TERRAIN_LABEL_SORT_PRIORITY: Readonly<Record<string, number>> = {
   Wetlands: 5,
   Desert: 6,
   Arctic: 7,
+  Snow: 8,
+  Rain: 9,
 };
 
 /**
@@ -102,9 +106,9 @@ export function formatOrderPreviewImpactHtml(args: OrderPreviewImpactHtmlInput):
   const slower = (args.slower ?? []).map((s) => s.trim()).filter((s) => s.length > 0);
   const terrainLine =
     blocked.length > 0
-      ? `<strong>Blocked:</strong> ${blocked.map((s) => escapeHtmlForOrderPreviewTooltip(s)).join(', ')}`
+      ? `<strong>Blocked:</strong> ${formatTerrainNameListHtml(blocked.join(', '))}`
       : slower.length > 0
-        ? `<strong>Slower:</strong> ${slower.map((s) => escapeHtmlForOrderPreviewTooltip(s)).join(', ')}`
+        ? `<strong>Slower:</strong> ${formatTerrainNameListHtml(slower.join(', '))}`
         : null;
   let out = terrainLine;
   if (args.roadRail) {
@@ -296,6 +300,27 @@ export type TacticalMarchTerrainImpact = {
  * Expected outcome: Anchor throttle labels (when `eff < baseline`) plus per-hex path labels. `roadRail` is true when a step's actual enter cost is the road or rail rate and the off-road cost would have been higher, including when only the destination cell has the line.
  * Exceptions: None; air/naval and trivial paths yield empty `slower` and `roadRail: false`.
  */
+/**
+ * Names snow or rain when that weather, not the anchor terrain, cut this leg's budget.
+ *
+ * Purpose: A plains armor unit in snow is slower even though plains has no terrain label.
+ * When to use: The anchor check in `collectTacticalMarchTerrainImpact`.
+ * Expected outcome: `Snow` or `Rain` when the unit lacks that tag; otherwise null.
+ * Exceptions: None.
+ */
+function weatherBudgetSlowLabel(
+  battle: TacticalBattleSnapshot,
+  subUnit: TacticalSubUnitSnapshot,
+  moveType: string
+): string | null {
+  if (battle.weatherBonusEnabled !== true) return null;
+  const weather = battle.weather;
+  const tagged = weather != null && (subUnit.weatherTags ?? []).includes(weather);
+  if (tagged || (weather !== 'snow' && weather !== 'rain')) return null;
+  if (moveType === 'armor' || (moveType === 'naval' && weather === 'snow')) return formatWeatherLabel(weather);
+  return null;
+}
+
 export function collectTacticalMarchTerrainImpact(args: {
   battle: TacticalBattleSnapshot;
   subUnit: TacticalSubUnitSnapshot;
@@ -303,8 +328,12 @@ export function collectTacticalMarchTerrainImpact(args: {
   pathH3: readonly string[];
 }): TacticalMarchTerrainImpact {
   const { battle, subUnit, moveType, pathH3 } = args;
-  if (pathH3.length < 2 || moveType === 'air' || moveType === 'naval') {
+  if (pathH3.length < 2 || moveType === 'air') {
     return { slower: [], roadRail: false };
+  }
+  if (moveType === 'naval') {
+    const label = weatherBudgetSlowLabel(battle, subUnit, moveType);
+    return { slower: label ? [label] : [], roadRail: false };
   }
 
   const slowerOrder: string[] = [];
@@ -324,6 +353,8 @@ export function collectTacticalMarchTerrainImpact(args: {
     if (battle.res4IsRubbleByH3?.[anchor]) push('Rubble');
     else if (battle.res4IsUrbanByH3?.[anchor]) push('Urban');
     else if (subUnit.unitType === 'armor' && tacticalRes4CellIsForestClass(battle, anchor)) push('Forest');
+    const weatherLabel = weatherBudgetSlowLabel(battle, subUnit, moveType);
+    if (weatherLabel) push(weatherLabel);
   }
 
   const terrainForTransport = buildTacticalTerrainKindResolverFromSnapshot(battle);
@@ -353,6 +384,9 @@ export function collectTacticalMarchTerrainImpact(args: {
       prevOfFrom: i >= 2 ? pathH3[i - 2]! : null,
       marchGoalH3,
       res4Set: footprint,
+      weatherEnabled: battle.weatherBonusEnabled === true,
+      weather: battle.weather,
+      weatherTags: subUnit.weatherTags,
     });
     const usedLineRate = Number.isFinite(stepCost) && stepCost < 1;
     if (usedLineRate && (cost > plainsCost || !Number.isFinite(cost))) {
@@ -365,6 +399,17 @@ export function collectTacticalMarchTerrainImpact(args: {
         push(label);
         continue;
       }
+    }
+    const openGround = tacticalWeatherOpenGroundCost({
+      unitType: moveType,
+      category: cat,
+      baseCost: Number.isFinite(cost) ? cost : 1,
+      weather: battle.weather,
+      tags: subUnit.weatherTags,
+      enabled: battle.weatherBonusEnabled === true,
+    });
+    if (!usedLineRate && Number.isFinite(cost) && openGround > cost && (battle.weather === 'snow' || battle.weather === 'rain')) {
+      push(formatWeatherLabel(battle.weather));
     }
     if (tacticalRes4CellIsForestClass(battle, h) && (subUnit.unitType === 'armor' || subUnit.unitType === 'infantry')) {
       push('Forest');

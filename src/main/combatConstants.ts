@@ -1,4 +1,6 @@
 import { strategicRangedRangeHexesForUnitType } from '../shared/rangePerimeterModel';
+import { strategicMovementHexes } from '../shared/weatherBonusRules';
+import { logTrace } from './logger';
 
 /**
  * Documents the `UnitType` type alias (export type UnitType).
@@ -105,53 +107,6 @@ air: 1,
 };
 
 /**
- * Documents the module-scope binding `MOVEMENT_BUDGET` (MOVEMENT_BUDGET: Record<UnitType, number>).
-
- * Purpose: Supports maintainability by documenting why `MOVEMENT_BUDGET` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-const MOVEMENT_BUDGET: Record<UnitType, number> = {
-    /**
-   * Documents the object literal property `infantry` (infantry: 1).
-
-   * Purpose: Supports maintainability by documenting why `infantry` exists.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-infantry: 1,
-    /**
-   * Documents the object literal property `armor` (armor: 2).
-
-   * Purpose: Supports maintainability by documenting why `armor` exists.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-armor: 2,
-    /**
-   * Documents the object literal property `naval` (naval: 2).
-
-   * Purpose: Supports maintainability by documenting why `naval` exists.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-naval: 2,
-    /**
-   * Documents the object literal property `air` (air: 0).
-
-   * Purpose: Supports maintainability by documenting why `air` exists.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-air: 0,
-};
-
-/**
  * Defines the `getAttack` function shape (export function getAttack(unitType: string): number).
 
  * Purpose: Supports maintainability by documenting why `getAttack` exists.
@@ -190,13 +145,14 @@ export function getRange(unitType: string): number {
 /**
  * Defines the `getMovementBudget` function shape (export function getMovementBudget(unitType: string): number).
 
- * Purpose: Supports maintainability by documenting why `getMovementBudget` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Purpose: Printed strategic march length, shared by validators and prompts.
+ * When to use: When weather is off, or the caller only needs the printed hex count.
+ * Expected outcome: Infantry 1, armor 2, naval 2, air 0. Weather reductions go through `strategicMovementHexesFor`.
  * Exceptions: None.
  */
 export function getMovementBudget(unitType: string): number {
-  return MOVEMENT_BUDGET[unitType as UnitType] ?? 1;
+  logTrace('combatConstants getMovementBudget', { unitType });
+  return strategicMovementHexes(unitType);
 }
 
 /**

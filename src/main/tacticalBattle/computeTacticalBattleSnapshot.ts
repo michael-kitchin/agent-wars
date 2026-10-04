@@ -10,6 +10,9 @@ import {
   listUnitsForSnapshot,
 } from '../gameDb';
 import { readTurnStateRow } from '../gameDb/turnStateReads';
+import { readPersistedOriginBonusSettings } from '../gameDb/originBonusConfig';
+import { parseStartMonth } from '../../shared/weatherBonusRules';
+import { displayWeatherForHex, weatherTagsForBirthHex } from '../weather/weatherPackLoad';
 import { res4CountryNamesForCells } from '../unitOrigin/res4BirthCountryCache';
 import { getRes4RoadRailOverlaysForRenderer } from '../terrainClassificationCache';
 import { tacticalNavalHasMovableNeighborInFootprint } from '../../shared/tacticalRes4MovementPlanner';
@@ -388,6 +391,11 @@ export function computeTacticalBattleSnapshot(
       return { snapshot: null, skippedParentDisplayNames: [], failureReason: 'Unknown strategic hex.' };
     }
     const allUnits = listUnitsForSnapshot();
+    const weatherSettings = readPersistedOriginBonusSettings({ getOne: dbGetOne, hasDb: () => true });
+    const weatherOn = weatherSettings.weatherBonusEnabled === true;
+    const battleWeather = weatherOn
+      ? displayWeatherForHex(enclosingRes1H3Index, turnRow.turn_number, parseStartMonth(weatherSettings.startMonth))
+      : undefined;
     const inHex = allUnits.filter((u) => u.h3Index === enclosingRes1H3Index);
     const hasHuman = inHex.some((u) => u.player === 'human');
     const hasOpponent = inHex.some((u) => u.player === 'opponent');
@@ -508,6 +516,7 @@ export function computeTacticalBattleSnapshot(
           h3Index: next.cell,
           displayName: formatTacticalSubUnitDisplayName(parentName, placed),
           ...(parent.origin ? { origin: parent.origin } : {}),
+          ...(weatherOn ? { weatherTags: weatherTagsForBirthHex(parent.origin?.birthH3Index) } : {}),
         });
       }
       if (placed < n) {
@@ -536,6 +545,7 @@ export function computeTacticalBattleSnapshot(
       res4ChildH3Indexes: children,
       strategicTurnNumber: turnRow.turn_number,
       tacticalTurnNumber: 1,
+      ...(weatherOn && battleWeather ? { weatherBonusEnabled: true as const, weather: battleWeather } : {}),
       strategicHexTerrain: hexRow.terrain,
       strategicHexTerrainKind: hexRow.terrain_kind,
       res4TerrainKindByH3,

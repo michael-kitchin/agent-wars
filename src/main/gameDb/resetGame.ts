@@ -214,6 +214,24 @@ export interface ResetGameForNewMatchOptions {
    * Exceptions: None.
    */
   readonly terrainBonusEnabled?: boolean;
+  /**
+   * Whether the weather bonus is on.
+   *
+   * Contract: Only `true` means on. Missing means off, so callers that predate the flag keep the old movement and dice.
+   * When to use: The new-game dialog's Weather bonus checkbox.
+   * Expected outcome: Persisted as `weather_bonus_enabled`.
+   * Exceptions: None.
+   */
+  readonly weatherBonusEnabled?: boolean;
+  /**
+   * Calendar month of turn 1.
+   *
+   * Contract: Parsed by `parseStartMonth`. Missing or invalid means January.
+   * When to use: The new-game dialog's start-month control.
+   * Expected outcome: Persisted as `start_month`.
+   * Exceptions: None.
+   */
+  readonly startMonth?: number;
 }
 
 /**
@@ -232,6 +250,8 @@ export function resetGameForNewMatch(deps: ResetGameDeps, options?: ResetGameFor
   const originBonusSettings = {
     countryBonusEnabled: options?.countryBonusEnabled === true,
     terrainBonusEnabled: options?.terrainBonusEnabled === true,
+    weatherBonusEnabled: options?.weatherBonusEnabled === true,
+    startMonth: options?.startMonth,
   };
   const { humanHomeRegion, aiHomeRegion } = resolveScenarioHomeRegions(options);
   logDebug('gameDb resetGameForNewMatch', { fogOfWarEnabled, gameSize, humanHomeRegion, aiHomeRegion, ...originBonusSettings });

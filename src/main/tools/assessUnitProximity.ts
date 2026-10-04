@@ -11,7 +11,8 @@ import { getResolution, gridDisk, gridDistance, isValidCell } from 'h3-js';
 import { computeGridDistanceWithPathFallbackPure } from '../../shared/h3GridRangePure';
 import { getRange } from '../combatConstants';
 import { logDebug, logError, logTrace } from '../logger';
-import { getMovementBudgetForUnit } from '../pathfinding';
+import { strategicRangeOnState } from '../weather/weatherMatch';
+import type { WeatherState } from '../../shared/weatherBonusTypes';
 import { h3ToLatLng, type LatLng, type LatLngMap } from './h3LatLng';
 
 /**
@@ -340,6 +341,15 @@ export interface OmniscientProximityUnit {
    * Exceptions: None.
    */
   h3Index: string;
+  /**
+   * Acclimation already stamped on the snapshot unit.
+   *
+   * Contract: Omitted when the weather option is off. An empty list means the unit has no tag.
+   * When to use: Copy `unit.weatherTags` from the snapshot.
+   * Expected outcome: A matching tag keeps the printed march length in the ETA.
+   * Exceptions: None.
+   */
+  weatherTags?: readonly WeatherState[] | null;
 }
 
 /**
@@ -378,6 +388,24 @@ export interface CollectOmniscientNearbyUnitsArgs {
    * Exceptions: None.
    */
   turnNumber: number;
+  /**
+   * Whether this match applies weather penalties.
+   *
+   * Contract: Omitted or false leaves printed budgets.
+   * When to use: `state.weatherBonusEnabled === true`.
+   * Expected outcome: Armor and naval ETAs shrink only in the weather they are not tagged for.
+   * Exceptions: None.
+   */
+  weatherBonusEnabled?: boolean;
+  /**
+   * Persisted start month for the match calendar.
+   *
+   * Contract: 1 through 12, or omitted. Omitted reads as January.
+   * When to use: `state.startMonth` while the weather option is on.
+   * Expected outcome: The occupied hex's weather for this turn selects the budget.
+   * Exceptions: None.
+   */
+  startMonth?: number;
   /**
    * Session lat/lng map for enemy/friendly position tuples.
    *
@@ -478,7 +506,11 @@ export function collectOmniscientNearbyUnits(args: CollectOmniscientNearbyUnitsA
   });
   const { assessedUnit, units, turnNumber, latLngByH3 } = args;
   const myRange = getRange(assessedUnit.unitType);
-  const myBudget = getMovementBudgetForUnit(assessedUnit.unitType);
+  const budgetOf = (unit: OmniscientProximityUnit): number => strategicRangeOnState(
+    { unitType: unit.unitType, h3Index: unit.h3Index, weatherTags: unit.weatherTags },
+    { weatherBonusEnabled: args.weatherBonusEnabled, turnNumber, startMonth: args.startMonth }
+  );
+  const myBudget = budgetOf(assessedUnit);
   const nearbyEnemies: OmniscientNearbyScanResult['nearbyEnemies'] = [];
   const nearbyFriendlies: OmniscientNearbyScanResult['nearbyFriendlies'] = [];
   const threats: OmniscientNearbyScanResult['threats'] = [];
@@ -502,7 +534,7 @@ export function collectOmniscientNearbyUnits(args: CollectOmniscientNearbyUnitsA
       const estimatedTurnsToReach = estimatedTurnsFromGridDistance(gridDist, myBudget);
       const enemyTurnsToReachMe = estimatedTurnsFromGridDistance(
         gridDist,
-        getMovementBudgetForUnit(other.unitType)
+        budgetOf(other)
       );
       nearbyEnemies.push({
         unitId: other.id,
@@ -543,7 +575,7 @@ export function collectOmniscientNearbyUnits(args: CollectOmniscientNearbyUnitsA
     } else {
       const friendlyTurns = estimatedTurnsFromGridDistance(
         gridDist,
-        getMovementBudgetForUnit(other.unitType)
+        budgetOf(other)
       );
       nearbyFriendlies.push({
         unitId: other.id,

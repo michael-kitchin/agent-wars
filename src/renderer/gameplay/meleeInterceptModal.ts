@@ -3,6 +3,7 @@
  */
 
 import type { MeleeCandidateRow } from '../../shared/ipcTypes';
+import { paintTerrainSwatches } from '../rendering/terrainVisualStyles';
 
 /**
  * Arguments for opening the melee intercept modal.
@@ -192,6 +193,7 @@ export function openMeleeInterceptModal(args: MeleeInterceptModalOpenArgs): Prom
       void args.buildHexPopupHtml(row.h3Index).then(
         (html) => {
           tdHex.innerHTML = html;
+          paintTerrainSwatches(tdHex);
         },
         () => {
           tdHex.textContent = row.h3Index;

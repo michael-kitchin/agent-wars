@@ -378,6 +378,24 @@ countryBonusEnabled?: boolean;
    * Exceptions: None.
    */
 terrainBonusEnabled?: boolean;
+    /**
+   * Whether the new match has the weather bonus on.
+   *
+   * Contract: A missing field means off. The new-game dialog always sends an explicit boolean.
+   * When to use: `game:newGame` from the Weather bonus checkbox.
+   * Expected outcome: Persisted as `game_config.weather_bonus_enabled`.
+   * Exceptions: None.
+   */
+weatherBonusEnabled?: boolean;
+    /**
+   * Calendar month of turn 1, 1 for January through 12 for December.
+   *
+   * Contract: A missing or invalid field means January.
+   * When to use: `game:newGame` from the start-month control.
+   * Expected outcome: Persisted as `game_config.start_month`.
+   * Exceptions: None.
+   */
+startMonth?: number;
 }
 
 /**

@@ -142,7 +142,10 @@ function buildPreviewForSubUnit(args: {
   const budget = effectiveTacticalMovementPointBudgetForMarchLeg(args.battle, sub, args.battle.subUnits, moveType);
   const terrain = buildTacticalTerrainKindResolverFromSnapshot(args.battle);
   ensureTacticalHoverPlanMemo(args.battle);
-  const memoKey = `${args.unitId}|${origin}|${args.hoveredH3Index}|${moveType}|${budget}`;
+  const weatherKey = args.battle.weatherBonusEnabled === true
+    ? `${args.battle.weather ?? ''}|${(sub.weatherTags ?? []).join(',')}`
+    : '';
+  const memoKey = `${args.unitId}|${origin}|${args.hoveredH3Index}|${moveType}|${budget}|${weatherKey}`;
   let plan = tacticalHoverPlanMemo.get(memoKey);
   if (plan) {
     tacticalHoverPlanMemo.delete(memoKey);
@@ -155,6 +158,9 @@ function buildPreviewForSubUnit(args: {
       unitTypeForMovement: moveType,
       movementPointBudget: Math.max(0, budget),
       terrain,
+      weatherEnabled: args.battle.weatherBonusEnabled === true,
+      weather: args.battle.weather,
+      weatherTags: sub.weatherTags,
     });
     while (tacticalHoverPlanMemo.size >= MAX_TACTICAL_HOVER_PLAN_MEMO) {
       const oldest = tacticalHoverPlanMemo.keys().next().value;

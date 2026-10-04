@@ -2,7 +2,6 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
   ORIGIN_BONUS_OFF,
-  formatOriginBonusTooltipLine,
   originBonusSources,
   originHitBonusFromSources,
 } from './originBonusRules';
@@ -88,8 +87,3 @@ test('both reasons are listed but the bonus stays +1', () => {
   assert.equal(originHitBonusFromSources(sources), 1);
 });
 
-test('the tooltip line names the reasons, or is absent', () => {
-  assert.equal(formatOriginBonusTooltipLine([]), null);
-  assert.equal(formatOriginBonusTooltipLine(['country']), 'Bonus: +1 (country)');
-  assert.equal(formatOriginBonusTooltipLine(['country', 'terrain']), 'Bonus: +1 (country, terrain)');
-});

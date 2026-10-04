@@ -15,8 +15,9 @@ import {
   isHexOwnershipVisibleToPerspective,
   resolveHomeRegionOwnerIdentity,
 } from '../../shared/homeRegionRules';
-import { computeTerrainEffectsLineHtml } from '../../shared/terrainEffectsForTooltip';
-import { formatTerrainKindLabel } from '../../shared/terrainKindLabel';
+import { computeTerrainEffectsLineHtml, joinHexEffectsLine } from '../../shared/terrainEffectsForTooltip';
+import { formatTerrainKindHtml, formatTerrainNameListHtml } from '../../shared/terrainSwatchHtml';
+import { formatWeatherIconHtml } from '../../shared/weatherIcons';
 import { TOOLTIP_SECTION_GAP_HTML } from '../../shared/tooltipSectionGap';
 import { WORLD_H3_RESOLUTION } from '../core/constants';
 import { rendererSharedState as S } from '../core/state';
@@ -109,11 +110,70 @@ function getTooltipControlLabel(namingTarget: NamingLookupTarget | null): string
 }
 
 /**
- * Builds the full terrain tooltip HTML: hex-code prefix, naming caption with flags, then control/terrain/feature lines.
+ * Returns the weather to show on a hex tooltip, if the snapshot has one.
+ *
+ * Purpose: Unexplored hexes omit weather, so the tooltip stays blank there.
+ * When to use: While building the terrain tooltip.
+ * Expected outcome: The battle's weather on a tactical cell. Otherwise the world hex's weather, including the parent of a zoomed cell, when that hex is explored. Null when the bonus is off or the hex is unexplored.
+ * Exceptions: None.
+ */
+function tooltipWeather(namingTarget: NamingLookupTarget | null): import('../../shared/weatherBonusTypes').WeatherState | null {
+  if (!namingTarget) return null;
+  if (namingTarget.resolution === 4 && S.tacticalBattleSnapshot) return S.tacticalBattleSnapshot.weather ?? null;
+  if (!S.gameState) return null;
+  const strategicHex = namingTarget.resolution === 1
+    ? namingTarget.h3Index
+    : parentStrategicHex(namingTarget.h3Index);
+  if (!strategicHex) return null;
+  return S.gameState.hexes.find((hex) => hex.h3Index === strategicHex)?.weather ?? null;
+}
+
+/**
+ * Resolves the world hex that owns a battle cell.
+ *
+ * Purpose: A zoomed strategic cell has no battle snapshot, so its weather is the parent hex's.
+ * When to use: `tooltipWeather` for a res4 naming target outside a battle.
+ * Expected outcome: The res1 parent, or null when the cell id is not a hex.
+ * Exceptions: None. An invalid id returns null.
+ */
+function parentStrategicHex(h3Index: string): string | null {
+  try {
+    return cellToParent(h3Index, WORLD_H3_RESOLUTION);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Builds the Effects line for a world hex or a detail cell.
+ *
+ * Purpose: Terrain effects stay on res4 cells. Snow, rain, and heat are named, with their icon, on world hexes and detail cells.
+ * When to use: From `formatTerrainTooltipHtml`.
+ * Expected outcome: Terrain effects, then the weather chip. Null when the cell has no terrain effects and the weather is mild, missing, or off.
+ * Exceptions: None.
+ */
+function effectsLine(state: TerrainTooltipState, namingTarget: NamingLookupTarget | null): string | null {
+  const terrain = namingTarget?.resolution === 4
+    ? computeTerrainEffectsLineHtml({
+      terrainKind: state.terrainKind,
+      parentTerrain: state.parentTerrain,
+      parentTerrainKind: state.parentTerrainKind,
+      isUrban: state.isUrban,
+      isRubble: state.isRubble,
+      isSeaport: state.isSeaport,
+      hasRoad: state.hasRoad,
+      hasRail: state.hasRail,
+    })
+    : null;
+  return joinHexEffectsLine(terrain, tooltipWeather(namingTarget));
+}
+
+/**
+ * Builds the full terrain tooltip HTML: hex-code prefix, naming caption with flags, then control, terrain, weather, and effects.
  *
  * Purpose: Single formatter behind `getCachedTerrainTooltipHtml`.
  * When to use: Only through `getCachedTerrainTooltipHtml`, which memoizes the result.
- * Expected outcome: The naming line is omitted when the caption is missing or empty.
+ * Expected outcome: The naming line is omitted when the caption is missing or empty. Effects include snow, rain, or heat when that weather is in effect.
  * Exceptions: None.
  */
 function formatTerrainTooltipHtml(
@@ -124,25 +184,18 @@ function formatTerrainTooltipHtml(
   const prefix = formatLlmLocationBoldPrefixHtml(namingTarget);
   const showControlLine = namingTarget?.resolution === 1;
   const controlLine = showControlLine ? `<strong>Control:</strong> ${getTooltipControlLabel(namingTarget)}` : null;
-  const terrainLabel = formatTerrainKindLabel(state.terrainKind);
-  const terrainValue = state.res1TerrainSummary ?? `${terrainLabel}${formatTerrainVariantSuffix(state)}`;
+  const terrainValue = state.res1TerrainSummary != null
+    ? formatTerrainNameListHtml(state.res1TerrainSummary)
+    : `${formatTerrainKindHtml(state.terrainKind)}${escapeHtmlText(formatTerrainVariantSuffix(state))}`;
   const terrainLine = `<strong>Terrain:</strong> ${terrainValue}`;
+  const weather = tooltipWeather(namingTarget);
+  const weatherLine = weather ? `<strong>Weather:</strong> ${formatWeatherIconHtml(weather)}` : null;
   const bodyParts: string[] = controlLine ? [controlLine, terrainLine] : [terrainLine];
+  if (weatherLine) bodyParts.push(weatherLine);
   if (state.res1FeaturesSummary != null) bodyParts.push(`<strong>Features:</strong> ${state.res1FeaturesSummary}`);
   else if (state.features.length > 0) bodyParts.push(`<strong>Features:</strong> ${state.features.join(', ')}`);
-  if (namingTarget?.resolution === 4) {
-    const effectsLineHtml = computeTerrainEffectsLineHtml({
-      terrainKind: state.terrainKind,
-      parentTerrain: state.parentTerrain,
-      parentTerrainKind: state.parentTerrainKind,
-      isUrban: state.isUrban,
-      isRubble: state.isRubble,
-      isSeaport: state.isSeaport,
-      hasRoad: state.hasRoad,
-      hasRail: state.hasRail,
-    });
-    if (effectsLineHtml) bodyParts.push(`<strong>Effects:</strong> ${effectsLineHtml}`);
-  }
+  const effectsLineHtml = effectsLine(state, namingTarget);
+  if (effectsLineHtml) bodyParts.push(`<strong>Effects:</strong> ${effectsLineHtml}`);
   if (state.urbanHexCount != null) {
     const productionLine =
       state.urbanHexCount > 0
@@ -177,13 +230,14 @@ function terrainTooltipContentKey(
   const urbanHexCountKey = state.urbanHexCount == null ? 'x' : String(state.urbanHexCount);
   const res1TerrainSummaryKey = state.res1TerrainSummary ?? '';
   const res1FeaturesSummaryKey = state.res1FeaturesSummary ?? '';
+  const weatherKey = tooltipWeather(namingTarget) ?? '';
   const controlKey = getTooltipControlLabel(namingTarget);
   const parentTerrainKey = state.parentTerrain;
   const parentTerrainKindKey = state.parentTerrainKind;
   const seaportKey = state.isSeaport ? '1' : '0';
   const roadKey = state.hasRoad ? '1' : '0';
   const railKey = state.hasRail ? '1' : '0';
-  return `${targetKey}::${namingKey}::${state.terrainKind}::${urbanKey}::${rubbleKey}::${featuresKey}::${urbanHexCountKey}::${res1TerrainSummaryKey}::${res1FeaturesSummaryKey}::${controlKey}::${parentTerrainKey}::${parentTerrainKindKey}::${seaportKey}::${roadKey}::${railKey}`;
+  return `${targetKey}::${namingKey}::${state.terrainKind}::${urbanKey}::${rubbleKey}::${featuresKey}::${urbanHexCountKey}::${res1TerrainSummaryKey}::${res1FeaturesSummaryKey}::${controlKey}::${parentTerrainKey}::${parentTerrainKindKey}::${seaportKey}::${roadKey}::${railKey}::${weatherKey}`;
 }
 
 /**

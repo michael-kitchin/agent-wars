@@ -23,6 +23,7 @@
 
 import { computeGridPathCellsPure, isWithinGridRangePure } from './h3GridRangePure';
 import type { TacticalBattleSnapshot, TacticalSubUnitSnapshot } from './tacticalBattleTypes';
+import { tacticalWeatherMovementBudget } from './weatherBonusRules';
 import { MOVEMENT_RANGE_BY_UNIT_TYPE, RANGED_RANGE_BY_UNIT_TYPE } from './tacticalRanges';
 import { tacticalRes4CellHasActiveTransportCorridor } from './tacticalRes4TransportLink';
 import { normalizeDbTerrainKindToTacticalCategory, type TacticalMovementCategory } from './tacticalTerrainMovement';
@@ -331,8 +332,8 @@ export function tacticalRangedDirectFirePassesTerrainAndRange(
  * Exceptions: None.
  */
 export function effectiveTacticalMovementPointBudgetForMarchLeg(
-  battle: TacticalBattleTerrainPick,
-  subUnit: Pick<TacticalSubUnitSnapshot, 'unitType' | 'h3Index' | 'embarkedOnSubUnitId'>,
+  battle: TacticalBattleTerrainPick & Pick<TacticalBattleSnapshot, 'weather' | 'weatherBonusEnabled'>,
+  subUnit: Pick<TacticalSubUnitSnapshot, 'unitType' | 'h3Index' | 'embarkedOnSubUnitId' | 'weatherTags'>,
   allSubUnits: readonly Pick<TacticalSubUnitSnapshot, 'id' | 'h3Index' | 'unitType' | 'embarkedOnSubUnitId'>[],
   moveType: string
 ): number {
@@ -354,7 +355,13 @@ export function effectiveTacticalMovementPointBudgetForMarchLeg(
   if (budget === 0 && moveType !== 'air' && subUnit.unitType !== 'air') {
     return 1;
   }
-  return budget;
+  return tacticalWeatherMovementBudget({
+    unitType: subUnit.unitType,
+    printedBudget: budget,
+    weather: battle.weather,
+    tags: subUnit.weatherTags,
+    enabled: battle.weatherBonusEnabled === true,
+  });
 }
 
 /**

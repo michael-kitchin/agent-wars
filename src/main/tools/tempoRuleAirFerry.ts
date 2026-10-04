@@ -19,6 +19,7 @@ import { AIR_STRIKE_RANGE_HEXES } from '../../shared/tacticalRanges';
 import { computeGridDistanceWithPathFallbackPure } from '../../shared/h3GridRangePure';
 import { validateFerryOrder } from '../gameActions/airValidation';
 import { isWithinAirFerryGridRange } from '../gameActions/gridRange';
+import { strategicFerryRangeOnState } from '../weather/weatherMatch';
 import { logDebug, logTrace } from '../logger';
 import { holdFireUnitIdsForPlayer } from './standingOrdersGeneration';
 
@@ -148,7 +149,8 @@ export function collectTempoRuleFerries(args: TempoRuleFerryArgs): FerryOrder[] 
     let best: { h3Index: string; distance: number } | null = null;
     for (const base of bases) {
       if (base === unit.h3Index) continue;
-      if (!isWithinAirFerryGridRange(unit.h3Index, base, 'tempoRuleAirFerry')) continue;
+      const ferryRange = strategicFerryRangeOnState(unit, base, state);
+      if (!isWithinAirFerryGridRange(unit.h3Index, base, 'tempoRuleAirFerry', ferryRange)) continue;
       const baseDistance = distanceToEnemy(base);
       if (baseDistance === null || baseDistance >= currentDistance) continue;
       if (best === null || baseDistance < best.distance) best = { h3Index: base, distance: baseDistance };

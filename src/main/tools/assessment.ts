@@ -6,7 +6,7 @@
 
 import { gridDisk } from 'h3-js';
 import type { GameStateSnapshot } from '../gameDb';
-import { getDistanceAndTurns, getMovementBudgetForUnit, terrainIsPassableForDomain } from '../pathfinding';
+import { getDistanceAndTurns, terrainIsPassableForDomain } from '../pathfinding';
 import type { PassableDomain } from '../pathfinding';
 import { passabilityAllowsNavalUnit } from '../../shared/pipelineTerrain';
 import { landUnitCanOccupyHex } from '../../shared/landTraversalRes1';
@@ -23,6 +23,10 @@ import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { executeTacticalAssessUnit } from './tacticalAssessUnit';
 import { originBonusSettingsFromSnapshot } from '../../shared/originBonusRules';
 import { strategicOriginBonusHexFields, strategicOriginBonusUnitFields } from './originBonusAssessment';
+import { parseStartMonth, weatherAttackPenalty } from '../../shared/weatherBonusRules';
+import type { WeatherState } from '../../shared/weatherBonusTypes';
+import { strategicRangeOnState } from '../weather/weatherMatch';
+import { displayWeatherForHex } from '../weather/weatherPackLoad';
 import {
   collectOmniscientNearbyUnits,
   gridHopDistanceBetween,
@@ -133,10 +137,14 @@ function getPathDistanceAndTurns(
   hexSet: Set<string>,
   terrainByH3: Map<string, string>,
   state: GameStateSnapshot,
-  blocked?: Set<string>
+  blocked?: Set<string>,
+  weatherTags?: readonly WeatherState[] | null
 ): { hexDistance: number; estimatedTurns: number } | null {
-  logTrace('assessment getPathDistanceAndTurns', { unitType });
-  const movementBudget = getMovementBudgetForUnit(unitType);
+  logTrace('assessment getPathDistanceAndTurns', { unitType, enabled: state.weatherBonusEnabled === true });
+  const movementBudget = strategicRangeOnState(
+    { unitType, h3Index: originH3, weatherTags },
+    state
+  );
   if (unitType === 'naval') {
     const lookup = navalLookupForHexState(state, state.hexes, state.res1Infrastructure);
     return getNavalStrategicDistanceAndTurns({
@@ -289,7 +297,13 @@ function executeAssessUnit(
     stateTurn: state.turnNumber,
     omniscientGridProximity,
   });
-  const movementBudget = getMovementBudgetForUnit(unit.unitType);
+  const weatherHere = state.weatherBonusEnabled === true
+    ? displayWeatherForHex(unit.h3Index, state.turnNumber, parseStartMonth(state.startMonth))
+    : null;
+  const movementBudget = strategicRangeOnState(
+    { unitType: unit.unitType, h3Index: unit.h3Index, weatherTags: unit.weatherTags },
+    state
+  );
   const terrain = terrainByH3.get(unit.h3Index) ?? 'land';
   const unitPosition = h3ToLatLng(unit.h3Index, latLngByH3, 'cellCenter');
 
@@ -324,9 +338,12 @@ function executeAssessUnit(
         player: unit.player,
         unitType: unit.unitType,
         h3Index: unit.h3Index,
+        weatherTags: unit.weatherTags,
       },
       units: state.units,
       turnNumber: state.turnNumber,
+      startMonth: state.startMonth,
+      weatherBonusEnabled: state.weatherBonusEnabled === true,
       latLngByH3,
     });
     nearbyEnemies.push(...collected.nearbyEnemies);
@@ -342,7 +359,9 @@ function executeAssessUnit(
       // radius at grid level can't be within radius by path either. 999 means the
       // H3 hop APIs (including disk fallback) could not measure the pair, so we conservatively keep those.
       if (gridDist > radius && gridDist !== 999) { preFilteredCount++; continue; }
-      const distResult = getPathDistanceAndTurns(unit.h3Index, other.h3Index, unit.unitType, hexSet, terrainByH3, state);
+      const distResult = getPathDistanceAndTurns(
+        unit.h3Index, other.h3Index, unit.unitType, hexSet, terrainByH3, state, undefined, unit.weatherTags
+      );
       const pathWithinRadius = distResult !== null && distResult.hexDistance <= radius;
       const gridWithinRadius = gridDist <= radius;
       if (!pathWithinRadius && !gridWithinRadius) continue;
@@ -357,10 +376,16 @@ function executeAssessUnit(
         const estimatedTurnsToReach = distResult !== null
           ? distResult.estimatedTurns
           : null;
-        const enemyToMe = getPathDistanceAndTurns(other.h3Index, unit.h3Index, other.unitType, hexSet, terrainByH3, state);
+        const enemyToMe = getPathDistanceAndTurns(
+          other.h3Index, unit.h3Index, other.unitType, hexSet, terrainByH3, state, undefined, other.weatherTags
+        );
+        const enemyBudget = strategicRangeOnState(
+          { unitType: other.unitType, h3Index: other.h3Index, weatherTags: other.weatherTags },
+          state
+        );
         const enemyTurnsToReachMe: number | null = enemyToMe
           ? enemyToMe.estimatedTurns
-          : (distResult !== null ? Math.ceil(hexDistance / getMovementBudgetForUnit(other.unitType)) : null);
+          : (distResult !== null && enemyBudget > 0 ? Math.ceil(hexDistance / enemyBudget) : null);
         nearbyEnemies.push({
           unitId: other.id,
           type: other.unitType,
@@ -401,8 +426,16 @@ function executeAssessUnit(
         }
       } else {
         if (!pathWithinRadius) continue;
-        const friendlyTurns = getPathDistanceAndTurns(other.h3Index, unit.h3Index, other.unitType, hexSet, terrainByH3, state);
-        const estimatedTurnsToReach = friendlyTurns ? friendlyTurns.estimatedTurns : Math.ceil(hexDistance / getMovementBudgetForUnit(other.unitType));
+        const friendlyTurns = getPathDistanceAndTurns(
+          other.h3Index, unit.h3Index, other.unitType, hexSet, terrainByH3, state, undefined, other.weatherTags
+        );
+        const friendlyBudget = strategicRangeOnState(
+          { unitType: other.unitType, h3Index: other.h3Index, weatherTags: other.weatherTags },
+          state
+        );
+        const estimatedTurnsToReach = friendlyTurns
+          ? friendlyTurns.estimatedTurns
+          : (friendlyBudget > 0 ? Math.ceil(hexDistance / friendlyBudget) : null);
         nearbyFriendlies.push({
           unitId: other.id,
           type: other.unitType,
@@ -421,7 +454,9 @@ function executeAssessUnit(
         if (!hexSet.has(intel.lastKnownH3Index)) continue;
         const gridDist = getGridDistance(unit.h3Index, intel.lastKnownH3Index) ?? 999;
         if (gridDist > radius && gridDist !== 999) continue;
-        const distResult = getPathDistanceAndTurns(unit.h3Index, intel.lastKnownH3Index, unit.unitType, hexSet, terrainByH3, state);
+        const distResult = getPathDistanceAndTurns(
+          unit.h3Index, intel.lastKnownH3Index, unit.unitType, hexSet, terrainByH3, state, undefined, unit.weatherTags
+        );
         const pathWithinRadius = distResult !== null && distResult.hexDistance <= radius;
         const gridWithinRadius = gridDist <= radius;
         if (!pathWithinRadius && !gridWithinRadius) continue;
@@ -465,6 +500,26 @@ function executeAssessUnit(
       movementBudget,
       currentStandingOrder,
       ...strategicOriginBonusUnitFields(state, unit),
+      ...(state.weatherBonusEnabled === true
+        ? {
+            weatherTags: unit.weatherTags ?? [],
+            weatherHere,
+            rangedAttackPenalized: weatherAttackPenalty({
+              unitType: unit.unitType,
+              kind: 'ranged',
+              weatherAtUnit: weatherHere,
+              tags: unit.weatherTags,
+              enabled: true,
+            }) === 1,
+            airStrikePenalizedAtBase: weatherAttackPenalty({
+              unitType: unit.unitType,
+              kind: 'airStrike',
+              weatherAtUnit: weatherHere,
+              tags: unit.weatherTags,
+              enabled: true,
+            }) === 1,
+          }
+        : {}),
     },
     nearbyEnemies,
     nearbyFriendlies,
@@ -587,6 +642,9 @@ function executeAssessHex(
     position: h3ToLatLng(hexH3, latLngByH3, 'cellCenter'),
     terrain,
     ...strategicOriginBonusHexFields(state, hexH3),
+    ...(state.weatherBonusEnabled === true
+      ? { weather: state.hexes.find((hex) => hex.h3Index === hexH3)?.weather ?? null }
+      : {}),
     passableBy,
     unitsAtHex,
     unitsInRange: { rangedRange1, rangedRange2, meleeRange },

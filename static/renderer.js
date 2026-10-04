@@ -15653,6 +15653,185 @@
     return null;
   }
 
+  // src/shared/unitDisplayNames.ts
+  var UNIT_TYPE_NOUN_BY_TYPE = {
+    /**
+       * Documents the object literal property `infantry` (infantry: 'Infantry').
+    
+       * Purpose: Supports maintainability by documenting why `infantry` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    infantry: "Infantry",
+    /**
+       * Documents the object literal property `armor` (armor: 'Armored').
+    
+       * Purpose: Supports maintainability by documenting why `armor` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    armor: "Armored",
+    /**
+       * Documents the object literal property `naval` (naval: 'Fleet').
+    
+       * Purpose: Supports maintainability by documenting why `naval` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    naval: "Fleet",
+    /**
+       * Documents the object literal property `air` (air: 'Squadron').
+    
+       * Purpose: Supports maintainability by documenting why `air` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    air: "Squadron"
+  };
+  var NATURAL_ID_COLLATOR = new Intl.Collator(void 0, { numeric: true, sensitivity: "base" });
+  function capitalizeWord(s) {
+    if (!s) return s;
+    return s.charAt(0).toUpperCase() + s.slice(1);
+  }
+  function ordinalSuffix(value) {
+    const abs = Math.abs(Math.trunc(value));
+    const mod100 = abs % 100;
+    if (mod100 >= 11 && mod100 <= 13) return "th";
+    const mod10 = abs % 10;
+    if (mod10 === 1) return "st";
+    if (mod10 === 2) return "nd";
+    if (mod10 === 3) return "rd";
+    return "th";
+  }
+  function toRomanNumeral(value) {
+    let remaining = Math.max(1, Math.trunc(value));
+    const numerals = [
+      [1e3, "M"],
+      [900, "CM"],
+      [500, "D"],
+      [400, "CD"],
+      [100, "C"],
+      [90, "XC"],
+      [50, "L"],
+      [40, "XL"],
+      [10, "X"],
+      [9, "IX"],
+      [5, "V"],
+      [4, "IV"],
+      [1, "I"]
+    ];
+    let out = "";
+    for (const [unit, symbol] of numerals) {
+      while (remaining >= unit) {
+        out += symbol;
+        remaining -= unit;
+      }
+    }
+    return out;
+  }
+  function unitDisplayOwner(unit) {
+    if (unit.player === "human" || unit.player === "opponent") return unit.player;
+    return unitIdOwnerFromId(unit.id) ?? "other";
+  }
+  function formatUnitNumberLabel(unit, value, locale) {
+    return unitDisplayOwner(unit) === "opponent" ? toRomanNumeral(value) : formatOrdinalLabel(value, locale);
+  }
+  function parseSeedUnitIdParts(unitId) {
+    const match = unitId.match(/^(human|opponent)-(infantry|armor|naval|air)-(\d+)$/);
+    if (!match) return null;
+    const ordinal = Number.parseInt(match[3], 10);
+    if (!Number.isFinite(ordinal) || ordinal <= 0) return null;
+    return { unitType: match[2], ordinal };
+  }
+  function productionSpawnSequenceFromUnitId(unitId) {
+    const match = unitId.match(/^(human|opponent)-(infantry|armor|naval|air)-prod-\d+-(\d+)$/);
+    if (!match) return null;
+    const sequence = Number.parseInt(match[3], 10);
+    return Number.isFinite(sequence) && sequence > 0 ? sequence : null;
+  }
+  function resolvePersistedDisplayOrderForUnitLabel(unit) {
+    if (typeof unit.displayOrder !== "number" || unit.displayOrder <= 0) return void 0;
+    const spawnSequence = productionSpawnSequenceFromUnitId(unit.id);
+    if (spawnSequence !== null && unit.displayOrder === spawnSequence) return void 0;
+    return unit.displayOrder;
+  }
+  function unitDisplaySequenceGroupKey(unit) {
+    return `${unitDisplayOwner(unit)}:${unit.unitType}`;
+  }
+  function uniqueUnitsPreferringPersistedOrder(units) {
+    const byId = /* @__PURE__ */ new Map();
+    for (const unit of units) {
+      const existing = byId.get(unit.id);
+      if (!existing) {
+        byId.set(unit.id, unit);
+        continue;
+      }
+      const existingOrder = resolvePersistedDisplayOrderForUnitLabel(existing);
+      const nextOrder = resolvePersistedDisplayOrderForUnitLabel(unit);
+      if (existingOrder === void 0 && nextOrder !== void 0) byId.set(unit.id, unit);
+    }
+    return [...byId.values()];
+  }
+  function formatOrdinalLabel(value, locale) {
+    const normalized = Math.max(1, Math.trunc(value));
+    const numberText = new Intl.NumberFormat(locale).format(normalized);
+    return `${numberText}${ordinalSuffix(normalized)}`;
+  }
+  function getUnitDisplayNoun(unitType) {
+    return UNIT_TYPE_NOUN_BY_TYPE[unitType] ?? capitalizeWord(unitType || "Unit");
+  }
+  function buildUnitDisplayNameLookup(units, locale) {
+    const byGroup = /* @__PURE__ */ new Map();
+    for (const unit of uniqueUnitsPreferringPersistedOrder(units)) {
+      const key = unitDisplaySequenceGroupKey(unit);
+      const existing = byGroup.get(key);
+      if (existing) existing.push(unit);
+      else byGroup.set(key, [unit]);
+    }
+    const result = /* @__PURE__ */ new Map();
+    for (const group of byGroup.values()) {
+      const unitType = group[0]?.unitType ?? "";
+      const withPersisted = group.filter((u) => resolvePersistedDisplayOrderForUnitLabel(u) !== void 0).sort(
+        (a, b) => resolvePersistedDisplayOrderForUnitLabel(a) - resolvePersistedDisplayOrderForUnitLabel(b) || NATURAL_ID_COLLATOR.compare(a.id, b.id)
+      );
+      const withoutPersisted = group.filter((u) => resolvePersistedDisplayOrderForUnitLabel(u) === void 0).sort((a, b) => NATURAL_ID_COLLATOR.compare(a.id, b.id));
+      const noun = getUnitDisplayNoun(unitType);
+      for (const unit of withPersisted) {
+        const ordinal = resolvePersistedDisplayOrderForUnitLabel(unit);
+        const numberLabel = formatUnitNumberLabel(unit, ordinal, locale);
+        result.set(unit.id, `${numberLabel} ${noun}`);
+      }
+      let fallbackOrdinal = withPersisted.reduce(
+        (max, u) => Math.max(max, resolvePersistedDisplayOrderForUnitLabel(u)),
+        0
+      );
+      for (const unit of withoutPersisted) {
+        fallbackOrdinal += 1;
+        const numberLabel = formatUnitNumberLabel(unit, fallbackOrdinal, locale);
+        result.set(unit.id, `${numberLabel} ${noun}`);
+      }
+    }
+    return result;
+  }
+  function fallbackDisplayNameFromUnitId(unitId, locale) {
+    const compact = parseStrategicUnitId(unitId);
+    if (compact) {
+      const numberLabel = formatUnitNumberLabel({ id: unitId, player: compact.player }, compact.ordinal, locale);
+      return `${numberLabel} ${getUnitDisplayNoun(compact.unitType)}`;
+    }
+    const seed = parseSeedUnitIdParts(unitId);
+    if (seed) {
+      const numberLabel = formatUnitNumberLabel({ id: unitId }, seed.ordinal, locale);
+      return `${numberLabel} ${getUnitDisplayNoun(seed.unitType)}`;
+    }
+    if (productionSpawnSequenceFromUnitId(unitId) !== null) return unitId;
+    return unitId;
+  }
+
   // src/shared/hexLlmCodeAssignment.ts
   var STRATEGIC_RESOLUTION = 1;
   var DETAIL_RESOLUTION = 4;
@@ -15719,26 +15898,6 @@
     return parentCode && childCode ? `(${parentCode}.${childCode})` : null;
   }
 
-  // src/shared/terrainKindLabel.ts
-  function formatTerrainKindLabel(kind) {
-    if (!kind) return "Unknown";
-    return kind.charAt(0).toUpperCase() + kind.slice(1);
-  }
-
-  // src/shared/unitOriginTooltipText.ts
-  function unitOriginsPresentTheSame(left, right) {
-    return left.birthH3Index === right.birthH3Index && left.birthRes4H3Index === right.birthRes4H3Index && left.birthTerrainKind === right.birthTerrainKind && left.birthIsUrban === right.birthIsUrban && left.birthCountryName === right.birthCountryName && left.birthCountryCode === right.birthCountryCode;
-  }
-  function formatUnitOriginTooltipText(origin, bonusLine) {
-    const hexCode = getStrategicRes1HexCode(origin.birthH3Index);
-    const codeSuffix = hexCode ? ` (${hexCode})` : "";
-    return [
-      `Origin: ${origin.birthCountryName ?? "Unknown"}${codeSuffix}`,
-      `Terrain: ${formatTerrainKindLabel(origin.birthTerrainKind)}`,
-      ...bonusLine ? [bonusLine] : []
-    ].join("\n");
-  }
-
   // src/shared/pipelineTerrain.ts
   var PIPELINE_TERRAIN_KINDS = [
     "water",
@@ -15753,6 +15912,184 @@
   var KIND_SET = new Set(PIPELINE_TERRAIN_KINDS);
   function isPipelineTerrainKind(s) {
     return KIND_SET.has(s);
+  }
+
+  // src/shared/terrainKindLabel.ts
+  function formatTerrainKindLabel(kind) {
+    if (!kind) return "Unknown";
+    return kind.charAt(0).toUpperCase() + kind.slice(1);
+  }
+
+  // src/shared/terrainSwatchHtml.ts
+  var TERRAIN_SWATCH_CLASS_NAME = "terrain-swatch";
+  var DISPLAY_LABEL_TO_KIND = Object.freeze({
+    Water: "water",
+    Coastal: "coastal",
+    Wetlands: "wetlands",
+    Plains: "plains",
+    Forest: "forest",
+    Mountain: "mountain",
+    Desert: "desert",
+    Arctic: "arctic"
+  });
+  function pipelineKindFromRaw(kind) {
+    if (kind == null) return null;
+    const normalized = kind.trim().toLowerCase();
+    return isPipelineTerrainKind(normalized) ? normalized : null;
+  }
+  function formatTerrainSwatchHtml(kind) {
+    return `<span class="${TERRAIN_SWATCH_CLASS_NAME}" data-terrain-kind="${kind}" aria-hidden="true"></span>`;
+  }
+  function formatTerrainKindHtml(kind) {
+    const label = formatTerrainKindLabel(kind ?? null);
+    const pipeline = pipelineKindFromRaw(kind);
+    if (!pipeline) return escapeHtmlText(label);
+    return `${formatTerrainSwatchHtml(pipeline)}${escapeHtmlText(label)}`;
+  }
+  function formatTerrainNameListHtml(text) {
+    return text.split(", ").map(formatTerrainNameTokenHtml).join(", ");
+  }
+  function formatTerrainNameTokenHtml(token) {
+    const match = /^([A-Za-z]+)([\s\S]*)$/.exec(token);
+    const word = match?.[1] ?? "";
+    const kind = DISPLAY_LABEL_TO_KIND[word];
+    if (!match || !kind) return escapeHtmlText(token);
+    return `${formatTerrainSwatchHtml(kind)}${escapeHtmlText(word)}${escapeHtmlText(match[2] ?? "")}`;
+  }
+
+  // src/shared/weatherBonusRules.ts
+  var WEATHER_MONTH_NAMES = Object.freeze([
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December"
+  ]);
+  var STRATEGIC_MOVEMENT_HEXES = Object.freeze({
+    infantry: 1,
+    armor: 2,
+    naval: 2,
+    air: 0
+  });
+  var OPEN_GROUND_CATEGORIES = /* @__PURE__ */ new Set(["plains", "desert", "wetlands", "arctic", "coastal"]);
+  var TAG_TIE_ORDER = Object.freeze(["snow", "heat", "rain"]);
+  var TAG_DISPLAY_ORDER = Object.freeze(["snow", "rain", "heat"]);
+  function parseStartMonth(raw) {
+    if (typeof raw === "number" && Number.isInteger(raw) && raw >= 1 && raw <= 12) return raw;
+    const text = String(raw ?? "").trim();
+    if (/^\d+$/.test(text)) {
+      const numeric = Number(text);
+      return numeric >= 1 && numeric <= 12 ? numeric : 1;
+    }
+    const index = WEATHER_MONTH_NAMES.findIndex((name) => name.toLowerCase() === text.toLowerCase());
+    return index >= 0 ? index + 1 : 1;
+  }
+  function weatherTagsInDisplayOrder(tags) {
+    const present = new Set(tags ?? []);
+    return TAG_DISPLAY_ORDER.filter((state) => present.has(state)).slice();
+  }
+  function strategicMovementHexes(unitType) {
+    return STRATEGIC_MOVEMENT_HEXES[unitType] ?? 1;
+  }
+  function strategicMovementHexesFor(input) {
+    const printed = strategicMovementHexes(input.unitType);
+    if (!input.enabled || !input.weather || hasWeatherTag(input.tags, input.weather)) return printed;
+    if (input.unitType === "armor" && (input.weather === "snow" || input.weather === "rain")) return 1;
+    if (input.unitType === "naval" && input.weather === "snow") return 1;
+    return printed;
+  }
+  function tacticalWeatherMovementBudget(input) {
+    const printed = input.printedBudget;
+    if (!input.enabled || !input.weather || hasWeatherTag(input.tags, input.weather)) return printed;
+    if (input.unitType === "armor" && (input.weather === "snow" || input.weather === "rain")) return Math.min(printed, 2);
+    if (input.unitType === "naval" && input.weather === "snow") return Math.min(printed, 2);
+    return printed;
+  }
+  function tacticalWeatherOpenGroundCost(input) {
+    if (!input.enabled || input.unitType !== "infantry" || !input.weather) return input.baseCost;
+    if (input.weather !== "snow" && input.weather !== "rain") return input.baseCost;
+    if (hasWeatherTag(input.tags, input.weather)) return input.baseCost;
+    if (!OPEN_GROUND_CATEGORIES.has(input.category)) return input.baseCost;
+    return Math.max(input.baseCost, 2);
+  }
+  function formatWeatherLabel(weather) {
+    switch (weather) {
+      case "rain":
+        return "Rain";
+      case "snow":
+        return "Snow";
+      case "heat":
+        return "Heat";
+      default:
+        return "Mild";
+    }
+  }
+  function hasWeatherTag(tags, weather) {
+    return tags?.includes(weather) === true;
+  }
+
+  // src/shared/weatherIcons.ts
+  var WEATHER_ICON_CLASS_NAME = "weather-icon";
+  var WEATHER_ICON_FILE = Object.freeze({
+    mild: "clear-day.svg",
+    rain: "rain.svg",
+    snow: "snow.svg",
+    heat: "thermometer-warmer.svg"
+  });
+  function weatherIconAssetPath(weather) {
+    const file = weather ? WEATHER_ICON_FILE[weather] : WEATHER_ICON_FILE.mild;
+    return `weather/${file ?? WEATHER_ICON_FILE.mild}`;
+  }
+  function formatWeatherIconHtml(weather) {
+    const label = formatWeatherLabel(weather);
+    const src = escapeHtmlText(weatherIconAssetPath(weather));
+    return `<img class="${WEATHER_ICON_CLASS_NAME}" src="${src}" alt="" aria-hidden="true" />${escapeHtmlText(label)}`;
+  }
+  function formatAppliedWeatherEffectHtml(weather) {
+    if (weather !== "snow" && weather !== "rain" && weather !== "heat") return null;
+    return formatWeatherIconHtml(weather);
+  }
+
+  // src/shared/unitOriginTooltipText.ts
+  function unitOriginsPresentTheSame(left, right) {
+    return left.birthH3Index === right.birthH3Index && left.birthRes4H3Index === right.birthRes4H3Index && left.birthTerrainKind === right.birthTerrainKind && left.birthIsUrban === right.birthIsUrban && left.birthCountryName === right.birthCountryName && left.birthCountryCode === right.birthCountryCode;
+  }
+  function bonusRow(label, value) {
+    return `<strong>${label}:</strong> ${value}`;
+  }
+  function bonusesBlock(origin, bonuses) {
+    const rows = [];
+    if (bonuses.countryEnabled && bonuses.countryApplies) {
+      const country = escapeHtmlText(origin.birthCountryName ?? "Unknown");
+      rows.push(bonusRow("Country", `${countryFlagImgHtml(origin.birthCountryCode)}${country}`));
+    }
+    if (bonuses.terrainEnabled && bonuses.terrainApplies) {
+      rows.push(bonusRow("Terrain", formatTerrainKindHtml(origin.birthTerrainKind)));
+    }
+    if (bonuses.weatherEnabled) {
+      const tags = weatherTagsInDisplayOrder(bonuses.weatherTags);
+      if (tags.length > 0) rows.push(bonusRow("Weather", tags.map((tag) => formatWeatherIconHtml(tag)).join(", ")));
+    }
+    const body = rows.length > 0 ? rows.join("\n") : "None";
+    return `<strong>Bonus:</strong>
+${body}`;
+  }
+  function formatUnitOriginTooltipHtml(input) {
+    const hexCode = getStrategicRes1HexCode(input.origin.birthH3Index);
+    const codeSuffix = hexCode ? ` (${escapeHtmlText(hexCode)})` : "";
+    const country = escapeHtmlText(input.origin.birthCountryName ?? "Unknown");
+    const originLine = bonusRow("Origin", `${countryFlagImgHtml(input.origin.birthCountryCode)}${country}${codeSuffix}`);
+    return `<strong>${escapeHtmlText(input.unitName)}</strong>
+${originLine}
+
+${bonusesBlock(input.origin, input.bonuses)}`;
   }
 
   // src/shared/tacticalRanges.ts
@@ -16076,11 +16413,16 @@
     if (budget === 0 && moveType !== "air" && subUnit.unitType !== "air") {
       return 1;
     }
-    return budget;
+    return tacticalWeatherMovementBudget({
+      unitType: subUnit.unitType,
+      printedBudget: budget,
+      weather: battle.weather,
+      tags: subUnit.weatherTags,
+      enabled: battle.weatherBonusEnabled === true
+    });
   }
 
   // src/shared/originBonusRules.ts
-  var ORIGIN_HIT_BONUS = 1;
   var ORIGIN_BONUS_OFF = Object.freeze({
     countryBonusEnabled: false,
     terrainBonusEnabled: false
@@ -16101,7 +16443,8 @@
   function originBonusSettingsFromSnapshot(state) {
     return {
       countryBonusEnabled: state.countryBonusEnabled === true,
-      terrainBonusEnabled: state.terrainBonusEnabled === true
+      terrainBonusEnabled: state.terrainBonusEnabled === true,
+      ...state.weatherBonusEnabled === true ? { weatherBonusEnabled: true, startMonth: state.startMonth } : {}
     };
   }
   function originBonusSources(input) {
@@ -16116,9 +16459,6 @@
       if (birthKind !== null && birthKind === normalizeOriginTerrainKind(place.terrainKind)) sources.push("terrain");
     }
     return sources;
-  }
-  function formatOriginBonusTooltipLine(sources) {
-    return sources.length > 0 ? `Bonus: +${ORIGIN_HIT_BONUS} (${sources.join(", ")})` : null;
   }
   function tacticalOriginBonusPlace(battle, res4H3Index) {
     return {
@@ -16140,44 +16480,44 @@
   }
 
   // src/renderer/core/unitOriginBonusLine.ts
-  function originBonusTooltipLineForUnit(unitId, origin) {
+  function originBonusSourcesForUnit(unitId, origin) {
     const state = rendererSharedState.gameState;
-    if (!state) return null;
+    if (!state) return [];
     const settings = originBonusSettingsFromSnapshot(state);
-    if (!settings.countryBonusEnabled && !settings.terrainBonusEnabled) return null;
     const battle = rendererSharedState.tacticalBattleSnapshot;
     const subUnit = battle?.subUnits.find((u) => u.id === unitId);
     if (battle && subUnit) {
-      return formatOriginBonusTooltipLine(
-        originBonusSources({
-          settings,
-          theater: "tactical",
-          origin,
-          place: tacticalOriginBonusPlace(battle, subUnit.h3Index)
-        })
-      );
+      return originBonusSources({
+        settings,
+        theater: "tactical",
+        origin,
+        place: tacticalOriginBonusPlace(battle, subUnit.h3Index)
+      });
     }
     const unit = state.units.find((u) => u.id === unitId);
-    if (!unit) return null;
-    return formatOriginBonusTooltipLine(
-      originBonusSources({
-        settings,
-        theater: "strategic",
-        origin,
-        place: strategicOriginBonusPlace(state, unit.h3Index)
-      })
-    );
+    if (!unit) return [];
+    return originBonusSources({
+      settings,
+      theater: "strategic",
+      origin,
+      place: strategicOriginBonusPlace(state, unit.h3Index)
+    });
   }
 
   // src/renderer/core/unitOriginFlags.ts
   var unitOriginById = /* @__PURE__ */ new Map();
+  var weatherTagsByBirthHex = /* @__PURE__ */ new Map();
   function rememberUnitOrigins(units) {
     for (const unit of units) {
       if (unit.origin) unitOriginById.set(unit.id, unit.origin);
+      if (unit.origin?.birthH3Index && unit.weatherTags) {
+        weatherTagsByBirthHex.set(unit.origin.birthH3Index, unit.weatherTags);
+      }
     }
   }
   function clearRememberedUnitOrigins() {
     unitOriginById.clear();
+    weatherTagsByBirthHex.clear();
   }
   function resolveUnitOrigin(unitId) {
     const direct = unitOriginById.get(unitId);
@@ -16185,20 +16525,61 @@
     const parentUnitId = parseTacticalSubUnitId(unitId)?.parentUnitId;
     return parentUnitId ? unitOriginById.get(parentUnitId) ?? null : null;
   }
-  function createUnitOriginFlagImage(origin, bonusLine) {
+  function bonusesForLiveUnit(unitId, origin) {
+    const state = rendererSharedState.gameState;
+    const sources = originBonusSourcesForUnit(unitId, origin);
+    const weatherEnabled = state?.weatherBonusEnabled === true;
+    return {
+      countryEnabled: state?.countryBonusEnabled === true,
+      terrainEnabled: state?.terrainBonusEnabled === true,
+      weatherEnabled,
+      countryApplies: sources.includes("country"),
+      terrainApplies: sources.includes("terrain"),
+      weatherTags: weatherEnabled ? weatherTagsFor(unitId, origin) : void 0
+    };
+  }
+  function bonusesForAbsentUnit(origin) {
+    const state = rendererSharedState.gameState;
+    const weatherEnabled = state?.weatherBonusEnabled === true;
+    return {
+      countryEnabled: state?.countryBonusEnabled === true,
+      terrainEnabled: state?.terrainBonusEnabled === true,
+      weatherEnabled,
+      countryApplies: false,
+      terrainApplies: false,
+      weatherTags: weatherEnabled ? weatherTagsByBirthHex.get(origin.birthH3Index) ?? [] : void 0
+    };
+  }
+  function weatherTagsFor(unitId, origin) {
+    const battleUnit = rendererSharedState.tacticalBattleSnapshot?.subUnits.find((unit) => unit.id === unitId);
+    if (battleUnit?.weatherTags) return battleUnit.weatherTags;
+    const strategicUnit = rendererSharedState.gameState?.units.find((unit) => unit.id === unitId);
+    if (strategicUnit?.weatherTags) return strategicUnit.weatherTags;
+    return weatherTagsByBirthHex.get(origin.birthH3Index) ?? [];
+  }
+  function createUnitOriginFlagImage(input) {
     const img = document.createElement("img");
     img.className = COUNTRY_FLAG_CLASS_NAME;
-    img.src = countryFlagAssetPath(origin.birthCountryCode);
+    img.src = countryFlagAssetPath(input.origin.birthCountryCode);
     img.alt = "";
     img.setAttribute("aria-hidden", "true");
     img.draggable = false;
-    img.dataset.unitOriginTooltip = formatUnitOriginTooltipText(origin, bonusLine);
+    img.dataset.unitOriginTooltip = formatUnitOriginTooltipHtml(input);
     return img;
+  }
+  function createAbsentUnitOriginFlagImage(origin, unitName) {
+    return createUnitOriginFlagImage({ origin, unitName, bonuses: bonusesForAbsentUnit(origin) });
   }
   function setUnitNameContent(target, unitId, text) {
     target.replaceChildren();
     const origin = resolveUnitOrigin(unitId);
-    if (origin) target.appendChild(createUnitOriginFlagImage(origin, originBonusTooltipLineForUnit(unitId, origin)));
+    if (origin) {
+      target.appendChild(createUnitOriginFlagImage({
+        origin,
+        unitName: rendererSharedState.unitDisplayNameById.get(unitId) ?? fallbackDisplayNameFromUnitId(unitId),
+        bonuses: bonusesForLiveUnit(unitId, origin)
+      }));
+    }
     target.appendChild(document.createTextNode(text));
   }
   function buildUnitOriginByLossDisplayName(summary) {
@@ -16355,7 +16736,7 @@
     if (unitOriginByDisplayName && unitOriginByDisplayName.size > 0) {
       for (const segment of splitLossCauseLineForUnitFlags(text, new Set(unitOriginByDisplayName.keys()))) {
         const origin = segment.unitDisplayName ? unitOriginByDisplayName.get(segment.unitDisplayName) : void 0;
-        if (origin) span.appendChild(createUnitOriginFlagImage(origin));
+        if (origin && segment.unitDisplayName) span.appendChild(createAbsentUnitOriginFlagImage(origin, segment.unitDisplayName));
         span.appendChild(document.createTextNode(segment.text));
       }
     } else {
@@ -16794,185 +17175,6 @@
       terrainInfraRes4Airport,
       terrainInfraRes4Seaport
     };
-  }
-
-  // src/shared/unitDisplayNames.ts
-  var UNIT_TYPE_NOUN_BY_TYPE = {
-    /**
-       * Documents the object literal property `infantry` (infantry: 'Infantry').
-    
-       * Purpose: Supports maintainability by documenting why `infantry` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    infantry: "Infantry",
-    /**
-       * Documents the object literal property `armor` (armor: 'Armored').
-    
-       * Purpose: Supports maintainability by documenting why `armor` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    armor: "Armored",
-    /**
-       * Documents the object literal property `naval` (naval: 'Fleet').
-    
-       * Purpose: Supports maintainability by documenting why `naval` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    naval: "Fleet",
-    /**
-       * Documents the object literal property `air` (air: 'Squadron').
-    
-       * Purpose: Supports maintainability by documenting why `air` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    air: "Squadron"
-  };
-  var NATURAL_ID_COLLATOR = new Intl.Collator(void 0, { numeric: true, sensitivity: "base" });
-  function capitalizeWord(s) {
-    if (!s) return s;
-    return s.charAt(0).toUpperCase() + s.slice(1);
-  }
-  function ordinalSuffix(value) {
-    const abs = Math.abs(Math.trunc(value));
-    const mod100 = abs % 100;
-    if (mod100 >= 11 && mod100 <= 13) return "th";
-    const mod10 = abs % 10;
-    if (mod10 === 1) return "st";
-    if (mod10 === 2) return "nd";
-    if (mod10 === 3) return "rd";
-    return "th";
-  }
-  function toRomanNumeral(value) {
-    let remaining = Math.max(1, Math.trunc(value));
-    const numerals = [
-      [1e3, "M"],
-      [900, "CM"],
-      [500, "D"],
-      [400, "CD"],
-      [100, "C"],
-      [90, "XC"],
-      [50, "L"],
-      [40, "XL"],
-      [10, "X"],
-      [9, "IX"],
-      [5, "V"],
-      [4, "IV"],
-      [1, "I"]
-    ];
-    let out = "";
-    for (const [unit, symbol] of numerals) {
-      while (remaining >= unit) {
-        out += symbol;
-        remaining -= unit;
-      }
-    }
-    return out;
-  }
-  function unitDisplayOwner(unit) {
-    if (unit.player === "human" || unit.player === "opponent") return unit.player;
-    return unitIdOwnerFromId(unit.id) ?? "other";
-  }
-  function formatUnitNumberLabel(unit, value, locale) {
-    return unitDisplayOwner(unit) === "opponent" ? toRomanNumeral(value) : formatOrdinalLabel(value, locale);
-  }
-  function parseSeedUnitIdParts(unitId) {
-    const match = unitId.match(/^(human|opponent)-(infantry|armor|naval|air)-(\d+)$/);
-    if (!match) return null;
-    const ordinal = Number.parseInt(match[3], 10);
-    if (!Number.isFinite(ordinal) || ordinal <= 0) return null;
-    return { unitType: match[2], ordinal };
-  }
-  function productionSpawnSequenceFromUnitId(unitId) {
-    const match = unitId.match(/^(human|opponent)-(infantry|armor|naval|air)-prod-\d+-(\d+)$/);
-    if (!match) return null;
-    const sequence = Number.parseInt(match[3], 10);
-    return Number.isFinite(sequence) && sequence > 0 ? sequence : null;
-  }
-  function resolvePersistedDisplayOrderForUnitLabel(unit) {
-    if (typeof unit.displayOrder !== "number" || unit.displayOrder <= 0) return void 0;
-    const spawnSequence = productionSpawnSequenceFromUnitId(unit.id);
-    if (spawnSequence !== null && unit.displayOrder === spawnSequence) return void 0;
-    return unit.displayOrder;
-  }
-  function unitDisplaySequenceGroupKey(unit) {
-    return `${unitDisplayOwner(unit)}:${unit.unitType}`;
-  }
-  function uniqueUnitsPreferringPersistedOrder(units) {
-    const byId = /* @__PURE__ */ new Map();
-    for (const unit of units) {
-      const existing = byId.get(unit.id);
-      if (!existing) {
-        byId.set(unit.id, unit);
-        continue;
-      }
-      const existingOrder = resolvePersistedDisplayOrderForUnitLabel(existing);
-      const nextOrder = resolvePersistedDisplayOrderForUnitLabel(unit);
-      if (existingOrder === void 0 && nextOrder !== void 0) byId.set(unit.id, unit);
-    }
-    return [...byId.values()];
-  }
-  function formatOrdinalLabel(value, locale) {
-    const normalized = Math.max(1, Math.trunc(value));
-    const numberText = new Intl.NumberFormat(locale).format(normalized);
-    return `${numberText}${ordinalSuffix(normalized)}`;
-  }
-  function getUnitDisplayNoun(unitType) {
-    return UNIT_TYPE_NOUN_BY_TYPE[unitType] ?? capitalizeWord(unitType || "Unit");
-  }
-  function buildUnitDisplayNameLookup(units, locale) {
-    const byGroup = /* @__PURE__ */ new Map();
-    for (const unit of uniqueUnitsPreferringPersistedOrder(units)) {
-      const key = unitDisplaySequenceGroupKey(unit);
-      const existing = byGroup.get(key);
-      if (existing) existing.push(unit);
-      else byGroup.set(key, [unit]);
-    }
-    const result = /* @__PURE__ */ new Map();
-    for (const group of byGroup.values()) {
-      const unitType = group[0]?.unitType ?? "";
-      const withPersisted = group.filter((u) => resolvePersistedDisplayOrderForUnitLabel(u) !== void 0).sort(
-        (a, b) => resolvePersistedDisplayOrderForUnitLabel(a) - resolvePersistedDisplayOrderForUnitLabel(b) || NATURAL_ID_COLLATOR.compare(a.id, b.id)
-      );
-      const withoutPersisted = group.filter((u) => resolvePersistedDisplayOrderForUnitLabel(u) === void 0).sort((a, b) => NATURAL_ID_COLLATOR.compare(a.id, b.id));
-      const noun = getUnitDisplayNoun(unitType);
-      for (const unit of withPersisted) {
-        const ordinal = resolvePersistedDisplayOrderForUnitLabel(unit);
-        const numberLabel = formatUnitNumberLabel(unit, ordinal, locale);
-        result.set(unit.id, `${numberLabel} ${noun}`);
-      }
-      let fallbackOrdinal = withPersisted.reduce(
-        (max, u) => Math.max(max, resolvePersistedDisplayOrderForUnitLabel(u)),
-        0
-      );
-      for (const unit of withoutPersisted) {
-        fallbackOrdinal += 1;
-        const numberLabel = formatUnitNumberLabel(unit, fallbackOrdinal, locale);
-        result.set(unit.id, `${numberLabel} ${noun}`);
-      }
-    }
-    return result;
-  }
-  function fallbackDisplayNameFromUnitId(unitId, locale) {
-    const compact = parseStrategicUnitId(unitId);
-    if (compact) {
-      const numberLabel = formatUnitNumberLabel({ id: unitId, player: compact.player }, compact.ordinal, locale);
-      return `${numberLabel} ${getUnitDisplayNoun(compact.unitType)}`;
-    }
-    const seed = parseSeedUnitIdParts(unitId);
-    if (seed) {
-      const numberLabel = formatUnitNumberLabel({ id: unitId }, seed.ordinal, locale);
-      return `${numberLabel} ${getUnitDisplayNoun(seed.unitType)}`;
-    }
-    if (productionSpawnSequenceFromUnitId(unitId) !== null) return unitId;
-    return unitId;
   }
 
   // src/shared/resolutionPlaybackPhase.ts
@@ -17814,6 +18016,13 @@
     if (activeTerrainStyleId === id) return;
     activeTerrainStyleId = id;
     patternCache.clear();
+  }
+  function paintTerrainSwatches(root) {
+    root.querySelectorAll(`span.${TERRAIN_SWATCH_CLASS_NAME}`).forEach((node) => {
+      const kind = node.dataset.terrainKind;
+      if (!kind) return;
+      node.style.background = terrainKindFillStyle(kind);
+    });
   }
   function terrainKindFillStyle(kind, options) {
     const k = kind;
@@ -18716,6 +18925,14 @@
     }
     const destinationLineMultiplier = ctx != null ? destinationLineBudgetMultiplier(toH3, ctx.roadRailByH3) : 1;
     const transportEffectiveBudgetMultiplier = useTransport && destinationLineMultiplier > 1 ? destinationLineMultiplier : 1;
+    const openGroundCost = tacticalWeatherOpenGroundCost({
+      unitType: unitTypeForMovement,
+      category: cat,
+      baseCost: base,
+      weather: args.weather,
+      tags: args.weatherTags,
+      enabled: args.weatherEnabled === true
+    });
     const appliedCost = useTransport ? landTransportStepMovementPointsAfterAuthorization({
       unitTypeForMovement,
       fromH3,
@@ -18724,7 +18941,7 @@
       terrain,
       tacticalCategoryForDestination: cat,
       isUrbanDestination: urbanOverride
-    }) : base;
+    }) : openGroundCost;
     return {
       appliedCost,
       appliedReason: useTransport ? blockingDestination ? "transport_blocking" : "transport_plains" : "base",
@@ -18792,7 +19009,10 @@
           prevOfFrom: prev,
           marchGoalH3: toH3,
           res4Set,
-          footprintNeighbors: neighborsOf
+          footprintNeighbors: neighborsOf,
+          weatherEnabled: args.weatherEnabled,
+          weather: args.weather,
+          weatherTags: args.weatherTags
         });
         if (!Number.isFinite(w) || w <= 0) continue;
         const nd = d + w;
@@ -18832,7 +19052,9 @@
     Mountain: 4,
     Wetlands: 5,
     Desert: 6,
-    Arctic: 7
+    Arctic: 7,
+    Snow: 8,
+    Rain: 9
   };
   function escapeHtmlForOrderPreviewTooltip(text) {
     return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -18848,7 +19070,7 @@
   function formatOrderPreviewImpactHtml(args) {
     const blocked = (args.blocked ?? []).map((s) => s.trim()).filter((s) => s.length > 0);
     const slower = (args.slower ?? []).map((s) => s.trim()).filter((s) => s.length > 0);
-    const terrainLine = blocked.length > 0 ? `<strong>Blocked:</strong> ${blocked.map((s) => escapeHtmlForOrderPreviewTooltip(s)).join(", ")}` : slower.length > 0 ? `<strong>Slower:</strong> ${slower.map((s) => escapeHtmlForOrderPreviewTooltip(s)).join(", ")}` : null;
+    const terrainLine = blocked.length > 0 ? `<strong>Blocked:</strong> ${formatTerrainNameListHtml(blocked.join(", "))}` : slower.length > 0 ? `<strong>Slower:</strong> ${formatTerrainNameListHtml(slower.join(", "))}` : null;
     let out = terrainLine;
     if (args.roadRail) {
       const usingLine = `<strong>Using:</strong> Road/Rail`;
@@ -18889,10 +19111,22 @@
         return null;
     }
   }
+  function weatherBudgetSlowLabel(battle, subUnit, moveType) {
+    if (battle.weatherBonusEnabled !== true) return null;
+    const weather = battle.weather;
+    const tagged = weather != null && (subUnit.weatherTags ?? []).includes(weather);
+    if (tagged || weather !== "snow" && weather !== "rain") return null;
+    if (moveType === "armor" || moveType === "naval" && weather === "snow") return formatWeatherLabel(weather);
+    return null;
+  }
   function collectTacticalMarchTerrainImpact(args) {
     const { battle, subUnit, moveType, pathH3 } = args;
-    if (pathH3.length < 2 || moveType === "air" || moveType === "naval") {
+    if (pathH3.length < 2 || moveType === "air") {
       return { slower: [], roadRail: false };
+    }
+    if (moveType === "naval") {
+      const label = weatherBudgetSlowLabel(battle, subUnit, moveType);
+      return { slower: label ? [label] : [], roadRail: false };
     }
     const slowerOrder = [];
     const seen = /* @__PURE__ */ new Set();
@@ -18910,6 +19144,8 @@
       if (battle.res4IsRubbleByH3?.[anchor]) push("Rubble");
       else if (battle.res4IsUrbanByH3?.[anchor]) push("Urban");
       else if (subUnit.unitType === "armor" && tacticalRes4CellIsForestClass(battle, anchor)) push("Forest");
+      const weatherLabel = weatherBudgetSlowLabel(battle, subUnit, moveType);
+      if (weatherLabel) push(weatherLabel);
     }
     const terrainForTransport = buildTacticalTerrainKindResolverFromSnapshot(battle);
     const footprint = new Set(battle.res4ChildH3Indexes);
@@ -18937,7 +19173,10 @@
         fromH3: prev,
         prevOfFrom: i >= 2 ? pathH3[i - 2] : null,
         marchGoalH3,
-        res4Set: footprint
+        res4Set: footprint,
+        weatherEnabled: battle.weatherBonusEnabled === true,
+        weather: battle.weather,
+        weatherTags: subUnit.weatherTags
       });
       const usedLineRate = Number.isFinite(stepCost) && stepCost < 1;
       if (usedLineRate && (cost > plainsCost || !Number.isFinite(cost))) {
@@ -18950,6 +19189,17 @@
           push(label);
           continue;
         }
+      }
+      const openGround = tacticalWeatherOpenGroundCost({
+        unitType: moveType,
+        category: cat,
+        baseCost: Number.isFinite(cost) ? cost : 1,
+        weather: battle.weather,
+        tags: subUnit.weatherTags,
+        enabled: battle.weatherBonusEnabled === true
+      });
+      if (!usedLineRate && Number.isFinite(cost) && openGround > cost && (battle.weather === "snow" || battle.weather === "rain")) {
+        push(formatWeatherLabel(battle.weather));
       }
       if (tacticalRes4CellIsForestClass(battle, h) && (subUnit.unitType === "armor" || subUnit.unitType === "infantry")) {
         push("Forest");
@@ -19077,7 +19327,7 @@
     }
     return 1;
   }
-  function enterCostForHex(h, unitTypeForMovement, terrain, fromH3) {
+  function enterCostForHex(h, unitTypeForMovement, terrain, fromH3, weatherEnter) {
     if (unitTypeForMovement === "naval") {
       return tacticalNavalEnterNeighborCost(fromH3, h, terrain);
     }
@@ -19089,7 +19339,10 @@
         fromH3,
         prevOfFrom: null,
         marchGoalH3: h,
-        res4Set: /* @__PURE__ */ new Set([fromH3, h])
+        res4Set: /* @__PURE__ */ new Set([fromH3, h]),
+        weatherEnabled: weatherEnter?.weatherEnabled,
+        weather: weatherEnter?.weather,
+        weatherTags: weatherEnter?.weatherTags
       });
     }
     const raw = terrain.effectiveKindForRes4Hex(h);
@@ -19097,7 +19350,14 @@
     const base = tacticalEnterHexMovementCost(unitTypeForMovement, cat);
     const urbanDest = !!(unitTypeForMovement === "infantry" || unitTypeForMovement === "armor") && !!terrain.isUrbanRes4?.(h);
     if (urbanDest) return 1;
-    return base;
+    return tacticalWeatherOpenGroundCost({
+      unitType: unitTypeForMovement,
+      category: cat,
+      baseCost: base,
+      weather: weatherEnter?.weather,
+      tags: weatherEnter?.weatherTags,
+      enabled: weatherEnter?.weatherEnabled === true
+    });
   }
   function reconstructPath(parent, from, to) {
     if (!parent.has(to)) return null;
@@ -19151,7 +19411,10 @@
         res4Set,
         unitTypeForMovement,
         terrain,
-        footprintNeighbors: neighborsOf
+        footprintNeighbors: neighborsOf,
+        weatherEnabled: args.weatherEnabled,
+        weather: args.weather,
+        weatherTags: args.weatherTags
       });
       if (!landResult) {
         return {
@@ -19176,7 +19439,10 @@
           prevOfFrom,
           marchGoalH3: toH3,
           res4Set,
-          footprintNeighbors: neighborsOf
+          footprintNeighbors: neighborsOf,
+          weatherEnabled: args.weatherEnabled,
+          weather: args.weather,
+          weatherTags: args.weatherTags
         });
         if (!Number.isFinite(stepCost)) {
           return {
@@ -19220,7 +19486,11 @@
       if (d !== dist.get(h)) continue;
       if (h === toH3) break;
       for (const nb of neighborsOf(h)) {
-        const w = enterCostForHex(nb, unitTypeForMovement, terrain, h);
+        const w = enterCostForHex(nb, unitTypeForMovement, terrain, h, {
+          weatherEnabled: args.weatherEnabled,
+          weather: args.weather,
+          weatherTags: args.weatherTags
+        });
         if (!Number.isFinite(w) || w <= 0) continue;
         const nd = d + w;
         const prev = dist.get(nb);
@@ -19256,7 +19526,11 @@
     let cum = 0;
     let stopIdx = 0;
     for (let i = 1; i < path.length; i++) {
-      const stepCost = enterCostForHex(path[i], unitTypeForMovement, terrain, path[i - 1]);
+      const stepCost = enterCostForHex(path[i], unitTypeForMovement, terrain, path[i - 1], {
+        weatherEnabled: args.weatherEnabled,
+        weather: args.weather,
+        weatherTags: args.weatherTags
+      });
       if (!Number.isFinite(stepCost)) {
         return {
           reachable: false,
@@ -19356,7 +19630,8 @@
     const budget = effectiveTacticalMovementPointBudgetForMarchLeg(args.battle, sub, args.battle.subUnits, moveType);
     const terrain = buildTacticalTerrainKindResolverFromSnapshot(args.battle);
     ensureTacticalHoverPlanMemo(args.battle);
-    const memoKey = `${args.unitId}|${origin}|${args.hoveredH3Index}|${moveType}|${budget}`;
+    const weatherKey = args.battle.weatherBonusEnabled === true ? `${args.battle.weather ?? ""}|${(sub.weatherTags ?? []).join(",")}` : "";
+    const memoKey = `${args.unitId}|${origin}|${args.hoveredH3Index}|${moveType}|${budget}|${weatherKey}`;
     let plan = tacticalHoverPlanMemo.get(memoKey);
     if (plan) {
       tacticalHoverPlanMemo.delete(memoKey);
@@ -19368,7 +19643,10 @@
         res4Set: args.res4Set,
         unitTypeForMovement: moveType,
         movementPointBudget: Math.max(0, budget),
-        terrain
+        terrain,
+        weatherEnabled: args.battle.weatherBonusEnabled === true,
+        weather: args.battle.weather,
+        weatherTags: sub.weatherTags
       });
       while (tacticalHoverPlanMemo.size >= MAX_TACTICAL_HOVER_PLAN_MEMO) {
         const oldest = tacticalHoverPlanMemo.keys().next().value;
@@ -20700,8 +20978,10 @@
   var NEW_GAME_OPTION_CHECKBOX_IDS = {
     fogOfWarEnabled: "new-game-fog-checkbox",
     countryBonusEnabled: "new-game-country-bonus-checkbox",
-    terrainBonusEnabled: "new-game-terrain-bonus-checkbox"
+    terrainBonusEnabled: "new-game-terrain-bonus-checkbox",
+    weatherBonusEnabled: "new-game-weather-bonus-checkbox"
   };
+  var NEW_GAME_START_MONTH_ID = "new-game-start-month";
   function optionCheckbox(id) {
     return document.getElementById(id);
   }
@@ -20709,14 +20989,21 @@
     return {
       fogOfWarEnabled: optionCheckbox(NEW_GAME_OPTION_CHECKBOX_IDS.fogOfWarEnabled)?.checked !== false,
       countryBonusEnabled: optionCheckbox(NEW_GAME_OPTION_CHECKBOX_IDS.countryBonusEnabled)?.checked === true,
-      terrainBonusEnabled: optionCheckbox(NEW_GAME_OPTION_CHECKBOX_IDS.terrainBonusEnabled)?.checked === true
+      terrainBonusEnabled: optionCheckbox(NEW_GAME_OPTION_CHECKBOX_IDS.terrainBonusEnabled)?.checked === true,
+      weatherBonusEnabled: optionCheckbox(NEW_GAME_OPTION_CHECKBOX_IDS.weatherBonusEnabled)?.checked === true
     };
+  }
+  function readNewGameStartMonth() {
+    const select = document.getElementById(NEW_GAME_START_MONTH_ID);
+    return parseStartMonth(select?.value);
   }
   function resetNewGameOptionCheckboxes() {
     for (const id of Object.values(NEW_GAME_OPTION_CHECKBOX_IDS)) {
       const checkbox = optionCheckbox(id);
       if (checkbox) checkbox.checked = true;
     }
+    const month = document.getElementById(NEW_GAME_START_MONTH_ID);
+    if (month) month.value = "1";
   }
 
   // src/renderer/core/uiState.ts
@@ -20752,7 +21039,11 @@
       if (!state) {
         turnEl.textContent = "\u2014";
       } else if (rendererSharedState.tacticalBattleSnapshot) {
-        turnEl.textContent = `Turn: ${rendererSharedState.tacticalBattleSnapshot.tacticalTurnNumber}`;
+        const month = state.monthName ? ` \xB7 ${state.monthName}` : "";
+        const weather = rendererSharedState.tacticalBattleSnapshot.weather ? ` \xB7 ${formatWeatherIconHtml(rendererSharedState.tacticalBattleSnapshot.weather)}` : "";
+        turnEl.innerHTML = `Turn: ${rendererSharedState.tacticalBattleSnapshot.tacticalTurnNumber}${month}${weather}`;
+      } else if (state.monthName) {
+        turnEl.textContent = `Turn: ${state.turnNumber} \xB7 ${state.monthName}`;
       } else {
         turnEl.textContent = `Turn: ${state.turnNumber}`;
       }
@@ -21379,7 +21670,7 @@
     const t = message.trim();
     const m = t.match(/^blocked:\s*(.*)$/i);
     if (!m) return escapeHtmlForOrderPreviewTooltip(t);
-    return `<strong>Blocked:</strong> ${escapeHtmlForOrderPreviewTooltip(m[1].trim())}`;
+    return `<strong>Blocked:</strong> ${formatTerrainNameListHtml(m[1].trim())}`;
   }
 
   // src/shared/hexNamingCaption.ts
@@ -21462,6 +21753,13 @@
   function computeTerrainEffectsLineHtml(input) {
     const formatted = formatTerrainEffectEntriesHtml(buildTerrainEffectGroupedMap(input));
     return formatted.length > 0 ? formatted.join(", ") : null;
+  }
+  function joinHexEffectsLine(terrainEffectsHtml, weather) {
+    const parts = [];
+    if (terrainEffectsHtml) parts.push(terrainEffectsHtml);
+    const weatherHtml = formatAppliedWeatherEffectHtml(weather);
+    if (weatherHtml) parts.push(weatherHtml);
+    return parts.length > 0 ? parts.join(", ") : null;
   }
   function formatSymbolSet(symbols) {
     return SYMBOL_ORDER.filter((s) => symbols.has(s)).join("/");
@@ -21615,29 +21913,48 @@
     if (!ownershipVisible) return "Unknown";
     return ownerLabel;
   }
+  function tooltipWeather(namingTarget) {
+    if (!namingTarget) return null;
+    if (namingTarget.resolution === 4 && rendererSharedState.tacticalBattleSnapshot) return rendererSharedState.tacticalBattleSnapshot.weather ?? null;
+    if (!rendererSharedState.gameState) return null;
+    const strategicHex = namingTarget.resolution === 1 ? namingTarget.h3Index : parentStrategicHex(namingTarget.h3Index);
+    if (!strategicHex) return null;
+    return rendererSharedState.gameState.hexes.find((hex) => hex.h3Index === strategicHex)?.weather ?? null;
+  }
+  function parentStrategicHex(h3Index) {
+    try {
+      return cellToParent(h3Index, WORLD_H3_RESOLUTION);
+    } catch {
+      return null;
+    }
+  }
+  function effectsLine(state, namingTarget) {
+    const terrain = namingTarget?.resolution === 4 ? computeTerrainEffectsLineHtml({
+      terrainKind: state.terrainKind,
+      parentTerrain: state.parentTerrain,
+      parentTerrainKind: state.parentTerrainKind,
+      isUrban: state.isUrban,
+      isRubble: state.isRubble,
+      isSeaport: state.isSeaport,
+      hasRoad: state.hasRoad,
+      hasRail: state.hasRail
+    }) : null;
+    return joinHexEffectsLine(terrain, tooltipWeather(namingTarget));
+  }
   function formatTerrainTooltipHtml(state, namingCaption, namingTarget) {
     const prefix = formatLlmLocationBoldPrefixHtml(namingTarget);
     const showControlLine = namingTarget?.resolution === 1;
     const controlLine = showControlLine ? `<strong>Control:</strong> ${getTooltipControlLabel(namingTarget)}` : null;
-    const terrainLabel = formatTerrainKindLabel(state.terrainKind);
-    const terrainValue = state.res1TerrainSummary ?? `${terrainLabel}${formatTerrainVariantSuffix(state)}`;
+    const terrainValue = state.res1TerrainSummary != null ? formatTerrainNameListHtml(state.res1TerrainSummary) : `${formatTerrainKindHtml(state.terrainKind)}${escapeHtmlText(formatTerrainVariantSuffix(state))}`;
     const terrainLine = `<strong>Terrain:</strong> ${terrainValue}`;
+    const weather = tooltipWeather(namingTarget);
+    const weatherLine = weather ? `<strong>Weather:</strong> ${formatWeatherIconHtml(weather)}` : null;
     const bodyParts = controlLine ? [controlLine, terrainLine] : [terrainLine];
+    if (weatherLine) bodyParts.push(weatherLine);
     if (state.res1FeaturesSummary != null) bodyParts.push(`<strong>Features:</strong> ${state.res1FeaturesSummary}`);
     else if (state.features.length > 0) bodyParts.push(`<strong>Features:</strong> ${state.features.join(", ")}`);
-    if (namingTarget?.resolution === 4) {
-      const effectsLineHtml = computeTerrainEffectsLineHtml({
-        terrainKind: state.terrainKind,
-        parentTerrain: state.parentTerrain,
-        parentTerrainKind: state.parentTerrainKind,
-        isUrban: state.isUrban,
-        isRubble: state.isRubble,
-        isSeaport: state.isSeaport,
-        hasRoad: state.hasRoad,
-        hasRail: state.hasRail
-      });
-      if (effectsLineHtml) bodyParts.push(`<strong>Effects:</strong> ${effectsLineHtml}`);
-    }
+    const effectsLineHtml = effectsLine(state, namingTarget);
+    if (effectsLineHtml) bodyParts.push(`<strong>Effects:</strong> ${effectsLineHtml}`);
     if (state.urbanHexCount != null) {
       const productionLine = state.urbanHexCount > 0 ? `<strong>Production:</strong> $${state.urbanHexCount.toLocaleString()} / turn` : `<strong>Production:</strong> (none)`;
       bodyParts.push(productionLine);
@@ -21655,13 +21972,14 @@
     const urbanHexCountKey = state.urbanHexCount == null ? "x" : String(state.urbanHexCount);
     const res1TerrainSummaryKey = state.res1TerrainSummary ?? "";
     const res1FeaturesSummaryKey = state.res1FeaturesSummary ?? "";
+    const weatherKey = tooltipWeather(namingTarget) ?? "";
     const controlKey = getTooltipControlLabel(namingTarget);
     const parentTerrainKey = state.parentTerrain;
     const parentTerrainKindKey = state.parentTerrainKind;
     const seaportKey = state.isSeaport ? "1" : "0";
     const roadKey = state.hasRoad ? "1" : "0";
     const railKey = state.hasRail ? "1" : "0";
-    return `${targetKey}::${namingKey}::${state.terrainKind}::${urbanKey}::${rubbleKey}::${featuresKey}::${urbanHexCountKey}::${res1TerrainSummaryKey}::${res1FeaturesSummaryKey}::${controlKey}::${parentTerrainKey}::${parentTerrainKindKey}::${seaportKey}::${roadKey}::${railKey}`;
+    return `${targetKey}::${namingKey}::${state.terrainKind}::${urbanKey}::${rubbleKey}::${featuresKey}::${urbanHexCountKey}::${res1TerrainSummaryKey}::${res1FeaturesSummaryKey}::${controlKey}::${parentTerrainKey}::${parentTerrainKindKey}::${seaportKey}::${roadKey}::${railKey}::${weatherKey}`;
   }
   function getCachedTerrainTooltipHtml(state, namingCaption, namingTarget) {
     const key = terrainTooltipContentKey(state, namingCaption, namingTarget);
@@ -22163,6 +22481,7 @@
     }
     orderBlockTooltip.show((el) => {
       el.innerHTML = blockingHoverMessageHtmlFromPlainMessage(message);
+      paintTerrainSwatches(el);
     });
   }
   function repositionOrderBlockHexTooltipIfVisible() {
@@ -22187,6 +22506,7 @@
     }
     orderSlowerTooltip.show((el) => {
       el.innerHTML = tooltipHtml;
+      paintTerrainSwatches(el);
     });
   }
   function repositionOrderSlowerHexTooltipIfVisible() {
@@ -22894,6 +23214,7 @@
         const selectedRegions = getSelectedScenarioRegions();
         const state = await window.gameApi.newGame({
           ...readNewGameOptionFlags(),
+          startMonth: readNewGameStartMonth(),
           humanHomeRegion: selectedRegions.humanHomeRegion,
           aiHomeRegion: selectedRegions.aiHomeRegion,
           gameSize: readSelectedGameSizeFromDocument()
@@ -23058,6 +23379,7 @@
     el.classList.add("hidden");
     el.setAttribute("aria-hidden", "true");
     el.textContent = "";
+    el.innerHTML = "";
   }
   function showForActiveAnchor() {
     showTimer = null;
@@ -23068,7 +23390,8 @@
       hideUnitOriginTooltip();
       return;
     }
-    el.textContent = text;
+    el.innerHTML = text;
+    paintTerrainSwatches(el);
     positionTooltip(el);
     el.classList.remove("hidden");
     el.setAttribute("aria-hidden", "false");
@@ -24971,10 +25294,16 @@
             slowestMovementRangeByOriginH3.set(eff, movementRange);
           }
         }
-      } else {
+      } else if (state) {
         const selectedHumanUnits = rendererSharedState.selectedUnitIds.map((id) => state.units.find((u) => u.id === id)).filter((unit) => !!unit && unit.player === "human");
         for (const unit of selectedHumanUnits) {
-          const movementRange = MOVEMENT_RANGE_BY_UNIT_TYPE[unit.unitType] ?? 1;
+          const occupied = state.hexes.find((hex) => hex.h3Index === unit.h3Index);
+          const movementRange = strategicMovementHexesFor({
+            unitType: unit.unitType,
+            weather: occupied?.weather,
+            tags: unit.weatherTags,
+            enabled: state.weatherBonusEnabled === true
+          });
           const prior = slowestMovementRangeByOriginH3.get(unit.h3Index);
           if (prior === void 0 || movementRange < prior) {
             slowestMovementRangeByOriginH3.set(unit.h3Index, movementRange);
@@ -24986,7 +25315,7 @@
         for (const perUnit of previewGroup.previews) {
           const preview = perUnit.preview;
           if (preview.segments.length === 0) continue;
-          const previewUnit = tb ? tb.subUnits.find((s) => s.id === perUnit.unitId) : state.units.find((u) => u.id === perUnit.unitId);
+          const previewUnit = tb ? tb.subUnits.find((s) => s.id === perUnit.unitId) : state?.units.find((u) => u.id === perUnit.unitId);
           const originH3 = previewUnit?.h3Index;
           if (previewUnit && originH3) {
             if (drawnOrigins.has(originH3)) continue;
@@ -26347,6 +26676,7 @@
         void args.buildHexPopupHtml(row.h3Index).then(
           (html) => {
             tdHex.innerHTML = html;
+            paintTerrainSwatches(tdHex);
           },
           () => {
             tdHex.textContent = row.h3Index;
@@ -28767,6 +29097,7 @@
     const el = document.getElementById("hex-tooltip");
     if (!el) return;
     el.innerHTML = getCachedTerrainTooltipHtml(state, namingLine, namingTarget);
+    paintTerrainSwatches(el);
     el.style.left = `${clientX + TOOLTIP_OFFSET_PX}px`;
     el.style.top = `${clientY + TOOLTIP_OFFSET_PX}px`;
     el.classList.remove("hidden");

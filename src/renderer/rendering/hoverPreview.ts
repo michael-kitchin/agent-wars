@@ -1,6 +1,6 @@
 import { effectiveTacticalMovementPointBudgetForMarchLeg } from '../../shared/tacticalTerrainCombatModifiers';
 import { tacticalMovementUnitTypeForPathfinding } from '../../shared/tacticalTerrainMovement';
-import { MOVEMENT_RANGE_BY_UNIT_TYPE } from '../../shared/tacticalRanges';
+import { strategicMovementHexesFor } from '../../shared/weatherBonusRules';
 import {
   ORDER_LINE_COLOR,
   ORDER_LINE_WIDTH,
@@ -74,12 +74,18 @@ export function drawHoverRoutePreview(ctx: CanvasRenderingContext2D): void {
         slowestMovementRangeByOriginH3.set(eff, movementRange);
       }
     }
-  } else {
+  } else if (state) {
     const selectedHumanUnits = S.selectedUnitIds
       .map((id) => state.units.find((u) => u.id === id))
       .filter((unit): unit is NonNullable<typeof unit> => !!unit && unit.player === 'human');
     for (const unit of selectedHumanUnits) {
-      const movementRange = MOVEMENT_RANGE_BY_UNIT_TYPE[unit.unitType] ?? 1;
+      const occupied = state.hexes.find((hex) => hex.h3Index === unit.h3Index);
+      const movementRange = strategicMovementHexesFor({
+        unitType: unit.unitType,
+        weather: occupied?.weather,
+        tags: unit.weatherTags,
+        enabled: state.weatherBonusEnabled === true,
+      });
       const prior = slowestMovementRangeByOriginH3.get(unit.h3Index);
       if (prior === undefined || movementRange < prior) {
         slowestMovementRangeByOriginH3.set(unit.h3Index, movementRange);
@@ -91,7 +97,7 @@ export function drawHoverRoutePreview(ctx: CanvasRenderingContext2D): void {
   for (const perUnit of previewGroup.previews) {
     const preview = perUnit.preview;
     if (preview.segments.length === 0) continue;
-    const previewUnit = tb ? tb.subUnits.find((s) => s.id === perUnit.unitId) : state.units.find((u) => u.id === perUnit.unitId);
+    const previewUnit = tb ? tb.subUnits.find((s) => s.id === perUnit.unitId) : state?.units.find((u) => u.id === perUnit.unitId);
     const originH3 = previewUnit?.h3Index;
     if (previewUnit && originH3) {
       if (drawnOrigins.has(originH3)) continue;

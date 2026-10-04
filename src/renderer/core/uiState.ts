@@ -1,5 +1,6 @@
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import { formatSidebarPhaseText } from '../../shared/sidebarPhaseLabel';
+import { formatWeatherIconHtml } from '../../shared/weatherIcons';
 import { rendererSharedState as S } from './state';
 import { setUnitNameContent } from './unitOriginFlags';
 import { initializeScenarioRegionSelectorsOnOverlayOpen } from '../gameplay/newGameRegionUi';
@@ -68,7 +69,13 @@ export function updateGameStateSidebar(state: GameStateSnapshot | null): void {
     if (!state) {
       turnEl.textContent = '—';
     } else if (S.tacticalBattleSnapshot) {
-      turnEl.textContent = `Turn: ${S.tacticalBattleSnapshot.tacticalTurnNumber}`;
+      const month = state.monthName ? ` · ${state.monthName}` : '';
+      const weather = S.tacticalBattleSnapshot.weather
+        ? ` · ${formatWeatherIconHtml(S.tacticalBattleSnapshot.weather)}`
+        : '';
+      turnEl.innerHTML = `Turn: ${S.tacticalBattleSnapshot.tacticalTurnNumber}${month}${weather}`;
+    } else if (state.monthName) {
+      turnEl.textContent = `Turn: ${state.turnNumber} · ${state.monthName}`;
     } else {
       turnEl.textContent = `Turn: ${state.turnNumber}`;
     }

@@ -298,3 +298,13 @@ Gate: `state.countryBonusEnabled` and `state.terrainBonusEnabled`, read through 
 | envelope | unchanged |
 | coaching | unchanged |
 | empty-state | A unit that does not qualify reads `—` in the `Bonus` column and `[]` in `originBonusHere`. |
+
+## 9. Weather bonus
+
+Gate: `state.weatherBonusEnabled`. With the flag off, prompt text is unchanged and assessment results omit weather fields.
+
+| Surface | Contract |
+| --- | --- |
+| system | The turn line names the month. The combat paragraph adds `buildWeatherRule` after the origin bonus sentence. The Unit Status table gains a Weather column when an assessment carries `weatherTags`. The cell names the weather where the unit stands, and birth tags follow in parentheses. |
+| tools | `assess_hex` adds `weather` (`null` on an unexplored hex). `assess_unit` adds `weatherTags`, `weatherHere`, `rangedAttackPenalized`, and `airStrikePenalizedAtBase`, including in battle. `plan_route` and `check_distance` estimate turns from the occupied hex's weather. `estimate_combat` uses the same ranged and air-strike thresholds as resolution. |
+| empty-state | A unit with no tags has `weatherTags: []`. The Unit Status cell is the weather where it stands, with no parentheses. The unit tooltip omits Weather when the unit has no tags. |

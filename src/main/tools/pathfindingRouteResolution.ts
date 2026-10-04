@@ -1,4 +1,6 @@
-import { getReachableHexes, getMovementBudgetForUnit, terrainIsPassableForDomain } from '../pathfinding';
+import { getReachableHexes, terrainIsPassableForDomain } from '../pathfinding';
+import { strategicRangeOnState } from '../weather/weatherMatch';
+import type { WeatherState } from '../../shared/weatherBonusTypes';
 import type { PassableDomain } from '../pathfinding';
 import { landUnitCanOccupyHex, type LandMassByH3 } from '../../shared/landTraversalRes1';
 import { logDebug } from '../logger';
@@ -140,6 +142,15 @@ export function resolveRoutePathForUnit(payload: {
   terrainByH3: Map<string, string>;
   session: PathfindingSession;
   blocked?: Set<string>;
+  /**
+   * Acclimation of the unit that is moving.
+   *
+   * Contract: Omitted when the caller has no snapshot row. Missing tags do not cancel a penalty.
+   * When to use: `executePlanRoute` passes the unit's tags.
+   * Expected outcome: A snow or rain tag keeps the printed budget in that weather.
+   * Exceptions: None.
+   */
+  weatherTags?: readonly WeatherState[] | null;
 }): ResolveRoutePathForUnitOk | PlanRouteError {
   if (payload.unitType === 'naval') {
     return resolveNavalStrategicRoutePath(payload);
@@ -159,7 +170,10 @@ export function resolveRoutePathForUnit(payload: {
     passableFor: 'land',
     destinationH3,
     path: stateful.path,
-    movementBudget: getMovementBudgetForUnit(payload.unitType),
+    movementBudget: strategicRangeOnState(
+      { unitType: payload.unitType, h3Index: payload.originH3, weatherTags: payload.weatherTags },
+      payload.session.state
+    ),
     warnings,
     statefulStats: stateful.stats,
   };
@@ -180,6 +194,15 @@ function resolveNavalStrategicRoutePath(payload: {
   terrainByH3: Map<string, string>;
   session: PathfindingSession;
   blocked?: Set<string>;
+  /**
+   * Acclimation of the naval unit.
+   *
+   * Contract: Same field `resolveRoutePathForUnit` receives.
+   * When to use: Forwarded from the public route resolver.
+   * Expected outcome: Untagged naval in snow uses a one-hex budget for the rest of the route.
+   * Exceptions: None.
+   */
+  weatherTags?: readonly WeatherState[] | null;
 }): ResolveRoutePathForUnitOk | PlanRouteError {
   logDebug('pathfinding resolveNavalStrategicRoutePath', {
     originH3: payload.originH3,
@@ -224,7 +247,10 @@ function resolveNavalStrategicRoutePath(payload: {
     if (egress.size <= 1) return { status: 'error', error: PLAN_ROUTE_ERR_SEAPORT_EGRESS };
   }
 
-  const movementBudget = getMovementBudgetForUnit('naval');
+  const movementBudget = strategicRangeOnState(
+    { unitType: 'naval', h3Index: payload.originH3, weatherTags: payload.weatherTags },
+    payload.session.state
+  );
   const firstTurnMovementBudget = isLandSeaportHex(originAttrs) ? 1 : undefined;
   let path = findNavalStrategicPath({
     originH3: payload.originH3,

@@ -302,11 +302,15 @@ function registerIpcHandlers(): void {
     const gameSize = parseGameSize(payload?.gameSize);
     const countryBonusEnabled = payload?.countryBonusEnabled === true;
     const terrainBonusEnabled = payload?.terrainBonusEnabled === true;
+    const weatherBonusEnabled = payload?.weatherBonusEnabled === true;
+    const startMonth = payload?.startMonth;
     logDebug('main game:newGame', {
       fogOfWarEnabled,
       gameSize,
       countryBonusEnabled,
       terrainBonusEnabled,
+      weatherBonusEnabled,
+      startMonth,
       requestedHumanHomeRegion: payload?.humanHomeRegion ?? '',
       requestedAiHomeRegion: payload?.aiHomeRegion ?? '',
     });
@@ -317,6 +321,8 @@ function registerIpcHandlers(): void {
       aiHomeRegion: payload?.aiHomeRegion,
       countryBonusEnabled,
       terrainBonusEnabled,
+      weatherBonusEnabled,
+      startMonth,
     });
     clearDeferredPlaybackConsultPending();
     clearStrategicPreviousHexMemory();

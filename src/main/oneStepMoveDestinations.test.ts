@@ -16,7 +16,7 @@ import {
   getValidDestinationsUnoccupied,
   resetValidDestinationsCacheForTests,
 } from './oneStepMoveDestinations';
-import { MOVEMENT_RANGE_BY_UNIT_TYPE } from '../shared/tacticalRanges';
+import { strategicMovementHexes } from '../shared/weatherBonusRules';
 import { getOrderedHexList } from './mapData';
 import {
   ensureTerrainClassificationCacheLoaded,
@@ -94,7 +94,7 @@ function getValidDestinationsFullScan(
   if (unit.unitType === 'infantry' || unit.unitType === 'armor' || unit.unitType === 'air') {
     return getValidDestinations(unit, state);
   }
-  const range = MOVEMENT_RANGE_BY_UNIT_TYPE[unit.unitType] ?? 1;
+  const range = strategicMovementHexes(unit.unitType);
   const lookup = createNavalStrategicHexLookup(
     state.hexes,
     seaportCountByH3ForNavalLookup(state.hexes, state.res1Infrastructure)
@@ -158,7 +158,7 @@ function testGetValidDestinationsMatchesFullScan(): void {
 function testGetValidDestinationsDiskBranchProducesResults(): void {
   ensureTerrainClassificationCacheLoaded();
   const origin = getOrderedHexList()[0]!;
-  gridDisk(origin, MOVEMENT_RANGE_BY_UNIT_TYPE.infantry ?? 1);
+  gridDisk(origin, strategicMovementHexes('infantry'));
   const state = minimalState([origin]);
   const unit = { h3Index: origin, unitType: 'infantry' };
   const result = getValidDestinations(unit, state);

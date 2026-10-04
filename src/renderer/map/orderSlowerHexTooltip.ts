@@ -1,4 +1,5 @@
 import { ORDER_BLOCK_HEX_TOOLTIP_TTL_MS } from '../core/constants';
+import { paintTerrainSwatches } from '../rendering/terrainVisualStyles';
 import { createTransientPointerTooltip } from './createTransientPointerTooltip';
 
 const orderSlowerTooltip = createTransientPointerTooltip({
@@ -45,6 +46,7 @@ export function showOrderSlowerHexTooltip(tooltipHtml: string | null): void {
   }
   orderSlowerTooltip.show((el) => {
     el.innerHTML = tooltipHtml;
+    paintTerrainSwatches(el);
   });
 }
 

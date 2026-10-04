@@ -118,4 +118,12 @@ test('blockingHoverMessageHtmlFromPlainMessage bolds Blocked and escapes suffix'
     blockingHoverMessageHtmlFromPlainMessage('Blocked: <script>x</script>'),
     '<strong>Blocked:</strong> &lt;script&gt;x&lt;/script&gt;'
   );
+  assert.equal(
+    blockingHoverMessageHtmlFromPlainMessage('Blocked: Arctic, Water'),
+    '<strong>Blocked:</strong> <span class="terrain-swatch" data-terrain-kind="arctic" aria-hidden="true"></span>Arctic, <span class="terrain-swatch" data-terrain-kind="water" aria-hidden="true"></span>Water'
+  );
+  assert.equal(
+    blockingHoverMessageHtmlFromPlainMessage('Blocked: Coastal, Land, Wetlands'),
+    '<strong>Blocked:</strong> <span class="terrain-swatch" data-terrain-kind="coastal" aria-hidden="true"></span>Coastal, Land, <span class="terrain-swatch" data-terrain-kind="wetlands" aria-hidden="true"></span>Wetlands'
+  );
 });

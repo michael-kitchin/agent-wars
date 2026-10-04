@@ -69,9 +69,9 @@ export function isWithinGridRangeSafe(
  * Expected outcome: Same boolean as `isWithinGridRangeSafe(..., AIR_FERRY_RANGE_HEXES, context)` before this wrapper existed.
  * Exceptions: None.
  */
-export function isWithinAirFerryGridRange(originH3: string, destH3: string, context: string): boolean {
-  logTrace('gridRange isWithinAirFerryGridRange', { originH3, destH3, context });
-  return isWithinGridRangeSafe(originH3, destH3, AIR_FERRY_RANGE_HEXES, context);
+export function isWithinAirFerryGridRange(originH3: string, destH3: string, context: string, rangeHexes: number = AIR_FERRY_RANGE_HEXES): boolean {
+  logTrace('gridRange isWithinAirFerryGridRange', { originH3, destH3, context, rangeHexes });
+  return isWithinGridRangeSafe(originH3, destH3, rangeHexes, context);
 }
 
 /**

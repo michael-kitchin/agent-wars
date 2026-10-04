@@ -53,6 +53,8 @@ type TacticalMarchPlanBattleArgs = Pick<
   | 'res4IsRubbleByH3'
   | 'res4RoadSidesByH3'
   | 'res4RailSidesByH3'
+  | 'weather'
+  | 'weatherBonusEnabled'
 >;
 
 /**
@@ -98,6 +100,7 @@ function tacticalLandMarchBestEffortPlanTowardOrderedHex(args: {
   res4Set: ReadonlySet<string>;
   moveType: string;
   movementPointBudget: number;
+  weatherTags?: readonly import('../../shared/weatherBonusTypes').WeatherState[] | null;
 }): TacticalMarchPlanResult | null {
   if (args.movementPointBudget < 1) return null;
   if (args.moveType !== 'infantry' && args.moveType !== 'armor') return null;
@@ -113,6 +116,9 @@ function tacticalLandMarchBestEffortPlanTowardOrderedHex(args: {
       res4Set: args.res4Set,
       unitTypeForMovement: args.moveType,
       movementPointBudget: Math.max(0, args.movementPointBudget),
+      weatherEnabled: args.battle.weatherBonusEnabled === true,
+      weather: args.battle.weather,
+      weatherTags: args.weatherTags,
     });
     if (!p.reachable) continue;
     const applied = p.firstStopWithinBudget.stopH3;
@@ -275,6 +281,8 @@ type TacticalMovementOrderOutcomeArgs = {
     | 'res4IsRubbleByH3'
     | 'res4RoadSidesByH3'
     | 'res4RailSidesByH3'
+    | 'weather'
+    | 'weatherBonusEnabled'
   >;
 };
 
@@ -351,7 +359,10 @@ function tacticalComputeMovementOrderOutcomeForPlayer(
     toH3: args.order.toH3Index,
     res4Set: args.res4Set,
     unitTypeForMovement: moveType,
-    movementPointBudget: Math.max(0, budget),
+      movementPointBudget: Math.max(0, budget),
+      weatherEnabled: args.battle.weatherBonusEnabled === true,
+      weather: args.battle.weather,
+      weatherTags: pathfindUnit.weatherTags,
   });
   if (!plan.reachable) {
     const bestEffortPlan =
@@ -363,6 +374,7 @@ function tacticalComputeMovementOrderOutcomeForPlayer(
             res4Set: args.res4Set,
             moveType,
             movementPointBudget: Math.max(0, budget),
+            weatherTags: pathfindUnit.weatherTags,
           })
         : null;
     if (bestEffortPlan) {

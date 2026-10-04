@@ -212,6 +212,29 @@ export function buildOriginBonusRule(gates: GameRuleTextGates): string | null {
 }
 
 /**
+ * Weather penalty sentence for a match that has the weather bonus on.
+ *
+ * Purpose: The model must know movement and attack are reduced, and that tags cancel the reduction.
+ * When to use: Combat paragraph after the origin bonus sentence.
+ * Expected outcome: Null when the flag is off, so the paragraph stays unchanged.
+ * Exceptions: None.
+ */
+export function buildWeatherRule(gates: GameRuleTextGates): string | null {
+  logTrace('promptSpec buildWeatherRule', { weatherBonusEnabled: gates.originBonusSettings.weatherBonusEnabled === true });
+  if (gates.originBonusSettings.weatherBonusEnabled !== true) return null;
+  return (
+    'Weather bonus is on: the month is on the turn line and every beat of a battle shares the enclosing hex\'s weather. ' +
+    'Armor strategic movement is 1 in snow or rain, and naval strategic movement is 1 in snow, unless the unit is tagged for that weather. ' +
+    'In battle, armor\'s point budget is 2 in snow or rain and naval\'s is 2 in snow; infantry pays 2 to enter open ground in snow or rain. ' +
+    'Armor ranged attack is 1 lower in snow or heat, including return fire and air-strike counter-fire. ' +
+    'An air strike is 1 lower once when its base or its target is snow, rain, or heat the unit lacks. ' +
+    'A strategic ferry into snow is 2 hexes unless the unit is tagged for snow. ' +
+    'Defense, melee, and casualty order keep their printed values. A tag is earned by the birth hex. ' +
+    'The Unit Status Weather column names the weather where that unit stands. Birth tags, when the unit has any, follow in parentheses.'
+  );
+}
+
+/**
  * Friendly stacking is legal; enemy cells are move/melee contact; approach omits stay-put stacks.
  *
  * Purpose: Best Options lists enemy-occupied cells as move/melee dests the engine will accept. Friendly stacking
@@ -422,10 +445,12 @@ function buildAttackConstraintsClause(gates: GameRuleTextGates): string {
 export function buildCombatRulesParagraph(gates: GameRuleTextGates): string {
   logDebug('promptSpec buildCombatRulesParagraph', { ...gates });
   const originBonus = buildOriginBonusRule(gates);
+  const weatherRule = buildWeatherRule(gates);
   const parts: string[] = [
     buildCombatStatsLine(gates.coordinateMode, gates.hasAirUnits),
     buildCasualtySortRule(),
     ...(originBonus ? [originBonus] : []),
+    ...(weatherRule ? [weatherRule] : []),
     buildResolutionOrderRule(gates.coordinateMode),
     'Ranged uses pre-move positions.',
     buildAttackConstraintsClause(gates),

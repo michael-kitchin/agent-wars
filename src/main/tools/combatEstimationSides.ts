@@ -326,7 +326,11 @@ function buildRealAttackers(ids: readonly string[], ctx: CombatSideContext): Att
     ctx.engagementType === 'ranged'
       ? combat.filter((u) => ctx.theater.canFireAt(u.unitType, u.h3Index, ctx.targetHexH3))
       : combat
-  ).map((u) => withEstimateOriginBonus(u, ctx.theater, ctx.engagementType === 'melee' ? ctx.targetHexH3 : u.h3Index));
+  ).map((u) => withEstimateOriginBonus(u, ctx.theater, ctx.engagementType === 'melee' ? ctx.targetHexH3 : u.h3Index))
+    .map((u) => {
+      const penalty = ctx.theater.weatherAttackPenaltyFor(u, ctx.targetHexH3, ctx.engagementType);
+      return penalty === 0 ? u : { ...u, weatherAttackPenalty: penalty };
+    });
   if (usable.length === 0) {
     const u = combat[0]!;
     const dist = gridHopDistanceBetween(u.h3Index, ctx.targetHexH3);
@@ -377,7 +381,10 @@ export function buildAttackers(raw: CombatSideArgs, ctx: CombatSideContext): Att
       unitType: type,
       h3Index: ctx.targetHexH3,
     }))
-  );
+  ).map((unit) => {
+    const penalty = ctx.theater.weatherAttackPenaltyFor(unit, ctx.targetHexH3, ctx.engagementType);
+    return penalty === 0 ? unit : { ...unit, weatherAttackPenalty: penalty };
+  });
   return {
     combat,
     summary: combat.map((u) => ({ unitId: u.id, type: u.unitType, attackValue: attackHitThreshold(u) })),

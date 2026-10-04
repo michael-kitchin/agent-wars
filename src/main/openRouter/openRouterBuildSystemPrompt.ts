@@ -297,10 +297,11 @@ ${contextCoaching}
         `or targetUnitId (not your move destination)${combatTargetHint}.`
       )
     : combatRulesParagraph;
+  const monthClause = state.monthName ? `, month: ${state.monthName}` : '';
   const turnPhaseHeader =
     coordinateContext.mode === 'tactical'
-      ? `Strategic turn: ${state.turnNumber}, tactical beat: ${coordinateContext.tacticalTurnNumber ?? '?'}, phase: ${state.phase}.`
-      : `Current turn: ${state.turnNumber}, phase: ${state.phase}.`;
+      ? `Strategic turn: ${state.turnNumber}${monthClause}, tactical beat: ${coordinateContext.tacticalTurnNumber ?? '?'}, phase: ${state.phase}.`
+      : `Current turn: ${state.turnNumber}${monthClause}, phase: ${state.phase}.`;
   const prompt = `You are the enemy commander in a WEGO (simultaneous movement) hex wargame. ${turnPhaseHeader}
 
 ${winConditionReminder}${scoutingDirective}${warning}

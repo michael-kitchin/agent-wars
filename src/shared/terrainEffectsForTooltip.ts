@@ -2,11 +2,13 @@
  * Pure res4 terrain-effect strings for the map hex tooltip "Effects:" line.
  *
  * Purpose: Centralizes movement/range symbol rules so tooltip copy matches tactical §12.4 and combat modifiers.
- * When to use: From `formatTerrainTooltipHtml` for res4 naming targets only.
+ * When to use: From `formatTerrainTooltipHtml` for the Effects line. Terrain symbols are for res4 cells. Weather is added for world hexes and res4 cells.
  * Expected outcome: Comma-delimited effect list or `null` when the hex has no applicable effects.
  * Exceptions: None; invalid/unknown kinds fall back through `normalizeDbTerrainKindToTacticalCategory`.
  */
 
+import { formatAppliedWeatherEffectHtml } from './weatherIcons';
+import type { WeatherState } from './weatherBonusTypes';
 import {
   isInfantryOrArmorTacticalSpawnCell,
   isNavalRes4TacticalCellNavigable,
@@ -338,6 +340,25 @@ export function computeTerrainEffectsLine(input: TerrainEffectsInput): string | 
 export function computeTerrainEffectsLineHtml(input: TerrainEffectsInput): string | null {
   const formatted = formatTerrainEffectEntriesHtml(buildTerrainEffectGroupedMap(input));
   return formatted.length > 0 ? formatted.join(', ') : null;
+}
+
+/**
+ * Joins terrain effects and the weather chip for one hex tooltip Effects line.
+ *
+ * Purpose: Strategic hexes have no terrain effects. Snow, rain, and heat still belong on the line. Mild does not.
+ * When to use: After computing res4 terrain effects, passing null for those effects on a world hex.
+ * Expected outcome: Terrain text, then the weather icon and name, comma-separated. Null when both parts are absent.
+ * Exceptions: None.
+ */
+export function joinHexEffectsLine(
+  terrainEffectsHtml: string | null | undefined,
+  weather: WeatherState | null | undefined
+): string | null {
+  const parts: string[] = [];
+  if (terrainEffectsHtml) parts.push(terrainEffectsHtml);
+  const weatherHtml = formatAppliedWeatherEffectHtml(weather);
+  if (weatherHtml) parts.push(weatherHtml);
+  return parts.length > 0 ? parts.join(', ') : null;
 }
 
 /**

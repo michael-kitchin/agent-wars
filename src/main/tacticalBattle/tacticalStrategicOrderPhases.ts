@@ -20,7 +20,8 @@ import {
   tacticalRes4HasStrikeableInfrastructure,
 } from '../../shared/tacticalTerrainCombatModifiers';
 import { tacticalRes4CellHasActiveTransportCorridor } from '../../shared/tacticalRes4TransportLink';
-import { getAttack } from '../combatConstants';
+import { attackHitThreshold } from '../combatHitThresholds';
+import { weatherAttackPenalty } from '../../shared/weatherBonusRules';
 import { runRangedPhase } from '../combatResolution';
 import { withOriginHitBonus, type OriginHitBonusLookup } from '../originBonus/originHitBonusLookup';
 import { buildTacticalOriginHitBonusLookupFromDb } from '../originBonus/originHitBonusLookupDb';
@@ -138,7 +139,17 @@ function tacticalSubUnitsToRangedCombatUnits(
       h3Index: u.h3Index,
       displayOrder: i,
     }));
-  return withOriginHitBonus(rows, originHitBonusAt);
+  return withOriginHitBonus(rows, originHitBonusAt).map((unit) => {
+    const source = subUnits.find((candidate) => candidate.id === unit.id);
+    const penalty = weatherAttackPenalty({
+      unitType: unit.unitType,
+      kind: 'ranged',
+      weatherAtUnit: battle.weather,
+      tags: source?.weatherTags,
+      enabled: battle.weatherBonusEnabled === true,
+    });
+    return penalty === 0 ? unit : { ...unit, weatherAttackPenalty: penalty };
+  });
 }
 
 /**
@@ -364,7 +375,18 @@ export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
       });
       continue;
     }
-    if (rollD6() > getAttack('air') + originHitBonusAt(attacker.id, attacker.h3Index)) {
+    if (rollD6() > attackHitThreshold({
+      unitType: 'air',
+      originHitBonus: originHitBonusAt(attacker.id, attacker.h3Index),
+      weatherAttackPenalty: weatherAttackPenalty({
+        unitType: 'air',
+        kind: 'airStrike',
+        weatherAtUnit: battle.weather,
+        weatherAtTarget: battle.weather,
+        tags: attacker.weatherTags,
+        enabled: battle.weatherBonusEnabled === true,
+      }),
+    })) {
       strikeMoves.push({
         unitId: attacker.id,
         player: attacker.player,
@@ -556,7 +578,17 @@ export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
     for (const o of rangedOrdersInfraOnly) {
       const atk = workBattle.subUnits.find((u) => u.id === o.unitId);
       if (!atk) continue;
-      if (rollRangedInfraStrikeD6() > getAttack(atk.unitType) + originHitBonusAt(atk.id, atk.h3Index)) continue;
+      if (rollRangedInfraStrikeD6() > attackHitThreshold({
+        unitType: atk.unitType,
+        originHitBonus: originHitBonusAt(atk.id, atk.h3Index),
+        weatherAttackPenalty: weatherAttackPenalty({
+          unitType: atk.unitType,
+          kind: 'ranged',
+          weatherAtUnit: workBattle.weather,
+          tags: atk.weatherTags,
+          enabled: workBattle.weatherBonusEnabled === true,
+        }),
+      })) continue;
       const hex = o.targetH3Index;
       if (rubbledInfraHexes.has(hex)) continue;
       if (!tacticalRes4HasStrikeableInfrastructure(workBattle, hex, res4RowsForBattle)) continue;

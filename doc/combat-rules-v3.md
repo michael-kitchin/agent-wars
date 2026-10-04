@@ -50,7 +50,7 @@ The game has four unit types. Per-side caps scale with match size (`getMaxUnitsP
 - **Range 1:** Unit can attack an enemy in any **adjacent** hex (H3 grid distance 1; includes land–water boundary; see §6 for coastal bombardment).
 - **Range 2:** Unit can attack enemies in hexes at distance 1 or 2. Range is H3 grid distance (same metric as movement).
 - **Range 3 (air only):** Unit can strike any hex within 3 hexes of its base airport. Air units do not use incremental movement — they strike from their base and return in the same phase.
-- **Move 0 (air):** Air units have no incremental movement. They reposition via ferry orders (up to 4 hexes between owned airports, one action per turn — see §4.4). Ferry range (4) is longer than strike range (3).
+- **Move 0 (air):** Air units have no incremental movement. They reposition via ferry orders (up to 4 hexes between owned airports, one action per turn — see §4.4). Ferry range (4) is longer than strike range (3). A ferry into snow can be 2 hexes when the weather bonus is on (§4.9).
 - **Cost:** Each res1 hex generates production points equal to its res4 urban hex count per turn (`buildProductionIncomeRule`). Points accumulate toward the queued unit; when accumulated points meet or exceed the cost, the unit spawns and excess carries over immediately. A hex produces as many units per turn as its rate and caps allow. Air also requires an airport at the hex; naval requires a seaport.
 
   Examples: a hex with 5 urban hexes produces one infantry (cost 20) every 4 turns. A hex with 10 urban hexes and a seaport queues a naval unit (cost 100): it spawns on turn 10 when accumulated production first reaches 100.
@@ -59,7 +59,7 @@ The game has four unit types. Per-side caps scale with match size (`getMaxUnitsP
 
   Each new unit records where it was born: its res1 hex, and one res4 cell inside that hex when the hex has land. An intact urban cell is chosen when the hex has one; otherwise any land cell. Rubble is not intact urban. A hex with no land cell records no cell, uses that hex's own terrain, and has no country. The chosen cell also stores its terrain, whether it is intact urban, and its country from the naming data ([terrain pipeline](terrain-pipeline.md)). The origin drives the flag and origin tooltip on unit names. It also drives the optional origin bonuses (§4.9): with both bonus flags off, the origin has no rules effect and AI prompts do not mention it.
 
-- **Strategic movement** is a flat hex budget (`getMovementBudget`): infantry 1, armor 2, naval 2, air 0. Terrain does **not** modify strategic movement costs. Naval movement is restricted to water and coastal hexes (`NAVAL_MOVEMENT_PROMPT_RULE`).
+- **Strategic movement** is a flat hex budget (`getMovementBudget`): infantry 1, armor 2, naval 2, air 0. Terrain does **not** modify strategic movement costs. With the weather bonus on, armor and naval can be shorter (§4.9). Naval movement is restricted to water and coastal hexes (`NAVAL_MOVEMENT_PROMPT_RULE`).
 
 ---
 
@@ -146,7 +146,7 @@ For each air unit with a ferry order:
 2. **If yes:** The air unit relocates to the destination airport.
 3. **If no:** Ferry aborts. If the origin airport is still owned and intact, the air unit stays. If the origin is also lost, the air unit is destroyed.
 
-Ferry range: maximum 4 hexes (H3 grid distance) between origin and destination airports. Both airports must be in hexes owned by the air unit's player at order time; destination validation occurs at resolution time.
+Ferry range: maximum 4 hexes (H3 grid distance) between origin and destination airports. With the weather bonus on, a destination in snow is 2 hexes when the unit lacks the snow tag (§4.9). Tactical ferry is unchanged. Both airports must be in hexes owned by the air unit's player at order time; destination validation occurs at resolution time.
 
 ### 4.6 Melee phase (post-move positions)
 
@@ -186,9 +186,26 @@ Two new-game options, **Country bonus** and **Terrain bonus**, are checked by de
 - **Who qualifies:** a unit without a recorded origin, or with a missing birth country or terrain, never qualifies for that test. Tactical sub-units use their parent unit's origin.
 - **Where a unit stands:** air strikes and ranged fire use pre-move positions; melee uses the melee hex or cell. An air unit is judged at its base, whatever it strikes. Cargo shares its carrier's position.
 - **Rolls that change:** ranged fire and return fire (including standing-order defend fire), both melee rolls, air strikes on units and on infrastructure, air-strike counter-fire by defending units, and tactical ranged fire at infrastructure.
-- **Rolls and rules that do not change:** infrastructure's fixed counter-fire, every casualty sort and air-strike victim pick (they keep the printed defense values), movement, ranges, enter costs, ferry range, sub-unit counts, and production.
+- **The origin bonus does not change:** infrastructure's fixed counter-fire, every casualty sort and air-strike victim pick (they keep the printed defense values), movement, ranges, enter costs, ferry range, sub-unit counts, and production. Weather, below, is a separate option.
 
 `estimate_combat` uses the same effective values. `assess_unit`, `assess_hex`, the briefing Unit Status table, and the AI combat rules paragraph report the bonus only while a flag that applies in that mode is on ([ai-tools.md](ai-tools.md)).
+
+#### Weather bonus (optional)
+
+**Weather bonus** is a new-game checkbox, checked by default, with a starting month under the options (January unless the player picks another month). Each strategic turn is one month. Every beat of a battle stays in that month and uses the weather of the enclosing hex.
+
+Weather is Mild, Rain, Snow, or Heat, from a fixed monthly climate, not a roll. A month is snow when its mean temperature is at or below 0°C; otherwise rain when precipitation is at least 120 mm; otherwise heat when the mean is at least 23°C; otherwise mild. A hot wet month displays as rain and still counts as heat. Land hexes are sampled at the centroid. A water hex copies the nearest land hex within two res1 steps, and is mild all year when no land is that close ([terrain pipeline](terrain-pipeline.md)).
+
+A unit is tagged for rain, snow, or heat when its birth hex has that condition in at least 3 of 12 months. Mild is never a tag. At most two tags. When three qualify, the two with more months are kept; equal counts keep snow, then heat, then rain. Tags are shown in the order snow, rain, heat. No birth hex means no tags. Sub-units inherit the parent.
+
+Penalties apply only to units that lack the tag. They never raise a printed stat. A match with no saved weather setting plays with the bonus off. An unreadable start month is January. Turn 1 of a January match is January.
+
+- **Strategic movement** is always infantry 1, armor 2, naval 2, air 0, even with the checkbox off. With the checkbox on, armor in snow or rain, and naval in snow, move 1 hex. The weather is the hex the unit occupies now, so it can still enter a worse hex at full speed and is slowed on the next turn. Route and distance estimates use that same budget for the whole path.
+- **Tactical movement:** armor's budget becomes 2 in snow or rain, and naval's becomes 2 in snow, then the lower of that and the existing forest or urban budget. Infantry's budget stays 2. Snow or rain raises the cost of entering open ground (plains, desert, wetlands, arctic, coastal) to 2. Roads, rubble, and urban costs do not change.
+- **Attack:** armor ranged attack, including return fire and air-strike counter-fire, is 1 lower in snow or heat. An air strike is 1 lower once when the base or the target is snow, rain, or heat the unit lacks. The printed attack is at least 1 before the origin bonus. Rain does not cut armor attack. Infantry attack is unchanged.
+- **Unchanged:** defense, melee dice, casualty order, and tactical ferry. A strategic ferry into snow is 2 hexes instead of 4 when the unit lacks the snow tag.
+
+`estimate_combat` uses the same attack thresholds. With the flag off, prompts stay as they were. With it on, the turn line names the month and the combat paragraph states these penalties.
 
 ### 4.10 Elimination
 
@@ -439,6 +456,7 @@ Tactical movement uses a per-beat **movement-point budget** consumed as sub-unit
 - Infantry or armor whose **current** cell is urban or rubble: budget **1** this beat, not the type baseline.
 - Armor whose current cell is forest: budget equals the **infantry** baseline (2).
 - A non-air unit always retains at least 1 point.
+- With the weather bonus on, the enclosing hex's weather applies after those terrain budgets (§4.9). Armor's budget becomes 2 in snow or rain, and naval's becomes 2 in snow, then the lower of that and the urban, rubble, or forest budget. Infantry's budget stays 2. Snow or rain raises infantry's cost to enter open ground (plains, desert, wetlands, arctic, coastal) to 2. Roads, rubble, and urban costs do not change. The table above stays the printed costs.
 - Entering an intact road cell costs half a point and an intact rail cell costs one third, for every terrain, for infantry and armor. The destination cell sets the rate (`1 / TACTICAL_TRANSPORT_ROAD_BUDGET_MULTIPLIER` and `1 / TACTICAL_TRANSPORT_RAIL_BUDGET_MULTIPLIER`). A unit may enter that cell from a neighbor that is not on the line, and may leave only onto terrain it can enter off the line or onto another intact line cell.
 - Urban enter override: infantry/armor enter urban at 1 MP when the cell has no road or rail. Rubble with no road or rail still costs 2 MP. Rubble on a road or rail costs 1 MP where the unit could already enter, and does not open water for infantry or mountains, wetlands, arctic, or water for armor. Naval treats rubble as blocking land.
 

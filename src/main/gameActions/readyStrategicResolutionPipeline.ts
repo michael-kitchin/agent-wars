@@ -23,6 +23,9 @@ import type {
 } from '../../shared/ipcTypes';
 import { resolveAirStrikePhase } from './airStrikeResolution';
 import { withOriginHitBonus } from '../originBonus/originHitBonusLookup';
+import { readPersistedOriginBonusSettings } from '../gameDb/originBonusConfig';
+import { weatherPenaltyForRoll } from '../weather/weatherMatch';
+import { weatherTagsForBirthHex } from '../weather/weatherPackLoad';
 import { buildStrategicOriginHitBonusLookupFromDb } from '../originBonus/originHitBonusLookupDb';
 import {
   applyEmbarkOrdersForPlayer,
@@ -47,6 +50,7 @@ import {
 import { collectTraversedHexesByPlayer } from './controlAndProduction';
 import { generateOrdersForStandingOrders } from '../tools/standingOrders';
 import { isWithinAirFerryGridRange } from './gridRange';
+import { strategicFerryRangeOnState } from '../weather/weatherMatch';
 import { hasIntactAirportAtStrategicAirBase } from '../returnFireAirportLookup';
 
 /**
@@ -203,8 +207,10 @@ export function executeReadyStrategicTurn(
     airStrikeResult.removedUnitIds,
     airStrikeResult.removedUnits
   );
+  const weatherSettings = readPersistedOriginBonusSettings({ getOne: dbGetOne, hasDb: () => true });
+  const listedForWeather = listUnitsForSnapshot();
   const rangedInputUnits = withOriginHitBonus(
-    listUnitsForSnapshot()
+    listedForWeather
       .filter((u) => {
         if (u.unitType !== 'infantry' && u.unitType !== 'armor') return true;
         return !isEmbarkedLandUnitOnWater(u.id);
@@ -217,7 +223,19 @@ export function executeReadyStrategicTurn(
         displayOrder: u.displayOrder,
       })),
     originHitBonusAt
-  );
+  ).map((unit) => {
+    const source = listedForWeather.find((candidate) => candidate.id === unit.id);
+    const penalty = weatherPenaltyForRoll({
+      unitType: unit.unitType,
+      kind: 'ranged',
+      enabled: weatherSettings.weatherBonusEnabled === true,
+      turnNumber,
+      startMonth: weatherSettings.startMonth ?? 1,
+      unitH3Index: unit.h3Index,
+      tags: weatherTagsForBirthHex(source?.origin?.birthH3Index),
+    });
+    return penalty === 0 ? unit : { ...unit, weatherAttackPenalty: penalty };
+  });
   const rangedResult = runRangedPhase(rangedInputUnits, hexList, allRanged, next, {
     theater: 'strategic',
     hasIntactAirportAtAirBase: hasIntactAirportAtStrategicAirBase,
@@ -308,7 +326,13 @@ export function executeReadyStrategicTurn(
     );
     if (!unit || unit.unit_type !== 'air') continue;
     const originH3Index = unit.h3_index;
-    const withinFerryRange = isWithinAirFerryGridRange(originH3Index, ferry.destinationH3Index, 'ready ferry');
+    const birth = dbGetOne<{ birth_h3_index: string | null }>('SELECT birth_h3_index FROM units WHERE id = ?', [ferry.unitId])?.birth_h3_index;
+    const ferryRange = strategicFerryRangeOnState(
+      { weatherTags: weatherTagsForBirthHex(birth) },
+      ferry.destinationH3Index,
+      { weatherBonusEnabled: weatherSettings.weatherBonusEnabled, turnNumber, startMonth: weatherSettings.startMonth }
+    );
+    const withinFerryRange = isWithinAirFerryGridRange(originH3Index, ferry.destinationH3Index, 'ready ferry', ferryRange);
     if (!withinFerryRange) continue;
     const destinationInfra = getRes1InfrastructureForHex(ferry.destinationH3Index);
     const destinationController = getHexController(ferry.destinationH3Index);

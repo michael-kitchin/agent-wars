@@ -91,7 +91,7 @@ export function estimateTacticalTurnsRequired(totalCost: number, budget: number,
  */
 export function estimateTacticalMarch(
   battle: TacticalBattleSnapshot,
-  mover: Pick<TacticalSubUnitSnapshot, 'unitType' | 'h3Index' | 'embarkedOnSubUnitId'>,
+  mover: Pick<TacticalSubUnitSnapshot, 'unitType' | 'h3Index' | 'embarkedOnSubUnitId' | 'weatherTags'>,
   toH3: string,
   res4Set?: ReadonlySet<string>
 ): TacticalMarchEstimate {
@@ -122,6 +122,9 @@ export function estimateTacticalMarch(
     res4Set: res4Set ?? new Set(battle.res4ChildH3Indexes),
     unitTypeForMovement: mover.unitType,
     movementPointBudget: budget,
+    weatherEnabled: battle.weatherBonusEnabled === true,
+    weather: battle.weather,
+    weatherTags: mover.weatherTags,
   });
   if (!plan.reachable || !plan.pathToDestination) return unreachable(budget);
   const pathLen = plan.pathToDestination.length;

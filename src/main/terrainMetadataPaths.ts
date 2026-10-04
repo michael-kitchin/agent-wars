@@ -69,6 +69,15 @@ const RES4_ROAD_RAIL_VECTORS_SEGMENTS = ['data', 'generated', 'terrain_res4_road
  * Exceptions: None.
  */
 const RES1_LANDMASS_SEGMENTS = ['data', 'generated', 'terrain_res1_landmass.json'] as const;
+/**
+ * Path segments for the res1 weather pack.
+ *
+ * Purpose: Campaign weather is a generated file, not a live climate query.
+ * When to use: `resolveTerrainRes1WeatherPath`.
+ * Expected outcome: Matches `data/generated/terrain_res1_weather.json`.
+ * Exceptions: None.
+ */
+const RES1_WEATHER_SEGMENTS = ['data', 'generated', 'terrain_res1_weather.json'] as const;
 
 /**
  * Documents the module-scope binding `testOverrideRoot` (testOverrideRoot: string | null).
@@ -203,6 +212,19 @@ export function resolveTerrainRes4NamingPath(): string {
 export function resolveTerrainRes1LandMassPath(): string {
   logDebug('terrainMetadataPaths resolveTerrainRes1LandMassPath');
   return resolveFirstExisting('terrain_res1_landmass.json', [...RES1_LANDMASS_SEGMENTS]);
+}
+
+/**
+ * Locates the res1 weather pack.
+ *
+ * Purpose: Startup and weather reads fail the same way as a missing terrain file.
+ * When to use: `ensureWeatherPackLoaded`.
+ * Expected outcome: Absolute path to `terrain_res1_weather.json`.
+ * Exceptions: Throws when no candidate exists.
+ */
+export function resolveTerrainRes1WeatherPath(): string {
+  logDebug('terrainMetadataPaths resolveTerrainRes1WeatherPath');
+  return resolveFirstExisting('terrain_res1_weather.json', [...RES1_WEATHER_SEGMENTS]);
 }
 
 /**

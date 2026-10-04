@@ -4,6 +4,7 @@
 
 import { logDebug, logTrace } from '../logger';
 import { ORIGIN_BONUS_OFF } from '../../shared/originBonusRules';
+import { parseStartMonth } from '../../shared/weatherBonusRules';
 import type { OriginBonusSettings } from '../../shared/originBonusTypes';
 import type { GameConfigKvDbOps } from './gameConfigKv';
 
@@ -28,11 +29,31 @@ export const COUNTRY_BONUS_CONFIG_KEY = 'country_bonus_enabled';
 export const TERRAIN_BONUS_CONFIG_KEY = 'terrain_bonus_enabled';
 
 /**
+ * `game_config` key for the weather bonus flag.
+ *
+ * Purpose: Frozen persisted key. A missing row means the flag is off.
+ * When to use: `persistOriginBonusSettings` / `readPersistedOriginBonusSettings` only.
+ * Expected outcome: Stable string `weather_bonus_enabled` with value `'1'` or `'0'`.
+ * Exceptions: None.
+ */
+export const WEATHER_BONUS_CONFIG_KEY = 'weather_bonus_enabled';
+
+/**
+ * `game_config` key for the match start month.
+ *
+ * Purpose: Frozen persisted key. A missing or invalid row means January.
+ * When to use: `persistOriginBonusSettings` / `readPersistedOriginBonusSettings` only.
+ * Expected outcome: Stable string `start_month` with value `'1'` through `'12'`.
+ * Exceptions: None.
+ */
+export const START_MONTH_CONFIG_KEY = 'start_month';
+
+/**
  * Writes both origin bonus flags for a new match.
  *
  * Purpose: Every new match records both flags, so one match's choice cannot leak into the next.
  * When to use: `resetGameForNewMatch`, and tests that need a specific setting.
- * Expected outcome: Two upserted rows with `'1'` or `'0'`.
+ * Expected outcome: Four upserted rows: the two origin flags, the weather flag, and the start month.
  * Exceptions: No-op when `hasDb` is present and false.
  */
 export function persistOriginBonusSettings(
@@ -44,6 +65,8 @@ export function persistOriginBonusSettings(
   const upsert = 'INSERT OR REPLACE INTO game_config (key, value) VALUES (?, ?)';
   ops.run(upsert, [COUNTRY_BONUS_CONFIG_KEY, settings.countryBonusEnabled ? '1' : '0']);
   ops.run(upsert, [TERRAIN_BONUS_CONFIG_KEY, settings.terrainBonusEnabled ? '1' : '0']);
+  ops.run(upsert, [WEATHER_BONUS_CONFIG_KEY, settings.weatherBonusEnabled === true ? '1' : '0']);
+  ops.run(upsert, [START_MONTH_CONFIG_KEY, String(parseStartMonth(settings.startMonth))]);
 }
 
 /**
@@ -59,8 +82,11 @@ export function readPersistedOriginBonusSettings(ops: Pick<GameConfigKvDbOps, 'g
   if (ops.hasDb && !ops.hasDb()) return ORIGIN_BONUS_OFF;
   const isOn = (key: string): boolean =>
     ops.getOne<{ value: string }>('SELECT value FROM game_config WHERE key = ?', [key])?.value === '1';
+  const startRaw = ops.getOne<{ value: string }>('SELECT value FROM game_config WHERE key = ?', [START_MONTH_CONFIG_KEY])?.value;
   return {
     countryBonusEnabled: isOn(COUNTRY_BONUS_CONFIG_KEY),
     terrainBonusEnabled: isOn(TERRAIN_BONUS_CONFIG_KEY),
+    weatherBonusEnabled: isOn(WEATHER_BONUS_CONFIG_KEY),
+    startMonth: parseStartMonth(startRaw),
   };
 }

@@ -83,11 +83,14 @@ export function normalizeOriginTerrainKind(raw: string | null | undefined): Pipe
  * Exceptions: None.
  */
 export function originBonusSettingsFromSnapshot(
-  state: Pick<GameStateSnapshot, 'countryBonusEnabled' | 'terrainBonusEnabled'>
+  state: Pick<GameStateSnapshot, 'countryBonusEnabled' | 'terrainBonusEnabled' | 'weatherBonusEnabled' | 'startMonth'>
 ): OriginBonusSettings {
   return {
     countryBonusEnabled: state.countryBonusEnabled === true,
     terrainBonusEnabled: state.terrainBonusEnabled === true,
+    ...(state.weatherBonusEnabled === true
+      ? { weatherBonusEnabled: true as const, startMonth: state.startMonth }
+      : {}),
   };
 }
 
@@ -129,18 +132,6 @@ export function originBonusSources(input: {
  */
 export function originHitBonusFromSources(sources: ReadonlyArray<OriginBonusSource>): OriginHitBonus {
   return sources.length > 0 ? ORIGIN_HIT_BONUS : 0;
-}
-
-/**
- * Builds the optional third line of a unit flag tooltip.
- *
- * Purpose: Keeps the tooltip wording in one tested place.
- * When to use: When building a unit flag for a live unit.
- * Expected outcome: `Bonus: +1 (country)` and similar, or `null` when the unit does not qualify.
- * Exceptions: None.
- */
-export function formatOriginBonusTooltipLine(sources: ReadonlyArray<OriginBonusSource>): string | null {
-  return sources.length > 0 ? `Bonus: +${ORIGIN_HIT_BONUS} (${sources.join(', ')})` : null;
 }
 
 /**

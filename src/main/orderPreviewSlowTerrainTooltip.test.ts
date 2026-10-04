@@ -125,7 +125,7 @@ test('resolveOrderSlowerTooltipHtml formats valid tactical march impact', () => 
     tacticalBattleActive: true,
     marchImpact: { slower: ['Forest'], roadRail: true },
   });
-  assert.ok(html?.includes('<strong>Slower:</strong> Forest'));
+  assert.ok(html?.includes('<strong>Slower:</strong> <span class="terrain-swatch" data-terrain-kind="forest" aria-hidden="true"></span>Forest'));
   assert.ok(html?.includes('<strong>Using:</strong> Road/Rail'));
 });
 

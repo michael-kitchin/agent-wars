@@ -1,4 +1,5 @@
 import { ORDER_BLOCK_HEX_TOOLTIP_TTL_MS } from '../core/constants';
+import { paintTerrainSwatches } from '../rendering/terrainVisualStyles';
 import { rendererSharedState as S } from '../core/state';
 import {
   blockingHoverMessageFromAirStrikeReason,
@@ -120,6 +121,7 @@ export function showOrderBlockHexTooltip(message: string | null): void {
   }
   orderBlockTooltip.show((el) => {
     el.innerHTML = blockingHoverMessageHtmlFromPlainMessage(message);
+    paintTerrainSwatches(el);
   });
 }
 

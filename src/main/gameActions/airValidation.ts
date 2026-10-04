@@ -11,6 +11,9 @@ import { fallbackDisplayNameFromUnitId } from '../../shared/unitDisplayNames';
 import { AIR_FERRY_RANGE_HEXES, AIR_STRIKE_RANGE_HEXES, formatFerryOutOfRangeReason, formatTargetOutOfRangeReason } from '../../shared/tacticalRanges';
 import { logTrace } from '../logger';
 import { isWithinAirFerryGridRange, isWithinAirStrikeGridRange } from './gridRange';
+import { readPersistedOriginBonusSettings } from '../gameDb/originBonusConfig';
+import { strategicFerryRangeOnState } from '../weather/weatherMatch';
+import { weatherTagsForBirthHex } from '../weather/weatherPackLoad';
 
 /**
  * Documents the `ValidationResult` type alias (export type ValidationResult).
@@ -128,8 +131,16 @@ export function validateFerryOrder(
   if (unit.player !== allowedPlayer) return { valid: false, reason: `Unit must belong to ${allowedPlayer}` };
   if (unit.unit_type !== 'air') return { valid: false, reason: 'Only air units can ferry' };
   if (!getMapHexSet().has(destinationH3Index)) return { valid: false, reason: 'Destination hex not on map' };
-  const withinFerryRange = isWithinAirFerryGridRange(unit.h3_index, destinationH3Index, 'validateFerryOrder');
-  if (!withinFerryRange) return { valid: false, reason: formatFerryOutOfRangeReason(AIR_FERRY_RANGE_HEXES) };
+  const weatherSettings = readPersistedOriginBonusSettings({ getOne: dbGetOne, hasDb: () => true });
+  const turnNumber = dbGetOne<{ turn_number: number }>('SELECT turn_number FROM turn_state WHERE id = 1')?.turn_number ?? 1;
+  const birth = dbGetOne<{ birth_h3_index: string | null }>('SELECT birth_h3_index FROM units WHERE id = ?', [unitId])?.birth_h3_index;
+  const ferryRange = strategicFerryRangeOnState(
+    { weatherTags: weatherTagsForBirthHex(birth) },
+    destinationH3Index,
+    { weatherBonusEnabled: weatherSettings.weatherBonusEnabled, turnNumber, startMonth: weatherSettings.startMonth }
+  );
+  const withinFerryRange = isWithinAirFerryGridRange(unit.h3_index, destinationH3Index, 'validateFerryOrder', ferryRange);
+  if (!withinFerryRange) return { valid: false, reason: formatFerryOutOfRangeReason(ferryRange) };
   const origin = getRes1InfrastructureForHex(unit.h3_index);
   if (origin.airportCount <= 0) return { valid: false, reason: 'Origin airport is not intact' };
   const destination = getRes1InfrastructureForHex(destinationH3Index);
