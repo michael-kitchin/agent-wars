@@ -30,6 +30,8 @@ When you change one of these, update `combat-rules-v3.md` (and any table that qu
 | Topic | Symbol |
 | --- | --- |
 | Attack / defense / strategic move / strategic range | `src/main/combatConstants.ts`, `src/shared/rangePerimeterModel.ts` |
+| Die size, hit-number floor and cap, infrastructure counter-fire | `src/main/combatDice.ts` |
+| Terrain cover by target terrain | `TERRAIN_COVER_BY_CATEGORY` and `URBAN_OR_RUBBLE_TERRAIN_COVER` in `src/shared/terrainCoverRules.ts` |
 | Unit costs and build prerequisites | `src/shared/productionConfig.ts`, `src/main/productionRules.ts` |
 | Per-side caps by game size | `src/shared/productionConfig.ts` (`MAX_UNITS_PER_TYPE`), `src/shared/gameSize.ts` |
 | Fog vision radii | `VISION_RANGE_BY_UNIT_TYPE` in `src/main/visibility.ts` |

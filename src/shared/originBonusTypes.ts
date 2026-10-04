@@ -1,6 +1,6 @@
 /**
  * Shapes for the optional origin bonuses: a unit standing in its birth country, or (in battles) on its birth terrain kind,
- * adds 1 (Low) or 2 (High) to the threshold of every hit roll it makes.
+ * adds 2 (Low) or 4 (High) to the threshold of every hit roll it makes.
  *
  * Purpose: Shared by main-process dice, AI tools, and renderer tooltips so every surface speaks the same vocabulary.
  * When to use: Import with `import type`; the runtime rules live in `originBonusRules.ts`.
@@ -15,10 +15,10 @@ import type { ActiveBonusLevel } from './bonusLevel';
  *
  * Purpose: Keeps the bonus a closed set so stacking can never grow it past the larger level's amount.
  * When to use: `CombatUnit.originHitBonus` and lookup results.
- * Expected outcome: `0` when the unit does not qualify, `1` at Low, `2` at High.
+ * Expected outcome: `0` when the unit does not qualify, `2` at Low, `4` at High.
  * Exceptions: None.
  */
-export type OriginHitBonus = 0 | 1 | 2;
+export type OriginHitBonus = 0 | 2 | 4;
 
 /**
  * Why a unit qualifies for an origin bonus.

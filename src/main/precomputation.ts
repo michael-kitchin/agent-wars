@@ -95,7 +95,7 @@ result: {
        *
        * Contract: Present exactly when `originBonusHere` is present; 0 when that list is empty.
        * When to use: The briefing's Unit Status Bonus column.
-       * Expected outcome: 0, 1, or 2.
+       * Expected outcome: 0, 2, or 4.
        * Exceptions: None.
        */
       originBonusAmount?: OriginHitBonus;

@@ -50,10 +50,10 @@ function testGetAssessmentCategory(): void {
  * Exceptions: None.
  */
 function testResolveOneMeleeDeterministic(): void {
-  const rollAlways3 = () => 3;
+  const rollAlways8 = () => 8;
   const atk = [makeUnit('a1', 'p1', 'armor', 'hex')];
   const def = [makeUnit('d1', 'p2', 'infantry', 'hex')];
-  const out = resolveOneMeleeEngagement(atk, def, rollAlways3);
+  const out = resolveOneMeleeEngagement(atk, def, rollAlways8);
   assert.ok(atk[0]!.unitType === 'armor' && def[0]!.unitType === 'infantry');
   assert.strictEqual(out.defenderRemovedIds.length, 1);
   assert.strictEqual(out.defenderRemovedIds[0], 'd1');
@@ -251,8 +251,8 @@ function testExactCombatProbabilities(): void {
   latLngByH3.set(h3, [0.5, 0.5]);
   const resolveToH3 = () => h3;
 
-  // 1 armor (attack 3, defense 2) melee vs 1 infantry (attack 1, defense 2). Melee roles are random, so the
-  // prediction averages "armor rolls 3/6 vs infantry 2/6" and "armor rolls 2/6 vs infantry 1/6".
+  // 1 armor (attack 10, defense 7) melee vs 1 infantry (attack 3, defense 7). Melee roles are random, so the
+  // prediction averages "armor rolls 10/20 vs infantry 7/20" and "armor rolls 7/20 vs infantry 3/20".
   type RoleCase = { probabilityDefenderEliminated: number; probabilityAttackerLosesUnit: number };
   const result = executeEstimateCombat(
     {
@@ -271,16 +271,16 @@ function testExactCombatProbabilities(): void {
     assessment: string;
   }; meleeRoleOutcomes?: { attackersRollAttack: RoleCase; attackersRollDefense: RoleCase } };
   assert.strictEqual(result.status, 'ok');
-  assert.ok(Math.abs(result.prediction!.probabilityDefenderEliminated - 5 / 12) < eps);
+  assert.ok(Math.abs(result.prediction!.probabilityDefenderEliminated - 17 / 40) < eps);
   assert.ok(Math.abs(result.prediction!.probabilityAttackerLosesUnit - 1 / 4) < eps);
-  assert.ok(Math.abs(result.prediction!.defenderLossesExpected - 5 / 12) < eps);
+  assert.ok(Math.abs(result.prediction!.defenderLossesExpected - 17 / 40) < eps);
   assert.ok(Math.abs(result.prediction!.attackerLossesExpected - 1 / 4) < eps);
   assert.strictEqual(result.prediction!.assessment, 'even');
   const roles = result.meleeRoleOutcomes!;
   assert.ok(Math.abs(roles.attackersRollAttack.probabilityDefenderEliminated - 1 / 2) < eps);
-  assert.ok(Math.abs(roles.attackersRollAttack.probabilityAttackerLosesUnit - 1 / 3) < eps);
-  assert.ok(Math.abs(roles.attackersRollDefense.probabilityDefenderEliminated - 1 / 3) < eps);
-  assert.ok(Math.abs(roles.attackersRollDefense.probabilityAttackerLosesUnit - 1 / 6) < eps);
+  assert.ok(Math.abs(roles.attackersRollAttack.probabilityAttackerLosesUnit - 7 / 20) < eps);
+  assert.ok(Math.abs(roles.attackersRollDefense.probabilityDefenderEliminated - 7 / 20) < eps);
+  assert.ok(Math.abs(roles.attackersRollDefense.probabilityAttackerLosesUnit - 3 / 20) < eps);
 }
 
 /**
@@ -379,8 +379,8 @@ function frenchOrigin(birthH3Index: string): UnitOrigin {
  *
  * Purpose: Estimates must use the same effective values as live dice.
  * When to use: After changing estimate thresholds or the strategic theater lookup.
- * Expected outcome: With the flag on, armor shows attack 4 and `originBonus: 1`; at High, attack 5 and `originBonus: 2`;
- * with it off, attack 3 and no key.
+ * Expected outcome: With the flag on, armor shows attack 12 and `originBonus: 2`; at High, attack 14 and `originBonus: 4`;
+ * with it off, attack 10 and no key.
  * Exceptions: None.
  */
 function testRangedEstimateReportsCountryBonus(): void {
@@ -401,13 +401,13 @@ function testRangedEstimateReportsCountryBonus(): void {
   const args = { engagementType: 'ranged', attackers: { units: ['opponent-armor-1'] }, targetHex: [0.5, 0.5] };
   type Summary = { attackerSummary?: { units: { attackValue: number; originBonus?: number }[] } };
   const on = executeEstimateCombat(args, state(true), latLngByH3, () => h3) as Summary;
-  assert.strictEqual(on.attackerSummary?.units[0]?.attackValue, 4);
-  assert.strictEqual(on.attackerSummary?.units[0]?.originBonus, 1);
+  assert.strictEqual(on.attackerSummary?.units[0]?.attackValue, 12);
+  assert.strictEqual(on.attackerSummary?.units[0]?.originBonus, 2);
   const high = executeEstimateCombat(args, state(true, 'high'), latLngByH3, () => h3) as Summary;
-  assert.strictEqual(high.attackerSummary?.units[0]?.attackValue, 5);
-  assert.strictEqual(high.attackerSummary?.units[0]?.originBonus, 2);
+  assert.strictEqual(high.attackerSummary?.units[0]?.attackValue, 14);
+  assert.strictEqual(high.attackerSummary?.units[0]?.originBonus, 4);
   const off = executeEstimateCombat(args, state(false), latLngByH3, () => h3) as Summary;
-  assert.strictEqual(off.attackerSummary?.units[0]?.attackValue, 3);
+  assert.strictEqual(off.attackerSummary?.units[0]?.attackValue, 10);
   assert.ok(!('originBonus' in off.attackerSummary!.units[0]!));
 }
 
@@ -446,8 +446,37 @@ function testMeleeEstimateJudgesAttackerAtTarget(): void {
     latLngByH3,
     () => target
   ) as { attackerSummary?: { units: { attackValue: number; originBonus?: number }[] } };
-  assert.strictEqual(result.attackerSummary?.units[0]?.attackValue, 4);
-  assert.strictEqual(result.attackerSummary?.units[0]?.originBonus, 1);
+  assert.strictEqual(result.attackerSummary?.units[0]?.attackValue, 12);
+  assert.strictEqual(result.attackerSummary?.units[0]?.originBonus, 2);
+}
+
+/**
+ * Verifies strategic ranged estimates lower the attack value by the target hex's cover.
+ *
+ * Purpose: Estimates must use the same effective values as live dice.
+ * When to use: After changing the strategic theater cover lookup or the attacker stamp.
+ * Expected outcome: Armor shows attack 8 at a forest hex and 10 at a plains hex.
+ * Exceptions: None.
+ */
+function testRangedEstimateAppliesTargetCover(): void {
+  const h3 = '891f1d48b9fffff';
+  const state = (terrainKind: string): GameStateSnapshot => ({
+    hexes: [{ h3Index: h3, terrain: 'land', terrainKind }],
+    units: [
+      { id: 'opponent-armor-1', player: 'opponent', unitType: 'armor', h3Index: h3 },
+      { id: 'human-infantry-1', player: 'human', unitType: 'infantry', h3Index: h3 },
+    ],
+    phase: 'planning',
+    turnNumber: 1,
+    pendingOrders: [],
+  });
+  const latLngByH3 = new Map<string, [number, number]>([[h3, [0.5, 0.5]]]);
+  const args = { engagementType: 'ranged', attackers: { units: ['opponent-armor-1'] }, targetHex: [0.5, 0.5] };
+  type Summary = { attackerSummary?: { units: { attackValue: number }[] } };
+  const forest = executeEstimateCombat(args, state('forest'), latLngByH3, () => h3) as Summary;
+  assert.strictEqual(forest.attackerSummary?.units[0]?.attackValue, 8);
+  const plains = executeEstimateCombat(args, state('plains'), latLngByH3, () => h3) as Summary;
+  assert.strictEqual(plains.attackerSummary?.units[0]?.attackValue, 10);
 }
 
 /**
@@ -472,6 +501,7 @@ export function runCombatEstimationVerification(): void {
   testExecuteEstimateCombatInvalidHex();
   testRangedEstimateReportsCountryBonus();
   testMeleeEstimateJudgesAttackerAtTarget();
+  testRangedEstimateAppliesTargetCover();
   console.log('Tool 3 verification: all checks passed.');
 }
 

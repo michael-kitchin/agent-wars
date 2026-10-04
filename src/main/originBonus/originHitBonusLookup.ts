@@ -3,7 +3,7 @@
  *
  * Purpose: Answers "how much does this unit add rolling at this position?" without touching the database, so combat code stays testable.
  * When to use: Build one lookup per combat phase and pass it to the roll sites; the database-backed builders live in `originHitBonusLookupDb.ts`.
- * Expected outcome: Lookups return 0, 1, or 2 and never throw.
+ * Expected outcome: Lookups return 0, 2, or 4 and never throw.
  * Exceptions: None.
  */
 import type { OriginBonusSettings, OriginHitBonus } from '../../shared/originBonusTypes';

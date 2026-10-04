@@ -85,16 +85,16 @@ test('both reasons are listed but the bonus does not stack', () => {
     place: { countryName: 'France', terrainKind: 'plains' },
   });
   assert.deepEqual(sources, ['country', 'terrain']);
-  assert.equal(originHitBonusFromSources(sources, BOTH_ON), 1);
+  assert.equal(originHitBonusFromSources(sources, BOTH_ON), 2);
 });
 
-test('a High bonus adds 2 and the larger level wins when both reasons apply', () => {
+test('a High bonus adds 4 and the larger level wins when both reasons apply', () => {
   const countryHigh: OriginBonusSettings = { ...BOTH_ON, countryBonusLevel: 'high', terrainBonusLevel: 'low' };
   const terrainHigh: OriginBonusSettings = { ...BOTH_ON, countryBonusLevel: 'low', terrainBonusLevel: 'high' };
-  assert.equal(originHitBonusFromSources(['country'], countryHigh), 2);
-  assert.equal(originHitBonusFromSources(['country', 'terrain'], countryHigh), 2);
-  assert.equal(originHitBonusFromSources(['country'], terrainHigh), 1);
+  assert.equal(originHitBonusFromSources(['country'], countryHigh), 4);
+  assert.equal(originHitBonusFromSources(['country', 'terrain'], countryHigh), 4);
+  assert.equal(originHitBonusFromSources(['country'], terrainHigh), 2);
   assert.equal(originHitBonusFromSources([], countryHigh), 0);
-  assert.equal(formatOriginBonusTableCell(['country'], 2), '+2 country');
+  assert.equal(formatOriginBonusTableCell(['country'], 4), '+4 country');
 });
 

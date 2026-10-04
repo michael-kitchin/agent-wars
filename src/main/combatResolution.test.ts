@@ -5,6 +5,7 @@
 
 import * as assert from 'assert';
 import { gridDisk, gridDistance, latLngToCell } from 'h3-js';
+import { COMBAT_DIE_SIDES } from './combatDice';
 import {
   resolveOneMeleeEngagement,
   resolveOneRangedEngagement,
@@ -88,7 +89,7 @@ function testRangedMixedStackTargetsEnemiesOnlyAndEnemyReturnFireOnly(): void {
     { unitId: 'opponent-armor-1', targetH3Index: hex },
     { unitId: 'opponent-armor-2', targetH3Index: hex },
   ];
-  const rollAlways1 = () => 0; // d6 => 1, every eligible shot hits.
+  const rollAlways1 = () => 0; // Combat die face 1, so every eligible shot hits.
 
   const out = runRangedPhase(units, [hex], rangedOrders, rollAlways1);
 
@@ -349,15 +350,15 @@ function testTacticalMountainBlocksArmorReturnFire(): void {
 }
 
 /**
- * Builds a unit-interval RNG whose d6 conversion always gives `roll`.
+ * Builds a unit-interval RNG whose combat die conversion always gives `roll`.
  *
- * Purpose: Rigs phase-level dice (`Math.floor(next() * 6) + 1`) to one exact face.
- * When to use: With `runRangedPhase` / `runMeleePhase`; engagement-level functions take a d6 function directly.
+ * Purpose: Rigs phase-level dice (`createCombatDieRoller`) to one exact face.
+ * When to use: With `runRangedPhase` / `runMeleePhase`; engagement-level functions take a die function directly.
  * Expected outcome: Every roll equals `roll`.
  * Exceptions: None.
  */
 function rollExactly(roll: number): () => number {
-  return () => (roll - 0.5) / 6;
+  return () => (roll - 0.5) / COMBAT_DIE_SIDES;
 }
 
 /**
@@ -365,7 +366,7 @@ function rollExactly(roll: number): () => number {
  *
  * Purpose: Ranged fire must read the effective threshold.
  * When to use: After changing ranged hit tests or `attackHitThreshold`.
- * Expected outcome: Armor (attack 3) hits a 4 only with the bonus; infantry return fire (attack 1) misses either way.
+ * Expected outcome: Armor (attack 10) hits an 11 only with the bonus; infantry return fire (attack 3) misses either way.
  * Exceptions: None.
  */
 function testRangedOriginBonusTurnsMissIntoHit(): void {
@@ -373,9 +374,9 @@ function testRangedOriginBonusTurnsMissIntoHit(): void {
   const armor = makeUnit('opponent-armor-1', 'opponent', 'armor', hex);
   const infantry = makeUnit('human-infantry-1', 'human', 'infantry', hex);
   const orders = [{ unitId: armor.id, targetH3Index: hex }];
-  const withBonus = runRangedPhase([{ ...armor, originHitBonus: 1 }, infantry], [hex], orders, rollExactly(4));
+  const withBonus = runRangedPhase([{ ...armor, originHitBonus: 2 }, infantry], [hex], orders, rollExactly(11));
   assert.deepStrictEqual(withBonus.removedUnitIds, [infantry.id]);
-  const without = runRangedPhase([armor, infantry], [hex], orders, rollExactly(4));
+  const without = runRangedPhase([armor, infantry], [hex], orders, rollExactly(11));
   assert.deepStrictEqual(without.removedUnitIds, []);
 }
 
@@ -384,17 +385,44 @@ function testRangedOriginBonusTurnsMissIntoHit(): void {
  *
  * Purpose: Melee defense rolls must read the effective threshold.
  * When to use: After changing melee hit tests or `defenseHitThreshold`.
- * Expected outcome: Infantry (defense 2) scores on a 3 only with the bonus.
+ * Expected outcome: Infantry (defense 7) scores on an 8 only with the bonus; the attacking infantry (attack 3) misses an 8 either way.
  * Exceptions: None.
  */
-function testMeleeDefenderOriginBonusScoresOnThree(): void {
+function testMeleeDefenderOriginBonusRaisesDefense(): void {
   const hex = '891f1d48b9fffff';
   const attacker = makeUnit('human-infantry-1', 'human', 'infantry', hex);
   const defender = makeUnit('opponent-infantry-1', 'opponent', 'infantry', hex);
-  const withBonus = resolveOneMeleeEngagement([attacker], [{ ...defender, originHitBonus: 1 }], () => 3);
+  const withBonus = resolveOneMeleeEngagement([attacker], [{ ...defender, originHitBonus: 2 }], () => 8);
   assert.deepStrictEqual(withBonus.attackerRemovedIds, [attacker.id]);
-  const without = resolveOneMeleeEngagement([attacker], [defender], () => 3);
+  const without = resolveOneMeleeEngagement([attacker], [defender], () => 8);
   assert.deepStrictEqual(without.attackerRemovedIds, []);
+}
+
+/**
+ * Verifies that target cover lowers direct fire but not return fire.
+ *
+ * Purpose: Cover belongs to the hex being fired at, so only the declared shots read it.
+ * When to use: After changing how `runRangedPhase` stamps cover or how `attackHitThreshold` reads it.
+ * Expected outcome: With cover 2 everywhere and every roll a 9, the attacking armor (10 - 2 = 8) misses and the defending armor's return fire (10) hits, so only the attacker is removed.
+ * Exceptions: None.
+ */
+function testRangedTargetCoverAppliesToAttackersOnly(): void {
+  const defenderHex = '89283082807ffff';
+  const attackerHex = gridDisk(defenderHex, 1).find((h) => h !== defenderHex);
+  assert.ok(attackerHex, 'need a neighbor hex');
+  const units: CombatUnit[] = [
+    makeUnit('atk', 'human', 'armor', attackerHex!),
+    makeUnit('def', 'opponent', 'armor', defenderHex),
+  ];
+  const out = runRangedPhase(
+    units,
+    [defenderHex, attackerHex!],
+    [{ unitId: 'atk', targetH3Index: defenderHex }],
+    rollExactly(9),
+    undefined,
+    () => 2
+  );
+  assert.deepStrictEqual(out.removedUnitIds, ['atk']);
 }
 
 /**
@@ -402,13 +430,13 @@ function testMeleeDefenderOriginBonusScoresOnThree(): void {
  *
  * Purpose: Casualties are picked by printed defense, so a bonus must not shield a unit.
  * When to use: After changing casualty sorts.
- * Expected outcome: With infantry (bonus) and armor both at printed defense 2, infantry is still lost first.
+ * Expected outcome: With infantry (bonus) and armor both at printed defense 7, infantry is still lost first.
  * Exceptions: None.
  */
 function testCasualtyOrderIgnoresOriginBonus(): void {
   const hex = '891f1d48b9fffff';
   const attacker = makeUnit('human-infantry-1', 'human', 'infantry', hex);
-  const infantry = { ...makeUnit('opponent-infantry-1', 'opponent', 'infantry', hex), originHitBonus: 1 as const };
+  const infantry = { ...makeUnit('opponent-infantry-1', 'opponent', 'infantry', hex), originHitBonus: 2 as const };
   const armor = makeUnit('opponent-armor-1', 'opponent', 'armor', hex);
   const out = resolveOneMeleeEngagement([attacker], [infantry, armor], () => 1);
   assert.deepStrictEqual(out.defenderRemovedIds, [infantry.id]);
@@ -434,7 +462,8 @@ function run(): void {
   testTacticalArmorDistance2ReturnFireOnPlains();
   testTacticalMountainBlocksArmorReturnFire();
   testRangedOriginBonusTurnsMissIntoHit();
-  testMeleeDefenderOriginBonusScoresOnThree();
+  testMeleeDefenderOriginBonusRaisesDefense();
+  testRangedTargetCoverAppliesToAttackersOnly();
   testCasualtyOrderIgnoresOriginBonus();
   console.log('combatResolution tests passed');
 }

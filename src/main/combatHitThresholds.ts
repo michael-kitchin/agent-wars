@@ -3,18 +3,20 @@
  *
  * Purpose: Adds a unit's origin bonus to its printed attack or defense value in one place, so every roll site agrees.
  * When to use: At every `roll <= threshold` hit test on a `CombatUnit`. Casualty sorts keep `getDefense`.
- * Expected outcome: The printed value, less any weather penalty on attack, plus the unit's `originHitBonus` (1 at Low, 2 at High).
+ * Expected outcome: The printed value, less any weather penalty and target cover on attack, plus the unit's `originHitBonus`, kept within `MIN_ATTACK_HIT_THRESHOLD` and `MAX_HIT_THRESHOLD`.
  * Exceptions: None.
  */
 import type { OriginHitBonus } from '../shared/originBonusTypes';
+import type { TerrainCover } from '../shared/terrainCoverRules';
 import type { WeatherAttackPenalty } from '../shared/weatherBonusTypes';
 import { getAttack, getDefense } from './combatConstants';
+import { MAX_HIT_THRESHOLD, MIN_ATTACK_HIT_THRESHOLD } from './combatDice';
 import { logTrace } from './logger';
 
 /**
  * The fields a hit threshold depends on.
  *
- * Purpose: Lets callers pass a `CombatUnit` or any lighter shape with the same two fields.
+ * Purpose: Lets callers pass a `CombatUnit` or any lighter shape with the same fields.
  * When to use: As the argument type of the threshold helpers below.
  * Expected outcome: Plain readonly data.
  * Exceptions: None.
@@ -41,27 +43,40 @@ export interface HitThresholdUnit {
   /**
    * Points removed from the printed attack before the origin bonus.
    *
-   * Contract: Absent and `0` leave the printed attack; `1` (Low) and `2` (High) lower it.
+   * Contract: Absent and `0` leave the printed attack; the Low and High amounts lower it.
    * When to use: Ranged and air-strike rows. Defense ignores it.
-   * Expected outcome: The printed attack is at least 1 after the penalty, then the origin bonus is added.
+   * Expected outcome: The printed attack is at least `MIN_ATTACK_HIT_THRESHOLD` after the penalty and cover, then the origin bonus is added.
    * Exceptions: None.
    */
   readonly weatherAttackPenalty?: WeatherAttackPenalty;
+  /**
+   * Cover the target's terrain gives against this shot.
+   *
+   * Contract: Absent and `0` leave the attack unchanged; set through `withTargetCover`.
+   * When to use: Ranged fire and air strikes at units. Return fire, anti-air, melee, and defense ignore it.
+   * Expected outcome: Subtracted from the printed attack together with the weather penalty, before the floor.
+   * Exceptions: None.
+   */
+  readonly targetCover?: TerrainCover;
 }
 
 /**
  * Returns the highest die face that scores an attack hit for this unit.
  *
  * Purpose: Attack, ranged fire, and return-fire hit tests.
- * When to use: As `rollD6() <= attackHitThreshold(unit)`.
- * Expected outcome: Printed attack, minus a weather penalty, floored at 1, plus the origin bonus.
+ * When to use: As `rollDie() <= attackHitThreshold(unit)`.
+ * Expected outcome: Printed attack, minus a weather penalty and target cover, floored at `MIN_ATTACK_HIT_THRESHOLD`, plus the origin bonus, capped at `MAX_HIT_THRESHOLD`.
  * Exceptions: None.
  */
 export function attackHitThreshold(unit: HitThresholdUnit): number {
   const printed = getAttack(unit.unitType);
   const penalty = unit.weatherAttackPenalty ?? 0;
-  const threshold = Math.max(1, printed - penalty) + (unit.originHitBonus ?? 0);
-  logTrace('combatHitThresholds attackHitThreshold', { unitType: unit.unitType, penalty, threshold });
+  const cover = unit.targetCover ?? 0;
+  const threshold = Math.min(
+    MAX_HIT_THRESHOLD,
+    Math.max(MIN_ATTACK_HIT_THRESHOLD, printed - penalty - cover) + (unit.originHitBonus ?? 0)
+  );
+  logTrace('combatHitThresholds attackHitThreshold', { unitType: unit.unitType, penalty, cover, threshold });
   return threshold;
 }
 
@@ -69,10 +84,10 @@ export function attackHitThreshold(unit: HitThresholdUnit): number {
  * Returns the highest die face that scores a defense hit for this unit.
  *
  * Purpose: Melee defense hit tests.
- * When to use: As `rollD6() <= defenseHitThreshold(unit)`; never for casualty order.
- * Expected outcome: `getDefense(unitType)` plus the origin bonus.
+ * When to use: As `rollDie() <= defenseHitThreshold(unit)`; never for casualty order.
+ * Expected outcome: `getDefense(unitType)` plus the origin bonus, capped at `MAX_HIT_THRESHOLD`.
  * Exceptions: None.
  */
 export function defenseHitThreshold(unit: HitThresholdUnit): number {
-  return getDefense(unit.unitType) + (unit.originHitBonus ?? 0);
+  return Math.min(MAX_HIT_THRESHOLD, getDefense(unit.unitType) + (unit.originHitBonus ?? 0));
 }

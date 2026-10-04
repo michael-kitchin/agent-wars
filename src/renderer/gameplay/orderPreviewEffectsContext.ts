@@ -3,12 +3,13 @@
  *
  * Purpose: The formatter does not read renderer state. This module does, from data the client already has.
  * When to use: `publishHoverRoutePreview`, after the blocked message is known.
- * Expected outcome: A kind, the selected units' origin weather and tags, and the tactical ranged-cap slice when the order is a battle shot.
+ * Expected outcome: A kind, the selected units' origin weather and tags, the tactical ranged-cap slice when the order is a battle shot, and the target's cover place when a shot aims at visible enemy units.
  * Exceptions: None.
  */
 
 import type { OrderPreviewEffectsKind, OrderPreviewEffectsTooltipInput, OrderPreviewEffectsUnit } from '../../shared/orderPreviewEffectsTooltip';
 import type { WeatherState } from '../../shared/weatherBonusTypes';
+import { tacticalCellCoverPlace, type TerrainCoverPlace } from '../../shared/terrainCoverRules';
 import { weatherBonusLevelOf } from '../../shared/weatherBonusRules';
 import { rendererSharedState as S } from '../core/state';
 import type { HoverRoutePreviewState } from '../core/types';
@@ -31,7 +32,7 @@ export type OrderPreviewEffectsContextArgs = {
  *
  * Purpose: Classifies march, ferry, air strike, and ranged attack the same way the preview was built.
  * When to use: When deciding whether `#order-slower-tooltip` has anything to say.
- * Expected outcome: Tactical ferry is still passed through; the formatter returns null for it. Strategic terrain is not consulted.
+ * Expected outcome: Tactical ferry is still passed through; the formatter returns null for it. Strategic terrain is consulted only for the target's cover.
  * Exceptions: None.
  */
 export function buildOrderPreviewEffectsTooltipInput(
@@ -51,7 +52,29 @@ export function buildOrderPreviewEffectsTooltipInput(
     marchImpact: args.preview.data.orderPreviewTerrainImpact ?? null,
     rangedBattle: kind === 'ranged' ? battle : null,
     rangedPreviewUnitIds: args.preview.data.previews.map((row) => row.unitId),
+    targetCover: kind === 'ranged' || kind === 'airStrike' ? targetCoverPlace(args.preview.hoveredH3Index) : null,
   };
+}
+
+/**
+ * Returns the cover place of a hovered target that holds a visible enemy unit.
+ *
+ * Purpose: Cover only matters when the shot has units to protect, and the tooltip must not reveal units the player cannot see.
+ * When to use: Ranged and air-strike hovers, from `buildOrderPreviewEffectsTooltipInput`.
+ * Expected outcome: In a battle, the engine's own cell cover place; on the world map, the hex's terrain kind from the snapshot (which already omits hidden enemy units). Null when no visible enemy unit is there.
+ * Exceptions: None.
+ */
+function targetCoverPlace(hoveredH3Index: string): TerrainCoverPlace | null {
+  const battle = S.tacticalBattleSnapshot;
+  if (battle) {
+    const enemyHere = battle.subUnits.some((unit) => unit.player !== 'human' && unit.h3Index === hoveredH3Index);
+    return enemyHere ? tacticalCellCoverPlace(battle, hoveredH3Index) : null;
+  }
+  const state = S.gameState;
+  if (!state) return null;
+  const enemyHere = state.units.some((unit) => unit.player !== 'human' && unit.h3Index === hoveredH3Index);
+  if (!enemyHere) return null;
+  return { terrainKind: state.hexes.find((hex) => hex.h3Index === hoveredH3Index)?.terrainKind ?? null };
 }
 
 /**

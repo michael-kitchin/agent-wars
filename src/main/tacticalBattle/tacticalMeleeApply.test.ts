@@ -14,6 +14,7 @@ import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import type { UnitOrigin } from '../../shared/unitOriginTypes';
 import { dbRun, isDbReady } from '../gameDb';
 import { persistOriginBonusSettings } from '../gameDb/originBonusConfig';
+import { COMBAT_DIE_SIDES } from '../combatDice';
 import { applyTacticalMeleeAfterSupportOrders } from './tacticalMeleeApply';
 import { firstRingCellDistinctFrom, tacticalRes1Cell, tacticalRes4UnderRes1Corner } from './testSupport/tacticalRes4HexFixtures';
 import { withTempGameDb } from '../testSupport/withTempGameDb';
@@ -103,14 +104,14 @@ test('tactical melee adds the terrain bonus only while the terrain flag is on', 
         },
       ],
     };
-    const rollThree = () => (3 - 0.5) / 6;
+    const rollEight = () => (8 - 0.5) / COMBAT_DIE_SIDES;
     persistOriginBonusSettings({ run: dbRun, hasDb: isDbReady }, { countryBonusEnabled: false, terrainBonusEnabled: true });
     assert.deepEqual(
-      applyTacticalMeleeAfterSupportOrders(snap, rollThree).meleeRemovedUnits.map((u) => u.id),
+      applyTacticalMeleeAfterSupportOrders(snap, rollEight).meleeRemovedUnits.map((u) => u.id),
       ['opp-n']
     );
     persistOriginBonusSettings({ run: dbRun, hasDb: isDbReady }, { countryBonusEnabled: false, terrainBonusEnabled: false });
-    assert.deepEqual(applyTacticalMeleeAfterSupportOrders(snap, rollThree).meleeRemovedUnits, []);
+    assert.deepEqual(applyTacticalMeleeAfterSupportOrders(snap, rollEight).meleeRemovedUnits, []);
   });
 });
 

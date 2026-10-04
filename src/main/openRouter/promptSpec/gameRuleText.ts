@@ -1,6 +1,6 @@
 /**
  * Engine-fact sentences both consultation modes need: dice, stats, resolution order,
- * casualty sort, origin bonus, occupancy, movement budgets, ranged reach, air employment, hold-fire,
+ * casualty sort, origin bonus, weather, terrain cover, occupancy, movement budgets, ranged reach, air employment, hold-fire,
  * production income, and intel staleness.
  *
  * Purpose: These facts used to live inline in the assembler or not at all. Every number
@@ -41,7 +41,14 @@ import {
   WEATHER_SLOWING_STATES,
   weatherBonusLevelOf,
 } from '../../../shared/weatherBonusRules';
-import type { WeatherState } from '../../../shared/weatherBonusTypes';
+import {
+  TERRAIN_COVER_BY_CATEGORY,
+  URBAN_OR_RUBBLE_TERRAIN_COVER,
+  type TerrainCoverPair,
+  type TerrainCoverShooter,
+} from '../../../shared/terrainCoverRules';
+import type { TacticalMovementCategory } from '../../../shared/tacticalTerrainMovement';
+import { COMBAT_DIE_SIDES, MAX_HIT_THRESHOLD, MIN_ATTACK_HIT_THRESHOLD } from '../../combatDice';
 import type { PromptCoordinateMode } from './envelopeContract';
 
 /**
@@ -136,7 +143,7 @@ function formatReachClause(unitType: string, mode: PromptCoordinateMode): string
  *
  * Purpose: strategic-prompt.md section 1.5 items 1–2. The model cannot choose a target without the stats.
  * When to use: First clause of `buildCombatRulesParagraph`.
- * Expected outcome: The existing "Combat: d6 per shot" sentence with engine stats interpolated; air is omitted when `hasAirUnits` is false.
+ * Expected outcome: The "Combat: d20 per shot" sentence with the hit-number floor, the cap, and engine stats interpolated; air is omitted when `hasAirUnits` is false.
  * Exceptions: None.
  */
 export function buildCombatStatsLine(mode: PromptCoordinateMode, hasAirUnits = true): string {
@@ -146,7 +153,10 @@ export function buildCombatStatsLine(mode: PromptCoordinateMode, hasAirUnits = t
     (unitType) =>
       `${unitType}: ${getAttack(unitType)} attack / ${getDefense(unitType)} defense${formatReachClause(unitType, mode)}`
   ).join('; ');
-  return `Combat: d6 per shot — attack hits on roll ≤ attack stat; defense hits on roll ≤ defense. ${summary}.`;
+  return (
+    `Combat: d${COMBAT_DIE_SIDES} per shot — an attack hits on a roll at or below its attack value and a defensive melee roll hits at or below its defense value, after the changes below. ` +
+    `Penalties and cover never lower an attack value below ${MIN_ATTACK_HIT_THRESHOLD} before bonuses, and no value exceeds ${MAX_HIT_THRESHOLD}. ${summary}.`
+  );
 }
 
 /**
@@ -223,16 +233,16 @@ export function buildOriginBonusRule(gates: GameRuleTextGates): string | null {
 }
 
 /**
- * Joins weather names into a prompt list.
+ * Joins names into an "or" list for prompt prose.
  *
- * Purpose: The slowing-weather lists come from a table, so the sentence must read naturally for one, two, or three names.
- * When to use: `buildWeatherRule` only.
+ * Purpose: Weather and cover lists come from tables, so the sentence must read naturally for any number of names.
+ * When to use: `buildWeatherRule` and `buildTerrainCoverRule`.
  * Expected outcome: `snow`, `snow or rain`, or `snow, rain, or heat`, in the order given.
  * Exceptions: None.
  */
-function formatWeatherList(states: ReadonlyArray<WeatherState>): string {
-  if (states.length <= 2) return states.join(' or ');
-  return `${states.slice(0, -1).join(', ')}, or ${states[states.length - 1]}`;
+function formatOrList(items: readonly string[]): string {
+  if (items.length <= 2) return items.join(' or ');
+  return `${items.slice(0, -1).join(', ')}, or ${items[items.length - 1]}`;
 }
 
 /**
@@ -248,8 +258,8 @@ export function buildWeatherRule(gates: GameRuleTextGates): string | null {
   const level = weatherBonusLevelOf(gates.originBonusSettings);
   logTrace('promptSpec buildWeatherRule', { level });
   if (gates.originBonusSettings.weatherBonusEnabled !== true || level === 'off') return null;
-  const armor = formatWeatherList(WEATHER_SLOWING_STATES[level].armor ?? []);
-  const naval = formatWeatherList(WEATHER_SLOWING_STATES[level].naval ?? []);
+  const armor = formatOrList(WEATHER_SLOWING_STATES[level].armor ?? []);
+  const naval = formatOrList(WEATHER_SLOWING_STATES[level].naval ?? []);
   const budget = TACTICAL_WEATHER_BUDGET_CAP[level];
   const penalty = WEATHER_ATTACK_PENALTY_BY_LEVEL[level];
   return (
@@ -262,6 +272,91 @@ export function buildWeatherRule(gates: GameRuleTextGates): string | null {
     'Defense, melee, and casualty order keep their printed values. A tag is earned by the birth hex. ' +
     'The Unit Status Weather column names the weather where that unit stands. Birth tags, when the unit has any, follow in parentheses.'
   );
+}
+
+/**
+ * Prompt name for each terrain category in the cover sentence.
+ *
+ * Purpose: The cover table is keyed by plural movement categories; the prose uses the singular terrain words players see.
+ * When to use: `terrainCoverPromptEntries` only.
+ * Expected outcome: One word per category, so a category that gains cover later is named without a code change here.
+ * Exceptions: None.
+ */
+const TERRAIN_COVER_PROMPT_NAME: Readonly<Record<TacticalMovementCategory, string>> = Object.freeze({
+  plains: 'plains',
+  forests: 'forest',
+  mountains: 'mountain',
+  wetlands: 'wetlands',
+  desert: 'desert',
+  arctic: 'arctic',
+  coastal: 'coastal',
+  water: 'water',
+});
+
+/**
+ * Lists the named cover sources that exist in one mode.
+ *
+ * Purpose: Strategic hexes read only their dominant terrain kind; battle cells add urban and rubble.
+ * When to use: `buildTerrainCoverRule` only.
+ * Expected outcome: Terrain entries in table order, then urban and rubble in battle mode.
+ * Exceptions: None.
+ */
+function terrainCoverPromptEntries(mode: PromptCoordinateMode): ReadonlyArray<{ readonly name: string; readonly pair: TerrainCoverPair }> {
+  const terrain = (Object.keys(TERRAIN_COVER_BY_CATEGORY) as TacticalMovementCategory[]).map((category) => ({
+    name: TERRAIN_COVER_PROMPT_NAME[category],
+    pair: TERRAIN_COVER_BY_CATEGORY[category],
+  }));
+  if (mode !== 'tactical') return terrain;
+  return [...terrain, { name: 'urban', pair: URBAN_OR_RUBBLE_TERRAIN_COVER }, { name: 'rubble', pair: URBAN_OR_RUBBLE_TERRAIN_COVER }];
+}
+
+/**
+ * Writes one cover clause for one shooter column, largest cover first.
+ *
+ * Purpose: Groups sources that share a cover value so the sentence names each value once.
+ * When to use: `buildTerrainCoverRule` only.
+ * Expected outcome: `<lead> <place for the largest group> needs a roll N lower, or M lower for <names>.`; null when no source covers against this shooter.
+ * Exceptions: None.
+ */
+function terrainCoverClause(input: {
+  readonly entries: ReadonlyArray<{ readonly name: string; readonly pair: TerrainCoverPair }>;
+  readonly shooter: TerrainCoverShooter;
+  readonly lead: string;
+  readonly place: (names: string) => string;
+}): string | null {
+  const namesByCover = new Map<number, string[]>();
+  for (const { name, pair } of input.entries) {
+    const cover = pair[input.shooter];
+    if (cover > 0) namesByCover.set(cover, [...(namesByCover.get(cover) ?? []), name]);
+  }
+  const [top, ...rest] = [...namesByCover.entries()].sort(([a], [b]) => b - a);
+  if (!top) return null;
+  const [topCover, topNames] = top;
+  const tail = rest.map(([cover, names]) => `, or ${cover} lower for ${formatOrList(names)}`).join('');
+  return `${input.lead} ${input.place(formatOrList(topNames))} needs a roll ${topCover} lower${tail}.`;
+}
+
+/**
+ * Terrain cover sentence for this mode.
+ *
+ * Purpose: Cover changes every ranged and air-strike hit number at covered targets, so the model must know where it applies and where it does not.
+ * When to use: Combat paragraph right after the weather sentence; always included, because cover has no setting.
+ * Expected outcome: Strategic text names hexes by main terrain; battle text names cells and adds urban and rubble. Values come from the cover tables.
+ * Exceptions: None.
+ */
+export function buildTerrainCoverRule(mode: PromptCoordinateMode): string {
+  logTrace('promptSpec buildTerrainCoverRule', { mode });
+  const tactical = mode === 'tactical';
+  const entries = terrainCoverPromptEntries(mode);
+  const place = (names: string): string => (tactical ? `a ${names} cell` : `a hex whose main terrain is ${names}`);
+  const clauses = [
+    terrainCoverClause({ entries, shooter: 'surface', lead: 'ranged fire at', place }),
+    terrainCoverClause({ entries, shooter: 'air', lead: 'An air strike on units in', place }),
+  ].filter((clause): clause is string => clause !== null);
+  const ignored = tactical
+    ? 'Melee, return fire, anti-air fire, and shots at infrastructure ignore cover.'
+    : 'Melee, return fire, anti-air fire, and strikes on infrastructure ignore cover.';
+  return `Terrain cover: ${[...clauses, ignored].join(' ')}`;
 }
 
 /**
@@ -428,7 +523,7 @@ export function buildIntelStalenessRule(): string {
 /**
  * Naval fire, movement domain, and land-target routing.
  *
- * Purpose: strategic-prompt.md section 1.5 item 12. Reach is `getRange('naval')`, not a copied numeral.
+ * Purpose: strategic-prompt.md section 1.5 item 14. Reach is `getRange('naval')`, not a copied numeral.
  * When to use: Combat paragraph when `hasNavalUnits` is true.
  * Expected outcome: Fire within engine range, water/coastal movement, route to the nearest water or coastal cell.
  * Exceptions: None.
@@ -446,7 +541,7 @@ function buildNavalClause(mode: PromptCoordinateMode): string {
 /**
  * One-attack-per-unit and target-field constraints, plus the period-start tempo sentence.
  *
- * Purpose: strategic-prompt.md section 1.5 items 6–7. Air strikes join the tempo sentence only when air is present.
+ * Purpose: strategic-prompt.md section 1.5 items 9 and 13. Air strikes join the tempo sentence only when air is present.
  * When to use: Inside `buildCombatRulesParagraph`.
  * Expected outcome: Existing targetHexCode/targetUnitId wording and the "does not prevent movement" tempo clause.
  * Exceptions: None.
@@ -469,7 +564,7 @@ function buildAttackConstraintsClause(gates: GameRuleTextGates): string {
  * has one home. Clause order follows strategic-prompt.md section 1.5, with tactical substitutions from 2.5.
  * When to use: Once per assembled system prompt, after roster and tool flags are known.
  * Expected outcome: Hold-fire only when `ordersEnabled`; air and naval clauses only when those units exist;
- * the origin bonus sentence only when a flag applies in this mode.
+ * the origin bonus sentence only when a flag applies in this mode; the terrain cover sentence always, after weather.
  * Exceptions: None.
  */
 export function buildCombatRulesParagraph(gates: GameRuleTextGates): string {
@@ -481,6 +576,7 @@ export function buildCombatRulesParagraph(gates: GameRuleTextGates): string {
     buildCasualtySortRule(),
     ...(originBonus ? [originBonus] : []),
     ...(weatherRule ? [weatherRule] : []),
+    buildTerrainCoverRule(gates.coordinateMode),
     buildResolutionOrderRule(gates.coordinateMode),
     'Ranged uses pre-move positions.',
     buildAttackConstraintsClause(gates),

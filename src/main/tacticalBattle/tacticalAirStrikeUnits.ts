@@ -13,6 +13,7 @@ import { casualtyPriorityIndex, getDefense } from '../combatConstants';
 import { attackHitThreshold } from '../combatHitThresholds';
 import { weatherAttackPenalty, weatherBonusLevelOf } from '../../shared/weatherBonusRules';
 import type { OriginHitBonusLookup } from '../originBonus/originHitBonusLookup';
+import type { TerrainCover } from '../../shared/terrainCoverRules';
 import { tacticalEmbarkedLandExcludedFromRangedInput } from './tacticalCombatInput';
 import { tacticalLogMutate } from './tacticalLogging';
 
@@ -62,23 +63,32 @@ export interface TacticalAirStrikeOnUnitsInput {
    */
   readonly targetH3Index: string;
   /**
-   * d6 roller drawing from the shared tactical PRNG.
+   * Combat die roller drawing from the shared tactical PRNG.
    *
    * Contract: Called once for the attack, then once per eligible defender until the attacker is lost.
-   * When to use: Always.
-   * Expected outcome: Integers 1–6.
+   * When to use: Always; build it with `createCombatDieRoller`.
+   * Expected outcome: Integers from 1 to `COMBAT_DIE_SIDES`.
    * Exceptions: None.
    */
-  readonly rollD6: () => number;
+  readonly rollDie: () => number;
   /**
    * Origin bonus per sub-unit at its own cell.
    *
    * Contract: Added to the attack threshold and to each counter-fire threshold.
    * When to use: Always; pass `noOriginHitBonus` when bonuses do not apply.
-   * Expected outcome: 0, 1, or 2 per roll.
+   * Expected outcome: 0, 2, or 4 per roll.
    * Exceptions: None.
    */
   readonly originHitBonusAt: OriginHitBonusLookup;
+  /**
+   * Air cover of the struck cell.
+   *
+   * Contract: Subtracted from the attack threshold only; anti-air rolls ignore it.
+   * When to use: Always; compute it with `tacticalCellTerrainCover(battle, targetH3Index, 'air')`.
+   * Expected outcome: 0 on open ground, 1 in forest, urban, or rubble.
+   * Exceptions: None.
+   */
+  readonly targetCover: TerrainCover;
   /**
    * Sub-unit ids to remove after the strike.
    *
@@ -157,15 +167,16 @@ export function markTacticalSubUnitCasualty(
  * Purpose: Keeps tactical air casualties and AA return fire aligned with strategic dice while only removing the struck sub-unit (plus cargo on that naval sub).
  * When to use: Inside `applyTacticalAirStrikeThenRangedPhaseOnBattle` for each `targetType === 'units'` order.
  * Expected outcome: Mutates `toRemove` and kill ledgers; strategic parent delete is deferred to `syncStrategicUnitsDbWhenTacticalParentsEliminated`.
- *   The attack roll and each counter-fire roll add the roller's origin bonus at its own cell; the victim pick keeps printed defense values.
+ *   The attack roll and each counter-fire roll add the roller's origin bonus at its own cell; the attack roll alone loses the target cell's cover; the victim pick keeps printed defense values.
  * Exceptions: None.
  */
 export function resolveTacticalAirStrikeAgainstUnitsOnSubUnits(input: TacticalAirStrikeOnUnitsInput): void {
-  const { battle, sub, attacker, targetH3Index, rollD6, originHitBonusAt, toRemove, killsByAirStrike, killsByReturnFire } =
+  const { battle, sub, attacker, targetH3Index, rollDie, originHitBonusAt, targetCover, toRemove, killsByAirStrike, killsByReturnFire } =
     input;
   tacticalLogMutate('resolveTacticalAirStrikeAgainstUnitsOnSubUnits', {
     attackerSubUnitId: attacker.id,
     targetH3Index,
+    targetCover,
   });
   const defenders = sub.filter((u) => u.h3Index === targetH3Index && u.player !== attacker.player);
   const eligibleForAa = defenders.filter(
@@ -173,7 +184,7 @@ export function resolveTacticalAirStrikeAgainstUnitsOnSubUnits(input: TacticalAi
       (d.unitType !== 'infantry' && d.unitType !== 'armor') ||
       !tacticalEmbarkedLandExcludedFromRangedInput(battle, sub, d)
   );
-  const attackHit = rollD6() <= attackHitThreshold({
+  const attackHit = rollDie() <= attackHitThreshold({
     unitType: 'air',
     originHitBonus: originHitBonusAt(attacker.id, attacker.h3Index),
     weatherAttackPenalty: weatherAttackPenalty({
@@ -184,6 +195,7 @@ export function resolveTacticalAirStrikeAgainstUnitsOnSubUnits(input: TacticalAi
       tags: attacker.weatherTags,
       level: weatherBonusLevelOf(battle),
     }),
+    targetCover,
   });
   if (attackHit && defenders.length > 0) {
     const victim = [...defenders].sort(
@@ -203,7 +215,7 @@ export function resolveTacticalAirStrikeAgainstUnitsOnSubUnits(input: TacticalAi
     if (toRemove.has(attacker.id)) break;
     if (toRemove.has(defender.id)) continue;
     if (!unitHasTacticalRangedBaseline(defender.unitType)) continue;
-    if (rollD6() > attackHitThreshold({
+    if (rollDie() > attackHitThreshold({
       unitType: defender.unitType,
       originHitBonus: originHitBonusAt(defender.id, defender.h3Index),
       weatherAttackPenalty: weatherAttackPenalty({

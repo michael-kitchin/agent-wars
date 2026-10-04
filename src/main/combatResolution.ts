@@ -1,11 +1,12 @@
 /**
  * Combat resolution per combat spec: participant IDs, ranged phase (declared attacks;
  * defenders may return fire when planning-parity reverse reach allows), then melee phase.
- * One d6 per unit, hit when roll ≤ attack/defense; casualty priority lowest defense first,
- * then infantry → armor → naval. Uses seeded RNG for determinism.
+ * One combat die (`COMBAT_DIE_SIDES` faces) per unit, hit when roll ≤ attack/defense hit number; casualty
+ * priority lowest defense first, then infantry → armor → naval. Uses seeded RNG for determinism.
  */
 
 import { getDefense, casualtyPriorityIndex } from './combatConstants';
+import { createCombatDieRoller } from './combatDice';
 import { attackHitThreshold, defenseHitThreshold } from './combatHitThresholds';
 import { createSeededRng } from './seededRng';
 import { logDebug } from './logger';
@@ -21,6 +22,8 @@ import {
   canDefenderReturnFireAtAnyAttackerHex,
   type ReturnFireEligibilityContext,
 } from '../shared/returnFireEligibility';
+import { terrainCoverShooterForUnitType } from '../shared/terrainCoverRules';
+import { noTerrainCover, withTargetCover, type TerrainCoverLookup } from './terrainCover/terrainCoverLookup';
 
 export type { CombatUnit } from './combatUnitTypes';
 export type { RangedResolutionShotLine };
@@ -96,7 +99,7 @@ export function resolveOneRangedEngagement(
   attackerUnits: CombatUnit[],
   defenderUnits: CombatUnit[],
   defenderHexH3: string,
-  rollD6: () => number,
+  rollDie: () => number,
   options?: ResolveOneRangedEngagementOptions
 ): OneEngagementResult {
   logDebug('resolveOneRangedEngagement', {
@@ -115,14 +118,14 @@ export function resolveOneRangedEngagement(
   const attackerHexes = [...new Set(attackerUnits.map((u) => u.h3Index))];
   let attackerHits = 0;
   for (const u of attackerUnits) {
-    if (rollD6() <= attackHitThreshold(u)) attackerHits++;
+    if (rollDie() <= attackHitThreshold(u)) attackerHits++;
   }
   let defenderHits = 0;
   if (!options?.skipReturnFire) {
     for (const u of defenderUnits) {
       const defender = { unitType: u.unitType, h3Index: u.h3Index || defenderHexH3 };
       const canReturnFire = canDefenderReturnFireAtAnyAttackerHex(defender, attackerHexes, returnFireContext);
-      if (canReturnFire && rollD6() <= attackHitThreshold(u)) defenderHits++;
+      if (canReturnFire && rollDie() <= attackHitThreshold(u)) defenderHits++;
     }
   }
 
@@ -171,7 +174,7 @@ export function resolveOneRangedEngagement(
  * Resolves one melee round between two sides sharing a hex or cell.
  *
  * Purpose: The single dice rule for melee: one side rolls attack values and the other defense values.
- * When to use: From `runMeleePhase`, after it has chosen which side rolls attack; `rollD6` returns integers 1–6.
+ * When to use: From `runMeleePhase`, after it has chosen which side rolls attack; `rollDie` returns integers from 1 to `COMBAT_DIE_SIDES`.
  * Expected outcome: Each unit rolls once against `attackHitThreshold` or `defenseHitThreshold` (origin bonus
  *   included). Each side's hits remove that many enemies, lowest printed defense first, then casualty priority.
  * Exceptions: None.
@@ -179,18 +182,18 @@ export function resolveOneRangedEngagement(
 export function resolveOneMeleeEngagement(
   attackerUnits: CombatUnit[],
   defenderUnits: CombatUnit[],
-  rollD6: () => number
+  rollDie: () => number
 ): OneEngagementResult {
   const attackerRemovedIds: string[] = [];
   const defenderRemovedIds: string[] = [];
 
   let atkHits = 0;
   for (const u of attackerUnits) {
-    if (rollD6() <= attackHitThreshold(u)) atkHits++;
+    if (rollDie() <= attackHitThreshold(u)) atkHits++;
   }
   let defHits = 0;
   for (const u of defenderUnits) {
-    if (rollD6() <= defenseHitThreshold(u)) defHits++;
+    if (rollDie() <= defenseHitThreshold(u)) defHits++;
   }
 
   const defSorted = [...defenderUnits].sort(
@@ -448,7 +451,16 @@ export function runRangedPhase(
    * Expected outcome: Defaults to `{ theater: 'strategic' }`.
    * Exceptions: None.
    */
-  returnFireContext?: ReturnFireEligibilityContext
+  returnFireContext?: ReturnFireEligibilityContext,
+  /**
+   * Cover each target position gives against the shots fired at it.
+   *
+   * Purpose: Lowers attacker hit numbers by the defender hex or cell's cover; return fire never reads it.
+   * When to use: Production strategic and battle callers always pass a lookup; tests that ignore cover may omit it.
+   * Expected outcome: Defaults to `noTerrainCover`.
+   * Exceptions: None.
+   */
+  targetCoverAt: TerrainCoverLookup = noTerrainCover
 ): CombatResolutionResult {
   const rfContext: ReturnFireEligibilityContext = returnFireContext ?? { theater: 'strategic' };
   logDebug('runRangedPhase', {
@@ -463,7 +475,7 @@ export function runRangedPhase(
   const unitList = units.filter((u) => !removed.has(u.id));
   const unitById = new Map(unitList.map((u) => [u.id, u] as const));
   const getUnitsAtHex = (h3: string) => unitList.filter((u) => !removed.has(u.id) && u.h3Index === h3);
-  const rollD6 = () => Math.floor(next() * 6) + 1;
+  const rollDie = createCombatDieRoller(next);
 
   const kills: KillRecord[] = [];
   const killsByDirectFire: KillRecord[] = [];
@@ -494,11 +506,14 @@ export function runRangedPhase(
       })
     );
 
+    const coveredAttackers = attackerUnits.map((u) =>
+      withTargetCover(u, targetCoverAt(group.defenderHex, terrainCoverShooterForUnitType(u.unitType)))
+    );
     const { attackerRemovedIds, defenderRemovedIds } = resolveOneRangedEngagement(
-      attackerUnits,
+      coveredAttackers,
       defenderUnits,
       group.defenderHex,
-      rollD6,
+      rollDie,
       { returnFireContext: rfContext }
     );
     const attackerUnitIds = attackerUnits.map((u) => u.id);
@@ -580,7 +595,7 @@ export function runMeleePhase(
   const combatHexes: string[] = [];
   const unitList = units.filter((u) => !removed.has(u.id));
   const getUnitsAtHex = (h3: string) => unitList.filter((u) => !removed.has(u.id) && u.h3Index === h3);
-  const rollD6 = () => Math.floor(next() * 6) + 1;
+  const rollDie = createCombatDieRoller(next);
 
   const combatSides = new Set<string>();
   for (const h of hexList) {
@@ -614,7 +629,7 @@ export function runMeleePhase(
       const [attackerSide, defenderSide] = sidesOrdered;
       const atkUnits = unitsHere.filter((u) => u.player === attackerSide);
       const defUnits = unitsHere.filter((u) => u.player === defenderSide);
-      const { attackerRemovedIds, defenderRemovedIds } = resolveOneMeleeEngagement(atkUnits, defUnits, rollD6);
+      const { attackerRemovedIds, defenderRemovedIds } = resolveOneMeleeEngagement(atkUnits, defUnits, rollDie);
       const atkUnitIds = atkUnits.map((u) => u.id);
       const defUnitIds = defUnits.map((u) => u.id);
       for (const id of defenderRemovedIds) {
@@ -648,7 +663,7 @@ export function runMeleePhase(
         const atkUnits = getUnitsAtHex(hex).filter((u) => u.player === attackerSide);
         const defUnits = getUnitsAtHex(hex).filter((u) => u.player === defenderSide);
         if (atkUnits.length === 0 || defUnits.length === 0) continue;
-        const { attackerRemovedIds, defenderRemovedIds } = resolveOneMeleeEngagement(atkUnits, defUnits, rollD6);
+        const { attackerRemovedIds, defenderRemovedIds } = resolveOneMeleeEngagement(atkUnits, defUnits, rollDie);
         const atkUnitIds = atkUnits.map((u) => u.id);
         const defUnitIds = defUnits.map((u) => u.id);
         for (const id of defenderRemovedIds) {

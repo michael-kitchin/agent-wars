@@ -6,6 +6,7 @@
  */
 
 import type { GameStateSnapshot } from '../gameDb';
+import { hitChanceForThreshold } from '../combatDice';
 import { attackHitThreshold, defenseHitThreshold } from '../combatHitThresholds';
 import { originBonusSettingsFromSnapshot } from '../../shared/originBonusRules';
 import { type CombatUnit } from '../combatResolution';
@@ -320,7 +321,7 @@ function evaluateReturnFire(
   return {
     canReturnFire: eligible.length > 0,
     details: whoCan.length > 0 ? whoCan.join('; ') : null,
-    hitProbs: eligible.map((u) => attackHitThreshold(u) / 6),
+    hitProbs: eligible.map((u) => hitChanceForThreshold(attackHitThreshold(u))),
   };
 }
 
@@ -477,8 +478,8 @@ export function executeEstimateCombat(
 
   const attackerCount = attackers.combat.length;
   const defenderCount = defenders.combat.length;
-  const attackProbs = (units: readonly CombatUnit[]) => units.map((u) => attackHitThreshold(u) / 6);
-  const defenseProbs = (units: readonly CombatUnit[]) => units.map((u) => defenseHitThreshold(u) / 6);
+  const attackProbs = (units: readonly CombatUnit[]) => units.map((u) => hitChanceForThreshold(attackHitThreshold(u)));
+  const defenseProbs = (units: readonly CombatUnit[]) => units.map((u) => hitChanceForThreshold(defenseHitThreshold(u)));
   const expectedFrag = (p: EngagementPrediction) =>
     `Expected outcome: ${p.attackerLossesExpected.toFixed(2)} attacker losses, ${p.defenderLossesExpected.toFixed(2)} defender losses.`;
 
@@ -495,7 +496,7 @@ export function executeEstimateCombat(
     prediction = computeEngagementPrediction(attackProbs(attackers.combat), returnFire.hitProbs, attackerCount, defenderCount);
     const leadType = attackers.combat[0]?.unitType ?? 'attacker';
     const leadAttack = attackerCount > 0 ? attackHitThreshold(attackers.combat[0]!) : 0;
-    const hitPct = Math.round((leadAttack / 6) * 100);
+    const hitPct = Math.round(hitChanceForThreshold(leadAttack) * 100);
     const returnFrag = returnFire.canReturnFire && returnFire.details ? ` ${returnFire.details}.` : '';
     reasoning = `${leadType} attacks at value ${leadAttack} (${hitPct}% hit chance).${returnFrag} ${expectedFrag(prediction)}`;
   } else {

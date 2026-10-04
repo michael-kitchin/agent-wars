@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { buildUnitStatusTable } from './briefingFormatter';
 import type { UnitAssessmentResult } from './precomputation';
+import type { OriginHitBonus } from '../shared/originBonusTypes';
 
 /**
  * Builds a quiet strategic assessment with optional origin bonus reasons and amount.
@@ -14,7 +15,7 @@ import type { UnitAssessmentResult } from './precomputation';
 function assessment(
   unitId: string,
   originBonusHere?: Array<'country' | 'terrain'>,
-  originBonusAmount: 0 | 1 | 2 = 0
+  originBonusAmount: OriginHitBonus = 0
 ): UnitAssessmentResult {
   return {
     unitId,
@@ -36,15 +37,15 @@ function assessment(
 
 test('the Bonus column appears when an assessment carries origin bonus reasons', () => {
   const table = buildUnitStatusTable(
-    [assessment('opp-a', ['country'], 1), assessment('opp-b', []), assessment('opp-c', ['country'], 2)],
+    [assessment('opp-a', ['country'], 2), assessment('opp-b', []), assessment('opp-c', ['country'], 4)],
     { mode: 'strategic' },
     true
   );
   const [header, , rowA, rowB, rowC] = table.split('\n');
   assert.equal(header, '| Unit ID | Type | Hex | Bonus | Nearest enemy + distance | Threat severity | Action needed |');
-  assert.ok(rowA?.includes('| +1 country |'), rowA);
+  assert.ok(rowA?.includes('| +2 country |'), rowA);
   assert.ok(rowB?.includes('| — |'), rowB);
-  assert.ok(rowC?.includes('| +2 country |'), rowC);
+  assert.ok(rowC?.includes('| +4 country |'), rowC);
 });
 
 test('the Weather column names the weather where the unit stands and its tags', () => {

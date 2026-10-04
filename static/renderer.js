@@ -15763,8 +15763,8 @@
     high: 1
   });
   var WEATHER_ATTACK_PENALTY_BY_LEVEL = Object.freeze({
-    low: 1,
-    high: 2
+    low: 3,
+    high: 5
   });
   var TAG_TIE_ORDER = Object.freeze(["snow", "heat", "rain"]);
   var TAG_DISPLAY_ORDER = Object.freeze(["snow", "rain", "heat"]);
@@ -21863,6 +21863,53 @@ ${body}`;
     }
   }
 
+  // src/shared/terrainCoverRules.ts
+  var TERRAIN_COVER_BY_CATEGORY = Object.freeze({
+    plains: Object.freeze({ surface: 0, air: 0 }),
+    forests: Object.freeze({ surface: 2, air: 1 }),
+    mountains: Object.freeze({ surface: 2, air: 0 }),
+    wetlands: Object.freeze({ surface: 1, air: 0 }),
+    desert: Object.freeze({ surface: 0, air: 0 }),
+    arctic: Object.freeze({ surface: 0, air: 0 }),
+    coastal: Object.freeze({ surface: 0, air: 0 }),
+    water: Object.freeze({ surface: 0, air: 0 })
+  });
+  var URBAN_OR_RUBBLE_TERRAIN_COVER = Object.freeze({ surface: 2, air: 1 });
+  function terrainCoverPairFor(place) {
+    const terrain = TERRAIN_COVER_BY_CATEGORY[normalizeDbTerrainKindToTacticalCategory(place.terrainKind ?? "", "land")];
+    if (place.isUrban !== true && place.isRubble !== true) return terrain;
+    return {
+      surface: Math.max(terrain.surface, URBAN_OR_RUBBLE_TERRAIN_COVER.surface),
+      air: Math.max(terrain.air, URBAN_OR_RUBBLE_TERRAIN_COVER.air)
+    };
+  }
+  function terrainCoverFor(place, shooter) {
+    return terrainCoverPairFor(place)[shooter];
+  }
+  function tacticalCellCoverPlace(battle, res4H3) {
+    return {
+      terrainKind: effectiveRes4TerrainKindString(battle, res4H3),
+      isUrban: battle.res4IsUrbanByH3?.[res4H3] === true,
+      isRubble: battle.res4IsRubbleByH3?.[res4H3] === true
+    };
+  }
+  function terrainCoverSourceLabel(place) {
+    if (place.isRubble === true) return "Rubble";
+    if (place.isUrban === true) return "Urban";
+    const category = normalizeDbTerrainKindToTacticalCategory(place.terrainKind ?? "", "land");
+    if (category === "forests") return "Forest";
+    if (category === "mountains") return "Mountain";
+    if (category === "wetlands") return "Wetlands";
+    return null;
+  }
+  function formatTerrainCoverTooltipText(pair) {
+    const parts = [
+      ...pair.surface > 0 ? [`-${pair.surface} ground and naval fire`] : [],
+      ...pair.air > 0 ? [`-${pair.air} air strikes`] : []
+    ];
+    return parts.length > 0 ? parts.join(", ") : null;
+  }
+
   // src/renderer/map/terrainTooltipHtml.ts
   function formatLlmLocationBoldPrefixHtml(namingTarget) {
     if (!namingTarget) return "";
@@ -21941,6 +21988,16 @@ ${body}`;
       hasRail: state.hasRail
     });
   }
+  function coverLine(state, namingTarget) {
+    if (!namingTarget) return null;
+    if (namingTarget.resolution === 1) {
+      const terrainKind = rendererSharedState.gameState?.hexes.find((h) => h.h3Index === namingTarget.h3Index)?.terrainKind;
+      return terrainKind ? formatTerrainCoverTooltipText(terrainCoverPairFor({ terrainKind })) : null;
+    }
+    return formatTerrainCoverTooltipText(
+      terrainCoverPairFor({ terrainKind: state.terrainKind, isUrban: state.isUrban, isRubble: state.isRubble })
+    );
+  }
   function formatTerrainTooltipHtml(state, namingCaption, namingTarget) {
     const prefix = formatLlmLocationBoldPrefixHtml(namingTarget);
     const showControlLine = namingTarget?.resolution === 1;
@@ -21955,6 +22012,8 @@ ${body}`;
     else if (state.features.length > 0) bodyParts.push(`<strong>Features:</strong> ${state.features.join(", ")}`);
     const effectsLineHtml = effectsLine(state, namingTarget);
     if (effectsLineHtml) bodyParts.push(`<strong>Effects:</strong> ${effectsLineHtml}`);
+    const coverText = coverLine(state, namingTarget);
+    if (coverText) bodyParts.push(`<strong>Cover:</strong> ${escapeHtmlText(coverText)}`);
     if (state.urbanHexCount != null) {
       const productionLine = state.urbanHexCount > 0 ? `<strong>Production:</strong> $${state.urbanHexCount.toLocaleString()} / turn` : `<strong>Production:</strong> (none)`;
       bodyParts.push(productionLine);
@@ -21973,13 +22032,14 @@ ${body}`;
     const res1TerrainSummaryKey = state.res1TerrainSummary ?? "";
     const res1FeaturesSummaryKey = state.res1FeaturesSummary ?? "";
     const weatherKey = tooltipWeather(namingTarget) ?? "";
+    const coverKey = coverLine(state, namingTarget) ?? "";
     const controlKey = getTooltipControlLabel(namingTarget);
     const parentTerrainKey = state.parentTerrain;
     const parentTerrainKindKey = state.parentTerrainKind;
     const seaportKey = state.isSeaport ? "1" : "0";
     const roadKey = state.hasRoad ? "1" : "0";
     const railKey = state.hasRail ? "1" : "0";
-    return `${targetKey}::${namingKey}::${state.terrainKind}::${urbanKey}::${rubbleKey}::${featuresKey}::${urbanHexCountKey}::${res1TerrainSummaryKey}::${res1FeaturesSummaryKey}::${controlKey}::${parentTerrainKey}::${parentTerrainKindKey}::${seaportKey}::${roadKey}::${railKey}::${weatherKey}`;
+    return `${targetKey}::${namingKey}::${state.terrainKind}::${urbanKey}::${rubbleKey}::${featuresKey}::${urbanHexCountKey}::${res1TerrainSummaryKey}::${res1FeaturesSummaryKey}::${controlKey}::${parentTerrainKey}::${parentTerrainKindKey}::${seaportKey}::${roadKey}::${railKey}::${weatherKey}::${coverKey}`;
   }
   function getCachedTerrainTooltipHtml(state, namingCaption, namingTarget) {
     const key = terrainTooltipContentKey(state, namingCaption, namingTarget);
@@ -22572,7 +22632,8 @@ ${body}`;
       });
       if (penalty > 0 && unit.originWeather) pushDistinct(labels, weatherDisplayWord(unit.originWeather));
     }
-    return effectsLine2(labels);
+    const surfaceShooter = input.units.some((unit) => unit.unitType !== "air");
+    return joinSections([effectsLine2(labels), surfaceShooter ? coverLine2(input.targetCover, "surface") : null]);
   }
   function airStrikeHtml(input) {
     const labels = [];
@@ -22592,7 +22653,16 @@ ${body}`;
         pushDistinct(labels, weatherDisplayWord(weather));
       }
     }
-    return effectsLine2(labels);
+    return joinSections([effectsLine2(labels), coverLine2(input.targetCover, "air")]);
+  }
+  function coverLine2(place, shooter) {
+    if (!place || terrainCoverFor(place, shooter) <= 0) return null;
+    const source = terrainCoverSourceLabel(place);
+    return source ? `<strong>Cover:</strong> ${labelHtml(source)}` : null;
+  }
+  function joinSections(sections) {
+    const present = sections.filter((section) => section !== null);
+    return present.length > 0 ? present.join(TOOLTIP_SECTION_GAP_HTML) : null;
   }
   function effectsLine2(labels) {
     if (labels.length === 0) return null;
@@ -22803,8 +22873,21 @@ ${body}`;
       targetWeather: battle ? battle.weather ?? null : weatherAtHex(args.preview.hoveredH3Index),
       marchImpact: args.preview.data.orderPreviewTerrainImpact ?? null,
       rangedBattle: kind === "ranged" ? battle : null,
-      rangedPreviewUnitIds: args.preview.data.previews.map((row) => row.unitId)
+      rangedPreviewUnitIds: args.preview.data.previews.map((row) => row.unitId),
+      targetCover: kind === "ranged" || kind === "airStrike" ? targetCoverPlace(args.preview.hoveredH3Index) : null
     };
+  }
+  function targetCoverPlace(hoveredH3Index) {
+    const battle = rendererSharedState.tacticalBattleSnapshot;
+    if (battle) {
+      const enemyHere2 = battle.subUnits.some((unit) => unit.player !== "human" && unit.h3Index === hoveredH3Index);
+      return enemyHere2 ? tacticalCellCoverPlace(battle, hoveredH3Index) : null;
+    }
+    const state = rendererSharedState.gameState;
+    if (!state) return null;
+    const enemyHere = state.units.some((unit) => unit.player !== "human" && unit.h3Index === hoveredH3Index);
+    if (!enemyHere) return null;
+    return { terrainKind: state.hexes.find((hex) => hex.h3Index === hoveredH3Index)?.terrainKind ?? null };
   }
   function effectsKind(preview) {
     if (preview.renderAsSupportTargeting === "ranged") return "ranged";

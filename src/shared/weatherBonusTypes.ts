@@ -59,9 +59,9 @@ export type WeatherAttackKind = 'ranged' | 'airStrike';
 /**
  * Points a weather penalty removes from a printed attack.
  *
- * Purpose: Keeps the penalty a closed set, so a threshold can never be cut below the floor of 1 by an unexpected value.
+ * Purpose: Keeps the penalty a closed set, so only the known amounts ever reach a hit number, which `attackHitThreshold` floors at 2.
  * When to use: `weatherAttackPenalty` results and `CombatUnit.weatherAttackPenalty`.
- * Expected outcome: `0` with no penalty, `1` at Low, `2` at High.
+ * Expected outcome: `0` with no penalty, `3` at Low, `5` at High.
  * Exceptions: None.
  */
-export type WeatherAttackPenalty = 0 | 1 | 2;
+export type WeatherAttackPenalty = 0 | 3 | 5;

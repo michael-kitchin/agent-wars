@@ -9,7 +9,7 @@ test('the strategic lookup from the database follows the country bonus flag', ()
     resetGameForNewMatch({ countryBonusLevel: 'low' });
     const units = listUnitsForSnapshot();
     const onLookup = buildStrategicOriginHitBonusLookupFromDb();
-    assert.ok(units.some((u) => onLookup(u.id, u.h3Index) === 1), 'expected a seeded unit standing in its birth country');
+    assert.ok(units.some((u) => onLookup(u.id, u.h3Index) === 2), 'expected a seeded unit standing in its birth country');
 
     resetGameForNewMatch();
     const offLookup = buildStrategicOriginHitBonusLookupFromDb();

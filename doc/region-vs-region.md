@@ -38,6 +38,6 @@ Tactical battles do **not** restate home-region victory. The tactical goal is to
 
 ## Related
 
-- Dice and phases: [combat-rules-v3.md](combat-rules-v3.md) §14
+- Dice and phases: [combat-rules-v3.md](combat-rules-v3.md) §4 (resolution order, and dice in §4.9); win conditions in §14
 - AI briefing objective block: [ai-commander-prompts/strategic-prompt.md](ai-commander-prompts/strategic-prompt.md)
 - Hybrid loop: [hybrid-ai.md](hybrid-ai.md)

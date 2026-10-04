@@ -21,11 +21,14 @@ import {
   tacticalRes4HasStrikeableInfrastructure,
 } from '../../shared/tacticalTerrainCombatModifiers';
 import { tacticalRes4CellHasActiveTransportCorridor } from '../../shared/tacticalRes4TransportLink';
+import { createCombatDieRoller, INFRASTRUCTURE_COUNTER_FIRE_THRESHOLD } from '../combatDice';
 import { attackHitThreshold } from '../combatHitThresholds';
 import { weatherAttackPenalty, weatherBonusLevelOf } from '../../shared/weatherBonusRules';
 import { runRangedPhase } from '../combatResolution';
 import { withOriginHitBonus, type OriginHitBonusLookup } from '../originBonus/originHitBonusLookup';
 import { buildTacticalOriginHitBonusLookupFromDb } from '../originBonus/originHitBonusLookupDb';
+import { tacticalCellTerrainCover } from '../../shared/terrainCoverRules';
+import { createTacticalTerrainCoverLookup } from '../terrainCover/terrainCoverLookup';
 import { markTacticalSubUnitCasualty, resolveTacticalAirStrikeAgainstUnitsOnSubUnits } from './tacticalAirStrikeUnits';
 import {
   dedupeRangedResolutionShotLines,
@@ -325,6 +328,7 @@ export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
     sub = sub.filter((u) => !toRemove.has(u.id));
     toRemove.clear();
   };
+  const rollDie = createCombatDieRoller(next);
   const sortedAir = sortTacticalAirStrikesForStrategicPhaseOrder(airStrikes ?? [], sub);
   const airPlayerOk = (attacker: TacticalSubUnitSnapshot): boolean =>
     resolutionScope === 'mergedHumanThenOpponent' || attacker.player === rangedPlayer;
@@ -336,14 +340,14 @@ export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
       airStrikeAttemptCount += 1;
       strikeHexesSet.add(s.targetH3Index);
       const fromH3Index = attacker.h3Index;
-      const rollD6Strike = (): number => Math.floor(next() * 6) + 1;
       resolveTacticalAirStrikeAgainstUnitsOnSubUnits({
         battle,
         sub,
         attacker,
         targetH3Index: s.targetH3Index,
-        rollD6: rollD6Strike,
+        rollDie,
         originHitBonusAt,
+        targetCover: tacticalCellTerrainCover(battle, s.targetH3Index, 'air'),
         toRemove,
         killsByAirStrike,
         killsByReturnFire,
@@ -363,7 +367,6 @@ export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
     airStrikeAttemptCount += 1;
     strikeHexesSet.add(s.targetH3Index);
     const fromH3Index = attacker.h3Index;
-    const rollD6 = (): number => Math.floor(next() * 6) + 1;
     const parent = cellToParent(s.targetH3Index, 1);
     if (parent !== battle.enclosingRes1H3Index) {
       strikeMoves.push({
@@ -376,7 +379,7 @@ export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
       });
       continue;
     }
-    if (rollD6() > attackHitThreshold({
+    if (rollDie() > attackHitThreshold({
       unitType: 'air',
       originHitBonus: originHitBonusAt(attacker.id, attacker.h3Index),
       weatherAttackPenalty: weatherAttackPenalty({
@@ -417,8 +420,7 @@ export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
         killsByAirStrike.push({ victimId: su.id, killerIds: [attacker.id] });
       }
     }
-    const counterThreshold = s.targetType === 'airport' ? 2 : 1;
-    if (rollD6() <= counterThreshold) {
+    if (rollDie() <= INFRASTRUCTURE_COUNTER_FIRE_THRESHOLD[s.targetType]) {
       markTacticalSubUnitCasualty(sub, toRemove, attacker.id, [], killsByAirStrike);
     }
     flushAirCasualties();
@@ -507,7 +509,8 @@ export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
       workBattle.res4ChildH3Indexes,
       rangedOrdersCombat,
       next,
-      buildTacticalReturnFireContext(workBattle)
+      buildTacticalReturnFireContext(workBattle),
+      createTacticalTerrainCoverLookup(workBattle)
     );
     rangedResolutionShotLines = dedupeRangedResolutionShotLines([
       ...rangedResolutionShotLines,
@@ -574,12 +577,11 @@ export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
     } catch {
       /* keep previous rows */
     }
-    const rollRangedInfraStrikeD6 = (): number => Math.floor(next() * 6) + 1;
     const rubbledInfraHexes = new Set<string>();
     for (const o of rangedOrdersInfraOnly) {
       const atk = workBattle.subUnits.find((u) => u.id === o.unitId);
       if (!atk) continue;
-      if (rollRangedInfraStrikeD6() > attackHitThreshold({
+      if (rollDie() > attackHitThreshold({
         unitType: atk.unitType,
         originHitBonus: originHitBonusAt(atk.id, atk.h3Index),
         weatherAttackPenalty: weatherAttackPenalty({

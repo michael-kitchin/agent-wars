@@ -26,12 +26,12 @@ import type { UnitOrigin } from './unitOriginTypes';
  *
  * Purpose: Single source for the bonus size used by dice, estimates, rule text, and tooltips.
  * When to use: Only through `originHitBonusForSource`, which also handles an Off bonus.
- * Expected outcome: 1 at Low and 2 at High. The highest printed attack is 3, so a threshold never passes 5 and a 6 always misses.
+ * Expected outcome: 2 at Low and 4 at High on the d20. The highest printed attack is 10, so a bonus never lifts a hit number past 14, under the cap of 17.
  * Exceptions: None.
  */
 export const ORIGIN_HIT_BONUS_BY_LEVEL: Readonly<Record<ActiveBonusLevel, Exclude<OriginHitBonus, 0>>> = Object.freeze({
-  low: 1,
-  high: 2,
+  low: 2,
+  high: 4,
 });
 
 /**

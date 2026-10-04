@@ -129,7 +129,7 @@ function testSystemPromptHasNoBracketedLatLngTuples(): void {
   const hit = prompt.match(LATLNG_TUPLE_IN_PROMPT);
   assert.strictEqual(hit, null, `prompt should not contain lat/lng tuple pattern; first hit: ${hit?.[0] ?? ''}`);
   assert.ok(
-    prompt.includes('infantry: 1 attack / 2 defense, melee only'),
+    prompt.includes('infantry: 3 attack / 7 defense, melee only'),
     'strategic combat summary must list infantry as melee only'
   );
   assert.ok(
@@ -163,7 +163,7 @@ function testTacticalSystemPromptAllowsInfantryRanged(): void {
   };
   const prompt = buildSystemPromptForTools(state, coordMap, ['plan_route'], undefined, tacticalCtx);
   assert.ok(
-    prompt.includes('infantry: 1 attack / 2 defense, range 2'),
+    prompt.includes('infantry: 3 attack / 7 defense, range 2'),
     'tactical combat summary must list infantry ranged baseline'
   );
   assert.ok(
@@ -171,7 +171,7 @@ function testTacticalSystemPromptAllowsInfantryRanged(): void {
     'tactical coaching must allow infantry ranged_attack and state terrain caps'
   );
   assert.ok(
-    !prompt.includes('infantry: 1 attack / 2 defense, melee only'),
+    !prompt.includes('infantry: 3 attack / 7 defense, melee only'),
     'tactical prompt must not describe infantry as melee only'
   );
 }

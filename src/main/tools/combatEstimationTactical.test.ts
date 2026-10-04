@@ -61,10 +61,26 @@ test('battle ranged: infantry fires two cells on plains and armor returns fire',
   const args = { engagementType: 'ranged', attackers: { units: ['opp-inf'] }, targetHex: at('far') };
   const result = estimate(fx, args);
   assert.equal(result.status, 'ok');
-  assert.ok(Math.abs(result.prediction!.probabilityDefenderEliminated - 1 / 6) < EPS);
+  assert.ok(Math.abs(result.prediction!.probabilityDefenderEliminated - 3 / 20) < EPS);
   assert.ok(Math.abs(result.prediction!.probabilityAttackerLosesUnit - 1 / 2) < EPS);
   assert.equal(result.defenderSummary!.canReturnFire, true);
   assert.equal(estimate(fx, args, false).status, 'error');
+});
+
+test('battle ranged: forest cover at the target lowers the shot to the floor and the forest caps armor return fire', () => {
+  const { fx, at } = setup({
+    battleId: 'estimate-ranged-cover',
+    terrainByCell: { far: 'forest' },
+    units: [
+      { id: 'opp-inf', player: 'opponent', unitType: 'infantry', cell: 'near' },
+      { id: 'hum-arm', player: 'human', unitType: 'armor', cell: 'far' },
+    ],
+  });
+  const result = estimate(fx, { engagementType: 'ranged', attackers: { units: ['opp-inf'] }, targetHex: at('far') });
+  assert.equal(result.status, 'ok');
+  assert.ok(Math.abs(result.prediction!.probabilityDefenderEliminated - 1 / 10) < EPS);
+  assert.equal(result.defenderSummary!.canReturnFire, false);
+  assert.equal(result.prediction!.probabilityAttackerLosesUnit, 0);
 });
 
 test('battle ranged: infantry in forest is capped to range one', () => {
@@ -110,7 +126,7 @@ test('battle melee: prediction averages both random role cases', () => {
   });
   const result = estimate(fx, { engagementType: 'melee', attackers: { units: ['opp-arm'] }, targetHex: at('far') });
   assert.equal(result.status, 'ok');
-  assert.ok(Math.abs(result.prediction!.probabilityDefenderEliminated - 5 / 12) < EPS);
+  assert.ok(Math.abs(result.prediction!.probabilityDefenderEliminated - 17 / 40) < EPS);
   assert.ok(Math.abs(result.prediction!.probabilityAttackerLosesUnit - 1 / 4) < EPS);
 });
 
@@ -157,5 +173,5 @@ test('battle: a defender on its birth terrain shows the terrain bonus', () => {
     defenderSummary?: { units: { unitId: string; defenseValue: number; originBonus?: number }[] };
   };
   assert.equal(result.status, 'ok');
-  assert.deepEqual(result.defenderSummary!.units, [{ unitId: 'hum-inf', type: 'infantry', defenseValue: 3, originBonus: 1 }]);
+  assert.deepEqual(result.defenderSummary!.units, [{ unitId: 'hum-inf', type: 'infantry', defenseValue: 9, originBonus: 2 }]);
 });

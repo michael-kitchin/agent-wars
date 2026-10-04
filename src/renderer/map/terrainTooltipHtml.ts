@@ -1,5 +1,5 @@
 /**
- * Terrain tooltip HTML: hex-code prefix, naming caption, control, terrain, features, and effects.
+ * Terrain tooltip HTML: hex-code prefix, naming caption, control, terrain, features, effects, and cover.
  *
  * Purpose: Keeps tooltip markup next to the caption flags, out of the hit-testing module.
  * When to use: `getCachedTerrainTooltipHtml` from the hover tooltip and the melee-intercept hex cell.
@@ -18,6 +18,7 @@ import {
 import { computeTerrainEffectsLineHtml } from '../../shared/terrainEffectsForTooltip';
 import { formatTerrainKindHtml, formatTerrainNameListHtml } from '../../shared/terrainSwatchHtml';
 import { formatWeatherIconHtml } from '../../shared/weatherIcons';
+import { formatTerrainCoverTooltipText, terrainCoverPairFor } from '../../shared/terrainCoverRules';
 import { TOOLTIP_SECTION_GAP_HTML } from '../../shared/tooltipSectionGap';
 import { WORLD_H3_RESOLUTION } from '../core/constants';
 import { rendererSharedState as S } from '../core/state';
@@ -167,7 +168,26 @@ function effectsLine(state: TerrainTooltipState, namingTarget: NamingLookupTarge
 }
 
 /**
- * Builds the full terrain tooltip HTML: hex-code prefix, naming caption with flags, then control, terrain, weather, and effects.
+ * Builds the Cover line text for a world hex or a detail cell.
+ *
+ * Purpose: Shows how much the hovered place lowers shots at units there, read from the same source the engine uses.
+ * When to use: From `formatTerrainTooltipHtml` and `terrainTooltipContentKey`.
+ * Expected outcome: For a world hex, the snapshot's dominant terrain kind (no urban or rubble); for a detail cell, the cell's kind and its urban and rubble flags. Null when there is no target, no known kind, or no cover.
+ * Exceptions: None.
+ */
+function coverLine(state: TerrainTooltipState, namingTarget: NamingLookupTarget | null): string | null {
+  if (!namingTarget) return null;
+  if (namingTarget.resolution === 1) {
+    const terrainKind = S.gameState?.hexes.find((h) => h.h3Index === namingTarget.h3Index)?.terrainKind;
+    return terrainKind ? formatTerrainCoverTooltipText(terrainCoverPairFor({ terrainKind })) : null;
+  }
+  return formatTerrainCoverTooltipText(
+    terrainCoverPairFor({ terrainKind: state.terrainKind, isUrban: state.isUrban, isRubble: state.isRubble })
+  );
+}
+
+/**
+ * Builds the full terrain tooltip HTML: hex-code prefix, naming caption with flags, then control, terrain, weather, effects, and cover.
  *
  * Purpose: Single formatter behind `getCachedTerrainTooltipHtml`.
  * When to use: Only through `getCachedTerrainTooltipHtml`, which memoizes the result.
@@ -194,6 +214,8 @@ function formatTerrainTooltipHtml(
   else if (state.features.length > 0) bodyParts.push(`<strong>Features:</strong> ${state.features.join(', ')}`);
   const effectsLineHtml = effectsLine(state, namingTarget);
   if (effectsLineHtml) bodyParts.push(`<strong>Effects:</strong> ${effectsLineHtml}`);
+  const coverText = coverLine(state, namingTarget);
+  if (coverText) bodyParts.push(`<strong>Cover:</strong> ${escapeHtmlText(coverText)}`);
   if (state.urbanHexCount != null) {
     const productionLine =
       state.urbanHexCount > 0
@@ -229,13 +251,14 @@ function terrainTooltipContentKey(
   const res1TerrainSummaryKey = state.res1TerrainSummary ?? '';
   const res1FeaturesSummaryKey = state.res1FeaturesSummary ?? '';
   const weatherKey = tooltipWeather(namingTarget) ?? '';
+  const coverKey = coverLine(state, namingTarget) ?? '';
   const controlKey = getTooltipControlLabel(namingTarget);
   const parentTerrainKey = state.parentTerrain;
   const parentTerrainKindKey = state.parentTerrainKind;
   const seaportKey = state.isSeaport ? '1' : '0';
   const roadKey = state.hasRoad ? '1' : '0';
   const railKey = state.hasRail ? '1' : '0';
-  return `${targetKey}::${namingKey}::${state.terrainKind}::${urbanKey}::${rubbleKey}::${featuresKey}::${urbanHexCountKey}::${res1TerrainSummaryKey}::${res1FeaturesSummaryKey}::${controlKey}::${parentTerrainKey}::${parentTerrainKindKey}::${seaportKey}::${roadKey}::${railKey}::${weatherKey}`;
+  return `${targetKey}::${namingKey}::${state.terrainKind}::${urbanKey}::${rubbleKey}::${featuresKey}::${urbanHexCountKey}::${res1TerrainSummaryKey}::${res1FeaturesSummaryKey}::${controlKey}::${parentTerrainKey}::${parentTerrainKindKey}::${seaportKey}::${roadKey}::${railKey}::${weatherKey}::${coverKey}`;
 }
 
 /**

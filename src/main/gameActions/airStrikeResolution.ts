@@ -15,6 +15,7 @@ import {
 import { logDebug } from '../logger';
 import { getAvailableBuildUnitTypes } from '../productionRules';
 import { casualtyPriorityIndex, getDefense, getRange } from '../combatConstants';
+import { createCombatDieRoller, INFRASTRUCTURE_COUNTER_FIRE_THRESHOLD } from '../combatDice';
 import { attackHitThreshold } from '../combatHitThresholds';
 import { readPersistedOriginBonusSettings } from '../gameDb/originBonusConfig';
 import { weatherPenaltyForRoll } from '../weather/weatherMatch';
@@ -24,6 +25,7 @@ import type { WeatherAttackKind, WeatherAttackPenalty } from '../../shared/weath
 import type { AirStrikeAnimationMove, AirStrikeOrder, AirStrikeTargetType, InfrastructureDestroyedEvent } from '../../shared/ipcTypes';
 import type { CombatUnit } from '../combatUnitTypes';
 import type { OriginHitBonusLookup } from '../originBonus/originHitBonusLookup';
+import type { TerrainCoverLookup } from '../terrainCover/terrainCoverLookup';
 import { validateAirStrikeOrder } from './airValidation';
 import { isEmbarkedLandUnitOnWater } from './sealift';
 
@@ -364,7 +366,7 @@ function resolveAirStrikeAgainstUnits(
   attacker: { id: string; player: string; unit_type: string; h3_index: string; display_order: number | null },
   targetH3Index: string,
   attackHit: boolean,
-  rollD6: () => number,
+  rollDie: () => number,
   acc: AirStrikePhaseAccumulator,
   originHitBonusAt: OriginHitBonusLookup
 ): { success: boolean; attackerLost: boolean } {
@@ -389,7 +391,7 @@ function resolveAirStrikeAgainstUnits(
 
   for (const defender of eligibleDefenders) {
     if (getRange(defender.unit_type) < 1) continue;
-    if (rollD6() > attackHitThreshold({
+    if (rollDie() > attackHitThreshold({
       unitType: defender.unit_type,
       originHitBonus: originHitBonusAt(defender.id, defender.h3_index),
       weatherAttackPenalty: penaltyForDbUnit({
@@ -420,7 +422,7 @@ function resolveAirStrikeAgainstInfrastructure(
   order: { targetH3Index: string; targetType: Exclude<AirStrikeTargetType, 'units'> },
   attackHit: boolean,
   next: () => number,
-  rollD6: () => number,
+  rollDie: () => number,
   acc: AirStrikePhaseAccumulator,
   infrastructureDestroyedEvents: InfrastructureDestroyedEvent[]
 ): { success: boolean; attackerLost: boolean } {
@@ -442,8 +444,7 @@ function resolveAirStrikeAgainstInfrastructure(
     }
   }
 
-  const counterThreshold = order.targetType === 'airport' ? 2 : 1;
-  if (rollD6() <= counterThreshold) {
+  if (rollDie() <= INFRASTRUCTURE_COUNTER_FIRE_THRESHOLD[order.targetType]) {
     dbRun('DELETE FROM units WHERE id = ?', [attacker.id]);
     recordRemovedUnit(acc, attacker, { removedAtH3Index: order.targetH3Index });
     attackerLost = true;
@@ -455,14 +456,15 @@ function resolveAirStrikeAgainstInfrastructure(
  * Resolves every strategic air strike of the turn against units or infrastructure.
  *
  * Purpose: First rolling phase of strategic resolution.
- * When to use: From `executeReadyStrategicTurn`, with the turn's seeded RNG and its origin bonus lookup; tests that ignore bonuses pass `noOriginHitBonus`.
- * Expected outcome: Removed units, strike hexes, animation moves, and counts. Each attack roll adds the air unit's origin bonus at its base hex; unit counter-fire adds each defender's bonus at its hex. Infrastructure counter-fire is unchanged.
+ * When to use: From `executeReadyStrategicTurn`, with the turn's seeded RNG, its origin bonus lookup, and its terrain cover lookup; tests that ignore them pass `noOriginHitBonus` and `noTerrainCover`.
+ * Expected outcome: Removed units, strike hexes, animation moves, and counts. Each attack roll adds the air unit's origin bonus at its base hex, and a strike on units loses the target hex's air cover; unit counter-fire adds each defender's bonus at its hex. Infrastructure strikes and all counter-fire ignore cover.
  * Exceptions: None.
  */
 export function resolveAirStrikePhase(
   airOrders: AirStrikeOrder[],
   next: () => number,
-  originHitBonusAt: OriginHitBonusLookup
+  originHitBonusAt: OriginHitBonusLookup,
+  targetCoverAt: TerrainCoverLookup
 ): {
   removedUnitIds: string[];
   removedUnits: CombatUnit[];
@@ -494,7 +496,7 @@ export function resolveAirStrikePhase(
     const bUnit = dbGetOne<{ h3_index: string }>('SELECT h3_index FROM units WHERE id = ?', [b.unitId])?.h3_index ?? '';
     return aUnit.localeCompare(bUnit) || a.unitId.localeCompare(b.unitId);
   });
-  const rollD6 = () => Math.floor(next() * 6) + 1;
+  const rollDie = createCombatDieRoller(next);
 
   for (const order of sorted) {
     if (acc.removedSet.has(order.unitId)) continue;
@@ -509,7 +511,7 @@ export function resolveAirStrikePhase(
     );
     if (!attacker) continue;
     attemptCount += 1;
-    const attackHit = rollD6() <= attackHitThreshold({
+    const attackHit = rollDie() <= attackHitThreshold({
       unitType: 'air',
       originHitBonus: originHitBonusAt(attacker.id, attacker.h3_index),
       weatherAttackPenalty: penaltyForDbUnit({
@@ -519,9 +521,10 @@ export function resolveAirStrikePhase(
         targetH3Index: order.targetH3Index,
         kind: 'airStrike',
       }),
+      targetCover: order.targetType === 'units' ? targetCoverAt(order.targetH3Index, 'air') : 0,
     });
     if (order.targetType === 'units') {
-      const result = resolveAirStrikeAgainstUnits(attacker, order.targetH3Index, attackHit, rollD6, acc, originHitBonusAt);
+      const result = resolveAirStrikeAgainstUnits(attacker, order.targetH3Index, attackHit, rollDie, acc, originHitBonusAt);
       strikeMoves.push({
         unitId: attacker.id,
         player: attacker.player,
@@ -541,7 +544,7 @@ export function resolveAirStrikePhase(
       { targetH3Index: order.targetH3Index, targetType: order.targetType },
       attackHit,
       next,
-      rollD6,
+      rollDie,
       acc,
       infrastructureDestroyedEvents
     );

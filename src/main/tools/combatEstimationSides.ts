@@ -15,6 +15,7 @@ import { gridHopDistanceBetween } from './assessUnitProximity';
 import type { CombatEstimationEngagementType, CombatEstimationTheater } from './combatEstimationTheater';
 import { h3ToLatLng, type LatLng, type LatLngMap } from './h3LatLng';
 import { logDebug, logTrace } from '../logger';
+import { withTargetCover } from '../terrainCover/terrainCoverLookup';
 
 /**
  * Player id of the AI side.
@@ -122,7 +123,7 @@ export interface AttackerSummaryRow {
   /**
    * Attack value used for hit chances.
    *
-   * Contract: From `attackHitThreshold`, so it includes any origin bonus.
+   * Contract: From `attackHitThreshold`, so it includes any origin bonus, weather penalty, and ranged target cover.
    * When to use: Result payloads.
    * Expected outcome: Non-negative integer.
    * Exceptions: None.
@@ -133,7 +134,7 @@ export interface AttackerSummaryRow {
    *
    * Contract: Present only when the attacker qualifies where it would roll; never on assumed attackers.
    * When to use: Result payloads.
-   * Expected outcome: 1 at Low or 2 at High when present.
+   * Expected outcome: 2 at Low or 4 at High when present.
    * Exceptions: None.
    */
   readonly originBonus?: Exclude<OriginHitBonus, 0>;
@@ -189,7 +190,7 @@ export interface DefenderSummaryRow {
    *
    * Contract: Present only when the defender qualifies at the target; never on assumed defenders.
    * When to use: Result payloads.
-   * Expected outcome: 1 at Low or 2 at High when present.
+   * Expected outcome: 2 at Low or 4 at High when present.
    * Exceptions: None.
    */
   readonly originBonus?: Exclude<OriginHitBonus, 0>;
@@ -209,16 +210,28 @@ function withEstimateOriginBonus(unit: CombatUnit, theater: CombatEstimationThea
 }
 
 /**
+ * Sets an attacker's target cover as live dice would for this estimate.
+ *
+ * Purpose: Ranged estimates must lower attack values by the target's cover exactly like resolution does.
+ * When to use: Real and assumed attackers, after the weather penalty; never defenders, whose return fire ignores cover.
+ * Expected outcome: A copy with `targetCover` set when the theater reports cover, or without the key when it reports 0 (always for melee).
+ * Exceptions: None.
+ */
+function withAttackerTargetCover(unit: CombatUnit, ctx: CombatSideContext): CombatUnit {
+  return withTargetCover(unit, ctx.theater.targetCoverFor(unit, ctx.targetHexH3, ctx.engagementType));
+}
+
+/**
  * Builds the optional `originBonus` field of a summary row.
  *
  * Purpose: Keeps bonus-free rows byte-for-byte unchanged.
  * When to use: Spread into attacker and defender summary rows.
- * Expected outcome: `{ originBonus: 1 }` or `{ originBonus: 2 }` when the unit carries a bonus, otherwise `{}`.
+ * Expected outcome: `{ originBonus: 2 }` or `{ originBonus: 4 }` when the unit carries a bonus, otherwise `{}`.
  * Exceptions: None.
  */
 function originBonusSummaryField(unit: CombatUnit): { readonly originBonus?: Exclude<OriginHitBonus, 0> } {
   const bonus = unit.originHitBonus;
-  return bonus === 1 || bonus === 2 ? { originBonus: bonus } : {};
+  return bonus ? { originBonus: bonus } : {};
 }
 
 /**
@@ -331,7 +344,8 @@ function buildRealAttackers(ids: readonly string[], ctx: CombatSideContext): Att
     .map((u) => {
       const penalty = ctx.theater.weatherAttackPenaltyFor(u, ctx.targetHexH3, ctx.engagementType);
       return penalty === 0 ? u : { ...u, weatherAttackPenalty: penalty };
-    });
+    })
+    .map((u) => withAttackerTargetCover(u, ctx));
   if (usable.length === 0) {
     const u = combat[0]!;
     const dist = gridHopDistanceBetween(u.h3Index, ctx.targetHexH3);
@@ -384,7 +398,7 @@ export function buildAttackers(raw: CombatSideArgs, ctx: CombatSideContext): Att
     }))
   ).map((unit) => {
     const penalty = ctx.theater.weatherAttackPenaltyFor(unit, ctx.targetHexH3, ctx.engagementType);
-    return penalty === 0 ? unit : { ...unit, weatherAttackPenalty: penalty };
+    return withAttackerTargetCover(penalty === 0 ? unit : { ...unit, weatherAttackPenalty: penalty }, ctx);
   });
   return {
     combat,

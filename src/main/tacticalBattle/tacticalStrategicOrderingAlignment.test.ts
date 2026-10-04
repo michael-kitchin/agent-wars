@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { gridDisk } from 'h3-js';
 import { test } from 'node:test';
 import { firstRingCellDistinctFrom, tacticalRes1Cell, tacticalRes4UnderRes1Corner } from './testSupport/tacticalRes4HexFixtures';
-import { tacticalSequencedRandom, tacticalUniformForD6Face } from './testSupport/tacticalDiceFixtures';
+import { tacticalSequencedRandom, tacticalUniformForCombatDieFace } from './testSupport/tacticalDiceFixtures';
 import type { AirStrikeOrder } from '../../shared/ipcTypes';
 import type { TacticalBattleSnapshot, TacticalSubUnitSnapshot } from '../../shared/tacticalBattleTypes';
 import {
@@ -372,8 +372,8 @@ test('tactical air strike against units removes one sub-unit when sibling sub-un
     undefined,
     'human',
     tacticalSequencedRandom([
-      tacticalUniformForD6Face(1), // air strike hits (d6=1 <= air attack 3)
-      tacticalUniformForD6Face(6), // surviving sibling armor AA misses (d6=6 > armor attack 3)
+      tacticalUniformForCombatDieFace(1), // air strike hits (roll 1 <= air attack 10)
+      tacticalUniformForCombatDieFace(20), // surviving sibling armor AA misses (roll 20 > armor attack 10)
     ])
   );
   const survivingOpp = out.battle.subUnits.filter((u) => u.parentUnitId === 'opponent-armor-1');
@@ -427,7 +427,7 @@ test('tactical air strike deletes strategic parent when the last sub-unit is eli
       undefined,
       'human',
       tacticalSequencedRandom([
-        tacticalUniformForD6Face(1), // air strike hits; sole defender eliminated, no AA roll
+        tacticalUniformForCombatDieFace(1), // air strike hits; sole defender eliminated, no AA roll
       ])
     );
     assert.strictEqual(out.battle.subUnits.some((u) => u.parentUnitId === parentId), false);
@@ -470,8 +470,8 @@ test('tactical infrastructure counterattack removes attacker without killsByAirS
       undefined,
       'human',
       tacticalSequencedRandom([
-        tacticalUniformForD6Face(1), // infra strike hits (d6=1 <= air attack 3)
-        tacticalUniformForD6Face(1), // urban counterattack succeeds (d6=1 <= threshold 1)
+        tacticalUniformForCombatDieFace(1), // infra strike hits (roll 1 <= air attack 10)
+        tacticalUniformForCombatDieFace(1), // urban counterattack succeeds (roll 1 <= threshold 3)
       ]),
       'singlePlayer'
     );
@@ -532,8 +532,8 @@ test('tactical infantry in the target hex can AA a striking air sub-unit', () =>
     undefined,
     'human',
     tacticalSequencedRandom([
-      tacticalUniformForD6Face(6),
-      tacticalUniformForD6Face(1),
+      tacticalUniformForCombatDieFace(20), // air strike misses (roll 20 > air attack 10)
+      tacticalUniformForCombatDieFace(1), // infantry AA hits (roll 1 <= infantry attack 3)
     ]),
     'singlePlayer'
   );
@@ -549,4 +549,49 @@ test('tactical infantry in the target hex can AA a striking air sub-unit', () =>
     out.battle.subUnits.some((u) => u.id === 'opp-inf-aa'),
     'infantry defender should survive a missed strike'
   );
+});
+
+/**
+ * Runs one air strike on a lone infantry sub-unit whose cell has the given terrain kind.
+ *
+ * Purpose: Isolates the target cell's air cover for the cover regression below.
+ * When to use: Only from the cover test in this file.
+ * Expected outcome: The phase output for a single strike seeded with `faces`; throws if more draws are made than seeded.
+ * Exceptions: Throws when resolution draws more rolls than `faces` provides.
+ */
+function strikeLoneInfantryOn(targetTerrainKind: string, faces: readonly number[]) {
+  const res1 = tacticalRes1Cell(12, 34);
+  const res4Inf = tacticalRes4UnderRes1Corner(12, 34);
+  const res4Air = firstRingCellDistinctFrom(res4Inf);
+  const ring = [...new Set([res4Inf, res4Air, ...gridDisk(res4Inf, 2)])];
+  const terrain: Record<string, string> = Object.fromEntries(ring.map((h) => [h, 'plains']));
+  terrain[res4Inf] = targetTerrainKind;
+  const snap: TacticalBattleSnapshot = {
+    battleId: 'tb-air-cover',
+    enclosingRes1H3Index: res1,
+    res4ChildH3Indexes: ring,
+    strategicTurnNumber: 1,
+    tacticalTurnNumber: 1,
+    strategicHexTerrain: 'land',
+    strategicHexTerrainKind: 'plains',
+    res4TerrainKindByH3: terrain,
+    subUnits: [
+      { id: 'hum-air-cover', parentUnitId: 'p-air', player: 'human', unitType: 'air', h3Index: res4Air, displayName: 'Air' },
+      { id: 'opp-inf-cover', parentUnitId: 'p-inf', player: 'opponent', unitType: 'infantry', h3Index: res4Inf, displayName: 'Infantry' },
+    ],
+  };
+  const strike: AirStrikeOrder = { unitId: 'hum-air-cover', targetH3Index: res4Inf, targetType: 'units' };
+  const next = tacticalSequencedRandom(faces.map(tacticalUniformForCombatDieFace));
+  return applyTacticalAirStrikeThenRangedPhaseOnBattle(snap, [strike], undefined, 'human', next, 'singlePlayer');
+}
+
+test('forest air cover turns a strike roll of 10 into a miss that hits on plains', () => {
+  // Forest: air attack 10 - 1 cover = 9, so a 10 misses; infantry AA (attack 3) misses a 20.
+  const forest = strikeLoneInfantryOn('forest', [10, 20]);
+  assert.equal(forest.killsByAirStrike.length, 0);
+  assert.equal(forest.killsByReturnFire.length, 0);
+  // Plains: no cover, so a 10 hits; the lone defender is removed and draws no AA roll.
+  const plains = strikeLoneInfantryOn('plains', [10]);
+  assert.deepEqual(plains.killsByAirStrike.map((k) => k.victimId), ['opp-inf-cover']);
+  assert.equal(plains.killsByReturnFire.length, 0);
 });

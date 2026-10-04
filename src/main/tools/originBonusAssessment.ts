@@ -44,7 +44,7 @@ export interface OriginBonusUnitFields {
    *
    * Contract: Present exactly when `originBonusHere` is present: 0 when that list is empty, otherwise the larger amount among its reasons.
    * When to use: Stating the bonus, such as the Unit Status Bonus cell.
-   * Expected outcome: 0, 1, or 2.
+   * Expected outcome: 0, 2, or 4.
    * Exceptions: None.
    */
   readonly originBonusAmount?: OriginHitBonus;

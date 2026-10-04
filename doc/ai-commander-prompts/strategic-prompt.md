@@ -39,24 +39,25 @@ Emit order. Each entry states purpose, the information items it carries, include
 
 One paragraph, in this order. Every clause is required unless marked.
 
-1. Dice model: one d6 per shot; an attack hits on a roll at or below the attacking stat, a defensive hit on a roll at or below the defending stat.
+1. Dice model: one d20 per shot; an attack hits on a roll at or below the attacking stat, a defensive hit on a roll at or below the defending stat, after the changes below. Penalties and cover never lower an attack value below 2 before bonuses, and no value exceeds 17 (`buildCombatStatsLine`).
 2. Per-type stats and reach: attack, defense, and strategic ranged reach for each of infantry, armor, naval, and air. Reach values come from `strategicRangedRangeHexesForUnitType`; a reach of zero is stated as melee only.
 3. Casualty rule: hits land on the lowest-defense unit in the target stack first, then in the fixed type order infantry, armor, naval, air (`buildCasualtySortRule`).
-4. Origin bonus, included only when the country bonus is on: a unit in a hex whose country is its birth country adds 1 (Low) or 2 (High) to every value it rolls there, including ranged fire, return fire, melee, and air-strike counter-fire; an air unit qualifies by its base when the opponent has air units; casualty order still uses the printed defense values (`buildOriginBonusRule`).
-5. Weather bonus, included only when that flag is on (`buildWeatherRule`). The turn line names the month. The Unit Status Weather column names the weather of the hex where the unit stands, with birth tags in parentheses. Armor and naval move less in the weather they lack (High adds heat for armor and rain for naval), armor ranged attack is lower in snow or heat, air strikes are lower when the base or the target is weather the unit lacks (1 lower at Low, 2 at High), and a ferry into snow is 2 hexes. Defense and melee stay printed.
-6. Resolution order for the turn: embark, then air strikes, then ranged fire, then movement, then cargo sync, then ferry, then melee (`buildResolutionOrderRule`).
-7. Attacks resolve from turn-start positions, so a unit may fire and move in the same turn and firing never costs a move.
-8. At most one ranged action per unit per turn, using exactly one of a target cell code or a target unit id, and never the unit's own move destination.
-9. Infantry has no strategic ranged action and closes to melee instead.
-10. Movement budgets: one cell for infantry, two for armor and naval, and air never marches (`buildMovementBudgetRule`). This clause stays the printed counts. The weather exception, when the flag is on, is clause 5.
-11. Friendly units may stack on the same cell. A cell holding an enemy is legal as a move/melee Target Hex. Approach Target Hexes omit stay-put friendlies; a cell a friendly is leaving this period is a legal dest (`buildDestinationOccupancyRule`).
-12. Invalid attacks are dropped before submission.
-13. Naval clause, included only when the opponent has naval units: naval units fire on land targets at one or two cells, move on water and coastal cells, and reach a land target by routing to the nearest water or coastal cell.
-14. Air clause, included only when the opponent has air units: the tempo sentence names air strikes alongside ranged attacks, and `buildAirEmploymentRule` states strike radius 3, ferry range 4, and that strike and ferry cannot share a turn.
-15. Hold-fire sentence, included only when standing-order tools are enabled: a fire-withholding standing order suppresses automatic engagement until replaced; omitting an attack is not the same (`buildHoldFireRule`).
+4. Origin bonus, included only when the country bonus is on: a unit in a hex whose country is its birth country adds 2 (Low) or 4 (High) to every value it rolls there, including ranged fire, return fire, melee, and air-strike counter-fire; an air unit qualifies by its base when the opponent has air units; casualty order still uses the printed defense values (`buildOriginBonusRule`).
+5. Weather bonus, included only when that flag is on (`buildWeatherRule`). The turn line names the month. The Unit Status Weather column names the weather of the hex where the unit stands, with birth tags in parentheses. Armor and naval move less in the weather they lack (High adds heat for armor and rain for naval), armor ranged attack is lower in snow or heat, air strikes are lower when the base or the target is weather the unit lacks (3 lower at Low, 5 at High), and a ferry into snow is 2 hexes. Defense and melee stay printed.
+6. Terrain cover, always included (`buildTerrainCoverRule`): ranged fire at a hex whose main terrain is forest or mountain needs a roll 2 lower, or 1 lower for wetlands; an air strike on units in a forest hex needs a roll 1 lower; melee, return fire, anti-air fire, and strikes on infrastructure ignore cover. Values come from `TERRAIN_COVER_BY_CATEGORY`.
+7. Resolution order for the turn: embark, then air strikes, then ranged fire, then movement, then cargo sync, then ferry, then melee (`buildResolutionOrderRule`).
+8. Attacks resolve from turn-start positions, so a unit may fire and move in the same turn and firing never costs a move.
+9. At most one ranged action per unit per turn, using exactly one of a target cell code or a target unit id, and never the unit's own move destination.
+10. Infantry has no strategic ranged action and closes to melee instead.
+11. Movement budgets: one cell for infantry, two for armor and naval, and air never marches (`buildMovementBudgetRule`). This clause stays the printed counts. The weather exception, when the flag is on, is clause 5.
+12. Friendly units may stack on the same cell. A cell holding an enemy is legal as a move/melee Target Hex. Approach Target Hexes omit stay-put friendlies; a cell a friendly is leaving this period is a legal dest (`buildDestinationOccupancyRule`).
+13. Invalid attacks are dropped before submission.
+14. Naval clause, included only when the opponent has naval units: naval units fire on land targets at one or two cells, move on water and coastal cells, and reach a land target by routing to the nearest water or coastal cell.
+15. Air clause, included only when the opponent has air units: the tempo sentence names air strikes alongside ranged attacks, and `buildAirEmploymentRule` states strike radius 3, ferry range 4, and that strike and ferry cannot share a turn.
+16. Hold-fire sentence, included only when standing-order tools are enabled: a fire-withholding standing order suppresses automatic engagement until replaced; omitting an attack is not the same (`buildHoldFireRule`).
 
-- **Items:** `COMBAT_STATS`, `STRATEGIC_RANGE_TABLE`, `ATTACK_ONE_PER_UNIT`, `WEGO_PHASE_ORDER`, `TEMPO_RANGED_SHOT`, `CASUALTY_PRIORITY`, `ORIGIN_BONUS`, `MOVE_BUDGET`, `LEGAL_DEST_OCCUPANCY`, `NAVAL_MOVEMENT_DOMAIN`.
-- **Include:** always; clauses 13 and 14 are roster-gated, clause 4 is gated by the country bonus flag, and clause 5 is gated by the weather bonus flag. **Empty-state:** not possible.
+- **Items:** `COMBAT_STATS`, `STRATEGIC_RANGE_TABLE`, `ATTACK_ONE_PER_UNIT`, `WEGO_PHASE_ORDER`, `TEMPO_RANGED_SHOT`, `CASUALTY_PRIORITY`, `ORIGIN_BONUS`, `TERRAIN_COVER`, `MOVE_BUDGET`, `LEGAL_DEST_OCCUPANCY`, `NAVAL_MOVEMENT_DOMAIN`.
+- **Include:** always; clauses 14 and 15 are roster-gated, clause 4 is gated by the country bonus flag, and clause 5 is gated by the weather bonus flag. **Empty-state:** not possible.
 - **Model use:** every firing and movement decision in the turn.
 
 Assessment-tool and combat-estimate hints must **not** appear when a precomputed briefing is attached, because those tools are not callable in that configuration.
@@ -78,7 +79,7 @@ Assessment-tool and combat-estimate hints must **not** appear when a precomputed
 - **Include:** always inside the briefing.
 - **Distance-basis caveat line:** immediately after the heading and before the table. Under fog off at res1, include one line stating that nearest-enemy distances and threat estimates are straight hop counts rather than march or sail paths, and that option-table targets are already this-turn legal destinations. Under fog on at res1, include the intel-staleness sentence and one line stating that nearest-enemy distances are march or sail path lengths when a path exists (otherwise a hop count), and that Best Options Target Hexes are already this-turn legal destinations — copy them even when the printed path is longer than one movement budget. Omit both caveat lines in battle. `variants.md` fixes the gates.
 - **Rows:** one per own unit. **No cap.** The table lists every unit the snapshot includes, at every game size.
-- **Bonus column:** when the country bonus is on, a `Bonus` column follows `Hex`, reading `+1 country` (`+2 country` at High) for a unit that qualifies where it stands and `—` otherwise. With the flag off the table is unchanged. Carries `ORIGIN_BONUS`.
+- **Bonus column:** when the country bonus is on, a `Bonus` column follows `Hex`, reading `+2 country` (`+4 country` at High) for a unit that qualifies where it stands and `—` otherwise. With the flag off the table is unchanged. Carries `ORIGIN_BONUS`.
 - **Items:** `OWN_UNIT_TABLE`, `UNIT_IDENTITY`, `NEAREST_ENEMY_DISTANCE`, `CONTACT_FLAGS`, `THREAT_SEVERITY`, `ACTION_NEEDED_FLAG`, `INTEL_FRESHNESS`, `INTEL_STALENESS_WINDOW`, `HOP_VS_PATH_CAVEAT`.
 - **Empty-state:** header row plus the line `(No AI units)`.
 - **Model use:** the roster to work through; the action-needed column is the worklist.

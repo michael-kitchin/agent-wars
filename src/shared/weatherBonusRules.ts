@@ -152,15 +152,15 @@ export const TACTICAL_WEATHER_BUDGET_CAP: Readonly<Record<ActiveBonusLevel, numb
 /**
  * Points a penalized ranged attack or air strike loses, by level.
  *
- * Purpose: High doubles the attack penalty; `attackHitThreshold` floors the printed attack at 1, so a 1 always still hits.
+ * Purpose: High cuts deeper than Low; `attackHitThreshold` floors the penalized attack at 2, so a shot keeps at least a 10% chance.
  * When to use: `weatherAttackPenalty`, and prompt text that states the penalty.
- * Expected outcome: Low 1, High 2.
+ * Expected outcome: Low 3, High 5. High is one more than the High origin bonus, so the two never cancel exactly.
  * Exceptions: None.
  */
 export const WEATHER_ATTACK_PENALTY_BY_LEVEL: Readonly<Record<ActiveBonusLevel, Exclude<WeatherAttackPenalty, 0>>> =
   Object.freeze({
-    low: 1,
-    high: 2,
+    low: 3,
+    high: 5,
   });
 
 /**
@@ -409,7 +409,7 @@ export function tacticalWeatherOpenGroundCost(input: {
  *
  * Purpose: Armor is less effective at range in snow and heat. Air is less effective when its base or its target is a weather it lacks.
  * When to use: Ranged hit thresholds, air-strike rolls, and air-strike counter-fire. Never for melee or defense.
- * Expected outcome: 0 when the level is off. Armor ranged fire in snow or heat unless tagged, and an air strike when either hex is snow, rain, or heat the unit lacks, lose `WEATHER_ATTACK_PENALTY_BY_LEVEL` (1 at Low, 2 at High), once per roll. Infantry, naval, mild weather, and a tagged weather return 0.
+ * Expected outcome: 0 when the level is off. Armor ranged fire in snow or heat unless tagged, and an air strike when either hex is snow, rain, or heat the unit lacks, lose `WEATHER_ATTACK_PENALTY_BY_LEVEL` (3 at Low, 5 at High), once per roll. Infantry, naval, mild weather, and a tagged weather return 0.
  * Exceptions: None.
  */
 export function weatherAttackPenalty(input: {

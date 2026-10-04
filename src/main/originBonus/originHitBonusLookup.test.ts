@@ -56,11 +56,11 @@ function coastalBattle(): TacticalBattleSnapshot {
   };
 }
 
-test('the strategic lookup gives 1 only at a hex of the birth country with the flag on', () => {
+test('the strategic lookup gives 2 only at a hex of the birth country with the flag on', () => {
   const countryNameAt = (h3: string) => (h3 === 'hex-fr' ? 'France' : 'Spain');
   const units = [{ id: 'u1', origin: FRENCH_COASTAL }];
   const lookup = createStrategicOriginHitBonusLookup({ settings: COUNTRY_ONLY, units, countryNameAt });
-  assert.equal(lookup('u1', 'hex-fr'), 1);
+  assert.equal(lookup('u1', 'hex-fr'), 2);
   assert.equal(lookup('u1', 'hex-es'), 0);
   assert.equal(lookup('unknown', 'hex-fr'), 0);
   const off = createStrategicOriginHitBonusLookup({ settings: TERRAIN_ONLY, units, countryNameAt });
@@ -68,7 +68,7 @@ test('the strategic lookup gives 1 only at a hex of the birth country with the f
 });
 
 test('the tactical lookup applies the terrain test only with the terrain flag on', () => {
-  assert.equal(createTacticalOriginHitBonusLookup({ settings: TERRAIN_ONLY, battle: coastalBattle() })('sub-1', 'cell-a'), 1);
+  assert.equal(createTacticalOriginHitBonusLookup({ settings: TERRAIN_ONLY, battle: coastalBattle() })('sub-1', 'cell-a'), 2);
   assert.equal(createTacticalOriginHitBonusLookup({ settings: COUNTRY_ONLY, battle: coastalBattle() })('sub-1', 'cell-a'), 0);
 });
 
@@ -77,19 +77,19 @@ test('withOriginHitBonus adds the field only to qualifying units', () => {
     { id: 'a', player: 'human', unitType: 'infantry', h3Index: 'h' },
     { id: 'b', player: 'human', unitType: 'infantry', h3Index: 'h' },
   ];
-  const out = withOriginHitBonus(units, (unitId) => (unitId === 'a' ? 1 : 0));
-  assert.equal(out[0]!.originHitBonus, 1);
+  const out = withOriginHitBonus(units, (unitId) => (unitId === 'a' ? 2 : 0));
+  assert.equal(out[0]!.originHitBonus, 2);
   assert.equal('originHitBonus' in out[1]!, false);
   assert.equal('originHitBonus' in units[0]!, false);
-  const high = withOriginHitBonus(units, (unitId) => (unitId === 'a' ? 2 : 0));
-  assert.equal(high[0]!.originHitBonus, 2);
+  const high = withOriginHitBonus(units, (unitId) => (unitId === 'a' ? 4 : 0));
+  assert.equal(high[0]!.originHitBonus, 4);
 });
 
-test('the strategic lookup gives 2 with the country bonus at High', () => {
+test('the strategic lookup gives 4 with the country bonus at High', () => {
   const lookup = createStrategicOriginHitBonusLookup({
     settings: { ...COUNTRY_ONLY, countryBonusLevel: 'high' },
     units: [{ id: 'u1', origin: FRENCH_COASTAL }],
     countryNameAt: () => 'France',
   });
-  assert.equal(lookup('u1', 'hex-fr'), 2);
+  assert.equal(lookup('u1', 'hex-fr'), 4);
 });

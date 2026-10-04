@@ -93,11 +93,11 @@ test('the tactical budget lowers armor in snow and naval only in snow', () => {
   );
 });
 
-test('ranged armor loses one point in snow and in heat', () => {
+test('ranged armor loses three points in snow and in heat', () => {
   for (const weatherAtUnit of ['snow', 'heat'] as const) {
     assert.equal(
       weatherAttackPenalty({ unitType: 'armor', kind: 'ranged', weatherAtUnit, tags: [], level: 'low' }),
-      1
+      3
     );
   }
 });
@@ -120,8 +120,8 @@ test('High slows armor in heat and naval in rain, and a tag still cancels it', (
   );
 });
 
-test('High doubles the attack penalty and still applies it once per air strike', () => {
-  assert.equal(weatherAttackPenalty({ unitType: 'armor', kind: 'ranged', weatherAtUnit: 'snow', tags: [], level: 'high' }), 2);
+test('High raises the attack penalty to 5 and still applies it once per air strike', () => {
+  assert.equal(weatherAttackPenalty({ unitType: 'armor', kind: 'ranged', weatherAtUnit: 'snow', tags: [], level: 'high' }), 5);
   assert.equal(
     weatherAttackPenalty({
       unitType: 'air',
@@ -131,7 +131,7 @@ test('High doubles the attack penalty and still applies it once per air strike',
       tags: [],
       level: 'high',
     }),
-    2
+    5
   );
   assert.equal(
     weatherAttackPenalty({
@@ -142,7 +142,7 @@ test('High doubles the attack penalty and still applies it once per air strike',
       tags: [],
       level: 'high',
     }),
-    2
+    5
   );
 });
 
@@ -172,7 +172,7 @@ test('air strikes into snow are penalized once, and ranged armor is not penalize
       tags: [],
       level: 'low',
     }),
-    1
+    3
   );
   assert.equal(
     weatherAttackPenalty({
@@ -183,7 +183,7 @@ test('air strikes into snow are penalized once, and ranged armor is not penalize
       tags: [],
       level: 'low',
     }),
-    1
+    3
   );
   assert.equal(
     weatherAttackPenalty({

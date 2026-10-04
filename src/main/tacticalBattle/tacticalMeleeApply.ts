@@ -55,7 +55,7 @@ function tacticalSubUnitsAsCombatUnits(subUnits: readonly TacticalSubUnitSnapsho
 /**
  * Runs one strategic-style melee pass over every res4 cell in the footprint after support projection.
  *
- * Purpose: Completes the tactical WEGO beat so co-located opposing sub-units fight with d6 resolution instead of
+ * Purpose: Completes the tactical WEGO beat so co-located opposing sub-units fight with combat-die resolution instead of
  * persisting indefinitely without combat; kill lines and removal snapshots feed the same toast path as strategic Ready.
  * When to use: End of `applyHumanTacticalDraftBeatInStrategicOrder` / `commitHumanTacticalDraftOrders` after air+ranged, march, optional human embark, ferry, and cargo sync.
  * Expected outcome: Updated `battle.subUnits` with melee casualties removed; empty melee arrays when no contested res4 hexes.

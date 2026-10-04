@@ -28,6 +28,7 @@ import { weatherPenaltyForRoll } from '../weather/weatherMatch';
 import { weatherBonusLevelOf } from '../../shared/weatherBonusRules';
 import { weatherTagsForBirthHex } from '../weather/weatherPackLoad';
 import { buildStrategicOriginHitBonusLookupFromDb } from '../originBonus/originHitBonusLookupDb';
+import { createStrategicTerrainCoverLookup } from '../terrainCover/terrainCoverLookup';
 import {
   applyEmbarkOrdersForPlayer,
   applyTransportOutcomeForRemovedStrategicUnits,
@@ -203,7 +204,8 @@ export function executeReadyStrategicTurn(
   logDebug('ready: combat resolution', { turnNumber, gameSeed, combatSeed: seed });
 
   const originHitBonusAt = buildStrategicOriginHitBonusLookupFromDb();
-  const airStrikeResult = resolveAirStrikePhase(allAirStrikes, next, originHitBonusAt);
+  const targetCoverAt = createStrategicTerrainCoverLookup(preMoveState.hexes);
+  const airStrikeResult = resolveAirStrikePhase(allAirStrikes, next, originHitBonusAt, targetCoverAt);
   const airStrikeTransportLosses = applyTransportOutcomeForRemovedStrategicUnits(
     airStrikeResult.removedUnitIds,
     airStrikeResult.removedUnits
@@ -237,10 +239,14 @@ export function executeReadyStrategicTurn(
     });
     return penalty === 0 ? unit : { ...unit, weatherAttackPenalty: penalty };
   });
-  const rangedResult = runRangedPhase(rangedInputUnits, hexList, allRanged, next, {
-    theater: 'strategic',
-    hasIntactAirportAtAirBase: hasIntactAirportAtStrategicAirBase,
-  });
+  const rangedResult = runRangedPhase(
+    rangedInputUnits,
+    hexList,
+    allRanged,
+    next,
+    { theater: 'strategic', hasIntactAirportAtAirBase: hasIntactAirportAtStrategicAirBase },
+    targetCoverAt
+  );
   for (const id of rangedResult.removedUnitIds) {
     dbRun('DELETE FROM units WHERE id = ?', [id]);
   }

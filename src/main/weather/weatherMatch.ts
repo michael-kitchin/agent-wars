@@ -85,9 +85,9 @@ export function strategicRangeOnState(
 /**
  * Returns the attack penalty for one roll.
  *
- * Purpose: Ranged fire and air strikes subtract this before the origin bonus, with a floor of 1 on the printed value.
+ * Purpose: Ranged fire and air strikes subtract this before the origin bonus; `attackHitThreshold` floors the result at `MIN_ATTACK_HIT_THRESHOLD`.
  * When to use: When building a `CombatUnit` or an air-strike threshold, with the match's weather level.
- * Expected outcome: 0 when off or not penalized, 1 at Low, 2 at High. Melee callers must not use this.
+ * Expected outcome: 0 when off or not penalized, 3 at Low, 5 at High. Melee callers must not use this.
  * Exceptions: None beyond pack load failures when a hex must be read.
  */
 export function weatherPenaltyForRoll(input: {

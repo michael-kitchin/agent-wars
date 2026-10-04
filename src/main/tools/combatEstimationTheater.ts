@@ -36,6 +36,12 @@ import {
   createTacticalOriginHitBonusLookup,
   type OriginHitBonusLookup,
 } from '../originBonus/originHitBonusLookup';
+import {
+  tacticalCellTerrainCover,
+  terrainCoverShooterForUnitType,
+  type TerrainCover,
+} from '../../shared/terrainCoverRules';
+import { createStrategicTerrainCoverLookup } from '../terrainCover/terrainCoverLookup';
 
 /**
  * Engagement kinds `estimate_combat` predicts.
@@ -138,10 +144,19 @@ export interface CombatEstimationTheater {
    *
    * Contract: 0 for melee and when the weather bonus is off.
    * When to use: Before `attackHitThreshold` on ranged attackers, including air strikes estimated as ranged.
-   * Expected outcome: 0, 1 at Low, or 2 at High, matching resolution.
+   * Expected outcome: 0, 3 at Low, or 5 at High, matching resolution.
    * Exceptions: None.
    */
   weatherAttackPenaltyFor(unit: CombatUnit, targetH3: string, engagement: CombatEstimationEngagementType): WeatherAttackPenalty;
+  /**
+   * Terrain cover the target gives against one estimated attacker.
+   *
+   * Contract: 0 for melee; otherwise the cover live dice read for this theater, target, and shooter.
+   * When to use: On attackers only, before `attackHitThreshold`; never on defenders or return fire.
+   * Expected outcome: 0, 1, or 2.
+   * Exceptions: None.
+   */
+  targetCoverFor(unit: CombatUnit, targetH3: string, engagement: CombatEstimationEngagementType): TerrainCover;
   findUnit(unitId: string, engagementType: CombatEstimationEngagementType): CombatEstimationUnitLookup;
   /**
    * Lists units standing on one cell for an engagement.
@@ -184,7 +199,7 @@ export interface CombatEstimationTheater {
    *
    * Contract: Same matching rules as live dice in this theater; unknown ids give 0.
    * When to use: Side builders, with the cell where the unit would roll.
-   * Expected outcome: 0, 1, or 2.
+   * Expected outcome: 0, 2, or 4.
    * Exceptions: None.
    */
   readonly originHitBonusAt: OriginHitBonusLookup;
@@ -229,8 +244,12 @@ export function buildStrategicCombatEstimationTheater(state: GameStateSnapshot):
     h3Index: u.h3Index,
     ...(u.weatherTags ? { weatherTags: u.weatherTags } : {}),
   });
+  const targetCoverAt = createStrategicTerrainCoverLookup(state.hexes);
   return {
     theater: 'strategic',
+    targetCoverFor(unit, targetH3, engagement) {
+      return engagement === 'ranged' ? targetCoverAt(targetH3, terrainCoverShooterForUnitType(unit.unitType)) : 0;
+    },
     weatherAttackPenaltyFor(unit, targetH3, engagement) {
       if (engagement !== 'ranged') return 0;
       return weatherPenaltyForRoll({
@@ -307,6 +326,11 @@ export function buildTacticalCombatEstimationTheater(
   });
   return {
     theater: 'tactical',
+    targetCoverFor(unit, targetH3, engagement) {
+      return engagement === 'ranged'
+        ? tacticalCellTerrainCover(battle, targetH3, terrainCoverShooterForUnitType(unit.unitType))
+        : 0;
+    },
     weatherAttackPenaltyFor(unit, _targetH3, engagement) {
       if (engagement !== 'ranged') return 0;
       return weatherAttackPenalty({

@@ -20,6 +20,7 @@ import {
   buildAirEmploymentRule,
   buildCasualtySortRule,
   buildCombatRulesParagraph,
+  buildCombatStatsLine,
   buildDestinationOccupancyRule,
   buildHoldFireRule,
   buildIntelStalenessRule,
@@ -28,6 +29,7 @@ import {
   buildProductionCostRulesLine,
   buildRangedReachRule,
   buildResolutionOrderRule,
+  buildTerrainCoverRule,
   buildWeatherRule,
   type GameRuleTextGates,
 } from './gameRuleText';
@@ -122,7 +124,7 @@ test('buildOriginBonusRule appears only when a flag applies in the mode', () => 
   assert.equal(buildOriginBonusRule(gates({ originBonusSettings: terrainOnly })), null);
 
   const strategic = buildOriginBonusRule(gates({ originBonusSettings: countryOnly }));
-  assert.match(strategic ?? '', /^Country bonus is on: a unit in a hex whose country is its birth country adds 1/);
+  assert.match(strategic ?? '', /^Country bonus is on: a unit in a hex whose country is its birth country adds 2/);
   assert.match(strategic ?? '', /Casualty order still uses the printed defense values\.$/);
   assert.doesNotMatch(strategic ?? '', /air unit qualifies/);
   const strategicAir = buildOriginBonusRule(gates({ originBonusSettings: countryOnly, hasAirUnits: true }));
@@ -139,7 +141,7 @@ test('tactical buildOriginBonusRule notes no stacking only when both flags are o
   assert.match(tactical(false, true), /^Terrain bonus is on: a unit on a cell/);
   assert.doesNotMatch(tactical(false, true), /do not stack/);
   assert.doesNotMatch(tactical(true, false), /do not stack/);
-  assert.match(tactical(true, true), /Country bonus is on: a unit on a cell.*Terrain bonus is on.*do not stack; the most is \+1\./);
+  assert.match(tactical(true, true), /Country bonus is on: a unit on a cell.*Terrain bonus is on.*do not stack; the most is \+2\./);
 });
 
 test('the origin bonus sentences keep their exact wording', () => {
@@ -147,7 +149,7 @@ test('the origin bonus sentences keep their exact wording', () => {
     buildOriginBonusRule(
       gates({ originBonusSettings: { countryBonusEnabled: true, terrainBonusEnabled: false }, hasAirUnits: true })
     ),
-    'Country bonus is on: a unit in a hex whose country is its birth country adds 1 to every attack or defense value it rolls there, including ranged fire, return fire, melee, and air-strike counter-fire. ' +
+    'Country bonus is on: a unit in a hex whose country is its birth country adds 2 to every attack or defense value it rolls there, including ranged fire, return fire, melee, and air-strike counter-fire. ' +
       'An air unit qualifies by the hex of its base, whatever it strikes. ' +
       'Casualty order still uses the printed defense values.'
   );
@@ -159,19 +161,19 @@ test('the origin bonus sentences keep their exact wording', () => {
         hasAirUnits: true,
       })
     ),
-    'Country bonus is on: a unit on a cell whose country is its birth country adds 1 to every attack or defense value it rolls there. ' +
-      "Terrain bonus is on: a unit on a cell whose terrain kind matches its birth terrain kind adds 1 to every attack or defense value it rolls there; urban and rubble do not change a cell's terrain kind. " +
-      'The two bonuses do not stack; the most is +1. ' +
+    'Country bonus is on: a unit on a cell whose country is its birth country adds 2 to every attack or defense value it rolls there. ' +
+      "Terrain bonus is on: a unit on a cell whose terrain kind matches its birth terrain kind adds 2 to every attack or defense value it rolls there; urban and rubble do not change a cell's terrain kind. " +
+      'The two bonuses do not stack; the most is +2. ' +
       'An air unit qualifies by the cell of its base, whatever it strikes. ' +
       'Casualty order still uses the printed defense values.'
   );
 });
 
-test('a High origin bonus states 2, and the stacking note states the larger amount', () => {
+test('a High origin bonus states 4, and the stacking note states the larger amount', () => {
   const strategic = buildOriginBonusRule(
     gates({ originBonusSettings: { countryBonusEnabled: true, terrainBonusEnabled: false, countryBonusLevel: 'high' } })
   );
-  assert.match(strategic ?? '', /^Country bonus is on: a unit in a hex whose country is its birth country adds 2 to every attack/);
+  assert.match(strategic ?? '', /^Country bonus is on: a unit in a hex whose country is its birth country adds 4 to every attack/);
   const tactical = buildOriginBonusRule(
     gates({
       coordinateMode: 'tactical',
@@ -183,8 +185,8 @@ test('a High origin bonus states 2, and the stacking note states the larger amou
       },
     })
   );
-  assert.match(tactical ?? '', /birth terrain kind adds 1 to every attack/);
-  assert.match(tactical ?? '', /The two bonuses do not stack; the most is \+2\./);
+  assert.match(tactical ?? '', /birth terrain kind adds 2 to every attack/);
+  assert.match(tactical ?? '', /The two bonuses do not stack; the most is \+4\./);
 });
 
 test('the weather sentence keeps its exact wording', () => {
@@ -195,15 +197,15 @@ test('the weather sentence keeps its exact wording', () => {
     "Weather bonus is on: the month is on the turn line and every beat of a battle shares the enclosing hex's weather. " +
       'Armor strategic movement is 1 in snow or rain, and naval strategic movement is 1 in snow, unless the unit is tagged for that weather. ' +
       "In battle, armor's point budget is 2 in snow or rain and naval's is 2 in snow; infantry pays 2 to enter open ground in snow or rain. " +
-      'Armor ranged attack is 1 lower in snow or heat, including return fire and air-strike counter-fire. ' +
-      'An air strike is 1 lower once when its base or its target is snow, rain, or heat the unit lacks. ' +
+      'Armor ranged attack is 3 lower in snow or heat, including return fire and air-strike counter-fire. ' +
+      'An air strike is 3 lower once when its base or its target is snow, rain, or heat the unit lacks. ' +
       'A strategic ferry into snow is 2 hexes unless the unit is tagged for snow. ' +
       'Defense, melee, and casualty order keep their printed values. A tag is earned by the birth hex. ' +
       'The Unit Status Weather column names the weather where that unit stands. Birth tags, when the unit has any, follow in parentheses.'
   );
 });
 
-test('the High weather sentence widens the slowing weather and doubles the penalties', () => {
+test('the High weather sentence widens the slowing weather and deepens the penalties', () => {
   assert.equal(
     buildWeatherRule(
       gates({
@@ -218,8 +220,8 @@ test('the High weather sentence widens the slowing weather and doubles the penal
     "Weather bonus is on: the month is on the turn line and every beat of a battle shares the enclosing hex's weather. " +
       'Armor strategic movement is 1 in snow, rain, or heat, and naval strategic movement is 1 in snow or rain, unless the unit is tagged for that weather. ' +
       "In battle, armor's point budget is 1 in snow, rain, or heat and naval's is 1 in snow or rain; infantry pays 2 to enter open ground in snow or rain. " +
-      'Armor ranged attack is 2 lower in snow or heat, including return fire and air-strike counter-fire. ' +
-      'An air strike is 2 lower once when its base or its target is snow, rain, or heat the unit lacks. ' +
+      'Armor ranged attack is 5 lower in snow or heat, including return fire and air-strike counter-fire. ' +
+      'An air strike is 5 lower once when its base or its target is snow, rain, or heat the unit lacks. ' +
       'A strategic ferry into snow is 2 hexes unless the unit is tagged for snow. ' +
       'Defense, melee, and casualty order keep their printed values. A tag is earned by the birth hex. ' +
       'The Unit Status Weather column names the weather where that unit stands. Birth tags, when the unit has any, follow in parentheses.'
@@ -335,12 +337,45 @@ test('buildProductionCostRulesLine interpolates engine costs', () => {
   assert.match(text, /requires airport/);
 });
 
+test('the terrain cover sentences keep their exact wording', () => {
+  assert.equal(
+    buildTerrainCoverRule('strategic'),
+    'Terrain cover: ranged fire at a hex whose main terrain is forest or mountain needs a roll 2 lower, or 1 lower for wetlands. ' +
+      'An air strike on units in a hex whose main terrain is forest needs a roll 1 lower. ' +
+      'Melee, return fire, anti-air fire, and strikes on infrastructure ignore cover.'
+  );
+  assert.equal(
+    buildTerrainCoverRule('tactical'),
+    'Terrain cover: ranged fire at a forest, mountain, urban, or rubble cell needs a roll 2 lower, or 1 lower for wetlands. ' +
+      'An air strike on units in a forest, urban, or rubble cell needs a roll 1 lower. ' +
+      'Melee, return fire, anti-air fire, and shots at infrastructure ignore cover.'
+  );
+});
+
+test('the combat paragraph always states cover, after the weather sentence when weather is on', () => {
+  const cover = buildTerrainCoverRule('strategic');
+  assert.ok(buildCombatRulesParagraph(gates()).includes(cover));
+  const weatherOn = gates({
+    originBonusSettings: { countryBonusEnabled: false, terrainBonusEnabled: false, weatherBonusEnabled: true },
+  });
+  const paragraph = buildCombatRulesParagraph(weatherOn);
+  const weather = buildWeatherRule(weatherOn) ?? '\u0000';
+  assert.ok(paragraph.indexOf(weather) >= 0 && paragraph.indexOf(cover) > paragraph.indexOf(weather));
+});
+
+test('the combat stats line states the d20, the floor, and the cap', () => {
+  assert.match(
+    buildCombatStatsLine('strategic', false),
+    /^Combat: d20 per shot — an attack hits on a roll at or below its attack value and a defensive melee roll hits at or below its defense value, after the changes below\. Penalties and cover never lower an attack value below 2 before bonuses, and no value exceeds 17\. infantry: 3 attack \/ 7 defense/
+  );
+});
+
 test('the system-prompt assembler delegates combat-rule prose to this module', () => {
   const assembler = fs.readFileSync(
     path.resolve(process.cwd(), 'src/main/openRouter/openRouterBuildSystemPrompt.ts'),
     'utf8'
   );
   assert.ok(assembler.includes('buildCombatRulesParagraph'));
-  assert.ok(!assembler.includes('d6 per shot'));
+  assert.ok(!assembler.includes('d20 per shot'));
   assert.ok(!assembler.includes('Hits land on the lowest-defense'));
 });

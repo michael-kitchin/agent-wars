@@ -131,6 +131,26 @@ test('resolveOrderPreviewEffectsTooltipHtml names each untagged weather that cut
   assert.equal(html, `<strong>Effects:</strong> ${snowIcon}, ${heatIcon}`);
 });
 
+test('resolveOrderPreviewEffectsTooltipHtml adds a Cover line only when the target has cover against the shooter', () => {
+  assert.equal(
+    resolveOrderPreviewEffectsTooltipHtml(
+      legal({ kind: 'ranged', units: [{ unitType: 'armor', originWeather: 'mild' }], targetCover: { terrainKind: 'forest' } })
+    ),
+    `<strong>Cover:</strong> ${forestSwatch}`
+  );
+  assert.equal(
+    resolveOrderPreviewEffectsTooltipHtml(
+      legal({ kind: 'airStrike', units: [{ unitType: 'air', originWeather: 'mild' }], targetCover: { terrainKind: 'mountain' } })
+    ),
+    null
+  );
+  const snowArmor = legal({ kind: 'ranged', units: [{ unitType: 'armor', originWeather: 'snow', weatherTags: [] }] });
+  assert.equal(
+    resolveOrderPreviewEffectsTooltipHtml({ ...snowArmor, targetCover: null }),
+    resolveOrderPreviewEffectsTooltipHtml(snowArmor)
+  );
+});
+
 test('resolveOrderPreviewEffectsTooltipHtml stays empty when the order is unchanged or blocked', () => {
   assert.equal(
     resolveOrderPreviewEffectsTooltipHtml(legal({ marchImpact: { slower: [], roadRail: false } })),

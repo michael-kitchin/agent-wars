@@ -1,13 +1,19 @@
 /**
  * HTML for the order-planning effects tooltip.
  *
- * Purpose: Tells the player which terrain and weather change the march, ferry, air strike, or ranged attack under the pointer.
+ * Purpose: Tells the player which terrain and weather change the march, ferry, air strike, or ranged attack under the pointer, and which cover protects the targeted units.
  * When to use: After a hover preview is known, and from tests of that copy.
  * Expected outcome: Escaped HTML, or null when the order is blocked or nothing changes it.
  * Exceptions: None.
  */
 
 import type { BonusLevel } from './bonusLevel';
+import {
+  terrainCoverFor,
+  terrainCoverSourceLabel,
+  type TerrainCoverPlace,
+  type TerrainCoverShooter,
+} from './terrainCoverRules';
 import { collectTacticalRangedSlowTerrainLabels } from './orderPreviewSlowTerrainTooltip';
 import type { TacticalBattleSnapshot } from './tacticalBattleTypes';
 import type { TacticalBattleTerrainPick } from './tacticalTerrainCombatModifiers';
@@ -81,6 +87,15 @@ export type OrderPreviewEffectsTooltipInput = {
   readonly marchImpact?: { readonly slower: readonly string[]; readonly roadRail: boolean } | null;
   readonly rangedBattle?: OrderPreviewRangedTerrainBattle | null;
   readonly rangedPreviewUnitIds?: readonly string[];
+  /**
+   * Cover place of the hovered target, for ranged and air-strike hovers.
+   *
+   * Contract: Set only when the hovered target holds an enemy unit the player can see; otherwise null or omitted.
+   * When to use: The hover publisher reads it from the same source the engine uses for that theater.
+   * Expected outcome: Adds a Cover line when the target's cover against the selected shooters is above 0.
+   * Exceptions: None.
+   */
+  readonly targetCover?: TerrainCoverPlace | null;
 };
 
 const WEATHER_WORDS: Readonly<Record<string, WeatherState>> = Object.freeze({
@@ -208,9 +223,9 @@ function strategicFerryHtml(input: OrderPreviewEffectsTooltipInput): string | nu
 /**
  * Names the attacker's range cap and any weather that cuts a ranged shot.
  *
- * Purpose: The cap is the attacker's cell. The hovered target does not choose the terrain word.
+ * Purpose: The cap is the attacker's cell. The hovered target does not choose the terrain word; it only adds a Cover line.
  * When to use: A legal ranged hover.
- * Expected outcome: `Effects:` with distinct terrain and weather labels, or null when the shot is unchanged.
+ * Expected outcome: `Effects:` with distinct terrain and weather labels, then `Cover:` when a non-air shooter faces cover at the target; null when the shot is unchanged.
  * Exceptions: None.
  */
 function rangedHtml(input: OrderPreviewEffectsTooltipInput): string | null {
@@ -230,7 +245,8 @@ function rangedHtml(input: OrderPreviewEffectsTooltipInput): string | null {
     });
     if (penalty > 0 && unit.originWeather) pushDistinct(labels, weatherDisplayWord(unit.originWeather));
   }
-  return effectsLine(labels);
+  const surfaceShooter = input.units.some((unit) => unit.unitType !== 'air');
+  return joinSections([effectsLine(labels), surfaceShooter ? coverLine(input.targetCover, 'surface') : null]);
 }
 
 /**
@@ -238,7 +254,7 @@ function rangedHtml(input: OrderPreviewEffectsTooltipInput): string | null {
  *
  * Purpose: Mild and a tagged weather do not change the strike. A shared weather is named once.
  * When to use: A legal air strike.
- * Expected outcome: `Effects:` or null. Mountains are not listed.
+ * Expected outcome: `Effects:`, then `Cover:` when the targeted units have air cover, or null. Mountains give no air cover, so they are not listed.
  * Exceptions: None.
  */
 function airStrikeHtml(input: OrderPreviewEffectsTooltipInput): string | null {
@@ -259,7 +275,34 @@ function airStrikeHtml(input: OrderPreviewEffectsTooltipInput): string | null {
       pushDistinct(labels, weatherDisplayWord(weather));
     }
   }
-  return effectsLine(labels);
+  return joinSections([effectsLine(labels), coverLine(input.targetCover, 'air')]);
+}
+
+/**
+ * Names the cover that protects the targeted units against one kind of shooter.
+ *
+ * Purpose: Cover belongs to the target, so it gets its own line beside the attacker's Effects line.
+ * When to use: Ranged and air-strike hovers with a `targetCover` place.
+ * Expected outcome: `Cover:` with the source word and its swatch, or null when there is no place, no cover, or no source word.
+ * Exceptions: None.
+ */
+function coverLine(place: TerrainCoverPlace | null | undefined, shooter: TerrainCoverShooter): string | null {
+  if (!place || terrainCoverFor(place, shooter) <= 0) return null;
+  const source = terrainCoverSourceLabel(place);
+  return source ? `<strong>Cover:</strong> ${labelHtml(source)}` : null;
+}
+
+/**
+ * Joins the non-empty tooltip sections with the standard gap.
+ *
+ * Purpose: Effects and Cover are independent lines; either may be missing.
+ * When to use: Shot hovers that may add a Cover line.
+ * Expected outcome: Null when every section is null.
+ * Exceptions: None.
+ */
+function joinSections(sections: ReadonlyArray<string | null>): string | null {
+  const present = sections.filter((section): section is string => section !== null);
+  return present.length > 0 ? present.join(TOOLTIP_SECTION_GAP_HTML) : null;
 }
 
 /**

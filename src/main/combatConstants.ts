@@ -13,121 +13,57 @@ import { logTrace } from './logger';
 export type UnitType = 'infantry' | 'armor' | 'naval' | 'air';
 
 /**
- * Documents the module-scope binding `ATTACK` (ATTACK: Record<UnitType, number>).
-
- * Purpose: Supports maintainability by documenting why `ATTACK` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Printed attack per unit type: the hit number on the combat die before bonuses, penalties, and cover.
+ *
+ * Purpose: Attack, ranged fire, return fire, anti-air, and air-strike rolls start from this value.
+ * When to use: Only through `getAttack`; hit tests go through `attackHitThreshold`.
+ * Expected outcome: On the d20, infantry hits 15% of the time, naval 35%, and armor and air 50%.
  * Exceptions: None.
  */
-const ATTACK: Record<UnitType, number> = {
-    /**
-   * Documents the object literal property `infantry` (infantry: 1).
-
-   * Purpose: Supports maintainability by documenting why `infantry` exists.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-infantry: 1,
-    /**
-   * Documents the object literal property `armor` (armor: 3).
-
-   * Purpose: Supports maintainability by documenting why `armor` exists.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-armor: 3,
-    /**
-   * Documents the object literal property `naval` (naval: 2).
-
-   * Purpose: Supports maintainability by documenting why `naval` exists.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-naval: 2,
-    /**
-   * Documents the object literal property `air` (air: 3).
-
-   * Purpose: Supports maintainability by documenting why `air` exists.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-air: 3,
-};
+const ATTACK: Readonly<Record<UnitType, number>> = Object.freeze({
+  infantry: 3,
+  armor: 10,
+  naval: 7,
+  air: 10,
+});
 
 /**
- * Documents the module-scope binding `DEFENSE` (DEFENSE: Record<UnitType, number>).
-
- * Purpose: Supports maintainability by documenting why `DEFENSE` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Printed defense per unit type: the melee defense hit number before bonuses, and the casualty-order key.
+ *
+ * Purpose: The side defending in melee rolls this value; casualties are taken from the lowest value first.
+ * When to use: Only through `getDefense`; hit tests go through `defenseHitThreshold`.
+ * Expected outcome: On the d20, air hits 15% of the time and the other types 35%. Air is lost first, then the tie breaks by `CASUALTY_PRIORITY_ORDER`.
  * Exceptions: None.
  */
-const DEFENSE: Record<UnitType, number> = {
-    /**
-   * Documents the object literal property `infantry` (infantry: 2).
-
-   * Purpose: Supports maintainability by documenting why `infantry` exists.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-infantry: 2,
-    /**
-   * Documents the object literal property `armor` (armor: 2).
-
-   * Purpose: Supports maintainability by documenting why `armor` exists.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-armor: 2,
-    /**
-   * Documents the object literal property `naval` (naval: 2).
-
-   * Purpose: Supports maintainability by documenting why `naval` exists.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-naval: 2,
-    /**
-   * Documents the object literal property `air` (air: 1).
-
-   * Purpose: Supports maintainability by documenting why `air` exists.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-air: 1,
-};
+const DEFENSE: Readonly<Record<UnitType, number>> = Object.freeze({
+  infantry: 7,
+  armor: 7,
+  naval: 7,
+  air: 3,
+});
 
 /**
- * Defines the `getAttack` function shape (export function getAttack(unitType: string): number).
-
- * Purpose: Supports maintainability by documenting why `getAttack` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Returns the printed attack for a unit type.
+ *
+ * Purpose: The base of every attack hit number and the value prompts and tools quote.
+ * When to use: Rule text and `attackHitThreshold`; roll sites use the threshold, not this value.
+ * Expected outcome: The `ATTACK` value; an unknown type reads as infantry.
  * Exceptions: None.
  */
 export function getAttack(unitType: string): number {
-  return ATTACK[unitType as UnitType] ?? 1;
+  return ATTACK[unitType as UnitType] ?? ATTACK.infantry;
 }
 
 /**
- * Defines the `getDefense` function shape (export function getDefense(unitType: string): number).
-
- * Purpose: Supports maintainability by documenting why `getDefense` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Returns the printed defense for a unit type.
+ *
+ * Purpose: The base of every melee defense hit number and the casualty-order key.
+ * When to use: Casualty sorts, rule text, and `defenseHitThreshold`.
+ * Expected outcome: The `DEFENSE` value; an unknown type reads as infantry.
  * Exceptions: None.
  */
 export function getDefense(unitType: string): number {
-  return DEFENSE[unitType as UnitType] ?? 2;
+  return DEFENSE[unitType as UnitType] ?? DEFENSE.infantry;
 }
 
 /**
