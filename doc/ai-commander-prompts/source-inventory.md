@@ -88,6 +88,8 @@ Production status interpolates `buildProductionIncomeRule` and `buildProductionC
 | Final JSON contract | `buildFinalJsonContractInstruction` | always | n/a |
 | Final JSON example | `getFinalJsonOrdersExampleBlock` | always | n/a |
 
+When a strategic briefing is present, planning or assessment tools are on, and standing-order tools are on, the intro says that status is already in the briefing and limits `query_orders` to a rare detail. Memory and production, when those tools are on, are named in the following selective-tools sentence.
+
 `Strategic context:` contents, in order: goals (three, plus home-region goals 4–5 when `includeScenarioWinPaths`), `STRATEGY_BLOCK`, `MESSAGE_BLOCK`, `Explored:` land-hex progress, `Controlled:` land-hex progress, then `regionHomeProgressAndHexBullets` when `homePartitions` is non-null. There is **no** unconditional enemy-intent opening sentence.
 
 Air Operations columns (strategic): `Unit ID` | `Base Hex` | `Base Intact` | `Base Controlled` | `Enemy Unit Targets` | `Strikeable Urban` | `Strikeable Airports` | `Strikeable Seaports` | `Ferry Destinations`. Naval Transport columns: `Unit ID` | `Hex` | `Your control` | `Seaport Here` | `Aboard` | `Capacity Used` | `Nearest Embark Hex`. Embark prose states coastal or land seaport without control, or a water seaport the opponent controls.

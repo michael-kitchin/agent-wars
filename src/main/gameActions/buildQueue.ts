@@ -323,11 +323,11 @@ function buildQueueViewForRequester(h3Index: string, requestingPlayerId: string)
 }
 
 /**
- * Defines the `validateBuildQueueMutationContext` function shape (function validateBuildQueueMutationContext(args: { h3Index: string; requestingPlayerId: string; requireBuildSectionVisible: boolean; }): { valid: true).
-
- * Purpose: Supports maintainability by documenting why `validateBuildQueueMutationContext` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Rejects a build-queue edit outside planning, and a human edit while a battle is open.
+ *
+ * Purpose: The human build UI stays closed during a battle. The opponent's strategic consultation still sets queues for that turn after the human has entered the battle.
+ * When to use: Every build-queue insert, update, and delete.
+ * Expected outcome: A queue view when the edit may proceed, or a reason when phase, the human battle lock, control, or infrastructure blocks it.
  * Exceptions: None.
  */
 function validateBuildQueueMutationContext(args: {
@@ -339,7 +339,7 @@ function validateBuildQueueMutationContext(args: {
   if (phase !== 'planning') {
     return { valid: false, reason: 'Build queue can only be edited during planning phase.' };
   }
-  if (isTacticalBattleActive()) {
+  if (isTacticalBattleActive() && args.requestingPlayerId === 'human') {
     return { valid: false, reason: 'Build queue is unavailable during a tactical battle.' };
   }
   const queueView = buildQueueViewForRequester(args.h3Index, args.requestingPlayerId);

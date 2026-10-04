@@ -632,7 +632,8 @@ function executeAssessHex(
     strategicNotes.push('Adjacent to water - exposed to naval bombardment (range 2)');
   }
   if (passableNeighbors <= 3) {
-    strategicNotes.push(`Chokepoint - only ${passableNeighbors} passable adjacent hexes`);
+    const adjacentHexWord = passableNeighbors === 1 ? 'hex' : 'hexes';
+    strategicNotes.push(`Chokepoint - only ${passableNeighbors} passable adjacent ${adjacentHexWord}`);
   }
   strategicNotes.splice(3);
 

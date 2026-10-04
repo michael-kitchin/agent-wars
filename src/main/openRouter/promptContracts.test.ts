@@ -162,6 +162,8 @@ function testTacticalPromptAllowsCopyingBestOptionsHexes(): void {
  * Purpose: The captured strategic system prompt used the same orderToHexCode-only dest contract as tactical. Strategic units usually already have standing marches; dest copy must not tell the model to explicit_move every row.
  * When to use: After edits to strategic briefing tool intro, standing-order guidance, or `getInitialUserMessage`.
  * Expected outcome: Best Options Target Hexes are copyable dests; standing-order primacy remains; no per-unit plan_route requirement.
+ * The strategic briefing intro says standing-order status is already in the briefing and limits `query_orders` to a rare detail.
+ * That sentence stays out of the tactical intro, a briefing-absent intro, and an intro whose standing-order tools are off.
  * Exceptions: None.
  */
 function testStrategicPromptAllowsCopyingBestOptionsHexesWithoutStandingOrderOverride(): void {
@@ -186,6 +188,19 @@ function testStrategicPromptAllowsCopyingBestOptionsHexesWithoutStandingOrderOve
   assert.ok(intro.includes('one-step move'));
   assert.ok(intro.includes('ranged_attack'), 'strategic intro maps ranged rows');
   assert.ok(!intro.includes('exact routing (plan_route)'));
+  assert.ok(
+    intro.includes('Standing-order status is already in the briefing; call query_orders only for a rare detail.'),
+    'strategic briefing intro limits query_orders to a rare detail'
+  );
+  assert.ok(!intro.includes('Use tools selectively for standing-order'));
+  assert.ok(intro.includes('memory lookup (memory_read) and production queue checks/sets'));
+  const tacticalIntro = buildAvailableToolsIntro(flags, true, 'tactical');
+  assert.ok(!tacticalIntro.includes('query_orders only for a rare detail'));
+  const noBriefingIntro = buildAvailableToolsIntro(flags, false, 'strategic');
+  assert.ok(!noBriefingIntro.includes('query_orders only for a rare detail'));
+  const ordersOffIntro = buildAvailableToolsIntro({ ...flags, ordersEnabled: false }, true, 'strategic');
+  assert.ok(!ordersOffIntro.includes('query_orders only for a rare detail'));
+  assert.ok(ordersOffIntro.includes('memory lookup (memory_read) and production queue checks/sets'));
 }
 
 /**

@@ -70,6 +70,7 @@ Strategic movement budgets are `getMovementBudget` (infantry 1, armor 2, naval 2
 
 - **`query_production`:** Controlled hexes, urban/airport/seaport counts, available types, queues. Capped types are hidden when another type can still spawn (`filterQueueableUnitTypes`); a hex whose every available type is maxed is marked `all at cap`.
 - **`set_build_queue`:** Replaces that hex's queue with one type and count (`BUILD_ENTRY_MIN_COUNT`–`MAX`, 1..99). Rejects a capped type when an alternative exists (`shouldRejectCappedQueueType`).
+- **While a tactical battle is open:** Opponent `set_build_queue` and `productionOrders` from a strategic consult apply when the turn phase is planning. The human build popup stays closed for that battle. See [build-popup.md](ux/build-popup.md).
 
 Costs and prerequisites: [combat-rules-v3.md](combat-rules-v3.md) §2.
 

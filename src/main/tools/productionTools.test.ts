@@ -5,7 +5,9 @@
 import * as assert from 'assert';
 import { cellToLatLng } from 'h3-js';
 import { getGameState, setHexController, setRes1InfrastructureForHex } from '../gameDb';
-import { getHexBuildQueue } from '../gameActions';
+import { addHexBuildQueueEntry, getHexBuildQueue } from '../gameActions';
+import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
+import { setActiveTacticalBattleSnapshotRef } from '../tacticalBattle/activeTacticalBattleRef';
 import { getMaxUnitsPerType, parseGameSize } from '../../shared/gameSize';
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import { withTempGameDb } from '../testSupport/withTempGameDb';
@@ -180,10 +182,46 @@ function testSetBuildQueueAllowsCappedTypeWhenAllAvailableAreMaxed(): void {
   });
 }
 
+/**
+ * Ensures the opponent can still set a queue after the human has entered a battle.
+ *
+ * Purpose: After the human enters a battle, opponent queue edits from the turn consultation apply, and human edits are rejected.
+ * When to use: After edits to the battle check in build-queue mutation.
+ * Expected outcome: A human edit is rejected. An opponent `set_build_queue` on a controlled hex succeeds.
+ * Exceptions: None.
+ */
+function testOpponentBuildQueueAppliesDuringTacticalBattle(): void {
+  withTempGameDb('aw-tool6-battle-', () => {
+    const h3Index = findOrProvisionOpponentBuildableHex(1);
+    const state = getGameState();
+    const { latLngByH3, resolveToH3 } = buildCoordHelpers(state);
+    const hex = latLngByH3.get(h3Index);
+    assert.ok(hex);
+    setActiveTacticalBattleSnapshotRef({ battleId: 'test-battle' } as TacticalBattleSnapshot);
+    try {
+      const human = addHexBuildQueueEntry(h3Index, 'human');
+      assert.equal(human.success, false);
+      assert.match(human.reason ?? '', /tactical battle/);
+      const opponent = executeProductionTools(
+        'set_build_queue',
+        { hex, unitType: 'infantry', count: 1 },
+        state,
+        latLngByH3,
+        resolveToH3
+      );
+      assert.equal(opponent.status, 'ok');
+      assert.equal(getHexBuildQueue(h3Index, 'opponent').entries.length, 1);
+    } finally {
+      setActiveTacticalBattleSnapshotRef(null);
+    }
+  });
+}
+
 function run(): void {
   testSetBuildQueueRejectsCappedTypeWhenAlternativeExists();
   testSetBuildQueueAllowsCappedTypeWhenNoAlternative();
   testSetBuildQueueAllowsCappedTypeWhenAllAvailableAreMaxed();
+  testOpponentBuildQueueAppliesDuringTacticalBattle();
   console.log('productionTools.test.ts passed');
 }
 

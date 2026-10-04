@@ -210,7 +210,8 @@ export interface ToolsIntroRosterGates {
  * Purpose: Tells the model when to rely on the briefing and when to call tools, naming only tools it can call.
  * When to use: `buildSystemPromptForTools` after computing flags, briefing presence, and roster gates.
  * Expected outcome: A generic "listed tools only" line when neither planning nor assessment is enabled; otherwise
- * mode- and briefing-specific guidance. Battle intros name `plan_route` and the routing tool only when planning is on.
+ * mode- and briefing-specific guidance. A strategic briefing with standing-order tools on says standing-order status
+ * is already present and limits `query_orders` to a rare detail. Battle intros name `plan_route` only when planning is on.
  * Exceptions: None.
  */
 export function buildAvailableToolsIntro(
@@ -221,6 +222,14 @@ export function buildAvailableToolsIntro(
 ): string {
   const hasAirUnits = roster.hasAirUnits !== false;
   const hasBestOptionsTable = roster.hasBestOptionsTable ?? hasPrecomputedBriefing;
+  logDebug('promptText buildAvailableToolsIntro', {
+    coordinateMode,
+    hasPrecomputedBriefing,
+    hasBestOptionsTable,
+    ordersEnabled: flags.ordersEnabled,
+    memoryEnabled: flags.memoryEnabled,
+    productionEnabled: flags.productionEnabled,
+  });
   const toolsIntroPurpose = flags.planningEnabled
     ? 'plan movement and assess the battlefield'
     : flags.assessmentEnabled
@@ -247,13 +256,17 @@ export function buildAvailableToolsIntro(
     const routing = flags.planningEnabled ? ' Use plan_route only for dests not listed for that sub-unit.' : '';
     return `${briefingLead} ${copy}${routing}`;
   }
-  const extraHints: string[] = [];
-  if (flags.ordersEnabled) {
-    extraHints.push('standing-order status is already in the briefing (query_orders only for rare detail)');
-  }
-  if (flags.memoryEnabled) extraHints.push('memory lookup (memory_read)');
-  if (flags.productionEnabled) extraHints.push('production queue checks/sets');
-  const extra = extraHints.length > 0 ? ` Use tools selectively for ${extraHints.join(', ')} when needed.` : '';
+  const selectiveTools: string[] = [];
+  if (flags.memoryEnabled) selectiveTools.push('memory lookup (memory_read)');
+  if (flags.productionEnabled) selectiveTools.push('production queue checks/sets');
+  const standingOrderNote = flags.ordersEnabled
+    ? ' Standing-order status is already in the briefing; call query_orders only for a rare detail.'
+    : '';
+  const selective =
+    selectiveTools.length > 0
+      ? ` Use tools selectively for ${selectiveTools.join(' and ')} when needed.`
+      : '';
+  const extra = `${standingOrderNote}${selective}`;
   if (!hasBestOptionsTable) {
     return (
       'Use the Commander\'s Briefing above for assessments and possible unit actions. No options are listed this period. Destinations must come from the routing tool, not from an absent options table.' +

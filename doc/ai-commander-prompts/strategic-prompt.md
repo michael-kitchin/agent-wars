@@ -200,6 +200,7 @@ Bullets in this order.
 ### 1.11 `# Available Tools`
 
 - **Content order:** intro paragraph, numbered lines for exactly the enabled tools, the tool-mechanic bullets (briefing-already-contains, tool-call batching, memory tiers, production query/set; see [source-inventory.md](source-inventory.md) section 2.4), then the guidance bullets from section 4.
+- **Intro when a briefing is present, planning or assessment tools are on, and standing-order tools are on:** The intro says the standing-order status is already in the briefing, and that `query_orders` is only for a rare detail. When memory tools or production tools are on, the next sentence names those calls as the selective ones.
 - **Batching bullet:** always present when any tool is listed. Independent calls to the same tool go together in one reply as parallel tool calls; the model waits for a result only when the next call's arguments depend on it.
 - **Items:** `TOOL_CATALOG`.
 - **Include:** always. **Empty-state:** the heading plus `No tools available.`
