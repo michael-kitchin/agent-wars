@@ -73,7 +73,7 @@ Same six columns as strategic: `Unit ID`, `Type`, `Hex`, `Nearest enemy + distan
 
 #### `## Attention Flags`
 
-Bullet list, ranked, capped at five, empty form `None.` Tactical emits threat bullets and the aggregate armed-units bullet only. **Must not** emit standing-order warning bullets.
+Bullet list, ranked, capped at five, empty form `None.` Tactical emits threat bullets and the aggregate armed-units bullet only. **Must not** emit standing-order warning bullets. The armed-units bullet names sub-units that can order a ranged attack or an air strike this beat. A sub-unit whose only legal fight is melee is left off that bullet.
 
 #### `# Operational Map`
 

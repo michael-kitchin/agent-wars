@@ -27182,8 +27182,8 @@ ${body}`;
       const hitChanged = hit !== prevHit;
       const detailChanged = detailHit !== prevDetail;
       if (!hitChanged && !detailChanged) {
-        const tipFollow2 = document.getElementById("hex-tooltip");
-        if (!deps.shouldSuppressTerrainTooltip() && tipFollow2 && !tipFollow2.classList.contains("hidden") && hit) {
+        const tipFollow = document.getElementById("hex-tooltip");
+        if (!deps.shouldSuppressTerrainTooltip() && tipFollow && !tipFollow.classList.contains("hidden") && hit) {
           const state = deps.terrainStateForPointer(rendererSharedState.lastPointerClientX, rendererSharedState.lastPointerClientY, hit);
           const namingTarget = deps.namingLookupTargetForPointer(rendererSharedState.lastPointerClientX, rendererSharedState.lastPointerClientY, hit);
           void deps.showTerrainTooltip(rendererSharedState.lastPointerClientX, rendererSharedState.lastPointerClientY, state, namingTarget);
@@ -27194,32 +27194,21 @@ ${body}`;
       rendererSharedState.hoveredDetailHexH3 = detailHit;
       void deps.refreshHoverRoutePreview({ allowBlockingOrderTooltip: true });
       deps.requestRedraw();
-      const tooltipDelayShouldReset = rendererSharedState.tacticalBattleSnapshot ? hitChanged : hitChanged || detailChanged;
-      if (tooltipDelayShouldReset) {
-        deps.clearTerrainTooltipTimer();
-        deps.hideTerrainTooltipVisual();
-      }
+      deps.clearTerrainTooltipTimer();
+      deps.hideTerrainTooltipVisual();
       if (!hit || deps.shouldSuppressTerrainTooltip()) {
         return;
       }
-      if (tooltipDelayShouldReset) {
-        const targetHex = hit;
-        rendererSharedState.terrainTooltipDelayTimer = setTimeout(() => {
-          rendererSharedState.terrainTooltipDelayTimer = null;
-          if (rendererSharedState.hoveredHexH3 !== targetHex || !rendererSharedState.gameState) return;
-          if (deps.shouldSuppressTerrainTooltip()) return;
-          const state = deps.terrainStateForPointer(rendererSharedState.lastPointerClientX, rendererSharedState.lastPointerClientY, targetHex);
-          const namingTarget = deps.namingLookupTargetForPointer(rendererSharedState.lastPointerClientX, rendererSharedState.lastPointerClientY, targetHex);
-          void deps.showTerrainTooltip(rendererSharedState.lastPointerClientX, rendererSharedState.lastPointerClientY, state, namingTarget);
-        }, HEX_DETAILS_TOOLTIP_DELAY_MS);
-        return;
-      }
-      const tipFollow = document.getElementById("hex-tooltip");
-      if (tipFollow && !tipFollow.classList.contains("hidden")) {
-        const state = deps.terrainStateForPointer(rendererSharedState.lastPointerClientX, rendererSharedState.lastPointerClientY, hit);
-        const namingTarget = deps.namingLookupTargetForPointer(rendererSharedState.lastPointerClientX, rendererSharedState.lastPointerClientY, hit);
+      const targetHex = hit;
+      const targetDetail = detailHit;
+      rendererSharedState.terrainTooltipDelayTimer = setTimeout(() => {
+        rendererSharedState.terrainTooltipDelayTimer = null;
+        if (rendererSharedState.hoveredHexH3 !== targetHex || rendererSharedState.hoveredDetailHexH3 !== targetDetail || !rendererSharedState.gameState) return;
+        if (deps.shouldSuppressTerrainTooltip()) return;
+        const state = deps.terrainStateForPointer(rendererSharedState.lastPointerClientX, rendererSharedState.lastPointerClientY, targetHex);
+        const namingTarget = deps.namingLookupTargetForPointer(rendererSharedState.lastPointerClientX, rendererSharedState.lastPointerClientY, targetHex);
         void deps.showTerrainTooltip(rendererSharedState.lastPointerClientX, rendererSharedState.lastPointerClientY, state, namingTarget);
-      }
+      }, HEX_DETAILS_TOOLTIP_DELAY_MS);
     });
     mainMapEl.addEventListener("pointerleave", (e) => {
       const next = e.relatedTarget;

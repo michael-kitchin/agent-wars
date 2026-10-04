@@ -34,7 +34,7 @@ The hex tooltip can appear in Strategic planning, Tactical planning, and Resolut
 
 ### Mouse
 
-- When the pointer rests on a hex, the hex tooltip appears after a short dwell and follows the pointer.
+- When the pointer rests on a hex, the hex tooltip appears after a short dwell and follows the pointer. Moving onto a different world hex, zoomed cell, or battle cell hides it and starts that dwell again.
 - When the pointer leaves the map, the hex tooltip hides.
 - When the pointer moves to a hex whose hovered order is blocked or slower, that order tooltip shows immediately and the hex tooltip hides.
 - When the order tooltip's time runs out, or the preview becomes legal, the order tooltip hides.
