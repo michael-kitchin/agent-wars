@@ -3,6 +3,7 @@
  * Kept renderer/main aligned via IPC payloads.
  */
 
+import type { ActiveBonusLevel } from './bonusLevel';
 import type { UnitOrigin } from './unitOriginTypes';
 import type { WeatherState } from './weatherBonusTypes';
 
@@ -171,6 +172,15 @@ export interface TacticalBattleSnapshot {
    * Exceptions: None.
    */
   weatherBonusEnabled?: boolean;
+  /**
+   * How strong the weather bonus is in this battle.
+   *
+   * Contract: Present with `weatherBonusEnabled`. A battle saved before levels existed has none, which means low.
+   * When to use: Read through `weatherBonusLevelOf` before applying tactical weather penalties.
+   * Expected outcome: Matches the strategic match level at battle start.
+   * Exceptions: None.
+   */
+  weatherBonusLevel?: ActiveBonusLevel;
   /**
    * Tactical turn counter for future resolution milestones.
    *

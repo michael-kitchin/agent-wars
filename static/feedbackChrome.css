@@ -1,0 +1,199 @@
+/* Toasts and the new-game dialog. */
+.map-toast {
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+  left: auto;
+  max-width: 360px;
+  max-height: 40vh;
+  overflow-y: auto;
+  padding: 0.5rem 0.75rem;
+  background: var(--chrome-bg);
+  color: var(--chrome-text);
+  color-scheme: dark;
+  border: 1px solid var(--chrome-error);
+  border-radius: 2px;
+  font-size: 12px;
+  opacity: 1;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  z-index: 7000;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+.map-toast.toast-info {
+  border-color: var(--chrome-border);
+}
+.map-toast.hidden { display: none; }
+.ai-strategy-toast {
+  top: 12px;
+  right: 12px;
+  left: auto;
+  bottom: auto;
+  max-width: min(360px, calc(100% - 240px));
+  opacity: 1;
+}
+.game-over-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 7002;
+}
+.game-over-overlay.hidden { display: none; }
+/* Stacks above tactical HUD (6600) and matches game-over overlay chrome for annihilation results. */
+.tactical-annihilation-overlay.game-over-overlay {
+  z-index: 7010;
+}
+.game-over-box {
+  background: var(--chrome-bg);
+  color: var(--chrome-text);
+  color-scheme: dark;
+  padding: 1.5rem 2rem;
+  border-radius: 4px;
+  border: 1px solid var(--chrome-border);
+  text-align: center;
+}
+.game-over-box p { margin: 0 0 1rem 0; font-size: 1.1rem; font-weight: 600; }
+.game-over-box button { padding: 0.5rem 1rem; font-size: 14px; }
+.game-over-options {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin: 0 0 0.9rem 0;
+  font-size: 0.95rem;
+  color: var(--chrome-text);
+}
+.game-over-options label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.game-over-start-month {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  margin: 0 0 0.9rem 0;
+  font-size: 0.95rem;
+  color: var(--chrome-text);
+}
+.game-over-region-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 0.9rem;
+  margin: 0 0 0.7rem 0;
+}
+.game-over-region-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.22rem;
+  min-width: 220px;
+  text-align: left;
+}
+.game-over-region-cell label {
+  font-size: 0.88rem;
+  color: var(--chrome-text);
+  font-weight: 600;
+}
+/* One column until a row has a button, so Game size stays full width and the randomize rows gain a square button column. */
+.game-over-region-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: stretch;
+}
+.game-over-region-controls:has(button) {
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 0.3rem;
+}
+/* Sizes the month dropdown to its longest name and places the randomize button in the next column. */
+.game-over-start-month .game-over-region-controls:has(button) {
+  width: max-content;
+  grid-template-columns: auto auto;
+}
+.game-over-box select {
+  font-size: 12px;
+  padding: 0.16rem 0.28rem;
+}
+.game-over-region-controls select {
+  min-width: 0;
+}
+/* Matches the dropdown beside it. The fixed square size on `.compact-square-btn` is for other buttons. */
+.game-over-box .compact-square-btn.game-over-region-randomize {
+  align-self: stretch;
+  justify-self: center;
+  width: auto;
+  min-width: 0;
+  height: auto;
+  margin-left: 0;
+  aspect-ratio: 1;
+  padding: 0;
+  line-height: 1;
+  font-size: 11px;
+  font-weight: 700;
+}
+.game-over-size-caps {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 1.1rem;
+  margin: 0 0 0.9rem 0;
+}
+.game-over-size-cap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.28rem;
+}
+.game-over-size-token {
+  position: relative;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #b0b0b0;
+  border: 2px solid #222;
+  box-sizing: content-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.game-over-size-token img {
+  width: 32px;
+  height: 32px;
+  pointer-events: none;
+  filter: brightness(0.133);
+}
+.game-over-size-badge {
+  position: absolute;
+  left: calc(50% + 16px);
+  top: calc(50% - 16px);
+  transform: translate(-50%, -50%);
+  font: bold 13px system-ui, sans-serif;
+  color: #000;
+  -webkit-text-stroke: 2px #fff;
+  paint-order: stroke fill;
+  pointer-events: none;
+}
+.game-over-size-name {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--chrome-text);
+}
+.map-toast p { margin: 0; flex: 1; white-space: pre-line; }
+#map-toast-dismiss {
+  flex-shrink: 0;
+  padding: 0.1rem 0.35rem;
+  font-size: 1.1rem;
+  line-height: 1;
+}
+#ai-strategy-toast-dismiss {
+  flex-shrink: 0;
+  padding: 0.1rem 0.35rem;
+  font-size: 1.1rem;
+  line-height: 1;
+}

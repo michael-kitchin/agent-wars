@@ -19,7 +19,8 @@ import { attackHitThreshold } from '../combatHitThresholds';
 import { readPersistedOriginBonusSettings } from '../gameDb/originBonusConfig';
 import { weatherPenaltyForRoll } from '../weather/weatherMatch';
 import { weatherTagsForBirthHex } from '../weather/weatherPackLoad';
-import type { WeatherAttackKind } from '../../shared/weatherBonusTypes';
+import { weatherBonusLevelOf } from '../../shared/weatherBonusRules';
+import type { WeatherAttackKind, WeatherAttackPenalty } from '../../shared/weatherBonusTypes';
 import type { AirStrikeAnimationMove, AirStrikeOrder, AirStrikeTargetType, InfrastructureDestroyedEvent } from '../../shared/ipcTypes';
 import type { CombatUnit } from '../combatUnitTypes';
 import type { OriginHitBonusLookup } from '../originBonus/originHitBonusLookup';
@@ -332,9 +333,9 @@ function recordRemovedUnit(
 /**
  * Returns the weather penalty for one strategic unit's roll.
  *
- * Purpose: Air strikes and their counter-fire share the match flag, the turn, and the unit's birth tags.
+ * Purpose: Air strikes and their counter-fire share the match level, the turn, and the unit's birth tags.
  * When to use: Immediately before `attackHitThreshold` in this file.
- * Expected outcome: 0 when the weather bonus is off. Otherwise the shared penalty for that kind of attack.
+ * Expected outcome: 0 when the weather bonus is off. Otherwise the shared penalty for that kind of attack at the match's level.
  * Exceptions: None beyond pack load failures.
  */
 function penaltyForDbUnit(input: {
@@ -343,14 +344,14 @@ function penaltyForDbUnit(input: {
   h3Index: string;
   kind: WeatherAttackKind;
   targetH3Index?: string;
-}): 0 | 1 {
+}): WeatherAttackPenalty {
   const settings = readPersistedOriginBonusSettings({ getOne: dbGetOne, hasDb: () => true });
   const turnNumber = dbGetOne<{ turn_number: number }>('SELECT turn_number FROM turn_state WHERE id = 1')?.turn_number ?? 1;
   const birth = dbGetOne<{ birth_h3_index: string | null }>('SELECT birth_h3_index FROM units WHERE id = ?', [input.unitId])?.birth_h3_index;
   return weatherPenaltyForRoll({
     unitType: input.unitType,
     kind: input.kind,
-    enabled: settings.weatherBonusEnabled === true,
+    level: weatherBonusLevelOf(settings),
     turnNumber,
     startMonth: settings.startMonth ?? 1,
     unitH3Index: input.h3Index,

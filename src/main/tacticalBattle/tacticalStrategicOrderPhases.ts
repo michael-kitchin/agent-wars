@@ -21,7 +21,7 @@ import {
 } from '../../shared/tacticalTerrainCombatModifiers';
 import { tacticalRes4CellHasActiveTransportCorridor } from '../../shared/tacticalRes4TransportLink';
 import { attackHitThreshold } from '../combatHitThresholds';
-import { weatherAttackPenalty } from '../../shared/weatherBonusRules';
+import { weatherAttackPenalty, weatherBonusLevelOf } from '../../shared/weatherBonusRules';
 import { runRangedPhase } from '../combatResolution';
 import { withOriginHitBonus, type OriginHitBonusLookup } from '../originBonus/originHitBonusLookup';
 import { buildTacticalOriginHitBonusLookupFromDb } from '../originBonus/originHitBonusLookupDb';
@@ -146,7 +146,7 @@ function tacticalSubUnitsToRangedCombatUnits(
       kind: 'ranged',
       weatherAtUnit: battle.weather,
       tags: source?.weatherTags,
-      enabled: battle.weatherBonusEnabled === true,
+      level: weatherBonusLevelOf(battle),
     });
     return penalty === 0 ? unit : { ...unit, weatherAttackPenalty: penalty };
   });
@@ -384,7 +384,7 @@ export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
         weatherAtUnit: battle.weather,
         weatherAtTarget: battle.weather,
         tags: attacker.weatherTags,
-        enabled: battle.weatherBonusEnabled === true,
+        level: weatherBonusLevelOf(battle),
       }),
     })) {
       strikeMoves.push({
@@ -586,7 +586,7 @@ export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
           kind: 'ranged',
           weatherAtUnit: workBattle.weather,
           tags: atk.weatherTags,
-          enabled: workBattle.weatherBonusEnabled === true,
+          level: weatherBonusLevelOf(workBattle),
         }),
       })) continue;
       const hex = o.targetH3Index;

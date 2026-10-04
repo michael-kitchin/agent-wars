@@ -1,9 +1,9 @@
 /**
  * Per-roll origin bonus lookups for combat resolution.
  *
- * Purpose: Answers "does this unit get +1 rolling at this position?" without touching the database, so combat code stays testable.
+ * Purpose: Answers "how much does this unit add rolling at this position?" without touching the database, so combat code stays testable.
  * When to use: Build one lookup per combat phase and pass it to the roll sites; the database-backed builders live in `originHitBonusLookupDb.ts`.
- * Expected outcome: Lookups return 0 or 1 and never throw.
+ * Expected outcome: Lookups return 0, 1, or 2 and never throw.
  * Exceptions: None.
  */
 import type { OriginBonusSettings, OriginHitBonus } from '../../shared/originBonusTypes';
@@ -18,7 +18,7 @@ import { logDebug, logTrace } from '../logger';
  *
  * Contract: `unitId` is the strategic unit id or tactical sub-unit id; `h3Index` is where the unit stands for this roll. Unknown ids give 0.
  * When to use: At every hit roll that can get the bonus.
- * Expected outcome: `0` or `1`.
+ * Expected outcome: `0` when the unit does not qualify; otherwise the larger amount among the bonuses it qualifies for.
  * Exceptions: None.
  */
 export type OriginHitBonusLookup = (unitId: string, h3Index: string) => OriginHitBonus;
@@ -57,7 +57,7 @@ export function createStrategicOriginHitBonusLookup(input: {
       origin: originById.get(unitId),
       place: { countryName: countryNameAt(h3Index), terrainKind: null },
     });
-    const bonus = originHitBonusFromSources(sources);
+    const bonus = originHitBonusFromSources(sources, settings);
     logTrace('originHitBonusLookup strategic', { unitId, h3Index, bonus });
     return bonus;
   };
@@ -90,7 +90,7 @@ export function createTacticalOriginHitBonusLookup(input: {
       origin: originById.get(unitId),
       place: tacticalOriginBonusPlace(battle, h3Index),
     });
-    const bonus = originHitBonusFromSources(sources);
+    const bonus = originHitBonusFromSources(sources, settings);
     logTrace('originHitBonusLookup tactical', { unitId, h3Index, bonus });
     return bonus;
   };
@@ -101,15 +101,16 @@ export function createTacticalOriginHitBonusLookup(input: {
  *
  * Purpose: Lets `combatResolution` read the bonus from each unit without knowing about origins.
  * When to use: When a `CombatUnit` array is built for a rolling phase.
- * Expected outcome: A new array of new objects; `originHitBonus: 1` is set only on qualifying units, and no key is added otherwise, so deep comparisons of bonus-free units are unchanged.
+ * Expected outcome: A new array of new objects; `originHitBonus` is set to the lookup's non-zero amount only on qualifying units, and no key is added otherwise, so deep comparisons of bonus-free units are unchanged.
  * Exceptions: None.
  */
 export function withOriginHitBonus(units: ReadonlyArray<CombatUnit>, lookup: OriginHitBonusLookup): CombatUnit[] {
   let qualifying = 0;
   const stamped = units.map((u) => {
-    if (lookup(u.id, u.h3Index) !== 1) return { ...u };
+    const bonus = lookup(u.id, u.h3Index);
+    if (bonus === 0) return { ...u };
     qualifying += 1;
-    return { ...u, originHitBonus: 1 as const };
+    return { ...u, originHitBonus: bonus };
   });
   logDebug('originHitBonusLookup withOriginHitBonus', { units: units.length, qualifying });
   return stamped;

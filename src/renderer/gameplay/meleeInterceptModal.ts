@@ -68,7 +68,7 @@ selectedH3Index?: string;
  *
  * Purpose: Isolates DOM construction from `readyHandler` to keep that module readable.
  * When to use: After strategic movement is applied and main reports melee candidates.
- * Expected outcome: Exclusive row selection; Fight disabled until a row is chosen.
+ * Expected outcome: Exclusive row selection; Fight disabled until a row is chosen. The panel uses the shared navy chrome classes.
  * Exceptions: None; rejects only if the modal cannot attach to `document.body`.
  */
 export function openMeleeInterceptModal(args: MeleeInterceptModalOpenArgs): Promise<MeleeInterceptModalOutcome> {
@@ -81,8 +81,7 @@ export function openMeleeInterceptModal(args: MeleeInterceptModalOpenArgs): Prom
       'position:fixed;inset:0;z-index:8000;background:rgba(0,0,0,0.35);display:flex;align-items:flex-start;justify-content:center;padding:12px;overflow-y:auto;';
 
     const panel = document.createElement('div');
-    panel.style.cssText =
-      'max-width:min(520px,92vw);width:100%;max-height:calc(100vh - 28px);display:flex;flex-direction:column;min-height:0;overflow:hidden;background:#f4f2ee;border:1px solid #555;border-radius:4px;padding:10px 12px;font:13px/1.35 system-ui,sans-serif;color:#222;box-shadow:0 4px 18px rgba(0,0,0,0.25);margin:12px auto 24px;';
+    panel.className = 'melee-intercept-panel';
 
     const title = document.createElement('div');
     const n = args.candidates.length;
@@ -91,10 +90,10 @@ export function openMeleeInterceptModal(args: MeleeInterceptModalOpenArgs): Prom
     panel.appendChild(title);
 
     const tableScroll = document.createElement('div');
-    tableScroll.style.cssText = 'flex:1;min-height:0;overflow-y:auto;overflow-x:auto;margin-bottom:8px;border:1px solid #ccc;border-radius:2px;background:#faf9f7;';
+    tableScroll.className = 'melee-intercept-scroll';
 
     const table = document.createElement('table');
-    table.style.cssText = 'width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed;';
+    table.className = 'melee-intercept-table';
     const colgroup = document.createElement('colgroup');
     for (const w of ['2.75rem', '50%', '25%', '25%']) {
       const col = document.createElement('col');
@@ -107,7 +106,6 @@ export function openMeleeInterceptModal(args: MeleeInterceptModalOpenArgs): Prom
     for (const label of ['', 'Hex', 'Human', 'AI']) {
       const th = document.createElement('th');
       th.textContent = label;
-      th.style.cssText = 'text-align:left;border-bottom:1px solid #aaa;padding:4px 6px;vertical-align:bottom;';
       hr.appendChild(th);
     }
     thead.appendChild(hr);
@@ -171,9 +169,7 @@ export function openMeleeInterceptModal(args: MeleeInterceptModalOpenArgs): Prom
 
     for (const row of args.candidates) {
       const tr = document.createElement('tr');
-      tr.style.cssText = 'border-bottom:1px solid #ddd;vertical-align:top;';
       const tdRadio = document.createElement('td');
-      tdRadio.style.padding = '6px';
       const radio = document.createElement('input');
       radio.type = 'radio';
       radio.name = 'melee-intercept-hex';
@@ -187,8 +183,6 @@ export function openMeleeInterceptModal(args: MeleeInterceptModalOpenArgs): Prom
       tr.appendChild(tdRadio);
 
       const tdHex = document.createElement('td');
-      tdHex.style.padding = '6px';
-      tdHex.style.overflowWrap = 'anywhere';
       tr.appendChild(tdHex);
       void args.buildHexPopupHtml(row.h3Index).then(
         (html) => {
@@ -201,14 +195,10 @@ export function openMeleeInterceptModal(args: MeleeInterceptModalOpenArgs): Prom
       );
 
       const tdHuman = document.createElement('td');
-      tdHuman.style.padding = '6px';
-      tdHuman.style.overflowWrap = 'anywhere';
       tdHuman.textContent = row.humanUnitSummary || '—';
       tr.appendChild(tdHuman);
 
       const tdAi = document.createElement('td');
-      tdAi.style.padding = '6px';
-      tdAi.style.overflowWrap = 'anywhere';
       tdAi.textContent = row.aiUnitSummary || '—';
       tr.appendChild(tdAi);
 

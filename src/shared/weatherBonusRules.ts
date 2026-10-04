@@ -7,7 +7,8 @@
  * Exceptions: None.
  */
 
-import type { WeatherAttackKind, WeatherMonthRecord, WeatherState } from './weatherBonusTypes';
+import { bonusLevelOf, type ActiveBonusLevel, type BonusLevel } from './bonusLevel';
+import type { WeatherAttackKind, WeatherAttackPenalty, WeatherMonthRecord, WeatherState } from './weatherBonusTypes';
 
 /**
  * Full month names, January first.
@@ -106,6 +107,61 @@ const STRATEGIC_MOVEMENT_HEXES: Readonly<Record<string, number>> = Object.freeze
  * Exceptions: None.
  */
 const OPEN_GROUND_CATEGORIES: ReadonlySet<string> = new Set(['plains', 'desert', 'wetlands', 'arctic', 'coastal']);
+
+/**
+ * Weather that slows an untagged unit, by level and unit type.
+ *
+ * Purpose: One table drives strategic movement, the tactical budget, the tactical tooltip, and the prompt text, so they cannot disagree.
+ * When to use: `weatherSlowsMovement`, and prompt text that lists the slowing weather.
+ * Expected outcome: Low slows armor in snow or rain and naval in snow. High slows armor in snow, rain, or heat and naval in snow or rain. Lists are in display order. Unlisted types are never slowed.
+ * Exceptions: None.
+ */
+export const WEATHER_SLOWING_STATES: Readonly<
+  Record<ActiveBonusLevel, Readonly<Record<string, ReadonlyArray<WeatherState>>>>
+> = Object.freeze({
+  low: Object.freeze({ armor: Object.freeze(['snow', 'rain'] as const), naval: Object.freeze(['snow'] as const) }),
+  high: Object.freeze({
+    armor: Object.freeze(['snow', 'rain', 'heat'] as const),
+    naval: Object.freeze(['snow', 'rain'] as const),
+  }),
+});
+
+/**
+ * Strategic movement, in hexes, of a unit slowed by weather.
+ *
+ * Purpose: Slowed armor and naval keep one hex at every level, so a slowed unit can always move.
+ * When to use: `strategicMovementHexesFor` only.
+ * Expected outcome: 1.
+ * Exceptions: None.
+ */
+const SLOWED_STRATEGIC_MOVEMENT_HEXES = 1;
+
+/**
+ * Highest tactical point budget a slowed unit keeps, by level.
+ *
+ * Purpose: Low keeps 2 points; High keeps 1, which still lets the march planner make one cell of progress.
+ * When to use: `tacticalWeatherMovementBudget`, and prompt text that states the battle budget.
+ * Expected outcome: Low 2, High 1.
+ * Exceptions: None.
+ */
+export const TACTICAL_WEATHER_BUDGET_CAP: Readonly<Record<ActiveBonusLevel, number>> = Object.freeze({
+  low: 2,
+  high: 1,
+});
+
+/**
+ * Points a penalized ranged attack or air strike loses, by level.
+ *
+ * Purpose: High doubles the attack penalty; `attackHitThreshold` floors the printed attack at 1, so a 1 always still hits.
+ * When to use: `weatherAttackPenalty`, and prompt text that states the penalty.
+ * Expected outcome: Low 1, High 2.
+ * Exceptions: None.
+ */
+export const WEATHER_ATTACK_PENALTY_BY_LEVEL: Readonly<Record<ActiveBonusLevel, Exclude<WeatherAttackPenalty, 0>>> =
+  Object.freeze({
+    low: 1,
+    high: 2,
+  });
 
 /**
  * Tie order when two conditions cover the same number of months. Earlier wins.
@@ -228,6 +284,36 @@ export function weatherTagsInDisplayOrder(tags: readonly WeatherState[] | null |
 }
 
 /**
+ * Returns the weather level of a snapshot or settings object.
+ *
+ * Purpose: Strategic snapshots, battle snapshots, and settings all store the weather flag and level separately.
+ * When to use: Before any weather rule that takes a level.
+ * Expected outcome: `off` unless `weatherBonusEnabled` is exactly true; otherwise the level, or `low` when it is missing.
+ * Exceptions: None.
+ */
+export function weatherBonusLevelOf(source: {
+  readonly weatherBonusEnabled?: boolean;
+  readonly weatherBonusLevel?: ActiveBonusLevel;
+}): BonusLevel {
+  return bonusLevelOf(source.weatherBonusEnabled, source.weatherBonusLevel);
+}
+
+/**
+ * Returns the weather flag and level fields for one level.
+ *
+ * Purpose: The reverse of `weatherBonusLevelOf`, so a weather-state literal can be built from a level in one spread.
+ * When to use: When a caller holds a level and needs snapshot-shaped weather fields.
+ * Expected outcome: `{ weatherBonusEnabled: false }` for off; otherwise the flag set to true and the level.
+ * Exceptions: None.
+ */
+export function weatherLevelFields(level: BonusLevel): {
+  readonly weatherBonusEnabled: boolean;
+  readonly weatherBonusLevel?: ActiveBonusLevel;
+} {
+  return level === 'off' ? { weatherBonusEnabled: false } : { weatherBonusEnabled: true, weatherBonusLevel: level };
+}
+
+/**
  * Returns the printed strategic movement for a unit type, in hexes.
  *
  * Purpose: Campaign-map movement before weather. This is not the tactical point budget.
@@ -240,32 +326,47 @@ export function strategicMovementHexes(unitType: string): number {
 }
 
 /**
+ * Reports whether weather slows a unit's movement.
+ *
+ * Purpose: The single slowing test behind strategic movement, the tactical budget, and the tactical tooltip.
+ * When to use: With the weather where the unit stands (strategic) or the battle's weather (tactical).
+ * Expected outcome: False when the level is off, the weather is missing, or the unit is tagged for it. Otherwise true when `WEATHER_SLOWING_STATES` lists that weather for the unit type at this level.
+ * Exceptions: None.
+ */
+export function weatherSlowsMovement(input: {
+  readonly unitType: string;
+  readonly weather: WeatherState | null | undefined;
+  readonly tags: readonly WeatherState[] | null | undefined;
+  readonly level: BonusLevel;
+}): boolean {
+  const { unitType, weather, tags, level } = input;
+  if (level === 'off' || !weather || hasWeatherTag(tags, weather)) return false;
+  return WEATHER_SLOWING_STATES[level][unitType]?.includes(weather) === true;
+}
+
+/**
  * Returns the strategic movement for a unit standing in the current hex's weather.
  *
- * Purpose: Armor loses its extra hex in snow and rain. Naval loses its extra hex in snow. Tagged units do not.
+ * Purpose: Armor and naval lose their extra hex in slowing weather they are not tagged for.
  * When to use: Every strategic reach check, with the weather of the hex the unit occupies now.
- * Expected outcome: The printed budget when the flag is off, the weather is missing, or the unit has that tag. Otherwise armor in snow or rain, and naval in snow, move 1. Infantry never changes. Air stays 0.
+ * Expected outcome: The printed budget unless `weatherSlowsMovement`, in which case 1. Infantry never changes. Air stays 0.
  * Exceptions: None.
  */
 export function strategicMovementHexesFor(input: {
   readonly unitType: string;
   readonly weather: WeatherState | null | undefined;
   readonly tags: readonly WeatherState[] | null | undefined;
-  readonly enabled: boolean;
+  readonly level: BonusLevel;
 }): number {
-  const printed = strategicMovementHexes(input.unitType);
-  if (!input.enabled || !input.weather || hasWeatherTag(input.tags, input.weather)) return printed;
-  if (input.unitType === 'armor' && (input.weather === 'snow' || input.weather === 'rain')) return 1;
-  if (input.unitType === 'naval' && input.weather === 'snow') return 1;
-  return printed;
+  return weatherSlowsMovement(input) ? SLOWED_STRATEGIC_MOVEMENT_HEXES : strategicMovementHexes(input.unitType);
 }
 
 /**
- * Returns the tactical movement budget after weather, before forest and urban cuts.
+ * Returns the tactical movement budget after weather.
  *
- * Purpose: Armor's budget falls to 2 in snow and rain, and naval's falls to 2 in snow. Callers then keep the lower of this and the terrain budget.
- * When to use: `effectiveTacticalMovementPointBudgetForMarchLeg`, with the battle's single weather.
- * Expected outcome: `printedBudget` when the flag is off, the weather is missing, or the unit has that tag. Otherwise the lowered armor or naval budget, never above the printed budget.
+ * Purpose: A slowed armor or naval unit keeps at most `TACTICAL_WEATHER_BUDGET_CAP` points, but never fewer than 1, so it can always move.
+ * When to use: `effectiveTacticalMovementPointBudgetForMarchLeg`, with the budget after terrain and the battle's single weather.
+ * Expected outcome: `printedBudget` unless `weatherSlowsMovement`; otherwise `max(1, min(printedBudget, cap))`.
  * Exceptions: None.
  */
 export function tacticalWeatherMovementBudget(input: {
@@ -273,13 +374,11 @@ export function tacticalWeatherMovementBudget(input: {
   readonly printedBudget: number;
   readonly weather: WeatherState | null | undefined;
   readonly tags: readonly WeatherState[] | null | undefined;
-  readonly enabled: boolean;
+  readonly level: BonusLevel;
 }): number {
-  const printed = input.printedBudget;
-  if (!input.enabled || !input.weather || hasWeatherTag(input.tags, input.weather)) return printed;
-  if (input.unitType === 'armor' && (input.weather === 'snow' || input.weather === 'rain')) return Math.min(printed, 2);
-  if (input.unitType === 'naval' && input.weather === 'snow') return Math.min(printed, 2);
-  return printed;
+  const { printedBudget, level } = input;
+  if (level === 'off' || !weatherSlowsMovement(input)) return printedBudget;
+  return Math.max(1, Math.min(printedBudget, TACTICAL_WEATHER_BUDGET_CAP[level]));
 }
 
 /**
@@ -306,11 +405,11 @@ export function tacticalWeatherOpenGroundCost(input: {
 }
 
 /**
- * Returns 1 when a ranged attack or an air strike loses one point of attack, otherwise 0.
+ * Returns the points a ranged attack or an air strike loses to weather.
  *
  * Purpose: Armor is less effective at range in snow and heat. Air is less effective when its base or its target is a weather it lacks.
  * When to use: Ranged hit thresholds, air-strike rolls, and air-strike counter-fire. Never for melee or defense.
- * Expected outcome: 0 when the flag is off. Armor ranged fire loses 1 in snow or heat unless tagged. An air strike loses 1 once when either hex is snow, rain, or heat and the unit lacks that tag. Infantry, naval, mild weather, and a tagged weather return 0.
+ * Expected outcome: 0 when the level is off. Armor ranged fire in snow or heat unless tagged, and an air strike when either hex is snow, rain, or heat the unit lacks, lose `WEATHER_ATTACK_PENALTY_BY_LEVEL` (1 at Low, 2 at High), once per roll. Infantry, naval, mild weather, and a tagged weather return 0.
  * Exceptions: None.
  */
 export function weatherAttackPenalty(input: {
@@ -319,15 +418,16 @@ export function weatherAttackPenalty(input: {
   readonly weatherAtUnit: WeatherState | null | undefined;
   readonly weatherAtTarget?: WeatherState | null;
   readonly tags: readonly WeatherState[] | null | undefined;
-  readonly enabled: boolean;
-}): 0 | 1 {
-  if (!input.enabled) return 0;
-  if (input.kind === 'ranged') {
-    return penalizesRangedAttack(input.unitType, input.weatherAtUnit, input.tags) ? 1 : 0;
-  }
-  if (input.unitType !== 'air') return 0;
-  const penalized = [input.weatherAtUnit, input.weatherAtTarget].some((weather) => penalizesAirStrike(weather, input.tags));
-  return penalized ? 1 : 0;
+  readonly level: BonusLevel;
+}): WeatherAttackPenalty {
+  const { level } = input;
+  if (level === 'off') return 0;
+  const penalized =
+    input.kind === 'ranged'
+      ? penalizesRangedAttack(input.unitType, input.weatherAtUnit, input.tags)
+      : input.unitType === 'air' &&
+        [input.weatherAtUnit, input.weatherAtTarget].some((weather) => penalizesAirStrike(weather, input.tags));
+  return penalized ? WEATHER_ATTACK_PENALTY_BY_LEVEL[level] : 0;
 }
 
 /**
@@ -409,7 +509,7 @@ function hasWeatherTag(tags: readonly WeatherState[] | null | undefined, weather
 }
 
 /**
- * Reports whether armor ranged fire loses a point in this weather.
+ * Reports whether armor ranged fire is penalized in this weather.
  *
  * Purpose: Rain slows armor and does not change its attack.
  * When to use: `weatherAttackPenalty` for `ranged`.

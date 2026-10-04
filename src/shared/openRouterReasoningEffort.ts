@@ -96,7 +96,7 @@ export function listSelectableReasoningEfforts(model: OpenRouterModel | undefine
 /**
  * Returns the model's default effort when the player could also select it.
  *
- * Purpose: The dropdown marks this option "(default)", and budget scaling uses it when there is no override.
+ * Purpose: The dropdown marks this option "(default)".
  * When to use: After switching models, or when resolving the effective effort.
  * Expected outcome: The `default_effort` string when it is in the selectable list; otherwise `null`.
  * Exceptions: None.
@@ -127,8 +127,8 @@ export function resolveRequestedReasoningEffort(
 /**
  * Returns the effort the model will actually use: the valid override, otherwise the model default.
  *
- * Purpose: Budget scaling and diagnostics need the effort in force even when nothing is sent.
- * When to use: Sizing `max_tokens` and logging consultation settings.
+ * Purpose: Diagnostics need the effort in force even when nothing is sent on the request.
+ * When to use: Logging consultation settings.
  * Expected outcome: An effort string, or `null` when neither an override nor a selectable default exists.
  * Exceptions: None.
  */

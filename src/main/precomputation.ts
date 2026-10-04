@@ -13,9 +13,9 @@ import { usesOmniscientGridProximity } from './tools/assessUnitProximity';
 import { getStandingOrderForUnit } from './tools/standingOrders';
 import { strategicOriginBonusUnitFields } from './tools/originBonusAssessment';
 import { strategicRangeOnState } from './weather/weatherMatch';
-import { weatherAttackPenalty } from '../shared/weatherBonusRules';
+import { weatherAttackPenalty, weatherBonusLevelOf } from '../shared/weatherBonusRules';
 import type { WeatherState } from '../shared/weatherBonusTypes';
-import type { OriginBonusSource } from '../shared/originBonusTypes';
+import type { OriginBonusSource, OriginHitBonus } from '../shared/originBonusTypes';
 import { logDebug, logError, logTrace } from './logger';
 import { compareUnitIdsNaturally } from '../shared/unitIds';
 
@@ -90,6 +90,15 @@ result: {
        * Exceptions: None.
        */
       originBonusHere?: readonly OriginBonusSource[];
+      /**
+       * Amount this unit's rolls add where it stands.
+       *
+       * Contract: Present exactly when `originBonusHere` is present; 0 when that list is empty.
+       * When to use: The briefing's Unit Status Bonus column.
+       * Expected outcome: 0, 1, or 2.
+       * Exceptions: None.
+       */
+      originBonusAmount?: OriginHitBonus;
       /**
        * Acclimation tags for this unit.
        *
@@ -255,7 +264,8 @@ function stackedUnitWeatherFields(
   rangedAttackPenalized: boolean;
   airStrikePenalizedAtBase: boolean;
 } {
-  logTrace('precomputation stackedUnitWeatherFields', { unitId: unit.id, h3Index: unit.h3Index });
+  const level = weatherBonusLevelOf(state);
+  logTrace('precomputation stackedUnitWeatherFields', { unitId: unit.id, h3Index: unit.h3Index, level });
   const tags = unit.weatherTags ?? [];
   const here =
     weatherHere === 'mild' || weatherHere === 'rain' || weatherHere === 'snow' || weatherHere === 'heat'
@@ -273,16 +283,16 @@ function stackedUnitWeatherFields(
         kind: 'ranged',
         weatherAtUnit: here,
         tags,
-        enabled: true,
-      }) === 1,
+        level,
+      }) > 0,
     airStrikePenalizedAtBase:
       weatherAttackPenalty({
         unitType: unit.unitType,
         kind: 'airStrike',
         weatherAtUnit: here,
         tags,
-        enabled: true,
-      }) === 1,
+        level,
+      }) > 0,
   };
 }
 

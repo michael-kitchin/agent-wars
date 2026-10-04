@@ -12,6 +12,8 @@ import { computeGridDistanceWithPathFallbackPure } from '../../shared/h3GridRang
 import { getRange } from '../combatConstants';
 import { logDebug, logError, logTrace } from '../logger';
 import { strategicRangeOnState } from '../weather/weatherMatch';
+import type { BonusLevel } from '../../shared/bonusLevel';
+import { weatherLevelFields } from '../../shared/weatherBonusRules';
 import type { WeatherState } from '../../shared/weatherBonusTypes';
 import { h3ToLatLng, type LatLng, type LatLngMap } from './h3LatLng';
 
@@ -389,14 +391,14 @@ export interface CollectOmniscientNearbyUnitsArgs {
    */
   turnNumber: number;
   /**
-   * Whether this match applies weather penalties.
+   * How strong this match's weather penalties are.
    *
-   * Contract: Omitted or false leaves printed budgets.
-   * When to use: `state.weatherBonusEnabled === true`.
-   * Expected outcome: Armor and naval ETAs shrink only in the weather they are not tagged for.
+   * Contract: Omitted or `off` leaves printed budgets.
+   * When to use: `weatherBonusLevelOf(state)`.
+   * Expected outcome: Armor and naval ETAs shrink only in the slowing weather they are not tagged for.
    * Exceptions: None.
    */
-  weatherBonusEnabled?: boolean;
+  weatherBonusLevel?: BonusLevel;
   /**
    * Persisted start month for the match calendar.
    *
@@ -499,16 +501,14 @@ export interface OmniscientNearbyScanResult {
  * Exceptions: Unreachable or invalid indexes are skipped.
  */
 export function collectOmniscientNearbyUnits(args: CollectOmniscientNearbyUnitsArgs): OmniscientNearbyScanResult {
-  logDebug('assessUnitProximity collectOmniscientNearbyUnits', {
-    assessedUnitId: args.assessedUnit.id,
-    unitCount: args.units.length,
-    turnNumber: args.turnNumber,
-  });
   const { assessedUnit, units, turnNumber, latLngByH3 } = args;
+  logDebug('assessUnitProximity collectOmniscientNearbyUnits', {
+    assessedUnitId: assessedUnit.id, unitCount: units.length, turnNumber, weatherBonusLevel: args.weatherBonusLevel ?? 'off',
+  });
   const myRange = getRange(assessedUnit.unitType);
   const budgetOf = (unit: OmniscientProximityUnit): number => strategicRangeOnState(
     { unitType: unit.unitType, h3Index: unit.h3Index, weatherTags: unit.weatherTags },
-    { weatherBonusEnabled: args.weatherBonusEnabled, turnNumber, startMonth: args.startMonth }
+    { ...weatherLevelFields(args.weatherBonusLevel ?? 'off'), turnNumber, startMonth: args.startMonth }
   );
   const myBudget = budgetOf(assessedUnit);
   const nearbyEnemies: OmniscientNearbyScanResult['nearbyEnemies'] = [];

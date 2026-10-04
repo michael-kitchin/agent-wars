@@ -6,7 +6,7 @@ import { buildStrategicOriginHitBonusLookupFromDb } from './originHitBonusLookup
 
 test('the strategic lookup from the database follows the country bonus flag', () => {
   withTempGameDb('aw-originbonus-lookup-', () => {
-    resetGameForNewMatch({ countryBonusEnabled: true });
+    resetGameForNewMatch({ countryBonusLevel: 'low' });
     const units = listUnitsForSnapshot();
     const onLookup = buildStrategicOriginHitBonusLookupFromDb();
     assert.ok(units.some((u) => onLookup(u.id, u.h3Index) === 1), 'expected a seeded unit standing in its birth country');

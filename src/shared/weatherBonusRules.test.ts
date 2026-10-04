@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { BONUS_LEVELS } from './bonusLevel';
 import {
   acclimationTags,
   calendarMonthName,
@@ -10,6 +11,7 @@ import {
   strategicFerryRangeHexes,
   strategicMovementHexes,
   strategicMovementHexesFor,
+  tacticalWeatherMovementBudget,
   tacticalWeatherOpenGroundCost,
   weatherAttackPenalty,
 } from './weatherBonusRules';
@@ -65,12 +67,99 @@ test('three qualifying conditions keep the two with more months, ties preferring
 test('strategic movement stays printed unless an unacclimated armor or naval unit is in bad weather', () => {
   assert.equal(strategicMovementHexes('armor'), 2);
   assert.equal(strategicMovementHexes('infantry'), 1);
-  assert.equal(strategicMovementHexesFor({ unitType: 'armor', weather: 'snow', tags: [], enabled: false }), 2);
-  assert.equal(strategicMovementHexesFor({ unitType: 'armor', weather: 'snow', tags: [], enabled: true }), 1);
-  assert.equal(strategicMovementHexesFor({ unitType: 'armor', weather: 'snow', tags: ['snow'], enabled: true }), 2);
-  assert.equal(strategicMovementHexesFor({ unitType: 'naval', weather: 'snow', tags: [], enabled: true }), 1);
-  assert.equal(strategicMovementHexesFor({ unitType: 'infantry', weather: 'snow', tags: [], enabled: true }), 1);
-  assert.equal(strategicMovementHexesFor({ unitType: 'armor', weather: null, tags: [], enabled: true }), 2);
+  assert.equal(strategicMovementHexesFor({ unitType: 'armor', weather: 'snow', tags: [], level: 'off' }), 2);
+  assert.equal(strategicMovementHexesFor({ unitType: 'armor', weather: 'snow', tags: [], level: 'low' }), 1);
+  assert.equal(strategicMovementHexesFor({ unitType: 'armor', weather: 'snow', tags: ['snow'], level: 'low' }), 2);
+  assert.equal(strategicMovementHexesFor({ unitType: 'naval', weather: 'snow', tags: [], level: 'low' }), 1);
+  assert.equal(strategicMovementHexesFor({ unitType: 'infantry', weather: 'snow', tags: [], level: 'low' }), 1);
+  assert.equal(strategicMovementHexesFor({ unitType: 'armor', weather: null, tags: [], level: 'low' }), 2);
+  assert.equal(strategicMovementHexesFor({ unitType: 'armor', weather: 'rain', tags: [], level: 'low' }), 1);
+  assert.equal(strategicMovementHexesFor({ unitType: 'armor', weather: 'heat', tags: [], level: 'low' }), 2);
+  assert.equal(strategicMovementHexesFor({ unitType: 'naval', weather: 'rain', tags: [], level: 'low' }), 2);
+});
+
+test('the tactical budget lowers armor in snow and naval only in snow', () => {
+  assert.equal(
+    tacticalWeatherMovementBudget({ unitType: 'armor', printedBudget: 4, weather: 'snow', tags: [], level: 'low' }),
+    2
+  );
+  assert.equal(
+    tacticalWeatherMovementBudget({ unitType: 'naval', printedBudget: 3, weather: 'snow', tags: [], level: 'low' }),
+    2
+  );
+  assert.equal(
+    tacticalWeatherMovementBudget({ unitType: 'naval', printedBudget: 3, weather: 'rain', tags: [], level: 'low' }),
+    3
+  );
+});
+
+test('ranged armor loses one point in snow and in heat', () => {
+  for (const weatherAtUnit of ['snow', 'heat'] as const) {
+    assert.equal(
+      weatherAttackPenalty({ unitType: 'armor', kind: 'ranged', weatherAtUnit, tags: [], level: 'low' }),
+      1
+    );
+  }
+});
+
+test('High slows armor in heat and naval in rain, and a tag still cancels it', () => {
+  assert.equal(strategicMovementHexesFor({ unitType: 'armor', weather: 'heat', tags: [], level: 'high' }), 1);
+  assert.equal(strategicMovementHexesFor({ unitType: 'naval', weather: 'rain', tags: [], level: 'high' }), 1);
+  assert.equal(strategicMovementHexesFor({ unitType: 'armor', weather: 'heat', tags: ['heat'], level: 'high' }), 2);
+  assert.equal(
+    tacticalWeatherMovementBudget({ unitType: 'armor', printedBudget: 4, weather: 'heat', tags: [], level: 'high' }),
+    1
+  );
+  assert.equal(
+    tacticalWeatherMovementBudget({ unitType: 'naval', printedBudget: 3, weather: 'rain', tags: [], level: 'high' }),
+    1
+  );
+  assert.equal(
+    tacticalWeatherMovementBudget({ unitType: 'armor', printedBudget: 1, weather: 'snow', tags: [], level: 'high' }),
+    1
+  );
+});
+
+test('High doubles the attack penalty and still applies it once per air strike', () => {
+  assert.equal(weatherAttackPenalty({ unitType: 'armor', kind: 'ranged', weatherAtUnit: 'snow', tags: [], level: 'high' }), 2);
+  assert.equal(
+    weatherAttackPenalty({
+      unitType: 'air',
+      kind: 'airStrike',
+      weatherAtUnit: 'mild',
+      weatherAtTarget: 'rain',
+      tags: [],
+      level: 'high',
+    }),
+    2
+  );
+  assert.equal(
+    weatherAttackPenalty({
+      unitType: 'air',
+      kind: 'airStrike',
+      weatherAtUnit: 'rain',
+      weatherAtTarget: 'heat',
+      tags: [],
+      level: 'high',
+    }),
+    2
+  );
+});
+
+test('every level leaves every untagged unit at least one hex and one battle point', () => {
+  for (const level of BONUS_LEVELS) {
+    for (const unitType of ['infantry', 'armor', 'naval'] as const) {
+      for (const weather of ['mild', 'rain', 'snow', 'heat'] as const) {
+        assert.ok(strategicMovementHexesFor({ unitType, weather, tags: [], level }) >= 1, `${level} ${unitType} ${weather}`);
+        for (const printedBudget of [1, 2, 3, 4]) {
+          assert.ok(
+            tacticalWeatherMovementBudget({ unitType, printedBudget, weather, tags: [], level }) >= 1,
+            `${level} ${unitType} ${weather} ${printedBudget}`
+          );
+        }
+      }
+    }
+  }
 });
 
 test('air strikes into snow are penalized once, and ranged armor is not penalized in rain', () => {
@@ -81,7 +170,7 @@ test('air strikes into snow are penalized once, and ranged armor is not penalize
       weatherAtUnit: 'mild',
       weatherAtTarget: 'snow',
       tags: [],
-      enabled: true,
+      level: 'low',
     }),
     1
   );
@@ -92,7 +181,7 @@ test('air strikes into snow are penalized once, and ranged armor is not penalize
       weatherAtUnit: 'rain',
       weatherAtTarget: 'heat',
       tags: [],
-      enabled: true,
+      level: 'low',
     }),
     1
   );
@@ -102,7 +191,7 @@ test('air strikes into snow are penalized once, and ranged armor is not penalize
       kind: 'ranged',
       weatherAtUnit: 'rain',
       tags: [],
-      enabled: true,
+      level: 'low',
     }),
     0
   );
@@ -112,7 +201,7 @@ test('air strikes into snow are penalized once, and ranged armor is not penalize
       kind: 'ranged',
       weatherAtUnit: 'heat',
       tags: ['heat'],
-      enabled: true,
+      level: 'low',
     }),
     0
   );

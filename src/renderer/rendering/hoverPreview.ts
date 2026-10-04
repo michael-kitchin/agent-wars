@@ -1,6 +1,6 @@
 import { effectiveTacticalMovementPointBudgetForMarchLeg } from '../../shared/tacticalTerrainCombatModifiers';
 import { tacticalMovementUnitTypeForPathfinding } from '../../shared/tacticalTerrainMovement';
-import { strategicMovementHexesFor } from '../../shared/weatherBonusRules';
+import { strategicMovementHexesFor, weatherBonusLevelOf } from '../../shared/weatherBonusRules';
 import {
   ORDER_LINE_COLOR,
   ORDER_LINE_WIDTH,
@@ -84,7 +84,7 @@ export function drawHoverRoutePreview(ctx: CanvasRenderingContext2D): void {
         unitType: unit.unitType,
         weather: occupied?.weather,
         tags: unit.weatherTags,
-        enabled: state.weatherBonusEnabled === true,
+        level: weatherBonusLevelOf(state),
       });
       const prior = slowestMovementRangeByOriginH3.get(unit.h3Index);
       if (prior === undefined || movementRange < prior) {

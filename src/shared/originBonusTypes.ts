@@ -1,6 +1,6 @@
 /**
  * Shapes for the optional origin bonuses: a unit standing in its birth country, or (in battles) on its birth terrain kind,
- * adds 1 to the threshold of every hit roll it makes.
+ * adds 1 (Low) or 2 (High) to the threshold of every hit roll it makes.
  *
  * Purpose: Shared by main-process dice, AI tools, and renderer tooltips so every surface speaks the same vocabulary.
  * When to use: Import with `import type`; the runtime rules live in `originBonusRules.ts`.
@@ -8,15 +8,17 @@
  * Exceptions: None.
  */
 
+import type { ActiveBonusLevel } from './bonusLevel';
+
 /**
  * Amount an origin bonus adds to a hit threshold.
  *
- * Purpose: Keeps the bonus a closed set so it can never grow past +1 by stacking.
+ * Purpose: Keeps the bonus a closed set so stacking can never grow it past the larger level's amount.
  * When to use: `CombatUnit.originHitBonus` and lookup results.
- * Expected outcome: `0` when the unit does not qualify, `1` when it does.
+ * Expected outcome: `0` when the unit does not qualify, `1` at Low, `2` at High.
  * Exceptions: None.
  */
-export type OriginHitBonus = 0 | 1;
+export type OriginHitBonus = 0 | 1 | 2;
 
 /**
  * Why a unit qualifies for an origin bonus.
@@ -39,7 +41,7 @@ export type OriginBonusSource = 'country' | 'terrain';
 export type OriginBonusTheater = 'strategic' | 'tactical';
 
 /**
- * The two origin bonus match flags.
+ * The optional bonus match flags, their levels, and the start month.
  *
  * Purpose: One value object for the persisted new-game choices.
  * When to use: Read from a snapshot with `originBonusSettingsFromSnapshot` or from the database in main.
@@ -74,6 +76,33 @@ export interface OriginBonusSettings {
    * Exceptions: None.
    */
   readonly weatherBonusEnabled?: boolean;
+  /**
+   * How strong the country bonus is.
+   *
+   * Contract: Read only when `countryBonusEnabled` is true. Missing means low.
+   * When to use: Through `originBonusLevelFor`, never directly.
+   * Expected outcome: Picks the amount a qualifying unit adds.
+   * Exceptions: None.
+   */
+  readonly countryBonusLevel?: ActiveBonusLevel;
+  /**
+   * How strong the terrain bonus is.
+   *
+   * Contract: Read only when `terrainBonusEnabled` is true. Missing means low.
+   * When to use: Through `originBonusLevelFor`, never directly.
+   * Expected outcome: Picks the amount a qualifying unit adds.
+   * Exceptions: None.
+   */
+  readonly terrainBonusLevel?: ActiveBonusLevel;
+  /**
+   * How strong the weather bonus is.
+   *
+   * Contract: Read only when `weatherBonusEnabled` is true. Missing means low.
+   * When to use: Through `weatherBonusLevelOf`, never directly.
+   * Expected outcome: Picks which weather slows a unit and how much attack it loses.
+   * Exceptions: None.
+   */
+  readonly weatherBonusLevel?: ActiveBonusLevel;
   /**
    * Calendar month of turn 1, 1 for January through 12 for December.
    *

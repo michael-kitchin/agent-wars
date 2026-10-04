@@ -3,7 +3,9 @@ import { getScenarioHomeRegionHexes, resolveScenarioHomeRegions } from '../regio
 import type { GuardedDbRunAndGetAllOps } from './dbOps';
 import { persistGameSize } from './gameSizeConfig';
 import { persistOriginBonusSettings } from './originBonusConfig';
+import { parseBonusLevel, type BonusLevel } from '../../shared/bonusLevel';
 import { parseGameSize, type GameSize } from '../../shared/gameSize';
+import { originBonusSettingsFromLevels } from '../../shared/originBonusRules';
 import { logHomeRegionControlParity } from './seeding/initialFlexAirSlot';
 import { persistRegionVsRegionScenarioState } from './scenarioState';
 
@@ -197,32 +199,32 @@ export interface ResetGameForNewMatchOptions {
    */
   readonly gameSize?: GameSize;
   /**
-   * Whether the country bonus is on.
+   * How strong the country bonus is.
    *
-   * Contract: Only `true` means on; missing means off, so callers that predate the flag keep the old dice.
-   * When to use: The new-game dialog's Country bonus checkbox.
-   * Expected outcome: Persisted as `country_bonus_enabled`.
+   * Contract: Parsed by `parseBonusLevel`; missing or unknown means off, so callers that predate the setting keep the old dice.
+   * When to use: The new-game dialog's Country bonus control.
+   * Expected outcome: Persisted as `country_bonus_enabled` and `country_bonus_level`.
    * Exceptions: None.
    */
-  readonly countryBonusEnabled?: boolean;
+  readonly countryBonusLevel?: BonusLevel;
   /**
-   * Whether the terrain bonus is on.
+   * How strong the terrain bonus is.
    *
-   * Contract: Only `true` means on; missing means off, so callers that predate the flag keep the old dice.
-   * When to use: The new-game dialog's Terrain bonus checkbox.
-   * Expected outcome: Persisted as `terrain_bonus_enabled`.
+   * Contract: Parsed by `parseBonusLevel`; missing or unknown means off, so callers that predate the setting keep the old dice.
+   * When to use: The new-game dialog's Terrain bonus control.
+   * Expected outcome: Persisted as `terrain_bonus_enabled` and `terrain_bonus_level`.
    * Exceptions: None.
    */
-  readonly terrainBonusEnabled?: boolean;
+  readonly terrainBonusLevel?: BonusLevel;
   /**
-   * Whether the weather bonus is on.
+   * How strong the weather bonus is.
    *
-   * Contract: Only `true` means on. Missing means off, so callers that predate the flag keep the old movement and dice.
-   * When to use: The new-game dialog's Weather bonus checkbox.
-   * Expected outcome: Persisted as `weather_bonus_enabled`.
+   * Contract: Parsed by `parseBonusLevel`; missing or unknown means off, so callers that predate the setting keep the old movement and dice.
+   * When to use: The new-game dialog's Weather bonus control.
+   * Expected outcome: Persisted as `weather_bonus_enabled` and `weather_bonus_level`.
    * Exceptions: None.
    */
-  readonly weatherBonusEnabled?: boolean;
+  readonly weatherBonusLevel?: BonusLevel;
   /**
    * Calendar month of turn 1.
    *
@@ -239,7 +241,7 @@ export interface ResetGameForNewMatchOptions {
  *
  * Purpose: The single reset path behind the new-game dialog, so every per-match table and setting starts clean.
  * When to use: Through the `gameDb` facade when the player starts a match.
- * Expected outcome: Persists fog, size, both origin bonus flags (only `true` means on), and home regions; reseeds
+ * Expected outcome: Persists fog, size, every bonus flag and level (missing levels mean off), and home regions; reseeds
  *   hexes, infrastructure, units, and control; clears orders, AI state, intel, and any tactical session; saves.
  *   No-op apart from logging when there is no database.
  * Exceptions: Propagates SQLite errors from `deps.run`.
@@ -247,12 +249,12 @@ export interface ResetGameForNewMatchOptions {
 export function resetGameForNewMatch(deps: ResetGameDeps, options?: ResetGameForNewMatchOptions): void {
   const fogOfWarEnabled = options?.fogOfWarEnabled !== false;
   const gameSize = parseGameSize(options?.gameSize);
-  const originBonusSettings = {
-    countryBonusEnabled: options?.countryBonusEnabled === true,
-    terrainBonusEnabled: options?.terrainBonusEnabled === true,
-    weatherBonusEnabled: options?.weatherBonusEnabled === true,
+  const originBonusSettings = originBonusSettingsFromLevels({
+    country: parseBonusLevel(options?.countryBonusLevel, 'off'),
+    terrain: parseBonusLevel(options?.terrainBonusLevel, 'off'),
+    weather: parseBonusLevel(options?.weatherBonusLevel, 'off'),
     startMonth: options?.startMonth,
-  };
+  });
   const { humanHomeRegion, aiHomeRegion } = resolveScenarioHomeRegions(options);
   logDebug('gameDb resetGameForNewMatch', { fogOfWarEnabled, gameSize, humanHomeRegion, aiHomeRegion, ...originBonusSettings });
   if (!deps.hasDb()) return;

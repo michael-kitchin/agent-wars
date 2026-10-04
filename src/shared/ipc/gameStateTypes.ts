@@ -1,5 +1,6 @@
 import type { BuildUnitType } from './productionTypes';
 import type { TacticalBattleSnapshot } from './tacticalTypes';
+import type { ActiveBonusLevel } from '../bonusLevel';
 import type { GameSize } from '../gameSize';
 import type { UnitOrigin } from '../unitOriginTypes';
 import type { WeatherState } from '../weatherBonusTypes';
@@ -170,7 +171,7 @@ gameSize?: GameSize;
    *
    * Contract: Always a boolean on snapshots built from a persisted match; omitted on test fixtures, which means off.
    * When to use: Read through `originBonusSettingsFromSnapshot` before any origin bonus check.
-   * Expected outcome: When true, a unit in its birth country adds 1 to the threshold of every hit roll it makes.
+   * Expected outcome: When true, a unit in its birth country adds the level's amount to the threshold of every hit roll it makes.
    * Exceptions: None.
    */
 countryBonusEnabled?: boolean;
@@ -179,7 +180,7 @@ countryBonusEnabled?: boolean;
    *
    * Contract: Always a boolean on snapshots built from a persisted match; omitted on test fixtures, which means off.
    * When to use: Read through `originBonusSettingsFromSnapshot` before any origin bonus check.
-   * Expected outcome: When true, a tactical sub-unit on its birth terrain kind adds 1 to the threshold of every hit roll it makes.
+   * Expected outcome: When true, a tactical sub-unit on its birth terrain kind adds the level's amount to the threshold of every hit roll it makes.
    * Exceptions: None.
    */
 terrainBonusEnabled?: boolean;
@@ -188,10 +189,37 @@ terrainBonusEnabled?: boolean;
    *
    * Contract: Omitted when off, so a flag-off snapshot does not grow new fields. Present and true when on.
    * When to use: Before showing the month or applying a weather penalty.
-   * Expected outcome: True only for a match that checked Weather bonus.
+   * Expected outcome: True only for a match that started with the weather bonus at Low or High.
    * Exceptions: None.
    */
 weatherBonusEnabled?: boolean;
+    /**
+   * How strong the country bonus is.
+   *
+   * Contract: Present exactly when `countryBonusEnabled` is true. Missing next to a true flag means low.
+   * When to use: Read through `originBonusSettingsFromSnapshot`, never directly.
+   * Expected outcome: Picks the amount a qualifying unit adds.
+   * Exceptions: None.
+   */
+countryBonusLevel?: ActiveBonusLevel;
+    /**
+   * How strong the terrain bonus is.
+   *
+   * Contract: Present exactly when `terrainBonusEnabled` is true. Missing next to a true flag means low.
+   * When to use: Read through `originBonusSettingsFromSnapshot`, never directly.
+   * Expected outcome: Picks the amount a qualifying unit adds.
+   * Exceptions: None.
+   */
+terrainBonusLevel?: ActiveBonusLevel;
+    /**
+   * How strong the weather bonus is.
+   *
+   * Contract: Present exactly when `weatherBonusEnabled` is true. Missing next to a true flag means low.
+   * When to use: Read through `weatherBonusLevelOf`, never directly.
+   * Expected outcome: Picks which weather slows a unit and how much attack it loses.
+   * Exceptions: None.
+   */
+weatherBonusLevel?: ActiveBonusLevel;
     /**
    * Calendar month of turn 1, 1 for January through 12 for December.
    *

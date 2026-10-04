@@ -11,14 +11,19 @@ import {
   randomizeScenarioRegionSelect,
 } from './newGameRegionUi';
 import { readSelectedGameSizeFromDocument, registerGameSizeSelect, syncGameSizeCapPreview } from './newGameSizeUi';
-import { readNewGameOptionFlags, readNewGameStartMonth, resetNewGameOptionCheckboxes } from './newGameOptionsUi';
+import {
+  randomizeNewGameStartMonth,
+  readNewGameOptionChoices,
+  readNewGameStartMonth,
+  resetNewGameOptionControls,
+} from './newGameOptionsUi';
 
 /**
- * Defines the `registerRegionRandomizeButtons` function shape (function registerRegionRandomizeButtons(): void).
-
- * Purpose: Supports maintainability by documenting why `registerRegionRandomizeButtons` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Wires the new-game randomize buttons.
+ *
+ * Purpose: Each button redraws only the control beside it.
+ * When to use: Once, while the renderer is starting.
+ * Expected outcome: Human and AI region buttons redraw those dropdowns. The starting-month button redraws the month list. A missing button is skipped.
  * Exceptions: None.
  */
 function registerRegionRandomizeButtons(): void {
@@ -27,6 +32,9 @@ function registerRegionRandomizeButtons(): void {
   });
   document.getElementById('new-game-ai-region-randomize')?.addEventListener('click', () => {
     randomizeScenarioRegionSelect('new-game-ai-region-select');
+  });
+  document.getElementById('new-game-start-month-randomize')?.addEventListener('click', () => {
+    randomizeNewGameStartMonth();
   });
 }
 
@@ -231,7 +239,7 @@ export function registerNewGameButton(deps: NewGameDeps): void {
     try {
       const selectedRegions = getSelectedScenarioRegions();
       const state = (await window.gameApi.newGame({
-        ...readNewGameOptionFlags(),
+        ...readNewGameOptionChoices(),
         startMonth: readNewGameStartMonth(),
         humanHomeRegion: selectedRegions.humanHomeRegion,
         aiHomeRegion: selectedRegions.aiHomeRegion,
@@ -291,8 +299,8 @@ export function registerNewGameButton(deps: NewGameDeps): void {
  * Purpose: Lets the player abandon the current match; stops pending AI work first so it cannot land on the new one.
  * When to use: The Model tab's New game button.
  * Expected outcome: During a battle or resolution playback the click returns without cancelling planning, showing
- *   the overlay, or disabling the map. Otherwise AI requests are cancelled, every option checkbox is checked again,
- *   and the new-game overlay opens.
+ *   the overlay, or disabling the map. Otherwise AI requests are cancelled, Fog of war and the bonus dropdowns
+ *   return to their defaults, the home regions and starting month are drawn again, and the new-game overlay opens.
  * Exceptions: None.
  */
 export function openNewGameOverlayFromModelTab(setMainUIControlsEnabled: (enabled: boolean) => void, updateReadyButtonState: () => void): void {
@@ -312,7 +320,7 @@ export function openNewGameOverlayFromModelTab(setMainUIControlsEnabled: (enable
     messageEl.style.display = '';
   }
   if (newGameBtn) newGameBtn.textContent = 'Start game';
-  resetNewGameOptionCheckboxes();
+  resetNewGameOptionControls();
   void initializeScenarioRegionSelectorsOnOverlayOpen();
   syncGameSizeCapPreview();
   overlay?.classList.remove('hidden');

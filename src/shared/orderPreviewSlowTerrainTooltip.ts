@@ -21,7 +21,12 @@ import type { TacticalBattleTerrainPick } from './tacticalTerrainCombatModifiers
 import type { TacticalBattleSnapshot, TacticalSubUnitSnapshot } from './tacticalBattleTypes';
 import { MOVEMENT_RANGE_BY_UNIT_TYPE, RANGED_RANGE_BY_UNIT_TYPE } from './tacticalRanges';
 import { landInfantryArmorEnterCost } from './tacticalRes4LandMarchContinuity';
-import { formatWeatherLabel, tacticalWeatherOpenGroundCost } from './weatherBonusRules';
+import {
+  formatWeatherLabel,
+  tacticalWeatherOpenGroundCost,
+  weatherBonusLevelOf,
+  weatherSlowsMovement,
+} from './weatherBonusRules';
 import {
   buildTacticalTerrainKindResolverFromSnapshot,
   normalizeDbTerrainKindToTacticalCategory,
@@ -44,6 +49,7 @@ const SLOW_TERRAIN_LABEL_SORT_PRIORITY: Readonly<Record<string, number>> = {
   Arctic: 7,
   Snow: 8,
   Rain: 9,
+  Heat: 10,
 };
 
 /**
@@ -301,11 +307,11 @@ export type TacticalMarchTerrainImpact = {
  * Exceptions: None; air/naval and trivial paths yield empty `slower` and `roadRail: false`.
  */
 /**
- * Names snow or rain when that weather, not the anchor terrain, cut this leg's budget.
+ * Names the battle's weather when that weather, not the anchor terrain, cut this leg's budget.
  *
  * Purpose: A plains armor unit in snow is slower even though plains has no terrain label.
  * When to use: The anchor check in `collectTacticalMarchTerrainImpact`.
- * Expected outcome: `Snow` or `Rain` when the unit lacks that tag; otherwise null.
+ * Expected outcome: `Snow`, `Rain`, or `Heat` when `weatherSlowsMovement` says that weather slows this move type at the battle's level; otherwise null.
  * Exceptions: None.
  */
 function weatherBudgetSlowLabel(
@@ -313,12 +319,13 @@ function weatherBudgetSlowLabel(
   subUnit: TacticalSubUnitSnapshot,
   moveType: string
 ): string | null {
-  if (battle.weatherBonusEnabled !== true) return null;
-  const weather = battle.weather;
-  const tagged = weather != null && (subUnit.weatherTags ?? []).includes(weather);
-  if (tagged || (weather !== 'snow' && weather !== 'rain')) return null;
-  if (moveType === 'armor' || (moveType === 'naval' && weather === 'snow')) return formatWeatherLabel(weather);
-  return null;
+  const slowed = weatherSlowsMovement({
+    unitType: moveType,
+    weather: battle.weather,
+    tags: subUnit.weatherTags,
+    level: weatherBonusLevelOf(battle),
+  });
+  return slowed ? formatWeatherLabel(battle.weather) : null;
 }
 
 export function collectTacticalMarchTerrainImpact(args: {

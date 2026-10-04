@@ -45,14 +45,22 @@ function testUnknownModelGetsBaseline(): void {
 }
 
 /**
- * Verifies a valid override is sent and scales the budget within the model's output limit.
+ * Verifies every reasoning level requests the model's advertised output limit.
  *
- * Purpose: High efforts need more room; the model limit caps the increase.
- * When to use: After changing budget scaling.
- * Expected outcome: `high` doubles to 16384; `max` with a 20000 limit stops at 20000.
+ * Purpose: A low effort must get the same ceiling as a high one, including a limit below the order-flow base.
+ * When to use: After changing how the completion budget is chosen.
+ * Expected outcome: `minimal` with a 4096 limit requests 4096; `high` with 128000 requests 128000; `max` with 20000 requests 20000.
  * Exceptions: None.
  */
-function testOverrideScalesBudgetWithinModelLimit(): void {
+function testEveryEffortUsesAdvertisedOutputLimit(): void {
+  const minimal = resolveOrdersRequestProfile({
+    modelId: 'r',
+    model: reasoningModel({ top_provider: { max_completion_tokens: 4096 } }),
+    persistedReasoningEffort: 'minimal',
+    baseCompletionMaxTokens: BASE,
+  });
+  assert.equal(minimal.reasoningEffort, 'minimal');
+  assert.equal(minimal.preferredCompletionMaxTokens, 4096);
   const high = resolveOrdersRequestProfile({
     modelId: 'r',
     model: reasoningModel({ top_provider: { max_completion_tokens: 128000 } }),
@@ -60,7 +68,7 @@ function testOverrideScalesBudgetWithinModelLimit(): void {
     baseCompletionMaxTokens: BASE,
   });
   assert.equal(high.reasoningEffort, 'high');
-  assert.equal(high.preferredCompletionMaxTokens, 16384);
+  assert.equal(high.preferredCompletionMaxTokens, 128000);
   const max = resolveOrdersRequestProfile({
     modelId: 'r',
     model: reasoningModel({ top_provider: { max_completion_tokens: 20000 } }),
@@ -71,14 +79,36 @@ function testOverrideScalesBudgetWithinModelLimit(): void {
 }
 
 /**
- * Verifies the model default drives scaling without being sent.
+ * Verifies an unusable advertised limit leaves the order-flow base in place.
  *
- * Purpose: Budget scaling uses the effective effort, but only an override is sent as `reasoning.effort`.
- * When to use: After changing effective-effort handling.
- * Expected outcome: `xhigh` default gives 32768 with a known limit and 8192 without one.
+ * Purpose: A zero, negative, or non-finite list value must not become `max_tokens`.
+ * When to use: After changing `completionMaxTokensFromAdvertisedLimit`.
+ * Expected outcome: `0`, `-1`, and `NaN` keep the base. A fractional limit is floored.
  * Exceptions: None.
  */
-function testDefaultEffortScalesWithoutBeingSent(): void {
+function testUnusableAdvertisedLimitKeepsBaseBudget(): void {
+  const budgetFor = (maxCompletionTokens: number): number =>
+    resolveOrdersRequestProfile({
+      modelId: 'r',
+      model: reasoningModel({ top_provider: { max_completion_tokens: maxCompletionTokens } }),
+      persistedReasoningEffort: 'low',
+      baseCompletionMaxTokens: BASE,
+    }).preferredCompletionMaxTokens;
+  assert.equal(budgetFor(0), BASE);
+  assert.equal(budgetFor(-1), BASE);
+  assert.equal(budgetFor(Number.NaN), BASE);
+  assert.equal(budgetFor(20000.9), 20000);
+}
+
+/**
+ * Verifies the model default is recorded without being sent, and does not change the budget.
+ *
+ * Purpose: Only an override is sent as `reasoning.effort`. The budget follows the advertised limit, or the base when that limit is missing.
+ * When to use: After changing effective-effort handling or the completion budget.
+ * Expected outcome: `xhigh` default is not sent. A known 128000 limit is requested as 128000; a missing limit stays at the base.
+ * Exceptions: None.
+ */
+function testDefaultEffortIsNotSentAndBudgetFollowsAdvertisedLimit(): void {
   const withLimit = resolveOrdersRequestProfile({
     modelId: 'r',
     model: reasoningModel({
@@ -90,7 +120,7 @@ function testDefaultEffortScalesWithoutBeingSent(): void {
   });
   assert.equal(withLimit.reasoningEffort, null);
   assert.equal(withLimit.effectiveReasoningEffort, 'xhigh');
-  assert.equal(withLimit.preferredCompletionMaxTokens, 32768);
+  assert.equal(withLimit.preferredCompletionMaxTokens, 128000);
   const withoutLimit = resolveOrdersRequestProfile({
     modelId: 'r',
     model: reasoningModel({ reasoning: { default_effort: 'xhigh', supported_efforts: null } }),
@@ -201,8 +231,9 @@ function testToolSupportFollowsAdvertisedParameters(): void {
  */
 function run(): void {
   testUnknownModelGetsBaseline();
-  testOverrideScalesBudgetWithinModelLimit();
-  testDefaultEffortScalesWithoutBeingSent();
+  testEveryEffortUsesAdvertisedOutputLimit();
+  testUnusableAdvertisedLimitKeepsBaseBudget();
+  testDefaultEffortIsNotSentAndBudgetFollowsAdvertisedLimit();
   testStructuredOutputsFollowAdvertisedParameters();
   testEnvironmentFlagDisablesStructuredOutputs();
   testToolSupportFollowsAdvertisedParameters();

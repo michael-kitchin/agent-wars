@@ -34,7 +34,7 @@ export interface OrdersRequestProfile {
    * Effort in force for this consultation: the override, otherwise the model default.
    *
    * Contract: `null` when neither an override nor a selectable default exists.
-   * When to use: Budget sizing and diagnostic logs.
+   * When to use: Diagnostic logs. It does not change `max_tokens`.
    * Expected outcome: Never sent to the API by itself.
    * Exceptions: None.
    */
@@ -72,7 +72,8 @@ export interface OrdersRequestProfile {
   /**
    * Preferred `max_tokens` before the session credit clamp.
    *
-   * Contract: At least the base order-flow budget; raised for high efforts when the model's output limit is known.
+   * Contract: The model's advertised output limit when that limit is known; otherwise the base order-flow budget.
+   * Reasoning effort does not change it.
    * When to use: Input to `resolveEffectiveOpenRouterCompletionMaxTokens` for every round and the repair call.
    * Expected outcome: Positive integer.
    * Exceptions: None.
@@ -99,37 +100,25 @@ export const BASELINE_ORDERS_REQUEST_PROFILE: OrdersRequestProfile = Object.free
 });
 
 /**
- * Budget multipliers for efforts that spend most of `max_tokens` on reasoning.
+ * Chooses the completion ceiling from the model's advertised output limit.
  *
- * Purpose: OpenRouter sizes reasoning as a share of `max_tokens` (about 95% for max/xhigh, 80% for high), so these
- * efforts need a larger ceiling to leave room for the JSON answer.
- * When to use: `scaleCompletionMaxTokensForReasoningEffort` only.
- * Expected outcome: Efforts not listed keep a multiplier of 1.
- * Exceptions: None.
- */
-const REASONING_EFFORT_BUDGET_MULTIPLIERS: ReadonlyMap<string, number> = new Map([
-  ['max', 4],
-  ['xhigh', 4],
-  ['high', 2],
-]);
-
-/**
- * Raises a completion budget for high reasoning efforts, capped by the model's output limit.
- *
- * Purpose: Keeps high-effort reasoning from consuming the whole budget and truncating the JSON answer.
+ * Purpose: Every reasoning level gets the same `max_tokens`, so a long final JSON is not cut off at the order-flow base.
  * When to use: When resolving a consultation's preferred `max_tokens`.
- * Expected outcome: `baseMaxTokens` when the effort has no multiplier or the model limit is unknown; otherwise
- * `max(base, min(base * multiplier, modelMax))`.
+ * Expected outcome: The advertised limit, floored, when it is a finite positive number; otherwise `baseMaxTokens`.
  * Exceptions: None.
  */
-function scaleCompletionMaxTokensForReasoningEffort(
+function completionMaxTokensFromAdvertisedLimit(
   baseMaxTokens: number,
-  effort: string | null,
   modelMaxCompletionTokens: number | undefined
 ): number {
-  const multiplier = effort === null ? 1 : (REASONING_EFFORT_BUDGET_MULTIPLIERS.get(effort) ?? 1);
-  if (multiplier === 1 || modelMaxCompletionTokens === undefined) return baseMaxTokens;
-  return Math.max(baseMaxTokens, Math.min(baseMaxTokens * multiplier, modelMaxCompletionTokens));
+  if (
+    modelMaxCompletionTokens === undefined ||
+    !Number.isFinite(modelMaxCompletionTokens) ||
+    modelMaxCompletionTokens <= 0
+  ) {
+    return baseMaxTokens;
+  }
+  return Math.floor(modelMaxCompletionTokens);
 }
 
 /**
@@ -138,7 +127,7 @@ function scaleCompletionMaxTokensForReasoningEffort(
  * Purpose: Combines cached model capabilities with the player's persisted reasoning choice.
  * When to use: Once per consultation, before the first chat request.
  * Expected outcome: The baseline (with the given base budget) for unknown models; otherwise a profile whose
- * reasoning effort is valid for the model and whose budget is scaled by the effective effort.
+ * reasoning effort is valid for the model and whose budget is the model's advertised output limit when known.
  * Exceptions: None.
  */
 export function resolveOrdersRequestProfile(input: {
@@ -156,9 +145,8 @@ export function resolveOrdersRequestProfile(input: {
         structuredOutputs: supportsStructuredOutputs(model),
         toolCalling: supportsToolCalling(model),
         toolChoice: supportsToolChoice(model),
-        preferredCompletionMaxTokens: scaleCompletionMaxTokensForReasoningEffort(
+        preferredCompletionMaxTokens: completionMaxTokensFromAdvertisedLimit(
           baseCompletionMaxTokens,
-          effectiveReasoningEffort,
           model.top_provider?.max_completion_tokens
         ),
       }

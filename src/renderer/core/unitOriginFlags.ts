@@ -1,13 +1,11 @@
 import { COUNTRY_FLAG_CLASS_NAME, countryFlagAssetPath } from '../../shared/countryFlags';
 import type { GameStateSnapshot } from '../../shared/ipc/gameStateTypes';
 import { LOSS_CAUSE_KEYS, type TurnLossSummary } from '../../shared/lossSummary';
-import { fallbackDisplayNameFromUnitId } from '../../shared/unitDisplayNames';
 import { parseTacticalSubUnitId } from '../../shared/unitIds';
 import { formatUnitOriginTooltipHtml, unitOriginsPresentTheSame } from '../../shared/unitOriginTooltipText';
 import type { UnitOriginTooltipBonuses } from '../../shared/unitOriginTooltipText';
 import type { UnitOrigin } from '../../shared/unitOriginTypes';
 import type { WeatherState } from '../../shared/weatherBonusTypes';
-import { originBonusSourcesForUnit } from './unitOriginBonusLine';
 import { rendererSharedState as S } from './state';
 
 /**
@@ -78,54 +76,60 @@ export function resolveUnitOrigin(unitId: string): UnitOrigin | null {
 }
 
 /**
- * Builds the Bonus block for a unit that is still on the map.
+ * Reads which bonus options this match selected.
  *
- * Purpose: Country and terrain follow the combat matcher. Weather tags come from the live row, then the birth-hex cache.
- * When to use: Live unit labels.
- * Expected outcome: Each selected option is enabled. Country and terrain apply only where the unit stands.
+ * Purpose: The flag tooltip lists a bonus only when the match has that option on. The unit's place does not belong here.
+ * When to use: `bonusesForLiveUnit` and `bonusesForAbsentUnit`.
+ * Expected outcome: Each flag is true only when the snapshot field is exactly true. A missing game state leaves every option off.
  * Exceptions: None.
  */
-function bonusesForLiveUnit(unitId: string, origin: UnitOrigin): UnitOriginTooltipBonuses {
+function selectedBonusOptions(): Pick<UnitOriginTooltipBonuses, 'countryEnabled' | 'terrainEnabled' | 'weatherEnabled'> {
   const state = S.gameState;
-  const sources = originBonusSourcesForUnit(unitId, origin);
-  const weatherEnabled = state?.weatherBonusEnabled === true;
   return {
     countryEnabled: state?.countryBonusEnabled === true,
     terrainEnabled: state?.terrainBonusEnabled === true,
-    weatherEnabled,
-    countryApplies: sources.includes('country'),
-    terrainApplies: sources.includes('terrain'),
-    weatherTags: weatherEnabled ? weatherTagsFor(unitId, origin) : undefined,
+    weatherEnabled: state?.weatherBonusEnabled === true,
+  };
+}
+
+/**
+ * Builds the Bonus block for a unit that is still on the map.
+ *
+ * Purpose: Country and terrain come from the birth record. Weather tags come from the live row, then the birth-hex cache.
+ * When to use: Live unit labels.
+ * Expected outcome: Each selected option is enabled. The block does not change when the unit moves.
+ * Exceptions: None.
+ */
+function bonusesForLiveUnit(unitId: string, origin: UnitOrigin): UnitOriginTooltipBonuses {
+  const options = selectedBonusOptions();
+  return {
+    ...options,
+    weatherTags: options.weatherEnabled ? weatherTagsFor(unitId, origin) : undefined,
   };
 }
 
 /**
  * Builds the Bonus block for a flag whose unit is no longer standing anywhere.
  *
- * Purpose: Loss toasts still name the unit and its birth country. Country and terrain bonuses need a place to stand.
+ * Purpose: A loss toast still names the bonuses the unit was born with.
  * When to use: Loss-toast flags.
- * Expected outcome: Selected options stay enabled. Country and terrain do not apply. Weather tags are the ones remembered for the birth hex.
+ * Expected outcome: Selected options stay enabled. Weather tags are the ones remembered for the birth hex.
  * Exceptions: None.
  */
 function bonusesForAbsentUnit(origin: UnitOrigin): UnitOriginTooltipBonuses {
-  const state = S.gameState;
-  const weatherEnabled = state?.weatherBonusEnabled === true;
+  const options = selectedBonusOptions();
   return {
-    countryEnabled: state?.countryBonusEnabled === true,
-    terrainEnabled: state?.terrainBonusEnabled === true,
-    weatherEnabled,
-    countryApplies: false,
-    terrainApplies: false,
-    weatherTags: weatherEnabled ? weatherTagsByBirthHex.get(origin.birthH3Index) ?? [] : undefined,
+    ...options,
+    weatherTags: options.weatherEnabled ? weatherTagsByBirthHex.get(origin.birthH3Index) ?? [] : undefined,
   };
 }
 
 /**
  * Reads weather tags for a unit that may be a strategic unit or a battle sub-unit.
  *
- * Purpose: Battle labels use sub-unit ids, which are not rows in `state.units`.
+ * Purpose: Battle labels use sub-unit ids, which are not rows in `state.units`. Both copies are the birth-hex tags.
  * When to use: From `bonusesForLiveUnit`.
- * Expected outcome: The live row's tags, otherwise the tags remembered for the birth hex, otherwise none.
+ * Expected outcome: The birth-hex tags on the live row, otherwise the tags remembered for that birth hex, otherwise none. The hex the unit occupies is not read.
  * Exceptions: None.
  */
 function weatherTagsFor(unitId: string, origin: UnitOrigin): readonly WeatherState[] {
@@ -147,7 +151,6 @@ function weatherTagsFor(unitId: string, origin: UnitOrigin): readonly WeatherSta
  */
 export function createUnitOriginFlagImage(input: {
   readonly origin: UnitOrigin;
-  readonly unitName: string;
   readonly bonuses: UnitOriginTooltipBonuses;
 }): HTMLImageElement {
   const img = document.createElement('img');
@@ -165,11 +168,11 @@ export function createUnitOriginFlagImage(input: {
  *
  * Purpose: Loss toasts share the live tooltip, without a country or terrain bonus for a unit that has nowhere to stand.
  * When to use: When a loss line names a victim whose origin is known.
- * Expected outcome: The victim's display name, birth country, and any remembered weather tags.
+ * Expected outcome: The victim's birth-country flag, with a tooltip of any remembered weather tags.
  * Exceptions: None.
  */
-export function createAbsentUnitOriginFlagImage(origin: UnitOrigin, unitName: string): HTMLImageElement {
-  return createUnitOriginFlagImage({ origin, unitName, bonuses: bonusesForAbsentUnit(origin) });
+export function createAbsentUnitOriginFlagImage(origin: UnitOrigin): HTMLImageElement {
+  return createUnitOriginFlagImage({ origin, bonuses: bonusesForAbsentUnit(origin) });
 }
 
 /**
@@ -178,8 +181,7 @@ export function createAbsentUnitOriginFlagImage(origin: UnitOrigin, unitName: st
  * Purpose: The single helper every unit-name surface uses in place of assigning `textContent`.
  * When to use: For labels that start with a unit's full display name; `text` is the full existing label text.
  * Expected outcome: `target` holds an optional flag followed by one text node; units without a remembered
- *   origin render exactly as plain text did before. The tooltip's unit name is the display name, so a selection
- *   count or an order target in `text` stays on the label.
+ *   origin render exactly as plain text did before. A selection count or an order target in `text` stays on the label.
  * Exceptions: None.
  */
 export function setUnitNameContent(target: HTMLElement, unitId: string, text: string): void {
@@ -188,7 +190,6 @@ export function setUnitNameContent(target: HTMLElement, unitId: string, text: st
   if (origin) {
     target.appendChild(createUnitOriginFlagImage({
       origin,
-      unitName: S.unitDisplayNameById.get(unitId) ?? fallbackDisplayNameFromUnitId(unitId),
       bonuses: bonusesForLiveUnit(unitId, origin),
     }));
   }

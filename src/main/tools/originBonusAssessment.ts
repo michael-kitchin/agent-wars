@@ -12,11 +12,12 @@ import {
   normalizeOriginTerrainKind,
   originBonusSettingsFromSnapshot,
   originBonusSources,
+  originHitBonusFromSources,
   strategicHexCountryNameAt,
   strategicOriginBonusPlace,
   tacticalOriginBonusPlace,
 } from '../../shared/originBonusRules';
-import type { OriginBonusSettings, OriginBonusSource } from '../../shared/originBonusTypes';
+import type { OriginBonusSettings, OriginBonusSource, OriginHitBonus } from '../../shared/originBonusTypes';
 import type { PipelineTerrainKind } from '../../shared/pipelineTerrain';
 import type { TacticalBattleSnapshot, TacticalSubUnitSnapshot } from '../../shared/tacticalBattleTypes';
 
@@ -30,7 +31,7 @@ import type { TacticalBattleSnapshot, TacticalSubUnitSnapshot } from '../../shar
  */
 export interface OriginBonusUnitFields {
   /**
-   * Reasons the unit's rolls get +1 where it stands now.
+   * Reasons the unit's rolls get a bonus where it stands now.
    *
    * Contract: Present when a flag that applies to the mode is on; empty when the unit does not qualify.
    * When to use: Deciding whether to fight from the current position.
@@ -38,6 +39,15 @@ export interface OriginBonusUnitFields {
    * Exceptions: None.
    */
   readonly originBonusHere?: OriginBonusSource[];
+  /**
+   * Amount the unit's rolls add where it stands now.
+   *
+   * Contract: Present exactly when `originBonusHere` is present: 0 when that list is empty, otherwise the larger amount among its reasons.
+   * When to use: Stating the bonus, such as the Unit Status Bonus cell.
+   * Expected outcome: 0, 1, or 2.
+   * Exceptions: None.
+   */
+  readonly originBonusAmount?: OriginHitBonus;
   /**
    * Birth country name of the unit.
    *
@@ -63,7 +73,7 @@ export interface OriginBonusUnitFields {
  *
  * Purpose: The strategic map uses the country test only.
  * When to use: At the end of the strategic `unit` block.
- * Expected outcome: `originBonusHere` and `birthCountry` when the country bonus is on, otherwise `{}`.
+ * Expected outcome: `originBonusHere`, `originBonusAmount`, and `birthCountry` when the country bonus is on, otherwise `{}`.
  * Exceptions: None.
  */
 export function strategicOriginBonusUnitFields(
@@ -73,13 +83,15 @@ export function strategicOriginBonusUnitFields(
   const settings = originBonusSettingsFromSnapshot(state);
   logTrace('originBonusAssessment strategicOriginBonusUnitFields', { unitId: unit.id, ...settings });
   if (!settings.countryBonusEnabled) return {};
+  const sources = originBonusSources({
+    settings,
+    theater: 'strategic',
+    origin: unit.origin,
+    place: strategicOriginBonusPlace(state, unit.h3Index),
+  });
   return {
-    originBonusHere: originBonusSources({
-      settings,
-      theater: 'strategic',
-      origin: unit.origin,
-      place: strategicOriginBonusPlace(state, unit.h3Index),
-    }),
+    originBonusHere: sources,
+    originBonusAmount: originHitBonusFromSources(sources, settings),
     birthCountry: unit.origin?.birthCountryName ?? null,
   };
 }
@@ -89,7 +101,7 @@ export function strategicOriginBonusUnitFields(
  *
  * Purpose: Battles use both tests, judged at the sub-unit's own cell so the answer matches the dice.
  * When to use: At the end of the tactical `unit` block.
- * Expected outcome: `originBonusHere` when either flag is on, plus `birthCountry` and/or `birthTerrain` per flag; `{}` when both are off.
+ * Expected outcome: `originBonusHere` and `originBonusAmount` when either flag is on, plus `birthCountry` and/or `birthTerrain` per flag; `{}` when both are off.
  * Exceptions: None.
  */
 export function tacticalOriginBonusUnitFields(
@@ -99,13 +111,15 @@ export function tacticalOriginBonusUnitFields(
 ): OriginBonusUnitFields {
   logTrace('originBonusAssessment tacticalOriginBonusUnitFields', { subUnitId: subUnit.id, ...settings });
   if (!settings.countryBonusEnabled && !settings.terrainBonusEnabled) return {};
+  const sources = originBonusSources({
+    settings,
+    theater: 'tactical',
+    origin: subUnit.origin,
+    place: tacticalOriginBonusPlace(battle, subUnit.h3Index),
+  });
   return {
-    originBonusHere: originBonusSources({
-      settings,
-      theater: 'tactical',
-      origin: subUnit.origin,
-      place: tacticalOriginBonusPlace(battle, subUnit.h3Index),
-    }),
+    originBonusHere: sources,
+    originBonusAmount: originHitBonusFromSources(sources, settings),
     ...(settings.countryBonusEnabled ? { birthCountry: subUnit.origin?.birthCountryName ?? null } : {}),
     ...(settings.terrainBonusEnabled ? { birthTerrain: normalizeOriginTerrainKind(subUnit.origin?.birthTerrainKind) } : {}),
   };

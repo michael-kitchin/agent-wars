@@ -55,6 +55,7 @@ type TacticalMarchPlanBattleArgs = Pick<
   | 'res4RailSidesByH3'
   | 'weather'
   | 'weatherBonusEnabled'
+  | 'weatherBonusLevel'
 >;
 
 /**
@@ -283,6 +284,7 @@ type TacticalMovementOrderOutcomeArgs = {
     | 'res4RailSidesByH3'
     | 'weather'
     | 'weatherBonusEnabled'
+    | 'weatherBonusLevel'
   >;
 };
 

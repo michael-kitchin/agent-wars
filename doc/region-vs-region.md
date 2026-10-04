@@ -12,7 +12,8 @@ On New game the player picks:
 - AI home region
 - Game size (caps only — [game-size-unit-caps.md](game-size-unit-caps.md))
 - Fog of war (default on)
-- Country bonus and Terrain bonus (both default on; rules in [combat-rules-v3.md](combat-rules-v3.md) §4.9, "Origin bonuses")
+- Country bonus and Terrain bonus dropdowns (Off, Low, or High; both default to Low; rules in [combat-rules-v3.md](combat-rules-v3.md) §4.9, "Origin bonuses")
+- Weather bonus dropdown (Off, Low, or High; default Low) and a starting month (a random month whenever the new-game dialog opens, with a square randomize button beside the list; rules in [combat-rules-v3.md](combat-rules-v3.md) §4.9, "Weather bonus")
 
 `scenarioId` on the snapshot is always `region_vs_region` for a new match (`fogState` / seeding). There is no second scenario picker in the live overlay.
 

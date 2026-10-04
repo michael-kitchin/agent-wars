@@ -1,3 +1,4 @@
+import type { BonusLevel } from '../bonusLevel';
 import type { GameSize } from '../gameSize';
 
 export interface MovementOrder {
@@ -361,32 +362,32 @@ aiHomeRegion?: string;
    */
 gameSize?: GameSize;
     /**
-   * Whether the new match has the country bonus on.
+   * How strong the new match's country bonus is.
    *
-   * Contract: A missing field means off; the new-game dialog always sends an explicit boolean.
-   * When to use: `game:newGame` from the new-game dialog's Country bonus checkbox.
-   * Expected outcome: Persisted as `game_config.country_bonus_enabled`.
+   * Contract: A missing or unknown field means off; the new-game dialog always sends an explicit level.
+   * When to use: `game:newGame` from the new-game dialog's Country bonus control.
+   * Expected outcome: Persisted as `game_config.country_bonus_enabled` and `game_config.country_bonus_level`.
    * Exceptions: None.
    */
-countryBonusEnabled?: boolean;
+countryBonusLevel?: BonusLevel;
     /**
-   * Whether the new match has the terrain bonus on.
+   * How strong the new match's terrain bonus is.
    *
-   * Contract: A missing field means off; the new-game dialog always sends an explicit boolean.
-   * When to use: `game:newGame` from the new-game dialog's Terrain bonus checkbox.
-   * Expected outcome: Persisted as `game_config.terrain_bonus_enabled`.
+   * Contract: A missing or unknown field means off; the new-game dialog always sends an explicit level.
+   * When to use: `game:newGame` from the new-game dialog's Terrain bonus control.
+   * Expected outcome: Persisted as `game_config.terrain_bonus_enabled` and `game_config.terrain_bonus_level`.
    * Exceptions: None.
    */
-terrainBonusEnabled?: boolean;
+terrainBonusLevel?: BonusLevel;
     /**
-   * Whether the new match has the weather bonus on.
+   * How strong the new match's weather bonus is.
    *
-   * Contract: A missing field means off. The new-game dialog always sends an explicit boolean.
-   * When to use: `game:newGame` from the Weather bonus checkbox.
-   * Expected outcome: Persisted as `game_config.weather_bonus_enabled`.
+   * Contract: A missing or unknown field means off; the new-game dialog always sends an explicit level.
+   * When to use: `game:newGame` from the new-game dialog's Weather bonus control.
+   * Expected outcome: Persisted as `game_config.weather_bonus_enabled` and `game_config.weather_bonus_level`.
    * Exceptions: None.
    */
-weatherBonusEnabled?: boolean;
+weatherBonusLevel?: BonusLevel;
     /**
    * Calendar month of turn 1, 1 for January through 12 for December.
    *

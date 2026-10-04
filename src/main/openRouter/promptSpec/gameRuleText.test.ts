@@ -28,6 +28,7 @@ import {
   buildProductionCostRulesLine,
   buildRangedReachRule,
   buildResolutionOrderRule,
+  buildWeatherRule,
   type GameRuleTextGates,
 } from './gameRuleText';
 
@@ -139,6 +140,90 @@ test('tactical buildOriginBonusRule notes no stacking only when both flags are o
   assert.doesNotMatch(tactical(false, true), /do not stack/);
   assert.doesNotMatch(tactical(true, false), /do not stack/);
   assert.match(tactical(true, true), /Country bonus is on: a unit on a cell.*Terrain bonus is on.*do not stack; the most is \+1\./);
+});
+
+test('the origin bonus sentences keep their exact wording', () => {
+  assert.equal(
+    buildOriginBonusRule(
+      gates({ originBonusSettings: { countryBonusEnabled: true, terrainBonusEnabled: false }, hasAirUnits: true })
+    ),
+    'Country bonus is on: a unit in a hex whose country is its birth country adds 1 to every attack or defense value it rolls there, including ranged fire, return fire, melee, and air-strike counter-fire. ' +
+      'An air unit qualifies by the hex of its base, whatever it strikes. ' +
+      'Casualty order still uses the printed defense values.'
+  );
+  assert.equal(
+    buildOriginBonusRule(
+      gates({
+        coordinateMode: 'tactical',
+        originBonusSettings: { countryBonusEnabled: true, terrainBonusEnabled: true },
+        hasAirUnits: true,
+      })
+    ),
+    'Country bonus is on: a unit on a cell whose country is its birth country adds 1 to every attack or defense value it rolls there. ' +
+      "Terrain bonus is on: a unit on a cell whose terrain kind matches its birth terrain kind adds 1 to every attack or defense value it rolls there; urban and rubble do not change a cell's terrain kind. " +
+      'The two bonuses do not stack; the most is +1. ' +
+      'An air unit qualifies by the cell of its base, whatever it strikes. ' +
+      'Casualty order still uses the printed defense values.'
+  );
+});
+
+test('a High origin bonus states 2, and the stacking note states the larger amount', () => {
+  const strategic = buildOriginBonusRule(
+    gates({ originBonusSettings: { countryBonusEnabled: true, terrainBonusEnabled: false, countryBonusLevel: 'high' } })
+  );
+  assert.match(strategic ?? '', /^Country bonus is on: a unit in a hex whose country is its birth country adds 2 to every attack/);
+  const tactical = buildOriginBonusRule(
+    gates({
+      coordinateMode: 'tactical',
+      originBonusSettings: {
+        countryBonusEnabled: true,
+        terrainBonusEnabled: true,
+        countryBonusLevel: 'high',
+        terrainBonusLevel: 'low',
+      },
+    })
+  );
+  assert.match(tactical ?? '', /birth terrain kind adds 1 to every attack/);
+  assert.match(tactical ?? '', /The two bonuses do not stack; the most is \+2\./);
+});
+
+test('the weather sentence keeps its exact wording', () => {
+  assert.equal(
+    buildWeatherRule(
+      gates({ originBonusSettings: { countryBonusEnabled: false, terrainBonusEnabled: false, weatherBonusEnabled: true } })
+    ),
+    "Weather bonus is on: the month is on the turn line and every beat of a battle shares the enclosing hex's weather. " +
+      'Armor strategic movement is 1 in snow or rain, and naval strategic movement is 1 in snow, unless the unit is tagged for that weather. ' +
+      "In battle, armor's point budget is 2 in snow or rain and naval's is 2 in snow; infantry pays 2 to enter open ground in snow or rain. " +
+      'Armor ranged attack is 1 lower in snow or heat, including return fire and air-strike counter-fire. ' +
+      'An air strike is 1 lower once when its base or its target is snow, rain, or heat the unit lacks. ' +
+      'A strategic ferry into snow is 2 hexes unless the unit is tagged for snow. ' +
+      'Defense, melee, and casualty order keep their printed values. A tag is earned by the birth hex. ' +
+      'The Unit Status Weather column names the weather where that unit stands. Birth tags, when the unit has any, follow in parentheses.'
+  );
+});
+
+test('the High weather sentence widens the slowing weather and doubles the penalties', () => {
+  assert.equal(
+    buildWeatherRule(
+      gates({
+        originBonusSettings: {
+          countryBonusEnabled: false,
+          terrainBonusEnabled: false,
+          weatherBonusEnabled: true,
+          weatherBonusLevel: 'high',
+        },
+      })
+    ),
+    "Weather bonus is on: the month is on the turn line and every beat of a battle shares the enclosing hex's weather. " +
+      'Armor strategic movement is 1 in snow, rain, or heat, and naval strategic movement is 1 in snow or rain, unless the unit is tagged for that weather. ' +
+      "In battle, armor's point budget is 1 in snow, rain, or heat and naval's is 1 in snow or rain; infantry pays 2 to enter open ground in snow or rain. " +
+      'Armor ranged attack is 2 lower in snow or heat, including return fire and air-strike counter-fire. ' +
+      'An air strike is 2 lower once when its base or its target is snow, rain, or heat the unit lacks. ' +
+      'A strategic ferry into snow is 2 hexes unless the unit is tagged for snow. ' +
+      'Defense, melee, and casualty order keep their printed values. A tag is earned by the birth hex. ' +
+      'The Unit Status Weather column names the weather where that unit stands. Birth tags, when the unit has any, follow in parentheses.'
+  );
 });
 
 test('buildMovementBudgetRule quotes engine budgets and states that air never marches', () => {

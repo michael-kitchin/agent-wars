@@ -191,7 +191,8 @@ Every tool round and the repair call go through `postOrdersChatRequest`. `resolv
 
   The combined row (every key, only `action` required) stays beside the `anyOf` with `type: "object"`. A provider that ignores `anyOf` still sees a valid row, and DeepSeek rejects an `anyOf` without a sibling `type`. `strict` is false, so some providers treat the schema as guidance rather than a hard constraint. The parser (`processV3OrdersArray` in `envelopeOrderRows.ts`) therefore still checks every row, and records each object row it drops (no unit, an unknown action, a missing or off-map destination or target, a missing naval unit) as a drop reason.
 - On HTTP 400, 404, or 422 to a request carrying the schema, the identical body minus `response_format` and `plugins` is sent once. If that succeeds, the model gets no schema for the rest of the session. This does not count against the one-repair budget.
-- Models missing from the cached list get no reasoning or schema options and are assumed to accept `tools` and `tool_choice`, so their request bodies are unchanged.
+- `max_tokens` is the cached model's `top_provider.max_completion_tokens` on every round and the repair call, at every reasoning level. A missing limit uses `OPENROUTER_ORDER_FLOW_COMPLETION_MAX_TOKENS` (8192). A session cap learned from an OpenRouter 402 can lower the value that is sent.
+- Models missing from the cached list get no reasoning or schema options, are assumed to accept `tools` and `tool_choice`, and use that 8192 completion budget.
 
 ## 5. Engine information versus prompt
 

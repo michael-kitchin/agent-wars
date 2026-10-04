@@ -55,3 +55,13 @@ export interface WeatherMonthRecord {
  * Exceptions: None.
  */
 export type WeatherAttackKind = 'ranged' | 'airStrike';
+
+/**
+ * Points a weather penalty removes from a printed attack.
+ *
+ * Purpose: Keeps the penalty a closed set, so a threshold can never be cut below the floor of 1 by an unexpected value.
+ * When to use: `weatherAttackPenalty` results and `CombatUnit.weatherAttackPenalty`.
+ * Expected outcome: `0` with no penalty, `1` at Low, `2` at High.
+ * Exceptions: None.
+ */
+export type WeatherAttackPenalty = 0 | 1 | 2;

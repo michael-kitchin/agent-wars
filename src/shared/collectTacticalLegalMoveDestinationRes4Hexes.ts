@@ -39,6 +39,7 @@ export function collectTacticalLegalMoveDestinationRes4Hexes(
     | 'res4RailSidesByH3'
     | 'weather'
     | 'weatherBonusEnabled'
+    | 'weatherBonusLevel'
   >,
   moverSubUnitId: string
 ): string[] {

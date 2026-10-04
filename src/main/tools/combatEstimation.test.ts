@@ -379,12 +379,13 @@ function frenchOrigin(birthH3Index: string): UnitOrigin {
  *
  * Purpose: Estimates must use the same effective values as live dice.
  * When to use: After changing estimate thresholds or the strategic theater lookup.
- * Expected outcome: With the flag on, armor shows attack 4 and `originBonus: 1`; with it off, attack 3 and no key.
+ * Expected outcome: With the flag on, armor shows attack 4 and `originBonus: 1`; at High, attack 5 and `originBonus: 2`;
+ * with it off, attack 3 and no key.
  * Exceptions: None.
  */
 function testRangedEstimateReportsCountryBonus(): void {
   const h3 = '891f1d48b9fffff';
-  const state = (countryBonusEnabled: boolean): GameStateSnapshot => ({
+  const state = (countryBonusEnabled: boolean, countryBonusLevel?: 'high'): GameStateSnapshot => ({
     hexes: [{ h3Index: h3, terrain: 'land', terrainKind: 'plains', countryName: 'France' }],
     units: [
       { id: 'opponent-armor-1', player: 'opponent', unitType: 'armor', h3Index: h3, origin: frenchOrigin(h3) },
@@ -394,6 +395,7 @@ function testRangedEstimateReportsCountryBonus(): void {
     turnNumber: 1,
     pendingOrders: [],
     countryBonusEnabled,
+    ...(countryBonusLevel ? { countryBonusLevel } : {}),
   });
   const latLngByH3 = new Map<string, [number, number]>([[h3, [0.5, 0.5]]]);
   const args = { engagementType: 'ranged', attackers: { units: ['opponent-armor-1'] }, targetHex: [0.5, 0.5] };
@@ -401,6 +403,9 @@ function testRangedEstimateReportsCountryBonus(): void {
   const on = executeEstimateCombat(args, state(true), latLngByH3, () => h3) as Summary;
   assert.strictEqual(on.attackerSummary?.units[0]?.attackValue, 4);
   assert.strictEqual(on.attackerSummary?.units[0]?.originBonus, 1);
+  const high = executeEstimateCombat(args, state(true, 'high'), latLngByH3, () => h3) as Summary;
+  assert.strictEqual(high.attackerSummary?.units[0]?.attackValue, 5);
+  assert.strictEqual(high.attackerSummary?.units[0]?.originBonus, 2);
   const off = executeEstimateCombat(args, state(false), latLngByH3, () => h3) as Summary;
   assert.strictEqual(off.attackerSummary?.units[0]?.attackValue, 3);
   assert.ok(!('originBonus' in off.attackerSummary!.units[0]!));

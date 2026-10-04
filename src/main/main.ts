@@ -56,6 +56,7 @@ import {
   TOOL_GROUP_REGISTRY,
 } from './openRouter/openRouter';
 import { logDebug, logError } from './logger';
+import { parseBonusLevel } from '../shared/bonusLevel';
 import { parseGameSize } from '../shared/gameSize';
 import {
   getHexNamingTooltipLineForRenderer,
@@ -300,16 +301,16 @@ function registerIpcHandlers(): void {
   ipcMain.handle(IPC_GAME.newGame, (_event, payload: NewGameIpcPayload | undefined) => {
     const fogOfWarEnabled = payload?.fogOfWarEnabled !== false;
     const gameSize = parseGameSize(payload?.gameSize);
-    const countryBonusEnabled = payload?.countryBonusEnabled === true;
-    const terrainBonusEnabled = payload?.terrainBonusEnabled === true;
-    const weatherBonusEnabled = payload?.weatherBonusEnabled === true;
+    const countryBonusLevel = parseBonusLevel(payload?.countryBonusLevel, 'off');
+    const terrainBonusLevel = parseBonusLevel(payload?.terrainBonusLevel, 'off');
+    const weatherBonusLevel = parseBonusLevel(payload?.weatherBonusLevel, 'off');
     const startMonth = payload?.startMonth;
     logDebug('main game:newGame', {
       fogOfWarEnabled,
       gameSize,
-      countryBonusEnabled,
-      terrainBonusEnabled,
-      weatherBonusEnabled,
+      countryBonusLevel,
+      terrainBonusLevel,
+      weatherBonusLevel,
       startMonth,
       requestedHumanHomeRegion: payload?.humanHomeRegion ?? '',
       requestedAiHomeRegion: payload?.aiHomeRegion ?? '',
@@ -319,9 +320,9 @@ function registerIpcHandlers(): void {
       gameSize,
       humanHomeRegion: payload?.humanHomeRegion,
       aiHomeRegion: payload?.aiHomeRegion,
-      countryBonusEnabled,
-      terrainBonusEnabled,
-      weatherBonusEnabled,
+      countryBonusLevel,
+      terrainBonusLevel,
+      weatherBonusLevel,
       startMonth,
     });
     clearDeferredPlaybackConsultPending();

@@ -186,7 +186,7 @@ export function appendOpenRouterLog(line: string, isError = false): void {
   const time = new Date().toLocaleTimeString();
   const span = document.createElement('div');
   span.textContent = `${time} ${line}`;
-  if (isError) span.style.color = '#a03030';
+  if (isError) span.className = 'chrome-error';
   el.appendChild(span);
   el.scrollTop = el.scrollHeight;
 }
@@ -287,7 +287,7 @@ function appendMapToastBulletLine(
   if (unitOriginByDisplayName && unitOriginByDisplayName.size > 0) {
     for (const segment of splitLossCauseLineForUnitFlags(text, new Set(unitOriginByDisplayName.keys()))) {
       const origin = segment.unitDisplayName ? unitOriginByDisplayName.get(segment.unitDisplayName) : undefined;
-      if (origin && segment.unitDisplayName) span.appendChild(createAbsentUnitOriginFlagImage(origin, segment.unitDisplayName));
+      if (origin && segment.unitDisplayName) span.appendChild(createAbsentUnitOriginFlagImage(origin));
       span.appendChild(document.createTextNode(segment.text));
     }
   } else {

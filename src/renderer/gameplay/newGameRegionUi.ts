@@ -1,3 +1,5 @@
+import { randomizeNewGameStartMonth } from './newGameOptionsUi';
+
 /**
  * Documents the module-scope binding `HUMAN_REGION_SELECT_ID` (HUMAN_REGION_SELECT_ID).
 
@@ -86,14 +88,15 @@ export async function ensureScenarioRegionOptionsLoaded(): Promise<void> {
 }
 
 /**
- * Defines the `initializeScenarioRegionSelectorsOnOverlayOpen` function shape (export async function initializeScenarioRegionSelectorsOnOverlayOpen(): Promise<void>).
-
- * Purpose: Supports maintainability by documenting why `initializeScenarioRegionSelectorsOnOverlayOpen` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
+ * Draws new home regions and a new starting month for one opening of the dialog.
+ *
+ * Purpose: Both draws belong to the moment the dialog opens. A later refresh while it stays open leaves them alone, so a player's change survives.
+ * When to use: At renderer startup, when the overlay goes from hidden to shown, and when New opens it from the Model tab.
+ * Expected outcome: The month list shows a random month immediately. After the region lists load, each shows a random legal region. A missing control is left unchanged.
+ * Exceptions: None. A failed region load leaves the region lists as they are and still draws the month.
  */
 export async function initializeScenarioRegionSelectorsOnOverlayOpen(): Promise<void> {
+  randomizeNewGameStartMonth();
   await ensureScenarioRegionOptionsLoaded();
   randomizeScenarioRegionSelects();
 }

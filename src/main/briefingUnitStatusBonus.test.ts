@@ -4,14 +4,18 @@ import { buildUnitStatusTable } from './briefingFormatter';
 import type { UnitAssessmentResult } from './precomputation';
 
 /**
- * Builds a quiet strategic assessment with optional origin bonus reasons.
+ * Builds a quiet strategic assessment with optional origin bonus reasons and amount.
  *
- * Purpose: The Bonus column depends only on `unit.originBonusHere`.
+ * Purpose: The Bonus column depends only on `unit.originBonusHere` and `unit.originBonusAmount`.
  * When to use: In the tests below.
  * Expected outcome: A minimal `UnitAssessmentResult` with no enemies or threats.
  * Exceptions: None.
  */
-function assessment(unitId: string, originBonusHere?: Array<'country' | 'terrain'>): UnitAssessmentResult {
+function assessment(
+  unitId: string,
+  originBonusHere?: Array<'country' | 'terrain'>,
+  originBonusAmount: 0 | 1 | 2 = 0
+): UnitAssessmentResult {
   return {
     unitId,
     result: {
@@ -21,7 +25,7 @@ function assessment(unitId: string, originBonusHere?: Array<'country' | 'terrain
         type: 'infantry',
         position: [3, 3],
         currentStandingOrder: null,
-        ...(originBonusHere ? { originBonusHere } : {}),
+        ...(originBonusHere ? { originBonusHere, originBonusAmount } : {}),
       },
       nearbyEnemies: [],
       threats: [],
@@ -32,14 +36,15 @@ function assessment(unitId: string, originBonusHere?: Array<'country' | 'terrain
 
 test('the Bonus column appears when an assessment carries origin bonus reasons', () => {
   const table = buildUnitStatusTable(
-    [assessment('opp-a', ['country']), assessment('opp-b', [])],
+    [assessment('opp-a', ['country'], 1), assessment('opp-b', []), assessment('opp-c', ['country'], 2)],
     { mode: 'strategic' },
     true
   );
-  const [header, , rowA, rowB] = table.split('\n');
+  const [header, , rowA, rowB, rowC] = table.split('\n');
   assert.equal(header, '| Unit ID | Type | Hex | Bonus | Nearest enemy + distance | Threat severity | Action needed |');
   assert.ok(rowA?.includes('| +1 country |'), rowA);
   assert.ok(rowB?.includes('| — |'), rowB);
+  assert.ok(rowC?.includes('| +2 country |'), rowC);
 });
 
 test('the Weather column names the weather where the unit stands and its tags', () => {

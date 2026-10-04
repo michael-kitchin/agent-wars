@@ -8,6 +8,7 @@
 import { gridDisk } from 'h3-js';
 import { logDebug, logError, logTrace } from './logger';
 import { getMovementBudget } from './combatConstants';
+import type { BonusLevel } from '../shared/bonusLevel';
 import { strategicMovementHexesFor } from '../shared/weatherBonusRules';
 import type { WeatherState } from '../shared/weatherBonusTypes';
 import {
@@ -333,24 +334,24 @@ export function getDistanceAndTurns(
  * Defines the `getMovementBudgetForUnit` function shape (export function getMovementBudgetForUnit(unitType: string): number).
 
  * Purpose: Printed strategic hexes, or the weather-reduced count when the caller has this turn's weather.
- * When to use: Route ETAs and assess_unit. Omit `weather` when the flag is off or the caller has no hex.
- * Expected outcome: Infantry 1, armor 2, naval 2, air 0, unless untagged armor or naval is slowed.
+ * When to use: Route ETAs and assess_unit. Omit `weather` when the weather bonus is off or the caller has no hex.
+ * Expected outcome: Infantry 1, armor 2, naval 2, air 0, unless untagged armor or naval is slowed at the given level.
  * Exceptions: None.
  */
 export function getMovementBudgetForUnit(
   unitType: string,
   weather?: {
-    enabled: boolean;
-    weather: WeatherState | null | undefined;
-    tags: readonly WeatherState[] | null | undefined;
+    readonly level: BonusLevel;
+    readonly weather: WeatherState | null | undefined;
+    readonly tags: readonly WeatherState[] | null | undefined;
   }
 ): number {
-  logTrace('pathfinding getMovementBudgetForUnit', { unitType, enabled: weather?.enabled === true });
+  logTrace('pathfinding getMovementBudgetForUnit', { unitType, level: weather?.level ?? 'off' });
   if (!weather) return getMovementBudget(unitType);
   return strategicMovementHexesFor({
     unitType,
     weather: weather.weather,
     tags: weather.tags,
-    enabled: weather.enabled,
+    level: weather.level,
   });
 }

@@ -443,7 +443,7 @@ export function updatePendingOrdersSidebar(deps: PendingOrdersDeps): void {
     if (S.tacticalPendingMarches.length === 0 && S.pendingFerryOrders.length === 0) {
       const span = document.createElement('span');
       span.textContent = 'None';
-      span.style.color = '#666';
+      span.className = 'chrome-muted';
       container.appendChild(span);
       return;
     }
@@ -488,7 +488,7 @@ export function updatePendingOrdersSidebar(deps: PendingOrdersDeps): void {
   if (pendingOrders.length === 0 && S.pendingFerryOrders.length === 0) {
     const span = document.createElement('span');
     span.textContent = 'None';
-    span.style.color = '#666';
+    span.className = 'chrome-muted';
     container.appendChild(span);
     return;
   }

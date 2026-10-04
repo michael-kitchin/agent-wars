@@ -10,7 +10,7 @@ import type { TacticalBattleSnapshot, TacticalSubUnitSnapshot } from '../../shar
 import { unitHasTacticalRangedBaseline } from '../../shared/tacticalRanges';
 import { casualtyPriorityIndex, getDefense } from '../combatConstants';
 import { attackHitThreshold } from '../combatHitThresholds';
-import { weatherAttackPenalty } from '../../shared/weatherBonusRules';
+import { weatherAttackPenalty, weatherBonusLevelOf } from '../../shared/weatherBonusRules';
 import type { OriginHitBonusLookup } from '../originBonus/originHitBonusLookup';
 import { tacticalEmbarkedLandExcludedFromRangedInput } from './tacticalCombatInput';
 import { tacticalLogMutate } from './tacticalLogging';
@@ -84,7 +84,7 @@ export interface TacticalAirStrikeOnUnitsInput {
    *
    * Contract: Added to the attack threshold and to each counter-fire threshold.
    * When to use: Always; pass `noOriginHitBonus` when bonuses do not apply.
-   * Expected outcome: 0 or 1 per roll.
+   * Expected outcome: 0, 1, or 2 per roll.
    * Exceptions: None.
    */
   readonly originHitBonusAt: OriginHitBonusLookup;
@@ -191,7 +191,7 @@ export function resolveTacticalAirStrikeAgainstUnitsOnSubUnits(input: TacticalAi
       weatherAtUnit: battle.weather,
       weatherAtTarget: battle.weather,
       tags: attacker.weatherTags,
-      enabled: battle.weatherBonusEnabled === true,
+      level: weatherBonusLevelOf(battle),
     }),
   });
   if (attackHit && defenders.length > 0) {
@@ -220,7 +220,7 @@ export function resolveTacticalAirStrikeAgainstUnitsOnSubUnits(input: TacticalAi
         kind: 'ranged',
         weatherAtUnit: battle.weather,
         tags: defender.weatherTags,
-        enabled: battle.weatherBonusEnabled === true,
+        level: weatherBonusLevelOf(battle),
       }),
     })) continue;
     markTacticalSubUnitCasualty(sub, toRemove, attacker.id, [defender.id], killsByReturnFire);

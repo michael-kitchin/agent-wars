@@ -25,6 +25,7 @@ import { resolveAirStrikePhase } from './airStrikeResolution';
 import { withOriginHitBonus } from '../originBonus/originHitBonusLookup';
 import { readPersistedOriginBonusSettings } from '../gameDb/originBonusConfig';
 import { weatherPenaltyForRoll } from '../weather/weatherMatch';
+import { weatherBonusLevelOf } from '../../shared/weatherBonusRules';
 import { weatherTagsForBirthHex } from '../weather/weatherPackLoad';
 import { buildStrategicOriginHitBonusLookupFromDb } from '../originBonus/originHitBonusLookupDb';
 import {
@@ -228,7 +229,7 @@ export function executeReadyStrategicTurn(
     const penalty = weatherPenaltyForRoll({
       unitType: unit.unitType,
       kind: 'ranged',
-      enabled: weatherSettings.weatherBonusEnabled === true,
+      level: weatherBonusLevelOf(weatherSettings),
       turnNumber,
       startMonth: weatherSettings.startMonth ?? 1,
       unitH3Index: unit.h3Index,

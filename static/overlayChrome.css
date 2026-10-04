@@ -1,0 +1,439 @@
+/* Hex tooltips, map buttons, and the build, stack, and tactical-battles popups. */
+.hex-tooltip {
+  position: fixed;
+  pointer-events: none;
+  padding: 0.35rem 0.5rem;
+  background: var(--chrome-bg);
+  color: var(--chrome-text);
+  color-scheme: dark;
+  border: 1px solid var(--chrome-border);
+  border-radius: 2px;
+  font-size: 12px;
+  max-width: 180px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.25;
+  z-index: 6400;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+.hex-tooltip.hidden { display: none; }
+#order-block-tooltip {
+  z-index: 6450;
+}
+#order-slower-tooltip {
+  z-index: 6450;
+}
+/* Body-level peer of #sidebar so the Model-tab tip is not trapped under canvas stacking. */
+#model-description-tooltip {
+  z-index: 6505;
+}
+/* Above the map toast (7000) and overlays because unit flags also appear in the toast. */
+#unit-origin-tooltip {
+  white-space: pre-line;
+  z-index: 7100;
+}
+/* Text-sized weather mark before the weather word. */
+.weather-icon {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  object-fit: contain;
+  vertical-align: -0.15em;
+  margin-right: 0.25em;
+}
+/* Text-sized country flag before country names (hex captions) and unit names. */
+.country-flag {
+  display: inline-block;
+  width: 1.125em;
+  height: 0.75em;
+  object-fit: contain;
+  vertical-align: -0.05em;
+  margin-right: 0.3em;
+  filter: drop-shadow(0 0 0.5px rgba(0, 0, 0, 0.85)) drop-shadow(0 0 0.5px rgba(255, 255, 255, 0.7));
+}
+/* Map-key terrain fill, flag-sized, before a terrain name. The background is set when the tooltip opens. */
+.terrain-swatch {
+  display: inline-block;
+  box-sizing: border-box;
+  width: 1.125em;
+  height: 0.75em;
+  vertical-align: -0.05em;
+  margin-right: 0.3em;
+  border: 1px solid #d5deea;
+  border-radius: 2px;
+}
+.build-entry-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 5000;
+  pointer-events: none;
+}
+.build-entry-layer.hidden { display: none; }
+.build-entry-btn {
+  position: absolute;
+  pointer-events: auto;
+  margin: 0;
+  padding: 0.06rem 0.28rem;
+  min-height: 0;
+  line-height: 1.15;
+  font-size: 10px;
+  font-weight: 500;
+  font-family: system-ui, sans-serif;
+  border-radius: 2px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+  cursor: default;
+}
+/* Brighter teal and a white edge mark the open build popup's hex against the other teal map buttons. */
+.build-entry-btn.selected {
+  background: #1d8a82;
+  border-color: #ffffff;
+  box-shadow: 0 0 0 1px var(--button-bg), 0 1px 3px rgba(0,0,0,0.18);
+}
+.build-entry-btn.has-capacity {
+  font-weight: 700;
+}
+.build-entry-btn.hidden { display: none; }
+.tactical-entry-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 5100;
+  pointer-events: none;
+}
+.tactical-entry-layer.hidden { display: none; }
+.tactical-entry-btn {
+  position: absolute;
+  pointer-events: auto;
+  margin: 0;
+  padding: 0;
+  width: 2rem;
+  height: 2rem;
+  min-width: 2rem;
+  min-height: 2rem;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  font-size: 15px;
+  font-weight: 600;
+  font-family: system-ui, sans-serif;
+  border-radius: 3px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.18);
+  cursor: default;
+}
+.tactical-battle-hud {
+  position: absolute;
+  left: 50%;
+  bottom: 14px;
+  transform: translateX(-50%);
+  z-index: 6600;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.45rem;
+  pointer-events: auto;
+  max-width: calc(100vw - 24px);
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.tactical-battle-hud.hidden { display: none; }
+.tactical-exit-btn {
+  margin: 0;
+  padding: 0.4rem 0.9rem;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: system-ui, sans-serif;
+  border-radius: 3px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+  cursor: default;
+}
+/* Buttons drawn over the pale map get a navy focus ring; the light teal ring would vanish there. */
+.build-entry-btn:focus,
+.tactical-entry-btn:focus,
+.tactical-exit-btn:focus {
+  outline: 1px solid var(--chrome-bg);
+}
+.tactical-exit-btn.hidden {
+  display: none;
+}
+aside#sidebar.tactical-strategic-suppress {
+  visibility: hidden;
+  pointer-events: none;
+}
+.build-popup {
+  position: fixed;
+  pointer-events: auto;
+  padding: 0.35rem 0.5rem;
+  min-width: 0;
+  width: fit-content;
+  max-width: 200px;
+  background: var(--chrome-bg);
+  color: var(--chrome-text);
+  color-scheme: dark;
+  border: 1px solid var(--chrome-border);
+  border-radius: 2px;
+  font-size: 12px;
+  z-index: 6501;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+.build-popup.hidden { display: none; }
+.build-popup .build-queue-section {
+  margin-top: 0;
+}
+.build-popup .build-queue-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+  margin-bottom: 0.35rem;
+}
+.build-popup .build-queue-title {
+  font-weight: 600;
+}
+.build-popup .build-queue-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.28rem;
+  margin-top: 0.25rem;
+}
+.build-popup .build-queue-row {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.build-popup .build-queue-row select {
+  flex: 1;
+  min-width: 0;
+  font-size: 11px;
+  padding: 0.1rem 0.2rem;
+}
+.build-popup .build-count-input {
+  width: 2.5rem;
+  min-width: 2.5rem;
+  font-size: 11px;
+  padding: 0.08rem 0.2rem;
+  text-align: center;
+}
+.build-popup .build-no-urban {
+  margin-top: 0.45rem;
+  color: var(--chrome-muted);
+  font-size: 11px;
+  line-height: 1.3;
+}
+.build-popup .build-keep-building-row {
+  margin-top: 0.55rem;
+  padding-top: 0.35rem;
+  border-top: 1px solid var(--chrome-border);
+}
+.build-popup .build-keep-building-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 12px;
+  color: var(--chrome-text);
+  cursor: pointer;
+  user-select: none;
+}
+.build-popup .build-keep-building-label:has(.build-keep-building-checkbox:disabled) {
+  cursor: default;
+  color: var(--chrome-disabled);
+}
+.build-popup .build-keep-building-checkbox {
+  margin: 0;
+}
+.stack-callout {
+  position: fixed;
+  pointer-events: auto;
+  padding: 0.35rem 0.5rem;
+  min-width: 0;
+  width: fit-content;
+  max-width: 240px;
+  background: var(--chrome-bg);
+  color: var(--chrome-text);
+  color-scheme: dark;
+  border: 1px solid var(--chrome-border);
+  border-radius: 2px;
+  font-size: 12px;
+  z-index: 6500;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+.stack-callout.hidden { display: none; }
+.stack-callout ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  width: 100%;
+}
+.stack-callout li {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  justify-content: space-between;
+  width: 100%;
+  margin-bottom: 0.25rem;
+  white-space: nowrap;
+}
+.stack-callout li:last-child { margin-bottom: 0; }
+.stack-callout .unit-label {
+  flex: 1 1 auto;
+  max-width: 180px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.stack-callout .unit-select,
+.build-popup .unit-select {
+  flex-shrink: 0;
+  padding: 0.15rem 0.4rem;
+  font-size: 11px;
+}
+.stack-callout .stack-unit-toggle,
+.build-popup .stack-unit-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  margin-left: auto;
+  width: 1.1rem;
+  min-width: 1.1rem;
+  height: 1.1rem;
+  padding: 0;
+  line-height: 1;
+  font-size: 11px;
+  font-weight: 700;
+}
+.compact-blue-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  margin-left: auto;
+  width: auto;
+  min-width: 0;
+  padding: 0.05rem 0.2rem;
+  line-height: 1;
+}
+/* Rose marks the AI side, so this button keeps the opponent color instead of the shared teal. */
+.compact-opponent-btn {
+  background: #9d174d;
+  border-color: var(--chrome-opponent-edge);
+}
+.compact-opponent-btn:hover {
+  background: #be185d;
+}
+.compact-square-btn {
+  width: 1.1rem;
+  min-width: 1.1rem;
+  height: 1.1rem;
+  padding: 0;
+  line-height: 1;
+  font-size: 11px;
+  font-weight: 700;
+}
+.build-popup .build-popup-close-row {
+  display: flex;
+  justify-content: flex-start;
+  margin-bottom: 0.25rem;
+}
+.stack-callout .stack-close-btn,
+.build-popup .build-close-btn {
+  min-width: 1.1rem;
+  height: 1.1rem;
+  padding: 0;
+  line-height: 1;
+  font-size: 11px;
+  font-weight: 700;
+}
+.stack-sealift-section {
+  margin-top: 0.45rem;
+  padding-top: 0.35rem;
+  border-top: 1px solid var(--chrome-border);
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.stack-sealift-title {
+  font-weight: 600;
+  font-size: 11px;
+  color: var(--chrome-text);
+}
+.stack-sealift-row {
+  display: flex;
+  gap: 0.35rem;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+.stack-sealift-naval {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 110px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.stack-sealift-slots {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  flex: 0 0 auto;
+}
+.stack-sealift-slot-row {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+.stack-sealift-select {
+  min-width: 98px;
+  max-width: 120px;
+  font-size: 11px;
+  padding: 0.08rem 0.2rem;
+}
+.melee-intercept-panel {
+  max-width: min(520px, 92vw);
+  width: 100%;
+  max-height: calc(100vh - 28px);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  margin: 12px auto 24px;
+  padding: 10px 12px;
+  background: var(--chrome-bg);
+  color: var(--chrome-text);
+  color-scheme: dark;
+  border: 1px solid var(--chrome-border);
+  border-radius: 4px;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.25);
+  font: 13px/1.35 system-ui, sans-serif;
+}
+.melee-intercept-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  margin-bottom: 8px;
+  background: var(--chrome-bg-raised);
+  border: 1px solid var(--chrome-border);
+  border-radius: 2px;
+}
+.melee-intercept-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  table-layout: fixed;
+}
+.melee-intercept-table th {
+  text-align: left;
+  vertical-align: bottom;
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--chrome-border);
+  color: var(--chrome-muted);
+  font-weight: 600;
+}
+.melee-intercept-table td {
+  padding: 6px;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+.melee-intercept-table tr {
+  border-bottom: 1px solid var(--chrome-border);
+}

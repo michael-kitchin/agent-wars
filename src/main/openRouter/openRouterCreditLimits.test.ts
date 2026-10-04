@@ -62,6 +62,21 @@ test('resolveEffectiveOpenRouterCompletionMaxTokens clamps preferred order-flow 
 });
 
 /**
+ * Contract: an advertised output limit is sent as-is, and a learned credit cap still lowers it.
+ *
+ * Purpose: Order-flow budgets can now be the model's full output limit, including one below the 512 floor.
+ * When to use: After changing `resolveEffectiveOpenRouterCompletionMaxTokens`.
+ * Expected outcome: 128000 stays 128000 until a 7896 cap is learned, then becomes 7896. A 256 limit stays 256.
+ * Exceptions: None.
+ */
+test('resolveEffectiveOpenRouterCompletionMaxTokens preserves a small advertised limit while clamping a large one', () => {
+  assert.equal(resolveEffectiveOpenRouterCompletionMaxTokens(128000), 128000);
+  noteOpenRouterAffordableMaxTokens(7896);
+  assert.equal(resolveEffectiveOpenRouterCompletionMaxTokens(128000), 7896);
+  assert.equal(resolveEffectiveOpenRouterCompletionMaxTokens(256), 256);
+});
+
+/**
  * Contract: default (no preferred) resolution still uses env/default when no session cap exists.
  *
  * Purpose: Keeps non-order-flow callers on the prepaid-friendly default until a cap is learned.

@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { latLngToCell } from 'h3-js';
-import { getStrategicRes1HexCode } from './hexLlmCodeAssignment';
 import { formatUnitOriginTooltipHtml, unitOriginsPresentTheSame } from './unitOriginTooltipText';
 import type { UnitOriginTooltipBonuses } from './unitOriginTooltipText';
 import type { UnitOrigin } from './unitOriginTypes';
@@ -9,19 +8,17 @@ import type { UnitOrigin } from './unitOriginTypes';
 const PARIS_RES1 = latLngToCell(48.85, 2.35, 1);
 
 /**
- * Bonus flags with every option off and nothing applying.
+ * Bonus flags with every option off.
  *
- * Purpose: The collapsed Bonus block is the default the other cases override.
+ * Purpose: The collapsed Bonuses block is the default the other cases override.
  * When to use: Tooltip tests.
- * Expected outcome: No category lines.
+ * Expected outcome: No category lines. The unit's birth record is ignored while every option is off.
  * Exceptions: None.
  */
 const NONE: UnitOriginTooltipBonuses = {
   countryEnabled: false,
   terrainEnabled: false,
   weatherEnabled: false,
-  countryApplies: false,
-  terrainApplies: false,
 };
 
 const origin: UnitOrigin = {
@@ -33,26 +30,22 @@ const origin: UnitOrigin = {
   birthIsUrban: false,
 };
 
-test('the tooltip names the unit, its birth country, and only the bonuses that are selected', () => {
-  const hexCode = getStrategicRes1HexCode(PARIS_RES1);
-  assert.equal(hexCode?.length, 2);
+test('the tooltip lists the bonuses the unit was born with', () => {
   const html = formatUnitOriginTooltipHtml({
-    unitName: 'Infantry 1',
     origin,
     bonuses: {
       countryEnabled: true,
       terrainEnabled: true,
       weatherEnabled: true,
-      countryApplies: true,
-      terrainApplies: false,
       weatherTags: ['snow', 'rain'],
     },
   });
-  assert.match(html, /^<strong>Infantry 1<\/strong>\n<strong>Origin:<\/strong> /);
-  assert.ok(html.includes(`France (${hexCode})`));
+  assert.match(html, /^<strong>Bonuses:<\/strong>\n<strong>Country:<\/strong> /);
+  assert.ok(!html.includes('\n\n'));
+  assert.ok(!html.includes('<strong>Origin:</strong>'));
+  assert.ok(html.includes('France'));
   assert.ok(html.includes('flags/fr.svg'));
-  assert.ok(html.includes('<strong>Bonus:</strong>\n<strong>Country:</strong> '));
-  assert.ok(!html.includes('<strong>Terrain:</strong>'));
+  assert.ok(html.includes('<strong>Terrain:</strong> <span class="terrain-swatch" data-terrain-kind="plains" aria-hidden="true"></span>Plains'));
   assert.ok(html.includes('weather/snow.svg'));
   assert.ok(html.includes('Snow'));
   assert.ok(html.includes('weather/rain.svg'));
@@ -61,66 +54,57 @@ test('the tooltip names the unit, its birth country, and only the bonuses that a
   assert.ok(!html.includes('Bonus: +1'));
 });
 
-test('terrain that applies is named, and weather tags render snow, then rain, then heat', () => {
+test('a turned-off option is omitted, and weather tags render snow, then rain, then heat', () => {
   const html = formatUnitOriginTooltipHtml({
-    unitName: 'Infantry 1',
     origin,
     bonuses: {
       countryEnabled: false,
       terrainEnabled: true,
       weatherEnabled: true,
-      countryApplies: false,
-      terrainApplies: true,
       weatherTags: ['heat', 'snow'],
     },
   });
   assert.ok(html.includes('<strong>Terrain:</strong> <span class="terrain-swatch" data-terrain-kind="plains" aria-hidden="true"></span>Plains'));
   assert.ok(!html.includes('<strong>Country:</strong>'));
-  assert.ok(html.indexOf('weather/snow.svg') < html.indexOf('weather/thermometer-warmer.svg'));
-  assert.ok(!html.includes('<strong>Bonus:</strong>\nNone'));
+  assert.ok(html.indexOf('weather/snow.svg') < html.indexOf('weather/heat.svg'));
+  assert.ok(!html.includes('<strong>Bonuses:</strong>\nNone'));
 });
 
-test('no selected bonus, or none that apply, collapses the Bonus block to None', () => {
-  const collapsed = formatUnitOriginTooltipHtml({ unitName: 'Infantry 1', origin, bonuses: NONE });
-  assert.ok(collapsed.includes('<strong>Bonus:</strong>\nNone'));
+test('no selected bonus, or a unit with none of them, collapses the Bonuses block to None', () => {
+  const collapsed = formatUnitOriginTooltipHtml({ origin, bonuses: NONE });
+  assert.ok(collapsed.includes('<strong>Bonuses:</strong>\nNone'));
   assert.ok(!collapsed.includes('<strong>Country:</strong>'));
   assert.ok(!collapsed.includes('<strong>Terrain:</strong>'));
   assert.ok(!collapsed.includes('<strong>Weather:</strong>'));
 
   const allEmpty = formatUnitOriginTooltipHtml({
-    unitName: 'Infantry 1',
-    origin,
+    origin: { ...origin, birthCountryName: null, birthTerrainKind: null },
     bonuses: {
       countryEnabled: true,
       terrainEnabled: true,
       weatherEnabled: true,
-      countryApplies: false,
-      terrainApplies: false,
       weatherTags: [],
     },
   });
-  assert.ok(allEmpty.includes('<strong>Bonus:</strong>\nNone'));
+  assert.ok(allEmpty.includes('<strong>Bonuses:</strong>\nNone'));
   assert.ok(!allEmpty.includes('<strong>Weather:</strong> None'));
 });
 
-test('an unknown country and a hex without a code omit the parenthetical and escape the unit name', () => {
-  const unknownHere: UnitOrigin = {
-    birthH3Index: PARIS_RES1,
-    birthRes4H3Index: null,
-    birthTerrainKind: null,
-    birthCountryName: null,
-    birthCountryCode: null,
-    birthIsUrban: false,
-  };
-  const html = formatUnitOriginTooltipHtml({
-    unitName: 'A<B',
-    origin: { ...unknownHere, birthH3Index: 'not-a-hex' },
-    bonuses: NONE,
+test('a unit with no birth country omits Country, and a country name is escaped', () => {
+  const enabled = { ...NONE, countryEnabled: true };
+  const unknown = formatUnitOriginTooltipHtml({
+    origin: { ...origin, birthCountryName: null, birthCountryCode: null },
+    bonuses: enabled,
   });
-  assert.ok(html.includes('<strong>A&lt;B</strong>'));
-  assert.ok(html.includes('<strong>Origin:</strong> '));
-  assert.ok(html.includes('Unknown'));
-  assert.ok(!html.includes('('));
+  assert.ok(unknown.includes('<strong>Bonuses:</strong>\nNone'));
+  assert.ok(!unknown.includes('<strong>Country:</strong>'));
+
+  const escaped = formatUnitOriginTooltipHtml({
+    origin: { ...origin, birthCountryName: 'A<B' },
+    bonuses: enabled,
+  });
+  assert.ok(escaped.includes('A&lt;B'));
+  assert.ok(!escaped.includes('<strong>A<B</strong>'));
 });
 
 /**

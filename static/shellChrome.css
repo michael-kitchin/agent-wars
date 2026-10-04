@@ -1,0 +1,423 @@
+/* Page shell: navy chrome tokens, the right-hand panel, and shared controls. */
+* { box-sizing: border-box; }
+/* Navy chrome so flags and weather icons separate from the pale map. Text stays off-white so the gold weather icons remain the warm mark. */
+:root {
+  --chrome-bg: #1b2838;
+  --chrome-bg-raised: #243044;
+  --chrome-text: #f4f6f8;
+  --chrome-muted: #b7c4d4;
+  --chrome-disabled: #8aa0b8;
+  --chrome-border: #5a7090;
+  --chrome-accent-edge: #7dcec8;
+  --chrome-opponent-edge: #f0b4c8;
+  --chrome-error: #f0a8a8;
+  /* Every button uses the Ready button's teal. Disabled buttons, toggles that are off, and unselected tabs use the dimmed teal. */
+  --button-bg: #115e59;
+  --button-bg-hover: #3a6a8f;
+  --button-text: #ffffff;
+  --button-border: var(--chrome-accent-edge);
+  --button-off-bg: #3b5654;
+  --button-off-bg-hover: #46625f;
+  --button-off-text: #b5c9c7;
+  --button-off-border: #6b8a87;
+  /* Text fields, dropdowns, and checkboxes share one light teal, well above the button face, so editable controls read as editable. */
+  --field-bg: #d4efec;
+  --field-text: #0b3b37;
+  --field-border: #0f766e;
+  --field-placeholder: #456864;
+  --field-disabled-bg: #9fb8b5;
+  --field-disabled-text: #243e3c;
+  --field-disabled-border: #6b8a87;
+}
+html, body { height: 100%; margin: 0; overflow: hidden; }
+body {
+  display: flex;
+  flex-direction: row;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 13px;
+}
+#canvas-container {
+  flex: 1;
+  min-width: 0;
+  position: relative;
+  height: 100%;
+  min-height: 0;
+}
+#main-map {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+}
+#main-map.leaflet-container {
+  font-family: system-ui, -apple-system, sans-serif;
+}
+#map-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 2;
+  display: block;
+  pointer-events: none;
+}
+#minimap {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  width: 200px;
+  height: 200px;
+  z-index: 6200;
+  border: 1px solid #999;
+  border-radius: 2px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+  background: #e8e4e0;
+}
+#minimap.leaflet-container {
+  font-family: system-ui, -apple-system, sans-serif;
+}
+#terrain-legend {
+  position: absolute;
+  top: 220px;
+  left: 12px;
+  z-index: 6200;
+  max-width: 200px;
+  padding: 6px 8px;
+  background: var(--chrome-bg);
+  color: var(--chrome-text);
+  color-scheme: dark;
+  border: 1px solid var(--chrome-border);
+  border-radius: 2px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.28);
+  pointer-events: auto;
+}
+#terrain-legend select {
+  font-size: 11px;
+  padding: 1px 3px;
+}
+#sidebar {
+  width: 320px;
+  min-width: 320px;
+  height: 100%;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 6000;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  background: var(--chrome-bg);
+  color: var(--chrome-text);
+  color-scheme: dark;
+  border-left: 1px solid var(--chrome-border);
+  overflow: hidden;
+}
+#sidebar.main-ui-disabled {
+  opacity: 0.65;
+  transition: opacity 0.15s ease;
+}
+#sidebar-top {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 1rem;
+  overflow: auto;
+}
+#sidebar-bottom {
+  flex: 0 0 40%;
+  min-height: 180px;
+  padding: 1rem;
+  border-top: 1px solid var(--chrome-border);
+  background: var(--chrome-bg);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.openrouter-tab-bar {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--chrome-border);
+  margin: 0 0 0.5rem 0;
+}
+.openrouter-tab-bar button {
+  padding: 0.35rem 0.75rem;
+  font-size: 12px;
+  background: var(--button-off-bg);
+  color: var(--button-off-text);
+  border: 1px solid var(--button-off-border);
+  border-bottom: 2px solid transparent;
+  border-radius: 2px 2px 0 0;
+  margin-bottom: -1px;
+}
+.openrouter-tab-bar button:hover {
+  background: var(--button-off-bg-hover);
+}
+.openrouter-tab-bar button[aria-selected="true"] {
+  font-weight: 600;
+  background: var(--button-bg);
+  color: var(--button-text);
+  border-color: var(--button-border);
+  border-bottom-color: var(--chrome-accent-edge);
+}
+.openrouter-tab-bar button[aria-selected="true"]:hover {
+  background: var(--button-bg-hover);
+}
+.openrouter-tab-panel {
+  display: none;
+  margin-bottom: 0.5rem;
+}
+.openrouter-tab-panel.active {
+  display: block;
+}
+.openrouter-tools-list {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.35rem;
+}
+.openrouter-tool-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.openrouter-tool-cell .openrouter-tool-toggle {
+  flex-shrink: 0;
+}
+.openrouter-tool-cell .openrouter-tool-label {
+  font-size: 0.85rem;
+  color: var(--chrome-text);
+  margin: 0;
+  min-width: 0;
+}
+.openrouter-tool-toggle {
+  min-width: 2rem;
+  padding: 0.25rem 0.4rem;
+  font-size: 12px;
+  font-weight: 500;
+}
+/* Off: the dimmed teal, so on and off stay obvious while both read as buttons. */
+.openrouter-tool-toggle[aria-pressed="false"] {
+  background: var(--button-off-bg);
+  color: var(--button-off-text);
+  border-color: var(--button-off-border);
+}
+.openrouter-tool-toggle[aria-pressed="false"]:hover {
+  background: var(--button-off-bg-hover);
+}
+/* A disabled toggle also fades, so it differs from one that is merely off. */
+.openrouter-tool-toggle:disabled {
+  opacity: 0.55;
+}
+.ready-btn,
+.ranged-btn {
+  min-width: 2rem;
+  padding: 0.25rem 0.4rem;
+  font-size: 12px;
+  font-weight: 500;
+}
+.openrouter-status-row {
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--chrome-border);
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+/* Both tabs: no rule line above the shared output log (status row follows both panels in DOM). */
+#openrouter-tools-panel.active ~ .openrouter-status-row,
+#openrouter-model-panel.active ~ .openrouter-status-row {
+  border-top: none;
+  margin-top: 0;
+  padding-top: 0;
+}
+#openrouter-model-panel.active > .openrouter-row:last-child {
+  margin-bottom: 0;
+}
+.openrouter-row {
+  margin-bottom: 0.6rem;
+}
+.openrouter-row label {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--chrome-muted);
+  margin-bottom: 0.2rem;
+}
+.openrouter-key-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.openrouter-key-row input[type="password"] {
+  flex: 1;
+  min-width: 0;
+}
+.openrouter-cost {
+  margin-left: auto;
+  min-width: 3.25rem;
+  width: 3.25rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.85rem;
+  color: var(--chrome-text);
+}
+.openrouter-row input[type="password"],
+.openrouter-row select {
+  width: 100%;
+  padding: 0.3rem 0.4rem;
+  font-size: 12px;
+  box-sizing: border-box;
+}
+.openrouter-model-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  gap: 0.4rem;
+  align-items: center;
+}
+.openrouter-model-grid select {
+  min-width: 0;
+}
+.openrouter-model-grid-checkbox {
+  grid-column: 2 / -1;
+}
+.openrouter-model-grid-checkbox label {
+  white-space: nowrap;
+}
+.openrouter-inline-checkbox {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.45rem;
+}
+.openrouter-inline-checkbox input[type="checkbox"] {
+  margin: 0;
+  flex-shrink: 0;
+}
+.openrouter-inline-checkbox label {
+  margin: 0;
+  font-weight: normal;
+}
+/* The model dropdown sets this row's height. Refresh, Run, and New stretch to that border box. */
+.openrouter-model-grid > button {
+  align-self: stretch;
+  height: auto;
+  box-sizing: border-box;
+  padding-block: 0;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.openrouter-refresh-btn {
+  flex-shrink: 0;
+  justify-self: center;
+  width: auto;
+  min-width: 0;
+  padding-inline: 0.4rem;
+  font-size: 12px;
+  font-weight: 500;
+}
+.openrouter-refresh-btn::before {
+  content: '';
+  width: 1em;
+  height: 1em;
+  background-color: currentColor;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M23 4v6h-6M1 20v-6h6'/%3E%3Cpath d='M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M23 4v6h-6M1 20v-6h6'/%3E%3Cpath d='M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+.openrouter-log {
+  font-size: 11px;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0.3rem;
+  background: var(--chrome-bg-raised);
+  color: var(--chrome-text);
+  border: 1px solid var(--chrome-border);
+  border-radius: 2px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.hint { font-size: 0.8rem; color: var(--chrome-muted); }
+.chrome-muted { color: var(--chrome-muted); }
+.chrome-error { color: var(--chrome-error); }
+/* Class rules elsewhere set size and spacing only. Colors come from here, so a new button needs no color rule. */
+button {
+  padding: 0.4rem 0.75rem;
+  font-size: 13px;
+  cursor: pointer;
+  background: var(--button-bg);
+  color: var(--button-text);
+  color-scheme: dark;
+  border: 1px solid var(--button-border);
+  border-radius: 2px;
+}
+button:hover {
+  background: var(--button-bg-hover);
+}
+button:disabled {
+  background: var(--button-off-bg);
+  color: var(--button-off-text);
+  border-color: var(--button-off-border);
+  cursor: not-allowed;
+}
+button:focus {
+  outline: 1px solid var(--chrome-accent-edge);
+}
+input:not([type]),
+input[type="text"],
+input[type="password"],
+input[type="number"],
+input[type="search"],
+textarea,
+select {
+  background: var(--field-bg);
+  color: var(--field-text);
+  color-scheme: light;
+  border: 1px solid var(--field-border);
+  border-radius: 2px;
+}
+input::placeholder,
+textarea::placeholder {
+  color: var(--field-placeholder);
+}
+input:disabled,
+textarea:disabled,
+select:disabled {
+  background-color: var(--field-disabled-bg);
+  color: var(--field-disabled-text);
+  border-color: var(--field-disabled-border);
+  cursor: not-allowed;
+}
+/* The native checkbox ignores background-color, so the box is drawn from the field tokens. The check stays the field text color. */
+input[type="checkbox"] {
+  appearance: none;
+  width: 0.85rem;
+  height: 0.85rem;
+  margin: 0;
+  flex-shrink: 0;
+  vertical-align: middle;
+  background-color: var(--field-bg);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 0.65rem 0.65rem;
+  border: 1px solid var(--field-border);
+  border-radius: 2px;
+  cursor: pointer;
+}
+input[type="checkbox"]:checked {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2 6.2 4.8 9 10 3' fill='none' stroke='%230b3b37' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+input[type="checkbox"]:disabled {
+  background-color: var(--field-disabled-bg);
+  border-color: var(--field-disabled-border);
+  cursor: not-allowed;
+}
+input[type="checkbox"]:checked:disabled {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2 6.2 4.8 9 10 3' fill='none' stroke='%23243e3c' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+input[type="checkbox"]:focus {
+  outline: 1px solid var(--chrome-accent-edge);
+}

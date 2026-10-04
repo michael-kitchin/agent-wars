@@ -246,6 +246,8 @@ export function getGameStateSnapshot(deps: FogDeps): GameStateSnapshot {
   const originFlags = {
     countryBonusEnabled: originBonusSettings.countryBonusEnabled,
     terrainBonusEnabled: originBonusSettings.terrainBonusEnabled,
+    ...(originBonusSettings.countryBonusEnabled ? { countryBonusLevel: originBonusSettings.countryBonusLevel ?? 'low' } : {}),
+    ...(originBonusSettings.terrainBonusEnabled ? { terrainBonusLevel: originBonusSettings.terrainBonusLevel ?? 'low' } : {}),
   };
   const snapshot = {
     hexes: weatherOn
@@ -264,7 +266,14 @@ export function getGameStateSnapshot(deps: FogDeps): GameStateSnapshot {
     winner,
     gameSize: readPersistedGameSize(ops),
     ...originFlags,
-    ...(weatherOn ? { weatherBonusEnabled: true as const, startMonth, monthName: calendarMonthName(turnNumber, startMonth) } : {}),
+    ...(weatherOn
+      ? {
+          weatherBonusEnabled: true as const,
+          weatherBonusLevel: originBonusSettings.weatherBonusLevel ?? 'low',
+          startMonth,
+          monthName: calendarMonthName(turnNumber, startMonth),
+        }
+      : {}),
   };
   return withFogMetadata(withScenarioMetadata(snapshot, ops), isFogOfWarEnabled(ops));
 }

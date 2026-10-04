@@ -1,5 +1,4 @@
 import { countryFlagImgHtml } from './countryFlags';
-import { getStrategicRes1HexCode } from './hexLlmCodeAssignment';
 import { escapeHtmlText } from './htmlTextFormatting';
 import { formatTerrainKindHtml } from './terrainSwatchHtml';
 import type { UnitOrigin } from './unitOriginTypes';
@@ -8,17 +7,17 @@ import { weatherTagsInDisplayOrder } from './weatherBonusRules';
 import { formatWeatherIconHtml } from './weatherIcons';
 
 /**
- * Which optional bonuses the tooltip may list, and which of them this unit has.
+ * Which optional bonuses the tooltip may list for one unit.
  *
- * Purpose: The Bonus block follows the match options and the unit's current qualification.
+ * Purpose: The Bonuses block follows the match options and the bonuses this unit was born with.
  * When to use: `formatUnitOriginTooltipHtml`.
- * Expected outcome: A disabled option is omitted. An enabled option that does not apply is omitted. The whole
- *   block is `None` when no selected bonus applies.
+ * Expected outcome: A disabled option is omitted. An enabled option with nothing recorded for this unit is omitted.
+ *   The whole block is `None` when the unit has none of the selected bonuses. Where the unit stands does not change the block.
  * Exceptions: None.
  */
 export interface UnitOriginTooltipBonuses {
   /**
-   * Country bonus checkbox.
+   * Country bonus for this match.
    *
    * Contract: The Country line is omitted when this is false.
    * When to use: `state.countryBonusEnabled`.
@@ -27,16 +26,16 @@ export interface UnitOriginTooltipBonuses {
    */
   readonly countryEnabled: boolean;
   /**
-   * Terrain bonus checkbox.
+   * Terrain bonus for this match.
    *
-   * Contract: The Terrain line is omitted when this is false, including on the strategic map when the box is off.
+   * Contract: The Terrain line is omitted when this is false.
    * When to use: `state.terrainBonusEnabled`.
    * Expected outcome: True only for a match that selected the terrain bonus.
    * Exceptions: None.
    */
   readonly terrainEnabled: boolean;
   /**
-   * Weather bonus checkbox.
+   * Weather bonus for this match.
    *
    * Contract: The Weather line is omitted when this is false.
    * When to use: `state.weatherBonusEnabled`.
@@ -45,29 +44,11 @@ export interface UnitOriginTooltipBonuses {
    */
   readonly weatherEnabled: boolean;
   /**
-   * Whether the unit's birth country matches where it stands.
-   *
-   * Contract: Ignored when the country bonus is off. A unit that is not standing anywhere is false.
-   * When to use: The same matcher as combat.
-   * Expected outcome: True only when the country bonus would add 1 to a roll here.
-   * Exceptions: None.
-   */
-  readonly countryApplies: boolean;
-  /**
-   * Whether the unit's birth terrain matches the cell where it stands.
-   *
-   * Contract: Ignored when the terrain bonus is off. Strategic standing never matches.
-   * When to use: The same matcher as combat.
-   * Expected outcome: True only when the terrain bonus would add 1 to a roll here.
-   * Exceptions: None.
-   */
-  readonly terrainApplies: boolean;
-  /**
-   * Acclimation tags, in display order.
+   * Acclimation tags the unit keeps from its birth hex.
    *
    * Contract: Used only when the weather bonus is on. Empty or omitted means the unit has no weather bonus.
    * When to use: The snapshot tags, or the tags remembered from the birth hex after the unit is gone.
-   * Expected outcome: Zero to two of snow, rain, and heat.
+   * Expected outcome: Zero to two of snow, rain, and heat. Moving the unit does not change them.
    * Exceptions: None.
    */
   readonly weatherTags?: readonly WeatherState[] | null;
@@ -93,7 +74,7 @@ export function unitOriginsPresentTheSame(left: UnitOrigin, right: UnitOrigin): 
 }
 
 /**
- * One labeled row inside the Bonus block.
+ * One labeled row inside the Bonuses block.
  *
  * Purpose: Keeps the bold category label next to its value.
  * When to use: While assembling `formatUnitOriginTooltipHtml`.
@@ -105,46 +86,30 @@ function bonusRow(label: string, value: string): string {
 }
 
 /**
- * Builds the Bonus block.
- *
- * Purpose: Only bonuses that apply to this unit are listed.
- * When to use: From `formatUnitOriginTooltipHtml`.
- * Expected outcome: `Bonus:` plus `None` when no option is on or none of them apply. Otherwise one row per bonus that applies.
- * Exceptions: None.
- */
-function bonusesBlock(origin: UnitOrigin, bonuses: UnitOriginTooltipBonuses): string {
-  const rows: string[] = [];
-  if (bonuses.countryEnabled && bonuses.countryApplies) {
-    const country = escapeHtmlText(origin.birthCountryName ?? 'Unknown');
-    rows.push(bonusRow('Country', `${countryFlagImgHtml(origin.birthCountryCode)}${country}`));
-  }
-  if (bonuses.terrainEnabled && bonuses.terrainApplies) {
-    rows.push(bonusRow('Terrain', formatTerrainKindHtml(origin.birthTerrainKind)));
-  }
-  if (bonuses.weatherEnabled) {
-    const tags = weatherTagsInDisplayOrder(bonuses.weatherTags);
-    if (tags.length > 0) rows.push(bonusRow('Weather', tags.map((tag) => formatWeatherIconHtml(tag)).join(', ')));
-  }
-  const body = rows.length > 0 ? rows.join('\n') : 'None';
-  return `<strong>Bonus:</strong>\n${body}`;
-}
-
-/**
  * Builds the unit-flag tooltip.
  *
- * Purpose: Every flag hover, including loss toasts, shows the unit name, its birth country, and the bonuses selected for the match.
+ * Purpose: Every flag hover, including loss toasts, lists the bonuses this unit carries. The unit name stays on the label beside the flag.
  * When to use: When creating a unit flag. The result is stored on the flag and assigned to the tooltip's `innerHTML`.
- * Expected outcome: The unit name and the labels Origin and Bonus are bold. Country, Terrain, and Weather are bold when those bonuses apply, and omitted when they do not. The birth hex code is omitted when the hex has none. A country with no name reads Unknown.
+ * Expected outcome: Bold `Bonuses:`, then one row per bonus the unit was born with. Country is the birth country, terrain is the birth terrain, and weather is the birth-hex tags. A line is omitted when that option is off or the unit has none. No selected bonus, or a unit with none of them, is `Bonuses:` and then `None`. Where the unit stands does not change the text.
  * Exceptions: None.
  */
 export function formatUnitOriginTooltipHtml(input: {
-  readonly unitName: string;
   readonly origin: UnitOrigin;
   readonly bonuses: UnitOriginTooltipBonuses;
 }): string {
-  const hexCode = getStrategicRes1HexCode(input.origin.birthH3Index);
-  const codeSuffix = hexCode ? ` (${escapeHtmlText(hexCode)})` : '';
-  const country = escapeHtmlText(input.origin.birthCountryName ?? 'Unknown');
-  const originLine = bonusRow('Origin', `${countryFlagImgHtml(input.origin.birthCountryCode)}${country}${codeSuffix}`);
-  return `<strong>${escapeHtmlText(input.unitName)}</strong>\n${originLine}\n\n${bonusesBlock(input.origin, input.bonuses)}`;
+  const rows: string[] = [];
+  const countryName = input.origin.birthCountryName?.trim() ?? '';
+  if (input.bonuses.countryEnabled && countryName.length > 0) {
+    rows.push(bonusRow('Country', `${countryFlagImgHtml(input.origin.birthCountryCode)}${escapeHtmlText(countryName)}`));
+  }
+  const terrainKind = input.origin.birthTerrainKind?.trim() ?? '';
+  if (input.bonuses.terrainEnabled && terrainKind.length > 0) {
+    rows.push(bonusRow('Terrain', formatTerrainKindHtml(terrainKind)));
+  }
+  if (input.bonuses.weatherEnabled) {
+    const tags = weatherTagsInDisplayOrder(input.bonuses.weatherTags);
+    if (tags.length > 0) rows.push(bonusRow('Weather', tags.map((tag) => formatWeatherIconHtml(tag)).join(', ')));
+  }
+  const body = rows.length > 0 ? rows.join('\n') : 'None';
+  return `<strong>Bonuses:</strong>\n${body}`;
 }

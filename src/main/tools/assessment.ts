@@ -23,7 +23,7 @@ import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { executeTacticalAssessUnit } from './tacticalAssessUnit';
 import { originBonusSettingsFromSnapshot } from '../../shared/originBonusRules';
 import { strategicOriginBonusHexFields, strategicOriginBonusUnitFields } from './originBonusAssessment';
-import { parseStartMonth, weatherAttackPenalty } from '../../shared/weatherBonusRules';
+import { parseStartMonth, weatherAttackPenalty, weatherBonusLevelOf } from '../../shared/weatherBonusRules';
 import type { WeatherState } from '../../shared/weatherBonusTypes';
 import { strategicRangeOnState } from '../weather/weatherMatch';
 import { displayWeatherForHex } from '../weather/weatherPackLoad';
@@ -140,7 +140,7 @@ function getPathDistanceAndTurns(
   blocked?: Set<string>,
   weatherTags?: readonly WeatherState[] | null
 ): { hexDistance: number; estimatedTurns: number } | null {
-  logTrace('assessment getPathDistanceAndTurns', { unitType, enabled: state.weatherBonusEnabled === true });
+  logTrace('assessment getPathDistanceAndTurns', { unitType, level: weatherBonusLevelOf(state) });
   const movementBudget = strategicRangeOnState(
     { unitType, h3Index: originH3, weatherTags },
     state
@@ -343,7 +343,7 @@ function executeAssessUnit(
       units: state.units,
       turnNumber: state.turnNumber,
       startMonth: state.startMonth,
-      weatherBonusEnabled: state.weatherBonusEnabled === true,
+      weatherBonusLevel: weatherBonusLevelOf(state),
       latLngByH3,
     });
     nearbyEnemies.push(...collected.nearbyEnemies);
@@ -509,15 +509,15 @@ function executeAssessUnit(
               kind: 'ranged',
               weatherAtUnit: weatherHere,
               tags: unit.weatherTags,
-              enabled: true,
-            }) === 1,
+              level: weatherBonusLevelOf(state),
+            }) > 0,
             airStrikePenalizedAtBase: weatherAttackPenalty({
               unitType: unit.unitType,
               kind: 'airStrike',
               weatherAtUnit: weatherHere,
               tags: unit.weatherTags,
-              enabled: true,
-            }) === 1,
+              level: weatherBonusLevelOf(state),
+            }) > 0,
           }
         : {}),
     },

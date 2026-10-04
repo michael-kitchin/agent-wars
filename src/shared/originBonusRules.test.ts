@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
+  formatOriginBonusTableCell,
   ORIGIN_BONUS_OFF,
   originBonusSources,
   originHitBonusFromSources,
@@ -76,7 +77,7 @@ test('the terrain test applies only in battles and normalizes kinds', () => {
   );
 });
 
-test('both reasons are listed but the bonus stays +1', () => {
+test('both reasons are listed but the bonus does not stack', () => {
   const sources = originBonusSources({
     settings: BOTH_ON,
     theater: 'tactical',
@@ -84,6 +85,16 @@ test('both reasons are listed but the bonus stays +1', () => {
     place: { countryName: 'France', terrainKind: 'plains' },
   });
   assert.deepEqual(sources, ['country', 'terrain']);
-  assert.equal(originHitBonusFromSources(sources), 1);
+  assert.equal(originHitBonusFromSources(sources, BOTH_ON), 1);
+});
+
+test('a High bonus adds 2 and the larger level wins when both reasons apply', () => {
+  const countryHigh: OriginBonusSettings = { ...BOTH_ON, countryBonusLevel: 'high', terrainBonusLevel: 'low' };
+  const terrainHigh: OriginBonusSettings = { ...BOTH_ON, countryBonusLevel: 'low', terrainBonusLevel: 'high' };
+  assert.equal(originHitBonusFromSources(['country'], countryHigh), 2);
+  assert.equal(originHitBonusFromSources(['country', 'terrain'], countryHigh), 2);
+  assert.equal(originHitBonusFromSources(['country'], terrainHigh), 1);
+  assert.equal(originHitBonusFromSources([], countryHigh), 0);
+  assert.equal(formatOriginBonusTableCell(['country'], 2), '+2 country');
 });
 

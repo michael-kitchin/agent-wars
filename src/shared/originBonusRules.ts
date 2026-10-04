@@ -2,11 +2,12 @@
  * Pure rules for the optional origin bonuses, shared by main-process dice, AI tools, and renderer tooltips.
  *
  * Purpose: One place decides whether a unit qualifies, so live dice, estimates, briefings, and tooltips never disagree.
- * When to use: Any code that needs to know whether a unit's roll gets the +1.
+ * When to use: Any code that needs to know whether a unit's roll gets a bonus, and how large it is.
  * Expected outcome: Deterministic results with no logging and no I/O.
  * Exceptions: None.
  */
 
+import { bonusLevelOf, type ActiveBonusLevel, type BonusLevel } from './bonusLevel';
 import type { GameStateSnapshot } from './ipc/gameStateTypes';
 import type {
   OriginBonusPlace,
@@ -21,14 +22,17 @@ import { effectiveRes4TerrainKindString, type TacticalBattleTerrainPick } from '
 import type { UnitOrigin } from './unitOriginTypes';
 
 /**
- * The amount a qualifying unit adds to its hit threshold.
+ * The amount a qualifying unit adds to its hit threshold, by bonus level.
  *
  * Purpose: Single source for the bonus size used by dice, estimates, rule text, and tooltips.
- * When to use: Building thresholds and any text that states the bonus.
- * Expected outcome: Always 1; the two bonuses do not stack.
+ * When to use: Only through `originHitBonusForSource`, which also handles an Off bonus.
+ * Expected outcome: 1 at Low and 2 at High. The highest printed attack is 3, so a threshold never passes 5 and a 6 always misses.
  * Exceptions: None.
  */
-export const ORIGIN_HIT_BONUS = 1 as const;
+export const ORIGIN_HIT_BONUS_BY_LEVEL: Readonly<Record<ActiveBonusLevel, Exclude<OriginHitBonus, 0>>> = Object.freeze({
+  low: 1,
+  high: 2,
+});
 
 /**
  * Settings with both bonuses off.
@@ -75,23 +79,78 @@ export function normalizeOriginTerrainKind(raw: string | null | undefined): Pipe
 }
 
 /**
- * Reads the two match flags from a game-state snapshot.
+ * Reads the match flags and levels from a game-state snapshot.
  *
- * Purpose: Snapshot flags are optional on fixtures; this turns them into strict booleans.
+ * Purpose: Snapshot flags are optional on fixtures; this turns them into strict booleans and keeps each level with its flag.
  * When to use: Tools, briefings, prompts, and the renderer, which all hold a snapshot rather than the database.
- * Expected outcome: Each flag is true only when the snapshot field is exactly `true`.
+ * Expected outcome: Each flag is true only when the snapshot field is exactly `true`. A level is copied only next to a true flag; the start month travels with the weather flag.
  * Exceptions: None.
  */
 export function originBonusSettingsFromSnapshot(
-  state: Pick<GameStateSnapshot, 'countryBonusEnabled' | 'terrainBonusEnabled' | 'weatherBonusEnabled' | 'startMonth'>
+  state: Pick<
+    GameStateSnapshot,
+    | 'countryBonusEnabled'
+    | 'terrainBonusEnabled'
+    | 'weatherBonusEnabled'
+    | 'startMonth'
+    | 'countryBonusLevel'
+    | 'terrainBonusLevel'
+    | 'weatherBonusLevel'
+  >
 ): OriginBonusSettings {
   return {
     countryBonusEnabled: state.countryBonusEnabled === true,
     terrainBonusEnabled: state.terrainBonusEnabled === true,
+    ...(state.countryBonusEnabled === true && state.countryBonusLevel ? { countryBonusLevel: state.countryBonusLevel } : {}),
+    ...(state.terrainBonusEnabled === true && state.terrainBonusLevel ? { terrainBonusLevel: state.terrainBonusLevel } : {}),
     ...(state.weatherBonusEnabled === true
-      ? { weatherBonusEnabled: true as const, startMonth: state.startMonth }
+      ? {
+          weatherBonusEnabled: true as const,
+          startMonth: state.startMonth,
+          ...(state.weatherBonusLevel ? { weatherBonusLevel: state.weatherBonusLevel } : {}),
+        }
       : {}),
   };
+}
+
+/**
+ * Builds match settings from the three new-game levels.
+ *
+ * Purpose: The new-game path chooses levels, while the rules read an on/off flag plus a level.
+ * When to use: When a new match starts, after each level has been parsed.
+ * Expected outcome: Each flag is `level !== 'off'`. Each level field is present only when its bonus is on. `startMonth` is copied as given.
+ * Exceptions: None.
+ */
+export function originBonusSettingsFromLevels(input: {
+  readonly country: BonusLevel;
+  readonly terrain: BonusLevel;
+  readonly weather: BonusLevel;
+  readonly startMonth?: number;
+}): OriginBonusSettings {
+  const { country, terrain, weather, startMonth } = input;
+  return {
+    countryBonusEnabled: country !== 'off',
+    terrainBonusEnabled: terrain !== 'off',
+    weatherBonusEnabled: weather !== 'off',
+    ...(country !== 'off' ? { countryBonusLevel: country } : {}),
+    ...(terrain !== 'off' ? { terrainBonusLevel: terrain } : {}),
+    ...(weather !== 'off' ? { weatherBonusLevel: weather } : {}),
+    startMonth,
+  };
+}
+
+/**
+ * Returns the level of one origin bonus.
+ *
+ * Purpose: The amount a qualifying unit adds depends on which bonus it qualifies for.
+ * When to use: With a source from `originBonusSources`, before looking up the amount.
+ * Expected outcome: `off` when that bonus is off; otherwise its level, or `low` when the settings carry none.
+ * Exceptions: None.
+ */
+export function originBonusLevelFor(settings: OriginBonusSettings, source: OriginBonusSource): BonusLevel {
+  return source === 'country'
+    ? bonusLevelOf(settings.countryBonusEnabled, settings.countryBonusLevel)
+    : bonusLevelOf(settings.terrainBonusEnabled, settings.terrainBonusLevel);
 }
 
 /**
@@ -123,27 +182,49 @@ export function originBonusSources(input: {
 }
 
 /**
+ * Returns the amount one origin bonus adds when a unit qualifies for it.
+ *
+ * Purpose: Country and terrain have separate levels, so each source has its own amount.
+ * When to use: Rule text that states one bonus, and `originHitBonusFromSources`.
+ * Expected outcome: 0 when that bonus is off; otherwise the `ORIGIN_HIT_BONUS_BY_LEVEL` amount for its level.
+ * Exceptions: None.
+ */
+export function originHitBonusForSource(settings: OriginBonusSettings, source: OriginBonusSource): OriginHitBonus {
+  const level = originBonusLevelFor(settings, source);
+  return level === 'off' ? 0 : ORIGIN_HIT_BONUS_BY_LEVEL[level];
+}
+
+/**
  * Converts qualifying reasons into the threshold bonus.
  *
  * Purpose: Enforces the no-stacking rule in one place.
- * When to use: After `originBonusSources`, before building a hit threshold.
- * Expected outcome: `1` when any reason applies, otherwise `0`.
+ * When to use: After `originBonusSources`, with the same settings, before building a hit threshold.
+ * Expected outcome: The largest amount among the reasons, so country High and terrain Low adds 2; `0` for an empty list.
  * Exceptions: None.
  */
-export function originHitBonusFromSources(sources: ReadonlyArray<OriginBonusSource>): OriginHitBonus {
-  return sources.length > 0 ? ORIGIN_HIT_BONUS : 0;
+export function originHitBonusFromSources(
+  sources: ReadonlyArray<OriginBonusSource>,
+  settings: OriginBonusSettings
+): OriginHitBonus {
+  return sources.reduce<OriginHitBonus>(
+    (best, source) => {
+      const amount = originHitBonusForSource(settings, source);
+      return amount > best ? amount : best;
+    },
+    0
+  );
 }
 
 /**
  * Builds the Bonus cell of the briefing's unit status table.
  *
  * Purpose: Keeps the table cell wording next to the other origin bonus text.
- * When to use: `buildUnitStatusTable` when the Bonus column is shown.
- * Expected outcome: `+1 country`, `+1 country, terrain`, or `—` when the unit does not qualify.
+ * When to use: `buildUnitStatusTable` when the Bonus column is shown, with the unit's sources and the amount they add.
+ * Expected outcome: `+1 country`, `+2 country, terrain`, and so on, or `—` when there are no sources or the amount is 0.
  * Exceptions: None.
  */
-export function formatOriginBonusTableCell(sources: ReadonlyArray<OriginBonusSource>): string {
-  return sources.length > 0 ? `+${ORIGIN_HIT_BONUS} ${sources.join(', ')}` : '—';
+export function formatOriginBonusTableCell(sources: ReadonlyArray<OriginBonusSource>, amount: OriginHitBonus): string {
+  return sources.length > 0 && amount > 0 ? `+${amount} ${sources.join(', ')}` : '—';
 }
 
 /**

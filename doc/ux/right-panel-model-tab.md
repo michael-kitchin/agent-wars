@@ -15,7 +15,7 @@ Shown when the Model tab is selected. This is the tab the panel starts on. The m
 - An API key field. The placeholder is "Set key and blur to save" until a key is saved, then "Saved API key". The field does not show the saved key as visible text after it is stored; it is a password field.
 - A cost readout for the current match, as a currency amount. A new match resets it to zero.
 - A model dropdown. It starts as "— Select model —" until models load. Each option shows the model name, then in brackets the combined prompt and completion price per million tokens and the model's reasoning levels, lowest first, abbreviated and separated by slashes, with the default level marked by an asterisk, for example `reasoning: None/Low/Med*/High`. Levels are abbreviated None, Min, Low, Med, High, Xhigh, and Max. A model that reports reasoning without listing levels shows `reasoning: <default level>` or `reasoning: default`.
-- A refresh control labeled "Refresh model list".
+- A refresh control labeled "Refresh model list". It, Run, and New are the same height as the model dropdown beside them.
 - A Run button. It is disabled, with the tip "Set API key and model to enable", until both a key and a model are set.
 - A New button labeled "New".
 - A reasoning effort dropdown on the row directly below the model dropdown, at the same width. It lists only the selected model's reasoning levels, as "High" and so on, and marks the model's default level "(default)". When the model has no default level, or no levels at all, an extra first option reads "Model default". The dropdown is disabled when the model offers fewer than two levels, and before models load.
@@ -28,7 +28,7 @@ Shown when the Model tab is selected. This is the tab the panel starts on. The m
 
 - When the player leaves the API key field, or changes it, the key is saved if the text changed. An empty key clears the saved placeholder. A non-empty key refreshes the model list.
 - When the player changes the model, that model is saved and the description tooltip clears if the choice is empty. The reasoning dropdown resets to the new model's default level, and any saved reasoning choice is cleared.
-- When the player changes the reasoning effort, the choice is saved with the model choice and survives a restart. Choosing the "(default)" level saves no override, so the model's own default applies. Later consultations send the chosen level. For high and above the model is also allowed a longer reply, when the model list reports the model's output limit.
+- When the player changes the reasoning effort, the choice is saved with the model choice and survives a restart. Choosing the "(default)" level saves no override, so the model's own default applies. Later consultations send the chosen level. Every level is allowed a reply as long as the model's advertised output limit when the model list reports one.
 - When the player clicks refresh, the model list reloads. A failure is written to the AI activity log.
 - When the player clicks Run and it is enabled, Run toggles. Pressed means opponent planning runs. Turning it on selects the Tools tab, clears any precomputed opponent plan, and may disable Ready until a plan is ready. Turning it off cancels an in-flight planning request and clears the precomputed plan.
 - When the player clicks New, the new-game overlay opens. See [new-game-dialog.md](new-game-dialog.md). New opens the overlay only during strategic planning. During a battle or resolution playback the click does nothing.

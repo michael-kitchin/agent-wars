@@ -81,4 +81,15 @@ test('withOriginHitBonus adds the field only to qualifying units', () => {
   assert.equal(out[0]!.originHitBonus, 1);
   assert.equal('originHitBonus' in out[1]!, false);
   assert.equal('originHitBonus' in units[0]!, false);
+  const high = withOriginHitBonus(units, (unitId) => (unitId === 'a' ? 2 : 0));
+  assert.equal(high[0]!.originHitBonus, 2);
+});
+
+test('the strategic lookup gives 2 with the country bonus at High', () => {
+  const lookup = createStrategicOriginHitBonusLookup({
+    settings: { ...COUNTRY_ONLY, countryBonusLevel: 'high' },
+    units: [{ id: 'u1', origin: FRENCH_COASTAL }],
+    countryNameAt: () => 'France',
+  });
+  assert.equal(lookup('u1', 'hex-fr'), 2);
 });

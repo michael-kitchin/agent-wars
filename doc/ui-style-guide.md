@@ -1,12 +1,12 @@
 # UI Style Guide
 
-*March 2026 target aesthetic; implementation-status note August 2026*
+*March 2026 target aesthetic; implementation-status note October 2026*
 
 ---
 
 This document defines UI aesthetics, control patterns, and application-specific guidelines for the grand strategy wargame. Use it for all UI and map chrome so the product reads as a coherent, serious strategy wargame.
 
-**Implementation status (2.4.0):** The live app is a map-first Electron window: Leaflet world map + canvas overlay, minimap, hex tooltips, stack callout, build-queue popup, OpenRouter side panel, lower-left toasts, WASD/arrow pan, wheel zoom, NATO-inspired SVG unit glyphs, and tactical-entry magnifiers on contested hexes. There is a single light cartographic theme (no dark-mode switch). Player colors are teal human `#115e59` and rose opponent `#9d174d` on background `#e0dcd4`. Unbuilt in this guide: save/load UI, replay strip, async turn-file exchange, diplomacy panel, in-app reference manual, and a documented full keyboard-shortcut overlay.
+**Implementation status (2.4.0):** The live app is a map-first Electron window: Leaflet world map + canvas overlay, minimap, hex tooltips, stack callout, build-queue popup, OpenRouter side panel, a lower-right update toast and an upper-right message toast, WASD/arrow pan, wheel zoom, NATO-inspired SVG unit glyphs, and tactical-entry magnifiers on contested hexes. The map stays the light cartographic theme (no dark-mode switch). Panels, popups, tooltips, and the message and update toasts use navy chrome `#1b2838` with off-white text so flags and weather icons separate from the pale terrain. Every button, including the map buttons, uses the Ready button's teal; text fields and dropdowns use a lighter teal so they read as editable. Player colors are teal human `#115e59` and rose opponent `#9d174d` on map background `#e0dcd4`. Unbuilt in this guide: save/load UI, replay strip, async turn-file exchange, diplomacy panel, in-app reference manual, and a documented full keyboard-shortcut overlay.
 
 When this guide and the running app disagree, the app wins until this file is updated.
 
@@ -31,18 +31,24 @@ When this guide and the running app disagree, the app wins until this file is up
 ### 1.3 Color
 
 - **Terrain (map):** Muted, topographic-style palette. Land: earth tones (tans, olives, soft browns). Water: cool blues/greys. Distinct but low-saturation hues for forest, mountain, desert, arctic so the map reads at a glance without looking garish.
-- **UI chrome:** Neutrals (greys, off-whites or dark greys depending on theme). Backgrounds should recede; borders and dividers subtle.
+- **UI chrome:** Navy panels, popups, and tooltips (`#1b2838`) with off-white text. Borders are a muted steel blue. Editable fields stay light. Legend and tooltip swatches are opaque colors in the same family as each map style, stronger than the translucent hex fills. Backgrounds should recede from the map; borders and dividers stay subtle.
 - **Accents:** Restrained. Use a limited set of accent colors for:
   - **Player identification** (e.g., faction color for unit outlines, control shading, minimap).
   - **State and alerts** (e.g., selected unit, pending order, combat, notification).
   - **Semantic states** (e.g., success/warning/error only where needed).
 - Avoid saturated primaries everywhere; accents should read clearly without dominating the map or panels.
 
-**Implemented palette (2.4.0, `src/renderer/core/constants.ts`). Suggested dual-theme rows below remain a target, not a second shipped theme:**
+**Implemented palette (2.4.0). Map colors live in `src/renderer/core/constants.ts`. Panel chrome tokens, and the shared button and field rules, are the `:root` variables in `static/shellChrome.css`. Map overlays and popups are in `static/overlayChrome.css`. Toasts and the new-game box are in `static/feedbackChrome.css`. The dual-theme rows below are a reference. Chrome is already the navy in the live table; those terrain rows are not a second map theme:**
 
 | Role | Live app | Notes |
 |------|----------|--------|
-| UI / map chrome bg | `#e0dcd4` | `BACKGROUND_COLOR` |
+| Map canvas bg | `#e0dcd4` | `BACKGROUND_COLOR` |
+| Panel, popup, tooltip, and toast bg | `#1b2838` | Sidebar, legend, hex tooltip, stack callout, build popup, new-game box, tactical-battles dialog, lower-right update toast, and upper-right message toast |
+| Chrome text / muted | `#f4f6f8` / `#b7c4d4` | Off-white body; blue-gray for secondary lines |
+| Chrome error text | `#f0a8a8` | On the navy surfaces only |
+| Button face / border / hover | `#115e59` / `#7dcec8` / `#3a6a8f` | Every button, styled like Ready, with white text. The Randomize AI home region button keeps the opponent rose. The home-region and starting-month randomize buttons match their dropdowns' height. The model-list refresh button matches the Run and New buttons beside it |
+| Button off / disabled | `#3b5654` / `#6b8a87` border | Dimmed teal with `#b5c9c7` text for disabled buttons, toggles that are off, and unselected tabs. A disabled Tools-tab toggle also fades |
+| Text field, dropdown, and checkbox | `#d4efec` / `#0f766e` border | Shared light teal with `#0b3b37` text, distinctly lighter than the button face. Placeholder text is `#456864`. A checkbox uses that same box, with a dark check. Disabled fields and checkboxes are `#9fb8b5` with `#243e3c` text |
 | Player 1 (human) | `#115e59` | Unit fill |
 | Player 2 (opponent) | `#9d174d` | Distinct from human |
 | Selection / slower / warning | `#a06020` | Range perimeter (ranged) |
@@ -61,7 +67,7 @@ When this guide and the running app disagree, the app wins until this file is up
 | Mountain | `#8a7a6a` | `#4a423a` | Stone / grey-brown |
 | Desert | `#c9b896` | `#6b5d4a` | Sandy, distinct from plains |
 | Arctic | `#d8dce4` | `#4a5058` | Cool grey, slight blue |
-| UI chrome bg | `#f0eeea` | `#2a2a2a` | Recedes from map |
+| UI chrome bg | — | `#1b2838` | Shipped panel, popup, and tooltip fill. `#2a2a2a` is an unused earlier suggestion. |
 | Player 1 accent | `#2e5a7b` | `#4a8abb` | Readable on terrain |
 | Player 2 accent | `#7b4a2e` | `#bb6a4a` | Distinct from P1 |
 | Selection / focus | `#c49b2e` | `#c49b2e` | High visibility |
@@ -177,7 +183,7 @@ When this guide and the running app disagree, the app wins until this file is up
 
 ### 3.6 Scenarios, Save/Load, and Onboarding
 
-- **New game (live):** Overlay with human/AI home-region selectors, Game size dropdown and cap badges, one row of Fog of war, Country bonus, and Terrain bonus checkboxes, and New game. The live scenario id is `region_vs_region`.
+- **New game (live):** Overlay with human/AI home-region selectors, Game size dropdown and cap badges, one row with a Fog of war checkbox and Country bonus, Terrain bonus, and Weather bonus dropdowns (Off, Low, High), a Starting month dropdown with a square randomize button matching the human home-region button, and New game. The live scenario id is `region_vs_region`.
 - **Save/Load:** **Not shipped.** Target: named saves, overwrite confirmation, auto-save visibility.
 - **End-game summary:** Live overlay reports winner and offers New game; territory-over-time charts are still target.
 - **Tutorial/onboarding:** Not shipped.
@@ -188,7 +194,7 @@ When this guide and the running app disagree, the app wins until this file is up
 
 ### 3.8 Theming and Display
 
-- **Light vs. dark:** Only the light cartographic theme is shipped. If a dark theme is added, test contrast for text and symbols on all terrain types.
+- **Light vs. dark:** The map is the light cartographic theme. Panels, popups, tooltips, and the message and update toasts are navy. There is no theme switch. If a second theme is added, test contrast for text and symbols on all terrain types.
 - **Window size:** Layout should adapt to reasonable desktop sizes (e.g., 1280×720 minimum target). Panels collapse or reflow so the map remains usable; avoid fixed widths that break on small or ultrawide screens.
 
 ---

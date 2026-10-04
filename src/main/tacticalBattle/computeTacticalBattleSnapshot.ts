@@ -545,7 +545,7 @@ export function computeTacticalBattleSnapshot(
       res4ChildH3Indexes: children,
       strategicTurnNumber: turnRow.turn_number,
       tacticalTurnNumber: 1,
-      ...(weatherOn && battleWeather ? { weatherBonusEnabled: true as const, weather: battleWeather } : {}),
+      ...(weatherOn && battleWeather ? { weatherBonusEnabled: true as const, weatherBonusLevel: weatherSettings.weatherBonusLevel ?? 'low', weather: battleWeather } : {}),
       strategicHexTerrain: hexRow.terrain,
       strategicHexTerrainKind: hexRow.terrain_kind,
       res4TerrainKindByH3,

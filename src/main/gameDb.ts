@@ -1531,7 +1531,7 @@ export function clearTacticalTurnNotes(battleId?: string): void {
  *
  * Purpose: Facade that binds this module's database helpers to `resetGame.ts`.
  * When to use: The `game:newGame` IPC handler.
- * Expected outcome: See `resetGameForNewMatch` in `gameDb/resetGame.ts`; missing bonus flags mean off.
+ * Expected outcome: See `resetGameForNewMatch` in `gameDb/resetGame.ts`; missing bonus levels mean off.
  * Exceptions: Propagates SQLite errors.
  */
 export function resetGameForNewMatch(options?: ResetGameForNewMatchOptions): void {

@@ -226,16 +226,6 @@ function maxThreatSeverity(
 }
 
 /**
- * True when the assessment lists at least one attack the unit could legally make this turn.
- *
- * Purpose: Distinguishes "covered by a standing order" from "has nothing to do". Those are not the same, and
- * conflating them is what let a unit with a critical threat and a legal shot render as `no (quiet)`.
- * When to use: The `Action needed` and Attention Flags decisions, in both coordinate modes.
- * Expected outcome: True for any `canAttackThisTurn` row whose `attackType` is not `none`; false when the list is
- * absent or holds only out-of-range rows.
- * Exceptions: None; unrecognised row shapes count as no attack.
- */
-/**
  * How many unit ids the available-attack Attention Flags bullet names before summarising the remainder.
  *
  * Purpose: The bullet has to be complete enough to act on without becoming a wall of ids on a large roster. Units
@@ -246,9 +236,44 @@ function maxThreatSeverity(
  */
 const ATTENTION_ARMED_UNITS_LISTED = 12;
 
+/**
+ * True when the assessment lists at least one attack the unit could legally make this turn.
+ *
+ * Purpose: Distinguishes "covered by a standing order" from "has nothing to do". Those are not the same, and
+ * conflating them is what let a unit with a critical threat and a legal shot render as `no (quiet)`.
+ * When to use: `needsAction` and `isQuiet`. The armed-units bullet uses `hasOrderableShotThisTurn`, because a
+ * strategic infantry contact is a legal fight and still not a ranged attack.
+ * Expected outcome: True for any `canAttackThisTurn` row whose `attackType` is not `none`; false when the list is
+ * absent or holds only out-of-range rows.
+ * Exceptions: None; unrecognised row shapes count as no attack.
+ */
 function hasLegalAttackThisTurn(assessment: UnitAssessmentResult): boolean {
   const rows = (assessment.result.canAttackThisTurn ?? []) as Array<{ attackType?: unknown }>;
   return rows.some((r) => typeof r.attackType === 'string' && r.attackType !== 'none');
+}
+
+/**
+ * True when the armed-units bullet can tell the model to order a shot for this unit.
+ *
+ * Purpose: Same-hex contact is stored as `melee`. Strategic infantry have no ranged attack, so naming them in
+ * "order a ranged_attack or air strike" contradicts the combat rules. Armor and naval still qualify at distance 0,
+ * because that hex is inside their strategic range, and air qualifies because the order is a strike.
+ * When to use: The armed-units Attention Flags bullet, and the closer bullets that skip units already on that list.
+ * Expected outcome: Strategic infantry are omitted. Other strategic units with any in-range row are included.
+ * A tactical row counts only when its attack type is `ranged` or `air_strike`.
+ * Exceptions: None.
+ */
+function hasOrderableShotThisTurn(
+  assessment: UnitAssessmentResult,
+  coordinateMode: 'strategic' | 'tactical'
+): boolean {
+  const rows = (assessment.result.canAttackThisTurn ?? []) as Array<{ attackType?: unknown }>;
+  const shots = rows.filter((row) => typeof row.attackType === 'string' && row.attackType !== 'none');
+  if (shots.length === 0) return false;
+  if (coordinateMode === 'tactical') {
+    return shots.some((row) => row.attackType === 'ranged' || row.attackType === 'air_strike');
+  }
+  return assessment.result.unit?.type !== 'infantry';
 }
 
 /**
@@ -422,7 +447,7 @@ export function buildUnitStatusTable(
     const selfLabel = formatUnitDisplayRef(a.unitId);
     const actionCell =
       ctx.mode === 'strategic' && isQuiet(a, standingOrdersActive) ? `${action} (quiet)` : action;
-    const bonusCell = showBonus ? ` ${formatOriginBonusTableCell(a.result.unit?.originBonusHere ?? [])} |` : '';
+    const bonusCell = showBonus ? ` ${formatOriginBonusTableCell(a.result.unit?.originBonusHere ?? [], a.result.unit?.originBonusAmount ?? 0)} |` : '';
     const weatherTags = a.result.unit?.weatherTags;
     const weatherHere = a.result.unit?.weatherHere;
     const weatherCell = showWeather
@@ -502,7 +527,7 @@ export function buildAttentionFlags(
     if (!needsAction(a, soActive, coordinateMode === 'strategic')) continue;
     const threats = a.result.threats ?? [];
     const nearest = a.result.nearbyEnemies?.[0];
-    if (hasLegalAttackThisTurn(a)) armedUnitRefs.push(formatUnitDisplayRef(a.unitId));
+    if (hasOrderableShotThisTurn(a, coordinateMode)) armedUnitRefs.push(formatUnitDisplayRef(a.unitId));
     if (!soActive) {
       const sev = maxThreatSeverity(threats);
       if ((sev === 'critical' || sev === 'moderate') && nearest) {
@@ -516,7 +541,7 @@ export function buildAttentionFlags(
     const order = a.result.unit?.currentStandingOrder as { status?: string } | null | undefined;
     // Shooters already occupy the armed-units aggregate. Emitting them again as closers lets naval/air
     // shots fill the reserved threat slots and hide armor that can only move/melee this turn.
-    if (canCloseThisTurn(a, coordinateMode === 'strategic') && hasActionableThreat(a) && nearest && !hasLegalAttackThisTurn(a)) {
+    if (canCloseThisTurn(a, coordinateMode === 'strategic') && hasActionableThreat(a) && nearest && !hasOrderableShotThisTurn(a, coordinateMode)) {
       const sev = maxThreatSeverity(threats);
       candidates.push({
         rank: severityRank(sev),
@@ -537,7 +562,7 @@ export function buildAttentionFlags(
       standingMarchRecedesFromNearestEnemy(a) &&
       hasActionableThreat(a) &&
       nearest &&
-      !hasLegalAttackThisTurn(a)
+      !hasOrderableShotThisTurn(a, coordinateMode)
     ) {
       candidates.push({
         rank: 1,
@@ -556,7 +581,7 @@ export function buildAttentionFlags(
     const overflow = armedUnitRefs.length - listed.length;
     const period = coordinateMode === 'tactical' ? 'beat' : 'turn';
     const hasAirShooter = unitAssessments.some(
-      (row) => row.result.unit?.type === 'air' && hasLegalAttackThisTurn(row)
+      (row) => row.result.unit?.type === 'air' && hasOrderableShotThisTurn(row, coordinateMode)
     );
     const attackKinds = hasAirShooter ? 'a ranged_attack or air strike' : 'a ranged_attack';
     candidates.push({

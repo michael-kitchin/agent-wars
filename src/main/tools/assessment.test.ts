@@ -552,12 +552,13 @@ function testCountryBonusFieldsFollowFlag(): void {
 
   const unitOn = assess(on, coordMap, 'opponent-armor-1').unit as Record<string, unknown>;
   assert.deepStrictEqual(unitOn.originBonusHere, ['country']);
+  assert.strictEqual(unitOn.originBonusAmount, 1);
   assert.strictEqual(unitOn.birthCountry, 'France');
   assert.strictEqual(assessHex(on).country, 'France');
 
   const off: GameStateSnapshot = { ...state, hexes };
   const unitOff = assess(off, coordMap, 'opponent-armor-1').unit as Record<string, unknown>;
-  assert.ok(!('originBonusHere' in unitOff) && !('birthCountry' in unitOff));
+  assert.ok(!('originBonusHere' in unitOff) && !('originBonusAmount' in unitOff) && !('birthCountry' in unitOff));
   assert.ok(!('country' in assessHex(off)));
 }
 

@@ -204,7 +204,8 @@ From `source-inventory.md` section 3, derived from code only.
 | Tactical beat consulted or skipped | 6.3 |
 | Previous consultation exhausted its tool budget | 6.4 |
 | Briefing present or absent | 7, combinations |
-| Country bonus and terrain bonus flags | 8 |
+| Country bonus and terrain bonus levels | 8 |
+| Weather bonus level | 9 |
 
 ## 6. Facts the builders now carry (formerly listed as gaps)
 

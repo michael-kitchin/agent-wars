@@ -1,4 +1,5 @@
 import type { OriginHitBonus } from '../shared/originBonusTypes';
+import type { WeatherAttackPenalty } from '../shared/weatherBonusTypes';
 
 /**
  * Documents the `CombatUnit` interface as a named contract surface (export interface CombatUnit).
@@ -57,21 +58,21 @@ displayOrder?: number;
     /**
    * Origin bonus added to this unit's hit thresholds in the current combat phase.
    *
-   * Contract: Set when the unit array is built for a phase, from the unit's position in that phase; present only when it is 1, and absent means 0.
+   * Contract: Set when the unit array is built for a phase, from the unit's position in that phase; present only when it is 1 or 2, and absent means 0.
    * When to use: Read through `attackHitThreshold` / `defenseHitThreshold`; set through `withOriginHitBonus`.
-   * Expected outcome: Each roll this unit makes hits on one more face; casualty order ignores it.
+   * Expected outcome: Each roll this unit makes hits on that many more faces; casualty order ignores it.
    * Exceptions: None.
    */
 readonly originHitBonus?: OriginHitBonus;
   /**
    * Points removed from this unit's printed attack before the origin bonus.
    *
-   * Contract: Armor ranged fire and air strikes lose one point in weather the unit lacks.
+   * Contract: Armor ranged fire and air strikes lose 1 (Low) or 2 (High) in weather the unit lacks.
    * When to use: Set only on ranged and air-strike rows. Melee rows leave it unset.
    * Expected outcome: `attackHitThreshold` floors the printed attack at 1, then adds the origin bonus.
    * Exceptions: None.
    */
-  readonly weatherAttackPenalty?: 0 | 1;
+  readonly weatherAttackPenalty?: WeatherAttackPenalty;
   /**
    * Acclimation tags carried into a roll.
    *

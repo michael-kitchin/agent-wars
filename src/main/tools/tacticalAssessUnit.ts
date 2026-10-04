@@ -21,7 +21,7 @@ import { gridHopDistanceBetween } from './assessUnitProximity';
 import { h3ToLatLng, type LatLng, type LatLngMap } from './h3LatLng';
 import { estimateTacticalMarch, type TacticalMarchEstimate } from './tacticalMarchEstimate';
 import { tacticalOriginBonusUnitFields } from './originBonusAssessment';
-import { weatherAttackPenalty } from '../../shared/weatherBonusRules';
+import { weatherAttackPenalty, weatherBonusLevelOf } from '../../shared/weatherBonusRules';
 import type { OriginBonusSettings } from '../../shared/originBonusTypes';
 
 /**
@@ -363,16 +363,16 @@ export function executeTacticalAssessUnit(args: TacticalAssessUnitArgs): {
               kind: 'ranged',
               weatherAtUnit: battle.weather,
               tags: self.weatherTags,
-              enabled: true,
-            }) === 1,
+              level: weatherBonusLevelOf(battle),
+            }) > 0,
             airStrikePenalizedAtBase: weatherAttackPenalty({
               unitType: self.unitType,
               kind: 'airStrike',
               weatherAtUnit: battle.weather,
               weatherAtTarget: battle.weather,
               tags: self.weatherTags,
-              enabled: true,
-            }) === 1,
+              level: weatherBonusLevelOf(battle),
+            }) > 0,
           }
         : {}),
     },

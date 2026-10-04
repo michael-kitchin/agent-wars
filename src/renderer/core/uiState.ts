@@ -5,7 +5,7 @@ import { rendererSharedState as S } from './state';
 import { setUnitNameContent } from './unitOriginFlags';
 import { initializeScenarioRegionSelectorsOnOverlayOpen } from '../gameplay/newGameRegionUi';
 import { syncGameSizeCapPreview } from '../gameplay/newGameSizeUi';
-import { resetNewGameOptionCheckboxes } from '../gameplay/newGameOptionsUi';
+import { resetNewGameOptionControls } from '../gameplay/newGameOptionsUi';
 
 /**
  * Title-cases the strategic phase id from main (`planning` / `resolution`) for the sidebar line.
@@ -112,7 +112,8 @@ export function setMainUIControlsEnabled(enabled: boolean): void {
  * Purpose: Keeps the overlay up while there is no game or the game is over, and the main controls disabled with it.
  * When to use: After every state refresh.
  * Expected outcome: With a live game the overlay hides and controls are enabled. Otherwise the overlay shows a
- *   win, loss, or start message, and the option checkboxes are checked again on every call while it shows.
+ *   win, loss, or start message. Fog of war and the bonus dropdowns return to their defaults on every call while
+ *   it shows. The home regions and the starting month are drawn only when the overlay opens.
  * Exceptions: None.
  */
 export function updateGameOverUI(
@@ -138,7 +139,7 @@ export function updateGameOverUI(
   }
 
   overlay?.classList.remove('hidden');
-  resetNewGameOptionCheckboxes();
+  resetNewGameOptionControls();
   if (wasHidden) {
     void initializeScenarioRegionSelectorsOnOverlayOpen();
   }

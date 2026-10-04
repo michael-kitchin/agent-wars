@@ -3,10 +3,11 @@
  *
  * Purpose: Adds a unit's origin bonus to its printed attack or defense value in one place, so every roll site agrees.
  * When to use: At every `roll <= threshold` hit test on a `CombatUnit`. Casualty sorts keep `getDefense`.
- * Expected outcome: The printed value, plus 1 when the unit carries `originHitBonus`.
+ * Expected outcome: The printed value, less any weather penalty on attack, plus the unit's `originHitBonus` (1 at Low, 2 at High).
  * Exceptions: None.
  */
 import type { OriginHitBonus } from '../shared/originBonusTypes';
+import type { WeatherAttackPenalty } from '../shared/weatherBonusTypes';
 import { getAttack, getDefense } from './combatConstants';
 import { logTrace } from './logger';
 
@@ -40,12 +41,12 @@ export interface HitThresholdUnit {
   /**
    * Points removed from the printed attack before the origin bonus.
    *
-   * Contract: Only `1` changes the threshold. Absent and `0` leave the printed attack.
+   * Contract: Absent and `0` leave the printed attack; `1` (Low) and `2` (High) lower it.
    * When to use: Ranged and air-strike rows. Defense ignores it.
    * Expected outcome: The printed attack is at least 1 after the penalty, then the origin bonus is added.
    * Exceptions: None.
    */
-  readonly weatherAttackPenalty?: 0 | 1;
+  readonly weatherAttackPenalty?: WeatherAttackPenalty;
 }
 
 /**
@@ -58,7 +59,7 @@ export interface HitThresholdUnit {
  */
 export function attackHitThreshold(unit: HitThresholdUnit): number {
   const printed = getAttack(unit.unitType);
-  const penalty = unit.weatherAttackPenalty === 1 ? 1 : 0;
+  const penalty = unit.weatherAttackPenalty ?? 0;
   const threshold = Math.max(1, printed - penalty) + (unit.originHitBonus ?? 0);
   logTrace('combatHitThresholds attackHitThreshold', { unitType: unit.unitType, penalty, threshold });
   return threshold;

@@ -261,7 +261,7 @@ export function updateRangedSidebar(deps: TacticalOrderDeps): void {
   if (S.pendingRangedAttacks.length === 0) {
     const span = document.createElement('span');
     span.textContent = 'None';
-    span.style.color = '#666';
+    span.className = 'chrome-muted';
     listEl.appendChild(span);
   } else {
     for (const r of S.pendingRangedAttacks) {
@@ -284,7 +284,7 @@ export function updateRangedSidebar(deps: TacticalOrderDeps): void {
     if (S.pendingAirStrikes.length === 0) {
       const span = document.createElement('span');
       span.textContent = 'None';
-      span.style.color = '#666';
+      span.className = 'chrome-muted';
       strikeListEl.appendChild(span);
     } else {
       for (const strike of S.pendingAirStrikes) {

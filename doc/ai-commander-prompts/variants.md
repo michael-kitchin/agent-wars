@@ -288,20 +288,20 @@ Each row is a pair of gates that would otherwise fight. The resolution column ma
 
 ## 8. Origin bonuses
 
-Gate: `state.countryBonusEnabled` and `state.terrainBonusEnabled`, read through `originBonusSettingsFromSnapshot` into `GameRuleTextGates.originBonusSettings`. On the strategic map only the country bonus applies; in battle either flag applies. With no applicable flag, every surface is byte-for-byte unchanged.
+Gate: `state.countryBonusEnabled` and `state.terrainBonusEnabled` with their levels (`countryBonusLevel`, `terrainBonusLevel`), read through `originBonusSettingsFromSnapshot` into `GameRuleTextGates.originBonusSettings`. On the strategic map only the country bonus applies; in battle either flag applies. With no applicable flag, every surface is byte-for-byte unchanged. Low reads exactly as the on-state did before levels existed. High changes only the amounts: the rule text says `adds 2`, the stacking sentence names the larger amount, the `Bonus` cell reads `+2 …`, and `originBonus` and `originBonusAmount` report 2.
 
 | Surface | Contract |
 | --- | --- |
 | system | The combat paragraph adds `buildOriginBonusRule` after the casualty rule. The Unit Status table gains a `Bonus` column after `Hex`. With the country bonus on, Supplemental Hex Intelligence bullets append the hex's country. |
 | user | unchanged |
-| tools | Names, descriptions, and schemas unchanged. `estimate_combat` reports effective values and `originBonus`; `assess_unit` adds `originBonusHere`, `birthCountry`, and in battle `birthTerrain`; `assess_hex` adds `country`. |
+| tools | Names, descriptions, and schemas unchanged. `estimate_combat` reports effective values and `originBonus` (1 or 2); `assess_unit` adds `originBonusHere`, `originBonusAmount`, `birthCountry`, and in battle `birthTerrain`; `assess_hex` adds `country`. |
 | envelope | unchanged |
 | coaching | unchanged |
-| empty-state | A unit that does not qualify reads `—` in the `Bonus` column and `[]` in `originBonusHere`. |
+| empty-state | A unit that does not qualify reads `—` in the `Bonus` column, `[]` in `originBonusHere`, and 0 in `originBonusAmount`. |
 
 ## 9. Weather bonus
 
-Gate: `state.weatherBonusEnabled`. With the flag off, prompt text is unchanged and assessment results omit weather fields.
+Gate: `state.weatherBonusEnabled` with its level (`weatherBonusLevel`, read through `weatherBonusLevelOf`). With the flag off, prompt text is unchanged and assessment results omit weather fields. Low reads exactly as the on-state did before levels existed. High changes only the weather lists and amounts in `buildWeatherRule`, which come from the tables in `src/shared/weatherBonusRules.ts`; `rangedAttackPenalized` and `airStrikePenalizedAtBase` stay booleans that mean any penalty.
 
 | Surface | Contract |
 | --- | --- |

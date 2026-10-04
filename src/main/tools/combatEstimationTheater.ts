@@ -11,7 +11,8 @@
 import type { GameStateSnapshot } from '../gameDb';
 import type { CombatUnit } from '../combatUnitTypes';
 import { weatherPenaltyForRoll } from '../weather/weatherMatch';
-import { weatherAttackPenalty } from '../../shared/weatherBonusRules';
+import { weatherAttackPenalty, weatherBonusLevelOf } from '../../shared/weatherBonusRules';
+import type { WeatherAttackPenalty } from '../../shared/weatherBonusTypes';
 import { getRange } from '../combatConstants';
 import { hasIntactAirportAtStrategicAirBase } from '../returnFireAirportLookup';
 import type { ReturnFireEligibilityContext } from '../../shared/returnFireEligibility';
@@ -137,10 +138,10 @@ export interface CombatEstimationTheater {
    *
    * Contract: 0 for melee and when the weather bonus is off.
    * When to use: Before `attackHitThreshold` on ranged attackers, including air strikes estimated as ranged.
-   * Expected outcome: 0 or 1, matching resolution.
+   * Expected outcome: 0, 1 at Low, or 2 at High, matching resolution.
    * Exceptions: None.
    */
-  weatherAttackPenaltyFor(unit: CombatUnit, targetH3: string, engagement: CombatEstimationEngagementType): 0 | 1;
+  weatherAttackPenaltyFor(unit: CombatUnit, targetH3: string, engagement: CombatEstimationEngagementType): WeatherAttackPenalty;
   findUnit(unitId: string, engagementType: CombatEstimationEngagementType): CombatEstimationUnitLookup;
   /**
    * Lists units standing on one cell for an engagement.
@@ -183,7 +184,7 @@ export interface CombatEstimationTheater {
    *
    * Contract: Same matching rules as live dice in this theater; unknown ids give 0.
    * When to use: Side builders, with the cell where the unit would roll.
-   * Expected outcome: 0 or 1.
+   * Expected outcome: 0, 1, or 2.
    * Exceptions: None.
    */
   readonly originHitBonusAt: OriginHitBonusLookup;
@@ -235,7 +236,7 @@ export function buildStrategicCombatEstimationTheater(state: GameStateSnapshot):
       return weatherPenaltyForRoll({
         unitType: unit.unitType,
         kind: unit.unitType === 'air' ? 'airStrike' : 'ranged',
-        enabled: state.weatherBonusEnabled === true,
+        level: weatherBonusLevelOf(state),
         turnNumber: state.turnNumber,
         startMonth: state.startMonth ?? 1,
         unitH3Index: unit.h3Index,
@@ -313,7 +314,7 @@ export function buildTacticalCombatEstimationTheater(
         kind: 'ranged',
         weatherAtUnit: battle.weather,
         tags: unit.weatherTags,
-        enabled: battle.weatherBonusEnabled === true,
+        level: weatherBonusLevelOf(battle),
       });
     },
     returnFireContext: buildTacticalReturnFireContext(battle),

@@ -13,7 +13,7 @@ Shown with the right panel in every mode where the panel is visible, whichever t
 ## Information Displayed
 
 - One line per event, prefixed with the local time.
-- Error lines are distinguished from ordinary lines.
+- Error lines use the light-red chrome error text from the [UI style guide](../ui-style-guide.md). Ordinary lines use the chrome text.
 - Lines include consultation results, ignored stale consultations, model-list failures, failures to load or save the reasoning effort, standing-order notices, and a one-line copy of a turn-update toast. That copy is plain text and has no origin flags.
 - An ordinary line, not an error line, appears when a provider rejects a consultation's structured JSON request. The request is retried once without it, so the line does not mean the consultation failed. Anthropic models currently produce this line once per session, on their first request that carries the schema (normally the first request after the model's first tool call), because the envelope schema uses `anyOf` and exceeds Anthropic's schema limits.
 - An ordinary line, not an error line, appears when a provider rejects a required tool call. The request is retried once with automatic tool choice, so the line does not mean the consultation failed. Claude served by Amazon Bedrock produces this line once per session.

@@ -87,7 +87,7 @@ name?: string;
    * Limits reported for the model's primary provider.
    *
    * Contract: Present only when at least one usable limit was reported.
-   * When to use: Capping completion budgets that scale with reasoning effort.
+   * When to use: Choosing the order-flow `max_tokens` ceiling.
    * Expected outcome: Read-only limits; missing values mean the limit is unknown.
    * Exceptions: None.
    */
@@ -96,8 +96,8 @@ name?: string;
      * Largest completion (`max_tokens`) the primary provider accepts for this model.
      *
      * Contract: Positive integer when set.
-     * When to use: Upper bound for reasoning-scaled completion budgets.
-     * Expected outcome: Missing means unknown, and callers must not scale budgets.
+     * When to use: The order-flow `max_tokens` for every reasoning level when this value is set.
+     * Expected outcome: Missing means unknown, and callers use the order-flow base budget.
      * Exceptions: None.
      */
     readonly max_completion_tokens?: number;

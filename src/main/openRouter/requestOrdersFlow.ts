@@ -340,8 +340,8 @@ export async function requestOrdersFlow(
 
   /**
    * Both tactical and strategic final-json passes can emit large `orders[]` (many units + subscriptions + production).
-   * Prefer a high completion budget (raised for high reasoning efforts), but clamp to any session affordable cap
-   * learned from OpenRouter 402s.
+   * The profile budget is the model's advertised output limit, or the order-flow base when that limit is missing,
+   * then clamped to any session affordable cap learned from OpenRouter 402s.
    */
   const resolveOrderFlowMaxTokens = (): number =>
     resolveEffectiveOpenRouterCompletionMaxTokens(requestProfile.preferredCompletionMaxTokens);

@@ -33,8 +33,15 @@ import {
   TACTICAL_TRANSPORT_RAIL_BUDGET_MULTIPLIER,
   TACTICAL_TRANSPORT_ROAD_BUDGET_MULTIPLIER,
 } from '../../../shared/tacticalRes4TransportLink';
-import { ORIGIN_HIT_BONUS } from '../../../shared/originBonusRules';
+import { originHitBonusForSource } from '../../../shared/originBonusRules';
 import type { OriginBonusSettings } from '../../../shared/originBonusTypes';
+import {
+  TACTICAL_WEATHER_BUDGET_CAP,
+  WEATHER_ATTACK_PENALTY_BY_LEVEL,
+  WEATHER_SLOWING_STATES,
+  weatherBonusLevelOf,
+} from '../../../shared/weatherBonusRules';
+import type { WeatherState } from '../../../shared/weatherBonusTypes';
 import type { PromptCoordinateMode } from './envelopeContract';
 
 /**
@@ -178,8 +185,8 @@ export function buildCasualtySortRule(): string {
  * Purpose: With a flag on, units roll better at home; the model must know this to weigh fights and estimates.
  * When to use: Combat paragraph right after the casualty rule.
  * Expected outcome: Null when no flag applies (terrain alone does nothing on the strategic map); otherwise the
- * applicable clauses, the no-stacking note when both apply, the air base note when air exists, and the
- * unchanged casualty order.
+ * applicable clauses, each stating that bonus's level amount, the no-stacking note with the larger amount when both
+ * apply, the air base note when air exists, and the unchanged casualty order.
  * Exceptions: None.
  */
 export function buildOriginBonusRule(gates: GameRuleTextGates): string | null {
@@ -190,21 +197,25 @@ export function buildOriginBonusRule(gates: GameRuleTextGates): string | null {
   if (!countryBonusEnabled && !terrainApplies) return null;
   const place = tactical ? 'cell' : 'hex';
   const onPlace = tactical ? 'on a cell' : 'in a hex';
-  const rollClause = `adds ${ORIGIN_HIT_BONUS} to every attack or defense value it rolls there`;
+  const countryAmount = originHitBonusForSource(gates.originBonusSettings, 'country');
+  const terrainAmount = originHitBonusForSource(gates.originBonusSettings, 'terrain');
+  const rollClause = (amount: number): string => `adds ${amount} to every attack or defense value it rolls there`;
   const parts: string[] = [];
   if (countryBonusEnabled) {
     const strategicDetail = tactical
       ? ''
       : ', including ranged fire, return fire, melee, and air-strike counter-fire';
-    parts.push(`Country bonus is on: a unit ${onPlace} whose country is its birth country ${rollClause}${strategicDetail}.`);
+    parts.push(
+      `Country bonus is on: a unit ${onPlace} whose country is its birth country ${rollClause(countryAmount)}${strategicDetail}.`
+    );
   }
   if (terrainApplies) {
     parts.push(
-      `Terrain bonus is on: a unit on a cell whose terrain kind matches its birth terrain kind ${rollClause}; urban and rubble do not change a cell's terrain kind.`
+      `Terrain bonus is on: a unit on a cell whose terrain kind matches its birth terrain kind ${rollClause(terrainAmount)}; urban and rubble do not change a cell's terrain kind.`
     );
   }
   if (countryBonusEnabled && terrainApplies) {
-    parts.push(`The two bonuses do not stack; the most is +${ORIGIN_HIT_BONUS}.`);
+    parts.push(`The two bonuses do not stack; the most is +${Math.max(countryAmount, terrainAmount)}.`);
   }
   if (gates.hasAirUnits) parts.push(`An air unit qualifies by the ${place} of its base, whatever it strikes.`);
   parts.push('Casualty order still uses the printed defense values.');
@@ -212,22 +223,41 @@ export function buildOriginBonusRule(gates: GameRuleTextGates): string | null {
 }
 
 /**
+ * Joins weather names into a prompt list.
+ *
+ * Purpose: The slowing-weather lists come from a table, so the sentence must read naturally for one, two, or three names.
+ * When to use: `buildWeatherRule` only.
+ * Expected outcome: `snow`, `snow or rain`, or `snow, rain, or heat`, in the order given.
+ * Exceptions: None.
+ */
+function formatWeatherList(states: ReadonlyArray<WeatherState>): string {
+  if (states.length <= 2) return states.join(' or ');
+  return `${states.slice(0, -1).join(', ')}, or ${states[states.length - 1]}`;
+}
+
+/**
  * Weather penalty sentence for a match that has the weather bonus on.
  *
  * Purpose: The model must know movement and attack are reduced, and that tags cancel the reduction.
  * When to use: Combat paragraph after the origin bonus sentence.
- * Expected outcome: Null when the flag is off, so the paragraph stays unchanged.
+ * Expected outcome: Null when the flag is off, so the paragraph stays unchanged. Otherwise the slowing weather, the
+ * battle budget cap, and the attack penalty for the match's level, read from the weather rule tables.
  * Exceptions: None.
  */
 export function buildWeatherRule(gates: GameRuleTextGates): string | null {
-  logTrace('promptSpec buildWeatherRule', { weatherBonusEnabled: gates.originBonusSettings.weatherBonusEnabled === true });
-  if (gates.originBonusSettings.weatherBonusEnabled !== true) return null;
+  const level = weatherBonusLevelOf(gates.originBonusSettings);
+  logTrace('promptSpec buildWeatherRule', { level });
+  if (gates.originBonusSettings.weatherBonusEnabled !== true || level === 'off') return null;
+  const armor = formatWeatherList(WEATHER_SLOWING_STATES[level].armor ?? []);
+  const naval = formatWeatherList(WEATHER_SLOWING_STATES[level].naval ?? []);
+  const budget = TACTICAL_WEATHER_BUDGET_CAP[level];
+  const penalty = WEATHER_ATTACK_PENALTY_BY_LEVEL[level];
   return (
     'Weather bonus is on: the month is on the turn line and every beat of a battle shares the enclosing hex\'s weather. ' +
-    'Armor strategic movement is 1 in snow or rain, and naval strategic movement is 1 in snow, unless the unit is tagged for that weather. ' +
-    'In battle, armor\'s point budget is 2 in snow or rain and naval\'s is 2 in snow; infantry pays 2 to enter open ground in snow or rain. ' +
-    'Armor ranged attack is 1 lower in snow or heat, including return fire and air-strike counter-fire. ' +
-    'An air strike is 1 lower once when its base or its target is snow, rain, or heat the unit lacks. ' +
+    `Armor strategic movement is 1 in ${armor}, and naval strategic movement is 1 in ${naval}, unless the unit is tagged for that weather. ` +
+    `In battle, armor's point budget is ${budget} in ${armor} and naval's is ${budget} in ${naval}; infantry pays 2 to enter open ground in snow or rain. ` +
+    `Armor ranged attack is ${penalty} lower in snow or heat, including return fire and air-strike counter-fire. ` +
+    `An air strike is ${penalty} lower once when its base or its target is snow, rain, or heat the unit lacks. ` +
     'A strategic ferry into snow is 2 hexes unless the unit is tagged for snow. ' +
     'Defense, melee, and casualty order keep their printed values. A tag is earned by the birth hex. ' +
     'The Unit Status Weather column names the weather where that unit stands. Birth tags, when the unit has any, follow in parentheses.'

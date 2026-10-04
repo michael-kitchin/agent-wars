@@ -15,7 +15,7 @@ import {
   isHexOwnershipVisibleToPerspective,
   resolveHomeRegionOwnerIdentity,
 } from '../../shared/homeRegionRules';
-import { computeTerrainEffectsLineHtml, joinHexEffectsLine } from '../../shared/terrainEffectsForTooltip';
+import { computeTerrainEffectsLineHtml } from '../../shared/terrainEffectsForTooltip';
 import { formatTerrainKindHtml, formatTerrainNameListHtml } from '../../shared/terrainSwatchHtml';
 import { formatWeatherIconHtml } from '../../shared/weatherIcons';
 import { TOOLTIP_SECTION_GAP_HTML } from '../../shared/tooltipSectionGap';
@@ -147,25 +147,23 @@ function parentStrategicHex(h3Index: string): string | null {
 /**
  * Builds the Effects line for a world hex or a detail cell.
  *
- * Purpose: Terrain effects stay on res4 cells. Snow, rain, and heat are named, with their icon, on world hexes and detail cells.
+ * Purpose: Terrain effects stay on res4 cells. Weather is the Weather line, so this line does not repeat it.
  * When to use: From `formatTerrainTooltipHtml`.
- * Expected outcome: Terrain effects, then the weather chip. Null when the cell has no terrain effects and the weather is mild, missing, or off.
+ * Expected outcome: The cell's tactical terrain effects, or null for a world hex and for a cell with none.
  * Exceptions: None.
  */
 function effectsLine(state: TerrainTooltipState, namingTarget: NamingLookupTarget | null): string | null {
-  const terrain = namingTarget?.resolution === 4
-    ? computeTerrainEffectsLineHtml({
-      terrainKind: state.terrainKind,
-      parentTerrain: state.parentTerrain,
-      parentTerrainKind: state.parentTerrainKind,
-      isUrban: state.isUrban,
-      isRubble: state.isRubble,
-      isSeaport: state.isSeaport,
-      hasRoad: state.hasRoad,
-      hasRail: state.hasRail,
-    })
-    : null;
-  return joinHexEffectsLine(terrain, tooltipWeather(namingTarget));
+  if (namingTarget?.resolution !== 4) return null;
+  return computeTerrainEffectsLineHtml({
+    terrainKind: state.terrainKind,
+    parentTerrain: state.parentTerrain,
+    parentTerrainKind: state.parentTerrainKind,
+    isUrban: state.isUrban,
+    isRubble: state.isRubble,
+    isSeaport: state.isSeaport,
+    hasRoad: state.hasRoad,
+    hasRail: state.hasRail,
+  });
 }
 
 /**
@@ -173,7 +171,7 @@ function effectsLine(state: TerrainTooltipState, namingTarget: NamingLookupTarge
  *
  * Purpose: Single formatter behind `getCachedTerrainTooltipHtml`.
  * When to use: Only through `getCachedTerrainTooltipHtml`, which memoizes the result.
- * Expected outcome: The naming line is omitted when the caption is missing or empty. Effects include snow, rain, or heat when that weather is in effect.
+ * Expected outcome: The naming line is omitted when the caption is missing or empty. Effects list terrain only. Weather stays on the Weather line.
  * Exceptions: None.
  */
 function formatTerrainTooltipHtml(

@@ -133,10 +133,10 @@ export interface AttackerSummaryRow {
    *
    * Contract: Present only when the attacker qualifies where it would roll; never on assumed attackers.
    * When to use: Result payloads.
-   * Expected outcome: Always 1 when present.
+   * Expected outcome: 1 at Low or 2 at High when present.
    * Exceptions: None.
    */
-  readonly originBonus?: OriginHitBonus;
+  readonly originBonus?: Exclude<OriginHitBonus, 0>;
   /**
    * Combat cell center of a real attacker.
    *
@@ -189,10 +189,10 @@ export interface DefenderSummaryRow {
    *
    * Contract: Present only when the defender qualifies at the target; never on assumed defenders.
    * When to use: Result payloads.
-   * Expected outcome: Always 1 when present.
+   * Expected outcome: 1 at Low or 2 at High when present.
    * Exceptions: None.
    */
-  readonly originBonus?: OriginHitBonus;
+  readonly originBonus?: Exclude<OriginHitBonus, 0>;
 }
 
 /**
@@ -200,7 +200,7 @@ export interface DefenderSummaryRow {
  *
  * Purpose: Melee attackers roll at the target, unlike their current cell, so the estimate cannot reuse `withOriginHitBonus`.
  * When to use: Real attackers and defenders only; assumed units never qualify.
- * Expected outcome: The same object when the bonus is 0, otherwise a copy with `originHitBonus: 1`; `h3Index` is unchanged.
+ * Expected outcome: The same object when the bonus is 0, otherwise a copy with `originHitBonus` set to that amount; `h3Index` is unchanged.
  * Exceptions: None.
  */
 function withEstimateOriginBonus(unit: CombatUnit, theater: CombatEstimationTheater, rollH3Index: string): CombatUnit {
@@ -213,11 +213,12 @@ function withEstimateOriginBonus(unit: CombatUnit, theater: CombatEstimationThea
  *
  * Purpose: Keeps bonus-free rows byte-for-byte unchanged.
  * When to use: Spread into attacker and defender summary rows.
- * Expected outcome: `{ originBonus: 1 }` or `{}`.
+ * Expected outcome: `{ originBonus: 1 }` or `{ originBonus: 2 }` when the unit carries a bonus, otherwise `{}`.
  * Exceptions: None.
  */
-function originBonusSummaryField(unit: CombatUnit): { readonly originBonus?: OriginHitBonus } {
-  return unit.originHitBonus === 1 ? { originBonus: 1 } : {};
+function originBonusSummaryField(unit: CombatUnit): { readonly originBonus?: Exclude<OriginHitBonus, 0> } {
+  const bonus = unit.originHitBonus;
+  return bonus === 1 || bonus === 2 ? { originBonus: bonus } : {};
 }
 
 /**

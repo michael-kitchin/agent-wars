@@ -1,5 +1,5 @@
 /**
- * Weather icons for the four states. Rain, snow, and heat are vendored Meteocons. Mild is a larger static sun in the same gold.
+ * Weather icons for the four states. Each state is one SVG under `static/weather/`.
  *
  * Purpose: Hex tooltips, the turn line, and unit origin tooltips share one icon per state.
  * When to use: Any UI that shows Mild, Rain, Snow, or Heat.
@@ -14,7 +14,7 @@ import { formatWeatherLabel } from './weatherBonusRules';
 /**
  * CSS class for a weather icon.
  *
- * Purpose: One size next to weather words, styled in `static/index.html`.
+ * Purpose: One size next to weather words, styled in `static/overlayChrome.css`.
  * When to use: On every weather `<img>`.
  * Expected outcome: A square icon that sits on the text baseline.
  * Exceptions: None.
@@ -24,16 +24,16 @@ export const WEATHER_ICON_CLASS_NAME = 'weather-icon';
 /**
  * Maps a weather state to its icon file.
  *
- * Purpose: Mild uses a large static sun so it fills the same text size as rain, snow, and heat. Heat uses the warmer thermometer.
+ * Purpose: Each weather state uses the file named for that state.
  * When to use: `weatherIconAssetPath`.
  * Expected outcome: A file name in `static/weather/`.
  * Exceptions: None.
  */
 const WEATHER_ICON_FILE: Readonly<Record<WeatherState, string>> = Object.freeze({
-  mild: 'clear-day.svg',
+  mild: 'mild.svg',
   rain: 'rain.svg',
   snow: 'snow.svg',
-  heat: 'thermometer-warmer.svg',
+  heat: 'heat.svg',
 });
 
 /**
@@ -61,17 +61,4 @@ export function formatWeatherIconHtml(weather: WeatherState | null | undefined):
   const label = formatWeatherLabel(weather);
   const src = escapeHtmlText(weatherIconAssetPath(weather));
   return `<img class="${WEATHER_ICON_CLASS_NAME}" src="${src}" alt="" aria-hidden="true" />${escapeHtmlText(label)}`;
-}
-
-/**
- * Returns the weather chip for an Effects line, when that weather changes movement or attack.
- *
- * Purpose: Mild is the baseline, so an Effects line names only snow, rain, and heat.
- * When to use: While building the hex tooltip Effects line. The Weather line still names mild.
- * Expected outcome: Icon plus word for snow, rain, or heat. Null for mild, missing weather, and an unknown value.
- * Exceptions: None.
- */
-export function formatAppliedWeatherEffectHtml(weather: WeatherState | null | undefined): string | null {
-  if (weather !== 'snow' && weather !== 'rain' && weather !== 'heat') return null;
-  return formatWeatherIconHtml(weather);
 }

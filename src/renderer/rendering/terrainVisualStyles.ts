@@ -610,22 +610,86 @@ export function setActiveTerrainStyle(id: TerrainVisualStyleId): void {
  * Purpose: Tooltip markup names the kind. The fill is read when the tooltip is shown, so a style change
  *   applies the next time that tooltip opens.
  * When to use: Immediately after assigning tooltip HTML that may contain `.terrain-swatch` spans.
- * Expected outcome: Each span's background matches the map key for its `data-terrain-kind`. An open tooltip is left as it was.
+ * Expected outcome: Each span's background is the opaque swatch color for that kind under the active style. An open tooltip is left as it was.
  * Exceptions: None.
  */
 export function paintTerrainSwatches(root: ParentNode): void {
   root.querySelectorAll<HTMLElement>(`span.${TERRAIN_SWATCH_CLASS_NAME}`).forEach((node) => {
     const kind = node.dataset.terrainKind;
     if (!kind) return;
-    node.style.background = terrainKindFillStyle(kind);
+    node.style.background = terrainSwatchColor(kind);
   });
 }
 
 /**
- * Returns the map-key fill for one terrain kind under the active style.
+ * Opaque legend and tooltip chips, one set per map style.
  *
- * Purpose: Legend rows and tooltip swatches use the same color.
- * When to use: When drawing a legend chip or painting a `.terrain-swatch`.
+ * Purpose: The hex fills are translucent and wash out on navy chrome. These solids keep each kind recognizable without changing the map.
+ * When to use: Only for legend rows and `.terrain-swatch` chips.
+ * Expected outcome: Coastal stays blue-green and wetlands a greener teal so the two rows are not the same chip. Mountain follows that style's hue.
+ * Exceptions: None.
+ */
+const TERRAIN_SWATCH_COLORS: Record<TerrainVisualStyleId, Record<PipelineTerrainKind, string>> = {
+  default: {
+    water: '#3d82d6',
+    coastal: '#2a9aaf',
+    wetlands: '#2f8f72',
+    plains: '#9bb56e',
+    forest: '#3a9a52',
+    mountain: '#8a5cb8',
+    desert: '#d4a85a',
+    arctic: '#d7e7f6',
+  },
+  atlas: {
+    water: '#3f86dc',
+    coastal: '#2e9eb4',
+    wetlands: '#339878',
+    plains: '#a0ba74',
+    forest: '#40a058',
+    mountain: '#b44a64',
+    desert: '#dbb468',
+    arctic: '#d8e8f7',
+  },
+  wargame: {
+    water: '#3a80d4',
+    coastal: '#34a8b8',
+    wetlands: '#36a080',
+    plains: '#96b068',
+    forest: '#3c9e56',
+    mountain: '#e05a9a',
+    desert: '#e0ac52',
+    arctic: '#d4e3f8',
+  },
+  scientific: {
+    water: '#3c84d8',
+    coastal: '#2aa8b0',
+    wetlands: '#329882',
+    plains: '#9cb672',
+    forest: '#38964e',
+    mountain: '#b04a84',
+    desert: '#d4b062',
+    arctic: '#d7e7f6',
+  },
+};
+
+/**
+ * Returns the opaque chip color for a terrain kind under the active map style.
+ *
+ * Purpose: Legend rows and tooltip swatches need a solid color that still reads on navy chrome.
+ * When to use: When assigning a swatch background. Do not use this for hex fills.
+ * Expected outcome: A hex color. An unknown kind is neutral gray `#9aa3ad`.
+ * Exceptions: None.
+ */
+function terrainSwatchColor(kind: string): string {
+  const colors = TERRAIN_SWATCH_COLORS[activeTerrainStyleId];
+  return colors[kind as PipelineTerrainKind] ?? '#9aa3ad';
+}
+
+/**
+ * Returns the translucent hex fill for one terrain kind under the active style.
+ *
+ * Purpose: Hex painting keeps the muted map palette. Legend rows and tooltip chips use `terrainSwatchColor`.
+ * When to use: `fillHexTerrain` and any other hex fill.
  * Expected outcome: An rgba color. An unknown kind uses the unknown fill. Urban overlay uses that preset's urban color.
  * Exceptions: None.
  */
@@ -744,11 +808,11 @@ export function fillHexTerrain(
 export const TERRAIN_LEGEND_ORDER: PipelineTerrainKind[] = [...PIPELINE_TERRAIN_KINDS];
 
 /**
- * Defines the `renderTerrainLegend` function shape (export function renderTerrainLegend().
-
- * Purpose: Supports maintainability by documenting why `renderTerrainLegend` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Fills the terrain legend with the active style's kinds and the style picker.
+ *
+ * Purpose: The legend is the map key. Row text and the picker are styled by `#terrain-legend` in the page stylesheet, so this function does not set those colors.
+ * When to use: On startup, and again after the player changes the terrain style.
+ * Expected outcome: The container shows a title, a style select, and one swatch row per kind. Swatches use the opaque key color for the active style. Pass `#terrain-legend`; another container inherits its own text color and an unstyled select.
  * Exceptions: None.
  */
 export function renderTerrainLegend(
@@ -768,15 +832,9 @@ export function renderTerrainLegend(
   const title = document.createElement('div');
   title.textContent = 'Terrain';
   title.style.fontWeight = '600';
-  title.style.color = '#333';
   header.appendChild(title);
   const styleSelect = document.createElement('select');
   styleSelect.setAttribute('aria-label', 'Terrain style');
-  styleSelect.style.fontSize = '11px';
-  styleSelect.style.padding = '1px 3px';
-  styleSelect.style.border = '1px solid #aaa';
-  styleSelect.style.borderRadius = '2px';
-  styleSelect.style.background = '#f6f3ee';
   const opts = getTerrainStyleOptions();
   for (const o of opts) {
     const opt = document.createElement('option');
@@ -804,14 +862,13 @@ export function renderTerrainLegend(
     sw.style.display = 'inline-block';
     sw.style.width = '18px';
     sw.style.height = '12px';
-    sw.style.border = '1px solid #888';
+    sw.style.border = '1px solid #d5deea';
     sw.style.borderRadius = '2px';
-    sw.style.background = terrainKindFillStyle(kind);
+    sw.style.background = terrainSwatchColor(kind);
     row.appendChild(sw);
 
     const lab = document.createElement('span');
     lab.textContent = kind;
-    lab.style.color = '#444';
     row.appendChild(lab);
     container.appendChild(row);
   }
