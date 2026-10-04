@@ -54,13 +54,50 @@ test('the strategic shot list omits infantry and keeps units that can fire', () 
     true
   );
   const shot = flags.split('\n').find((line) => line.includes('legal attack')) ?? '';
-  assert.ok(shot.includes('a1-t2'), shot);
-  assert.ok(shot.includes('a1-t4'), shot);
-  assert.ok(shot.includes('a1-a1'), shot);
+  const [shotClause, contactClause = ''] = shot.split(';');
+  assert.ok(shotClause.includes('a1-t2'), shot);
+  assert.ok(shotClause.includes('a1-a1'), shot);
+  assert.equal(shotClause.includes('a1-t4'), false, shot);
+  assert.ok(contactClause.includes('a1-t4'), shot);
+  assert.ok(contactClause.includes('do not order a ranged_attack'), shot);
+  assert.equal(contactClause.includes('a1-t2'), false, shot);
   assert.ok(shot.includes('air strike'), shot);
   assert.equal(shot.includes('a1-i1'), false, shot);
   assert.equal(shot.includes('a1-i2'), false, shot);
   assert.ok(flags.includes('a1-i1'), 'infantry in contact stays on a threat bullet');
+});
+
+test('same-hex armor and naval are told to copy move/melee', () => {
+  const flags = buildAttentionFlags(
+    [contacted('a1-t1', 'armor', 'melee'), contacted('a1-n1', 'naval', 'melee')],
+    'strategic',
+    true
+  );
+  const shot = flags.split('\n').find((line) => line.includes('legal attack')) ?? '';
+  assert.ok(shot.includes('a1-t1'), shot);
+  assert.ok(shot.includes('a1-n1'), shot);
+  assert.ok(shot.includes('copy a move/melee Target Hex'), shot);
+  assert.ok(shot.includes('do not order a ranged_attack'), shot);
+  assert.equal(shot.includes('choose the targets yourself'), false, shot);
+});
+
+test('a unit with both contact and a ranged row stays in the shot clause', () => {
+  const mixed = contacted('a1-t9', 'armor', 'melee');
+  (mixed.result.canAttackThisTurn as Array<{ unitId: string; attackType: string; reason: string }>).push({
+    unitId: 'hum-2',
+    attackType: 'ranged',
+    reason: '',
+  });
+  const flags = buildAttentionFlags([mixed], 'strategic', true);
+  const shot = flags.split('\n').find((line) => line.includes('legal attack')) ?? '';
+  assert.ok(shot.includes('a1-t9'), shot);
+  assert.ok(shot.includes('order a ranged_attack for each'), shot);
+  assert.equal(shot.includes('copy a move/melee'), false, shot);
+});
+
+test('a tactical melee-only armor sub-unit is left off the armed-units bullet', () => {
+  const flags = buildAttentionFlags([contacted('a1-t1-s3', 'armor', 'melee')], 'tactical', false);
+  assert.equal(flags.includes('legal attack'), false, flags);
 });
 
 test('a tactical infantry shot stays on the armed-units bullet', () => {

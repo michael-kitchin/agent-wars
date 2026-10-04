@@ -345,8 +345,10 @@ test('consultation policy: both modes state skipped periods issue nothing, and t
   }).join('\n');
   assert.match(strategic, /consulted when a subscribed event fires/i);
   assert.match(strategic, /issued nothing/i);
-  assert.match(tactical, /consulted only when a subscribed event fires/i);
+  assert.match(tactical, /consulted when a subscribed event fires/i);
+  assert.match(tactical, /engine forces a consultation/i);
   assert.match(tactical, /issued nothing/i);
+  assert.doesNotMatch(tactical, /consulted only when/i);
   const warning = buildToolBudgetExceededWarning();
   assert.ok(warning.includes(String(REQUEST_ORDERS_MAX_TOOL_ROUNDS)));
   assert.match(warning, /submitted no explicit orders/i);

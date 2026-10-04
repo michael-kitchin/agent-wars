@@ -154,13 +154,13 @@ const CALLBACK_BULLET =
 /**
  * An unconsulted beat is a beat the model did not act in.
  *
- * Purpose: Under event-driven policy, standing orders are inert, so a skipped beat is idle.
+ * Purpose: Under event-driven policy the model is asked when a subscribed event fires or the engine forces a consult. Standing orders do not move sub-units, so a skipped beat is idle.
  * When to use: Always in tactical coaching.
- * Expected outcome: Consulted only when a subscribed event fires; otherwise the sub-units issued nothing.
+ * Expected outcome: Consulted when a subscribed event fires or when the engine forces a consultation; otherwise the sub-units issued nothing.
  * Exceptions: None.
  */
 const UNCONSULTED_BEAT_BULLET =
-  '- The model is consulted only when a subscribed event fires; a beat it is not consulted for is a beat in which its sub-units issued nothing.';
+  '- The model is consulted when a subscribed event fires or when the engine forces a consultation; a beat it is not consulted for is a beat in which its sub-units issued nothing.';
 
 /**
  * Copy listed option rows, or send the model to the routing tool.

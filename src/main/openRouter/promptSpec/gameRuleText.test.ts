@@ -233,7 +233,9 @@ test('buildMovementBudgetRule quotes engine budgets and states that air never ma
   assert.doesNotMatch(strategic, /urban or rubble/i);
   const tactical = buildMovementBudgetRule('tactical');
   assert.ok(tactical.includes(String(MOVEMENT_RANGE_BY_UNIT_TYPE.armor)));
-  assert.match(tactical, /point/i);
+  assert.match(tactical, /Clear of weather, the point budget is/);
+  assert.doesNotMatch(tactical, /Movement this beat is a terrain-weighted/);
+  assert.doesNotMatch(tactical, /\b(snow|rain|heat)\b/i);
   assert.match(tactical, /urban or rubble/i);
   assert.match(tactical, /1[- ]point|one[- ]point/i);
   assert.match(tactical, /road/i);
@@ -304,6 +306,16 @@ test('buildCombatRulesParagraph keeps strike radius out of tactical and MP wordi
   );
   assert.ok(!tactical.includes(`strike radius of ${AIR_STRIKE_RANGE_HEXES}`));
   assert.match(tactical, /anywhere in the battle/i);
+  assert.match(tactical, /Clear of weather, the point budget is/);
+  assert.doesNotMatch(tactical, /\b(snow|rain|heat)\b/i);
+  const weatherOn = buildCombatRulesParagraph(
+    gates({
+      coordinateMode: 'tactical',
+      originBonusSettings: { countryBonusEnabled: false, terrainBonusEnabled: false, weatherBonusEnabled: true },
+    })
+  );
+  assert.match(weatherOn, /Clear of weather, the point budget is/);
+  assert.match(weatherOn, /armor's point budget is 2 in snow or rain/);
   const strategic = buildCombatRulesParagraph(
     gates({ coordinateMode: 'strategic', hasAirUnits: true, ordersEnabled: true })
   );

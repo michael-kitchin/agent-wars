@@ -147,8 +147,8 @@ function formatQuotedEnvelopeFields(gates: EnvelopeGates): string {
  * Purpose: The opening message may point at options or tools, but must not restate the copy-row mapping.
  * When to use: Second sentence of `buildOpeningUserMessage`.
  * Expected outcome: A single clause (or two when the orderless pointer applies). Briefing-present
- * planning names one move/approach row and one ranged row per tactical sub-unit, or one option row
- * per unit per action strategically.
+ * tactical planning names one move or approach row per sub-unit, and a ranged row only when the
+ * table lists one for that sub-unit. Strategic planning names one option row per unit per action.
  * Exceptions: None.
  */
 function buildOpeningActionClause(gates: OpeningMessageGates): string {
@@ -157,7 +157,7 @@ function buildOpeningActionClause(gates: OpeningMessageGates): string {
       if (!gates.hasBestOptionsTable) {
         return 'No options are listed this period; use the routing tool for destinations.';
       }
-      return 'Copy one move or approach row and one ranged row per sub-unit; use the routing tool only for an unlisted destination.';
+      return 'Copy one move or approach row per sub-unit, and one ranged row only when the table lists one for that sub-unit; use the routing tool only for an unlisted destination.';
     }
     const optionsClause = gates.hasBestOptionsTable
       ? 'Copy one option row per unit per action into the matching envelope field; use the routing tool only for an unlisted destination.'

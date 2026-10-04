@@ -302,14 +302,14 @@ export function tacticalLandEnterCostRule(): string {
  *
  * Purpose: Multi-turn and intra-beat reach cannot be judged from the options table alone.
  * When to use: Combat paragraph after the infantry reach clause.
- * Expected outcome: Strategic cell counts from `getMovementBudget`; tactical point budgets from `MOVEMENT_RANGE_BY_UNIT_TYPE`, origin urban/rubble collapse, and enter costs for an intact line, a roadless urban cell, and rubble. The line-entry sentence refers to the road or rail cell.
+ * Expected outcome: Strategic cell counts from `getMovementBudget`. Tactical type numbers are the clear-weather point baselines from `MOVEMENT_RANGE_BY_UNIT_TYPE`; the weather sentence, when the bonus is on, states any lower budget. Origin urban/rubble collapse and enter costs for an intact line, a roadless urban cell, and rubble follow. The line-entry sentence refers to the road or rail cell.
  * Exceptions: None.
  */
 export function buildMovementBudgetRule(mode: PromptCoordinateMode): string {
   logTrace('promptSpec buildMovementBudgetRule', { mode });
   if (mode === 'tactical') {
     return (
-      `Movement this beat is a terrain-weighted point budget: ${MOVEMENT_RANGE_BY_UNIT_TYPE.infantry} points for infantry, ` +
+      `Clear of weather, the point budget is ${MOVEMENT_RANGE_BY_UNIT_TYPE.infantry} points for infantry, ` +
       `${MOVEMENT_RANGE_BY_UNIT_TYPE.armor} for armor, ${MOVEMENT_RANGE_BY_UNIT_TYPE.naval} for naval, and air does not march. ` +
       'Infantry or armor whose current cell is urban or rubble has a 1-point budget this beat, not the type baseline. ' +
       'Armor in forest is penalised to the infantry baseline. ' +

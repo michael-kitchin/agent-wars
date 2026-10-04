@@ -143,8 +143,9 @@ function testTacticalPromptAllowsCopyingBestOptionsHexes(): void {
   assert.ok(move.includes('Best Options This Turn'));
   const user = getInitialUserMessage(flags, true, 'tactical');
   assert.ok(!user.includes('Call plan_route for each sub-unit'));
-  assert.ok(user.includes('one move or approach row'));
-  assert.ok(user.includes('one ranged row per sub-unit'));
+  assert.ok(user.includes('one move or approach row per sub-unit'));
+  assert.ok(user.includes('one ranged row only when the table lists one for that sub-unit'));
+  assert.ok(!user.includes('one ranged row per sub-unit'));
   assert.ok(!user.includes('Give every sub-unit with a move or approach option a move order'));
   assert.ok(user.includes('Do not emit assign_order or cancel_order for tactical sub-unit ids.'));
   assert.ok(!user.includes('Copy Best Options approach and move/melee Target Hexes into explicit_move'));

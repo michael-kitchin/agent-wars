@@ -163,7 +163,10 @@ test('tactical coaching includes every required item when its gate is on', () =>
   assert.match(text, /sub-unit ids/i);
   assert.match(text, /omit the array or send \[\]/i);
   assert.match(text, /cleared when the battle ends/i);
-  assert.match(text, /consulted only when a subscribed event fires/i);
+  assert.match(text, /consulted when a subscribed event fires/i);
+  assert.match(text, /engine forces a consultation/i);
+  assert.match(text, /issued nothing/i);
+  assert.doesNotMatch(text, /consulted only when/i);
   assert.match(text, /taunt or threat/i);
 });
 

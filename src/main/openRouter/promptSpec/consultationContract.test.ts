@@ -130,8 +130,9 @@ test('opening action clause points at one move row and one ranged row without re
     memoryEnabled: false,
     productionEnabled: false,
   });
-  assert.match(tactical, /one move or approach row/i);
-  assert.match(tactical, /one ranged row per sub-unit/i);
+  assert.match(tactical, /one move or approach row per sub-unit/i);
+  assert.match(tactical, /one ranged row only when the table lists one for that sub-unit/i);
+  assert.doesNotMatch(tactical, /one ranged row per sub-unit/i);
   assert.ok(!tactical.includes('Give every sub-unit with a move or approach option a move order'));
   assert.ok(!tactical.includes('Copy Best Options approach and move/melee Target Hexes into explicit_move'));
   const strategic = buildOpeningUserMessage(strategicOpening());
