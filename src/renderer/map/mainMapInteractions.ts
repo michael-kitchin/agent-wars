@@ -14,7 +14,10 @@ import {
   clearDeferredStackCalloutTimer,
   scheduleDeferredStackCallout,
 } from './mapClickSelectionPolicy';
-import { resolutionPlaybackBlocksMapOrders } from '../../shared/mapOrderGestureGate';
+import {
+  hexTooltipSuppressedForOrderPlanning,
+  resolutionPlaybackBlocksMapOrders,
+} from '../../shared/mapOrderGestureGate';
 import { resolveMapGesturePress } from '../../shared/mapPlanningGesture';
 import { selectionUnitIdSetsDiffer } from '../../shared/selectionUnitIdSets';
 import {
@@ -22,7 +25,11 @@ import {
   type DoubleClickSelectedUnit,
 } from './mapDoubleClickHandler';
 import { hideOrderBlockHexTooltip, repositionOrderBlockHexTooltipIfVisible } from './orderBlockHexTooltip';
-import { hideOrderSlowerHexTooltip, repositionOrderSlowerHexTooltipIfVisible } from './orderSlowerHexTooltip';
+import {
+  clearOrderEffectsTooltipDwell,
+  noteOrderEffectsTooltipCellChange,
+  repositionOrderSlowerHexTooltipIfVisible,
+} from './orderSlowerHexTooltip';
 import { shouldHideStrategicMapUnitsForRes4Zoom } from './terrainView';
 
 /**
@@ -475,7 +482,12 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
     S.lastPointerClientY = e.clientY;
     repositionOrderBlockHexTooltipIfVisible();
     repositionOrderSlowerHexTooltipIfVisible();
-    if (deps.shouldSuppressTerrainTooltip()) {
+    const planningHidesHexTooltip = hexTooltipSuppressedForOrderPlanning({
+      shiftHeld: S.shiftKeyActive,
+      hasSelection: S.selectedUnitIds.length > 0,
+      playbackActive: resolutionPlaybackBlocksMapOrders(S.resolutionMoveAnimation),
+    });
+    if (deps.shouldSuppressTerrainTooltip() || planningHidesHexTooltip) {
       deps.clearTerrainTooltipTimer();
       deps.hideTerrainTooltipVisual();
     }
@@ -489,32 +501,43 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
     const detailChanged = detailHit !== prevDetail;
 
     if (!hitChanged && !detailChanged) {
-      const tipFollow = document.getElementById('hex-tooltip');
-      if (
-        !deps.shouldSuppressTerrainTooltip() &&
-        tipFollow &&
-        !tipFollow.classList.contains('hidden') &&
-        hit
-      ) {
-        const state = deps.terrainStateForPointer(S.lastPointerClientX, S.lastPointerClientY, hit);
-        const namingTarget = deps.namingLookupTargetForPointer(S.lastPointerClientX, S.lastPointerClientY, hit);
-        void deps.showTerrainTooltip(S.lastPointerClientX, S.lastPointerClientY, state, namingTarget);
+      if (planningHidesHexTooltip) {
+        deps.clearTerrainTooltipTimer();
+        deps.hideTerrainTooltipVisual();
+      } else {
+        clearOrderEffectsTooltipDwell();
+        const tipFollow = document.getElementById('hex-tooltip');
+        if (
+          !deps.shouldSuppressTerrainTooltip() &&
+          tipFollow &&
+          !tipFollow.classList.contains('hidden') &&
+          hit
+        ) {
+          const state = deps.terrainStateForPointer(S.lastPointerClientX, S.lastPointerClientY, hit);
+          const namingTarget = deps.namingLookupTargetForPointer(S.lastPointerClientX, S.lastPointerClientY, hit);
+          void deps.showTerrainTooltip(S.lastPointerClientX, S.lastPointerClientY, state, namingTarget);
+        }
       }
       return;
     }
 
     S.hoveredHexH3 = hit;
     S.hoveredDetailHexH3 = detailHit;
-    void deps.refreshHoverRoutePreview({ allowBlockingOrderTooltip: true });
-    deps.requestRedraw();
 
     // A battle is one world hex, so the enclosing hit stays put while the pointer crosses cells.
     // This path runs only after the world hex or the detail cell changed. Hide the popup and
-    // start the dwell again; movement inside the same cell follows an already-visible popup above.
+    // start the dwell again before the preview refresh, which may publish synchronously.
     deps.clearTerrainTooltipTimer();
     deps.hideTerrainTooltipVisual();
+    if (planningHidesHexTooltip && hit) {
+      noteOrderEffectsTooltipCellChange(hit, detailHit);
+    } else {
+      clearOrderEffectsTooltipDwell();
+    }
+    void deps.refreshHoverRoutePreview({ allowBlockingOrderTooltip: true });
+    deps.requestRedraw();
 
-    if (!hit || deps.shouldSuppressTerrainTooltip()) {
+    if (!hit || deps.shouldSuppressTerrainTooltip() || planningHidesHexTooltip) {
       return;
     }
 
@@ -547,7 +570,7 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
     deps.clearTerrainTooltipTimer();
     deps.hideTerrainTooltipVisual();
     hideOrderBlockHexTooltip();
-    hideOrderSlowerHexTooltip();
+    clearOrderEffectsTooltipDwell();
     if (S.hoveredHexH3 !== null || S.hoveredDetailHexH3 !== null) {
       S.hoveredHexH3 = null;
       S.hoveredDetailHexH3 = null;
@@ -590,7 +613,8 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
     deps.clearTerrainTooltipTimer();
     deps.hideTerrainTooltipVisual();
     hideOrderBlockHexTooltip();
-    hideOrderSlowerHexTooltip();
+    // A press leaves the effects tooltip up. Ranged and air-strike clicks do not refresh the
+    // preview, and that notice stays while the pointer remains on the cell.
   });
 
   mainMapEl.addEventListener('click', async (e) => {

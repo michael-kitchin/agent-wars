@@ -1014,9 +1014,27 @@ function testHoverOrderPlanningInteractionLock(): void {
     'hover preview publish should dismiss map detail popovers when planning is active'
   );
   assert.ok(
-    hoverRefreshSource.includes('resolveOrderSlowerTooltipHtml') &&
-      !hoverRefreshSource.includes('collectTacticalRangedSlowTerrainLabels'),
-    'hover preview slower tooltip should omit ranged collection and use resolveOrderSlowerTooltipHtml'
+    hoverRefreshSource.includes('resolveOrderPreviewEffectsTooltipHtml') &&
+      !hoverRefreshSource.includes('collectTacticalRangedSlowTerrainLabels') &&
+      !hoverRefreshSource.includes('resolveOrderSlowerTooltipHtml'),
+    'hover preview effects tooltip should use resolveOrderPreviewEffectsTooltipHtml and keep ranged collection out of the publisher'
+  );
+  const mainMapPath = path.resolve(process.cwd(), 'src', 'renderer', 'map', 'mainMapInteractions.ts');
+  const mainMapSource = fs.readFileSync(mainMapPath, 'utf8');
+  const planningGateAt = mainMapSource.indexOf('hexTooltipSuppressedForOrderPlanning({');
+  const dwellTimeoutAt = mainMapSource.indexOf('}, HEX_DETAILS_TOOLTIP_DELAY_MS)');
+  assert.ok(
+    planningGateAt >= 0 && dwellTimeoutAt > planningGateAt,
+    'pointer move should decide order planning before starting the hex tooltip dwell'
+  );
+  const pointerDownAt = mainMapSource.indexOf("addEventListener('pointerdown'");
+  const clickAt = mainMapSource.indexOf("addEventListener('click'", pointerDownAt);
+  const pointerDownSource = mainMapSource.slice(pointerDownAt, clickAt);
+  assert.ok(
+    pointerDownSource.includes('hideOrderBlockHexTooltip') &&
+      !pointerDownSource.includes('hideOrderSlowerHexTooltip') &&
+      !pointerDownSource.includes('clearOrderEffectsTooltipDwell'),
+    'a press hides the blocked notice and leaves the effects tooltip in place'
   );
   const initCorePath = path.resolve(process.cwd(), 'src', 'renderer', 'map', 'initCore.ts');
   const initCoreSource = fs.readFileSync(initCorePath, 'utf8');
@@ -1071,8 +1089,15 @@ function testMaintainabilityConsolidationSeams(): void {
     blockTooltipSource.includes("from './createTransientPointerTooltip'") &&
       slowerTooltipSource.includes("from './createTransientPointerTooltip'") &&
       blockTooltipSource.includes('export function hideOrderBlockHexTooltip') &&
-      slowerTooltipSource.includes('export function hideOrderSlowerHexTooltip'),
+      slowerTooltipSource.includes('export function hideOrderSlowerHexTooltip') &&
+      slowerTooltipSource.includes('persistent: true'),
     'order block/slower tooltips should use createTransientPointerTooltip with stable public exports'
+  );
+  const transientTooltipPath = path.resolve(process.cwd(), 'src', 'renderer', 'map', 'createTransientPointerTooltip.ts');
+  const transientTooltipSource = fs.readFileSync(transientTooltipPath, 'utf8');
+  assert.ok(
+    transientTooltipSource.includes('ttl?.clear()') && !transientTooltipSource.includes('ttl.clear()'),
+    'a persistent order tooltip must not call a dismiss timer it does not have'
   );
 
   const tacticalOrdersPath = path.resolve(process.cwd(), 'src', 'renderer', 'gameplay', 'tacticalOrders.ts');

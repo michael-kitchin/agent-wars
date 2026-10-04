@@ -24,12 +24,21 @@ export type TransientPointerTooltipOptions = {
   /**
    * Auto-dismiss duration in milliseconds.
    *
-   * Purpose: Matches prior `ORDER_BLOCK_HEX_TOOLTIP_TTL_MS` semantics.
-   * When to use: Pass the shared constant used by both order tooltips.
+   * Purpose: The blocked hint hides itself after the pointer rests.
+   * When to use: Pass `ORDER_BLOCK_HEX_TOOLTIP_TTL_MS` for `#order-block-tooltip`. Omit it when `persistent` is true.
    * Expected outcome: Timer fires hide after idle.
    * Exceptions: None.
    */
-  ttlMs: number;
+  ttlMs?: number;
+  /**
+   * Whether the tooltip stays up until the caller hides it.
+   *
+   * Purpose: The effects hint follows the hex dwell and then stays while the pointer remains on that cell.
+   * When to use: `#order-slower-tooltip`. Leave unset for the blocked hint.
+   * Expected outcome: `show` and `repositionIfVisible` do not schedule a hide.
+   * Exceptions: None.
+   */
+  persistent?: boolean;
 };
 
 /**
@@ -52,11 +61,12 @@ export type TransientPointerTooltip = {
  *
  * Purpose: Deduplicates DOM/TTL plumbing between Blocked and Slower order hover tooltips.
  * When to use: Module init for each order tooltip kind; keep message-resolution logic in the caller module.
- * Expected outcome: Controllers that suppress terrain tooltips on show and auto-dismiss after `ttlMs`.
+ * Expected outcome: Controllers that suppress terrain tooltips on show. A persistent tooltip stays until `hide`. Otherwise it auto-dismisses after `ttlMs`.
  * Exceptions: Missing DOM nodes no-op without throwing.
  */
 export function createTransientPointerTooltip(options: TransientPointerTooltipOptions): TransientPointerTooltip {
-  const ttl = createTransientPointerTooltipTtl(options.ttlMs);
+  const ttl =
+    options.persistent === true ? null : createTransientPointerTooltipTtl(options.ttlMs ?? 0);
 
   /**
    * Hides the tooltip element and clears its dismiss timer.
@@ -67,7 +77,7 @@ export function createTransientPointerTooltip(options: TransientPointerTooltipOp
    * Exceptions: None.
    */
   function hide(): void {
-    ttl.clear();
+    ttl?.clear();
     const el = document.getElementById(options.elementId);
     if (el) {
       el.classList.add('hidden');
@@ -91,13 +101,13 @@ export function createTransientPointerTooltip(options: TransientPointerTooltipOp
   /**
    * Shows the tooltip near the last pointer position after applying caller-supplied content.
    *
-   * Purpose: Shared show path that suppresses terrain tooltips and (re)starts TTL.
+   * Purpose: Shared show path that suppresses the hex tooltip. A timed tooltip also restarts its auto-hide.
    * When to use: After the caller decides content is non-null; pass a content writer for HTML/text policy.
-   * Expected outcome: Element visible at `S.lastPointerClient*` + offset; terrain tooltip cleared.
+   * Expected outcome: Element visible at `S.lastPointerClient*` + offset; hex tooltip cleared. A persistent tooltip stays until `hide`.
    * Exceptions: Missing DOM nodes no-op without throwing.
    */
   function show(applyContent: (el: HTMLElement) => void): void {
-    ttl.clear();
+    ttl?.clear();
     clearTerrainTooltipTimer();
     hideTerrainTooltipVisual();
     const el = document.getElementById(options.elementId);
@@ -107,7 +117,7 @@ export function createTransientPointerTooltip(options: TransientPointerTooltipOp
     el.style.top = `${S.lastPointerClientY + TOOLTIP_OFFSET_PX}px`;
     el.classList.remove('hidden');
     el.setAttribute('aria-hidden', 'false');
-    ttl.schedule(() => hide());
+    ttl?.schedule(() => hide());
   }
 
   /**
@@ -123,7 +133,7 @@ export function createTransientPointerTooltip(options: TransientPointerTooltipOp
     if (!el || el.classList.contains('hidden')) return;
     el.style.left = `${S.lastPointerClientX + TOOLTIP_OFFSET_PX}px`;
     el.style.top = `${S.lastPointerClientY + TOOLTIP_OFFSET_PX}px`;
-    ttl.schedule(() => hide());
+    ttl?.schedule(() => hide());
   }
 
   return { hide, isVisible, show, repositionIfVisible };

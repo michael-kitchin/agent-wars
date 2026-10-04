@@ -173,7 +173,7 @@ slowerTerrainDisplayTitle?: string | null;
    *
    * Contract: Present only when `valid` and at least one of `slower.length > 0` or `roadRail` is true. Strategic marches omit this.
    * When to use: Tactical `buildTacticalMarchHoverPreview` and merged grouped envelopes.
-   * Expected outcome: Renderer passes this payload to `resolveOrderSlowerTooltipHtml` without recomputing paths.
+   * Expected outcome: The order-effects tooltip reads `slower` and `roadRail` for a battle march without recomputing the path.
    * Exceptions: None.
    */
 orderPreviewTerrainImpact?: OrderPreviewTerrainImpact | null;

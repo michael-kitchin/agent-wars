@@ -1,11 +1,36 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { resolutionPlaybackBlocksMapOrders, tacticalHitIsInsideBattle } from './mapOrderGestureGate';
+import {
+  hexTooltipSuppressedForOrderPlanning,
+  resolutionPlaybackBlocksMapOrders,
+  tacticalHitIsInsideBattle,
+} from './mapOrderGestureGate';
 
 describe('resolutionPlaybackBlocksMapOrders', () => {
   it('blocks while an animation is present and allows a null animation', () => {
     assert.equal(resolutionPlaybackBlocksMapOrders({ startedAtMs: 1 }), true);
     assert.equal(resolutionPlaybackBlocksMapOrders(null), false);
+  });
+});
+
+describe('hexTooltipSuppressedForOrderPlanning', () => {
+  it('hides the hex tooltip only while a selection is aiming an order', () => {
+    assert.equal(
+      hexTooltipSuppressedForOrderPlanning({ shiftHeld: false, hasSelection: true, playbackActive: false }),
+      true
+    );
+    assert.equal(
+      hexTooltipSuppressedForOrderPlanning({ shiftHeld: false, hasSelection: false, playbackActive: false }),
+      false
+    );
+    assert.equal(
+      hexTooltipSuppressedForOrderPlanning({ shiftHeld: true, hasSelection: true, playbackActive: false }),
+      false
+    );
+    assert.equal(
+      hexTooltipSuppressedForOrderPlanning({ shiftHeld: false, hasSelection: true, playbackActive: true }),
+      false
+    );
   });
 });
 

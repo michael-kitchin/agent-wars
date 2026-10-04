@@ -2,7 +2,7 @@
  * Copy and light terrain classification for transient “Slower: …” hover hints during valid tactical marches.
  *
  * Purpose: Keeps tactical march preview labels aligned without importing renderer or Electron main modules.
- * When to use: `humanMarchPreviewResolve`, `buildTacticalMarchHoverPreview`, `publishHoverRoutePreview`, and HTML tooltip formatters.
+ * When to use: `humanMarchPreviewResolve`, `buildTacticalMarchHoverPreview`, and the order-effects tooltip.
  * Expected outcome: Structured `OrderPreviewTerrainImpact` for IPC plus HTML fragments with bold section labels; `null` when no slowdown applies.
  * Exceptions: None; invalid inputs yield `null` or empty collections.
  */
@@ -453,7 +453,7 @@ export function pickTacticalMarchSlowTerrainDisplayTitle(args: {
  * Resolves tactical ranged “slow terrain” when forest/urban/rubble caps range below the unit’s baseline.
  *
  * Purpose: Surfaces the attacker-anchor terrain that triggers the max-range-1 cap for infantry/armor.
- * When to use: Tests and callers that still expect `string | null` for the range-cap terrain; order-preview tooltips no longer show it.
+ * When to use: `collectTacticalRangedSlowTerrainLabels`, which the order-effects tooltip uses for a battle shot.
  * Expected outcome: `Rubble` / `Urban` / `Forest` priority on the anchor cell, or `null` when the cap is inactive.
  * Exceptions: None.
  */
@@ -479,7 +479,7 @@ export function pickTacticalRangedSlowTerrainDisplayTitle(
  * Collects ranged slow terrain labels across selected human infantry/armor (union, stable preview-unit order).
  *
  * Purpose: Grouped ranged hover can list every throttling terrain type present among origins, not only the first unit.
- * When to use: Tests and `pickFirstTacticalRangedSlowTerrainDisplayTitle`; order-preview tooltips no longer show ranged slower hints.
+ * When to use: The order-effects tooltip for a battle ranged attack, and tests of that cap.
  * Expected outcome: Distinct labels in `previewUnitIds` traversal order.
  * Exceptions: None.
  */

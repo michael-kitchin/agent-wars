@@ -14,7 +14,7 @@ Keep errors, turn summaries, and the opponent's consultation text on the surface
 | AI strategy toast | The opponent's message and strategy summary after a consultation | Until dismiss, or until the same fixed interval elapses. Empty content hides it. | This document |
 | Sidebar error line | Nothing. It is not a player-visible surface. Errors reported to the sidebar, such as a failed Ready or a failed tactical commit, show on the map toast instead. | Always hidden | This document |
 | AI activity log | AI interaction lines and error lines, including a one-line copy of a turn-update toast | Accumulates during a match. Starting a new match clears it. | [ai-activity-log.md](ai-activity-log.md) |
-| Hex tooltips | Terrain, units, and order-block or slower explanations under the pointer | While the pointer remains, or for a short time for transient order tooltips | [hex-tooltips.md](hex-tooltips.md) |
+| Hex tooltips | The hex readout, a blocked-order notice, and the terrain and weather that change an aimed order | The hex readout and the effects notice stay while the pointer remains on that cell. The blocked notice hides itself after a short time. | [hex-tooltips.md](hex-tooltips.md) |
 | Stack callout | Units in a hex | Until the player dismisses it or the next map gesture closes it | [stack-callout.md](stack-callout.md) |
 
 ## Availability

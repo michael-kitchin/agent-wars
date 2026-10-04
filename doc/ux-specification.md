@@ -72,7 +72,7 @@ Element documents share a fixed heading set:
 - [map-overlays.md](ux/map-overlays.md): range, path, order, hover, city, transport, infrastructure, and resolution drawings on the map.
 - [minimap.md](ux/minimap.md): the world overview and how it relates to the main map view.
 - [terrain-legend.md](ux/terrain-legend.md): the terrain legend and any inputs it accepts.
-- [hex-tooltips.md](ux/hex-tooltips.md): the hover information tooltip and transient order-feedback tooltips.
+- [hex-tooltips.md](ux/hex-tooltips.md): the hover information tooltip, the blocked-order notice, and the effects tooltip that stays while the pointer remains on the cell.
 - [stack-callout.md](ux/stack-callout.md): the list of units in a hex and how it changes the selection.
 - [build-popup.md](ux/build-popup.md): the single-hex build queue popup and the markers that open it.
 - [multi-hex-build-popup.md](ux/multi-hex-build-popup.md): the build queue popup used when several build hexes are selected together.

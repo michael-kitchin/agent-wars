@@ -15804,6 +15804,16 @@
     if (!OPEN_GROUND_CATEGORIES.has(input.category)) return input.baseCost;
     return Math.max(input.baseCost, 2);
   }
+  function weatherAttackPenalty(input) {
+    const { level } = input;
+    if (level === "off") return 0;
+    const penalized = input.kind === "ranged" ? penalizesRangedAttack(input.unitType, input.weatherAtUnit, input.tags) : input.unitType === "air" && [input.weatherAtUnit, input.weatherAtTarget].some((weather) => penalizesAirStrike(weather, input.tags));
+    return penalized ? WEATHER_ATTACK_PENALTY_BY_LEVEL[level] : 0;
+  }
+  function strategicFerryRangeHexes(input) {
+    if (input.enabled && input.weatherAtDestination === "snow" && !hasWeatherTag(input.tags, "snow")) return 2;
+    return 4;
+  }
   function formatWeatherLabel(weather) {
     switch (weather) {
       case "rain":
@@ -15818,6 +15828,14 @@
   }
   function hasWeatherTag(tags, weather) {
     return tags?.includes(weather) === true;
+  }
+  function penalizesRangedAttack(unitType, weather, tags) {
+    if (unitType !== "armor" || weather !== "snow" && weather !== "heat") return false;
+    return !hasWeatherTag(tags, weather);
+  }
+  function penalizesAirStrike(weather, tags) {
+    if (weather !== "snow" && weather !== "rain" && weather !== "heat") return false;
+    return !hasWeatherTag(tags, weather);
   }
 
   // src/shared/weatherIcons.ts
@@ -18972,25 +18990,6 @@ ${body}`;
       return a.localeCompare(b);
     });
   }
-  function formatOrderPreviewImpactHtml(args) {
-    const blocked = (args.blocked ?? []).map((s) => s.trim()).filter((s) => s.length > 0);
-    const slower = (args.slower ?? []).map((s) => s.trim()).filter((s) => s.length > 0);
-    const terrainLine = blocked.length > 0 ? `<strong>Blocked:</strong> ${formatTerrainNameListHtml(blocked.join(", "))}` : slower.length > 0 ? `<strong>Slower:</strong> ${formatTerrainNameListHtml(slower.join(", "))}` : null;
-    let out = terrainLine;
-    if (args.roadRail) {
-      const usingLine = `<strong>Using:</strong> Road/Rail`;
-      out = out ? `${out}${TOOLTIP_SECTION_GAP_HTML}${usingLine}` : usingLine;
-    }
-    return out;
-  }
-  function resolveOrderSlowerTooltipHtml(args) {
-    if (args.hasBlockedMessage) return null;
-    if (args.supportTargeting === "ranged" || args.supportTargeting === "air") return null;
-    if (!args.validForAll || !args.tacticalBattleActive) return null;
-    const imp = args.marchImpact;
-    if (!imp || imp.slower.length === 0 && !imp.roadRail) return null;
-    return formatOrderPreviewImpactHtml({ slower: [...imp.slower], roadRail: imp.roadRail });
-  }
   function displayTitleForSlowTerrainBucket(bucket) {
     switch (bucket) {
       case "forests":
@@ -19116,6 +19115,33 @@ ${body}`;
       }
     }
     return { slower: slowerOrder, roadRail };
+  }
+  function pickTacticalRangedSlowTerrainDisplayTitle(battle, unitType, attackerSubUnitId) {
+    if (unitType !== "infantry" && unitType !== "armor") return null;
+    const u = battle.subUnits.find((s) => s.id === attackerSubUnitId);
+    if (!u) return null;
+    const anchor = tacticalMovementTerrainAnchorH3(u, battle.subUnits);
+    const baseline = RANGED_RANGE_BY_UNIT_TYPE[unitType] ?? 0;
+    const eff = effectiveTacticalRangedMaxRangeForAttacker(battle, unitType, anchor);
+    if (eff >= baseline) return null;
+    if (battle.res4IsRubbleByH3?.[anchor]) return "Rubble";
+    if (battle.res4IsUrbanByH3?.[anchor]) return "Urban";
+    if (tacticalRes4CellIsForestClass(battle, anchor)) return "Forest";
+    return null;
+  }
+  function collectTacticalRangedSlowTerrainLabels(battle, previewUnitIds) {
+    const order = [];
+    const seen = /* @__PURE__ */ new Set();
+    for (const id of previewUnitIds) {
+      const sub = battle.subUnits.find((s) => s.id === id);
+      if (!sub || sub.player !== "human") continue;
+      const t = pickTacticalRangedSlowTerrainDisplayTitle(battle, sub.unitType, id);
+      if (t && !seen.has(t)) {
+        seen.add(t);
+        order.push(t);
+      }
+    }
+    return order;
   }
 
   // src/shared/humanMarchPreviewGroupAssembly.ts
@@ -22369,9 +22395,9 @@ ${body}`;
 
   // src/renderer/map/createTransientPointerTooltip.ts
   function createTransientPointerTooltip(options) {
-    const ttl = createTransientPointerTooltipTtl(options.ttlMs);
+    const ttl = options.persistent === true ? null : createTransientPointerTooltipTtl(options.ttlMs ?? 0);
     function hide() {
-      ttl.clear();
+      ttl?.clear();
       const el = document.getElementById(options.elementId);
       if (el) {
         el.classList.add("hidden");
@@ -22383,7 +22409,7 @@ ${body}`;
       return !!el && !el.classList.contains("hidden");
     }
     function show(applyContent) {
-      ttl.clear();
+      ttl?.clear();
       clearTerrainTooltipTimer();
       hideTerrainTooltipVisual();
       const el = document.getElementById(options.elementId);
@@ -22393,14 +22419,14 @@ ${body}`;
       el.style.top = `${rendererSharedState.lastPointerClientY + TOOLTIP_OFFSET_PX}px`;
       el.classList.remove("hidden");
       el.setAttribute("aria-hidden", "false");
-      ttl.schedule(() => hide());
+      ttl?.schedule(() => hide());
     }
     function repositionIfVisible() {
       const el = document.getElementById(options.elementId);
       if (!el || el.classList.contains("hidden")) return;
       el.style.left = `${rendererSharedState.lastPointerClientX + TOOLTIP_OFFSET_PX}px`;
       el.style.top = `${rendererSharedState.lastPointerClientY + TOOLTIP_OFFSET_PX}px`;
-      ttl.schedule(() => hide());
+      ttl?.schedule(() => hide());
     }
     return { hide, isVisible, show, repositionIfVisible };
   }
@@ -22462,13 +22488,166 @@ ${body}`;
     orderBlockTooltip.repositionIfVisible();
   }
 
+  // src/shared/orderPreviewEffectsTooltip.ts
+  var WEATHER_WORDS = Object.freeze({
+    Snow: "snow",
+    Rain: "rain",
+    Heat: "heat"
+  });
+  var PENALIZING_WEATHER = Object.freeze(["snow", "rain", "heat"]);
+  function orderEffectsTooltipRemainingWaitMs(cellChangeMs, previewReadyMs, dwellMs) {
+    const elapsed = Math.max(0, previewReadyMs - cellChangeMs);
+    return Math.max(0, dwellMs - elapsed);
+  }
+  function resolveOrderPreviewEffectsTooltipHtml(input) {
+    if (input.hasBlockedMessage || !input.validForAll) return null;
+    switch (input.kind) {
+      case "tacticalMarch":
+        return tacticalMarchHtml(input.marchImpact ?? null);
+      case "strategicMarch":
+        return strategicMarchHtml(input);
+      case "strategicFerry":
+        return strategicFerryHtml(input);
+      case "tacticalFerry":
+        return null;
+      case "ranged":
+        return rangedHtml(input);
+      case "airStrike":
+        return airStrikeHtml(input);
+      default:
+        return null;
+    }
+  }
+  function tacticalMarchHtml(impact) {
+    if (!impact || impact.slower.length === 0 && !impact.roadRail) return null;
+    const parts = [];
+    if (impact.slower.length > 0) {
+      parts.push(`<strong>Slower:</strong> ${impact.slower.map((label) => labelHtml(label)).join(", ")}`);
+    }
+    if (impact.roadRail) parts.push("<strong>Using:</strong> Road/Rail");
+    return parts.join(TOOLTIP_SECTION_GAP_HTML);
+  }
+  function strategicMarchHtml(input) {
+    const weathers = [];
+    for (const unit of input.units) {
+      if (!weatherSlowsMovement({
+        unitType: unit.unitType,
+        weather: unit.originWeather,
+        tags: unit.weatherTags,
+        level: input.level
+      })) {
+        continue;
+      }
+      const weather = unit.originWeather;
+      if (weather && !weathers.includes(weather)) weathers.push(weather);
+    }
+    if (weathers.length === 0) return null;
+    return `<strong>Slower:</strong> ${weathers.map((weather) => formatWeatherIconHtml(weather)).join(", ")}`;
+  }
+  function strategicFerryHtml(input) {
+    const shortened = input.units.some(
+      (unit) => strategicFerryRangeHexes({
+        weatherAtDestination: input.destinationWeather,
+        tags: unit.weatherTags,
+        enabled: input.level !== "off"
+      }) === 2
+    );
+    if (!shortened) return null;
+    return `<strong>Effects:</strong> ${formatWeatherIconHtml("snow")}`;
+  }
+  function rangedHtml(input) {
+    const labels = [];
+    if (input.rangedBattle && input.rangedPreviewUnitIds) {
+      for (const label of collectTacticalRangedSlowTerrainLabels(input.rangedBattle, input.rangedPreviewUnitIds)) {
+        pushDistinct(labels, label);
+      }
+    }
+    for (const unit of input.units) {
+      const penalty = weatherAttackPenalty({
+        unitType: unit.unitType,
+        kind: "ranged",
+        weatherAtUnit: unit.originWeather,
+        tags: unit.weatherTags,
+        level: input.level
+      });
+      if (penalty > 0 && unit.originWeather) pushDistinct(labels, weatherDisplayWord(unit.originWeather));
+    }
+    return effectsLine2(labels);
+  }
+  function airStrikeHtml(input) {
+    const labels = [];
+    for (const unit of input.units) {
+      const penalty = weatherAttackPenalty({
+        unitType: unit.unitType,
+        kind: "airStrike",
+        weatherAtUnit: unit.originWeather,
+        weatherAtTarget: input.targetWeather,
+        tags: unit.weatherTags,
+        level: input.level
+      });
+      if (penalty <= 0) continue;
+      for (const weather of [unit.originWeather, input.targetWeather]) {
+        if (!weather || !PENALIZING_WEATHER.includes(weather)) continue;
+        if (unit.weatherTags?.includes(weather)) continue;
+        pushDistinct(labels, weatherDisplayWord(weather));
+      }
+    }
+    return effectsLine2(labels);
+  }
+  function effectsLine2(labels) {
+    if (labels.length === 0) return null;
+    return `<strong>Effects:</strong> ${labels.map(labelHtml).join(", ")}`;
+  }
+  function labelHtml(label) {
+    const weather = weatherWord(label);
+    if (weather) return formatWeatherIconHtml(weather);
+    return formatTerrainNameListHtml(label);
+  }
+  function weatherWord(label) {
+    return WEATHER_WORDS[label] ?? null;
+  }
+  function weatherDisplayWord(weather) {
+    switch (weather) {
+      case "snow":
+        return "Snow";
+      case "rain":
+        return "Rain";
+      case "heat":
+        return "Heat";
+      default:
+        return "Mild";
+    }
+  }
+  function pushDistinct(labels, label) {
+    if (!labels.includes(label)) labels.push(label);
+  }
+
   // src/renderer/map/orderSlowerHexTooltip.ts
   var orderSlowerTooltip = createTransientPointerTooltip({
     elementId: "order-slower-tooltip",
-    ttlMs: ORDER_BLOCK_HEX_TOOLTIP_TTL_MS
+    persistent: true
   });
+  var effectsDwell = null;
+  var effectsShowTimer = null;
+  var effectsShowGeneration = 0;
+  function cancelEffectsShowTimer() {
+    effectsShowGeneration += 1;
+    if (effectsShowTimer !== null) {
+      clearTimeout(effectsShowTimer);
+      effectsShowTimer = null;
+    }
+  }
   function hideOrderSlowerHexTooltip() {
+    cancelEffectsShowTimer();
     orderSlowerTooltip.hide();
+  }
+  function clearOrderEffectsTooltipDwell() {
+    effectsDwell = null;
+    hideOrderSlowerHexTooltip();
+  }
+  function noteOrderEffectsTooltipCellChange(hex, detail) {
+    hideOrderSlowerHexTooltip();
+    effectsDwell = { hex, detail, startedAtMs: Date.now() };
   }
   function isOrderSlowerHexTooltipVisible() {
     return orderSlowerTooltip.isVisible();
@@ -22482,6 +22661,35 @@ ${body}`;
       el.innerHTML = tooltipHtml;
       paintTerrainSwatches(el);
     });
+  }
+  function scheduleOrderEffectsTooltip(tooltipHtml) {
+    cancelEffectsShowTimer();
+    if (!tooltipHtml) {
+      orderSlowerTooltip.hide();
+      return;
+    }
+    const hex = rendererSharedState.hoveredHexH3;
+    const detail = rendererSharedState.hoveredDetailHexH3;
+    if (!effectsDwell || effectsDwell.hex !== hex || effectsDwell.detail !== detail) {
+      effectsDwell = { hex, detail, startedAtMs: Date.now() };
+    }
+    const wait = orderEffectsTooltipRemainingWaitMs(
+      effectsDwell.startedAtMs,
+      Date.now(),
+      HEX_DETAILS_TOOLTIP_DELAY_MS
+    );
+    const generation = effectsShowGeneration;
+    const showIfCurrent = () => {
+      if (generation !== effectsShowGeneration) return;
+      effectsShowTimer = null;
+      if (rendererSharedState.hoveredHexH3 !== hex || rendererSharedState.hoveredDetailHexH3 !== detail) return;
+      showOrderSlowerHexTooltip(tooltipHtml);
+    };
+    if (wait === 0) {
+      showIfCurrent();
+      return;
+    }
+    effectsShowTimer = setTimeout(showIfCurrent, wait);
   }
   function repositionOrderSlowerHexTooltipIfVisible() {
     orderSlowerTooltip.repositionIfVisible();
@@ -22559,6 +22767,75 @@ ${body}`;
     return buildHumanOrderGroupPreviewEnvelope({ previews, slowestMovementRange: 1 });
   }
 
+  // src/shared/mapOrderGestureGate.ts
+  function resolutionPlaybackBlocksMapOrders(animation) {
+    return animation != null;
+  }
+  function hexTooltipSuppressedForOrderPlanning(input) {
+    return input.hasSelection && !input.shiftHeld && !input.playbackActive;
+  }
+  function tacticalHitIsInsideBattle(hasBattle, hit, footprintSaysInside) {
+    if (!hasBattle) return true;
+    if (hit == null) return false;
+    return footprintSaysInside;
+  }
+
+  // src/renderer/gameplay/orderPreviewEffectsContext.ts
+  function buildOrderPreviewEffectsTooltipInput(args) {
+    const kind = effectsKind(args.preview);
+    const battle = rendererSharedState.tacticalBattleSnapshot;
+    const levelSource = battle ?? rendererSharedState.gameState;
+    return {
+      kind,
+      hasBlockedMessage: args.hasBlockedMessage,
+      validForAll: args.preview.data.validForAll,
+      level: weatherBonusLevelOf(levelSource ?? {}),
+      units: effectsUnits(kind),
+      destinationWeather: weatherAtHex(args.preview.hoveredH3Index),
+      targetWeather: battle ? battle.weather ?? null : weatherAtHex(args.preview.hoveredH3Index),
+      marchImpact: args.preview.data.orderPreviewTerrainImpact ?? null,
+      rangedBattle: kind === "ranged" ? battle : null,
+      rangedPreviewUnitIds: args.preview.data.previews.map((row) => row.unitId)
+    };
+  }
+  function effectsKind(preview) {
+    if (preview.renderAsSupportTargeting === "ranged") return "ranged";
+    if (preview.renderAsSupportTargeting === "air") return "airStrike";
+    const battle = rendererSharedState.tacticalBattleSnapshot;
+    if (battle) {
+      const selected2 = battle.subUnits.filter(
+        (unit) => unit.player === "human" && rendererSharedState.selectedUnitIds.includes(unit.id)
+      );
+      if (selected2.length > 0 && selected2.every((unit) => unit.unitType === "air")) return "tacticalFerry";
+      return "tacticalMarch";
+    }
+    const selected = strategicSelection();
+    if (selected.length > 0 && selected.every((unit) => unit.unitType === "air")) return "strategicFerry";
+    return "strategicMarch";
+  }
+  function effectsUnits(kind) {
+    const battle = rendererSharedState.tacticalBattleSnapshot;
+    if (battle && kind !== "strategicMarch" && kind !== "strategicFerry") {
+      return battle.subUnits.filter((unit) => unit.player === "human" && rendererSharedState.selectedUnitIds.includes(unit.id)).map((unit) => ({
+        unitType: unit.unitType,
+        originWeather: battle.weather ?? null,
+        weatherTags: unit.weatherTags ?? []
+      }));
+    }
+    return strategicSelection().map((unit) => ({
+      unitType: unit.unitType,
+      originWeather: weatherAtHex(unit.h3Index),
+      weatherTags: unit.weatherTags ?? []
+    }));
+  }
+  function strategicSelection() {
+    const ids = new Set(rendererSharedState.selectedUnitIds);
+    return (rendererSharedState.gameState?.units ?? []).filter((unit) => unit.player === "human" && ids.has(unit.id));
+  }
+  function weatherAtHex(h3Index) {
+    return rendererSharedState.gameState?.hexes.find((hex) => hex.h3Index === h3Index)?.weather ?? null;
+  }
+
   // src/renderer/gameplay/gameApiHumanOrderPreview.ts
   function getValidateGroupRangedTarget() {
     return window.gameApi?.validateGroupRangedTarget;
@@ -22614,6 +22891,15 @@ ${body}`;
   // src/renderer/gameplay/hoverRoutePreviewRefresh.ts
   function publishHoverRoutePreview(deps, preview, rangedValidationReason, airStrikeValidationReason, allowBlockingOrderTooltip) {
     rendererSharedState.hoverRoutePreview = preview;
+    const planningHidesHexTooltip = hexTooltipSuppressedForOrderPlanning({
+      shiftHeld: rendererSharedState.shiftKeyActive,
+      hasSelection: rendererSharedState.selectedUnitIds.length > 0,
+      playbackActive: resolutionPlaybackBlocksMapOrders(rendererSharedState.resolutionMoveAnimation)
+    });
+    if (planningHidesHexTooltip) {
+      clearTerrainTooltipTimer();
+      hideTerrainTooltipVisual();
+    }
     if (!preview) {
       showOrderBlockHexTooltip(null);
       hideOrderSlowerHexTooltip();
@@ -22629,13 +22915,12 @@ ${body}`;
       preview.renderAsSupportTargeting === "ranged" ? rangedValidationReason : null,
       preview.renderAsSupportTargeting === "air" ? airStrikeValidationReason : null
     );
-    const slowHtml = resolveOrderSlowerTooltipHtml({
-      hasBlockedMessage: Boolean(msg),
-      supportTargeting: preview.renderAsSupportTargeting,
-      validForAll: preview.data.validForAll,
-      tacticalBattleActive: Boolean(rendererSharedState.tacticalBattleSnapshot),
-      marchImpact: preview.data.orderPreviewTerrainImpact ?? null
-    });
+    const effectsHtml = resolveOrderPreviewEffectsTooltipHtml(
+      buildOrderPreviewEffectsTooltipInput({
+        preview,
+        hasBlockedMessage: Boolean(msg)
+      })
+    );
     if (msg) {
       hideOrderSlowerHexTooltip();
       if (allowBlockingOrderTooltip) {
@@ -22645,7 +22930,11 @@ ${body}`;
       }
     } else {
       showOrderBlockHexTooltip(null);
-      showOrderSlowerHexTooltip(slowHtml);
+      if (planningHidesHexTooltip) {
+        scheduleOrderEffectsTooltip(effectsHtml);
+      } else {
+        hideOrderSlowerHexTooltip();
+      }
     }
     deps.dismissMapDetailPopoversForHoverPlanning?.();
     deps.requestRedraw();
@@ -23613,16 +23902,6 @@ ${body}`;
       ...io,
       endTacticalBattle: window.gameApi?.endTacticalBattle
     });
-  }
-
-  // src/shared/mapOrderGestureGate.ts
-  function resolutionPlaybackBlocksMapOrders(animation) {
-    return animation != null;
-  }
-  function tacticalHitIsInsideBattle(hasBattle, hit, footprintSaysInside) {
-    if (!hasBattle) return true;
-    if (hit == null) return false;
-    return footprintSaysInside;
   }
 
   // src/renderer/gameplay/buildQueuePopupFormatting.ts
@@ -27170,7 +27449,12 @@ ${body}`;
       rendererSharedState.lastPointerClientY = e.clientY;
       repositionOrderBlockHexTooltipIfVisible();
       repositionOrderSlowerHexTooltipIfVisible();
-      if (deps.shouldSuppressTerrainTooltip()) {
+      const planningHidesHexTooltip = hexTooltipSuppressedForOrderPlanning({
+        shiftHeld: rendererSharedState.shiftKeyActive,
+        hasSelection: rendererSharedState.selectedUnitIds.length > 0,
+        playbackActive: resolutionPlaybackBlocksMapOrders(rendererSharedState.resolutionMoveAnimation)
+      });
+      if (deps.shouldSuppressTerrainTooltip() || planningHidesHexTooltip) {
         deps.clearTerrainTooltipTimer();
         deps.hideTerrainTooltipVisual();
       }
@@ -27182,21 +27466,32 @@ ${body}`;
       const hitChanged = hit !== prevHit;
       const detailChanged = detailHit !== prevDetail;
       if (!hitChanged && !detailChanged) {
-        const tipFollow = document.getElementById("hex-tooltip");
-        if (!deps.shouldSuppressTerrainTooltip() && tipFollow && !tipFollow.classList.contains("hidden") && hit) {
-          const state = deps.terrainStateForPointer(rendererSharedState.lastPointerClientX, rendererSharedState.lastPointerClientY, hit);
-          const namingTarget = deps.namingLookupTargetForPointer(rendererSharedState.lastPointerClientX, rendererSharedState.lastPointerClientY, hit);
-          void deps.showTerrainTooltip(rendererSharedState.lastPointerClientX, rendererSharedState.lastPointerClientY, state, namingTarget);
+        if (planningHidesHexTooltip) {
+          deps.clearTerrainTooltipTimer();
+          deps.hideTerrainTooltipVisual();
+        } else {
+          clearOrderEffectsTooltipDwell();
+          const tipFollow = document.getElementById("hex-tooltip");
+          if (!deps.shouldSuppressTerrainTooltip() && tipFollow && !tipFollow.classList.contains("hidden") && hit) {
+            const state = deps.terrainStateForPointer(rendererSharedState.lastPointerClientX, rendererSharedState.lastPointerClientY, hit);
+            const namingTarget = deps.namingLookupTargetForPointer(rendererSharedState.lastPointerClientX, rendererSharedState.lastPointerClientY, hit);
+            void deps.showTerrainTooltip(rendererSharedState.lastPointerClientX, rendererSharedState.lastPointerClientY, state, namingTarget);
+          }
         }
         return;
       }
       rendererSharedState.hoveredHexH3 = hit;
       rendererSharedState.hoveredDetailHexH3 = detailHit;
-      void deps.refreshHoverRoutePreview({ allowBlockingOrderTooltip: true });
-      deps.requestRedraw();
       deps.clearTerrainTooltipTimer();
       deps.hideTerrainTooltipVisual();
-      if (!hit || deps.shouldSuppressTerrainTooltip()) {
+      if (planningHidesHexTooltip && hit) {
+        noteOrderEffectsTooltipCellChange(hit, detailHit);
+      } else {
+        clearOrderEffectsTooltipDwell();
+      }
+      void deps.refreshHoverRoutePreview({ allowBlockingOrderTooltip: true });
+      deps.requestRedraw();
+      if (!hit || deps.shouldSuppressTerrainTooltip() || planningHidesHexTooltip) {
         return;
       }
       const targetHex = hit;
@@ -27223,7 +27518,7 @@ ${body}`;
       deps.clearTerrainTooltipTimer();
       deps.hideTerrainTooltipVisual();
       hideOrderBlockHexTooltip();
-      hideOrderSlowerHexTooltip();
+      clearOrderEffectsTooltipDwell();
       if (rendererSharedState.hoveredHexH3 !== null || rendererSharedState.hoveredDetailHexH3 !== null) {
         rendererSharedState.hoveredHexH3 = null;
         rendererSharedState.hoveredDetailHexH3 = null;
@@ -27263,7 +27558,6 @@ ${body}`;
       deps.clearTerrainTooltipTimer();
       deps.hideTerrainTooltipVisual();
       hideOrderBlockHexTooltip();
-      hideOrderSlowerHexTooltip();
     });
     mainMapEl.addEventListener("click", async (e) => {
       if (resolutionPlaybackBlocksMapOrders(rendererSharedState.resolutionMoveAnimation)) {

@@ -4,11 +4,17 @@ import {
   buildTacticalFerryHoverPreview,
   buildTacticalMixedAirNonAirHoverEnvelope,
 } from '../../shared/tacticalFerryHoverPreview';
-import { resolveOrderSlowerTooltipHtml } from '../../shared/orderPreviewSlowTerrainTooltip';
+import {
+  hexTooltipSuppressedForOrderPlanning,
+  resolutionPlaybackBlocksMapOrders,
+} from '../../shared/mapOrderGestureGate';
+import { resolveOrderPreviewEffectsTooltipHtml } from '../../shared/orderPreviewEffectsTooltip';
 import { rendererSharedState as S } from '../core/state';
 import type { HoverRoutePreviewState } from '../core/types';
 import { resolveOrderBlockHexTooltipMessage, showOrderBlockHexTooltip } from '../map/orderBlockHexTooltip';
-import { hideOrderSlowerHexTooltip, showOrderSlowerHexTooltip } from '../map/orderSlowerHexTooltip';
+import { hideOrderSlowerHexTooltip, scheduleOrderEffectsTooltip } from '../map/orderSlowerHexTooltip';
+import { clearTerrainTooltipTimer, hideTerrainTooltipVisual } from '../map/terrainTooltipRes1State';
+import { buildOrderPreviewEffectsTooltipInput } from './orderPreviewEffectsContext';
 import { getPreviewHumanMarchOrders, getValidateGroupAirStrikeTarget, getValidateGroupRangedTarget } from './gameApiHumanOrderPreview';
 import { buildGroupedSupportTargetingLinePreview } from './hoverRoutePreviewGroupedTargeting';
 import { hoverRoutePreviewAsyncContextStillValid } from './hoverRoutePreviewStale';
@@ -20,7 +26,7 @@ import type { TacticalOrderDeps } from './tacticalOrderDeps';
  *
  * Purpose: Keeps tactical and strategic preview paths aligned on when to show terrain vs range blocking copy (air: range only).
  * When to use: Only from `refreshHoverRoutePreview` after validation / preview envelopes are computed.
- * Expected outcome: Redraw requested; `#order-block-tooltip` shows for invalid previews on both maps; `#order-slower-tooltip` only for valid tactical marches.
+ * Expected outcome: Redraw requested. `#order-block-tooltip` shows immediately for an illegal preview. `#order-slower-tooltip` waits out the hex dwell for terrain or weather that changes a legal order. The hex tooltip stays hidden while that planning gesture is armed.
  * Exceptions: None.
  */
 function publishHoverRoutePreview(
@@ -31,6 +37,15 @@ function publishHoverRoutePreview(
   allowBlockingOrderTooltip: boolean
 ): void {
   S.hoverRoutePreview = preview;
+  const planningHidesHexTooltip = hexTooltipSuppressedForOrderPlanning({
+    shiftHeld: S.shiftKeyActive,
+    hasSelection: S.selectedUnitIds.length > 0,
+    playbackActive: resolutionPlaybackBlocksMapOrders(S.resolutionMoveAnimation),
+  });
+  if (planningHidesHexTooltip) {
+    clearTerrainTooltipTimer();
+    hideTerrainTooltipVisual();
+  }
   if (!preview) {
     showOrderBlockHexTooltip(null);
     hideOrderSlowerHexTooltip();
@@ -46,13 +61,12 @@ function publishHoverRoutePreview(
     preview.renderAsSupportTargeting === 'ranged' ? rangedValidationReason : null,
     preview.renderAsSupportTargeting === 'air' ? airStrikeValidationReason : null
   );
-  const slowHtml = resolveOrderSlowerTooltipHtml({
-    hasBlockedMessage: Boolean(msg),
-    supportTargeting: preview.renderAsSupportTargeting,
-    validForAll: preview.data.validForAll,
-    tacticalBattleActive: Boolean(S.tacticalBattleSnapshot),
-    marchImpact: preview.data.orderPreviewTerrainImpact ?? null,
-  });
+  const effectsHtml = resolveOrderPreviewEffectsTooltipHtml(
+    buildOrderPreviewEffectsTooltipInput({
+      preview,
+      hasBlockedMessage: Boolean(msg),
+    })
+  );
   if (msg) {
     hideOrderSlowerHexTooltip();
     if (allowBlockingOrderTooltip) {
@@ -62,7 +76,11 @@ function publishHoverRoutePreview(
     }
   } else {
     showOrderBlockHexTooltip(null);
-    showOrderSlowerHexTooltip(slowHtml);
+    if (planningHidesHexTooltip) {
+      scheduleOrderEffectsTooltip(effectsHtml);
+    } else {
+      hideOrderSlowerHexTooltip();
+    }
   }
   deps.dismissMapDetailPopoversForHoverPlanning?.();
   deps.requestRedraw();

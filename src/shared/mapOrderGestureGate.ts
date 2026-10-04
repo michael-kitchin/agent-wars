@@ -20,6 +20,22 @@ export function resolutionPlaybackBlocksMapOrders(animation: unknown): boolean {
 }
 
 /**
+ * Returns whether an armed order-planning gesture should keep the hex tooltip hidden.
+ *
+ * Purpose: March, ferry, air-strike, and ranged aiming start before the hover preview arrives, and the hex readout must stay hidden for that whole gesture.
+ * When to use: Before starting the hex-tooltip dwell, and when a hover preview is published.
+ * Expected outcome: True when a unit is selected, Shift is up, and resolution playback is not running. False for an empty selection, Shift inspection, and playback.
+ * Exceptions: None.
+ */
+export function hexTooltipSuppressedForOrderPlanning(input: {
+  readonly shiftHeld: boolean;
+  readonly hasSelection: boolean;
+  readonly playbackActive: boolean;
+}): boolean {
+  return input.hasSelection && !input.shiftHeld && !input.playbackActive;
+}
+
+/**
  * Returns whether a hit-tested hex may receive an order or a selection change.
  *
  * Purpose: A miss during a battle is outside the battle, while a miss with no battle is still a normal empty click.
