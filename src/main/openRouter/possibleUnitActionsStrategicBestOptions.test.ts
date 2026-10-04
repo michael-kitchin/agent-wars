@@ -106,7 +106,7 @@ function collectStrategicThisTurnRows(state: GameStateSnapshot) {
  *
  * Purpose: Strategic occupancy parity with the tactical friendly-occupied urban fix.
  * When to use: After changing strategic this-turn interest or approach fallback.
- * Expected outcome: No move/melee onto `chain[1]`; at least one approach row that reduces grid distance to the far human.
+ * Expected outcome: No move/melee onto `chain[1]`. Armor's 2-hex budget still has an approach row that reduces grid distance to the far human. Infantry's 1-hex budget cannot step past the occupied city.
  * Exceptions: Throws if no geodesic 4-hop land chain exists.
  */
 function testStrategicBestOptionsIgnoresFriendlyOccupiedUncontrolledUrban(): void {
@@ -118,12 +118,12 @@ function testStrategicBestOptionsIgnoresFriendlyOccupiedUncontrolledUrban(): voi
     chain,
     urbanOnStep1: true,
     units: [
-      { id: 'opponent-inf-mover', player: 'opponent', unitType: 'infantry', h3Index: origin },
+      { id: 'opponent-arm-mover', player: 'opponent', unitType: 'armor', h3Index: origin },
       { id: 'opponent-inf-on-city', player: 'opponent', unitType: 'infantry', h3Index: friendlyUrban },
       { id: 'human-inf-far', player: 'human', unitType: 'infantry', h3Index: enemy },
     ],
   });
-  const rows = collectStrategicThisTurnRows(state).filter((r) => r.unitId === 'opponent-inf-mover');
+  const rows = collectStrategicThisTurnRows(state).filter((r) => r.unitId === 'opponent-arm-mover');
   assert.ok(
     !rows.some((r) => r.targetH3 === friendlyUrban && r.actionTypes.includes('move/melee')),
     'friendly-occupied uncontrolled urban hex must not appear as move/melee'
@@ -554,7 +554,7 @@ function findUnmeasurableFerryDiskPair(): { origin: string; dest: string } {
  * orderless Suggested Destination was an em dash or a different hex. Both surfaces must copy the same
  * closing dest that is not a stay-put stack.
  * When to use: After changing `applyInterestOrApproach` occupancy or `suggestApproachDestinationsForOrderlessUnits`.
- * Expected outcome: No approach row onto the stay-put friendly hex; the orderless suggestion is one of the remaining approach hexes.
+ * Expected outcome: No approach row onto the stay-put friendly hex. Armor's 2-hex budget still has an unoccupied closing dest, and the orderless suggestion is one of those approach hexes.
  * Exceptions: Throws if no geodesic 4-hop land chain exists.
  */
 function testStrategicBestOptionsApproachSkipsFriendlyOccupiedAndMatchesOrderless(): void {
@@ -562,20 +562,20 @@ function testStrategicBestOptionsApproachSkipsFriendlyOccupiedAndMatchesOrderles
   const state = chainState({
     chain,
     units: [
-      { id: 'opponent-inf-mover', player: 'opponent', unitType: 'infantry', h3Index: chain[0]! },
+      { id: 'opponent-arm-mover', player: 'opponent', unitType: 'armor', h3Index: chain[0]! },
       { id: 'opponent-inf-block', player: 'opponent', unitType: 'infantry', h3Index: chain[1]! },
       { id: 'human-inf-far', player: 'human', unitType: 'infantry', h3Index: chain[4]! },
     ],
   });
-  const rows = collectStrategicThisTurnRows(state).filter((r) => r.unitId === 'opponent-inf-mover');
+  const rows = collectStrategicThisTurnRows(state).filter((r) => r.unitId === 'opponent-arm-mover');
   const approaches = rows.filter((r) => r.actionTypes.includes('approach'));
   assert.ok(
     !approaches.some((r) => r.targetH3 === chain[1]),
     'stay-put friendly-occupied hex must not be an approach dest'
   );
   assert.ok(approaches.length >= 1, 'expected unoccupied approach dests toward the far human');
-  const suggestions = suggestApproachDestinationsForOrderlessUnits('opponent', state, ['opponent-inf-mover']);
-  const suggested = suggestions.get('opponent-inf-mover');
+  const suggestions = suggestApproachDestinationsForOrderlessUnits('opponent', state, ['opponent-arm-mover']);
+  const suggested = suggestions.get('opponent-arm-mover');
   assert.ok(suggested, 'orderless table must offer a closing dest when one exists');
   assert.ok(
     approaches.some((r) => r.targetH3 === suggested),

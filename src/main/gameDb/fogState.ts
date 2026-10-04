@@ -243,7 +243,10 @@ export function getGameStateSnapshot(deps: FogDeps): GameStateSnapshot {
   const weatherOn = originBonusSettings.weatherBonusEnabled === true;
   const startMonth = parseStartMonth(originBonusSettings.startMonth);
   const turnNumber = turnRow?.turnNumber ?? 1;
-  const { weatherBonusEnabled: _weatherFlag, startMonth: _startMonth, ...originFlags } = originBonusSettings;
+  const originFlags = {
+    countryBonusEnabled: originBonusSettings.countryBonusEnabled,
+    terrainBonusEnabled: originBonusSettings.terrainBonusEnabled,
+  };
   const snapshot = {
     hexes: weatherOn
       ? hexRows.map((hex) => ({ ...hex, weather: displayWeatherForHex(hex.h3Index, turnNumber, startMonth) }))

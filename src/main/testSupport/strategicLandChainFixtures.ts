@@ -72,7 +72,7 @@ export function findGeodesicLandMassChain(hops: number): string[] {
  *
  * Purpose: Shared fixture so occupancy vs empty-urban vs adjacent-enemy vs suggestion tests differ only in units and infra.
  * When to use: With a chain from `findGeodesicLandMassChain`.
- * Expected outcome: Infantry at `chain[0]` can legally step onto `chain[1]` / `chain[2]` this turn; `chain[4]` is out of this-turn reach.
+ * Expected outcome: Infantry at `chain[0]` can step onto `chain[1]` this turn. Armor can also reach `chain[2]`. `chain[4]` is beyond a 2-hex move.
  * Exceptions: None.
  */
 export function buildLandChainState(args: {

@@ -8,7 +8,7 @@ import {
 } from '../gameDb';
 import type { AirStrikeTargetType } from '../../shared/ipcTypes';
 import { fallbackDisplayNameFromUnitId } from '../../shared/unitDisplayNames';
-import { AIR_FERRY_RANGE_HEXES, AIR_STRIKE_RANGE_HEXES, formatFerryOutOfRangeReason, formatTargetOutOfRangeReason } from '../../shared/tacticalRanges';
+import { AIR_STRIKE_RANGE_HEXES, formatFerryOutOfRangeReason, formatTargetOutOfRangeReason } from '../../shared/tacticalRanges';
 import { logTrace } from '../logger';
 import { isWithinAirFerryGridRange, isWithinAirStrikeGridRange } from './gridRange';
 import { readPersistedOriginBonusSettings } from '../gameDb/originBonusConfig';
