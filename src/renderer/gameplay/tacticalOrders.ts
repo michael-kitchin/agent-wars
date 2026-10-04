@@ -7,37 +7,12 @@ import {
 import { rendererSharedState as S } from '../core/state';
 import { showOrderBlockHexTooltip } from '../map/orderBlockHexTooltip';
 import { hideOrderSlowerHexTooltip } from '../map/orderSlowerHexTooltip';
+import { appendMutedPlaceholder } from './sidebarListHelpers';
 import type { TacticalOrderDeps } from './tacticalOrderDeps';
 export type { TacticalOrderDeps } from './tacticalOrderDeps';
 export type { RefreshHoverRoutePreviewOptions } from './hoverRoutePreviewTypes';
 import { refreshHoverRoutePreview } from './hoverRoutePreviewRefresh';
 export { refreshHoverRoutePreview };
-
-/**
- * Defines the `getRepresentativeSelectedUnitIdsByOrigin` function shape (export function getRepresentativeSelectedUnitIdsByOrigin(): string[]).
-
- * Purpose: Supports maintainability by documenting why `getRepresentativeSelectedUnitIdsByOrigin` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-export function getRepresentativeSelectedUnitIdsByOrigin(): string[] {
-  if (!S.gameState) return [...S.selectedUnitIds];
-  const tb = S.tacticalBattleSnapshot;
-  const byId = new Map(
-    (tb ? tb.subUnits : S.gameState.units).map((u) => [u.id, u] as const)
-  );
-  const seenOrigins = new Set<string>();
-  const representatives: string[] = [];
-  for (const unitId of S.selectedUnitIds) {
-    const unit = byId.get(unitId);
-    if (!unit || unit.player !== 'human') continue;
-    if (seenOrigins.has(unit.h3Index)) continue;
-    seenOrigins.add(unit.h3Index);
-    representatives.push(unitId);
-  }
-  return representatives;
-}
 
 /**
  * Replaces pending support-order rows for the selected unit ids via a row builder.
@@ -187,16 +162,8 @@ export async function cancelOrderForUnit(unitId: string, deps: TacticalOrderDeps
  */
 export function cancelRangedForUnit(unitId: string, deps: TacticalOrderDeps): void {
   S.pendingRangedAttacks = S.pendingRangedAttacks.filter((r) => r.unitId !== unitId);
-  if (S.tacticalBattleSnapshot) {
-    S.pendingEmbarkOrders = S.pendingEmbarkOrders.filter((e) => e.unitId !== unitId);
-  }
   S.rangedModeActive = false;
-  void refreshHoverRoutePreview(deps);
-  deps.updateSidebar();
-  deps.updatePendingOrdersSidebar();
-  deps.updateRangedSidebar();
-  deps.refreshStackCalloutIfOpen();
-  deps.redraw();
+  finishTargetingDraftCancel(unitId, deps);
 }
 
 /**
@@ -209,10 +176,22 @@ export function cancelRangedForUnit(unitId: string, deps: TacticalOrderDeps): vo
  */
 export function cancelAirStrikeForUnit(unitId: string, deps: TacticalOrderDeps): void {
   S.pendingAirStrikes = S.pendingAirStrikes.filter((r) => r.unitId !== unitId);
+  S.airStrikeModeActive = false;
+  finishTargetingDraftCancel(unitId, deps);
+}
+
+/**
+ * Drops one unit's embark draft during a battle, then refreshes hover, sidebars, and the map.
+ *
+ * Purpose: Ranged and strike cancel share this refresh sequence after each has cleared its own draft and mode flag.
+ * When to use: Only from `cancelRangedForUnit` and `cancelAirStrikeForUnit`, after those writes.
+ * Expected outcome: Embark rows for that unit are gone when a battle is active; panels and the map match the remaining drafts.
+ * Exceptions: None.
+ */
+function finishTargetingDraftCancel(unitId: string, deps: TacticalOrderDeps): void {
   if (S.tacticalBattleSnapshot) {
     S.pendingEmbarkOrders = S.pendingEmbarkOrders.filter((e) => e.unitId !== unitId);
   }
-  S.airStrikeModeActive = false;
   void refreshHoverRoutePreview(deps);
   deps.updateSidebar();
   deps.updatePendingOrdersSidebar();
@@ -259,10 +238,7 @@ export function updateRangedSidebar(deps: TacticalOrderDeps): void {
   const tacticalPositions = S.tacticalBattleSnapshot?.subUnits;
   listEl.innerHTML = '';
   if (S.pendingRangedAttacks.length === 0) {
-    const span = document.createElement('span');
-    span.textContent = 'None';
-    span.className = 'chrome-muted';
-    listEl.appendChild(span);
+    appendMutedPlaceholder(listEl, 'None');
   } else {
     for (const r of S.pendingRangedAttacks) {
       const row = deps.createSidebarOrderRow({
@@ -282,10 +258,7 @@ export function updateRangedSidebar(deps: TacticalOrderDeps): void {
   if (strikeListEl) {
     strikeListEl.innerHTML = '';
     if (S.pendingAirStrikes.length === 0) {
-      const span = document.createElement('span');
-      span.textContent = 'None';
-      span.className = 'chrome-muted';
-      strikeListEl.appendChild(span);
+      appendMutedPlaceholder(strikeListEl, 'None');
     } else {
       for (const strike of S.pendingAirStrikes) {
         const row = deps.createSidebarOrderRow({

@@ -2,7 +2,7 @@
  * Resolves tactical res4 ranged targets for sub-units (closest in-range enemy cell with LOS) and generates per-beat DEFEND engagement orders.
  */
 
-import type { TacticalOpponentPlanPayload } from '../../shared/ipc/readyTypes';
+import type { TacticalOpponentPlanPayload } from '../../shared/ipc/consultationPushTypes';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import {
   collectTacticalLegalRangedTargetRes4Hexes,

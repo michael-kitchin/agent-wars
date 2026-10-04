@@ -4,16 +4,17 @@
  */
 
 import { getRes0Cells, cellToChildren, cellToLatLng } from 'h3-js';
+import { STRATEGIC_H3_RESOLUTION } from '../shared/h3Resolutions';
 
 /**
- * Documents the module-scope binding `H3_RESOLUTION` (H3_RESOLUTION).
-
- * Purpose: Supports maintainability by documenting why `H3_RESOLUTION` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * H3 resolution of the ordered world hex list.
+ *
+ * Purpose: Names the strategic resolution used to enumerate every world cell and to fill prompt text.
+ * When to use: `getOrderedHexList` and any prompt that prints the world resolution.
+ * Expected outcome: Always equals `STRATEGIC_H3_RESOLUTION` (1).
  * Exceptions: None.
  */
-export const H3_RESOLUTION = 1;
+export const H3_RESOLUTION = STRATEGIC_H3_RESOLUTION;
 
 /**
  * Documents the module-scope binding `cachedWorldHexList` (cachedWorldHexList: string[] | null).

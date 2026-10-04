@@ -1,8 +1,8 @@
 /** Loads and validates terrain naming envelopes emitted by the Python naming pipeline. */
 
-import * as fs from 'fs';
 import { getResolution } from 'h3-js';
-import { logDebug, logError, logTrace } from './logger';
+import { readJsonFileOrThrow } from './jsonFileHelpers';
+import { logDebug, logTrace } from './logger';
 import { resolveTerrainRes1NamingPath, resolveTerrainRes4NamingPath } from './terrainMetadataPaths';
 
 /**
@@ -693,42 +693,30 @@ export function namesForFirstOccurringScalerankList(
 }
 
 /**
- * Defines the `loadTerrainRes1NamingFromPath` function shape (export function loadTerrainRes1NamingFromPath(absPath: string): TerrainNamingEnvelope).
-
- * Purpose: Supports maintainability by documenting why `loadTerrainRes1NamingFromPath` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
+ * Loads and validates a res1 terrain naming JSON file.
+ *
+ * Purpose: Entry point for strategic place-name data on disk.
+ * When to use: Bundled load and any caller that already has an absolute naming path.
+ * Expected outcome: Parsed naming envelope at resolution 1.
+ * Exceptions: Rethrows read and parse failures. Throws when the envelope fails validation.
  */
 export function loadTerrainRes1NamingFromPath(absPath: string): TerrainNamingEnvelope {
   logDebug('terrainNamingLoad loadTerrainRes1NamingFromPath', { absPath });
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(fs.readFileSync(absPath, 'utf8')) as unknown;
-  } catch (err) {
-    logError('terrainNamingLoad loadTerrainRes1NamingFromPath: read/parse failed', err);
-    throw err;
-  }
+  const parsed = readJsonFileOrThrow(absPath, 'terrainNamingLoad loadTerrainRes1NamingFromPath');
   return parseNamingEnvelope(parsed, 1);
 }
 
 /**
- * Defines the `loadTerrainRes4NamingFromPath` function shape (export function loadTerrainRes4NamingFromPath(absPath: string): TerrainNamingEnvelope).
-
- * Purpose: Supports maintainability by documenting why `loadTerrainRes4NamingFromPath` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
+ * Loads and validates a res4 terrain naming JSON file.
+ *
+ * Purpose: Entry point for tactical place-name data on disk.
+ * When to use: Bundled load and any caller that already has an absolute naming path.
+ * Expected outcome: Parsed naming envelope at resolution 4.
+ * Exceptions: Rethrows read and parse failures. Throws when the envelope fails validation.
  */
 export function loadTerrainRes4NamingFromPath(absPath: string): TerrainNamingEnvelope {
   logDebug('terrainNamingLoad loadTerrainRes4NamingFromPath', { absPath });
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(fs.readFileSync(absPath, 'utf8')) as unknown;
-  } catch (err) {
-    logError('terrainNamingLoad loadTerrainRes4NamingFromPath: read/parse failed', err);
-    throw err;
-  }
+  const parsed = readJsonFileOrThrow(absPath, 'terrainNamingLoad loadTerrainRes4NamingFromPath');
   return parseNamingEnvelope(parsed, 4);
 }
 

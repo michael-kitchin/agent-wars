@@ -27,8 +27,7 @@ import {
   tacticalMovementUnitTypeForPathfinding,
   tacticalTerrainLayerSignature,
 } from './tacticalTerrainMovement';
-
-const TACTICAL_H3_RESOLUTION = 4;
+import { TACTICAL_H3_RESOLUTION } from './h3Resolutions';
 
 /** Milestone 2.2 §3.4: renderer-only march plan memo bound (LRU by Map insertion order). */
 const MAX_TACTICAL_HOVER_PLAN_MEMO = 64;

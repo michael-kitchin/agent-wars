@@ -443,6 +443,36 @@
       "waiverReason": "Same identifier as the waived implementation export."
     },
     {
+      "id": "sym-getHexController-controlInfrastructureAccess",
+      "kind": "symbol",
+      "currentPath": "src/main/gameDb/controlInfrastructureAccess.ts",
+      "currentName": "getHexController",
+      "proposedName": "getHexController",
+      "category": "bannedSuffix",
+      "rationale": "Facade re-export of the waived hex-ownership helper.",
+      "referencingFileCount": 10,
+      "linkedEntryIds": [
+        "sym-getHexController-gameDb"
+      ],
+      "status": "waived",
+      "waiverReason": "Same identifier as the waived gameDb facade."
+    },
+    {
+      "id": "sym-setHexController-controlInfrastructureAccess",
+      "kind": "symbol",
+      "currentPath": "src/main/gameDb/controlInfrastructureAccess.ts",
+      "currentName": "setHexController",
+      "proposedName": "setHexController",
+      "category": "bannedSuffix",
+      "rationale": "Facade re-export of the waived hex-ownership helper.",
+      "referencingFileCount": 8,
+      "linkedEntryIds": [
+        "sym-setHexController-gameDb"
+      ],
+      "status": "waived",
+      "waiverReason": "Same identifier as the waived gameDb facade."
+    },
+    {
       "id": "sym-formatProductionLabelForAnyController",
       "kind": "symbol",
       "currentPath": "src/renderer/gameplay/productionOverlayHelpers.ts",

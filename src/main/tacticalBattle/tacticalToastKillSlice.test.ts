@@ -1,5 +1,5 @@
 import * as assert from 'assert';
-import type { TacticalCommitResolutionPlayback } from '../../shared/ipc/readyTypes';
+import type { TacticalCommitResolutionPlayback } from '../../shared/ipc/tacticalPlaybackTypes';
 import { tacticalKillEdgesForStrategicStyleTurnUpdate } from '../../shared/tacticalToastKillSlice';
 
 /**

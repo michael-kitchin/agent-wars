@@ -18,7 +18,7 @@ import type {
   TacticalCommitResolutionPlayback,
 } from '../../shared/ipcTypes';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
-import type { TacticalPostBeatConsultFields, TacticalPostBeatConsultMergeSource } from '../../shared/ipc/readyTypes';
+import type { TacticalPostBeatConsultFields, TacticalPostBeatConsultMergeSource } from '../../shared/ipc/consultationPushTypes';
 
 /**
  * Spreads optional `aiMessage` / `aiStrategy` IPC fields when the trimmed text is non-empty.

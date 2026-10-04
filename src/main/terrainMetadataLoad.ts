@@ -1,10 +1,11 @@
 /** Loads and validates terrain hex metadata envelopes from the Python metadata pipeline. */
 
-import * as fs from 'fs';
 import { getResolution } from 'h3-js';
-import { logDebug, logError, logTrace } from './logger';
+import { readJsonFileOrThrow } from './jsonFileHelpers';
+import { logDebug, logTrace } from './logger';
 import type { PipelineTerrainKind } from '../shared/pipelineTerrain';
 import { resolveTerrainRes1MetadataPath, resolveTerrainRes4MetadataPath } from './terrainMetadataPaths';
+import { STRATEGIC_H3_RESOLUTION, TACTICAL_H3_RESOLUTION } from '../shared/h3Resolutions';
 
 /**
  * Documents the module-scope binding `EXPECTED_HEX_METADATA_SCHEMA_VERSION` (EXPECTED_HEX_METADATA_SCHEMA_VERSION).
@@ -157,23 +158,23 @@ mountain_elevation_max_min: 700,
 export const DEFAULT_NODATA_FALLBACK_TERRAIN: PipelineTerrainKind = 'water';
 
 /**
- * Documents the module-scope binding `METADATA_PARENT_RESOLUTION` (METADATA_PARENT_RESOLUTION).
-
- * Purpose: Supports maintainability by documenting why `METADATA_PARENT_RESOLUTION` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * H3 resolution of parent cells in terrain metadata packs.
+ *
+ * Purpose: Names the strategic resolution used when validating res1 metadata rows.
+ * When to use: Terrain metadata load and validation.
+ * Expected outcome: Always equals `STRATEGIC_H3_RESOLUTION` (1).
  * Exceptions: None.
  */
-export const METADATA_PARENT_RESOLUTION = 1;
+export const METADATA_PARENT_RESOLUTION = STRATEGIC_H3_RESOLUTION;
 /**
- * Documents the module-scope binding `METADATA_CHILD_RESOLUTION` (METADATA_CHILD_RESOLUTION).
-
- * Purpose: Supports maintainability by documenting why `METADATA_CHILD_RESOLUTION` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * H3 resolution of child cells in terrain metadata packs.
+ *
+ * Purpose: Names the tactical resolution used when validating res4 metadata rows.
+ * When to use: Terrain metadata load and validation.
+ * Expected outcome: Always equals `TACTICAL_H3_RESOLUTION` (4).
  * Exceptions: None.
  */
-export const METADATA_CHILD_RESOLUTION = 4;
+export const METADATA_CHILD_RESOLUTION = TACTICAL_H3_RESOLUTION;
 
 /**
  * Documents the module-scope binding `TERRAIN_METADATA_COUNT_KEYS` (TERRAIN_METADATA_COUNT_KEYS).
@@ -806,42 +807,30 @@ function parseMetadataEnvelope(raw: unknown, expectedResolution: number): HexMet
 }
 
 /**
- * Defines the `loadTerrainRes1MetadataFromPath` function shape (export function loadTerrainRes1MetadataFromPath(absPath: string): HexMetadataEnvelope).
-
- * Purpose: Supports maintainability by documenting why `loadTerrainRes1MetadataFromPath` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
+ * Loads and validates a res1 terrain metadata JSON file.
+ *
+ * Purpose: Entry point for the strategic terrain pack on disk.
+ * When to use: Bundled load and any caller that already has an absolute metadata path.
+ * Expected outcome: Parsed envelope at resolution 1.
+ * Exceptions: Rethrows read and parse failures. Throws when the envelope fails validation.
  */
 export function loadTerrainRes1MetadataFromPath(absPath: string): HexMetadataEnvelope {
   logDebug('terrainMetadataLoad loadTerrainRes1MetadataFromPath', { absPath });
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(fs.readFileSync(absPath, 'utf8')) as unknown;
-  } catch (err) {
-    logError('terrainMetadataLoad loadTerrainRes1MetadataFromPath: read/parse failed', err);
-    throw err;
-  }
+  const parsed = readJsonFileOrThrow(absPath, 'terrainMetadataLoad loadTerrainRes1MetadataFromPath');
   return parseMetadataEnvelope(parsed, 1);
 }
 
 /**
- * Defines the `loadTerrainRes4MetadataFromPath` function shape (export function loadTerrainRes4MetadataFromPath(absPath: string): HexMetadataEnvelope).
-
- * Purpose: Supports maintainability by documenting why `loadTerrainRes4MetadataFromPath` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
+ * Loads and validates a res4 terrain metadata JSON file.
+ *
+ * Purpose: Entry point for the tactical terrain pack on disk.
+ * When to use: Bundled load and any caller that already has an absolute metadata path.
+ * Expected outcome: Parsed envelope at resolution 4.
+ * Exceptions: Rethrows read and parse failures. Throws when the envelope fails validation.
  */
 export function loadTerrainRes4MetadataFromPath(absPath: string): HexMetadataEnvelope {
   logDebug('terrainMetadataLoad loadTerrainRes4MetadataFromPath', { absPath });
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(fs.readFileSync(absPath, 'utf8')) as unknown;
-  } catch (err) {
-    logError('terrainMetadataLoad loadTerrainRes4MetadataFromPath: read/parse failed', err);
-    throw err;
-  }
+  const parsed = readJsonFileOrThrow(absPath, 'terrainMetadataLoad loadTerrainRes4MetadataFromPath');
   return parseMetadataEnvelope(parsed, 4);
 }
 

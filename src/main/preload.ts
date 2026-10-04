@@ -37,7 +37,11 @@ import type {
   StartTacticalBattleIpcResult,
   TacticalBattleSnapshot,
 } from '../shared/tacticalBattleTypes';
-import type { CommitHumanTacticalDraftOrdersIpcResult } from '../shared/ipc/gameApiTypes';
+import type {
+  CommitHumanTacticalDraftOrdersIpcPayload,
+  CommitHumanTacticalDraftOrdersIpcResult,
+  GameApi,
+} from '../shared/ipc/gameApiTypes';
 import type { HexNamingCaption } from '../shared/hexNamingCaption';
 /**
  * Preload-local IPC channel map for game handlers.
@@ -149,11 +153,11 @@ ipcRenderer.on(IPC_GAME.postTacticalBeatConsultation, (_event, payload: Tactical
 });
 
 /**
- * Documents the module-scope binding `gameApi` (gameApi).
-
- * Purpose: Supports maintainability by documenting why `gameApi` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Renderer bridge checked against `GameApi`.
+ *
+ * Purpose: `satisfies GameApi` fails the build when a preload method drifts from the shared contract.
+ * When to use: The only object passed to `contextBridge.exposeInMainWorld('gameApi', ...)`.
+ * Expected outcome: Every `GameApi` member is present with a compatible signature.
  * Exceptions: None.
  */
 const gameApi = {
@@ -392,16 +396,7 @@ assignHumanMarchOrders: (payload: {
    * `TacticalPostBeatConsultFields` (kind `tactical`, battleId, attach flag, optional plan/strategy/counts) on the same result.
    * Exceptions: IPC errors propagate as promise rejections.
    */
-commitHumanTacticalDraftOrders: (payload: {
-    movementOrders: { unitId: string; toH3Index: string }[];
-    rangedAttacks?: { unitId: string; targetH3Index: string }[];
-    airStrikes?: { unitId: string; targetH3Index: string; targetType: AirStrikeTargetType }[];
-    ferryOrders?: { unitId: string; destinationH3Index: string }[];
-    embarkOrders?: { unitId: string; navalUnitId: string }[];
-    opponentTacticalDraft?: import('../shared/ipc/readyTypes').TacticalOpponentPlanPayload;
-    useEventDrivenConsultation?: boolean;
-    aiPlanningRunEnabled?: boolean;
-  }): Promise<CommitHumanTacticalDraftOrdersIpcResult> =>
+commitHumanTacticalDraftOrders: (payload: CommitHumanTacticalDraftOrdersIpcPayload): Promise<CommitHumanTacticalDraftOrdersIpcResult> =>
     ipcRenderer.invoke(IPC_GAME.commitHumanTacticalDraftOrders, payload),
     /**
    * Documents the object literal property `validateGroupRangedTarget` (validateGroupRangedTarget: (payload: { unitIds: string[]; targetH3Index: string }): Promise<{ success: boolean; reason?: string }> => ipcRenderer.invoke('g).
@@ -616,6 +611,6 @@ openRouter: {
     getToolGroupList: (): Promise<{ id: string; label: string }[]> =>
       ipcRenderer.invoke(IPC_OPENROUTER.getToolGroupList),
   },
-};
+} satisfies GameApi;
 
 contextBridge.exposeInMainWorld('gameApi', gameApi);

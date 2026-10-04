@@ -1,5 +1,5 @@
 import type { AirStrikeOrder, EmbarkOrder, FerryOrder } from './ordersTypes';
-import type { TacticalOpponentPlanPayload } from './readyTypes';
+import type { TacticalOpponentPlanPayload } from './consultationPushTypes';
 
 /**
  * True when the opponent tactical plan carries at least one executable row across movement, support, or embark lists.

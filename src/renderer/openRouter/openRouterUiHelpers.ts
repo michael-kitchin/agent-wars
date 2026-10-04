@@ -203,33 +203,6 @@ export function clearOpenRouterLog(): void {
   if (el) el.textContent = '';
 }
 
-/**
- * Defines the `bulletizeToastLines` function shape (export function bulletizeToastLines(message: string): string).
-
- * Purpose: Supports maintainability by documenting why `bulletizeToastLines` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-export function bulletizeToastLines(message: string): string {
-  const lines = message
-    .split('\n')
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0);
-  if (lines.length === 0) return '•';
-  let inSection = false;
-  return lines
-    .map((line) => {
-      if (line.startsWith('## ')) {
-        inSection = true;
-        return line.slice(3);
-      }
-      const bullet = line.startsWith('•') ? line : `• ${line}`;
-      return inSection ? `  ${bullet}` : bullet;
-    })
-    .join('\n');
-}
-
 /** Left margin applied to sub-bullets under a `##` section header in `#map-toast`. */
 export const MAP_TOAST_SECTION_BULLET_INDENT = '1.25em';
 

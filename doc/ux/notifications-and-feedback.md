@@ -83,6 +83,7 @@ None.
 - `src/renderer/openRouter/openRouterUiHelpers.ts`
 - `src/renderer/openRouter/openRouterControls.ts`
 - `src/renderer/gameplay/sidebarSupport.ts`
+- `src/renderer/gameplay/readyResolutionAnnouncements.ts`
 - `src/renderer/gameplay/turnUpdateSummary.ts`
 - `src/renderer/core/unitOriginFlags.ts`
 - `src/shared/lossToastUnitSegments.ts`

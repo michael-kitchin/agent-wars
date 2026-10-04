@@ -34,8 +34,7 @@ import {
 } from './tacticalTerrainMovement';
 import type { TacticalMovementCategory } from './tacticalTerrainMovement';
 import { TOOLTIP_SECTION_GAP_HTML } from './tooltipSectionGap';
-
-const STRATEGIC_H3_RESOLUTION = 1;
+import { STRATEGIC_H3_RESOLUTION } from './h3Resolutions';
 
 /** Stable ordering for multi-terrain comma lists in order-preview HTML (lower sorts earlier). */
 const SLOW_TERRAIN_LABEL_SORT_PRIORITY: Readonly<Record<string, number>> = {

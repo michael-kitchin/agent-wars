@@ -1,3 +1,4 @@
+import type { KillEdge } from './ipc/combatResultTypes';
 import { parseStrategicUnitId, unitIdOwnerFromId } from './unitIds';
 
 /**
@@ -364,7 +365,7 @@ export function buildStrategicUnitDisplayLabelResolver(
  * Exceptions: None.
  */
 export function buildKillLabelUnitRoster(
-  killEdges: readonly { victimId: string; killerIds: string[] }[],
+  killEdges: readonly KillEdge[],
   liveUnits: readonly UnitDisplayIdentity[],
   removedUnits: readonly { id: string; unitType: string; displayOrder?: number; player?: string }[]
 ): UnitDisplayIdentity[] {

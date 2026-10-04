@@ -27,7 +27,7 @@ const gridDistanceMemo = new Map<string, number | null>();
 /**
  * Returns grid-step distance between two cells, or null when H3 APIs cannot derive a path or distance.
  *
- * Contract: Tries `gridDistance`, then path length from `gridPathCells` minus one, matching `computeGridDistanceSafe` core.
+ * Contract: Tries `gridDistance`, then path length from `gridPathCells` minus one.
  * When to use: `isWithinGridRangePure` and callers that need a numeric distance without logging.
  * Expected outcome: Non-negative integer when derivable.
  * Exceptions: None; failures return null.

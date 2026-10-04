@@ -11,6 +11,7 @@ import type {
   FerryOrder,
   RangedAttackOrder,
 } from '../../shared/ipcTypes';
+import type { KillEdge } from '../../shared/ipc/combatResultTypes';
 import type { InfrastructureDestroyedEvent, RemovedUnitSnapshot } from '../../shared/ipc/readyTypes';
 import type { TacticalBattleSnapshot, TacticalSubUnitSnapshot } from '../../shared/tacticalBattleTypes';
 import { tacticalFerryApplyOutcome } from './tacticalFerryAirportGuards';
@@ -218,9 +219,9 @@ export function applyTacticalEmbarkPhaseOnBattle(
  */
 export type TacticalAirRangedPhaseAccum = {
   battle: TacticalBattleSnapshot;
-  killsByDirectFire: { victimId: string; killerIds: string[] }[];
-  killsByAirStrike: { victimId: string; killerIds: string[] }[];
-  killsByReturnFire: { victimId: string; killerIds: string[] }[];
+  killsByDirectFire: KillEdge[];
+  killsByAirStrike: KillEdge[];
+  killsByReturnFire: KillEdge[];
   removedUnits: RemovedUnitSnapshot[];
   infrastructureDestroyedEvents: InfrastructureDestroyedEvent[];
   airStrikeAttemptCount: number;
@@ -294,9 +295,9 @@ export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
   const originHitBonusAt = buildTacticalOriginHitBonusLookupFromDb(battle);
   let sub = battle.subUnits.map((u) => ({ ...u }));
   const infrastructureDestroyedEvents: InfrastructureDestroyedEvent[] = [];
-  const killsByDirectFire: { victimId: string; killerIds: string[] }[] = [];
-  const killsByAirStrike: { victimId: string; killerIds: string[] }[] = [];
-  const killsByReturnFire: { victimId: string; killerIds: string[] }[] = [];
+  const killsByDirectFire: KillEdge[] = [];
+  const killsByAirStrike: KillEdge[] = [];
+  const killsByReturnFire: KillEdge[] = [];
   const removedUnits: RemovedUnitSnapshot[] = [];
   const removedUnitIdsLogged = new Set<string>();
   let airStrikeAttemptCount = 0;

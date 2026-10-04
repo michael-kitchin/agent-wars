@@ -10,6 +10,7 @@
 import { logTrace } from '../logger';
 import { unitIdOwnerFromId } from '../../shared/unitIds';
 import type { GameStateSnapshot } from '../gameDb';
+import type { KillEdge } from '../../shared/ipc/combatResultTypes';
 import type { ReadyResult, TacticalCommitResolutionPlayback } from '../../shared/ipcTypes';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 
@@ -142,7 +143,7 @@ function subUnitPlayerHadTacticalBeatResolutionActions(
   if (player === 'human' && playback.humanBeatHadSubmittedRangedOrAirOrders === true) return true;
   if (player === 'opponent' && playback.opponentBeatHadSubmittedRangedOrAirOrders === true) return true;
   const ids = new Set(tacticalBattle.subUnits.filter((s) => s.player === player).map((s) => s.id));
-  const buckets: ReadonlyArray<ReadonlyArray<{ victimId: string; killerIds: string[] }> | undefined> = [
+  const buckets: ReadonlyArray<ReadonlyArray<KillEdge> | undefined> = [
     playback.killsByDirectFire,
     playback.killsByAirStrike,
     playback.killsByReturnFire,

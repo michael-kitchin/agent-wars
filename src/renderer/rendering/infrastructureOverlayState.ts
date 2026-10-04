@@ -1,14 +1,5 @@
 import { cellToParent } from 'h3-js';
-
-/**
- * Documents the module-scope binding `WORLD_H3_RESOLUTION` (WORLD_H3_RESOLUTION).
-
- * Purpose: Supports maintainability by documenting why `WORLD_H3_RESOLUTION` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-const WORLD_H3_RESOLUTION = 1;
+import { STRATEGIC_H3_RESOLUTION } from '../../shared/h3Resolutions';
 
 /**
  * Documents the `Res4OverlayInfrastructureRow` interface as a named contract surface (export interface Res4OverlayInfrastructureRow).
@@ -216,7 +207,7 @@ export function deriveInfrastructureOverlayState(
   const terrainInfraRes1Seaport = new Set<string>();
   for (const row of rows) {
     if (!row.isAirport && !row.isSeaport) continue;
-    const parentH3 = cellToParent(row.h3Index, WORLD_H3_RESOLUTION);
+    const parentH3 = cellToParent(row.h3Index, STRATEGIC_H3_RESOLUTION);
     if (row.isAirport) terrainInfraRes1Airport.add(parentH3);
     if (row.isSeaport) terrainInfraRes1Seaport.add(parentH3);
   }

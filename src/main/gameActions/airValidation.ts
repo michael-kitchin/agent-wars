@@ -1,16 +1,15 @@
 import {
-  dbGetAll,
   dbGetOne,
   getHexController,
   getMapHexSet,
   getRes1InfrastructureForHex,
-  isDbReady,
 } from '../gameDb';
 import type { AirStrikeTargetType } from '../../shared/ipcTypes';
 import { fallbackDisplayNameFromUnitId } from '../../shared/unitDisplayNames';
 import { AIR_STRIKE_RANGE_HEXES, formatFerryOutOfRangeReason, formatTargetOutOfRangeReason } from '../../shared/tacticalRanges';
 import { logTrace } from '../logger';
 import { isWithinAirFerryGridRange, isWithinAirStrikeGridRange } from './gridRange';
+import { hasEnemyUnitsAtHex, loadOwnedStrategicUnit } from './ownedUnitGuards';
 import { readPersistedOriginBonusSettings } from '../gameDb/originBonusConfig';
 import { strategicFerryRangeOnState } from '../weather/weatherMatch';
 import { weatherTagsForBirthHex } from '../weather/weatherPackLoad';
@@ -50,12 +49,12 @@ valid: false; /**
 reason: string };
 
 /**
- * Defines the `validateAirStrikeOrder` function shape (export function validateAirStrikeOrder( unitId: string, targetH3Index: string, targetType: AirStrikeTargetType, options?: { allowedPlayer?: string }).
-
- * Purpose: Supports maintainability by documenting why `validateAirStrikeOrder` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
+ * Checks whether one air unit may strike a strategic hex.
+ *
+ * Purpose: Single-unit strike gate shared by group targeting and order submit.
+ * When to use: After the caller has a unit id, target hex, and strike target type.
+ * Expected outcome: `{ valid: true }` or `{ valid: false, reason }` covering ownership, base airport, range, and the target type.
+ * Exceptions: None. A closed database returns `{ valid: false, reason: 'Database not initialized' }`.
  */
 export function validateAirStrikeOrder(
   unitId: string,
@@ -66,13 +65,9 @@ export function validateAirStrikeOrder(
   logTrace('airValidation validateAirStrikeOrder', { unitId, targetH3Index, targetType, allowedPlayer: options?.allowedPlayer });
   const allowedPlayer = options?.allowedPlayer ?? 'human';
   const labelFor = options?.displayLabelForUnit ?? fallbackDisplayNameFromUnitId;
-  if (!isDbReady()) return { valid: false, reason: 'Database not initialized' };
-  const unit = dbGetOne<{ player: string; unit_type: string; h3_index: string }>(
-    'SELECT player, unit_type, h3_index FROM units WHERE id = ?',
-    [unitId]
-  );
-  if (!unit) return { valid: false, reason: `Unit not found: ${labelFor(unitId)}` };
-  if (unit.player !== allowedPlayer) return { valid: false, reason: `Unit must belong to ${allowedPlayer}` };
+  const owned = loadOwnedStrategicUnit(unitId, { allowedPlayer, displayLabelForUnit: labelFor });
+  if (!owned.ok) return owned.failure;
+  const unit = owned.unit;
   if (unit.unit_type !== 'air') return { valid: false, reason: 'Only air units can execute strikes' };
   if (!getMapHexSet().has(targetH3Index)) return { valid: false, reason: 'Target hex not on map' };
 
@@ -85,11 +80,7 @@ export function validateAirStrikeOrder(
   }
 
   if (targetType === 'units') {
-    const enemiesAtTarget = dbGetAll<{ player: string }>(
-      'SELECT player FROM units WHERE h3_index = ? AND player != ?',
-      [targetH3Index, unit.player]
-    );
-    if (enemiesAtTarget.length === 0) return { valid: false, reason: 'Target hex has no enemy units' };
+    if (!hasEnemyUnitsAtHex(targetH3Index, unit.player)) return { valid: false, reason: 'Target hex has no enemy units' };
     return { valid: true };
   }
 
@@ -107,12 +98,12 @@ export function validateAirStrikeOrder(
 }
 
 /**
- * Defines the `validateFerryOrder` function shape (export function validateFerryOrder().
-
- * Purpose: Supports maintainability by documenting why `validateFerryOrder` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
+ * Checks whether one air unit may ferry to another controlled airport.
+ *
+ * Purpose: Single-unit ferry gate shared by group targeting and order submit.
+ * When to use: After the caller has a unit id and a destination hex.
+ * Expected outcome: `{ valid: true }` or `{ valid: false, reason }` covering ownership, range, and intact owned airports.
+ * Exceptions: None. A closed database returns `{ valid: false, reason: 'Database not initialized' }`.
  */
 export function validateFerryOrder(
   unitId: string,
@@ -122,13 +113,9 @@ export function validateFerryOrder(
   logTrace('airValidation validateFerryOrder', { unitId, destinationH3Index, allowedPlayer: options?.allowedPlayer });
   const allowedPlayer = options?.allowedPlayer ?? 'human';
   const labelFor = options?.displayLabelForUnit ?? fallbackDisplayNameFromUnitId;
-  if (!isDbReady()) return { valid: false, reason: 'Database not initialized' };
-  const unit = dbGetOne<{ player: string; unit_type: string; h3_index: string }>(
-    'SELECT player, unit_type, h3_index FROM units WHERE id = ?',
-    [unitId]
-  );
-  if (!unit) return { valid: false, reason: `Unit not found: ${labelFor(unitId)}` };
-  if (unit.player !== allowedPlayer) return { valid: false, reason: `Unit must belong to ${allowedPlayer}` };
+  const owned = loadOwnedStrategicUnit(unitId, { allowedPlayer, displayLabelForUnit: labelFor });
+  if (!owned.ok) return owned.failure;
+  const unit = owned.unit;
   if (unit.unit_type !== 'air') return { valid: false, reason: 'Only air units can ferry' };
   if (!getMapHexSet().has(destinationH3Index)) return { valid: false, reason: 'Destination hex not on map' };
   const weatherSettings = readPersistedOriginBonusSettings({ getOne: dbGetOne, hasDb: () => true });

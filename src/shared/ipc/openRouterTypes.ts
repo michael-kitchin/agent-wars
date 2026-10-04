@@ -6,7 +6,7 @@ import type {
   RangedAttackOrder,
 } from './ordersTypes';
 import type { TacticalBattleSnapshot } from './tacticalTypes';
-import type { TacticalOpponentPlanPayload } from './readyTypes';
+import type { TacticalOpponentPlanPayload } from './consultationPushTypes';
 
 /**
  * Documents the `OpenRouterModel` interface as a named contract surface (export interface OpenRouterModel).

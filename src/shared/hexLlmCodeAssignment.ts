@@ -9,20 +9,7 @@
  */
 
 import { cellToChildren, cellToLatLng, cellToParent, getRes0Cells } from 'h3-js';
-
-/**
- * H3 resolution for strategic cells (matches `WORLD_H3_RESOLUTION` / `hex-coordinates` strategic mode).
- *
- * Purpose: Pins parent resolution when deriving a res1 index from a res4 child for composite labels.
- */
-const STRATEGIC_RESOLUTION = 1;
-
-/**
- * H3 resolution for tactical / detail children under one res1 parent (matches `DETAIL_H3_RESOLUTION`).
- *
- * Purpose: Enumerates res4 children when assigning the second code in `(parent.child)` labels.
- */
-const DETAIL_RESOLUTION = 4;
+import { STRATEGIC_H3_RESOLUTION, TACTICAL_H3_RESOLUTION } from './h3Resolutions';
 
 /**
  * Alphabet for 2-character codes: A–Z then 0–9 (same order as `hex-coordinates`).
@@ -83,7 +70,7 @@ export function buildStrategicRes1H3ToCodeMap(): Map<string, string> {
   const res0 = getRes0Cells();
   const res1Set = new Set<string>();
   for (const r0 of res0) {
-    for (const child of cellToChildren(r0, STRATEGIC_RESOLUTION)) {
+    for (const child of cellToChildren(r0, STRATEGIC_H3_RESOLUTION)) {
       res1Set.add(child);
     }
   }
@@ -133,7 +120,7 @@ export function getStrategicRes1HexCode(h3Index: string): string | undefined {
 export function getRes4ChildCodeWithinParent(
   parentRes1H3Index: string,
   childRes4H3Index: string,
-  childResolution: number = DETAIL_RESOLUTION
+  childResolution: number = TACTICAL_H3_RESOLUTION
 ): string | undefined {
   const children = sortCellsForStableLlmCodes(cellToChildren(parentRes1H3Index, childResolution));
   const idx = children.indexOf(childRes4H3Index);
@@ -157,7 +144,7 @@ export function getLlmHexLocationParenLabelForNamingTarget(target: {
     const c = getStrategicRes1HexCode(target.h3Index);
     return c ? `(${c})` : null;
   }
-  const parent = cellToParent(target.h3Index, STRATEGIC_RESOLUTION);
+  const parent = cellToParent(target.h3Index, STRATEGIC_H3_RESOLUTION);
   const parentCode = getStrategicRes1HexCode(parent);
   const childCode = getRes4ChildCodeWithinParent(parent, target.h3Index);
   return parentCode && childCode ? `(${parentCode}.${childCode})` : null;

@@ -39,8 +39,10 @@ How to regenerate the pack stays in `scripts/weather_pipeline/`. Only the `.json
 
 ## Resolutions
 
-- **Strategic map:** H3 resolution **1**.
-- **Tactical battles:** H3 resolution **4** children of one contested res-1 cell.
+- **Strategic map:** H3 resolution **1** (`STRATEGIC_H3_RESOLUTION`).
+- **Tactical battles:** H3 resolution **4** (`TACTICAL_H3_RESOLUTION`) children of one contested res-1 cell.
+
+Both constants live in `src/shared/h3Resolutions.ts`.
 
 Parent-child mapping is H3's native hierarchy (res 1 → res 4 spans three steps). Terrain kinds at res 4 can differ from the parent (coastal, forest, mountain, urban flags, rubble).
 

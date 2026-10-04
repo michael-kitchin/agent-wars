@@ -4,7 +4,10 @@
  */
 
 import * as assert from 'assert';
-import { partitionPathByTurn } from './pathfinding';
+import { gridDisk, gridDistance, latLngToCell } from 'h3-js';
+import { findPath, getReachableHexes, partitionPathByTurn } from './pathfinding';
+import { findGeodesicLandMassChain } from './testSupport/strategicLandChainFixtures';
+import { getRes1LandMassByH3 } from './terrainClassificationCache';
 
 /**
  * Defines the `testSingleStepInfantry` function shape (function testSingleStepInfantry(): void).
@@ -163,6 +166,178 @@ function testFirstTurnEgressThenSailingBudget(): void {
 }
 
 /**
+ * Water-domain hex set where every cell is passable water.
+ *
+ * Purpose: Gives `findPath` and `getReachableHexes` a domain with no land-mass fixture.
+ * When to use: Characterization tests for the shared breadth-first walk.
+ * Expected outcome: A set and terrain map covering exactly `cells`.
+ * Exceptions: None.
+ */
+function waterHexWorld(cells: readonly string[]): { hexSet: Set<string>; terrainByH3: Map<string, string> } {
+  return {
+    hexSet: new Set(cells),
+    terrainByH3: new Map(cells.map((cell) => [cell, 'water'])),
+  };
+}
+
+/**
+ * A fully passable water disk yields a neighbor-by-neighbor path of length `gridDistance + 1`.
+ *
+ * Purpose: Locks the water `findPath` contract before the search is shared.
+ * When to use: From `run`.
+ * Expected outcome: Path starts at the origin, ends at the destination, and each step is a grid neighbor.
+ * Exceptions: Throws when the assertion fails.
+ */
+function testFindPathOnPassableWaterDisk(): void {
+  const origin = latLngToCell(10, 10, 1);
+  const cells = gridDisk(origin, 2);
+  const destination = cells.find((cell) => gridDistance(origin, cell) === 2);
+  assert.ok(destination);
+  const { hexSet, terrainByH3 } = waterHexWorld(cells);
+  const path = findPath(origin, destination, hexSet, terrainByH3, 'water');
+  assert.ok(path);
+  assert.strictEqual(path[0], origin);
+  assert.strictEqual(path[path.length - 1], destination);
+  assert.strictEqual(path.length, gridDistance(origin, destination) + 1);
+  for (let i = 1; i < path.length; i += 1) {
+    assert.ok(gridDisk(path[i - 1]!, 1).includes(path[i]!));
+  }
+}
+
+/**
+ * A blocked or off-map destination is not a path.
+ *
+ * Purpose: Locks the water `findPath` failure contract.
+ * When to use: From `run`.
+ * Expected outcome: `null` for both cases.
+ * Exceptions: Throws when the assertion fails.
+ */
+function testFindPathRejectsBlockedOrMissingDestination(): void {
+  const origin = latLngToCell(10, 10, 1);
+  const cells = gridDisk(origin, 2);
+  const destination = cells.find((cell) => gridDistance(origin, cell) === 2);
+  assert.ok(destination);
+  const { hexSet, terrainByH3 } = waterHexWorld(cells);
+  assert.strictEqual(findPath(origin, destination, hexSet, terrainByH3, 'water', new Set([destination])), null);
+  const outside = gridDisk(origin, 3).find((cell) => !hexSet.has(cell));
+  assert.ok(outside);
+  assert.strictEqual(findPath(origin, outside, hexSet, terrainByH3, 'water'), null);
+}
+
+/**
+ * A radius-2 water disk is fully reachable, and a blocked cell is left out.
+ *
+ * Purpose: Locks the water `getReachableHexes` contract.
+ * When to use: From `run`.
+ * Expected outcome: 19 cells when open; the blocked cell is absent and the rest remain.
+ * Exceptions: Throws when the assertion fails.
+ */
+function testReachableWaterDiskExcludesBlockedCell(): void {
+  const origin = latLngToCell(10, 10, 1);
+  const cells = gridDisk(origin, 2);
+  assert.strictEqual(cells.length, 19);
+  const { hexSet, terrainByH3 } = waterHexWorld(cells);
+  const open = getReachableHexes(origin, hexSet, terrainByH3, 'water');
+  assert.strictEqual(open.size, 19);
+  for (const cell of cells) assert.ok(open.has(cell));
+  const blocked = cells.find((cell) => cell !== origin);
+  assert.ok(blocked);
+  const partial = getReachableHexes(origin, hexSet, terrainByH3, 'water', new Set([blocked]));
+  assert.strictEqual(partial.has(blocked), false);
+  assert.strictEqual(partial.size, 18);
+}
+
+/**
+ * Memo for `landChainWorld` so the three land cases share one map scan.
+ *
+ * Purpose: `findGeodesicLandMassChain` walks the loaded world map.
+ * When to use: Only inside `landChainWorld`.
+ * Expected outcome: Undefined until the first land case; then the same chain for the rest of the run.
+ * Exceptions: None.
+ */
+let cachedLandChain: { chain: string[]; hexSet: Set<string> } | undefined;
+
+/**
+ * One geodesic land chain, scanned once.
+ *
+ * Purpose: Land-domain cases share one chain so the world-map scan runs a single time.
+ * When to use: From the land `findPath` and `getReachableHexes` cases.
+ * Expected outcome: `chain[0]` can reach `chain[2]` across occupiable land.
+ * Exceptions: Throws when the loaded map has no 2-hop geodesic land chain.
+ */
+function landChainWorld(): { chain: string[]; hexSet: Set<string> } {
+  if (cachedLandChain) return cachedLandChain;
+  const chain = findGeodesicLandMassChain(2);
+  cachedLandChain = { chain, hexSet: new Set(chain) };
+  return cachedLandChain;
+}
+
+/**
+ * A land chain yields a neighbor-by-neighbor path of length `gridDistance + 1`.
+ *
+ * Purpose: Locks the land `findPath` contract on a real land-mass chain.
+ * When to use: From `run`.
+ * Expected outcome: Path starts at the chain origin, ends at the far hex, and each step is a grid neighbor.
+ * Exceptions: Throws when the assertion fails or no land chain exists.
+ */
+function testFindPathOnLandChain(): void {
+  const { chain, hexSet } = landChainWorld();
+  const origin = chain[0]!;
+  const destination = chain[2]!;
+  const path = findPath(origin, destination, hexSet, new Map(), 'land', undefined, getRes1LandMassByH3());
+  assert.ok(path);
+  assert.strictEqual(path[0], origin);
+  assert.strictEqual(path[path.length - 1], destination);
+  assert.strictEqual(path.length, gridDistance(origin, destination) + 1);
+  for (let i = 1; i < path.length; i += 1) {
+    assert.ok(gridDisk(path[i - 1]!, 1).includes(path[i]!));
+  }
+}
+
+/**
+ * A blocked land destination is not a path.
+ *
+ * Purpose: Locks the land `findPath` failure contract.
+ * When to use: From `run`.
+ * Expected outcome: `null` when the far hex is blocked.
+ * Exceptions: Throws when the assertion fails or no land chain exists.
+ */
+function testFindPathLandRejectsBlockedDestination(): void {
+  const { chain, hexSet } = landChainWorld();
+  const path = findPath(
+    chain[0]!,
+    chain[2]!,
+    hexSet,
+    new Map(),
+    'land',
+    new Set([chain[2]!]),
+    getRes1LandMassByH3()
+  );
+  assert.strictEqual(path, null);
+}
+
+/**
+ * Land reachability includes the chain and leaves out a blocked step.
+ *
+ * Purpose: Locks the land `getReachableHexes` contract on the same chain.
+ * When to use: From `run`.
+ * Expected outcome: The open set contains every chain hex. Blocking the middle step drops that step and the far hex, and keeps the origin.
+ * Exceptions: Throws when the assertion fails or no land chain exists.
+ */
+function testReachableLandChainExcludesBlockedCell(): void {
+  const { chain, hexSet } = landChainWorld();
+  const landMass = getRes1LandMassByH3();
+  const open = getReachableHexes(chain[0]!, hexSet, new Map(), 'land', undefined, landMass);
+  assert.strictEqual(open.size, chain.length);
+  for (const cell of chain) assert.ok(open.has(cell));
+  const blocked = chain[1]!;
+  const partial = getReachableHexes(chain[0]!, hexSet, new Map(), 'land', new Set([blocked]), landMass);
+  assert.ok(partial.has(chain[0]!));
+  assert.strictEqual(partial.has(blocked), false);
+  assert.strictEqual(partial.has(chain[2]!), false);
+}
+
+/**
  * Defines the `run` function shape (function run(): void).
 
  * Purpose: Supports maintainability by documenting why `run` exists.
@@ -180,6 +355,12 @@ function run(): void {
   testNoZeroMovementSegments();
   testExactBudgetMatch();
   testFirstTurnEgressThenSailingBudget();
+  testFindPathOnPassableWaterDisk();
+  testFindPathRejectsBlockedOrMissingDestination();
+  testReachableWaterDiskExcludesBlockedCell();
+  testFindPathOnLandChain();
+  testFindPathLandRejectsBlockedDestination();
+  testReachableLandChainExcludesBlockedCell();
   console.log('pathfinding tests passed');
 }
 

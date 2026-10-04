@@ -3,7 +3,9 @@ import type {
   TacticalBattleSnapshot,
 } from '../../shared/tacticalBattleTypes';
 import type { AirStrikeAnimationMove, AirStrikeOrder, EmbarkOrder, FerryOrder } from '../../shared/ipcTypes';
-import type { InfrastructureDestroyedEvent, RemovedUnitSnapshot, TacticalOpponentPlanPayload } from '../../shared/ipc/readyTypes';
+import type { KillEdge } from '../../shared/ipc/combatResultTypes';
+import type { TacticalOpponentPlanPayload } from '../../shared/ipc/consultationPushTypes';
+import type { InfrastructureDestroyedEvent, RemovedUnitSnapshot } from '../../shared/ipc/readyTypes';
 import type { RangedResolutionShotLine } from '../../shared/rangedResolutionShotLines';
 import { tacticalBoundaryConcurrentSessionAllowed } from '../../shared/tacticalStateAssertions';
 import { createCombatRng } from '../combatResolution';
@@ -307,7 +309,7 @@ export function endTacticalBattleSessionForHumanVoluntaryExitBailout(): void {
  * Maps a tactical human march validation failure to a short user-facing reason string.
  *
  * Purpose: Keeps IPC failure wording consistent for tactical march validation without exposing internal codes.
- * When to use: `applyHumanTacticalMarchOrders` when pre-projection validation fails for any row.
+ * When to use: `humanTacticalMarchValidationFailure` when pre-projection validation fails for any row.
  * Expected outcome: English clause suitable for map toasts without leaking internal ids unnecessarily.
  * Exceptions: None.
  */
@@ -334,7 +336,7 @@ function humanTacticalMarchBlockMessage(reason: TacticalMovementBlockReason): st
  * Returns a user-facing validation error string when any human tactical march order is illegal, or null when all pass.
  *
  * Purpose: Centralizes the all-or-nothing guard shared by draft validation IPC and snapshot application.
- * When to use: `validateHumanTacticalMarchOrders` and `applyHumanTacticalMarchOrders` before mutating the snapshot.
+ * When to use: `validateHumanTacticalMarchOrders` before accepting a draft, and `applyHumanTacticalDraftBeatInStrategicOrder` before mutating the snapshot.
  * Expected outcome: First failure reason wins; empty `orders` yields null (vacuously valid).
  * Exceptions: None; invalid H3 indexes may propagate from distance helpers as before.
  */
@@ -397,36 +399,6 @@ export function validateHumanTacticalMarchOrders(
  * Expected outcome: Updated snapshot with human `h3Index` changes and synced embark-on-naval positions.
  * Exceptions: Logs at error and returns failure when projection throws unexpectedly.
  */
-export function applyHumanTacticalMarchOrders(
-  orders: readonly { unitId: string; toH3Index: string }[]
-): { success: true; battle: TacticalBattleSnapshot } | { success: false; reason: string } {
-  tacticalLogMutate('applyHumanTacticalMarchOrders', { orderCount: orders.length });
-  try {
-    const cur = getActiveTacticalBattleSnapshotRef();
-    if (!cur) {
-      tacticalLogQuery('applyHumanTacticalMarchOrders rejected', { reason: 'no_active_session' });
-      return { success: false, reason: 'No tactical battle is active.' };
-    }
-    if (orders.length === 0) {
-      return { success: true, battle: cur };
-    }
-    const fail = humanTacticalMarchValidationFailure(cur, orders);
-    if (fail) {
-      return { success: false, reason: fail };
-    }
-    const next = projectTacticalSnapshotAfterHumanMovementOrders(cur, orders);
-    commitActiveTacticalBattle(next);
-    tacticalLogMutate('applyHumanTacticalMarchOrders applied', {
-      battleId: next.battleId,
-      subUnitCount: next.subUnits.length,
-    });
-    return { success: true, battle: next };
-  } catch (err) {
-    tacticalLogError('applyHumanTacticalMarchOrders failed', { err });
-    return { success: false, reason: 'Could not apply tactical movement orders.' };
-  }
-}
-
 /**
  * Applies one human tactical Ready beat in strategic resolution order (air+ranged, march, optional human embark, ferry, cargo sync, melee) with a single persisted snapshot.
  *
@@ -450,9 +422,9 @@ export function applyHumanTacticalDraftBeatInStrategicOrder(args: {
       success: true;
       battle: TacticalBattleSnapshot;
       battleAfterMovementBeforeFerry: TacticalBattleSnapshot;
-      killsByDirectFire: { victimId: string; killerIds: string[] }[];
-      killsByAirStrike: { victimId: string; killerIds: string[] }[];
-      killsByReturnFire: { victimId: string; killerIds: string[] }[];
+      killsByDirectFire: KillEdge[];
+      killsByAirStrike: KillEdge[];
+      killsByReturnFire: KillEdge[];
       removedUnits: RemovedUnitSnapshot[];
       infrastructureDestroyedEvents: InfrastructureDestroyedEvent[];
       airStrikeAttemptCount: number;
@@ -584,9 +556,9 @@ export function applyValidatedHumanTacticalSupportOrders(args: {
   | {
       success: true;
       battle: TacticalBattleSnapshot;
-      killsByDirectFire: { victimId: string; killerIds: string[] }[];
-      killsByAirStrike: { victimId: string; killerIds: string[] }[];
-      killsByReturnFire: { victimId: string; killerIds: string[] }[];
+      killsByDirectFire: KillEdge[];
+      killsByAirStrike: KillEdge[];
+      killsByReturnFire: KillEdge[];
       removedUnits: RemovedUnitSnapshot[];
       infrastructureDestroyedEvents: InfrastructureDestroyedEvent[];
       airStrikeAttemptCount: number;

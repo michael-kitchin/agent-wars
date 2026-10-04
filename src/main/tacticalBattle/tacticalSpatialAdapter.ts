@@ -1,7 +1,6 @@
 import { gridDistance, getResolution } from 'h3-js';
+import { TACTICAL_H3_RESOLUTION } from '../../shared/h3Resolutions';
 import { tacticalLogError, tacticalLogQuery } from './tacticalLogging';
-
-const TACTICAL_H3_RESOLUTION = 4;
 
 /**
  * Returns the H3 grid distance between two res4 cells for tactical range math (milestone-2.1 adapter seed).

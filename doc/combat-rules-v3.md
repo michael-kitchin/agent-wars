@@ -4,7 +4,7 @@
 
 This document describes combat, movement, production, fog, sealift, and optional tactical battles. **Live engine symbols under `src/` are first authority.** Constants cited here are the values in those symbols as of 2.4.0.
 
-Rules are divided into two layers: **strategic** (H3 res1, the primary game) and **tactical** (H3 res4, optional zoom-in battles). Both layers use **WEGO** simultaneous resolution. A tactical battle pauses the rest of the strategic map until it ends.
+Rules are divided into two layers: **strategic** (H3 res1, the primary game) and **tactical** (H3 res4, optional zoom-in battles). Those resolutions are `STRATEGIC_H3_RESOLUTION` and `TACTICAL_H3_RESOLUTION` in `src/shared/h3Resolutions.ts`. Both layers use **WEGO** simultaneous resolution. A tactical battle pauses the rest of the strategic map until it ends.
 
 **Stated needs addressed:**
 1. **Offensive and defensive strengths** — §3 and §2 (unit roster).

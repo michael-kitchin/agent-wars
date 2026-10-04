@@ -7,6 +7,7 @@ import type { CombatUnit } from '../combatUnitTypes';
 import { getGameSeed } from '../gameDb';
 import { withOriginHitBonus } from '../originBonus/originHitBonusLookup';
 import { buildTacticalOriginHitBonusLookupFromDb } from '../originBonus/originHitBonusLookupDb';
+import type { KillEdge } from '../../shared/ipc/combatResultTypes';
 import type { RemovedUnitSnapshot } from '../../shared/ipc/readyTypes';
 import type { TacticalBattleSnapshot, TacticalSubUnitSnapshot } from '../../shared/tacticalBattleTypes';
 import { tacticalLogMutate, tacticalLogQuery } from './tacticalLogging';
@@ -66,7 +67,7 @@ export function applyTacticalMeleeAfterSupportOrders(
   combatNext?: () => number
 ): {
   battle: TacticalBattleSnapshot;
-  killsByMelee: { victimId: string; killerIds: string[] }[];
+  killsByMelee: KillEdge[];
   meleeRemovedUnits: RemovedUnitSnapshot[];
   meleeCombatHexes: string[];
   meleeCasualtyHexes: string[];

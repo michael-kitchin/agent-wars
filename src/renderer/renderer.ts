@@ -6,6 +6,7 @@
 import { cellToParent, latLngToCell } from 'h3-js';
 import { getMainLeafletMap, invalidateLeafletMapSizes } from './map/worldLeafletMap';
 import { deriveInfrastructureOverlayState } from './rendering/infrastructureOverlayState';
+import type { KillEdge } from '../shared/ipc/combatResultTypes';
 import type {
   GameStateSnapshot,
   GameApi,
@@ -2846,7 +2847,7 @@ function buildKillToastFormatterBundle(
   tacticalSubUnitsForKillLabels?: readonly { id: string; displayName: string }[],
   killLabelUnits?: readonly import('../shared/unitDisplayNames').UnitDisplayIdentity[]
 ): {
-  formatKillLine: (kill: { victimId: string; killerIds: string[] }) => string;
+  formatKillLine: (kill: KillEdge) => string;
   formatUnitName: (unitId: string) => string;
 } {
   return buildKillToastFormatterBundleFromModule(state, removedUnits, tacticalSubUnitsForKillLabels, killLabelUnits);

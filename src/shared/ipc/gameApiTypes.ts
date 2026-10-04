@@ -1,4 +1,13 @@
-import type { AirStrikeTargetType } from './ordersTypes';
+import type {
+  AirStrikeOrder,
+  AirStrikeTargetType,
+  EmbarkOrder,
+  FerryOrder,
+  MovementOrder,
+  NewGameIpcPayload,
+  RangedAttackOrder,
+  SubmitOrdersIpcPayload,
+} from './ordersTypes';
 import type {
   ApplyBuildQueueTemplateResult,
   BuildQueueTemplateEntry,
@@ -21,18 +30,16 @@ import type {
   Res4TerrainOverrideRow,
 } from './terrainHexTypes';
 import type { HumanOrderGroupPreviewResult, HumanOrderPreviewResult, HumanStandingOrderSnapshot } from './humanOrderPreviewTypes';
-import type { NewGameIpcPayload, SubmitOrdersIpcPayload } from './ordersTypes';
 import type { OpenRouterModel, RequestAiOrdersResult } from './openRouterTypes';
+import type { GameReadyIpcPayload, ReadyResult } from './readyTypes';
+import type { TacticalCommitResolutionPlayback } from './tacticalPlaybackTypes';
 import type {
-  GameReadyIpcPayload,
   NotifyResolutionPlaybackCompletePayload,
   PostResolutionConsultationPushPayload,
-  ReadyResult,
-  ResolveMeleeInterceptIpcPayload,
-  TacticalCommitResolutionPlayback,
   TacticalOpponentPlanPayload,
   TacticalPostBeatConsultFields,
-} from './readyTypes';
+} from './consultationPushTypes';
+import type { ResolveMeleeInterceptIpcPayload } from './meleeInterceptTypes';
 import type { SealiftStackState } from './sealiftTypes';
 import type { HexNamingCaption } from '../hexNamingCaption';
 
@@ -73,6 +80,25 @@ export type CommitHumanTacticalDraftOrdersIpcResult = {
    */
   tacticalPostBeatConsultDeferred?: boolean;
 } & Partial<TacticalPostBeatConsultFields>;
+
+/**
+ * Draft rows the renderer sends when the human commits a tactical beat.
+ *
+ * Purpose: Names the `commitHumanTacticalDraftOrders` argument so the preload bridge and `GameApi` share one shape.
+ * When to use: The `GameApi` method and the preload `satisfies GameApi` annotation.
+ * Expected outcome: Movement is required; support drafts and consultation flags stay optional.
+ * Exceptions: None.
+ */
+export type CommitHumanTacticalDraftOrdersIpcPayload = {
+  movementOrders: MovementOrder[];
+  rangedAttacks?: RangedAttackOrder[];
+  airStrikes?: AirStrikeOrder[];
+  ferryOrders?: FerryOrder[];
+  embarkOrders?: EmbarkOrder[];
+  opponentTacticalDraft?: TacticalOpponentPlanPayload;
+  useEventDrivenConsultation?: boolean;
+  aiPlanningRunEnabled?: boolean;
+};
 
 /**
  * Documents the `GameApi` interface as a named contract surface (export interface GameApi).
@@ -279,16 +305,9 @@ assignHumanMarchOrders: (payload: {
    * Expected outcome: Returns the updated tactical snapshot on success for immediate redraw.
    * Exceptions: None; failures return `success: false` with a reason string.
    */
-commitHumanTacticalDraftOrders: (payload: {
-    movementOrders: { unitId: string; toH3Index: string }[];
-    rangedAttacks?: { unitId: string; targetH3Index: string }[];
-    airStrikes?: { unitId: string; targetH3Index: string; targetType: AirStrikeTargetType }[];
-    ferryOrders?: { unitId: string; destinationH3Index: string }[];
-    embarkOrders?: { unitId: string; navalUnitId: string }[];
-    opponentTacticalDraft?: import('./readyTypes').TacticalOpponentPlanPayload;
-    useEventDrivenConsultation?: boolean;
-    aiPlanningRunEnabled?: boolean;
-  }) => Promise<CommitHumanTacticalDraftOrdersIpcResult>;
+commitHumanTacticalDraftOrders: (
+    payload: CommitHumanTacticalDraftOrdersIpcPayload
+  ) => Promise<CommitHumanTacticalDraftOrdersIpcResult>;
     /**
    * Specifies the contract for the `validateGroupRangedTarget` member (validateGroupRangedTarget: (payload: { unitIds: string[]; targetH3Index: string }) => Promise<{ success: boolean; reason?: string }>;).
 

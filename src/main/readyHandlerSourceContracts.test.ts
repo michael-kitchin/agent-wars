@@ -2,10 +2,12 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { readRendererSource } from './testSupport/rendererSourceAssertions';
 
-test('readyHandler uses collectUnknownBattleContinentNames', () => {
-  const source = readRendererSource('gameplay', 'readyHandler.ts');
-  assert.ok(source.includes('collectUnknownBattleContinentNames'));
-  assert.ok(!source.includes('if (!unknownContinentNames.includes(n))'));
+test('ready resolution announcements use collectUnknownBattleContinentNames', () => {
+  const readyHandlerSource = readRendererSource('gameplay', 'readyHandler.ts');
+  const announcementsSource = readRendererSource('gameplay', 'readyResolutionAnnouncements.ts');
+  assert.ok(announcementsSource.includes('collectUnknownBattleContinentNames'));
+  assert.ok(!readyHandlerSource.includes('if (!unknownContinentNames.includes(n))'));
+  assert.ok(!announcementsSource.includes('if (!unknownContinentNames.includes(n))'));
 });
 
 test('readyHandler has a single tool-count rollback helper', () => {

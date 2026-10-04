@@ -18,14 +18,14 @@ import { logDebug, logError, logTrace } from '../logger';
 import { IPC_GAME, IPC_OPENROUTER } from '../../shared/ipc/channels';
 import { DEFERRED_PLAYBACK_CONSULT_ABANDONED_LOG } from '../../shared/ipc/deferredPlaybackConsultAbandoned';
 import type { RequestAiOrdersResult } from '../../shared/ipc/openRouterTypes';
+import type { ReadyResult } from '../../shared/ipc/readyTypes';
+import type { TacticalCommitResolutionPlayback } from '../../shared/ipc/tacticalPlaybackTypes';
 import type {
   NotifyResolutionPlaybackCompletePayload,
   PostResolutionConsultationPushPayload,
-  ReadyResult,
-  TacticalCommitResolutionPlayback,
   TacticalPostBeatConsultFields,
   TacticalPostBeatConsultMergeSource,
-} from '../../shared/ipc/readyTypes';
+} from '../../shared/ipc/consultationPushTypes';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import {
   runEventDrivenAfterResolutionConsultation,

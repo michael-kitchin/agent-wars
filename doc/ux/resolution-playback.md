@@ -83,4 +83,5 @@ None.
 - `src/renderer/rendering/resolutionCombatOverlays.ts`
 - `src/renderer/openRouter/resolutionPlaybackDeferral.ts`
 - `src/renderer/gameplay/readyHandler.ts`
+- `src/renderer/gameplay/readyResolutionAnnouncements.ts`
 - `src/renderer/gameplay/turnUpdateSummary.ts`

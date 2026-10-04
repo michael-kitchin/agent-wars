@@ -61,12 +61,68 @@ export function terrainIsPassableForDomain(terrain: string | undefined, passable
 }
 
 /**
- * Defines the `findPath` function shape (export function findPath( originH3: string, destinationH3: string, hexSet: Set<string>, terrainByH3: Map<string, string>, passableFor: PassableDo).
+ * Breadth-first walk that records which cell each visit came from.
+ *
+ * Purpose: One queue, parent map, and `gridDisk` neighbor order for path and reachability searches.
+ * When to use: After the caller has already rejected an illegal origin.
+ * Expected outcome: Parent map whose keys are the origin and every entered cell, in visit order. When `stopAtH3` is set, the walk stops after that cell is dequeued.
+ * Exceptions: `gridDisk` failures are reported through `onGridDiskError` when provided, then the walk continues with the next queued cell.
+ */
+function breadthFirstHexSearch(
+  originH3: string,
+  canEnter: (fromH3: string, toH3: string) => boolean,
+  options: { stopAtH3?: string; onGridDiskError?: (err: unknown) => void }
+): Map<string, string> {
+  const queue: string[] = [originH3];
+  const parent = new Map<string, string>();
+  parent.set(originH3, originH3);
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    if (options.stopAtH3 !== undefined && current === options.stopAtH3) break;
+    let neighbors: string[];
+    try {
+      neighbors = gridDisk(current, 1);
+    } catch (err) {
+      options.onGridDiskError?.(err);
+      continue;
+    }
+    for (const n of neighbors) {
+      if (n === current || parent.has(n)) continue;
+      if (!canEnter(current, n)) continue;
+      parent.set(n, current);
+      queue.push(n);
+    }
+  }
+  return parent;
+}
 
- * Purpose: Supports maintainability by documenting why `findPath` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
+/**
+ * Rebuilds an inclusive path from a parent map produced by `breadthFirstHexSearch`.
+ *
+ * Purpose: Keeps the same unshift walk `findPath` used before the search was shared.
+ * When to use: After a search that stopped on `destinationH3`.
+ * Expected outcome: Path from the origin (the cell whose parent is itself) through `destinationH3`.
+ * Exceptions: None. A missing parent stops the walk at the last known cell.
+ */
+function rebuildPathFromParents(parentByH3: Map<string, string>, destinationH3: string): string[] {
+  const path: string[] = [];
+  let p: string = destinationH3;
+  while (true) {
+    path.unshift(p);
+    const prev = parentByH3.get(p);
+    if (prev === undefined || prev === p) break;
+    p = prev;
+  }
+  return path;
+}
+
+/**
+ * Shortest hex path from origin to destination for one movement domain.
+ *
+ * Purpose: Shared route search for march planning and distance checks.
+ * When to use: When both cells are H3 indexes and the caller has the passable hex set.
+ * Expected outcome: Inclusive path, or null when no legal path exists. Same cell returns a one-cell path.
+ * Exceptions: None. A missing land-mass map for the land domain is logged and returns null. `gridDisk` failures are logged and that neighbor ring is skipped.
  */
 export function findPath(
   originH3: string,
@@ -102,41 +158,16 @@ export function findPath(
     if (blocked?.has(originH3) || blocked?.has(destinationH3)) return null;
     if (!landUnitCanOccupyHex(destinationH3, landMass)) return null;
 
-    const queue: string[] = [originH3];
-    const parent = new Map<string, string>();
-    parent.set(originH3, originH3);
-
-    while (queue.length > 0) {
-      const current = queue.shift()!;
-      if (current === destinationH3) {
-        const path: string[] = [];
-        let p: string = destinationH3;
-        while (true) {
-          path.unshift(p);
-          const prev = parent.get(p);
-          if (prev === undefined || prev === p) break;
-          p = prev;
-        }
-        return path;
+    const parent = breadthFirstHexSearch(
+      originH3,
+      (fromH3, toH3) => hexSet.has(toH3) && !blocked?.has(toH3) && canLandUnitTraverseEdge(fromH3, toH3, landMass),
+      {
+        stopAtH3: destinationH3,
+        onGridDiskError: (err) => logError('pathfinding findPath: gridDisk threw', err),
       }
-      let neighbors: string[];
-      try {
-        neighbors = gridDisk(current, 1);
-      } catch (err) {
-        logError('pathfinding findPath: gridDisk threw', err);
-        continue;
-      }
-      for (const n of neighbors) {
-        if (n === current) continue;
-        if (parent.has(n)) continue;
-        if (!hexSet.has(n)) continue;
-        if (blocked?.has(n)) continue;
-        if (!canLandUnitTraverseEdge(current, n, landMass)) continue;
-        parent.set(n, current);
-        queue.push(n);
-      }
-    }
-    return null;
+    );
+    if (!parent.has(destinationH3)) return null;
+    return rebuildPathFromParents(parent, destinationH3);
   }
 
   const passable = (h3: string) => {
@@ -147,48 +178,21 @@ export function findPath(
   };
   if (!passable(originH3) || !passable(destinationH3)) return null;
 
-  const queue: string[] = [originH3];
-  const parent = new Map<string, string>();
-  parent.set(originH3, originH3);
-
-  while (queue.length > 0) {
-    const current = queue.shift()!;
-    if (current === destinationH3) {
-      const path: string[] = [];
-      let p: string = destinationH3;
-      while (true) {
-        path.unshift(p);
-        const prev = parent.get(p);
-        if (prev === undefined || prev === p) break;
-        p = prev;
-      }
-      return path;
-    }
-    let neighbors: string[];
-    try {
-      neighbors = gridDisk(current, 1);
-    } catch (err) {
-      logError('pathfinding findPath: gridDisk threw', err);
-      continue;
-    }
-    for (const n of neighbors) {
-      if (n === current) continue;
-      if (parent.has(n)) continue;
-      if (!passable(n)) continue;
-      parent.set(n, current);
-      queue.push(n);
-    }
-  }
-  return null;
+  const parent = breadthFirstHexSearch(originH3, (_fromH3, toH3) => passable(toH3), {
+    stopAtH3: destinationH3,
+    onGridDiskError: (err) => logError('pathfinding findPath: gridDisk threw', err),
+  });
+  if (!parent.has(destinationH3)) return null;
+  return rebuildPathFromParents(parent, destinationH3);
 }
 
 /**
- * Defines the `getReachableHexes` function shape (export function getReachableHexes( originH3: string, hexSet: Set<string>, terrainByH3: Map<string, string>, passableFor: PassableDomain, blocked?).
-
- * Purpose: Supports maintainability by documenting why `getReachableHexes` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
+ * Hexes reachable from an origin under one movement domain, including the origin.
+ *
+ * Purpose: Range and preview checks that need the reachable set rather than one path.
+ * When to use: When the caller has the passable hex set and optional blocked cells.
+ * Expected outcome: Visit-order set of entered cells. Empty when the origin itself is illegal.
+ * Exceptions: None. A missing land-mass map for the land domain is logged and returns an empty set. `gridDisk` failures skip that ring without logging.
  */
 export function getReachableHexes(
   originH3: string,
@@ -204,25 +208,13 @@ export function getReachableHexes(
       return new Set();
     }
     if (!hexSet.has(originH3) || blocked?.has(originH3)) return new Set();
-    const reachable = new Set<string>([originH3]);
-    const queue: string[] = [originH3];
-    while (queue.length > 0) {
-      const current = queue.shift()!;
-      let neighbors: string[];
-      try {
-        neighbors = gridDisk(current, 1);
-      } catch {
-        continue;
-      }
-      for (const n of neighbors) {
-        if (n === current || !hexSet.has(n) || reachable.has(n)) continue;
-        if (blocked?.has(n)) continue;
-        if (!canLandUnitTraverseEdge(current, n, landMass)) continue;
-        reachable.add(n);
-        queue.push(n);
-      }
-    }
-    return reachable;
+    return new Set(
+      breadthFirstHexSearch(
+        originH3,
+        (fromH3, toH3) => hexSet.has(toH3) && !blocked?.has(toH3) && canLandUnitTraverseEdge(fromH3, toH3, landMass),
+        {}
+      ).keys()
+    );
   }
 
   const passable = (h3: string) => {
@@ -232,23 +224,7 @@ export function getReachableHexes(
     return terrainIsPassableForDomain(terrain, passableFor);
   };
   if (!passable(originH3)) return new Set();
-  const reachable = new Set<string>([originH3]);
-  const queue: string[] = [originH3];
-  while (queue.length > 0) {
-    const current = queue.shift()!;
-    let neighbors: string[];
-    try {
-      neighbors = gridDisk(current, 1);
-    } catch {
-      continue;
-    }
-    for (const n of neighbors) {
-      if (n === current || reachable.has(n) || !passable(n)) continue;
-      reachable.add(n);
-      queue.push(n);
-    }
-  }
-  return reachable;
+  return new Set(breadthFirstHexSearch(originH3, (_fromH3, toH3) => passable(toH3), {}).keys());
 }
 
 /**

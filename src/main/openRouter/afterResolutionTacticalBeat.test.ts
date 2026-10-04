@@ -17,7 +17,7 @@ import { closeGameDatabaseForTests, openGameDatabaseAtPathForTests, resetGameFor
 import type { GameStateSnapshot } from '../gameDb';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import type { TacticalCommitResolutionPlayback } from '../../shared/ipcTypes';
-import type { TacticalOpponentPlanPayload } from '../../shared/ipc/readyTypes';
+import type { TacticalOpponentPlanPayload } from '../../shared/ipc/consultationPushTypes';
 import { gridDisk } from 'h3-js';
 import {
   firstRingCellDistinctFrom,

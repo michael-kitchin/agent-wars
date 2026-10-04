@@ -15,25 +15,6 @@ import { logError, logTrace } from '../logger';
 const gridDiskFallbackMemo = new Map<string, Set<string>>();
 
 /**
- * Returns H3 grid-step distance with main-process trace logging on fallback failure.
- *
- * Purpose: Logging wrapper around `computeGridDistancePure` for code paths that have access to the main logger.
- * When to use: Anywhere in the main process that needs a numeric distance and wants trace-level fallback diagnostics.
- * Expected outcome: Non-negative integer when derivable; null when both `gridDistance` and `gridPathCells` fail.
- * Exceptions: None; all H3 errors are swallowed inside `computeGridDistancePure`.
- */
-export function computeGridDistanceSafe(
-  originH3Index: string,
-  destinationH3Index: string,
-  context: string
-): number | null {
-  const d = computeGridDistancePure(originH3Index, destinationH3Index);
-  if (d !== null) return d;
-  logTrace(`${context}: gridDistance and gridPathCells unavailable`, { originH3Index, destinationH3Index });
-  return null;
-}
-
-/**
  * Returns whether a destination hex is within range, using a memoized disk-fallback with main-process error logging.
  *
  * Purpose: Main-process entry point for grid-range checks; extends `isWithinGridRangePure` with `logError` on disk failure.

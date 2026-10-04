@@ -1,4 +1,4 @@
-import type { TacticalPostBeatConsultFields } from '../../shared/ipc/readyTypes';
+import type { TacticalPostBeatConsultFields } from '../../shared/ipc/consultationPushTypes';
 import type { AiStrategyToastFields } from '../../shared/aiStrategyToastContent';
 import { nextTacticalOpponentDraftAfterPostBeatPlan } from '../../shared/ipc/tacticalOpponentPlanMerge';
 import { rendererSharedState as S } from '../core/state';

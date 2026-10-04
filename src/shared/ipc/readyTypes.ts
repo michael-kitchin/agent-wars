@@ -9,6 +9,8 @@ import type {
 } from './ordersTypes';
 import type { BuildUnitType } from './productionTypes';
 import type { RangedResolutionShotLine } from '../rangedResolutionShotLines';
+import type { KillEdge } from './combatResultTypes';
+import type { MeleeCandidateRow } from './meleeInterceptTypes';
 
 export type { RangedResolutionShotLine };
 export interface GameReadyIpcPayload {
@@ -168,275 +170,6 @@ displayOrder?: number;
    */
 displayName?: string;
 }
-
-/**
- * Playback payload returned with a successful tactical Ready commit so the renderer can run the same resolution animation pipeline as strategic turns.
- *
- * Purpose: Bridges tactical snapshot-only commits with `S.resolutionMoveAnimation` without duplicating combat simulation in the renderer.
- * When to use: Main-process `commitHumanTacticalDraftOrders` success path after movement and support projection complete.
- * Expected outcome: `humanMoves` lists sub-unit position deltas; ranged fields mirror strategic `ReadyResult` subsets when support orders remove units.
- * Exceptions: None; empty `humanMoves` is valid when only non-move effects occur.
- */
-/**
- * Normalized opponent tactical orders buffered in the renderer until tactical Ready; mirrors strategic “AI orders held until ready” scheduling.
- *
- * Purpose: Single IPC shape for `tacticalOpponentPlan` on `requestAiOrders` and optional `opponentTacticalDraft` on tactical commit payloads.
- * When to use: Renderer state after a successful tactical AI consultation; echoed back on `commitHumanTacticalDraftOrders` for the combined beat.
- * Expected outcome: Arrays are always present (possibly empty); movement uses tactical sub-unit ids.
- * Exceptions: None.
- */
-export type TacticalOpponentPlanPayload = {
-  movementOrders: { unitId: string; toH3Index: string }[];
-  rangedAttacks: { unitId: string; targetH3Index: string }[];
-  airStrikes: AirStrikeOrder[];
-  ferryOrders: FerryOrder[];
-  embarkOrders: EmbarkOrder[];
-};
-
-/**
- * Post–beat tactical consultation fields merged on the commit IPC result (or historically via a renderer push).
- *
- * Purpose: Single shape for opponent draft refresh, optional strategy toast, and tool-count telemetry after `afterTacticalBeatResolution`.
- * When to use: Main attaches to successful `commitHumanTacticalDraftOrders` when event-driven Run consult completes; renderer matches `battleId` to `S.tacticalBattleSnapshot`.
- * Expected outcome: When `attachTacticalOpponentPlanToIpc` is true, `tacticalOpponentPlan` may be null or empty to clear draft and trigger prefetch; when false, the consumed Ready draft is cleared and prefetch may refill for the next beat.
- * Exceptions: None.
- */
-export type TacticalPostBeatConsultFields = {
-  kind: 'tactical';
-  battleId: string;
-  attachTacticalOpponentPlanToIpc: boolean;
-  tacticalOpponentPlan?: TacticalOpponentPlanPayload | null;
-  aiStrategy?: string;
-  /**
-   * Player-facing taunt/threat from the same consultation as `aiStrategy`.
-   *
-   * Contract: Optional; omit when empty after trim.
-   * When to use: Renderer strategy toast Message section after a tactical beat consult.
-   * Expected outcome: Independent of `aiStrategy` so message-only consults still display.
-   * Exceptions: None.
-   */
-  aiMessage?: string;
-  toolInvocationCounts?: Record<string, number>;
-  /**
-   * Dollar cost of this tactical post-beat consultation.
-   *
-   * Contract: Present only when the consult returned a finite number. A missing field is not zero.
-   * When to use: Renderer adds it once to the match cost readout when applying these fields.
-   * Expected outcome: Omitted when the consult did not report a finite cost.
-   * Exceptions: None.
-   */
-  cost?: number;
-  /**
-   * True when main abandoned this consult because playback notify metadata did not match.
-   *
-   * Contract: Omit on successful consultation; renderer must unlatch and resume planning without applying a plan.
-   * When to use: `notifyResolutionPlaybackComplete` mismatch or invalid payload while a tactical consult is pending.
-   * Expected outcome: Latch cleared, opponent draft dropped, prefetch may restart; AI log comes from `openRouter:log`.
-   * Exceptions: None.
-   */
-  abandoned?: boolean;
-};
-
-/**
- * Partial post-beat consultation payload before `kind` and `battleId` are attached for the tactical commit IPC surface.
- *
- * Purpose: Lets `runEventDrivenAfterTacticalBeatConsultation` return the same intermediate shape `afterTacticalBeatResolution` uses (`strategy` name) while `toTacticalPostBeatConsultFields` maps to `TacticalPostBeatConsultFields` (`aiStrategy`) in one place.
- * When to use: As the resolve type of `runEventDrivenAfterTacticalBeatConsultation` and as input to `toTacticalPostBeatConsultFields` from `main.ts`.
- * Expected outcome: Empty object when consultation is skipped or fails; otherwise optional attach flag, plan, strategy/message text, and tool counts.
- * Exceptions: None.
- */
-export type TacticalPostBeatConsultMergeSource = {
-  attachTacticalOpponentPlanToIpc?: boolean;
-  tacticalOpponentPlan?: TacticalOpponentPlanPayload | null;
-  strategy?: string;
-  aiStrategy?: string;
-  /**
-   * Player-facing taunt/threat from the merge source (`message` from afterResolution, or already-mapped `aiMessage`).
-   *
-   * Contract: Optional; mapper prefers `message` then `aiMessage`.
-   * When to use: `toTacticalPostBeatConsultFields`.
-   * Expected outcome: Exposed as `aiMessage` on the IPC fields when non-empty.
-   * Exceptions: None.
-   */
-  message?: string;
-  aiMessage?: string;
-  toolInvocationCounts?: Record<string, number>;
-  /**
-   * Dollar cost from the tactical post-beat consult, before IPC mapping.
-   *
-   * Contract: Copied onto `TacticalPostBeatConsultFields` only when it is a finite number.
-   * When to use: `toTacticalPostBeatConsultFields`.
-   * Expected outcome: Omitted from the IPC fields when missing or not finite, including `NaN`.
-   * Exceptions: None.
-   */
-  cost?: number;
-};
-
-/**
- * One tactical Ready playback march segment for resolution animation (res4 cells).
- *
- * Purpose: Carries optional `pathH3Indexes` so the renderer can glide units along the planned §12.4 path instead of a straight chord.
- * When to use: `TacticalCommitResolutionPlayback.humanMoves` and `opponentMoves` entries from `commitHumanTacticalDraftOrders`.
- * Expected outcome: When `pathH3Indexes` is set, it is ordered `[from, …, to]` inclusive with length at least 2.
- * Exceptions: Ferry-only rows omit `pathH3Indexes`; straight-line fallback when unset.
- */
-export type TacticalPlaybackMarchMove = {
-  unitId: string;
-  fromH3Index: string;
-  toH3Index: string;
-  pathH3Indexes?: string[];
-};
-
-export type TacticalCommitResolutionPlayback = {
-  humanMoves: TacticalPlaybackMarchMove[];
-  /**
-   * Opponent sub-unit march deltas applied on the same Ready beat after human marches (strategic `allOrders` orders human rows before AI).
-   *
-   * Purpose: Lets `S.resolutionMoveAnimation.moves` include AI tactical marches without re-fetching the snapshot mid-playback.
-   * When to use: Populated when `opponentTacticalDraft.movementOrders` committed non-noop opponent legs this beat.
-   * Expected outcome: Same shape as `humanMoves`, including optional `pathH3Indexes` for bent res4 paths.
-   * Exceptions: Omitted when empty.
-   */
-  opponentMoves?: TacticalPlaybackMarchMove[];
-  /**
-   * True when the human commit payload included at least one ranged or air-strike order this beat (before resolution drops).
-   *
-   * Purpose: Lets `consultationPolicy` treat human ranged/air attempts as observable beat activity even when no kills or noop marches appear in playback.
-   * When to use: Set by `commitHumanTacticalDraftOrders` alongside other playback fields.
-   * Expected outcome: Omitted when both human lists were empty.
-   * Exceptions: None.
-   */
-  humanBeatHadSubmittedRangedOrAirOrders?: boolean;
-  /**
-   * True when the committed opponent draft included at least one ranged or air-strike order this beat.
-   *
-   * Purpose: Lets `consultationPolicy` treat opponent ranged/air as beat activity when `opponentMoves` is empty (ranged does not populate march playback).
-   * When to use: Set by `commitHumanTacticalDraftOrders` when `opponentTacticalDraft` was present.
-   * Expected outcome: Omitted when opponent draft had no ranged or air rows.
-   * Exceptions: None.
-   */
-  opponentBeatHadSubmittedRangedOrAirOrders?: boolean;
-  rangedCombatHexes?: string[];
-  rangedCasualtyHexes?: string[];
-  rangedRemovedUnits?: RemovedUnitSnapshot[];
-  /**
-   * Hex-to-hex ranged connectors for the lightning playback window (direct fire + return-fire attempts).
-   *
-   * Purpose: Lets strategic and tactical resolution draw planned-style shot lines without reconstructing from kills.
-   * When to use: Set by `commitHumanTacticalDraftOrders` from combat resolution / order merge; copied onto anim state.
-   * Expected outcome: Deduped pairs; omitted when empty.
-   * Exceptions: None.
-   */
-  rangedResolutionShotLines?: RangedResolutionShotLine[];
-  /**
-   * Kill edges from human tactical **ranged** orders only (mirrors `ReadyResult.killsByDirectFire`).
-   *
-   * Purpose: Keeps ranged casualties on the “Direct fire” toast line separate from air-strike casualties.
-   * When to use: Populated by `commitHumanTacticalDraftOrders` when ranged projection removes enemy sub-units.
-   * Expected outcome: One entry per removed sub-unit id with the firing ranged attacker id in `killerIds`.
-   * Exceptions: Omitted when no ranged kills occurred.
-   */
-  killsByDirectFire?: { victimId: string; killerIds: string[] }[];
-  /**
-   * Kill edges from human tactical **air vs units** (and air-strike follow-on sub-unit losses), not ranged fire.
-   *
-   * Purpose: Lets `buildTacticalCommitReadyResultForToast` populate `airStrikeRemovedUnits` / air-strike summary without mislabeling strikes as direct fire.
-   * When to use: Populated alongside `killsByDirectFire` when air sub-units remove enemies or infrastructure strikes remove based aircraft sub-rows.
-   * Expected outcome: Same `{ victimId, killerIds }` shape as strategic air strike kill metadata.
-   * Exceptions: Omitted when empty.
-   */
-  killsByAirStrike?: { victimId: string; killerIds: string[] }[];
-  /**
-   * Res1 infrastructure damage events from tactical human air strikes against urban/airport/seaport targets.
-   *
-   * Purpose: Surfaces “Air strikes: … destroyed N airports” in the same toast field as strategic Ready.
-   * When to use: After `applyInfrastructureDestructionEffects` runs for non-`units` tactical strike orders.
-   * Expected outcome: Same contract as `ReadyResult.infrastructureDestroyedEvents` with `h3Index` on the parent res1 cell.
-   * Exceptions: Omitted when empty.
-   */
-  infrastructureDestroyedEvents?: InfrastructureDestroyedEvent[];
-  /**
-   * Count of tactical human air strike **orders** that entered resolution (including infrastructure strikes).
-   *
-   * Purpose: Drives `formatAirStrikeOutcomeLine` attempt counts after tactical Ready.
-   * When to use: Set to the number of validated `airStrikes` rows processed on the commit path.
-   * Expected outcome: Non-negative; zero when `airStrikes` was empty or all rows skipped.
-   * Exceptions: None.
-   */
-  airStrikeAttemptCount?: number;
-  /**
-   * Per–air-strike animation rows for tactical Ready, aligned with `ReadyResult.airStrikeMoves` / strategic `resolveAirStrikePhase`.
-   *
-   * Purpose: Lets the renderer call `buildAirStrikeOutboundPlaybackMoves` / `buildAirStrikeReturnPlaybackMoves` so air phases precede ranged movement on the shared timeline.
-   * When to use: Populated by `applyTacticalAirStrikeThenRangedPhaseOnBattle` for each processed strike (pre-strike `fromH3Index`, post-strike `returnsToBase`).
-   * Expected outcome: Omitted when no air orders entered resolution; length matches attempted strikes that recorded playback.
-   * Exceptions: None.
-   */
-  airStrikeMoves?: AirStrikeAnimationMove[];
-  /**
-   * Res4 hexes where tactical air combat lightning should flash (targets), mirroring `ReadyResult.airStrikeHexes`.
-   *
-   * Purpose: Feeds `resolutionMoveAnimation.airStrikeCombatHexes` for `phase.inAirStrikeLightning`; must not duplicate ranged-only combat hexes.
-   * When to use: Set alongside `airStrikeMoves` from the same air pass.
-   * Expected outcome: Unique target cells for strikes that ran in the air phase.
-   * Exceptions: Omitted when empty.
-   */
-  airStrikeHexes?: string[];
-  /**
-   * Res4 hexes where air-strike casualties occurred this beat, mirroring `ReadyResult.airStrikeCasualtyHexes`.
-   *
-   * Purpose: Feeds `resolutionMoveAnimation.airStrikeCasualtyHexes` for the air casualty pulse segment.
-   * When to use: Populated from removals and outcomes during the tactical air phase (ground AA, destroyed aircraft, etc.).
-   * Expected outcome: Subset of cells tied to `killsByAirStrike` / air-phase `removedUnits`.
-   * Exceptions: Omitted when empty.
-   */
-  airStrikeCasualtyHexes?: string[];
-  /**
-   * Kill edges from tactical **melee** resolution after movement and support on the same commit (mirrors melee slice of `ReadyResult.kills`).
-   *
-   * Purpose: Lets `buildTacticalCommitReadyResultForToast` classify melee lines separately from ranged and air-strike summaries.
-   * When to use: Populated by `commitHumanTacticalDraftOrders` after `applyTacticalMeleeAfterSupportOrders` removes co-located enemies.
-   * Expected outcome: Same `{ victimId, killerIds }` shape as strategic melee kill metadata; omitted when no res4 hex had opposing survivors after support.
-   * Exceptions: None.
-   */
-  killsByMelee?: { victimId: string; killerIds: string[] }[];
-  /**
-   * Res4 hexes where tactical melee combat was adjudicated this commit.
-   *
-   * Purpose: Drives resolution playback overlays for melee flashes on the tactical map.
-   * When to use: After tactical melee phase runs on the post-support snapshot.
-   * Expected outcome: Subset of `res4ChildH3Indexes` where at least two players had sub-units before melee rolls.
-   * Exceptions: None.
-   */
-  meleeCombatHexes?: string[];
-  /**
-   * Res4 hexes that lost at least one sub-unit to tactical melee this commit.
-   *
-   * Purpose: Aligns tactical casualty highlighting with strategic `meleeCasualtyHexes` semantics.
-   * When to use: Populated alongside `meleeRemovedUnits` from the same melee pass.
-   * Expected outcome: Each entry appears in `meleeCombatHexes` when casualties occurred there.
-   * Exceptions: None.
-   */
-  meleeCasualtyHexes?: string[];
-  /**
-   * Sub-unit rows removed by tactical melee this commit (display names preserved for toasts).
-   *
-   * Purpose: Extends `rangedRemovedUnits` with the same `RemovedUnitSnapshot` contract for merged casualty tables.
-   * When to use: Renderer kill formatters and `buildTacticalCommitReadyResultForToast` merge this with ranged/air removals.
-   * Expected outcome: One row per removed tactical id; stable ordering is not required.
-   * Exceptions: None.
-   */
-  meleeRemovedUnits?: RemovedUnitSnapshot[];
-  /**
-   * Kill edges from human tactical **ranged return fire** when `runRangedPhase` resolves defensive shots (mirrors strategic `killsByReturnFire`).
-   *
-   * Purpose: Keeps the playback shape aligned with `ReadyResult` for shared toast helpers.
-   * When to use: Populated by `commitHumanTacticalDraftOrders` when tactical ranged combat produces return-fire casualties.
-   * Expected outcome: Same `{ victimId, killerIds }` shape as strategic return-fire metadata; omitted when empty.
-   * Exceptions: None.
-   */
-  killsByReturnFire?: { victimId: string; killerIds: string[] }[];
-};
 
 /**
  * Documents the `InfrastructureDestroyedEvent` interface as a named contract surface (export interface InfrastructureDestroyedEvent).
@@ -828,32 +561,32 @@ unknownCasualtyHexes?: string[];
    */
 unknownBattleAnnouncement?: string;
     /**
-   * Specifies the contract for the `kills` member (kills?: { victimId: string; killerIds: string[] }[];).
+   * Specifies the contract for the `kills` member (kills?: KillEdge[];).
 
    * Contract: Describes stable behavior for callers of `kills` in this codebase.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-kills?: { victimId: string; killerIds: string[] }[];
+kills?: KillEdge[];
     /**
-   * Specifies the contract for the `killsByDirectFire` member (killsByDirectFire?: { victimId: string; killerIds: string[] }[];).
+   * Specifies the contract for the `killsByDirectFire` member (killsByDirectFire?: KillEdge[];).
 
    * Contract: Describes stable behavior for callers of `killsByDirectFire` in this codebase.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-killsByDirectFire?: { victimId: string; killerIds: string[] }[];
+killsByDirectFire?: KillEdge[];
     /**
-   * Specifies the contract for the `killsByReturnFire` member (killsByReturnFire?: { victimId: string; killerIds: string[] }[];).
+   * Specifies the contract for the `killsByReturnFire` member (killsByReturnFire?: KillEdge[];).
 
    * Contract: Describes stable behavior for callers of `killsByReturnFire` in this codebase.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-killsByReturnFire?: { victimId: string; killerIds: string[] }[];
+killsByReturnFire?: KillEdge[];
     /**
    * Specifies the contract for the `deployedUnitsByType` member (deployedUnitsByType?: { armor?: number; infantry?: number; naval?: number; air?: number };).
 
@@ -1053,161 +786,4 @@ postResolutionConsultDeferred?: boolean;
    * Exceptions: None.
    */
 deferredResolutionPlanningTurnNumber?: number;
-}
-
-/**
- * Renderer tells main that resolution canvas playback finished so deferred LLM consultation may run.
- *
- * Purpose: Typed `game:notifyResolutionPlaybackComplete` body discriminating strategic Ready vs melee resolve vs tactical beat.
- * When to use: Preload bridge and main notify handler validation.
- * Expected outcome: `planningTurnNumber` aligns with `ReadyResult.deferredResolutionPlanningTurnNumber` for strategic/melee.
- * Exceptions: Invalid payloads clear pending mutex on main (logged).
- */
-export type NotifyResolutionPlaybackCompletePayload =
-  | { kind: 'strategic'; planningTurnNumber: number }
-  | { kind: 'melee'; planningTurnNumber: number }
-  | { kind: 'tactical'; battleId: string };
-
-/**
- * Main pushes merged strategy telemetry after deferred `runEventDrivenAfterResolutionConsultation` completes.
- *
- * Purpose: Separates mechanical Ready IPC from post-resolution consultation results when deferring LLM work.
- * When to use: `webContents.send` on `IPC_GAME.postResolutionConsultation`.
- * Expected outcome: Renderer merges strategy toast + tool counts once `planningTurnNumber` matches `gameState.turnNumber`.
- * Exceptions: `abandoned` skips toast/tool merge and resumes planning after a notify mismatch.
- */
-export type PostResolutionConsultationPushPayload = {
-  planningTurnNumber: number;
-  aiStrategy?: string;
-  /**
-   * Player-facing taunt/threat from the deferred post-resolution consultation.
-   *
-   * Contract: Optional; omit when empty after trim.
-   * When to use: Renderer post-resolution consultation listener.
-   * Expected outcome: Shown in the Message toast section independently of `aiStrategy`.
-   * Exceptions: None.
-   */
-  aiMessage?: string;
-  toolInvocationCounts?: Record<string, number>;
-  /**
-   * Dollar cost of the deferred strategic or melee post-resolution consultation.
-   *
-   * Contract: Present only when the consult returned a finite number. A missing field is not zero.
-   * When to use: Renderer adds it once when this push is applied. Inline consults put the same cost on the Ready result instead.
-   * Expected outcome: Omitted when the consult did not report a finite cost.
-   * Exceptions: None.
-   */
-  cost?: number;
-  /**
-   * True when main abandoned this consult because playback notify metadata did not match.
-   *
-   * Contract: Omit on successful consultation; renderer must unlatch and resume planning without applying strategy.
-   * When to use: `notifyResolutionPlaybackComplete` mismatch or invalid payload while a strategic/melee consult is pending.
-   * Expected outcome: Latch cleared and Run prefetch may restart; AI log comes from `openRouter:log`.
-   * Exceptions: None.
-   */
-  abandoned?: boolean;
-};
-
-/**
- * Documents the `MeleeCandidateRow` interface as a named contract surface (export interface MeleeCandidateRow).
-
- * Purpose: Carries per-hex melee intercept metadata from main to renderer without duplicating terrain HTML (built client-side).
- * When to use: Populating `ReadyResult.meleeInterceptCandidates` while `awaitingMeleeDecision` is true.
- * Expected outcome: Renderer shows radio row per `h3Index` with summaries and tooltip-equivalent terrain column.
- * Exceptions: None.
- */
-export interface MeleeCandidateRow {
-    /**
-   * Specifies the contract for the `h3Index` member (h3Index: string;).
-
-   * Contract: Res1 cell id where melee would resolve.
-   * When to use: Row key and tactical auto-start target after Fight.
-   * Expected outcome: Valid res1 index present in the strategic map.
-   * Exceptions: None.
-   */
-h3Index: string;
-    /**
-   * Specifies the contract for the `humanUnitSummary` member (humanUnitSummary: string;).
-
-   * Contract: Non-empty categories only, stable order air → armor → infantry → naval (e.g. "2 infantry, 1 armor").
-   * When to use: Human column in the intercept modal.
-   * Expected outcome: Plain text suitable for table cell display.
-   * Exceptions: None.
-   */
-humanUnitSummary: string;
-    /**
-   * Specifies the contract for the `aiUnitSummary` member (aiUnitSummary: string;).
-
-   * Contract: Same formatting rules as `humanUnitSummary` for opponent units in the hex.
-   * When to use: AI column in the intercept modal.
-   * Expected outcome: Plain text suitable for table cell display.
-   * Exceptions: None.
-   */
-aiUnitSummary: string;
-}
-
-/**
- * Documents the `ResolveMeleeInterceptIpcPayload` interface as a named contract surface (export interface ResolveMeleeInterceptIpcPayload).
-
- * Purpose: IPC body for resuming a paused ready after the player chooses Fight or Ignore on the melee intercept modal.
- * When to use: Renderer calls `game:resolveMeleeIntercept` after `awaitingMeleeDecision` from ready.
- * Expected outcome: Main completes melee and remainder of the turn, returning a normal `ReadyResult` completion payload.
- * Exceptions: Invalid token or phase yields `success: false` with reason.
- */
-export interface ResolveMeleeInterceptIpcPayload {
-    /**
-   * Specifies the contract for the `meleeDecisionToken` member (meleeDecisionToken: string;).
-
-   * Contract: Must match the token issued with `awaitingMeleeDecision`.
-   * When to use: Every resolve call.
-   * Expected outcome: Rejects stale decisions when token mismatches pending snapshot.
-   * Exceptions: None.
-   */
-meleeDecisionToken: string;
-    /**
-   * Specifies the contract for the `decision` member (decision: 'fight' | 'ignore';).
-
-   * Contract: Fight skips melee in exactly one selected hex for this turn; Ignore runs stock melee everywhere.
-   * When to use: User modal choice.
-   * Expected outcome: Fight requires `selectedH3Index` present in the candidate list from the paired ready pause.
-   * Exceptions: None.
-   */
-decision: 'fight' | 'ignore';
-    /**
-   * Specifies the contract for the `selectedH3Index` member (selectedH3Index?: string;).
-
-   * Contract: Required when `decision` is fight; must be one of the candidate res1 hex ids.
-   * When to use: Fight path only.
-   * Expected outcome: That hex is excluded from strategic melee resolution for this turn.
-   * Exceptions: None.
-   */
-selectedH3Index?: string;
-    /**
-   * Specifies the contract for the `useEventDrivenConsultation` member (useEventDrivenConsultation?: boolean;).
-
-   * Contract: When true, runs the same post-resolution AI consultation path as `game:ready`.
-   * When to use: Renderer mirrors the flags from the prior ready click.
-   * Expected outcome: Optional; defaults to false when omitted.
-   * Exceptions: None.
-   */
-useEventDrivenConsultation?: boolean;
-    /**
-   * Specifies the contract for the `aiPlanningRunEnabled` member (aiPlanningRunEnabled?: boolean;).
-
-   * Contract: Gates whether after-resolution consultation may call the model.
-   * When to use: Renderer mirrors the ready panel toggle.
-   * Expected outcome: Optional; defaults to false when omitted.
-   * Exceptions: None.
-   */
-aiPlanningRunEnabled?: boolean;
-    /**
-   * Specifies the contract for the `enabledToolGroups` member (enabledToolGroups?: string[];).
-
-   * Contract: Tool group ids forwarded into after-resolution consultation.
-   * When to use: Renderer mirrors enabled tool groups from the prior ready click.
-   * Expected outcome: Optional; IPC handler falls back to defaults when absent.
-   * Exceptions: None.
-   */
-enabledToolGroups?: string[];
 }

@@ -6,6 +6,7 @@
  * Expected outcome: Mutates the caller's removal set and kill ledgers; never touches the database.
  * Exceptions: None.
  */
+import type { KillEdge } from '../../shared/ipc/combatResultTypes';
 import type { TacticalBattleSnapshot, TacticalSubUnitSnapshot } from '../../shared/tacticalBattleTypes';
 import { unitHasTacticalRangedBaseline } from '../../shared/tacticalRanges';
 import { casualtyPriorityIndex, getDefense } from '../combatConstants';
@@ -14,16 +15,6 @@ import { weatherAttackPenalty, weatherBonusLevelOf } from '../../shared/weatherB
 import type { OriginHitBonusLookup } from '../originBonus/originHitBonusLookup';
 import { tacticalEmbarkedLandExcludedFromRangedInput } from './tacticalCombatInput';
 import { tacticalLogMutate } from './tacticalLogging';
-
-/**
- * One kill ledger row: a removed sub-unit and the sub-units credited with it.
- *
- * Purpose: Shared shape of the air-strike and return-fire ledgers.
- * When to use: Typing ledgers passed to the functions below.
- * Expected outcome: Plain data.
- * Exceptions: None.
- */
-type TacticalKillLedgerRow = { victimId: string; killerIds: string[] };
 
 /**
  * Inputs for one air-vs-units strike on a tactical snapshot.
@@ -105,7 +96,7 @@ export interface TacticalAirStrikeOnUnitsInput {
    * Expected outcome: Gains one row per removed victim id.
    * Exceptions: None.
    */
-  readonly killsByAirStrike: TacticalKillLedgerRow[];
+  readonly killsByAirStrike: KillEdge[];
   /**
    * Ledger of counter-fire kills.
    *
@@ -114,7 +105,7 @@ export interface TacticalAirStrikeOnUnitsInput {
    * Expected outcome: Gains a row when the attacker is shot down.
    * Exceptions: None.
    */
-  readonly killsByReturnFire: TacticalKillLedgerRow[];
+  readonly killsByReturnFire: KillEdge[];
 }
 
 /**
@@ -149,7 +140,7 @@ export function markTacticalSubUnitCasualty(
   toRemove: Set<string>,
   victimSubUnitId: string,
   killerSubUnitIds: string[],
-  killLedger: TacticalKillLedgerRow[]
+  killLedger: KillEdge[]
 ): void {
   for (const id of expandedRemovalIdsForVictim(subUnits, victimSubUnitId)) {
     if (toRemove.has(id)) continue;

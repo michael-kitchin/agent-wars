@@ -542,12 +542,18 @@ function testAirFerryDoubleClickContracts(): void {
  */
 function testAirStrikeAndAirGlyphContracts(): void {
   const rendererPath = path.resolve(process.cwd(), 'src', 'renderer', 'renderer.ts');
-  const readyHandlerPath = path.resolve(process.cwd(), 'src', 'renderer', 'gameplay', 'readyHandler.ts');
+  const readyAnnouncementsPath = path.resolve(
+    process.cwd(),
+    'src',
+    'renderer',
+    'gameplay',
+    'readyResolutionAnnouncements.ts'
+  );
   const tacticalOrdersPath = path.resolve(process.cwd(), 'src', 'renderer', 'gameplay', 'tacticalOrders.ts');
   const sidebarSupportPath = path.resolve(process.cwd(), 'src', 'renderer', 'gameplay', 'sidebarSupport.ts');
   const rendererConstantsPath = path.resolve(process.cwd(), 'src', 'renderer', 'core', 'constants.ts');
   const source = fs.readFileSync(rendererPath, 'utf8');
-  const readyHandlerSource = fs.readFileSync(readyHandlerPath, 'utf8');
+  const readyAnnouncementsSource = fs.readFileSync(readyAnnouncementsPath, 'utf8');
   const tacticalOrdersSource = fs.readFileSync(tacticalOrdersPath, 'utf8');
   const sidebarSupportSource = fs.readFileSync(sidebarSupportPath, 'utf8');
   const rendererConstantsSource = fs.readFileSync(rendererConstantsPath, 'utf8');
@@ -559,9 +565,9 @@ function testAirStrikeAndAirGlyphContracts(): void {
     'air unit type label should render as S'
   );
   assert.ok(
-    readyHandlerSource.includes("from './turnUpdateSummary'") &&
-      readyHandlerSource.includes('buildConsolidatedTurnUpdateToastMessage({') &&
-      readyHandlerSource.includes('buildPopupTurnLossSummary({'),
+    readyAnnouncementsSource.includes("from './turnUpdateSummary'") &&
+      readyAnnouncementsSource.includes('buildConsolidatedTurnUpdateToastMessage({') &&
+      readyAnnouncementsSource.includes('buildPopupTurnLossSummary({'),
     'ready update toast should use consolidated turn update summary helpers'
   );
   assert.ok(

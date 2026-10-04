@@ -1,4 +1,5 @@
 import { logDebug, logError, logTrace } from '../logger';
+import type { KillEdge } from '../../shared/ipc/combatResultTypes';
 import type { AirStrikeOrder, EmbarkOrder, FerryOrder, MovementOrder, RangedAttackOrder } from '../../shared/ipcTypes';
 import type { GuardedDbOps } from './dbOps';
 
@@ -307,9 +308,9 @@ export function addAiLossEventsSinceConsultation(
   playerId: string,
   turnNumber: number,
   removedUnits: { id: string; player: string }[],
-  kills: { victimId: string; killerIds: string[] }[],
-  killsByDirectFire?: { victimId: string; killerIds: string[] }[],
-  killsByReturnFire?: { victimId: string; killerIds: string[] }[]
+  kills: KillEdge[],
+  killsByDirectFire?: KillEdge[],
+  killsByReturnFire?: KillEdge[]
 ): void {
   if (!ops.hasDb()) return;
   if (removedUnits.length === 0 || kills.length === 0) {

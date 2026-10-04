@@ -42,7 +42,7 @@ export type HumanMarchPreviewComputationContext = {
  * Expected outcome: Sorted `id:h3` pairs joined by `|` for stable string ordering.
  * Exceptions: None.
  */
-export function buildHumanMarchPreviewStateCacheKey(state: GameStateSnapshot): string {
+function buildHumanMarchPreviewStateCacheKey(state: GameStateSnapshot): string {
   const unitSignature = state.units
     .map((u) => `${u.id}:${u.h3Index}`)
     .sort()

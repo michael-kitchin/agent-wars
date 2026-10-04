@@ -8,20 +8,11 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import Database from 'better-sqlite3';
-import { getOrderedHexList } from './mapData';
-import {
-  assertTerrainMetadataMatchesHexList,
-} from './terrainMetadataLoad';
-import {
-  ensureTerrainClassificationCacheLoaded,
-  getTerrainRes1KindsFromCache,
-  getRes1ProductionContext,
-  getRes4FeatureRowsForSeeding,
-} from './terrainClassificationCache';
-import { pipelineTerrainToPassability } from './terrainPassability';
+import { ensureTerrainClassificationCacheLoaded } from './terrainClassificationCache';
 import { logDebug, logError, logTrace } from './logger';
+import { closeDbHandle, gameDbOps, getAll, getOne, hasDbHandle, run, setDbHandle } from './gameDb/dbConnection';
 import { resolveUnitBirthOrigin } from './unitOrigin/unitBirthOrigin';
-import type { AirStrikeOrder, EmbarkOrder, FerryOrder, GameStateSnapshot, MovementOrder, RangedAttackOrder } from '../shared/ipcTypes';
+import type { GameStateSnapshot } from '../shared/ipcTypes';
 import type { BuildUnitType } from './productionRules';
 import { seedUnits as seedUnitsFromModule } from './gameDb/seeding/seedUnits';
 import {
@@ -41,55 +32,16 @@ import {
 import { getMapHexSetWithGetAll } from './gameDb/mapHexRead';
 import { listUnitsForSnapshotWithGetAll } from './gameDb/unitSnapshotRead';
 import {
-  clearBuildQueueAndProgressForHex as clearBuildQueueAndProgressForHexFromModule,
-  getBuildProgressPointsForHex as getBuildProgressPointsForHexFromModule,
-  getKeepBuildingForHex as getKeepBuildingForHexFromModule,
-  getHexController as getHexControllerFromModule,
-  getRes1InfrastructureForHex as getRes1InfrastructureForHexFromModule,
-  getRes4TerrainOverridesForRendererFromGame as getRes4TerrainOverridesForRendererFromGameFromModule,
-  ensureRes1InfrastructureSyncTriggers as ensureRes1InfrastructureSyncTriggersFromModule,
-  listAllHexControls as listAllHexControlsFromModule,
-  listBuildQueueRowsForHex as listBuildQueueRowsForHexFromModule,
-  listRes1InfrastructureRows as listRes1InfrastructureRowsFromModule,
-  listRes4FeatureOverridesForGame as listRes4FeatureOverridesForGameFromModule,
-  reconcileRes1InfrastructureCountsFromRes4Overrides as reconcileRes1InfrastructureCountsFromRes4OverridesFromModule,
-  replaceBuildQueueForHex as replaceBuildQueueForHexFromModule,
-  setBuildProgressPointsForHex as setBuildProgressPointsForHexFromModule,
-  setKeepBuildingForHex as setKeepBuildingForHexFromModule,
-  setHexController as setHexControllerFromModule,
-  setRes1InfrastructureForHex as setRes1InfrastructureForHexFromModule,
-  insertRes4FeatureOverrideRubbleRow as insertRes4FeatureOverrideRubbleRowFromModule,
-  updateRes4FeatureOverrideRow as updateRes4FeatureOverrideRowFromModule,
-  type BuildQueueRow,
-  type HexControlRow,
-  type Res1InfrastructureRow,
-  type Res4FeatureOverrideRow,
-} from './gameDb/controlInfrastructure';
+  ensureRes1InfrastructureSyncTriggers,
+  listRes1InfrastructureRows,
+  reconcileRes1InfrastructureCountsFromRes4Overrides,
+  runInfrastructureStartupConsistencyPass,
+} from './gameDb/controlInfrastructureAccess';
 import {
-  addAiLossEventsSinceConsultation as addAiLossEventsSinceConsultationFromModule,
-  addOpponentCombatParticipants as addOpponentCombatParticipantsFromModule,
-  clearAiLossEventsSinceConsultation as clearAiLossEventsSinceConsultationFromModule,
-  clearAiPendingOrders as clearAiPendingOrdersFromModule,
-  clearOpponentCombatSinceConsultation as clearOpponentCombatSinceConsultationFromModule,
-  getAiLastConsultationTurn as getAiLastConsultationTurnFromModule,
-  getAiLossEventsSinceConsultation as getAiLossEventsSinceConsultationFromModule,
-  getAiPendingOrders as getAiPendingOrdersFromModule,
-  getAndClearAiToolLimitExceededLastTurn as getAndClearAiToolLimitExceededLastTurnFromModule,
-  getOpponentUnitsInCombatSinceConsultation as getOpponentUnitsInCombatSinceConsultationFromModule,
-  setAiLastConsultationTurn as setAiLastConsultationTurnFromModule,
-  setAiPendingOrders as setAiPendingOrdersFromModule,
-  setAiToolLimitExceededLastTurn as setAiToolLimitExceededLastTurnFromModule,
-  type AiLossEventSinceConsultation,
-} from './gameDb/aiState';
-import {
-  clearTacticalTurnNotes as clearTacticalTurnNotesFromModule,
-  getRecentTurnNotes as getRecentTurnNotesFromModule,
-  upsertTurnLossNote as upsertTurnLossNoteFromModule,
-  upsertTurnStrategyNote as upsertTurnStrategyNoteFromModule,
-  type TurnConsultationNoteTexts,
-  type TurnNoteRow,
-  type TurnNotesScope,
-} from './gameDb/turnNotesHistory';
+  backfillInfrastructureStateFromMetadataIfMissing,
+  seedHexesFromTerrainMetadata,
+  seedInfrastructureStateFromMetadata,
+} from './gameDb/seeding/infrastructureSeeding';
 import {
   consumeFogNewContactsForPlayer as consumeFogNewContactsForPlayerFromModule,
   getGameStateSnapshot as getGameStateSnapshotFromModule,
@@ -117,6 +69,48 @@ export type { GameStateSnapshot } from '../shared/ipcTypes';
 export type { AiLossEventSinceConsultation } from './gameDb/aiState';
 export type { TurnConsultationNoteTexts, TurnNoteRow, TurnNotesScope } from './gameDb/turnNotesHistory';
 export type { BuildQueueRow, HexControlRow, Res1InfrastructureRow, Res4FeatureOverrideRow } from './gameDb/controlInfrastructure';
+export {
+  clearBuildQueueAndProgressForHex,
+  ensureRes1InfrastructureSyncTriggers,
+  getBuildProgressPointsForHex,
+  getHexControlMap,
+  getHexController,
+  getKeepBuildingForHex,
+  getRes1InfrastructureForHex,
+  getRes4TerrainOverridesForRendererFromGame,
+  insertRes4FeatureOverrideRubbleRow,
+  listAllHexControls,
+  listBuildQueueRowsForHex,
+  listRes1InfrastructureRows,
+  listRes4FeatureOverridesForGame,
+  reconcileRes1InfrastructureCountsFromRes4Overrides,
+  replaceBuildQueueForHex,
+  setBuildProgressPointsForHex,
+  setHexController,
+  setKeepBuildingForHex,
+  setRes1InfrastructureForHex,
+  sumUrbanHexCountForHexes,
+  updateRes4FeatureOverrideRow,
+} from './gameDb/controlInfrastructureAccess';
+export {
+  addAiLossEventsSinceConsultation,
+  addOpponentCombatParticipants,
+  clearAiLossEventsSinceConsultation,
+  clearAiPendingOrders,
+  clearOpponentCombatSinceConsultation,
+  clearTacticalTurnNotes,
+  getAiLastConsultationTurn,
+  getAiLossEventsSinceConsultation,
+  getAiPendingOrders,
+  getAndClearAiToolLimitExceededLastTurn,
+  getOpponentUnitsInCombatSinceConsultation,
+  getRecentTurnNotes,
+  setAiLastConsultationTurn,
+  setAiPendingOrders,
+  setAiToolLimitExceededLastTurn,
+  upsertTurnLossNote,
+  upsertTurnStrategyNote,
+} from './gameDb/aiStateAccess';
 
 /**
  * SQLite `user_version` that the current schema DDL produces.
@@ -137,30 +131,6 @@ export const EXPECTED_USER_VERSION = 16;
  * Exceptions: None.
  */
 export const GAME_DB_FILE_NAME = 'game-baseline-v12.sqlite';
-
-/**
- * Documents the module-scope binding `db` (db: InstanceType<typeof Database> | null).
-
- * Purpose: Supports maintainability by documenting why `db` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-let db: InstanceType<typeof Database> | null = null;
-
-/**
- * Documents the module-scope binding `INFRASTRUCTURE_SYNC_TRIGGER_NAMES` (INFRASTRUCTURE_SYNC_TRIGGER_NAMES).
-
- * Purpose: Supports maintainability by documenting why `INFRASTRUCTURE_SYNC_TRIGGER_NAMES` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-const INFRASTRUCTURE_SYNC_TRIGGER_NAMES = [
-  'res4_sync_res1_after_insert',
-  'res4_sync_res1_after_delete',
-  'res4_sync_res1_after_update',
-] as const;
 
 /**
  * Defines the `applyGameDbPragmas` function shape (export function applyGameDbPragmas(database: InstanceType<typeof Database>): void).
@@ -187,64 +157,6 @@ export function validateGameDatabaseOrThrow(database: InstanceType<typeof Databa
 }
 
 /**
- * Defines the `closeDbHandle` function shape (function closeDbHandle(): void).
-
- * Purpose: Supports maintainability by documenting why `closeDbHandle` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function closeDbHandle(): void {
-  if (db) {
-    try {
-      db.close();
-    } catch (err) {
-      logError('gameDb closeDbHandle: error closing database', err);
-    }
-    db = null;
-  }
-}
-
-/**
- * Defines the `run` function shape (function run(sql: string, params: unknown[] = []): void).
-
- * Purpose: Supports maintainability by documenting why `run` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function run(sql: string, params: unknown[] = []): void {
-  if (!db) return;
-  db.prepare(sql).run(...(params as never[]));
-}
-
-/**
- * Defines the `getOne` function shape (function getOne<T extends Record<string, unknown>>(sql: string, params: unknown[] = []): T | undefined).
-
- * Purpose: Supports maintainability by documenting why `getOne` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function getOne<T extends Record<string, unknown>>(sql: string, params: unknown[] = []): T | undefined {
-  if (!db) return undefined;
-  return db.prepare(sql).get(...(params as never[])) as T | undefined;
-}
-
-/**
- * Defines the `getAll` function shape (function getAll<T extends Record<string, unknown>>(sql: string, params: unknown[] = []): T[]).
-
- * Purpose: Supports maintainability by documenting why `getAll` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function getAll<T extends Record<string, unknown>>(sql: string, params: unknown[] = []): T[] {
-  if (!db) return [];
-  return db.prepare(sql).all(...(params as never[])) as T[];
-}
-
-/**
  * Defines the `getCanonicalDbPath` function shape (function getCanonicalDbPath(): string).
 
  * Purpose: Delegates canonical DB location to `resolveGameDbFileUnderUserData` for reuse across modules.
@@ -265,7 +177,7 @@ function getCanonicalDbPath(): string {
  * Exceptions: None.
  */
 function ensureTurnStateRow(): void {
-  if (!db) return;
+  if (!hasDbHandle()) return;
   ensureTurnStateRowWhenDbOpen(run, getOne);
 }
 
@@ -278,7 +190,7 @@ function ensureTurnStateRow(): void {
  * Exceptions: None; skips work when the DB handle is missing.
  */
 export function repairStrandedStrategicResolutionPhaseOnDbBootstrap(): void {
-  if (!db) return;
+  if (!hasDbHandle()) return;
   repairStrandedStrategicResolutionPhaseWhenDbOpen(run, getOne);
 }
 
@@ -295,12 +207,13 @@ export function createFreshGameDatabaseAt(canonicalPath: string): void {
   closeDbHandle();
   const dir = path.dirname(canonicalPath);
   fs.mkdirSync(dir, { recursive: true });
-  db = new Database(canonicalPath);
-  applyGameDbPragmas(db);
-  db.exec(getFullDdl());
+  const database = new Database(canonicalPath);
+  setDbHandle(database);
+  applyGameDbPragmas(database);
+  database.exec(getFullDdl());
   ensureRes1InfrastructureSyncTriggers();
   ensureTurnStateRow();
-  db.pragma(`user_version = ${EXPECTED_USER_VERSION}`);
+  database.pragma(`user_version = ${EXPECTED_USER_VERSION}`);
   seedGameSeedIfMissing();
 }
 
@@ -328,7 +241,7 @@ export function openGameDatabaseAtPathForTests(absPath: string): void {
     d = new Database(absPath);
     applyGameDbPragmas(d);
     validateGameDatabaseOrThrow(d);
-    db = d;
+    setDbHandle(d);
     d = null;
     runInfrastructureStartupConsistencyPass();
   } catch (err) {
@@ -401,7 +314,7 @@ export async function initDatabase(): Promise<void> {
     d = new Database(canonicalPath);
     applyGameDbPragmas(d);
     validateGameDatabaseOrThrow(d);
-    db = d;
+    setDbHandle(d);
     d = null;
     runInfrastructureStartupConsistencyPass({ includeReconciliation: false });
     ensureTurnStateRow();
@@ -441,7 +354,7 @@ export async function initDatabase(): Promise<void> {
  * Exceptions: None.
  */
 function seedGameSeedIfMissing(): void {
-  seedGameSeedIfMissingWithOps({ hasDb: () => db !== null, run, getOne });
+  seedGameSeedIfMissingWithOps(gameDbOps);
 }
 
 /**
@@ -454,7 +367,7 @@ function seedGameSeedIfMissing(): void {
  * Exceptions: None.
  */
 export function allocateNextUnitDisplayOrder(unitType: BuildUnitType, player: string): number {
-  return allocateNextUnitDisplayOrderWithOps({ hasDb: () => db !== null, run, getOne }, unitType, player);
+  return allocateNextUnitDisplayOrderWithOps(gameDbOps, unitType, player);
 }
 
 /**
@@ -466,7 +379,7 @@ export function allocateNextUnitDisplayOrder(unitType: BuildUnitType, player: st
  * Exceptions: Throws when the game database is not open.
  */
 export function allocateNextUnitIdOrdinal(unitType: BuildUnitType, player: string): number {
-  return allocateNextUnitIdOrdinalWithOps({ hasDb: () => db !== null, run, getOne }, unitType, player);
+  return allocateNextUnitIdOrdinalWithOps(gameDbOps, unitType, player);
 }
 
 /**
@@ -478,7 +391,7 @@ export function allocateNextUnitIdOrdinal(unitType: BuildUnitType, player: strin
  * Exceptions: None.
  */
 export function getGameSeed(): number {
-  return getGameSeedWithOps({ hasDb: () => db !== null, run, getOne });
+  return getGameSeedWithOps(gameDbOps);
 }
 
 /**
@@ -508,243 +421,6 @@ export function getScenarioHomeRegionHexes(regionName: string): string[] {
 }
 
 /**
- * Defines the `seedHexesFromTerrainMetadata` function shape (function seedHexesFromTerrainMetadata(): void).
-
- * Purpose: Supports maintainability by documenting why `seedHexesFromTerrainMetadata` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function seedHexesFromTerrainMetadata(): void {
-  logDebug('gameDb seedHexesFromTerrainMetadata');
-  if (db === null) return;
-  ensureTerrainClassificationCacheLoaded();
-  const hexes = getOrderedHexList();
-  const byH3 = getTerrainRes1KindsFromCache();
-  assertTerrainMetadataMatchesHexList(byH3, hexes);
-  for (const h3 of hexes) {
-    const kind = byH3.get(h3);
-    if (!kind) {
-      logError('gameDb seedHexesFromTerrainMetadata: missing row', new Error(`no classified kind for ${h3}`));
-      throw new Error(`terrain metadata missing h3_index ${h3}`);
-    }
-    const terrain = pipelineTerrainToPassability(kind);
-    run('INSERT INTO hexes (h3_index, terrain, terrain_kind) VALUES (?, ?, ?)', [h3, terrain, kind]);
-  }
-}
-
-/**
- * Defines the `seedInfrastructureStateFromMetadata` function shape (function seedInfrastructureStateFromMetadata(): void).
-
- * Purpose: Supports maintainability by documenting why `seedInfrastructureStateFromMetadata` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function seedInfrastructureStateFromMetadata(): void {
-  logDebug('gameDb seedInfrastructureStateFromMetadata');
-  if (db === null) return;
-  for (const triggerName of INFRASTRUCTURE_SYNC_TRIGGER_NAMES) {
-    run(`DROP TRIGGER IF EXISTS ${triggerName}`);
-  }
-  try {
-    run('DELETE FROM res1_infrastructure');
-    run('DELETE FROM res4_feature_overrides');
-    const { res1Rows, res4Rows } = getInfrastructureSeedRowsFromMetadata();
-    for (const row of res1Rows) {
-      insertRes1InfrastructureRow(row.h3Index, row.urbanHexCount, row.airportCount, row.seaportCount);
-    }
-    for (const row of res4Rows) {
-      insertRes4FeatureOverrideSeedRow(row);
-    }
-  } finally {
-    // Bulk reseed already writes canonical res1 counts, so restoring triggers afterwards avoids N-per-row trigger overhead.
-    ensureRes1InfrastructureSyncTriggers();
-  }
-  const { changedHexCount } = reconcileRes1InfrastructureCountsFromRes4Overrides();
-  logDebug('gameDb seedInfrastructureStateFromMetadata: post-seed reconciliation complete', { changedHexCount });
-}
-
-/**
- * Defines the `backfillInfrastructureStateFromMetadataIfMissing` function shape (function backfillInfrastructureStateFromMetadataIfMissing(): void).
-
- * Purpose: Supports maintainability by documenting why `backfillInfrastructureStateFromMetadataIfMissing` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function backfillInfrastructureStateFromMetadataIfMissing(): void {
-  logDebug('gameDb backfillInfrastructureStateFromMetadataIfMissing');
-  if (db === null) return;
-  const hexRows = getAll<{ h3Index: string }>('SELECT h3_index AS h3Index FROM hexes');
-  if (hexRows.length <= 0) return;
-
-  const existingInfra = new Set(
-    getAll<{ h3Index: string }>('SELECT h3_index AS h3Index FROM res1_infrastructure').map((r) => r.h3Index)
-  );
-  const existingRes4Overrides = new Set(
-    getAll<{ h3Index: string }>('SELECT h3_index AS h3Index FROM res4_feature_overrides').map((r) => r.h3Index)
-  );
-  const { res1Rows, res4Rows } = getInfrastructureSeedRowsFromMetadata();
-  let insertedInfra = 0;
-  for (const row of res1Rows) {
-    if (existingInfra.has(row.h3Index)) continue;
-    insertRes1InfrastructureRow(row.h3Index, row.urbanHexCount, row.airportCount, row.seaportCount);
-    insertedInfra += 1;
-  }
-  let insertedRes4 = 0;
-  for (const row of res4Rows) {
-    if (existingRes4Overrides.has(row.h3Index)) continue;
-    insertRes4FeatureOverrideSeedRow(row);
-    insertedRes4 += 1;
-  }
-
-  if (insertedInfra > 0 || insertedRes4 > 0) {
-    logDebug('gameDb backfillInfrastructureStateFromMetadataIfMissing: inserted missing rows', {
-      insertedInfra,
-      insertedRes4,
-    });
-  }
-}
-
-/**
- * Documents the `InfrastructureSeedRes1Row` interface as a named contract surface (interface InfrastructureSeedRes1Row).
-
- * Purpose: Supports maintainability by documenting why `InfrastructureSeedRes1Row` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-interface InfrastructureSeedRes1Row {
-    /**
-   * Specifies the contract for the `h3Index` member (h3Index: string;).
-
-   * Contract: Describes stable behavior for callers of `h3Index` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-h3Index: string;
-    /**
-   * Specifies the contract for the `urbanHexCount` member (urbanHexCount: number;).
-
-   * Contract: Describes stable behavior for callers of `urbanHexCount` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-urbanHexCount: number;
-    /**
-   * Specifies the contract for the `airportCount` member (airportCount: number;).
-
-   * Contract: Describes stable behavior for callers of `airportCount` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-airportCount: number;
-    /**
-   * Specifies the contract for the `seaportCount` member (seaportCount: number;).
-
-   * Contract: Describes stable behavior for callers of `seaportCount` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-seaportCount: number;
-}
-
-/**
- * Documents the `InfrastructureSeedRows` interface as a named contract surface (interface InfrastructureSeedRows).
-
- * Purpose: Supports maintainability by documenting why `InfrastructureSeedRows` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-interface InfrastructureSeedRows {
-    /**
-   * Specifies the contract for the `res1Rows` member (res1Rows: InfrastructureSeedRes1Row[];).
-
-   * Contract: Describes stable behavior for callers of `res1Rows` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-res1Rows: InfrastructureSeedRes1Row[];
-    /**
-   * Specifies the contract for the `res4Rows` member (res4Rows: ReturnType<typeof getRes4FeatureRowsForSeeding>;).
-
-   * Contract: Describes stable behavior for callers of `res4Rows` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-   * Exceptions: None.
-   */
-res4Rows: ReturnType<typeof getRes4FeatureRowsForSeeding>;
-}
-
-/**
- * Defines the `getInfrastructureSeedRowsFromMetadata` function shape (function getInfrastructureSeedRowsFromMetadata(): InfrastructureSeedRows).
-
- * Purpose: Supports maintainability by documenting why `getInfrastructureSeedRowsFromMetadata` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function getInfrastructureSeedRowsFromMetadata(): InfrastructureSeedRows {
-  const res1Rows: InfrastructureSeedRes1Row[] = getOrderedHexList().map((h3Index) => {
-    const ctx = getRes1ProductionContext({ h3Index });
-    return {
-      h3Index,
-      urbanHexCount: ctx.urbanHexCount,
-      airportCount: ctx.airportCount,
-      seaportCount: ctx.seaportCount,
-    };
-  });
-  const res4Rows = getRes4FeatureRowsForSeeding()
-    .filter((row) => row.isUrban || row.isAirport || row.isSeaport);
-  return { res1Rows, res4Rows };
-}
-
-/**
- * Defines the `insertRes1InfrastructureRow` function shape (function insertRes1InfrastructureRow().
-
- * Purpose: Supports maintainability by documenting why `insertRes1InfrastructureRow` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function insertRes1InfrastructureRow(
-  h3Index: string,
-  urbanHexCount: number,
-  airportCount: number,
-  seaportCount: number
-): void {
-  run(
-    `INSERT INTO res1_infrastructure (h3_index, urban_hex_count, airport_count, seaport_count)
-     VALUES (?, ?, ?, ?)`,
-    [h3Index, urbanHexCount, airportCount, seaportCount]
-  );
-}
-
-/**
- * Defines the `insertRes4FeatureOverrideSeedRow` function shape (function insertRes4FeatureOverrideSeedRow(row: ReturnType<typeof getRes4FeatureRowsForSeeding>[number]): void).
-
- * Purpose: Supports maintainability by documenting why `insertRes4FeatureOverrideSeedRow` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function insertRes4FeatureOverrideSeedRow(row: ReturnType<typeof getRes4FeatureRowsForSeeding>[number]): void {
-  run(
-    `INSERT INTO res4_feature_overrides (
-       h3_index, parent_h3_index, terrain_kind, is_urban, is_airport, is_seaport, is_rubble
-     ) VALUES (?, ?, ?, ?, ?, ?, 0)`,
-    [row.h3Index, row.parentH3Index, row.terrainKind, row.isUrban ? 1 : 0, row.isAirport ? 1 : 0, row.isSeaport ? 1 : 0]
-  );
-}
-
-/**
  * Defines the `seedUnits` function shape (function seedUnits(): void).
 
  * Purpose: Supports maintainability by documenting why `seedUnits` exists.
@@ -759,8 +435,8 @@ function seedUnits(): void {
     getAll,
     allocateNextUnitDisplayOrder,
     allocateNextUnitIdOrdinal,
-    hasDb: () => db !== null,
-    resolveBirthOrigin: (unitId, h3Index) => resolveUnitBirthOrigin({ run, getOne, getAll }, { unitId, birthH3Index: h3Index }),
+    hasDb: hasDbHandle,
+    resolveBirthOrigin: (unitId, h3Index) => resolveUnitBirthOrigin(gameDbOps, { unitId, birthH3Index: h3Index }),
   });
 }
 
@@ -799,12 +475,7 @@ export function saveDatabase(): void {
  */
 function getFogDeps() {
   return {
-    ops: {
-      hasDb: () => db !== null,
-      run,
-      getOne,
-      getAll,
-    },
+    ops: gameDbOps,
     listUnitsForSnapshot,
     listRes1InfrastructureRows,
   };
@@ -834,7 +505,7 @@ export function refreshFogOfWarIntelFromCurrentState(options?: {
  */
 export function consumeFogNewContactsForPlayer(playerId: 'human' | 'opponent'): string[] {
   return consumeFogNewContactsForPlayerFromModule(
-    { hasDb: () => db !== null, run, getOne, getAll },
+    gameDbOps,
     playerId
   );
 }
@@ -921,312 +592,15 @@ export function listUnitsForSnapshot(): GameStateSnapshot['units'] {
 }
 
 /**
- * Defines the `getHexController` function shape (export function getHexController(h3Index: string): string | null).
-
- * Purpose: Supports maintainability by documenting why `getHexController` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-export function getHexController(h3Index: string): string | null {
-  return getHexControllerFromModule({ run, getOne, getAll }, h3Index);
-}
-
-/**
- * Defines the `setHexController` function shape (export function setHexController(h3Index: string, controllerPlayerId: string | null): void).
-
- * Purpose: Supports maintainability by documenting why `setHexController` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-export function setHexController(h3Index: string, controllerPlayerId: string | null): void {
-  setHexControllerFromModule({ run, getOne, getAll }, h3Index, controllerPlayerId);
-}
-
-/**
- * Defines the `listAllHexControls` function shape (export function listAllHexControls(): HexControlRow[]).
-
- * Purpose: Supports maintainability by documenting why `listAllHexControls` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-export function listAllHexControls(): HexControlRow[] {
-  return listAllHexControlsFromModule({ run, getOne, getAll });
-}
-
-/**
- * Returns every strategic res1 hex’s current controller as a map keyed by H3 index.
+ * Reports whether the game database handle is open.
  *
- * Purpose: Avoid repeating `new Map(listAllHexControls().map(...))` at call sites that need bulk control lookups.
- * When to use: Whenever resolution reads many hex controllers from `res1_control` in one pass (win checks, control resolution snapshots).
- * Expected outcome: A new map per call; values mirror `controller_player_id` (including null when unset).
- * Exceptions: None.
- */
-export function getHexControlMap(): ReadonlyMap<string, string | null> {
-  logTrace('gameDb getHexControlMap');
-  return new Map(listAllHexControls().map((row) => [row.h3Index, row.controllerPlayerId]));
-}
-
-/**
- * Defines the `listBuildQueueRowsForHex` function shape (export function listBuildQueueRowsForHex(h3Index: string): BuildQueueRow[]).
-
- * Purpose: Supports maintainability by documenting why `listBuildQueueRowsForHex` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-export function listBuildQueueRowsForHex(h3Index: string): BuildQueueRow[] {
-  return listBuildQueueRowsForHexFromModule({ run, getOne, getAll }, h3Index);
-}
-
-/**
- * Defines the `getBuildProgressPointsForHex` function shape (export function getBuildProgressPointsForHex(h3Index: string): number).
-
- * Purpose: Supports maintainability by documenting why `getBuildProgressPointsForHex` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-export function getBuildProgressPointsForHex(h3Index: string): number {
-  return getBuildProgressPointsForHexFromModule({ run, getOne, getAll }, h3Index);
-}
-
-/**
- * Reads Keep-building standing order for a hex through the game DB handle.
- *
- * Purpose: Facade over controlInfrastructure Keep-building reads for gameActions callers.
- * When to use: Snapshots, prune sync, production refill, and Keep-building mutations.
- * Expected outcome: Same contract as `getKeepBuildingForHex` in controlInfrastructure.
- * Exceptions: None.
- */
-export function getKeepBuildingForHex(h3Index: string): {
-  keepBuilding: boolean;
-  keepBuildingUnitType: BuildUnitType | null;
-} {
-  return getKeepBuildingForHexFromModule({ run, getOne, getAll }, h3Index);
-}
-
-/**
- * Writes Keep-building standing order for a hex through the game DB handle.
- *
- * Purpose: Facade over controlInfrastructure Keep-building writes for gameActions callers.
- * When to use: Arm/disarm, last-type sync, prune invalidation, and refill-path clears.
- * Expected outcome: Same contract as `setKeepBuildingForHex` in controlInfrastructure.
- * Exceptions: Propagates when enabling without a unit type.
- */
-export function setKeepBuildingForHex(
-  h3Index: string,
-  keepBuilding: boolean,
-  keepBuildingUnitType: BuildUnitType | null
-): void {
-  setKeepBuildingForHexFromModule({ run, getOne, getAll }, h3Index, keepBuilding, keepBuildingUnitType);
-}
-
-/**
- * Defines the `setBuildProgressPointsForHex` function shape (export function setBuildProgressPointsForHex(h3Index: string, storedPoints: number): void).
-
- * Purpose: Supports maintainability by documenting why `setBuildProgressPointsForHex` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-export function setBuildProgressPointsForHex(h3Index: string, storedPoints: number): void {
-  setBuildProgressPointsForHexFromModule({ run, getOne, getAll }, h3Index, storedPoints);
-}
-
-/**
- * Defines the `clearBuildQueueAndProgressForHex` function shape (export function clearBuildQueueAndProgressForHex(h3Index: string): void).
-
- * Purpose: Supports maintainability by documenting why `clearBuildQueueAndProgressForHex` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-export function clearBuildQueueAndProgressForHex(h3Index: string): void {
-  clearBuildQueueAndProgressForHexFromModule({ run, getOne, getAll }, h3Index);
-}
-
-/**
- * Defines the `replaceBuildQueueForHex` function shape (export function replaceBuildQueueForHex(h3Index: string, entries: Array<).
-
- * Purpose: Supports maintainability by documenting why `replaceBuildQueueForHex` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-export function replaceBuildQueueForHex(h3Index: string, entries: Array<{ unitType: BuildUnitType; remainingCount: number }>): void {
-  replaceBuildQueueForHexFromModule({ run, getOne, getAll }, h3Index, entries);
-}
-
-/**
- * Defines the `getRes1InfrastructureForHex` function shape (export function getRes1InfrastructureForHex(h3Index: string): Res1InfrastructureRow).
-
- * Purpose: Supports maintainability by documenting why `getRes1InfrastructureForHex` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-export function getRes1InfrastructureForHex(h3Index: string): Res1InfrastructureRow {
-  return getRes1InfrastructureForHexFromModule({ run, getOne, getAll }, h3Index);
-}
-
-/**
- * Sums persisted res4 urban cell counts (aggregated per res1 hex) over a list of strategic hex ids.
- *
- * Purpose: Single place for region-scale urban totals used by victory rules and any future analytics.
- * When to use: Pass the full res1 hex list for a home region or other bounded set.
- * Expected outcome: Non-negative integer equal to the sum of each hex’s `urbanHexCount` from `res1_infrastructure`.
- * Exceptions: None.
- */
-export function sumUrbanHexCountForHexes(hexIds: readonly string[]): number {
-  logTrace('gameDb sumUrbanHexCountForHexes', { hexCount: hexIds.length });
-  let sum = 0;
-  for (const h3Index of hexIds) {
-    sum += getRes1InfrastructureForHex(h3Index).urbanHexCount;
-  }
-  return sum;
-}
-
-/**
- * Defines the `listRes1InfrastructureRows` function shape (export function listRes1InfrastructureRows(): Res1InfrastructureRow[]).
-
- * Purpose: Supports maintainability by documenting why `listRes1InfrastructureRows` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-export function listRes1InfrastructureRows(): Res1InfrastructureRow[] {
-  return listRes1InfrastructureRowsFromModule({ run, getOne, getAll });
-}
-
-/**
- * Defines the `setRes1InfrastructureForHex` function shape (export function setRes1InfrastructureForHex().
-
- * Purpose: Supports maintainability by documenting why `setRes1InfrastructureForHex` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-export function setRes1InfrastructureForHex(
-  h3Index: string,
-  counts: { urbanHexCount: number; airportCount: number; seaportCount: number }
-): void {
-  setRes1InfrastructureForHexFromModule({ run, getOne, getAll }, h3Index, counts);
-}
-
-/**
- * Defines the `listRes4FeatureOverridesForGame` function shape (export function listRes4FeatureOverridesForGame(): Res4FeatureOverrideRow[]).
-
- * Purpose: Supports maintainability by documenting why `listRes4FeatureOverridesForGame` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-export function listRes4FeatureOverridesForGame(): Res4FeatureOverrideRow[] {
-  return listRes4FeatureOverridesForGameFromModule({ run, getOne, getAll });
-}
-
-/**
- * Defines the `reconcileRes1InfrastructureCountsFromRes4Overrides` function shape (export function reconcileRes1InfrastructureCountsFromRes4Overrides(): { changedHexCount: number } { logDebug('gameDb reconcileRes1InfrastructureCountsFromRes).
-
- * Purpose: Supports maintainability by documenting why `reconcileRes1InfrastructureCountsFromRes4Overrides` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-export function reconcileRes1InfrastructureCountsFromRes4Overrides(): { changedHexCount: number } {
-  logDebug('gameDb reconcileRes1InfrastructureCountsFromRes4Overrides');
-  return reconcileRes1InfrastructureCountsFromRes4OverridesFromModule({ run, getOne, getAll });
-}
-
-/**
- * Defines the `runInfrastructureStartupConsistencyPass` function shape (function runInfrastructureStartupConsistencyPass(options?:).
-
- * Purpose: Supports maintainability by documenting why `runInfrastructureStartupConsistencyPass` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function runInfrastructureStartupConsistencyPass(options?: { includeReconciliation?: boolean }): void {
-  ensureRes1InfrastructureSyncTriggers();
-  if (options?.includeReconciliation === false) return;
-  reconcileRes1InfrastructureCountsFromRes4Overrides();
-}
-
-/**
- * Defines the `ensureRes1InfrastructureSyncTriggers` function shape (export function ensureRes1InfrastructureSyncTriggers(): void).
-
- * Purpose: Supports maintainability by documenting why `ensureRes1InfrastructureSyncTriggers` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-export function ensureRes1InfrastructureSyncTriggers(): void {
-  ensureRes1InfrastructureSyncTriggersFromModule({ run, getOne, getAll });
-}
-
-/**
- * Defines the `updateRes4FeatureOverrideRow` function shape (export function updateRes4FeatureOverrideRow( h3Index: string, patch: Partial<Pick<Res4FeatureOverrideRow, 'isUrban' | 'isAirport' | 'isSeaport' | 'isRubb).
-
- * Purpose: Supports maintainability by documenting why `updateRes4FeatureOverrideRow` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-/**
- * Defines the `insertRes4FeatureOverrideRubbleRow` function shape (export function insertRes4FeatureOverrideRubbleRow(args: { h3Index: string; parentH3Index: string; terrainKind: string }): void).
- *
- * Purpose: Exposes transport-only tactical rubble persistence at the game DB facade.
- * When to use: `applyTacticalRangedRubbleToRes4Cell` when no override row exists yet for the res4 cell.
- * Expected outcome: Delegates to `controlInfrastructure.insertRes4FeatureOverrideRubbleRow` with the live connection bundle (which emits debug logs).
- * Exceptions: None; SQLite errors surface to callers that wrap in try/catch.
- */
-export function insertRes4FeatureOverrideRubbleRow(args: {
-  h3Index: string;
-  parentH3Index: string;
-  terrainKind: string;
-}): void {
-  insertRes4FeatureOverrideRubbleRowFromModule({ run, getOne, getAll }, args);
-}
-
-export function updateRes4FeatureOverrideRow(
-  h3Index: string,
-  patch: Partial<Pick<Res4FeatureOverrideRow, 'isUrban' | 'isAirport' | 'isSeaport' | 'isRubble'>>
-): void {
-  updateRes4FeatureOverrideRowFromModule({ run, getOne, getAll }, h3Index, patch);
-}
-
-/**
- * Defines the `getRes4TerrainOverridesForRendererFromGame` function shape (export function getRes4TerrainOverridesForRendererFromGame(): Array<).
-
- * Purpose: Supports maintainability by documenting why `getRes4TerrainOverridesForRendererFromGame` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-export function getRes4TerrainOverridesForRendererFromGame(): Array<{
-  h3Index: string;
-  terrainKind: string;
-  isUrban: boolean;
-  isAirport?: boolean;
-  isSeaport?: boolean;
-  isRubble?: boolean;
-}> {
-  return getRes4TerrainOverridesForRendererFromGameFromModule({ run, getOne, getAll });
-}
-
-/**
- * Defines the `isDbReady` function shape (export function isDbReady(): boolean).
-
- * Purpose: Supports maintainability by documenting why `isDbReady` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Purpose: Callers outside this module should not touch the connection module directly.
+ * When to use: Before IPC work that must no-op when init has not finished or the handle was closed.
+ * Expected outcome: Same boolean as `hasDbHandle`.
  * Exceptions: None.
  */
 export function isDbReady(): boolean {
-  return db !== null;
+  return hasDbHandle();
 }
 
 /**
@@ -1238,7 +612,7 @@ export function isDbReady(): boolean {
  * Exceptions: None.
  */
 export function setGameOver(winner: string): void {
-  setGameOverWithOps({ hasDb: () => db !== null, run, getOne }, winner);
+  setGameOverWithOps(gameDbOps, winner);
 }
 
 /**
@@ -1250,280 +624,7 @@ export function setGameOver(winner: string): void {
  * Exceptions: None.
  */
 export function clearGameOver(): void {
-  clearGameOverWithOps({ hasDb: () => db !== null, run, getOne });
-}
-
-/**
- * Defines the `getAiStateDbOps` function shape (function getAiStateDbOps()).
-
- * Purpose: Supports maintainability by documenting why `getAiStateDbOps` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function getAiStateDbOps() {
-  return {
-    hasDb: () => db !== null,
-    run,
-    getOne,
-    getAll,
-  };
-}
-
-/**
- * Defines the `setAiToolLimitExceededLastTurn` function shape (export function setAiToolLimitExceededLastTurn(): void).
-
- * Purpose: Supports maintainability by documenting why `setAiToolLimitExceededLastTurn` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-export function setAiToolLimitExceededLastTurn(): void {
-  setAiToolLimitExceededLastTurnFromModule(getAiStateDbOps());
-}
-
-/**
- * Defines the `getAndClearAiToolLimitExceededLastTurn` function shape (export function getAndClearAiToolLimitExceededLastTurn(): boolean).
-
- * Purpose: Supports maintainability by documenting why `getAndClearAiToolLimitExceededLastTurn` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-export function getAndClearAiToolLimitExceededLastTurn(): boolean {
-  return getAndClearAiToolLimitExceededLastTurnFromModule(getAiStateDbOps());
-}
-
-/**
- * Defines the `getAiLastConsultationTurn` function shape (export function getAiLastConsultationTurn(): number).
-
- * Purpose: Supports maintainability by documenting why `getAiLastConsultationTurn` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-export function getAiLastConsultationTurn(): number {
-  return getAiLastConsultationTurnFromModule(getAiStateDbOps());
-}
-
-/**
- * Defines the `setAiLastConsultationTurn` function shape (export function setAiLastConsultationTurn(turn: number): void).
-
- * Purpose: Supports maintainability by documenting why `setAiLastConsultationTurn` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-export function setAiLastConsultationTurn(turn: number): void {
-  setAiLastConsultationTurnFromModule(getAiStateDbOps(), turn);
-}
-
-/**
- * Defines the `getOpponentUnitsInCombatSinceConsultation` function shape (export function getOpponentUnitsInCombatSinceConsultation(): string[]).
-
- * Purpose: Supports maintainability by documenting why `getOpponentUnitsInCombatSinceConsultation` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-export function getOpponentUnitsInCombatSinceConsultation(): string[] {
-  return getOpponentUnitsInCombatSinceConsultationFromModule(getAiStateDbOps());
-}
-
-/**
- * Defines the `addOpponentCombatParticipants` function shape (export function addOpponentCombatParticipants(unitIds: string[]): void).
-
- * Purpose: Supports maintainability by documenting why `addOpponentCombatParticipants` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-export function addOpponentCombatParticipants(unitIds: string[]): void {
-  addOpponentCombatParticipantsFromModule(getAiStateDbOps(), unitIds);
-}
-
-/**
- * Defines the `clearOpponentCombatSinceConsultation` function shape (export function clearOpponentCombatSinceConsultation(): void).
-
- * Purpose: Supports maintainability by documenting why `clearOpponentCombatSinceConsultation` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-export function clearOpponentCombatSinceConsultation(): void {
-  clearOpponentCombatSinceConsultationFromModule(getAiStateDbOps());
-}
-
-/**
- * Defines the `addAiLossEventsSinceConsultation` function shape (export function addAiLossEventsSinceConsultation( playerId: string, turnNumber: number, removedUnits: { id: string; player: string }[], kills: { vic).
-
- * Purpose: Supports maintainability by documenting why `addAiLossEventsSinceConsultation` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-export function addAiLossEventsSinceConsultation(
-  playerId: string,
-  turnNumber: number,
-  removedUnits: { id: string; player: string }[],
-  kills: { victimId: string; killerIds: string[] }[],
-  killsByDirectFire?: { victimId: string; killerIds: string[] }[],
-  killsByReturnFire?: { victimId: string; killerIds: string[] }[]
-): void {
-  addAiLossEventsSinceConsultationFromModule(
-    getAiStateDbOps(),
-    playerId,
-    turnNumber,
-    removedUnits,
-    kills,
-    killsByDirectFire,
-    killsByReturnFire
-  );
-}
-
-/**
- * Defines the `getAiLossEventsSinceConsultation` function shape (export function getAiLossEventsSinceConsultation(playerId: string): AiLossEventSinceConsultation[]).
-
- * Purpose: Supports maintainability by documenting why `getAiLossEventsSinceConsultation` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-export function getAiLossEventsSinceConsultation(playerId: string): AiLossEventSinceConsultation[] {
-  return getAiLossEventsSinceConsultationFromModule(getAiStateDbOps(), playerId);
-}
-
-/**
- * Defines the `clearAiLossEventsSinceConsultation` function shape (export function clearAiLossEventsSinceConsultation(playerId: string): void).
-
- * Purpose: Supports maintainability by documenting why `clearAiLossEventsSinceConsultation` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-export function clearAiLossEventsSinceConsultation(playerId: string): void {
-  clearAiLossEventsSinceConsultationFromModule(getAiStateDbOps(), playerId);
-}
-
-/**
- * Defines the `getAiPendingOrders` function shape (export function getAiPendingOrders(playerId: string): { movementOrders: MovementOrder[]; rangedOrders: RangedAttackOrder[]; airStrikeOrders: AirStrikeO).
-
- * Purpose: Supports maintainability by documenting why `getAiPendingOrders` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-export function getAiPendingOrders(playerId: string): {
-  movementOrders: MovementOrder[];
-  rangedOrders: RangedAttackOrder[];
-  airStrikeOrders: AirStrikeOrder[];
-  ferryOrders: FerryOrder[];
-  embarkOrders: EmbarkOrder[];
-} | null {
-  return getAiPendingOrdersFromModule(getAiStateDbOps(), playerId);
-}
-
-/**
- * Defines the `setAiPendingOrders` function shape (export function setAiPendingOrders( playerId: string, movementOrders: MovementOrder[], rangedOrders: RangedAttackOrder[], airStrikeOrders: AirStrike).
-
- * Purpose: Supports maintainability by documenting why `setAiPendingOrders` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-export function setAiPendingOrders(
-  playerId: string,
-  movementOrders: MovementOrder[],
-  rangedOrders: RangedAttackOrder[],
-  airStrikeOrders: AirStrikeOrder[] = [],
-  ferryOrders: FerryOrder[] = [],
-  embarkOrders: EmbarkOrder[] = []
-): void {
-  setAiPendingOrdersFromModule(
-    getAiStateDbOps(),
-    playerId,
-    movementOrders,
-    rangedOrders,
-    airStrikeOrders,
-    ferryOrders,
-    embarkOrders
-  );
-}
-
-/**
- * Defines the `clearAiPendingOrders` function shape (export function clearAiPendingOrders(playerId: string): void).
-
- * Purpose: Supports maintainability by documenting why `clearAiPendingOrders` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-export function clearAiPendingOrders(playerId: string): void {
-  clearAiPendingOrdersFromModule(getAiStateDbOps(), playerId);
-}
-
-/**
- * Persists AI strategy and message text for one strategic turn or tactical beat.
- *
- * Purpose: Public facade over `turnNotesHistory.upsertTurnStrategyNote` for OpenRouter consultation capture.
- * When to use: After successful AI order planning in `requestOrdersFlow`.
- * Expected outcome: Row upserted in `turn_notes_history` without disturbing loss JSON on the same row.
- * Exceptions: None; underlying module logs errors without throwing.
- */
-export function upsertTurnStrategyNote(
-  scope: TurnNotesScope,
-  battleId: string,
-  turnNumber: number,
-  texts: TurnConsultationNoteTexts
-): void {
-  upsertTurnStrategyNoteFromModule(getAiStateDbOps(), scope, battleId, turnNumber, texts);
-}
-
-/**
- * Persists serialized human/AI loss summaries for one strategic turn or tactical beat.
- *
- * Purpose: Public facade over `turnNotesHistory.upsertTurnLossNote` for resolution finalize paths.
- * When to use: Strategic Ready finalize and tactical beat commit on main process.
- * Expected outcome: Row upserted in `turn_notes_history` without disturbing strategy text on the same row.
- * Exceptions: None; underlying module logs errors without throwing.
- */
-export function upsertTurnLossNote(
-  scope: TurnNotesScope,
-  battleId: string,
-  turnNumber: number,
-  humanLossJson: string,
-  aiLossJson: string
-): void {
-  upsertTurnLossNoteFromModule(getAiStateDbOps(), scope, battleId, turnNumber, humanLossJson, aiLossJson);
-}
-
-/**
- * Reads recent turn/beat notes before the current planning turn for prompt injection.
- *
- * Purpose: Public facade over `turnNotesHistory.getRecentTurnNotes`.
- * When to use: `buildRecentTurnNotesSection` when assembling AI system prompts.
- * Expected outcome: Up to three prior rows in ascending turn order.
- * Exceptions: None; returns empty array when DB unavailable.
- */
-export function getRecentTurnNotes(
-  scope: TurnNotesScope,
-  battleId: string,
-  beforeTurnNumber: number,
-  limit = 3
-): TurnNoteRow[] {
-  return getRecentTurnNotesFromModule(getAiStateDbOps(), scope, battleId, beforeTurnNumber, limit);
-}
-
-/**
- * Clears persisted tactical turn-note history when starting or resetting tactical battles.
- *
- * Purpose: Public facade over `turnNotesHistory.clearTacticalTurnNotes`.
- * When to use: `startTacticalBattleForEnclosingRes1Hex` before recording notes for the new battle.
- * Expected outcome: Tactical rows removed; strategic history preserved.
- * Exceptions: None; underlying module logs errors without throwing.
- */
-export function clearTacticalTurnNotes(battleId?: string): void {
-  clearTacticalTurnNotesFromModule(getAiStateDbOps(), battleId);
+  clearGameOverWithOps(gameDbOps);
 }
 
 /**
@@ -1537,7 +638,7 @@ export function clearTacticalTurnNotes(battleId?: string): void {
 export function resetGameForNewMatch(options?: ResetGameForNewMatchOptions): void {
   resetGameForNewMatchFromModule(
     {
-      hasDb: () => db !== null,
+      hasDb: hasDbHandle,
       run,
       getAll,
       clearGameOver,

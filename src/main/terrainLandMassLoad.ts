@@ -1,7 +1,7 @@
 /** Loads and validates res-1 land-mass JSON from the Python landmass pipeline. */
 
-import * as fs from 'fs';
-import { logDebug, logError, logTrace } from './logger';
+import { readJsonFileOrThrow } from './jsonFileHelpers';
+import { logDebug, logTrace } from './logger';
 import type { Res1LandMassRecord } from '../shared/landTraversalRes1';
 import { resolveTerrainRes1LandMassPath } from './terrainMetadataPaths';
 
@@ -411,22 +411,16 @@ export function buildRes1LandMassByH3(envelope: Res1LandMassEnvelope): Map<strin
 }
 
 /**
- * Defines the `loadTerrainRes1LandMassFromPath` function shape (export function loadTerrainRes1LandMassFromPath(absPath: string): Res1LandMassEnvelope).
-
- * Purpose: Supports maintainability by documenting why `loadTerrainRes1LandMassFromPath` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
+ * Loads and validates a res1 land-mass JSON file.
+ *
+ * Purpose: Entry point for strategic land-mass data on disk.
+ * When to use: Bundled load and any caller that already has an absolute land-mass path.
+ * Expected outcome: Parsed land-mass envelope.
+ * Exceptions: Rethrows read and parse failures. Throws when the envelope fails validation.
  */
 export function loadTerrainRes1LandMassFromPath(absPath: string): Res1LandMassEnvelope {
   logDebug('terrainLandMassLoad loadTerrainRes1LandMassFromPath', { absPath });
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(fs.readFileSync(absPath, 'utf8')) as unknown;
-  } catch (err) {
-    logError('terrainLandMassLoad loadTerrainRes1LandMassFromPath: read/parse failed', err);
-    throw err;
-  }
+  const parsed = readJsonFileOrThrow(absPath, 'terrainLandMassLoad loadTerrainRes1LandMassFromPath');
   return parseRes1LandMassEnvelope(parsed);
 }
 

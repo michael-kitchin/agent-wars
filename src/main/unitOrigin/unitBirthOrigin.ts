@@ -9,6 +9,7 @@
 import { cellToChildren } from 'h3-js';
 import { isPipelineTerrainKind } from '../../shared/pipelineTerrain';
 import type { UnitOrigin } from '../../shared/unitOriginTypes';
+import { TACTICAL_H3_RESOLUTION } from '../../shared/h3Resolutions';
 import { getRes4TerrainOverridesForRendererFromGame } from '../gameDb/controlInfrastructure';
 import type { BasicDbOps } from '../gameDb/dbOps';
 import { getGameSeedWithOps } from '../gameDb/gameConfigKv';
@@ -21,10 +22,10 @@ import { selectUnitBirthOrigin, type Res4BirthCandidate } from './unitBirthCellS
  *
  * Purpose: Matches the terrain cache's res4 naming and override data.
  * When to use: With `cellToChildren` on the birth hex.
- * Expected outcome: Always 4.
+ * Expected outcome: Always equals the shared tactical resolution (4).
  * Exceptions: None.
  */
-const BIRTH_CELL_RESOLUTION = 4;
+const BIRTH_CELL_RESOLUTION = TACTICAL_H3_RESOLUTION;
 
 /**
  * One row of the merged res4 terrain overrides.

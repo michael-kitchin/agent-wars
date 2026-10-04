@@ -1,14 +1,5 @@
-import type { TacticalCommitResolutionPlayback } from './ipc/readyTypes';
-
-/**
- * Documents the `TacticalKillEdge` type alias (type TacticalKillEdge).
-
- * Purpose: Names the minimal kill-edge shape reused when assembling tactical toast payloads to mirror strategic Ready.
- * When to use: Use wherever tactical playback kill arrays are composed for renderer turn updates.
- * Expected outcome: Structural typing compatible with `ReadyResult` kill records.
- * Exceptions: None.
- */
-type TacticalKillEdge = { victimId: string; killerIds: string[] };
+import type { KillEdge } from './ipc/combatResultTypes';
+import type { TacticalCommitResolutionPlayback } from './ipc/tacticalPlaybackTypes';
 
 /**
  * Returns kill edges that belong in `ReadyResult.kills` for tactical commit toasts, matching strategic Ready semantics.
@@ -21,7 +12,7 @@ type TacticalKillEdge = { victimId: string; killerIds: string[] };
  */
 export function tacticalKillEdgesForStrategicStyleTurnUpdate(
   playback: Pick<TacticalCommitResolutionPlayback, 'killsByDirectFire' | 'killsByReturnFire' | 'killsByMelee'>
-): TacticalKillEdge[] {
+): KillEdge[] {
   return [
     ...(playback.killsByDirectFire ?? []),
     ...(playback.killsByReturnFire ?? []),

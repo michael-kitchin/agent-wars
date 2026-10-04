@@ -4,7 +4,7 @@ import type {
   EmbarkOrder,
   FerryOrder,
 } from '../shared/ipcTypes';
-import type { TacticalOpponentPlanPayload } from '../shared/ipc/readyTypes';
+import type { TacticalOpponentPlanPayload } from '../shared/ipc/consultationPushTypes';
 
 /**
  * Documents the `GroupTargetType` type alias (type GroupTargetType).

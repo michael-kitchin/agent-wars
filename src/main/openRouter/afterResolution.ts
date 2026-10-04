@@ -25,7 +25,7 @@ import {
   type ResolutionContext,
 } from '../callbackEvaluation';
 import type { RequestAiOrdersResult, TacticalCommitResolutionPlayback } from '../../shared/ipcTypes';
-import type { TacticalOpponentPlanPayload } from '../../shared/ipc/readyTypes';
+import type { TacticalOpponentPlanPayload } from '../../shared/ipc/consultationPushTypes';
 import { tacticalOpponentPlanFromRequestOrdersSuccess } from '../../shared/ipc/tacticalOpponentPlanMerge';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { getTacticalAnnihilationOutcome } from '../../shared/tacticalAnnihilation';

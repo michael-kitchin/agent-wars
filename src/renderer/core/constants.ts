@@ -1,4 +1,5 @@
 import { AI_CONSULTATION_WAIT_TIMEOUT_MS } from '../../shared/aiConsultationLimits';
+import { STRATEGIC_H3_RESOLUTION, TACTICAL_H3_RESOLUTION } from '../../shared/h3Resolutions';
 
 /**
  * Documents the module-scope binding `BACKGROUND_COLOR` (BACKGROUND_COLOR).
@@ -161,23 +162,23 @@ export const HEX_DETAILS_TOOLTIP_DELAY_MS = 750;
 export const ORDER_BLOCK_HEX_TOOLTIP_TTL_MS = 1500;
 
 /**
- * Documents the module-scope binding `WORLD_H3_RESOLUTION` (WORLD_H3_RESOLUTION).
-
- * Purpose: Supports maintainability by documenting why `WORLD_H3_RESOLUTION` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Strategic map H3 resolution exposed to the renderer.
+ *
+ * Purpose: Keeps renderer callers on the historical name while the value comes from the shared resolution pair.
+ * When to use: Renderer map code that needs the res1 world grid.
+ * Expected outcome: Always equals `STRATEGIC_H3_RESOLUTION` (1).
  * Exceptions: None.
  */
-export const WORLD_H3_RESOLUTION = 1;
+export const WORLD_H3_RESOLUTION = STRATEGIC_H3_RESOLUTION;
 /**
- * Documents the module-scope binding `DETAIL_H3_RESOLUTION` (DETAIL_H3_RESOLUTION).
-
- * Purpose: Supports maintainability by documenting why `DETAIL_H3_RESOLUTION` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Tactical detail H3 resolution exposed to the renderer.
+ *
+ * Purpose: Keeps renderer callers on the historical name while the value comes from the shared resolution pair.
+ * When to use: Renderer map code that needs the res4 tactical grid.
+ * Expected outcome: Always equals `TACTICAL_H3_RESOLUTION` (4).
  * Exceptions: None.
  */
-export const DETAIL_H3_RESOLUTION = 4;
+export const DETAIL_H3_RESOLUTION = TACTICAL_H3_RESOLUTION;
 /**
  * Documents the module-scope binding `RES4_SHOW_THRESHOLD_VIEW_FRACTION` (RES4_SHOW_THRESHOLD_VIEW_FRACTION).
 

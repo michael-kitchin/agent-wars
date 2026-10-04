@@ -1,3 +1,4 @@
+import type { KillEdge } from '../../shared/ipc/combatResultTypes';
 import type { GameStateSnapshot, HumanStandingOrderSnapshot, RemovedUnitSnapshot } from '../../shared/ipcTypes';
 import {
   formatPendingMovementSidebarTargetLabel,
@@ -5,6 +6,7 @@ import {
 } from '../../shared/pendingMovementSidebarLabels';
 import { buildUnitDisplayNameLookup, fallbackDisplayNameFromUnitId, type UnitDisplayIdentity } from '../../shared/unitDisplayNames';
 import { formatPendingFerryOrderSidebarLabel } from './orderLabelFormatting';
+import { appendMutedPlaceholder } from './sidebarListHelpers';
 import { rendererSharedState as S } from '../core/state';
 import type { SidebarOrderRowArgs } from './sidebarOrderRow';
 import { shouldBlockEmbarkedLandUnitSelect } from '../core/selection';
@@ -309,7 +311,7 @@ export function formatPendingOrderSidebarLabel(
  * Exceptions: None.
  */
 export function formatKillToastLine(
-  kill: { victimId: string; killerIds: string[] },
+  kill: KillEdge,
   formatDisplayUnitName: (unitId: string) => string
 ): string {
   const killers = kill.killerIds.map((unitId) => formatDisplayUnitName(unitId)).join(', ');
@@ -357,7 +359,7 @@ export function buildKillToastFormatterBundle(
   removedUnits: RemovedUnitSnapshot[] | undefined,
   tacticalSubUnitsForKillLabels?: readonly { id: string; displayName: string }[],
   killLabelUnits?: readonly UnitDisplayIdentity[]
-): { formatUnitName: (unitId: string) => string; formatKillLine: (kill: { victimId: string; killerIds: string[] }) => string } {
+): { formatUnitName: (unitId: string) => string; formatKillLine: (kill: KillEdge) => string } {
   const removedUnitsForDisplay = removedUnits ?? [];
   const rosterFromRemoved = removedUnitsForDisplay
     .filter((u) => !u.displayName)
@@ -399,7 +401,7 @@ export function buildKillToastFormatterBundle(
   }
   const formatDisplayUnitName = (unitId: string) =>
     displayNameById.get(unitId) ?? S.unitDisplayNameById.get(unitId) ?? fallbackDisplayNameFromUnitId(unitId);
-  const formatKillLine = (kill: { victimId: string; killerIds: string[] }): string =>
+  const formatKillLine = (kill: KillEdge): string =>
     formatKillToastLine(kill, formatDisplayUnitName);
   return { formatUnitName: formatDisplayUnitName, formatKillLine };
 }
@@ -441,10 +443,7 @@ export function updatePendingOrdersSidebar(deps: PendingOrdersDeps): void {
   container.innerHTML = '';
   if (S.tacticalBattleSnapshot) {
     if (S.tacticalPendingMarches.length === 0 && S.pendingFerryOrders.length === 0) {
-      const span = document.createElement('span');
-      span.textContent = 'None';
-      span.className = 'chrome-muted';
-      container.appendChild(span);
+      appendMutedPlaceholder(container, 'None');
       return;
     }
     for (const row of S.tacticalPendingMarches) {
@@ -486,10 +485,7 @@ export function updatePendingOrdersSidebar(deps: PendingOrdersDeps): void {
   }
   const pendingOrders = S.humanStandingOrders.filter((order) => deps.isPendingMovementOrderForDisplay(order));
   if (pendingOrders.length === 0 && S.pendingFerryOrders.length === 0) {
-    const span = document.createElement('span');
-    span.textContent = 'None';
-    span.className = 'chrome-muted';
-    container.appendChild(span);
+    appendMutedPlaceholder(container, 'None');
     return;
   }
   for (const order of pendingOrders) {

@@ -182,18 +182,47 @@ applyGameStateSnapshot: (
 }
 
 /**
- * Defines the `refreshGameStateAfterBuildQueueChange` function shape (export async function refreshGameStateAfterBuildQueueChange(deps: RefreshBuildQueueDeps): Promise<void>).
-
- * Purpose: Supports maintainability by documenting why `refreshGameStateAfterBuildQueueChange` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
+ * Reloads the strategic snapshot from main and applies it, logging a caller-supplied message on failure.
+ *
+ * Purpose: Build-queue and sealift refreshes share the getGameState guard and the same catch path.
+ * When to use: After a main-process mutation that the open map must redraw from a fresh snapshot.
+ * Expected outcome: `applyGameStateSnapshot` runs with `applyOptions`, or the function returns when `getGameState` is missing.
+ * Exceptions: Failures are logged with `console.error(failureMessage, err)` and not rethrown.
  */
-export async function refreshGameStateAfterBuildQueueChange(deps: RefreshBuildQueueDeps): Promise<void> {
+export async function refreshGameStateFromMain(
+  deps: Pick<RefreshBuildQueueDeps, 'applyGameStateSnapshot'>,
+  applyOptions: {
+    refreshStandingOrders?: boolean;
+    updateGameStateSidebarUi?: boolean;
+    updateSelectionUi?: boolean;
+    updateGameOverUi?: boolean;
+    updateReadyButton?: boolean;
+    refreshBuildPopup?: boolean;
+    redraw?: boolean;
+  },
+  failureMessage: string
+): Promise<void> {
   if (!window.gameApi?.getGameState) return;
   try {
     const nextState = (await window.gameApi.getGameState()) as GameStateSnapshot;
-    await deps.applyGameStateSnapshot(nextState, {
+    await deps.applyGameStateSnapshot(nextState, applyOptions);
+  } catch (err) {
+    console.error(failureMessage, err);
+  }
+}
+
+/**
+ * Reloads strategic state after a build-queue edit and redraws without touching selection or standing orders.
+ *
+ * Purpose: The build popup and map production marks must match the queue main just stored.
+ * When to use: After a successful build-queue IPC mutation.
+ * Expected outcome: The map redraws from the fresh snapshot; sidebar selection and standing orders stay as they were.
+ * Exceptions: Logs `refreshGameStateAfterBuildQueueChange failed:` and does not rethrow.
+ */
+export async function refreshGameStateAfterBuildQueueChange(deps: RefreshBuildQueueDeps): Promise<void> {
+  await refreshGameStateFromMain(
+    deps,
+    {
       refreshStandingOrders: false,
       updateGameStateSidebarUi: false,
       updateSelectionUi: false,
@@ -201,10 +230,9 @@ export async function refreshGameStateAfterBuildQueueChange(deps: RefreshBuildQu
       updateReadyButton: false,
       refreshBuildPopup: false,
       redraw: true,
-    });
-  } catch (err) {
-    console.error('refreshGameStateAfterBuildQueueChange failed:', err);
-  }
+    },
+    'refreshGameStateAfterBuildQueueChange failed:'
+  );
 }
 
 /**
@@ -220,10 +248,9 @@ export async function refreshGameStateAfterSealiftChange(
   deps: RefreshBuildQueueDeps,
   options: { refreshStandingOrders?: boolean } = {}
 ): Promise<void> {
-  if (!window.gameApi?.getGameState) return;
-  try {
-    const nextState = (await window.gameApi.getGameState()) as GameStateSnapshot;
-    await deps.applyGameStateSnapshot(nextState, {
+  await refreshGameStateFromMain(
+    deps,
+    {
       refreshStandingOrders: options.refreshStandingOrders === true,
       updateGameStateSidebarUi: true,
       updateSelectionUi: true,
@@ -231,10 +258,9 @@ export async function refreshGameStateAfterSealiftChange(
       updateReadyButton: false,
       refreshBuildPopup: false,
       redraw: true,
-    });
-  } catch (err) {
-    console.error('refreshGameStateAfterSealiftChange failed:', err);
-  }
+    },
+    'refreshGameStateAfterSealiftChange failed:'
+  );
 }
 
 /**

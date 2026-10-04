@@ -13,12 +13,10 @@ import {
   indexToCode,
   sortCellsForStableLlmCodes,
 } from '../../../shared/hexLlmCodeAssignment';
+import { STRATEGIC_H3_RESOLUTION, TACTICAL_H3_RESOLUTION } from '../../../shared/h3Resolutions';
 import { logDebug, logError, logTrace } from '../../logger';
 import type { CoordinateContext } from './coordinateContext';
 import { HEX_CODE_PATTERN } from './coordinateContext';
-
-const STRATEGIC_RESOLUTION = 1;
-const TACTICAL_RESOLUTION = 4;
 
 let strategicH3ToCode: Map<string, string> | null = null;
 let strategicCodeToH3: Map<string, string> | null = null;
@@ -69,7 +67,7 @@ export function initTacticalCoordinateRegistry(battleId: string, enclosingRes1H3
     enclosingRes1H3Index,
   });
   try {
-    const children = sortCellsForStableLlmCodes(cellToChildren(enclosingRes1H3Index, TACTICAL_RESOLUTION));
+    const children = sortCellsForStableLlmCodes(cellToChildren(enclosingRes1H3Index, TACTICAL_H3_RESOLUTION));
     const h3ToCode = new Map<string, string>();
     const codeToH3 = new Map<string, string>();
     for (let i = 0; i < children.length; i++) {
@@ -101,15 +99,15 @@ export function getHexCodeForContext(h3Index: string, context: CoordinateContext
   logTrace('hex-coordinates getHexCodeForContext', { h3Index, mode: context.mode });
   if (context.mode === 'strategic') {
     const res1 =
-      getResolution(h3Index) === STRATEGIC_RESOLUTION
+      getResolution(h3Index) === STRATEGIC_H3_RESOLUTION
         ? h3Index
-        : latLngToCell(...cellToLatLng(h3Index), STRATEGIC_RESOLUTION);
+        : latLngToCell(...cellToLatLng(h3Index), STRATEGIC_H3_RESOLUTION);
     return strategicH3ToCode?.get(res1);
   }
   const battleId = context.battleId;
   if (!battleId) return undefined;
   const [lat, lng] = cellToLatLng(h3Index);
-  const h4 = latLngToCell(lat, lng, TACTICAL_RESOLUTION);
+  const h4 = latLngToCell(lat, lng, TACTICAL_H3_RESOLUTION);
   return tacticalRegistries.get(battleId)?.h3ToCode.get(h4);
 }
 

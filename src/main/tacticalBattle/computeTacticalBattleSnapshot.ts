@@ -31,9 +31,7 @@ import { logDebug } from '../logger';
 import { claimInitialPlacementHex, type InitialPlacementSide } from '../../shared/initialPlacementSides';
 import { hashStringToUint32 } from '../../shared/stableHash';
 import { tacticalLogError, tacticalLogMutate, tacticalLogQuery } from './tacticalLogging';
-
-const WORLD_H3_RESOLUTION = 1;
-const TACTICAL_H3_RESOLUTION = 4;
+import { STRATEGIC_H3_RESOLUTION, TACTICAL_H3_RESOLUTION } from '../../shared/h3Resolutions';
 
 /**
  * Maps one strategic parent type to the number of tactical sub-units placed for it.
@@ -370,7 +368,7 @@ export function computeTacticalBattleSnapshot(
     allowDuringStrategicResolution: !!options?.allowDuringStrategicResolution,
   });
   try {
-    if (getResolution(enclosingRes1H3Index) !== WORLD_H3_RESOLUTION) {
+    if (getResolution(enclosingRes1H3Index) !== STRATEGIC_H3_RESOLUTION) {
       return { snapshot: null, skippedParentDisplayNames: [], failureReason: 'Not a res1 hex index.' };
     }
     const turnRow = readTurnStateRow(dbGetOne);

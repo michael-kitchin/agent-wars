@@ -14201,6 +14201,10 @@
   var AI_CONSULTATION_WALL_CLOCK_MS = 3e5;
   var AI_CONSULTATION_WAIT_TIMEOUT_MS = AI_CONSULTATION_WALL_CLOCK_MS + 2 * (1 + AI_MODEL_REQUEST_RETRY_COUNT) * AI_MODEL_REQUEST_TIMEOUT_MS;
 
+  // src/shared/h3Resolutions.ts
+  var STRATEGIC_H3_RESOLUTION = 1;
+  var TACTICAL_H3_RESOLUTION = 4;
+
   // src/renderer/core/constants.ts
   var BACKGROUND_COLOR = "#e0dcd4";
   var UNIT_RADIUS = 18;
@@ -14269,8 +14273,8 @@
   var TOOLTIP_OFFSET_PX = 12;
   var HEX_DETAILS_TOOLTIP_DELAY_MS = 750;
   var ORDER_BLOCK_HEX_TOOLTIP_TTL_MS = 1500;
-  var WORLD_H3_RESOLUTION = 1;
-  var DETAIL_H3_RESOLUTION = 4;
+  var WORLD_H3_RESOLUTION = STRATEGIC_H3_RESOLUTION;
+  var DETAIL_H3_RESOLUTION = TACTICAL_H3_RESOLUTION;
   var RES4_SHOW_THRESHOLD_VIEW_FRACTION = 0.8;
   var RES4_HIDE_THRESHOLD_VIEW_FRACTION = 0.7;
   var BUILD_ENTRY_ZOOM_STEPS_FROM_DEFAULT = 2;
@@ -16518,7 +16522,6 @@ ${body}`;
   }
 
   // src/renderer/rendering/infrastructureOverlayState.ts
-  var WORLD_H3_RESOLUTION2 = 1;
   function deriveInfrastructureOverlayState(rows) {
     const res4TerrainOverridesByH3 = new Map(
       rows.map((r) => [
@@ -16538,7 +16541,7 @@ ${body}`;
     const terrainInfraRes1Seaport = /* @__PURE__ */ new Set();
     for (const row of rows) {
       if (!row.isAirport && !row.isSeaport) continue;
-      const parentH3 = cellToParent(row.h3Index, WORLD_H3_RESOLUTION2);
+      const parentH3 = cellToParent(row.h3Index, STRATEGIC_H3_RESOLUTION);
       if (row.isAirport) terrainInfraRes1Airport.add(parentH3);
       if (row.isSeaport) terrainInfraRes1Seaport.add(parentH3);
     }
@@ -19494,7 +19497,6 @@ ${body}`;
   }
 
   // src/shared/tacticalMarchHoverPreview.ts
-  var TACTICAL_H3_RESOLUTION = 4;
   var MAX_TACTICAL_HOVER_PLAN_MEMO = 64;
   function tacticalHoverSubUnitPlacementSignature(subUnits) {
     return [...subUnits].map((u) => `${u.id}:${u.h3Index}`).sort().join("|");
@@ -21637,8 +21639,6 @@ ${body}`;
   }
 
   // src/shared/hexLlmCodeAssignment.ts
-  var STRATEGIC_RESOLUTION = 1;
-  var DETAIL_RESOLUTION = 4;
   var CODE_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
   var strategicH3ToCodeSingleton = null;
   function indexToCode(index) {
@@ -21665,7 +21665,7 @@ ${body}`;
     const res0 = getRes0Cells();
     const res1Set = /* @__PURE__ */ new Set();
     for (const r0 of res0) {
-      for (const child of cellToChildren(r0, STRATEGIC_RESOLUTION)) {
+      for (const child of cellToChildren(r0, STRATEGIC_H3_RESOLUTION)) {
         res1Set.add(child);
       }
     }
@@ -21685,7 +21685,7 @@ ${body}`;
   function getStrategicRes1HexCode(h3Index) {
     return getStrategicRes1H3ToCodeMap().get(h3Index);
   }
-  function getRes4ChildCodeWithinParent(parentRes1H3Index, childRes4H3Index, childResolution = DETAIL_RESOLUTION) {
+  function getRes4ChildCodeWithinParent(parentRes1H3Index, childRes4H3Index, childResolution = TACTICAL_H3_RESOLUTION) {
     const children = sortCellsForStableLlmCodes(cellToChildren(parentRes1H3Index, childResolution));
     const idx = children.indexOf(childRes4H3Index);
     if (idx < 0) return void 0;
@@ -21696,7 +21696,7 @@ ${body}`;
       const c = getStrategicRes1HexCode(target.h3Index);
       return c ? `(${c})` : null;
     }
-    const parent = cellToParent(target.h3Index, STRATEGIC_RESOLUTION);
+    const parent = cellToParent(target.h3Index, STRATEGIC_H3_RESOLUTION);
     const parentCode = getStrategicRes1HexCode(parent);
     const childCode = getRes4ChildCodeWithinParent(parent, target.h3Index);
     return parentCode && childCode ? `(${parentCode}.${childCode})` : null;
@@ -22695,6 +22695,14 @@ ${body}`;
     orderSlowerTooltip.repositionIfVisible();
   }
 
+  // src/renderer/gameplay/sidebarListHelpers.ts
+  function appendMutedPlaceholder(container, text) {
+    const span = document.createElement("span");
+    span.textContent = text;
+    span.className = "chrome-muted";
+    container.appendChild(span);
+  }
+
   // src/shared/tacticalFerryHoverPreview.ts
   var MIXED_AIR_NON_AIR_MOVEMENT_MESSAGE = "Cannot issue grouped movement for mixed air and non-air units.";
   function invalidPreview(reason, showMarker = true) {
@@ -23241,23 +23249,18 @@ ${body}`;
   }
   function cancelRangedForUnit(unitId, deps) {
     rendererSharedState.pendingRangedAttacks = rendererSharedState.pendingRangedAttacks.filter((r) => r.unitId !== unitId);
-    if (rendererSharedState.tacticalBattleSnapshot) {
-      rendererSharedState.pendingEmbarkOrders = rendererSharedState.pendingEmbarkOrders.filter((e) => e.unitId !== unitId);
-    }
     rendererSharedState.rangedModeActive = false;
-    void refreshHoverRoutePreview(deps);
-    deps.updateSidebar();
-    deps.updatePendingOrdersSidebar();
-    deps.updateRangedSidebar();
-    deps.refreshStackCalloutIfOpen();
-    deps.redraw();
+    finishTargetingDraftCancel(unitId, deps);
   }
   function cancelAirStrikeForUnit(unitId, deps) {
     rendererSharedState.pendingAirStrikes = rendererSharedState.pendingAirStrikes.filter((r) => r.unitId !== unitId);
+    rendererSharedState.airStrikeModeActive = false;
+    finishTargetingDraftCancel(unitId, deps);
+  }
+  function finishTargetingDraftCancel(unitId, deps) {
     if (rendererSharedState.tacticalBattleSnapshot) {
       rendererSharedState.pendingEmbarkOrders = rendererSharedState.pendingEmbarkOrders.filter((e) => e.unitId !== unitId);
     }
-    rendererSharedState.airStrikeModeActive = false;
     void refreshHoverRoutePreview(deps);
     deps.updateSidebar();
     deps.updatePendingOrdersSidebar();
@@ -23285,10 +23288,7 @@ ${body}`;
     const tacticalPositions = rendererSharedState.tacticalBattleSnapshot?.subUnits;
     listEl.innerHTML = "";
     if (rendererSharedState.pendingRangedAttacks.length === 0) {
-      const span = document.createElement("span");
-      span.textContent = "None";
-      span.className = "chrome-muted";
-      listEl.appendChild(span);
+      appendMutedPlaceholder(listEl, "None");
     } else {
       for (const r of rendererSharedState.pendingRangedAttacks) {
         const row = deps.createSidebarOrderRow({
@@ -23308,10 +23308,7 @@ ${body}`;
     if (strikeListEl) {
       strikeListEl.innerHTML = "";
       if (rendererSharedState.pendingAirStrikes.length === 0) {
-        const span = document.createElement("span");
-        span.textContent = "None";
-        span.className = "chrome-muted";
-        strikeListEl.appendChild(span);
+        appendMutedPlaceholder(strikeListEl, "None");
       } else {
         for (const strike of rendererSharedState.pendingAirStrikes) {
           const row = deps.createSidebarOrderRow({
@@ -25799,10 +25796,7 @@ ${body}`;
     container.innerHTML = "";
     if (rendererSharedState.tacticalBattleSnapshot) {
       if (rendererSharedState.tacticalPendingMarches.length === 0 && rendererSharedState.pendingFerryOrders.length === 0) {
-        const span = document.createElement("span");
-        span.textContent = "None";
-        span.className = "chrome-muted";
-        container.appendChild(span);
+        appendMutedPlaceholder(container, "None");
         return;
       }
       for (const row of rendererSharedState.tacticalPendingMarches) {
@@ -25844,10 +25838,7 @@ ${body}`;
     }
     const pendingOrders = rendererSharedState.humanStandingOrders.filter((order) => deps.isPendingMovementOrderForDisplay(order));
     if (pendingOrders.length === 0 && rendererSharedState.pendingFerryOrders.length === 0) {
-      const span = document.createElement("span");
-      span.textContent = "None";
-      span.className = "chrome-muted";
-      container.appendChild(span);
+      appendMutedPlaceholder(container, "None");
       return;
     }
     for (const order of pendingOrders) {
@@ -25884,69 +25875,76 @@ ${body}`;
     if (el) el.style.display = "none";
   }
 
-  // src/shared/consolidatedTurnUpdateToast.ts
-  var MAP_TOAST_SECTION_HEADER_PREFIX = "## ";
-  var MAP_TOAST_UPDATES_SECTION_TITLE = "Updates";
-  function formatDeployedUnitsLine(deployed) {
-    if (!deployed) return null;
-    const parts = [];
-    if ((deployed.armor ?? 0) > 0) parts.push(`${deployed.armor.toLocaleString()} armor`);
-    if ((deployed.infantry ?? 0) > 0) parts.push(`${deployed.infantry.toLocaleString()} infantry`);
-    if ((deployed.naval ?? 0) > 0) parts.push(`${deployed.naval.toLocaleString()} naval`);
-    if ((deployed.air ?? 0) > 0) parts.push(`${deployed.air.toLocaleString()} air`);
-    if (parts.length === 0) return null;
-    if (parts.length === 1) return `${parts[0]} units deployed`;
-    if (parts.length === 2) return `${parts[0]} and ${parts[1]} units deployed`;
-    if (parts.length === 3) return `${parts[0]}, ${parts[1]}, and ${parts[2]} units deployed`;
-    return `${parts[0]}, ${parts[1]}, ${parts[2]}, and ${parts[3]} units deployed`;
-  }
-  function formatDeploymentCapReachedLine(cappedTypes, player) {
-    if (player !== "human") return null;
-    if (!cappedTypes || cappedTypes.length === 0) return null;
-    const ordered = ALL_BUILD_UNIT_TYPES.filter((unitType) => cappedTypes.includes(unitType));
-    if (ordered.length === 0) return null;
-    if (ordered.length === 1) return `Maximum human ${ordered[0]} units deployed.`;
-    if (ordered.length === 2) return `Maximum human ${ordered[0]} and ${ordered[1]} units deployed.`;
-    if (ordered.length === 3) return `Maximum human ${ordered[0]}, ${ordered[1]}, and ${ordered[2]} units deployed.`;
-    return `Maximum human ${ordered[0]}, ${ordered[1]}, ${ordered[2]}, and ${ordered[3]} units deployed.`;
-  }
-  function buildOtherTurnUpdatePrimaryLines(readyResult) {
-    const lines = [];
-    const deployedLine = formatDeployedUnitsLine(readyResult.deployedUnitsByType);
-    if (deployedLine) lines.push(deployedLine);
-    const deploymentCapLine = formatDeploymentCapReachedLine(readyResult.humanDeploymentCapReachedUnitTypes, "human");
-    if (deploymentCapLine) lines.push(deploymentCapLine);
-    if ((readyResult.humanHexesLostCount ?? 0) > 0) {
-      lines.push(`${readyResult.humanHexesLostCount.toLocaleString()} hexes lost to opponent`);
+  // src/shared/marchPathHelpers.ts
+  function findPathTailFromCurrentPosition(storedPathH3Indexes, currentH3) {
+    if (storedPathH3Indexes.length === 0) return null;
+    if (storedPathH3Indexes[0] === currentH3) return storedPathH3Indexes;
+    for (let i = 1; i < storedPathH3Indexes.length; i++) {
+      if (storedPathH3Indexes[i] === currentH3) return storedPathH3Indexes.slice(i);
     }
-    return lines;
+    return null;
   }
-  function stripLeadingBullet(line) {
-    return line.replace(/^\u2022\s*/, "");
+
+  // src/shared/tacticalMarchContinuations.ts
+  function filterTacticalMarchContinuationsToPresentSubUnits(continuations, presentSubUnitIds) {
+    return continuations.filter((row) => presentSubUnitIds.has(row.subUnitId));
   }
-  function appendLossSection(out, header, summary) {
-    if (!playerHasAnyLoss(summary)) return;
-    out.push(`${MAP_TOAST_SECTION_HEADER_PREFIX}${header}`);
-    for (const line of formatPlayerLossLinesMultiline(summary)) {
-      out.push(`${line.causeLabel}: ${line.text}`);
-    }
+
+  // src/renderer/tactical/tacticalPendingMarchPath.ts
+  function buildTacticalPendingMarchRowsFromContinuations(args) {
+    const livingIds = new Set(args.battle.subUnits.map((u) => u.id));
+    const livingContinuations = filterTacticalMarchContinuationsToPresentSubUnits(
+      args.continuations,
+      livingIds
+    );
+    return livingContinuations.map((cont) => {
+      const prev = args.previousBySubUnitId.get(cont.subUnitId);
+      const sub = args.battle.subUnits.find((u) => u.id === cont.subUnitId);
+      const newUnitH3 = sub?.h3Index;
+      if (prev?.pathH3Indexes && newUnitH3) {
+        const tail = findPathTailFromCurrentPosition(prev.pathH3Indexes, newUnitH3);
+        if (tail) {
+          const result2 = buildTacticalMarchDraftDestinationPreview(
+            args.battle,
+            cont.subUnitId,
+            cont.destinationH3Index,
+            { overridePathH3Indexes: tail }
+          );
+          if (result2.preview.valid && result2.preview.segments.length > 0) {
+            return {
+              subUnitId: cont.subUnitId,
+              destinationH3Index: cont.destinationH3Index,
+              pathH3Indexes: [...tail],
+              cachedSegments: result2.preview.segments
+            };
+          }
+        }
+      }
+      const result = buildTacticalMarchDraftDestinationPreview(
+        args.battle,
+        cont.subUnitId,
+        cont.destinationH3Index
+      );
+      return {
+        subUnitId: cont.subUnitId,
+        destinationH3Index: cont.destinationH3Index,
+        ...result.pathH3Indexes ? { pathH3Indexes: result.pathH3Indexes } : {},
+        ...result.preview.valid && result.preview.segments.length > 0 ? { cachedSegments: result.preview.segments } : {}
+      };
+    });
   }
-  function buildConsolidatedTurnUpdateToastMessage(args) {
-    const { readyResult, turnLossSummary, combatFallbackBullets } = args;
-    const sections = [];
-    appendLossSection(sections, "Human Losses", turnLossSummary.human);
-    appendLossSection(sections, "AI Losses", turnLossSummary.ai);
-    const hasLossSections = playerHasAnyLoss(turnLossSummary.human) || playerHasAnyLoss(turnLossSummary.ai);
-    let otherLines = buildOtherTurnUpdatePrimaryLines(readyResult);
-    if (!hasLossSections && otherLines.length === 0) {
-      otherLines = composeResolutionMapToastBullets([], combatFallbackBullets).map(stripLeadingBullet);
-    }
-    if (otherLines.length > 0) {
-      sections.push(`${MAP_TOAST_SECTION_HEADER_PREFIX}${MAP_TOAST_UPDATES_SECTION_TITLE}`);
-      sections.push(...otherLines);
-    }
-    if (sections.length === 0) return null;
-    return sections.join("\n");
+  function buildTacticalPendingMarchRowFromDraft(args) {
+    const result = buildTacticalMarchDraftDestinationPreview(
+      args.battle,
+      args.subUnitId,
+      args.destinationH3Index
+    );
+    return {
+      subUnitId: args.subUnitId,
+      destinationH3Index: args.destinationH3Index,
+      ...result.pathH3Indexes ? { pathH3Indexes: result.pathH3Indexes } : {},
+      ...result.preview.valid && result.preview.segments.length > 0 ? { cachedSegments: result.preview.segments } : {}
+    };
   }
 
   // src/shared/lossSummaryFromResolution.ts
@@ -26060,78 +26058,6 @@ ${body}`;
     ];
   }
 
-  // src/shared/marchPathHelpers.ts
-  function findPathTailFromCurrentPosition(storedPathH3Indexes, currentH3) {
-    if (storedPathH3Indexes.length === 0) return null;
-    if (storedPathH3Indexes[0] === currentH3) return storedPathH3Indexes;
-    for (let i = 1; i < storedPathH3Indexes.length; i++) {
-      if (storedPathH3Indexes[i] === currentH3) return storedPathH3Indexes.slice(i);
-    }
-    return null;
-  }
-
-  // src/shared/tacticalMarchContinuations.ts
-  function filterTacticalMarchContinuationsToPresentSubUnits(continuations, presentSubUnitIds) {
-    return continuations.filter((row) => presentSubUnitIds.has(row.subUnitId));
-  }
-
-  // src/renderer/tactical/tacticalPendingMarchPath.ts
-  function buildTacticalPendingMarchRowsFromContinuations(args) {
-    const livingIds = new Set(args.battle.subUnits.map((u) => u.id));
-    const livingContinuations = filterTacticalMarchContinuationsToPresentSubUnits(
-      args.continuations,
-      livingIds
-    );
-    return livingContinuations.map((cont) => {
-      const prev = args.previousBySubUnitId.get(cont.subUnitId);
-      const sub = args.battle.subUnits.find((u) => u.id === cont.subUnitId);
-      const newUnitH3 = sub?.h3Index;
-      if (prev?.pathH3Indexes && newUnitH3) {
-        const tail = findPathTailFromCurrentPosition(prev.pathH3Indexes, newUnitH3);
-        if (tail) {
-          const result2 = buildTacticalMarchDraftDestinationPreview(
-            args.battle,
-            cont.subUnitId,
-            cont.destinationH3Index,
-            { overridePathH3Indexes: tail }
-          );
-          if (result2.preview.valid && result2.preview.segments.length > 0) {
-            return {
-              subUnitId: cont.subUnitId,
-              destinationH3Index: cont.destinationH3Index,
-              pathH3Indexes: [...tail],
-              cachedSegments: result2.preview.segments
-            };
-          }
-        }
-      }
-      const result = buildTacticalMarchDraftDestinationPreview(
-        args.battle,
-        cont.subUnitId,
-        cont.destinationH3Index
-      );
-      return {
-        subUnitId: cont.subUnitId,
-        destinationH3Index: cont.destinationH3Index,
-        ...result.pathH3Indexes ? { pathH3Indexes: result.pathH3Indexes } : {},
-        ...result.preview.valid && result.preview.segments.length > 0 ? { cachedSegments: result.preview.segments } : {}
-      };
-    });
-  }
-  function buildTacticalPendingMarchRowFromDraft(args) {
-    const result = buildTacticalMarchDraftDestinationPreview(
-      args.battle,
-      args.subUnitId,
-      args.destinationH3Index
-    );
-    return {
-      subUnitId: args.subUnitId,
-      destinationH3Index: args.destinationH3Index,
-      ...result.pathH3Indexes ? { pathH3Indexes: result.pathH3Indexes } : {},
-      ...result.preview.valid && result.preview.segments.length > 0 ? { cachedSegments: result.preview.segments } : {}
-    };
-  }
-
   // src/shared/unknownBattleContinentNames.ts
   async function collectUnknownBattleContinentNames(unknownCombatHexes, unknownCasualtyHexes, fetchContinentNames) {
     const unknownContinentNames = [];
@@ -26148,24 +26074,72 @@ ${body}`;
     return unknownContinentNames;
   }
 
-  // src/renderer/gameplay/readyHandler.ts
-  function buildReadyPayload(args) {
-    const { enabledToolGroupsPayload, useEventDriven, usePrecomputed, aiPlanningRunEnabled } = args;
-    const base = {
-      enabledToolGroups: enabledToolGroupsPayload,
-      aiPlanningRunEnabled: aiPlanningRunEnabled ?? rendererSharedState.runButtonOn
-    };
-    if (useEventDriven) {
-      base.useEventDrivenConsultation = true;
-    }
-    if (!usePrecomputed) return base;
-    base.precomputedAiOrders = rendererSharedState.precomputedAiOrders ?? [];
-    base.precomputedAiRangedOrders = rendererSharedState.precomputedAiRangedOrders ?? [];
-    base.precomputedAiEmbarkOrders = rendererSharedState.precomputedAiEmbarkOrders ?? [];
-    base.precomputedAiStrategy = rendererSharedState.precomputedAiStrategy ?? void 0;
-    base.precomputedAiMessage = rendererSharedState.precomputedAiMessage ?? void 0;
-    return base;
+  // src/shared/consolidatedTurnUpdateToast.ts
+  var MAP_TOAST_SECTION_HEADER_PREFIX = "## ";
+  var MAP_TOAST_UPDATES_SECTION_TITLE = "Updates";
+  function formatDeployedUnitsLine(deployed) {
+    if (!deployed) return null;
+    const parts = [];
+    if ((deployed.armor ?? 0) > 0) parts.push(`${deployed.armor.toLocaleString()} armor`);
+    if ((deployed.infantry ?? 0) > 0) parts.push(`${deployed.infantry.toLocaleString()} infantry`);
+    if ((deployed.naval ?? 0) > 0) parts.push(`${deployed.naval.toLocaleString()} naval`);
+    if ((deployed.air ?? 0) > 0) parts.push(`${deployed.air.toLocaleString()} air`);
+    if (parts.length === 0) return null;
+    if (parts.length === 1) return `${parts[0]} units deployed`;
+    if (parts.length === 2) return `${parts[0]} and ${parts[1]} units deployed`;
+    if (parts.length === 3) return `${parts[0]}, ${parts[1]}, and ${parts[2]} units deployed`;
+    return `${parts[0]}, ${parts[1]}, ${parts[2]}, and ${parts[3]} units deployed`;
   }
+  function formatDeploymentCapReachedLine(cappedTypes, player) {
+    if (player !== "human") return null;
+    if (!cappedTypes || cappedTypes.length === 0) return null;
+    const ordered = ALL_BUILD_UNIT_TYPES.filter((unitType) => cappedTypes.includes(unitType));
+    if (ordered.length === 0) return null;
+    if (ordered.length === 1) return `Maximum human ${ordered[0]} units deployed.`;
+    if (ordered.length === 2) return `Maximum human ${ordered[0]} and ${ordered[1]} units deployed.`;
+    if (ordered.length === 3) return `Maximum human ${ordered[0]}, ${ordered[1]}, and ${ordered[2]} units deployed.`;
+    return `Maximum human ${ordered[0]}, ${ordered[1]}, ${ordered[2]}, and ${ordered[3]} units deployed.`;
+  }
+  function buildOtherTurnUpdatePrimaryLines(readyResult) {
+    const lines = [];
+    const deployedLine = formatDeployedUnitsLine(readyResult.deployedUnitsByType);
+    if (deployedLine) lines.push(deployedLine);
+    const deploymentCapLine = formatDeploymentCapReachedLine(readyResult.humanDeploymentCapReachedUnitTypes, "human");
+    if (deploymentCapLine) lines.push(deploymentCapLine);
+    if ((readyResult.humanHexesLostCount ?? 0) > 0) {
+      lines.push(`${readyResult.humanHexesLostCount.toLocaleString()} hexes lost to opponent`);
+    }
+    return lines;
+  }
+  function stripLeadingBullet(line) {
+    return line.replace(/^\u2022\s*/, "");
+  }
+  function appendLossSection(out, header, summary) {
+    if (!playerHasAnyLoss(summary)) return;
+    out.push(`${MAP_TOAST_SECTION_HEADER_PREFIX}${header}`);
+    for (const line of formatPlayerLossLinesMultiline(summary)) {
+      out.push(`${line.causeLabel}: ${line.text}`);
+    }
+  }
+  function buildConsolidatedTurnUpdateToastMessage(args) {
+    const { readyResult, turnLossSummary, combatFallbackBullets } = args;
+    const sections = [];
+    appendLossSection(sections, "Human Losses", turnLossSummary.human);
+    appendLossSection(sections, "AI Losses", turnLossSummary.ai);
+    const hasLossSections = playerHasAnyLoss(turnLossSummary.human) || playerHasAnyLoss(turnLossSummary.ai);
+    let otherLines = buildOtherTurnUpdatePrimaryLines(readyResult);
+    if (!hasLossSections && otherLines.length === 0) {
+      otherLines = composeResolutionMapToastBullets([], combatFallbackBullets).map(stripLeadingBullet);
+    }
+    if (otherLines.length > 0) {
+      sections.push(`${MAP_TOAST_SECTION_HEADER_PREFIX}${MAP_TOAST_UPDATES_SECTION_TITLE}`);
+      sections.push(...otherLines);
+    }
+    if (sections.length === 0) return null;
+    return sections.join("\n");
+  }
+
+  // src/renderer/gameplay/readyResolutionAnnouncements.ts
   function deriveCombatVisibilityClassification(readyResult, visibleHexes) {
     const allKills = readyResult.kills ?? [];
     const anyCombatResolved = (readyResult.airStrikeHexes?.length ?? 0) > 0 || (readyResult.airStrikeCasualtyHexes?.length ?? 0) > 0 || (readyResult.rangedCombatHexes?.length ?? 0) > 0 || (readyResult.rangedCasualtyHexes?.length ?? 0) > 0 || (readyResult.meleeCombatHexes?.length ?? 0) > 0 || (readyResult.meleeCasualtyHexes?.length ?? 0) > 0 || (readyResult.combatHexes?.length ?? 0) > 0 || (readyResult.casualtyHexes?.length ?? 0) > 0 || allKills.length > 0 || (readyResult.removedUnits?.length ?? 0) > 0;
@@ -26301,6 +26275,64 @@ ${body}`;
     const casualtyHexCount = (readyResult.rangedCasualtyHexes?.length ?? 0) + (readyResult.meleeCasualtyHexes?.length ?? 0) + (readyResult.airStrikeCasualtyHexes?.length ?? 0);
     if (casualtyHexCount > 0) bullets.push(formatHexCount("Casualty outcomes", casualtyHexCount));
     return bullets;
+  }
+  async function announceResolutionTurnUpdate(args, deps) {
+    const { readySlice, visibility, killToastFormatter, extraKills } = args;
+    const { unknownCombatHexes, unknownCasualtyHexes, knownVictimIds, unknownVictimIds } = visibility;
+    const turnLossSummary = buildPopupTurnLossSummary({
+      readySlice,
+      knownVictimIds,
+      formatUnitName: killToastFormatter.formatUnitName,
+      ...extraKills !== void 0 ? extraKills : {}
+    });
+    const combatFallbackBullets = buildCombatActivityFallbackBullets(readySlice);
+    const updateText = buildConsolidatedTurnUpdateToastMessage({
+      readyResult: readySlice,
+      turnLossSummary,
+      combatFallbackBullets
+    });
+    if (updateText) {
+      const unitOriginByDisplayName = buildUnitOriginByLossDisplayName(turnLossSummary);
+      deps.showMapToast(updateText, { isError: false, unitOriginByDisplayName });
+      deps.appendOpenRouterLog(`Update: ${updateText.replace(/\n/g, " | ")}`);
+    }
+    const hasUnknownBattle = unknownCombatHexes.length > 0 || unknownCasualtyHexes.length > 0 || unknownVictimIds.length > 0;
+    if (hasUnknownBattle) {
+      const getContinentNames = window.gameApi?.getHexContinentNames;
+      const unknownContinentNames = await collectUnknownBattleContinentNames(
+        unknownCombatHexes,
+        unknownCasualtyHexes,
+        getContinentNames ? (h3Index) => getContinentNames({ h3Index }) : void 0
+      );
+      deps.showMapToast(deps.formatUnknownBattleAnnouncement(unknownContinentNames), { isError: false });
+    }
+  }
+  function scheduleResolutionPlaybackCompleteNotify(send, needsPlayback) {
+    if (needsPlayback) {
+      enqueueResolutionPlaybackCompleteNotify(send);
+    } else {
+      dropQueuedResolutionPlaybackCompleteNotifies();
+      send();
+    }
+  }
+
+  // src/renderer/gameplay/readyHandler.ts
+  function buildReadyPayload(args) {
+    const { enabledToolGroupsPayload, useEventDriven, usePrecomputed, aiPlanningRunEnabled } = args;
+    const base = {
+      enabledToolGroups: enabledToolGroupsPayload,
+      aiPlanningRunEnabled: aiPlanningRunEnabled ?? rendererSharedState.runButtonOn
+    };
+    if (useEventDriven) {
+      base.useEventDrivenConsultation = true;
+    }
+    if (!usePrecomputed) return base;
+    base.precomputedAiOrders = rendererSharedState.precomputedAiOrders ?? [];
+    base.precomputedAiRangedOrders = rendererSharedState.precomputedAiRangedOrders ?? [];
+    base.precomputedAiEmbarkOrders = rendererSharedState.precomputedAiEmbarkOrders ?? [];
+    base.precomputedAiStrategy = rendererSharedState.precomputedAiStrategy ?? void 0;
+    base.precomputedAiMessage = rendererSharedState.precomputedAiMessage ?? void 0;
+    return base;
   }
   function rollbackReadyToolCounts(deps, snapshot) {
     rendererSharedState.toolInvocationCounts = snapshot;
@@ -26458,7 +26490,7 @@ ${body}`;
         if (playback && rendererSharedState.gameState && needsResolutionPlayback) {
           const tacticalReadySlice = buildTacticalCommitReadyResultForToast(playback);
           const visibleHexes2 = deps.getVisibleHexSet(rendererSharedState.gameState);
-          const { unknownCombatHexes: unknownCombatHexes2, unknownCasualtyHexes: unknownCasualtyHexes2, knownVictimIds: knownVictimIds2, unknownVictimIds: unknownVictimIds2 } = deriveCombatVisibilityClassification(tacticalReadySlice, visibleHexes2);
+          const visibility2 = deriveCombatVisibilityClassification(tacticalReadySlice, visibleHexes2);
           const killToastFormatter = deps.buildKillToastFormatterBundle(
             rendererSharedState.gameState,
             tacticalReadySlice.removedUnits,
@@ -26468,34 +26500,18 @@ ${body}`;
               removedUnits: tacticalReadySlice.removedUnits
             })
           );
-          const turnLossSummary = buildPopupTurnLossSummary({
-            readySlice: tacticalReadySlice,
-            knownVictimIds: knownVictimIds2,
-            formatUnitName: killToastFormatter.formatUnitName,
-            killsByMelee: playback.killsByMelee,
-            killsByAirStrike: playback.killsByAirStrike
-          });
-          const combatFallbackBullets = buildCombatActivityFallbackBullets(tacticalReadySlice);
-          const updateText = buildConsolidatedTurnUpdateToastMessage({
-            readyResult: tacticalReadySlice,
-            turnLossSummary,
-            combatFallbackBullets
-          });
-          if (updateText) {
-            const unitOriginByDisplayName = buildUnitOriginByLossDisplayName(turnLossSummary);
-            deps.showMapToast(updateText, { isError: false, unitOriginByDisplayName });
-            deps.appendOpenRouterLog(`Update: ${updateText.replace(/\n/g, " | ")}`);
-          }
-          const hasUnknownBattle = unknownCombatHexes2.length > 0 || unknownCasualtyHexes2.length > 0 || unknownVictimIds2.length > 0;
-          if (hasUnknownBattle) {
-            const getContinentNames = window.gameApi?.getHexContinentNames;
-            const unknownContinentNames = await collectUnknownBattleContinentNames(
-              unknownCombatHexes2,
-              unknownCasualtyHexes2,
-              getContinentNames ? (h3Index) => getContinentNames({ h3Index }) : void 0
-            );
-            deps.showMapToast(deps.formatUnknownBattleAnnouncement(unknownContinentNames), { isError: false });
-          }
+          await announceResolutionTurnUpdate(
+            {
+              readySlice: tacticalReadySlice,
+              visibility: visibility2,
+              killToastFormatter,
+              extraKills: {
+                killsByMelee: playback.killsByMelee,
+                killsByAirStrike: playback.killsByAirStrike
+              }
+            },
+            deps
+          );
         }
         await deps.refreshRes4TerrainOverridesForRenderer();
         deps.updatePendingOrdersSidebar();
@@ -26519,12 +26535,7 @@ ${body}`;
               rendererSharedState.deferredResolutionConsultNotifySent = true;
               deps.updateReadyButtonState();
             };
-            if (needsResolutionPlayback) {
-              enqueueResolutionPlaybackCompleteNotify(sendTacticalNotify);
-            } else {
-              dropQueuedResolutionPlaybackCompleteNotifies();
-              sendTacticalNotify();
-            }
+            scheduleResolutionPlaybackCompleteNotify(sendTacticalNotify, needsResolutionPlayback);
           }
         }
         if (rendererSharedState.runButtonOn && !commitResult.tacticalPostBeatConsultDeferred) {
@@ -26642,10 +26653,8 @@ ${body}`;
       const hasLegacy = (readyResult.combatHexes?.length ?? 0) > 0 || (readyResult.casualtyHexes?.length ?? 0) > 0;
       const hasAirStrikeResolution = (readyResult.airStrikeAttemptCount ?? 0) > 0 || (readyResult.airStrikeHexes?.length ?? 0) > 0 || (readyResult.infrastructureDestroyedEvents?.length ?? 0) > 0 || (readyResult.baseInvalidAirLossCount ?? 0) > 0;
       const visibleHexes = deps.getVisibleHexSet(state);
-      const { unknownCombatHexes, unknownCasualtyHexes, knownVictimIds, unknownVictimIds } = deriveCombatVisibilityClassification(
-        readyResult,
-        visibleHexes
-      );
+      const visibility = deriveCombatVisibilityClassification(readyResult, visibleHexes);
+      const { unknownCombatHexes, unknownCasualtyHexes } = visibility;
       const needsAnimation = resolutionMoves.length > 0 || hasRanged || hasMelee || hasLegacy || hasAirStrikeResolution;
       if (readyResult.postResolutionConsultDeferred === true) {
         rendererSharedState.pendingDeferredStrategicPostResolutionConsult = true;
@@ -26659,12 +26668,7 @@ ${body}`;
           rendererSharedState.deferredResolutionConsultNotifySent = true;
           deps.updateReadyButtonState();
         };
-        if (needsAnimation) {
-          enqueueResolutionPlaybackCompleteNotify(sendStrategicNotify);
-        } else {
-          dropQueuedResolutionPlaybackCompleteNotifies();
-          sendStrategicNotify();
-        }
+        scheduleResolutionPlaybackCompleteNotify(sendStrategicNotify, needsAnimation);
       }
       if (needsAnimation) {
         if (rendererSharedState.resolutionMoveAnimationFrameId !== null) cancelAnimationFrame(rendererSharedState.resolutionMoveAnimationFrameId);
@@ -26694,32 +26698,14 @@ ${body}`;
           void 0,
           readyResult.killLabelUnits
         );
-        const turnLossSummary = buildPopupTurnLossSummary({
-          readySlice: readyResult,
-          knownVictimIds,
-          formatUnitName: killToastFormatter.formatUnitName
-        });
-        const combatFallbackBullets = buildCombatActivityFallbackBullets(readyResult);
-        const updateText = buildConsolidatedTurnUpdateToastMessage({
-          readyResult,
-          turnLossSummary,
-          combatFallbackBullets
-        });
-        if (updateText) {
-          const unitOriginByDisplayName = buildUnitOriginByLossDisplayName(turnLossSummary);
-          deps.showMapToast(updateText, { isError: false, unitOriginByDisplayName });
-          deps.appendOpenRouterLog(`Update: ${updateText.replace(/\n/g, " | ")}`);
-        }
-        const hasUnknownBattle = unknownCombatHexes.length > 0 || unknownCasualtyHexes.length > 0 || unknownVictimIds.length > 0;
-        if (hasUnknownBattle) {
-          const getContinentNames = window.gameApi?.getHexContinentNames;
-          const unknownContinentNames = await collectUnknownBattleContinentNames(
-            unknownCombatHexes,
-            unknownCasualtyHexes,
-            getContinentNames ? (h3Index) => getContinentNames({ h3Index }) : void 0
-          );
-          deps.showMapToast(deps.formatUnknownBattleAnnouncement(unknownContinentNames), { isError: false });
-        }
+        await announceResolutionTurnUpdate(
+          {
+            readySlice: readyResult,
+            visibility,
+            killToastFormatter
+          },
+          deps
+        );
         rendererSharedState.resolutionMoveAnimationFrameId = requestAnimationFrame(deps.tickResolutionMoveAnimation);
       }
       rendererSharedState.hoverRoutePreview = null;
@@ -28622,11 +28608,19 @@ ${body}`;
   }
 
   // src/renderer/core/stateSnapshot.ts
-  async function refreshGameStateAfterBuildQueueChange(deps) {
+  async function refreshGameStateFromMain(deps, applyOptions, failureMessage) {
     if (!window.gameApi?.getGameState) return;
     try {
       const nextState = await window.gameApi.getGameState();
-      await deps.applyGameStateSnapshot(nextState, {
+      await deps.applyGameStateSnapshot(nextState, applyOptions);
+    } catch (err) {
+      console.error(failureMessage, err);
+    }
+  }
+  async function refreshGameStateAfterBuildQueueChange(deps) {
+    await refreshGameStateFromMain(
+      deps,
+      {
         refreshStandingOrders: false,
         updateGameStateSidebarUi: false,
         updateSelectionUi: false,
@@ -28634,16 +28628,14 @@ ${body}`;
         updateReadyButton: false,
         refreshBuildPopup: false,
         redraw: true
-      });
-    } catch (err) {
-      console.error("refreshGameStateAfterBuildQueueChange failed:", err);
-    }
+      },
+      "refreshGameStateAfterBuildQueueChange failed:"
+    );
   }
   async function refreshGameStateAfterSealiftChange(deps, options = {}) {
-    if (!window.gameApi?.getGameState) return;
-    try {
-      const nextState = await window.gameApi.getGameState();
-      await deps.applyGameStateSnapshot(nextState, {
+    await refreshGameStateFromMain(
+      deps,
+      {
         refreshStandingOrders: options.refreshStandingOrders === true,
         updateGameStateSidebarUi: true,
         updateSelectionUi: true,
@@ -28651,10 +28643,9 @@ ${body}`;
         updateReadyButton: false,
         refreshBuildPopup: false,
         redraw: true
-      });
-    } catch (err) {
-      console.error("refreshGameStateAfterSealiftChange failed:", err);
-    }
+      },
+      "refreshGameStateAfterSealiftChange failed:"
+    );
   }
   async function applyGameStateSnapshot(deps, nextState, options = {}) {
     const previousState = rendererSharedState.gameState;

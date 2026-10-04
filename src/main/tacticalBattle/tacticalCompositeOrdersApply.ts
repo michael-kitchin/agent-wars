@@ -3,6 +3,7 @@
  * embark, air strike + ranged, march, ferry, then embark cargo sync.
  */
 
+import type { KillEdge } from '../../shared/ipc/combatResultTypes';
 import type { AirStrikeOrder, EmbarkOrder, FerryOrder } from '../../shared/ipcTypes';
 import type { InfrastructureDestroyedEvent, RemovedUnitSnapshot } from '../../shared/ipc/readyTypes';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
@@ -74,9 +75,9 @@ export function projectTacticalSnapshotAfterValidatedOpponentOrders(
  */
 export type TacticalHumanSupportProjectionResult = {
   battle: TacticalBattleSnapshot;
-  killsByDirectFire: { victimId: string; killerIds: string[] }[];
-  killsByAirStrike: { victimId: string; killerIds: string[] }[];
-  killsByReturnFire: { victimId: string; killerIds: string[] }[];
+  killsByDirectFire: KillEdge[];
+  killsByAirStrike: KillEdge[];
+  killsByReturnFire: KillEdge[];
   removedUnits: RemovedUnitSnapshot[];
   infrastructureDestroyedEvents: InfrastructureDestroyedEvent[];
   airStrikeAttemptCount: number;

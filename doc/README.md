@@ -39,6 +39,7 @@ When you change one of these, update `combat-rules-v3.md` (and any table that qu
 | Tactical ranged and movement budgets | `src/shared/tacticalRanges.ts` |
 | Tactical terrain enter costs | `tacticalEnterHexMovementCost` in `src/shared/tacticalTerrainMovement.ts` |
 | Tactical combat modifiers (LOS, range caps, MP) | `src/shared/tacticalTerrainCombatModifiers.ts` |
+| Strategic and tactical H3 resolutions | `STRATEGIC_H3_RESOLUTION` and `TACTICAL_H3_RESOLUTION` in `src/shared/h3Resolutions.ts` |
 | Sub-unit multiplication | `tacticalSubUnitCountForStrategicUnitType` in `src/main/tacticalBattle/computeTacticalBattleSnapshot.ts` |
 | Resolution phase order | `executeReadyStrategicTurn`, `buildResolutionOrderRule` |
 

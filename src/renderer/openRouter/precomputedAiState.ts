@@ -1,4 +1,4 @@
-import type { TacticalOpponentPlanPayload } from '../../shared/ipc/readyTypes';
+import type { TacticalOpponentPlanPayload } from '../../shared/ipc/consultationPushTypes';
 import type { RequestAiOrdersResult } from '../../shared/ipcTypes';
 import { rendererSharedState as S } from '../core/state';
 
