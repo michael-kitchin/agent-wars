@@ -12,6 +12,7 @@ import {
 import { getAssessmentCategory, executeEstimateCombat, poissonBinomialPMF } from './combatEstimation';
 import type { GameStateSnapshot } from '../gameDb';
 import type { UnitOrigin } from '../../shared/unitOriginTypes';
+import { TECH_ADVANCED_MIN_URBAN_HEX_COUNT } from '../../shared/techBonusRules';
 import { ensureTerrainClassificationCacheLoaded, getRes4FeatureRowsForSeeding } from '../terrainClassificationCache';
 
 /**
@@ -465,7 +466,7 @@ function testMeleeEstimateJudgesAttackerAtTarget(): void {
  *
  * Purpose: Estimates classify tech from the terrain cache, so the fixture has to be a real birth hex.
  * When to use: The tech-bonus estimate case.
- * Expected outcome: A parent hex with at least five urban cells.
+ * Expected outcome: A parent hex with at least `TECH_ADVANCED_MIN_URBAN_HEX_COUNT` urban cells.
  * Exceptions: Throws when the loaded cache has no such hex.
  */
 function advancedBirthHex(): string {
@@ -474,10 +475,10 @@ function advancedBirthHex(): string {
   for (const row of getRes4FeatureRowsForSeeding()) {
     if (!row.isUrban) continue;
     const next = (counts.get(row.parentH3Index) ?? 0) + 1;
-    if (next >= 5) return row.parentH3Index;
+    if (next >= TECH_ADVANCED_MIN_URBAN_HEX_COUNT) return row.parentH3Index;
     counts.set(row.parentH3Index, next);
   }
-  throw new Error('terrain cache has no res1 hex with five urban cells');
+  throw new Error(`terrain cache has no res1 hex with ${TECH_ADVANCED_MIN_URBAN_HEX_COUNT} urban cells`);
 }
 
 /**

@@ -311,7 +311,7 @@ Gate: `state.weatherBonusEnabled` with its level (`weatherBonusLevel`, read thro
 
 ## 10. Tech bonus
 
-Gate: `state.techBonusEnabled` with its level (`techBonusLevel`, read through `techBonusLevelOf`). A missing row is off, and a present flag with no level is Low. With the flag off, prompt text is unchanged and assessment results omit `techLevel`. Low adds 2 attack for an Advanced unit and leaves defense unchanged. High adds 2 attack and 2 defense. Basic adds nothing at either level. The tier is the generated urban count of the birth hex, five or more for Advanced.
+Gate: `state.techBonusEnabled` with its level (`techBonusLevel`, read through `techBonusLevelOf`). A missing row is off, and a present flag with no level is Low. With the flag off, prompt text is unchanged and assessment results omit `techLevel`. Low adds 2 attack for an Advanced unit and leaves defense unchanged. High adds 2 attack and 2 defense. Basic adds nothing at either level. The tier is the generated urban count of the birth hex, 21 or more for Advanced.
 
 | Surface | Contract |
 | --- | --- |

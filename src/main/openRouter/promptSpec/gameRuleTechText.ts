@@ -8,7 +8,7 @@
  */
 
 import { logTrace } from '../../logger';
-import { techBonusLevelOf } from '../../../shared/techBonusRules';
+import { TECH_ADVANCED_MIN_URBAN_HEX_COUNT, techBonusLevelOf } from '../../../shared/techBonusRules';
 import type { OriginBonusSettings } from '../../../shared/originBonusTypes';
 
 /**
@@ -23,7 +23,7 @@ export function buildTechBonusRule(settings: OriginBonusSettings): string | null
   const level = techBonusLevelOf(settings);
   logTrace('promptSpec buildTechBonusRule', { level });
   if (level === 'off') return null;
-  const birth = 'An Advanced unit, born in a hex with at least five urban cells,';
+  const birth = `An Advanced unit, born in a hex with at least ${TECH_ADVANCED_MIN_URBAN_HEX_COUNT} urban cells,`;
   if (level === 'high') {
     return `Tech bonus is on. ${birth} adds 2 to its attack and 2 to its defense. A Basic unit adds nothing. Casualty order still uses printed defense.`;
   }

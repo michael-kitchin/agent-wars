@@ -99,7 +99,7 @@ units: {
     /**
      * Tech tier of the unit's birth hex.
      *
-     * Contract: Present only when the tech bonus is on. `basic` when the birth hex is missing or has fewer than five urban cells.
+     * Contract: Present only when the tech bonus is on. `basic` when the birth hex is missing or has 20 or fewer urban cells.
      * When to use: The unit tooltip and AI tools. Dice recompute the tier from the birth hex.
      * Expected outcome: `advanced` or `basic`.
      * Exceptions: None.

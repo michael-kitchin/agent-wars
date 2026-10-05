@@ -3,7 +3,7 @@
  *
  * Purpose: The tier follows the generated urban count of the origin res1 hex, including after urban cells are destroyed.
  * When to use: Snapshot stamping and the hit-bonus lookup. Dice must not trust a stamp alone.
- * Expected outcome: `advanced` at five or more urban cells. A missing birth hex or an unloaded terrain cache is `basic` and does not throw.
+ * Expected outcome: `advanced` at 21 or more urban cells. A count of 20, a missing birth hex, or an unloaded terrain cache is `basic` and does not throw.
  * Exceptions: None.
  */
 

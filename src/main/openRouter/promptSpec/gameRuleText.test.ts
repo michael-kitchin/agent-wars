@@ -370,6 +370,7 @@ test('the combat paragraph names the tech bonus at Low and at High', () => {
   const high = buildCombatRulesParagraph(gates({
     originBonusSettings: { countryBonusEnabled: false, terrainBonusEnabled: false, techBonusEnabled: true, techBonusLevel: 'high' },
   }));
+  assert.ok(low.includes('at least 21 urban cells'));
   assert.ok(low.includes('adds 2 to its attack'));
   assert.ok(low.includes('The tech bonus does not change defense'));
   assert.ok(!low.includes('adds 2 to its attack and 2 to its defense'));

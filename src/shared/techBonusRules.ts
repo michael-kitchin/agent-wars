@@ -17,10 +17,10 @@ import type { TechHitBonus, TechLevel } from './techBonusTypes';
  *
  * Purpose: The cut is on the generated baseline count, not the live count after air strikes.
  * When to use: `techLevelFromUrbanHexCount`.
- * Expected outcome: Five.
+ * Expected outcome: Twenty-one. A count of 20 is still Basic.
  * Exceptions: None.
  */
-export const TECH_ADVANCED_MIN_URBAN_HEX_COUNT = 5;
+export const TECH_ADVANCED_MIN_URBAN_HEX_COUNT = 21;
 
 /**
  * Points an Advanced unit adds.

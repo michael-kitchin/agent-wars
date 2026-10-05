@@ -12,7 +12,7 @@
  *
  * Purpose: The tier is fixed from the generated urban count of that hex.
  * When to use: Stamped on snapshots for tooltips and tools. Dice recompute it from the birth hex.
- * Expected outcome: `advanced` at five or more urban cells; otherwise `basic`.
+ * Expected outcome: `advanced` at 21 or more urban cells; otherwise `basic`.
  * Exceptions: None.
  */
 export type TechLevel = 'basic' | 'advanced';
