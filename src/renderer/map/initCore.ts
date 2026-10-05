@@ -14,7 +14,8 @@ import {
   clearDeferredStackCalloutTimerForPressAway,
 } from './mapClickSelectionPolicy';
 import { hideOrderBlockHexTooltip } from './orderBlockHexTooltip';
-import { hideOrderSlowerHexTooltip } from './orderSlowerHexTooltip';
+import { clearOrderEffectsTooltipDwell, hideOrderSlowerHexTooltip } from './orderSlowerHexTooltip';
+import { resumeHexTooltipDwellAfterAimingEnds } from './mainMapInteractions';
 import { getMainLeafletMap, initWorldLeafletMaps, setMainBasemapByProviderId, setMainBasemapFilter } from './worldLeafletMap';
 
 /**
@@ -474,6 +475,11 @@ export function wireInitCore(deps: InitCoreDeps): void {
       if (e.key === 'Shift') {
         const shiftKeyAlreadyActive = S.shiftKeyActive;
         S.shiftKeyActive = true;
+        if (!shiftKeyAlreadyActive) {
+          hideOrderBlockHexTooltip();
+          clearOrderEffectsTooltipDwell();
+          resumeHexTooltipDwellAfterAimingEnds();
+        }
         if (shouldRefreshStackCalloutOnShiftKeydown(shiftKeyAlreadyActive)) {
           deps.applyModifierDrivenPopoverCloseRules('shift_pressed');
         }
@@ -499,6 +505,9 @@ export function wireInitCore(deps: InitCoreDeps): void {
     if (e.key === 'Shift') {
       S.shiftKeyActive = false;
       deps.applyModifierDrivenPopoverCloseRules('shift_released');
+      if (S.hoveredHexH3 !== null) {
+        void deps.refreshHoverRoutePreview({ allowBlockingOrderTooltip: true });
+      }
       return;
     }
     if (e.key.toLowerCase() === 't') {

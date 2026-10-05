@@ -351,6 +351,28 @@ refreshHumanStandingOrders: () => Promise<void>;
 }
 
 /**
+ * Starts the hex-tooltip wait after aiming ends, once the map handlers exist.
+ *
+ * Purpose: Shift inspection can begin while the pointer is already resting, so the wait cannot depend on another pointer move.
+ * When to use: The Shift keydown that first holds the key.
+ * Expected outcome: No effect until the map handlers are wired. After that, a hidden hex tooltip with no wait starts one. An open tooltip or a wait already running is left alone.
+ * Exceptions: None.
+ */
+let resumeHexTooltipDwellAfterAiming: (() => void) | null = null;
+
+/**
+ * Starts the hex-tooltip wait when aiming ends and the pointer is already on a hex.
+ *
+ * Purpose: Inspection must show the hex tooltip after one second without a further move across the hex.
+ * When to use: From the Shift keydown that begins inspection.
+ * Expected outcome: A one-second wait starts when the tooltip is hidden and no wait is running. Otherwise the current tooltip is left as it is.
+ * Exceptions: None.
+ */
+export function resumeHexTooltipDwellAfterAimingEnds(): void {
+  resumeHexTooltipDwellAfterAiming?.();
+}
+
+/**
  * Attaches the main map's pointer, click, double-click, and context-menu handlers.
  *
  * Purpose: Single place where map gestures become hover previews, selection changes, and order drafts in both theaters.
@@ -496,6 +518,16 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
   let dwellAnchorY = 0;
 
   /**
+   * Whether the previous pointer move was aiming an order.
+   *
+   * Purpose: Ending an aim on a small move must start the hex-tooltip wait. The rest spot from before the aim must not swallow that start.
+   * When to use: Read at the start of a move that is not aiming. Set at the end of every pointer move.
+   * Expected outcome: The first move after aiming starts a one-second wait when none is running. Later jitter inside the rest distance does not.
+   * Exceptions: None.
+   */
+  let aimingOnPreviousMove = false;
+
+  /**
    * Reports whether the pointer has left the spot where this hex-tooltip dwell started.
    *
    * Purpose: Travel inside a hex must not finish a wait that began at the edge.
@@ -530,6 +562,15 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
       const namingTarget = deps.namingLookupTargetForPointer(S.lastPointerClientX, S.lastPointerClientY, targetHex);
       void deps.showTerrainTooltip(S.lastPointerClientX, S.lastPointerClientY, state, namingTarget);
     }, HEX_DETAILS_TOOLTIP_DELAY_MS);
+  };
+
+  resumeHexTooltipDwellAfterAiming = (): void => {
+    if (S.terrainTooltipDelayTimer !== null) return;
+    const tip = document.getElementById('hex-tooltip');
+    if (tip && !tip.classList.contains('hidden')) return;
+    const hit = S.hoveredHexH3;
+    if (!hit || deps.shouldSuppressTerrainTooltip()) return;
+    scheduleHexDetailsTooltip(hit, S.hoveredDetailHexH3, S.lastPointerClientX, S.lastPointerClientY);
   };
 
   mainMapEl.addEventListener('pointermove', (e) => {
@@ -586,6 +627,8 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
       hideOrderBlockHexTooltip();
       const tipFollow = document.getElementById('hex-tooltip');
       const tipVisible = !!tipFollow && !tipFollow.classList.contains('hidden');
+      const startHexWaitAfterAiming =
+        aimingOnPreviousMove && !tipVisible && S.terrainTooltipDelayTimer === null;
       if (!deps.shouldSuppressTerrainTooltip() && tipVisible && hit) {
         const state = deps.terrainStateForPointer(S.lastPointerClientX, S.lastPointerClientY, hit);
         const namingTarget = deps.namingLookupTargetForPointer(S.lastPointerClientX, S.lastPointerClientY, hit);
@@ -593,8 +636,7 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
       } else if (
         hit &&
         !deps.shouldSuppressTerrainTooltip() &&
-        !planningHidesHexTooltip &&
-        pointerLeftDwellAnchor(e.clientX, e.clientY)
+        (startHexWaitAfterAiming || pointerLeftDwellAnchor(e.clientX, e.clientY))
       ) {
         scheduleHexDetailsTooltip(hit, detailHit, e.clientX, e.clientY);
       }
@@ -628,6 +670,7 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
     ) {
       scheduleHexDetailsTooltip(hit, detailHit, e.clientX, e.clientY);
     }
+    aimingOnPreviousMove = planningHidesHexTooltip;
   });
 
   mainMapEl.addEventListener('pointerleave', (e) => {

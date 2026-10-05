@@ -27949,6 +27949,10 @@ ${body}`;
   }
 
   // src/renderer/map/mainMapInteractions.ts
+  var resumeHexTooltipDwellAfterAiming = null;
+  function resumeHexTooltipDwellAfterAimingEnds() {
+    resumeHexTooltipDwellAfterAiming?.();
+  }
   function wireMainMapInteractions(deps) {
     const mainMapEl = document.getElementById("main-map");
     if (!mainMapEl) return;
@@ -28044,6 +28048,7 @@ ${body}`;
     }
     let dwellAnchorX = 0;
     let dwellAnchorY = 0;
+    let aimingOnPreviousMove = false;
     const pointerLeftDwellAnchor = (clientX, clientY) => {
       const dx = clientX - dwellAnchorX;
       const dy = clientY - dwellAnchorY;
@@ -28062,6 +28067,14 @@ ${body}`;
         const namingTarget = deps.namingLookupTargetForPointer(rendererSharedState.lastPointerClientX, rendererSharedState.lastPointerClientY, targetHex);
         void deps.showTerrainTooltip(rendererSharedState.lastPointerClientX, rendererSharedState.lastPointerClientY, state, namingTarget);
       }, HEX_DETAILS_TOOLTIP_DELAY_MS);
+    };
+    resumeHexTooltipDwellAfterAiming = () => {
+      if (rendererSharedState.terrainTooltipDelayTimer !== null) return;
+      const tip = document.getElementById("hex-tooltip");
+      if (tip && !tip.classList.contains("hidden")) return;
+      const hit = rendererSharedState.hoveredHexH3;
+      if (!hit || deps.shouldSuppressTerrainTooltip()) return;
+      scheduleHexDetailsTooltip(hit, rendererSharedState.hoveredDetailHexH3, rendererSharedState.lastPointerClientX, rendererSharedState.lastPointerClientY);
     };
     mainMapEl.addEventListener("pointermove", (e) => {
       rendererSharedState.lastPointerClientX = e.clientX;
@@ -28111,11 +28124,12 @@ ${body}`;
         hideOrderBlockHexTooltip();
         const tipFollow = document.getElementById("hex-tooltip");
         const tipVisible = !!tipFollow && !tipFollow.classList.contains("hidden");
+        const startHexWaitAfterAiming = aimingOnPreviousMove && !tipVisible && rendererSharedState.terrainTooltipDelayTimer === null;
         if (!deps.shouldSuppressTerrainTooltip() && tipVisible && hit) {
           const state = deps.terrainStateForPointer(rendererSharedState.lastPointerClientX, rendererSharedState.lastPointerClientY, hit);
           const namingTarget = deps.namingLookupTargetForPointer(rendererSharedState.lastPointerClientX, rendererSharedState.lastPointerClientY, hit);
           void deps.showTerrainTooltip(rendererSharedState.lastPointerClientX, rendererSharedState.lastPointerClientY, state, namingTarget);
-        } else if (hit && !deps.shouldSuppressTerrainTooltip() && !planningHidesHexTooltip && pointerLeftDwellAnchor(e.clientX, e.clientY)) {
+        } else if (hit && !deps.shouldSuppressTerrainTooltip() && (startHexWaitAfterAiming || pointerLeftDwellAnchor(e.clientX, e.clientY))) {
           scheduleHexDetailsTooltip(hit, detailHit, e.clientX, e.clientY);
         }
       }
@@ -28135,6 +28149,7 @@ ${body}`;
       if (releaseHexTooltip && !hitChanged && !detailChanged && hit && !deps.shouldSuppressTerrainTooltip() && !planningHidesHexTooltip) {
         scheduleHexDetailsTooltip(hit, detailHit, e.clientX, e.clientY);
       }
+      aimingOnPreviousMove = planningHidesHexTooltip;
     });
     mainMapEl.addEventListener("pointerleave", (e) => {
       const next = e.relatedTarget;
@@ -28504,6 +28519,11 @@ ${body}`;
         if (e.key === "Shift") {
           const shiftKeyAlreadyActive = rendererSharedState.shiftKeyActive;
           rendererSharedState.shiftKeyActive = true;
+          if (!shiftKeyAlreadyActive) {
+            hideOrderBlockHexTooltip();
+            clearOrderEffectsTooltipDwell();
+            resumeHexTooltipDwellAfterAimingEnds();
+          }
           if (shouldRefreshStackCalloutOnShiftKeydown(shiftKeyAlreadyActive)) {
             deps.applyModifierDrivenPopoverCloseRules("shift_pressed");
           }
@@ -28528,6 +28548,9 @@ ${body}`;
       if (e.key === "Shift") {
         rendererSharedState.shiftKeyActive = false;
         deps.applyModifierDrivenPopoverCloseRules("shift_released");
+        if (rendererSharedState.hoveredHexH3 !== null) {
+          void deps.refreshHoverRoutePreview({ allowBlockingOrderTooltip: true });
+        }
         return;
       }
       if (e.key.toLowerCase() === "t") {

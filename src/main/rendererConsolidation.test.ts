@@ -1042,8 +1042,9 @@ function testHoverOrderPlanningInteractionLock(): void {
     'the hex tooltip rest spot must survive later pointer moves'
   );
   assert.ok(
-    mainMapSource.includes('restartOrderEffectsDwellIfPointerMoved()'),
-    'a planning move inside one cell restarts the effects tooltip wait before it opens'
+    pointerMoveBody.includes('restartOrderEffectsDwellIfPointerMoved()') &&
+      pointerMoveBody.includes('restartOrderBlockDwellIfPointerMoved()'),
+    'a planning move inside one cell restarts the effects and blocked tooltip waits before they open'
   );
   const pointerDownAt = mainMapSource.indexOf("addEventListener('pointerdown'");
   const clickAt = mainMapSource.indexOf("addEventListener('click'", pointerDownAt);
@@ -1056,6 +1057,10 @@ function testHoverOrderPlanningInteractionLock(): void {
   );
   const initCorePath = path.resolve(process.cwd(), 'src', 'renderer', 'map', 'initCore.ts');
   const initCoreSource = fs.readFileSync(initCorePath, 'utf8');
+  assert.ok(
+    initCoreSource.includes('resumeHexTooltipDwellAfterAimingEnds()'),
+    'Shift inspection starts the hex tooltip wait when the pointer is already resting'
+  );
   assert.ok(
     initCoreSource.includes('function beginHoverSupportTargetingMode') &&
       initCoreSource.includes("beginHoverSupportTargetingMode(deps, 'ranged')") &&

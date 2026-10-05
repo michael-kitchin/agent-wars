@@ -162,11 +162,11 @@ export const HEX_DETAILS_TOOLTIP_DELAY_MS = 1000;
 export const HEX_DETAILS_TOOLTIP_REST_PX = 6;
 
 /**
- * Wall-clock visibility for the transient “Blocked: …” and “Slower: …” order-preview tooltips that follow the pointer.
+ * Wall-clock visibility for the blocked-order tooltip after it opens.
  *
- * Purpose: Keeps order-preview hints readable without tying TTL to the hex details dwell delay.
- * When to use: `orderBlockHexTooltip` and `orderSlowerHexTooltip` auto-hide timers after each reveal / pointer refresh.
- * Expected outcome: Tooltip dismisses after 1500ms unless refreshed by a new hover evaluation.
+ * Purpose: Keeps the blocked notice readable without tying its hide time to the one-second rest.
+ * When to use: The blocked-tooltip auto-hide timer after it opens, and again when the pointer moves while it is open.
+ * Expected outcome: The notice hides 1500ms after the pointer stops. The effects tooltip does not use this timer.
  * Exceptions: None.
  */
 export const ORDER_BLOCK_HEX_TOOLTIP_TTL_MS = 1500;
