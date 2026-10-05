@@ -20,7 +20,7 @@ Shown when the Model tab is selected. This is the tab the panel starts on. The m
 - A New button labeled "New".
 - A reasoning effort dropdown on the row directly below the model dropdown, at the same width. It lists only the selected model's reasoning levels, as "High" and so on, and marks the model's default level "(default)". When the model has no default level, or no levels at all, an extra first option reads "Model default". The dropdown is disabled when the model offers fewer than two levels, and before models load.
 - A Tactical battles checkbox, checked by default, to the right of the reasoning dropdown and directly below the refresh control. Its tip says that, when unchecked, the tactical battles list does not appear and melee resolves as if the player chose Ignore every time.
-- A model description tooltip: the selected model's description, after the same dwell as the hex tooltip. An empty description shows nothing.
+- A model description tooltip: the selected model's description, one second after the pointer arrives on the model dropdown. Moving on the dropdown does not start that wait again. An empty description shows nothing.
 
 ## Inputs and Responses
 
@@ -33,7 +33,7 @@ Shown when the Model tab is selected. This is the tab the panel starts on. The m
 - When the player clicks Run and it is enabled, Run toggles. Pressed means opponent planning runs. Turning it on selects the Tools tab, clears any precomputed opponent plan, and may disable Ready until a plan is ready. Turning it off cancels an in-flight planning request and clears the precomputed plan.
 - When the player clicks New, the new-game overlay opens. See [new-game-dialog.md](new-game-dialog.md). New opens the overlay only during strategic planning. During a battle or resolution playback the click does nothing.
 - When the player changes Tactical battles, later Ready resolutions either show the tactical battles list or skip it. See [tactical-battles-list.md](tactical-battles-list.md).
-- When the pointer rests on the model dropdown, the description tooltip appears after a dwell if the selected model has a description.
+- When the pointer arrives on the model dropdown, the description tooltip appears one second later if the selected model has a description. Moving on the dropdown does not start that wait again.
 
 ### Keyboard
 

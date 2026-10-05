@@ -1,4 +1,4 @@
-import { HEX_DETAILS_TOOLTIP_DELAY_MS } from '../core/constants';
+import { HEX_DETAILS_TOOLTIP_DELAY_MS, HEX_DETAILS_TOOLTIP_REST_PX } from '../core/constants';
 import { rendererSharedState as S } from '../core/state';
 import { paintTerrainSwatches } from '../rendering/terrainVisualStyles';
 import { createTransientPointerTooltip } from './createTransientPointerTooltip';
@@ -11,7 +11,7 @@ const orderSlowerTooltip = createTransientPointerTooltip({
 /**
  * The world hex and detail cell the current effects wait belongs to.
  *
- * Purpose: A second preview for that same cell must not start another one-second wait.
+ * Purpose: A second preview for that same cell keeps the wait while the pointer rests. Travel starts another wait.
  * When to use: Set when a wait starts, and when the pointer moves to another cell. Cleared when planning ends or the pointer leaves.
  * Expected outcome: `scheduleOrderEffectsTooltip` keeps the open popup, or the pending wait, when the hover still matches.
  * Exceptions: None.
@@ -19,11 +19,22 @@ const orderSlowerTooltip = createTransientPointerTooltip({
 let effectsDwell: { hex: string | null; detail: string | null } | null = null;
 
 /**
+ * Pointer spot where the current effects wait began.
+ *
+ * Purpose: Travel inside a cell must not finish a wait that began at the edge.
+ * When to use: Set when a wait starts. Compared on a later pointer move or preview for that same cell.
+ * Expected outcome: Movement farther than the rest threshold starts the one-second wait again.
+ * Exceptions: None.
+ */
+let effectsDwellAnchorX = 0;
+let effectsDwellAnchorY = 0;
+
+/**
  * Pending show timer for the effects tooltip.
  *
- * Purpose: The popup waits one second after the effect for a cell is known, then stays until the cell changes.
+ * Purpose: The popup waits one second after the pointer rests on a cell whose effect is known.
  * When to use: Only inside this module.
- * Expected outcome: Null when nothing is waiting to appear.
+ * Expected outcome: Null when nothing is waiting to appear. Travel before the popup opens clears this timer and starts another.
  * Exceptions: None.
  */
 let effectsShowTimer: ReturnType<typeof setTimeout> | null = null;
@@ -32,7 +43,7 @@ let effectsShowTimer: ReturnType<typeof setTimeout> | null = null;
  * Generation of the latest schedule, so a stale timer cannot show an older cell.
  *
  * Purpose: Clearing a timeout is not enough if the callback has already begun.
- * When to use: Bump on every schedule, hide, and cell change.
+ * When to use: Bump when a wait is cancelled or replaced. A resting preview for the same cell does not bump it.
  * Expected outcome: A callback whose generation is not current returns without showing.
  * Exceptions: None.
  */
@@ -41,9 +52,9 @@ let effectsShowGeneration = 0;
 /**
  * Effects HTML the pending timer will show.
  *
- * Purpose: A newer preview for the same cell must replace the copy without restarting the one-second wait.
- * When to use: Written by `scheduleOrderEffectsTooltip` and read when the timer fires.
- * Expected outcome: The popup shows the latest copy for the cell that started the wait.
+ * Purpose: Holds the copy the open wait will show. A resting pointer replaces this copy. Travel starts a new wait with the new copy.
+ * When to use: Written when a wait starts or when a later preview keeps the current wait. Read when the timer fires.
+ * Expected outcome: The popup shows the latest copy for the cell the pointer rested on.
  * Exceptions: None.
  */
 let pendingEffectsHtml: string | null = null;
@@ -51,8 +62,8 @@ let pendingEffectsHtml: string | null = null;
 /**
  * Drops a pending effects show without hiding a popup that is already visible.
  *
- * Purpose: A cell change or a hide must not let the previous timer finish. A newer preview for the same cell leaves this timer running.
- * When to use: From hide, from a null schedule, and when a wait starts for a cell that does not already have one.
+ * Purpose: A cell change, a hide, or travel inside the cell must not let the previous timer finish.
+ * When to use: From hide, from a null schedule, and when a wait starts again.
  * Expected outcome: No timer remains, and an in-flight callback sees a new generation.
  * Exceptions: None.
  */
@@ -78,11 +89,11 @@ export function hideOrderSlowerHexTooltip(): void {
 }
 
 /**
- * Forgets the dwell anchor and hides the effects popup.
+ * Forgets which cell the effects wait belongs to and hides the popup.
  *
- * Purpose: Leaving the map, or leaving order planning, must not reuse a stale cell time.
+ * Purpose: Leaving the map, or leaving order planning, must not keep the previous cell's wait.
  * When to use: Pointer leave, and a pointer move that is not an armed planning gesture.
- * Expected outcome: The next armed cell change starts a full dwell.
+ * Expected outcome: The next armed preview starts a full one-second wait. The pointer spot is recorded again when that wait starts.
  * Exceptions: None.
  */
 export function clearOrderEffectsTooltipDwell(): void {
@@ -135,11 +146,48 @@ export function showOrderSlowerHexTooltip(tooltipHtml: string | null): void {
 }
 
 /**
- * Shows the effects popup one second after the effect for this cell is known.
+ * Reports whether the pointer has left the spot where this effects wait started.
  *
- * Purpose: The popup waits one second after the effect for this cell is known. A later preview for that same cell keeps the wait that is already running, or updates the copy if the popup is already open.
+ * Purpose: A march, ferry, shot, or strike preview keeps refreshing while the pointer travels.
+ * When to use: Before keeping a wait that is already running for the same cell.
+ * Expected outcome: True when the pointer is farther than the rest threshold from the dwell anchor.
+ * Exceptions: None.
+ */
+function pointerLeftEffectsDwellAnchor(): boolean {
+  const dx = S.lastPointerClientX - effectsDwellAnchorX;
+  const dy = S.lastPointerClientY - effectsDwellAnchorY;
+  return dx * dx + dy * dy > HEX_DETAILS_TOOLTIP_REST_PX * HEX_DETAILS_TOOLTIP_REST_PX;
+}
+
+/**
+ * Starts a one-second wait for the effects popup at the current pointer spot.
+ *
+ * Purpose: Strategic and tactical planning previews share one rest before the effects popup opens.
+ * When to use: A new cell, or travel inside the cell before the popup is open.
+ * Expected outcome: The popup shows one second later if the pointer is still on this cell. A newer wait cancels this one.
+ * Exceptions: None.
+ */
+function armEffectsDwell(hex: string | null, detail: string | null, tooltipHtml: string): void {
+  cancelEffectsShowTimer();
+  effectsDwell = { hex, detail };
+  effectsDwellAnchorX = S.lastPointerClientX;
+  effectsDwellAnchorY = S.lastPointerClientY;
+  pendingEffectsHtml = tooltipHtml;
+  const generation = effectsShowGeneration;
+  effectsShowTimer = setTimeout(() => {
+    if (generation !== effectsShowGeneration) return;
+    effectsShowTimer = null;
+    if (S.hoveredHexH3 !== hex || S.hoveredDetailHexH3 !== detail) return;
+    showOrderSlowerHexTooltip(pendingEffectsHtml);
+  }, HEX_DETAILS_TOOLTIP_DELAY_MS);
+}
+
+/**
+ * Shows the effects popup one second after the pointer rests on a cell whose order is changed by terrain, weather, or cover.
+ *
+ * Purpose: March, ferry, ranged, and air-strike aiming in both theaters use this wait. A later preview for that same cell keeps the wait while the pointer rests, or updates the copy if the popup is already open.
  * When to use: `publishHoverRoutePreview` when the hover is a legal armed order and the effects HTML is known. Pass null to hide.
- * Expected outcome: The popup shows one second later, and only if the pointer is still on the cell that was current when this schedule ran.
+ * Expected outcome: The popup shows one second after the pointer rests, and only if the pointer is still on that cell. Travel before it opens starts the wait again.
  * Exceptions: None.
  */
 export function scheduleOrderEffectsTooltip(tooltipHtml: string | null): void {
@@ -157,20 +205,26 @@ export function scheduleOrderEffectsTooltip(tooltipHtml: string | null): void {
     showOrderSlowerHexTooltip(tooltipHtml);
     return;
   }
-  if (sameCell && effectsShowTimer !== null) {
+  if (sameCell && effectsShowTimer !== null && !pointerLeftEffectsDwellAnchor()) {
     pendingEffectsHtml = tooltipHtml;
     return;
   }
-  cancelEffectsShowTimer();
-  effectsDwell = { hex, detail };
-  pendingEffectsHtml = tooltipHtml;
-  const generation = effectsShowGeneration;
-  effectsShowTimer = setTimeout(() => {
-    if (generation !== effectsShowGeneration) return;
-    effectsShowTimer = null;
-    if (S.hoveredHexH3 !== hex || S.hoveredDetailHexH3 !== detail) return;
-    showOrderSlowerHexTooltip(pendingEffectsHtml);
-  }, HEX_DETAILS_TOOLTIP_DELAY_MS);
+  armEffectsDwell(hex, detail, tooltipHtml);
+}
+
+/**
+ * Starts the effects wait again when the pointer travels before the popup is open.
+ *
+ * Purpose: Aiming inside one cell refreshes the preview without a cell change, and that refresh may not run on every move.
+ * When to use: A planning pointer move that stays on the same world hex and detail cell.
+ * Expected outcome: No effect once the popup is open, or when the pointer has only jittered. Otherwise the one-second wait starts again at the current spot.
+ * Exceptions: None.
+ */
+export function restartOrderEffectsDwellIfPointerMoved(): void {
+  if (orderSlowerTooltip.isVisible()) return;
+  if (effectsShowTimer === null || pendingEffectsHtml === null || effectsDwell === null) return;
+  if (!pointerLeftEffectsDwellAnchor()) return;
+  armEffectsDwell(effectsDwell.hex, effectsDwell.detail, pendingEffectsHtml);
 }
 
 /**

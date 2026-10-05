@@ -695,14 +695,25 @@ export function createBuildQueuePopupHandler(deps: BuildQueuePopupDeps) {
     return buildEntryInteractionChain;
   }
 
+  /**
+   * Closes the build popup and drops its in-memory queue.
+   *
+   * Purpose: Res4 zoom and battle maps call this on redraw to keep the popup from covering the cells. A popup that is already closed must not touch the hex tooltip.
+   * When to use: Build-entry dismissal, and the res4 branch of `syncBuildEntryButton`.
+   * Expected outcome: An open popup hides, and the hex tooltip can return after that close. An already closed popup leaves the hex-tooltip dwell running.
+   * Exceptions: None.
+   */
   function hideBuildPopup(): void {
+    const el = document.getElementById('build-popup');
+    const wasOpen = !!el && !el.classList.contains('hidden');
+    const hadBuildState =
+      S.buildPopupHexH3 !== null || S.selectedBuildHexH3s.length > 0 || S.buildQueueTemplate.length > 0;
+    if (!wasOpen && !hadBuildState) return;
     popupLifecycleRevision++;
     S.buildPopupHexH3 = null;
     S.buildPopupRequestSeq++;
     S.selectedBuildHexH3s = [];
     S.buildQueueTemplate = [];
-    const el = document.getElementById('build-popup');
-    const body = document.getElementById('build-popup-body');
     if (el) {
       el.classList.add('hidden');
       el.removeAttribute('data-open');
@@ -710,9 +721,10 @@ export function createBuildQueuePopupHandler(deps: BuildQueuePopupDeps) {
       el.removeAttribute('data-y');
       el.setAttribute('aria-hidden', 'true');
     }
+    const body = document.getElementById('build-popup-body');
     if (body) body.innerHTML = '';
     deps.requestRedraw();
-    deps.scheduleTerrainTooltipRestoreAfterPopoverClose();
+    if (wasOpen) deps.scheduleTerrainTooltipRestoreAfterPopoverClose();
   }
 
   /**

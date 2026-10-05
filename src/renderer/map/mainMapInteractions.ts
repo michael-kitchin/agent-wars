@@ -1,6 +1,6 @@
 import type { AirStrikeTargetType, GameStateSnapshot } from '../../shared/ipcTypes';
 import type { NamingLookupTarget, TerrainTooltipState } from './terrainTooltipTypes';
-import { HEX_DETAILS_TOOLTIP_DELAY_MS } from '../core/constants';
+import { HEX_DETAILS_TOOLTIP_DELAY_MS, HEX_DETAILS_TOOLTIP_REST_PX } from '../core/constants';
 import { isHoverOrderPlanningActive } from '../rendering/canvasPreviewPolicy';
 import { hitTestHexAtContainerPixel, hitTestTacticalRes4HexAtContainerPixel } from './mapHelpers';
 import { rendererSharedState as S } from '../core/state';
@@ -25,11 +25,17 @@ import {
   handleMainMapDoubleClick,
   type DoubleClickSelectedUnit,
 } from './mapDoubleClickHandler';
-import { hideOrderBlockHexTooltip, repositionOrderBlockHexTooltipIfVisible } from './orderBlockHexTooltip';
+import {
+  hideOrderBlockHexTooltip,
+  noteOrderBlockTooltipCellChange,
+  repositionOrderBlockHexTooltipIfVisible,
+  restartOrderBlockDwellIfPointerMoved,
+} from './orderBlockHexTooltip';
 import {
   clearOrderEffectsTooltipDwell,
   noteOrderEffectsTooltipCellChange,
   repositionOrderSlowerHexTooltipIfVisible,
+  restartOrderEffectsDwellIfPointerMoved,
 } from './orderSlowerHexTooltip';
 import { shouldHideStrategicMapUnitsForRes4Zoom } from './terrainView';
 
@@ -478,6 +484,54 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
     return true;
   }
 
+  /**
+   * Pointer spot where the current hex-tooltip wait began.
+   *
+   * Purpose: Travel inside a hex must not finish a wait that began at the edge.
+   * When to use: Keep this pair beside the pointer-move listener. Recreating it inside the listener makes every move look like travel from the origin.
+   * Expected outcome: Movement farther than the rest threshold starts the one-second wait again.
+   * Exceptions: None.
+   */
+  let dwellAnchorX = 0;
+  let dwellAnchorY = 0;
+
+  /**
+   * Reports whether the pointer has left the spot where this hex-tooltip dwell started.
+   *
+   * Purpose: Travel inside a hex must not finish a wait that began at the edge.
+   * When to use: A pointer move that stays on the same world hex and detail cell, before the tooltip is open.
+   * Expected outcome: True when the pointer is farther than the rest threshold from the dwell anchor.
+   * Exceptions: None.
+   */
+  const pointerLeftDwellAnchor = (clientX: number, clientY: number): boolean => {
+    const dx = clientX - dwellAnchorX;
+    const dy = clientY - dwellAnchorY;
+    return dx * dx + dy * dy > HEX_DETAILS_TOOLTIP_REST_PX * HEX_DETAILS_TOOLTIP_REST_PX;
+  };
+
+  /**
+   * Starts a one-second hex-tooltip wait at the current pointer spot.
+   *
+   * Purpose: A new cell, travel inside that cell, and leaving a single-unit token all share one rest.
+   * When to use: Before the tooltip is open. An open tooltip follows the pointer instead.
+   * Expected outcome: The tooltip shows one second later if the pointer is still on this cell. A newer wait cancels this one.
+   * Exceptions: None.
+   */
+  const scheduleHexDetailsTooltip = (targetHex: string, targetDetail: string | null, clientX: number, clientY: number): void => {
+    deps.clearTerrainTooltipTimer();
+    deps.hideTerrainTooltipVisual();
+    dwellAnchorX = clientX;
+    dwellAnchorY = clientY;
+    S.terrainTooltipDelayTimer = setTimeout(() => {
+      S.terrainTooltipDelayTimer = null;
+      if (S.hoveredHexH3 !== targetHex || S.hoveredDetailHexH3 !== targetDetail || !S.gameState) return;
+      if (deps.shouldSuppressTerrainTooltip()) return;
+      const state = deps.terrainStateForPointer(S.lastPointerClientX, S.lastPointerClientY, targetHex);
+      const namingTarget = deps.namingLookupTargetForPointer(S.lastPointerClientX, S.lastPointerClientY, targetHex);
+      void deps.showTerrainTooltip(S.lastPointerClientX, S.lastPointerClientY, state, namingTarget);
+    }, HEX_DETAILS_TOOLTIP_DELAY_MS);
+  };
+
   mainMapEl.addEventListener('pointermove', (e) => {
     S.lastPointerClientX = e.clientX;
     S.lastPointerClientY = e.clientY;
@@ -500,54 +554,49 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
     const prevDetail = S.hoveredDetailHexH3;
     const hitChanged = hit !== prevHit;
     const detailChanged = detailHit !== prevDetail;
-    // One dwell for a new cell and for leaving a single-unit token onto the rest of its hex.
-    const scheduleHexDetailsTooltip = (targetHex: string, targetDetail: string | null): void => {
-      deps.clearTerrainTooltipTimer();
-      S.terrainTooltipDelayTimer = setTimeout(() => {
-        S.terrainTooltipDelayTimer = null;
-        if (S.hoveredHexH3 !== targetHex || S.hoveredDetailHexH3 !== targetDetail || !S.gameState) return;
-        if (deps.shouldSuppressTerrainTooltip()) return;
-        const state = deps.terrainStateForPointer(S.lastPointerClientX, S.lastPointerClientY, targetHex);
-        const namingTarget = deps.namingLookupTargetForPointer(S.lastPointerClientX, S.lastPointerClientY, targetHex);
-        void deps.showTerrainTooltip(S.lastPointerClientX, S.lastPointerClientY, state, namingTarget);
-      }, HEX_DETAILS_TOOLTIP_DELAY_MS);
-    };
 
     if (hitChanged || detailChanged) {
       S.hoveredHexH3 = hit;
       S.hoveredDetailHexH3 = detailHit;
 
-      // A battle is one world hex, so the enclosing hit stays put while the pointer crosses cells.
       // This path runs only after the world hex or the detail cell changed. Hide the popup and
       // start the dwell again before the preview refresh, which may publish synchronously.
       deps.clearTerrainTooltipTimer();
       deps.hideTerrainTooltipVisual();
       if (planningHidesHexTooltip && hit) {
         noteOrderEffectsTooltipCellChange(hit, detailHit);
+        noteOrderBlockTooltipCellChange(hit, detailHit);
       } else {
         clearOrderEffectsTooltipDwell();
       }
       void deps.refreshHoverRoutePreview({ allowBlockingOrderTooltip: true });
       deps.requestRedraw();
+      if (!planningHidesHexTooltip) hideOrderBlockHexTooltip();
 
       if (hit && !deps.shouldSuppressTerrainTooltip() && !planningHidesHexTooltip) {
-        scheduleHexDetailsTooltip(hit, detailHit);
+        scheduleHexDetailsTooltip(hit, detailHit, e.clientX, e.clientY);
       }
     } else if (planningHidesHexTooltip) {
       deps.clearTerrainTooltipTimer();
       deps.hideTerrainTooltipVisual();
+      restartOrderEffectsDwellIfPointerMoved();
+      restartOrderBlockDwellIfPointerMoved();
     } else {
       clearOrderEffectsTooltipDwell();
+      hideOrderBlockHexTooltip();
       const tipFollow = document.getElementById('hex-tooltip');
-      if (
-        !deps.shouldSuppressTerrainTooltip() &&
-        tipFollow &&
-        !tipFollow.classList.contains('hidden') &&
-        hit
-      ) {
+      const tipVisible = !!tipFollow && !tipFollow.classList.contains('hidden');
+      if (!deps.shouldSuppressTerrainTooltip() && tipVisible && hit) {
         const state = deps.terrainStateForPointer(S.lastPointerClientX, S.lastPointerClientY, hit);
         const namingTarget = deps.namingLookupTargetForPointer(S.lastPointerClientX, S.lastPointerClientY, hit);
         void deps.showTerrainTooltip(S.lastPointerClientX, S.lastPointerClientY, state, namingTarget);
+      } else if (
+        hit &&
+        !deps.shouldSuppressTerrainTooltip() &&
+        !planningHidesHexTooltip &&
+        pointerLeftDwellAnchor(e.clientX, e.clientY)
+      ) {
+        scheduleHexDetailsTooltip(hit, detailHit, e.clientX, e.clientY);
       }
     }
 
@@ -577,7 +626,7 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
       !deps.shouldSuppressTerrainTooltip() &&
       !planningHidesHexTooltip
     ) {
-      scheduleHexDetailsTooltip(hit, detailHit);
+      scheduleHexDetailsTooltip(hit, detailHit, e.clientX, e.clientY);
     }
   });
 

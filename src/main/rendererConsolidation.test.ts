@@ -1027,11 +1027,23 @@ function testHoverOrderPlanningInteractionLock(): void {
   );
   const mainMapPath = path.resolve(process.cwd(), 'src', 'renderer', 'map', 'mainMapInteractions.ts');
   const mainMapSource = fs.readFileSync(mainMapPath, 'utf8');
-  const planningGateAt = mainMapSource.indexOf('hexTooltipSuppressedForOrderPlanning({');
-  const dwellTimeoutAt = mainMapSource.indexOf('}, HEX_DETAILS_TOOLTIP_DELAY_MS)');
+  const pointerMoveAt = mainMapSource.indexOf("addEventListener('pointermove'");
+  const pointerLeaveAt = mainMapSource.indexOf("addEventListener('pointerleave'");
+  const pointerMoveBody = mainMapSource.slice(pointerMoveAt, pointerLeaveAt);
+  const planningInMove = pointerMoveBody.indexOf('hexTooltipSuppressedForOrderPlanning({');
+  const scheduleInMove = pointerMoveBody.indexOf('scheduleHexDetailsTooltip(');
   assert.ok(
-    planningGateAt >= 0 && dwellTimeoutAt > planningGateAt,
+    planningInMove >= 0 && scheduleInMove > planningInMove,
     'pointer move should decide order planning before starting the hex tooltip dwell'
+  );
+  const hexRestAnchorAt = mainMapSource.indexOf('let dwellAnchorX');
+  assert.ok(
+    hexRestAnchorAt >= 0 && pointerMoveAt > hexRestAnchorAt,
+    'the hex tooltip rest spot must survive later pointer moves'
+  );
+  assert.ok(
+    mainMapSource.includes('restartOrderEffectsDwellIfPointerMoved()'),
+    'a planning move inside one cell restarts the effects tooltip wait before it opens'
   );
   const pointerDownAt = mainMapSource.indexOf("addEventListener('pointerdown'");
   const clickAt = mainMapSource.indexOf("addEventListener('click'", pointerDownAt);

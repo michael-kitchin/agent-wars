@@ -144,12 +144,22 @@ export const TOOLTIP_OFFSET_PX = 12;
 /**
  * Millisecond hover dwell before the res1/res4 hex details popup appears on the main map.
  *
- * Purpose: Deliberate disclosure delay for strategic res1 cells and tactical res4 battle cells.
- * When to use: `mainMapInteractions` deferred `showTerrainTooltip` timer after the pointer settles.
- * Expected outcome: Hex terrain/effects details appear after 1000ms hover on the same cell.
+ * Purpose: Deliberate disclosure delay for the hex tooltip, the order-effects tooltip, and the blocked-order tooltip.
+ * When to use: The deferred hex-tooltip timer, the deferred effects-tooltip timer, and the deferred blocked-tooltip timer, after the pointer settles.
+ * Expected outcome: Those details appear after 1000ms on the same cell once the pointer has rested. Travel inside the cell starts this wait again.
  * Exceptions: None.
  */
 export const HEX_DETAILS_TOOLTIP_DELAY_MS = 1000;
+
+/**
+ * Pointer travel, in CSS pixels, that restarts the hex tooltip, the order-effects tooltip, and the blocked-order tooltip.
+ *
+ * Purpose: These waits are for a resting pointer, so travel inside a cell must not finish a wait that began at the edge.
+ * When to use: Compare the pointer with the spot where the current dwell started, before that tooltip is open.
+ * Expected outcome: Movement farther than this starts the one-second wait again. Movement of this many pixels or less does not.
+ * Exceptions: None.
+ */
+export const HEX_DETAILS_TOOLTIP_REST_PX = 6;
 
 /**
  * Wall-clock visibility for the transient “Blocked: …” and “Slower: …” order-preview tooltips that follow the pointer.

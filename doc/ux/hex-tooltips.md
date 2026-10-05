@@ -27,20 +27,20 @@ The hex tooltip can appear in Strategic planning, Tactical planning, and Resolut
 
 ### Blocked tooltip
 
-- A blocked notice and the reason the hovered march, ranged attack, or air strike is illegal. A map-key terrain name in that notice has the same swatch as the hex tooltip. It replaces the hex tooltip while it is showing, then hides itself.
+- A blocked notice and the reason the hovered march, ranged attack, or air strike is illegal. A map-key terrain name in that notice has the same swatch as the hex tooltip. It replaces the hex tooltip while it is showing. Once open, it follows the pointer and hides itself a short time after the pointer stops.
 
 ### Effects tooltip
 
-- Shown from `#order-slower-tooltip` while the player is aiming a march, ferry, air strike, or ranged attack. It lists only the terrain and weather that change that order, plus the target's cover described below. A map-key terrain name has the same swatch as the hex tooltip. Snow, Rain, and Heat use the weather icon, not a swatch. Urban uses the same chip. Rubble has no swatch. A battle march that uses a road or a rail shows that icon on the Using line. An older payload that only says a line was used shows both icons. The line is omitted when nothing changes the order. A strategic march, ferry, ranged attack, or air strike can name weather. A battle march can name terrain, weather, and road or rail. A battle ranged attack can name forest, urban, or rubble on the attacker's own cell when that shortens the shot, and weather when the shot loses attack. A battle ferry shows nothing here. When a ranged attack or air strike is aimed at a cell or hex holding a visible enemy unit and that target has cover against the shot, a second line, `Cover:`, names the cover source (Forest, Mountain, Wetlands, Urban, or Rubble) with the same swatch rules; ground and naval fire uses the ground column and air strikes the air column, so a mountain target shows no Cover line for an air strike. A ranged attack made only by air units shows no Cover line. Snow, Rain, or Heat is named when that weather, and not a tag the unit has, changes the order. Heat cuts a battle march budget only at High, and it cuts armor ranged attack at both levels. It appears one second after the effect for that cell is known, then stays while the pointer remains on that cell, including while the pointer rests. Moving onto another world hex, zoomed cell, or battle cell hides it and starts that wait again. The rules are in [combat rules §4.9](../combat-rules-v3.md).
+- Shown from `#order-slower-tooltip` while the player is aiming a march, ferry, air strike, or ranged attack. It lists only the terrain and weather that change that order, plus the target's cover described below. A map-key terrain name has the same swatch as the hex tooltip. Snow, Rain, and Heat use the weather icon, not a swatch. Urban uses the same chip. Rubble has no swatch. A battle march that uses a road or a rail shows that icon on the Using line. An older payload that only says a line was used shows both icons. The line is omitted when nothing changes the order. A strategic march, ferry, ranged attack, or air strike can name weather. A battle march can name terrain, weather, and road or rail. A battle ranged attack can name forest, urban, or rubble on the attacker's own cell when that shortens the shot, and weather when the shot loses attack. A battle ferry shows nothing here. When a ranged attack or air strike is aimed at a cell or hex holding a visible enemy unit and that target has cover against the shot, a second line, `Cover:`, names the cover source (Forest, Mountain, Wetlands, Urban, or Rubble) with the same swatch rules; ground and naval fire uses the ground column and air strikes the air column, so a mountain target shows no Cover line for an air strike. A ranged attack made only by air units shows no Cover line. Snow, Rain, or Heat is named when that weather, and not a tag the unit has, changes the order. Heat cuts a battle march budget only at High, and it cuts armor ranged attack at both levels. It appears one second after the pointer rests on that cell, once the effect is known, then stays while the pointer remains on that cell. Moving farther than 6 pixels on that cell before the tooltip opens starts the one-second wait again. Movement of 6 pixels or less does not. Moving onto another world hex, zoomed cell, or battle cell hides it and starts that wait again. The rules are in [combat rules §4.9](../combat-rules-v3.md).
 
 ## Inputs and Responses
 
 ### Mouse
 
-- When the pointer rests on a hex and the player is not aiming an order, the hex tooltip appears after one second and follows the pointer. Moving onto a different world hex, zoomed cell, or battle cell hides it and starts that dwell again. Resting on the token of a hex that holds one stationary unit with a recorded origin shows that unit's Bonuses tooltip instead, after the same second. A token with no recorded origin keeps this tooltip. Leaving the token for the rest of the hex starts the hex tooltip dwell again. A stack token does not. See [stack-callout.md](stack-callout.md).
-- When the pointer leaves the map, the hex tooltip and the effects tooltip hide.
-- While the player is aiming a march, ferry, air strike, or ranged attack, the hex tooltip does not appear. The effects tooltip appears after one second when terrain, weather, or target cover changes the order, then stays while the pointer remains on that cell.
-- When the hovered order is illegal, the blocked tooltip shows immediately, replaces the effects tooltip, and then hides itself. When the preview becomes legal, the blocked tooltip hides.
+- When the pointer rests on a hex and the player is not aiming an order, the hex tooltip appears one second after the pointer rests, then follows the pointer. Moving farther than 6 pixels on that hex before the tooltip opens starts the one-second wait again. Movement of 6 pixels or less does not. Moving onto a different world hex, zoomed cell, or battle cell hides it and starts that wait again. Resting on the token of a hex that holds one stationary unit with a recorded origin shows that unit's Bonuses tooltip instead, after the same second. A token with no recorded origin keeps this tooltip. Leaving the token for the rest of the hex starts the hex tooltip dwell again. A stack token does not. See [stack-callout.md](stack-callout.md).
+- When the pointer leaves the map, the hex tooltip, the effects tooltip, and the blocked tooltip hide. A blocked notice that has not opened yet is cancelled.
+- While the player is aiming a march, ferry, air strike, or ranged attack, the hex tooltip does not appear. The effects tooltip appears one second after the pointer rests when terrain, weather, or target cover changes the order, then stays while the pointer remains on that cell. Moving farther than 6 pixels before it opens starts that wait again. Movement of 6 pixels or less does not.
+- When the hovered order is illegal, the blocked tooltip appears one second after the pointer rests, replaces the effects tooltip, and follows the pointer. It hides itself a short time after the pointer stops. Moving farther than 6 pixels before it opens starts that wait again. Movement of 6 pixels or less does not. Moving onto another world hex, zoomed cell, or battle cell hides it and starts that wait again. When the preview becomes legal, or the player stops aiming, it hides, including a notice that has not opened yet. A press hides it and leaves the effects tooltip up.
 
 ### Keyboard
 
@@ -52,10 +52,10 @@ The hex tooltip can appear in Strategic planning, Tactical planning, and Resolut
 
 ## States
 
-- Hidden: no dwell has elapsed, the pointer left, or another surface took over.
-- Hex tooltip visible: dwell elapsed, the player is not aiming an order, and no order tooltip is showing.
-- Effects tooltip visible: the dwell elapsed, the order is legal, and terrain, weather, or target cover changes it. It stays until the cell changes or the pointer leaves.
-- Blocked tooltip visible: an illegal preview. It hides on its own.
+- Hidden: the pointer has not rested for one second, the pointer left, or another surface took over.
+- Hex tooltip visible: the pointer rested for one second, the player is not aiming an order, and no order tooltip is showing.
+- Effects tooltip visible: the pointer rested for one second, the order is legal, and terrain, weather, or target cover changes it. It stays while the pointer remains on that cell, until the cell changes or the pointer leaves.
+- Blocked tooltip visible: the pointer rested for one second on an illegal preview. It hides on its own a short time after the pointer stops, and also when the player stops aiming, changes cell, leaves the map, or presses.
 
 ## Invariants
 
@@ -99,7 +99,7 @@ None.
 - `src/renderer/map/orderBlockHexTooltip.ts`
 - `src/renderer/map/orderSlowerHexTooltip.ts`
 - `src/renderer/map/mainMapInteractions.ts`
-- `src/renderer/core/constants.ts` (`HEX_DETAILS_TOOLTIP_DELAY_MS`, one second)
+- `src/renderer/core/constants.ts` (`HEX_DETAILS_TOOLTIP_DELAY_MS`, one second; `HEX_DETAILS_TOOLTIP_REST_PX`, 6 pixels)
 - `src/renderer/gameplay/hoverRoutePreviewRefresh.ts`
 - `src/renderer/gameplay/orderPreviewEffectsContext.ts`
 - `src/shared/orderPreviewEffectsTooltip.ts`

@@ -14272,6 +14272,7 @@
   var AI_ORDER_LINE_COLOR = PLAYER_COLORS.opponent;
   var TOOLTIP_OFFSET_PX = 12;
   var HEX_DETAILS_TOOLTIP_DELAY_MS = 1e3;
+  var HEX_DETAILS_TOOLTIP_REST_PX = 6;
   var ORDER_BLOCK_HEX_TOOLTIP_TTL_MS = 1500;
   var WORLD_H3_RESOLUTION = STRATEGIC_H3_RESOLUTION;
   var DETAIL_H3_RESOLUTION = TACTICAL_H3_RESOLUTION;
@@ -22773,7 +22774,16 @@ ${body}`;
     elementId: "order-block-tooltip",
     ttlMs: ORDER_BLOCK_HEX_TOOLTIP_TTL_MS
   });
+  var blockDwell = null;
+  var blockDwellAnchorX = 0;
+  var blockDwellAnchorY = 0;
+  var blockShowTimer = null;
+  var blockShowGeneration = 0;
+  var pendingBlockMessage = null;
   function hideOrderBlockHexTooltip() {
+    cancelBlockShowTimer();
+    pendingBlockMessage = null;
+    blockDwell = null;
     orderBlockTooltip.hide();
   }
   function isOrderBlockHexTooltipVisible() {
@@ -22811,15 +22821,68 @@ ${body}`;
     const kind = terrainKindForHoveredHex(hoveredH3);
     return blockingHoverMessageFromMarchInvalidReason(marchReason, kind);
   }
+  function cancelBlockShowTimer() {
+    blockShowGeneration += 1;
+    if (blockShowTimer !== null) {
+      clearTimeout(blockShowTimer);
+      blockShowTimer = null;
+    }
+  }
+  function pointerLeftBlockDwellAnchor() {
+    const dx = rendererSharedState.lastPointerClientX - blockDwellAnchorX;
+    const dy = rendererSharedState.lastPointerClientY - blockDwellAnchorY;
+    return dx * dx + dy * dy > HEX_DETAILS_TOOLTIP_REST_PX * HEX_DETAILS_TOOLTIP_REST_PX;
+  }
+  function armBlockDwell(hex, detail, message) {
+    cancelBlockShowTimer();
+    blockDwell = { hex, detail };
+    blockDwellAnchorX = rendererSharedState.lastPointerClientX;
+    blockDwellAnchorY = rendererSharedState.lastPointerClientY;
+    pendingBlockMessage = message;
+    const generation = blockShowGeneration;
+    blockShowTimer = setTimeout(() => {
+      if (generation !== blockShowGeneration) return;
+      blockShowTimer = null;
+      if (rendererSharedState.hoveredHexH3 !== hex || rendererSharedState.hoveredDetailHexH3 !== detail) return;
+      const text = pendingBlockMessage;
+      if (!text) return;
+      orderBlockTooltip.show((el) => {
+        el.innerHTML = blockingHoverMessageHtmlFromPlainMessage(text);
+        paintTerrainSwatches(el);
+      });
+    }, HEX_DETAILS_TOOLTIP_DELAY_MS);
+  }
+  function noteOrderBlockTooltipCellChange(hex, detail) {
+    hideOrderBlockHexTooltip();
+    blockDwell = { hex, detail };
+  }
   function showOrderBlockHexTooltip(message) {
     if (!message) {
       hideOrderBlockHexTooltip();
       return;
     }
-    orderBlockTooltip.show((el) => {
-      el.innerHTML = blockingHoverMessageHtmlFromPlainMessage(message);
-      paintTerrainSwatches(el);
-    });
+    const hex = rendererSharedState.hoveredHexH3;
+    const detail = rendererSharedState.hoveredDetailHexH3;
+    const sameCell = blockDwell !== null && blockDwell.hex === hex && blockDwell.detail === detail;
+    if (sameCell && orderBlockTooltip.isVisible()) {
+      pendingBlockMessage = message;
+      orderBlockTooltip.show((el) => {
+        el.innerHTML = blockingHoverMessageHtmlFromPlainMessage(message);
+        paintTerrainSwatches(el);
+      });
+      return;
+    }
+    if (sameCell && blockShowTimer !== null && !pointerLeftBlockDwellAnchor()) {
+      pendingBlockMessage = message;
+      return;
+    }
+    armBlockDwell(hex, detail, message);
+  }
+  function restartOrderBlockDwellIfPointerMoved() {
+    if (orderBlockTooltip.isVisible()) return;
+    if (blockShowTimer === null || pendingBlockMessage === null || blockDwell === null) return;
+    if (!pointerLeftBlockDwellAnchor()) return;
+    armBlockDwell(blockDwell.hex, blockDwell.detail, pendingBlockMessage);
   }
   function repositionOrderBlockHexTooltipIfVisible() {
     orderBlockTooltip.repositionIfVisible();
@@ -22831,6 +22894,8 @@ ${body}`;
     persistent: true
   });
   var effectsDwell = null;
+  var effectsDwellAnchorX = 0;
+  var effectsDwellAnchorY = 0;
   var effectsShowTimer = null;
   var effectsShowGeneration = 0;
   var pendingEffectsHtml = null;
@@ -22866,6 +22931,25 @@ ${body}`;
       paintTerrainSwatches(el);
     });
   }
+  function pointerLeftEffectsDwellAnchor() {
+    const dx = rendererSharedState.lastPointerClientX - effectsDwellAnchorX;
+    const dy = rendererSharedState.lastPointerClientY - effectsDwellAnchorY;
+    return dx * dx + dy * dy > HEX_DETAILS_TOOLTIP_REST_PX * HEX_DETAILS_TOOLTIP_REST_PX;
+  }
+  function armEffectsDwell(hex, detail, tooltipHtml) {
+    cancelEffectsShowTimer();
+    effectsDwell = { hex, detail };
+    effectsDwellAnchorX = rendererSharedState.lastPointerClientX;
+    effectsDwellAnchorY = rendererSharedState.lastPointerClientY;
+    pendingEffectsHtml = tooltipHtml;
+    const generation = effectsShowGeneration;
+    effectsShowTimer = setTimeout(() => {
+      if (generation !== effectsShowGeneration) return;
+      effectsShowTimer = null;
+      if (rendererSharedState.hoveredHexH3 !== hex || rendererSharedState.hoveredDetailHexH3 !== detail) return;
+      showOrderSlowerHexTooltip(pendingEffectsHtml);
+    }, HEX_DETAILS_TOOLTIP_DELAY_MS);
+  }
   function scheduleOrderEffectsTooltip(tooltipHtml) {
     if (!tooltipHtml) {
       cancelEffectsShowTimer();
@@ -22881,20 +22965,17 @@ ${body}`;
       showOrderSlowerHexTooltip(tooltipHtml);
       return;
     }
-    if (sameCell && effectsShowTimer !== null) {
+    if (sameCell && effectsShowTimer !== null && !pointerLeftEffectsDwellAnchor()) {
       pendingEffectsHtml = tooltipHtml;
       return;
     }
-    cancelEffectsShowTimer();
-    effectsDwell = { hex, detail };
-    pendingEffectsHtml = tooltipHtml;
-    const generation = effectsShowGeneration;
-    effectsShowTimer = setTimeout(() => {
-      if (generation !== effectsShowGeneration) return;
-      effectsShowTimer = null;
-      if (rendererSharedState.hoveredHexH3 !== hex || rendererSharedState.hoveredDetailHexH3 !== detail) return;
-      showOrderSlowerHexTooltip(pendingEffectsHtml);
-    }, HEX_DETAILS_TOOLTIP_DELAY_MS);
+    armEffectsDwell(hex, detail, tooltipHtml);
+  }
+  function restartOrderEffectsDwellIfPointerMoved() {
+    if (orderSlowerTooltip.isVisible()) return;
+    if (effectsShowTimer === null || pendingEffectsHtml === null || effectsDwell === null) return;
+    if (!pointerLeftEffectsDwellAnchor()) return;
+    armEffectsDwell(effectsDwell.hex, effectsDwell.detail, pendingEffectsHtml);
   }
   function repositionOrderSlowerHexTooltipIfVisible() {
     orderSlowerTooltip.repositionIfVisible();
@@ -25059,13 +25140,15 @@ ${body}`;
       return buildEntryInteractionChain;
     }
     function hideBuildPopup2() {
+      const el = document.getElementById("build-popup");
+      const wasOpen = !!el && !el.classList.contains("hidden");
+      const hadBuildState = rendererSharedState.buildPopupHexH3 !== null || rendererSharedState.selectedBuildHexH3s.length > 0 || rendererSharedState.buildQueueTemplate.length > 0;
+      if (!wasOpen && !hadBuildState) return;
       popupLifecycleRevision++;
       rendererSharedState.buildPopupHexH3 = null;
       rendererSharedState.buildPopupRequestSeq++;
       rendererSharedState.selectedBuildHexH3s = [];
       rendererSharedState.buildQueueTemplate = [];
-      const el = document.getElementById("build-popup");
-      const body = document.getElementById("build-popup-body");
       if (el) {
         el.classList.add("hidden");
         el.removeAttribute("data-open");
@@ -25073,9 +25156,10 @@ ${body}`;
         el.removeAttribute("data-y");
         el.setAttribute("aria-hidden", "true");
       }
+      const body = document.getElementById("build-popup-body");
       if (body) body.innerHTML = "";
       deps.requestRedraw();
-      deps.scheduleTerrainTooltipRestoreAfterPopoverClose();
+      if (wasOpen) deps.scheduleTerrainTooltipRestoreAfterPopoverClose();
     }
     function showBuildPopup2(h3Index, clientX, clientY) {
       if (isHoverOrderPlanningActive()) return;
@@ -27958,6 +28042,27 @@ ${body}`;
       deps.redraw();
       return true;
     }
+    let dwellAnchorX = 0;
+    let dwellAnchorY = 0;
+    const pointerLeftDwellAnchor = (clientX, clientY) => {
+      const dx = clientX - dwellAnchorX;
+      const dy = clientY - dwellAnchorY;
+      return dx * dx + dy * dy > HEX_DETAILS_TOOLTIP_REST_PX * HEX_DETAILS_TOOLTIP_REST_PX;
+    };
+    const scheduleHexDetailsTooltip = (targetHex, targetDetail, clientX, clientY) => {
+      deps.clearTerrainTooltipTimer();
+      deps.hideTerrainTooltipVisual();
+      dwellAnchorX = clientX;
+      dwellAnchorY = clientY;
+      rendererSharedState.terrainTooltipDelayTimer = setTimeout(() => {
+        rendererSharedState.terrainTooltipDelayTimer = null;
+        if (rendererSharedState.hoveredHexH3 !== targetHex || rendererSharedState.hoveredDetailHexH3 !== targetDetail || !rendererSharedState.gameState) return;
+        if (deps.shouldSuppressTerrainTooltip()) return;
+        const state = deps.terrainStateForPointer(rendererSharedState.lastPointerClientX, rendererSharedState.lastPointerClientY, targetHex);
+        const namingTarget = deps.namingLookupTargetForPointer(rendererSharedState.lastPointerClientX, rendererSharedState.lastPointerClientY, targetHex);
+        void deps.showTerrainTooltip(rendererSharedState.lastPointerClientX, rendererSharedState.lastPointerClientY, state, namingTarget);
+      }, HEX_DETAILS_TOOLTIP_DELAY_MS);
+    };
     mainMapEl.addEventListener("pointermove", (e) => {
       rendererSharedState.lastPointerClientX = e.clientX;
       rendererSharedState.lastPointerClientY = e.clientY;
@@ -27979,17 +28084,6 @@ ${body}`;
       const prevDetail = rendererSharedState.hoveredDetailHexH3;
       const hitChanged = hit !== prevHit;
       const detailChanged = detailHit !== prevDetail;
-      const scheduleHexDetailsTooltip = (targetHex, targetDetail) => {
-        deps.clearTerrainTooltipTimer();
-        rendererSharedState.terrainTooltipDelayTimer = setTimeout(() => {
-          rendererSharedState.terrainTooltipDelayTimer = null;
-          if (rendererSharedState.hoveredHexH3 !== targetHex || rendererSharedState.hoveredDetailHexH3 !== targetDetail || !rendererSharedState.gameState) return;
-          if (deps.shouldSuppressTerrainTooltip()) return;
-          const state = deps.terrainStateForPointer(rendererSharedState.lastPointerClientX, rendererSharedState.lastPointerClientY, targetHex);
-          const namingTarget = deps.namingLookupTargetForPointer(rendererSharedState.lastPointerClientX, rendererSharedState.lastPointerClientY, targetHex);
-          void deps.showTerrainTooltip(rendererSharedState.lastPointerClientX, rendererSharedState.lastPointerClientY, state, namingTarget);
-        }, HEX_DETAILS_TOOLTIP_DELAY_MS);
-      };
       if (hitChanged || detailChanged) {
         rendererSharedState.hoveredHexH3 = hit;
         rendererSharedState.hoveredDetailHexH3 = detailHit;
@@ -27997,24 +28091,32 @@ ${body}`;
         deps.hideTerrainTooltipVisual();
         if (planningHidesHexTooltip && hit) {
           noteOrderEffectsTooltipCellChange(hit, detailHit);
+          noteOrderBlockTooltipCellChange(hit, detailHit);
         } else {
           clearOrderEffectsTooltipDwell();
         }
         void deps.refreshHoverRoutePreview({ allowBlockingOrderTooltip: true });
         deps.requestRedraw();
+        if (!planningHidesHexTooltip) hideOrderBlockHexTooltip();
         if (hit && !deps.shouldSuppressTerrainTooltip() && !planningHidesHexTooltip) {
-          scheduleHexDetailsTooltip(hit, detailHit);
+          scheduleHexDetailsTooltip(hit, detailHit, e.clientX, e.clientY);
         }
       } else if (planningHidesHexTooltip) {
         deps.clearTerrainTooltipTimer();
         deps.hideTerrainTooltipVisual();
+        restartOrderEffectsDwellIfPointerMoved();
+        restartOrderBlockDwellIfPointerMoved();
       } else {
         clearOrderEffectsTooltipDwell();
+        hideOrderBlockHexTooltip();
         const tipFollow = document.getElementById("hex-tooltip");
-        if (!deps.shouldSuppressTerrainTooltip() && tipFollow && !tipFollow.classList.contains("hidden") && hit) {
+        const tipVisible = !!tipFollow && !tipFollow.classList.contains("hidden");
+        if (!deps.shouldSuppressTerrainTooltip() && tipVisible && hit) {
           const state = deps.terrainStateForPointer(rendererSharedState.lastPointerClientX, rendererSharedState.lastPointerClientY, hit);
           const namingTarget = deps.namingLookupTargetForPointer(rendererSharedState.lastPointerClientX, rendererSharedState.lastPointerClientY, hit);
           void deps.showTerrainTooltip(rendererSharedState.lastPointerClientX, rendererSharedState.lastPointerClientY, state, namingTarget);
+        } else if (hit && !deps.shouldSuppressTerrainTooltip() && !planningHidesHexTooltip && pointerLeftDwellAnchor(e.clientX, e.clientY)) {
+          scheduleHexDetailsTooltip(hit, detailHit, e.clientX, e.clientY);
         }
       }
       const drawn = rendererSharedState.gameState ? deps.getUnitsForDrawWithMovingIds(rendererSharedState.gameState) : { unitsToDraw: [], movingIds: void 0 };
@@ -28031,7 +28133,7 @@ ${body}`;
         hideHexTooltip: deps.hideTerrainTooltipVisual
       });
       if (releaseHexTooltip && !hitChanged && !detailChanged && hit && !deps.shouldSuppressTerrainTooltip() && !planningHidesHexTooltip) {
-        scheduleHexDetailsTooltip(hit, detailHit);
+        scheduleHexDetailsTooltip(hit, detailHit, e.clientX, e.clientY);
       }
     });
     mainMapEl.addEventListener("pointerleave", (e) => {
