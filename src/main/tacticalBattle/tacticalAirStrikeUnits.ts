@@ -13,6 +13,7 @@ import { casualtyPriorityIndex, getDefense } from '../combatConstants';
 import { attackHitThreshold } from '../combatHitThresholds';
 import { weatherAttackPenalty, weatherBonusLevelOf } from '../../shared/weatherBonusRules';
 import type { OriginHitBonusLookup } from '../originBonus/originHitBonusLookup';
+import { noTechHitBonus, type TechHitBonusLookup } from '../techBonus/techHitBonusLookup';
 import type { TerrainCover } from '../../shared/terrainCoverRules';
 import { tacticalEmbarkedLandExcludedFromRangedInput } from './tacticalCombatInput';
 import { tacticalLogMutate } from './tacticalLogging';
@@ -80,6 +81,15 @@ export interface TacticalAirStrikeOnUnitsInput {
    * Exceptions: None.
    */
   readonly originHitBonusAt: OriginHitBonusLookup;
+  /**
+   * Tech bonus per sub-unit, from its birth hex.
+   *
+   * Contract: Optional. Missing means no tech bonus. Added to the attack and to counter-fire. The victim pick ignores it.
+   * When to use: The tactical air-strike phase, beside `originHitBonusAt`.
+   * Expected outcome: Attack 0 or 2, and defense is unused on these attack rolls.
+   * Exceptions: None.
+   */
+  readonly techHitBonusAt?: TechHitBonusLookup;
   /**
    * Air cover of the struck cell.
    *
@@ -173,6 +183,7 @@ export function markTacticalSubUnitCasualty(
 export function resolveTacticalAirStrikeAgainstUnitsOnSubUnits(input: TacticalAirStrikeOnUnitsInput): void {
   const { battle, sub, attacker, targetH3Index, rollDie, originHitBonusAt, targetCover, toRemove, killsByAirStrike, killsByReturnFire } =
     input;
+  const techHitBonusAt = input.techHitBonusAt ?? noTechHitBonus;
   tacticalLogMutate('resolveTacticalAirStrikeAgainstUnitsOnSubUnits', {
     attackerSubUnitId: attacker.id,
     targetH3Index,
@@ -187,6 +198,7 @@ export function resolveTacticalAirStrikeAgainstUnitsOnSubUnits(input: TacticalAi
   const attackHit = rollDie() <= attackHitThreshold({
     unitType: 'air',
     originHitBonus: originHitBonusAt(attacker.id, attacker.h3Index),
+    techAttackBonus: techHitBonusAt(attacker.id).attack,
     weatherAttackPenalty: weatherAttackPenalty({
       unitType: 'air',
       kind: 'airStrike',
@@ -218,6 +230,7 @@ export function resolveTacticalAirStrikeAgainstUnitsOnSubUnits(input: TacticalAi
     if (rollDie() > attackHitThreshold({
       unitType: defender.unitType,
       originHitBonus: originHitBonusAt(defender.id, defender.h3Index),
+      techAttackBonus: techHitBonusAt(defender.id).attack,
       weatherAttackPenalty: weatherAttackPenalty({
         unitType: defender.unitType,
         kind: 'ranged',

@@ -23,6 +23,8 @@ import type {
 } from '../../shared/ipcTypes';
 import { resolveAirStrikePhase } from './airStrikeResolution';
 import { withOriginHitBonus } from '../originBonus/originHitBonusLookup';
+import { withTechHitBonus } from '../techBonus/techHitBonusLookup';
+import { buildTechHitBonusLookupFromDb } from '../techBonus/techHitBonusLookupDb';
 import { readPersistedOriginBonusSettings } from '../gameDb/originBonusConfig';
 import { weatherPenaltyForRoll } from '../weather/weatherMatch';
 import { weatherBonusLevelOf } from '../../shared/weatherBonusRules';
@@ -204,15 +206,16 @@ export function executeReadyStrategicTurn(
   logDebug('ready: combat resolution', { turnNumber, gameSeed, combatSeed: seed });
 
   const originHitBonusAt = buildStrategicOriginHitBonusLookupFromDb();
+  const weatherSettings = readPersistedOriginBonusSettings({ getOne: dbGetOne, hasDb: () => true });
+  const listedForWeather = listUnitsForSnapshot();
+  const techHitBonusAt = buildTechHitBonusLookupFromDb(listedForWeather);
   const targetCoverAt = createStrategicTerrainCoverLookup(preMoveState.hexes);
-  const airStrikeResult = resolveAirStrikePhase(allAirStrikes, next, originHitBonusAt, targetCoverAt);
+  const airStrikeResult = resolveAirStrikePhase(allAirStrikes, next, originHitBonusAt, targetCoverAt, techHitBonusAt);
   const airStrikeTransportLosses = applyTransportOutcomeForRemovedStrategicUnits(
     airStrikeResult.removedUnitIds,
     airStrikeResult.removedUnits
   );
-  const weatherSettings = readPersistedOriginBonusSettings({ getOne: dbGetOne, hasDb: () => true });
-  const listedForWeather = listUnitsForSnapshot();
-  const rangedInputUnits = withOriginHitBonus(
+  const rangedInputUnits = withTechHitBonus(withOriginHitBonus(
     listedForWeather
       .filter((u) => {
         if (u.unitType !== 'infantry' && u.unitType !== 'armor') return true;
@@ -238,7 +241,7 @@ export function executeReadyStrategicTurn(
       tags: weatherTagsForBirthHex(source?.origin?.birthH3Index),
     });
     return penalty === 0 ? unit : { ...unit, weatherAttackPenalty: penalty };
-  });
+  }), techHitBonusAt);
   const rangedResult = runRangedPhase(
     rangedInputUnits,
     hexList,
@@ -363,7 +366,7 @@ export function executeReadyStrategicTurn(
 
   const unitsAfterMove = listUnitsForSnapshot();
   const rangedRemovedSet = new Set(rangedResult.removedUnitIds);
-  const combatUnitsAfter: CombatUnit[] = withOriginHitBonus(
+  const combatUnitsAfter: CombatUnit[] = withTechHitBonus(withOriginHitBonus(
     unitsAfterMove
       .filter((u) => !rangedRemovedSet.has(u.id))
       .filter((u) => {
@@ -378,7 +381,7 @@ export function executeReadyStrategicTurn(
         displayOrder: u.displayOrder,
       })),
     originHitBonusAt
-  );
+  ), techHitBonusAt);
 
   const rawMeleeHexes = listMeleeCandidateHexes(combatUnitsAfter, hexList);
   const candidateHexes = filterMeleeCandidateHexesWithTacticalEntry(rawMeleeHexes, {

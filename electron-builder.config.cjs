@@ -13,7 +13,6 @@ module.exports = buildElectronBuilderConfig({
   files: [
     'dist',
     'static',
-    'symbols',
     'package.json',
     'node_modules',
     ...generatedTerrainFiles,

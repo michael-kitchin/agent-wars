@@ -73,6 +73,7 @@ test('a turned-off option is omitted, and weather tags render snow, then rain, t
 test('no selected bonus, or a unit with none of them, collapses the Bonuses block to None', () => {
   const collapsed = formatUnitOriginTooltipHtml({ origin, bonuses: NONE });
   assert.ok(collapsed.includes('<strong>Bonuses:</strong>\nNone'));
+  assert.ok(!collapsed.includes('<strong>Tech:</strong>'));
   assert.ok(!collapsed.includes('<strong>Country:</strong>'));
   assert.ok(!collapsed.includes('<strong>Terrain:</strong>'));
   assert.ok(!collapsed.includes('<strong>Weather:</strong>'));
@@ -115,6 +116,24 @@ test('a unit with no birth country omits Country, and a country name is escaped'
  * Expected outcome: Matching copies return true; a different birth hex returns false.
  * Exceptions: AssertionError when the comparison drifts.
  */
+test('the Tech row names Basic or Advanced, and a missing tier stays None', () => {
+  const advanced = formatUnitOriginTooltipHtml({ origin, bonuses: { ...NONE, techLevel: 'advanced' } });
+  assert.ok(advanced.includes('<strong>Tech:</strong>'));
+  assert.ok(advanced.includes('tech/tech_advanced.svg'));
+  assert.ok(advanced.includes('Advanced'));
+  assert.ok(!advanced.includes('tech/tech_basic.svg'));
+  assert.ok(!advanced.includes('<strong>Bonuses:</strong>\nNone'));
+  const basic = formatUnitOriginTooltipHtml({ origin, bonuses: { ...NONE, techLevel: 'basic' } });
+  assert.ok(basic.includes('<strong>Tech:</strong>'));
+  assert.ok(basic.includes('tech/tech_basic.svg'));
+  assert.ok(basic.includes('Basic'));
+  assert.ok(!basic.includes('tech/tech_advanced.svg'));
+  assert.ok(!basic.includes('<strong>Bonuses:</strong>\nNone'));
+  const missing = formatUnitOriginTooltipHtml({ origin, bonuses: NONE });
+  assert.ok(missing.includes('<strong>Bonuses:</strong>\nNone'));
+  assert.ok(!missing.includes('<strong>Tech:</strong>'));
+});
+
 test('origins that present the same flag and tooltip match, and a different birth hex does not', () => {
   const copy: UnitOrigin = { ...origin };
   assert.equal(unitOriginsPresentTheSame(origin, copy), true);

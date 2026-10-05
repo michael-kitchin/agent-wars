@@ -12,6 +12,7 @@ import { executeAssessment } from './tools/assessment';
 import { usesOmniscientGridProximity } from './tools/assessUnitProximity';
 import { getStandingOrderForUnit } from './tools/standingOrders';
 import { strategicOriginBonusUnitFields } from './tools/originBonusAssessment';
+import { techLevelAssessmentField } from './techBonus/techLevelAssessmentField';
 import { strategicRangeOnState } from './weather/weatherMatch';
 import { weatherAttackPenalty, weatherBonusLevelOf } from '../shared/weatherBonusRules';
 import type { WeatherState } from '../shared/weatherBonusTypes';
@@ -99,6 +100,15 @@ result: {
        * Exceptions: None.
        */
       originBonusAmount?: OriginHitBonus;
+      /**
+       * Tech tier of this unit's birth hex.
+       *
+       * Contract: Present only when the tech bonus is on.
+       * When to use: The briefing's Unit Status Bonus column.
+       * Expected outcome: `basic` or `advanced`.
+       * Exceptions: None.
+       */
+      techLevel?: 'basic' | 'advanced';
       /**
        * Acclimation tags for this unit.
        *
@@ -301,8 +311,8 @@ function stackedUnitWeatherFields(
  *
  * Purpose: Avoid repeating path BFS for 20 armor on one city while still emitting one briefing row per unit id.
  * When to use: Cache hit in `runUnitAssessments`.
- * Expected outcome: Cloned nearbyEnemies/threats; standing order, unit id, origin bonus, and weather tags belong to the stacked unit (stack mates can
- *   have different birth countries and tags). The hex weather is shared. The donor appears as a distance-0 friendly.
+ * Expected outcome: Cloned nearbyEnemies/threats; standing order, unit id, origin bonus, tech tier, and weather tags belong to the stacked unit (stack mates can
+ *   have different birth countries, tiers, and tags). The hex weather is shared. The donor appears as a distance-0 friendly.
  * Exceptions: None.
  */
 function cloneAssessmentForStackedUnit(
@@ -347,6 +357,7 @@ function cloneAssessmentForStackedUnit(
       position: unitPosition,
       currentStandingOrder: getStandingOrderForUnit(unit.player, unit.id),
       ...strategicOriginBonusUnitFields(state, unit),
+      ...techLevelAssessmentField(unit.techLevel),
       ...(Array.isArray(cached.result.unit.weatherTags)
         ? stackedUnitWeatherFields(state, unit, cached.result.unit.weatherHere)
         : {}),

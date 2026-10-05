@@ -26,6 +26,8 @@ import { attackHitThreshold } from '../combatHitThresholds';
 import { weatherAttackPenalty, weatherBonusLevelOf } from '../../shared/weatherBonusRules';
 import { runRangedPhase } from '../combatResolution';
 import { withOriginHitBonus, type OriginHitBonusLookup } from '../originBonus/originHitBonusLookup';
+import { withTechHitBonus, type TechHitBonusLookup } from '../techBonus/techHitBonusLookup';
+import { buildTechHitBonusLookupFromDb } from '../techBonus/techHitBonusLookupDb';
 import { buildTacticalOriginHitBonusLookupFromDb } from '../originBonus/originHitBonusLookupDb';
 import { tacticalCellTerrainCover } from '../../shared/terrainCoverRules';
 import { createTacticalTerrainCoverLookup } from '../terrainCover/terrainCoverLookup';
@@ -132,7 +134,8 @@ export function syncStrategicUnitsDbWhenTacticalParentsEliminated(
 function tacticalSubUnitsToRangedCombatUnits(
   battle: TacticalBattleSnapshot,
   subUnits: readonly TacticalSubUnitSnapshot[],
-  originHitBonusAt: OriginHitBonusLookup
+  originHitBonusAt: OriginHitBonusLookup,
+  techHitBonusAt: TechHitBonusLookup
 ): CombatUnit[] {
   const rows = subUnits
     .filter((u) => !tacticalEmbarkedLandExcludedFromRangedInput(battle, subUnits, u))
@@ -143,7 +146,7 @@ function tacticalSubUnitsToRangedCombatUnits(
       h3Index: u.h3Index,
       displayOrder: i,
     }));
-  return withOriginHitBonus(rows, originHitBonusAt).map((unit) => {
+  return withTechHitBonus(withOriginHitBonus(rows, originHitBonusAt), techHitBonusAt).map((unit) => {
     const source = subUnits.find((candidate) => candidate.id === unit.id);
     const penalty = weatherAttackPenalty({
       unitType: unit.unitType,
@@ -296,6 +299,7 @@ export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
     resolutionScope,
   });
   const originHitBonusAt = buildTacticalOriginHitBonusLookupFromDb(battle);
+  const techHitBonusAt = buildTechHitBonusLookupFromDb(battle.subUnits);
   let sub = battle.subUnits.map((u) => ({ ...u }));
   const infrastructureDestroyedEvents: InfrastructureDestroyedEvent[] = [];
   const killsByDirectFire: KillEdge[] = [];
@@ -347,6 +351,7 @@ export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
         targetH3Index: s.targetH3Index,
         rollDie,
         originHitBonusAt,
+        techHitBonusAt,
         targetCover: tacticalCellTerrainCover(battle, s.targetH3Index, 'air'),
         toRemove,
         killsByAirStrike,
@@ -382,6 +387,7 @@ export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
     if (rollDie() > attackHitThreshold({
       unitType: 'air',
       originHitBonus: originHitBonusAt(attacker.id, attacker.h3Index),
+      techAttackBonus: techHitBonusAt(attacker.id).attack,
       weatherAttackPenalty: weatherAttackPenalty({
         unitType: 'air',
         kind: 'airStrike',
@@ -503,7 +509,7 @@ export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
   if (rangedOrdersCombat.length > 0) {
     const subBeforeRanged = workBattle.subUnits.map((u) => ({ ...u }));
     const byIdBefore = new Map(subBeforeRanged.map((u) => [u.id, u] as const));
-    const rangedInput = tacticalSubUnitsToRangedCombatUnits(workBattle, workBattle.subUnits, originHitBonusAt);
+    const rangedInput = tacticalSubUnitsToRangedCombatUnits(workBattle, workBattle.subUnits, originHitBonusAt, techHitBonusAt);
     const rangedResult = runRangedPhase(
       rangedInput,
       workBattle.res4ChildH3Indexes,
@@ -584,6 +590,7 @@ export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
       if (rollDie() > attackHitThreshold({
         unitType: atk.unitType,
         originHitBonus: originHitBonusAt(atk.id, atk.h3Index),
+        techAttackBonus: techHitBonusAt(atk.id).attack,
         weatherAttackPenalty: weatherAttackPenalty({
           unitType: atk.unitType,
           kind: 'ranged',

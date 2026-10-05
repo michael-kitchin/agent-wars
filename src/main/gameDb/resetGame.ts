@@ -234,6 +234,15 @@ export interface ResetGameForNewMatchOptions {
    * Exceptions: None.
    */
   readonly startMonth?: number;
+  /**
+   * How strong the tech bonus is.
+   *
+   * Contract: Parsed by `parseBonusLevel`; missing or unknown means off, so callers that predate the setting keep the old dice.
+   * When to use: The new-game dialog's Tech control.
+   * Expected outcome: Persisted as `tech_bonus_enabled` and `tech_bonus_level`.
+   * Exceptions: None.
+   */
+  readonly techBonusLevel?: BonusLevel;
 }
 
 /**
@@ -254,6 +263,7 @@ export function resetGameForNewMatch(deps: ResetGameDeps, options?: ResetGameFor
     terrain: parseBonusLevel(options?.terrainBonusLevel, 'off'),
     weather: parseBonusLevel(options?.weatherBonusLevel, 'off'),
     startMonth: options?.startMonth,
+    tech: parseBonusLevel(options?.techBonusLevel, 'off'),
   });
   const { humanHomeRegion, aiHomeRegion } = resolveScenarioHomeRegions(options);
   logDebug('gameDb resetGameForNewMatch', { fogOfWarEnabled, gameSize, humanHomeRegion, aiHomeRegion, ...originBonusSettings });

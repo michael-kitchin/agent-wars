@@ -37,6 +37,7 @@ When you change one of these, update `combat-rules-v3.md` (and any table that qu
 | Fog vision radii | `VISION_RANGE_BY_UNIT_TYPE` in `src/main/visibility.ts` |
 | Origin bonus size and matching | `ORIGIN_HIT_BONUS_BY_LEVEL` and `originBonusSources` in `src/shared/originBonusRules.ts` |
 | Weather bonus amounts by level | `WEATHER_SLOWING_STATES`, `TACTICAL_WEATHER_BUDGET_CAP`, and `WEATHER_ATTACK_PENALTY_BY_LEVEL` in `src/shared/weatherBonusRules.ts` |
+| Tech bonus cutoff and amounts | `TECH_ADVANCED_MIN_URBAN_HEX_COUNT` and `TECH_HIT_BONUS` in `src/shared/techBonusRules.ts` |
 | Weather month, tags, movement, and attack penalties | `src/shared/weatherBonusRules.ts` |
 | Tactical ranged and movement budgets | `src/shared/tacticalRanges.ts` |
 | Tactical terrain enter costs | `tacticalEnterHexMovementCost` in `src/shared/tacticalTerrainMovement.ts` |

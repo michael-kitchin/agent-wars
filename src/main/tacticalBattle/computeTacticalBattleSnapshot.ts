@@ -12,6 +12,7 @@ import {
 import { readTurnStateRow } from '../gameDb/turnStateReads';
 import { readPersistedOriginBonusSettings } from '../gameDb/originBonusConfig';
 import { parseStartMonth } from '../../shared/weatherBonusRules';
+import { techLevelForBirthHex } from '../techBonus/techLevelForBirthHex';
 import { displayWeatherForHex, weatherTagsForBirthHex } from '../weather/weatherPackLoad';
 import { res4CountryNamesForCells } from '../unitOrigin/res4BirthCountryCache';
 import { getRes4RoadRailOverlaysForRenderer } from '../terrainClassificationCache';
@@ -391,6 +392,7 @@ export function computeTacticalBattleSnapshot(
     const allUnits = listUnitsForSnapshot();
     const weatherSettings = readPersistedOriginBonusSettings({ getOne: dbGetOne, hasDb: () => true });
     const weatherOn = weatherSettings.weatherBonusEnabled === true;
+    const techOn = weatherSettings.techBonusEnabled === true;
     const battleWeather = weatherOn
       ? displayWeatherForHex(enclosingRes1H3Index, turnRow.turn_number, parseStartMonth(weatherSettings.startMonth))
       : undefined;
@@ -515,6 +517,7 @@ export function computeTacticalBattleSnapshot(
           displayName: formatTacticalSubUnitDisplayName(parentName, placed),
           ...(parent.origin ? { origin: parent.origin } : {}),
           ...(weatherOn ? { weatherTags: weatherTagsForBirthHex(parent.origin?.birthH3Index) } : {}),
+          ...(techOn ? { techLevel: techLevelForBirthHex(parent.origin?.birthH3Index) } : {}),
         });
       }
       if (placed < n) {
@@ -544,6 +547,7 @@ export function computeTacticalBattleSnapshot(
       strategicTurnNumber: turnRow.turn_number,
       tacticalTurnNumber: 1,
       ...(weatherOn && battleWeather ? { weatherBonusEnabled: true as const, weatherBonusLevel: weatherSettings.weatherBonusLevel ?? 'low', weather: battleWeather } : {}),
+      ...(techOn ? { techBonusEnabled: true as const, techBonusLevel: weatherSettings.techBonusLevel ?? 'low' } : {}),
       strategicHexTerrain: hexRow.terrain,
       strategicHexTerrainKind: hexRow.terrain_kind,
       res4TerrainKindByH3,

@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { formatStatusIconHtml } from './statusIconHtml';
 import {
-  formatTerrainCoverTooltipText,
+  formatTerrainCoverTooltipHtml,
+  joinHexTooltipEffectsHtml,
   terrainCoverFor,
   terrainCoverPairFor,
   terrainCoverShooterForUnitType,
@@ -35,12 +37,22 @@ test('only air units read the air column', () => {
 });
 
 test('the tooltip text states each non-zero column', () => {
-  assert.equal(
-    formatTerrainCoverTooltipText(terrainCoverPairFor({ terrainKind: 'forest' })),
-    '-2 ground and naval fire, -1 air strikes'
-  );
-  assert.equal(formatTerrainCoverTooltipText(terrainCoverPairFor({ terrainKind: 'mountain' })), '-2 ground and naval fire');
-  assert.equal(formatTerrainCoverTooltipText(terrainCoverPairFor({ terrainKind: 'plains' })), null);
+  const groundDouble = `${formatStatusIconHtml('doubleUp')}Ground &amp; Naval Cover`;
+  const groundSingle = `${formatStatusIconHtml('up')}Ground &amp; Naval Cover`;
+  const airSingle = `${formatStatusIconHtml('up')}Air Cover`;
+  const forest = formatTerrainCoverTooltipHtml(terrainCoverPairFor({ terrainKind: 'forest' }));
+  assert.equal(forest, `${groundDouble}, ${airSingle}`);
+  assert.equal(forest!.includes('-2'), false);
+  assert.equal(forest!.includes('ground and naval fire'), false);
+  assert.equal(forest!.includes('air strikes'), false);
+  assert.equal(formatTerrainCoverTooltipHtml(terrainCoverPairFor({ terrainKind: 'mountain' })), groundDouble);
+  assert.equal(formatTerrainCoverTooltipHtml(terrainCoverPairFor({ terrainKind: 'wetlands' })), groundSingle);
+  assert.equal(formatTerrainCoverTooltipHtml(terrainCoverPairFor({ terrainKind: 'plains' })), null);
+  const movement = `${formatStatusIconHtml('down')}All Movement`;
+  assert.equal(joinHexTooltipEffectsHtml(null, null), null);
+  assert.equal(joinHexTooltipEffectsHtml('  ', null), null);
+  assert.equal(joinHexTooltipEffectsHtml(movement, null), movement);
+  assert.equal(joinHexTooltipEffectsHtml(movement, forest), `${movement}, ${forest}`);
 });
 
 test('the source label prefers rubble, then urban, then the terrain kind', () => {

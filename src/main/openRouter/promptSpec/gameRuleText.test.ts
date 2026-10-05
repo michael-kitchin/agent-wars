@@ -200,7 +200,7 @@ test('the weather sentence keeps its exact wording', () => {
       'Armor ranged attack is 3 lower in snow or heat, including return fire and air-strike counter-fire. ' +
       'An air strike is 3 lower once when its base or its target is snow, rain, or heat the unit lacks. ' +
       'A strategic ferry into snow is 2 hexes unless the unit is tagged for snow. ' +
-      'Defense, melee, and casualty order keep their printed values. A tag is earned by the birth hex. ' +
+      'Weather does not change defense, melee, or casualty order. A tag is earned by the birth hex. ' +
       'The Unit Status Weather column names the weather where that unit stands. Birth tags, when the unit has any, follow in parentheses.'
   );
 });
@@ -223,7 +223,7 @@ test('the High weather sentence widens the slowing weather and deepens the penal
       'Armor ranged attack is 5 lower in snow or heat, including return fire and air-strike counter-fire. ' +
       'An air strike is 5 lower once when its base or its target is snow, rain, or heat the unit lacks. ' +
       'A strategic ferry into snow is 2 hexes unless the unit is tagged for snow. ' +
-      'Defense, melee, and casualty order keep their printed values. A tag is earned by the birth hex. ' +
+      'Weather does not change defense, melee, or casualty order. A tag is earned by the birth hex. ' +
       'The Unit Status Weather column names the weather where that unit stands. Birth tags, when the unit has any, follow in parentheses.'
   );
 });
@@ -350,6 +350,31 @@ test('the terrain cover sentences keep their exact wording', () => {
       'An air strike on units in a forest, urban, or rubble cell needs a roll 1 lower. ' +
       'Melee, return fire, anti-air fire, and shots at infrastructure ignore cover.'
   );
+});
+
+test('the combat paragraph does not mention a tech bonus when that option is off', () => {
+  const paragraph = buildCombatRulesParagraph(gates());
+  const weatherOn = buildCombatRulesParagraph(gates({
+    originBonusSettings: { countryBonusEnabled: false, terrainBonusEnabled: false, weatherBonusEnabled: true },
+  }));
+  assert.ok(!/tech bonus/i.test(paragraph));
+  assert.ok(!/tech bonus/i.test(weatherOn));
+  assert.equal(paragraph.includes('Country bonus is on'), false);
+  assert.ok(weatherOn.includes('Weather bonus is on'));
+});
+
+test('the combat paragraph names the tech bonus at Low and at High', () => {
+  const low = buildCombatRulesParagraph(gates({
+    originBonusSettings: { countryBonusEnabled: false, terrainBonusEnabled: false, techBonusEnabled: true, techBonusLevel: 'low' },
+  }));
+  const high = buildCombatRulesParagraph(gates({
+    originBonusSettings: { countryBonusEnabled: false, terrainBonusEnabled: false, techBonusEnabled: true, techBonusLevel: 'high' },
+  }));
+  assert.ok(low.includes('adds 2 to its attack'));
+  assert.ok(low.includes('The tech bonus does not change defense'));
+  assert.ok(!low.includes('adds 2 to its attack and 2 to its defense'));
+  assert.ok(high.includes('adds 2 to its attack and 2 to its defense'));
+  assert.ok(high.includes('Casualty order still uses printed defense'));
 });
 
 test('the combat paragraph always states cover, after the weather sentence when weather is on', () => {

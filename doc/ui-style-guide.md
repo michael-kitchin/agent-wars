@@ -99,7 +99,7 @@ When this guide and the running app disagree, the app wins until this file is up
 
 ### 2.2 Units and Symbols
 
-- **NATO APP-6–inspired symbols:** Live unit markers use SVG glyphs under `symbols/` (infantry, armor, naval, air) tinted with player color. Differentiate unit types by symbol; use player color for ownership.
+- **NATO APP-6–inspired symbols:** Live unit markers use white SVG glyphs under `static/units/` (infantry, armor, naval, air, mixed) drawn on the player-colored circle. A mixed-side stack and the new-game cap tokens use the gray circle and draw that glyph dark. Differentiate unit types by symbol; use player color for ownership.
 - **Unit state:** Selection, movement-in-progress, and pending orders should be obvious (e.g., outline, halo, or icon badge). Strength or health (e.g., bars or numeric) should be readable at default zoom without cluttering the map.
 - **Stacking:** When multiple units occupy one hex, show stack count and/or a compact summary (e.g., icon + number). Detail on click or in the unit panel.
 
@@ -183,7 +183,7 @@ When this guide and the running app disagree, the app wins until this file is up
 
 ### 3.6 Scenarios, Save/Load, and Onboarding
 
-- **New game (live):** Overlay with human/AI home-region selectors, Game size dropdown and cap badges, one row with a Fog of war checkbox and Country bonus, Terrain bonus, and Weather bonus dropdowns (Off, Low, High), a Starting month dropdown with a square randomize button matching the human home-region button, and New game. The live scenario id is `region_vs_region`.
+- **New game (live):** Overlay with human/AI home-region selectors, Game size dropdown and cap badges that draw the map glyphs dark on gray disks, one options row of Country bonus, Terrain bonus, Weather bonus, and Tech bonus dropdowns (Off, Low, High, default Low), a following row with Fog of war to the left of a Starting month dropdown and a square randomize button matching the human home-region button, and New game. The live scenario id is `region_vs_region`.
 - **Save/Load:** **Not shipped.** Target: named saves, overwrite confirmation, auto-save visibility.
 - **End-game summary:** Live overlay reports winner and offers New game; territory-over-time charts are still target.
 - **Tutorial/onboarding:** Not shipped.

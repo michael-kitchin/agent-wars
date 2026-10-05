@@ -17,6 +17,7 @@ import {
 import { collectTacticalRangedSlowTerrainLabels } from './orderPreviewSlowTerrainTooltip';
 import type { TacticalBattleSnapshot } from './tacticalBattleTypes';
 import type { TacticalBattleTerrainPick } from './tacticalTerrainCombatModifiers';
+import { formatTransportIconsHtml, transportLineSpecified } from './featureIconHtml';
 import { formatTerrainNameListHtml } from './terrainSwatchHtml';
 import { TOOLTIP_SECTION_GAP_HTML } from './tooltipSectionGap';
 import {
@@ -84,7 +85,12 @@ export type OrderPreviewEffectsTooltipInput = {
   readonly units: readonly OrderPreviewEffectsUnit[];
   readonly destinationWeather?: WeatherState | null;
   readonly targetWeather?: WeatherState | null;
-  readonly marchImpact?: { readonly slower: readonly string[]; readonly roadRail: boolean } | null;
+  readonly marchImpact?: {
+    readonly slower: readonly string[];
+    readonly roadRail: boolean;
+    readonly road?: boolean;
+    readonly rail?: boolean;
+  } | null;
   readonly rangedBattle?: OrderPreviewRangedTerrainBattle | null;
   readonly rangedPreviewUnitIds?: readonly string[];
   /**
@@ -105,23 +111,6 @@ const WEATHER_WORDS: Readonly<Record<string, WeatherState>> = Object.freeze({
 });
 
 const PENALIZING_WEATHER: readonly WeatherState[] = Object.freeze(['snow', 'rain', 'heat']);
-
-/**
- * Returns the milliseconds still left in the hex-tooltip dwell.
- *
- * Purpose: A preview that arrives during the dwell must not start another full wait, and a late preview shows at once.
- * When to use: When the effects HTML is ready for the cell that started the dwell.
- * Expected outcome: `dwellMs` at the start, a smaller positive value while the preview is in flight, and 0 when the preview is already late. A preview time before the cell change waits the full dwell.
- * Exceptions: None.
- */
-export function orderEffectsTooltipRemainingWaitMs(
-  cellChangeMs: number,
-  previewReadyMs: number,
-  dwellMs: number
-): number {
-  const elapsed = Math.max(0, previewReadyMs - cellChangeMs);
-  return Math.max(0, dwellMs - elapsed);
-}
 
 /**
  * Returns effects HTML for the hover in progress, or null when the popup should stay hidden.
@@ -160,14 +149,20 @@ export function resolveOrderPreviewEffectsTooltipHtml(input: OrderPreviewEffects
  * Exceptions: None.
  */
 function tacticalMarchHtml(
-  impact: { readonly slower: readonly string[]; readonly roadRail: boolean } | null
+  impact: {
+    readonly slower: readonly string[];
+    readonly roadRail: boolean;
+    readonly road?: boolean;
+    readonly rail?: boolean;
+  } | null
 ): string | null {
-  if (!impact || (impact.slower.length === 0 && !impact.roadRail)) return null;
+  if (!impact || (impact.slower.length === 0 && !transportLineSpecified(impact))) return null;
   const parts: string[] = [];
   if (impact.slower.length > 0) {
     parts.push(`<strong>Slower:</strong> ${impact.slower.map((label) => labelHtml(label)).join(', ')}`);
   }
-  if (impact.roadRail) parts.push('<strong>Using:</strong> Road/Rail');
+  const using = formatTransportIconsHtml(impact);
+  if (using) parts.push(`<strong>Using:</strong> ${using}`);
   return parts.join(TOOLTIP_SECTION_GAP_HTML);
 }
 
@@ -321,7 +316,7 @@ function effectsLine(labels: readonly string[]): string | null {
 /**
  * Renders one label with a weather icon or a terrain swatch.
  *
- * Purpose: Snow, Rain, and Heat are weather. Map-key terrain keeps its swatch. Urban and Rubble stay plain.
+ * Purpose: Snow, Rain, and Heat are weather. Map-key terrain and Urban keep a swatch. Rubble stays plain.
  * When to use: Effects lines. March lines handle weather before this runs.
  * Expected outcome: Icon HTML already includes the weather word. Terrain HTML is escaped.
  * Exceptions: None.

@@ -185,8 +185,13 @@ function buildPreviewForSubUnit(args: {
   });
   const sortedSlower = sortSlowTerrainLabels(marchImpact.slower);
   const orderPreviewTerrainImpact: OrderPreviewTerrainImpact | null =
-    sortedSlower.length > 0 || marchImpact.roadRail
-      ? { slower: sortedSlower, roadRail: marchImpact.roadRail }
+    sortedSlower.length > 0 || marchImpact.roadRail || marchImpact.road === true || marchImpact.rail === true
+      ? {
+          slower: sortedSlower,
+          roadRail: marchImpact.roadRail,
+          ...(marchImpact.road === true ? { road: true as const } : {}),
+          ...(marchImpact.rail === true ? { rail: true as const } : {}),
+        }
       : null;
   const slowTitle =
     sortedSlower.length > 0 ? sortedSlower.join(', ') : marchImpact.roadRail ? 'Road/Rail' : null;

@@ -23,6 +23,7 @@ import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { executeTacticalAssessUnit } from './tacticalAssessUnit';
 import { originBonusSettingsFromSnapshot } from '../../shared/originBonusRules';
 import { strategicOriginBonusHexFields, strategicOriginBonusUnitFields } from './originBonusAssessment';
+import { techLevelAssessmentField } from '../techBonus/techLevelAssessmentField';
 import { parseStartMonth, weatherAttackPenalty, weatherBonusLevelOf } from '../../shared/weatherBonusRules';
 import type { WeatherState } from '../../shared/weatherBonusTypes';
 import { strategicRangeOnState } from '../weather/weatherMatch';
@@ -500,6 +501,7 @@ function executeAssessUnit(
       movementBudget,
       currentStandingOrder,
       ...strategicOriginBonusUnitFields(state, unit),
+      ...techLevelAssessmentField(unit.techLevel),
       ...(state.weatherBonusEnabled === true
         ? {
             weatherTags: unit.weatherTags ?? [],

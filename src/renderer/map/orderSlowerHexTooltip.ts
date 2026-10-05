@@ -1,6 +1,5 @@
 import { HEX_DETAILS_TOOLTIP_DELAY_MS } from '../core/constants';
 import { rendererSharedState as S } from '../core/state';
-import { orderEffectsTooltipRemainingWaitMs } from '../../shared/orderPreviewEffectsTooltip';
 import { paintTerrainSwatches } from '../rendering/terrainVisualStyles';
 import { createTransientPointerTooltip } from './createTransientPointerTooltip';
 
@@ -10,19 +9,19 @@ const orderSlowerTooltip = createTransientPointerTooltip({
 });
 
 /**
- * The cell that started the effects dwell, and when that dwell began.
+ * The world hex and detail cell the current effects wait belongs to.
  *
- * Purpose: A preview that arrives later must finish the same wait instead of starting another one.
- * When to use: Set on a world-hex or detail-cell change while order planning is armed. Cleared when planning ends or the pointer leaves.
- * Expected outcome: `scheduleOrderEffectsTooltip` reads it. A mismatch with the live hover starts a new dwell.
+ * Purpose: A second preview for that same cell must not start another one-second wait.
+ * When to use: Set when a wait starts, and when the pointer moves to another cell. Cleared when planning ends or the pointer leaves.
+ * Expected outcome: `scheduleOrderEffectsTooltip` keeps the open popup, or the pending wait, when the hover still matches.
  * Exceptions: None.
  */
-let effectsDwell: { hex: string | null; detail: string | null; startedAtMs: number } | null = null;
+let effectsDwell: { hex: string | null; detail: string | null } | null = null;
 
 /**
  * Pending show timer for the effects tooltip.
  *
- * Purpose: The popup waits out the remainder of the hex dwell, then stays until the cell changes.
+ * Purpose: The popup waits one second after the effect for a cell is known, then stays until the cell changes.
  * When to use: Only inside this module.
  * Expected outcome: Null when nothing is waiting to appear.
  * Exceptions: None.
@@ -40,10 +39,20 @@ let effectsShowTimer: ReturnType<typeof setTimeout> | null = null;
 let effectsShowGeneration = 0;
 
 /**
+ * Effects HTML the pending timer will show.
+ *
+ * Purpose: A newer preview for the same cell must replace the copy without restarting the one-second wait.
+ * When to use: Written by `scheduleOrderEffectsTooltip` and read when the timer fires.
+ * Expected outcome: The popup shows the latest copy for the cell that started the wait.
+ * Exceptions: None.
+ */
+let pendingEffectsHtml: string | null = null;
+
+/**
  * Drops a pending effects show without hiding a popup that is already visible.
  *
- * Purpose: A new cell or a new preview must not let the previous timer finish.
- * When to use: Before scheduling, hiding, or noting a cell change.
+ * Purpose: A cell change or a hide must not let the previous timer finish. A newer preview for the same cell leaves this timer running.
+ * When to use: From hide, from a null schedule, and when a wait starts for a cell that does not already have one.
  * Expected outcome: No timer remains, and an in-flight callback sees a new generation.
  * Exceptions: None.
  */
@@ -59,7 +68,7 @@ function cancelEffectsShowTimer(): void {
  * Hides `#order-slower-tooltip` and cancels a show that has not fired yet.
  *
  * Purpose: Central teardown for an illegal preview, an empty effects line, and blocking-tooltip takeover.
- * When to use: Whenever the effects popup must disappear. This leaves the dwell anchor in place so a later legal preview on the same cell can finish the original wait.
+ * When to use: Whenever the effects popup must disappear. This leaves the cell anchor in place. A later legal preview on that cell waits one second again.
  * Expected outcome: Element has `hidden` and `aria-hidden=true`.
  * Exceptions: None.
  */
@@ -82,16 +91,16 @@ export function clearOrderEffectsTooltipDwell(): void {
 }
 
 /**
- * Hides the effects popup and starts the hex dwell for a newly hovered cell.
+ * Hides the effects popup when the pointer moves to another cell.
  *
- * Purpose: Moving to another world hex, zoomed cell, or battle cell restarts the same wait the hex tooltip uses.
+ * Purpose: The popup for the previous cell must not stay up, and the next preview for the new cell waits one second.
  * When to use: From the map pointer-move handler when order planning is armed and the hit or detail cell changed.
- * Expected outcome: The popup is hidden. `scheduleOrderEffectsTooltip` for this cell waits the remainder of `HEX_DETAILS_TOOLTIP_DELAY_MS`.
+ * Expected outcome: The popup is hidden. The next `scheduleOrderEffectsTooltip` for this cell waits one second.
  * Exceptions: None.
  */
 export function noteOrderEffectsTooltipCellChange(hex: string | null, detail: string | null): void {
   hideOrderSlowerHexTooltip();
-  effectsDwell = { hex, detail, startedAtMs: Date.now() };
+  effectsDwell = { hex, detail };
 }
 
 /**
@@ -109,8 +118,8 @@ export function isOrderSlowerHexTooltipVisible(): boolean {
 /**
  * Shows or hides `#order-slower-tooltip` near the last pointer position.
  *
- * Purpose: Paints terrain swatches on effects HTML that has already waited out the dwell.
- * When to use: From `scheduleOrderEffectsTooltip` when the remaining wait is zero. Pass null to hide.
+ * Purpose: Paints terrain swatches on effects HTML that is ready to show.
+ * When to use: From `scheduleOrderEffectsTooltip` when the one-second wait has elapsed, or when the popup is already open for this cell. Pass null to hide.
  * Expected outcome: A visible popup stays until the caller hides it. It does not auto-hide.
  * Exceptions: Missing DOM nodes no-op without throwing.
  */
@@ -126,41 +135,42 @@ export function showOrderSlowerHexTooltip(tooltipHtml: string | null): void {
 }
 
 /**
- * Shows the effects popup after the remainder of the hex dwell for the current cell.
+ * Shows the effects popup one second after the effect for this cell is known.
  *
- * Purpose: A preview that is already late shows immediately. A preview that arrives during the dwell waits out the rest. Motion inside the cell does not restart the wait.
+ * Purpose: The popup waits one second after the effect for this cell is known. A later preview for that same cell keeps the wait that is already running, or updates the copy if the popup is already open.
  * When to use: `publishHoverRoutePreview` when the hover is a legal armed order and the effects HTML is known. Pass null to hide.
- * Expected outcome: The popup shows only if the pointer is still on the cell that was current when this schedule ran.
+ * Expected outcome: The popup shows one second later, and only if the pointer is still on the cell that was current when this schedule ran.
  * Exceptions: None.
  */
 export function scheduleOrderEffectsTooltip(tooltipHtml: string | null): void {
-  cancelEffectsShowTimer();
   if (!tooltipHtml) {
+    cancelEffectsShowTimer();
+    pendingEffectsHtml = null;
     orderSlowerTooltip.hide();
     return;
   }
   const hex = S.hoveredHexH3;
   const detail = S.hoveredDetailHexH3;
-  if (!effectsDwell || effectsDwell.hex !== hex || effectsDwell.detail !== detail) {
-    effectsDwell = { hex, detail, startedAtMs: Date.now() };
+  const sameCell = effectsDwell !== null && effectsDwell.hex === hex && effectsDwell.detail === detail;
+  if (sameCell && orderSlowerTooltip.isVisible()) {
+    pendingEffectsHtml = tooltipHtml;
+    showOrderSlowerHexTooltip(tooltipHtml);
+    return;
   }
-  const wait = orderEffectsTooltipRemainingWaitMs(
-    effectsDwell.startedAtMs,
-    Date.now(),
-    HEX_DETAILS_TOOLTIP_DELAY_MS
-  );
+  if (sameCell && effectsShowTimer !== null) {
+    pendingEffectsHtml = tooltipHtml;
+    return;
+  }
+  cancelEffectsShowTimer();
+  effectsDwell = { hex, detail };
+  pendingEffectsHtml = tooltipHtml;
   const generation = effectsShowGeneration;
-  const showIfCurrent = (): void => {
+  effectsShowTimer = setTimeout(() => {
     if (generation !== effectsShowGeneration) return;
     effectsShowTimer = null;
     if (S.hoveredHexH3 !== hex || S.hoveredDetailHexH3 !== detail) return;
-    showOrderSlowerHexTooltip(tooltipHtml);
-  };
-  if (wait === 0) {
-    showIfCurrent();
-    return;
-  }
-  effectsShowTimer = setTimeout(showIfCurrent, wait);
+    showOrderSlowerHexTooltip(pendingEffectsHtml);
+  }, HEX_DETAILS_TOOLTIP_DELAY_MS);
 }
 
 /**

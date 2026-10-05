@@ -116,7 +116,7 @@ function keyOpensNativeList(ev: KeyboardEvent): boolean {
 
  * Purpose: Shows the selected model’s OpenRouter description after the same dwell as hex details.
  * When to use: Once during Model-tab control initialization.
- * Expected outcome: Tip appears after 750ms on the closed select; suppressed while the native list is open.
+ * Expected outcome: Tip appears after the hex-details dwell on the closed select; suppressed while the native list is open.
  * Exceptions: None.
  */
 export function attachModelDescriptionTooltip(
@@ -179,7 +179,7 @@ export function attachModelDescriptionTooltip(
 
    * Purpose: Matches `HEX_DETAILS_TOOLTIP_DELAY_MS` behavior for the closed select.
    * When to use: Pointer enter while hovered and not suppressed.
-   * Expected outcome: Tip appears after 750ms if still eligible; no-op when suppressed/empty.
+   * Expected outcome: Tip appears after the hex-details dwell if still eligible; no-op when suppressed/empty.
    * Exceptions: None.
    */
   function scheduleShow(): void {

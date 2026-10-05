@@ -13,6 +13,7 @@ import { parseTacticalSubUnitId } from '../../shared/unitIds';
 import { ORIGIN_BONUS_OFF } from '../../shared/originBonusRules';
 import type { OriginBonusSettings } from '../../shared/originBonusTypes';
 import { tacticalOriginBonusUnitFields, type OriginBonusUnitFields } from '../tools/originBonusAssessment';
+import { techLevelAssessmentField } from '../techBonus/techLevelAssessmentField';
 
 /**
  * Extracts the strategic parent unit id from a tactical sub-unit id.
@@ -87,7 +88,7 @@ function weatherFieldsForBriefing(
  *
  * Purpose: Avoid repeating grid-distance scans for stacked same-type pawns while still emitting one Unit Status row each.
  * When to use: Cache hit in `buildLightweightTacticalUnitAssessments`.
- * Expected outcome: Cloned nearby rows; unit id, position, origin bonus, and weather tags belong to the stacked sub-unit.
+ * Expected outcome: Cloned nearby rows; unit id, position, origin bonus, tech tier, and weather tags belong to the stacked sub-unit.
  * Exceptions: None.
  */
 function cloneTacticalAssessmentForStackedUnit(
@@ -112,6 +113,7 @@ function cloneTacticalAssessmentForStackedUnit(
         unitId: unit.id,
         position: [lat, lng],
         ...originBonusFor(unit),
+        ...techLevelAssessmentField(unit.techLevel),
         ...weatherFieldsForBriefing(battle, unit),
       },
       nearbyEnemies: cached.result.nearbyEnemies.map((enemy) => ({ ...enemy })),
@@ -281,7 +283,10 @@ export function buildLightweightTacticalUnitAssessments(
     const scanned = assessTacticalOpponentUnit(unit, byId, humans, tacticalBattle);
     const entry: UnitAssessmentResult = {
       ...scanned,
-      result: { ...scanned.result, unit: { ...scanned.result.unit, ...originBonusFor(unit) } },
+      result: {
+        ...scanned.result,
+        unit: { ...scanned.result.unit, ...originBonusFor(unit), ...techLevelAssessmentField(unit.techLevel) },
+      },
     };
     assessmentByStackKey.set(stackKey, entry);
     uniqueAssessments += 1;

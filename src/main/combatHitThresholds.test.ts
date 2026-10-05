@@ -31,6 +31,20 @@ test('target cover lowers the attack with the weather penalty, before the floor 
   assert.equal(attackHitThreshold({ unitType: 'infantry', targetCover: 2, originHitBonus: 2 }), 4);
 });
 
+test('an attack with no tech field keeps the printed value, and cover does not change defense', () => {
+  assert.equal(attackHitThreshold({ unitType: 'armor' }), 10);
+  assert.equal(attackHitThreshold({ unitType: 'armor', weatherAttackPenalty: 5, targetCover: 2, originHitBonus: 4 }), 7);
+  assert.equal(defenseHitThreshold({ unitType: 'armor', targetCover: 2 }), 7);
+});
+
+test('an Advanced tech bonus adds 2 attack, and 2 defense only at High, and the cap still holds', () => {
+  assert.equal(attackHitThreshold({ unitType: 'armor', techAttackBonus: 2 }), 12);
+  assert.equal(defenseHitThreshold({ unitType: 'armor', techDefenseBonus: 0 }), 7);
+  assert.equal(defenseHitThreshold({ unitType: 'armor', techDefenseBonus: 2 }), 9);
+  assert.equal(attackHitThreshold({ unitType: 'armor', originHitBonus: 4, techAttackBonus: 10 }), 17);
+  assert.equal(defenseHitThreshold({ unitType: 'armor', originHitBonus: 4, techDefenseBonus: 10 }), 17);
+});
+
 test('defense threshold is the printed defense plus the origin bonus, and ignores cover', () => {
   assert.equal(defenseHitThreshold({ unitType: 'infantry', originHitBonus: 2 }), 9);
   assert.equal(defenseHitThreshold({ unitType: 'infantry', originHitBonus: 4 }), 11);

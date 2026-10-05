@@ -191,7 +191,7 @@ Every item marked `required` in `information-decision-model.md` names its carrie
 | `BEST_OPTIONS_ROWS`, `RANGED_LEGAL_TARGETS`, `LEGAL_DEST_OCCUPANCY` | `### Best Options This Turn` plus the options bullet in `# Available Tools` |
 | `ENEMY_ROSTER_OBSERVED` | Observed enemy roster line and `## Unit Status and Threats` |
 | `ATTENTION_FLAGS` | `## Attention Flags` |
-| `COMBAT_STATS`, `STRATEGIC_RANGE_TABLE`, `TACTICAL_RANGE_TABLE`, `ATTACK_ONE_PER_UNIT`, `WEGO_PHASE_ORDER`, `TEMPO_RANGED_SHOT`, `CASUALTY_PRIORITY`, `ORIGIN_BONUS`, `TERRAIN_COVER` | Combat and attack rules |
+| `COMBAT_STATS`, `STRATEGIC_RANGE_TABLE`, `TACTICAL_RANGE_TABLE`, `ATTACK_ONE_PER_UNIT`, `WEGO_PHASE_ORDER`, `TEMPO_RANGED_SHOT`, `CASUALTY_PRIORITY`, `ORIGIN_BONUS`, `TECH_BONUS`, `TERRAIN_COVER` | Combat and attack rules |
 | `MOVE_BUDGET`, `TACTICAL_MP_RULES`, `FIRST_LEG_TRUNCATION` | Combat and attack rules, and the envelope movement clause |
 | `HOLD_FIRE_SEMANTICS`, `ORDER_TYPE_LEGALITY`, `MARCH_CURRENT_HEX_RULE`, `STANDING_ORDER_STATE`, `ORDERLESS_UNITS`, `SUGGESTED_DESTINATION` | `# Standing Order Status` and the standing-order guidance bullet |
 | `AIR_STRIKE_ENVELOPE`, `FERRY_DESTINATIONS`, `AIR_ORDER_RESTRICTIONS` | `# Air Operations Status` |

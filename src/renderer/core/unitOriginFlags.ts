@@ -5,6 +5,7 @@ import { parseTacticalSubUnitId } from '../../shared/unitIds';
 import { formatUnitOriginTooltipHtml, unitOriginsPresentTheSame } from '../../shared/unitOriginTooltipText';
 import type { UnitOriginTooltipBonuses } from '../../shared/unitOriginTooltipText';
 import type { UnitOrigin } from '../../shared/unitOriginTypes';
+import type { TechLevel } from '../../shared/techBonusTypes';
 import type { WeatherState } from '../../shared/weatherBonusTypes';
 import { rendererSharedState as S } from './state';
 
@@ -31,6 +32,16 @@ const unitOriginById = new Map<string, UnitOrigin>();
 const weatherTagsByBirthHex = new Map<string, readonly WeatherState[]>();
 
 /**
+ * Tech tier last seen for a birth hex.
+ *
+ * Purpose: A loss toast is built after the unit has left the snapshot, and the tier comes from the birth hex.
+ * When to use: Written by `rememberUnitOrigins` and read when a flag is built for a unit that is already gone.
+ * Expected outcome: Cleared with the origin cache on a new game. Absent when the match has tech off.
+ * Exceptions: None.
+ */
+const techLevelByBirthHex = new Map<string, TechLevel>();
+
+/**
  * Records the birth origin of every unit in a snapshot that carries one.
  *
  * Purpose: Fills the accumulating origin cache so unit labels can show flags, even after a unit is destroyed.
@@ -43,6 +54,9 @@ export function rememberUnitOrigins(units: GameStateSnapshot['units']): void {
     if (unit.origin) unitOriginById.set(unit.id, unit.origin);
     if (unit.origin?.birthH3Index && unit.weatherTags) {
       weatherTagsByBirthHex.set(unit.origin.birthH3Index, unit.weatherTags);
+    }
+    if (unit.origin?.birthH3Index && unit.techLevel) {
+      techLevelByBirthHex.set(unit.origin.birthH3Index, unit.techLevel);
     }
   }
 }
@@ -58,6 +72,7 @@ export function rememberUnitOrigins(units: GameStateSnapshot['units']): void {
 export function clearRememberedUnitOrigins(): void {
   unitOriginById.clear();
   weatherTagsByBirthHex.clear();
+  techLevelByBirthHex.clear();
 }
 
 /**
@@ -105,6 +120,7 @@ function bonusesForLiveUnit(unitId: string, origin: UnitOrigin): UnitOriginToolt
   return {
     ...options,
     weatherTags: options.weatherEnabled ? weatherTagsFor(unitId, origin) : undefined,
+    techLevel: techLevelFor(unitId, origin),
   };
 }
 
@@ -121,7 +137,24 @@ function bonusesForAbsentUnit(origin: UnitOrigin): UnitOriginTooltipBonuses {
   return {
     ...options,
     weatherTags: options.weatherEnabled ? weatherTagsByBirthHex.get(origin.birthH3Index) ?? [] : undefined,
+    techLevel: techLevelByBirthHex.get(origin.birthH3Index),
   };
+}
+
+/**
+ * Reads the tech tier for a unit that may be a strategic unit or a battle sub-unit.
+ *
+ * Purpose: Battle labels use sub-unit ids. The tier follows the birth hex, including after the unit is gone.
+ * When to use: From the live and absent bonus builders.
+ * Expected outcome: The live row's tier, otherwise the tier remembered for that birth hex, otherwise none. The hex the unit occupies is not read.
+ * Exceptions: None.
+ */
+function techLevelFor(unitId: string, origin: UnitOrigin): TechLevel | undefined {
+  const battleUnit = S.tacticalBattleSnapshot?.subUnits.find((unit) => unit.id === unitId);
+  if (battleUnit?.techLevel) return battleUnit.techLevel;
+  const strategicUnit = S.gameState?.units.find((unit) => unit.id === unitId);
+  if (strategicUnit?.techLevel) return strategicUnit.techLevel;
+  return techLevelByBirthHex.get(origin.birthH3Index);
 }
 
 /**
@@ -173,6 +206,20 @@ export function createUnitOriginFlagImage(input: {
  */
 export function createAbsentUnitOriginFlagImage(origin: UnitOrigin): HTMLImageElement {
   return createUnitOriginFlagImage({ origin, bonuses: bonusesForAbsentUnit(origin) });
+}
+
+/**
+ * Builds the Bonuses tooltip for a unit that is still on the map.
+ *
+ * Purpose: The map token has no flag element, so the hover uses the same HTML the flag stores.
+ * When to use: When the pointer has rested on a single-unit token.
+ * Expected outcome: The flag tooltip HTML, or null when the unit has no remembered origin.
+ * Exceptions: None.
+ */
+export function formatLiveUnitOriginTooltipHtml(unitId: string): string | null {
+  const origin = resolveUnitOrigin(unitId);
+  if (!origin) return null;
+  return formatUnitOriginTooltipHtml({ origin, bonuses: bonusesForLiveUnit(unitId, origin) });
 }
 
 /**

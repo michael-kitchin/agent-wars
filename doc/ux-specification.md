@@ -72,8 +72,8 @@ Element documents share a fixed heading set:
 - [map-overlays.md](ux/map-overlays.md): range, path, order, hover, city, transport, infrastructure, and resolution drawings on the map.
 - [minimap.md](ux/minimap.md): the world overview and how it relates to the main map view.
 - [terrain-legend.md](ux/terrain-legend.md): the terrain legend and any inputs it accepts.
-- [hex-tooltips.md](ux/hex-tooltips.md): the hover information tooltip, the blocked-order notice, and the effects tooltip that stays while the pointer remains on the cell.
-- [stack-callout.md](ux/stack-callout.md): the list of units in a hex and how it changes the selection.
+- [hex-tooltips.md](ux/hex-tooltips.md): the hover information tooltip, whose Effects line includes movement, range, and cover, the blocked-order notice, and the effects tooltip that stays while the pointer remains on the cell.
+- [stack-callout.md](ux/stack-callout.md): the list of units in a hex, the Bonuses tooltip, and how the list changes the selection.
 - [build-popup.md](ux/build-popup.md): the single-hex build queue popup and the markers that open it.
 - [multi-hex-build-popup.md](ux/multi-hex-build-popup.md): the build queue popup used when several build hexes are selected together.
 - [right-panel.md](ux/right-panel.md): the right panel as a whole, including tab switching.
@@ -91,7 +91,7 @@ Element documents share a fixed heading set:
 ## Glossary
 
 - Hex: one cell of the world or battle grid.
-- Stack: two or more units in the same hex. The stack callout lists the units in one hex, including a single unit.
+- Stack: two or more units in the same hex. The stack callout lists the units in one hex, including a single unit. Hovering a one-unit token shows that unit's Bonuses tooltip.
 - Selection: the human units the player has chosen. The selected hex is tracked separately.
 - Targeting mode: Ranged or Strike, while the next map click chooses a target.
 - Order: a march, ferry, ranged attack, air strike, or build queue entry. Sealift embark and debark apply immediately and are not orders in this sense.

@@ -60,7 +60,9 @@ export function formatTacticalBriefing(args: {
   sections.push(markdownHeading1(SECTION_TITLE_COMMANDERS_BRIEFING));
   sections.push(buildTacticalBriefingNarrative(tacticalBattle, assessments));
   sections.push(markdownHeading2(SECTION_TITLE_UNIT_STATUS_AND_THREATS));
-  sections.push(buildUnitStatusTable(assessments, coordCtx, false));
+  sections.push(
+    buildUnitStatusTable(assessments, coordCtx, false, originBonusSettingsFromSnapshot(planState))
+  );
   sections.push(markdownHeading2(SECTION_TITLE_ATTENTION_FLAGS));
   sections.push(buildAttentionFlags(assessments, 'tactical', false));
 

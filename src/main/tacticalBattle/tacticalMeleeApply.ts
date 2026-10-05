@@ -6,6 +6,8 @@ import { createCombatRng, runMeleePhase } from '../combatResolution';
 import type { CombatUnit } from '../combatUnitTypes';
 import { getGameSeed } from '../gameDb';
 import { withOriginHitBonus } from '../originBonus/originHitBonusLookup';
+import { withTechHitBonus } from '../techBonus/techHitBonusLookup';
+import { buildTechHitBonusLookupFromDb } from '../techBonus/techHitBonusLookupDb';
 import { buildTacticalOriginHitBonusLookupFromDb } from '../originBonus/originHitBonusLookupDb';
 import type { KillEdge } from '../../shared/ipc/combatResultTypes';
 import type { RemovedUnitSnapshot } from '../../shared/ipc/readyTypes';
@@ -77,9 +79,12 @@ export function applyTacticalMeleeAfterSupportOrders(
     subCount: battle.subUnits.length,
     res4CellCount: battle.res4ChildH3Indexes.length,
   });
-  const combatUnits = withOriginHitBonus(
-    tacticalSubUnitsAsCombatUnits(battle.subUnits),
-    buildTacticalOriginHitBonusLookupFromDb(battle)
+  const combatUnits = withTechHitBonus(
+    withOriginHitBonus(
+      tacticalSubUnitsAsCombatUnits(battle.subUnits),
+      buildTacticalOriginHitBonusLookupFromDb(battle)
+    ),
+    buildTechHitBonusLookupFromDb(battle.subUnits)
   );
   const next =
     combatNext ??

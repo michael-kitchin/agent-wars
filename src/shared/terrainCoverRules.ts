@@ -6,6 +6,8 @@
  * Expected outcome: Pure functions and frozen tables with no logging and no database access.
  * Exceptions: None.
  */
+import { escapeHtmlText } from './htmlTextFormatting';
+import { formatStatusIconHtml } from './statusIconHtml';
 import { effectiveRes4TerrainKindString, type TacticalBattleTerrainPick } from './tacticalTerrainCombatModifiers';
 import { normalizeDbTerrainKindToTacticalCategory, type TacticalMovementCategory } from './tacticalTerrainMovement';
 
@@ -174,17 +176,80 @@ export function terrainCoverSourceLabel(place: TerrainCoverPlace): string | null
 }
 
 /**
- * Formats a cover pair for a tooltip line.
+ * Words for cover against ground and naval fire.
  *
- * Purpose: One wording for every tooltip that states cover.
- * When to use: After `terrainCoverPairFor`, when the tooltip has room for both columns.
- * Expected outcome: `-2 ground and naval fire, -1 air strikes`, either half alone when the other is 0, or null when both are 0.
+ * Purpose: The Effects line names the column. The terrain name stays on the Terrain line.
+ * When to use: `formatTerrainCoverTooltipHtml` when surface cover is above 0.
+ * Expected outcome: The player-facing words `Ground & Naval Cover`.
  * Exceptions: None.
  */
-export function formatTerrainCoverTooltipText(pair: TerrainCoverPair): string | null {
-  const parts = [
-    ...(pair.surface > 0 ? [`-${pair.surface} ground and naval fire`] : []),
-    ...(pair.air > 0 ? [`-${pair.air} air strikes`] : []),
-  ];
+const GROUND_NAVAL_COVER_LABEL = 'Ground & Naval Cover';
+
+/**
+ * Words for cover against air strikes.
+ *
+ * Purpose: The Effects line names the air column separately from ground and naval cover.
+ * When to use: `formatTerrainCoverTooltipHtml` when air cover is above 0.
+ * Expected outcome: The player-facing words `Air Cover`.
+ * Exceptions: None.
+ */
+const AIR_COVER_LABEL = 'Air Cover';
+
+/**
+ * Builds one cover clause.
+ *
+ * Purpose: Cover of 1 uses one up icon and cover of 2 or more uses the double up icon.
+ * When to use: From `formatTerrainCoverTooltipHtml` for one column.
+ * Expected outcome: The icon immediately followed by the escaped label, or null when the value is 0.
+ * Exceptions: None.
+ */
+function coverClauseHtml(value: TerrainCover, label: string): string | null {
+  if (value <= 0) return null;
+  const kind = value >= 2 ? 'doubleUp' : 'up';
+  return `${formatStatusIconHtml(kind)}${escapeHtmlText(label)}`;
+}
+
+/**
+ * Formats a cover pair for the hex tooltip Effects line.
+ *
+ * Purpose: One wording for the cover clauses appended after movement and range.
+ * When to use: After `terrainCoverPairFor`.
+ * Expected outcome: `Ground & Naval Cover`, then `Air Cover`, each with its icon. Either clause alone when the other is 0. Null when both are 0. The ampersand is escaped in the HTML.
+ * Exceptions: None.
+ */
+export function formatTerrainCoverTooltipHtml(pair: TerrainCoverPair): string | null {
+  const parts = [coverClauseHtml(pair.surface, GROUND_NAVAL_COVER_LABEL), coverClauseHtml(pair.air, AIR_COVER_LABEL)].filter(
+    (part): part is string => part != null
+  );
   return parts.length > 0 ? parts.join(', ') : null;
+}
+
+/**
+ * Returns a clause string when it has visible text.
+ *
+ * Purpose: A blank fragment must not produce an Effects line or a stray comma.
+ * When to use: `joinHexTooltipEffectsHtml`.
+ * Expected outcome: Null for null or trim-empty input. The original string when it has text.
+ * Exceptions: None.
+ */
+function presentEffectHtml(html: string | null): string | null {
+  if (html == null) return null;
+  return html.trim().length > 0 ? html : null;
+}
+
+/**
+ * Joins movement and range HTML with cover HTML for one Effects line.
+ *
+ * Purpose: The hex tooltip has one Effects heading. Cover clauses follow the movement and range clauses.
+ * When to use: From `formatTerrainTooltipHtml`. The caller adds the heading.
+ * Expected outcome: Null when both sides are absent. The present side unchanged when the other is absent. Both sides joined with `, ` when both are present.
+ * Exceptions: None.
+ */
+export function joinHexTooltipEffectsHtml(movementRangeHtml: string | null, coverHtml: string | null): string | null {
+  const movement = presentEffectHtml(movementRangeHtml);
+  const cover = presentEffectHtml(coverHtml);
+  if (movement == null && cover == null) return null;
+  if (movement == null) return cover;
+  if (cover == null) return movement;
+  return `${movement}, ${cover}`;
 }

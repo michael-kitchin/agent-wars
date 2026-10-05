@@ -11,6 +11,7 @@
 import { attackHitThreshold, defenseHitThreshold } from '../combatHitThresholds';
 import type { CombatUnit } from '../combatUnitTypes';
 import type { OriginHitBonus } from '../../shared/originBonusTypes';
+import type { TechHitBonus } from '../../shared/techBonusTypes';
 import { gridHopDistanceBetween } from './assessUnitProximity';
 import type { CombatEstimationEngagementType, CombatEstimationTheater } from './combatEstimationTheater';
 import { h3ToLatLng, type LatLng, type LatLngMap } from './h3LatLng';
@@ -139,6 +140,15 @@ export interface AttackerSummaryRow {
    */
   readonly originBonus?: Exclude<OriginHitBonus, 0>;
   /**
+   * Tech points included in `attackValue`.
+   *
+   * Contract: Present when either point is non-zero. Defense is 0 at Low so the pair is not read as symmetric. Never on assumed attackers.
+   * When to use: Result payloads.
+   * Expected outcome: `{ attack: 2, defense: 0 }` at Low, or `{ attack: 2, defense: 2 }` at High, for an Advanced unit.
+   * Exceptions: None.
+   */
+  readonly techBonus?: TechHitBonus;
+  /**
    * Combat cell center of a real attacker.
    *
    * Contract: Omitted for assumed attackers.
@@ -194,6 +204,15 @@ export interface DefenderSummaryRow {
    * Exceptions: None.
    */
   readonly originBonus?: Exclude<OriginHitBonus, 0>;
+  /**
+   * Tech points included in this row's hit value.
+   *
+   * Contract: Present when either point is non-zero. Defense is 0 at Low so the pair is not read as symmetric. Never on assumed units.
+   * When to use: Result payloads.
+   * Expected outcome: `{ attack: 2, defense: 0 }` at Low, or `{ attack: 2, defense: 2 }` at High, for an Advanced unit.
+   * Exceptions: None.
+   */
+  readonly techBonus?: TechHitBonus;
 }
 
 /**
@@ -232,6 +251,35 @@ function withAttackerTargetCover(unit: CombatUnit, ctx: CombatSideContext): Comb
 function originBonusSummaryField(unit: CombatUnit): { readonly originBonus?: Exclude<OriginHitBonus, 0> } {
   const bonus = unit.originHitBonus;
   return bonus ? { originBonus: bonus } : {};
+}
+
+/**
+ * Copies a real unit's tech bonus onto the combat row.
+ *
+ * Purpose: Estimates use the same birth-hex points as live dice. Assumed units are never passed here.
+ * When to use: After origin, weather, and cover, before the hit threshold.
+ * Expected outcome: The same object when both points are 0; otherwise a copy with both tech fields, including a 0 defense at Low.
+ * Exceptions: None.
+ */
+function withEstimateTechBonus(unit: CombatUnit, theater: CombatEstimationTheater): CombatUnit {
+  const bonus = theater.techHitBonusAt(unit.id);
+  if (bonus.attack === 0 && bonus.defense === 0) return unit;
+  return { ...unit, techAttackBonus: bonus.attack, techDefenseBonus: bonus.defense };
+}
+
+/**
+ * Builds the optional `techBonus` field of a summary row.
+ *
+ * Purpose: Rows with no tech bonus stay unchanged. A Low bonus still reports defense 0.
+ * When to use: Spread into real attacker and defender summary rows.
+ * Expected outcome: `{ techBonus: { attack, defense } }` when either point is non-zero, otherwise `{}`.
+ * Exceptions: None.
+ */
+function techBonusSummaryField(unit: CombatUnit): { readonly techBonus?: TechHitBonus } {
+  const attack = unit.techAttackBonus ?? 0;
+  const defense = unit.techDefenseBonus ?? 0;
+  if (attack === 0 && defense === 0) return {};
+  return { techBonus: { attack, defense } };
 }
 
 /**
@@ -345,7 +393,7 @@ function buildRealAttackers(ids: readonly string[], ctx: CombatSideContext): Att
       const penalty = ctx.theater.weatherAttackPenaltyFor(u, ctx.targetHexH3, ctx.engagementType);
       return penalty === 0 ? u : { ...u, weatherAttackPenalty: penalty };
     })
-    .map((u) => withAttackerTargetCover(u, ctx));
+    .map((u) => withEstimateTechBonus(withAttackerTargetCover(u, ctx), ctx.theater));
   if (usable.length === 0) {
     const u = combat[0]!;
     const dist = gridHopDistanceBetween(u.h3Index, ctx.targetHexH3);
@@ -363,6 +411,7 @@ function buildRealAttackers(ids: readonly string[], ctx: CombatSideContext): Att
       type: u.unitType,
       attackValue: attackHitThreshold(u),
       ...originBonusSummaryField(u),
+      ...techBonusSummaryField(u),
       position: h3ToLatLng(u.h3Index, ctx.latLngByH3, 'cellCenter'),
     })),
   };
@@ -428,8 +477,10 @@ export function buildDefenders(raw: CombatSideArgs | undefined, ctx: CombatSideC
     type: u.unitType,
     defenseValue: defenseHitThreshold(u),
     ...originBonusSummaryField(u),
+    ...techBonusSummaryField(u),
   });
-  const atTarget = (u: CombatUnit): CombatUnit => withEstimateOriginBonus(u, ctx.theater, ctx.targetHexH3);
+  const atTarget = (u: CombatUnit): CombatUnit =>
+    withEstimateTechBonus(withEstimateOriginBonus(u, ctx.theater, ctx.targetHexH3), ctx.theater);
   if (raw?.units && raw.units.length > 0) {
     const combat: CombatUnit[] = [];
     for (const id of raw.units) {

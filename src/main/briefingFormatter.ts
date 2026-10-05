@@ -38,7 +38,9 @@ import {
   topLevelHeading,
 } from './openRouter/promptSpec/sectionHeadings';
 import { buildIntelStalenessRule } from './openRouter/promptSpec/gameRuleText';
-import { formatOriginBonusTableCell } from '../shared/originBonusRules';
+import { formatBonusTableCellWithTech } from '../shared/techBonusRules';
+import { ORIGIN_BONUS_OFF, originBonusSettingsFromSnapshot } from '../shared/originBonusRules';
+import type { OriginBonusSettings } from '../shared/originBonusTypes';
 
 /**
  * Optional shared coordinate/index data to avoid rebuilding within one AI request.
@@ -465,7 +467,7 @@ function isQuiet(assessment: UnitAssessmentResult, standingOrdersActive: boolean
  * Purpose: One dense per-unit type/threat/nearest/action table; standing-order detail lives in `# Standing Order Status` when Orders are enabled.
  * When to use: Strategic `formatBriefing` and tactical `formatTacticalBriefing` after assessments are ready.
  * Expected outcome: GFM table with Type; no standing-order column (avoids duplicating Standing Order Status / former Unit Roster).
- *   A Bonus column follows Hex only when some assessment carries `originBonusHere`. A Weather column follows that only when some assessment carries `weatherTags`. The cell names the weather where the unit stands, with birth tags in parentheses. Otherwise the table is unchanged.
+ *   A Bonus column follows Hex when some assessment carries `originBonusHere` or a tech tier. A Weather column follows that only when some assessment carries `weatherTags`. The cell names the weather where the unit stands, with birth tags in parentheses. Otherwise the table is unchanged.
  * Exceptions: None; empty assessments yield an empty-state row.
  */
 export function buildUnitStatusTable(
@@ -474,14 +476,28 @@ export function buildUnitStatusTable(
   /**
    * When false, Action needed uses moderate/critical threats only (no standing-order gaps).
    */
-  standingOrdersActive = true
+  standingOrdersActive = true,
+  /**
+   * Match bonus settings, including tech.
+   *
+   * Contract: Optional. Missing means every bonus is off, so a Bonus cell does not name tech.
+   * When to use: The strategic and tactical briefing callers, which have the snapshot.
+   * Expected outcome: Advanced rows name the tech clause for the match level.
+   * Exceptions: None.
+   */
+  originBonusSettings: OriginBonusSettings = ORIGIN_BONUS_OFF
 ): string {
   logDebug('briefingFormatter buildUnitStatusTable', {
     unitCount: unitAssessments.length,
     mode: ctx.mode,
     standingOrdersActive,
   });
-  const showBonus = unitAssessments.some((a) => Array.isArray(a.result.unit?.originBonusHere));
+  const showBonus = unitAssessments.some(
+    (a) =>
+      Array.isArray(a.result.unit?.originBonusHere) ||
+      a.result.unit?.techLevel === 'basic' ||
+      a.result.unit?.techLevel === 'advanced'
+  );
   const showWeather = unitAssessments.some((a) => Array.isArray(a.result.unit?.weatherTags));
   const header = `| Unit ID | Type | Hex |${showBonus ? ' Bonus |' : ''}${showWeather ? ' Weather |' : ''} Nearest enemy + distance | Threat severity | Action needed |`;
   const sep = `|---------|------|-----|${showBonus ? '-------|' : ''}${showWeather ? '---------|' : ''}---------------------------|-----------------|---------------|`;
@@ -508,7 +524,15 @@ export function buildUnitStatusTable(
     const selfLabel = formatUnitDisplayRef(a.unitId);
     const actionCell =
       ctx.mode === 'strategic' && isQuiet(a, standingOrdersActive) ? `${action} (quiet)` : action;
-    const bonusCell = showBonus ? ` ${formatOriginBonusTableCell(a.result.unit?.originBonusHere ?? [], a.result.unit?.originBonusAmount ?? 0)} |` : '';
+    const techLevel = a.result.unit?.techLevel;
+    const bonusCell = showBonus
+      ? ` ${formatBonusTableCellWithTech({
+          sources: a.result.unit?.originBonusHere ?? [],
+          amount: a.result.unit?.originBonusAmount ?? 0,
+          techLevel: techLevel === 'basic' || techLevel === 'advanced' ? techLevel : null,
+          settings: originBonusSettings,
+        })} |`
+      : '';
     const weatherTags = a.result.unit?.weatherTags;
     const weatherHere = a.result.unit?.weatherHere;
     const weatherCell = showWeather
@@ -750,7 +774,9 @@ export function formatBriefing(
     if (fogPathLine.length > 0) caveatParts.push(fogPathLine);
     if (caveatParts.length > 0) sections.push(caveatParts.join('\n\n') + '\n\n');
   }
-  sections.push(buildUnitStatusTable(precomputed.unitAssessments, coordCtx, standingOrdersActive));
+  sections.push(
+    buildUnitStatusTable(precomputed.unitAssessments, coordCtx, standingOrdersActive, originBonusSettingsFromSnapshot(state))
+  );
   sections.push(markdownHeading2(SECTION_TITLE_ATTENTION_FLAGS));
   sections.push(buildAttentionFlags(precomputed.unitAssessments, 'strategic', standingOrdersActive));
   const operational = buildStrategicOperationalMapSectionMarkdown({

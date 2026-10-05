@@ -16,6 +16,7 @@ import { loadScenarioState, REGION_VS_REGION_SCENARIO_ID } from './scenarioState
 import { readPersistedGameSize } from './gameSizeConfig';
 import { readPersistedOriginBonusSettings } from './originBonusConfig';
 import { calendarMonthName, parseStartMonth } from '../../shared/weatherBonusRules';
+import { techLevelForBirthHex } from '../techBonus/techLevelForBirthHex';
 import { displayWeatherForHex, weatherTagsForBirthHex } from '../weather/weatherPackLoad';
 import { getRes1MajorityCountryNamesFromSnapshot } from '../unitOrigin/res4BirthCountryCache';
 
@@ -241,6 +242,7 @@ export function getGameStateSnapshot(deps: FogDeps): GameStateSnapshot {
   const gameOver = gameOverRow?.value === '1';
   const winner = winnerRow?.value ?? undefined;
   const weatherOn = originBonusSettings.weatherBonusEnabled === true;
+  const techOn = originBonusSettings.techBonusEnabled === true;
   const startMonth = parseStartMonth(originBonusSettings.startMonth);
   const turnNumber = turnRow?.turnNumber ?? 1;
   const originFlags = {
@@ -248,14 +250,17 @@ export function getGameStateSnapshot(deps: FogDeps): GameStateSnapshot {
     terrainBonusEnabled: originBonusSettings.terrainBonusEnabled,
     ...(originBonusSettings.countryBonusEnabled ? { countryBonusLevel: originBonusSettings.countryBonusLevel ?? 'low' } : {}),
     ...(originBonusSettings.terrainBonusEnabled ? { terrainBonusLevel: originBonusSettings.terrainBonusLevel ?? 'low' } : {}),
+    ...(techOn ? { techBonusEnabled: true as const, techBonusLevel: originBonusSettings.techBonusLevel ?? 'low' } : {}),
   };
   const snapshot = {
     hexes: weatherOn
       ? hexRows.map((hex) => ({ ...hex, weather: displayWeatherForHex(hex.h3Index, turnNumber, startMonth) }))
       : hexRows,
-    units: weatherOn
-      ? unitRows.map((unit) => ({ ...unit, weatherTags: weatherTagsForBirthHex(unit.origin?.birthH3Index) }))
-      : unitRows,
+    units: unitRows.map((unit) => ({
+      ...unit,
+      ...(weatherOn ? { weatherTags: weatherTagsForBirthHex(unit.origin?.birthH3Index) } : {}),
+      ...(techOn ? { techLevel: techLevelForBirthHex(unit.origin?.birthH3Index) } : {}),
+    })),
     phase: turnRow?.phase ?? 'planning',
     turnNumber,
     pendingOrders: orderRows,

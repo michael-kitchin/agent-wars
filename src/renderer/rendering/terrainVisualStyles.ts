@@ -5,6 +5,7 @@
 import type { PipelineTerrainKind } from '../../shared/pipelineTerrain';
 import { PIPELINE_TERRAIN_KINDS } from '../../shared/pipelineTerrain';
 import { TERRAIN_SWATCH_CLASS_NAME } from '../../shared/terrainSwatchHtml';
+import { appendUrbanLegendRow, urbanSwatchColor } from './terrainLegendUrban';
 
 /**
  * Documents the module-scope binding `patternCache` (patternCache).
@@ -617,7 +618,7 @@ export function paintTerrainSwatches(root: ParentNode): void {
   root.querySelectorAll<HTMLElement>(`span.${TERRAIN_SWATCH_CLASS_NAME}`).forEach((node) => {
     const kind = node.dataset.terrainKind;
     if (!kind) return;
-    node.style.background = terrainSwatchColor(kind);
+    node.style.background = kind === 'urban' ? urbanSwatchColor(activeTerrainStyleId) : terrainSwatchColor(kind);
   });
 }
 
@@ -872,4 +873,5 @@ export function renderTerrainLegend(
     row.appendChild(lab);
     container.appendChild(row);
   }
+  appendUrbanLegendRow(container, urbanSwatchColor(getActiveTerrainStyleId()));
 }

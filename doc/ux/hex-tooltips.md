@@ -16,12 +16,11 @@ The hex tooltip can appear in Strategic planning, Tactical planning, and Resolut
 
 - A hex name line, including the hex code, when the lookup succeeds. If the lookup fails, that line is omitted.
 - In the hex name line, a small country flag comes before each country name. A country with no ISO code or no flag file shows a gray placeholder flag. These flags have no tooltip of their own. Continent, state, city, and water names have no flag, and neither does the "Unknown Country" fallback heading.
-- Terrain kind. On the strategic map this can include the mix of terrain inside the hex. Each map-key kind (water, coastal, wetlands, plains, forest, mountain, desert, arctic) is preceded by that kind's chip from the [terrain legend](terrain-legend.md), at the size of a country flag. Urban, rubble, and Other have no swatch. The chip is the legend color for the style selected when the tooltip opens. Changing style leaves an open tooltip as it is.
+- Terrain kind. On the strategic map this can include the mix of terrain inside the hex. Each map-key kind (water, coastal, wetlands, plains, forest, mountain, desert, arctic) is preceded by that kind's chip from the [terrain legend](terrain-legend.md), at the size of a country flag. Urban uses that same chip. Rubble and Other have no swatch. The chip is the legend color for the style selected when the tooltip opens. Changing style leaves an open tooltip as it is.
 - Weather, when the weather bonus is on and the hex is explored: a small icon and the word Mild, Rain, Snow, or Heat. Unexplored hexes omit it. A zoomed cell shows the world hex's weather. In a battle every cell shows the enclosing hex's weather. The rules are in [combat rules §4.9](../combat-rules-v3.md).
-- Effects. A world hex has no terrain effects, because strategic terrain does not change movement or range, so the line is omitted. A zoomed cell and a battle cell show tactical terrain effects when that cell has any, and omit the line when it has none. Weather is not repeated here. The rules are in the [combat rules](../combat-rules-v3.md).
-- Cover, when the place lowers shots at units there: for example `-2 ground and naval fire, -1 air strikes`, or only one of the two halves when the other is 0. A world hex reads its main terrain kind, the same value strategic combat uses, and urban never adds cover there. A zoomed cell and a battle cell read that cell's terrain kind plus its urban and rubble flags, which is the cover the cell gives in a battle. The line is omitted when the place has no cover or its terrain kind is unknown. The values are in [combat rules §4.9](../combat-rules-v3.md), "Terrain cover".
+- Effects. Movement and range clauses, then cover clauses, on one line. A single up icon is a road or rail bonus, a single down icon is a slowdown, and a single blocked icon is a block. Mixed symbols show those icons in blocked, down, up order, with no parentheses. Cover of 1 is one up icon and cover of 2 or more is a double up icon. The words are `Ground & Naval Cover` and `Air Cover`, surface first. A world hex has no movement or range clauses, because strategic terrain does not change movement or range; it shows cover from its main terrain kind, and urban never adds cover there. A zoomed cell and a battle cell show tactical movement and range when the cell has any, then cover from that cell's kind plus its urban and rubble flags. Weather stays on the Weather line. The line is omitted when every clause is empty. The values are in [combat rules §4.9](../combat-rules-v3.md), "Terrain cover".
 - Control or home-region ownership on a world hex, when the player is allowed to see it. Fog of war hides ownership the player has not earned. See the fog section of the [combat rules](../combat-rules-v3.md).
-- Infrastructure the hex has, such as a seaport, road, rail, urban area, or rubble, when that information is known.
+- Infrastructure the hex has, such as a seaport, road, rail, urban area, or rubble, when that information is known. On a zoomed cell, Road and Rail are preceded by their icons. Airport, Seaport, and Rubble stay plain text.
 
 ### Blocked tooltip
 
@@ -29,15 +28,15 @@ The hex tooltip can appear in Strategic planning, Tactical planning, and Resolut
 
 ### Effects tooltip
 
-- Shown from `#order-slower-tooltip` while the player is aiming a march, ferry, air strike, or ranged attack. It lists only the terrain and weather that change that order, plus the target's cover described below. A map-key terrain name has the same swatch as the hex tooltip. Snow, Rain, and Heat use the weather icon, not a swatch. Urban and Rubble have no swatch. The line is omitted when nothing changes the order. A strategic march, ferry, ranged attack, or air strike can name weather. A battle march can name terrain, weather, and road or rail. A battle ranged attack can name forest, urban, or rubble on the attacker's own cell when that shortens the shot, and weather when the shot loses attack. A battle ferry shows nothing here. When a ranged attack or air strike is aimed at a cell or hex holding a visible enemy unit and that target has cover against the shot, a second line, `Cover:`, names the cover source (Forest, Mountain, Wetlands, Urban, or Rubble) with the same swatch rules; ground and naval fire uses the ground column and air strikes the air column, so a mountain target shows no Cover line for an air strike. A ranged attack made only by air units shows no Cover line. Snow, Rain, or Heat is named when that weather, and not a tag the unit has, changes the order. Heat cuts a battle march budget only at High, and it cuts armor ranged attack at both levels. It appears after the same dwell as the hex tooltip, then stays while the pointer remains on that cell, including while the pointer rests. Moving onto another world hex, zoomed cell, or battle cell hides it and starts that dwell again. The rules are in [combat rules §4.9](../combat-rules-v3.md).
+- Shown from `#order-slower-tooltip` while the player is aiming a march, ferry, air strike, or ranged attack. It lists only the terrain and weather that change that order, plus the target's cover described below. A map-key terrain name has the same swatch as the hex tooltip. Snow, Rain, and Heat use the weather icon, not a swatch. Urban uses the same chip. Rubble has no swatch. A battle march that uses a road or a rail shows that icon on the Using line. An older payload that only says a line was used shows both icons. The line is omitted when nothing changes the order. A strategic march, ferry, ranged attack, or air strike can name weather. A battle march can name terrain, weather, and road or rail. A battle ranged attack can name forest, urban, or rubble on the attacker's own cell when that shortens the shot, and weather when the shot loses attack. A battle ferry shows nothing here. When a ranged attack or air strike is aimed at a cell or hex holding a visible enemy unit and that target has cover against the shot, a second line, `Cover:`, names the cover source (Forest, Mountain, Wetlands, Urban, or Rubble) with the same swatch rules; ground and naval fire uses the ground column and air strikes the air column, so a mountain target shows no Cover line for an air strike. A ranged attack made only by air units shows no Cover line. Snow, Rain, or Heat is named when that weather, and not a tag the unit has, changes the order. Heat cuts a battle march budget only at High, and it cuts armor ranged attack at both levels. It appears one second after the effect for that cell is known, then stays while the pointer remains on that cell, including while the pointer rests. Moving onto another world hex, zoomed cell, or battle cell hides it and starts that wait again. The rules are in [combat rules §4.9](../combat-rules-v3.md).
 
 ## Inputs and Responses
 
 ### Mouse
 
-- When the pointer rests on a hex and the player is not aiming an order, the hex tooltip appears after a short dwell and follows the pointer. Moving onto a different world hex, zoomed cell, or battle cell hides it and starts that dwell again.
+- When the pointer rests on a hex and the player is not aiming an order, the hex tooltip appears after one second and follows the pointer. Moving onto a different world hex, zoomed cell, or battle cell hides it and starts that dwell again. Resting on the token of a hex that holds one stationary unit with a recorded origin shows that unit's Bonuses tooltip instead, after the same second. A token with no recorded origin keeps this tooltip. Leaving the token for the rest of the hex starts the hex tooltip dwell again. A stack token does not. See [stack-callout.md](stack-callout.md).
 - When the pointer leaves the map, the hex tooltip and the effects tooltip hide.
-- While the player is aiming a march, ferry, air strike, or ranged attack, the hex tooltip does not appear. The effects tooltip appears after the same dwell when terrain, weather, or target cover changes the order, then stays while the pointer remains on that cell.
+- While the player is aiming a march, ferry, air strike, or ranged attack, the hex tooltip does not appear. The effects tooltip appears after one second when terrain, weather, or target cover changes the order, then stays while the pointer remains on that cell.
 - When the hovered order is illegal, the blocked tooltip shows immediately, replaces the effects tooltip, and then hides itself. When the preview becomes legal, the blocked tooltip hides.
 
 ### Keyboard
@@ -66,8 +65,8 @@ The hex tooltip can appear in Strategic planning, Tactical planning, and Resolut
 | Aspect | Strategic | Tactical |
 | --- | --- | --- |
 | Hex | World hex, including a terrain mix | Battle hex |
-| Effects | None on a world hex. A zoomed cell shows that cell's tactical terrain effects, and omits the line when it has none | Tactical terrain effects, omitted when the cell has none |
-| Cover | A world hex shows its main terrain's cover. A zoomed cell shows the cover it would give in a battle | The cell's terrain, urban, or rubble cover |
+| Effects | Cover clauses only, from the main terrain kind, when it has cover. No movement or range. A zoomed cell puts that cell's tactical movement and range before the cover clauses. Omitted when nothing applies | Tactical movement and range, then the cell's cover clauses. Omitted when the cell has neither |
+| Cover | Not its own line. Appended to Effects. A world hex uses its main terrain kind, and urban never adds cover there. A zoomed cell uses the cell's terrain kind plus urban and rubble | Not its own line. Appended to Effects. The cell's terrain, urban, or rubble cover |
 | Control | Control or home-region ownership when the player is allowed to see it | A battle hex does not show a control line |
 | Blocked tooltip | Strategic march, ranged, and strike previews | Battle march, ranged, and strike previews |
 | Effects tooltip | Weather, when it changes a strategic march, ferry, ranged attack, or air strike. A Cover line names the target hex's main terrain when it covers enemy units there | Battle march terrain, weather, and road or rail. A battle ranged attack names the attacker's forest, urban, or rubble cap, and weather when the shot loses attack. A Cover line names the target cell's cover source. A battle ferry shows nothing |
@@ -96,6 +95,7 @@ None.
 - `src/renderer/map/orderBlockHexTooltip.ts`
 - `src/renderer/map/orderSlowerHexTooltip.ts`
 - `src/renderer/map/mainMapInteractions.ts`
+- `src/renderer/core/constants.ts` (`HEX_DETAILS_TOOLTIP_DELAY_MS`, one second)
 - `src/renderer/gameplay/hoverRoutePreviewRefresh.ts`
 - `src/renderer/gameplay/orderPreviewEffectsContext.ts`
 - `src/shared/orderPreviewEffectsTooltip.ts`
@@ -104,8 +104,10 @@ None.
 - `src/renderer/map/transientPointerTooltipTtl.ts`
 - `src/renderer/gameplay/meleeInterceptHexTooltip.ts`
 - `src/shared/terrainEffectsForTooltip.ts`
+- `src/shared/statusIconHtml.ts`
 - `src/shared/terrainCoverRules.ts`
 - `src/shared/weatherIcons.ts`
 - `src/shared/hexNamingCaption.ts`
 - `src/shared/countryFlags.ts`
 - `src/shared/terrainSwatchHtml.ts`
+- `src/shared/featureIconHtml.ts`

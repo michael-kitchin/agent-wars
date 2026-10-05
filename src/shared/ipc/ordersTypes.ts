@@ -397,6 +397,15 @@ weatherBonusLevel?: BonusLevel;
    * Exceptions: None.
    */
 startMonth?: number;
+    /**
+   * How strong the new match's tech bonus is.
+   *
+   * Contract: A missing or unknown field means off; the new-game dialog always sends an explicit level.
+   * When to use: `game:newGame` from the new-game dialog's Tech control.
+   * Expected outcome: Persisted as `game_config.tech_bonus_enabled` and `game_config.tech_bonus_level`.
+   * Exceptions: None.
+   */
+techBonusLevel?: BonusLevel;
 }
 
 /**

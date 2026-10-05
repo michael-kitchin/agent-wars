@@ -84,6 +84,24 @@ readonly originHitBonus?: OriginHitBonus;
    */
   readonly targetCover?: TerrainCover;
   /**
+   * Tech points added to this unit's attack after the floor.
+   *
+   * Contract: Set when the unit array is built, from the birth hex; absent means 0. Low and High Advanced units carry 2.
+   * When to use: Read through `attackHitThreshold`; set through `withTechHitBonus`.
+   * Expected outcome: Each attack this unit makes hits on that many more faces.
+   * Exceptions: None.
+   */
+  readonly techAttackBonus?: number;
+  /**
+   * Tech points added to this unit's defense.
+   *
+   * Contract: Set with `techAttackBonus`. High Advanced units carry 2; Low carries 0 when attack is set. Absent means 0. Casualty order ignores it.
+   * When to use: Read through `defenseHitThreshold`.
+   * Expected outcome: Melee defense hits on that many more faces.
+   * Exceptions: None.
+   */
+  readonly techDefenseBonus?: number;
+  /**
    * Acclimation tags carried into a roll.
    *
    * Contract: A tag cancels the weather penalty for that state.

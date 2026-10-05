@@ -80,11 +80,31 @@ export const WEATHER_BONUS_LEVEL_CONFIG_KEY = 'weather_bonus_level';
 export const START_MONTH_CONFIG_KEY = 'start_month';
 
 /**
+ * `game_config` key for the tech bonus flag.
+ *
+ * Purpose: Frozen persisted key. A missing row means the flag is off, which is how matches saved before tech existed play.
+ * When to use: `persistOriginBonusSettings` / `readPersistedOriginBonusSettings` only.
+ * Expected outcome: Stable string `tech_bonus_enabled` with value `'1'` or `'0'`.
+ * Exceptions: None.
+ */
+export const TECH_BONUS_CONFIG_KEY = 'tech_bonus_enabled';
+
+/**
+ * `game_config` key for the tech bonus level.
+ *
+ * Purpose: Frozen persisted key. A missing row next to an enabled flag means low.
+ * When to use: `persistOriginBonusSettings` / `readPersistedOriginBonusSettings` only.
+ * Expected outcome: Stable string `tech_bonus_level` with value `'low'` or `'high'`.
+ * Exceptions: None.
+ */
+export const TECH_BONUS_LEVEL_CONFIG_KEY = 'tech_bonus_level';
+
+/**
  * Writes every bonus flag, level, and the start month for a new match.
  *
  * Purpose: Every new match records every row, so one match's choice cannot leak into the next.
  * When to use: `resetGameForNewMatch`, and tests that need a specific setting.
- * Expected outcome: Seven upserted rows: the three flags, the three levels (`'low'` when a level is missing, including for a bonus that is off), and the start month.
+ * Expected outcome: Nine upserted rows: the four flags, the four levels (`'low'` when a level is missing, including for a bonus that is off), and the start month.
  * Exceptions: No-op when `hasDb` is present and false.
  */
 export function persistOriginBonusSettings(
@@ -100,6 +120,8 @@ export function persistOriginBonusSettings(
   ops.run(upsert, [COUNTRY_BONUS_LEVEL_CONFIG_KEY, settings.countryBonusLevel ?? 'low']);
   ops.run(upsert, [TERRAIN_BONUS_LEVEL_CONFIG_KEY, settings.terrainBonusLevel ?? 'low']);
   ops.run(upsert, [WEATHER_BONUS_LEVEL_CONFIG_KEY, settings.weatherBonusLevel ?? 'low']);
+  ops.run(upsert, [TECH_BONUS_CONFIG_KEY, settings.techBonusEnabled === true ? '1' : '0']);
+  ops.run(upsert, [TECH_BONUS_LEVEL_CONFIG_KEY, settings.techBonusLevel ?? 'low']);
   ops.run(upsert, [START_MONTH_CONFIG_KEY, String(parseStartMonth(settings.startMonth))]);
 }
 
@@ -120,6 +142,7 @@ export function readPersistedOriginBonusSettings(ops: Pick<GameConfigKvDbOps, 'g
   const countryBonusEnabled = valueOf(COUNTRY_BONUS_CONFIG_KEY) === '1';
   const terrainBonusEnabled = valueOf(TERRAIN_BONUS_CONFIG_KEY) === '1';
   const weatherBonusEnabled = valueOf(WEATHER_BONUS_CONFIG_KEY) === '1';
+  const techBonusEnabled = valueOf(TECH_BONUS_CONFIG_KEY) === '1';
   return {
     countryBonusEnabled,
     terrainBonusEnabled,
@@ -127,6 +150,7 @@ export function readPersistedOriginBonusSettings(ops: Pick<GameConfigKvDbOps, 'g
     ...(countryBonusEnabled ? { countryBonusLevel: levelOf(COUNTRY_BONUS_LEVEL_CONFIG_KEY) } : {}),
     ...(terrainBonusEnabled ? { terrainBonusLevel: levelOf(TERRAIN_BONUS_LEVEL_CONFIG_KEY) } : {}),
     ...(weatherBonusEnabled ? { weatherBonusLevel: levelOf(WEATHER_BONUS_LEVEL_CONFIG_KEY) } : {}),
+    ...(techBonusEnabled ? { techBonusEnabled: true as const, techBonusLevel: levelOf(TECH_BONUS_LEVEL_CONFIG_KEY) } : {}),
     startMonth: parseStartMonth(valueOf(START_MONTH_CONFIG_KEY)),
   };
 }

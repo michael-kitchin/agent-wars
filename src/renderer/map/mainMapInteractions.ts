@@ -14,6 +14,7 @@ import {
   clearDeferredStackCalloutTimer,
   scheduleDeferredStackCallout,
 } from './mapClickSelectionPolicy';
+import { forgetSingleUnitHoverCallout, syncMapSingleUnitHover } from './singleUnitHoverCallout';
 import {
   hexTooltipSuppressedForOrderPlanning,
   resolutionPlaybackBlocksMapOrders,
@@ -499,62 +500,101 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
     const prevDetail = S.hoveredDetailHexH3;
     const hitChanged = hit !== prevHit;
     const detailChanged = detailHit !== prevDetail;
+    // One dwell for a new cell and for leaving a single-unit token onto the rest of its hex.
+    const scheduleHexDetailsTooltip = (targetHex: string, targetDetail: string | null): void => {
+      deps.clearTerrainTooltipTimer();
+      S.terrainTooltipDelayTimer = setTimeout(() => {
+        S.terrainTooltipDelayTimer = null;
+        if (S.hoveredHexH3 !== targetHex || S.hoveredDetailHexH3 !== targetDetail || !S.gameState) return;
+        if (deps.shouldSuppressTerrainTooltip()) return;
+        const state = deps.terrainStateForPointer(S.lastPointerClientX, S.lastPointerClientY, targetHex);
+        const namingTarget = deps.namingLookupTargetForPointer(S.lastPointerClientX, S.lastPointerClientY, targetHex);
+        void deps.showTerrainTooltip(S.lastPointerClientX, S.lastPointerClientY, state, namingTarget);
+      }, HEX_DETAILS_TOOLTIP_DELAY_MS);
+    };
 
-    if (!hitChanged && !detailChanged) {
-      if (planningHidesHexTooltip) {
-        deps.clearTerrainTooltipTimer();
-        deps.hideTerrainTooltipVisual();
+    if (hitChanged || detailChanged) {
+      S.hoveredHexH3 = hit;
+      S.hoveredDetailHexH3 = detailHit;
+
+      // A battle is one world hex, so the enclosing hit stays put while the pointer crosses cells.
+      // This path runs only after the world hex or the detail cell changed. Hide the popup and
+      // start the dwell again before the preview refresh, which may publish synchronously.
+      deps.clearTerrainTooltipTimer();
+      deps.hideTerrainTooltipVisual();
+      if (planningHidesHexTooltip && hit) {
+        noteOrderEffectsTooltipCellChange(hit, detailHit);
       } else {
         clearOrderEffectsTooltipDwell();
-        const tipFollow = document.getElementById('hex-tooltip');
-        if (
-          !deps.shouldSuppressTerrainTooltip() &&
-          tipFollow &&
-          !tipFollow.classList.contains('hidden') &&
-          hit
-        ) {
-          const state = deps.terrainStateForPointer(S.lastPointerClientX, S.lastPointerClientY, hit);
-          const namingTarget = deps.namingLookupTargetForPointer(S.lastPointerClientX, S.lastPointerClientY, hit);
-          void deps.showTerrainTooltip(S.lastPointerClientX, S.lastPointerClientY, state, namingTarget);
-        }
       }
-      return;
-    }
+      void deps.refreshHoverRoutePreview({ allowBlockingOrderTooltip: true });
+      deps.requestRedraw();
 
-    S.hoveredHexH3 = hit;
-    S.hoveredDetailHexH3 = detailHit;
-
-    // A battle is one world hex, so the enclosing hit stays put while the pointer crosses cells.
-    // This path runs only after the world hex or the detail cell changed. Hide the popup and
-    // start the dwell again before the preview refresh, which may publish synchronously.
-    deps.clearTerrainTooltipTimer();
-    deps.hideTerrainTooltipVisual();
-    if (planningHidesHexTooltip && hit) {
-      noteOrderEffectsTooltipCellChange(hit, detailHit);
+      if (hit && !deps.shouldSuppressTerrainTooltip() && !planningHidesHexTooltip) {
+        scheduleHexDetailsTooltip(hit, detailHit);
+      }
+    } else if (planningHidesHexTooltip) {
+      deps.clearTerrainTooltipTimer();
+      deps.hideTerrainTooltipVisual();
     } else {
       clearOrderEffectsTooltipDwell();
+      const tipFollow = document.getElementById('hex-tooltip');
+      if (
+        !deps.shouldSuppressTerrainTooltip() &&
+        tipFollow &&
+        !tipFollow.classList.contains('hidden') &&
+        hit
+      ) {
+        const state = deps.terrainStateForPointer(S.lastPointerClientX, S.lastPointerClientY, hit);
+        const namingTarget = deps.namingLookupTargetForPointer(S.lastPointerClientX, S.lastPointerClientY, hit);
+        void deps.showTerrainTooltip(S.lastPointerClientX, S.lastPointerClientY, state, namingTarget);
+      }
     }
-    void deps.refreshHoverRoutePreview({ allowBlockingOrderTooltip: true });
-    deps.requestRedraw();
 
-    if (!hit || deps.shouldSuppressTerrainTooltip() || planningHidesHexTooltip) {
-      return;
+    const drawn = S.gameState
+      ? deps.getUnitsForDrawWithMovingIds(S.gameState)
+      : { unitsToDraw: [] as GameStateSnapshot['units'], movingIds: undefined };
+    const releaseHexTooltip = syncMapSingleUnitHover({
+      h3: hit,
+      unitsToDraw: drawn.unitsToDraw,
+      movingIds: drawn.movingIds,
+      unitsHidden: shouldHideStrategicMapUnitsForRes4Zoom(),
+      pointerOnToken: hit !== null && pointerHitsDrawnUnitIcon(e.clientX, e.clientY, hit),
+      blocked:
+        resolutionPlaybackBlocksMapOrders(S.resolutionMoveAnimation) ||
+        planningHidesHexTooltip ||
+        deps.shouldSuppressTerrainTooltip(),
+      clientX: e.clientX,
+      clientY: e.clientY,
+      clearHexTooltip: deps.clearTerrainTooltipTimer,
+      hideHexTooltip: deps.hideTerrainTooltipVisual,
+    });
+    if (
+      releaseHexTooltip &&
+      !hitChanged &&
+      !detailChanged &&
+      hit &&
+      !deps.shouldSuppressTerrainTooltip() &&
+      !planningHidesHexTooltip
+    ) {
+      scheduleHexDetailsTooltip(hit, detailHit);
     }
-
-    const targetHex = hit;
-    const targetDetail = detailHit;
-    S.terrainTooltipDelayTimer = setTimeout(() => {
-      S.terrainTooltipDelayTimer = null;
-      if (S.hoveredHexH3 !== targetHex || S.hoveredDetailHexH3 !== targetDetail || !S.gameState) return;
-      if (deps.shouldSuppressTerrainTooltip()) return;
-      const state = deps.terrainStateForPointer(S.lastPointerClientX, S.lastPointerClientY, targetHex);
-      const namingTarget = deps.namingLookupTargetForPointer(S.lastPointerClientX, S.lastPointerClientY, targetHex);
-      void deps.showTerrainTooltip(S.lastPointerClientX, S.lastPointerClientY, state, namingTarget);
-    }, HEX_DETAILS_TOOLTIP_DELAY_MS);
   });
 
   mainMapEl.addEventListener('pointerleave', (e) => {
     const next = e.relatedTarget;
+    syncMapSingleUnitHover({
+      h3: null,
+      unitsToDraw: [],
+      movingIds: undefined,
+      unitsHidden: false,
+      pointerOnToken: false,
+      blocked: false,
+      clientX: e.clientX,
+      clientY: e.clientY,
+      clearHexTooltip: deps.clearTerrainTooltipTimer,
+      hideHexTooltip: deps.hideTerrainTooltipVisual,
+    });
     if (next instanceof Node) {
       const buildEntry = document.getElementById('build-entry-layer');
       const buildPopup = document.getElementById('build-popup');
@@ -610,6 +650,7 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
         deps.replaceSelection([...S.selectedUnitIdsAtMouseDown]);
       }
     }
+    forgetSingleUnitHoverCallout();
     deps.clearTerrainTooltipTimer();
     deps.hideTerrainTooltipVisual();
     hideOrderBlockHexTooltip();

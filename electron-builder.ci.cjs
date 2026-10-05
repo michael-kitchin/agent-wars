@@ -2,7 +2,7 @@ const { buildElectronBuilderConfig } = require('./scripts/electronBuilderBaseCon
 
 module.exports = buildElectronBuilderConfig({
   publish: null,
-  files: ['dist', 'static', 'symbols', 'package.json', 'node_modules'],
+  files: ['dist', 'static', 'package.json', 'node_modules'],
   winTarget: ['nsis'],
   linuxTarget: ['AppImage'],
   macTarget: ['dmg'],

@@ -2,12 +2,12 @@
  * Copy and light terrain classification for transient “Slower: …” hover hints during valid tactical marches.
  *
  * Purpose: Keeps tactical march preview labels aligned without importing renderer or Electron main modules.
- * When to use: `humanMarchPreviewResolve`, `buildTacticalMarchHoverPreview`, and the order-effects tooltip.
+ * When to use: `buildTacticalMarchHoverPreview` and the order-effects tooltip. Strategic marches do not use these labels.
  * Expected outcome: Structured `OrderPreviewTerrainImpact` for IPC plus HTML fragments with bold section labels; `null` when no slowdown applies.
  * Exceptions: None; invalid inputs yield `null` or empty collections.
  */
 
-import { latLngToCell } from 'h3-js';
+import { formatTransportIconsHtml, transportLineSpecified } from './featureIconHtml';
 import { formatTerrainNameListHtml } from './terrainSwatchHtml';
 import {
   effectiveRes4TerrainKindString,
@@ -34,7 +34,6 @@ import {
 } from './tacticalTerrainMovement';
 import type { TacticalMovementCategory } from './tacticalTerrainMovement';
 import { TOOLTIP_SECTION_GAP_HTML } from './tooltipSectionGap';
-import { STRATEGIC_H3_RESOLUTION } from './h3Resolutions';
 
 /** Stable ordering for multi-terrain comma lists in order-preview HTML (lower sorts earlier). */
 const SLOW_TERRAIN_LABEL_SORT_PRIORITY: Readonly<Record<string, number>> = {
@@ -89,13 +88,31 @@ export function sortSlowTerrainLabels(labels: readonly string[]): string[] {
  *
  * Purpose: Keeps HTML builder arguments explicit and renderer-call sites self-documenting.
  * When to use: Only when assembling `#order-slower-tooltip` / related order-preview HTML.
- * Expected outcome: At most one of `blocked` vs `slower` wins in the formatter; `roadRail` adds `Using: Road/Rail` after the terrain line when present.
+ * Expected outcome: At most one of `blocked` vs `slower` wins in the formatter. A road, a rail, or an unspecified line adds a Using line with those icons.
  * Exceptions: None; omit fields or pass empty arrays when not applicable.
  */
 export type OrderPreviewImpactHtmlInput = {
   readonly blocked?: readonly string[];
   readonly slower?: readonly string[];
   readonly roadRail?: boolean;
+  /**
+   * The march used a road.
+   *
+   * Contract: Optional. When true, the Using line shows the road icon. Omitted on older payloads.
+   * When to use: With `rail` beside `roadRail`.
+   * Expected outcome: A road-only line when `rail` is not also true.
+   * Exceptions: None.
+   */
+  readonly road?: boolean;
+  /**
+   * The march used a rail.
+   *
+   * Contract: Optional. When true, the Using line shows the rail icon.
+   * When to use: With `road` beside `roadRail`.
+   * Expected outcome: A rail icon. Both icons when this and `road` are true, or when only `roadRail` is set.
+   * Exceptions: None.
+   */
+  readonly rail?: boolean;
 };
 
 /**
@@ -103,7 +120,7 @@ export type OrderPreviewImpactHtmlInput = {
  *
  * Purpose: Unifies blocked vs slower HTML with hex tooltip vertical rhythm via `TOOLTIP_SECTION_GAP_HTML`.
  * When to use: `resolveOrderSlowerTooltipHtml` and tests that assert escaped tooltip markup.
- * Expected outcome: At most one terrain line (`Blocked` wins over `Slower`); optional second line `Using: Road/Rail`; `null` if nothing applies.
+ * Expected outcome: At most one terrain line (`Blocked` wins over `Slower`); an optional Using line with the road icon, the rail icon, or both; `null` if nothing applies.
  * Exceptions: None; empty arrays treated as absent.
  */
 export function formatOrderPreviewImpactHtml(args: OrderPreviewImpactHtmlInput): string | null {
@@ -116,8 +133,9 @@ export function formatOrderPreviewImpactHtml(args: OrderPreviewImpactHtmlInput):
         ? `<strong>Slower:</strong> ${formatTerrainNameListHtml(slower.join(', '))}`
         : null;
   let out = terrainLine;
-  if (args.roadRail) {
-    const usingLine = `<strong>Using:</strong> Road/Rail`;
+  const using = formatTransportIconsHtml(args);
+  if (using) {
+    const usingLine = `<strong>Using:</strong> ${using}`;
     out = out ? `${out}${TOOLTIP_SECTION_GAP_HTML}${usingLine}` : usingLine;
   }
   return out;
@@ -136,14 +154,24 @@ export function resolveOrderSlowerTooltipHtml(args: {
   supportTargeting?: 'ranged' | 'air';
   validForAll: boolean;
   tacticalBattleActive: boolean;
-  marchImpact: { slower: readonly string[]; roadRail: boolean } | null;
+  marchImpact: {
+    slower: readonly string[];
+    roadRail: boolean;
+    road?: boolean;
+    rail?: boolean;
+  } | null;
 }): string | null {
   if (args.hasBlockedMessage) return null;
   if (args.supportTargeting === 'ranged' || args.supportTargeting === 'air') return null;
   if (!args.validForAll || !args.tacticalBattleActive) return null;
   const imp = args.marchImpact;
-  if (!imp || (imp.slower.length === 0 && !imp.roadRail)) return null;
-  return formatOrderPreviewImpactHtml({ slower: [...imp.slower], roadRail: imp.roadRail });
+  if (!imp || (imp.slower.length === 0 && !transportLineSpecified(imp))) return null;
+  return formatOrderPreviewImpactHtml({
+    slower: [...imp.slower],
+    roadRail: imp.roadRail,
+    road: imp.road,
+    rail: imp.rail,
+  });
 }
 
 /**
@@ -200,111 +228,29 @@ export function displayTitleForSlowTerrainBucket(bucket: TacticalMovementCategor
   }
 }
 
-/**
- * Lists ordered res1 H3 indexes along a successful strategic route plan (deduping consecutive duplicates).
- *
- * Purpose: Lets slow-terrain classification inspect each entered cell using snapshot terrain maps.
- * When to use: Only with `PlanRouteOk.path` from `executePlanRouteWithSession` / hover preview caches.
- * Expected outcome: At least two indexes when the plan includes movement; skips coordinates that fail `latLngToCell`.
- * Exceptions: Malformed coordinates are skipped without throwing.
- */
-export function strategicMarchPathH3IndicesFromPlan(plan: {
-  path: ReadonlyArray<{ hexes: ReadonlyArray<[number, number]> }>;
-}): string[] {
-  const out: string[] = [];
-  let prev = '';
-  for (const seg of plan.path) {
-    if (!Array.isArray(seg.hexes)) continue;
-    for (const xy of seg.hexes) {
-      if (!Array.isArray(xy) || xy.length < 2) continue;
-      try {
-        const h = latLngToCell(xy[0]!, xy[1]!, STRATEGIC_H3_RESOLUTION);
-        if (h && h !== prev) {
-          out.push(h);
-          prev = h;
-        }
-      } catch {
-        /* ignore bad coordinates */
-      }
-    }
-  }
-  return out;
-}
-
-/**
- * Collects every distinct slowing terrain label along a strategic res1 path (first-seen path order).
- *
- * Purpose: Feeds grouped HTML tooltips and `OrderPreviewTerrainImpact` without stopping at the first slow hex.
- * When to use: `humanMarchPreviewResolve` after `PlanRouteOk`; combine with `sortSlowTerrainLabels` for display lists.
- * Expected outcome: Title-case terrain tokens in traversal order, de-duplicated.
- * Exceptions: None.
- */
-export function collectStrategicMarchSlowTerrainLabels(
-  unitType: string,
-  pathH3: readonly string[],
-  terrainKindByH3: ReadonlyMap<string, string>,
-  terrainByH3: ReadonlyMap<string, string>
-): string[] {
-  if (pathH3.length < 2) return [];
-  if (unitType === 'air') return [];
-  const order: string[] = [];
-  const seen = new Set<string>();
-  for (let i = 1; i < pathH3.length; i++) {
-    const h = pathH3[i]!;
-    const kindRaw = terrainKindByH3.get(h) ?? 'plains';
-    const kindLower = String(kindRaw).toLowerCase();
-    const parentRaw = terrainByH3.get(h) ?? 'land';
-    const parent = parentRaw === 'water' ? 'water' : 'land';
-    let label: string | null = null;
-    if (kindLower.includes('urban')) {
-      label = 'Urban';
-    } else if (kindLower.includes('rubble')) {
-      label = 'Rubble';
-    } else {
-      const cat = normalizeDbTerrainKindToTacticalCategory(kindLower, parent);
-      const cost = tacticalEnterHexMovementCost(unitType, cat);
-      if (!Number.isFinite(cost) || cost <= 1) continue;
-      label = displayTitleForSlowTerrainBucket(cat);
-    }
-    if (label && !seen.has(label)) {
-      seen.add(label);
-      order.push(label);
-    }
-  }
-  return order;
-}
-
-/**
- * Picks the first march slow-down terrain label along a strategic res1 path for the given unit type.
- *
- * Purpose: Backward-compatible single-token surface for callers/tests expecting first-hit semantics.
- * When to use: Legacy call sites; prefer `collectStrategicMarchSlowTerrainLabels` for IPC.
- * Expected outcome: First label in path order from the collector, or `null`.
- * Exceptions: None.
- */
-export function pickStrategicMarchSlowTerrainDisplayTitle(
-  unitType: string,
-  pathH3: readonly string[],
-  terrainKindByH3: ReadonlyMap<string, string>,
-  terrainByH3: ReadonlyMap<string, string>
-): string | null {
-  const labels = collectStrategicMarchSlowTerrainLabels(unitType, pathH3, terrainKindByH3, terrainByH3);
-  return labels.length > 0 ? labels[0]! : null;
-}
-
 export type TacticalMarchTerrainImpact = {
   readonly slower: string[];
   readonly roadRail: boolean;
+  /**
+   * A step used the line rate on a road cell.
+   *
+   * Contract: Optional. Set only when that cell had a road and no rail.
+   * When to use: The Using line. Omitted when the line kind is unknown.
+   * Expected outcome: The road icon.
+   * Exceptions: None.
+   */
+  readonly road?: boolean;
+  /**
+   * A step used the line rate on a rail cell.
+   *
+   * Contract: Optional. Rail wins when the same cell also has a road.
+   * When to use: The Using line.
+   * Expected outcome: The rail icon. A path can set both flags.
+   * Exceptions: None.
+   */
+  readonly rail?: boolean;
 };
 
-/**
- * Collects tactical march slow terrain labels along `pathH3` plus whether any step uses road/rail transport over costly terrain.
- *
- * Purpose: Replaces “first only” `pickTacticalMarchSlowTerrainDisplayTitle` with a union suitable for HTML tooltips.
- * When to use: `buildTacticalMarchHoverPreview` / `buildPreviewForSubUnit` after `planTacticalRes4March` succeeds.
- * Expected outcome: Anchor throttle labels (when `eff < baseline`) plus per-hex path labels. `roadRail` is true when a step's actual enter cost is the road or rail rate and the off-road cost would have been higher, including when only the destination cell has the line.
- * Exceptions: None; air/naval and trivial paths yield empty `slower` and `roadRail: false`.
- */
 /**
  * Names the battle's weather when that weather, not the anchor terrain, cut this leg's budget.
  *
@@ -327,6 +273,14 @@ function weatherBudgetSlowLabel(
   return slowed ? formatWeatherLabel(battle.weather) : null;
 }
 
+/**
+ * Collects tactical march slow terrain labels along `pathH3` plus whether any step paid the road or rail rate.
+ *
+ * Purpose: Replaces the first-label helper with one result suitable for HTML tooltips.
+ * When to use: After a battle march plan succeeds.
+ * Expected outcome: Slow-terrain labels for the start cell's budget and for steps that did not pay the road or rail rate. A line-rate step sets `road` or `rail` and does not add that cell's terrain. Air and trivial paths yield empty labels and `roadRail: false`.
+ * Exceptions: None.
+ */
 export function collectTacticalMarchTerrainImpact(args: {
   battle: TacticalBattleSnapshot;
   subUnit: TacticalSubUnitSnapshot;
@@ -344,6 +298,8 @@ export function collectTacticalMarchTerrainImpact(args: {
 
   const slowerOrder: string[] = [];
   const seen = new Set<string>();
+  let usedRoad = false;
+  let usedRail = false;
   const push = (lab: string) => {
     if (!seen.has(lab)) {
       seen.add(lab);
@@ -373,15 +329,11 @@ export function collectTacticalMarchTerrainImpact(args: {
       push('Rubble');
       continue;
     }
-    if (battle.res4IsUrbanByH3?.[h]) {
-      push('Urban');
-      continue;
-    }
+    const urban = battle.res4IsUrbanByH3?.[h] === true;
     const rawKind = effectiveRes4TerrainKindString(battle, h);
     const parent = battle.strategicHexTerrain ?? 'land';
     const cat = normalizeDbTerrainKindToTacticalCategory(String(rawKind).toLowerCase(), parent);
     const cost = tacticalEnterHexMovementCost(moveType, cat);
-    const plainsCost = tacticalEnterHexMovementCost(moveType, 'plains');
     const stepCost = landInfantryArmorEnterCost({
       toH3: h,
       unitTypeForMovement: moveType,
@@ -395,8 +347,16 @@ export function collectTacticalMarchTerrainImpact(args: {
       weatherTags: subUnit.weatherTags,
     });
     const usedLineRate = Number.isFinite(stepCost) && stepCost < 1;
-    if (usedLineRate && (cost > plainsCost || !Number.isFinite(cost))) {
+    if (usedLineRate) {
       roadRail = true;
+      const railSides = battle.res4RailSidesByH3?.[h];
+      const roadSides = battle.res4RoadSidesByH3?.[h];
+      if (railSides?.some((side) => side === true)) usedRail = true;
+      else if (roadSides?.some((side) => side === true)) usedRoad = true;
+      continue;
+    }
+    if (urban) {
+      push('Urban');
       continue;
     }
     if (Number.isFinite(cost) && cost > 1) {
@@ -414,7 +374,7 @@ export function collectTacticalMarchTerrainImpact(args: {
       tags: subUnit.weatherTags,
       enabled: battle.weatherBonusEnabled === true,
     });
-    if (!usedLineRate && Number.isFinite(cost) && openGround > cost && (battle.weather === 'snow' || battle.weather === 'rain')) {
+    if (Number.isFinite(cost) && openGround > cost && (battle.weather === 'snow' || battle.weather === 'rain')) {
       push(formatWeatherLabel(battle.weather));
     }
     if (tacticalRes4CellIsForestClass(battle, h) && (subUnit.unitType === 'armor' || subUnit.unitType === 'infantry')) {
@@ -425,7 +385,12 @@ export function collectTacticalMarchTerrainImpact(args: {
       push('Mountain');
     }
   }
-  return { slower: slowerOrder, roadRail };
+  return {
+    slower: slowerOrder,
+    roadRail,
+    ...(usedRoad ? { road: true as const } : {}),
+    ...(usedRail ? { rail: true as const } : {}),
+  };
 }
 
 /**

@@ -112,6 +112,24 @@ export interface OriginBonusSettings {
    * Exceptions: None.
    */
   readonly startMonth?: number;
+  /**
+   * Whether the tech bonus is on.
+   *
+   * Contract: Optional so existing settings literals stay valid. Missing means off.
+   * When to use: Before adding tech points. A missing row in a saved match is off.
+   * Expected outcome: `true` lets an Advanced unit add attack, and defense when the level is high.
+   * Exceptions: None.
+   */
+  readonly techBonusEnabled?: boolean;
+  /**
+   * How strong the tech bonus is.
+   *
+   * Contract: Read only when `techBonusEnabled` is true. Missing next to a true flag means low.
+   * When to use: Through `techBonusLevelOf`, never directly.
+   * Expected outcome: Low adds attack only. High adds attack and defense.
+   * Exceptions: None.
+   */
+  readonly techBonusLevel?: ActiveBonusLevel;
 }
 
 /**

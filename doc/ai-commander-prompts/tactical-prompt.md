@@ -49,10 +49,11 @@ Same clause order as strategic section 1.5, with these substitutions:
 | Resolution order | Embark, air strikes, ranged fire, movement, ferry, cargo sync, melee, applied per beat with no production step (`buildResolutionOrderRule`) |
 | Truncation clause | A destination beyond this beat's budget is clamped to the first reachable leg rather than rejected; when the planner cannot use the destination at all but a neighbouring footprint cell still closes on it, the engine may take that single step instead. Friendly stacking on that cell is legal. |
 | Origin bonus | Included when either bonus flag is on. Country: a unit on a cell whose country is its birth country adds 2 (Low) or 4 (High) to every value it rolls there. Terrain: the same for a cell whose terrain kind matches its birth terrain kind, with urban and rubble ignored. Both on: the bonuses do not stack, and the sentence names the larger amount as the most. Air qualifies by its base cell when the opponent has air. Casualty order keeps the printed defense values (`buildOriginBonusRule`) |
+| Tech bonus | Included only when the tech bonus is on (`buildTechBonusRule`). An Advanced unit, born in a hex with at least five urban cells, adds 2 to its attack at Low and High, and also 2 to its defense at High. A Basic unit adds nothing. At Low, the tech bonus does not change defense. Casualty order keeps the printed defense values. The Unit Status Bonus column names the clause |
 | Weather bonus | Included only when the weather bonus is on (`buildWeatherRule`). The turn line names the month. The battle uses the enclosing hex's weather. The Unit Status Weather column names that weather, with birth tags in parentheses. Armor and naval budgets drop in weather they lack (at Low, armor in snow or rain and naval in snow, to 2; at High, armor also in heat and naval also in rain, to 1), infantry pays 2 to enter open ground in snow or rain, and armor ranged attack is lower in snow or heat (3 at Low, 5 at High). |
 | Terrain cover | Always included (`buildTerrainCoverRule`), naming cells instead of hexes and adding urban and rubble: ranged fire at a forest, mountain, urban, or rubble cell needs a roll 2 lower, or 1 lower for wetlands; an air strike on units in a forest, urban, or rubble cell needs a roll 1 lower; melee, return fire, anti-air fire, and shots at infrastructure ignore cover. A cell without its own terrain kind uses the battle hex's kind |
 
-Carries `COMBAT_STATS`, `TACTICAL_RANGE_TABLE`, `ATTACK_ONE_PER_UNIT`, `WEGO_PHASE_ORDER`, `TEMPO_RANGED_SHOT`, `CASUALTY_PRIORITY`, `ORIGIN_BONUS`, `TERRAIN_COVER`, `TACTICAL_MP_RULES`, `FIRST_LEG_TRUNCATION`, `LEGAL_DEST_OCCUPANCY`.
+Carries `COMBAT_STATS`, `TACTICAL_RANGE_TABLE`, `ATTACK_ONE_PER_UNIT`, `WEGO_PHASE_ORDER`, `TEMPO_RANGED_SHOT`, `CASUALTY_PRIORITY`, `ORIGIN_BONUS`, `TECH_BONUS`, `TERRAIN_COVER`, `TACTICAL_MP_RULES`, `FIRST_LEG_TRUNCATION`, `LEGAL_DEST_OCCUPANCY`.
 
 ### 2.6 `# Commander's Briefing`
 
@@ -64,7 +65,7 @@ At most five sentences. The first is always the beat number, own sub-unit count,
 
 #### `## Unit Status and Threats`
 
-Same six columns as strategic: `Unit ID`, `Type`, `Hex`, `Nearest enemy + distance`, `Threat severity`, `Action needed`. When either origin bonus flag is on, a `Bonus` column follows `Hex` (`+2 country`, `+2 terrain`, `+2 country, terrain`, or `—`; the number is 4 when the larger applicable level is High).
+Same six columns as strategic: `Unit ID`, `Type`, `Hex`, `Nearest enemy + distance`, `Threat severity`, `Action needed`. When an origin bonus flag or the tech bonus is on, a `Bonus` column follows `Hex`. Origin reads `+2 country`, `+2 terrain`, `+2 country, terrain`, or the number 4 when the larger applicable level is High. Tech appends `tech +2 attack` at Low, or `tech +2 attack and defense` at High, for an Advanced sub-unit. A row with neither reads `—`.
 
 - **No standing-order column.** Standing orders do not act in a beat, so a column for them would invite the model to rely on one. The row's current-order value is null by construction even when the parent unit has a standing order at strategic level.
 - **No quiet annotation.** Every sub-unit in the footprint is in the battle; there is no rear area.

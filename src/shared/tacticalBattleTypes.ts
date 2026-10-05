@@ -5,6 +5,7 @@
 
 import type { ActiveBonusLevel } from './bonusLevel';
 import type { UnitOrigin } from './unitOriginTypes';
+import type { TechLevel } from './techBonusTypes';
 import type { WeatherState } from './weatherBonusTypes';
 
 /**
@@ -107,6 +108,15 @@ export interface TacticalSubUnitSnapshot {
    * Exceptions: None.
    */
   weatherTags?: WeatherState[];
+  /**
+   * Tech tier of the parent unit's birth hex.
+   *
+   * Contract: Present when the match has the tech bonus on. Basic when the parent has no birth hex.
+   * When to use: Tactical tooltips and assessments. Dice recompute the tier from the birth hex.
+   * Expected outcome: The same tier as the parent.
+   * Exceptions: None.
+   */
+  techLevel?: TechLevel;
 }
 
 /**
@@ -181,6 +191,24 @@ export interface TacticalBattleSnapshot {
    * Exceptions: None.
    */
   weatherBonusLevel?: ActiveBonusLevel;
+  /**
+   * Whether the match that opened this battle has the tech bonus on.
+   *
+   * Contract: Omitted when off. True when the strategic snapshot had the flag on.
+   * When to use: Before applying tactical tech bonuses.
+   * Expected outcome: Matches the strategic match flag at battle start.
+   * Exceptions: None.
+   */
+  techBonusEnabled?: boolean;
+  /**
+   * How strong the tech bonus is in this battle.
+   *
+   * Contract: Present with `techBonusEnabled`. Missing next to a true flag means low.
+   * When to use: Read through `techBonusLevelOf` before applying tactical tech bonuses.
+   * Expected outcome: Matches the strategic match level at battle start.
+   * Exceptions: None.
+   */
+  techBonusLevel?: ActiveBonusLevel;
   /**
    * Tactical turn counter for future resolution milestones.
    *

@@ -18,7 +18,7 @@ Rules are divided into two layers: **strategic** (H3 res1, the primary game) and
 ## 1. Design principles
 
 - **Simultaneous resolution:** The engine resolves all combat and movement in a defined phase sequence. No mid-combat input, except the melee-intercept choice to enter a tactical battle or continue strategic melee.
-- **Dice-based hits:** Each unit rolls one d20; a hit is scored when the result is **less than or equal to** that unit's hit number (A&A style). The attack hit number is `min(17, max(2, attack − weather penalty − target cover) + origin bonus)`; the defense hit number is `min(17, defense + origin bonus)` (§4.9). Penalties and cover never take an attack below 2 before the bonus, and a roll of 18 to 20 always misses.
+- **Dice-based hits:** Each unit rolls one d20; a hit is scored when the result is **less than or equal to** that unit's hit number (A&A style). The attack hit number is `min(17, max(2, attack − weather penalty − target cover) + origin bonus + tech attack bonus)`; the defense hit number is `min(17, defense + origin bonus + tech defense bonus)` (§4.9). Penalties and cover never take an attack below 2 before either bonus, and a roll of 18 to 20 always misses.
 - **Automatic casualty assignment:** Hits remove units by **lowest defense first**, then type order **infantry → armor → naval → air** (`CASUALTY_PRIORITY_ORDER`).
 - **Resolution order (strategic):** embark → air strikes → ranged → ground/naval movement → cargo sync → ferry → melee. Production, control, and fog refresh run after melee.
 - **Resolution order (tactical beat):** embark → air strikes → ranged → movement → ferry → cargo sync → melee. No production step.
@@ -174,8 +174,8 @@ No "continue or retreat." If both sides remain in the same hex after melee, they
 ### 4.9 Hit and casualty rules
 
 - **Roll:** One die per unit (d20, result 1–20). Each roll draws once from the seeded game RNG (`createCombatDieRoller` in `src/main/combatDice.ts`).
-- **Hit:** For **attack** (including return fire), hit if `roll ≤ min(17, max(2, attack − weather penalty − target cover) + origin bonus)`. For **defense** (melee only), hit if `roll ≤ min(17, defense + origin bonus)`. The weather penalty, cover, and origin bonus are each 0 unless the rules below apply (`attackHitThreshold` and `defenseHitThreshold` in `src/main/combatHitThresholds.ts`).
-- **Floor and cap:** The floor of 2 applies after penalties and cover and before the origin bonus, so a shot keeps at least a 10% chance and a home unit always gets its full bonus. The cap of 17 means a roll of 18, 19, or 20 always misses.
+- **Hit:** For **attack** (including return fire), hit if `roll ≤ min(17, max(2, attack − weather penalty − target cover) + origin bonus + tech attack bonus)`. For **defense** (melee only), hit if `roll ≤ min(17, defense + origin bonus + tech defense bonus)`. The weather penalty, cover, origin bonus, and tech bonus are each 0 unless the rules below apply (`attackHitThreshold` and `defenseHitThreshold` in `src/main/combatHitThresholds.ts`).
+- **Floor and cap:** The floor of 2 applies after penalties and cover and before the origin and tech bonuses, so a shot keeps at least a 10% chance and a qualifying unit gets its full bonuses. The cap of 17 means a roll of 18, 19, or 20 always misses.
 - **Return fire (ranged phase):** A defending unit returns fire only if at least one attacker hex is a legal reverse shot under planning rules. **Strategic ground** (infantry/armor/naval): strategic ranged range + H3 grid distance. Infantry strategic range is 0, so infantry never returns fire on the strategic map. **Tactical ground:** tactical ranged baselines with terrain caps and mountain LOS (same as direct-fire validation), including infantry. **Air** in the ranged phase: strike-planning rules — intact airport at base, and on the strategic map within air strike range of the attacker hex; in a tactical battle, airport only (engagement hexes are already in footprint). Air-strike phase counter-fire (§8) is separate and still has **no** range-to-base check.
 - **Casualty assignment:** When a side receives N hits, remove N of its units using **lowest defense first**. Ties: **infantry → armor → naval → air**.
 
@@ -188,7 +188,7 @@ Two new-game dropdowns, **Country bonus** and **Terrain bonus**, each offer Off,
 | Low | +2 |
 | High | +4 |
 
-The highest printed attack is 10, so the highest attack hit number is 14, under the cap of 17. The highest defense hit number is 11.
+The highest printed attack is 10, so origin alone reaches 14, under the cap of 17. The highest defense hit number from origin alone is 11.
 
 - **Country bonus (strategic and tactical):** the unit's birth country equals the country of the place where it rolls. Countries match by canonical name, not by code. On the strategic map, a hex's country is its **majority country**: the country with the most res4 cells inside the hex, with ties going to the name that sorts first. A hex with no counted cells has no country. In a battle, a cell's country is that cell's own country, the same value used for unit births.
 - **Terrain bonus (tactical only):** the unit's birth terrain kind equals the cell's effective terrain kind. Urban and rubble are flags, not kinds, and never affect the match. The strategic map ignores this flag.
@@ -223,10 +223,28 @@ Penalties apply only to units that lack the tag. They never raise a printed stat
 
 - **Strategic movement** is always infantry 1, armor 2, naval 2, air 0, with the weather bonus off. At Low or High, armor and naval in weather that slows them move 1 hex. The weather is the hex the unit occupies now, so it can still enter a worse hex at full speed and is slowed on the next turn. Route and distance estimates use that same budget for the whole path.
 - **Tactical movement:** in weather that slows it, armor's or naval's budget becomes the level's cap (2 at Low, 1 at High), then the lower of that and the existing forest or urban budget. A slowed unit's budget is never below 1, and a march always makes at least one cell of progress. Infantry's budget stays 2. Snow or rain raises the cost of entering open ground (plains, desert, wetlands, arctic, coastal) to 2. Roads, rubble, and urban costs do not change.
-- **Attack:** armor ranged attack, including return fire and air-strike counter-fire, is lower in snow or heat by the level's penalty (3 at Low, 5 at High). An air strike is lower by the same amount once when the base or the target is snow, rain, or heat the unit lacks. The attack is at least 2 after the penalty and any cover, and before the origin bonus. High origin and High weather do not cancel exactly: home armor firing in snow ends at `max(2, 10 − 5) + 4 = 9`, one below its printed 10. Rain does not cut armor attack. Infantry attack is unchanged.
+- **Attack:** armor ranged attack, including return fire and air-strike counter-fire, is lower in snow or heat by the level's penalty (3 at Low, 5 at High). An air strike is lower by the same amount once when the base or the target is snow, rain, or heat the unit lacks. The attack is at least 2 after the penalty and any cover, and before the origin and tech bonuses. High origin and High weather do not cancel exactly: home armor firing in snow ends at `max(2, 10 − 5) + 4 = 9`, one below its printed 10. Rain does not cut armor attack. Infantry attack is unchanged.
 - **Unchanged:** defense, melee dice, casualty order, and tactical ferry. A strategic ferry into snow is 2 hexes instead of 4 when the unit lacks the snow tag, at either level.
 
 `estimate_combat` uses the same attack thresholds. With the weather bonus off, prompts stay as they were. With it on, the turn line names the month and the combat paragraph states the penalties for the chosen level.
+
+#### Tech bonus (optional)
+
+**Tech bonus** is a new-game dropdown offering Off, Low, and High, defaulting to Low. It sits at the right end of the options row. A match saved with no tech row plays with the bonus off. A saved flag with no level plays at Low.
+
+A unit's tier is fixed from the generated urban-cell count of its birth res1 hex, not from the live count after air strikes destroy urban cells. Five or more urban cells is Advanced. Fewer, a missing birth hex, or an unloaded count is Basic. The tier does not follow the hex the unit stands on now, and it does not change when the unit moves. Tactical sub-units use the parent unit's birth hex.
+
+| Level | Advanced attack | Advanced defense | Basic |
+|---|---|---|---|
+| Low | +2 | 0 | 0 |
+| High | +2 | +2 | 0 |
+
+The points are added after the floor of 2, in the same place as the origin bonus, and the cap of 17 still applies. Origin and tech are different bonuses and both apply. Real armor with High origin and High tech attacks at 16. Defense at High tech is the printed defense plus 2, so infantry and armor defend at 9 before any origin bonus.
+
+- **Rolls that change:** the same attack rolls as the origin bonus, including unit counter-fire. High also changes melee defense.
+- **Unchanged:** casualty order and air-strike victim picks (they keep printed defense), infrastructure counter-fire, movement, range, and production.
+
+The unit-flag tooltip lists Tech for a Basic or Advanced unit, with that tier's icon and word. A match with tech off omits the line. With the option off, the combat paragraph does not mention tech. With it on, `assess_unit` reports `techLevel`, `estimate_combat` reports effective values plus `techBonus`, and the briefing Bonus cell names the clause.
 
 #### Terrain cover
 
@@ -246,7 +264,7 @@ Cover lowers the shooter's attack hit number based on the **target's** terrain. 
 - **Strategic source:** the target hex's main terrain, `hexes.terrain_kind`, which is the dominant detail-cell kind stored at seeding and never changes during a match. Urban does not give cover on the strategic map.
 - **Battle source:** the target cell's effective terrain kind (a cell without its own kind takes the battle hex's kind, as movement does), plus its urban and rubble flags. When a cell has both, the larger cover applies in each column.
 
-`estimate_combat` subtracts the same cover from ranged attack values, and the AI combat rules paragraph always states it. Hex tooltips show a Cover line, and the effects tooltip names the cover source while aiming at covered units ([hex tooltips](ux/hex-tooltips.md)).
+`estimate_combat` subtracts the same cover from ranged attack values, and the AI combat rules paragraph always states it. Hex tooltips include that cover on the Effects line, with an up icon for 1 and a double up icon for 2, labeled Ground & Naval Cover and Air Cover. The effects tooltip names the cover source while aiming at covered units ([hex tooltips](ux/hex-tooltips.md)).
 
 #### Reference odds
 
@@ -415,7 +433,7 @@ Destroyed urban hexes, airports, and seaports do not rebuild. This applies globa
 | Airport | 10 (50%) | AA defenses (fixed roll, unaffected by hex occupation) | ≤ 7 (35%) |
 | Seaport | 10 (50%) | Seaport defenses (fixed roll, unaffected by hex occupation) | ≤ 3 (15%) |
 
-The values in §8 are the printed values. With an origin bonus on (§4.9), a qualifying air unit's strike roll and a qualifying defender's counter-fire roll each add the bonus amount (2 at Low, 4 at High). Infrastructure counter-fire never changes.
+The values in §8 are the printed values. With an origin bonus on (§4.9), a qualifying air unit's strike roll and a qualifying defender's counter-fire roll each add the bonus amount (2 at Low, 4 at High). An Advanced unit also adds its tech bonus (§4.9). Infrastructure counter-fire never changes.
 
 ---
 
@@ -545,7 +563,7 @@ At the tactical level, all unit types have a positive ranged baseline (`RANGED_R
 - **Air-strike AA:** tactical infantry may counter-fire when an air strike targets their hex, because infantry has a positive tactical ranged baseline.
 - Legal targets include enemy-occupied cells **and** strikeable infrastructure (urban, airport, seaport, or active non-rubble road/rail).
 
-Ranged attacks use the same A&A-style dice as strategic combat. Casualty assignment follows the standard fixed priority. With the origin bonuses on, a unit on a cell matching its birth country or birth terrain kind adds 2 (Low) or 4 (High) to its rolls there (§4.9, "Origin bonuses").
+Ranged attacks use the same A&A-style dice as strategic combat. Casualty assignment follows the standard fixed priority. With the origin bonuses on, a unit on a cell matching its birth country or birth terrain kind adds 2 (Low) or 4 (High) to its rolls there (§4.9, "Origin bonuses"). An Advanced unit adds its tech bonus on top (§4.9, "Tech bonus").
 
 **Terrain cover in battles:** a shot at units on a forest, mountain, wetlands, urban, or rubble cell takes that cell's cover (§4.9, "Terrain cover"). The attacker-cell range cap above and the target-cell cover are separate rules and can both apply to one shot. Cover never applies to ranged fire at infrastructure. Infantry firing at an urban cell drops from 3 to the floor of 2.
 

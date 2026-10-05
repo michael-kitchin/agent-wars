@@ -96,6 +96,8 @@ export function originBonusSettingsFromSnapshot(
     | 'countryBonusLevel'
     | 'terrainBonusLevel'
     | 'weatherBonusLevel'
+    | 'techBonusEnabled'
+    | 'techBonusLevel'
   >
 ): OriginBonusSettings {
   return {
@@ -110,11 +112,17 @@ export function originBonusSettingsFromSnapshot(
           ...(state.weatherBonusLevel ? { weatherBonusLevel: state.weatherBonusLevel } : {}),
         }
       : {}),
+    ...(state.techBonusEnabled === true
+      ? {
+          techBonusEnabled: true as const,
+          ...(state.techBonusLevel ? { techBonusLevel: state.techBonusLevel } : {}),
+        }
+      : {}),
   };
 }
 
 /**
- * Builds match settings from the three new-game levels.
+ * Builds match settings from the new-game levels.
  *
  * Purpose: The new-game path chooses levels, while the rules read an on/off flag plus a level.
  * When to use: When a new match starts, after each level has been parsed.
@@ -126,8 +134,17 @@ export function originBonusSettingsFromLevels(input: {
   readonly terrain: BonusLevel;
   readonly weather: BonusLevel;
   readonly startMonth?: number;
+  /**
+   * Tech bonus level for the new match.
+   *
+   * Contract: Optional. Missing means off, so callers that predate the option keep the old dice.
+   * When to use: The new-game dialog's Tech control.
+   * Expected outcome: The flag is on only when this is `low` or `high`.
+   * Exceptions: None.
+   */
+  readonly tech?: BonusLevel;
 }): OriginBonusSettings {
-  const { country, terrain, weather, startMonth } = input;
+  const { country, terrain, weather, startMonth, tech = 'off' } = input;
   return {
     countryBonusEnabled: country !== 'off',
     terrainBonusEnabled: terrain !== 'off',
@@ -135,6 +152,7 @@ export function originBonusSettingsFromLevels(input: {
     ...(country !== 'off' ? { countryBonusLevel: country } : {}),
     ...(terrain !== 'off' ? { terrainBonusLevel: terrain } : {}),
     ...(weather !== 'off' ? { weatherBonusLevel: weather } : {}),
+    ...(tech !== 'off' ? { techBonusEnabled: true as const, techBonusLevel: tech } : {}),
     startMonth,
   };
 }

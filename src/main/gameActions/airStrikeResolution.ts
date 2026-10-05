@@ -25,6 +25,7 @@ import type { WeatherAttackKind, WeatherAttackPenalty } from '../../shared/weath
 import type { AirStrikeAnimationMove, AirStrikeOrder, AirStrikeTargetType, InfrastructureDestroyedEvent } from '../../shared/ipcTypes';
 import type { CombatUnit } from '../combatUnitTypes';
 import type { OriginHitBonusLookup } from '../originBonus/originHitBonusLookup';
+import { noTechHitBonus, type TechHitBonusLookup } from '../techBonus/techHitBonusLookup';
 import type { TerrainCoverLookup } from '../terrainCover/terrainCoverLookup';
 import { validateAirStrikeOrder } from './airValidation';
 import { isEmbarkedLandUnitOnWater } from './sealift';
@@ -368,8 +369,10 @@ function resolveAirStrikeAgainstUnits(
   attackHit: boolean,
   rollDie: () => number,
   acc: AirStrikePhaseAccumulator,
-  originHitBonusAt: OriginHitBonusLookup
+  bonuses: { originHitBonusAt: OriginHitBonusLookup; techHitBonusAt?: TechHitBonusLookup }
 ): { success: boolean; attackerLost: boolean } {
+  const originHitBonusAt = bonuses.originHitBonusAt;
+  const techHitBonusAt = bonuses.techHitBonusAt ?? noTechHitBonus;
   const defenders = dbGetAll<{ id: string; player: string; unit_type: string; h3_index: string; display_order: number | null }>(
     'SELECT id, player, unit_type, h3_index, display_order FROM units WHERE h3_index = ? AND player != ?',
     [targetH3Index, attacker.player]
@@ -394,6 +397,7 @@ function resolveAirStrikeAgainstUnits(
     if (rollDie() > attackHitThreshold({
       unitType: defender.unit_type,
       originHitBonus: originHitBonusAt(defender.id, defender.h3_index),
+      techAttackBonus: techHitBonusAt(defender.id).attack,
       weatherAttackPenalty: penaltyForDbUnit({
         unitId: defender.id,
         unitType: defender.unit_type,
@@ -464,7 +468,8 @@ export function resolveAirStrikePhase(
   airOrders: AirStrikeOrder[],
   next: () => number,
   originHitBonusAt: OriginHitBonusLookup,
-  targetCoverAt: TerrainCoverLookup
+  targetCoverAt: TerrainCoverLookup,
+  techHitBonusAt: TechHitBonusLookup = noTechHitBonus
 ): {
   removedUnitIds: string[];
   removedUnits: CombatUnit[];
@@ -514,6 +519,7 @@ export function resolveAirStrikePhase(
     const attackHit = rollDie() <= attackHitThreshold({
       unitType: 'air',
       originHitBonus: originHitBonusAt(attacker.id, attacker.h3_index),
+      techAttackBonus: techHitBonusAt(attacker.id).attack,
       weatherAttackPenalty: penaltyForDbUnit({
         unitId: attacker.id,
         unitType: 'air',
@@ -524,7 +530,10 @@ export function resolveAirStrikePhase(
       targetCover: order.targetType === 'units' ? targetCoverAt(order.targetH3Index, 'air') : 0,
     });
     if (order.targetType === 'units') {
-      const result = resolveAirStrikeAgainstUnits(attacker, order.targetH3Index, attackHit, rollDie, acc, originHitBonusAt);
+      const result = resolveAirStrikeAgainstUnits(attacker, order.targetH3Index, attackHit, rollDie, acc, {
+        originHitBonusAt,
+        techHitBonusAt,
+      });
       strikeMoves.push({
         unitId: attacker.id,
         player: attacker.player,

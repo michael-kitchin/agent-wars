@@ -18,6 +18,7 @@ import {
   getMovementBudget,
   getRange,
 } from '../../combatConstants';
+import { buildTechBonusRule } from './gameRuleTechText';
 import { STALE_INTEL_TURNS } from '../../gameDb/fogState';
 import { logDebug, logTrace } from '../../logger';
 import { ALL_BUILD_UNIT_TYPES } from '../../../shared/ipc/productionTypes';
@@ -249,7 +250,7 @@ function formatOrList(items: readonly string[]): string {
  * Weather penalty sentence for a match that has the weather bonus on.
  *
  * Purpose: The model must know movement and attack are reduced, and that tags cancel the reduction.
- * When to use: Combat paragraph after the origin bonus sentence.
+ * When to use: Combat paragraph after the tech sentence, or after the origin sentence when tech is off.
  * Expected outcome: Null when the flag is off, so the paragraph stays unchanged. Otherwise the slowing weather, the
  * battle budget cap, and the attack penalty for the match's level, read from the weather rule tables.
  * Exceptions: None.
@@ -269,7 +270,7 @@ export function buildWeatherRule(gates: GameRuleTextGates): string | null {
     `Armor ranged attack is ${penalty} lower in snow or heat, including return fire and air-strike counter-fire. ` +
     `An air strike is ${penalty} lower once when its base or its target is snow, rain, or heat the unit lacks. ` +
     'A strategic ferry into snow is 2 hexes unless the unit is tagged for snow. ' +
-    'Defense, melee, and casualty order keep their printed values. A tag is earned by the birth hex. ' +
+    'Weather does not change defense, melee, or casualty order. A tag is earned by the birth hex. ' +
     'The Unit Status Weather column names the weather where that unit stands. Birth tags, when the unit has any, follow in parentheses.'
   );
 }
@@ -564,17 +565,19 @@ function buildAttackConstraintsClause(gates: GameRuleTextGates): string {
  * has one home. Clause order follows strategic-prompt.md section 1.5, with tactical substitutions from 2.5.
  * When to use: Once per assembled system prompt, after roster and tool flags are known.
  * Expected outcome: Hold-fire only when `ordersEnabled`; air and naval clauses only when those units exist;
- * the origin bonus sentence only when a flag applies in this mode; the terrain cover sentence always, after weather.
+ * the origin bonus sentence only when a flag applies in this mode; the tech sentence only when that option is on, between origin and weather; the terrain cover sentence always, after weather.
  * Exceptions: None.
  */
 export function buildCombatRulesParagraph(gates: GameRuleTextGates): string {
   logDebug('promptSpec buildCombatRulesParagraph', { ...gates });
   const originBonus = buildOriginBonusRule(gates);
+  const techBonus = buildTechBonusRule(gates.originBonusSettings);
   const weatherRule = buildWeatherRule(gates);
   const parts: string[] = [
     buildCombatStatsLine(gates.coordinateMode, gates.hasAirUnits),
     buildCasualtySortRule(),
     ...(originBonus ? [originBonus] : []),
+    ...(techBonus ? [techBonus] : []),
     ...(weatherRule ? [weatherRule] : []),
     buildTerrainCoverRule(gates.coordinateMode),
     buildResolutionOrderRule(gates.coordinateMode),

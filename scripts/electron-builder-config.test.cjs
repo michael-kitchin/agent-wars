@@ -101,8 +101,9 @@ function testLinuxAndMacIconContract() {
 function testIconPackagingContract() {
   const files = Array.isArray(buildConfig.files) ? buildConfig.files : [];
   const ciFiles = Array.isArray(ciBuildConfig.files) ? ciBuildConfig.files : [];
-  assert.ok(files.includes('symbols'), 'electron-builder files must include symbols directory');
-  assert.ok(ciFiles.includes('symbols'), 'CI electron-builder files must include symbols directory');
+  assert.ok(!files.includes('symbols'), 'electron-builder files must not include a symbols directory');
+  assert.ok(!ciFiles.includes('symbols'), 'CI electron-builder files must not include a symbols directory');
+  assert.ok(files.includes('static'), 'electron-builder files must include static, which holds the unit glyphs');
 }
 
 function main() {

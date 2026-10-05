@@ -14271,7 +14271,7 @@
   var ORDER_ARROW_SIZE = 10;
   var AI_ORDER_LINE_COLOR = PLAYER_COLORS.opponent;
   var TOOLTIP_OFFSET_PX = 12;
-  var HEX_DETAILS_TOOLTIP_DELAY_MS = 750;
+  var HEX_DETAILS_TOOLTIP_DELAY_MS = 1e3;
   var ORDER_BLOCK_HEX_TOOLTIP_TTL_MS = 1500;
   var WORLD_H3_RESOLUTION = STRATEGIC_H3_RESOLUTION;
   var DETAIL_H3_RESOLUTION = TACTICAL_H3_RESOLUTION;
@@ -15699,6 +15699,9 @@
   function formatTerrainSwatchHtml(kind) {
     return `<span class="${TERRAIN_SWATCH_CLASS_NAME}" data-terrain-kind="${kind}" aria-hidden="true"></span>`;
   }
+  function formatUrbanSwatchHtml() {
+    return `<span class="${TERRAIN_SWATCH_CLASS_NAME}" data-terrain-kind="urban" aria-hidden="true"></span>`;
+  }
   function formatTerrainKindHtml(kind) {
     const label = formatTerrainKindLabel(kind ?? null);
     const pipeline = pipelineKindFromRaw(kind);
@@ -15711,6 +15714,9 @@
   function formatTerrainNameTokenHtml(token) {
     const match = /^([A-Za-z]+)([\s\S]*)$/.exec(token);
     const word = match?.[1] ?? "";
+    if (match && word === "Urban") {
+      return `${formatUrbanSwatchHtml()}${escapeHtmlText(word)}${escapeHtmlText(match[2] ?? "")}`;
+    }
     const kind = DISPLAY_LABEL_TO_KIND[word];
     if (!match || !kind) return escapeHtmlText(token);
     return `${formatTerrainSwatchHtml(kind)}${escapeHtmlText(word)}${escapeHtmlText(match[2] ?? "")}`;
@@ -15860,6 +15866,33 @@
     return `<img class="${WEATHER_ICON_CLASS_NAME}" src="${src}" alt="" aria-hidden="true" />${escapeHtmlText(label)}`;
   }
 
+  // src/shared/featureIconHtml.ts
+  var FEATURE_ICON_CLASS_NAME = "feature-icon";
+  function formatFeatureIconHtml(src, label) {
+    return `<img class="${FEATURE_ICON_CLASS_NAME}" src="${escapeHtmlText(src)}" alt="" aria-hidden="true" />${escapeHtmlText(label)}`;
+  }
+  function transportLineSpecified(input) {
+    return input.road === true || input.rail === true || input.roadRail === true;
+  }
+  function formatTransportIconsHtml(input) {
+    const specified = input.road === true || input.rail === true;
+    const road = specified ? input.road === true : input.roadRail === true;
+    const rail = specified ? input.rail === true : input.roadRail === true;
+    const parts = [];
+    if (road) parts.push(formatFeatureIconHtml("transport/road.svg", "Road"));
+    if (rail) parts.push(formatFeatureIconHtml("transport/rail.svg", "Rail"));
+    return parts.join(", ");
+  }
+  function formatFeatureLabelHtml(label) {
+    if (label === "Road") return formatFeatureIconHtml("transport/road.svg", "Road");
+    if (label === "Rail") return formatFeatureIconHtml("transport/rail.svg", "Rail");
+    return escapeHtmlText(label);
+  }
+  function formatTechTierHtml(level) {
+    if (level === "advanced") return formatFeatureIconHtml("tech/tech_advanced.svg", "Advanced");
+    return formatFeatureIconHtml("tech/tech_basic.svg", "Basic");
+  }
+
   // src/shared/unitOriginTooltipText.ts
   function unitOriginsPresentTheSame(left, right) {
     return left.birthH3Index === right.birthH3Index && left.birthRes4H3Index === right.birthRes4H3Index && left.birthTerrainKind === right.birthTerrainKind && left.birthIsUrban === right.birthIsUrban && left.birthCountryName === right.birthCountryName && left.birthCountryCode === right.birthCountryCode;
@@ -15881,6 +15914,9 @@
       const tags = weatherTagsInDisplayOrder(input.bonuses.weatherTags);
       if (tags.length > 0) rows.push(bonusRow("Weather", tags.map((tag) => formatWeatherIconHtml(tag)).join(", ")));
     }
+    if (input.bonuses.techLevel === "basic" || input.bonuses.techLevel === "advanced") {
+      rows.push(bonusRow("Tech", formatTechTierHtml(input.bonuses.techLevel)));
+    }
     const body = rows.length > 0 ? rows.join("\n") : "None";
     return `<strong>Bonuses:</strong>
 ${body}`;
@@ -15889,17 +15925,22 @@ ${body}`;
   // src/renderer/core/unitOriginFlags.ts
   var unitOriginById = /* @__PURE__ */ new Map();
   var weatherTagsByBirthHex = /* @__PURE__ */ new Map();
+  var techLevelByBirthHex = /* @__PURE__ */ new Map();
   function rememberUnitOrigins(units) {
     for (const unit of units) {
       if (unit.origin) unitOriginById.set(unit.id, unit.origin);
       if (unit.origin?.birthH3Index && unit.weatherTags) {
         weatherTagsByBirthHex.set(unit.origin.birthH3Index, unit.weatherTags);
       }
+      if (unit.origin?.birthH3Index && unit.techLevel) {
+        techLevelByBirthHex.set(unit.origin.birthH3Index, unit.techLevel);
+      }
     }
   }
   function clearRememberedUnitOrigins() {
     unitOriginById.clear();
     weatherTagsByBirthHex.clear();
+    techLevelByBirthHex.clear();
   }
   function resolveUnitOrigin(unitId) {
     const direct = unitOriginById.get(unitId);
@@ -15919,15 +15960,24 @@ ${body}`;
     const options = selectedBonusOptions();
     return {
       ...options,
-      weatherTags: options.weatherEnabled ? weatherTagsFor(unitId, origin) : void 0
+      weatherTags: options.weatherEnabled ? weatherTagsFor(unitId, origin) : void 0,
+      techLevel: techLevelFor(unitId, origin)
     };
   }
   function bonusesForAbsentUnit(origin) {
     const options = selectedBonusOptions();
     return {
       ...options,
-      weatherTags: options.weatherEnabled ? weatherTagsByBirthHex.get(origin.birthH3Index) ?? [] : void 0
+      weatherTags: options.weatherEnabled ? weatherTagsByBirthHex.get(origin.birthH3Index) ?? [] : void 0,
+      techLevel: techLevelByBirthHex.get(origin.birthH3Index)
     };
+  }
+  function techLevelFor(unitId, origin) {
+    const battleUnit = rendererSharedState.tacticalBattleSnapshot?.subUnits.find((unit) => unit.id === unitId);
+    if (battleUnit?.techLevel) return battleUnit.techLevel;
+    const strategicUnit = rendererSharedState.gameState?.units.find((unit) => unit.id === unitId);
+    if (strategicUnit?.techLevel) return strategicUnit.techLevel;
+    return techLevelByBirthHex.get(origin.birthH3Index);
   }
   function weatherTagsFor(unitId, origin) {
     const battleUnit = rendererSharedState.tacticalBattleSnapshot?.subUnits.find((unit) => unit.id === unitId);
@@ -15948,6 +15998,11 @@ ${body}`;
   }
   function createAbsentUnitOriginFlagImage(origin) {
     return createUnitOriginFlagImage({ origin, bonuses: bonusesForAbsentUnit(origin) });
+  }
+  function formatLiveUnitOriginTooltipHtml(unitId) {
+    const origin = resolveUnitOrigin(unitId);
+    if (!origin) return null;
+    return formatUnitOriginTooltipHtml({ origin, bonuses: bonusesForLiveUnit(unitId, origin) });
   }
   function setUnitNameContent(target, unitId, text) {
     target.replaceChildren();
@@ -17324,6 +17379,36 @@ ${body}`;
     return "none";
   }
 
+  // src/renderer/rendering/terrainLegendUrban.ts
+  var URBAN_SWATCH_COLOR = Object.freeze({
+    default: "#827060",
+    atlas: "#8d7a67",
+    wargame: "#847061",
+    scientific: "#897562"
+  });
+  function urbanSwatchColor(styleId) {
+    return URBAN_SWATCH_COLOR[styleId] ?? URBAN_SWATCH_COLOR.default;
+  }
+  function appendUrbanLegendRow(container, color) {
+    const row = document.createElement("div");
+    row.style.display = "flex";
+    row.style.alignItems = "center";
+    row.style.gap = "6px";
+    row.style.marginBottom = "2px";
+    const swatch = document.createElement("span");
+    swatch.style.display = "inline-block";
+    swatch.style.width = "18px";
+    swatch.style.height = "12px";
+    swatch.style.border = "1px solid #d5deea";
+    swatch.style.borderRadius = "2px";
+    swatch.style.background = color;
+    row.appendChild(swatch);
+    const label = document.createElement("span");
+    label.textContent = "Urban";
+    row.appendChild(label);
+    container.appendChild(row);
+  }
+
   // src/renderer/rendering/terrainVisualStyles.ts
   var patternCache = /* @__PURE__ */ new Map();
   var UNKNOWN_FILL = "rgba(140, 140, 140, 0.075)";
@@ -17577,7 +17662,7 @@ ${body}`;
     root.querySelectorAll(`span.${TERRAIN_SWATCH_CLASS_NAME}`).forEach((node) => {
       const kind = node.dataset.terrainKind;
       if (!kind) return;
-      node.style.background = terrainSwatchColor(kind);
+      node.style.background = kind === "urban" ? urbanSwatchColor(activeTerrainStyleId) : terrainSwatchColor(kind);
     });
   }
   var TERRAIN_SWATCH_COLORS = {
@@ -17734,6 +17819,7 @@ ${body}`;
       row.appendChild(lab);
       container.appendChild(row);
     }
+    appendUrbanLegendRow(container, urbanSwatchColor(getActiveTerrainStyleId()));
   }
 
   // src/renderer/rendering/terrainInfrastructureIconPaths.ts
@@ -19038,6 +19124,8 @@ ${body}`;
     }
     const slowerOrder = [];
     const seen = /* @__PURE__ */ new Set();
+    let usedRoad = false;
+    let usedRail = false;
     const push = (lab) => {
       if (!seen.has(lab)) {
         seen.add(lab);
@@ -19065,15 +19153,11 @@ ${body}`;
         push("Rubble");
         continue;
       }
-      if (battle.res4IsUrbanByH3?.[h]) {
-        push("Urban");
-        continue;
-      }
+      const urban = battle.res4IsUrbanByH3?.[h] === true;
       const rawKind = effectiveRes4TerrainKindString(battle, h);
       const parent = battle.strategicHexTerrain ?? "land";
       const cat = normalizeDbTerrainKindToTacticalCategory(String(rawKind).toLowerCase(), parent);
       const cost = tacticalEnterHexMovementCost(moveType, cat);
-      const plainsCost = tacticalEnterHexMovementCost(moveType, "plains");
       const stepCost = landInfantryArmorEnterCost({
         toH3: h,
         unitTypeForMovement: moveType,
@@ -19087,8 +19171,16 @@ ${body}`;
         weatherTags: subUnit.weatherTags
       });
       const usedLineRate = Number.isFinite(stepCost) && stepCost < 1;
-      if (usedLineRate && (cost > plainsCost || !Number.isFinite(cost))) {
+      if (usedLineRate) {
         roadRail = true;
+        const railSides = battle.res4RailSidesByH3?.[h];
+        const roadSides = battle.res4RoadSidesByH3?.[h];
+        if (railSides?.some((side) => side === true)) usedRail = true;
+        else if (roadSides?.some((side) => side === true)) usedRoad = true;
+        continue;
+      }
+      if (urban) {
+        push("Urban");
         continue;
       }
       if (Number.isFinite(cost) && cost > 1) {
@@ -19106,7 +19198,7 @@ ${body}`;
         tags: subUnit.weatherTags,
         enabled: battle.weatherBonusEnabled === true
       });
-      if (!usedLineRate && Number.isFinite(cost) && openGround > cost && (battle.weather === "snow" || battle.weather === "rain")) {
+      if (Number.isFinite(cost) && openGround > cost && (battle.weather === "snow" || battle.weather === "rain")) {
         push(formatWeatherLabel(battle.weather));
       }
       if (tacticalRes4CellIsForestClass(battle, h) && (subUnit.unitType === "armor" || subUnit.unitType === "infantry")) {
@@ -19117,7 +19209,12 @@ ${body}`;
         push("Mountain");
       }
     }
-    return { slower: slowerOrder, roadRail };
+    return {
+      slower: slowerOrder,
+      roadRail,
+      ...usedRoad ? { road: true } : {},
+      ...usedRail ? { rail: true } : {}
+    };
   }
   function pickTacticalRangedSlowTerrainDisplayTitle(battle, unitType, attackerSubUnitId) {
     if (unitType !== "infantry" && unitType !== "armor") return null;
@@ -19197,15 +19294,24 @@ ${body}`;
   function mergeOrderPreviewTerrainImpactsFromPreviews(previews) {
     const slower = /* @__PURE__ */ new Set();
     let roadRail = false;
+    let road = false;
+    let rail = false;
     for (const row of previews) {
       const imp = row.preview.orderPreviewTerrainImpact;
       if (!imp) continue;
       roadRail = roadRail || imp.roadRail;
+      road = road || imp.road === true;
+      rail = rail || imp.rail === true;
       for (const s of imp.slower) slower.add(s);
     }
     const slowerArr = sortSlowTerrainLabels([...slower]);
-    if (slowerArr.length === 0 && !roadRail) return null;
-    return { slower: slowerArr, roadRail };
+    if (slowerArr.length === 0 && !roadRail && !road && !rail) return null;
+    return {
+      slower: slowerArr,
+      roadRail,
+      ...road ? { road: true } : {},
+      ...rail ? { rail: true } : {}
+    };
   }
   function buildHumanOrderGroupPreviewEnvelope(args) {
     const previews = [...args.previews];
@@ -19605,7 +19711,12 @@ ${body}`;
       pathH3: displayPath
     });
     const sortedSlower = sortSlowTerrainLabels(marchImpact.slower);
-    const orderPreviewTerrainImpact = sortedSlower.length > 0 || marchImpact.roadRail ? { slower: sortedSlower, roadRail: marchImpact.roadRail } : null;
+    const orderPreviewTerrainImpact = sortedSlower.length > 0 || marchImpact.roadRail || marchImpact.road === true || marchImpact.rail === true ? {
+      slower: sortedSlower,
+      roadRail: marchImpact.roadRail,
+      ...marchImpact.road === true ? { road: true } : {},
+      ...marchImpact.rail === true ? { rail: true } : {}
+    } : null;
     const slowTitle = sortedSlower.length > 0 ? sortedSlower.join(", ") : marchImpact.roadRail ? "Road/Rail" : null;
     const buildSegments = () => {
       if (plan.reachableThisTurn) {
@@ -19738,54 +19849,54 @@ ${body}`;
   var TOKEN_ICON_FIT_RATIO = 0.9;
   var UNIT_ICON_FILE_BY_TYPE = {
     /**
-       * Documents the object literal property `infantry` (infantry: 'infantry-1.svg').
+       * Documents the object literal property `infantry` (infantry: 'infantry.svg').
     
        * Purpose: Supports maintainability by documenting why `infantry` exists.
        * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
        * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
        * Exceptions: None.
        */
-    infantry: "infantry-1.svg",
+    infantry: "infantry.svg",
     /**
-       * Documents the object literal property `armor` (armor: 'armor-1.svg').
+       * Documents the object literal property `armor` (armor: 'armor.svg').
     
        * Purpose: Supports maintainability by documenting why `armor` exists.
        * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
        * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
        * Exceptions: None.
        */
-    armor: "armor-1.svg",
+    armor: "armor.svg",
     /**
-       * Documents the object literal property `naval` (naval: 'naval-1.svg').
+       * Documents the object literal property `naval` (naval: 'naval.svg').
     
        * Purpose: Supports maintainability by documenting why `naval` exists.
        * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
        * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
        * Exceptions: None.
        */
-    naval: "naval-1.svg",
+    naval: "naval.svg",
     /**
-       * Documents the object literal property `air` (air: 'air-1.svg').
+       * Documents the object literal property `air` (air: 'air.svg').
     
        * Purpose: Supports maintainability by documenting why `air` exists.
        * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
        * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
        * Exceptions: None.
        */
-    air: "air-1.svg",
+    air: "air.svg",
     /**
-       * Documents the object literal property `mixed` (mixed: 'mixed-1.svg').
+       * Documents the object literal property `mixed` (mixed: 'mixed.svg').
     
        * Purpose: Supports maintainability by documenting why `mixed` exists.
        * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
        * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
        * Exceptions: None.
        */
-    mixed: "mixed-1.svg"
+    mixed: "mixed.svg"
   };
   var unitIconCache = /* @__PURE__ */ new Map();
   function iconPathForType(unitType) {
-    return `../symbols/${UNIT_ICON_FILE_BY_TYPE[unitType]}`;
+    return `units/${UNIT_ICON_FILE_BY_TYPE[unitType]}`;
   }
   function getOrStartUnitIconLoad(unitType) {
     if (unitIconCache.has(unitType)) return unitIconCache.get(unitType) ?? null;
@@ -20656,7 +20767,8 @@ ${body}`;
   var NEW_GAME_BONUS_LEVEL_SELECT_IDS = {
     countryBonusLevel: "new-game-country-bonus-select",
     terrainBonusLevel: "new-game-terrain-bonus-select",
-    weatherBonusLevel: "new-game-weather-bonus-select"
+    weatherBonusLevel: "new-game-weather-bonus-select",
+    techBonusLevel: "new-game-tech-bonus-select"
   };
   var NEW_GAME_START_MONTH_ID = "new-game-start-month";
   function fogCheckbox() {
@@ -20671,7 +20783,8 @@ ${body}`;
       fogOfWarEnabled: fogCheckbox()?.checked !== false,
       countryBonusLevel: levelOf(NEW_GAME_BONUS_LEVEL_SELECT_IDS.countryBonusLevel),
       terrainBonusLevel: levelOf(NEW_GAME_BONUS_LEVEL_SELECT_IDS.terrainBonusLevel),
-      weatherBonusLevel: levelOf(NEW_GAME_BONUS_LEVEL_SELECT_IDS.weatherBonusLevel)
+      weatherBonusLevel: levelOf(NEW_GAME_BONUS_LEVEL_SELECT_IDS.weatherBonusLevel),
+      techBonusLevel: levelOf(NEW_GAME_BONUS_LEVEL_SELECT_IDS.techBonusLevel)
     };
   }
   function readNewGameStartMonth() {
@@ -21702,6 +21815,34 @@ ${body}`;
     return parentCode && childCode ? `(${parentCode}.${childCode})` : null;
   }
 
+  // src/shared/statusIconHtml.ts
+  var STATUS_ICON_CLASS_NAME = "status-icon";
+  var STATUS_ICON = Object.freeze({
+    up: Object.freeze({ file: "arrow_up.svg", alt: "+" }),
+    doubleUp: Object.freeze({ file: "arrow_up_double.svg", alt: "++" }),
+    down: Object.freeze({ file: "arrow_down.svg", alt: "-" }),
+    blocked: Object.freeze({ file: "x_mark.svg", alt: "x" })
+  });
+  var EFFECT_SYMBOL_KIND = Object.freeze({
+    "+": "up",
+    "-": "down",
+    x: "blocked"
+  });
+  function formatStatusIconHtml(kind) {
+    const icon = STATUS_ICON[kind];
+    const src = escapeHtmlText(`status/${icon.file}`);
+    const alt = escapeHtmlText(icon.alt);
+    return `<img class="${STATUS_ICON_CLASS_NAME}" src="${src}" alt="${alt}" />`;
+  }
+  function formatEffectSymbolPrefixHtml(symbols) {
+    let html = "";
+    for (const symbol of symbols) {
+      const kind = EFFECT_SYMBOL_KIND[symbol];
+      if (kind) html += formatStatusIconHtml(kind);
+    }
+    return html;
+  }
+
   // src/shared/terrainEffectsForTooltip.ts
   var SYMBOL_ORDER = ["x", "-", "+"];
   var MOVEMENT_UNIT_TYPES = ["infantry", "armor", "naval"];
@@ -21714,16 +21855,23 @@ ${body}`;
     if (!symbols) return "";
     return `(${symbols})`;
   }
+  function unwrapTerrainEffectSymbolSetFromDisplay(display) {
+    const match = /^\(([-x+/]+)\)$/.exec(display);
+    return match ? match[1] : display;
+  }
   function formatTerrainEffectLabel(category, unit) {
     return unit === "All" ? `All ${category}` : `${unit} ${category}`;
+  }
+  function formatTerrainEffectSymbolPrefixHtml(symbols) {
+    return formatEffectSymbolPrefixHtml(symbols);
   }
   function formatTerrainEffectEntryPlain(symbols, category, unit) {
     return `${wrapTerrainEffectSymbolSetForDisplay(symbols)} ${formatTerrainEffectLabel(category, unit)}`;
   }
   function formatTerrainEffectEntryHtmlFromParts(symbols, category, unit) {
-    return formatTerrainEffectEntryPlain(symbols, category, unit);
+    return `${formatTerrainEffectSymbolPrefixHtml(symbols)}${formatTerrainEffectLabel(category, unit)}`;
   }
-  function formatTerrainEffectEntriesHtml(grouped) {
+  function formatTerrainEffectEntries(grouped) {
     const entries = [];
     for (const [key, symbols] of grouped) {
       const slash = formatSymbolSet(symbols);
@@ -21731,9 +21879,21 @@ ${body}`;
       const pipe = key.indexOf("|");
       const category = key.slice(0, pipe);
       const unit = key.slice(pipe + 1);
-      entries.push(formatTerrainEffectEntryHtmlFromParts(slash, category, unit));
+      entries.push(formatTerrainEffectEntryPlain(slash, category, unit));
     }
     return [...new Set(entries)].sort((a, b) => a.localeCompare(b));
+  }
+  function formatTerrainEffectEntryHtml(entry) {
+    const match = /^(\([-x+/]+\)) (All|Air|Armored|Infantry|Naval) (Movement|Range)$/.exec(entry);
+    if (!match) return entry;
+    return formatTerrainEffectEntryHtmlFromParts(
+      unwrapTerrainEffectSymbolSetFromDisplay(match[1]),
+      match[3],
+      match[2]
+    );
+  }
+  function formatTerrainEffectsLineHtml(line) {
+    return line.split(", ").map(formatTerrainEffectEntryHtml).join(", ");
   }
   function buildTerrainEffectGroupedMap(input) {
     const cat = normalizeDbTerrainKindToTacticalCategory(input.terrainKind, input.parentTerrain);
@@ -21757,9 +21917,13 @@ ${body}`;
     collapseCategoryEntries(grouped, "Range", rangeByUnit, occupiableRangeUnits(cat, input));
     return grouped;
   }
-  function computeTerrainEffectsLineHtml(input) {
-    const formatted = formatTerrainEffectEntriesHtml(buildTerrainEffectGroupedMap(input));
+  function computeTerrainEffectsLine(input) {
+    const formatted = formatTerrainEffectEntries(buildTerrainEffectGroupedMap(input));
     return formatted.length > 0 ? formatted.join(", ") : null;
+  }
+  function computeTerrainEffectsLineHtml(input) {
+    const plain = computeTerrainEffectsLine(input);
+    return plain == null ? null : formatTerrainEffectsLineHtml(plain);
   }
   function formatSymbolSet(symbols) {
     return SYMBOL_ORDER.filter((s) => symbols.has(s)).join("/");
@@ -21902,12 +22066,30 @@ ${body}`;
     if (category === "wetlands") return "Wetlands";
     return null;
   }
-  function formatTerrainCoverTooltipText(pair) {
-    const parts = [
-      ...pair.surface > 0 ? [`-${pair.surface} ground and naval fire`] : [],
-      ...pair.air > 0 ? [`-${pair.air} air strikes`] : []
-    ];
+  var GROUND_NAVAL_COVER_LABEL = "Ground & Naval Cover";
+  var AIR_COVER_LABEL = "Air Cover";
+  function coverClauseHtml(value, label) {
+    if (value <= 0) return null;
+    const kind = value >= 2 ? "doubleUp" : "up";
+    return `${formatStatusIconHtml(kind)}${escapeHtmlText(label)}`;
+  }
+  function formatTerrainCoverTooltipHtml(pair) {
+    const parts = [coverClauseHtml(pair.surface, GROUND_NAVAL_COVER_LABEL), coverClauseHtml(pair.air, AIR_COVER_LABEL)].filter(
+      (part) => part != null
+    );
     return parts.length > 0 ? parts.join(", ") : null;
+  }
+  function presentEffectHtml(html) {
+    if (html == null) return null;
+    return html.trim().length > 0 ? html : null;
+  }
+  function joinHexTooltipEffectsHtml(movementRangeHtml2, coverHtml) {
+    const movement = presentEffectHtml(movementRangeHtml2);
+    const cover = presentEffectHtml(coverHtml);
+    if (movement == null && cover == null) return null;
+    if (movement == null) return cover;
+    if (cover == null) return movement;
+    return `${movement}, ${cover}`;
   }
 
   // src/renderer/map/terrainTooltipHtml.ts
@@ -21919,8 +22101,8 @@ ${body}`;
   }
   function formatTerrainVariantSuffix(state) {
     const variants = [];
-    if (state.isUrban) variants.push("Urban");
-    if (state.isRubble) variants.push("Rubble");
+    if (state.isUrban) variants.push(`${formatUrbanSwatchHtml()}Urban`);
+    if (state.isRubble) variants.push(escapeHtmlText("Rubble"));
     return variants.length > 0 ? `, ${variants.join(", ")}` : "";
   }
   function resolveStrategicHexForControlLine(namingTarget) {
@@ -21975,7 +22157,7 @@ ${body}`;
       return null;
     }
   }
-  function effectsLine(state, namingTarget) {
+  function movementRangeHtml(state, namingTarget) {
     if (namingTarget?.resolution !== 4) return null;
     return computeTerrainEffectsLineHtml({
       terrainKind: state.terrainKind,
@@ -21988,32 +22170,32 @@ ${body}`;
       hasRail: state.hasRail
     });
   }
-  function coverLine(state, namingTarget) {
+  function coverPair(state, namingTarget) {
     if (!namingTarget) return null;
     if (namingTarget.resolution === 1) {
       const terrainKind = rendererSharedState.gameState?.hexes.find((h) => h.h3Index === namingTarget.h3Index)?.terrainKind;
-      return terrainKind ? formatTerrainCoverTooltipText(terrainCoverPairFor({ terrainKind })) : null;
+      return terrainKind ? terrainCoverPairFor({ terrainKind }) : null;
     }
-    return formatTerrainCoverTooltipText(
-      terrainCoverPairFor({ terrainKind: state.terrainKind, isUrban: state.isUrban, isRubble: state.isRubble })
-    );
+    return terrainCoverPairFor({ terrainKind: state.terrainKind, isUrban: state.isUrban, isRubble: state.isRubble });
   }
   function formatTerrainTooltipHtml(state, namingCaption, namingTarget) {
     const prefix = formatLlmLocationBoldPrefixHtml(namingTarget);
     const showControlLine = namingTarget?.resolution === 1;
     const controlLine = showControlLine ? `<strong>Control:</strong> ${getTooltipControlLabel(namingTarget)}` : null;
-    const terrainValue = state.res1TerrainSummary != null ? formatTerrainNameListHtml(state.res1TerrainSummary) : `${formatTerrainKindHtml(state.terrainKind)}${escapeHtmlText(formatTerrainVariantSuffix(state))}`;
+    const terrainValue = state.res1TerrainSummary != null ? formatTerrainNameListHtml(state.res1TerrainSummary) : `${formatTerrainKindHtml(state.terrainKind)}${formatTerrainVariantSuffix(state)}`;
     const terrainLine = `<strong>Terrain:</strong> ${terrainValue}`;
     const weather = tooltipWeather(namingTarget);
     const weatherLine = weather ? `<strong>Weather:</strong> ${formatWeatherIconHtml(weather)}` : null;
     const bodyParts = controlLine ? [controlLine, terrainLine] : [terrainLine];
     if (weatherLine) bodyParts.push(weatherLine);
     if (state.res1FeaturesSummary != null) bodyParts.push(`<strong>Features:</strong> ${state.res1FeaturesSummary}`);
-    else if (state.features.length > 0) bodyParts.push(`<strong>Features:</strong> ${state.features.join(", ")}`);
-    const effectsLineHtml = effectsLine(state, namingTarget);
-    if (effectsLineHtml) bodyParts.push(`<strong>Effects:</strong> ${effectsLineHtml}`);
-    const coverText = coverLine(state, namingTarget);
-    if (coverText) bodyParts.push(`<strong>Cover:</strong> ${escapeHtmlText(coverText)}`);
+    else if (state.features.length > 0) {
+      bodyParts.push(`<strong>Features:</strong> ${state.features.map((label) => formatFeatureLabelHtml(label)).join(", ")}`);
+    }
+    const pair = coverPair(state, namingTarget);
+    const coverHtml = pair == null ? null : formatTerrainCoverTooltipHtml(pair);
+    const effectsHtml = joinHexTooltipEffectsHtml(movementRangeHtml(state, namingTarget), coverHtml);
+    if (effectsHtml) bodyParts.push(`<strong>Effects:</strong> ${effectsHtml}`);
     if (state.urbanHexCount != null) {
       const productionLine = state.urbanHexCount > 0 ? `<strong>Production:</strong> $${state.urbanHexCount.toLocaleString()} / turn` : `<strong>Production:</strong> (none)`;
       bodyParts.push(productionLine);
@@ -22032,7 +22214,8 @@ ${body}`;
     const res1TerrainSummaryKey = state.res1TerrainSummary ?? "";
     const res1FeaturesSummaryKey = state.res1FeaturesSummary ?? "";
     const weatherKey = tooltipWeather(namingTarget) ?? "";
-    const coverKey = coverLine(state, namingTarget) ?? "";
+    const pair = coverPair(state, namingTarget);
+    const coverKey = pair == null ? "none" : `${pair.surface}:${pair.air}`;
     const controlKey = getTooltipControlLabel(namingTarget);
     const parentTerrainKey = state.parentTerrain;
     const parentTerrainKindKey = state.parentTerrainKind;
@@ -22548,150 +22731,6 @@ ${body}`;
     orderBlockTooltip.repositionIfVisible();
   }
 
-  // src/shared/orderPreviewEffectsTooltip.ts
-  var WEATHER_WORDS = Object.freeze({
-    Snow: "snow",
-    Rain: "rain",
-    Heat: "heat"
-  });
-  var PENALIZING_WEATHER = Object.freeze(["snow", "rain", "heat"]);
-  function orderEffectsTooltipRemainingWaitMs(cellChangeMs, previewReadyMs, dwellMs) {
-    const elapsed = Math.max(0, previewReadyMs - cellChangeMs);
-    return Math.max(0, dwellMs - elapsed);
-  }
-  function resolveOrderPreviewEffectsTooltipHtml(input) {
-    if (input.hasBlockedMessage || !input.validForAll) return null;
-    switch (input.kind) {
-      case "tacticalMarch":
-        return tacticalMarchHtml(input.marchImpact ?? null);
-      case "strategicMarch":
-        return strategicMarchHtml(input);
-      case "strategicFerry":
-        return strategicFerryHtml(input);
-      case "tacticalFerry":
-        return null;
-      case "ranged":
-        return rangedHtml(input);
-      case "airStrike":
-        return airStrikeHtml(input);
-      default:
-        return null;
-    }
-  }
-  function tacticalMarchHtml(impact) {
-    if (!impact || impact.slower.length === 0 && !impact.roadRail) return null;
-    const parts = [];
-    if (impact.slower.length > 0) {
-      parts.push(`<strong>Slower:</strong> ${impact.slower.map((label) => labelHtml(label)).join(", ")}`);
-    }
-    if (impact.roadRail) parts.push("<strong>Using:</strong> Road/Rail");
-    return parts.join(TOOLTIP_SECTION_GAP_HTML);
-  }
-  function strategicMarchHtml(input) {
-    const weathers = [];
-    for (const unit of input.units) {
-      if (!weatherSlowsMovement({
-        unitType: unit.unitType,
-        weather: unit.originWeather,
-        tags: unit.weatherTags,
-        level: input.level
-      })) {
-        continue;
-      }
-      const weather = unit.originWeather;
-      if (weather && !weathers.includes(weather)) weathers.push(weather);
-    }
-    if (weathers.length === 0) return null;
-    return `<strong>Slower:</strong> ${weathers.map((weather) => formatWeatherIconHtml(weather)).join(", ")}`;
-  }
-  function strategicFerryHtml(input) {
-    const shortened = input.units.some(
-      (unit) => strategicFerryRangeHexes({
-        weatherAtDestination: input.destinationWeather,
-        tags: unit.weatherTags,
-        enabled: input.level !== "off"
-      }) === 2
-    );
-    if (!shortened) return null;
-    return `<strong>Effects:</strong> ${formatWeatherIconHtml("snow")}`;
-  }
-  function rangedHtml(input) {
-    const labels = [];
-    if (input.rangedBattle && input.rangedPreviewUnitIds) {
-      for (const label of collectTacticalRangedSlowTerrainLabels(input.rangedBattle, input.rangedPreviewUnitIds)) {
-        pushDistinct(labels, label);
-      }
-    }
-    for (const unit of input.units) {
-      const penalty = weatherAttackPenalty({
-        unitType: unit.unitType,
-        kind: "ranged",
-        weatherAtUnit: unit.originWeather,
-        tags: unit.weatherTags,
-        level: input.level
-      });
-      if (penalty > 0 && unit.originWeather) pushDistinct(labels, weatherDisplayWord(unit.originWeather));
-    }
-    const surfaceShooter = input.units.some((unit) => unit.unitType !== "air");
-    return joinSections([effectsLine2(labels), surfaceShooter ? coverLine2(input.targetCover, "surface") : null]);
-  }
-  function airStrikeHtml(input) {
-    const labels = [];
-    for (const unit of input.units) {
-      const penalty = weatherAttackPenalty({
-        unitType: unit.unitType,
-        kind: "airStrike",
-        weatherAtUnit: unit.originWeather,
-        weatherAtTarget: input.targetWeather,
-        tags: unit.weatherTags,
-        level: input.level
-      });
-      if (penalty <= 0) continue;
-      for (const weather of [unit.originWeather, input.targetWeather]) {
-        if (!weather || !PENALIZING_WEATHER.includes(weather)) continue;
-        if (unit.weatherTags?.includes(weather)) continue;
-        pushDistinct(labels, weatherDisplayWord(weather));
-      }
-    }
-    return joinSections([effectsLine2(labels), coverLine2(input.targetCover, "air")]);
-  }
-  function coverLine2(place, shooter) {
-    if (!place || terrainCoverFor(place, shooter) <= 0) return null;
-    const source = terrainCoverSourceLabel(place);
-    return source ? `<strong>Cover:</strong> ${labelHtml(source)}` : null;
-  }
-  function joinSections(sections) {
-    const present = sections.filter((section) => section !== null);
-    return present.length > 0 ? present.join(TOOLTIP_SECTION_GAP_HTML) : null;
-  }
-  function effectsLine2(labels) {
-    if (labels.length === 0) return null;
-    return `<strong>Effects:</strong> ${labels.map(labelHtml).join(", ")}`;
-  }
-  function labelHtml(label) {
-    const weather = weatherWord(label);
-    if (weather) return formatWeatherIconHtml(weather);
-    return formatTerrainNameListHtml(label);
-  }
-  function weatherWord(label) {
-    return WEATHER_WORDS[label] ?? null;
-  }
-  function weatherDisplayWord(weather) {
-    switch (weather) {
-      case "snow":
-        return "Snow";
-      case "rain":
-        return "Rain";
-      case "heat":
-        return "Heat";
-      default:
-        return "Mild";
-    }
-  }
-  function pushDistinct(labels, label) {
-    if (!labels.includes(label)) labels.push(label);
-  }
-
   // src/renderer/map/orderSlowerHexTooltip.ts
   var orderSlowerTooltip = createTransientPointerTooltip({
     elementId: "order-slower-tooltip",
@@ -22700,6 +22739,7 @@ ${body}`;
   var effectsDwell = null;
   var effectsShowTimer = null;
   var effectsShowGeneration = 0;
+  var pendingEffectsHtml = null;
   function cancelEffectsShowTimer() {
     effectsShowGeneration += 1;
     if (effectsShowTimer !== null) {
@@ -22717,7 +22757,7 @@ ${body}`;
   }
   function noteOrderEffectsTooltipCellChange(hex, detail) {
     hideOrderSlowerHexTooltip();
-    effectsDwell = { hex, detail, startedAtMs: Date.now() };
+    effectsDwell = { hex, detail };
   }
   function isOrderSlowerHexTooltipVisible() {
     return orderSlowerTooltip.isVisible();
@@ -22733,33 +22773,34 @@ ${body}`;
     });
   }
   function scheduleOrderEffectsTooltip(tooltipHtml) {
-    cancelEffectsShowTimer();
     if (!tooltipHtml) {
+      cancelEffectsShowTimer();
+      pendingEffectsHtml = null;
       orderSlowerTooltip.hide();
       return;
     }
     const hex = rendererSharedState.hoveredHexH3;
     const detail = rendererSharedState.hoveredDetailHexH3;
-    if (!effectsDwell || effectsDwell.hex !== hex || effectsDwell.detail !== detail) {
-      effectsDwell = { hex, detail, startedAtMs: Date.now() };
+    const sameCell = effectsDwell !== null && effectsDwell.hex === hex && effectsDwell.detail === detail;
+    if (sameCell && orderSlowerTooltip.isVisible()) {
+      pendingEffectsHtml = tooltipHtml;
+      showOrderSlowerHexTooltip(tooltipHtml);
+      return;
     }
-    const wait = orderEffectsTooltipRemainingWaitMs(
-      effectsDwell.startedAtMs,
-      Date.now(),
-      HEX_DETAILS_TOOLTIP_DELAY_MS
-    );
+    if (sameCell && effectsShowTimer !== null) {
+      pendingEffectsHtml = tooltipHtml;
+      return;
+    }
+    cancelEffectsShowTimer();
+    effectsDwell = { hex, detail };
+    pendingEffectsHtml = tooltipHtml;
     const generation = effectsShowGeneration;
-    const showIfCurrent = () => {
+    effectsShowTimer = setTimeout(() => {
       if (generation !== effectsShowGeneration) return;
       effectsShowTimer = null;
       if (rendererSharedState.hoveredHexH3 !== hex || rendererSharedState.hoveredDetailHexH3 !== detail) return;
-      showOrderSlowerHexTooltip(tooltipHtml);
-    };
-    if (wait === 0) {
-      showIfCurrent();
-      return;
-    }
-    effectsShowTimer = setTimeout(showIfCurrent, wait);
+      showOrderSlowerHexTooltip(pendingEffectsHtml);
+    }, HEX_DETAILS_TOOLTIP_DELAY_MS);
   }
   function repositionOrderSlowerHexTooltipIfVisible() {
     orderSlowerTooltip.repositionIfVisible();
@@ -22856,6 +22897,147 @@ ${body}`;
     if (!hasBattle) return true;
     if (hit == null) return false;
     return footprintSaysInside;
+  }
+
+  // src/shared/orderPreviewEffectsTooltip.ts
+  var WEATHER_WORDS = Object.freeze({
+    Snow: "snow",
+    Rain: "rain",
+    Heat: "heat"
+  });
+  var PENALIZING_WEATHER = Object.freeze(["snow", "rain", "heat"]);
+  function resolveOrderPreviewEffectsTooltipHtml(input) {
+    if (input.hasBlockedMessage || !input.validForAll) return null;
+    switch (input.kind) {
+      case "tacticalMarch":
+        return tacticalMarchHtml(input.marchImpact ?? null);
+      case "strategicMarch":
+        return strategicMarchHtml(input);
+      case "strategicFerry":
+        return strategicFerryHtml(input);
+      case "tacticalFerry":
+        return null;
+      case "ranged":
+        return rangedHtml(input);
+      case "airStrike":
+        return airStrikeHtml(input);
+      default:
+        return null;
+    }
+  }
+  function tacticalMarchHtml(impact) {
+    if (!impact || impact.slower.length === 0 && !transportLineSpecified(impact)) return null;
+    const parts = [];
+    if (impact.slower.length > 0) {
+      parts.push(`<strong>Slower:</strong> ${impact.slower.map((label) => labelHtml(label)).join(", ")}`);
+    }
+    const using = formatTransportIconsHtml(impact);
+    if (using) parts.push(`<strong>Using:</strong> ${using}`);
+    return parts.join(TOOLTIP_SECTION_GAP_HTML);
+  }
+  function strategicMarchHtml(input) {
+    const weathers = [];
+    for (const unit of input.units) {
+      if (!weatherSlowsMovement({
+        unitType: unit.unitType,
+        weather: unit.originWeather,
+        tags: unit.weatherTags,
+        level: input.level
+      })) {
+        continue;
+      }
+      const weather = unit.originWeather;
+      if (weather && !weathers.includes(weather)) weathers.push(weather);
+    }
+    if (weathers.length === 0) return null;
+    return `<strong>Slower:</strong> ${weathers.map((weather) => formatWeatherIconHtml(weather)).join(", ")}`;
+  }
+  function strategicFerryHtml(input) {
+    const shortened = input.units.some(
+      (unit) => strategicFerryRangeHexes({
+        weatherAtDestination: input.destinationWeather,
+        tags: unit.weatherTags,
+        enabled: input.level !== "off"
+      }) === 2
+    );
+    if (!shortened) return null;
+    return `<strong>Effects:</strong> ${formatWeatherIconHtml("snow")}`;
+  }
+  function rangedHtml(input) {
+    const labels = [];
+    if (input.rangedBattle && input.rangedPreviewUnitIds) {
+      for (const label of collectTacticalRangedSlowTerrainLabels(input.rangedBattle, input.rangedPreviewUnitIds)) {
+        pushDistinct(labels, label);
+      }
+    }
+    for (const unit of input.units) {
+      const penalty = weatherAttackPenalty({
+        unitType: unit.unitType,
+        kind: "ranged",
+        weatherAtUnit: unit.originWeather,
+        tags: unit.weatherTags,
+        level: input.level
+      });
+      if (penalty > 0 && unit.originWeather) pushDistinct(labels, weatherDisplayWord(unit.originWeather));
+    }
+    const surfaceShooter = input.units.some((unit) => unit.unitType !== "air");
+    return joinSections([effectsLine(labels), surfaceShooter ? coverLine(input.targetCover, "surface") : null]);
+  }
+  function airStrikeHtml(input) {
+    const labels = [];
+    for (const unit of input.units) {
+      const penalty = weatherAttackPenalty({
+        unitType: unit.unitType,
+        kind: "airStrike",
+        weatherAtUnit: unit.originWeather,
+        weatherAtTarget: input.targetWeather,
+        tags: unit.weatherTags,
+        level: input.level
+      });
+      if (penalty <= 0) continue;
+      for (const weather of [unit.originWeather, input.targetWeather]) {
+        if (!weather || !PENALIZING_WEATHER.includes(weather)) continue;
+        if (unit.weatherTags?.includes(weather)) continue;
+        pushDistinct(labels, weatherDisplayWord(weather));
+      }
+    }
+    return joinSections([effectsLine(labels), coverLine(input.targetCover, "air")]);
+  }
+  function coverLine(place, shooter) {
+    if (!place || terrainCoverFor(place, shooter) <= 0) return null;
+    const source = terrainCoverSourceLabel(place);
+    return source ? `<strong>Cover:</strong> ${labelHtml(source)}` : null;
+  }
+  function joinSections(sections) {
+    const present = sections.filter((section) => section !== null);
+    return present.length > 0 ? present.join(TOOLTIP_SECTION_GAP_HTML) : null;
+  }
+  function effectsLine(labels) {
+    if (labels.length === 0) return null;
+    return `<strong>Effects:</strong> ${labels.map(labelHtml).join(", ")}`;
+  }
+  function labelHtml(label) {
+    const weather = weatherWord(label);
+    if (weather) return formatWeatherIconHtml(weather);
+    return formatTerrainNameListHtml(label);
+  }
+  function weatherWord(label) {
+    return WEATHER_WORDS[label] ?? null;
+  }
+  function weatherDisplayWord(weather) {
+    switch (weather) {
+      case "snow":
+        return "Snow";
+      case "rain":
+        return "Rain";
+      case "heat":
+        return "Heat";
+      default:
+        return "Mild";
+    }
+  }
+  function pushDistinct(labels, label) {
+    if (!labels.includes(label)) labels.push(label);
   }
 
   // src/renderer/gameplay/orderPreviewEffectsContext.ts
@@ -23752,6 +23934,39 @@ ${body}`;
   function trackPointer(event) {
     lastPointer.x = event.clientX;
     lastPointer.y = event.clientY;
+  }
+  function presentUnitOriginTooltip(html, clientX, clientY) {
+    stopAnchorWatch();
+    if (showTimer !== null) {
+      clearTimeout(showTimer);
+      showTimer = null;
+    }
+    activeAnchor = null;
+    lastPointer.x = clientX;
+    lastPointer.y = clientY;
+    const el = getTooltipEl();
+    if (!html || !el) {
+      hideUnitOriginTooltip();
+      return;
+    }
+    el.innerHTML = html;
+    paintTerrainSwatches(el);
+    positionTooltip(el);
+    el.classList.remove("hidden");
+    el.setAttribute("aria-hidden", "false");
+    el.setAttribute("role", "tooltip");
+  }
+  function dismissMapUnitOriginTooltip() {
+    if (activeAnchor) return;
+    hideUnitOriginTooltip();
+  }
+  function moveMapUnitOriginTooltip(clientX, clientY) {
+    if (activeAnchor) return;
+    lastPointer.x = clientX;
+    lastPointer.y = clientY;
+    const el = getTooltipEl();
+    if (!el || el.classList.contains("hidden")) return;
+    positionTooltip(el);
   }
   function installUnitOriginTooltip() {
     if (installed) return;
@@ -27194,6 +27409,112 @@ ${body}`;
     }, HUMAN_UNIT_SINGLE_SELECT_DEBOUNCE_MS);
   }
 
+  // src/shared/singleUnitHoverCallout.ts
+  function decideSingleUnitHoverCallout(input) {
+    const oneUnit = input.h3 !== null && input.stationaryUnitCount === 1 && input.pointerOnToken && !input.blocked;
+    if (oneUnit) {
+      const already = input.pendingH3 === input.h3 || input.hoverOpenedH3 === input.h3;
+      return {
+        schedule: !already,
+        clearPending: input.pendingH3 !== null && input.pendingH3 !== input.h3,
+        dismissOpen: input.hoverOpenedH3 !== null && input.hoverOpenedH3 !== input.h3,
+        suppressHexTooltip: true
+      };
+    }
+    return {
+      schedule: false,
+      clearPending: input.pendingH3 !== null,
+      dismissOpen: input.hoverOpenedH3 !== null,
+      suppressHexTooltip: false
+    };
+  }
+
+  // src/renderer/map/singleUnitHoverCallout.ts
+  var pendingTimer = null;
+  var pendingH3 = null;
+  var hoverOpenedH3 = null;
+  var hoverClientX = 0;
+  var hoverClientY = 0;
+  var holdingHexTooltip = false;
+  var drawnNow = { unitsToDraw: [], movingIds: void 0, unitsHidden: false };
+  function cancelSingleUnitHoverCalloutPending() {
+    if (pendingTimer !== null) {
+      clearTimeout(pendingTimer);
+      pendingTimer = null;
+    }
+    pendingH3 = null;
+  }
+  function forgetSingleUnitHoverCallout() {
+    cancelSingleUnitHoverCalloutPending();
+    hoverOpenedH3 = null;
+    dismissMapUnitOriginTooltip();
+  }
+  function applySingleUnitHoverCallout(input) {
+    hoverClientX = input.clientX;
+    hoverClientY = input.clientY;
+    const decision = decideSingleUnitHoverCallout({
+      h3: input.h3,
+      stationaryUnitCount: input.stationaryUnitCount,
+      pointerOnToken: input.pointerOnToken,
+      pendingH3,
+      hoverOpenedH3,
+      blocked: input.blocked
+    });
+    if (decision.clearPending) cancelSingleUnitHoverCalloutPending();
+    if (decision.dismissOpen) forgetSingleUnitHoverCallout();
+    if (decision.schedule && input.h3 !== null) {
+      const h3 = input.h3;
+      cancelSingleUnitHoverCalloutPending();
+      pendingH3 = h3;
+      pendingTimer = setTimeout(() => {
+        pendingTimer = null;
+        pendingH3 = null;
+        hoverOpenedH3 = h3;
+        showTokenTooltip(h3, hoverClientX, hoverClientY);
+        const tooltip = document.getElementById("unit-origin-tooltip");
+        if (!tooltip || tooltip.classList.contains("hidden")) hoverOpenedH3 = null;
+      }, HEX_DETAILS_TOOLTIP_DELAY_MS);
+    } else if (hoverOpenedH3 !== null && hoverOpenedH3 === input.h3) {
+      moveMapUnitOriginTooltip(input.clientX, input.clientY);
+    }
+    return { suppressHexTooltip: decision.suppressHexTooltip };
+  }
+  function showTokenTooltip(h3, clientX, clientY) {
+    const units = stationaryUnitsOnHex(h3, drawnNow.unitsToDraw, drawnNow.movingIds, drawnNow.unitsHidden);
+    const unit = units.length === 1 ? units[0] : void 0;
+    const html = unit ? formatLiveUnitOriginTooltipHtml(unit.id) : null;
+    if (!html) return;
+    presentUnitOriginTooltip(html, clientX, clientY);
+  }
+  function stationaryUnitsOnHex(h3, unitsToDraw, movingIds, unitsHidden) {
+    if (h3 === null || unitsHidden) return [];
+    return unitsToDraw.filter((unit) => unit.h3Index === h3 && !movingIds?.has(unit.id));
+  }
+  function syncMapSingleUnitHover(input) {
+    drawnNow = {
+      unitsToDraw: input.unitsToDraw,
+      movingIds: input.movingIds,
+      unitsHidden: input.unitsHidden
+    };
+    const onHex = stationaryUnitsOnHex(input.h3, input.unitsToDraw, input.movingIds, input.unitsHidden);
+    const lone = onHex.length === 1 ? onHex[0] : void 0;
+    const hover = applySingleUnitHoverCallout({
+      h3: input.h3,
+      stationaryUnitCount: onHex.length,
+      pointerOnToken: input.pointerOnToken && lone !== void 0 && resolveUnitOrigin(lone.id) !== null,
+      blocked: input.blocked,
+      clientX: input.clientX,
+      clientY: input.clientY
+    });
+    const releasedHexTooltip = holdingHexTooltip && !hover.suppressHexTooltip;
+    holdingHexTooltip = hover.suppressHexTooltip;
+    if (hover.suppressHexTooltip) {
+      input.clearHexTooltip();
+      input.hideHexTooltip();
+    }
+    return releasedHexTooltip;
+  }
+
   // src/renderer/map/mapDoubleClickHandler.ts
   function ignoreReasonFor(input) {
     if (input.targetingModeActive) return "targeting_mode_active";
@@ -27534,48 +27855,75 @@ ${body}`;
       const prevDetail = rendererSharedState.hoveredDetailHexH3;
       const hitChanged = hit !== prevHit;
       const detailChanged = detailHit !== prevDetail;
-      if (!hitChanged && !detailChanged) {
-        if (planningHidesHexTooltip) {
-          deps.clearTerrainTooltipTimer();
-          deps.hideTerrainTooltipVisual();
+      const scheduleHexDetailsTooltip = (targetHex, targetDetail) => {
+        deps.clearTerrainTooltipTimer();
+        rendererSharedState.terrainTooltipDelayTimer = setTimeout(() => {
+          rendererSharedState.terrainTooltipDelayTimer = null;
+          if (rendererSharedState.hoveredHexH3 !== targetHex || rendererSharedState.hoveredDetailHexH3 !== targetDetail || !rendererSharedState.gameState) return;
+          if (deps.shouldSuppressTerrainTooltip()) return;
+          const state = deps.terrainStateForPointer(rendererSharedState.lastPointerClientX, rendererSharedState.lastPointerClientY, targetHex);
+          const namingTarget = deps.namingLookupTargetForPointer(rendererSharedState.lastPointerClientX, rendererSharedState.lastPointerClientY, targetHex);
+          void deps.showTerrainTooltip(rendererSharedState.lastPointerClientX, rendererSharedState.lastPointerClientY, state, namingTarget);
+        }, HEX_DETAILS_TOOLTIP_DELAY_MS);
+      };
+      if (hitChanged || detailChanged) {
+        rendererSharedState.hoveredHexH3 = hit;
+        rendererSharedState.hoveredDetailHexH3 = detailHit;
+        deps.clearTerrainTooltipTimer();
+        deps.hideTerrainTooltipVisual();
+        if (planningHidesHexTooltip && hit) {
+          noteOrderEffectsTooltipCellChange(hit, detailHit);
         } else {
           clearOrderEffectsTooltipDwell();
-          const tipFollow = document.getElementById("hex-tooltip");
-          if (!deps.shouldSuppressTerrainTooltip() && tipFollow && !tipFollow.classList.contains("hidden") && hit) {
-            const state = deps.terrainStateForPointer(rendererSharedState.lastPointerClientX, rendererSharedState.lastPointerClientY, hit);
-            const namingTarget = deps.namingLookupTargetForPointer(rendererSharedState.lastPointerClientX, rendererSharedState.lastPointerClientY, hit);
-            void deps.showTerrainTooltip(rendererSharedState.lastPointerClientX, rendererSharedState.lastPointerClientY, state, namingTarget);
-          }
         }
-        return;
-      }
-      rendererSharedState.hoveredHexH3 = hit;
-      rendererSharedState.hoveredDetailHexH3 = detailHit;
-      deps.clearTerrainTooltipTimer();
-      deps.hideTerrainTooltipVisual();
-      if (planningHidesHexTooltip && hit) {
-        noteOrderEffectsTooltipCellChange(hit, detailHit);
+        void deps.refreshHoverRoutePreview({ allowBlockingOrderTooltip: true });
+        deps.requestRedraw();
+        if (hit && !deps.shouldSuppressTerrainTooltip() && !planningHidesHexTooltip) {
+          scheduleHexDetailsTooltip(hit, detailHit);
+        }
+      } else if (planningHidesHexTooltip) {
+        deps.clearTerrainTooltipTimer();
+        deps.hideTerrainTooltipVisual();
       } else {
         clearOrderEffectsTooltipDwell();
+        const tipFollow = document.getElementById("hex-tooltip");
+        if (!deps.shouldSuppressTerrainTooltip() && tipFollow && !tipFollow.classList.contains("hidden") && hit) {
+          const state = deps.terrainStateForPointer(rendererSharedState.lastPointerClientX, rendererSharedState.lastPointerClientY, hit);
+          const namingTarget = deps.namingLookupTargetForPointer(rendererSharedState.lastPointerClientX, rendererSharedState.lastPointerClientY, hit);
+          void deps.showTerrainTooltip(rendererSharedState.lastPointerClientX, rendererSharedState.lastPointerClientY, state, namingTarget);
+        }
       }
-      void deps.refreshHoverRoutePreview({ allowBlockingOrderTooltip: true });
-      deps.requestRedraw();
-      if (!hit || deps.shouldSuppressTerrainTooltip() || planningHidesHexTooltip) {
-        return;
+      const drawn = rendererSharedState.gameState ? deps.getUnitsForDrawWithMovingIds(rendererSharedState.gameState) : { unitsToDraw: [], movingIds: void 0 };
+      const releaseHexTooltip = syncMapSingleUnitHover({
+        h3: hit,
+        unitsToDraw: drawn.unitsToDraw,
+        movingIds: drawn.movingIds,
+        unitsHidden: shouldHideStrategicMapUnitsForRes4Zoom(),
+        pointerOnToken: hit !== null && pointerHitsDrawnUnitIcon(e.clientX, e.clientY, hit),
+        blocked: resolutionPlaybackBlocksMapOrders(rendererSharedState.resolutionMoveAnimation) || planningHidesHexTooltip || deps.shouldSuppressTerrainTooltip(),
+        clientX: e.clientX,
+        clientY: e.clientY,
+        clearHexTooltip: deps.clearTerrainTooltipTimer,
+        hideHexTooltip: deps.hideTerrainTooltipVisual
+      });
+      if (releaseHexTooltip && !hitChanged && !detailChanged && hit && !deps.shouldSuppressTerrainTooltip() && !planningHidesHexTooltip) {
+        scheduleHexDetailsTooltip(hit, detailHit);
       }
-      const targetHex = hit;
-      const targetDetail = detailHit;
-      rendererSharedState.terrainTooltipDelayTimer = setTimeout(() => {
-        rendererSharedState.terrainTooltipDelayTimer = null;
-        if (rendererSharedState.hoveredHexH3 !== targetHex || rendererSharedState.hoveredDetailHexH3 !== targetDetail || !rendererSharedState.gameState) return;
-        if (deps.shouldSuppressTerrainTooltip()) return;
-        const state = deps.terrainStateForPointer(rendererSharedState.lastPointerClientX, rendererSharedState.lastPointerClientY, targetHex);
-        const namingTarget = deps.namingLookupTargetForPointer(rendererSharedState.lastPointerClientX, rendererSharedState.lastPointerClientY, targetHex);
-        void deps.showTerrainTooltip(rendererSharedState.lastPointerClientX, rendererSharedState.lastPointerClientY, state, namingTarget);
-      }, HEX_DETAILS_TOOLTIP_DELAY_MS);
     });
     mainMapEl.addEventListener("pointerleave", (e) => {
       const next = e.relatedTarget;
+      syncMapSingleUnitHover({
+        h3: null,
+        unitsToDraw: [],
+        movingIds: void 0,
+        unitsHidden: false,
+        pointerOnToken: false,
+        blocked: false,
+        clientX: e.clientX,
+        clientY: e.clientY,
+        clearHexTooltip: deps.clearTerrainTooltipTimer,
+        hideHexTooltip: deps.hideTerrainTooltipVisual
+      });
       if (next instanceof Node) {
         const buildEntry = document.getElementById("build-entry-layer");
         const buildPopup = document.getElementById("build-popup");
@@ -27624,6 +27972,7 @@ ${body}`;
           deps.replaceSelection([...rendererSharedState.selectedUnitIdsAtMouseDown]);
         }
       }
+      forgetSingleUnitHoverCallout();
       deps.clearTerrainTooltipTimer();
       deps.hideTerrainTooltipVisual();
       hideOrderBlockHexTooltip();

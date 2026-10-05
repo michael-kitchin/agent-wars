@@ -32,50 +32,50 @@ type UnitIconType = 'infantry' | 'armor' | 'naval' | 'air' | 'mixed';
  */
 const UNIT_ICON_FILE_BY_TYPE: Record<UnitIconType, string> = {
     /**
-   * Documents the object literal property `infantry` (infantry: 'infantry-1.svg').
+   * Documents the object literal property `infantry` (infantry: 'infantry.svg').
 
    * Purpose: Supports maintainability by documenting why `infantry` exists.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-infantry: 'infantry-1.svg',
+infantry: 'infantry.svg',
     /**
-   * Documents the object literal property `armor` (armor: 'armor-1.svg').
+   * Documents the object literal property `armor` (armor: 'armor.svg').
 
    * Purpose: Supports maintainability by documenting why `armor` exists.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-armor: 'armor-1.svg',
+armor: 'armor.svg',
     /**
-   * Documents the object literal property `naval` (naval: 'naval-1.svg').
+   * Documents the object literal property `naval` (naval: 'naval.svg').
 
    * Purpose: Supports maintainability by documenting why `naval` exists.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-naval: 'naval-1.svg',
+naval: 'naval.svg',
     /**
-   * Documents the object literal property `air` (air: 'air-1.svg').
+   * Documents the object literal property `air` (air: 'air.svg').
 
    * Purpose: Supports maintainability by documenting why `air` exists.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-air: 'air-1.svg',
+air: 'air.svg',
     /**
-   * Documents the object literal property `mixed` (mixed: 'mixed-1.svg').
+   * Documents the object literal property `mixed` (mixed: 'mixed.svg').
 
    * Purpose: Supports maintainability by documenting why `mixed` exists.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-mixed: 'mixed-1.svg',
+mixed: 'mixed.svg',
 };
 /**
  * Documents the module-scope binding `unitIconCache` (unitIconCache).
@@ -88,15 +88,15 @@ mixed: 'mixed-1.svg',
 const unitIconCache = new Map<UnitIconType, HTMLImageElement | null>();
 
 /**
- * Defines the `iconPathForType` function shape (function iconPathForType(unitType: UnitIconType): string).
-
- * Purpose: Supports maintainability by documenting why `iconPathForType` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Path of the glyph for one unit type.
+ *
+ * Purpose: The map token and the image loader share one URL.
+ * When to use: When starting an icon load.
+ * Expected outcome: `units/<file>.svg`, resolved from `static/index.html`, the same way weather icons resolve.
  * Exceptions: None.
  */
 function iconPathForType(unitType: UnitIconType): string {
-  return `../symbols/${UNIT_ICON_FILE_BY_TYPE[unitType]}`;
+  return `units/${UNIT_ICON_FILE_BY_TYPE[unitType]}`;
 }
 
 /**

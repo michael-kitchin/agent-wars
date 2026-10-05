@@ -36,6 +36,8 @@ import {
   createTacticalOriginHitBonusLookup,
   type OriginHitBonusLookup,
 } from '../originBonus/originHitBonusLookup';
+import { createTechHitBonusLookup, type TechHitBonusLookup } from '../techBonus/techHitBonusLookup';
+import { urbanHexCountForTech } from '../techBonus/techLevelForBirthHex';
 import {
   tacticalCellTerrainCover,
   terrainCoverShooterForUnitType,
@@ -203,6 +205,15 @@ export interface CombatEstimationTheater {
    * Exceptions: None.
    */
   readonly originHitBonusAt: OriginHitBonusLookup;
+  /**
+   * Tech bonus for a real unit, from its birth hex.
+   *
+   * Contract: Unknown ids and assumed units are not asked. Both points are 0 when tech is off or the unit is Basic.
+   * When to use: Side builders, before the hit threshold.
+   * Expected outcome: Attack 0 or 2, defense 0 or 2.
+   * Exceptions: None.
+   */
+  readonly techHitBonusAt: TechHitBonusLookup;
 }
 
 /**
@@ -293,6 +304,11 @@ export function buildStrategicCombatEstimationTheater(state: GameStateSnapshot):
       units: state.units,
       countryNameAt: (res1H3Index) => strategicHexCountryNameAt(state, res1H3Index),
     }),
+    techHitBonusAt: createTechHitBonusLookup({
+      settings: originBonusSettingsFromSnapshot(state),
+      units: state.units,
+      urbanHexCountAt: urbanHexCountForTech,
+    }),
   };
 }
 
@@ -370,5 +386,10 @@ export function buildTacticalCombatEstimationTheater(
         : `battle range ${effectiveTacticalRangedMaxRangeForAttacker(battle, unitType, fromH3)}`;
     },
     originHitBonusAt: createTacticalOriginHitBonusLookup({ settings, battle }),
+    techHitBonusAt: createTechHitBonusLookup({
+      settings,
+      units: battle.subUnits,
+      urbanHexCountAt: urbanHexCountForTech,
+    }),
   };
 }

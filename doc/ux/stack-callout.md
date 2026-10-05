@@ -8,12 +8,12 @@ Let the player see the units in a hex, including a single unit, and change which
 
 ## Availability
 
-Opens in Strategic planning and Tactical planning after a click on a unit icon, including a single human unit, once a short delay elapses. A lone human unit that can be selected is still selected, or Shift-toggled, by that same click. An embarked land unit stays unselected. It does not open while a hover order preview is already active, while strategic units are hidden because the map is zoomed to battle detail, or during Resolution playback. The preview that starts because this click selected a unit on the hex under the pointer does not cancel the scheduled callout and does not close it after it opens. A later click while that preview is still active does not open the callout again. Moving the pointer onto another hex while a preview is active does close it. It also closes when the player dismisses it, presses Escape, clicks outside it, or starts a gesture that hides it. See [input-map.md](input-map.md) and [selection-model.md](selection-model.md).
+Opens in Strategic planning and Tactical planning after a click on a unit icon, including a single unit, once a short delay elapses. Hovering that icon shows the unit's Bonuses tooltip instead of this list, as described under Information Displayed. A lone human unit that can be selected is still selected, or Shift-toggled, by a click on its icon. An embarked land unit stays unselected. The list does not open while a hover order preview is already active, while strategic units are hidden because the map is zoomed to battle detail, or during Resolution playback. The preview that starts because a stack click selected a unit on the hex under the pointer does not cancel the scheduled callout and does not close it after it opens. A later click while that preview remains active does not open the callout again. Moving the pointer onto another hex while a preview is active does close it. It also closes when the player dismisses it, presses Escape, clicks outside it, or starts a gesture that hides it. See [input-map.md](input-map.md) and [selection-model.md](selection-model.md).
 
 ## Information Displayed
 
 - One row per unit in the hex, sorted by side, type, and name. Each row shows the unit name, preceded by the unit's country-of-origin flag for both human and enemy units. A battle unit shows the flag of the strategic unit it came from. A unit whose origin country is unknown shows a gray placeholder flag, and a unit with no recorded origin shows no flag.
-- Hovering a unit flag shows a tooltip after the same short dwell as the hex tooltip, on every surface that shows a unit flag, including loss toasts. The label beside the flag is unchanged, including a selected-unit count or a pending order. The bold first line is `Bonuses:`. Country, Terrain, and Weather lines appear for options selected for the match that this unit was born with, in that order ([combat rules §4.9](../combat-rules-v3.md)). They do not change when the unit moves, and they do not say whether the bonus is active on the hex where it stands now. Country shows the birth country's flag and name. A unit with no birth country omits that line. Terrain shows the birth terrain name, preceded by that kind's map-key swatch at flag size. A unit with no birth terrain omits that line. Weather shows an icon and name for each acclimation tag, in the order snow, rain, heat. A unit with no tags omits that line. A selected option the unit does not have is omitted. When no bonus option is selected, or the unit has none of the selected bonuses, the tooltip is `Bonuses:` and then `None`, with no category lines. A destroyed unit keeps the same lines; its weather tags are the ones it had. The tooltip hides when that flag is no longer visible.
+- Hovering a unit flag, or the map token of a hex that holds one stationary unit, shows a tooltip after the same one-second dwell as the hex tooltip. The token hover does not open this list and does not select the unit. That tooltip hides when the pointer leaves the token. A token whose unit has no recorded origin keeps the hex tooltip. A stack token does not show that tooltip; the list still opens from a click. The flag tooltip appears on every surface that shows a unit flag, including loss toasts. The label beside the flag is unchanged, including a selected-unit count or a pending order. The bold first line is `Bonuses:`. Country, Terrain, and Weather lines appear for options selected for the match that this unit was born with, in that order. A Tech line follows Weather when the unit's tech tier is known, with that tier's icon and the word Basic or Advanced. A missing tier omits the line ([combat rules §4.9](../combat-rules-v3.md)). They do not change when the unit moves, and they do not say whether the bonus is active on the hex where it stands now. Country shows the birth country's flag and name. A unit with no birth country omits that line. Terrain shows the birth terrain name, preceded by that kind's map-key swatch at flag size. A unit with no birth terrain omits that line. Weather shows an icon and name for each acclimation tag, in the order snow, rain, heat. A unit with no tags omits that line. A selected option the unit does not have is omitted. When no bonus option is selected, or the unit has none of the selected bonuses, the tooltip is `Bonuses:` and then `None`, with no category lines. A destroyed unit keeps the same lines; its weather tags are the ones it had. The tooltip hides when that flag is no longer visible.
 - Human rows include a toggle that shows whether that unit is in the selection.
 - When the hex has human units and Shift is not held, a "+ All" control selects the selectable human units.
 - When Shift is held and the hex has human units, "+ All" adds them and "- All" removes them.
@@ -43,7 +43,7 @@ Enemy rows have no selection toggle.
 
 ## States
 
-- Scheduled: a click asked for the callout, and the delay has not elapsed.
+- Scheduled: a click on a unit icon asked for the callout, and the delay has not elapsed.
 - Open: the list is visible.
 - Closed: hidden. This is the start state.
 
@@ -79,6 +79,8 @@ None.
 - `src/renderer/renderer.ts`
 - `src/renderer/map/mainMapInteractions.ts`
 - `src/renderer/map/mapClickSelectionPolicy.ts`
+- `src/renderer/map/singleUnitHoverCallout.ts`
+- `src/shared/singleUnitHoverCallout.ts`
 - `src/renderer/map/initCore.ts`
 - `src/renderer/core/unitOriginFlags.ts`
 - `src/renderer/core/unitOriginTooltip.ts`
@@ -86,3 +88,4 @@ None.
 - `src/shared/unitOriginTooltipText.ts`
 - `src/shared/terrainSwatchHtml.ts`
 - `src/shared/weatherIcons.ts`
+- `src/shared/featureIconHtml.ts`

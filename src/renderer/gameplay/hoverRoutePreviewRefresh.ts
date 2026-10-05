@@ -26,7 +26,7 @@ import type { TacticalOrderDeps } from './tacticalOrderDeps';
  *
  * Purpose: Keeps tactical and strategic preview paths aligned on when to show terrain vs range blocking copy (air: range only).
  * When to use: Only from `refreshHoverRoutePreview` after validation / preview envelopes are computed.
- * Expected outcome: Redraw requested. `#order-block-tooltip` shows immediately for an illegal preview. `#order-slower-tooltip` waits out the hex dwell for terrain or weather that changes a legal order. The hex tooltip stays hidden while that planning gesture is armed.
+ * Expected outcome: Redraw requested. `#order-block-tooltip` shows immediately for an illegal preview. `#order-slower-tooltip` waits one second for terrain or weather that changes a legal order. The hex tooltip stays hidden while that planning gesture is armed.
  * Exceptions: None.
  */
 function publishHoverRoutePreview(

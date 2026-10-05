@@ -159,12 +159,11 @@ function testRightClickClearsSelectionWithoutIconException(): void {
 }
 
 /**
- * Checks that a stationary unit icon opens the callout, and a lone human unit is still selected first.
+ * Checks that a stack icon opens the callout, and a lone human unit is still selected on click.
  *
- * Purpose: A lone human token used to select without opening the popup, so its origin flag never appeared.
+ * Purpose: A click on a unit icon still opens the list and selects a lone human unit. Hover shows the Bonuses tooltip instead.
  * When to use: Regression signal when refactoring the main-map click listener.
- * Expected outcome: The callout gate is any stationary unit, selection runs before the callout is scheduled,
- *   and `hideStackCallout` stays after that schedule so it cannot cancel the popup just queued.
+ * Expected outcome: Selection runs before the stack callout is scheduled, and `hideStackCallout` stays after that schedule so it cannot cancel the popup just queued.
  * Exceptions: AssertionError when the wiring drifts.
  */
 function testLoneHumanUnitIconOpensCalloutAndSelects(): void {
@@ -173,8 +172,9 @@ function testLoneHumanUnitIconOpensCalloutAndSelects(): void {
   const clickEnd = interactions.indexOf("addEventListener('dblclick'");
   assert.ok(clickStart >= 0 && clickEnd > clickStart, 'click listener precedes the double-click listener');
   const clickListener = interactions.slice(clickStart, clickEnd);
-  assert.equal(clickListener.includes('isLoneAi'), false, 'a single unit icon should open the callout whether or not it is an enemy');
-  assert.ok(clickListener.includes('unitsAtHit.length >= 1 && unitIconHit'), 'any stationary unit icon should schedule the callout');
+  assert.equal(clickListener.includes('isLoneAi'), false, 'a stack icon should open the callout whether or not an enemy is in it');
+  assert.ok(clickListener.includes('unitsAtHit.length >= 1 && unitIconHit'), 'a stationary unit icon still enters the click path');
+  assert.ok(clickListener.includes('unitsAtHit.length >= 1'), 'a unit icon schedules the callout from a click');
   const policyAt = clickListener.indexOf('applyHumanUnitIconClickSelectionPolicy(');
   const scheduleAt = clickListener.indexOf('scheduleDeferredStackCallout(');
   const hideAt = clickListener.indexOf('deps.hideStackCallout()');
@@ -183,6 +183,11 @@ function testLoneHumanUnitIconOpensCalloutAndSelects(): void {
     'lone-human selection is scheduled before the callout, and hideStackCallout cannot cancel that callout'
   );
   assert.ok(clickListener.includes('unitId: loneHumanUnit.id'), 'the selected id is the stationary token, not whichever unit getUnitAtHex finds first');
+  const moveStart = interactions.indexOf("addEventListener('pointermove'");
+  const moveEnd = interactions.indexOf("addEventListener('pointerleave'");
+  const moveListener = interactions.slice(moveStart, moveEnd);
+  assert.ok(moveListener.includes('pointerOnToken:'), 'a one-unit token shows its tooltip from the pointer dwell');
+  assert.equal(moveListener.includes('showCallout'), false, 'the pointer dwell does not open the unit list');
 }
 
 /**

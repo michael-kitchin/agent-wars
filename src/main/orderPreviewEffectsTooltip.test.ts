@@ -1,7 +1,7 @@
 /**
  * Contracts for the order-planning effects tooltip.
  *
- * Purpose: Locks the copy for a march, ferry, air strike, and ranged attack, and the dwell that remains after a late preview.
+ * Purpose: Locks the copy for a march, ferry, air strike, and ranged attack.
  * When to use: `node --test dist/main/orderPreviewEffectsTooltip.test.js` after `tsc -p tsconfig.main.json`.
  * Expected outcome: Happy paths include icons or swatches. Blocked, tagged, off, and empty orders stay null.
  * Exceptions: None.
@@ -10,7 +10,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
-  orderEffectsTooltipRemainingWaitMs,
   resolveOrderPreviewEffectsTooltipHtml,
   type OrderPreviewEffectsTooltipInput,
   type OrderPreviewRangedTerrainBattle,
@@ -23,6 +22,9 @@ const rainIcon = '<img class="weather-icon" src="weather/rain.svg" alt="" aria-h
 const heatIcon = '<img class="weather-icon" src="weather/heat.svg" alt="" aria-hidden="true" />Heat';
 const forestSwatch =
   '<span class="terrain-swatch" data-terrain-kind="forest" aria-hidden="true"></span>Forest';
+const roadMark = '<img class="feature-icon" src="transport/road.svg" alt="" aria-hidden="true" />Road';
+const railMark = '<img class="feature-icon" src="transport/rail.svg" alt="" aria-hidden="true" />Rail';
+const usingBoth = `<strong>Using:</strong> ${roadMark}, ${railMark}`;
 
 /**
  * Builds a legal effects input, so each test only overrides the order it cares about.
@@ -43,13 +45,6 @@ function legal(overrides: Partial<OrderPreviewEffectsTooltipInput>): OrderPrevie
   };
 }
 
-test('orderEffectsTooltipRemainingWaitMs counts down from the cell change and floors at zero', () => {
-  assert.equal(orderEffectsTooltipRemainingWaitMs(0, 0, 750), 750);
-  assert.equal(orderEffectsTooltipRemainingWaitMs(0, 200, 750), 550);
-  assert.equal(orderEffectsTooltipRemainingWaitMs(0, 800, 750), 0);
-  assert.equal(orderEffectsTooltipRemainingWaitMs(500, 100, 750), 750);
-});
-
 test('resolveOrderPreviewEffectsTooltipHtml shows a tactical march slowdown with a weather icon and a terrain swatch', () => {
   const html = resolveOrderPreviewEffectsTooltipHtml(
     legal({
@@ -57,13 +52,13 @@ test('resolveOrderPreviewEffectsTooltipHtml shows a tactical march slowdown with
     })
   );
   assert.ok(html?.includes(`<strong>Slower:</strong> ${forestSwatch}, ${snowIcon}`));
-  assert.ok(html?.includes(`${TOOLTIP_SECTION_GAP_HTML}<strong>Using:</strong> Road/Rail`));
+  assert.ok(html?.includes(`${TOOLTIP_SECTION_GAP_HTML}${usingBoth}`));
 });
 
 test('resolveOrderPreviewEffectsTooltipHtml keeps a road-or-rail tactical march on the Using line', () => {
   assert.equal(
     resolveOrderPreviewEffectsTooltipHtml(legal({ marchImpact: { slower: [], roadRail: true } })),
-    '<strong>Using:</strong> Road/Rail'
+    usingBoth
   );
 });
 

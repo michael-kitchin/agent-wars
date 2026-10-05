@@ -114,7 +114,7 @@ function testSessionInvalidatesOnVisibleOccupancyChange(): void {
  * Ensures strategic march previews never attach slower-terrain tooltip fields.
  *
  * Purpose: Res1 movement has no §12.4 slowdowns; `#order-slower-tooltip` must stay dark on the strategic map.
- * When to use: After edits to `strategicMarchTerrainForPlan` or grouped envelope merge.
+ * When to use: After edits to `emptyStrategicTerrainFields` or grouped envelope merge.
  * Expected outcome: Envelope and per-row `slowerTerrainDisplayTitle` / `orderPreviewTerrainImpact` are null.
  * Exceptions: None.
  */

@@ -21,6 +21,7 @@ import { gridHopDistanceBetween } from './assessUnitProximity';
 import { h3ToLatLng, type LatLng, type LatLngMap } from './h3LatLng';
 import { estimateTacticalMarch, type TacticalMarchEstimate } from './tacticalMarchEstimate';
 import { tacticalOriginBonusUnitFields } from './originBonusAssessment';
+import { techLevelAssessmentField } from '../techBonus/techLevelAssessmentField';
 import { weatherAttackPenalty, weatherBonusLevelOf } from '../../shared/weatherBonusRules';
 import type { OriginBonusSettings } from '../../shared/originBonusTypes';
 
@@ -354,6 +355,7 @@ export function executeTacticalAssessUnit(args: TacticalAssessUnitArgs): {
       rangedRangeThisBeat: selfRange,
       embarkedOnSubUnitId: self.embarkedOnSubUnitId ?? null,
       ...tacticalOriginBonusUnitFields(args.originBonusSettings, battle, self),
+      ...techLevelAssessmentField(self.techLevel),
       ...(battle.weatherBonusEnabled === true
         ? {
             weatherTags: self.weatherTags ?? [],

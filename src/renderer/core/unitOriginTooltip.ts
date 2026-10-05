@@ -223,6 +223,66 @@ function trackPointer(event: PointerEvent): void {
 }
 
 /**
+ * Shows the Bonuses tooltip at a pointer position, without a flag element under the pointer.
+ *
+ * Purpose: A single-unit map token uses the same tooltip as a unit flag.
+ * When to use: After the token dwell elapses, and while the pointer stays on that token.
+ * Expected outcome: `#unit-origin-tooltip` shows `html` near the pointer. An empty `html` hides it.
+ * Exceptions: None. A missing tooltip element hides and returns.
+ */
+export function presentUnitOriginTooltip(html: string, clientX: number, clientY: number): void {
+  stopAnchorWatch();
+  if (showTimer !== null) {
+    clearTimeout(showTimer);
+    showTimer = null;
+  }
+  activeAnchor = null;
+  lastPointer.x = clientX;
+  lastPointer.y = clientY;
+  const el = getTooltipEl();
+  if (!html || !el) {
+    hideUnitOriginTooltip();
+    return;
+  }
+  el.innerHTML = html;
+  paintTerrainSwatches(el);
+  positionTooltip(el);
+  el.classList.remove('hidden');
+  el.setAttribute('aria-hidden', 'false');
+  el.setAttribute('role', 'tooltip');
+}
+
+/**
+ * Hides the Bonuses tooltip when it was opened from a map token.
+ *
+ * Purpose: Leaving the token, or pressing the map, must not leave the tooltip up. A flag hover owns the same element and is left to its own listeners.
+ * When to use: From the single-unit token hover when the pointer leaves that token.
+ * Expected outcome: The tooltip hides when no flag is the active anchor. A flag hover is unchanged.
+ * Exceptions: None.
+ */
+export function dismissMapUnitOriginTooltip(): void {
+  if (activeAnchor) return;
+  hideUnitOriginTooltip();
+}
+
+/**
+ * Moves a map-opened Bonuses tooltip with the pointer.
+ *
+ * Purpose: The token hover has no flag element for the document listener to follow.
+ * When to use: While the pointer stays on the token after the tooltip is open.
+ * Expected outcome: The tooltip moves when it is visible and no flag hover is active. Otherwise no-op.
+ * Exceptions: None.
+ */
+export function moveMapUnitOriginTooltip(clientX: number, clientY: number): void {
+  if (activeAnchor) return;
+  lastPointer.x = clientX;
+  lastPointer.y = clientY;
+  const el = getTooltipEl();
+  if (!el || el.classList.contains('hidden')) return;
+  positionTooltip(el);
+}
+
+/**
  * Installs the delegated hover tooltip for unit country flags.
  *
  * Purpose: Flags appear in labels that are rebuilt often (stack callout, sidebar, toasts), so one set of

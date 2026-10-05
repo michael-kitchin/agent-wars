@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { formatEffectSymbolPrefixHtml, formatStatusIconHtml } from '../shared/statusIconHtml';
 import {
   computeTerrainEffectsLine,
   computeTerrainEffectsLineHtml,
@@ -173,24 +174,35 @@ test('formatTerrainEffectEntries sorts alphabetically and deduplicates', () => {
 test('formatTerrainEffectEntriesHtml preserves x/-/+ symbol order', () => {
   const grouped = new Map<string, ReadonlySet<'x' | '-' | '+'>>();
   grouped.set('Range|Armored', new Set(['-', 'x']));
-  assert.deepEqual(formatTerrainEffectEntriesHtml(grouped), ['(x/-) Armored Range']);
+  const html = formatTerrainEffectEntriesHtml(grouped);
+  assert.deepEqual(html, [`${formatEffectSymbolPrefixHtml('x/-')}Armored Range`]);
+  assert.equal(html[0]!.includes('(x/-)'), false);
 });
 
-test('formatTerrainEffectSymbolPrefixHtml returns parenthesized symbol prefixes without markup', () => {
-  assert.equal(formatTerrainEffectSymbolPrefixHtml('x'), '(x)');
-  assert.equal(formatTerrainEffectSymbolPrefixHtml('-'), '(-)');
-  assert.equal(formatTerrainEffectSymbolPrefixHtml('+'), '(+)');
-  assert.equal(formatTerrainEffectSymbolPrefixHtml('x/-/+'), '(x/-/+)');
+test('formatTerrainEffectSymbolPrefixHtml returns status icons', () => {
+  assert.equal(formatTerrainEffectSymbolPrefixHtml('x'), formatStatusIconHtml('blocked'));
+  assert.equal(formatTerrainEffectSymbolPrefixHtml('-'), formatStatusIconHtml('down'));
+  assert.equal(formatTerrainEffectSymbolPrefixHtml('+'), formatStatusIconHtml('up'));
+  assert.equal(formatTerrainEffectSymbolPrefixHtml('x/-/+'), formatEffectSymbolPrefixHtml('x/-/+'));
 });
 
-test('formatTerrainEffectsLineHtml preserves plain effect entry text', () => {
-  assert.equal(
-    formatTerrainEffectsLineHtml('(-) All Movement, (x/-) Armored Range, (+) All Movement'),
-    '(-) All Movement, (x/-) Armored Range, (+) All Movement'
-  );
+test('formatTerrainEffectsLineHtml leaves an unmatched clause unchanged', () => {
+  assert.equal(formatTerrainEffectsLineHtml('not an effect'), 'not an effect');
 });
 
-test('computeTerrainEffectsLineHtml matches plain ordering and text', () => {
+test('computeTerrainEffectsLineHtml keeps plain clause order and uses status icons', () => {
   const input = fx({ terrainKind: 'mountain', isUrban: true });
-  assert.equal(computeTerrainEffectsLineHtml(input), computeTerrainEffectsLine(input));
+  const plain = computeTerrainEffectsLine(input);
+  assert.equal(plain, '(-) All Movement, (-) Infantry Range, (x) Naval Range, (x/-) Armored Range');
+  const down = formatStatusIconHtml('down');
+  const blocked = formatStatusIconHtml('blocked');
+  const html = computeTerrainEffectsLineHtml(input);
+  assert.equal(
+    html,
+    `${down}All Movement, ${down}Infantry Range, ${blocked}Naval Range, ${blocked}${down}Armored Range`
+  );
+  assert.ok(html!.indexOf('Naval Range') < html!.indexOf('Armored Range'));
+  assert.equal(html!.includes('(+)'), false);
+  assert.equal(html!.includes('(-)'), false);
+  assert.equal(html!.includes('(x)'), false);
 });

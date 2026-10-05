@@ -146,10 +146,10 @@ export const TOOLTIP_OFFSET_PX = 12;
  *
  * Purpose: Deliberate disclosure delay for strategic res1 cells and tactical res4 battle cells.
  * When to use: `mainMapInteractions` deferred `showTerrainTooltip` timer after the pointer settles.
- * Expected outcome: Hex terrain/effects details appear after 750ms hover on the same cell.
+ * Expected outcome: Hex terrain/effects details appear after 1000ms hover on the same cell.
  * Exceptions: None.
  */
-export const HEX_DETAILS_TOOLTIP_DELAY_MS = 750;
+export const HEX_DETAILS_TOOLTIP_DELAY_MS = 1000;
 
 /**
  * Wall-clock visibility for the transient “Blocked: …” and “Slower: …” order-preview tooltips that follow the pointer.

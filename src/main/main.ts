@@ -304,6 +304,7 @@ function registerIpcHandlers(): void {
     const countryBonusLevel = parseBonusLevel(payload?.countryBonusLevel, 'off');
     const terrainBonusLevel = parseBonusLevel(payload?.terrainBonusLevel, 'off');
     const weatherBonusLevel = parseBonusLevel(payload?.weatherBonusLevel, 'off');
+    const techBonusLevel = parseBonusLevel(payload?.techBonusLevel, 'off');
     const startMonth = payload?.startMonth;
     logDebug('main game:newGame', {
       fogOfWarEnabled,
@@ -311,6 +312,7 @@ function registerIpcHandlers(): void {
       countryBonusLevel,
       terrainBonusLevel,
       weatherBonusLevel,
+      techBonusLevel,
       startMonth,
       requestedHumanHomeRegion: payload?.humanHomeRegion ?? '',
       requestedAiHomeRegion: payload?.aiHomeRegion ?? '',
@@ -323,6 +325,7 @@ function registerIpcHandlers(): void {
       countryBonusLevel,
       terrainBonusLevel,
       weatherBonusLevel,
+      techBonusLevel,
       startMonth,
     });
     clearDeferredPlaybackConsultPending();

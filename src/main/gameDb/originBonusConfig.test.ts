@@ -10,6 +10,8 @@ import {
   TERRAIN_BONUS_LEVEL_CONFIG_KEY,
   WEATHER_BONUS_CONFIG_KEY,
   WEATHER_BONUS_LEVEL_CONFIG_KEY,
+  TECH_BONUS_CONFIG_KEY,
+  TECH_BONUS_LEVEL_CONFIG_KEY,
 } from './originBonusConfig';
 
 /**
@@ -140,11 +142,43 @@ function testHexCountryNamesFollowCountryBonus(): void {
   });
 }
 
+/**
+ * Locks tech persistence: a missing row is off, High round-trips, and a missing level is Low.
+ *
+ * Purpose: Matches saved before tech existed must keep playing with tech off.
+ * When to use: After changing tech rows in `originBonusConfig`.
+ * Expected outcome: Off omits the snapshot flag. High is stored and reported. Deleting only the level row reads as low.
+ * Exceptions: None.
+ */
+function testTechBonusPersistsAndAMissingRowReadsOff(): void {
+  withTempGameDb('aw-techbonus-', () => {
+    resetGameForNewMatch();
+    assert.strictEqual(configValue(TECH_BONUS_CONFIG_KEY), '0');
+    const off = readPersistedOriginBonusSettings({ getOne: dbGetOne, hasDb: isDbReady });
+    assert.strictEqual(off.techBonusEnabled, undefined);
+    assert.ok(!('techBonusLevel' in off));
+    assert.ok(!('techBonusEnabled' in getGameStateForPlayer('human')));
+
+    resetGameForNewMatch({ techBonusLevel: 'high' });
+    assert.strictEqual(configValue(TECH_BONUS_CONFIG_KEY), '1');
+    assert.strictEqual(configValue(TECH_BONUS_LEVEL_CONFIG_KEY), 'high');
+    const on = getGameStateForPlayer('human');
+    assert.strictEqual(on.techBonusEnabled, true);
+    assert.strictEqual(on.techBonusLevel, 'high');
+
+    dbRun('DELETE FROM game_config WHERE key = ?', [TECH_BONUS_LEVEL_CONFIG_KEY]);
+    const missingLevel = readPersistedOriginBonusSettings({ getOne: dbGetOne, hasDb: isDbReady });
+    assert.strictEqual(missingLevel.techBonusEnabled, true);
+    assert.strictEqual(missingLevel.techBonusLevel, 'low');
+  });
+}
+
 function run(): void {
   testFlagsPersistOnResetAndReachSnapshots();
   testHighLevelsPersistAndReachSnapshots();
   testMissingLevelRowsReadAsLow();
   testHexCountryNamesFollowCountryBonus();
+  testTechBonusPersistsAndAMissingRowReadsOff();
   console.log('originBonusConfig.test.ts passed');
 }
 

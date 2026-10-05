@@ -12,6 +12,7 @@ import {
 import { getAssessmentCategory, executeEstimateCombat, poissonBinomialPMF } from './combatEstimation';
 import type { GameStateSnapshot } from '../gameDb';
 import type { UnitOrigin } from '../../shared/unitOriginTypes';
+import { ensureTerrainClassificationCacheLoaded, getRes4FeatureRowsForSeeding } from '../terrainClassificationCache';
 
 /**
  * Defines the `makeUnit` function shape (function makeUnit(id: string, player: string, unitType: string, h3Index: string): CombatUnit).
@@ -409,6 +410,7 @@ function testRangedEstimateReportsCountryBonus(): void {
   const off = executeEstimateCombat(args, state(false), latLngByH3, () => h3) as Summary;
   assert.strictEqual(off.attackerSummary?.units[0]?.attackValue, 10);
   assert.ok(!('originBonus' in off.attackerSummary!.units[0]!));
+  assert.ok(!('techBonus' in off.attackerSummary!.units[0]!));
 }
 
 /**
@@ -458,6 +460,72 @@ function testMeleeEstimateJudgesAttackerAtTarget(): void {
  * Expected outcome: Armor shows attack 8 at a forest hex and 10 at a plains hex.
  * Exceptions: None.
  */
+/**
+ * Finds one res1 hex whose generated urban count is high enough to be Advanced.
+ *
+ * Purpose: Estimates classify tech from the terrain cache, so the fixture has to be a real birth hex.
+ * When to use: The tech-bonus estimate case.
+ * Expected outcome: A parent hex with at least five urban cells.
+ * Exceptions: Throws when the loaded cache has no such hex.
+ */
+function advancedBirthHex(): string {
+  ensureTerrainClassificationCacheLoaded();
+  const counts = new Map<string, number>();
+  for (const row of getRes4FeatureRowsForSeeding()) {
+    if (!row.isUrban) continue;
+    const next = (counts.get(row.parentH3Index) ?? 0) + 1;
+    if (next >= 5) return row.parentH3Index;
+    counts.set(row.parentH3Index, next);
+  }
+  throw new Error('terrain cache has no res1 hex with five urban cells');
+}
+
+/**
+ * Verifies a Low estimate raises Advanced armor's attack and leaves its defense printed.
+ *
+ * Purpose: The summary the model reads must match the dice, including a defense of 0 at Low.
+ * When to use: After changing estimate tech stamping or the hit thresholds.
+ * Expected outcome: Low armor attack is 12 and defense is 7, with `techBonus.defense` 0. High defense is 9.
+ *   A unit with no birth hex stays at its printed values and has no `techBonus`.
+ * Exceptions: None.
+ */
+function testRangedEstimateReportsTechBonus(): void {
+  const h3 = '891f1d48b9fffff';
+  const birth = advancedBirthHex();
+  const origin = frenchOrigin(birth);
+  const state = (techBonusLevel: 'low' | 'high'): GameStateSnapshot => ({
+    hexes: [{ h3Index: h3, terrain: 'land', terrainKind: 'plains' }],
+    units: [
+      { id: 'opponent-armor-1', player: 'opponent', unitType: 'armor', h3Index: h3, origin },
+      { id: 'human-armor-1', player: 'human', unitType: 'armor', h3Index: h3, origin },
+      { id: 'human-infantry-1', player: 'human', unitType: 'infantry', h3Index: h3 },
+    ],
+    phase: 'planning',
+    turnNumber: 1,
+    pendingOrders: [],
+    techBonusEnabled: true,
+    techBonusLevel,
+  });
+  const latLngByH3 = new Map<string, [number, number]>([[h3, [0.5, 0.5]]]);
+  const args = { engagementType: 'ranged', attackers: { units: ['opponent-armor-1'] }, targetHex: [0.5, 0.5] };
+  type TechRow = { unitId: string; attackValue?: number; defenseValue?: number; techBonus?: { attack: number; defense: number } };
+  type Summary = { attackerSummary?: { units: TechRow[] }; defenderSummary?: { units: TechRow[] } };
+  const low = executeEstimateCombat(args, state('low'), latLngByH3, () => h3) as Summary;
+  const lowAttacker = low.attackerSummary?.units[0];
+  assert.equal(lowAttacker?.attackValue, 12);
+  assert.deepEqual(lowAttacker?.techBonus, { attack: 2, defense: 0 });
+  const lowArmor = low.defenderSummary?.units.find((unit) => unit.unitId === 'human-armor-1');
+  assert.equal(lowArmor?.defenseValue, 7);
+  assert.deepEqual(lowArmor?.techBonus, { attack: 2, defense: 0 });
+  const lowInfantry = low.defenderSummary?.units.find((unit) => unit.unitId === 'human-infantry-1');
+  assert.equal(lowInfantry?.defenseValue, 7);
+  assert.ok(lowInfantry && !('techBonus' in lowInfantry));
+  const high = executeEstimateCombat(args, state('high'), latLngByH3, () => h3) as Summary;
+  assert.equal(high.attackerSummary?.units[0]?.attackValue, 12);
+  assert.equal(high.defenderSummary?.units.find((unit) => unit.unitId === 'human-armor-1')?.defenseValue, 9);
+  assert.deepEqual(high.attackerSummary?.units[0]?.techBonus, { attack: 2, defense: 2 });
+}
+
 function testRangedEstimateAppliesTargetCover(): void {
   const h3 = '891f1d48b9fffff';
   const state = (terrainKind: string): GameStateSnapshot => ({
@@ -501,6 +569,7 @@ export function runCombatEstimationVerification(): void {
   testExecuteEstimateCombatInvalidHex();
   testRangedEstimateReportsCountryBonus();
   testMeleeEstimateJudgesAttackerAtTarget();
+  testRangedEstimateReportsTechBonus();
   testRangedEstimateAppliesTargetCover();
   console.log('Tool 3 verification: all checks passed.');
 }

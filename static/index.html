@@ -60,35 +60,34 @@
         <div class="game-over-size-caps" aria-live="polite">
           <div class="game-over-size-cap">
             <div class="game-over-size-token">
-              <img src="../symbols/infantry-1.svg" alt="" />
+              <img src="units/infantry.svg" alt="" />
               <span id="new-game-size-cap-infantry" class="game-over-size-badge">12</span>
             </div>
             <div class="game-over-size-name">Infantry</div>
           </div>
           <div class="game-over-size-cap">
             <div class="game-over-size-token">
-              <img src="../symbols/armor-1.svg" alt="" />
+              <img src="units/armor.svg" alt="" />
               <span id="new-game-size-cap-armor" class="game-over-size-badge">8</span>
             </div>
             <div class="game-over-size-name">Armor</div>
           </div>
           <div class="game-over-size-cap">
             <div class="game-over-size-token">
-              <img src="../symbols/naval-1.svg" alt="" />
+              <img src="units/naval.svg" alt="" />
               <span id="new-game-size-cap-naval" class="game-over-size-badge">8</span>
             </div>
             <div class="game-over-size-name">Naval</div>
           </div>
           <div class="game-over-size-cap">
             <div class="game-over-size-token">
-              <img src="../symbols/air-1.svg" alt="" />
+              <img src="units/air.svg" alt="" />
               <span id="new-game-size-cap-air" class="game-over-size-badge">6</span>
             </div>
             <div class="game-over-size-name">Air</div>
           </div>
         </div>
         <div class="game-over-options">
-          <label for="new-game-fog-checkbox"><input type="checkbox" id="new-game-fog-checkbox" checked /> Fog of war</label>
           <label for="new-game-country-bonus-select">Country bonus
             <select id="new-game-country-bonus-select">
               <option value="off">Off</option>
@@ -110,8 +109,16 @@
               <option value="high">High</option>
             </select>
           </label>
+          <label for="new-game-tech-bonus-select">Tech bonus
+            <select id="new-game-tech-bonus-select">
+              <option value="off">Off</option>
+              <option value="low" selected>Low</option>
+              <option value="high">High</option>
+            </select>
+          </label>
         </div>
         <div class="game-over-start-month">
+          <label for="new-game-fog-checkbox"><input type="checkbox" id="new-game-fog-checkbox" checked /> Fog of war</label>
           <label for="new-game-start-month">Starting month</label>
           <div class="game-over-region-controls">
             <select id="new-game-start-month">

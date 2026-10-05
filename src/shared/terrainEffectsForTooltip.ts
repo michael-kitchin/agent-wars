@@ -1,9 +1,9 @@
 /**
  * Pure res4 terrain-effect strings for the map hex tooltip "Effects:" line.
  *
- * Purpose: Centralizes movement/range symbol rules so tooltip copy matches tactical §12.4 and combat modifiers.
- * When to use: From `formatTerrainTooltipHtml` for the Effects line. Terrain symbols are for res4 cells. Weather stays on the Weather line.
- * Expected outcome: Comma-delimited effect list or `null` when the hex has no applicable effects.
+ * Purpose: Centralizes movement and range symbol rules so tooltip copy matches tactical movement and range.
+ * When to use: From `formatTerrainTooltipHtml` for the movement and range clauses of the Effects line. Cover clauses are separate. Terrain symbols are for res4 cells. Weather stays on the Weather line.
+ * Expected outcome: A comma-delimited plain list, or the same clauses as HTML with status icons. `null` when the cell has no movement or range effect.
  * Exceptions: None; invalid/unknown kinds fall back through `normalizeDbTerrainKindToTacticalCategory`.
  */
 
@@ -14,6 +14,7 @@ import {
   tacticalEnterHexMovementCost,
 } from './tacticalTerrainMovement';
 import type { TacticalMovementCategory } from './tacticalTerrainMovement';
+import { formatEffectSymbolPrefixHtml } from './statusIconHtml';
 
 /** Effect polarity symbols shown before Movement or Range in tooltip copy. */
 type EffectSymbol = 'x' | '-' | '+';
@@ -160,15 +161,15 @@ function formatTerrainEffectLabel(category: EffectCategory, unit: UnitLabel | 'A
 }
 
 /**
- * Returns the parenthesized effect symbol prefix for tooltip HTML.
+ * Returns the status-icon prefix for one movement or range symbol set.
  *
- * Purpose: Shared display shape for res4 Effects tooltip symbol prefixes without extra styling.
+ * Purpose: Tooltip HTML uses the same symbol order as the plain prefix, drawn as icons.
  * When to use: While assembling res4 Effects tooltip entries from known symbol strings.
- * Expected outcome: `(+)`, `(-)`, or `(x/-)` with no surrounding markup.
- * Exceptions: Returns empty string when `symbols` is empty.
+ * Expected outcome: Icons for `+`, `-`, and `x`, with slashes omitted. An empty string returns `''`.
+ * Exceptions: None.
  */
 export function formatTerrainEffectSymbolPrefixHtml(symbols: string): string {
-  return wrapTerrainEffectSymbolSetForDisplay(symbols);
+  return formatEffectSymbolPrefixHtml(symbols);
 }
 
 /**
@@ -190,9 +191,9 @@ function formatTerrainEffectEntryPlain(
 /**
  * Formats one HTML effect entry from grouped parts without regex parsing.
  *
- * Purpose: Keeps res4 Effects tooltip entries aligned with plain-text formatting rules.
- * When to use: From `formatTerrainEffectEntriesHtml` and `computeTerrainEffectsLineHtml`.
- * Expected outcome: Parenthesized symbol prefix, space, then unit scope and category.
+ * Purpose: Keeps res4 Effects tooltip entries in the same clause order as the plain line.
+ * When to use: From `formatTerrainEffectEntryHtml` after a plain entry has been parsed.
+ * Expected outcome: Status icons, then the unit scope and category, with no space between them.
  * Exceptions: None.
  */
 function formatTerrainEffectEntryHtmlFromParts(
@@ -200,7 +201,7 @@ function formatTerrainEffectEntryHtmlFromParts(
   category: EffectCategory,
   unit: UnitLabel | 'All'
 ): string {
-  return formatTerrainEffectEntryPlain(symbols, category, unit);
+  return `${formatTerrainEffectSymbolPrefixHtml(symbols)}${formatTerrainEffectLabel(category, unit)}`;
 }
 
 /**
@@ -227,26 +228,17 @@ export function formatTerrainEffectEntries(
 }
 
 /**
- * Formats grouped symbol sets into sorted unique HTML effect strings (exported for unit tests).
+ * Formats grouped symbol sets into HTML effect strings in plain-text order.
  *
- * Purpose: Tooltip HTML assembly without round-tripping through plain text and regex.
- * When to use: `computeTerrainEffectsLineHtml` and tests covering symbol prefix formatting.
- * Expected outcome: Same text shape as plain entries.
+ * Purpose: Sorting the icon markup would move a mixed prefix ahead of a single blocked clause.
+ * When to use: Tests that check symbol order. Tooltip assembly uses `computeTerrainEffectsLineHtml`.
+ * Expected outcome: The plain entries, each with its parenthesized prefix replaced by status icons.
  * Exceptions: None.
  */
 export function formatTerrainEffectEntriesHtml(
   grouped: ReadonlyMap<string, ReadonlySet<EffectSymbol>>
 ): string[] {
-  const entries: string[] = [];
-  for (const [key, symbols] of grouped) {
-    const slash = formatSymbolSet(symbols);
-    if (!slash) continue;
-    const pipe = key.indexOf('|');
-    const category = key.slice(0, pipe) as EffectCategory;
-    const unit = key.slice(pipe + 1) as UnitLabel | 'All';
-    entries.push(formatTerrainEffectEntryHtmlFromParts(slash, category, unit));
-  }
-  return [...new Set(entries)].sort((a, b) => a.localeCompare(b));
+  return formatTerrainEffectEntries(grouped).map(formatTerrainEffectEntryHtml);
 }
 
 /**
@@ -254,7 +246,7 @@ export function formatTerrainEffectEntriesHtml(
  *
  * Purpose: Converts plain entries (tests or cached plain lines) into tooltip HTML fragments.
  * When to use: `formatTerrainEffectsLineHtml` when only a plain comma-delimited line is available.
- * Expected outcome: Same text as the matched plain entry when formatting succeeds.
+ * Expected outcome: Status icons and the label when the entry matches. The entry itself when it does not.
  * Exceptions: Returns the entry unchanged when it does not match the expected pattern.
  */
 export function formatTerrainEffectEntryHtml(entry: string): string {
@@ -272,7 +264,7 @@ export function formatTerrainEffectEntryHtml(entry: string): string {
  *
  * Purpose: Keeps `computeTerrainEffectsLine` plain for tests while sharing HTML assembly helpers.
  * When to use: When only a plain effects line is available; prefer `computeTerrainEffectsLineHtml` at source.
- * Expected outcome: Same text as the plain line with comma spacing unchanged.
+ * Expected outcome: Each matched clause uses status icons. Clause order and comma spacing stay as given. An unmatched clause is copied through.
  * Exceptions: None.
  */
 export function formatTerrainEffectsLineHtml(line: string): string {
@@ -330,14 +322,14 @@ export function computeTerrainEffectsLine(input: TerrainEffectsInput): string | 
 /**
  * Returns the comma-delimited terrain effects tooltip HTML for a res4 hex, or null when empty.
  *
- * Purpose: Res4 tooltip `Effects:` body without plain-text round-trip so all symbol prefixes render consistently.
+ * Purpose: Res4 tooltip `Effects:` body. Icons replace the plain prefixes after the plain line has been sorted.
  * When to use: `formatTerrainTooltipHtml` when `namingTarget.resolution === 4`.
- * Expected outcome: Same ordering and text as `computeTerrainEffectsLine`.
+ * Expected outcome: The same clauses as `computeTerrainEffectsLine`, in that order, with status icons in place of `(+)`, `(-)`, and `(x)`. Null when the plain line is null.
  * Exceptions: None.
  */
 export function computeTerrainEffectsLineHtml(input: TerrainEffectsInput): string | null {
-  const formatted = formatTerrainEffectEntriesHtml(buildTerrainEffectGroupedMap(input));
-  return formatted.length > 0 ? formatted.join(', ') : null;
+  const plain = computeTerrainEffectsLine(input);
+  return plain == null ? null : formatTerrainEffectsLineHtml(plain);
 }
 
 /**

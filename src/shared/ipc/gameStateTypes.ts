@@ -3,6 +3,7 @@ import type { TacticalBattleSnapshot } from './tacticalTypes';
 import type { ActiveBonusLevel } from '../bonusLevel';
 import type { GameSize } from '../gameSize';
 import type { UnitOrigin } from '../unitOriginTypes';
+import type { TechLevel } from '../techBonusTypes';
 import type { WeatherState } from '../weatherBonusTypes';
 
 /**
@@ -95,6 +96,15 @@ units: {
      * Exceptions: None.
      */
     weatherTags?: WeatherState[];
+    /**
+     * Tech tier of the unit's birth hex.
+     *
+     * Contract: Present only when the tech bonus is on. `basic` when the birth hex is missing or has fewer than five urban cells.
+     * When to use: The unit tooltip and AI tools. Dice recompute the tier from the birth hex.
+     * Expected outcome: `advanced` or `basic`.
+     * Exceptions: None.
+     */
+    techLevel?: TechLevel;
   }[];
     /**
    * Specifies the contract for the `visibleHexes` member (visibleHexes?: string[];).
@@ -238,6 +248,24 @@ startMonth?: number;
    * Exceptions: None.
    */
 monthName?: string;
+    /**
+   * Whether this match has the tech bonus on.
+   *
+   * Contract: Omitted when off, including matches saved before the option existed. Present and true when on.
+   * When to use: Read through `originBonusSettingsFromSnapshot` before adding tech points.
+   * Expected outcome: True only for a match that started with tech at Low or High.
+   * Exceptions: None.
+   */
+techBonusEnabled?: boolean;
+    /**
+   * How strong the tech bonus is.
+   *
+   * Contract: Present exactly when `techBonusEnabled` is true. Missing next to a true flag means low.
+   * When to use: Read through `techBonusLevelOf`, never directly.
+   * Expected outcome: Low adds 2 attack for Advanced units. High also adds 2 defense.
+   * Exceptions: None.
+   */
+techBonusLevel?: ActiveBonusLevel;
     /**
    * Specifies the contract for the `scenarioId` member (scenarioId?: 'region_vs_region';).
 

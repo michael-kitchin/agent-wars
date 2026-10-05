@@ -13,7 +13,7 @@ Shown in Strategic planning, Resolution playback, and Tactical planning. While t
 ## Information Displayed
 
 - The strategic world, or the battle area while Tactical planning or a tactical Resolution playback is active.
-- Unit glyphs on their hexes. Units that are moving during playback are drawn along the playback, not only at the destination.
+- Unit glyphs on their hexes: a white type glyph on the player-colored circle. A hex that holds both sides uses the gray circle and draws that glyph dark. Units that are moving during playback are drawn along the playback, not only at the destination. The glyphs are in the [UI style guide](../ui-style-guide.md).
 - A scale in metric and imperial units.
 - Terrain fill, unless the player is holding T. See [input-map.md](input-map.md).
 - Overlays from [map-overlays.md](map-overlays.md).

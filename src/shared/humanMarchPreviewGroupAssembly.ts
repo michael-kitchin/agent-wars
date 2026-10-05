@@ -168,15 +168,24 @@ export function mergeOrderPreviewTerrainImpactsFromPreviews(
 ): OrderPreviewTerrainImpact | null {
   const slower = new Set<string>();
   let roadRail = false;
+  let road = false;
+  let rail = false;
   for (const row of previews) {
     const imp = row.preview.orderPreviewTerrainImpact;
     if (!imp) continue;
     roadRail = roadRail || imp.roadRail;
+    road = road || imp.road === true;
+    rail = rail || imp.rail === true;
     for (const s of imp.slower) slower.add(s);
   }
   const slowerArr = sortSlowTerrainLabels([...slower]);
-  if (slowerArr.length === 0 && !roadRail) return null;
-  return { slower: slowerArr, roadRail };
+  if (slowerArr.length === 0 && !roadRail && !road && !rail) return null;
+  return {
+    slower: slowerArr,
+    roadRail,
+    ...(road ? { road: true as const } : {}),
+    ...(rail ? { rail: true as const } : {}),
+  };
 }
 
 export function minMovementRangeAmongUnitTypes(

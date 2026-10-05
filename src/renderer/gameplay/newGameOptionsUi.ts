@@ -15,7 +15,7 @@ const NEW_GAME_FOG_CHECKBOX_ID = 'new-game-fog-checkbox';
  * DOM ids of the bonus level dropdowns, keyed by the `newGame` payload field each one fills.
  *
  * Purpose: One table shared by the read and reset helpers so a new dropdown cannot be read but never reset.
- * When to use: Querying the Country bonus, Terrain bonus, and Weather bonus dropdowns.
+ * When to use: Querying the Country, Terrain, Weather, and Tech bonus dropdowns.
  * Expected outcome: Matches the `id` attributes in `static/index.html`; option values match `BonusLevel`.
  * Exceptions: None.
  */
@@ -23,6 +23,7 @@ const NEW_GAME_BONUS_LEVEL_SELECT_IDS = {
   countryBonusLevel: 'new-game-country-bonus-select',
   terrainBonusLevel: 'new-game-terrain-bonus-select',
   weatherBonusLevel: 'new-game-weather-bonus-select',
+  techBonusLevel: 'new-game-tech-bonus-select',
 } as const;
 
 /**
@@ -87,6 +88,7 @@ export function readNewGameOptionChoices(): NewGameOptionChoices {
     countryBonusLevel: levelOf(NEW_GAME_BONUS_LEVEL_SELECT_IDS.countryBonusLevel),
     terrainBonusLevel: levelOf(NEW_GAME_BONUS_LEVEL_SELECT_IDS.terrainBonusLevel),
     weatherBonusLevel: levelOf(NEW_GAME_BONUS_LEVEL_SELECT_IDS.weatherBonusLevel),
+    techBonusLevel: levelOf(NEW_GAME_BONUS_LEVEL_SELECT_IDS.techBonusLevel),
   };
 }
 

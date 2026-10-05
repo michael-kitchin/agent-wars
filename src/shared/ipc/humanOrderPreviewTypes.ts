@@ -76,12 +76,30 @@ routeSegments?: { turn: number; hexes: [number, number][] }[];
  *
  * Purpose: Lets the renderer render comma-separated `Slower:` lists and a separate `Using: Road/Rail` line without re-walking paths.
  * When to use: Populate on each `HumanOrderPreviewResult` when `valid` and terrain throttles movement or infrastructure applies.
- * Expected outcome: `slower` contains title-case terrain tokens (typically sorted); `roadRail` true when any march step used transport-over-blocked semantics.
+ * Expected outcome: `slower` contains title-case terrain tokens (typically sorted). A cell entered at the road or rail rate is left out of `slower`; the start cell's budget can still add Urban, Rubble, or Forest. `roadRail` is true when any step paid that rate, including a plains road and a road through urban.
  * Exceptions: Omitted entirely when no throttle applies; never set on invalid-only previews.
  */
 export type OrderPreviewTerrainImpact = {
   readonly slower: readonly string[];
   readonly roadRail: boolean;
+  /**
+   * The path entered a cell on a road.
+   *
+   * Contract: Optional. True only when a step used the line rate and the destination cell had a road and no rail. Omitted when unknown.
+   * When to use: The Using line. A true `roadRail` with both flags omitted still means an unspecified line.
+   * Expected outcome: The road icon, without the rail icon.
+   * Exceptions: None.
+   */
+  readonly road?: boolean;
+  /**
+   * The path entered a cell on a rail.
+   *
+   * Contract: Optional. True when a step used the line rate and the destination cell had a rail. Rail wins over a road on the same cell.
+   * When to use: The Using line.
+   * Expected outcome: The rail icon. A path can set both this and `road` when different steps used different lines.
+   * Exceptions: None.
+   */
+  readonly rail?: boolean;
 };
 
 export interface HumanOrderPreviewSegment {

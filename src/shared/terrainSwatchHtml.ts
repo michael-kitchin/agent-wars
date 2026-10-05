@@ -58,6 +58,18 @@ export function formatTerrainSwatchHtml(kind: PipelineTerrainKind): string {
 }
 
 /**
+ * Returns the empty Urban chip.
+ *
+ * Purpose: Urban is a map overlay, not one of the eight terrain kinds, so it is not a pipeline kind.
+ * When to use: Before the word Urban in a tooltip.
+ * Expected outcome: A span whose `data-terrain-kind` is `urban`. The color is applied when the tooltip opens.
+ * Exceptions: None.
+ */
+export function formatUrbanSwatchHtml(): string {
+  return `<span class="${TERRAIN_SWATCH_CLASS_NAME}" data-terrain-kind="urban" aria-hidden="true"></span>`;
+}
+
+/**
  * Returns a terrain name, with a swatch when the kind is one the map key draws.
  *
  * Purpose: Unit tooltips and single-kind hex lines share one markup rule.
@@ -95,6 +107,9 @@ export function formatTerrainNameListHtml(text: string): string {
 function formatTerrainNameTokenHtml(token: string): string {
   const match = /^([A-Za-z]+)([\s\S]*)$/.exec(token);
   const word = match?.[1] ?? '';
+  if (match && word === 'Urban') {
+    return `${formatUrbanSwatchHtml()}${escapeHtmlText(word)}${escapeHtmlText(match[2] ?? '')}`;
+  }
   const kind = DISPLAY_LABEL_TO_KIND[word];
   if (!match || !kind) return escapeHtmlText(token);
   return `${formatTerrainSwatchHtml(kind)}${escapeHtmlText(word)}${escapeHtmlText(match[2] ?? '')}`;

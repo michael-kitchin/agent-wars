@@ -1,5 +1,5 @@
 /**
- * Terrain tooltip HTML: hex-code prefix, naming caption, control, terrain, features, effects, and cover.
+ * Terrain tooltip HTML: hex-code prefix, naming caption, control, terrain, features, and effects.
  *
  * Purpose: Keeps tooltip markup next to the caption flags, out of the hit-testing module.
  * When to use: `getCachedTerrainTooltipHtml` from the hover tooltip and the melee-intercept hex cell.
@@ -16,9 +16,15 @@ import {
   resolveHomeRegionOwnerIdentity,
 } from '../../shared/homeRegionRules';
 import { computeTerrainEffectsLineHtml } from '../../shared/terrainEffectsForTooltip';
-import { formatTerrainKindHtml, formatTerrainNameListHtml } from '../../shared/terrainSwatchHtml';
+import { formatFeatureLabelHtml } from '../../shared/featureIconHtml';
+import { formatTerrainKindHtml, formatTerrainNameListHtml, formatUrbanSwatchHtml } from '../../shared/terrainSwatchHtml';
 import { formatWeatherIconHtml } from '../../shared/weatherIcons';
-import { formatTerrainCoverTooltipText, terrainCoverPairFor } from '../../shared/terrainCoverRules';
+import {
+  formatTerrainCoverTooltipHtml,
+  joinHexTooltipEffectsHtml,
+  terrainCoverPairFor,
+  type TerrainCoverPair,
+} from '../../shared/terrainCoverRules';
 import { TOOLTIP_SECTION_GAP_HTML } from '../../shared/tooltipSectionGap';
 import { WORLD_H3_RESOLUTION } from '../core/constants';
 import { rendererSharedState as S } from '../core/state';
@@ -43,13 +49,13 @@ function formatLlmLocationBoldPrefixHtml(namingTarget: NamingLookupTarget | null
  *
  * Purpose: The base terrain kind does not include those cell flags.
  * When to use: From `formatTerrainTooltipHtml` when there is no prebuilt res1 terrain summary.
- * Expected outcome: Empty, `, Urban`, `, Rubble`, or `, Urban, Rubble`.
+ * Expected outcome: Empty, an Urban swatch, escaped Rubble, or both. The caller inserts this HTML as-is.
  * Exceptions: None.
  */
 function formatTerrainVariantSuffix(state: Pick<TerrainTooltipState, 'isUrban' | 'isRubble'>): string {
   const variants: string[] = [];
-  if (state.isUrban) variants.push('Urban');
-  if (state.isRubble) variants.push('Rubble');
+  if (state.isUrban) variants.push(`${formatUrbanSwatchHtml()}Urban`);
+  if (state.isRubble) variants.push(escapeHtmlText('Rubble'));
   return variants.length > 0 ? `, ${variants.join(', ')}` : '';
 }
 
@@ -146,14 +152,14 @@ function parentStrategicHex(h3Index: string): string | null {
 }
 
 /**
- * Builds the Effects line for a world hex or a detail cell.
+ * Builds the movement and range clauses for a detail cell.
  *
- * Purpose: Terrain effects stay on res4 cells. Weather is the Weather line, so this line does not repeat it.
- * When to use: From `formatTerrainTooltipHtml`.
- * Expected outcome: The cell's tactical terrain effects, or null for a world hex and for a cell with none.
+ * Purpose: Those clauses belong on res4 cells. Cover is joined afterward, and weather stays on the Weather line.
+ * When to use: From `formatTerrainTooltipHtml`, as the first argument to `joinHexTooltipEffectsHtml`.
+ * Expected outcome: The cell's tactical movement and range HTML, or null for a world hex and for a cell with none.
  * Exceptions: None.
  */
-function effectsLine(state: TerrainTooltipState, namingTarget: NamingLookupTarget | null): string | null {
+function movementRangeHtml(state: TerrainTooltipState, namingTarget: NamingLookupTarget | null): string | null {
   if (namingTarget?.resolution !== 4) return null;
   return computeTerrainEffectsLineHtml({
     terrainKind: state.terrainKind,
@@ -168,30 +174,28 @@ function effectsLine(state: TerrainTooltipState, namingTarget: NamingLookupTarge
 }
 
 /**
- * Builds the Cover line text for a world hex or a detail cell.
+ * Reads the cover pair for a world hex or a detail cell.
  *
- * Purpose: Shows how much the hovered place lowers shots at units there, read from the same source the engine uses.
+ * Purpose: The Effects line and the tooltip cache key share one lookup.
  * When to use: From `formatTerrainTooltipHtml` and `terrainTooltipContentKey`.
- * Expected outcome: For a world hex, the snapshot's dominant terrain kind (no urban or rubble); for a detail cell, the cell's kind and its urban and rubble flags. Null when there is no target, no known kind, or no cover.
+ * Expected outcome: For a world hex, the stored terrain kind with no urban or rubble, or null when that kind is missing. For any other resolution, the cell's kind plus its urban and rubble flags. Null when there is no target.
  * Exceptions: None.
  */
-function coverLine(state: TerrainTooltipState, namingTarget: NamingLookupTarget | null): string | null {
+function coverPair(state: TerrainTooltipState, namingTarget: NamingLookupTarget | null): TerrainCoverPair | null {
   if (!namingTarget) return null;
   if (namingTarget.resolution === 1) {
     const terrainKind = S.gameState?.hexes.find((h) => h.h3Index === namingTarget.h3Index)?.terrainKind;
-    return terrainKind ? formatTerrainCoverTooltipText(terrainCoverPairFor({ terrainKind })) : null;
+    return terrainKind ? terrainCoverPairFor({ terrainKind }) : null;
   }
-  return formatTerrainCoverTooltipText(
-    terrainCoverPairFor({ terrainKind: state.terrainKind, isUrban: state.isUrban, isRubble: state.isRubble })
-  );
+  return terrainCoverPairFor({ terrainKind: state.terrainKind, isUrban: state.isUrban, isRubble: state.isRubble });
 }
 
 /**
- * Builds the full terrain tooltip HTML: hex-code prefix, naming caption with flags, then control, terrain, weather, effects, and cover.
+ * Builds the full terrain tooltip HTML: hex-code prefix, naming caption with flags, then control, terrain, weather, and effects.
  *
  * Purpose: Single formatter behind `getCachedTerrainTooltipHtml`.
  * When to use: Only through `getCachedTerrainTooltipHtml`, which memoizes the result.
- * Expected outcome: The naming line is omitted when the caption is missing or empty. Effects list terrain only. Weather stays on the Weather line.
+ * Expected outcome: The naming line is omitted when the caption is missing or empty. Effects lists movement, range, and cover clauses. Weather stays on the Weather line.
  * Exceptions: None.
  */
 function formatTerrainTooltipHtml(
@@ -204,18 +208,20 @@ function formatTerrainTooltipHtml(
   const controlLine = showControlLine ? `<strong>Control:</strong> ${getTooltipControlLabel(namingTarget)}` : null;
   const terrainValue = state.res1TerrainSummary != null
     ? formatTerrainNameListHtml(state.res1TerrainSummary)
-    : `${formatTerrainKindHtml(state.terrainKind)}${escapeHtmlText(formatTerrainVariantSuffix(state))}`;
+    : `${formatTerrainKindHtml(state.terrainKind)}${formatTerrainVariantSuffix(state)}`;
   const terrainLine = `<strong>Terrain:</strong> ${terrainValue}`;
   const weather = tooltipWeather(namingTarget);
   const weatherLine = weather ? `<strong>Weather:</strong> ${formatWeatherIconHtml(weather)}` : null;
   const bodyParts: string[] = controlLine ? [controlLine, terrainLine] : [terrainLine];
   if (weatherLine) bodyParts.push(weatherLine);
   if (state.res1FeaturesSummary != null) bodyParts.push(`<strong>Features:</strong> ${state.res1FeaturesSummary}`);
-  else if (state.features.length > 0) bodyParts.push(`<strong>Features:</strong> ${state.features.join(', ')}`);
-  const effectsLineHtml = effectsLine(state, namingTarget);
-  if (effectsLineHtml) bodyParts.push(`<strong>Effects:</strong> ${effectsLineHtml}`);
-  const coverText = coverLine(state, namingTarget);
-  if (coverText) bodyParts.push(`<strong>Cover:</strong> ${escapeHtmlText(coverText)}`);
+  else if (state.features.length > 0) {
+    bodyParts.push(`<strong>Features:</strong> ${state.features.map((label) => formatFeatureLabelHtml(label)).join(', ')}`);
+  }
+  const pair = coverPair(state, namingTarget);
+  const coverHtml = pair == null ? null : formatTerrainCoverTooltipHtml(pair);
+  const effectsHtml = joinHexTooltipEffectsHtml(movementRangeHtml(state, namingTarget), coverHtml);
+  if (effectsHtml) bodyParts.push(`<strong>Effects:</strong> ${effectsHtml}`);
   if (state.urbanHexCount != null) {
     const productionLine =
       state.urbanHexCount > 0
@@ -251,7 +257,8 @@ function terrainTooltipContentKey(
   const res1TerrainSummaryKey = state.res1TerrainSummary ?? '';
   const res1FeaturesSummaryKey = state.res1FeaturesSummary ?? '';
   const weatherKey = tooltipWeather(namingTarget) ?? '';
-  const coverKey = coverLine(state, namingTarget) ?? '';
+  const pair = coverPair(state, namingTarget);
+  const coverKey = pair == null ? 'none' : `${pair.surface}:${pair.air}`;
   const controlKey = getTooltipControlLabel(namingTarget);
   const parentTerrainKey = state.parentTerrain;
   const parentTerrainKindKey = state.parentTerrainKind;

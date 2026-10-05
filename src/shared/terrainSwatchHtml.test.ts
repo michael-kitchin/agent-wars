@@ -20,7 +20,7 @@ test('a mixed terrain phrase swatches only the map-key names', () => {
   assert.ok(!html.includes('data-terrain-kind="other"'));
   assert.equal(formatTerrainNameListHtml('Forest, Urban, a<b'), [
     '<span class="terrain-swatch" data-terrain-kind="forest" aria-hidden="true"></span>Forest',
-    'Urban',
+    '<span class="terrain-swatch" data-terrain-kind="urban" aria-hidden="true"></span>Urban',
     'a&lt;b',
   ].join(', '));
 });

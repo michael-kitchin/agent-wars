@@ -41,6 +41,24 @@
   vertical-align: -0.15em;
   margin-right: 0.25em;
 }
+/* Text-sized magnitude mark before an Effects clause. */
+.status-icon {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  object-fit: contain;
+  vertical-align: -0.15em;
+  margin-right: 0.25em;
+}
+/* Text-sized tech, road, and rail marks before those words. */
+.feature-icon {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  object-fit: contain;
+  vertical-align: -0.15em;
+  margin-right: 0.25em;
+}
 /* Text-sized country flag before country names (hex captions) and unit names. */
 .country-flag {
   display: inline-block;

@@ -50,6 +50,7 @@ Every item defined in `information-decision-model.md` section 3, with the file a
 | `TEMPO_RANGED_SHOT` | `assembly-contract.md` | Shared coaching |
 | `CASUALTY_PRIORITY` | `assembly-contract.md` | Shared coaching |
 | `ORIGIN_BONUS` | both mode files | Combat and attack rules; Unit Status `Bonus` column |
+| `TECH_BONUS` | both mode files | Combat and attack rules; Unit Status `Bonus` column |
 | `TERRAIN_COVER` | both mode files | Combat and attack rules |
 | `HOLD_FIRE_SEMANTICS` | `strategic-prompt.md` | Required coaching item 4 |
 | `MOVE_BUDGET` | `strategic-prompt.md` | Combat and attack rules |
@@ -207,6 +208,7 @@ From `source-inventory.md` section 3, derived from code only.
 | Briefing present or absent | 7, combinations |
 | Country bonus and terrain bonus levels | 8 |
 | Weather bonus level | 9 |
+| Tech bonus level | 10 |
 
 ## 6. Facts the builders now carry (formerly listed as gaps)
 
@@ -217,6 +219,7 @@ These were absent or partial in an earlier assembler. The builders in `promptSpe
 | `WEGO_PHASE_ORDER` | Combat paragraph, both modes | `buildResolutionOrderRule` |
 | `CASUALTY_PRIORITY` | Combat paragraph and coaching | `buildCasualtySortRule` |
 | `ORIGIN_BONUS` | Combat paragraph when a flag applies in the mode | `buildOriginBonusRule` |
+| `TECH_BONUS` | Combat paragraph when the tech bonus is on | `buildTechBonusRule` |
 | `TERRAIN_COVER` | Combat paragraph, both modes, after the weather sentence | `buildTerrainCoverRule` |
 | `LEGAL_DEST_OCCUPANCY` | Combat paragraph and coaching | `buildDestinationOccupancyRule` |
 | `MOVE_BUDGET` | Strategic combat paragraph | `buildMovementBudgetRule` |
