@@ -18111,6 +18111,7 @@ ${body}`;
     padX: 4,
     padY: 3,
     gap: 3,
+    rowGap: 1,
     cornerRadius: 3,
     tokenRadius: 6,
     glyphSize: 10,
@@ -18163,6 +18164,14 @@ ${body}`;
       { type: "text", text: `\u2264${row.threshold}`, color: CHIP_COLORS.text }
     ];
   }
+  function chipHeight(lineCount) {
+    const betweenLines = Math.max(0, lineCount - 1) * CHIP_LAYOUT.rowGap;
+    return lineCount * CHIP_LAYOUT.rowHeight + betweenLines + CHIP_LAYOUT.padY * 2;
+  }
+  function lineCenterY(top, lineIndex) {
+    const pitch = CHIP_LAYOUT.rowHeight + CHIP_LAYOUT.rowGap;
+    return top + CHIP_LAYOUT.padY + lineIndex * pitch + CHIP_LAYOUT.rowHeight / 2;
+  }
   function segmentWidth(ctx, segment) {
     return segment.type === "token" ? CHIP_LAYOUT.tokenRadius * 2 : ctx.measureText(segment.text).width;
   }
@@ -18180,7 +18189,7 @@ ${body}`;
       anchorH3Index: chip.anchorH3Index,
       lines,
       width: contentWidth + CHIP_LAYOUT.padX * 2,
-      height: lines.length * CHIP_LAYOUT.rowHeight + CHIP_LAYOUT.padY * 2
+      height: chipHeight(lines.length)
     };
   }
   function clampToCanvas(value, size, extent) {
@@ -18212,7 +18221,7 @@ ${body}`;
     ctx.lineWidth = 1;
     ctx.stroke();
     chip.lines.forEach((segments, lineIndex) => {
-      const centerY = top + CHIP_LAYOUT.padY + lineIndex * CHIP_LAYOUT.rowHeight + CHIP_LAYOUT.rowHeight / 2;
+      const centerY = lineCenterY(top, lineIndex);
       let x = left + CHIP_LAYOUT.padX;
       for (const segment of segments) {
         if (segment.type === "token") {

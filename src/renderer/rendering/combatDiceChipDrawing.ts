@@ -35,8 +35,8 @@ const CHIP_FONT = 'bold 10px system-ui, sans-serif';
  *
  * Purpose: Keeps measuring and drawing on the same numbers.
  * When to use: All chip layout in this module.
- * Expected outcome: Row height 14, padding 4 horizontal and 3 vertical, 3 between row segments, corner radius 3,
- *   mini-token radius 6, unit glyph size 10, and at least 2 between a chip and the canvas edge.
+ * Expected outcome: Row height 14, padding 4 horizontal and 3 vertical, 3 between row segments, 1 between lines,
+ *   corner radius 3, mini-token radius 6, unit glyph size 10, and at least 2 between a chip and the canvas edge.
  * Exceptions: None.
  */
 const CHIP_LAYOUT = Object.freeze({
@@ -44,6 +44,7 @@ const CHIP_LAYOUT = Object.freeze({
   padX: 4,
   padY: 3,
   gap: 3,
+  rowGap: 1,
   cornerRadius: 3,
   tokenRadius: 6,
   glyphSize: 10,
@@ -173,7 +174,7 @@ interface LaidOutChip {
   /**
    * Chip height in CSS pixels.
    *
-   * Contract: Line count times row height plus vertical padding.
+   * Contract: Line count times row height, plus one pixel between each pair of lines, plus vertical padding.
    * When to use: Positioning and the background rectangle.
    * Expected outcome: Positive.
    * Exceptions: None.
@@ -230,6 +231,32 @@ function rowSegments(row: CombatDiceChipRow): ChipSegment[] {
 }
 
 /**
+ * Vertical size of a chip for a given line count.
+ *
+ * Purpose: The panel grows with the one-pixel gaps `lineCenterY` leaves between lines.
+ * When to use: `layoutChip`.
+ * Expected outcome: Row heights, one `rowGap` between each pair of lines, and vertical padding on both ends.
+ * Exceptions: None.
+ */
+function chipHeight(lineCount: number): number {
+  const betweenLines = Math.max(0, lineCount - 1) * CHIP_LAYOUT.rowGap;
+  return lineCount * CHIP_LAYOUT.rowHeight + betweenLines + CHIP_LAYOUT.padY * 2;
+}
+
+/**
+ * Vertical center of one chip line.
+ *
+ * Purpose: Each line after the first starts one pixel below the line above it.
+ * When to use: `paintChip`.
+ * Expected outcome: The middle of that line inside the padded panel.
+ * Exceptions: None.
+ */
+function lineCenterY(top: number, lineIndex: number): number {
+  const pitch = CHIP_LAYOUT.rowHeight + CHIP_LAYOUT.rowGap;
+  return top + CHIP_LAYOUT.padY + lineIndex * pitch + CHIP_LAYOUT.rowHeight / 2;
+}
+
+/**
  * Measures one segment with the chip font already set.
  *
  * Purpose: Shared width rule for layout.
@@ -272,7 +299,7 @@ function layoutChip(ctx: CanvasRenderingContext2D, chip: CombatDiceChip): LaidOu
     anchorH3Index: chip.anchorH3Index,
     lines,
     width: contentWidth + CHIP_LAYOUT.padX * 2,
-    height: lines.length * CHIP_LAYOUT.rowHeight + CHIP_LAYOUT.padY * 2,
+    height: chipHeight(lines.length),
   };
 }
 
@@ -336,7 +363,7 @@ function paintChip(ctx: CanvasRenderingContext2D, chip: LaidOutChip, left: numbe
   ctx.lineWidth = 1;
   ctx.stroke();
   chip.lines.forEach((segments, lineIndex) => {
-    const centerY = top + CHIP_LAYOUT.padY + lineIndex * CHIP_LAYOUT.rowHeight + CHIP_LAYOUT.rowHeight / 2;
+    const centerY = lineCenterY(top, lineIndex);
     let x = left + CHIP_LAYOUT.padX;
     for (const segment of segments) {
       if (segment.type === 'token') {
