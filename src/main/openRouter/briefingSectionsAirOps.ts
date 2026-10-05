@@ -11,6 +11,8 @@ import type { GameStateSnapshot } from '../gameDb';
 import { logDebug } from '../logger';
 import { AIR_FERRY_RANGE_HEXES, AIR_STRIKE_RANGE_HEXES } from '../../shared/tacticalRanges';
 import { buildPromptTableLines } from '../promptTableHelpers';
+import { isWithinAirFerryGridRange } from '../gameActions/gridRange';
+import { strategicFerryRangeOnState } from '../weather/weatherMatch';
 import { getRangeEnvelopeByBase, type RangeEnvelopeCache } from './rangeSupport';
 import { SECTION_TITLE_AIR_OPERATIONS_STATUS, topLevelHeading } from './promptSpec/sectionHeadings';
 
@@ -45,7 +47,8 @@ function countStrikeableEnemyInfrastructure(args: {
  *
  * Purpose: Shared shell section after the Commander's Briefing; tactical mode omits ferry/infra columns and empty battles.
  * When to use: `buildSystemPromptForTools` for both modes.
- * Expected outcome: Empty string when the opponent has no air units. Otherwise a heading, rules, and table.
+ * Expected outcome: Empty string when the opponent has no air units. Otherwise a heading, rules, and table. Ferry
+ * destinations use each unit's ferry range to that airport, which is shorter into snow the unit lacks when weather is on.
  * Exceptions: None.
  */
 export function buildAirOperationsBriefingBlock(
@@ -108,21 +111,21 @@ export function buildAirOperationsBriefingBlock(
       hexUniverse,
       rangeEnvelopeCache
     );
-    const ferryEnvelope = getRangeEnvelopeByBase(
-      air.h3Index,
-      AIR_FERRY_RANGE_HEXES,
-      hexUniverse,
-      rangeEnvelopeCache
-    );
     const baseInfra = infraByHex.get(air.h3Index);
     const baseIntact = Number(baseInfra?.airportCount ?? 0) > 0;
     const baseControlled = controllerByHex.get(air.h3Index) === 'opponent';
     const targetableEnemyUnits = humanUnits.filter((u) => strikeEnvelope.has(u.h3Index)).length;
     const strikeable = countStrikeableEnemyInfrastructure({ strikeEnvelope, infraRows, controllerByHex });
-    const ferryDestinations = opponentAirports.filter((ap) => {
-      if (ap.h3Index === air.h3Index) return false;
-      return ferryEnvelope.has(ap.h3Index);
-    }).length;
+    const ferryDestinations = opponentAirports.filter(
+      (ap) =>
+        ap.h3Index !== air.h3Index &&
+        isWithinAirFerryGridRange(
+          air.h3Index,
+          ap.h3Index,
+          'briefingSectionsAirOps ferry destinations',
+          strategicFerryRangeOnState(air, ap.h3Index, state)
+        )
+    ).length;
     airStatusRows.push([
       air.id,
       format(air.h3Index),

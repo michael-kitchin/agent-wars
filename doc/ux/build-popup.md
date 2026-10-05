@@ -8,7 +8,7 @@ Let the player queue unit production on one hex they control.
 
 ## Availability
 
-Build markers appear in Strategic planning on explored hexes where the player can produce, once the map is zoomed in far enough to show them. They hide when the map is zoomed back out, and they hide again at battle-detail zoom, which also closes this popup. While the tactical battles list is open, markers and an open popup stay as they were and do not accept clicks. During Resolution playback, markers stay visible, but clicks on them and queue edits in an open popup are ignored until playback ends. A hover order preview does not hide the markers, but a click does not open the popup while that preview is active. Clicking a marker opens this popup when one hex is selected. Two or more selected build hexes use [multi-hex-build-popup.md](multi-hex-build-popup.md) instead. The popup closes on its close control, on Escape, on a pointer press outside it and outside its marker, when the stack callout opens, and when a tactical battle starts. See [input-map.md](input-map.md) and [modes-and-transitions.md](modes-and-transitions.md).
+Build markers appear in Strategic planning on explored hexes where the player can produce, once the map is zoomed in far enough to show them. They hide when the map is zoomed back out, and they hide again at battle-detail zoom, which also closes this popup. While the tactical battles list is open, markers and an open popup stay as they were and do not accept clicks. During Resolution playback, markers stay visible, but clicks on them and queue edits in an open popup are ignored until playback ends. The exception is while playback shows dice chips: the markers hide so they don't cover the chips, and return when the chips fade. An open popup stays open. A hover order preview does not hide the markers, but a click does not open the popup while that preview is active. Clicking a marker opens this popup when one hex is selected. Two or more selected build hexes use [multi-hex-build-popup.md](multi-hex-build-popup.md) instead. The popup closes on its close control, on Escape, on a pointer press outside it and outside its marker, when the stack callout opens, and when a tactical battle starts. See [input-map.md](input-map.md) and [modes-and-transitions.md](modes-and-transitions.md).
 
 ## Information Displayed
 
@@ -45,7 +45,7 @@ Build markers appear in Strategic planning on explored hexes where the player ca
 
 ## States
 
-- Markers hidden: zoomed out, battle-detail zoom, New game, Game over, or Tactical planning. A hover order preview leaves the markers visible and ignores clicks.
+- Markers hidden: zoomed out, battle-detail zoom, New game, Game over, Tactical planning, or while Resolution playback shows dice chips. A hover order preview leaves the markers visible and ignores clicks.
 - Popup closed: no build hex is being edited.
 - Popup open: one build hex is selected and the editor or the cannot-build notice is showing.
 

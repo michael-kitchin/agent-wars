@@ -11,6 +11,7 @@ import type { TacticalBattleSnapshot, TacticalSubUnitSnapshot } from '../../shar
 import { unitHasTacticalRangedBaseline } from '../../shared/tacticalRanges';
 import { casualtyPriorityIndex, getDefense } from '../combatConstants';
 import { attackHitThreshold } from '../combatHitThresholds';
+import { rollCombatDieAgainst, type CombatDiceRollSink } from '../combatDiceRecording';
 import { weatherAttackPenalty, weatherBonusLevelOf } from '../../shared/weatherBonusRules';
 import type { OriginHitBonusLookup } from '../originBonus/originHitBonusLookup';
 import { noTechHitBonus, type TechHitBonusLookup } from '../techBonus/techHitBonusLookup';
@@ -126,6 +127,15 @@ export interface TacticalAirStrikeOnUnitsInput {
    * Exceptions: None.
    */
   readonly killsByReturnFire: KillEdge[];
+  /**
+   * Receives every die this strike rolls, for resolution playback.
+   *
+   * Contract: Optional; the attack roll is reported as `airStrike` and counter-fire as `antiAir`, all anchored on `targetH3Index`.
+   * When to use: The tactical air-strike phase passes its dice log sink; tests may omit it.
+   * Expected outcome: Called once per die in roll order; omitting it changes nothing else.
+   * Exceptions: None.
+   */
+  readonly onRoll?: CombatDiceRollSink;
 }
 
 /**
@@ -178,6 +188,7 @@ export function markTacticalSubUnitCasualty(
  * When to use: Inside `applyTacticalAirStrikeThenRangedPhaseOnBattle` for each `targetType === 'units'` order.
  * Expected outcome: Mutates `toRemove` and kill ledgers; strategic parent delete is deferred to `syncStrategicUnitsDbWhenTacticalParentsEliminated`.
  *   The attack roll and each counter-fire roll add the roller's origin bonus at its own cell; the attack roll alone loses the target cell's cover; the victim pick keeps printed defense values.
+ *   Every roll is reported to `input.onRoll` when it is set.
  * Exceptions: None.
  */
 export function resolveTacticalAirStrikeAgainstUnitsOnSubUnits(input: TacticalAirStrikeOnUnitsInput): void {
@@ -195,7 +206,7 @@ export function resolveTacticalAirStrikeAgainstUnitsOnSubUnits(input: TacticalAi
       (d.unitType !== 'infantry' && d.unitType !== 'armor') ||
       !tacticalEmbarkedLandExcludedFromRangedInput(battle, sub, d)
   );
-  const attackHit = rollDie() <= attackHitThreshold({
+  const strikeThreshold = attackHitThreshold({
     unitType: 'air',
     originHitBonus: originHitBonusAt(attacker.id, attacker.h3Index),
     techAttackBonus: techHitBonusAt(attacker.id).attack,
@@ -209,6 +220,13 @@ export function resolveTacticalAirStrikeAgainstUnitsOnSubUnits(input: TacticalAi
     }),
     targetCover,
   });
+  const strikeContext = {
+    kind: 'airStrike',
+    player: attacker.player,
+    unitType: attacker.unitType,
+    anchorH3Index: targetH3Index,
+  } as const;
+  const attackHit = rollCombatDieAgainst(rollDie, strikeThreshold, strikeContext, input.onRoll);
   if (attackHit && defenders.length > 0) {
     const victim = [...defenders].sort(
       (a, b) =>
@@ -227,7 +245,7 @@ export function resolveTacticalAirStrikeAgainstUnitsOnSubUnits(input: TacticalAi
     if (toRemove.has(attacker.id)) break;
     if (toRemove.has(defender.id)) continue;
     if (!unitHasTacticalRangedBaseline(defender.unitType)) continue;
-    if (rollDie() > attackHitThreshold({
+    const counterFireThreshold = attackHitThreshold({
       unitType: defender.unitType,
       originHitBonus: originHitBonusAt(defender.id, defender.h3Index),
       techAttackBonus: techHitBonusAt(defender.id).attack,
@@ -238,7 +256,14 @@ export function resolveTacticalAirStrikeAgainstUnitsOnSubUnits(input: TacticalAi
         tags: defender.weatherTags,
         level: weatherBonusLevelOf(battle),
       }),
-    })) continue;
+    });
+    const counterFireContext = {
+      kind: 'antiAir',
+      player: defender.player,
+      unitType: defender.unitType,
+      anchorH3Index: targetH3Index,
+    } as const;
+    if (!rollCombatDieAgainst(rollDie, counterFireThreshold, counterFireContext, input.onRoll)) continue;
     markTacticalSubUnitCasualty(sub, toRemove, attacker.id, [defender.id], killsByReturnFire);
     tacticalLogMutate('resolveTacticalAirStrikeAgainstUnitsOnSubUnits attacker lost to AA', {
       targetH3Index,

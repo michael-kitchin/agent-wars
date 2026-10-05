@@ -112,6 +112,9 @@ export type ReadyResolutionIpcMirrorSource = Pick<
   | 'humanHexesLostCount'
   | 'controlLossLightningHexes'
   | 'killLabelUnits'
+  | 'airStrikeDiceRolls'
+  | 'rangedDiceRolls'
+  | 'meleeDiceRolls'
 >;
 
 /**
@@ -123,7 +126,11 @@ export type ReadyResolutionIpcMirrorSource = Pick<
  * Exceptions: None.
  */
 export function pickReadyResolutionIpcMirrorFields(source: ReadyResolutionIpcMirrorSource): ReadyResolutionIpcMirrorSource {
-  logTrace('pickReadyResolutionIpcMirrorFields', {});
+  logTrace('pickReadyResolutionIpcMirrorFields', {
+    airStrikeDiceRollCount: source.airStrikeDiceRolls?.length ?? 0,
+    rangedDiceRollCount: source.rangedDiceRolls?.length ?? 0,
+    meleeDiceRollCount: source.meleeDiceRolls?.length ?? 0,
+  });
   return {
     combatHexes: source.combatHexes,
     removedUnitIds: source.removedUnitIds,
@@ -156,6 +163,9 @@ export function pickReadyResolutionIpcMirrorFields(source: ReadyResolutionIpcMir
     humanHexesLostCount: source.humanHexesLostCount,
     controlLossLightningHexes: source.controlLossLightningHexes,
     killLabelUnits: source.killLabelUnits,
+    airStrikeDiceRolls: source.airStrikeDiceRolls,
+    rangedDiceRolls: source.rangedDiceRolls,
+    meleeDiceRolls: source.meleeDiceRolls,
   };
 }
 

@@ -305,8 +305,8 @@ Gate: `state.weatherBonusEnabled` with its level (`weatherBonusLevel`, read thro
 
 | Surface | Contract |
 | --- | --- |
-| system | The turn line names the month. The combat paragraph adds `buildWeatherRule` after the origin bonus sentence and before the terrain cover sentence, which is always present. The Unit Status table gains a Weather column when an assessment carries `weatherTags`. The cell names the weather where the unit stands, and birth tags follow in parentheses. |
-| tools | `assess_hex` adds `weather` (`null` on an unexplored hex). `assess_unit` adds `weatherTags`, `weatherHere`, `rangedAttackPenalized`, and `airStrikePenalizedAtBase`, including in battle. `plan_route` and `check_distance` estimate turns from the occupied hex's weather. `estimate_combat` uses the same ranged and air-strike thresholds as resolution. |
+| system | The turn line names the month. The combat paragraph adds `buildWeatherRule` after the origin bonus sentence and before the terrain cover sentence, which is always present. The Unit Status table gains a Weather column when an assessment carries `weatherTags`. The cell names the weather where the unit stands, and birth tags follow in parentheses. The Air Operations `Ferry Destinations` count uses each unit's ferry range to each airport, so an airport in snow the unit lacks counts only within 2 hexes. Battle Best Options move targets include the weather open-ground cost for untagged infantry, matching the march planner. |
+| tools | `assess_hex` adds `weather` (`null` on an unexplored hex). `assess_unit` adds `weatherTags`, `weatherHere`, `rangedAttackPenalized`, and `airStrikePenalizedAtBase`, including in battle. `plan_route` and `check_distance` estimate turns from the occupied hex's weather. `estimate_combat` uses the same ranged, return-fire, and air-strike thresholds as resolution. |
 | empty-state | A unit with no tags has `weatherTags: []`. The Unit Status cell is the weather where it stands, with no parentheses. The unit tooltip omits Weather when the unit has no tags. |
 
 ## 10. Tech bonus

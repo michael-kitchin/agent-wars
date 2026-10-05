@@ -1,6 +1,5 @@
-import { effectiveTacticalMovementPointBudgetForMarchLeg } from '../../shared/tacticalTerrainCombatModifiers';
-import { tacticalMovementUnitTypeForPathfinding } from '../../shared/tacticalTerrainMovement';
 import { strategicMovementHexesFor, weatherBonusLevelOf } from '../../shared/weatherBonusRules';
+import { tacticalHoverSolidEdgeCapByOriginH3 } from '../../shared/tacticalMarchHoverPreview';
 import {
   ORDER_LINE_COLOR,
   ORDER_LINE_WIDTH,
@@ -14,11 +13,15 @@ import { getLeafletGlobal, hexCenterPx, hexCenterPxRelativeTo } from '../map/map
 import { getMainLeafletMap } from '../map/worldLeafletMap';
 
 /**
- * Defines the `drawHoverRoutePreview` function shape (export function drawHoverRoutePreview(ctx: CanvasRenderingContext2D): void).
-
- * Purpose: Supports maintainability by documenting why `drawHoverRoutePreview` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Draws the hover order preview for the current selection: a support line, or a march or ferry route with an arrow.
+ *
+ * Purpose: Shows where an order would go before the player commits it.
+ * When to use: Once per scene draw while `S.hoverRoutePreview` is set.
+ * Expected outcome: Ranged and strike targeting draw one dashed line per origin to the hovered target. Otherwise each
+ *   origin stack draws its route solid for the part it covers this turn or beat and dashed beyond, with an arrowhead
+ *   at the end. Air routes are solid throughout. On the strategic map the solid part is the slowest selected unit's
+ *   weather-adjusted movement; in battle it comes from `tacticalHoverSolidEdgeCapByOriginH3`. An X marks the hovered
+ *   hex when the preview says the order is invalid. Nothing is drawn without a preview or a map.
  * Exceptions: None.
  */
 export function drawHoverRoutePreview(ctx: CanvasRenderingContext2D): void {
@@ -60,21 +63,15 @@ export function drawHoverRoutePreview(ctx: CanvasRenderingContext2D): void {
     }
   } else {
   if (!state && !tb) return;
-  const slowestMovementRangeByOriginH3 = new Map<string, number>();
-  if (tb) {
-    const hovered = S.hoverRoutePreview?.hoveredH3Index;
-    for (const id of S.selectedUnitIds) {
-      const u = tb.subUnits.find((s) => s.id === id);
-      if (!u || u.player !== 'human') continue;
-      const eff = u.h3Index;
-      const moveType = hovered ? tacticalMovementUnitTypeForPathfinding(u, hovered) : u.unitType;
-      const movementRange = effectiveTacticalMovementPointBudgetForMarchLeg(tb, u, tb.subUnits, moveType);
-      const prior = slowestMovementRangeByOriginH3.get(eff);
-      if (prior === undefined || movementRange < prior) {
-        slowestMovementRangeByOriginH3.set(eff, movementRange);
-      }
-    }
-  } else if (state) {
+  const solidEdgeCapByOriginH3 = tb
+    ? tacticalHoverSolidEdgeCapByOriginH3(
+        tb,
+        S.selectedUnitIds,
+        previewGroup.previews,
+        S.hoverRoutePreview.hoveredH3Index ?? null
+      )
+    : new Map<string, number>();
+  if (!tb && state) {
     const selectedHumanUnits = S.selectedUnitIds
       .map((id) => state.units.find((u) => u.id === id))
       .filter((unit): unit is NonNullable<typeof unit> => !!unit && unit.player === 'human');
@@ -86,9 +83,9 @@ export function drawHoverRoutePreview(ctx: CanvasRenderingContext2D): void {
         tags: unit.weatherTags,
         level: weatherBonusLevelOf(state),
       });
-      const prior = slowestMovementRangeByOriginH3.get(unit.h3Index);
+      const prior = solidEdgeCapByOriginH3.get(unit.h3Index);
       if (prior === undefined || movementRange < prior) {
-        slowestMovementRangeByOriginH3.set(unit.h3Index, movementRange);
+        solidEdgeCapByOriginH3.set(unit.h3Index, movementRange);
       }
     }
   }
@@ -110,8 +107,8 @@ export function drawHoverRoutePreview(ctx: CanvasRenderingContext2D): void {
     const perStackSolidCap =
       previewUnit && originH3 && previewUnit.unitType === 'air'
         ? Math.max(1, previewEdgeCount)
-        : previewUnit && originH3 && slowestMovementRangeByOriginH3.has(originH3)
-          ? slowestMovementRangeByOriginH3.get(originH3)!
+        : previewUnit && originH3 && solidEdgeCapByOriginH3.has(originH3)
+          ? solidEdgeCapByOriginH3.get(originH3)!
           : previewGroup.slowestMovementRange;
     let lastSegmentPenultimate: { x: number; y: number } | null = null;
     let lastSegmentLast: { x: number; y: number } | null = null;

@@ -23,6 +23,8 @@ import {
 import { tacticalRes4CellHasActiveTransportCorridor } from '../../shared/tacticalRes4TransportLink';
 import { createCombatDieRoller, INFRASTRUCTURE_COUNTER_FIRE_THRESHOLD } from '../combatDice';
 import { attackHitThreshold } from '../combatHitThresholds';
+import { createCombatDiceLog, rollCombatDieAgainst } from '../combatDiceRecording';
+import type { CombatDiceRoll } from '../../shared/ipc/combatDiceTypes';
 import { weatherAttackPenalty, weatherBonusLevelOf } from '../../shared/weatherBonusRules';
 import { runRangedPhase } from '../combatResolution';
 import { withOriginHitBonus, type OriginHitBonusLookup } from '../originBonus/originHitBonusLookup';
@@ -267,6 +269,24 @@ export type TacticalAirRangedPhaseAccum = {
    * Exceptions: None.
    */
   rangedResolutionShotLines: RangedResolutionShotLine[];
+  /**
+   * Every die rolled by air strikes this beat: strike attacks, anti-air, and infrastructure counter-fire.
+   *
+   * Purpose: Feeds `TacticalCommitResolutionPlayback.airStrikeDiceRolls` for dice chips.
+   * When to use: Read by `commitHumanTacticalDraftOrders` when assembling playback.
+   * Expected outcome: Roll order; anchored on strike target cells; empty when no strike rolled.
+   * Exceptions: None.
+   */
+  airStrikeDiceRolls: CombatDiceRoll[];
+  /**
+   * Every die rolled by ranged fire this beat, including return fire and infrastructure-only shots.
+   *
+   * Purpose: Feeds `TacticalCommitResolutionPlayback.rangedDiceRolls` for dice chips.
+   * When to use: Same assembly path as `airStrikeDiceRolls`.
+   * Expected outcome: Roll order; anchored on the rolling sub-unit's cell; empty when nothing fired.
+   * Exceptions: None.
+   */
+  rangedDiceRolls: CombatDiceRoll[];
 };
 
 /**
@@ -281,6 +301,7 @@ export type TacticalAirRangedResolutionScope = 'singlePlayer' | 'mergedHumanThen
  * When to use: After opponent embark on the same snapshot clone; use `mergedHumanThenOpponent` when concatenating human-then-opponent air and ranged lists like strategic `allAirStrikes` / `allRanged`.
  * Expected outcome: Snapshot reflects air and ranged casualties; kill buckets match strategic toast semantics. Air, ranged, and counter-fire
  *   rolls add each roller's origin bonus at its own cell, read from the persisted match flags and this `battle`.
+ *   Every die is also returned in `airStrikeDiceRolls` or `rangedDiceRolls` for playback; recording never changes the draws.
  * Exceptions: None; consumes `next` draws for air infra rolls and ranged/melee downstream callers must continue the same PRNG.
  */
 export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
@@ -333,6 +354,8 @@ export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
     toRemove.clear();
   };
   const rollDie = createCombatDieRoller(next);
+  const airDiceLog = createCombatDiceLog();
+  const rangedDiceLog = createCombatDiceLog();
   const sortedAir = sortTacticalAirStrikesForStrategicPhaseOrder(airStrikes ?? [], sub);
   const airPlayerOk = (attacker: TacticalSubUnitSnapshot): boolean =>
     resolutionScope === 'mergedHumanThenOpponent' || attacker.player === rangedPlayer;
@@ -356,6 +379,7 @@ export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
         toRemove,
         killsByAirStrike,
         killsByReturnFire,
+        onRoll: airDiceLog.sink,
       });
       flushAirCasualties();
       strikeMoves.push({
@@ -384,7 +408,7 @@ export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
       });
       continue;
     }
-    if (rollDie() > attackHitThreshold({
+    const strikeThreshold = attackHitThreshold({
       unitType: 'air',
       originHitBonus: originHitBonusAt(attacker.id, attacker.h3Index),
       techAttackBonus: techHitBonusAt(attacker.id).attack,
@@ -396,7 +420,14 @@ export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
         tags: attacker.weatherTags,
         level: weatherBonusLevelOf(battle),
       }),
-    })) {
+    });
+    const strikeContext = {
+      kind: 'airStrike',
+      player: attacker.player,
+      unitType: attacker.unitType,
+      anchorH3Index: s.targetH3Index,
+    } as const;
+    if (!rollCombatDieAgainst(rollDie, strikeThreshold, strikeContext, airDiceLog.sink)) {
       strikeMoves.push({
         unitId: attacker.id,
         player: attacker.player,
@@ -426,7 +457,15 @@ export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
         killsByAirStrike.push({ victimId: su.id, killerIds: [attacker.id] });
       }
     }
-    if (rollDie() <= INFRASTRUCTURE_COUNTER_FIRE_THRESHOLD[s.targetType]) {
+    const counterFireContext = {
+      kind: 'infrastructureCounterFire',
+      player: null,
+      unitType: null,
+      infrastructureType: s.targetType,
+      anchorH3Index: s.targetH3Index,
+    } as const;
+    const counterFireThreshold = INFRASTRUCTURE_COUNTER_FIRE_THRESHOLD[s.targetType];
+    if (rollCombatDieAgainst(rollDie, counterFireThreshold, counterFireContext, airDiceLog.sink)) {
       markTacticalSubUnitCasualty(sub, toRemove, attacker.id, [], killsByAirStrike);
     }
     flushAirCasualties();
@@ -518,6 +557,7 @@ export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
       buildTacticalReturnFireContext(workBattle),
       createTacticalTerrainCoverLookup(workBattle)
     );
+    rangedDiceLog.rolls.push(...(rangedResult.diceRolls ?? []));
     rangedResolutionShotLines = dedupeRangedResolutionShotLines([
       ...rangedResolutionShotLines,
       ...(rangedResult.rangedResolutionShotLines ?? []),
@@ -587,7 +627,7 @@ export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
     for (const o of rangedOrdersInfraOnly) {
       const atk = workBattle.subUnits.find((u) => u.id === o.unitId);
       if (!atk) continue;
-      if (rollDie() > attackHitThreshold({
+      const infraShotThreshold = attackHitThreshold({
         unitType: atk.unitType,
         originHitBonus: originHitBonusAt(atk.id, atk.h3Index),
         techAttackBonus: techHitBonusAt(atk.id).attack,
@@ -598,7 +638,14 @@ export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
           tags: atk.weatherTags,
           level: weatherBonusLevelOf(workBattle),
         }),
-      })) continue;
+      });
+      const infraShotContext = {
+        kind: 'ranged',
+        player: atk.player,
+        unitType: atk.unitType,
+        anchorH3Index: atk.h3Index,
+      } as const;
+      if (!rollCombatDieAgainst(rollDie, infraShotThreshold, infraShotContext, rangedDiceLog.sink)) continue;
       const hex = o.targetH3Index;
       if (rubbledInfraHexes.has(hex)) continue;
       if (!tacticalRes4HasStrikeableInfrastructure(workBattle, hex, res4RowsForBattle)) continue;
@@ -633,6 +680,8 @@ export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
     rangedOrderCount: rangedOrders.length,
     removedCount: removedUnits.length,
     shotLineCount: rangedResolutionShotLines.length,
+    airDiceRollCount: airDiceLog.rolls.length,
+    rangedDiceRollCount: rangedDiceLog.rolls.length,
   });
   syncStrategicUnitsDbWhenTacticalParentsEliminated(battle.subUnits, workBattle.subUnits);
   return {
@@ -647,6 +696,8 @@ export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
     airStrikePlaybackStrikeHexes: [...strikeHexesSet],
     airStrikePlaybackCasualtyHexes: [...airStrikeCasualtyHexSet],
     rangedResolutionShotLines,
+    airStrikeDiceRolls: airDiceLog.rolls,
+    rangedDiceRolls: rangedDiceLog.rolls,
   };
 }
 

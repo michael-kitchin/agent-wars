@@ -14,6 +14,7 @@ import { captureTurnLossNoteFromResolution } from './captureTurnLossNote';
 import { processProductionAfterControlResolution, resolveRes1ControlAfterCombatAndMovement } from './controlAndProduction';
 import { applyTransportOutcomeForRemovedStrategicUnits } from './sealift';
 import type { CombatResolutionResult } from '../combatResolution';
+import { combatDicePlaybackFields } from '../combatDiceRecording';
 import type { CombatUnit } from '../combatUnitTypes';
 import type { AirStrikePhaseResult } from './airStrikeResolution';
 import type { FerryAnimationMove, RangedAttackOrder, ReadyResult } from '../../shared/ipcTypes';
@@ -165,11 +166,23 @@ aiRangedOrders: RangedAttackOrder[];
  *
  * Purpose: Single implementation for the tail of `ready` so melee intercept resume cannot drift from the happy path.
  * When to use: After `runMeleePhase` returns, whether ready ran melee immediately or after an intercept decision.
- * Expected outcome: `ReadyResult` matches the stock ready contract for a completed turn.
+ * Expected outcome: `ReadyResult` matches the stock ready contract for a completed turn, including each phase's
+ *   recorded dice rolls (omitted when that phase rolled nothing).
  * Exceptions: Propagates DB errors to the caller try/catch.
  */
 export function finalizeReadyTurnAfterMelee(args: FinalizeReadyAfterMeleeArgs): ReadyResult {
-  logDebug('finalizeReadyTurnAfterMelee', { turnNumber: args.turnNumber, meleeRemoved: args.meleeResult.removedUnitIds.length });
+  const diceFields = combatDicePlaybackFields(
+    args.airStrikeResult.diceRolls,
+    args.rangedResult.diceRolls ?? [],
+    args.meleeResult.diceRolls ?? []
+  );
+  logDebug('finalizeReadyTurnAfterMelee', {
+    turnNumber: args.turnNumber,
+    meleeRemoved: args.meleeResult.removedUnitIds.length,
+    airStrikeDiceRollCount: diceFields.airStrikeDiceRolls?.length ?? 0,
+    rangedDiceRollCount: diceFields.rangedDiceRolls?.length ?? 0,
+    meleeDiceRollCount: diceFields.meleeDiceRolls?.length ?? 0,
+  });
   const {
     meleeResult,
     rangedResult,
@@ -375,5 +388,6 @@ export function finalizeReadyTurnAfterMelee(args: FinalizeReadyAfterMeleeArgs): 
     opponentCombatParticipantUnitIds,
     removedOpponentUnitIds,
     opponentHadStrategicMarchResolution,
+    ...diceFields,
   };
 }

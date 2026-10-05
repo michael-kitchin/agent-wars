@@ -217,7 +217,7 @@ export function originHitBonusForSource(settings: OriginBonusSettings, source: O
  *
  * Purpose: Enforces the no-stacking rule in one place.
  * When to use: After `originBonusSources`, with the same settings, before building a hit threshold.
- * Expected outcome: The largest amount among the reasons, so country High and terrain Low adds 2; `0` for an empty list.
+ * Expected outcome: The largest amount among the reasons, so country High and terrain Low adds 4; `0` for an empty list.
  * Exceptions: None.
  */
 export function originHitBonusFromSources(
@@ -238,7 +238,7 @@ export function originHitBonusFromSources(
  *
  * Purpose: Keeps the table cell wording next to the other origin bonus text.
  * When to use: `buildUnitStatusTable` when the Bonus column is shown, with the unit's sources and the amount they add.
- * Expected outcome: `+1 country`, `+2 country, terrain`, and so on, or `—` when there are no sources or the amount is 0.
+ * Expected outcome: `+2 country`, `+4 country, terrain`, and so on, or `—` when there are no sources or the amount is 0.
  * Exceptions: None.
  */
 export function formatOriginBonusTableCell(sources: ReadonlyArray<OriginBonusSource>, amount: OriginHitBonus): string {

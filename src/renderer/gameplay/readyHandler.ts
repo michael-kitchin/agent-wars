@@ -13,6 +13,7 @@ import { readTacticalBattlesInterceptPromptEnabled } from './tacticalBattlePromp
 import type { ResolutionMove } from '../core/types';
 import { rendererSharedState as S } from '../core/state';
 import { tacticalOpponentPlanPayloadHasAnyOrders } from '../../shared/ipc/tacticalOpponentPlanMerge';
+import { pickPlaybackDiceRolls } from '../../shared/combatDiceChips';
 import { resetPrecomputedAiState } from '../openRouter/precomputedAiState';
 import {
   isDeferredResolutionPlaybackConsultPending,
@@ -122,12 +123,16 @@ function rollbackReadyToolCounts(
 }
 
 /**
- * Defines the `handleReadyButtonClick` function shape (export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<void>).
-
- * Purpose: Supports maintainability by documenting why `handleReadyButtonClick` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
+ * Runs the Ready button: commits a tactical beat in battle, or resolves the strategic turn on the world map.
+ *
+ * Purpose: Single entry for ending a turn or beat and starting its resolution playback.
+ * When to use: From the Ready button's click handler.
+ * Expected outcome: Does nothing when there is no game API, the game is over, a Ready is already in flight, the
+ *   annihilation dialog is open, or a deferred AI consult is pending. In battle, commits the beat and plays it back.
+ *   On the world map, submits drafts, resolves the turn (pausing for the tactical battles list when melee candidates
+ *   are reported), reloads state, and plays the turn back with fog-filtered combat marks and dice chips. It can then
+ *   start a battle the turn chose. Failures show on the map toast and return the player to planning.
+ * Exceptions: None; errors are caught and reported.
  */
 export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<void> {
   if (!window.gameApi) return;
@@ -249,6 +254,7 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
           meleeCombatHexes: playback.meleeCombatHexes?.length ? playback.meleeCombatHexes : undefined,
           meleeCasualtyHexes: playback.meleeCasualtyHexes?.length ? playback.meleeCasualtyHexes : undefined,
           meleeRemovedUnits: playback.meleeRemovedUnits?.length ? playback.meleeRemovedUnits : undefined,
+          ...pickPlaybackDiceRolls(playback),
         };
       }
       if (commitResult.tacticalBattle) {
@@ -401,6 +407,7 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
       usePrecomputed,
       aiPlanningRunEnabled: S.runButtonOn,
     });
+    const visibleHexesBeforeTurn = deps.getVisibleHexSet(S.gameState);
     let readyResult = await deps.callReadyWithTimeout(readyPayload);
     let resolutionPlaybackNotifyKind: 'strategic' | 'melee' = 'strategic';
     if (!readyResult.success) {
@@ -543,6 +550,11 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
         meleeRemovedUnits: readyResult.meleeRemovedUnits?.length ? readyResult.meleeRemovedUnits : undefined,
         unknownCombatHexes: unknownCombatHexes.length > 0 ? unknownCombatHexes : undefined,
         unknownCasualtyHexes: unknownCasualtyHexes.length > 0 ? unknownCasualtyHexes : undefined,
+        ...pickPlaybackDiceRolls(readyResult, {
+          visibleHexesBeforeTurn,
+          visibleHexesAfterTurn: visibleHexes,
+          unknownHexes: new Set([...unknownCombatHexes, ...unknownCasualtyHexes]),
+        }),
       };
       const killToastFormatter = deps.buildKillToastFormatterBundle(
         state,

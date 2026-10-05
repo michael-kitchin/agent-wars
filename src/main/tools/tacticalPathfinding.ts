@@ -2,10 +2,11 @@
  * Tactical pathfinding: plan_route / check_distance via res4 march planner (not strategic land-mass).
  */
 
-import { gridDisk } from 'h3-js';
 import { computeGridDistanceWithPathFallbackPure } from '../../shared/h3GridRangePure';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { planTacticalRes4MarchWithSessionCache } from '../tacticalBattle/tacticalMovementPlanningCache';
+import { tacticalLandMarchBestEffortPlanTowardOrderedHex } from '../tacticalBattle/tacticalSnapshotGuards';
+import { checkDistanceTagSourceUnit } from './pathfindingDistanceHelpers';
 import { effectiveTacticalMovementPointBudgetForMarchLeg } from '../../shared/tacticalTerrainCombatModifiers';
 import {
   buildTacticalTerrainKindResolverFromSnapshot,
@@ -244,13 +245,14 @@ export function executeTacticalPlanRoute(
     }
 
     if (!plan.reachable && (unit.unitType === 'infantry' || unit.unitType === 'armor') && budget >= 1) {
-      const bestEffort = tacticalBestEffortNeighborPlan({
+      const bestEffort = tacticalLandMarchBestEffortPlanTowardOrderedHex({
         battle,
         fromH3: originH3,
         orderedToH3: destH3,
         res4Set: footprint,
         moveType: unit.unitType,
         movementPointBudget: budget,
+        weatherTags: sub?.weatherTags,
       });
       if (bestEffort) {
         plan = bestEffort;
@@ -327,62 +329,13 @@ export function executeTacticalPlanRoute(
 }
 
 /**
- * One-step best-effort approach when the full destination has no continuous tactical path (mirrors Ready recovery).
- *
- * Purpose: Supplies a usable orderToHexCode when continuity planning fails for the full goal but a neighbor advances.
- * When to use: After primary plan_route to the ordered hex fails with no path for infantry/armor.
- * Expected outcome: Cheapest one-beat plan whose first stop strictly reduces H3 distance to the ordered hex, or null.
- * Exceptions: None.
- */
-function tacticalBestEffortNeighborPlan(args: {
-  battle: TacticalBattleSnapshot;
-  fromH3: string;
-  orderedToH3: string;
-  res4Set: ReadonlySet<string>;
-  moveType: string;
-  movementPointBudget: number;
-}): ReturnType<typeof planTacticalRes4MarchWithSessionCache> | null {
-  const d0 = computeGridDistanceWithPathFallbackPure(args.fromH3, args.orderedToH3);
-  if (d0 === null || d0 <= 1) return null;
-  const neighbors: string[] = [];
-  try {
-    for (const n of gridDisk(args.fromH3, 1)) {
-      if (n !== args.fromH3 && args.res4Set.has(n)) neighbors.push(n);
-    }
-  } catch {
-    return null;
-  }
-  let best: ReturnType<typeof planTacticalRes4MarchWithSessionCache> | null = null;
-  let bestRank = Infinity;
-  for (const n of neighbors) {
-    const p = planTacticalRes4MarchWithSessionCache(args.battle, {
-      fromH3: args.fromH3,
-      toH3: n,
-      res4Set: args.res4Set,
-      unitTypeForMovement: args.moveType,
-      movementPointBudget: Math.max(0, args.movementPointBudget),
-    });
-    if (!p.reachable) continue;
-    const applied = p.firstStopWithinBudget.stopH3;
-    if (applied === args.fromH3) continue;
-    const d1 = computeGridDistanceWithPathFallbackPure(applied, args.orderedToH3);
-    if (d1 === null || d1 >= d0) continue;
-    const cost = Number.isFinite(p.totalCostToDestination) ? p.totalCostToDestination : Number.POSITIVE_INFINITY;
-    const rank = d1 * 1e9 + cost;
-    if (rank < bestRank) {
-      bestRank = rank;
-      best = p;
-    }
-  }
-  return best;
-}
-
-/**
  * Tactical check_distance using res4 march cost/path instead of strategic land-mass BFS.
  *
  * Purpose: Lets the model compare approach options inside a battle without false “unreachable” from res1 land-mass.
  * When to use: `executePathfinding` when `tacticalBattle` is set for `check_distance`.
  * Expected outcome: hexDistance from path length; estimatedTurns from MP cost / budget; reachable when a finite path exists.
+ * Weather budgets and enter costs use the tags of the sub-unit `checkDistanceTagSourceUnit` picks on the start cell, as
+ * strategic `check_distance` does; an empty start cell means an untagged mover.
  * Exceptions: Returns error for invalid hexes; air unitType yields unreachable ok with zero distances.
  */
 export function executeTacticalCheckDistance(
@@ -427,7 +380,13 @@ export function executeTacticalCheckDistance(
   if (fromH3 === toH3Resolved) {
     return { status: 'ok', from: fromLl, to: h3ToLatLng(toH3Resolved, latLngByH3, 'origin'), hexDistance: 0, estimatedTurns: 0, reachable: true };
   }
-  const estimate = estimateTacticalMarch(battle, { unitType, h3Index: fromH3 }, toH3Resolved, footprint);
+  const occupant = checkDistanceTagSourceUnit(battle.subUnits, fromH3, unitType);
+  const estimate = estimateTacticalMarch(
+    battle,
+    { unitType, h3Index: fromH3, weatherTags: occupant?.weatherTags },
+    toH3Resolved,
+    footprint
+  );
   return {
     status: 'ok',
     from: fromLl,

@@ -694,6 +694,14 @@ function testAirStrikeInfrastructureDestructionPreservesRes1Res4Parity(
     const event = result.infrastructureDestroyedEvents.find((entry) => entry.h3Index === targetH3Index && entry.targetType === targetType);
     assert.ok(event, `expected infrastructure destruction event for ${targetType}`);
     assert.ok((event?.changedRubbleCount ?? 0) > 0, `expected rubble changes for ${targetType}`);
+    assert.deepStrictEqual(
+      result.diceRolls.map((r) => [r.kind, r.anchorH3Index]),
+      [
+        ['airStrike', targetH3Index],
+        ['infrastructureCounterFire', targetH3Index],
+      ],
+      'strike and counter-fire rolls are recorded on the target hex'
+    );
     assertRes1MatchesRes4RollupForHex(gameDb, targetH3Index);
   } finally {
     gameDb.closeGameDatabaseForTests();

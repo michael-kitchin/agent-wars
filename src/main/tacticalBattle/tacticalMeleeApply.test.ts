@@ -51,6 +51,10 @@ test('tactical melee adjudicates co-located opposing sub-units on the same res4 
     };
     const out = applyTacticalMeleeAfterSupportOrders(snap);
     assert.ok(out.meleeCombatHexes.includes(h0), 'expected melee combat recorded on shared res4 hex');
+    assert.ok(
+      out.meleeDiceRolls.length > 0 && out.meleeDiceRolls.every((r) => r.anchorH3Index === h0),
+      'melee dice must be recorded on the contested res4 cell'
+    );
     assert.strictEqual(
       out.battle.subUnits.length + out.meleeRemovedUnits.length,
       snap.subUnits.length,

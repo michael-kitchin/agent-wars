@@ -17,6 +17,7 @@ import {
 } from '../../shared/tacticalTerrainMovement';
 import { effectiveTacticalMovementPointBudgetForMarchLeg } from '../../shared/tacticalTerrainCombatModifiers';
 import { tacticalLogMutate } from './tacticalLogging';
+import { logDebug } from '../logger';
 
 /**
  * Snapshot fields required to rebuild the tactical terrain resolver for march debug previews.
@@ -86,15 +87,15 @@ function landRes4FootprintRing1Neighbors(fromH3: string, res4Set: ReadonlySet<st
  * Purpose: `planInfantryArmorLandContinuityMarch` depends on `marchGoalH3` for transport-aware edge costs; the model
  * may supply a valid `orderToHexCode` that is unreachable as a **full** goal while a neighbor remains a legal first hop
  * that advances toward that code on the H3 grid (matches user expectation when “too far” / continuity mismatch).
- * When to use: Opponent/human `tacticalCompute*MovementOrderOutcome` only after primary `planTacticalRes4March` fails
- * with `failureReason === 'no_path'`, for infantry/armor with a positive MP budget, when grid distance from origin to
+ * When to use: Opponent/human `tacticalCompute*MovementOrderOutcome` and the battle `plan_route` tool, only after the
+ * primary plan to the ordered hex fails, for infantry/armor with a positive MP budget, when grid distance from origin to
  * the ordered hex is at least two (adjacent failures stay authoritative).
  * Expected outcome: `null` when no neighbor yields a reachable one-beat plan that strictly approaches `orderedToH3`.
  * Exceptions: None; distances come from the shared BFS fallback, so a res4 pair spanning an icosahedron face crossing
  * still yields a candidate instead of disabling recovery for the whole beat. Friendly-occupied neighbors stay
  * eligible so units may stack.
  */
-function tacticalLandMarchBestEffortPlanTowardOrderedHex(args: {
+export function tacticalLandMarchBestEffortPlanTowardOrderedHex(args: {
   battle: TacticalMarchPlanBattleArgs;
   fromH3: string;
   orderedToH3: string;
@@ -103,6 +104,13 @@ function tacticalLandMarchBestEffortPlanTowardOrderedHex(args: {
   movementPointBudget: number;
   weatherTags?: readonly import('../../shared/weatherBonusTypes').WeatherState[] | null;
 }): TacticalMarchPlanResult | null {
+  logDebug('tacticalSnapshotGuards tacticalLandMarchBestEffortPlanTowardOrderedHex', {
+    battleId: args.battle.battleId,
+    fromH3: args.fromH3,
+    orderedToH3: args.orderedToH3,
+    moveType: args.moveType,
+    movementPointBudget: args.movementPointBudget,
+  });
   if (args.movementPointBudget < 1) return null;
   if (args.moveType !== 'infantry' && args.moveType !== 'armor') return null;
   const d0 = computeGridDistanceWithPathFallbackPure(args.fromH3, args.orderedToH3);

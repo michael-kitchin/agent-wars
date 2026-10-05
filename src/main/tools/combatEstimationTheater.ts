@@ -133,15 +133,6 @@ export interface CombatEstimationTheater {
    */
   readonly blockedShotRules: string;
   /**
-   * Looks up one unit by id for an engagement.
-   *
-   * Contract: Returns an error for unknown ids and for units that sit out this engagement type in the theater's
-   * resolution; otherwise the unit with `h3Index` set to its combat cell.
-   * When to use: Attacker and defender id lists.
-   * Expected outcome: A `CombatEstimationUnitLookup`.
-   * Exceptions: None.
-   */
-  /**
    * Weather penalty for one estimated attack.
    *
    * Contract: 0 for melee and when the weather bonus is off.
@@ -150,6 +141,25 @@ export interface CombatEstimationTheater {
    * Exceptions: None.
    */
   weatherAttackPenaltyFor(unit: CombatUnit, targetH3: string, engagement: CombatEstimationEngagementType): WeatherAttackPenalty;
+  /**
+   * Weather penalty for one defender firing back at ranged attackers or air strikers.
+   *
+   * Contract: Uses the ranged-attack rules at the defender's own cell, as return fire and anti-air counter-fire do in
+   * resolution; 0 when the weather bonus is off.
+   * When to use: Before `attackHitThreshold` on defenders that can return fire.
+   * Expected outcome: 0, 3 at Low, or 5 at High.
+   * Exceptions: None.
+   */
+  returnFireWeatherPenaltyFor(unit: CombatUnit): WeatherAttackPenalty;
+  /**
+   * Looks up one unit by id for an engagement.
+   *
+   * Contract: Returns an error for unknown ids and for units that sit out this engagement type in the theater's
+   * resolution; otherwise the unit with `h3Index` set to its combat cell.
+   * When to use: Attacker and defender id lists.
+   * Expected outcome: A `CombatEstimationUnitLookup`.
+   * Exceptions: None.
+   */
   /**
    * Terrain cover the target gives against one estimated attacker.
    *
@@ -274,6 +284,17 @@ export function buildStrategicCombatEstimationTheater(state: GameStateSnapshot):
         tags: unit.weatherTags,
       });
     },
+    returnFireWeatherPenaltyFor(unit) {
+      return weatherPenaltyForRoll({
+        unitType: unit.unitType,
+        kind: 'ranged',
+        level: weatherBonusLevelOf(state),
+        turnNumber: state.turnNumber,
+        startMonth: state.startMonth ?? 1,
+        unitH3Index: unit.h3Index,
+        tags: unit.weatherTags,
+      });
+    },
     returnFireContext: { theater: 'strategic', hasIntactAirportAtAirBase: hasIntactAirportAtStrategicAirBase },
     blockedShotRules: '',
     findUnit(unitId, engagementType) {
@@ -340,6 +361,15 @@ export function buildTacticalCombatEstimationTheater(
     h3Index: tacticalMovementTerrainAnchorH3(u, battle.subUnits),
     ...(u.weatherTags ? { weatherTags: u.weatherTags } : {}),
   });
+  /** Battle-wide weather penalty on one ranged shot or return-fire roll; 0 when the weather bonus is off or the unit is exempt. */
+  const rangedWeatherPenalty = (unit: CombatUnit): WeatherAttackPenalty =>
+    weatherAttackPenalty({
+      unitType: unit.unitType,
+      kind: 'ranged',
+      weatherAtUnit: battle.weather,
+      tags: unit.weatherTags,
+      level: weatherBonusLevelOf(battle),
+    });
   return {
     theater: 'tactical',
     targetCoverFor(unit, targetH3, engagement) {
@@ -348,15 +378,9 @@ export function buildTacticalCombatEstimationTheater(
         : 0;
     },
     weatherAttackPenaltyFor(unit, _targetH3, engagement) {
-      if (engagement !== 'ranged') return 0;
-      return weatherAttackPenalty({
-        unitType: unit.unitType,
-        kind: 'ranged',
-        weatherAtUnit: battle.weather,
-        tags: unit.weatherTags,
-        level: weatherBonusLevelOf(battle),
-      });
+      return engagement === 'ranged' ? rangedWeatherPenalty(unit) : 0;
     },
+    returnFireWeatherPenaltyFor: rangedWeatherPenalty,
     returnFireContext: buildTacticalReturnFireContext(battle),
     blockedShotRules: ' under battle range, terrain, and line-of-sight rules',
     findUnit(unitId, engagementType) {

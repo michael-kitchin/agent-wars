@@ -296,6 +296,34 @@ test('collectTacticalMarchTerrainImpact keeps roadRail when anchor MP throttle a
   assert.ok(html?.includes(usingBoth));
 });
 
+test('collectTacticalMarchTerrainImpact names snow for forest armor only when the weather cap is below the forest budget', () => {
+  const a = tacticalRes4Cell(58, 68);
+  const b = firstRingCellDistinctFrom(a);
+  const armor = { id: 'u1', parentUnitId: 'p1', player: 'human', unitType: 'armor', h3Index: a, displayName: 'A' } as const;
+  const slowerAt = (weatherBonusLevel: 'low' | 'high'): readonly string[] =>
+    collectTacticalMarchTerrainImpact({
+      battle: {
+        battleId: `tb-forest-snow-${weatherBonusLevel}`,
+        enclosingRes1H3Index: '8f283082dcb519f',
+        res4ChildH3Indexes: [a, b],
+        strategicTurnNumber: 1,
+        tacticalTurnNumber: 1,
+        strategicHexTerrain: 'land',
+        strategicHexTerrainKind: 'plains',
+        res4TerrainKindByH3: { [a]: 'forest', [b]: 'plains' },
+        weather: 'snow',
+        weatherBonusEnabled: true,
+        weatherBonusLevel,
+        subUnits: [armor],
+      },
+      subUnit: armor,
+      moveType: 'armor',
+      pathH3: [a, b],
+    }).slower;
+  assert.deepEqual(slowerAt('low'), ['Forest']);
+  assert.deepEqual(slowerAt('high'), ['Forest', 'Snow']);
+});
+
 test('collectTacticalMarchTerrainImpact sets roadRail without duplicating Road/Rail in slower list', () => {
   const a = tacticalRes4Cell(57, 67);
   const b = firstRingCellDistinctFrom(a);

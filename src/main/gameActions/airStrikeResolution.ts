@@ -17,12 +17,19 @@ import { getAvailableBuildUnitTypes } from '../productionRules';
 import { casualtyPriorityIndex, getDefense, getRange } from '../combatConstants';
 import { createCombatDieRoller, INFRASTRUCTURE_COUNTER_FIRE_THRESHOLD } from '../combatDice';
 import { attackHitThreshold } from '../combatHitThresholds';
+import { createCombatDiceLog, rollCombatDieAgainst, type CombatDiceLog } from '../combatDiceRecording';
 import { readPersistedOriginBonusSettings } from '../gameDb/originBonusConfig';
 import { weatherPenaltyForRoll } from '../weather/weatherMatch';
 import { weatherTagsForBirthHex } from '../weather/weatherPackLoad';
 import { weatherBonusLevelOf } from '../../shared/weatherBonusRules';
 import type { WeatherAttackKind, WeatherAttackPenalty } from '../../shared/weatherBonusTypes';
-import type { AirStrikeAnimationMove, AirStrikeOrder, AirStrikeTargetType, InfrastructureDestroyedEvent } from '../../shared/ipcTypes';
+import type {
+  AirStrikeAnimationMove,
+  AirStrikeOrder,
+  AirStrikeTargetType,
+  CombatDiceRoll,
+  InfrastructureDestroyedEvent,
+} from '../../shared/ipcTypes';
 import type { CombatUnit } from '../combatUnitTypes';
 import type { OriginHitBonusLookup } from '../originBonus/originHitBonusLookup';
 import { noTechHitBonus, type TechHitBonusLookup } from '../techBonus/techHitBonusLookup';
@@ -252,11 +259,11 @@ export function applyInfrastructureDestructionEffects(
 }
 
 /**
- * Documents the `AirStrikePhaseAccumulator` interface as a named contract surface (interface AirStrikePhaseAccumulator).
-
- * Purpose: Supports maintainability by documenting why `AirStrikePhaseAccumulator` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Running totals of one strategic air strike phase, shared by every strike it resolves.
+ *
+ * Purpose: Lets the per-strike helpers record removals, casualty hexes, and dice without returning and merging lists.
+ * When to use: Created once in `resolveAirStrikePhase` and passed to each strike helper.
+ * Expected outcome: Each unit is recorded once even when several strikes remove it; the dice log keeps roll order.
  * Exceptions: None.
  */
 interface AirStrikePhaseAccumulator {
@@ -296,6 +303,15 @@ removedUnits: CombatUnit[];
    * Exceptions: None.
    */
 casualtyHexes: Set<string>;
+  /**
+   * Every die rolled in this phase, for resolution playback.
+   *
+   * Contract: Roll sites in this file pass `diceLog.sink` to `rollCombatDieAgainst`; anchors are strike targets.
+   * When to use: Read `diceLog.rolls` once the phase finishes.
+   * Expected outcome: Attack, anti-air, and infrastructure counter-fire rolls in roll order.
+   * Exceptions: None.
+   */
+  readonly diceLog: CombatDiceLog;
 }
 
 /**
@@ -326,14 +342,6 @@ function recordRemovedUnit(
 }
 
 /**
- * Resolves one strategic air strike against the enemy units in a hex.
- *
- * Purpose: Applies the pre-rolled attack hit to the lowest-defense victim, then rolls counter-fire from eligible defenders.
- * When to use: From `resolveAirStrikePhase` for `units` targets.
- * Expected outcome: Deletes the victim and/or the attacker; counter-fire thresholds include each defender's origin bonus from `originHitBonusAt` at its own hex, while the victim pick keeps printed defense values.
- * Exceptions: None.
- */
-/**
  * Returns the weather penalty for one strategic unit's roll.
  *
  * Purpose: Air strikes and their counter-fire share the match level, the turn, and the unit's birth tags.
@@ -363,6 +371,15 @@ function penaltyForDbUnit(input: {
   });
 }
 
+/**
+ * Resolves one strategic air strike against the enemy units in a hex.
+ *
+ * Purpose: Applies the pre-rolled attack hit to the lowest-defense victim, then rolls counter-fire from eligible defenders.
+ * When to use: From `resolveAirStrikePhase` for `units` targets.
+ * Expected outcome: Deletes the victim and/or the attacker; counter-fire thresholds include each defender's origin bonus from `originHitBonusAt` at its own hex, while the victim pick keeps printed defense values.
+ *   Counter-fire stops at the first hit; each roll is recorded in `acc.diceLog` as `antiAir`, anchored on the target hex.
+ * Exceptions: None.
+ */
 function resolveAirStrikeAgainstUnits(
   attacker: { id: string; player: string; unit_type: string; h3_index: string; display_order: number | null },
   targetH3Index: string,
@@ -394,7 +411,7 @@ function resolveAirStrikeAgainstUnits(
 
   for (const defender of eligibleDefenders) {
     if (getRange(defender.unit_type) < 1) continue;
-    if (rollDie() > attackHitThreshold({
+    const counterFireThreshold = attackHitThreshold({
       unitType: defender.unit_type,
       originHitBonus: originHitBonusAt(defender.id, defender.h3_index),
       techAttackBonus: techHitBonusAt(defender.id).attack,
@@ -404,7 +421,14 @@ function resolveAirStrikeAgainstUnits(
         h3Index: defender.h3_index,
         kind: 'ranged',
       }),
-    })) continue;
+    });
+    const counterFireContext = {
+      kind: 'antiAir',
+      player: defender.player,
+      unitType: defender.unit_type,
+      anchorH3Index: targetH3Index,
+    } as const;
+    if (!rollCombatDieAgainst(rollDie, counterFireThreshold, counterFireContext, acc.diceLog.sink)) continue;
     dbRun('DELETE FROM units WHERE id = ?', [attacker.id]);
     recordRemovedUnit(acc, attacker, { removedAtH3Index: targetH3Index });
     attackerLost = true;
@@ -414,12 +438,14 @@ function resolveAirStrikeAgainstUnits(
 }
 
 /**
- * Defines the `resolveAirStrikeAgainstInfrastructure` function shape (function resolveAirStrikeAgainstInfrastructure( attacker: { id: string; player: string; unit_type: string; h3_index: string; display_order: number | null },).
-
- * Purpose: Supports maintainability by documenting why `resolveAirStrikeAgainstInfrastructure` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
+ * Resolves one strategic air strike against a city, airport, or seaport.
+ *
+ * Purpose: Applies the pre-rolled attack hit as infrastructure destruction, then rolls the target's counter-fire.
+ * When to use: From `resolveAirStrikePhase` for targets other than `units`.
+ * Expected outcome: A hit rubbles the target and removes air units based there, and counts as a success only when
+ *   something changed. Counter-fire always rolls once against `INFRASTRUCTURE_COUNTER_FIRE_THRESHOLD` and, on a hit,
+ *   deletes the attacker. That roll is recorded in `acc.diceLog` as `infrastructureCounterFire` on the target hex.
+ * Exceptions: Propagates database errors.
  */
 function resolveAirStrikeAgainstInfrastructure(
   attacker: { id: string; player: string; unit_type: string; h3_index: string; display_order: number | null },
@@ -448,7 +474,15 @@ function resolveAirStrikeAgainstInfrastructure(
     }
   }
 
-  if (rollDie() <= INFRASTRUCTURE_COUNTER_FIRE_THRESHOLD[order.targetType]) {
+  const counterFireContext = {
+    kind: 'infrastructureCounterFire',
+    player: null,
+    unitType: null,
+    infrastructureType: order.targetType,
+    anchorH3Index: order.targetH3Index,
+  } as const;
+  const counterFireThreshold = INFRASTRUCTURE_COUNTER_FIRE_THRESHOLD[order.targetType];
+  if (rollCombatDieAgainst(rollDie, counterFireThreshold, counterFireContext, acc.diceLog.sink)) {
     dbRun('DELETE FROM units WHERE id = ?', [attacker.id]);
     recordRemovedUnit(acc, attacker, { removedAtH3Index: order.targetH3Index });
     attackerLost = true;
@@ -481,6 +515,7 @@ export function resolveAirStrikePhase(
   successfulCount: number;
   failedCount: number;
   attackerLossCount: number;
+  diceRolls: CombatDiceRoll[];
 } {
   logDebug('resolveAirStrikePhase', { orderCount: airOrders.length });
   const acc: AirStrikePhaseAccumulator = {
@@ -488,6 +523,7 @@ export function resolveAirStrikePhase(
     removedUnitIds: [],
     removedUnits: [],
     casualtyHexes: new Set<string>(),
+    diceLog: createCombatDiceLog(),
   };
   const strikeHexes = new Set<string>();
   const strikeMoves: AirStrikeAnimationMove[] = [];
@@ -516,7 +552,7 @@ export function resolveAirStrikePhase(
     );
     if (!attacker) continue;
     attemptCount += 1;
-    const attackHit = rollDie() <= attackHitThreshold({
+    const strikeThreshold = attackHitThreshold({
       unitType: 'air',
       originHitBonus: originHitBonusAt(attacker.id, attacker.h3_index),
       techAttackBonus: techHitBonusAt(attacker.id).attack,
@@ -529,6 +565,13 @@ export function resolveAirStrikePhase(
       }),
       targetCover: order.targetType === 'units' ? targetCoverAt(order.targetH3Index, 'air') : 0,
     });
+    const strikeContext = {
+      kind: 'airStrike',
+      player: attacker.player,
+      unitType: attacker.unit_type,
+      anchorH3Index: order.targetH3Index,
+    } as const;
+    const attackHit = rollCombatDieAgainst(rollDie, strikeThreshold, strikeContext, acc.diceLog.sink);
     if (order.targetType === 'units') {
       const result = resolveAirStrikeAgainstUnits(attacker, order.targetH3Index, attackHit, rollDie, acc, {
         originHitBonusAt,
@@ -570,7 +613,13 @@ export function resolveAirStrikePhase(
     if (result.attackerLost) attackerLossCount += 1;
   }
 
+  logDebug('resolveAirStrikePhase complete', {
+    attemptCount,
+    removedCount: acc.removedUnitIds.length,
+    diceRollCount: acc.diceLog.rolls.length,
+  });
   return {
+    diceRolls: acc.diceLog.rolls,
     removedUnitIds: acc.removedUnitIds,
     removedUnits: acc.removedUnits,
     casualtyHexes: [...acc.casualtyHexes],

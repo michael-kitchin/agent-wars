@@ -67,6 +67,24 @@ test('battle ranged: infantry fires two cells on plains and armor returns fire',
   assert.equal(estimate(fx, args, false).status, 'error');
 });
 
+test('battle ranged: snow at Low weather lowers untagged armor return fire by three', () => {
+  const { fx, at } = setup({
+    battleId: 'estimate-ranged-snow',
+    units: [
+      { id: 'opp-inf', player: 'opponent', unitType: 'infantry', cell: 'near' },
+      { id: 'hum-arm', player: 'human', unitType: 'armor', cell: 'far' },
+    ],
+  });
+  const snowy: TacticalToolFixture = {
+    ...fx,
+    battle: { ...fx.battle, weather: 'snow', weatherBonusEnabled: true, weatherBonusLevel: 'low' },
+  };
+  const result = estimate(snowy, { engagementType: 'ranged', attackers: { units: ['opp-inf'] }, targetHex: at('far') });
+  assert.equal(result.status, 'ok');
+  assert.equal(result.defenderSummary!.canReturnFire, true);
+  assert.ok(Math.abs(result.prediction!.probabilityAttackerLosesUnit - 7 / 20) < EPS);
+});
+
 test('battle ranged: forest cover at the target lowers the shot to the floor and the forest caps armor return fire', () => {
   const { fx, at } = setup({
     battleId: 'estimate-ranged-cover',

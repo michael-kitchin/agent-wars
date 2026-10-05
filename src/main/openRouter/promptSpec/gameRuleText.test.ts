@@ -195,12 +195,13 @@ test('the weather sentence keeps its exact wording', () => {
       gates({ originBonusSettings: { countryBonusEnabled: false, terrainBonusEnabled: false, weatherBonusEnabled: true } })
     ),
     "Weather bonus is on: the month is on the turn line and every beat of a battle shares the enclosing hex's weather. " +
-      'Armor strategic movement is 1 in snow or rain, and naval strategic movement is 1 in snow, unless the unit is tagged for that weather. ' +
+      'Armor strategic movement is 1 in snow or rain, and naval strategic movement is 1 in snow. ' +
       "In battle, armor's point budget is 2 in snow or rain and naval's is 2 in snow; infantry pays 2 to enter open ground in snow or rain. " +
       'Armor ranged attack is 3 lower in snow or heat, including return fire and air-strike counter-fire. ' +
       'An air strike is 3 lower once when its base or its target is snow, rain, or heat the unit lacks. ' +
-      'A strategic ferry into snow is 2 hexes unless the unit is tagged for snow. ' +
-      'Weather does not change defense, melee, or casualty order. A tag is earned by the birth hex. ' +
+      'A strategic ferry into snow is 2 hexes. ' +
+      'None of these penalties applies to a unit tagged for that weather; a tag is earned by the birth hex. ' +
+      'Weather does not change defense, melee, or casualty order. ' +
       'The Unit Status Weather column names the weather where that unit stands. Birth tags, when the unit has any, follow in parentheses.'
   );
 });
@@ -218,12 +219,13 @@ test('the High weather sentence widens the slowing weather and deepens the penal
       })
     ),
     "Weather bonus is on: the month is on the turn line and every beat of a battle shares the enclosing hex's weather. " +
-      'Armor strategic movement is 1 in snow, rain, or heat, and naval strategic movement is 1 in snow or rain, unless the unit is tagged for that weather. ' +
+      'Armor strategic movement is 1 in snow, rain, or heat, and naval strategic movement is 1 in snow or rain. ' +
       "In battle, armor's point budget is 1 in snow, rain, or heat and naval's is 1 in snow or rain; infantry pays 2 to enter open ground in snow or rain. " +
       'Armor ranged attack is 5 lower in snow or heat, including return fire and air-strike counter-fire. ' +
       'An air strike is 5 lower once when its base or its target is snow, rain, or heat the unit lacks. ' +
-      'A strategic ferry into snow is 2 hexes unless the unit is tagged for snow. ' +
-      'Weather does not change defense, melee, or casualty order. A tag is earned by the birth hex. ' +
+      'A strategic ferry into snow is 2 hexes. ' +
+      'None of these penalties applies to a unit tagged for that weather; a tag is earned by the birth hex. ' +
+      'Weather does not change defense, melee, or casualty order. ' +
       'The Unit Status Weather column names the weather where that unit stands. Birth tags, when the unit has any, follow in parentheses.'
   );
 });

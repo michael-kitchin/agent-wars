@@ -29,7 +29,7 @@ import {
 } from './tacticalTerrainMovement';
 import { TACTICAL_H3_RESOLUTION } from './h3Resolutions';
 
-/** Milestone 2.2 §3.4: renderer-only march plan memo bound (LRU by Map insertion order). */
+/** Renderer-only march plan memo bound (LRU by Map insertion order). */
 const MAX_TACTICAL_HOVER_PLAN_MEMO = 64;
 
 /**
@@ -276,6 +276,55 @@ export function buildTacticalMarchHoverPreview(
   });
   const slowestMovementRange = budgets.length > 0 ? Math.min(...budgets) : 0;
   return buildHumanOrderGroupPreviewEnvelope({ previews, slowestMovementRange });
+}
+
+/**
+ * Counts the path edges a tactical march covers this beat.
+ *
+ * Purpose: The planner marks the part of a route reachable this beat as turn 1, which already reflects cells that
+ *   cost 2.
+ * When to use: `tacticalHoverSolidEdgeCapByOriginH3` for sub-units that have their own preview.
+ * Expected outcome: Edges in the segments marked turn 1; the whole path when the destination is reachable this beat.
+ * Exceptions: None.
+ */
+function firstBeatEdgeCount(segments: readonly HumanOrderPreviewSegment[]): number {
+  return segments
+    .filter((seg) => seg.turn === 1 && Array.isArray(seg.hexes))
+    .reduce((sum, seg) => sum + Math.max(0, seg.hexes.length - 1), 0);
+}
+
+/**
+ * Returns, per origin cell, how many edges of a battle hover route to draw solid.
+ *
+ * Purpose: The solid stroke must stop where the slowest selected sub-unit on that cell stops this beat. Forest,
+ *   rubble, or weather can make one cell cost 2, so a sub-unit with its own preview uses the planner's first-beat
+ *   stop. A grouped preview keeps one representative per cell, so every other selected sub-unit falls back to its
+ *   movement point budget, which can only shorten the solid part.
+ * When to use: `drawHoverRoutePreview` in battle, with the previews built for the same selection and hovered cell.
+ * Expected outcome: A map from each selected human sub-unit's cell to the smallest edge count among the selected
+ *   human sub-units there. Missing and non-human ids are skipped.
+ * Exceptions: None.
+ */
+export function tacticalHoverSolidEdgeCapByOriginH3(
+  battle: TacticalBattleSnapshot,
+  selectedUnitIds: readonly string[],
+  previews: readonly HumanOrderGroupPreviewUnitResult[],
+  hoveredH3Index: string | null
+): Map<string, number> {
+  const capByOrigin = new Map<string, number>();
+  for (const id of selectedUnitIds) {
+    const u = battle.subUnits.find((s) => s.id === id);
+    if (!u || u.player !== 'human') continue;
+    const segments = previews.find((p) => p.unitId === id)?.preview.segments ?? [];
+    const moveType = hoveredH3Index ? tacticalMovementUnitTypeForPathfinding(u, hoveredH3Index) : u.unitType;
+    const edges =
+      segments.length > 0
+        ? firstBeatEdgeCount(segments)
+        : effectiveTacticalMovementPointBudgetForMarchLeg(battle, u, battle.subUnits, moveType);
+    const prior = capByOrigin.get(u.h3Index);
+    if (prior === undefined || edges < prior) capByOrigin.set(u.h3Index, edges);
+  }
+  return capByOrigin;
 }
 
 /**

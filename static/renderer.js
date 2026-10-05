@@ -17725,6 +17725,524 @@ ${body}`;
     return !rendererSharedState.selectedUnitIds.includes(unitId);
   }
 
+  // src/shared/combatDiceChips.ts
+  var COMBAT_DICE_CHIP_MAX_LINES = 4;
+  var COMBAT_DICE_ROW_MAX_FACES = 3;
+  var COMBAT_DICE_FADE_IN_MS = 150;
+  var COMBAT_DICE_FADE_OUT_MS = 250;
+  var TAG_BY_KIND = Object.freeze({
+    airStrike: "ATK",
+    ranged: "ATK",
+    meleeAttack: "ATK",
+    meleeDefense: "DEF",
+    returnFire: "RET",
+    antiAir: "AA",
+    infrastructureCounterFire: "AA"
+  });
+  var KIND_ORDER = [
+    "airStrike",
+    "ranged",
+    "meleeAttack",
+    "returnFire",
+    "meleeDefense",
+    "antiAir",
+    "infrastructureCounterFire"
+  ];
+  var PLAYER_ORDER = ["human", "opponent"];
+  var UNIT_TYPE_ORDER = ["infantry", "armor", "naval", "air"];
+  function isCombatDiceHit(roll) {
+    return roll.face <= roll.threshold;
+  }
+  function orderIndex(order, value) {
+    const index = value === null ? -1 : order.indexOf(value);
+    return index < 0 ? order.length : index;
+  }
+  function compareRows(a, b) {
+    return KIND_ORDER.indexOf(a.kind) - KIND_ORDER.indexOf(b.kind) || orderIndex(PLAYER_ORDER, a.player) - orderIndex(PLAYER_ORDER, b.player) || orderIndex(UNIT_TYPE_ORDER, a.unitType) - orderIndex(UNIT_TYPE_ORDER, b.unitType) || b.threshold - a.threshold;
+  }
+  function buildRow(group) {
+    const first = group[0];
+    const faces = group.length <= COMBAT_DICE_ROW_MAX_FACES ? group.map((r) => r.face).sort((a, b) => a - b) : [];
+    return {
+      tag: TAG_BY_KIND[first.kind],
+      kind: first.kind,
+      player: first.player,
+      unitType: first.unitType,
+      ...first.infrastructureType ? { infrastructureType: first.infrastructureType } : {},
+      threshold: first.threshold,
+      rollCount: group.length,
+      hitCount: group.filter(isCombatDiceHit).length,
+      faces
+    };
+  }
+  function buildCombatDiceChips(rolls) {
+    const groupsByAnchor = /* @__PURE__ */ new Map();
+    for (const roll of rolls) {
+      const groups = groupsByAnchor.get(roll.anchorH3Index) ?? /* @__PURE__ */ new Map();
+      groupsByAnchor.set(roll.anchorH3Index, groups);
+      const key = [roll.kind, roll.player, roll.unitType, roll.infrastructureType, roll.threshold].join("|");
+      groups.set(key, [...groups.get(key) ?? [], roll]);
+    }
+    return [...groupsByAnchor].map(([anchorH3Index, groups]) => {
+      const rows = [...groups.values()].map(buildRow).sort(compareRows);
+      if (rows.length <= COMBAT_DICE_CHIP_MAX_LINES) return { anchorH3Index, rows, hiddenRowCount: 0 };
+      const visibleRows = rows.slice(0, COMBAT_DICE_CHIP_MAX_LINES - 1);
+      return { anchorH3Index, rows: visibleRows, hiddenRowCount: rows.length - visibleRows.length };
+    });
+  }
+  function combatDiceWindowForPhase(phase, which) {
+    if (which === "airStrike") return { startMs: phase.airStrikeCombatStart, endMs: phase.airStrikeReturnStart };
+    if (which === "ranged") return { startMs: phase.rangedCombatStart, endMs: phase.movementStart };
+    return { startMs: phase.meleeCombatStart, endMs: phase.totalMs };
+  }
+  function combatDiceChipOpacity(elapsedMs, startMs, endMs) {
+    if (!(endMs > startMs) || elapsedMs < startMs || elapsedMs >= endMs) return 0;
+    const fadeIn = (elapsedMs - startMs) / COMBAT_DICE_FADE_IN_MS;
+    const fadeOut = (endMs - elapsedMs) / COMBAT_DICE_FADE_OUT_MS;
+    return Math.min(1, fadeIn, fadeOut);
+  }
+  function pickPlaybackDiceRolls(source, visibility) {
+    const keep = (roll) => !visibility || (visibility.visibleHexesBeforeTurn.has(roll.anchorH3Index) || visibility.visibleHexesAfterTurn.has(roll.anchorH3Index)) && !visibility.unknownHexes.has(roll.anchorH3Index);
+    const airStrikeDiceRolls = (source.airStrikeDiceRolls ?? []).filter(keep);
+    const rangedDiceRolls = (source.rangedDiceRolls ?? []).filter(keep);
+    const meleeDiceRolls = (source.meleeDiceRolls ?? []).filter(keep);
+    return {
+      ...airStrikeDiceRolls.length > 0 ? { airStrikeDiceRolls } : {},
+      ...rangedDiceRolls.length > 0 ? { rangedDiceRolls } : {},
+      ...meleeDiceRolls.length > 0 ? { meleeDiceRolls } : {}
+    };
+  }
+
+  // src/renderer/rendering/unitDrawing.ts
+  var TOKEN_ICON_FIT_RATIO = 0.9;
+  var UNIT_ICON_FILE_BY_TYPE = {
+    /**
+       * Documents the object literal property `infantry` (infantry: 'infantry.svg').
+    
+       * Purpose: Supports maintainability by documenting why `infantry` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    infantry: "infantry.svg",
+    /**
+       * Documents the object literal property `armor` (armor: 'armor.svg').
+    
+       * Purpose: Supports maintainability by documenting why `armor` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    armor: "armor.svg",
+    /**
+       * Documents the object literal property `naval` (naval: 'naval.svg').
+    
+       * Purpose: Supports maintainability by documenting why `naval` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    naval: "naval.svg",
+    /**
+       * Documents the object literal property `air` (air: 'air.svg').
+    
+       * Purpose: Supports maintainability by documenting why `air` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    air: "air.svg",
+    /**
+       * Documents the object literal property `mixed` (mixed: 'mixed.svg').
+    
+       * Purpose: Supports maintainability by documenting why `mixed` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    mixed: "mixed.svg"
+  };
+  var unitIconCache = /* @__PURE__ */ new Map();
+  function iconPathForType(unitType) {
+    return `units/${UNIT_ICON_FILE_BY_TYPE[unitType]}`;
+  }
+  function getOrStartUnitIconLoad(unitType) {
+    if (unitIconCache.has(unitType)) return unitIconCache.get(unitType) ?? null;
+    const img = new Image();
+    img.decoding = "async";
+    img.onload = () => {
+    };
+    img.onerror = () => {
+      unitIconCache.set(unitType, null);
+    };
+    img.src = iconPathForType(unitType);
+    unitIconCache.set(unitType, img);
+    return img;
+  }
+  function drawUnitSvgIcon(ctx, centerX, centerY, unitType, unitPlayer, flipForOpponent = true, fitScaleMultiplier = 1) {
+    const img = getOrStartUnitIconLoad(unitType);
+    if (!img || !img.complete || img.naturalWidth <= 0 || img.naturalHeight <= 0) return false;
+    const maxIconSize = UNIT_RADIUS * 2 * TOKEN_ICON_FIT_RATIO * fitScaleMultiplier;
+    const iconScale = maxIconSize / Math.max(img.naturalWidth, img.naturalHeight);
+    const width = img.naturalWidth * iconScale;
+    const height = img.naturalHeight * iconScale;
+    const drawX = centerX - width / 2;
+    const drawY = centerY - height / 2;
+    const shouldFlip = flipForOpponent && unitPlayer === "opponent";
+    ctx.save();
+    if (shouldFlip) {
+      ctx.translate(centerX, centerY);
+      ctx.scale(-1, 1);
+      ctx.drawImage(img, -width / 2, -height / 2, width, height);
+    } else {
+      ctx.drawImage(img, drawX, drawY, width, height);
+    }
+    ctx.restore();
+    return true;
+  }
+  function drawUnitTypeGlyph(ctx, centerX, centerY, unitType, sizePx, player) {
+    if (unitType !== "infantry" && unitType !== "armor" && unitType !== "naval" && unitType !== "air") return false;
+    const fitScaleMultiplier = sizePx / (UNIT_RADIUS * 2 * TOKEN_ICON_FIT_RATIO);
+    return drawUnitSvgIcon(ctx, centerX, centerY, unitType, player, true, fitScaleMultiplier);
+  }
+  function drawOneUnitMarker(ctx, x, y, color, label, strokeColor = "#fff", unitPlayer) {
+    const stackedNeutral = color === MULTI_PLAYER_FILL;
+    ctx.beginPath();
+    ctx.arc(x, y, UNIT_RADIUS, 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.strokeStyle = stackedNeutral ? MULTI_PLAYER_STROKE : strokeColor;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.save();
+    if (stackedNeutral) ctx.filter = MULTI_PLAYER_GLYPH_FILTER;
+    ctx.fillStyle = "#fff";
+    ctx.font = "bold 14px system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    const drewIcon = label === UNIT_TYPE_LABELS.armor && drawUnitSvgIcon(ctx, x, y, "armor", unitPlayer) || label === UNIT_TYPE_LABELS.infantry && drawUnitSvgIcon(ctx, x, y, "infantry", unitPlayer) || label === UNIT_TYPE_LABELS.air && drawUnitSvgIcon(ctx, x, y, "air", unitPlayer) || label === UNIT_TYPE_LABELS.naval && drawUnitSvgIcon(ctx, x, y, "naval", unitPlayer) || label === "*" && drawUnitSvgIcon(ctx, x, y, "mixed", unitPlayer, false, 0.5);
+    if (!drewIcon) ctx.fillText(label, x, y);
+    ctx.restore();
+  }
+  function drawUnits(ctx, units, movingUnitIds) {
+    const byHex = /* @__PURE__ */ new Map();
+    for (const u of units) {
+      if (movingUnitIds?.has(u.id)) continue;
+      const list = byHex.get(u.h3Index) ?? [];
+      list.push(u);
+      byHex.set(u.h3Index, list);
+    }
+    for (const [h3Index, hexUnits] of byHex) {
+      const { x, y } = hexCenterPx(h3Index);
+      const count = hexUnits.length;
+      const types = new Set(hexUnits.map((u) => u.unitType));
+      const players = new Set(hexUnits.map((u) => u.player));
+      const mixedType = types.size > 1;
+      const multiPlayer = players.size > 1;
+      const fillColor = multiPlayer ? MULTI_PLAYER_FILL : PLAYER_COLORS[hexUnits[0].player] ?? "#333";
+      const strokeColor = multiPlayer ? MULTI_PLAYER_STROKE : "#fff";
+      const label = mixedType ? "*" : UNIT_TYPE_LABELS[hexUnits[0].unitType] ?? "?";
+      drawOneUnitMarker(ctx, x, y, fillColor, label, strokeColor, hexUnits[0].player);
+      if (count > 1) {
+        drawOneUnitMarker(ctx, x + STACK_OFFSET_X, y + STACK_OFFSET_Y, fillColor, label, strokeColor, hexUnits[0].player);
+        const badgeX = x + COUNT_BADGE_OFFSET;
+        const badgeY = y - COUNT_BADGE_OFFSET;
+        ctx.font = "bold 13px system-ui, sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.strokeStyle = "#fff";
+        ctx.lineWidth = 2;
+        ctx.strokeText(String(count), badgeX, badgeY);
+        ctx.fillStyle = "#000";
+        ctx.fillText(String(count), badgeX, badgeY);
+      }
+    }
+  }
+  function drawStaleEnemyIntel(ctx, state, inferUnitTypeLabelFromId2) {
+    const hasFogData = Array.isArray(state.visibleHexes);
+    const currentlyVisibleEnemies = state.units.filter((u) => u.player !== "human");
+    const currentlyVisibleEnemyIds = new Set(currentlyVisibleEnemies.map((u) => u.id));
+    for (const [unitId, prevSeen] of rendererSharedState.lastRenderedVisibleEnemyByUnitId) {
+      if (currentlyVisibleEnemyIds.has(unitId)) continue;
+      if (!rendererSharedState.clientStaleEnemyIntelByUnitId.has(unitId)) {
+        const lastSeenTurn = Math.min(prevSeen.lastSeenTurn, Math.max(1, state.turnNumber - 1));
+        rendererSharedState.clientStaleEnemyIntelByUnitId.set(unitId, {
+          unitId,
+          lastKnownH3Index: prevSeen.h3Index,
+          lastSeenTurn,
+          staleUntilTurn: lastSeenTurn + 2
+        });
+      }
+    }
+    rendererSharedState.lastRenderedVisibleEnemyByUnitId.clear();
+    for (const enemy of currentlyVisibleEnemies) {
+      rendererSharedState.lastRenderedVisibleEnemyByUnitId.set(enemy.id, {
+        h3Index: enemy.h3Index,
+        lastSeenTurn: state.turnNumber
+      });
+    }
+    if (shouldHideStrategicMapUnitsForRes4Zoom()) return;
+    if (!hasFogData) return;
+    const persistedIntel = Array.isArray(state.enemyIntel) ? state.enemyIntel : [];
+    const fallbackIntel = Array.from(rendererSharedState.clientStaleEnemyIntelByUnitId.values()).map((row) => ({
+      unitId: row.unitId,
+      lastKnownH3Index: row.lastKnownH3Index,
+      intelState: "stale",
+      lastSeenTurn: row.lastSeenTurn,
+      staleUntilTurn: row.staleUntilTurn
+    }));
+    const byUnitId = /* @__PURE__ */ new Map();
+    for (const row of fallbackIntel) byUnitId.set(row.unitId, row);
+    for (const row of persistedIntel) {
+      if (row.intelState !== "stale") continue;
+      byUnitId.set(row.unitId, {
+        unitId: row.unitId,
+        lastKnownH3Index: row.lastKnownH3Index,
+        intelState: "stale",
+        lastSeenTurn: row.lastSeenTurn,
+        staleUntilTurn: row.staleUntilTurn
+      });
+    }
+    const intel = Array.from(byUnitId.values());
+    if (intel.length === 0) return;
+    const visibleHexes = new Set(state.visibleHexes);
+    const stale = intel.filter((row) => row.intelState === "stale");
+    if (stale.length === 0) return;
+    const visibleEnemyHexes = new Set(currentlyVisibleEnemies.map((u) => u.h3Index));
+    const staleByHex = /* @__PURE__ */ new Map();
+    for (const row of stale) {
+      if (visibleEnemyHexes.has(row.lastKnownH3Index)) continue;
+      if (visibleHexes.has(row.lastKnownH3Index)) continue;
+      const list = staleByHex.get(row.lastKnownH3Index) ?? [];
+      list.push(row);
+      staleByHex.set(row.lastKnownH3Index, list);
+    }
+    for (const [h3Index, rows] of staleByHex) {
+      const age = Math.max(0, state.turnNumber - rows[0].lastSeenTurn);
+      const alpha = age === 1 ? 0.5 : age === 2 ? 0.3 : 0;
+      if (alpha <= 0) continue;
+      const types = new Set(rows.map((r) => inferUnitTypeLabelFromId2(r.unitId)));
+      const label = types.size === 1 ? [...types][0] : "*";
+      const { x, y } = hexCenterPx(h3Index);
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      drawOneUnitMarker(ctx, x, y, PLAYER_COLORS.opponent, label, "#fff", "opponent");
+      ctx.restore();
+    }
+  }
+  function drawUnknownBattleMarkers(ctx, hexes, opacity) {
+    if (hexes.length === 0 || opacity <= 0) return;
+    ctx.save();
+    ctx.globalAlpha = opacity;
+    for (const h3Index of hexes) {
+      const { x, y } = hexCenterPx(h3Index);
+      drawOneUnitMarker(ctx, x, y, "#7a7a7a", "?", "#202020");
+    }
+    ctx.restore();
+  }
+  function drawCombatLightning(ctx, canvasWidth, canvasHeight, combatHexes, hexList, opacity) {
+    if (combatHexes.length === 0 || opacity <= 0) return;
+    void canvasWidth;
+    void canvasHeight;
+    void hexList;
+    ctx.save();
+    ctx.globalAlpha = opacity;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    const h = 18;
+    for (const h3Index of combatHexes) {
+      const { x, y } = hexCenterPx(h3Index);
+      ctx.beginPath();
+      ctx.moveTo(x, y - h);
+      ctx.lineTo(x + 6, y - 4);
+      ctx.lineTo(x - 4, y + 6);
+      ctx.lineTo(x + 5, y + h);
+      ctx.strokeStyle = "#000";
+      ctx.lineWidth = 5;
+      ctx.stroke();
+      ctx.strokeStyle = LIGHTNING_COLOR;
+      ctx.lineWidth = 3;
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+  function drawCasualtyOverlay(ctx, canvasWidth, canvasHeight, casualtyHexes, hexList, opacity) {
+    if (casualtyHexes.length === 0 || opacity <= 0) return;
+    void canvasWidth;
+    void canvasHeight;
+    void hexList;
+    ctx.save();
+    ctx.globalAlpha = opacity;
+    ctx.lineCap = "round";
+    const size = 20;
+    for (const h3Index of casualtyHexes) {
+      const { x, y } = hexCenterPx(h3Index);
+      ctx.beginPath();
+      ctx.moveTo(x - size, y - size);
+      ctx.lineTo(x + size, y + size);
+      ctx.moveTo(x + size, y - size);
+      ctx.lineTo(x - size, y + size);
+      ctx.strokeStyle = "#000";
+      ctx.lineWidth = 6;
+      ctx.stroke();
+      ctx.strokeStyle = CASUALTY_X_COLOR;
+      ctx.lineWidth = 4;
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // src/renderer/rendering/combatDiceChipDrawing.ts
+  var CHIP_FONT = "bold 10px system-ui, sans-serif";
+  var CHIP_LAYOUT = Object.freeze({
+    rowHeight: 14,
+    padX: 4,
+    padY: 3,
+    gap: 3,
+    cornerRadius: 3,
+    tokenRadius: 6,
+    glyphSize: 10,
+    edgeInset: 2
+  });
+  var CHIP_COLORS = Object.freeze({
+    background: "rgba(27, 40, 56, 0.92)",
+    border: "#5a7090",
+    text: "#f4f6f8",
+    tag: "#b7c4d4",
+    hit: "#86efac",
+    miss: "#8aa0b8"
+  });
+  var PLAYER_TOKEN_STROKES = Object.freeze({
+    human: "#7dcec8",
+    opponent: "#f0b4c8"
+  });
+  var INFRASTRUCTURE_LABELS = Object.freeze({
+    urban: "City",
+    airport: "Airport",
+    seaport: "Port"
+  });
+  var DICE_PHASES = [
+    { key: "airStrike", rolls: (anim) => anim.airStrikeDiceRolls },
+    { key: "ranged", rolls: (anim) => anim.rangedDiceRolls },
+    { key: "melee", rolls: (anim) => anim.meleeDiceRolls }
+  ];
+  var chipsByRollArray = /* @__PURE__ */ new WeakMap();
+  function chipsForRolls(rolls) {
+    const cached = chipsByRollArray.get(rolls);
+    if (cached) return cached;
+    const chips = buildCombatDiceChips(rolls);
+    chipsByRollArray.set(rolls, chips);
+    return chips;
+  }
+  function rowSegments(row) {
+    const subject = row.infrastructureType ? { type: "text", text: INFRASTRUCTURE_LABELS[row.infrastructureType], color: CHIP_COLORS.text } : { type: "token", player: row.player, unitType: row.unitType };
+    const results = row.faces.length > 0 ? row.faces.map((face) => ({
+      type: "text",
+      text: String(face),
+      color: isCombatDiceHit({ face, threshold: row.threshold }) ? CHIP_COLORS.hit : CHIP_COLORS.miss
+    })) : [
+      { type: "text", text: String(row.hitCount), color: CHIP_COLORS.hit },
+      { type: "text", text: `/${row.rollCount}`, color: CHIP_COLORS.text }
+    ];
+    return [
+      { type: "text", text: row.tag, color: CHIP_COLORS.tag },
+      subject,
+      ...results,
+      { type: "text", text: `\u2264${row.threshold}`, color: CHIP_COLORS.text }
+    ];
+  }
+  function segmentWidth(ctx, segment) {
+    return segment.type === "token" ? CHIP_LAYOUT.tokenRadius * 2 : ctx.measureText(segment.text).width;
+  }
+  function lineWidth(ctx, segments) {
+    const total = segments.reduce((sum, segment) => sum + segmentWidth(ctx, segment), 0);
+    return total + CHIP_LAYOUT.gap * Math.max(0, segments.length - 1);
+  }
+  function layoutChip(ctx, chip) {
+    const lines = chip.rows.map(rowSegments);
+    if (chip.hiddenRowCount > 0) {
+      lines.push([{ type: "text", text: `+${chip.hiddenRowCount} more`, color: CHIP_COLORS.tag }]);
+    }
+    const contentWidth = Math.max(...lines.map((line) => lineWidth(ctx, line)));
+    return {
+      anchorH3Index: chip.anchorH3Index,
+      lines,
+      width: contentWidth + CHIP_LAYOUT.padX * 2,
+      height: lines.length * CHIP_LAYOUT.rowHeight + CHIP_LAYOUT.padY * 2
+    };
+  }
+  function clampToCanvas(value, size, extent) {
+    const inset = CHIP_LAYOUT.edgeInset;
+    return Math.max(inset, Math.min(value, extent - size - inset));
+  }
+  function paintMiniToken(ctx, centerX, centerY, segment) {
+    const player = segment.player ?? "";
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, CHIP_LAYOUT.tokenRadius, 0, Math.PI * 2);
+    ctx.fillStyle = PLAYER_COLORS[player] ?? "#333";
+    ctx.fill();
+    ctx.strokeStyle = PLAYER_TOKEN_STROKES[player] ?? CHIP_COLORS.border;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    const unitType = segment.unitType ?? "";
+    if (drawUnitTypeGlyph(ctx, centerX, centerY, unitType, CHIP_LAYOUT.glyphSize, segment.player ?? void 0)) return;
+    ctx.textAlign = "center";
+    ctx.fillStyle = CHIP_COLORS.text;
+    ctx.fillText(UNIT_TYPE_LABELS[unitType] ?? "?", centerX, centerY);
+    ctx.textAlign = "left";
+  }
+  function paintChip(ctx, chip, left, top) {
+    ctx.beginPath();
+    ctx.roundRect(left, top, chip.width, chip.height, CHIP_LAYOUT.cornerRadius);
+    ctx.fillStyle = CHIP_COLORS.background;
+    ctx.fill();
+    ctx.strokeStyle = CHIP_COLORS.border;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    chip.lines.forEach((segments, lineIndex) => {
+      const centerY = top + CHIP_LAYOUT.padY + lineIndex * CHIP_LAYOUT.rowHeight + CHIP_LAYOUT.rowHeight / 2;
+      let x = left + CHIP_LAYOUT.padX;
+      for (const segment of segments) {
+        if (segment.type === "token") {
+          paintMiniToken(ctx, x + CHIP_LAYOUT.tokenRadius, centerY, segment);
+        } else {
+          ctx.fillStyle = segment.color;
+          ctx.fillText(segment.text, x, centerY);
+        }
+        x += segmentWidth(ctx, segment) + CHIP_LAYOUT.gap;
+      }
+    });
+  }
+  function visibleDicePhases(anim, elapsedMs) {
+    const { phase } = buildResolutionPlaybackState(anim, elapsedMs);
+    return DICE_PHASES.flatMap((dicePhase) => {
+      const rolls = dicePhase.rolls(anim);
+      if (!rolls?.length) return [];
+      const { startMs, endMs } = combatDiceWindowForPhase(phase, dicePhase.key);
+      const opacity = combatDiceChipOpacity(elapsedMs, startMs, endMs);
+      return opacity > 0 ? [{ rolls, opacity }] : [];
+    });
+  }
+  function areResolutionDiceChipsShowing(anim) {
+    if (!anim || shouldHideStrategicMapUnitsForRes4Zoom()) return false;
+    return visibleDicePhases(anim, resolutionAnimationElapsedMs(anim)).length > 0;
+  }
+  function drawResolutionDiceChips(ctx, width, height, anim, elapsedMs) {
+    for (const { rolls, opacity } of visibleDicePhases(anim, elapsedMs)) {
+      ctx.save();
+      ctx.globalAlpha = opacity;
+      ctx.font = CHIP_FONT;
+      ctx.textAlign = "left";
+      ctx.textBaseline = "middle";
+      chipsForRolls(rolls).map((chip) => ({ chip: layoutChip(ctx, chip), center: hexCenterPx(chip.anchorH3Index) })).sort((a, b) => a.center.y - b.center.y).forEach(({ chip, center }) => {
+        const left = clampToCanvas(center.x - chip.width / 2, chip.width, width);
+        const top = clampToCanvas(center.y + UNIT_RADIUS - 2, chip.height, height);
+        paintChip(ctx, chip, left, top);
+      });
+      ctx.restore();
+    }
+  }
+
   // src/shared/inspectionStatusIconLine.ts
   var RES1_OVERLAY_BAND_OFFSET_SPAN_FRAC = 0.24;
   var INSPECTION_STATUS_ICON_SLASH_TEXT = " / ";
@@ -18026,7 +18544,7 @@ ${body}`;
     }
   };
   var activeTerrainStyleId = "default";
-  function makeDiagonalHatchPattern(color, spacing, lineWidth, reverseDiagonal, crosshatch = false) {
+  function makeDiagonalHatchPattern(color, spacing, lineWidth2, reverseDiagonal, crosshatch = false) {
     const c = document.createElement("canvas");
     const s = spacing * 2;
     c.width = s;
@@ -18034,7 +18552,7 @@ ${body}`;
     const p = c.getContext("2d");
     if (!p) return null;
     p.strokeStyle = color;
-    p.lineWidth = lineWidth;
+    p.lineWidth = lineWidth2;
     p.beginPath();
     if (reverseDiagonal) {
       p.moveTo(0, 0);
@@ -18069,7 +18587,7 @@ ${body}`;
     p.fill();
     return p.createPattern(c, "repeat");
   }
-  function makeOrthogonalHatchPattern(color, spacing, lineWidth) {
+  function makeOrthogonalHatchPattern(color, spacing, lineWidth2) {
     const c = document.createElement("canvas");
     const s = spacing * 2;
     c.width = s;
@@ -18077,7 +18595,7 @@ ${body}`;
     const p = c.getContext("2d");
     if (!p) return null;
     p.strokeStyle = color;
-    p.lineWidth = lineWidth;
+    p.lineWidth = lineWidth2;
     p.beginPath();
     p.moveTo(0, s * 0.5);
     p.lineTo(s, s * 0.5);
@@ -18848,6 +19366,10 @@ ${body}`;
       hideTacticalEntryLayer(layer);
       return;
     }
+    if (areResolutionDiceChipsShowing(rendererSharedState.resolutionMoveAnimation)) {
+      hideTacticalEntryLayer(layer);
+      return;
+    }
     if (!shouldShowBuildEntryZoom()) {
       hideTacticalEntryLayer(layer);
       return;
@@ -19274,7 +19796,13 @@ ${body}`;
       if (battle.res4IsRubbleByH3?.[anchor]) push("Rubble");
       else if (battle.res4IsUrbanByH3?.[anchor]) push("Urban");
       else if (subUnit.unitType === "armor" && tacticalRes4CellIsForestClass(battle, anchor)) push("Forest");
-      const weatherLabel = weatherBudgetSlowLabel(battle, subUnit, moveType);
+      const terrainOnly = effectiveTacticalMovementPointBudgetForMarchLeg(
+        { ...battle, weatherBonusEnabled: false },
+        subUnit,
+        battle.subUnits,
+        moveType
+      );
+      const weatherLabel = eff < terrainOnly ? weatherBudgetSlowLabel(battle, subUnit, moveType) : null;
       if (weatherLabel) push(weatherLabel);
     }
     const terrainForTransport = buildTacticalTerrainKindResolverFromSnapshot(battle);
@@ -19919,6 +20447,22 @@ ${body}`;
     const slowestMovementRange = budgets.length > 0 ? Math.min(...budgets) : 0;
     return buildHumanOrderGroupPreviewEnvelope({ previews, slowestMovementRange });
   }
+  function firstBeatEdgeCount(segments) {
+    return segments.filter((seg) => seg.turn === 1 && Array.isArray(seg.hexes)).reduce((sum, seg) => sum + Math.max(0, seg.hexes.length - 1), 0);
+  }
+  function tacticalHoverSolidEdgeCapByOriginH3(battle, selectedUnitIds, previews, hoveredH3Index) {
+    const capByOrigin = /* @__PURE__ */ new Map();
+    for (const id of selectedUnitIds) {
+      const u = battle.subUnits.find((s) => s.id === id);
+      if (!u || u.player !== "human") continue;
+      const segments = previews.find((p) => p.unitId === id)?.preview.segments ?? [];
+      const moveType = hoveredH3Index ? tacticalMovementUnitTypeForPathfinding(u, hoveredH3Index) : u.unitType;
+      const edges = segments.length > 0 ? firstBeatEdgeCount(segments) : effectiveTacticalMovementPointBudgetForMarchLeg(battle, u, battle.subUnits, moveType);
+      const prior = capByOrigin.get(u.h3Index);
+      if (prior === void 0 || edges < prior) capByOrigin.set(u.h3Index, edges);
+    }
+    return capByOrigin;
+  }
   function buildTacticalMarchDraftDestinationPreview(battle, subUnitId, destinationH3Index, options) {
     const res4Set = new Set(battle.res4ChildH3Indexes);
     return buildPreviewForSubUnit({
@@ -19977,280 +20521,6 @@ ${body}`;
       return { lat, lng };
     }
     return { lat: coords[coords.length - 1].lat, lng: coords[coords.length - 1].lng };
-  }
-
-  // src/renderer/rendering/unitDrawing.ts
-  var TOKEN_ICON_FIT_RATIO = 0.9;
-  var UNIT_ICON_FILE_BY_TYPE = {
-    /**
-       * Documents the object literal property `infantry` (infantry: 'infantry.svg').
-    
-       * Purpose: Supports maintainability by documenting why `infantry` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    infantry: "infantry.svg",
-    /**
-       * Documents the object literal property `armor` (armor: 'armor.svg').
-    
-       * Purpose: Supports maintainability by documenting why `armor` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    armor: "armor.svg",
-    /**
-       * Documents the object literal property `naval` (naval: 'naval.svg').
-    
-       * Purpose: Supports maintainability by documenting why `naval` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    naval: "naval.svg",
-    /**
-       * Documents the object literal property `air` (air: 'air.svg').
-    
-       * Purpose: Supports maintainability by documenting why `air` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    air: "air.svg",
-    /**
-       * Documents the object literal property `mixed` (mixed: 'mixed.svg').
-    
-       * Purpose: Supports maintainability by documenting why `mixed` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    mixed: "mixed.svg"
-  };
-  var unitIconCache = /* @__PURE__ */ new Map();
-  function iconPathForType(unitType) {
-    return `units/${UNIT_ICON_FILE_BY_TYPE[unitType]}`;
-  }
-  function getOrStartUnitIconLoad(unitType) {
-    if (unitIconCache.has(unitType)) return unitIconCache.get(unitType) ?? null;
-    const img = new Image();
-    img.decoding = "async";
-    img.onload = () => {
-    };
-    img.onerror = () => {
-      unitIconCache.set(unitType, null);
-    };
-    img.src = iconPathForType(unitType);
-    unitIconCache.set(unitType, img);
-    return img;
-  }
-  function drawUnitSvgIcon(ctx, centerX, centerY, unitType, unitPlayer, flipForOpponent = true, fitScaleMultiplier = 1) {
-    const img = getOrStartUnitIconLoad(unitType);
-    if (!img || !img.complete || img.naturalWidth <= 0 || img.naturalHeight <= 0) return false;
-    const maxIconSize = UNIT_RADIUS * 2 * TOKEN_ICON_FIT_RATIO * fitScaleMultiplier;
-    const iconScale = maxIconSize / Math.max(img.naturalWidth, img.naturalHeight);
-    const width = img.naturalWidth * iconScale;
-    const height = img.naturalHeight * iconScale;
-    const drawX = centerX - width / 2;
-    const drawY = centerY - height / 2;
-    const shouldFlip = flipForOpponent && unitPlayer === "opponent";
-    ctx.save();
-    if (shouldFlip) {
-      ctx.translate(centerX, centerY);
-      ctx.scale(-1, 1);
-      ctx.drawImage(img, -width / 2, -height / 2, width, height);
-    } else {
-      ctx.drawImage(img, drawX, drawY, width, height);
-    }
-    ctx.restore();
-    return true;
-  }
-  function drawOneUnitMarker(ctx, x, y, color, label, strokeColor = "#fff", unitPlayer) {
-    const stackedNeutral = color === MULTI_PLAYER_FILL;
-    ctx.beginPath();
-    ctx.arc(x, y, UNIT_RADIUS, 0, Math.PI * 2);
-    ctx.fillStyle = color;
-    ctx.fill();
-    ctx.strokeStyle = stackedNeutral ? MULTI_PLAYER_STROKE : strokeColor;
-    ctx.lineWidth = 2;
-    ctx.stroke();
-    ctx.save();
-    if (stackedNeutral) ctx.filter = MULTI_PLAYER_GLYPH_FILTER;
-    ctx.fillStyle = "#fff";
-    ctx.font = "bold 14px system-ui, sans-serif";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    const drewIcon = label === UNIT_TYPE_LABELS.armor && drawUnitSvgIcon(ctx, x, y, "armor", unitPlayer) || label === UNIT_TYPE_LABELS.infantry && drawUnitSvgIcon(ctx, x, y, "infantry", unitPlayer) || label === UNIT_TYPE_LABELS.air && drawUnitSvgIcon(ctx, x, y, "air", unitPlayer) || label === UNIT_TYPE_LABELS.naval && drawUnitSvgIcon(ctx, x, y, "naval", unitPlayer) || label === "*" && drawUnitSvgIcon(ctx, x, y, "mixed", unitPlayer, false, 0.5);
-    if (!drewIcon) ctx.fillText(label, x, y);
-    ctx.restore();
-  }
-  function drawUnits(ctx, units, movingUnitIds) {
-    const byHex = /* @__PURE__ */ new Map();
-    for (const u of units) {
-      if (movingUnitIds?.has(u.id)) continue;
-      const list = byHex.get(u.h3Index) ?? [];
-      list.push(u);
-      byHex.set(u.h3Index, list);
-    }
-    for (const [h3Index, hexUnits] of byHex) {
-      const { x, y } = hexCenterPx(h3Index);
-      const count = hexUnits.length;
-      const types = new Set(hexUnits.map((u) => u.unitType));
-      const players = new Set(hexUnits.map((u) => u.player));
-      const mixedType = types.size > 1;
-      const multiPlayer = players.size > 1;
-      const fillColor = multiPlayer ? MULTI_PLAYER_FILL : PLAYER_COLORS[hexUnits[0].player] ?? "#333";
-      const strokeColor = multiPlayer ? MULTI_PLAYER_STROKE : "#fff";
-      const label = mixedType ? "*" : UNIT_TYPE_LABELS[hexUnits[0].unitType] ?? "?";
-      drawOneUnitMarker(ctx, x, y, fillColor, label, strokeColor, hexUnits[0].player);
-      if (count > 1) {
-        drawOneUnitMarker(ctx, x + STACK_OFFSET_X, y + STACK_OFFSET_Y, fillColor, label, strokeColor, hexUnits[0].player);
-        const badgeX = x + COUNT_BADGE_OFFSET;
-        const badgeY = y - COUNT_BADGE_OFFSET;
-        ctx.font = "bold 13px system-ui, sans-serif";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.strokeStyle = "#fff";
-        ctx.lineWidth = 2;
-        ctx.strokeText(String(count), badgeX, badgeY);
-        ctx.fillStyle = "#000";
-        ctx.fillText(String(count), badgeX, badgeY);
-      }
-    }
-  }
-  function drawStaleEnemyIntel(ctx, state, inferUnitTypeLabelFromId2) {
-    const hasFogData = Array.isArray(state.visibleHexes);
-    const currentlyVisibleEnemies = state.units.filter((u) => u.player !== "human");
-    const currentlyVisibleEnemyIds = new Set(currentlyVisibleEnemies.map((u) => u.id));
-    for (const [unitId, prevSeen] of rendererSharedState.lastRenderedVisibleEnemyByUnitId) {
-      if (currentlyVisibleEnemyIds.has(unitId)) continue;
-      if (!rendererSharedState.clientStaleEnemyIntelByUnitId.has(unitId)) {
-        const lastSeenTurn = Math.min(prevSeen.lastSeenTurn, Math.max(1, state.turnNumber - 1));
-        rendererSharedState.clientStaleEnemyIntelByUnitId.set(unitId, {
-          unitId,
-          lastKnownH3Index: prevSeen.h3Index,
-          lastSeenTurn,
-          staleUntilTurn: lastSeenTurn + 2
-        });
-      }
-    }
-    rendererSharedState.lastRenderedVisibleEnemyByUnitId.clear();
-    for (const enemy of currentlyVisibleEnemies) {
-      rendererSharedState.lastRenderedVisibleEnemyByUnitId.set(enemy.id, {
-        h3Index: enemy.h3Index,
-        lastSeenTurn: state.turnNumber
-      });
-    }
-    if (shouldHideStrategicMapUnitsForRes4Zoom()) return;
-    if (!hasFogData) return;
-    const persistedIntel = Array.isArray(state.enemyIntel) ? state.enemyIntel : [];
-    const fallbackIntel = Array.from(rendererSharedState.clientStaleEnemyIntelByUnitId.values()).map((row) => ({
-      unitId: row.unitId,
-      lastKnownH3Index: row.lastKnownH3Index,
-      intelState: "stale",
-      lastSeenTurn: row.lastSeenTurn,
-      staleUntilTurn: row.staleUntilTurn
-    }));
-    const byUnitId = /* @__PURE__ */ new Map();
-    for (const row of fallbackIntel) byUnitId.set(row.unitId, row);
-    for (const row of persistedIntel) {
-      if (row.intelState !== "stale") continue;
-      byUnitId.set(row.unitId, {
-        unitId: row.unitId,
-        lastKnownH3Index: row.lastKnownH3Index,
-        intelState: "stale",
-        lastSeenTurn: row.lastSeenTurn,
-        staleUntilTurn: row.staleUntilTurn
-      });
-    }
-    const intel = Array.from(byUnitId.values());
-    if (intel.length === 0) return;
-    const visibleHexes = new Set(state.visibleHexes);
-    const stale = intel.filter((row) => row.intelState === "stale");
-    if (stale.length === 0) return;
-    const visibleEnemyHexes = new Set(currentlyVisibleEnemies.map((u) => u.h3Index));
-    const staleByHex = /* @__PURE__ */ new Map();
-    for (const row of stale) {
-      if (visibleEnemyHexes.has(row.lastKnownH3Index)) continue;
-      if (visibleHexes.has(row.lastKnownH3Index)) continue;
-      const list = staleByHex.get(row.lastKnownH3Index) ?? [];
-      list.push(row);
-      staleByHex.set(row.lastKnownH3Index, list);
-    }
-    for (const [h3Index, rows] of staleByHex) {
-      const age = Math.max(0, state.turnNumber - rows[0].lastSeenTurn);
-      const alpha = age === 1 ? 0.5 : age === 2 ? 0.3 : 0;
-      if (alpha <= 0) continue;
-      const types = new Set(rows.map((r) => inferUnitTypeLabelFromId2(r.unitId)));
-      const label = types.size === 1 ? [...types][0] : "*";
-      const { x, y } = hexCenterPx(h3Index);
-      ctx.save();
-      ctx.globalAlpha = alpha;
-      drawOneUnitMarker(ctx, x, y, PLAYER_COLORS.opponent, label, "#fff", "opponent");
-      ctx.restore();
-    }
-  }
-  function drawUnknownBattleMarkers(ctx, hexes, opacity) {
-    if (hexes.length === 0 || opacity <= 0) return;
-    ctx.save();
-    ctx.globalAlpha = opacity;
-    for (const h3Index of hexes) {
-      const { x, y } = hexCenterPx(h3Index);
-      drawOneUnitMarker(ctx, x, y, "#7a7a7a", "?", "#202020");
-    }
-    ctx.restore();
-  }
-  function drawCombatLightning(ctx, canvasWidth, canvasHeight, combatHexes, hexList, opacity) {
-    if (combatHexes.length === 0 || opacity <= 0) return;
-    void canvasWidth;
-    void canvasHeight;
-    void hexList;
-    ctx.save();
-    ctx.globalAlpha = opacity;
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-    const h = 18;
-    for (const h3Index of combatHexes) {
-      const { x, y } = hexCenterPx(h3Index);
-      ctx.beginPath();
-      ctx.moveTo(x, y - h);
-      ctx.lineTo(x + 6, y - 4);
-      ctx.lineTo(x - 4, y + 6);
-      ctx.lineTo(x + 5, y + h);
-      ctx.strokeStyle = "#000";
-      ctx.lineWidth = 5;
-      ctx.stroke();
-      ctx.strokeStyle = LIGHTNING_COLOR;
-      ctx.lineWidth = 3;
-      ctx.stroke();
-    }
-    ctx.restore();
-  }
-  function drawCasualtyOverlay(ctx, canvasWidth, canvasHeight, casualtyHexes, hexList, opacity) {
-    if (casualtyHexes.length === 0 || opacity <= 0) return;
-    void canvasWidth;
-    void canvasHeight;
-    void hexList;
-    ctx.save();
-    ctx.globalAlpha = opacity;
-    ctx.lineCap = "round";
-    const size = 20;
-    for (const h3Index of casualtyHexes) {
-      const { x, y } = hexCenterPx(h3Index);
-      ctx.beginPath();
-      ctx.moveTo(x - size, y - size);
-      ctx.lineTo(x + size, y + size);
-      ctx.moveTo(x + size, y - size);
-      ctx.lineTo(x - size, y + size);
-      ctx.strokeStyle = "#000";
-      ctx.lineWidth = 6;
-      ctx.stroke();
-      ctx.strokeStyle = CASUALTY_X_COLOR;
-      ctx.lineWidth = 4;
-      ctx.stroke();
-    }
-    ctx.restore();
   }
 
   // src/renderer/rendering/pathDrawing.ts
@@ -20612,26 +20882,26 @@ ${body}`;
   function getRangeOverlayLineCap(kind) {
     return kind === "perimeter" ? RANGE_PERIMETER_LINE_CAP : RANGE_SUPPORT_CONNECTOR_LINE_CAP;
   }
-  function buildRangeOverlayDashArray(lineWidth, kind, mode) {
+  function buildRangeOverlayDashArray(lineWidth2, kind, mode) {
     const minSolid = mode === "airStrike" ? RANGE_PERIMETER_AIR_STRIKE_DASH_MIN_SOLID_PX : RANGE_PERIMETER_DASH_MIN_SOLID_PX;
     const minGap = mode === "airStrike" ? RANGE_PERIMETER_AIR_STRIKE_DASH_MIN_GAP_PX : RANGE_PERIMETER_DASH_MIN_GAP_PX;
     if (kind === "perimeter") {
-      const segment = Math.max(minSolid, minGap, lineWidth * RANGE_PERIMETER_ANIMATED_DASH_VS_WIDTH);
+      const segment = Math.max(minSolid, minGap, lineWidth2 * RANGE_PERIMETER_ANIMATED_DASH_VS_WIDTH);
       return [segment, segment];
     }
     const solidFraction = mode === "airStrike" ? RANGE_PERIMETER_AIR_STRIKE_DASH_SOLID_FRACTION : RANGE_PERIMETER_DASH_SOLID_FRACTION;
     const gapFraction = mode === "airStrike" ? RANGE_PERIMETER_AIR_STRIKE_DASH_GAP_FRACTION : RANGE_PERIMETER_DASH_GAP_FRACTION;
-    return [Math.max(minSolid, lineWidth * solidFraction), Math.max(minGap, lineWidth * gapFraction)];
+    return [Math.max(minSolid, lineWidth2 * solidFraction), Math.max(minGap, lineWidth2 * gapFraction)];
   }
 
   // src/renderer/rendering/orderDrawing.ts
   function rangePerimeterStaticLineStyle(mode, kind = "connector") {
-    const lineWidth = getCurrentRangeOverlayLineWidth(kind);
+    const lineWidth2 = getCurrentRangeOverlayLineWidth(kind);
     const strokeColor = mode === "airStrike" ? RANGE_PERIMETER_AIR_STRIKE_COLOR : RANGE_PERIMETER_RANGED_COLOR;
     return {
-      lineWidth,
+      lineWidth: lineWidth2,
       strokeColor,
-      dash: buildRangeOverlayDashArray(lineWidth, kind, mode),
+      dash: buildRangeOverlayDashArray(lineWidth2, kind, mode),
       lineCap: getRangeOverlayLineCap(kind)
     };
   }
@@ -20905,6 +21175,8 @@ ${body}`;
     techBonusLevel: "new-game-tech-bonus-select"
   };
   var NEW_GAME_START_MONTH_ID = "new-game-start-month";
+  var NEW_GAME_OPTIONS_ROW_SELECTOR = ".game-over-options";
+  var NEW_GAME_OPTION_SEPARATOR_CLASS = "game-over-options-separator";
   function fogCheckbox() {
     return document.getElementById(NEW_GAME_FOG_CHECKBOX_ID);
   }
@@ -20936,6 +21208,24 @@ ${body}`;
       const select = optionSelect(id);
       if (select) select.value = DEFAULT_BONUS_LEVEL;
     }
+  }
+  function isOnSeparatorLine(separatorMidY, neighbor) {
+    if (!neighbor) return false;
+    const rect = neighbor.getBoundingClientRect();
+    return separatorMidY >= rect.top && separatorMidY <= rect.bottom;
+  }
+  function syncNewGameOptionSeparators(row) {
+    for (const separator of row.querySelectorAll(`.${NEW_GAME_OPTION_SEPARATOR_CLASS}`)) {
+      const rect = separator.getBoundingClientRect();
+      const midY = (rect.top + rect.bottom) / 2;
+      const joinsNeighbors = isOnSeparatorLine(midY, separator.previousElementSibling) && isOnSeparatorLine(midY, separator.nextElementSibling);
+      separator.style.visibility = joinsNeighbors ? "" : "hidden";
+    }
+  }
+  function registerNewGameOptionSeparators() {
+    const row = document.querySelector(NEW_GAME_OPTIONS_ROW_SELECTOR);
+    if (!row || typeof ResizeObserver === "undefined") return;
+    new ResizeObserver(() => syncNewGameOptionSeparators(row)).observe(row);
   }
 
   // src/renderer/gameplay/newGameRegionUi.ts
@@ -23692,10 +23982,10 @@ ${body}`;
   }
 
   // src/renderer/gameplay/tacticalOrders.ts
-  function replacePendingOrdersForSelected(getRows, setRows, selectedIds, buildRow) {
+  function replacePendingOrdersForSelected(getRows, setRows, selectedIds, buildRow2) {
     const kept = getRows().filter((row) => !selectedIds.includes(row.unitId));
     for (const unitId of selectedIds) {
-      kept.push(buildRow(unitId));
+      kept.push(buildRow2(unitId));
     }
     setRows(kept);
   }
@@ -23982,6 +24272,7 @@ ${body}`;
     void initializeScenarioRegionSelectorsOnOverlayOpen();
     registerRegionRandomizeButtons();
     registerGameSizeSelect();
+    registerNewGameOptionSeparators();
     document.getElementById("new-game-btn")?.addEventListener("click", async () => {
       if (!window.gameApi?.newGame) return;
       try {
@@ -24101,6 +24392,9 @@ ${body}`;
       const unknownCasualtyHexes = casualtyHexes.filter((h3) => unknownSet.has(h3));
       drawCasualtyOverlay(ctx, width, height, knownCasualtyHexes, hexList, pulseOpacity);
       drawUnknownBattleMarkers(ctx, unknownCasualtyHexes, pulseOpacity);
+    }
+    if (anim && !shouldHideStrategicMapUnitsForRes4Zoom()) {
+      drawResolutionDiceChips(ctx, width, height, anim, elapsed);
     }
   }
 
@@ -26110,21 +26404,13 @@ ${body}`;
       }
     } else {
       if (!state && !tb) return;
-      const slowestMovementRangeByOriginH3 = /* @__PURE__ */ new Map();
-      if (tb) {
-        const hovered = rendererSharedState.hoverRoutePreview?.hoveredH3Index;
-        for (const id of rendererSharedState.selectedUnitIds) {
-          const u = tb.subUnits.find((s) => s.id === id);
-          if (!u || u.player !== "human") continue;
-          const eff = u.h3Index;
-          const moveType = hovered ? tacticalMovementUnitTypeForPathfinding(u, hovered) : u.unitType;
-          const movementRange = effectiveTacticalMovementPointBudgetForMarchLeg(tb, u, tb.subUnits, moveType);
-          const prior = slowestMovementRangeByOriginH3.get(eff);
-          if (prior === void 0 || movementRange < prior) {
-            slowestMovementRangeByOriginH3.set(eff, movementRange);
-          }
-        }
-      } else if (state) {
+      const solidEdgeCapByOriginH3 = tb ? tacticalHoverSolidEdgeCapByOriginH3(
+        tb,
+        rendererSharedState.selectedUnitIds,
+        previewGroup.previews,
+        rendererSharedState.hoverRoutePreview.hoveredH3Index ?? null
+      ) : /* @__PURE__ */ new Map();
+      if (!tb && state) {
         const selectedHumanUnits = rendererSharedState.selectedUnitIds.map((id) => state.units.find((u) => u.id === id)).filter((unit) => !!unit && unit.player === "human");
         for (const unit of selectedHumanUnits) {
           const occupied = state.hexes.find((hex) => hex.h3Index === unit.h3Index);
@@ -26134,9 +26420,9 @@ ${body}`;
             tags: unit.weatherTags,
             level: weatherBonusLevelOf(state)
           });
-          const prior = slowestMovementRangeByOriginH3.get(unit.h3Index);
+          const prior = solidEdgeCapByOriginH3.get(unit.h3Index);
           if (prior === void 0 || movementRange < prior) {
-            slowestMovementRangeByOriginH3.set(unit.h3Index, movementRange);
+            solidEdgeCapByOriginH3.set(unit.h3Index, movementRange);
           }
         }
       }
@@ -26155,7 +26441,7 @@ ${body}`;
             if (!Array.isArray(seg.hexes) || seg.hexes.length < 2) return sum;
             return sum + seg.hexes.length - 1;
           }, 0);
-          const perStackSolidCap = previewUnit && originH3 && previewUnit.unitType === "air" ? Math.max(1, previewEdgeCount) : previewUnit && originH3 && slowestMovementRangeByOriginH3.has(originH3) ? slowestMovementRangeByOriginH3.get(originH3) : previewGroup.slowestMovementRange;
+          const perStackSolidCap = previewUnit && originH3 && previewUnit.unitType === "air" ? Math.max(1, previewEdgeCount) : previewUnit && originH3 && solidEdgeCapByOriginH3.has(originH3) ? solidEdgeCapByOriginH3.get(originH3) : previewGroup.slowestMovementRange;
           let lastSegmentPenultimate = null;
           let lastSegmentLast = null;
           let remainingSolidEdges = perStackSolidCap;
@@ -27005,7 +27291,8 @@ ${body}`;
             ...playback.rangedResolutionShotLines?.length ? { rangedResolutionShotLines: playback.rangedResolutionShotLines } : {},
             meleeCombatHexes: playback.meleeCombatHexes?.length ? playback.meleeCombatHexes : void 0,
             meleeCasualtyHexes: playback.meleeCasualtyHexes?.length ? playback.meleeCasualtyHexes : void 0,
-            meleeRemovedUnits: playback.meleeRemovedUnits?.length ? playback.meleeRemovedUnits : void 0
+            meleeRemovedUnits: playback.meleeRemovedUnits?.length ? playback.meleeRemovedUnits : void 0,
+            ...pickPlaybackDiceRolls(playback)
           };
         }
         if (commitResult.tacticalBattle) {
@@ -27146,6 +27433,7 @@ ${body}`;
         usePrecomputed,
         aiPlanningRunEnabled: rendererSharedState.runButtonOn
       });
+      const visibleHexesBeforeTurn = deps.getVisibleHexSet(rendererSharedState.gameState);
       let readyResult = await deps.callReadyWithTimeout(readyPayload);
       let resolutionPlaybackNotifyKind = "strategic";
       if (!readyResult.success) {
@@ -27267,7 +27555,12 @@ ${body}`;
           meleeCasualtyHexes: readyResult.meleeCasualtyHexes?.length ? readyResult.meleeCasualtyHexes : void 0,
           meleeRemovedUnits: readyResult.meleeRemovedUnits?.length ? readyResult.meleeRemovedUnits : void 0,
           unknownCombatHexes: unknownCombatHexes.length > 0 ? unknownCombatHexes : void 0,
-          unknownCasualtyHexes: unknownCasualtyHexes.length > 0 ? unknownCasualtyHexes : void 0
+          unknownCasualtyHexes: unknownCasualtyHexes.length > 0 ? unknownCasualtyHexes : void 0,
+          ...pickPlaybackDiceRolls(readyResult, {
+            visibleHexesBeforeTurn,
+            visibleHexesAfterTurn: visibleHexes,
+            unknownHexes: /* @__PURE__ */ new Set([...unknownCombatHexes, ...unknownCasualtyHexes])
+          })
         };
         const killToastFormatter = deps.buildKillToastFormatterBundle(
           state,
@@ -27391,6 +27684,32 @@ ${body}`;
     };
   }
 
+  // src/renderer/map/visibleMapFrame.ts
+  var MAP_CONTAINER_ID = "canvas-container";
+  function syncFrameToVisibleMap(frame) {
+    const rect = document.getElementById(MAP_CONTAINER_ID)?.getBoundingClientRect();
+    const hasArea = rect !== void 0 && rect.width > 0 && rect.height > 0;
+    frame.style.left = `${hasArea ? rect.left : 0}px`;
+    frame.style.top = `${hasArea ? rect.top : 0}px`;
+    frame.style.width = `${hasArea ? rect.width : window.innerWidth}px`;
+    frame.style.height = `${hasArea ? rect.height : window.innerHeight}px`;
+  }
+  function attachFrameToVisibleMap(frame) {
+    const sync = () => syncFrameToVisibleMap(frame);
+    sync();
+    const container = document.getElementById(MAP_CONTAINER_ID);
+    const observer = container && typeof ResizeObserver !== "undefined" ? new ResizeObserver(sync) : null;
+    if (container) observer?.observe(container);
+    window.addEventListener("resize", sync);
+    let attached = true;
+    return () => {
+      if (!attached) return;
+      attached = false;
+      observer?.disconnect();
+      window.removeEventListener("resize", sync);
+    };
+  }
+
   // src/renderer/gameplay/meleeInterceptModal.ts
   function openMeleeInterceptModal(args) {
     return new Promise((resolve, reject) => {
@@ -27398,7 +27717,9 @@ ${body}`;
       overlay.setAttribute("role", "dialog");
       overlay.setAttribute("aria-modal", "true");
       overlay.setAttribute("aria-label", "Tactical battles");
-      overlay.style.cssText = "position:fixed;inset:0;z-index:8000;background:rgba(0,0,0,0.35);display:flex;align-items:flex-start;justify-content:center;padding:12px;overflow-y:auto;";
+      overlay.style.cssText = "position:fixed;inset:0;z-index:8000;background:rgba(0,0,0,0.35);";
+      const frame = document.createElement("div");
+      frame.className = "melee-intercept-frame";
       const panel = document.createElement("div");
       panel.className = "melee-intercept-panel";
       const title = document.createElement("div");
@@ -27411,7 +27732,7 @@ ${body}`;
       const table = document.createElement("table");
       table.className = "melee-intercept-table";
       const colgroup = document.createElement("colgroup");
-      for (const w of ["2.75rem", "50%", "25%", "25%"]) {
+      for (const w of ["2.75rem", "", "20%", "20%"]) {
         const col = document.createElement("col");
         col.style.width = w;
         colgroup.appendChild(col);
@@ -27446,8 +27767,12 @@ ${body}`;
       btnRow.appendChild(fightBtn);
       btnRow.appendChild(ignoreBtn);
       panel.appendChild(btnRow);
-      overlay.appendChild(panel);
+      frame.appendChild(panel);
+      overlay.appendChild(frame);
+      let detachFrame = null;
       const cleanup = () => {
+        detachFrame?.();
+        detachFrame = null;
         overlay.remove();
         window.removeEventListener("keydown", onKey);
       };
@@ -27510,6 +27835,7 @@ ${body}`;
         return;
       }
       document.body.appendChild(overlay);
+      detachFrame = attachFrameToVisibleMap(frame);
       radios[0]?.focus();
     });
   }
@@ -30452,6 +30778,10 @@ ${body}`;
       return;
     }
     if (!shouldShowBuildEntryZoom()) {
+      hideBuildEntryLayer(layer);
+      return;
+    }
+    if (areResolutionDiceChipsShowing(rendererSharedState.resolutionMoveAnimation)) {
       hideBuildEntryLayer(layer);
       return;
     }

@@ -5,6 +5,7 @@ export * from './ordersTypes';
 export * from './gameStateTypes';
 export * from './openRouterTypes';
 export * from './combatResultTypes';
+export * from './combatDiceTypes';
 export * from './readyTypes';
 export * from './tacticalPlaybackTypes';
 export * from './consultationPushTypes';

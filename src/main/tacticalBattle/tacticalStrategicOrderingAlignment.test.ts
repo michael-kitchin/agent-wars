@@ -545,6 +545,14 @@ test('tactical infantry in the target hex can AA a striking air sub-unit', () =>
     out.removedUnits.some((u) => u.id === 'hum-air-aa'),
     'infantry AA hit should remove the striking air sub-unit'
   );
+  assert.deepEqual(
+    out.airStrikeDiceRolls.map((r) => [r.kind, r.face, r.anchorH3Index]),
+    [
+      ['airStrike', 20, res4Inf],
+      ['antiAir', 1, res4Inf],
+    ],
+    'strike and AA rolls are recorded in order on the target cell'
+  );
   assert.ok(
     out.battle.subUnits.some((u) => u.id === 'opp-inf-aa'),
     'infantry defender should survive a missed strike'

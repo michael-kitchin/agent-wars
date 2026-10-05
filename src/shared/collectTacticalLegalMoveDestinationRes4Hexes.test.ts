@@ -88,6 +88,27 @@ test('every single-source hex is reachableThisTurn under planTacticalRes4March',
   }
 });
 
+test('snow on plains holds untagged infantry to one cell, matching the planner, while snow-tagged infantry reach two', () => {
+  const { battle: plains } = plainsArmorBattle();
+  const mover = { ...plains.subUnits[0]!, unitType: 'infantry' as const };
+  const snowy = (weatherTags?: ('snow' | 'rain' | 'heat')[]): TacticalBattleSnapshot => ({
+    ...plains,
+    weather: 'snow',
+    weatherBonusEnabled: true,
+    weatherBonusLevel: 'low',
+    subUnits: [{ ...mover, ...(weatherTags ? { weatherTags } : {}) }],
+  });
+  const farthest = (battle: TacticalBattleSnapshot): number =>
+    Math.max(...collectTacticalLegalMoveDestinationRes4Hexes(battle, mover.id).map((h) => gridDistance(mover.h3Index, h)));
+  const untagged = snowy();
+  assert.equal(farthest(untagged), 1);
+  assert.deepEqual(
+    collectTacticalLegalMoveDestinationRes4Hexes(untagged, mover.id).sort(),
+    collectTacticalLegalMoveDestinationRes4HexesBruteForceForTests(untagged, mover.id).sort()
+  );
+  assert.equal(farthest(snowy(['snow'])), 2);
+});
+
 test('adjacent plains neighbor remains collectable', () => {
   const from = latLngToCell(40, 50, 4);
   const neighbor = [...gridDisk(from, 1)].find((h) => h !== from);

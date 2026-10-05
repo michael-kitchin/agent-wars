@@ -13,6 +13,7 @@ import {
   parseLandStateKey,
 } from './tacticalRes4LandMarchContinuity';
 import type { Res4FootprintNeighborLookup } from './tacticalRes4TransportLink';
+import type { WeatherState } from './weatherBonusTypes';
 import type { TacticalTerrainKindResolver } from './tacticalTerrainMovement';
 import {
   popNumericPriorityMinHeap,
@@ -28,7 +29,8 @@ const TRANSIT_ONLY_GOAL = '';
  *
  * Purpose: Tactical analogue of strategic `getLandMassReachableHexes` — one origin search, then membership by budget.
  * When to use: `collectTacticalLegalMoveDestinationRes4Hexes` for infantry/armor Best Options / possible-actions rows.
- * Expected outcome: Destination hexes with a finite path totaling ≤ `movementPointBudget`, excluding the origin; blocking
+ * Expected outcome: Destination hexes with a finite path totaling ≤ `movementPointBudget`, including the weather open-ground
+ * cost when the weather fields are given, excluding the origin; blocking
  * destinations are recovered via goal short-circuit backfill so membership matches per-destination `reachableThisTurn`.
  * Exceptions: None; never throws.
  */
@@ -39,8 +41,15 @@ export function collectInfantryArmorReachableWithinBudget(args: {
   movementPointBudget: number;
   terrain: TacticalTerrainKindResolver;
   footprintNeighbors: Res4FootprintNeighborLookup;
+  /** True when the match has the weather bonus on, so untagged infantry pay 2 for open ground in snow or rain. */
+  weatherEnabled?: boolean;
+  /** Battle weather; ignored unless `weatherEnabled` is true. */
+  weather?: WeatherState | null;
+  /** The mover's acclimation tags; a tag matching `weather` keeps printed costs. */
+  weatherTags?: readonly WeatherState[] | null;
 }): string[] {
   const { fromH3, res4Set, unitTypeForMovement, movementPointBudget, terrain } = args;
+  const weatherEnter = { weatherEnabled: args.weatherEnabled, weather: args.weather, weatherTags: args.weatherTags };
   const neighborsOf = args.footprintNeighbors;
   const distLand = new Map<string, number>();
   const heapLand: NumericPriorityHeapEntry<string>[] = [];
@@ -81,6 +90,7 @@ export function collectInfantryArmorReachableWithinBudget(args: {
         marchGoalH3: TRANSIT_ONLY_GOAL,
         res4Set,
         footprintNeighbors: neighborsOf,
+        ...weatherEnter,
       });
       if (!Number.isFinite(w) || w <= 0) continue;
       const nd = d + w;
@@ -125,6 +135,7 @@ export function collectInfantryArmorReachableWithinBudget(args: {
         marchGoalH3: goal,
         res4Set,
         footprintNeighbors: neighborsOf,
+        ...weatherEnter,
       });
       if (!Number.isFinite(step) || step <= 0) continue;
       if (dNb + step <= movementPointBudget) {

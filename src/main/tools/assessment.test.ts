@@ -519,7 +519,7 @@ function testFogOffOmitsStaleIntelGhost(): void {
 /**
  * Verifies the country bonus fields of `assess_unit` and `assess_hex` follow the snapshot flag.
  *
- * Purpose: The AI needs to know where its units roll with +1; with the flag off, results must be unchanged.
+ * Purpose: The AI needs to know where its units get the origin bonus; with the flag off, results must be unchanged.
  * When to use: After changing assessment origin bonus fields.
  * Expected outcome: On, the unit block has `originBonusHere: ['country']` and `birthCountry`, and the hex has `country`; off, none of the three keys.
  * Exceptions: None.

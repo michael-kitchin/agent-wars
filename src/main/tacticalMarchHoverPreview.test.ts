@@ -4,11 +4,12 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { gridDisk, latLngToCell } from 'h3-js';
+import { gridDisk, gridDistance, latLngToCell } from 'h3-js';
 import { formatTacticalDraftMarchPendingOrderTargetLabel } from '../shared/pendingMovementSidebarLabels';
 import {
   buildTacticalMarchDraftDestinationPreview,
   buildTacticalMarchHoverPreview,
+  tacticalHoverSolidEdgeCapByOriginH3,
 } from '../shared/tacticalMarchHoverPreview';
 import type { TacticalBattleSnapshot } from '../shared/tacticalBattleTypes';
 
@@ -287,6 +288,31 @@ test('buildTacticalMarchHoverPreview keeps distant in-footprint destination vali
   assert.equal(result.validForAll, true);
   assert.equal(result.previews[0]?.preview.valid, true);
   assert.ok((result.previews[0]?.preview.segments[0]?.hexes.length ?? 0) > 2);
+});
+
+test('tacticalHoverSolidEdgeCapByOriginH3 holds a land stack to its slowest sub-unit even without its own preview', () => {
+  const center = latLngToCell(13, 23, 4);
+  const cells = [...gridDisk(center, 5)];
+  const far = cells.find((h) => gridDistance(center, h) === 5);
+  assert.ok(far);
+  const battle: TacticalBattleSnapshot = {
+    battleId: 'b-solid-cap',
+    enclosingRes1H3Index: center,
+    res4ChildH3Indexes: cells,
+    strategicTurnNumber: 1,
+    tacticalTurnNumber: 1,
+    subUnits: [
+      { id: 'su-arm', parentUnitId: 'p-arm', player: 'human', unitType: 'armor', h3Index: center, displayName: 'Arm A' },
+      { id: 'su-inf', parentUnitId: 'p-inf', player: 'human', unitType: 'infantry', h3Index: center, displayName: 'Inf A' },
+    ],
+  };
+  const capFor = (ids: string[]): number | undefined => {
+    const group = buildTacticalMarchHoverPreview(battle, ids, far!);
+    return tacticalHoverSolidEdgeCapByOriginH3(battle, ids, group.previews, far!).get(center);
+  };
+  assert.equal(buildTacticalMarchHoverPreview(battle, ['su-arm', 'su-inf'], far!).previews.length, 1);
+  assert.equal(capFor(['su-arm']), 4);
+  assert.equal(capFor(['su-arm', 'su-inf']), 2);
 });
 
 test('formatTacticalDraftMarchPendingOrderTargetLabel reports res4 grid steps with strategic-style status', () => {

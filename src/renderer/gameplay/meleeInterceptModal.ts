@@ -3,6 +3,7 @@
  */
 
 import type { MeleeCandidateRow } from '../../shared/ipcTypes';
+import { attachFrameToVisibleMap } from '../map/visibleMapFrame';
 import { paintTerrainSwatches } from '../rendering/terrainVisualStyles';
 
 /**
@@ -69,6 +70,7 @@ selectedH3Index?: string;
  * Purpose: Isolates DOM construction from `readyHandler` to keep that module readable.
  * When to use: After strategic movement is applied and main reports melee candidates.
  * Expected outcome: Exclusive row selection; Fight disabled until a row is chosen. The panel uses the shared navy chrome classes.
+ *   The dimmed backdrop covers the window, while the panel is centered on the visible map and follows it on resize.
  * Exceptions: None; rejects only if the modal cannot attach to `document.body`.
  */
 export function openMeleeInterceptModal(args: MeleeInterceptModalOpenArgs): Promise<MeleeInterceptModalOutcome> {
@@ -77,8 +79,10 @@ export function openMeleeInterceptModal(args: MeleeInterceptModalOpenArgs): Prom
     overlay.setAttribute('role', 'dialog');
     overlay.setAttribute('aria-modal', 'true');
     overlay.setAttribute('aria-label', 'Tactical battles');
-    overlay.style.cssText =
-      'position:fixed;inset:0;z-index:8000;background:rgba(0,0,0,0.35);display:flex;align-items:flex-start;justify-content:center;padding:12px;overflow-y:auto;';
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:8000;background:rgba(0,0,0,0.35);';
+
+    const frame = document.createElement('div');
+    frame.className = 'melee-intercept-frame';
 
     const panel = document.createElement('div');
     panel.className = 'melee-intercept-panel';
@@ -95,7 +99,9 @@ export function openMeleeInterceptModal(args: MeleeInterceptModalOpenArgs): Prom
     const table = document.createElement('table');
     table.className = 'melee-intercept-table';
     const colgroup = document.createElement('colgroup');
-    for (const w of ['2.75rem', '50%', '25%', '25%']) {
+    // An empty width leaves the Hex column unsized, so `table-layout: fixed` gives it all remaining width.
+    // Percentages keep the summaries narrow on a small map; fixed tables ignore `min()` on columns.
+    for (const w of ['2.75rem', '', '20%', '20%']) {
       const col = document.createElement('col');
       col.style.width = w;
       colgroup.appendChild(col);
@@ -135,9 +141,13 @@ export function openMeleeInterceptModal(args: MeleeInterceptModalOpenArgs): Prom
     btnRow.appendChild(ignoreBtn);
     panel.appendChild(btnRow);
 
-    overlay.appendChild(panel);
+    frame.appendChild(panel);
+    overlay.appendChild(frame);
 
+    let detachFrame: (() => void) | null = null;
     const cleanup = (): void => {
+      detachFrame?.();
+      detachFrame = null;
       overlay.remove();
       window.removeEventListener('keydown', onKey);
     };
@@ -212,6 +222,7 @@ export function openMeleeInterceptModal(args: MeleeInterceptModalOpenArgs): Prom
       return;
     }
     document.body.appendChild(overlay);
+    detachFrame = attachFrameToVisibleMap(frame);
     radios[0]?.focus();
   });
 }

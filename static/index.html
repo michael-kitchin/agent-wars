@@ -88,29 +88,32 @@
           </div>
         </div>
         <div class="game-over-options">
-          <label for="new-game-country-bonus-select">Country bonus
+          <label for="new-game-country-bonus-select">Country bonus:
             <select id="new-game-country-bonus-select">
               <option value="off">Off</option>
               <option value="low" selected>Low</option>
               <option value="high">High</option>
             </select>
           </label>
-          <label for="new-game-terrain-bonus-select">Terrain bonus
+          <span class="game-over-options-separator" aria-hidden="true">/</span>
+          <label for="new-game-tech-bonus-select">Tech bonus:
+            <select id="new-game-tech-bonus-select">
+              <option value="off">Off</option>
+              <option value="low" selected>Low</option>
+              <option value="high">High</option>
+            </select>
+          </label>
+          <span class="game-over-options-separator" aria-hidden="true">/</span>
+          <label for="new-game-terrain-bonus-select">Terrain bonus:
             <select id="new-game-terrain-bonus-select">
               <option value="off">Off</option>
               <option value="low" selected>Low</option>
               <option value="high">High</option>
             </select>
           </label>
-          <label for="new-game-weather-bonus-select">Weather bonus
+          <span class="game-over-options-separator" aria-hidden="true">/</span>
+          <label for="new-game-weather-bonus-select">Weather bonus:
             <select id="new-game-weather-bonus-select">
-              <option value="off">Off</option>
-              <option value="low" selected>Low</option>
-              <option value="high">High</option>
-            </select>
-          </label>
-          <label for="new-game-tech-bonus-select">Tech bonus
-            <select id="new-game-tech-bonus-select">
               <option value="off">Off</option>
               <option value="low" selected>Low</option>
               <option value="high">High</option>
@@ -119,7 +122,8 @@
         </div>
         <div class="game-over-start-month">
           <label for="new-game-fog-checkbox"><input type="checkbox" id="new-game-fog-checkbox" checked /> Fog of war</label>
-          <label for="new-game-start-month">Starting month</label>
+          <span aria-hidden="true">/</span>
+          <label for="new-game-start-month">Starting month:</label>
           <div class="game-over-region-controls">
             <select id="new-game-start-month">
               <option value="1" selected>January</option>

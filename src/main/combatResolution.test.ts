@@ -5,7 +5,9 @@
 
 import * as assert from 'assert';
 import { gridDisk, gridDistance, latLngToCell } from 'h3-js';
+import type { CombatDiceRoll } from '../shared/ipc/combatDiceTypes';
 import { COMBAT_DIE_SIDES } from './combatDice';
+import { attackHitThreshold, defenseHitThreshold } from './combatHitThresholds';
 import {
   resolveOneMeleeEngagement,
   resolveOneRangedEngagement,
@@ -443,6 +445,107 @@ function testCasualtyOrderIgnoresOriginBonus(): void {
 }
 
 /**
+ * Builds a die that returns the given faces in order and counts how often it was rolled.
+ *
+ * Purpose: Lets recording tests prove each recorded roll is exactly one draw.
+ * When to use: With engagement-level functions that take a die function directly.
+ * Expected outcome: `roll()` returns `faces[i]` on the i-th call (the last face once exhausted); `calls()` returns the count.
+ * Exceptions: None.
+ */
+function scriptedDie(faces: readonly number[]): { readonly roll: () => number; readonly calls: () => number } {
+  let count = 0;
+  return {
+    roll: () => faces[Math.min(count++, faces.length - 1)]!,
+    calls: () => count,
+  };
+}
+
+/**
+ * Verifies that recording ranged rolls draws once per roll and leaves outcomes unchanged.
+ *
+ * Purpose: Dice playback must never change combat results or RNG consumption.
+ * When to use: After changing ranged roll sites or `rollCombatDieAgainst`.
+ * Expected outcome: Two draws record faces 3 then 15 as `ranged` (shooter hex) then `returnFire` (defender hex);
+ *   removals match a run without a sink.
+ * Exceptions: None.
+ */
+function testRangedRecordingDrawsOncePerRollAndKeepsOutcomes(): void {
+  const defenderHex = '89283082807ffff';
+  const attackerHex = gridDisk(defenderHex, 1).find((h) => h !== defenderHex)!;
+  const attackers = [makeUnit('atk', 'human', 'armor', attackerHex)];
+  const defenders = [makeUnit('def', 'opponent', 'armor', defenderHex)];
+  const recorded: CombatDiceRoll[] = [];
+  const die = scriptedDie([3, 15]);
+  const withSink = resolveOneRangedEngagement(attackers, defenders, defenderHex, die.roll, {
+    onRoll: (roll) => recorded.push(roll),
+  });
+  assert.strictEqual(die.calls(), 2, 'one draw per rolling unit');
+  assert.deepStrictEqual(
+    recorded.map((r) => [r.kind, r.face, r.anchorH3Index]),
+    [
+      ['ranged', 3, attackerHex],
+      ['returnFire', 15, defenderHex],
+    ]
+  );
+  const withoutSink = resolveOneRangedEngagement(attackers, defenders, defenderHex, scriptedDie([3, 15]).roll);
+  assert.deepStrictEqual(withSink, withoutSink, 'recording must not change removals');
+}
+
+/**
+ * Verifies that melee recording labels each side and records the hit number it rolled against.
+ *
+ * Purpose: Chips show attack rolls for one side and defense rolls for the other.
+ * When to use: After changing melee roll sites.
+ * Expected outcome: One `meleeAttack` roll at the attacker's attack hit number and one `meleeDefense` roll at the
+ *   defender's defense hit number.
+ * Exceptions: None.
+ */
+function testMeleeRecordingLabelsAttackAndDefense(): void {
+  const hex = '891f1d48b9fffff';
+  const attacker = makeUnit('human-infantry-1', 'human', 'infantry', hex);
+  const defender = makeUnit('opponent-armor-1', 'opponent', 'armor', hex);
+  const recorded: CombatDiceRoll[] = [];
+  resolveOneMeleeEngagement([attacker], [defender], () => 8, (roll) => recorded.push(roll));
+  assert.deepStrictEqual(
+    recorded.map((r) => [r.kind, r.player, r.threshold, r.anchorH3Index]),
+    [
+      ['meleeAttack', 'human', attackHitThreshold(attacker), hex],
+      ['meleeDefense', 'opponent', defenseHitThreshold(defender), hex],
+    ]
+  );
+}
+
+/**
+ * Verifies that both combat phases return their recorded rolls.
+ *
+ * Purpose: Phase results carry dice to playback payloads.
+ * When to use: After changing how `runRangedPhase` or `runMeleePhase` builds results.
+ * Expected outcome: Non-empty `diceRolls` anchored only on hexes that took part in that phase.
+ * Exceptions: None.
+ */
+function testPhasesReturnRecordedDiceRolls(): void {
+  const defenderHex = '89283082807ffff';
+  const attackerHex = gridDisk(defenderHex, 1).find((h) => h !== defenderHex)!;
+  const ranged = runRangedPhase(
+    [makeUnit('atk', 'human', 'armor', attackerHex), makeUnit('def', 'opponent', 'armor', defenderHex)],
+    [defenderHex, attackerHex],
+    [{ unitId: 'atk', targetH3Index: defenderHex }],
+    rollExactly(9)
+  );
+  assert.ok((ranged.diceRolls?.length ?? 0) > 0, 'ranged phase must record its rolls');
+  assert.ok(ranged.diceRolls!.every((r) => r.anchorH3Index === attackerHex || r.anchorH3Index === defenderHex));
+
+  const meleeHex = '891f1d48b8fffff';
+  const melee = runMeleePhase(
+    [makeUnit('h1', 'human', 'infantry', meleeHex), makeUnit('o1', 'opponent', 'infantry', meleeHex)],
+    [meleeHex],
+    rollExactly(9)
+  );
+  assert.strictEqual(melee.diceRolls?.length, 2, 'one melee roll per unit');
+  assert.ok(melee.diceRolls!.every((r) => r.anchorH3Index === meleeHex));
+}
+
+/**
  * Defines the `run` function shape (function run(): void).
 
  * Purpose: Supports maintainability by documenting why `run` exists.
@@ -465,6 +568,9 @@ function run(): void {
   testMeleeDefenderOriginBonusRaisesDefense();
   testRangedTargetCoverAppliesToAttackersOnly();
   testCasualtyOrderIgnoresOriginBonus();
+  testRangedRecordingDrawsOncePerRollAndKeepsOutcomes();
+  testMeleeRecordingLabelsAttackAndDefense();
+  testPhasesReturnRecordedDiceRolls();
   console.log('combatResolution tests passed');
 }
 

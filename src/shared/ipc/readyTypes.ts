@@ -10,6 +10,7 @@ import type {
 import type { BuildUnitType } from './productionTypes';
 import type { RangedResolutionShotLine } from '../rangedResolutionShotLines';
 import type { KillEdge } from './combatResultTypes';
+import type { CombatDicePlaybackFields } from './combatDiceTypes';
 import type { MeleeCandidateRow } from './meleeInterceptTypes';
 
 export type { RangedResolutionShotLine };
@@ -219,14 +220,17 @@ destroyedAirUnitsCount: number;
 }
 
 /**
- * Documents the `ReadyResult` interface as a named contract surface (export interface ReadyResult).
-
- * Purpose: Supports maintainability by documenting why `ReadyResult` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Result of one strategic Ready sent from main to the renderer.
+ *
+ * Purpose: Carries what the turn changed and everything resolution playback needs: moves, combat and casualty hexes,
+ *   shot lines, removed units, loss counts, and the AI consult outcome.
+ * When to use: Returned by the `ready` IPC and the melee intercept resume path; read by `handleReadyButtonClick`.
+ * Expected outcome: `success: false` carries a reason and nothing else to apply. A paused turn sets
+ *   `awaitingMeleeDecision` with candidates. Optional playback lists are omitted when empty, including the per-phase
+ *   dice rolls from `CombatDicePlaybackFields`.
  * Exceptions: None.
  */
-export interface ReadyResult {
+export interface ReadyResult extends CombatDicePlaybackFields {
     /**
    * Specifies the contract for the `success` member (success: boolean;).
 

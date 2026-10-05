@@ -288,7 +288,8 @@ interface ReturnFireEvaluation {
  *
  * Purpose: Uses the theater's return-fire context, the same predicate ranged resolution applies.
  * When to use: Ranged estimates with real attackers; assumed attackers have no known position.
- * Expected outcome: One attack-value hit chance per eligible defender, and a detail line per eligible defender.
+ * Expected outcome: One hit chance per eligible defender, from its attack value less the weather penalty resolution
+ * applies to return fire, and a detail line per eligible defender.
  * Exceptions: None.
  */
 function evaluateReturnFire(
@@ -321,7 +322,9 @@ function evaluateReturnFire(
   return {
     canReturnFire: eligible.length > 0,
     details: whoCan.length > 0 ? whoCan.join('; ') : null,
-    hitProbs: eligible.map((u) => hitChanceForThreshold(attackHitThreshold(u))),
+    hitProbs: eligible.map((u) =>
+      hitChanceForThreshold(attackHitThreshold({ ...u, weatherAttackPenalty: theater.returnFireWeatherPenaltyFor(u) }))
+    ),
   };
 }
 

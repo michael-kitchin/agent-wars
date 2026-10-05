@@ -29,6 +29,7 @@ import {
 import { getRes1LandMassByH3 } from '../terrainClassificationCache';
 import type { LandMassByH3 } from '../../shared/landTraversalRes1';
 import {
+  checkDistanceTagSourceUnit,
   nearestWaterHexTo,
 } from './pathfindingDistanceHelpers';
 import {
@@ -664,12 +665,15 @@ export function executePlanRouteWithSession(
 }
 
 /**
- * Defines the `executeCheckDistance` function shape (export function executeCheckDistance( from: LatLng, to: LatLng, unitType: string, state: GameStateSnapshot, latLngByH3: Map<string, LatLng>, r).
-
- * Purpose: Supports maintainability by documenting why `executeCheckDistance` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
+ * Strategic `check_distance`: hex distance and turns for a unit type between two hexes.
+ *
+ * Purpose: Lets the model compare approaches without naming a unit; naval routes use sea lanes and land routes use the
+ * land mass.
+ * When to use: `executePathfinding` for `check_distance` outside a tactical battle.
+ * Expected outcome: The movement budget is the start hex's weather budget for the unit `checkDistanceTagSourceUnit`
+ * picks there (an empty start means an untagged mover), applied to the whole route. A naval destination on land is
+ * moved to the nearest water hex. Unreachable routes return `reachable: false` with zero distances.
+ * Exceptions: Returns an error result for coordinates outside the map.
  */
 export function executeCheckDistance(
   from: LatLng,
@@ -697,7 +701,7 @@ export function executeCheckDistance(
   }
 
   const passableFor: PassableDomain = unitType === 'naval' ? 'water' : 'land';
-  const occupant = state.units.find((unit) => unit.h3Index === fromH3 && unit.unitType === unitType);
+  const occupant = checkDistanceTagSourceUnit(state.units, fromH3, unitType);
   const movementBudget = strategicRangeOnState(
     { unitType, h3Index: fromH3, weatherTags: occupant?.weatherTags },
     state

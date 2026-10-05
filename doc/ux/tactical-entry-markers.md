@@ -8,7 +8,7 @@ Let the player enter a contested hex's battle from the strategic map.
 
 ## Availability
 
-Shown in Strategic planning during the planning phase, once the map is zoomed in far enough, on each explored contested hex. They remain at battle-detail zoom, which is when build markers hide. They stay shown during strategic Resolution playback, because the next turn's planning state is already loaded; a click then starts the battle and cancels the playback. See [resolution-playback.md](resolution-playback.md). Hidden during Tactical planning, during a non-planning strategic phase, and when the map is zoomed out. While the tactical battles list is open, the map is not refreshed, so markers that were already visible stay visible and do not accept clicks. A hover order preview does not hide the markers, but a click is ignored while that preview is active.
+Shown in Strategic planning during the planning phase, once the map is zoomed in far enough, on each explored contested hex. They remain at battle-detail zoom, which is when build markers hide. They stay shown during strategic Resolution playback, because the next turn's planning state is already loaded; a click then starts the battle and cancels the playback. The exception is while playback shows dice chips: the markers hide so they don't cover the chips, and return when the chips fade. See [resolution-playback.md](resolution-playback.md). Hidden during Tactical planning, during a non-planning strategic phase, and when the map is zoomed out. While the tactical battles list is open, the map is not refreshed, so markers that were already visible stay visible and do not accept clicks. A hover order preview does not hide the markers, but a click is ignored while that preview is active.
 
 ## Information Displayed
 
@@ -31,7 +31,7 @@ Shown in Strategic planning during the planning phase, once the map is zoomed in
 
 ## States
 
-- Hidden: no eligible hex, wrong phase, or a battle is already active.
+- Hidden: no eligible hex, wrong phase, a battle is already active, or Resolution playback is showing dice chips.
 - Shown: one or more markers.
 
 ## Invariants
@@ -63,4 +63,5 @@ None.
 
 - `static/index.html` (`#tactical-entry-layer`)
 - `src/renderer/map/tacticalEntryLayer.ts`
+- `src/renderer/rendering/combatDiceChipDrawing.ts` (`areResolutionDiceChipsShowing`)
 - `src/renderer/tactical/tacticalEntryFlow.ts`

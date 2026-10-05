@@ -5,8 +5,8 @@ import { logDebug } from '../logger';
 /**
  * Minimal indexed snapshot needed to list strategic (res1) ranged target hexes from enemy occupancy.
  *
- * Purpose: Keeps `collectRangedTargetHexes` decoupled from the full `IndexedState` in `possibleUnitActions.ts` while
- * remaining structurally compatible with values produced by `buildIndexedState`.
+ * Purpose: Keeps `collectRangedTargetHexes` decoupled from the full `PossibleActionsIndexedState` while remaining
+ * structurally compatible with values produced by `buildPossibleActionsIndexedState`.
  * When to use: Only strategic ranged discovery for briefing markdown; tactical paths use `collectTacticalLegalRangedTargetRes4Hexes`.
  * Expected outcome: Callers pass the same `indexed` object they already build for possible-actions tables.
  * Exceptions: None.

@@ -106,6 +106,7 @@ import {
   buildResolutionPlaybackMoves,
   drawRangedResolutionShotLines,
 } from './rendering/orderDrawing';
+import { areResolutionDiceChipsShowing } from './rendering/combatDiceChipDrawing';
 import { drawResolutionCombatAndCasualtyOverlays } from './rendering/resolutionCombatOverlays';
 import { drawStaleEnemyIntel, drawUnits } from './rendering/unitDrawing';
 import { rendererSharedState as S } from './core/state';
@@ -1776,11 +1777,14 @@ function computeRes1OverlayTextY(
 }
 
 /**
- * Defines the `syncBuildEntryButton` function shape (function syncBuildEntryButton(): void).
-
- * Purpose: Supports maintainability by documenting why `syncBuildEntryButton` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Synchronizes the build marker buttons (production labels) on explored human urban hexes.
+ *
+ * Purpose: Keeps the DOM markers that open the build popup aligned with the map after every redraw.
+ * When to use: After each scene draw, beside the tactical entry marker sync.
+ * Expected outcome: One button per eligible hex, rebuilt only when labels, positions, or the build selection change.
+ *   The layer hides when the zoom is too far out, at battle-detail zoom (which also closes the build popup), and while
+ *   resolution playback paints dice chips, which the buttons would otherwise cover. Playback redraws every frame, so
+ *   the markers return as the chips fade.
  * Exceptions: None.
  */
 function syncBuildEntryButton(): void {
@@ -1790,6 +1794,10 @@ function syncBuildEntryButton(): void {
     return;
   }
   if (!shouldShowBuildEntryZoom()) {
+    hideBuildEntryLayer(layer);
+    return;
+  }
+  if (areResolutionDiceChipsShowing(S.resolutionMoveAnimation)) {
     hideBuildEntryLayer(layer);
     return;
   }

@@ -9,6 +9,7 @@ import type {
   TacticalOpponentPlanPayload,
 } from '../../shared/ipcTypes';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
+import { combatDicePlaybackFields } from '../combatDiceRecording';
 import { effectiveTacticalMovementPointBudgetForMarchLeg } from '../../shared/tacticalTerrainCombatModifiers';
 import { tacticalMovementUnitTypeForPathfinding } from '../../shared/tacticalTerrainMovement';
 import { isDbReady, reconcileRes1InfrastructureCountsFromRes4Overrides } from '../gameDb';
@@ -466,6 +467,7 @@ export function commitHumanTacticalDraftOrders(args: {
       meleeCombatHexes: meleePack.meleeCombatHexes.length > 0 ? meleePack.meleeCombatHexes : undefined,
       meleeCasualtyHexes: meleePack.meleeCasualtyHexes.length > 0 ? meleePack.meleeCasualtyHexes : undefined,
       meleeRemovedUnits: meleePack.meleeRemovedUnits.length > 0 ? meleePack.meleeRemovedUnits : undefined,
+      ...combatDicePlaybackFields(support.airStrikeDiceRolls, support.rangedDiceRolls, meleePack.meleeDiceRolls),
     };
     const livingSubUnitIds = new Set(finalBattle.subUnits.map((u) => u.id));
     const livingMarchContinuations = filterTacticalMarchContinuationsToPresentSubUnits(
@@ -496,6 +498,9 @@ export function commitHumanTacticalDraftOrders(args: {
       meleeRemovedCount: meleePack.meleeRemovedUnits.length,
       marchContinuationCount: livingMarchContinuations.length,
       shotLineCount: support.rangedResolutionShotLines.length,
+      airStrikeDiceRollCount: support.airStrikeDiceRolls.length,
+      rangedDiceRollCount: support.rangedDiceRolls.length,
+      meleeDiceRollCount: meleePack.meleeDiceRolls.length,
     });
     /**
      * Persists human tactical embark onto strategic `unit_transport_assignments` after the beat succeeded.

@@ -2,6 +2,7 @@ import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import { TACTICAL_ENTRY_HIT_PAD_PX } from '../core/constants';
 import { rendererSharedState as S } from '../core/state';
 import { isHoverOrderPlanningActive } from '../rendering/canvasPreviewPolicy';
+import { areResolutionDiceChipsShowing } from '../rendering/combatDiceChipDrawing';
 import { computeRes1OverlayTextY } from '../rendering/terrainRendering';
 import { getLeafletGlobal, hexCenterPx } from './mapHelpers';
 import { shouldShowBuildEntryZoom } from './terrainView';
@@ -39,7 +40,8 @@ function isContestedRes1Hex(state: GameStateSnapshot, h3Index: string): boolean 
  * Vertical placement: same horizontal center as the hex; `top` is `center.y + (textY - center.y)` so the icon sits
  * **below** the hex midpoint by the same distance overlay text sits below it (previously `2 * center.y - textY` mirrored above).
  *
- * Magnifiers are hidden outside strategic planning (`phase !== 'planning'`) or while the renderer already holds a tactical battle (`S.tacticalBattleSnapshot`).
+ * Magnifiers are hidden outside strategic planning (`phase !== 'planning'`), while the renderer already holds a tactical battle (`S.tacticalBattleSnapshot`),
+ * and while resolution playback paints dice chips, which the buttons would otherwise cover. Playback redraws every frame, so they return as the chips fade.
  */
 export function syncTacticalEntryButton(deps: {
   isHexExploredByPlayer: (h3: string) => boolean;
@@ -51,6 +53,10 @@ export function syncTacticalEntryButton(deps: {
     return;
   }
   if (S.gameState.phase !== 'planning' || S.tacticalBattleSnapshot) {
+    hideTacticalEntryLayer(layer);
+    return;
+  }
+  if (areResolutionDiceChipsShowing(S.resolutionMoveAnimation)) {
     hideTacticalEntryLayer(layer);
     return;
   }

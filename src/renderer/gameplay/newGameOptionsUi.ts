@@ -15,7 +15,7 @@ const NEW_GAME_FOG_CHECKBOX_ID = 'new-game-fog-checkbox';
  * DOM ids of the bonus level dropdowns, keyed by the `newGame` payload field each one fills.
  *
  * Purpose: One table shared by the read and reset helpers so a new dropdown cannot be read but never reset.
- * When to use: Querying the Country, Terrain, Weather, and Tech bonus dropdowns.
+ * When to use: Querying the Country, Tech, Terrain, and Weather bonus dropdowns.
  * Expected outcome: Matches the `id` attributes in `static/index.html`; option values match `BonusLevel`.
  * Exceptions: None.
  */
@@ -35,6 +35,26 @@ const NEW_GAME_BONUS_LEVEL_SELECT_IDS = {
  * Exceptions: None.
  */
 const NEW_GAME_START_MONTH_ID = 'new-game-start-month';
+
+/**
+ * Selector for the wrapping bonus options row.
+ *
+ * Purpose: Its slash separators are hidden when the row wraps them to a line edge.
+ * When to use: `registerNewGameOptionSeparators`.
+ * Expected outcome: Matches the row in `static/index.html`.
+ * Exceptions: None.
+ */
+const NEW_GAME_OPTIONS_ROW_SELECTOR = '.game-over-options';
+
+/**
+ * Class of the slash separators between the bonus dropdowns.
+ *
+ * Purpose: Finds the separators without depending on their position in the row.
+ * When to use: `syncNewGameOptionSeparators`.
+ * Expected outcome: Matches the separator spans in `static/index.html`.
+ * Exceptions: None.
+ */
+const NEW_GAME_OPTION_SEPARATOR_CLASS = 'game-over-options-separator';
 
 /**
  * The choices the new-game option controls contribute to the `newGame` payload.
@@ -134,4 +154,54 @@ export function resetNewGameOptionControls(): void {
     const select = optionSelect(id);
     if (select) select.value = DEFAULT_BONUS_LEVEL;
   }
+}
+
+/**
+ * Returns true when an element shares a line with a separator in a wrapping row.
+ *
+ * Purpose: Items on one flex line can differ in height, so the test uses the separator's vertical midpoint
+ *   instead of comparing tops.
+ * When to use: `syncNewGameOptionSeparators`.
+ * Expected outcome: True when the midpoint falls inside the neighbor's vertical extent. A missing neighbor counts as
+ *   a different line.
+ * Exceptions: None.
+ */
+function isOnSeparatorLine(separatorMidY: number, neighbor: Element | null): boolean {
+  if (!neighbor) return false;
+  const rect = neighbor.getBoundingClientRect();
+  return separatorMidY >= rect.top && separatorMidY <= rect.bottom;
+}
+
+/**
+ * Hides each slash separator that the row wrapped to the start or end of a line.
+ *
+ * Purpose: A narrow window wraps the bonus dropdowns, and a slash left at a line edge separates nothing.
+ * When to use: Through `registerNewGameOptionSeparators`, whenever the row changes size.
+ * Expected outcome: A separator stays visible only when both neighbors are on its line. Hidden separators keep their
+ *   space, so hiding one never re-wraps the row.
+ * Exceptions: None.
+ */
+function syncNewGameOptionSeparators(row: Element): void {
+  for (const separator of row.querySelectorAll<HTMLElement>(`.${NEW_GAME_OPTION_SEPARATOR_CLASS}`)) {
+    const rect = separator.getBoundingClientRect();
+    const midY = (rect.top + rect.bottom) / 2;
+    const joinsNeighbors =
+      isOnSeparatorLine(midY, separator.previousElementSibling) && isOnSeparatorLine(midY, separator.nextElementSibling);
+    separator.style.visibility = joinsNeighbors ? '' : 'hidden';
+  }
+}
+
+/**
+ * Keeps the bonus row's slash separators in step with how the row wraps.
+ *
+ * Purpose: The row's width depends on the window and on the region lists, which load after the dialog opens.
+ * When to use: Once while the renderer is starting.
+ * Expected outcome: The separators are checked now and again each time the row changes size, including when the
+ *   dialog opens. A missing row or a missing `ResizeObserver` leaves every separator visible.
+ * Exceptions: None.
+ */
+export function registerNewGameOptionSeparators(): void {
+  const row = document.querySelector(NEW_GAME_OPTIONS_ROW_SELECTOR);
+  if (!row || typeof ResizeObserver === 'undefined') return;
+  new ResizeObserver(() => syncNewGameOptionSeparators(row)).observe(row);
 }

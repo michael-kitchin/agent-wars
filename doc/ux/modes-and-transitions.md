@@ -24,13 +24,13 @@ While a Ready request is in flight, Ready stays disabled and keeps the label "Re
 
 ### Tactical battles list
 
-The player sees a dialog titled "Tactical Battles (N)", where N is the number of candidate hexes. Each row offers a choice, the hex information, a human unit summary, and an AI unit summary. Fight stays disabled until a row is chosen. Ignore is always available. The dialog covers the window on a dimmed backdrop. The map and the right panel stay as they were when Ready paused, and they do not receive pointer input. This dialog opens after Ready when the match reports melee candidates and the Tactical battles checkbox is checked. When that checkbox is unchecked, the dialog does not open and the turn continues as if the player chose Ignore.
+The player sees a dialog titled "Tactical Battles (N)", where N is the number of candidate hexes. Each row offers a choice, the hex information, a human unit summary, and an AI unit summary. Fight stays disabled until a row is chosen. Ignore is always available. A dimmed backdrop covers the window, and the dialog is centered on the visible map area rather than on the map plus the right panel. The map and the right panel stay as they were when Ready paused, and they do not receive pointer input. This dialog opens after Ready when the match reports melee candidates and the Tactical battles checkbox is checked. When that checkbox is unchecked, the dialog does not open and the turn continues as if the player chose Ignore.
 
 Choosing Fight or Ignore closes the dialog. Escape and a click on the dimmed backdrop choose Ignore. Fight then starts a tactical battle on the chosen hex after the strategic turn finishes resolving. Ignore resolves melee without entering a tactical battle.
 
 ### Resolution playback
 
-The player sees units and combat results animate on the current map. A map toast may summarize losses the player can see. Combat the player cannot see is announced as an unknown battle, with continent names when those names are available. Playback runs after Ready, or after a tactical Ready commit, when the resolved turn has movement or combat to show. It ends when the animation finishes.
+The player sees units and combat results animate on the current map, with dice chips showing the dice rolled in each combat phase. A map toast may summarize losses the player can see. Combat the player cannot see is announced as an unknown battle, with continent names when those names are available. Playback runs after Ready, or after a tactical Ready commit, when the resolved turn has movement or combat to show. It ends when the animation finishes.
 
 Playback does not replace the underlying match: the game-state readout can already show the next planning turn while the animation is still running. Until the animation ends, map gestures that change orders or the selection are ignored. Pan, zoom, hex tooltips, and right-click still work, and the right panel keeps its own rules. Details are in [resolution-playback.md](resolution-playback.md). Starting a tactical battle cancels a strategic playback that is still running. Leaving a tactical battle also cancels playback.
 

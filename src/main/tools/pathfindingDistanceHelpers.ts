@@ -7,7 +7,7 @@ import { findPath } from '../pathfinding';
 import type { PassableDomain } from '../pathfinding';
 import type { LandMassByH3 } from '../../shared/landTraversalRes1';
 import { terrainIsPassableForDomain } from '../pathfinding';
-import { logDebug, logError } from '../logger';
+import { logDebug, logError, logTrace } from '../logger';
 
 /**
  * Documents the `GridDistanceFailureSample` interface as a named contract surface (interface GridDistanceFailureSample).
@@ -309,4 +309,31 @@ export function findPathWithOptionalAvoidanceRetry(payload: {
     payload.warnings.push(payload.blockedRetryWarning);
   }
   return retried;
+}
+
+/** Player id of the AI commander, whose own units supply `check_distance` weather tags first. */
+const CHECK_DISTANCE_AI_PLAYER_ID = 'opponent';
+
+/**
+ * Picks the unit whose weather tags `check_distance` uses for one start cell.
+ *
+ * Purpose: `check_distance` names a unit type rather than a unit, but weather budgets and enter costs depend on the
+ * mover's tags. The AI is asking about its own forces, so its unit wins when both sides share the cell.
+ * When to use: Strategic and battle `check_distance`, before computing the movement budget.
+ * Expected outcome: The first AI unit of that type on the cell, else the first unit of that type from any player, else
+ * undefined, which callers treat as an untagged mover.
+ * Exceptions: None.
+ */
+export function checkDistanceTagSourceUnit<
+  T extends { readonly player: string; readonly h3Index: string; readonly unitType: string },
+>(units: readonly T[], fromH3: string, unitType: string): T | undefined {
+  const here = units.filter((u) => u.h3Index === fromH3 && u.unitType === unitType);
+  const picked = here.find((u) => u.player === CHECK_DISTANCE_AI_PLAYER_ID) ?? here[0];
+  logTrace('pathfindingDistanceHelpers checkDistanceTagSourceUnit', {
+    fromH3,
+    unitType,
+    candidateCount: here.length,
+    pickedPlayer: picked?.player ?? null,
+  });
+  return picked;
 }

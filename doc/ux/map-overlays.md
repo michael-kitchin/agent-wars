@@ -13,12 +13,13 @@ Drawn on the map surface whenever their condition is true, in Strategic planning
 ## Information Displayed
 
 - A range perimeter while ranged or strike targeting is on and the selection has a perimeter to draw.
-- A hover route or shot preview while the pointer is over a candidate destination for the current selection.
+- A hover route or shot preview while the pointer is over a candidate destination for the current selection. A route is solid for the part each origin stack covers this turn or beat, and dashed beyond it. An air route is solid all the way.
 - Lines for queued ranged attacks, air strikes, and ferries.
 - Shot lines during resolution playback for ranged combat that is being replayed.
 - A draft march path during Tactical planning.
 - City, transport, and infrastructure marks on hexes that have them, when that overlay is enabled for the current zoom.
 - Combat marks during Resolution playback: the hexes where combat and casualties are being shown.
+- Dice chips during Resolution playback: the dice each stack rolled in the phase being shown, drawn above every other playback overlay. See [resolution-playback.md](resolution-playback.md).
 
 Empty means the overlay is not drawn. Overlays do not show a placeholder.
 
@@ -36,7 +37,7 @@ Empty means the overlay is not drawn. Overlays do not show a placeholder.
 
 - When targeting turns off, or the selection can no longer support a perimeter, the range perimeter stops.
 - When the hover preview is cleared, its line stops. See [order-lifecycle.md](order-lifecycle.md).
-- When playback ends, combat marks and playback shot lines stop.
+- When playback ends, combat marks, dice chips, and playback shot lines stop.
 
 ## States
 
@@ -47,7 +48,7 @@ Empty means the overlay is not drawn. Overlays do not show a placeholder.
 
 - Overlays never accept clicks of their own.
 - A range perimeter is never shown while targeting is off.
-- Playback combat marks are never shown after playback ends.
+- Playback combat marks and dice chips are never shown after playback ends.
 
 ## Strategic and Tactical Differences
 
@@ -55,6 +56,7 @@ Empty means the overlay is not drawn. Overlays do not show a placeholder.
 | --- | --- | --- |
 | Range perimeter | Strategic reach for the selection | Tactical reach for the selection |
 | March preview | Strategic route preview | Battle march preview, including a draft march drawing |
+| Solid part of a hover route | The movement of the slowest selected unit in that hex, after the weather of the hex it stands in | The shortest first-beat reach the march planner gives any selected unit on that cell, so forest, rubble, or weather that make a cell cost 2 shorten it |
 | Playback | Strategic turn animation | Battle beat animation |
 
 ## Related Documents
@@ -85,4 +87,5 @@ None.
 - `src/renderer/rendering/terrainInfrastructureOverlay.ts`
 - `src/renderer/rendering/infrastructureOverlayState.ts`
 - `src/renderer/rendering/resolutionCombatOverlays.ts`
+- `src/renderer/rendering/combatDiceChipDrawing.ts`
 - `src/renderer/tactical/tacticalDraftMarchOverlay.ts`

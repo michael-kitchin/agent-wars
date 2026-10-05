@@ -163,6 +163,30 @@ function drawUnitSvgIcon(
 }
 
 /**
+ * Draws one unit-type glyph at an arbitrary size, without the token circle.
+ *
+ * Purpose: Lets small overlays such as resolution dice chips show the same unit glyphs as map tokens.
+ * When to use: When a caller draws its own background and needs only the glyph. Map tokens keep using
+ *   `drawOneUnitMarker`.
+ * Expected outcome: Draws the glyph so its longer side is `sizePx`, mirrored for the opponent like map tokens, and
+ *   returns true. Returns false without drawing for a type other than infantry, armor, naval, or air, and while the
+ *   glyph image is still loading, so the caller can draw a text fallback.
+ * Exceptions: None.
+ */
+export function drawUnitTypeGlyph(
+  ctx: CanvasRenderingContext2D,
+  centerX: number,
+  centerY: number,
+  unitType: string,
+  sizePx: number,
+  player?: string
+): boolean {
+  if (unitType !== 'infantry' && unitType !== 'armor' && unitType !== 'naval' && unitType !== 'air') return false;
+  const fitScaleMultiplier = sizePx / (UNIT_RADIUS * 2 * TOKEN_ICON_FIT_RATIO);
+  return drawUnitSvgIcon(ctx, centerX, centerY, unitType, player, true, fitScaleMultiplier);
+}
+
+/**
  * Defines the `drawOneUnitMarker` function shape (export function drawOneUnitMarker( ctx: CanvasRenderingContext2D, x: number, y: number, color: string, label: string, strokeColor: string = '#).
 
  * Purpose: Supports maintainability by documenting why `drawOneUnitMarker` exists.

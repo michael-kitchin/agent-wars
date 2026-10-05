@@ -18,7 +18,7 @@ import { ACTION_APPROACH, ACTION_MOVES_MELEE } from './possibleUnitActionsTableA
 /**
  * Indexed snapshot fields the interest/approach filters read.
  *
- * Purpose: Avoid importing `IndexedState` from `possibleUnitActions.ts` (circular).
+ * Purpose: Lets the filters depend only on the maps they read rather than the full `PossibleActionsIndexedState`.
  * When to use: `filterGroundMoveHexesForThisTurnOptionsTable` and `applyInterestOrApproach`.
  * Expected outcome: Structurally matches the maps `buildPossibleActionsIndexedState` fills.
  * Exceptions: None.

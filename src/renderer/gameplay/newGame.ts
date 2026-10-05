@@ -15,6 +15,7 @@ import {
   randomizeNewGameStartMonth,
   readNewGameOptionChoices,
   readNewGameStartMonth,
+  registerNewGameOptionSeparators,
   resetNewGameOptionControls,
 } from './newGameOptionsUi';
 
@@ -226,14 +227,16 @@ setMainUIControlsEnabled: (enabled: boolean) => void;
  *
  * Purpose: Starts a match from the dialog's choices and resets every renderer cache the old match left behind.
  * When to use: Once at renderer startup.
- * Expected outcome: Clicking Start sends fog, both origin bonus flags, home regions, and game size to `newGame`,
- *   then reloads the map, sidebars, and overlay from the returned state. Failures are logged to the console.
+ * Expected outcome: The randomize buttons, game-size preview, and bonus-row separators are live. Clicking Start sends
+ *   fog, the four bonus levels, the starting month, home regions, and game size to `newGame`, then reloads the map,
+ *   sidebars, and overlay from the returned state. Failures are logged to the console.
  * Exceptions: None; click handler errors are caught.
  */
 export function registerNewGameButton(deps: NewGameDeps): void {
   void initializeScenarioRegionSelectorsOnOverlayOpen();
   registerRegionRandomizeButtons();
   registerGameSizeSelect();
+  registerNewGameOptionSeparators();
   document.getElementById('new-game-btn')?.addEventListener('click', async () => {
     if (!window.gameApi?.newGame) return;
     try {

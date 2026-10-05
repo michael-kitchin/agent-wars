@@ -278,7 +278,7 @@ function weatherBudgetSlowLabel(
  *
  * Purpose: Replaces the first-label helper with one result suitable for HTML tooltips.
  * When to use: After a battle march plan succeeds.
- * Expected outcome: Slow-terrain labels for the start cell's budget and for steps that did not pay the road or rail rate. A line-rate step sets `road` or `rail` and does not add that cell's terrain. Air and trivial paths yield empty labels and `roadRail: false`.
+ * Expected outcome: Slow-terrain labels for the start cell's budget and for steps that did not pay the road or rail rate. The battle's weather is named for the budget only when its cap is below the start cell's terrain budget. A line-rate step sets `road` or `rail` and does not add that cell's terrain. Air and trivial paths yield empty labels and `roadRail: false`.
  * Exceptions: None.
  */
 export function collectTacticalMarchTerrainImpact(args: {
@@ -315,7 +315,13 @@ export function collectTacticalMarchTerrainImpact(args: {
     if (battle.res4IsRubbleByH3?.[anchor]) push('Rubble');
     else if (battle.res4IsUrbanByH3?.[anchor]) push('Urban');
     else if (subUnit.unitType === 'armor' && tacticalRes4CellIsForestClass(battle, anchor)) push('Forest');
-    const weatherLabel = weatherBudgetSlowLabel(battle, subUnit, moveType);
+    const terrainOnly = effectiveTacticalMovementPointBudgetForMarchLeg(
+      { ...battle, weatherBonusEnabled: false },
+      subUnit,
+      battle.subUnits,
+      moveType
+    );
+    const weatherLabel = eff < terrainOnly ? weatherBudgetSlowLabel(battle, subUnit, moveType) : null;
     if (weatherLabel) push(weatherLabel);
   }
 

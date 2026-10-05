@@ -8,7 +8,9 @@ import type { GameStateSnapshot } from '../gameDb';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { buildTacticalAiPlanState } from '../tacticalBattle/buildTacticalAiPlanState';
 import { tacticalRes1Cell, tacticalRes4UnderRes1Corner } from '../tacticalBattle/testSupport/tacticalRes4HexFixtures';
+import { buildTacticalToolFixture } from '../tacticalBattle/testSupport/tacticalToolFixtures';
 import { executePathfinding } from './pathfinding';
+import { executeTacticalCheckDistance } from './tacticalPathfinding';
 
 /**
  * Builds a two-cell plains tactical footprint with opponent armor adjacent to human infantry.
@@ -155,6 +157,51 @@ function testTacticalCheckDistanceAdjacentOk(): void {
 }
 
 /**
+ * Ensures tactical check_distance applies the weather budget cap only to a mover that lacks the tag.
+ *
+ * Purpose: The start cell's armor supplies the tags, preferring the AI's own, so a snow-tagged tank is not estimated as
+ * slowed and an enemy tank sharing the cell does not lend its tags.
+ * When to use: After edits to how `executeTacticalCheckDistance` picks the mover.
+ * Expected outcome: Two plains cells in High snow take two beats untagged and one beat when tagged for snow. A
+ * snow-tagged human tank listed first on the cell does not change the AI's untagged estimate.
+ * Exceptions: None.
+ */
+function testTacticalCheckDistanceUsesStartCellTags(): void {
+  const estimateBeats = (weatherTags?: ('snow' | 'rain' | 'heat')[], taggedHumanFirst = false): number | undefined => {
+    const fx = buildTacticalToolFixture({
+      battleId: `t-tool1-snow-${weatherTags?.join('-') ?? 'none'}-${taggedHumanFirst}`,
+      units: [
+        ...(taggedHumanFirst ? [{ id: 'hum-arm', player: 'human' as const, unitType: 'armor' as const, cell: 'near' as const }] : []),
+        { id: 'opp-arm', player: 'opponent', unitType: 'armor', cell: 'near' },
+      ],
+    });
+    const battle: TacticalBattleSnapshot = {
+      ...fx.battle,
+      weather: 'snow',
+      weatherBonusEnabled: true,
+      weatherBonusLevel: 'high',
+      subUnits: fx.battle.subUnits.map((s) => {
+        const tags = s.player === 'human' ? ['snow' as const] : weatherTags;
+        return tags ? { ...s, weatherTags: tags } : s;
+      }),
+    };
+    const result = executeTacticalCheckDistance(
+      cellToLatLng(fx.cells.near) as [number, number],
+      cellToLatLng(fx.cells.far) as [number, number],
+      'armor',
+      battle,
+      fx.latLngByH3,
+      fx.resolveToH3
+    ) as { status: string; estimatedTurns?: number };
+    assert.strictEqual(result.status, 'ok');
+    return result.estimatedTurns;
+  };
+  assert.strictEqual(estimateBeats(), 2);
+  assert.strictEqual(estimateBeats(['snow']), 1);
+  assert.strictEqual(estimateBeats(undefined, true), 2);
+}
+
+/**
  * Ensures tactical plan_route rejects air units with an air-strike guidance error.
  *
  * Purpose: Contract parity with strategic Tool1 air handling.
@@ -266,6 +313,7 @@ const tests = [
   { name: 'tactical plan_route adjacent enemy ok', fn: testTacticalPlanRouteAdjacentEnemyOk },
   { name: 'strategic plan_route on res4 planState still land-mass', fn: testStrategicPlanRouteOnRes4PlanStateStillUsesLandMass },
   { name: 'tactical check_distance adjacent ok', fn: testTacticalCheckDistanceAdjacentOk },
+  { name: 'tactical check_distance uses start cell tags', fn: testTacticalCheckDistanceUsesStartCellTags },
   { name: 'tactical plan_route rejects air', fn: testTacticalPlanRouteRejectsAir },
   { name: 'tactical plan_route rejects embarked', fn: testTacticalPlanRouteRejectsEmbarked },
 ];

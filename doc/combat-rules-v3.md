@@ -173,7 +173,7 @@ No "continue or retreat." If both sides remain in the same hex after melee, they
 
 ### 4.9 Hit and casualty rules
 
-- **Roll:** One die per unit (d20, result 1–20). Each roll draws once from the seeded game RNG (`createCombatDieRoller` in `src/main/combatDice.ts`).
+- **Roll:** One die per unit (d20, result 1–20). Each roll draws once from the seeded game RNG (`createCombatDieRoller` in `src/main/combatDice.ts`). The roll site also records the face and hit number for the playback dice chips (§13.1) without drawing again, so showing dice never changes a result (`rollCombatDieAgainst` in `src/main/combatDiceRecording.ts`).
 - **Hit:** For **attack** (including return fire), hit if `roll ≤ min(17, max(2, attack − weather penalty − target cover) + origin bonus + tech attack bonus)`. For **defense** (melee only), hit if `roll ≤ min(17, defense + origin bonus + tech defense bonus)`. The weather penalty, cover, origin bonus, and tech bonus are each 0 unless the rules below apply (`attackHitThreshold` and `defenseHitThreshold` in `src/main/combatHitThresholds.ts`).
 - **Floor and cap:** The floor of 2 applies after penalties and cover and before the origin and tech bonuses, so a shot keeps at least a 10% chance and a qualifying unit gets its full bonuses. The cap of 17 means a roll of 18, 19, or 20 always misses.
 - **Return fire (ranged phase):** A defending unit returns fire only if at least one attacker hex is a legal reverse shot under planning rules. **Strategic ground** (infantry/armor/naval): strategic ranged range + H3 grid distance. Infantry strategic range is 0, so infantry never returns fire on the strategic map. **Tactical ground:** tactical ranged baselines with terrain caps and mountain LOS (same as direct-fire validation), including infantry. **Air** in the ranged phase: strike-planning rules — intact airport at base, and on the strategic map within air strike range of the attacker hex; in a tactical battle, airport only (engagement hexes are already in footprint). Air-strike phase counter-fire (§8) is separate and still has **no** range-to-base check.
@@ -627,9 +627,11 @@ During the resolution phase, the client animates so that combat and death overla
 
 Air strike overlays complete before ranged overlays begin. Ranged overlays never "chase" moved units; melee overlays appear only after movement is complete.
 
+Dice chips listing every die rolled in the air strike, ranged, and melee phases sit on top of every other playback layer, from each phase's lightning through its casualties. They are not drawn on hexes that were outside the player's vision both before and after the turn. See [resolution-playback.md](ux/resolution-playback.md).
+
 ### 13.2 Tactical battle animation
 
-Tactical battle animation follows the same principles at the res4 hex grid scale. Movement uses interpolation between res4 hexes. Ranged fire shows directional indicators. Casualties use the same red X overlay.
+Tactical battle animation follows the same principles at the res4 hex grid scale. Movement uses interpolation between res4 hexes. Ranged fire shows directional indicators. Casualties use the same red X overlay. The same dice chips sit on top of every other playback layer from lightning through casualties, on the res4 cells.
 
 The tactical battle UI displays the res4 hex grid for the parent res1 hex with terrain coloring, road/rail overlays, sub-unit markers by type, and an exit control that triggers voluntary-exit mapping (§12.8).
 

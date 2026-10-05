@@ -3,6 +3,7 @@ import type {
   TacticalBattleSnapshot,
 } from '../../shared/tacticalBattleTypes';
 import type { AirStrikeAnimationMove, AirStrikeOrder, EmbarkOrder, FerryOrder } from '../../shared/ipcTypes';
+import type { CombatDiceRoll } from '../../shared/ipc/combatDiceTypes';
 import type { KillEdge } from '../../shared/ipc/combatResultTypes';
 import type { TacticalOpponentPlanPayload } from '../../shared/ipc/consultationPushTypes';
 import type { InfrastructureDestroyedEvent, RemovedUnitSnapshot } from '../../shared/ipc/readyTypes';
@@ -405,6 +406,7 @@ export function validateHumanTacticalMarchOrders(
  * Purpose: Matches `executeReadyStrategicTurn` combat ordering without production: no human embark before air (strategic has none there); optional `embarkOrders` apply after movement like sealift committed after positions settle; fixes prior drift where melee updated IPC but not the active snapshot.
  * When to use: `commitHumanTacticalDraftOrders` after target validations and after computing applied march legs.
  * Expected outcome: One `commitActiveTacticalBattle` with post-melee rows; air/ranged/melee share one `createCombatRng` stream rooted like melee-only `applyTacticalMeleeAfterSupportOrders`.
+ *   Success carries each phase's recorded dice (`airStrikeDiceRolls`, `rangedDiceRolls`, `meleePack.meleeDiceRolls`) for playback.
  * Exceptions: Returns `success: false` when no session, march validation fails, or projection throws.
  */
 export function applyHumanTacticalDraftBeatInStrategicOrder(args: {
@@ -432,6 +434,8 @@ export function applyHumanTacticalDraftBeatInStrategicOrder(args: {
       airStrikePlaybackStrikeHexes: string[];
       airStrikePlaybackCasualtyHexes: string[];
       rangedResolutionShotLines: RangedResolutionShotLine[];
+      airStrikeDiceRolls: CombatDiceRoll[];
+      rangedDiceRolls: CombatDiceRoll[];
       meleePack: ReturnType<typeof applyTacticalMeleeAfterSupportOrders>;
     }
   | { success: false; reason: string } {
@@ -528,6 +532,8 @@ export function applyHumanTacticalDraftBeatInStrategicOrder(args: {
       airStrikePlaybackStrikeHexes: acc.airStrikePlaybackStrikeHexes,
       airStrikePlaybackCasualtyHexes: acc.airStrikePlaybackCasualtyHexes,
       rangedResolutionShotLines: acc.rangedResolutionShotLines,
+      airStrikeDiceRolls: acc.airStrikeDiceRolls,
+      rangedDiceRolls: acc.rangedDiceRolls,
       meleePack: {
         ...meleePack,
         battle: battleAdvancedTurn,

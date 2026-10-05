@@ -9,6 +9,7 @@ import { withOriginHitBonus } from '../originBonus/originHitBonusLookup';
 import { withTechHitBonus } from '../techBonus/techHitBonusLookup';
 import { buildTechHitBonusLookupFromDb } from '../techBonus/techHitBonusLookupDb';
 import { buildTacticalOriginHitBonusLookupFromDb } from '../originBonus/originHitBonusLookupDb';
+import type { CombatDiceRoll } from '../../shared/ipc/combatDiceTypes';
 import type { KillEdge } from '../../shared/ipc/combatResultTypes';
 import type { RemovedUnitSnapshot } from '../../shared/ipc/readyTypes';
 import type { TacticalBattleSnapshot, TacticalSubUnitSnapshot } from '../../shared/tacticalBattleTypes';
@@ -62,6 +63,7 @@ function tacticalSubUnitsAsCombatUnits(subUnits: readonly TacticalSubUnitSnapsho
  * When to use: End of `applyHumanTacticalDraftBeatInStrategicOrder` / `commitHumanTacticalDraftOrders` after air+ranged, march, optional human embark, ferry, and cargo sync.
  * Expected outcome: Updated `battle.subUnits` with melee casualties removed; empty melee arrays when no contested res4 hexes.
  *   Each melee roll adds the roller's origin bonus at its cell, read from the persisted match flags and this `battle`.
+ *   `meleeDiceRolls` lists every melee die in roll order, anchored on the contested cell, for playback.
  * Exceptions: None; delegates RNG to `createCombatRng` and melee logic to `runMeleePhase` when `combatNext` is omitted.
  */
 export function applyTacticalMeleeAfterSupportOrders(
@@ -73,6 +75,7 @@ export function applyTacticalMeleeAfterSupportOrders(
   meleeRemovedUnits: RemovedUnitSnapshot[];
   meleeCombatHexes: string[];
   meleeCasualtyHexes: string[];
+  meleeDiceRolls: CombatDiceRoll[];
 } {
   tacticalLogQuery('applyTacticalMeleeAfterSupportOrders', {
     battleId: battle.battleId,
@@ -96,10 +99,12 @@ export function applyTacticalMeleeAfterSupportOrders(
         0
     );
   const meleeResult = runMeleePhase(combatUnits, battle.res4ChildH3Indexes, next);
+  const meleeDiceRolls = meleeResult.diceRolls ?? [];
   if (meleeResult.removedUnitIds.length === 0) {
     tacticalLogMutate('applyTacticalMeleeAfterSupportOrders no casualties', {
       battleId: battle.battleId,
       combatHexCount: meleeResult.combatHexes.length,
+      diceRollCount: meleeDiceRolls.length,
     });
     return {
       battle,
@@ -107,6 +112,7 @@ export function applyTacticalMeleeAfterSupportOrders(
       meleeRemovedUnits: [],
       meleeCombatHexes: meleeResult.combatHexes,
       meleeCasualtyHexes: meleeResult.casualtyHexes,
+      meleeDiceRolls,
     };
   }
   const removedSet = new Set(meleeResult.removedUnitIds);
@@ -130,6 +136,7 @@ export function applyTacticalMeleeAfterSupportOrders(
     battleId: battle.battleId,
     removedCount: meleeRemovedUnits.length,
     combatHexCount: meleeResult.combatHexes.length,
+    diceRollCount: meleeDiceRolls.length,
   });
   return {
     battle: { ...battle, subUnits },
@@ -137,5 +144,6 @@ export function applyTacticalMeleeAfterSupportOrders(
     meleeRemovedUnits,
     meleeCombatHexes: meleeResult.combatHexes,
     meleeCasualtyHexes: meleeResult.casualtyHexes,
+    meleeDiceRolls,
   };
 }

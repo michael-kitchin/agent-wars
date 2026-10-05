@@ -45,6 +45,7 @@ When you change one of these, update `combat-rules-v3.md` (and any table that qu
 | Strategic and tactical H3 resolutions | `STRATEGIC_H3_RESOLUTION` and `TACTICAL_H3_RESOLUTION` in `src/shared/h3Resolutions.ts` |
 | Sub-unit multiplication | `tacticalSubUnitCountForStrategicUnitType` in `src/main/tacticalBattle/computeTacticalBattleSnapshot.ts` |
 | Resolution phase order | `executeReadyStrategicTurn`, `buildResolutionOrderRule` |
+| Dice chip line and face limits (quoted in [ux/resolution-playback.md](ux/resolution-playback.md), not in the combat rules) | `COMBAT_DICE_CHIP_MAX_LINES` and `COMBAT_DICE_ROW_MAX_FACES` in `src/shared/combatDiceChips.ts` |
 
 Prompt-generating code is catalogued in [ai-commander-prompts/](ai-commander-prompts/README.md). That package describes today's emitted prompts and answers to the same engine symbols; it does not invent stats. How the consult is scheduled and which tools exist: [hybrid-ai.md](hybrid-ai.md) and [ai-tools.md](ai-tools.md).
 

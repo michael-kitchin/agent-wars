@@ -55,6 +55,8 @@ When this guide and the running app disagree, the app wins until this file is up
 | Air-strike perimeter | `#7a3db5` | Distinct from ground ranged |
 | Combat lightning | `#f0d000` | Resolution overlay |
 | Casualty X | `#c03030` | Removal overlay |
+| Dice chip bg / border | `#1b2838` at 92% / `#5a7090` | Resolution dice chips, with the chrome text and muted colors for text and tags. Mini-token outlines are `#7dcec8` (human) and `#f0b4c8` (opponent). See `src/renderer/rendering/combatDiceChipDrawing.ts` |
+| Dice hit / miss | `#86efac` / `#8aa0b8` | Die faces on resolution dice chips |
 | Mixed stack fill / stroke | `#b0b0b0` / `#222222` | Multi-player hex |
 
 **Suggested palette reference if a dark theme is added later:**
@@ -183,7 +185,7 @@ When this guide and the running app disagree, the app wins until this file is up
 
 ### 3.6 Scenarios, Save/Load, and Onboarding
 
-- **New game (live):** Overlay with human/AI home-region selectors, Game size dropdown and cap badges that draw the map glyphs dark on gray disks, one options row of Country bonus, Terrain bonus, Weather bonus, and Tech bonus dropdowns (Off, Low, High, default Low), a following row with Fog of war to the left of a Starting month dropdown and a square randomize button matching the human home-region button, and New game. The live scenario id is `region_vs_region`.
+- **New game (live):** Overlay with human/AI home-region selectors, Game size dropdown and cap badges that draw the map glyphs dark on gray disks, one options row of Country bonus, Tech bonus, Terrain bonus, and Weather bonus dropdowns (Off, Low, High, default Low) whose labels end in colons, separated by slashes, a following row with Fog of war, a slash separator, and a "Starting month:" dropdown and a square randomize button matching the human home-region button, and New game. The live scenario id is `region_vs_region`.
 - **Save/Load:** **Not shipped.** Target: named saves, overwrite confirmation, auto-save visibility.
 - **End-game summary:** Live overlay reports winner and offers New game; territory-over-time charts are still target.
 - **Tutorial/onboarding:** Not shipped.

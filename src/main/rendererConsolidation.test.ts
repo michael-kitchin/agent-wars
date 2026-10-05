@@ -281,6 +281,10 @@ function testProductionLabelContractsForExploredVsUnexploredHexes(): void {
     'syncBuildEntryButton should suppress build UI and close build popup on res4 zoom'
   );
   assert.ok(
+    syncBuildEntryFn.includes('if (areResolutionDiceChipsShowing(S.resolutionMoveAnimation)) {'),
+    'syncBuildEntryButton should hide build markers while resolution dice chips are showing'
+  );
+  assert.ok(
     syncBuildEntryFn.includes('if (!explored) continue;'),
     'syncBuildEntryButton should only render clickable buttons for explored hexes'
   );
@@ -780,6 +784,10 @@ function testTacticalEntryLayerPlanningAndContestedContracts(): void {
   assert.ok(
     /if\s*\(\s*S\.gameState\.phase\s*!==\s*'planning'\s*\|\|\s*S\.tacticalBattleSnapshot\s*\)/.test(source),
     'syncTacticalEntryButton should gate overlays on planning phase OR renderer tactical snapshot in one condition'
+  );
+  assert.ok(
+    source.includes('if (areResolutionDiceChipsShowing(S.resolutionMoveAnimation)) {'),
+    'syncTacticalEntryButton should hide magnifiers while resolution dice chips are showing'
   );
   assert.ok(
     source.includes('if (!isContestedRes1Hex(S.gameState, hx.h3Index)) continue;'),

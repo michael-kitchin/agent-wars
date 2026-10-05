@@ -1,6 +1,7 @@
 import type { AirStrikeAnimationMove } from './ordersTypes';
 import type { RangedResolutionShotLine } from '../rangedResolutionShotLines';
 import type { KillEdge } from './combatResultTypes';
+import type { CombatDicePlaybackFields } from './combatDiceTypes';
 import type { InfrastructureDestroyedEvent, RemovedUnitSnapshot } from './readyTypes';
 
 /**
@@ -25,9 +26,10 @@ export type TacticalPlaybackMarchMove = {
  * Purpose: Bridges tactical snapshot-only commits with `S.resolutionMoveAnimation` without duplicating combat simulation in the renderer.
  * When to use: Main-process `commitHumanTacticalDraftOrders` success path after movement and support projection complete.
  * Expected outcome: `humanMoves` lists sub-unit position deltas; ranged fields mirror strategic `ReadyResult` subsets when support orders remove units.
+ *   Per-phase dice rolls come from `CombatDicePlaybackFields`, anchored on res4 cells.
  * Exceptions: None; empty `humanMoves` is valid when only non-move effects occur.
  */
-export type TacticalCommitResolutionPlayback = {
+export type TacticalCommitResolutionPlayback = CombatDicePlaybackFields & {
   humanMoves: TacticalPlaybackMarchMove[];
   /**
    * Opponent sub-unit march deltas applied on the same Ready beat after human marches (strategic `allOrders` orders human rows before AI).

@@ -21,7 +21,8 @@ import { gridDisk } from 'h3-js';
  *
  * Purpose: Replaces strategic `getValidDestinations` (res1 land-mass / naval disk) when Best Options runs on a tactical planState.
  * When to use: `collectAggregatedPossibleActionRows` when `tacticalBattle` is set for non-air opponent sub-units.
- * Expected outcome: Hexes reachable this beat under MP budgets, excluding the mover’s current cell; empty for air, embarked cargo, unknown ids, or zero budget.
+ * Expected outcome: Hexes reachable this beat under MP budgets and the battle's weather enter costs, excluding the mover’s
+ * current cell; empty for air, embarked cargo, unknown ids, or zero budget.
  * Exceptions: Never throws.
  */
 export function collectTacticalLegalMoveDestinationRes4Hexes(
@@ -66,6 +67,9 @@ export function collectTacticalLegalMoveDestinationRes4Hexes(
       movementPointBudget: budget,
       terrain,
       footprintNeighbors,
+      weatherEnabled: battle.weatherBonusEnabled === true,
+      weather: battle.weather,
+      weatherTags: u.weatherTags,
     });
   }
   return collectSimpleEnterCostReachableWithinBudget({
