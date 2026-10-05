@@ -8,6 +8,7 @@
  */
 
 import { escapeHtmlText } from './htmlTextFormatting';
+import { formatRubbleSwatchHtml } from './terrainSwatchHtml';
 import { techLevelFromUrbanHexCount } from './techBonusRules';
 import type { TechLevel } from './techBonusTypes';
 
@@ -74,14 +75,15 @@ export function formatTransportIconsHtml(input: {
 /**
  * Returns one feature label, with an icon when the word is Road or Rail.
  *
- * Purpose: A cell's feature list mixes transport with airports, seaports, and rubble.
+ * Purpose: Road and Rail keep their icons. An exact Rubble label keeps the hatched chip. Airport and Seaport stay plain.
  * When to use: Each comma-separated feature token.
- * Expected outcome: An icon before Road and Rail. Other words are escaped text.
+ * Expected outcome: An icon before Road and Rail. The rubble swatch span before an exact `Rubble` label. The hatch is applied when the tooltip opens. Other words are escaped text.
  * Exceptions: None.
  */
 export function formatFeatureLabelHtml(label: string): string {
   if (label === 'Road') return formatFeatureIconHtml('transport/road.svg', 'Road');
   if (label === 'Rail') return formatFeatureIconHtml('transport/rail.svg', 'Rail');
+  if (label === 'Rubble') return `${formatRubbleSwatchHtml()}${escapeHtmlText('Rubble')}`;
   return escapeHtmlText(label);
 }
 

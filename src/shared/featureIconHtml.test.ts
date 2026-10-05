@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { formatProducedUnitTechLineHtml, formatSelectedHexTechLineHtml } from './featureIconHtml';
+import { formatFeatureLabelHtml, formatProducedUnitTechLineHtml, formatSelectedHexTechLineHtml } from './featureIconHtml';
 
 /**
  * Checks when a hex's Tech line is present and which tier it names.
@@ -68,4 +68,23 @@ test('selected hexes list each producing tier once, Basic then Advanced', () => 
   assert.ok(both != null && both.indexOf('tech/tech_basic.svg') < both.indexOf('tech/tech_advanced.svg'));
   assert.equal(both?.match(/tech\/tech_basic\.svg/g)?.length, 1);
   assert.equal(both?.match(/tech\/tech_advanced\.svg/g)?.length, 1);
+});
+
+/**
+ * Checks which feature words lead with a chip or an icon.
+ *
+ * Purpose: A cell feature list mixes Rubble with airports and transport.
+ * When to use: From this file's runner.
+ * Expected outcome: Rubble leads with the rubble swatch. Airport stays plain. Road keeps its icon.
+ * Exceptions: AssertionError when the markup drifts.
+ */
+test('Rubble leads with a swatch, and Airport and Road keep their own marks', () => {
+  const rubble = formatFeatureLabelHtml('Rubble');
+  assert.equal(
+    rubble.startsWith('<span class="terrain-swatch" data-terrain-kind="rubble" aria-hidden="true"></span>'),
+    true
+  );
+  assert.equal(rubble.endsWith('Rubble'), true);
+  assert.equal(formatFeatureLabelHtml('Airport'), 'Airport');
+  assert.equal(formatFeatureLabelHtml('Road').includes('transport/road.svg'), true);
 });

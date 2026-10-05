@@ -17,7 +17,7 @@ export const TERRAIN_SWATCH_CLASS_NAME = 'terrain-swatch';
  *
  * Purpose: Tooltip copy title-cases the kind, and the swatch has to recognize that word in a longer phrase.
  * When to use: `formatTerrainNameListHtml`.
- * Expected outcome: One entry per pipeline kind. Urban, rubble, and Other are absent.
+ * Expected outcome: One entry per pipeline kind. Urban and Rubble are chipped as overlay words. Other is absent.
  * Exceptions: None.
  */
 const DISPLAY_LABEL_TO_KIND: Readonly<Record<string, PipelineTerrainKind>> = Object.freeze({
@@ -70,6 +70,33 @@ export function formatUrbanSwatchHtml(): string {
 }
 
 /**
+ * Returns the empty Rubble chip.
+ *
+ * Purpose: Rubble is a map overlay, not one of the eight terrain kinds, so it is not a pipeline kind.
+ * When to use: Before the word Rubble in a tooltip.
+ * Expected outcome: A span whose `data-terrain-kind` is `rubble`. The fill and hatch are applied when the tooltip opens.
+ * Exceptions: None.
+ */
+export function formatRubbleSwatchHtml(): string {
+  return `<span class="${TERRAIN_SWATCH_CLASS_NAME}" data-terrain-kind="rubble" aria-hidden="true"></span>`;
+}
+
+/**
+ * Returns the crosshatch painted over the Rubble chip.
+ *
+ * Purpose: Rubble and Urban share one opaque fill. The hatch is what tells the two chips apart at flag size.
+ * When to use: When assigning a Rubble swatch background. Do not use this for hex fills.
+ * Expected outcome: Two diagonal repeating gradients in the map hatch's dark red, opaque enough to read on an 18 by 12 chip.
+ * Exceptions: None.
+ */
+export function rubbleSwatchBackgroundImage(): string {
+  const line = 'rgba(110, 22, 18, 0.95)';
+  const slash = `repeating-linear-gradient(45deg, transparent 0 2px, ${line} 2px 3px)`;
+  const backslash = `repeating-linear-gradient(-45deg, transparent 0 2px, ${line} 2px 3px)`;
+  return `${slash}, ${backslash}`;
+}
+
+/**
  * Returns a terrain name, with a swatch when the kind is one the map key draws.
  *
  * Purpose: Unit tooltips and single-kind hex lines share one markup rule.
@@ -88,8 +115,8 @@ export function formatTerrainKindHtml(kind: string | null | undefined): string {
  * Puts a swatch before each map-key terrain name in a comma-separated phrase.
  *
  * Purpose: A world hex can name several kinds, and a slower notice can name several reasons.
- * When to use: For `Plains (60%), Forest (40%)` and `Forest, Urban`.
- * Expected outcome: A swatch before Water, Coastal, Wetlands, Plains, Forest, Mountain, Desert, and Arctic. Other words stay text.
+ * When to use: For `Plains (60%), Forest (40%)` and `Forest, Urban, Rubble`.
+ * Expected outcome: A swatch before Water, Coastal, Wetlands, Plains, Forest, Mountain, Desert, Arctic, Urban, and Rubble. Other words stay text.
  * Exceptions: None.
  */
 export function formatTerrainNameListHtml(text: string): string {
@@ -101,7 +128,7 @@ export function formatTerrainNameListHtml(text: string): string {
  *
  * Purpose: Percentages and extra words stay attached to the name they follow.
  * When to use: From `formatTerrainNameListHtml`.
- * Expected outcome: `Forest (12%)` gains a forest swatch. `Other (12%)` and `a<b` stay escaped text.
+ * Expected outcome: `Forest (12%)` gains a forest swatch. `Rubble (2)` gains a rubble swatch and keeps the suffix. `Other (12%)` and `a<b` stay escaped text.
  * Exceptions: None.
  */
 function formatTerrainNameTokenHtml(token: string): string {
@@ -109,6 +136,9 @@ function formatTerrainNameTokenHtml(token: string): string {
   const word = match?.[1] ?? '';
   if (match && word === 'Urban') {
     return `${formatUrbanSwatchHtml()}${escapeHtmlText(word)}${escapeHtmlText(match[2] ?? '')}`;
+  }
+  if (match && word === 'Rubble') {
+    return `${formatRubbleSwatchHtml()}${escapeHtmlText(word)}${escapeHtmlText(match[2] ?? '')}`;
   }
   const kind = DISPLAY_LABEL_TO_KIND[word];
   if (!match || !kind) return escapeHtmlText(token);

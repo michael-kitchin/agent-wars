@@ -159,11 +159,11 @@ function testRightClickClearsSelectionWithoutIconException(): void {
 }
 
 /**
- * Checks that a stack icon opens the callout, and a lone human unit is still selected on click.
+ * Checks that a stack, an enemy token, and an embarked single human still reach the callout schedule.
  *
- * Purpose: A click on a unit icon still opens the list and selects a lone human unit. Hover shows the Bonuses tooltip instead.
+ * Purpose: Those clicks still open the list. The embarked single human still goes through `unitId: loneHumanUnit.id` before that schedule. Hover shows the Bonuses tooltip instead of the list.
  * When to use: Regression signal when refactoring the main-map click listener.
- * Expected outcome: Selection runs before the stack callout is scheduled, and `hideStackCallout` stays after that schedule so it cannot cancel the popup just queued.
+ * Expected outcome: `unitId: loneHumanUnit.id` stays before `scheduleDeferredStackCallout`, and the later `hideStackCallout` is the miss-icon path.
  * Exceptions: AssertionError when the wiring drifts.
  */
 function testLoneHumanUnitIconOpensCalloutAndSelects(): void {
@@ -175,12 +175,12 @@ function testLoneHumanUnitIconOpensCalloutAndSelects(): void {
   assert.equal(clickListener.includes('isLoneAi'), false, 'a stack icon should open the callout whether or not an enemy is in it');
   assert.ok(clickListener.includes('unitsAtHit.length >= 1 && unitIconHit'), 'a stationary unit icon still enters the click path');
   assert.ok(clickListener.includes('unitsAtHit.length >= 1'), 'a unit icon schedules the callout from a click');
-  const policyAt = clickListener.indexOf('applyHumanUnitIconClickSelectionPolicy(');
+  const policyAt = clickListener.indexOf('unitId: loneHumanUnit.id');
   const scheduleAt = clickListener.indexOf('scheduleDeferredStackCallout(');
-  const hideAt = clickListener.indexOf('deps.hideStackCallout()');
+  const hideAt = clickListener.indexOf('deps.hideStackCallout()', scheduleAt);
   assert.ok(
     policyAt >= 0 && scheduleAt > policyAt && hideAt > scheduleAt,
-    'lone-human selection is scheduled before the callout, and hideStackCallout cannot cancel that callout'
+    'embarked lone-human selection policy stays before the callout schedule, and the later hideStackCallout is the miss-icon path'
   );
   assert.ok(clickListener.includes('unitId: loneHumanUnit.id'), 'the selected id is the stationary token, not whichever unit getUnitAtHex finds first');
   const moveStart = interactions.indexOf("addEventListener('pointermove'");
@@ -188,6 +188,69 @@ function testLoneHumanUnitIconOpensCalloutAndSelects(): void {
   const moveListener = interactions.slice(moveStart, moveEnd);
   assert.ok(moveListener.includes('pointerOnToken:'), 'a one-unit token shows its tooltip from the pointer dwell');
   assert.equal(moveListener.includes('showCallout'), false, 'the pointer dwell does not open the unit list');
+}
+
+/**
+ * Checks that Shift-click on one selectable human unit toggles it and does not schedule the callout.
+ *
+ * Purpose: A one-unit hex does not need the stack list. Stacks, enemy icons, and embarked-only icons still open it.
+ * When to use: Regression signal when refactoring the main-map click listener.
+ * Expected outcome: The Shift branch uses the embarked predicate and `shiftKey: true`. Its hide is guarded so a double-click's second press and a hover preview leave an existing callout alone. Other icon hits still schedule the callout.
+ * Exceptions: AssertionError when the wiring drifts.
+ */
+function testShiftClickOnOneSelectableUnitTogglesWithoutCallout(): void {
+  const interactions = readRendererSource('map', 'mainMapInteractions.ts');
+  const clickStart = interactions.indexOf("addEventListener('click'");
+  const clickEnd = interactions.indexOf("addEventListener('dblclick'");
+  assert.ok(clickStart >= 0 && clickEnd > clickStart, 'click listener precedes the double-click listener');
+  const clickListener = interactions.slice(clickStart, clickEnd);
+  const soleAt = clickListener.indexOf('soleSelectableHumanUnitId(');
+  const embarkedAt = clickListener.indexOf('isEmbarkedLandUnitBlockedForSelection');
+  const shiftPolicyAt = clickListener.indexOf('shiftKey: true');
+  const plainAt = clickListener.indexOf('shiftKey: false');
+  const scheduleAt = clickListener.indexOf('scheduleDeferredStackCallout(');
+  assert.ok(soleAt >= 0 && embarkedAt > soleAt && shiftPolicyAt > soleAt, 'Shift-click resolves the sole selectable unit before toggling it');
+  assert.ok(plainAt > shiftPolicyAt && scheduleAt > plainAt, 'the plain-click branch follows Shift and still precedes the callout schedule');
+  const shiftBranch = clickListener.slice(soleAt, plainAt);
+  assert.ok(
+    shiftBranch.includes('!suppressIconRetargetOnNextClick && !isHoverOrderPlanningActive()'),
+    'hideStackCallout in the Shift branch is guarded by the double-click and hover checks'
+  );
+  assert.ok(shiftBranch.includes('deps.hideStackCallout()'), 'a new Shift gesture closes a stale callout');
+}
+
+/**
+ * Checks that a plain click on one stationary selectable human unit does not schedule the callout.
+ *
+ * Purpose: That click sole-selects through the existing policy. Stacks, enemy tokens, and embarked-only tokens still open the list.
+ * When to use: Regression signal when refactoring the main-map click listener.
+ * Expected outcome: The plain-click branch uses `shiftKey: false` and `unitsAtHit.length === 1`, and it returns before the embarked single-human path.
+ * Exceptions: AssertionError when the wiring drifts.
+ */
+function testPlainClickOnOneSelectableUnitSelectsWithoutCallout(): void {
+  const interactions = readRendererSource('map', 'mainMapInteractions.ts');
+  const clickStart = interactions.indexOf("addEventListener('click'");
+  const clickEnd = interactions.indexOf("addEventListener('dblclick'");
+  assert.ok(clickStart >= 0 && clickEnd > clickStart, 'click listener precedes the double-click listener');
+  const clickListener = interactions.slice(clickStart, clickEnd);
+  const conditionAt = clickListener.indexOf('!e.shiftKey && unitsAtHit.length === 1 && soleSelectableUnitId');
+  const plainAt = clickListener.indexOf('shiftKey: false');
+  const scheduleAt = clickListener.indexOf('scheduleDeferredStackCallout(');
+  assert.ok(
+    conditionAt >= 0 && plainAt > conditionAt && scheduleAt > plainAt,
+    'plain click on one selectable unit is wired before the callout schedule'
+  );
+  const plainBranch = clickListener.slice(conditionAt, scheduleAt);
+  const returnAt = plainBranch.indexOf('return;');
+  const embarkedAt = plainBranch.indexOf('if (loneHumanUnit)');
+  assert.ok(returnAt >= 0 && embarkedAt > returnAt, 'the plain-click path returns before the embarked unit and the callout schedule');
+  assert.ok(plainBranch.includes('unitsAtHit.length === 1'), 'the plain-click return is only the single stationary unit');
+  assert.ok(plainBranch.includes('soleSelectableUnitId'), 'the plain-click return uses the selectable-human id');
+  assert.ok(
+    plainBranch.includes('!suppressIconRetargetOnNextClick && !isHoverOrderPlanningActive()'),
+    'hideStackCallout on the plain-click path is guarded by the double-click and hover checks'
+  );
+  assert.ok(plainBranch.includes('deps.hideStackCallout()'), 'a new plain click closes a stale callout');
 }
 
 /**
@@ -237,6 +300,8 @@ function run(): void {
   testStackCalloutOpensOnCancellableTimer();
   testDoubleClickPlanningUsesSharedDecisionTable();
   testLoneHumanUnitIconOpensCalloutAndSelects();
+  testShiftClickOnOneSelectableUnitTogglesWithoutCallout();
+  testPlainClickOnOneSelectableUnitSelectsWithoutCallout();
   testTargetingDoubleClickPlacesTheAttack();
   testPlaybackIgnoresBuildMarkersAndTemplateEdits();
   testRightClickClearsSelectionWithoutIconException();

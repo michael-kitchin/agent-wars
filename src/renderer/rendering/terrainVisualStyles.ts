@@ -4,8 +4,10 @@
 
 import type { PipelineTerrainKind } from '../../shared/pipelineTerrain';
 import { PIPELINE_TERRAIN_KINDS } from '../../shared/pipelineTerrain';
+import { formatTerrainKindLabel } from '../../shared/terrainKindLabel';
 import { TERRAIN_SWATCH_CLASS_NAME } from '../../shared/terrainSwatchHtml';
 import { appendUrbanLegendRow, urbanSwatchColor } from './terrainLegendUrban';
+import { appendRubbleLegendRow, applyRubbleSwatchPaint } from './terrainLegendRubble';
 
 /**
  * Documents the module-scope binding `patternCache` (patternCache).
@@ -611,14 +613,22 @@ export function setActiveTerrainStyle(id: TerrainVisualStyleId): void {
  * Purpose: Tooltip markup names the kind. The fill is read when the tooltip is shown, so a style change
  *   applies the next time that tooltip opens.
  * When to use: Immediately after assigning tooltip HTML that may contain `.terrain-swatch` spans.
- * Expected outcome: Each span's background is the opaque swatch color for that kind under the active style. An open tooltip is left as it was.
+ * Expected outcome: Each span's background is the opaque swatch color for that kind under the active style. A rubble span also receives the crosshatch. An open tooltip is left as it was.
  * Exceptions: None.
  */
 export function paintTerrainSwatches(root: ParentNode): void {
   root.querySelectorAll<HTMLElement>(`span.${TERRAIN_SWATCH_CLASS_NAME}`).forEach((node) => {
     const kind = node.dataset.terrainKind;
     if (!kind) return;
-    node.style.background = kind === 'urban' ? urbanSwatchColor(activeTerrainStyleId) : terrainSwatchColor(kind);
+    if (kind === 'urban') {
+      node.style.background = urbanSwatchColor(activeTerrainStyleId);
+      return;
+    }
+    if (kind === 'rubble') {
+      applyRubbleSwatchPaint(node, activeTerrainStyleId);
+      return;
+    }
+    node.style.background = terrainSwatchColor(kind);
   });
 }
 
@@ -813,7 +823,7 @@ export const TERRAIN_LEGEND_ORDER: PipelineTerrainKind[] = [...PIPELINE_TERRAIN_
  *
  * Purpose: The legend is the map key. Row text and the picker are styled by `#terrain-legend` in the page stylesheet, so this function does not set those colors.
  * When to use: On startup, and again after the player changes the terrain style.
- * Expected outcome: The container shows a title, a style select, and one swatch row per kind. Swatches use the opaque key color for the active style. Pass `#terrain-legend`; another container inherits its own text color and an unstyled select.
+ * Expected outcome: The container shows a left-aligned style select, then one capitalized swatch row per kind, then Urban, then Rubble. There is no title. Swatches use the opaque key color for the active style. Pass `#terrain-legend`; another container inherits its own text color and an unstyled select.
  * Exceptions: None.
  */
 export function renderTerrainLegend(
@@ -824,16 +834,6 @@ export function renderTerrainLegend(
   container.style.fontSize = '11px';
   container.style.lineHeight = '1.3';
   container.style.pointerEvents = 'auto';
-  const header = document.createElement('div');
-  header.style.display = 'flex';
-  header.style.alignItems = 'center';
-  header.style.justifyContent = 'space-between';
-  header.style.gap = '8px';
-  header.style.marginBottom = '4px';
-  const title = document.createElement('div');
-  title.textContent = 'Terrain';
-  title.style.fontWeight = '600';
-  header.appendChild(title);
   const styleSelect = document.createElement('select');
   styleSelect.setAttribute('aria-label', 'Terrain style');
   const opts = getTerrainStyleOptions();
@@ -849,8 +849,7 @@ export function renderTerrainLegend(
     if (options?.onStyleChanged) options.onStyleChanged(getActiveTerrainStyleId());
     renderTerrainLegend(container, options);
   });
-  header.appendChild(styleSelect);
-  container.appendChild(header);
+  container.appendChild(styleSelect);
 
   for (const kind of TERRAIN_LEGEND_ORDER) {
     const row = document.createElement('div');
@@ -869,9 +868,10 @@ export function renderTerrainLegend(
     row.appendChild(sw);
 
     const lab = document.createElement('span');
-    lab.textContent = kind;
+    lab.textContent = formatTerrainKindLabel(kind);
     row.appendChild(lab);
     container.appendChild(row);
   }
   appendUrbanLegendRow(container, urbanSwatchColor(getActiveTerrainStyleId()));
+  appendRubbleLegendRow(container, getActiveTerrainStyleId());
 }

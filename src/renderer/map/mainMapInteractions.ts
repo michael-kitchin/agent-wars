@@ -4,7 +4,7 @@ import { HEX_DETAILS_TOOLTIP_DELAY_MS, HEX_DETAILS_TOOLTIP_REST_PX } from '../co
 import { isHoverOrderPlanningActive } from '../rendering/canvasPreviewPolicy';
 import { hitTestHexAtContainerPixel, hitTestTacticalRes4HexAtContainerPixel } from './mapHelpers';
 import { rendererSharedState as S } from '../core/state';
-import { clearMapSelectionChrome } from '../core/selection';
+import { clearMapSelectionChrome, isEmbarkedLandUnitBlockedForSelection } from '../core/selection';
 import { getMainLeafletMap } from './worldLeafletMap';
 import { tacticalRendererHitInsideBattleFootprint } from '../tactical/tacticalUiGuards';
 import { buildTacticalPendingMarchRowFromDraft } from '../tactical/tacticalPendingMarchPath';
@@ -21,6 +21,7 @@ import {
 } from '../../shared/mapOrderGestureGate';
 import { resolveMapGesturePress } from '../../shared/mapPlanningGesture';
 import { selectionUnitIdSetsDiffer } from '../../shared/selectionUnitIdSets';
+import { soleSelectableHumanUnitId } from '../../shared/soleSelectableHumanUnit';
 import {
   handleMainMapDoubleClick,
   type DoubleClickSelectedUnit,
@@ -808,6 +809,44 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
       redraw: deps.redraw,
     };
     if (hit && unitsAtHit.length >= 1 && unitIconHit) {
+      const soleSelectableUnitId = soleSelectableHumanUnitId(
+        unitsAtHit,
+        isEmbarkedLandUnitBlockedForSelection
+      );
+      // The toggled unit is the one selectable human on the hex, including when the pointer is on another icon there.
+      // The second press of a double-click, and a click during hover planning, leave an open callout in place.
+      if (e.shiftKey && soleSelectableUnitId) {
+        applyHumanUnitIconClickSelectionPolicy({
+          shiftKey: true,
+          unitId: soleSelectableUnitId,
+          suppressSelectionRetarget: suppressIconRetargetOnNextClick,
+          deps: humanUnitIconSelectionDeps,
+        });
+        if (!suppressIconRetargetOnNextClick && !isHoverOrderPlanningActive()) {
+          deps.hideStackCallout();
+        }
+        deps.updateSidebar();
+        deps.updateRangedSidebar();
+        deps.redraw();
+        return;
+      }
+      // One stationary selectable human sole-selects and starts the hover route preview. The list stays closed.
+      // The second press of a double-click, and a click during hover planning, leave an open callout in place.
+      if (!e.shiftKey && unitsAtHit.length === 1 && soleSelectableUnitId) {
+        applyHumanUnitIconClickSelectionPolicy({
+          shiftKey: false,
+          unitId: soleSelectableUnitId,
+          suppressSelectionRetarget: suppressIconRetargetOnNextClick,
+          deps: humanUnitIconSelectionDeps,
+        });
+        if (!suppressIconRetargetOnNextClick && !isHoverOrderPlanningActive()) {
+          deps.hideStackCallout();
+        }
+        deps.updateSidebar();
+        deps.updateRangedSidebar();
+        deps.redraw();
+        return;
+      }
       if (loneHumanUnit) {
         applyHumanUnitIconClickSelectionPolicy({
           shiftKey: e.shiftKey,

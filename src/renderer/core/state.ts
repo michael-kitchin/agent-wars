@@ -392,7 +392,7 @@ res1TerrainSummaryByH3: new Map<string, string>(),
    */
 res1FeaturesSummaryByH3: new Map<string, string | null>(),
     /**
-   * Documents the object literal property `res1FeatureCountsByH3` (res1FeatureCountsByH3: new Map< string, { airportCount: number; seaportCount: number; rubbleCount: number } >()).
+   * Documents the object literal property `res1FeatureCountsByH3` (res1FeatureCountsByH3: new Map< string, { airportCount: number; seaportCount: number } >()).
 
    * Purpose: Supports maintainability by documenting why `res1FeatureCountsByH3` exists.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
@@ -401,7 +401,7 @@ res1FeaturesSummaryByH3: new Map<string, string | null>(),
    */
 res1FeatureCountsByH3: new Map<
     string,
-    { airportCount: number; seaportCount: number; rubbleCount: number }
+    { airportCount: number; seaportCount: number }
   >(),
 
     /**

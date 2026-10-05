@@ -121,11 +121,11 @@ export type HumanUnitIconSelectionSideEffects = {
 };
 
 /**
- * Applies human unit icon click selection rules for non-shift clicks (debounced single-select + second-click flush).
+ * Applies human unit icon click selection for one human unit id.
  *
- * Purpose: Extracted from `mainMapInteractions` to keep tactical/strategic selection drift-proof.
- * When to use: After confirming `unit.player === 'human'` and icon pixel hit-test success.
- * Expected outcome: Shift path is handled by the caller; non-shift path schedules or flushes deferred selection.
+ * Purpose: Strategic and tactical icon clicks share one selection rule.
+ * When to use: After confirming the id is a human unit and the pointer hit its icon, including a Shift-click on the one selectable human unit in a hex.
+ * Expected outcome: Shift toggles that unit immediately and cancels a pending single-select. Embarked cargo is left unchanged. During hover planning, a toggle into the selection is skipped and a toggle out still runs. A plain click replaces the selection after a short delay, or immediately when a second click arrives before that delay ends. Hover planning skips a replace that would add a unit. The second press of a double-click changes nothing here.
  * Exceptions: None.
  */
 export function applyHumanUnitIconClickSelectionPolicy(args: {

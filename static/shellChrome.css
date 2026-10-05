@@ -86,7 +86,7 @@ body {
   top: 220px;
   left: 12px;
   z-index: 6200;
-  max-width: 200px;
+  width: max-content;
   padding: 6px 8px;
   background: var(--chrome-bg);
   color: var(--chrome-text);
@@ -97,8 +97,12 @@ body {
   pointer-events: auto;
 }
 #terrain-legend select {
+  display: block;
+  width: auto;
+  margin: 0 0 4px;
   font-size: 11px;
   padding: 1px 3px;
+  text-align: left;
 }
 #sidebar {
   width: 320px;

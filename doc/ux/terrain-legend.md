@@ -12,10 +12,9 @@ Shown with the map. It stays available in Strategic planning and Tactical planni
 
 ## Information Displayed
 
-- The title "Terrain".
-- One row per terrain kind, in this order: water, coastal, wetlands, plains, forest, mountain, desert, arctic. An Urban row follows them. Urban is an overlay, not one of those kinds. Its chip is the opaque form of that style's urban fill, flat, not hatched.
-- A Terrain style dropdown. The choices are Default, Atlas, Wargame, and Scientific.
-- Each row shows an opaque color chip for that kind under the active style. The chip is in the same family as that style's map fill and is stronger than the translucent hex paint. Coastal and wetlands use different chips. Mountain follows that style's hue. The same chip is drawn, at the size of a country flag, before each of these terrain names in the hex tooltip, the unit tooltip, and the blocked and effects order tooltips. Snow, rain, and heat in those tooltips use a weather icon, as described in [hex-tooltips.md](hex-tooltips.md). An open tooltip keeps the chips it opened with. Hex paint stays the translucent fill.
+- A terrain style dropdown, left-aligned, with no label beside it. The choices are Default, Atlas, Wargame, and Scientific. The key is only as wide as that dropdown and the rows under it.
+- One row per terrain kind, in this order: Water, Coastal, Wetlands, Plains, Forest, Mountain, Desert, Arctic. An Urban row follows them, then a Rubble row. Urban and Rubble are overlays, not one of those kinds. The Urban chip is the opaque form of that style's urban fill, flat, not hatched. The Rubble chip is that same opaque fill with a dark-red crosshatch.
+- Each row shows an opaque color chip for that kind under the active style. The chip is in the same family as that style's map fill and is stronger than the translucent hex paint. Coastal and wetlands use different chips. Mountain follows that style's hue. The same chip is drawn, at the size of a country flag, before each of these terrain names in the hex tooltip, the unit tooltip, and the blocked and effects order tooltips. The Rubble chip, hatch included, is drawn the same way before the word Rubble in a zoomed-cell or battle-cell hex tooltip, the blocked tooltip, and the effects tooltip. Snow, rain, and heat in those tooltips use a weather icon, as described in [hex-tooltips.md](hex-tooltips.md). An open tooltip keeps the chips it opened with. Hex paint stays the translucent fill.
 
 ## Inputs and Responses
 
@@ -38,7 +37,7 @@ Shown with the map. It stays available in Strategic planning and Tactical planni
 
 ## Invariants
 
-- The legend always lists the same terrain kinds, in the same order, and then Urban.
+- The legend always lists the same terrain kinds, in the same order, then Urban, then Rubble.
 - Changing style never changes the match, the selection, or queued orders.
 
 ## Strategic and Tactical Differences
@@ -64,5 +63,6 @@ None.
 - `static/index.html` (`#terrain-legend`)
 - `src/renderer/rendering/terrainVisualStyles.ts`
 - `src/renderer/rendering/terrainLegendUrban.ts`
+- `src/renderer/rendering/terrainLegendRubble.ts`
 - `src/renderer/map/initCore.ts`
 - `src/shared/pipelineTerrain.ts`

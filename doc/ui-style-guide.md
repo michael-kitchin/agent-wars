@@ -31,7 +31,7 @@ When this guide and the running app disagree, the app wins until this file is up
 ### 1.3 Color
 
 - **Terrain (map):** Muted, topographic-style palette. Land: earth tones (tans, olives, soft browns). Water: cool blues/greys. Distinct but low-saturation hues for forest, mountain, desert, arctic so the map reads at a glance without looking garish.
-- **UI chrome:** Navy panels, popups, and tooltips (`#1b2838`) with off-white text. Borders are a muted steel blue. Editable fields stay light. Legend and tooltip swatches are opaque colors in the same family as each map style, stronger than the translucent hex fills. Backgrounds should recede from the map; borders and dividers stay subtle.
+- **UI chrome:** Navy panels, popups, and tooltips (`#1b2838`) with off-white text. Borders are a muted steel blue. Editable fields stay light. Legend and tooltip swatches are opaque colors in the same family as each map style, stronger than the translucent hex fills. The Rubble chip uses that style's opaque urban fill plus a dark-red crosshatch. Backgrounds should recede from the map; borders and dividers stay subtle.
 - **Accents:** Restrained. Use a limited set of accent colors for:
   - **Player identification** (e.g., faction color for unit outlines, control shading, minimap).
   - **State and alerts** (e.g., selected unit, pending order, combat, notification).

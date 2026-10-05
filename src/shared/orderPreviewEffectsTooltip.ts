@@ -316,9 +316,9 @@ function effectsLine(labels: readonly string[]): string | null {
 /**
  * Renders one label with a weather icon or a terrain swatch.
  *
- * Purpose: Snow, Rain, and Heat are weather. Map-key terrain and Urban keep a swatch. Rubble stays plain.
+ * Purpose: Snow, Rain, and Heat are weather. Map-key terrain, Urban, and Rubble keep a swatch.
  * When to use: Effects lines. March lines handle weather before this runs.
- * Expected outcome: Icon HTML already includes the weather word. Terrain HTML is escaped.
+ * Expected outcome: Icon HTML already includes the weather word. Terrain words, including Urban and Rubble, keep their swatch span. The chip color is applied when the tooltip opens.
  * Exceptions: None.
  */
 function labelHtml(label: string): string {

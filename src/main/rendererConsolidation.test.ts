@@ -678,9 +678,15 @@ function testRes4RubbleTooltipAndTerrainVariantContracts(): void {
     'res1 terrain fills/styles should be suppressed while res4 child hex rendering is active'
   );
   assert.ok(
-    featureLabelsForRes4ChildFn.includes('detail?.isRubble') &&
-      featureLabelsForRes4ChildFn.includes("labels.push('Rubble')"),
-    'res4 feature labels should include rubble when a child override marks rubble'
+    !featureLabelsForRes4ChildFn.includes("labels.push('Rubble')") &&
+      !getFunctionSource(terrainTooltipStateSource, 'featureLabelsForRes1Hex').includes('Rubble') &&
+      !getFunctionSource(terrainTooltipStateSource, 'getRes1FeaturesSummary').includes('Rubble'),
+    'feature lines omit Rubble'
+  );
+  assert.ok(
+    !getFunctionSource(terrainTooltipStateSource, 'getRes1TerrainSummary').includes('Urban') &&
+      !getFunctionSource(terrainTooltipStateSource, 'getRes1TerrainSummary').includes('Rubble'),
+    'a world hex terrain summary stays the kind mix'
   );
   assert.ok(
     featureLabelsForRes4ChildFn.includes('res4RoadRailSideMasksForChild') &&

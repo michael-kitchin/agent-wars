@@ -4,11 +4,11 @@ The list of units in one hex.
 
 ## Purpose
 
-Let the player see the units in a hex, including a single unit, and change which human units in that hex are selected.
+Let the player see the units in a hex and change which human units in that hex are selected. A plain click on a hex with exactly one stationary selectable human unit does not open this list.
 
 ## Availability
 
-Opens in Strategic planning and Tactical planning after a click on a unit icon, including a single unit, once a short delay elapses. Hovering that icon shows the unit's Bonuses tooltip instead of this list, as described under Information Displayed. A lone human unit that can be selected is still selected, or Shift-toggled, by a click on its icon. An embarked land unit stays unselected. The list does not open while a hover order preview is already active, while strategic units are hidden because the map is zoomed to battle detail, or during Resolution playback. The preview that starts because a stack click selected a unit on the hex under the pointer does not cancel the scheduled callout and does not close it after it opens. A later click while that preview remains active does not open the callout again. Moving the pointer onto another hex while a preview is active does close it. It also closes when the player dismisses it, presses Escape, clicks outside it, or starts a gesture that hides it. See [input-map.md](input-map.md) and [selection-model.md](selection-model.md).
+Opens in Strategic planning and Tactical planning after a plain click on a unit icon once a short delay elapses, except a hex with exactly one stationary selectable human unit. A plain click on an enemy-only token, an embarked-only token, or two or more stationary units still opens the list. A Shift-click on an icon whose hex has one selectable human unit does not open the list. Hovering that icon shows the unit's Bonuses tooltip instead of this list, as described under Information Displayed. A lone human unit that can be selected is still selected by a plain click on its icon, and Shift-toggled by a Shift-click. An embarked land unit stays unselected. The list does not open while a hover order preview is already active, while strategic units are hidden because the map is zoomed to battle detail, or during Resolution playback. The preview that starts because a stack click selected a unit on the hex under the pointer does not cancel the scheduled callout and does not close it after it opens. A later click while that preview remains active does not open the callout again. Moving the pointer onto another hex while a preview is active does close it. It also closes when the player dismisses it, presses Escape, clicks outside it, or starts a gesture that hides it. See [input-map.md](input-map.md) and [selection-model.md](selection-model.md).
 
 ## Information Displayed
 
@@ -51,6 +51,8 @@ Enemy rows have no selection toggle.
 
 - Enemy units in the callout never become selected.
 - Select-all and add-all both read "+ All". They are never shown at the same time: Shift decides which one is showing.
+- A Shift-click on one selectable human unit does not schedule the callout. A Shift-click with two or more selectable human units, or with none, schedules it when a plain click on that icon would.
+- A plain click on one stationary selectable human unit does not schedule the callout. A plain click on two or more stationary units, or on one unselectable unit, schedules it when the hover-preview and double-click rules allow.
 - The callout does not open while a hover order preview is already active. A preview of the hex the selected units already occupy, started by the click that opened the callout, does not cancel or close it. A later click while that preview remains active does not open the callout again.
 - Embarked land units stay unselectable from the callout, the same as from the map.
 
@@ -79,6 +81,7 @@ None.
 - `src/renderer/renderer.ts`
 - `src/renderer/map/mainMapInteractions.ts`
 - `src/renderer/map/mapClickSelectionPolicy.ts`
+- `src/shared/soleSelectableHumanUnit.ts`
 - `src/renderer/map/singleUnitHoverCallout.ts`
 - `src/shared/singleUnitHoverCallout.ts`
 - `src/renderer/map/initCore.ts`

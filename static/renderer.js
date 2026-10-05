@@ -14527,7 +14527,7 @@
        */
     res1FeaturesSummaryByH3: /* @__PURE__ */ new Map(),
     /**
-       * Documents the object literal property `res1FeatureCountsByH3` (res1FeatureCountsByH3: new Map< string, { airportCount: number; seaportCount: number; rubbleCount: number } >()).
+       * Documents the object literal property `res1FeatureCountsByH3` (res1FeatureCountsByH3: new Map< string, { airportCount: number; seaportCount: number } >()).
     
        * Purpose: Supports maintainability by documenting why `res1FeatureCountsByH3` exists.
        * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
@@ -15712,6 +15712,15 @@
   function formatUrbanSwatchHtml() {
     return `<span class="${TERRAIN_SWATCH_CLASS_NAME}" data-terrain-kind="urban" aria-hidden="true"></span>`;
   }
+  function formatRubbleSwatchHtml() {
+    return `<span class="${TERRAIN_SWATCH_CLASS_NAME}" data-terrain-kind="rubble" aria-hidden="true"></span>`;
+  }
+  function rubbleSwatchBackgroundImage() {
+    const line = "rgba(110, 22, 18, 0.95)";
+    const slash = `repeating-linear-gradient(45deg, transparent 0 2px, ${line} 2px 3px)`;
+    const backslash = `repeating-linear-gradient(-45deg, transparent 0 2px, ${line} 2px 3px)`;
+    return `${slash}, ${backslash}`;
+  }
   function formatTerrainKindHtml(kind) {
     const label = formatTerrainKindLabel(kind ?? null);
     const pipeline = pipelineKindFromRaw(kind);
@@ -15726,6 +15735,9 @@
     const word = match?.[1] ?? "";
     if (match && word === "Urban") {
       return `${formatUrbanSwatchHtml()}${escapeHtmlText(word)}${escapeHtmlText(match[2] ?? "")}`;
+    }
+    if (match && word === "Rubble") {
+      return `${formatRubbleSwatchHtml()}${escapeHtmlText(word)}${escapeHtmlText(match[2] ?? "")}`;
     }
     const kind = DISPLAY_LABEL_TO_KIND[word];
     if (!match || !kind) return escapeHtmlText(token);
@@ -16251,6 +16263,7 @@
   function formatFeatureLabelHtml(label) {
     if (label === "Road") return formatFeatureIconHtml("transport/road.svg", "Road");
     if (label === "Rail") return formatFeatureIconHtml("transport/rail.svg", "Rail");
+    if (label === "Rubble") return `${formatRubbleSwatchHtml()}${escapeHtmlText("Rubble")}`;
     return escapeHtmlText(label);
   }
   function formatTechTierHtml(level) {
@@ -17796,6 +17809,33 @@ ${body}`;
     container.appendChild(row);
   }
 
+  // src/renderer/rendering/terrainLegendRubble.ts
+  function applyRubbleSwatchPaint(element, styleId) {
+    element.style.background = "";
+    element.style.backgroundColor = urbanSwatchColor(styleId);
+    element.style.backgroundImage = rubbleSwatchBackgroundImage();
+    element.style.backgroundRepeat = "repeat";
+  }
+  function appendRubbleLegendRow(container, styleId) {
+    const row = document.createElement("div");
+    row.style.display = "flex";
+    row.style.alignItems = "center";
+    row.style.gap = "6px";
+    row.style.marginBottom = "2px";
+    const swatch = document.createElement("span");
+    swatch.style.display = "inline-block";
+    swatch.style.width = "18px";
+    swatch.style.height = "12px";
+    swatch.style.border = "1px solid #d5deea";
+    swatch.style.borderRadius = "2px";
+    applyRubbleSwatchPaint(swatch, styleId);
+    row.appendChild(swatch);
+    const label = document.createElement("span");
+    label.textContent = "Rubble";
+    row.appendChild(label);
+    container.appendChild(row);
+  }
+
   // src/renderer/rendering/terrainVisualStyles.ts
   var patternCache = /* @__PURE__ */ new Map();
   var UNKNOWN_FILL = "rgba(140, 140, 140, 0.075)";
@@ -18049,7 +18089,15 @@ ${body}`;
     root.querySelectorAll(`span.${TERRAIN_SWATCH_CLASS_NAME}`).forEach((node) => {
       const kind = node.dataset.terrainKind;
       if (!kind) return;
-      node.style.background = kind === "urban" ? urbanSwatchColor(activeTerrainStyleId) : terrainSwatchColor(kind);
+      if (kind === "urban") {
+        node.style.background = urbanSwatchColor(activeTerrainStyleId);
+        return;
+      }
+      if (kind === "rubble") {
+        applyRubbleSwatchPaint(node, activeTerrainStyleId);
+        return;
+      }
+      node.style.background = terrainSwatchColor(kind);
     });
   }
   var TERRAIN_SWATCH_COLORS = {
@@ -18160,16 +18208,6 @@ ${body}`;
     container.style.fontSize = "11px";
     container.style.lineHeight = "1.3";
     container.style.pointerEvents = "auto";
-    const header = document.createElement("div");
-    header.style.display = "flex";
-    header.style.alignItems = "center";
-    header.style.justifyContent = "space-between";
-    header.style.gap = "8px";
-    header.style.marginBottom = "4px";
-    const title = document.createElement("div");
-    title.textContent = "Terrain";
-    title.style.fontWeight = "600";
-    header.appendChild(title);
     const styleSelect = document.createElement("select");
     styleSelect.setAttribute("aria-label", "Terrain style");
     const opts = getTerrainStyleOptions();
@@ -18185,8 +18223,7 @@ ${body}`;
       if (options?.onStyleChanged) options.onStyleChanged(getActiveTerrainStyleId());
       renderTerrainLegend(container, options);
     });
-    header.appendChild(styleSelect);
-    container.appendChild(header);
+    container.appendChild(styleSelect);
     for (const kind of TERRAIN_LEGEND_ORDER) {
       const row = document.createElement("div");
       row.style.display = "flex";
@@ -18202,11 +18239,12 @@ ${body}`;
       sw.style.background = terrainSwatchColor(kind);
       row.appendChild(sw);
       const lab = document.createElement("span");
-      lab.textContent = kind;
+      lab.textContent = formatTerrainKindLabel(kind);
       row.appendChild(lab);
       container.appendChild(row);
     }
     appendUrbanLegendRow(container, urbanSwatchColor(getActiveTerrainStyleId()));
+    appendRubbleLegendRow(container, getActiveTerrainStyleId());
   }
 
   // src/renderer/rendering/terrainInfrastructureIconPaths.ts
@@ -22191,8 +22229,8 @@ ${body}`;
   }
   function formatTerrainVariantSuffix(state) {
     const variants = [];
-    if (state.isUrban) variants.push(`${formatUrbanSwatchHtml()}Urban`);
-    if (state.isRubble) variants.push(escapeHtmlText("Rubble"));
+    if (state.isRubble) variants.push(`${formatRubbleSwatchHtml()}Rubble`);
+    else if (state.isUrban) variants.push(`${formatUrbanSwatchHtml()}Urban`);
     return variants.length > 0 ? `, ${variants.join(", ")}` : "";
   }
   function resolveStrategicHexForControlLine(namingTarget) {
@@ -22277,7 +22315,7 @@ ${body}`;
     const terrainLine = `<strong>Terrain:</strong> ${terrainValue}`;
     const weather = tooltipWeather(namingTarget);
     const weatherLine = weather ? `<strong>Weather:</strong> ${formatWeatherIconHtml(weather)}` : null;
-    const featuresLine = state.res1FeaturesSummary != null ? `<strong>Features:</strong> ${state.res1FeaturesSummary}` : state.features.length > 0 ? `<strong>Features:</strong> ${state.features.map((label) => formatFeatureLabelHtml(label)).join(", ")}` : null;
+    const featuresLine = state.res1FeaturesSummary != null ? `<strong>Features:</strong> ${formatTerrainNameListHtml(state.res1FeaturesSummary)}` : state.features.length > 0 ? `<strong>Features:</strong> ${state.features.map((label) => formatFeatureLabelHtml(label)).join(", ")}` : null;
     const pair = coverPair(state, namingTarget);
     const coverHtml = pair == null ? null : formatTerrainCoverTooltipHtml(pair);
     const effectsHtml = joinHexTooltipEffectsHtml(movementRangeHtml(state, namingTarget), coverHtml);
@@ -22403,7 +22441,6 @@ ${body}`;
     const labels = [];
     if (counts.airportCount > 0) labels.push("Airports");
     if (counts.seaportCount > 0) labels.push("Seaports");
-    if (counts.rubbleCount > 0) labels.push("Rubble");
     return labels;
   }
   function transportSideMaskHasAnyTrue(mask) {
@@ -22413,8 +22450,6 @@ ${body}`;
   function featureLabelsForRes4Child(parentH3, childH3) {
     if (!infraGlyphsAllowedForRes4Child(parentH3, childH3)) return [];
     const labels = [];
-    const detail = rendererSharedState.res4TerrainOverridesByH3.get(childH3);
-    if (detail?.isRubble) labels.push("Rubble");
     if (rendererSharedState.terrainInfraRes4Airport.has(childH3)) labels.push("Airport");
     if (rendererSharedState.terrainInfraRes4Seaport.has(childH3)) labels.push("Seaport");
     const { roadSides, railSides } = res4RoadRailSideMasksForChild(childH3);
@@ -22460,13 +22495,11 @@ ${body}`;
     }
     let airportCount = 0;
     let seaportCount = 0;
-    let rubbleCount = 0;
     for (const child of children) {
       if (rendererSharedState.terrainInfraRes4Airport.has(child)) airportCount++;
       if (rendererSharedState.terrainInfraRes4Seaport.has(child)) seaportCount++;
-      if (rendererSharedState.res4TerrainOverridesByH3.get(child)?.isRubble) rubbleCount++;
     }
-    const counts = { airportCount, seaportCount, rubbleCount };
+    const counts = { airportCount, seaportCount };
     rendererSharedState.res1FeatureCountsByH3.set(h3, counts);
     return counts;
   }
@@ -22548,11 +22581,10 @@ ${body}`;
       rendererSharedState.res1FeaturesSummaryByH3.set(h3, null);
       return null;
     }
-    const { airportCount, seaportCount, rubbleCount } = getRes1FeatureCounts(h3);
+    const { airportCount, seaportCount } = getRes1FeatureCounts(h3);
     const parts = [];
     if (airportCount > 0) parts.push(`Airports (${airportCount.toLocaleString()})`);
     if (seaportCount > 0) parts.push(`Seaports (${seaportCount.toLocaleString()})`);
-    if (rubbleCount > 0) parts.push(`Rubble (${rubbleCount.toLocaleString()})`);
     const summary = parts.length > 0 ? parts.join(", ") : null;
     rendererSharedState.res1FeaturesSummaryByH3.set(h3, summary);
     return summary;
@@ -27723,6 +27755,13 @@ ${body}`;
     return releasedHexTooltip;
   }
 
+  // src/shared/soleSelectableHumanUnit.ts
+  function soleSelectableHumanUnitId(units, isEmbarkedLandUnit) {
+    const selectable = units.filter((unit) => unit.player === "human" && !isEmbarkedLandUnit(unit.id));
+    const only = selectable[0];
+    return selectable.length === 1 && only != null ? only.id : null;
+  }
+
   // src/renderer/map/mapDoubleClickHandler.ts
   function ignoreReasonFor(input) {
     if (input.targetingModeActive) return "targeting_mode_active";
@@ -28263,6 +28302,40 @@ ${body}`;
         redraw: deps.redraw
       };
       if (hit && unitsAtHit.length >= 1 && unitIconHit) {
+        const soleSelectableUnitId = soleSelectableHumanUnitId(
+          unitsAtHit,
+          isEmbarkedLandUnitBlockedForSelection
+        );
+        if (e.shiftKey && soleSelectableUnitId) {
+          applyHumanUnitIconClickSelectionPolicy({
+            shiftKey: true,
+            unitId: soleSelectableUnitId,
+            suppressSelectionRetarget: suppressIconRetargetOnNextClick,
+            deps: humanUnitIconSelectionDeps
+          });
+          if (!suppressIconRetargetOnNextClick && !isHoverOrderPlanningActive()) {
+            deps.hideStackCallout();
+          }
+          deps.updateSidebar();
+          deps.updateRangedSidebar();
+          deps.redraw();
+          return;
+        }
+        if (!e.shiftKey && unitsAtHit.length === 1 && soleSelectableUnitId) {
+          applyHumanUnitIconClickSelectionPolicy({
+            shiftKey: false,
+            unitId: soleSelectableUnitId,
+            suppressSelectionRetarget: suppressIconRetargetOnNextClick,
+            deps: humanUnitIconSelectionDeps
+          });
+          if (!suppressIconRetargetOnNextClick && !isHoverOrderPlanningActive()) {
+            deps.hideStackCallout();
+          }
+          deps.updateSidebar();
+          deps.updateRangedSidebar();
+          deps.redraw();
+          return;
+        }
         if (loneHumanUnit) {
           applyHumanUnitIconClickSelectionPolicy({
             shiftKey: e.shiftKey,

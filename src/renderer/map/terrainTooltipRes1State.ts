@@ -180,13 +180,20 @@ export function infraGlyphsAllowedForRes4Child(parentH3: string, childH3: string
   return true;
 }
 
+/**
+ * Builds world-hex feature labels for the tooltip Features line.
+ *
+ * Purpose: Names airports and seaports when the hex is explored.
+ * When to use: From `terrainTooltipStateForRes1Hex`.
+ * Expected outcome: Airports and Seaports when those counts are positive. Empty when the hex is unexplored or has neither.
+ * Exceptions: None.
+ */
 function featureLabelsForRes1Hex(h3: string): string[] {
   if (!infraGlyphsAllowedForRes1Hex(h3)) return [];
   const counts = getRes1FeatureCounts(h3);
   const labels: string[] = [];
   if (counts.airportCount > 0) labels.push('Airports');
   if (counts.seaportCount > 0) labels.push('Seaports');
-  if (counts.rubbleCount > 0) labels.push('Rubble');
   return labels;
 }
 
@@ -208,14 +215,12 @@ function transportSideMaskHasAnyTrue(mask: readonly boolean[] | undefined): bool
  *
  * Purpose: Lists visible res4 infrastructure and transport features for the hex tooltip Features line.
  * When to use: Res4 branch of `terrainStateForPointer` after resolving parent/child ids.
- * Expected outcome: Road/Rail labels when global side masks have any true edge; empty when parent is unexplored.
+ * Expected outcome: Airport, Seaport, Road, and Rail when those are present. Urban and Rubble stay on the Terrain line. Empty when the parent is unexplored.
  * Exceptions: None.
  */
 function featureLabelsForRes4Child(parentH3: string, childH3: string): string[] {
   if (!infraGlyphsAllowedForRes4Child(parentH3, childH3)) return [];
   const labels: string[] = [];
-  const detail = S.res4TerrainOverridesByH3.get(childH3);
-  if (detail?.isRubble) labels.push('Rubble');
   if (S.terrainInfraRes4Airport.has(childH3)) labels.push('Airport');
   if (S.terrainInfraRes4Seaport.has(childH3)) labels.push('Seaport');
   const { roadSides, railSides } = res4RoadRailSideMasksForChild(childH3);
@@ -289,7 +294,15 @@ export function clearRes1TooltipSummaryCaches(): void {
   S.terrainTooltipHtmlByContentKey.clear();
 }
 
-function getRes1FeatureCounts(h3: string): { airportCount: number; seaportCount: number; rubbleCount: number } {
+/**
+ * Counts airports and seaports inside one world hex.
+ *
+ * Purpose: The Features line names those counts. Urban and rubble stay off that line.
+ * When to use: From `featureLabelsForRes1Hex` and `getRes1FeaturesSummary`.
+ * Expected outcome: Cached airport and seaport counts for the hex.
+ * Exceptions: None.
+ */
+function getRes1FeatureCounts(h3: string): { airportCount: number; seaportCount: number } {
   const cached = S.res1FeatureCountsByH3.get(h3);
   if (cached) return cached;
   let children = S.res4ChildrenByParent.get(h3);
@@ -299,13 +312,11 @@ function getRes1FeatureCounts(h3: string): { airportCount: number; seaportCount:
   }
   let airportCount = 0;
   let seaportCount = 0;
-  let rubbleCount = 0;
   for (const child of children) {
     if (S.terrainInfraRes4Airport.has(child)) airportCount++;
     if (S.terrainInfraRes4Seaport.has(child)) seaportCount++;
-    if (S.res4TerrainOverridesByH3.get(child)?.isRubble) rubbleCount++;
   }
-  const counts = { airportCount, seaportCount, rubbleCount };
+  const counts = { airportCount, seaportCount };
   S.res1FeatureCountsByH3.set(h3, counts);
   return counts;
 }
@@ -392,17 +403,24 @@ function getRes1TerrainSummary(h3: string, parentKind: string): string {
   return summary;
 }
 
+/**
+ * Builds the world-hex Features summary.
+ *
+ * Purpose: The world-hex tooltip and the tactical battles dialog share this string.
+ * When to use: From `terrainTooltipStateForRes1Hex`.
+ * Expected outcome: `Airports (n)` and `Seaports (n)` when those counts are positive. Null when the hex is unexplored or has neither.
+ * Exceptions: None.
+ */
 function getRes1FeaturesSummary(h3: string): string | null {
   if (S.res1FeaturesSummaryByH3.has(h3)) return S.res1FeaturesSummaryByH3.get(h3) ?? null;
   if (!infraGlyphsAllowedForRes1Hex(h3)) {
     S.res1FeaturesSummaryByH3.set(h3, null);
     return null;
   }
-  const { airportCount, seaportCount, rubbleCount } = getRes1FeatureCounts(h3);
+  const { airportCount, seaportCount } = getRes1FeatureCounts(h3);
   const parts: string[] = [];
   if (airportCount > 0) parts.push(`Airports (${airportCount.toLocaleString()})`);
   if (seaportCount > 0) parts.push(`Seaports (${seaportCount.toLocaleString()})`);
-  if (rubbleCount > 0) parts.push(`Rubble (${rubbleCount.toLocaleString()})`);
   const summary = parts.length > 0 ? parts.join(', ') : null;
   S.res1FeaturesSummaryByH3.set(h3, summary);
   return summary;

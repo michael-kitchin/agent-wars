@@ -17,7 +17,7 @@ import {
 } from '../../shared/homeRegionRules';
 import { computeTerrainEffectsLineHtml } from '../../shared/terrainEffectsForTooltip';
 import { formatFeatureLabelHtml, formatProducedUnitTechLineHtml } from '../../shared/featureIconHtml';
-import { formatTerrainKindHtml, formatTerrainNameListHtml, formatUrbanSwatchHtml } from '../../shared/terrainSwatchHtml';
+import { formatRubbleSwatchHtml, formatTerrainKindHtml, formatTerrainNameListHtml, formatUrbanSwatchHtml } from '../../shared/terrainSwatchHtml';
 import { formatWeatherIconHtml } from '../../shared/weatherIcons';
 import {
   formatTerrainCoverTooltipHtml,
@@ -50,13 +50,13 @@ function formatLlmLocationBoldPrefixHtml(namingTarget: NamingLookupTarget | null
  *
  * Purpose: The base terrain kind does not include those cell flags.
  * When to use: From `formatTerrainTooltipHtml` when there is no prebuilt res1 terrain summary.
- * Expected outcome: Empty, an Urban swatch, escaped Rubble, or both. The caller inserts this HTML as-is.
+ * Expected outcome: Empty, an Urban swatch, or a Rubble swatch. A rubble cell names Rubble. An intact urban cell names Urban. The caller inserts this HTML as-is.
  * Exceptions: None.
  */
 function formatTerrainVariantSuffix(state: Pick<TerrainTooltipState, 'isUrban' | 'isRubble'>): string {
   const variants: string[] = [];
-  if (state.isUrban) variants.push(`${formatUrbanSwatchHtml()}Urban`);
-  if (state.isRubble) variants.push(escapeHtmlText('Rubble'));
+  if (state.isRubble) variants.push(`${formatRubbleSwatchHtml()}Rubble`);
+  else if (state.isUrban) variants.push(`${formatUrbanSwatchHtml()}Urban`);
   return variants.length > 0 ? `, ${variants.join(', ')}` : '';
 }
 
@@ -216,7 +216,7 @@ function formatTerrainTooltipHtml(
   const weatherLine = weather ? `<strong>Weather:</strong> ${formatWeatherIconHtml(weather)}` : null;
   const featuresLine =
     state.res1FeaturesSummary != null
-      ? `<strong>Features:</strong> ${state.res1FeaturesSummary}`
+      ? `<strong>Features:</strong> ${formatTerrainNameListHtml(state.res1FeaturesSummary)}`
       : state.features.length > 0
         ? `<strong>Features:</strong> ${state.features.map((label) => formatFeatureLabelHtml(label)).join(', ')}`
         : null;
