@@ -13,11 +13,13 @@ Opens in Strategic planning when two or more build hexes are selected. Selection
 ## Information Displayed
 
 - The selected hex codes.
+- Tech, under the hex codes, when the tech bonus is on and at least one selected hex's original urban count can produce units. Each tier appears once, Basic then Advanced, with the same small icon and word as the [single-hex popup](build-popup.md). A hex that produces no units adds nothing. The line is omitted when the tech bonus is off or no selected hex produces units. The rules are in [combat rules §4.9](../combat-rules-v3.md).
+- Production per turn for the selected hexes added together, under Tech when that line is shown and under the hex codes when it is not.
 - A combined queue summary: cost and turns for the template as applied to those hexes.
 - The title "Build Queue".
 - One template row per queued entry. Each unit-type choice says whether it applies to all selected hexes, to one hex, or to a count of hexes.
 - A Keep building checkbox. It shows as checked only when every selected hex has Keep building on. It can be changed only when every selected hex can arm it.
-- If the queues fail to load, "Failed to load build queues for the selected hexes."
+- If the queues fail to load, "Failed to load build queues for the selected hexes." That failure shows no Tech line.
 
 Shared row editing is the same as [build-popup.md](build-popup.md). Costs and caps stay in the [combat rules](../combat-rules-v3.md) and [game size and unit caps](../game-size-unit-caps.md).
 

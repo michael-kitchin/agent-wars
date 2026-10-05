@@ -115,3 +115,30 @@ export function formatProducedUnitTechLineHtml(input: {
   const level = techLevelFromUrbanHexCount(input.baselineUrbanHexCount);
   return `<strong>Tech:</strong> ${formatTechTierHtml(level)}`;
 }
+
+/**
+ * Returns the Tech line for the unique tiers of several selected hexes, or null when that line does not apply.
+ *
+ * Purpose: The multi-hex build popup names every tier those hexes will produce, in the same words as one hex.
+ * When to use: Under the hex codes, passing the match's tech flag and each hex's generated urban count.
+ * Expected outcome: Null when tech is off, or when no count is a positive finite number. Otherwise `Tech:` plus Basic, then Advanced, each at most once. A count that is not positive is ignored before classification, so it cannot appear as Basic.
+ * Exceptions: None.
+ */
+export function formatSelectedHexTechLineHtml(input: {
+  readonly techBonusEnabled: boolean;
+  readonly baselineUrbanHexCounts: readonly number[];
+}): string | null {
+  if (input.techBonusEnabled !== true) return null;
+  let hasBasic = false;
+  let hasAdvanced = false;
+  for (const count of input.baselineUrbanHexCounts) {
+    if (!Number.isFinite(count) || count <= 0) continue;
+    if (techLevelFromUrbanHexCount(count) === 'advanced') hasAdvanced = true;
+    else hasBasic = true;
+  }
+  const parts: string[] = [];
+  if (hasBasic) parts.push(formatTechTierHtml('basic'));
+  if (hasAdvanced) parts.push(formatTechTierHtml('advanced'));
+  if (parts.length === 0) return null;
+  return `<strong>Tech:</strong> ${parts.join(', ')}`;
+}

@@ -1,8 +1,10 @@
+import { formatSelectedHexTechLineHtml } from '../../shared/featureIconHtml';
 import { ALL_BUILD_UNIT_TYPES, type BuildUnitType, type HexBuildQueueSnapshot } from '../../shared/ipcTypes';
 import { resolutionPlaybackBlocksMapOrders } from '../../shared/mapOrderGestureGate';
 import { estimateTurnsToCompleteQueuedProduction, sumQueuedProductionCost } from '../../shared/productionConfig';
 import { UNIT_SELECT_GLYPH } from '../core/constants';
 import { rendererSharedState as S } from '../core/state';
+import { baselineUrbanHexCountForRes1Hex } from '../rendererRes4Hydration';
 import {
   appendKeepBuildingCheckbox,
   areAllKeepBuildingArmed,
@@ -214,7 +216,7 @@ function buildQueueEditBlockedByPlayback(): boolean {
  *
  * Purpose: Presents summed production, template queue cost, ETA range, and union build types.
  * When to use: Build popup refresh while `selectedBuildHexH3s.length >= 2`.
- * Expected outcome: Template edits broadcast through the batch API without exposing per-hex row ids.
+ * Expected outcome: Template edits broadcast through the batch API without exposing per-hex row ids. Tech, when shown, sits under the hex codes and names each selected tier once. A failed snapshot load shows the error and no Tech line.
  * Exceptions: Stale async renders are discarded using request sequence and selection signature.
  */
 export async function renderMultiBuildQueueIntoMount(deps: MultiBuildQueueRenderDeps): Promise<void> {
@@ -270,6 +272,19 @@ export async function renderMultiBuildQueueIntoMount(deps: MultiBuildQueueRender
   const descriptionSpacer = document.createElement('div');
   descriptionSpacer.style.height = '0.5em';
   section.appendChild(descriptionSpacer);
+
+  const techLineHtml = formatSelectedHexTechLineHtml({
+    techBonusEnabled: S.gameState?.techBonusEnabled === true,
+    baselineUrbanHexCounts: selectedH3Indexes.map((h3Index) => baselineUrbanHexCountForRes1Hex(h3Index)),
+  });
+  if (techLineHtml) {
+    const techLine = document.createElement('div');
+    techLine.innerHTML = techLineHtml;
+    section.appendChild(techLine);
+    const techSpacer = document.createElement('div');
+    techSpacer.style.height = '0.5em';
+    section.appendChild(techSpacer);
+  }
 
   const totalProduction = snapshots.reduce((sum, snapshot) => sum + snapshot.urbanHexCount, 0);
   const pointsLine = document.createElement('div');

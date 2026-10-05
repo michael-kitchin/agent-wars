@@ -19,6 +19,7 @@ const NONE: UnitOriginTooltipBonuses = {
   countryEnabled: false,
   terrainEnabled: false,
   weatherEnabled: false,
+  techEnabled: false,
 };
 
 const origin: UnitOrigin = {
@@ -37,6 +38,7 @@ test('the tooltip lists the bonuses the unit was born with', () => {
       countryEnabled: true,
       terrainEnabled: true,
       weatherEnabled: true,
+      techEnabled: false,
       weatherTags: ['snow', 'rain'],
     },
   });
@@ -61,6 +63,7 @@ test('a turned-off option is omitted, and weather tags render snow, then rain, t
       countryEnabled: false,
       terrainEnabled: true,
       weatherEnabled: true,
+      techEnabled: false,
       weatherTags: ['heat', 'snow'],
     },
   });
@@ -84,6 +87,7 @@ test('no selected bonus, or a unit with none of them, collapses the Bonuses bloc
       countryEnabled: true,
       terrainEnabled: true,
       weatherEnabled: true,
+      techEnabled: false,
       weatherTags: [],
     },
   });
@@ -109,21 +113,21 @@ test('a unit with no birth country omits Country, and a country name is escaped'
 });
 
 /**
- * Checks that equal birth fields count as the same origin and one differing field does not.
+ * Checks the Tech row against the match flag and the recorded tier.
  *
- * Purpose: Loss toasts share one flag per display name, so two units from the same place must still get that flag.
+ * Purpose: A remembered Advanced tier must stay hidden when the match tech bonus is off.
  * When to use: From this file's runner.
- * Expected outcome: Matching copies return true; a different birth hex returns false.
- * Exceptions: AssertionError when the comparison drifts.
+ * Expected outcome: Basic and Advanced render when the flag is on. A missing tier, and an Advanced tier with the flag off, collapse to None.
+ * Exceptions: AssertionError when the markup drifts.
  */
 test('the Tech row names Basic or Advanced, and a missing tier stays None', () => {
-  const advanced = formatUnitOriginTooltipHtml({ origin, bonuses: { ...NONE, techLevel: 'advanced' } });
+  const advanced = formatUnitOriginTooltipHtml({ origin, bonuses: { ...NONE, techEnabled: true, techLevel: 'advanced' } });
   assert.ok(advanced.includes('<strong>Tech:</strong>'));
   assert.ok(advanced.includes('tech/tech_advanced.svg'));
   assert.ok(advanced.includes('Advanced'));
   assert.ok(!advanced.includes('tech/tech_basic.svg'));
   assert.ok(!advanced.includes('<strong>Bonuses:</strong>\nNone'));
-  const basic = formatUnitOriginTooltipHtml({ origin, bonuses: { ...NONE, techLevel: 'basic' } });
+  const basic = formatUnitOriginTooltipHtml({ origin, bonuses: { ...NONE, techEnabled: true, techLevel: 'basic' } });
   assert.ok(basic.includes('<strong>Tech:</strong>'));
   assert.ok(basic.includes('tech/tech_basic.svg'));
   assert.ok(basic.includes('Basic'));
@@ -132,8 +136,19 @@ test('the Tech row names Basic or Advanced, and a missing tier stays None', () =
   const missing = formatUnitOriginTooltipHtml({ origin, bonuses: NONE });
   assert.ok(missing.includes('<strong>Bonuses:</strong>\nNone'));
   assert.ok(!missing.includes('<strong>Tech:</strong>'));
+  const off = formatUnitOriginTooltipHtml({ origin, bonuses: { ...NONE, techEnabled: false, techLevel: 'advanced' } });
+  assert.ok(off.includes('<strong>Bonuses:</strong>\nNone'));
+  assert.ok(!off.includes('<strong>Tech:</strong>'));
 });
 
+/**
+ * Checks that equal birth fields count as the same origin and one differing field does not.
+ *
+ * Purpose: Loss toasts share one flag per display name, so two units from the same place must still get that flag.
+ * When to use: From this file's runner.
+ * Expected outcome: Matching copies return true; a different birth hex returns false.
+ * Exceptions: AssertionError when the comparison drifts.
+ */
 test('origins that present the same flag and tooltip match, and a different birth hex does not', () => {
   const copy: UnitOrigin = { ...origin };
   assert.equal(unitOriginsPresentTheSame(origin, copy), true);

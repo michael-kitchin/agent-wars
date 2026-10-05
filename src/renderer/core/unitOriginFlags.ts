@@ -98,12 +98,13 @@ export function resolveUnitOrigin(unitId: string): UnitOrigin | null {
  * Expected outcome: Each flag is true only when the snapshot field is exactly true. A missing game state leaves every option off.
  * Exceptions: None.
  */
-function selectedBonusOptions(): Pick<UnitOriginTooltipBonuses, 'countryEnabled' | 'terrainEnabled' | 'weatherEnabled'> {
+function selectedBonusOptions(): Pick<UnitOriginTooltipBonuses, 'countryEnabled' | 'terrainEnabled' | 'weatherEnabled' | 'techEnabled'> {
   const state = S.gameState;
   return {
     countryEnabled: state?.countryBonusEnabled === true,
     terrainEnabled: state?.terrainBonusEnabled === true,
     weatherEnabled: state?.weatherBonusEnabled === true,
+    techEnabled: state?.techBonusEnabled === true,
   };
 }
 

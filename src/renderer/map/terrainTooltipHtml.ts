@@ -1,9 +1,9 @@
 /**
- * Terrain tooltip HTML: hex-code prefix, naming caption, control, terrain, features, and effects.
+ * Terrain tooltip HTML for the hover tooltip and the tactical battles list.
  *
  * Purpose: Keeps tooltip markup next to the caption flags, out of the hit-testing module.
  * When to use: `getCachedTerrainTooltipHtml` from the hover tooltip and the melee-intercept hex cell.
- * Expected outcome: Memoized HTML; the naming line is omitted when the caption is missing or empty.
+ * Expected outcome: Memoized HTML. The naming line is omitted when the caption is missing or empty. A world hex orders Control, Production, Tech, Features, Terrain, Weather, and Effects. A detail cell orders Features, then Terrain, Weather, and Effects. A line that does not apply is left out.
  * Exceptions: None.
  */
 import { cellToParent } from 'h3-js';
@@ -192,11 +192,11 @@ function coverPair(state: TerrainTooltipState, namingTarget: NamingLookupTarget 
 }
 
 /**
- * Builds the full terrain tooltip HTML: hex-code prefix, naming caption with flags, then control, terrain, weather, and effects.
+ * Builds the full terrain tooltip HTML: hex-code prefix, naming caption with flags, then the resolution's line order.
  *
  * Purpose: Single formatter behind `getCachedTerrainTooltipHtml`.
  * When to use: Only through `getCachedTerrainTooltipHtml`, which memoizes the result.
- * Expected outcome: The naming line is omitted when the caption is missing or empty. Effects lists movement, range, and cover clauses. Weather stays on the Weather line.
+ * Expected outcome: The naming line is omitted when the caption is missing or empty. A world hex lists Control, Production, Tech, Features, Terrain, Weather, and Effects. A detail cell lists Features, then Terrain, Weather, and Effects. A line that does not apply is left out, and the next line moves up. Effects lists movement, range, and cover clauses. Weather stays on the Weather line.
  * Exceptions: None.
  */
 function formatTerrainTooltipHtml(
@@ -214,26 +214,30 @@ function formatTerrainTooltipHtml(
   const terrainLine = `<strong>Terrain:</strong> ${terrainValue}`;
   const weather = tooltipWeather(namingTarget);
   const weatherLine = weather ? `<strong>Weather:</strong> ${formatWeatherIconHtml(weather)}` : null;
-  const bodyParts: string[] = [];
-  if (techLine) bodyParts.push(techLine);
-  if (controlLine) bodyParts.push(controlLine);
-  bodyParts.push(terrainLine);
-  if (weatherLine) bodyParts.push(weatherLine);
-  if (state.res1FeaturesSummary != null) bodyParts.push(`<strong>Features:</strong> ${state.res1FeaturesSummary}`);
-  else if (state.features.length > 0) {
-    bodyParts.push(`<strong>Features:</strong> ${state.features.map((label) => formatFeatureLabelHtml(label)).join(', ')}`);
-  }
+  const featuresLine =
+    state.res1FeaturesSummary != null
+      ? `<strong>Features:</strong> ${state.res1FeaturesSummary}`
+      : state.features.length > 0
+        ? `<strong>Features:</strong> ${state.features.map((label) => formatFeatureLabelHtml(label)).join(', ')}`
+        : null;
   const pair = coverPair(state, namingTarget);
   const coverHtml = pair == null ? null : formatTerrainCoverTooltipHtml(pair);
   const effectsHtml = joinHexTooltipEffectsHtml(movementRangeHtml(state, namingTarget), coverHtml);
-  if (effectsHtml) bodyParts.push(`<strong>Effects:</strong> ${effectsHtml}`);
-  if (state.urbanHexCount != null) {
-    const productionLine =
-      state.urbanHexCount > 0
+  const effectsLine = effectsHtml ? `<strong>Effects:</strong> ${effectsHtml}` : null;
+  const productionLine =
+    state.urbanHexCount == null
+      ? null
+      : state.urbanHexCount > 0
         ? `<strong>Production:</strong> $${state.urbanHexCount.toLocaleString()} / turn`
         : `<strong>Production:</strong> (none)`;
-    bodyParts.push(productionLine);
-  }
+  const resolution = namingTarget?.resolution;
+  const orderedLines =
+    resolution === 1
+      ? [controlLine, productionLine, techLine, featuresLine, terrainLine, weatherLine, effectsLine]
+      : resolution === 4
+        ? [featuresLine, techLine, controlLine, terrainLine, weatherLine, effectsLine, productionLine]
+        : [techLine, controlLine, terrainLine, weatherLine, featuresLine, effectsLine, productionLine];
+  const bodyParts = orderedLines.filter((line): line is string => line != null);
   const bodyLine = bodyParts.join(TOOLTIP_SECTION_GAP_HTML);
   if (!namingCaption || namingCaption.text === '') return `${prefix}${bodyLine}`;
   return `${prefix}${formatHexNamingCaptionHtml(namingCaption)}${TOOLTIP_SECTION_GAP_HTML}${bodyLine}`;
@@ -279,7 +283,7 @@ function terrainTooltipContentKey(
 /**
  * Tech line for a res1 hex, using the generated urban count.
  *
- * Purpose: The hover tooltip and the melee-intercept cell share this placement, under the hex name.
+ * Purpose: The hover tooltip and the melee-intercept cell share this placement in the world-hex order, after Control and Production and before Features.
  * When to use: From `formatTerrainTooltipHtml` when the naming target is a world hex.
  * Expected outcome: The shared Tech line, or null for any other resolution, when tech is off, or when the hex produces nothing.
  * Exceptions: None.

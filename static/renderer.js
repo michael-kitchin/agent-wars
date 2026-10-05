@@ -16262,6 +16262,21 @@
     const level = techLevelFromUrbanHexCount(input.baselineUrbanHexCount);
     return `<strong>Tech:</strong> ${formatTechTierHtml(level)}`;
   }
+  function formatSelectedHexTechLineHtml(input) {
+    if (input.techBonusEnabled !== true) return null;
+    let hasBasic = false;
+    let hasAdvanced = false;
+    for (const count of input.baselineUrbanHexCounts) {
+      if (!Number.isFinite(count) || count <= 0) continue;
+      if (techLevelFromUrbanHexCount(count) === "advanced") hasAdvanced = true;
+      else hasBasic = true;
+    }
+    const parts = [];
+    if (hasBasic) parts.push(formatTechTierHtml("basic"));
+    if (hasAdvanced) parts.push(formatTechTierHtml("advanced"));
+    if (parts.length === 0) return null;
+    return `<strong>Tech:</strong> ${parts.join(", ")}`;
+  }
 
   // src/shared/unitOriginTooltipText.ts
   function unitOriginsPresentTheSame(left, right) {
@@ -16284,7 +16299,7 @@
       const tags = weatherTagsInDisplayOrder(input.bonuses.weatherTags);
       if (tags.length > 0) rows.push(bonusRow("Weather", tags.map((tag) => formatWeatherIconHtml(tag)).join(", ")));
     }
-    if (input.bonuses.techLevel === "basic" || input.bonuses.techLevel === "advanced") {
+    if (input.bonuses.techEnabled && (input.bonuses.techLevel === "basic" || input.bonuses.techLevel === "advanced")) {
       rows.push(bonusRow("Tech", formatTechTierHtml(input.bonuses.techLevel)));
     }
     const body = rows.length > 0 ? rows.join("\n") : "None";
@@ -16323,7 +16338,8 @@ ${body}`;
     return {
       countryEnabled: state?.countryBonusEnabled === true,
       terrainEnabled: state?.terrainBonusEnabled === true,
-      weatherEnabled: state?.weatherBonusEnabled === true
+      weatherEnabled: state?.weatherBonusEnabled === true,
+      techEnabled: state?.techBonusEnabled === true
     };
   }
   function bonusesForLiveUnit(unitId, origin) {
@@ -22260,23 +22276,15 @@ ${body}`;
     const terrainLine = `<strong>Terrain:</strong> ${terrainValue}`;
     const weather = tooltipWeather(namingTarget);
     const weatherLine = weather ? `<strong>Weather:</strong> ${formatWeatherIconHtml(weather)}` : null;
-    const bodyParts = [];
-    if (techLine) bodyParts.push(techLine);
-    if (controlLine) bodyParts.push(controlLine);
-    bodyParts.push(terrainLine);
-    if (weatherLine) bodyParts.push(weatherLine);
-    if (state.res1FeaturesSummary != null) bodyParts.push(`<strong>Features:</strong> ${state.res1FeaturesSummary}`);
-    else if (state.features.length > 0) {
-      bodyParts.push(`<strong>Features:</strong> ${state.features.map((label) => formatFeatureLabelHtml(label)).join(", ")}`);
-    }
+    const featuresLine = state.res1FeaturesSummary != null ? `<strong>Features:</strong> ${state.res1FeaturesSummary}` : state.features.length > 0 ? `<strong>Features:</strong> ${state.features.map((label) => formatFeatureLabelHtml(label)).join(", ")}` : null;
     const pair = coverPair(state, namingTarget);
     const coverHtml = pair == null ? null : formatTerrainCoverTooltipHtml(pair);
     const effectsHtml = joinHexTooltipEffectsHtml(movementRangeHtml(state, namingTarget), coverHtml);
-    if (effectsHtml) bodyParts.push(`<strong>Effects:</strong> ${effectsHtml}`);
-    if (state.urbanHexCount != null) {
-      const productionLine = state.urbanHexCount > 0 ? `<strong>Production:</strong> $${state.urbanHexCount.toLocaleString()} / turn` : `<strong>Production:</strong> (none)`;
-      bodyParts.push(productionLine);
-    }
+    const effectsLine2 = effectsHtml ? `<strong>Effects:</strong> ${effectsHtml}` : null;
+    const productionLine = state.urbanHexCount == null ? null : state.urbanHexCount > 0 ? `<strong>Production:</strong> $${state.urbanHexCount.toLocaleString()} / turn` : `<strong>Production:</strong> (none)`;
+    const resolution = namingTarget?.resolution;
+    const orderedLines = resolution === 1 ? [controlLine, productionLine, techLine, featuresLine, terrainLine, weatherLine, effectsLine2] : resolution === 4 ? [featuresLine, techLine, controlLine, terrainLine, weatherLine, effectsLine2, productionLine] : [techLine, controlLine, terrainLine, weatherLine, featuresLine, effectsLine2, productionLine];
+    const bodyParts = orderedLines.filter((line) => line != null);
     const bodyLine = bodyParts.join(TOOLTIP_SECTION_GAP_HTML);
     if (!namingCaption || namingCaption.text === "") return `${prefix}${bodyLine}`;
     return `${prefix}${formatHexNamingCaptionHtml(namingCaption)}${TOOLTIP_SECTION_GAP_HTML}${bodyLine}`;
@@ -24491,6 +24499,18 @@ ${body}`;
     const descriptionSpacer = document.createElement("div");
     descriptionSpacer.style.height = "0.5em";
     section.appendChild(descriptionSpacer);
+    const techLineHtml = formatSelectedHexTechLineHtml({
+      techBonusEnabled: rendererSharedState.gameState?.techBonusEnabled === true,
+      baselineUrbanHexCounts: selectedH3Indexes.map((h3Index) => baselineUrbanHexCountForRes1Hex(h3Index))
+    });
+    if (techLineHtml) {
+      const techLine = document.createElement("div");
+      techLine.innerHTML = techLineHtml;
+      section.appendChild(techLine);
+      const techSpacer = document.createElement("div");
+      techSpacer.style.height = "0.5em";
+      section.appendChild(techSpacer);
+    }
     const totalProduction = snapshots.reduce((sum, snapshot) => sum + snapshot.urbanHexCount, 0);
     const pointsLine = document.createElement("div");
     pointsLine.innerHTML = `<strong>Production:</strong> $${totalProduction.toLocaleString()} / turn`;

@@ -13,7 +13,7 @@ Opens in the Tactical battles list mode, after Ready reports melee candidates an
 ## Information Displayed
 
 - A navy panel, using the chrome in the [UI style guide](../ui-style-guide.md), titled "Tactical Battles (N)", where N is the number of rows.
-- One row per candidate hex: a choice, the hex information used by the hex tooltip (including a country flag before each country name), a human unit summary, and an AI unit summary. An empty summary shows an em dash.
+- One row per candidate hex: a choice, the world-hex tooltip for that hex in the same line order (including a country flag before each country name), a human unit summary, and an AI unit summary. An empty summary shows an em dash. See [hex tooltips](hex-tooltips.md).
 - Fight, disabled until a row is chosen.
 - Ignore.
 

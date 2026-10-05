@@ -14,7 +14,7 @@ import type { TechLevel } from './techBonusTypes';
  * Purpose: The Bonuses block follows the match options and the bonuses this unit was born with.
  * When to use: `formatUnitOriginTooltipHtml`.
  * Expected outcome: A disabled option is omitted. An enabled option with nothing recorded for this unit is omitted.
- *   The whole block is `None` when the unit has none of the selected bonuses and no known tech tier. Where the unit stands does not change the block.
+ *   The whole block is `None` when the unit has none of the selected bonuses. A known tech tier is omitted when the tech bonus is off. Where the unit stands does not change the block.
  * Exceptions: None.
  */
 export interface UnitOriginTooltipBonuses {
@@ -46,6 +46,15 @@ export interface UnitOriginTooltipBonuses {
    */
   readonly weatherEnabled: boolean;
   /**
+   * Tech bonus for this match.
+   *
+   * Contract: The Tech line is omitted when this is false, even when a tier is recorded.
+   * When to use: `state.techBonusEnabled`.
+   * Expected outcome: True only for a match that selected the tech bonus.
+   * Exceptions: None.
+   */
+  readonly techEnabled: boolean;
+  /**
    * Acclimation tags the unit keeps from its birth hex.
    *
    * Contract: Used only when the weather bonus is on. Empty or omitted means the unit has no weather bonus.
@@ -57,7 +66,7 @@ export interface UnitOriginTooltipBonuses {
   /**
    * Tech tier of this unit's birth hex.
    *
-   * Contract: Optional. The Tech row is shown for `basic` and `advanced`. A missing tier is omitted.
+   * Contract: Optional. The Tech row is shown for `basic` and `advanced` only when `techEnabled` is true. A missing tier is omitted.
    * When to use: The snapshot tier, or the tier remembered from the birth hex after the unit is gone.
    * Expected outcome: `basic` adds the basic icon and the word Basic. `advanced` adds the advanced icon and the word Advanced. Both follow Weather.
    * Exceptions: None.
@@ -101,7 +110,7 @@ function bonusRow(label: string, value: string): string {
  *
  * Purpose: Every flag hover, including loss toasts, lists the bonuses this unit carries. The unit name stays on the label beside the flag.
  * When to use: When creating a unit flag. The result is stored on the flag and assigned to the tooltip's `innerHTML`.
- * Expected outcome: Bold `Bonuses:`, then one row per bonus the unit was born with. Country is the birth country, terrain is the birth terrain, and weather is the birth-hex tags. Tech follows when the unit has a known tier. A line is omitted when that option is off or the unit has none. No selected bonus, and no known tech tier, is `Bonuses:` and then `None`. Where the unit stands does not change the text.
+ * Expected outcome: Bold `Bonuses:`, then one row per bonus the unit was born with. Country is the birth country, terrain is the birth terrain, and weather is the birth-hex tags. Tech follows when the match tech bonus is on and the unit has a known tier. A line is omitted when that option is off or the unit has none. No selected bonus is `Bonuses:` and then `None`. Where the unit stands does not change the text.
  * Exceptions: None.
  */
 export function formatUnitOriginTooltipHtml(input: {
@@ -121,7 +130,7 @@ export function formatUnitOriginTooltipHtml(input: {
     const tags = weatherTagsInDisplayOrder(input.bonuses.weatherTags);
     if (tags.length > 0) rows.push(bonusRow('Weather', tags.map((tag) => formatWeatherIconHtml(tag)).join(', ')));
   }
-  if (input.bonuses.techLevel === 'basic' || input.bonuses.techLevel === 'advanced') {
+  if (input.bonuses.techEnabled && (input.bonuses.techLevel === 'basic' || input.bonuses.techLevel === 'advanced')) {
     rows.push(bonusRow('Tech', formatTechTierHtml(input.bonuses.techLevel)));
   }
   const body = rows.length > 0 ? rows.join('\n') : 'None';
