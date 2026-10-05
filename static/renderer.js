@@ -21930,12 +21930,12 @@ ${body}`;
     return `<img class="${STATUS_ICON_CLASS_NAME}" src="${src}" alt="${alt}" />`;
   }
   function formatEffectSymbolPrefixHtml(symbols) {
-    let html = "";
+    const icons = [];
     for (const symbol of symbols) {
       const kind = EFFECT_SYMBOL_KIND[symbol];
-      if (kind) html += formatStatusIconHtml(kind);
+      if (kind) icons.push(formatStatusIconHtml(kind));
     }
-    return html;
+    return icons.join("/");
   }
 
   // src/shared/terrainEffectsForTooltip.ts
