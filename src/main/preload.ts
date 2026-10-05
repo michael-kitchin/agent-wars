@@ -14,6 +14,7 @@ import type {
   HumanOrderPreviewResult,
   HumanOrderGroupPreviewResult,
   HumanStandingOrderSnapshot,
+  Res1BaselineUrbanHexCountRow,
   Res4TerrainOverrideRow,
   Res4CityOverlayRow,
   Res4RoadRailOverlayRow,
@@ -58,6 +59,7 @@ const IPC_GAME = {
   getRes4CityOverlays: 'game:getRes4CityOverlays',
   getRes4RoadRailOverlays: 'game:getRes4RoadRailOverlays',
   getRes4TransportVectorOverlays: 'game:getRes4TransportVectorOverlays',
+  getRes1BaselineUrbanHexCounts: 'game:getRes1BaselineUrbanHexCounts',
   getHexNamingTooltipLine: 'game:getHexNamingTooltipLine',
   getHexContinentNames: 'game:getHexContinentNames',
   listScenarioHomeRegions: 'game:listScenarioHomeRegions',
@@ -210,6 +212,16 @@ getRes4RoadRailOverlays: (): Promise<Res4RoadRailOverlayRow[]> =>
    */
 getRes4TransportVectorOverlays: (): Promise<Res4TransportVectorOverlayRow[]> =>
     ipcRenderer.invoke(IPC_GAME.getRes4TransportVectorOverlays),
+  /**
+   * Fetches the generated urban-cell count for each res1 hex that can produce units.
+   *
+   * Purpose: The hex tooltip and the build popup classify tech from this baseline, which air strikes do not change.
+   * When to use: Once per renderer session, beside the static res4 overlay load.
+   * Expected outcome: Resolves to rows with a positive count, or an empty array when the cache is not loaded.
+   * Exceptions: Rejects on IPC transport failures. A handler failure resolves to an empty array.
+   */
+  getRes1BaselineUrbanHexCounts: (): Promise<Res1BaselineUrbanHexCountRow[]> =>
+    ipcRenderer.invoke(IPC_GAME.getRes1BaselineUrbanHexCounts),
   /**
    * Fetches the structured naming caption (text plus country spans) for a res1 or res4 hex.
    *

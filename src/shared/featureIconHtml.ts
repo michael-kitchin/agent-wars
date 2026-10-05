@@ -8,6 +8,7 @@
  */
 
 import { escapeHtmlText } from './htmlTextFormatting';
+import { techLevelFromUrbanHexCount } from './techBonusRules';
 import type { TechLevel } from './techBonusTypes';
 
 /**
@@ -95,4 +96,22 @@ export function formatFeatureLabelHtml(label: string): string {
 export function formatTechTierHtml(level: TechLevel): string {
   if (level === 'advanced') return formatFeatureIconHtml('tech/tech_advanced.svg', 'Advanced');
   return formatFeatureIconHtml('tech/tech_basic.svg', 'Basic');
+}
+
+/**
+ * Returns the Tech line for units a res1 hex will produce, or null when that line does not apply.
+ *
+ * Purpose: The hex tooltip and the build popup name the hex's tier with the same icon and word as a unit tooltip.
+ * When to use: Under the hex name on a res1 surface, passing the match's tech flag and the hex's generated urban count.
+ * Expected outcome: Null when tech is off, or when the count is not finite or not positive. Otherwise `Tech:` plus the Basic or Advanced icon. Low and High use the same line.
+ * Exceptions: None.
+ */
+export function formatProducedUnitTechLineHtml(input: {
+  readonly techBonusEnabled: boolean;
+  readonly baselineUrbanHexCount: number;
+}): string | null {
+  if (input.techBonusEnabled !== true) return null;
+  if (!Number.isFinite(input.baselineUrbanHexCount) || input.baselineUrbanHexCount <= 0) return null;
+  const level = techLevelFromUrbanHexCount(input.baselineUrbanHexCount);
+  return `<strong>Tech:</strong> ${formatTechTierHtml(level)}`;
 }

@@ -780,6 +780,15 @@ res4TerrainOverridesByH3: new Map<
    */
 res4CityOverlayLabelByH3: new Map<string, string>(),
     /**
+   * Generated urban-cell count for each res1 hex that can produce units.
+   *
+   * Purpose: The hex tooltip and the build popup classify tech from this baseline, which air strikes do not change.
+   * When to use: Hydrated once per session from `game:getRes1BaselineUrbanHexCounts`. A missing hex produces nothing.
+   * Expected outcome: Keys are res1 indexes. Values are integers of at least 1.
+   * Exceptions: None.
+   */
+baselineUrbanHexCountByRes1H3: new Map<string, number>(),
+    /**
    * Documents the object literal property `res4RoadRailSidesByH3` (res4RoadRailSidesByH3: new Map<string, { roadSides: boolean[]; railSides: boolean[] }>()).
 
    * Purpose: Caches road/rail side masks for res4 cells used by the res4 transport overlay renderer (gameplay truth: booleans).

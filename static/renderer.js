@@ -14905,6 +14905,15 @@
        */
     res4CityOverlayLabelByH3: /* @__PURE__ */ new Map(),
     /**
+    * Generated urban-cell count for each res1 hex that can produce units.
+    *
+    * Purpose: The hex tooltip and the build popup classify tech from this baseline, which air strikes do not change.
+    * When to use: Hydrated once per session from `game:getRes1BaselineUrbanHexCounts`. A missing hex produces nothing.
+    * Expected outcome: Keys are res1 indexes. Values are integers of at least 1.
+    * Exceptions: None.
+    */
+    baselineUrbanHexCountByRes1H3: /* @__PURE__ */ new Map(),
+    /**
        * Documents the object literal property `res4RoadRailSidesByH3` (res4RoadRailSidesByH3: new Map<string, { roadSides: boolean[]; railSides: boolean[] }>()).
     
        * Purpose: Caches road/rail side masks for res4 cells used by the res4 transport overlay renderer (gameplay truth: booleans).
@@ -15866,6 +15875,361 @@
     return `<img class="${WEATHER_ICON_CLASS_NAME}" src="${src}" alt="" aria-hidden="true" />${escapeHtmlText(label)}`;
   }
 
+  // src/shared/tacticalRanges.ts
+  var MOVEMENT_RANGE_BY_UNIT_TYPE = Object.freeze({
+    infantry: 2,
+    armor: 4,
+    naval: 3,
+    air: 0
+  });
+  var RANGED_RANGE_BY_UNIT_TYPE = Object.freeze({
+    infantry: 2,
+    armor: 5,
+    naval: 10,
+    air: 99
+  });
+  function unitHasTacticalRangedBaseline(unitType) {
+    return (RANGED_RANGE_BY_UNIT_TYPE[unitType] ?? 0) >= 1;
+  }
+  var AIR_STRIKE_RANGE_HEXES = 3;
+
+  // src/shared/tacticalRes4TransportLink.ts
+  var orderedRingMemo = /* @__PURE__ */ new Map();
+  var ORDERED_RING_MEMO_CAPACITY = 1e3;
+  function res4GridDiskNeighborsOrdered(fromH3) {
+    const cached = orderedRingMemo.get(fromH3);
+    if (cached !== void 0) return cached;
+    let ring;
+    try {
+      ring = [...gridDisk(fromH3, 1)].filter((h) => h !== fromH3);
+    } catch {
+      ring = [];
+    }
+    if (orderedRingMemo.size >= ORDERED_RING_MEMO_CAPACITY) {
+      const oldest = orderedRingMemo.keys().next().value;
+      if (oldest !== void 0) orderedRingMemo.delete(oldest);
+    }
+    orderedRingMemo.set(fromH3, ring);
+    return ring;
+  }
+  function res4NeighborsInFootprint(h, res4Set) {
+    const out = [];
+    try {
+      for (const n of gridDisk(h, 1)) {
+        if (n !== h && res4Set.has(n)) out.push(n);
+      }
+    } catch {
+      return out;
+    }
+    return out;
+  }
+  function tacticalRes4TransportMaskHasAnyRoadOrRail(masks, ringLen) {
+    const { roadSides, railSides } = masks;
+    if (roadSides.length !== ringLen || railSides.length !== ringLen) return false;
+    for (let i = 0; i < ringLen; i++) {
+      if (roadSides[i] || railSides[i]) return true;
+    }
+    return false;
+  }
+  function tacticalRes4TransportCellHasValidAnySideOverlay(h3, roadRailByH3) {
+    const masks = roadRailByH3.get(h3);
+    if (!masks) return false;
+    const ring = res4GridDiskNeighborsOrdered(h3);
+    return tacticalRes4TransportMaskHasAnyRoadOrRail(masks, ring.length);
+  }
+  function tacticalRes4TransportMarchAdjacentPairAllowsStep(args) {
+    const { fromH3, toH3, roadRailByH3, rubbleByH3 } = args;
+    if (rubbleByH3?.[fromH3] || rubbleByH3?.[toH3]) return false;
+    const ring = res4GridDiskNeighborsOrdered(fromH3);
+    if (ring.indexOf(toH3) < 0) return false;
+    return tacticalRes4TransportCellHasValidAnySideOverlay(fromH3, roadRailByH3) && tacticalRes4TransportCellHasValidAnySideOverlay(toH3, roadRailByH3);
+  }
+  var TACTICAL_TRANSPORT_ROAD_BUDGET_MULTIPLIER = 2;
+  var TACTICAL_TRANSPORT_RAIL_BUDGET_MULTIPLIER = 3;
+
+  // src/shared/tacticalTerrainMovement.ts
+  function normalizeDbTerrainKindToTacticalCategory(effectiveKind, parentTerrain) {
+    const k = (effectiveKind || "").toLowerCase();
+    const pt = (parentTerrain || "").toLowerCase();
+    if (k === "water") return "water";
+    if (k === "coastal") return "coastal";
+    if (k === "forest" || k === "forests") return "forests";
+    if (k === "mountain" || k === "mountains") return "mountains";
+    if (k === "wetland" || k === "wetlands") return "wetlands";
+    if (k === "desert") return "desert";
+    if (k === "arctic") return "arctic";
+    if (k === "plains" || k === "land") return "plains";
+    if (k.length > 0) return "plains";
+    if (pt === "water" || pt === "sea" || pt === "ocean") return "water";
+    return "plains";
+  }
+  function nativeRes4TerrainKindIsWaterOrCoastalForNavalRouting(kind) {
+    const k = (kind || "").toLowerCase();
+    return k === "water" || k === "coastal" || k === "ocean" || k === "sea";
+  }
+  function isInfantryOrArmorTacticalSpawnCell(args) {
+    const k = args.resolvedKindForCell || args.parentTerrainKind;
+    const cat = normalizeDbTerrainKindToTacticalCategory(k, args.parentTerrain);
+    return cat !== "water" && cat !== "arctic";
+  }
+  function tacticalLandUnitMayOccupyCellWithoutTransport(unitType, cellH3, terrain) {
+    if (unitType !== "infantry" && unitType !== "armor") return false;
+    if (terrain.isUrbanRes4?.(cellH3) || terrain.isRubbleRes4?.(cellH3)) return true;
+    const raw = terrain.effectiveKindForRes4Hex(cellH3);
+    const cat = normalizeDbTerrainKindToTacticalCategory(raw, terrain.parentTerrain);
+    return Number.isFinite(tacticalEnterHexMovementCost(unitType, cat));
+  }
+  function isNavalRes4TacticalCellNavigable(args) {
+    const { resolvedKindForCell, parentTerrain, parentTerrainKind, isSeaportCell } = args;
+    if (isSeaportCell) return true;
+    if (nativeRes4TerrainKindIsWaterOrCoastalForNavalRouting(resolvedKindForCell)) return true;
+    void parentTerrainKind;
+    const cat = normalizeDbTerrainKindToTacticalCategory(resolvedKindForCell, parentTerrain);
+    return cat === "water" || cat === "coastal";
+  }
+  function buildRoadRailMapFromRes4RoadRailRecords(roadBy, railBy) {
+    const roadRailByH3 = /* @__PURE__ */ new Map();
+    const transportKeys = /* @__PURE__ */ new Set([...Object.keys(roadBy), ...Object.keys(railBy)]);
+    for (const h3 of transportKeys) {
+      const r = roadBy[h3];
+      const l = railBy[h3];
+      if (!r && !l) continue;
+      const n = Math.max(r?.length ?? 0, l?.length ?? 0);
+      if (n === 0) continue;
+      const roadSides = r ?? Array.from({ length: n }, () => false);
+      const railSides = l ?? Array.from({ length: n }, () => false);
+      if (roadSides.length !== railSides.length) continue;
+      roadRailByH3.set(h3, { roadSides, railSides });
+    }
+    return roadRailByH3;
+  }
+  function tacticalTerrainTransportResolverFnsFromRoadRailMap(roadRailByH3, rubbleByH3) {
+    if (roadRailByH3.size === 0) {
+      return { transportFromTo: void 0, landTransportMarchContext: void 0 };
+    }
+    const transportFromTo = (fromH3, toH3) => tacticalRes4TransportMarchAdjacentPairAllowsStep({
+      fromH3,
+      toH3,
+      roadRailByH3,
+      rubbleByH3
+    });
+    return {
+      transportFromTo,
+      landTransportMarchContext: { roadRailByH3, rubbleByH3 }
+    };
+  }
+  function tacticalEnterHexMovementCost(unitType, category) {
+    if (unitType === "infantry") {
+      switch (category) {
+        case "plains":
+        case "desert":
+        case "wetlands":
+        case "arctic":
+        case "coastal":
+          return 1;
+        case "forests":
+        case "mountains":
+          return 2;
+        case "water":
+          return Infinity;
+        default:
+          return 1;
+      }
+    }
+    if (unitType === "armor") {
+      switch (category) {
+        case "plains":
+        case "desert":
+          return 1;
+        case "forests":
+        case "coastal":
+          return 2;
+        case "mountains":
+        case "wetlands":
+        case "arctic":
+        case "water":
+          return Infinity;
+        default:
+          return 1;
+      }
+    }
+    if (unitType === "naval") {
+      switch (category) {
+        case "water":
+        case "coastal":
+          return 1;
+        default:
+          return Infinity;
+      }
+    }
+    return Infinity;
+  }
+  function buildTacticalTerrainKindResolverFromSnapshot(battle) {
+    const parentTerrain = battle.strategicHexTerrain ?? "land";
+    const parentKind = battle.strategicHexTerrainKind ?? "plains";
+    const map = battle.res4TerrainKindByH3 ?? {};
+    const seaportMap = battle.res4IsSeaportByH3 ?? {};
+    const urbanMap = battle.res4IsUrbanByH3 ?? {};
+    const rubbleMap = battle.res4IsRubbleByH3 ?? {};
+    const roadBy = battle.res4RoadSidesByH3 ?? {};
+    const railBy = battle.res4RailSidesByH3 ?? {};
+    const roadRailByH3 = buildRoadRailMapFromRes4RoadRailRecords(roadBy, railBy);
+    const { transportFromTo: transportFromToFn, landTransportMarchContext } = tacticalTerrainTransportResolverFnsFromRoadRailMap(roadRailByH3, rubbleMap);
+    return {
+      parentTerrain,
+      parentTerrainKind: parentKind,
+      transportFromTo: transportFromToFn,
+      landTransportMarchContext,
+      effectiveKindForRes4Hex(h3) {
+        const raw = map[h3];
+        if (raw == null) return parentKind;
+        const trimmed = String(raw).trim();
+        return trimmed.length > 0 ? trimmed : parentKind;
+      },
+      isSeaportRes4(h3) {
+        return !!seaportMap[h3];
+      },
+      isUrbanRes4(h3) {
+        return !!urbanMap[h3];
+      },
+      isRubbleRes4(h3) {
+        return !!rubbleMap[h3];
+      }
+    };
+  }
+  function tacticalMovementUnitTypeForPathfinding(unit, _toH3Index) {
+    void _toH3Index;
+    if (unit.unitType === "air") return "air";
+    const embarked = (unit.unitType === "infantry" || unit.unitType === "armor") && !!unit.embarkedOnSubUnitId && unit.embarkedOnSubUnitId.length > 0;
+    if (embarked) {
+      return "naval";
+    }
+    return unit.unitType;
+  }
+  function tacticalTerrainLayerSignature(battle) {
+    const parentTerrain = battle.strategicHexTerrain ?? "";
+    const parentKind = battle.strategicHexTerrainKind ?? "";
+    const map = battle.res4TerrainKindByH3;
+    const sp = battle.res4IsSeaportByH3;
+    const spBody = !sp ? "" : Object.entries(sp).filter(([, v]) => v).map(([h3]) => h3).sort((a, b) => a.localeCompare(b)).join(";");
+    const urban = battle.res4IsUrbanByH3;
+    const urbanBody = !urban ? "" : Object.entries(urban).filter(([, v]) => v).map(([h3]) => h3).sort((a, b) => a.localeCompare(b)).join(";");
+    const rubble = battle.res4IsRubbleByH3;
+    const rubbleBody = !rubble ? "" : Object.entries(rubble).filter(([, v]) => v).map(([h3]) => h3).sort((a, b) => a.localeCompare(b)).join(";");
+    const road = battle.res4RoadSidesByH3;
+    const rail = battle.res4RailSidesByH3;
+    const trKeys = /* @__PURE__ */ new Set([...road ? Object.keys(road) : [], ...rail ? Object.keys(rail) : []]);
+    const trBody = trKeys.size === 0 ? "" : [...trKeys].sort((a, b) => a.localeCompare(b)).map((h3) => {
+      const r = road?.[h3] ?? [];
+      const l = rail?.[h3] ?? [];
+      const n = Math.max(r.length, l.length);
+      let s = `${h3}:`;
+      for (let i = 0; i < n; i++) {
+        s += (r[i] ? "1" : "0") + (l[i] ? "1" : "0");
+      }
+      return s;
+    }).join(";");
+    if (!map || Object.keys(map).length === 0) {
+      return `${parentTerrain}|${parentKind}||sp:${spBody}|u:${urbanBody}|rb:${rubbleBody}|tr:${trBody}`;
+    }
+    const body = Object.entries(map).sort(([a], [b]) => a.localeCompare(b)).map(([h3, kind]) => `${h3}:${kind}`).join(";");
+    return `${parentTerrain}|${parentKind}|${body}|sp:${spBody}|u:${urbanBody}|rb:${rubbleBody}|tr:${trBody}`;
+  }
+
+  // src/shared/tacticalTerrainCombatModifiers.ts
+  function effectiveRes4TerrainKindString(battle, res4H3) {
+    const fromMap = battle.res4TerrainKindByH3?.[res4H3];
+    if (fromMap !== void 0 && fromMap !== null && String(fromMap).trim().length > 0) {
+      return String(fromMap);
+    }
+    return battle.strategicHexTerrainKind ?? "plains";
+  }
+  function tacticalRes4MovementCategory(battle, res4H3) {
+    const kind = effectiveRes4TerrainKindString(battle, res4H3);
+    const parentTerrain = battle.strategicHexTerrain ?? "land";
+    return normalizeDbTerrainKindToTacticalCategory(kind, parentTerrain);
+  }
+  function tacticalRes4CellIsMountain(battle, res4H3) {
+    return tacticalRes4MovementCategory(battle, res4H3) === "mountains";
+  }
+  function tacticalRes4CellIsUrbanOrRubble(battle, res4H3) {
+    return !!battle.res4IsRubbleByH3?.[res4H3] || !!battle.res4IsUrbanByH3?.[res4H3];
+  }
+  function tacticalRes4CellIsForestClass(battle, res4H3) {
+    return tacticalRes4MovementCategory(battle, res4H3) === "forests";
+  }
+  function tacticalMovementTerrainAnchorH3(u, subUnits) {
+    const emb = u.embarkedOnSubUnitId;
+    if (emb && (u.unitType === "infantry" || u.unitType === "armor")) {
+      const naval = subUnits.find((x) => x.id === emb && x.unitType === "naval");
+      if (naval) return naval.h3Index;
+    }
+    return u.h3Index;
+  }
+  function tacticalForestUrbanRubbleRangedCapActive(battle, attackerAnchorH3) {
+    if (tacticalRes4CellIsUrbanOrRubble(battle, attackerAnchorH3)) return true;
+    return tacticalRes4CellIsForestClass(battle, attackerAnchorH3);
+  }
+  function effectiveTacticalRangedMaxRangeForAttacker(battle, unitType, attackerAnchorH3) {
+    const baseline = RANGED_RANGE_BY_UNIT_TYPE[unitType] ?? 0;
+    if ((unitType === "infantry" || unitType === "armor") && tacticalForestUrbanRubbleRangedCapActive(battle, attackerAnchorH3)) {
+      return Math.min(baseline, 1);
+    }
+    return baseline;
+  }
+  function effectiveTacticalMovementPointBudgetForMarchLeg(battle, subUnit, allSubUnits, moveType) {
+    const anchor = tacticalMovementTerrainAnchorH3(subUnit, allSubUnits);
+    const base = MOVEMENT_RANGE_BY_UNIT_TYPE[moveType] ?? MOVEMENT_RANGE_BY_UNIT_TYPE[subUnit.unitType] ?? 1;
+    let budget;
+    if (subUnit.unitType === "infantry" || subUnit.unitType === "armor") {
+      if (tacticalRes4CellIsUrbanOrRubble(battle, anchor)) {
+        budget = Math.max(0, 1);
+      } else if (subUnit.unitType === "armor" && tacticalRes4CellIsForestClass(battle, anchor)) {
+        const inf = MOVEMENT_RANGE_BY_UNIT_TYPE.infantry ?? 2;
+        budget = Math.max(0, inf);
+      } else {
+        budget = Math.max(0, base);
+      }
+    } else {
+      budget = Math.max(0, base);
+    }
+    if (budget === 0 && moveType !== "air" && subUnit.unitType !== "air") {
+      return 1;
+    }
+    return tacticalWeatherMovementBudget({
+      unitType: subUnit.unitType,
+      printedBudget: budget,
+      weather: battle.weather,
+      tags: subUnit.weatherTags,
+      level: weatherBonusLevelOf(battle)
+    });
+  }
+
+  // src/shared/originBonusRules.ts
+  var ORIGIN_HIT_BONUS_BY_LEVEL = Object.freeze({
+    low: 2,
+    high: 4
+  });
+  var ORIGIN_BONUS_OFF = Object.freeze({
+    countryBonusEnabled: false,
+    terrainBonusEnabled: false
+  });
+  var TERRAIN_KIND_ALIASES = Object.freeze({
+    ocean: "water",
+    sea: "water",
+    forests: "forest",
+    mountains: "mountain",
+    wetland: "wetlands"
+  });
+
+  // src/shared/techBonusRules.ts
+  var TECH_ADVANCED_MIN_URBAN_HEX_COUNT = 21;
+  var TECH_HIT_BONUS = Object.freeze({ attack: 2, defense: 2 });
+  function techLevelFromUrbanHexCount(urbanHexCount) {
+    if (urbanHexCount == null || !Number.isFinite(urbanHexCount)) return "basic";
+    return urbanHexCount >= TECH_ADVANCED_MIN_URBAN_HEX_COUNT ? "advanced" : "basic";
+  }
+
   // src/shared/featureIconHtml.ts
   var FEATURE_ICON_CLASS_NAME = "feature-icon";
   function formatFeatureIconHtml(src, label) {
@@ -15891,6 +16255,12 @@
   function formatTechTierHtml(level) {
     if (level === "advanced") return formatFeatureIconHtml("tech/tech_advanced.svg", "Advanced");
     return formatFeatureIconHtml("tech/tech_basic.svg", "Basic");
+  }
+  function formatProducedUnitTechLineHtml(input) {
+    if (input.techBonusEnabled !== true) return null;
+    if (!Number.isFinite(input.baselineUrbanHexCount) || input.baselineUrbanHexCount <= 0) return null;
+    const level = techLevelFromUrbanHexCount(input.baselineUrbanHexCount);
+    return `<strong>Tech:</strong> ${formatTechTierHtml(level)}`;
   }
 
   // src/shared/unitOriginTooltipText.ts
@@ -18437,336 +18807,6 @@ ${body}`;
       return true;
     }
     return false;
-  }
-
-  // src/shared/tacticalRanges.ts
-  var MOVEMENT_RANGE_BY_UNIT_TYPE = Object.freeze({
-    infantry: 2,
-    armor: 4,
-    naval: 3,
-    air: 0
-  });
-  var RANGED_RANGE_BY_UNIT_TYPE = Object.freeze({
-    infantry: 2,
-    armor: 5,
-    naval: 10,
-    air: 99
-  });
-  function unitHasTacticalRangedBaseline(unitType) {
-    return (RANGED_RANGE_BY_UNIT_TYPE[unitType] ?? 0) >= 1;
-  }
-  var AIR_STRIKE_RANGE_HEXES = 3;
-
-  // src/shared/tacticalRes4TransportLink.ts
-  var orderedRingMemo = /* @__PURE__ */ new Map();
-  var ORDERED_RING_MEMO_CAPACITY = 1e3;
-  function res4GridDiskNeighborsOrdered(fromH3) {
-    const cached = orderedRingMemo.get(fromH3);
-    if (cached !== void 0) return cached;
-    let ring;
-    try {
-      ring = [...gridDisk(fromH3, 1)].filter((h) => h !== fromH3);
-    } catch {
-      ring = [];
-    }
-    if (orderedRingMemo.size >= ORDERED_RING_MEMO_CAPACITY) {
-      const oldest = orderedRingMemo.keys().next().value;
-      if (oldest !== void 0) orderedRingMemo.delete(oldest);
-    }
-    orderedRingMemo.set(fromH3, ring);
-    return ring;
-  }
-  function res4NeighborsInFootprint(h, res4Set) {
-    const out = [];
-    try {
-      for (const n of gridDisk(h, 1)) {
-        if (n !== h && res4Set.has(n)) out.push(n);
-      }
-    } catch {
-      return out;
-    }
-    return out;
-  }
-  function tacticalRes4TransportMaskHasAnyRoadOrRail(masks, ringLen) {
-    const { roadSides, railSides } = masks;
-    if (roadSides.length !== ringLen || railSides.length !== ringLen) return false;
-    for (let i = 0; i < ringLen; i++) {
-      if (roadSides[i] || railSides[i]) return true;
-    }
-    return false;
-  }
-  function tacticalRes4TransportCellHasValidAnySideOverlay(h3, roadRailByH3) {
-    const masks = roadRailByH3.get(h3);
-    if (!masks) return false;
-    const ring = res4GridDiskNeighborsOrdered(h3);
-    return tacticalRes4TransportMaskHasAnyRoadOrRail(masks, ring.length);
-  }
-  function tacticalRes4TransportMarchAdjacentPairAllowsStep(args) {
-    const { fromH3, toH3, roadRailByH3, rubbleByH3 } = args;
-    if (rubbleByH3?.[fromH3] || rubbleByH3?.[toH3]) return false;
-    const ring = res4GridDiskNeighborsOrdered(fromH3);
-    if (ring.indexOf(toH3) < 0) return false;
-    return tacticalRes4TransportCellHasValidAnySideOverlay(fromH3, roadRailByH3) && tacticalRes4TransportCellHasValidAnySideOverlay(toH3, roadRailByH3);
-  }
-  var TACTICAL_TRANSPORT_ROAD_BUDGET_MULTIPLIER = 2;
-  var TACTICAL_TRANSPORT_RAIL_BUDGET_MULTIPLIER = 3;
-
-  // src/shared/tacticalTerrainMovement.ts
-  function normalizeDbTerrainKindToTacticalCategory(effectiveKind, parentTerrain) {
-    const k = (effectiveKind || "").toLowerCase();
-    const pt = (parentTerrain || "").toLowerCase();
-    if (k === "water") return "water";
-    if (k === "coastal") return "coastal";
-    if (k === "forest" || k === "forests") return "forests";
-    if (k === "mountain" || k === "mountains") return "mountains";
-    if (k === "wetland" || k === "wetlands") return "wetlands";
-    if (k === "desert") return "desert";
-    if (k === "arctic") return "arctic";
-    if (k === "plains" || k === "land") return "plains";
-    if (k.length > 0) return "plains";
-    if (pt === "water" || pt === "sea" || pt === "ocean") return "water";
-    return "plains";
-  }
-  function nativeRes4TerrainKindIsWaterOrCoastalForNavalRouting(kind) {
-    const k = (kind || "").toLowerCase();
-    return k === "water" || k === "coastal" || k === "ocean" || k === "sea";
-  }
-  function isInfantryOrArmorTacticalSpawnCell(args) {
-    const k = args.resolvedKindForCell || args.parentTerrainKind;
-    const cat = normalizeDbTerrainKindToTacticalCategory(k, args.parentTerrain);
-    return cat !== "water" && cat !== "arctic";
-  }
-  function tacticalLandUnitMayOccupyCellWithoutTransport(unitType, cellH3, terrain) {
-    if (unitType !== "infantry" && unitType !== "armor") return false;
-    if (terrain.isUrbanRes4?.(cellH3) || terrain.isRubbleRes4?.(cellH3)) return true;
-    const raw = terrain.effectiveKindForRes4Hex(cellH3);
-    const cat = normalizeDbTerrainKindToTacticalCategory(raw, terrain.parentTerrain);
-    return Number.isFinite(tacticalEnterHexMovementCost(unitType, cat));
-  }
-  function isNavalRes4TacticalCellNavigable(args) {
-    const { resolvedKindForCell, parentTerrain, parentTerrainKind, isSeaportCell } = args;
-    if (isSeaportCell) return true;
-    if (nativeRes4TerrainKindIsWaterOrCoastalForNavalRouting(resolvedKindForCell)) return true;
-    void parentTerrainKind;
-    const cat = normalizeDbTerrainKindToTacticalCategory(resolvedKindForCell, parentTerrain);
-    return cat === "water" || cat === "coastal";
-  }
-  function buildRoadRailMapFromRes4RoadRailRecords(roadBy, railBy) {
-    const roadRailByH3 = /* @__PURE__ */ new Map();
-    const transportKeys = /* @__PURE__ */ new Set([...Object.keys(roadBy), ...Object.keys(railBy)]);
-    for (const h3 of transportKeys) {
-      const r = roadBy[h3];
-      const l = railBy[h3];
-      if (!r && !l) continue;
-      const n = Math.max(r?.length ?? 0, l?.length ?? 0);
-      if (n === 0) continue;
-      const roadSides = r ?? Array.from({ length: n }, () => false);
-      const railSides = l ?? Array.from({ length: n }, () => false);
-      if (roadSides.length !== railSides.length) continue;
-      roadRailByH3.set(h3, { roadSides, railSides });
-    }
-    return roadRailByH3;
-  }
-  function tacticalTerrainTransportResolverFnsFromRoadRailMap(roadRailByH3, rubbleByH3) {
-    if (roadRailByH3.size === 0) {
-      return { transportFromTo: void 0, landTransportMarchContext: void 0 };
-    }
-    const transportFromTo = (fromH3, toH3) => tacticalRes4TransportMarchAdjacentPairAllowsStep({
-      fromH3,
-      toH3,
-      roadRailByH3,
-      rubbleByH3
-    });
-    return {
-      transportFromTo,
-      landTransportMarchContext: { roadRailByH3, rubbleByH3 }
-    };
-  }
-  function tacticalEnterHexMovementCost(unitType, category) {
-    if (unitType === "infantry") {
-      switch (category) {
-        case "plains":
-        case "desert":
-        case "wetlands":
-        case "arctic":
-        case "coastal":
-          return 1;
-        case "forests":
-        case "mountains":
-          return 2;
-        case "water":
-          return Infinity;
-        default:
-          return 1;
-      }
-    }
-    if (unitType === "armor") {
-      switch (category) {
-        case "plains":
-        case "desert":
-          return 1;
-        case "forests":
-        case "coastal":
-          return 2;
-        case "mountains":
-        case "wetlands":
-        case "arctic":
-        case "water":
-          return Infinity;
-        default:
-          return 1;
-      }
-    }
-    if (unitType === "naval") {
-      switch (category) {
-        case "water":
-        case "coastal":
-          return 1;
-        default:
-          return Infinity;
-      }
-    }
-    return Infinity;
-  }
-  function buildTacticalTerrainKindResolverFromSnapshot(battle) {
-    const parentTerrain = battle.strategicHexTerrain ?? "land";
-    const parentKind = battle.strategicHexTerrainKind ?? "plains";
-    const map = battle.res4TerrainKindByH3 ?? {};
-    const seaportMap = battle.res4IsSeaportByH3 ?? {};
-    const urbanMap = battle.res4IsUrbanByH3 ?? {};
-    const rubbleMap = battle.res4IsRubbleByH3 ?? {};
-    const roadBy = battle.res4RoadSidesByH3 ?? {};
-    const railBy = battle.res4RailSidesByH3 ?? {};
-    const roadRailByH3 = buildRoadRailMapFromRes4RoadRailRecords(roadBy, railBy);
-    const { transportFromTo: transportFromToFn, landTransportMarchContext } = tacticalTerrainTransportResolverFnsFromRoadRailMap(roadRailByH3, rubbleMap);
-    return {
-      parentTerrain,
-      parentTerrainKind: parentKind,
-      transportFromTo: transportFromToFn,
-      landTransportMarchContext,
-      effectiveKindForRes4Hex(h3) {
-        const raw = map[h3];
-        if (raw == null) return parentKind;
-        const trimmed = String(raw).trim();
-        return trimmed.length > 0 ? trimmed : parentKind;
-      },
-      isSeaportRes4(h3) {
-        return !!seaportMap[h3];
-      },
-      isUrbanRes4(h3) {
-        return !!urbanMap[h3];
-      },
-      isRubbleRes4(h3) {
-        return !!rubbleMap[h3];
-      }
-    };
-  }
-  function tacticalMovementUnitTypeForPathfinding(unit, _toH3Index) {
-    void _toH3Index;
-    if (unit.unitType === "air") return "air";
-    const embarked = (unit.unitType === "infantry" || unit.unitType === "armor") && !!unit.embarkedOnSubUnitId && unit.embarkedOnSubUnitId.length > 0;
-    if (embarked) {
-      return "naval";
-    }
-    return unit.unitType;
-  }
-  function tacticalTerrainLayerSignature(battle) {
-    const parentTerrain = battle.strategicHexTerrain ?? "";
-    const parentKind = battle.strategicHexTerrainKind ?? "";
-    const map = battle.res4TerrainKindByH3;
-    const sp = battle.res4IsSeaportByH3;
-    const spBody = !sp ? "" : Object.entries(sp).filter(([, v]) => v).map(([h3]) => h3).sort((a, b) => a.localeCompare(b)).join(";");
-    const urban = battle.res4IsUrbanByH3;
-    const urbanBody = !urban ? "" : Object.entries(urban).filter(([, v]) => v).map(([h3]) => h3).sort((a, b) => a.localeCompare(b)).join(";");
-    const rubble = battle.res4IsRubbleByH3;
-    const rubbleBody = !rubble ? "" : Object.entries(rubble).filter(([, v]) => v).map(([h3]) => h3).sort((a, b) => a.localeCompare(b)).join(";");
-    const road = battle.res4RoadSidesByH3;
-    const rail = battle.res4RailSidesByH3;
-    const trKeys = /* @__PURE__ */ new Set([...road ? Object.keys(road) : [], ...rail ? Object.keys(rail) : []]);
-    const trBody = trKeys.size === 0 ? "" : [...trKeys].sort((a, b) => a.localeCompare(b)).map((h3) => {
-      const r = road?.[h3] ?? [];
-      const l = rail?.[h3] ?? [];
-      const n = Math.max(r.length, l.length);
-      let s = `${h3}:`;
-      for (let i = 0; i < n; i++) {
-        s += (r[i] ? "1" : "0") + (l[i] ? "1" : "0");
-      }
-      return s;
-    }).join(";");
-    if (!map || Object.keys(map).length === 0) {
-      return `${parentTerrain}|${parentKind}||sp:${spBody}|u:${urbanBody}|rb:${rubbleBody}|tr:${trBody}`;
-    }
-    const body = Object.entries(map).sort(([a], [b]) => a.localeCompare(b)).map(([h3, kind]) => `${h3}:${kind}`).join(";");
-    return `${parentTerrain}|${parentKind}|${body}|sp:${spBody}|u:${urbanBody}|rb:${rubbleBody}|tr:${trBody}`;
-  }
-
-  // src/shared/tacticalTerrainCombatModifiers.ts
-  function effectiveRes4TerrainKindString(battle, res4H3) {
-    const fromMap = battle.res4TerrainKindByH3?.[res4H3];
-    if (fromMap !== void 0 && fromMap !== null && String(fromMap).trim().length > 0) {
-      return String(fromMap);
-    }
-    return battle.strategicHexTerrainKind ?? "plains";
-  }
-  function tacticalRes4MovementCategory(battle, res4H3) {
-    const kind = effectiveRes4TerrainKindString(battle, res4H3);
-    const parentTerrain = battle.strategicHexTerrain ?? "land";
-    return normalizeDbTerrainKindToTacticalCategory(kind, parentTerrain);
-  }
-  function tacticalRes4CellIsMountain(battle, res4H3) {
-    return tacticalRes4MovementCategory(battle, res4H3) === "mountains";
-  }
-  function tacticalRes4CellIsUrbanOrRubble(battle, res4H3) {
-    return !!battle.res4IsRubbleByH3?.[res4H3] || !!battle.res4IsUrbanByH3?.[res4H3];
-  }
-  function tacticalRes4CellIsForestClass(battle, res4H3) {
-    return tacticalRes4MovementCategory(battle, res4H3) === "forests";
-  }
-  function tacticalMovementTerrainAnchorH3(u, subUnits) {
-    const emb = u.embarkedOnSubUnitId;
-    if (emb && (u.unitType === "infantry" || u.unitType === "armor")) {
-      const naval = subUnits.find((x) => x.id === emb && x.unitType === "naval");
-      if (naval) return naval.h3Index;
-    }
-    return u.h3Index;
-  }
-  function tacticalForestUrbanRubbleRangedCapActive(battle, attackerAnchorH3) {
-    if (tacticalRes4CellIsUrbanOrRubble(battle, attackerAnchorH3)) return true;
-    return tacticalRes4CellIsForestClass(battle, attackerAnchorH3);
-  }
-  function effectiveTacticalRangedMaxRangeForAttacker(battle, unitType, attackerAnchorH3) {
-    const baseline = RANGED_RANGE_BY_UNIT_TYPE[unitType] ?? 0;
-    if ((unitType === "infantry" || unitType === "armor") && tacticalForestUrbanRubbleRangedCapActive(battle, attackerAnchorH3)) {
-      return Math.min(baseline, 1);
-    }
-    return baseline;
-  }
-  function effectiveTacticalMovementPointBudgetForMarchLeg(battle, subUnit, allSubUnits, moveType) {
-    const anchor = tacticalMovementTerrainAnchorH3(subUnit, allSubUnits);
-    const base = MOVEMENT_RANGE_BY_UNIT_TYPE[moveType] ?? MOVEMENT_RANGE_BY_UNIT_TYPE[subUnit.unitType] ?? 1;
-    let budget;
-    if (subUnit.unitType === "infantry" || subUnit.unitType === "armor") {
-      if (tacticalRes4CellIsUrbanOrRubble(battle, anchor)) {
-        budget = Math.max(0, 1);
-      } else if (subUnit.unitType === "armor" && tacticalRes4CellIsForestClass(battle, anchor)) {
-        const inf = MOVEMENT_RANGE_BY_UNIT_TYPE.infantry ?? 2;
-        budget = Math.max(0, inf);
-      } else {
-        budget = Math.max(0, base);
-      }
-    } else {
-      budget = Math.max(0, base);
-    }
-    if (budget === 0 && moveType !== "air" && subUnit.unitType !== "air") {
-      return 1;
-    }
-    return tacticalWeatherMovementBudget({
-      unitType: subUnit.unitType,
-      printedBudget: budget,
-      weather: battle.weather,
-      tags: subUnit.weatherTags,
-      level: weatherBonusLevelOf(battle)
-    });
   }
 
   // src/shared/numericPriorityMinHeap.ts
@@ -22092,6 +22132,39 @@ ${body}`;
     return `${movement}, ${cover}`;
   }
 
+  // src/renderer/rendererRes4Hydration.ts
+  function applyRes4CityOverlayRows(cityRows, roadRailRows, vectorRows) {
+    const nextCities = /* @__PURE__ */ new Map();
+    for (const row of cityRows) {
+      if (row.label) nextCities.set(row.h3Index, row.label);
+    }
+    rendererSharedState.res4CityOverlayLabelByH3 = nextCities;
+    const nextRoadRail = /* @__PURE__ */ new Map();
+    for (const row of roadRailRows) {
+      nextRoadRail.set(row.h3Index, { roadSides: [...row.roadSides], railSides: [...row.railSides] });
+    }
+    rendererSharedState.res4RoadRailSidesByH3 = nextRoadRail;
+    rendererSharedState.res4TransportVectorOverlayRows = vectorRows.map((row) => ({
+      kind: row.kind,
+      points: row.points.map((p) => [p[0], p[1]])
+    }));
+  }
+  function applyRes1BaselineUrbanHexCounts(rows) {
+    const next = /* @__PURE__ */ new Map();
+    for (const row of rows) {
+      if (!row.h3Index || !Number.isFinite(row.urbanHexCount)) continue;
+      const count = Math.trunc(row.urbanHexCount);
+      if (count <= 0) continue;
+      next.set(row.h3Index, count);
+    }
+    rendererSharedState.baselineUrbanHexCountByRes1H3 = next;
+    rendererSharedState.terrainTooltipHtmlByContentKey.clear();
+  }
+  function baselineUrbanHexCountForRes1Hex(h3Index) {
+    const count = rendererSharedState.baselineUrbanHexCountByRes1H3.get(h3Index);
+    return count == null || !Number.isFinite(count) ? 0 : count;
+  }
+
   // src/renderer/map/terrainTooltipHtml.ts
   function formatLlmLocationBoldPrefixHtml(namingTarget) {
     if (!namingTarget) return "";
@@ -22180,13 +22253,17 @@ ${body}`;
   }
   function formatTerrainTooltipHtml(state, namingCaption, namingTarget) {
     const prefix = formatLlmLocationBoldPrefixHtml(namingTarget);
+    const techLine = producedUnitTechLineHtml(namingTarget);
     const showControlLine = namingTarget?.resolution === 1;
     const controlLine = showControlLine ? `<strong>Control:</strong> ${getTooltipControlLabel(namingTarget)}` : null;
     const terrainValue = state.res1TerrainSummary != null ? formatTerrainNameListHtml(state.res1TerrainSummary) : `${formatTerrainKindHtml(state.terrainKind)}${formatTerrainVariantSuffix(state)}`;
     const terrainLine = `<strong>Terrain:</strong> ${terrainValue}`;
     const weather = tooltipWeather(namingTarget);
     const weatherLine = weather ? `<strong>Weather:</strong> ${formatWeatherIconHtml(weather)}` : null;
-    const bodyParts = controlLine ? [controlLine, terrainLine] : [terrainLine];
+    const bodyParts = [];
+    if (techLine) bodyParts.push(techLine);
+    if (controlLine) bodyParts.push(controlLine);
+    bodyParts.push(terrainLine);
     if (weatherLine) bodyParts.push(weatherLine);
     if (state.res1FeaturesSummary != null) bodyParts.push(`<strong>Features:</strong> ${state.res1FeaturesSummary}`);
     else if (state.features.length > 0) {
@@ -22222,7 +22299,16 @@ ${body}`;
     const seaportKey = state.isSeaport ? "1" : "0";
     const roadKey = state.hasRoad ? "1" : "0";
     const railKey = state.hasRail ? "1" : "0";
-    return `${targetKey}::${namingKey}::${state.terrainKind}::${urbanKey}::${rubbleKey}::${featuresKey}::${urbanHexCountKey}::${res1TerrainSummaryKey}::${res1FeaturesSummaryKey}::${controlKey}::${parentTerrainKey}::${parentTerrainKindKey}::${seaportKey}::${roadKey}::${railKey}::${weatherKey}::${coverKey}`;
+    const techBonusKey = rendererSharedState.gameState?.techBonusEnabled === true ? "1" : "0";
+    const baselineUrbanKey = namingTarget?.resolution === 1 ? String(baselineUrbanHexCountForRes1Hex(namingTarget.h3Index)) : "x";
+    return `${targetKey}::${namingKey}::${state.terrainKind}::${urbanKey}::${rubbleKey}::${featuresKey}::${urbanHexCountKey}::${res1TerrainSummaryKey}::${res1FeaturesSummaryKey}::${controlKey}::${parentTerrainKey}::${parentTerrainKindKey}::${seaportKey}::${roadKey}::${railKey}::${weatherKey}::${coverKey}::${techBonusKey}::${baselineUrbanKey}`;
+  }
+  function producedUnitTechLineHtml(namingTarget) {
+    if (namingTarget?.resolution !== 1) return null;
+    return formatProducedUnitTechLineHtml({
+      techBonusEnabled: rendererSharedState.gameState?.techBonusEnabled === true,
+      baselineUrbanHexCount: baselineUrbanHexCountForRes1Hex(namingTarget.h3Index)
+    });
   }
   function getCachedTerrainTooltipHtml(state, namingCaption, namingTarget) {
     const key = terrainTooltipContentKey(state, namingCaption, namingTarget);
@@ -24409,6 +24495,9 @@ ${body}`;
     const pointsLine = document.createElement("div");
     pointsLine.innerHTML = `<strong>Production:</strong> $${totalProduction.toLocaleString()} / turn`;
     section.appendChild(pointsLine);
+    const productionQueueSpacer = document.createElement("div");
+    productionQueueSpacer.style.height = "0.5em";
+    section.appendChild(productionQueueSpacer);
     const queueSummaryLine = document.createElement("div");
     queueSummaryLine.innerHTML = formatMultiQueueSummary(snapshots);
     section.appendChild(queueSummaryLine);
@@ -24668,11 +24757,26 @@ ${body}`;
         codeSpacer.style.height = "0.5em";
         section.appendChild(codeSpacer);
       }
+      const techLineHtml = formatProducedUnitTechLineHtml({
+        techBonusEnabled: rendererSharedState.gameState?.techBonusEnabled === true,
+        baselineUrbanHexCount: baselineUrbanHexCountForRes1Hex(h3Index)
+      });
+      if (techLineHtml) {
+        const techLine = document.createElement("div");
+        techLine.innerHTML = techLineHtml;
+        section.appendChild(techLine);
+        const techSpacer = document.createElement("div");
+        techSpacer.style.height = "0.5em";
+        section.appendChild(techSpacer);
+      }
       const pointsLine = document.createElement("div");
       const productionCapacity = snapshot.urbanHexCount;
       const productionDetail = productionCapacity > 0 ? `$${productionCapacity.toLocaleString()} / turn` : "(none)";
       pointsLine.innerHTML = `<strong>Production:</strong> ${productionDetail}`;
       section.appendChild(pointsLine);
+      const productionQueueSpacer = document.createElement("div");
+      productionQueueSpacer.style.height = "0.5em";
+      section.appendChild(productionQueueSpacer);
       const queueSummaryLine = document.createElement("div");
       const queueTotalCost = sumQueuedProductionCost(snapshot.entries);
       if (snapshot.entries.length === 0) {
@@ -28893,24 +28997,6 @@ ${body}`;
     }
   }
 
-  // src/renderer/rendererRes4Hydration.ts
-  function applyRes4CityOverlayRows(cityRows, roadRailRows, vectorRows) {
-    const nextCities = /* @__PURE__ */ new Map();
-    for (const row of cityRows) {
-      if (row.label) nextCities.set(row.h3Index, row.label);
-    }
-    rendererSharedState.res4CityOverlayLabelByH3 = nextCities;
-    const nextRoadRail = /* @__PURE__ */ new Map();
-    for (const row of roadRailRows) {
-      nextRoadRail.set(row.h3Index, { roadSides: [...row.roadSides], railSides: [...row.railSides] });
-    }
-    rendererSharedState.res4RoadRailSidesByH3 = nextRoadRail;
-    rendererSharedState.res4TransportVectorOverlayRows = vectorRows.map((row) => ({
-      kind: row.kind,
-      points: row.points.map((p) => [p[0], p[1]])
-    }));
-  }
-
   // src/renderer/map/res4TransportVectorLayer.ts
   var vectorLayer = null;
   var vectorLayerAttached = false;
@@ -29847,16 +29933,31 @@ ${body}`;
     clearRes1TooltipSummaryCaches();
   }
   var sessionStaticRes4OverlaysLoaded = false;
+  var sessionBaselineUrbanHexCountsLoaded = false;
   async function ensureStaticRes4OverlaysLoaded(forceReload) {
-    if (sessionStaticRes4OverlaysLoaded && !forceReload) return;
+    if (!(sessionStaticRes4OverlaysLoaded && !forceReload)) {
+      const api = window.gameApi;
+      if (!api) return;
+      const cityPromise = api.getRes4CityOverlays ? api.getRes4CityOverlays() : Promise.resolve([]);
+      const roadRailPromise = api.getRes4RoadRailOverlays ? api.getRes4RoadRailOverlays() : Promise.resolve([]);
+      const vectorsPromise = api.getRes4TransportVectorOverlays ? api.getRes4TransportVectorOverlays() : Promise.resolve([]);
+      const [cityRows, roadRailRows, vectorRows] = await Promise.all([cityPromise, roadRailPromise, vectorsPromise]);
+      applyRes4CityOverlayRows(cityRows, roadRailRows, vectorRows);
+      sessionStaticRes4OverlaysLoaded = true;
+    }
+    await ensureBaselineUrbanHexCountsLoaded(forceReload);
+  }
+  async function ensureBaselineUrbanHexCountsLoaded(forceReload) {
+    if (sessionBaselineUrbanHexCountsLoaded && !forceReload) return;
     const api = window.gameApi;
-    if (!api) return;
-    const cityPromise = api.getRes4CityOverlays ? api.getRes4CityOverlays() : Promise.resolve([]);
-    const roadRailPromise = api.getRes4RoadRailOverlays ? api.getRes4RoadRailOverlays() : Promise.resolve([]);
-    const vectorsPromise = api.getRes4TransportVectorOverlays ? api.getRes4TransportVectorOverlays() : Promise.resolve([]);
-    const [cityRows, roadRailRows, vectorRows] = await Promise.all([cityPromise, roadRailPromise, vectorsPromise]);
-    applyRes4CityOverlayRows(cityRows, roadRailRows, vectorRows);
-    sessionStaticRes4OverlaysLoaded = true;
+    if (!api?.getRes1BaselineUrbanHexCounts) return;
+    try {
+      const rows = await api.getRes1BaselineUrbanHexCounts();
+      applyRes1BaselineUrbanHexCounts(rows);
+      sessionBaselineUrbanHexCountsLoaded = true;
+    } catch (err) {
+      console.error("getRes1BaselineUrbanHexCounts failed:", err);
+    }
   }
   async function refreshRes4TerrainOverridesForRenderer(options) {
     const api = window.gameApi;

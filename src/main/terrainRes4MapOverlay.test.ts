@@ -7,6 +7,7 @@ import type { TerrainNamingRecordRes4 } from './terrainNamingLoad';
 import {
   clearTerrainClassificationCacheForTests,
   ensureTerrainClassificationCacheLoaded,
+  getRes1BaselineUrbanHexCountsForRenderer,
   getRes4CityOverlaysForRenderer,
   getRes4RoadRailOverlaysForRenderer,
 } from './terrainClassificationCache';
@@ -152,13 +153,14 @@ function testRoadRailParseRejectsNonBoolean(): void {
 
  * Purpose: Locks the non-fatal IPC fallback when the classification cache is not populated.
  * When to use: `npm test` main-process suite.
- * Expected outcome: Both getters yield empty arrays without throwing.
+ * Expected outcome: The overlay getters yield empty arrays without throwing.
  * Exceptions: None.
  */
 function testOverlayIpcGettersReturnEmptyWhenCacheCleared(): void {
   clearTerrainClassificationCacheForTests();
   assert.deepStrictEqual(getRes4CityOverlaysForRenderer(), []);
   assert.deepStrictEqual(getRes4RoadRailOverlaysForRenderer(), []);
+  assert.deepStrictEqual(getRes1BaselineUrbanHexCountsForRenderer(), []);
 }
 
 /**
@@ -183,6 +185,14 @@ function testOverlayIpcGettersShapeAfterCacheLoad(): void {
     assert.ok(row.h3Index.length > 0);
     assert.strictEqual(typeof row.label, 'string');
     assert.ok(row.label.length > 0);
+  }
+  const baselines = getRes1BaselineUrbanHexCountsForRenderer();
+  assert.ok(baselines.length > 0);
+  for (const row of baselines) {
+    assert.strictEqual(typeof row.h3Index, 'string');
+    assert.ok(row.h3Index.length > 0);
+    assert.strictEqual(Number.isInteger(row.urbanHexCount), true);
+    assert.ok(row.urbanHexCount >= 1);
   }
   const rails = getRes4RoadRailOverlaysForRenderer();
   for (const row of rails) {

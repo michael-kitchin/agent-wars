@@ -211,7 +211,7 @@ import {
   ensureRangePerimeterAnimation,
 } from './rendering/rangePerimeterOverlay';
 import { drawRes4CityOverlays, drawStrategicRes1InspectionHexCodes } from './rendering/res4CityOverlays';
-import { applyRes4CityOverlayRows } from './rendererRes4Hydration';
+import { applyRes1BaselineUrbanHexCounts, applyRes4CityOverlayRows } from './rendererRes4Hydration';
 import { syncRes4TransportVectorLeafletLayer } from './map/res4TransportVectorLayer';
 import {
   applyGameStateSnapshot as applyGameStateSnapshotFromModule,
@@ -1408,28 +1408,61 @@ function applyRes4TerrainOverrides(rows: Array<{
 let sessionStaticRes4OverlaysLoaded = false;
 
 /**
+ * Tracks whether the generated res1 urban counts were fetched this renderer session.
+ *
+ * Purpose: Those counts never change within a session, so a failed fetch can retry without refetching the city overlays.
+ * When to use: Cleared in effect when `reloadStaticOverlays` is true (New Game path) by passing forceReload.
+ * Expected outcome: The baseline map loads once per session unless explicitly reset.
+ * Exceptions: None.
+ */
+let sessionBaselineUrbanHexCountsLoaded = false;
+
+/**
  * Fetches static res4 overlay IPC payloads once per session unless `forceReload` is set.
  *
  * Purpose: Static overlays never change within a session, so they load separately from the dynamic terrain-override
  * refresh and are not refetched on every map refresh.
  * When to use: Before every map refresh; skipped when already loaded and not forced.
- * Expected outcome: City/road-rail/vector renderer state populated via `applyRes4CityOverlayRows`.
- * Exceptions: Logs to console and rethrows on IPC failure (caller catches).
+ * Expected outcome: City, road, and rail overlays are applied, then the generated res1 urban counts load. A failure of that count load leaves the overlays in place.
+ * Exceptions: A city, road, or rail IPC failure rethrows for the caller to log. A baseline-count failure is logged inside `ensureBaselineUrbanHexCountsLoaded` and does not rethrow.
  */
 async function ensureStaticRes4OverlaysLoaded(forceReload: boolean): Promise<void> {
-  if (sessionStaticRes4OverlaysLoaded && !forceReload) return;
+  if (!(sessionStaticRes4OverlaysLoaded && !forceReload)) {
+    const api = window.gameApi;
+    if (!api) return;
+    const cityPromise = api.getRes4CityOverlays ? api.getRes4CityOverlays() : Promise.resolve<Res4CityOverlayRow[]>([]);
+    const roadRailPromise = api.getRes4RoadRailOverlays
+      ? api.getRes4RoadRailOverlays()
+      : Promise.resolve<Res4RoadRailOverlayRow[]>([]);
+    const vectorsPromise = api.getRes4TransportVectorOverlays
+      ? api.getRes4TransportVectorOverlays()
+      : Promise.resolve<Res4TransportVectorOverlayRow[]>([]);
+    const [cityRows, roadRailRows, vectorRows] = await Promise.all([cityPromise, roadRailPromise, vectorsPromise]);
+    applyRes4CityOverlayRows(cityRows, roadRailRows, vectorRows);
+    sessionStaticRes4OverlaysLoaded = true;
+  }
+  await ensureBaselineUrbanHexCountsLoaded(forceReload);
+}
+
+/**
+ * Fetches generated res1 urban counts once per session unless `forceReload` is set.
+ *
+ * Purpose: Tech lines use this baseline. A failure here must not drop the city, road, or rail overlays.
+ * When to use: From `ensureStaticRes4OverlaysLoaded`, including when that load is skipped because overlays are already present.
+ * Expected outcome: `baselineUrbanHexCountByRes1H3` is replaced. A thrown IPC call is logged and the previous map is left as it was.
+ * Exceptions: Logs to console and does not rethrow.
+ */
+async function ensureBaselineUrbanHexCountsLoaded(forceReload: boolean): Promise<void> {
+  if (sessionBaselineUrbanHexCountsLoaded && !forceReload) return;
   const api = window.gameApi;
-  if (!api) return;
-  const cityPromise = api.getRes4CityOverlays ? api.getRes4CityOverlays() : Promise.resolve<Res4CityOverlayRow[]>([]);
-  const roadRailPromise = api.getRes4RoadRailOverlays
-    ? api.getRes4RoadRailOverlays()
-    : Promise.resolve<Res4RoadRailOverlayRow[]>([]);
-  const vectorsPromise = api.getRes4TransportVectorOverlays
-    ? api.getRes4TransportVectorOverlays()
-    : Promise.resolve<Res4TransportVectorOverlayRow[]>([]);
-  const [cityRows, roadRailRows, vectorRows] = await Promise.all([cityPromise, roadRailPromise, vectorsPromise]);
-  applyRes4CityOverlayRows(cityRows, roadRailRows, vectorRows);
-  sessionStaticRes4OverlaysLoaded = true;
+  if (!api?.getRes1BaselineUrbanHexCounts) return;
+  try {
+    const rows = await api.getRes1BaselineUrbanHexCounts();
+    applyRes1BaselineUrbanHexCounts(rows);
+    sessionBaselineUrbanHexCountsLoaded = true;
+  } catch (err) {
+    console.error('getRes1BaselineUrbanHexCounts failed:', err);
+  }
 }
 
 /**

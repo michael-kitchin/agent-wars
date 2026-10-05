@@ -275,6 +275,9 @@ export async function renderMultiBuildQueueIntoMount(deps: MultiBuildQueueRender
   const pointsLine = document.createElement('div');
   pointsLine.innerHTML = `<strong>Production:</strong> $${totalProduction.toLocaleString()} / turn`;
   section.appendChild(pointsLine);
+  const productionQueueSpacer = document.createElement('div');
+  productionQueueSpacer.style.height = '0.5em';
+  section.appendChild(productionQueueSpacer);
   const queueSummaryLine = document.createElement('div');
   queueSummaryLine.innerHTML = formatMultiQueueSummary(snapshots);
   section.appendChild(queueSummaryLine);

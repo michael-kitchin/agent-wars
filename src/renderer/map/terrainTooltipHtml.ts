@@ -16,7 +16,7 @@ import {
   resolveHomeRegionOwnerIdentity,
 } from '../../shared/homeRegionRules';
 import { computeTerrainEffectsLineHtml } from '../../shared/terrainEffectsForTooltip';
-import { formatFeatureLabelHtml } from '../../shared/featureIconHtml';
+import { formatFeatureLabelHtml, formatProducedUnitTechLineHtml } from '../../shared/featureIconHtml';
 import { formatTerrainKindHtml, formatTerrainNameListHtml, formatUrbanSwatchHtml } from '../../shared/terrainSwatchHtml';
 import { formatWeatherIconHtml } from '../../shared/weatherIcons';
 import {
@@ -28,6 +28,7 @@ import {
 import { TOOLTIP_SECTION_GAP_HTML } from '../../shared/tooltipSectionGap';
 import { WORLD_H3_RESOLUTION } from '../core/constants';
 import { rendererSharedState as S } from '../core/state';
+import { baselineUrbanHexCountForRes1Hex } from '../rendererRes4Hydration';
 import type { NamingLookupTarget, TerrainTooltipState } from './terrainTooltipTypes';
 /**
  * Renders the bold LLM hex-code badge (`(XX)` or `(XX.YY)`) that prefixes tooltip copy for the active naming target.
@@ -204,6 +205,7 @@ function formatTerrainTooltipHtml(
   namingTarget: NamingLookupTarget | null
 ): string {
   const prefix = formatLlmLocationBoldPrefixHtml(namingTarget);
+  const techLine = producedUnitTechLineHtml(namingTarget);
   const showControlLine = namingTarget?.resolution === 1;
   const controlLine = showControlLine ? `<strong>Control:</strong> ${getTooltipControlLabel(namingTarget)}` : null;
   const terrainValue = state.res1TerrainSummary != null
@@ -212,7 +214,10 @@ function formatTerrainTooltipHtml(
   const terrainLine = `<strong>Terrain:</strong> ${terrainValue}`;
   const weather = tooltipWeather(namingTarget);
   const weatherLine = weather ? `<strong>Weather:</strong> ${formatWeatherIconHtml(weather)}` : null;
-  const bodyParts: string[] = controlLine ? [controlLine, terrainLine] : [terrainLine];
+  const bodyParts: string[] = [];
+  if (techLine) bodyParts.push(techLine);
+  if (controlLine) bodyParts.push(controlLine);
+  bodyParts.push(terrainLine);
   if (weatherLine) bodyParts.push(weatherLine);
   if (state.res1FeaturesSummary != null) bodyParts.push(`<strong>Features:</strong> ${state.res1FeaturesSummary}`);
   else if (state.features.length > 0) {
@@ -265,7 +270,26 @@ function terrainTooltipContentKey(
   const seaportKey = state.isSeaport ? '1' : '0';
   const roadKey = state.hasRoad ? '1' : '0';
   const railKey = state.hasRail ? '1' : '0';
-  return `${targetKey}::${namingKey}::${state.terrainKind}::${urbanKey}::${rubbleKey}::${featuresKey}::${urbanHexCountKey}::${res1TerrainSummaryKey}::${res1FeaturesSummaryKey}::${controlKey}::${parentTerrainKey}::${parentTerrainKindKey}::${seaportKey}::${roadKey}::${railKey}::${weatherKey}::${coverKey}`;
+  const techBonusKey = S.gameState?.techBonusEnabled === true ? '1' : '0';
+  const baselineUrbanKey =
+    namingTarget?.resolution === 1 ? String(baselineUrbanHexCountForRes1Hex(namingTarget.h3Index)) : 'x';
+  return `${targetKey}::${namingKey}::${state.terrainKind}::${urbanKey}::${rubbleKey}::${featuresKey}::${urbanHexCountKey}::${res1TerrainSummaryKey}::${res1FeaturesSummaryKey}::${controlKey}::${parentTerrainKey}::${parentTerrainKindKey}::${seaportKey}::${roadKey}::${railKey}::${weatherKey}::${coverKey}::${techBonusKey}::${baselineUrbanKey}`;
+}
+
+/**
+ * Tech line for a res1 hex, using the generated urban count.
+ *
+ * Purpose: The hover tooltip and the melee-intercept cell share this placement, under the hex name.
+ * When to use: From `formatTerrainTooltipHtml` when the naming target is a world hex.
+ * Expected outcome: The shared Tech line, or null for any other resolution, when tech is off, or when the hex produces nothing.
+ * Exceptions: None.
+ */
+function producedUnitTechLineHtml(namingTarget: NamingLookupTarget | null): string | null {
+  if (namingTarget?.resolution !== 1) return null;
+  return formatProducedUnitTechLineHtml({
+    techBonusEnabled: S.gameState?.techBonusEnabled === true,
+    baselineUrbanHexCount: baselineUrbanHexCountForRes1Hex(namingTarget.h3Index),
+  });
 }
 
 /**

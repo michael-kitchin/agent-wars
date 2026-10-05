@@ -48,6 +48,7 @@ import { loadTerrainRes4RoadRailVectorsBundled } from './terrainRoadRailVectorsL
 import {
   hexContinentNamesFromSnapshot,
   hexNamingTooltipLineFromSnapshot,
+  res1BaselineUrbanHexCountRowsFromSnapshot,
   res1ProductionContextFromSnapshot,
   res4CityOverlayRowsFromSnapshot,
   res4FeatureRowsForSeedingFromSnapshot,
@@ -57,6 +58,7 @@ import {
   terrainRes1KindsFromSnapshot,
 } from './terrainClassificationCacheSerialization';
 import type {
+  Res1BaselineUrbanHexCountRow,
   Res4CityOverlayRow,
   Res4RoadRailOverlayRow,
   Res4TransportVectorOverlayRow,
@@ -555,6 +557,23 @@ export function getRes4CityOverlaysForRenderer(): Res4CityOverlayRow[] {
     return [];
   }
   return res4CityOverlayRowsFromSnapshot(cached);
+}
+
+/**
+ * Returns the generated urban-cell count for each res1 hex that can produce units.
+ *
+ * Purpose: Tooltips and the build popup classify tech from this baseline, which air strikes do not change.
+ * When to use: `game:getRes1BaselineUrbanHexCounts` after the classification cache is loaded.
+ * Expected outcome: Rows with a positive count. Empty when the cache has not been built yet.
+ * Exceptions: None.
+ */
+export function getRes1BaselineUrbanHexCountsForRenderer(): Res1BaselineUrbanHexCountRow[] {
+  logTrace('terrainClassificationCache getRes1BaselineUrbanHexCountsForRenderer');
+  if (!cached) {
+    logDebug('terrainClassificationCache getRes1BaselineUrbanHexCountsForRenderer: cache empty, returning []');
+    return [];
+  }
+  return res1BaselineUrbanHexCountRowsFromSnapshot(cached);
 }
 
 /**

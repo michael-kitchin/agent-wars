@@ -207,3 +207,32 @@ kind: 'road' | 'rail';
    */
 points: [number, number][];
 }
+
+/**
+ * One res1 hex and the generated urban-cell count that sets the tech tier of units born there.
+ *
+ * Purpose: The renderer classifies a hex without using the live production count, which air strikes can lower.
+ * When to use: IPC payloads from `game:getRes1BaselineUrbanHexCounts`.
+ * Expected outcome: `urbanHexCount` is an integer of at least 1. Hexes that produce nothing are absent.
+ * Exceptions: None.
+ */
+export interface Res1BaselineUrbanHexCountRow {
+  /**
+   * Res1 hex this count belongs to.
+   *
+   * Contract: The parent hex id used by tooltips and the build popup.
+   * When to use: As the map key after hydration.
+   * Expected outcome: A non-empty res1 H3 index.
+   * Exceptions: None.
+   */
+  h3Index: string;
+  /**
+   * Generated urban res4 cells inside the hex.
+   *
+   * Contract: The baseline used to classify Basic and Advanced. It does not fall when cities are destroyed.
+   * When to use: `formatProducedUnitTechLineHtml`.
+   * Expected outcome: An integer of at least 1.
+   * Exceptions: None.
+   */
+  urbanHexCount: number;
+}

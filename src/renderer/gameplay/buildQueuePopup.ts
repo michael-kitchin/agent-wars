@@ -16,7 +16,9 @@ import {
   canArmKeepBuilding,
 } from './buildQueueKeepBuilding';
 import { escapeBuildPopupHtml, sanitizeBuildCountInputText } from './buildQueuePopupFormatting';
+import { formatProducedUnitTechLineHtml } from '../../shared/featureIconHtml';
 import { formatHexNamingCaptionHtml, type HexNamingCaption } from '../../shared/hexNamingCaption';
+import { baselineUrbanHexCountForRes1Hex } from '../rendererRes4Hydration';
 
 /**
  * Re-exports build-count sanitizer for existing `buildQueuePopup` import paths.
@@ -343,6 +345,18 @@ export function createBuildQueuePopupHandler(deps: BuildQueuePopupDeps) {
       codeSpacer.style.height = '0.5em';
       section.appendChild(codeSpacer);
     }
+    const techLineHtml = formatProducedUnitTechLineHtml({
+      techBonusEnabled: S.gameState?.techBonusEnabled === true,
+      baselineUrbanHexCount: baselineUrbanHexCountForRes1Hex(h3Index),
+    });
+    if (techLineHtml) {
+      const techLine = document.createElement('div');
+      techLine.innerHTML = techLineHtml;
+      section.appendChild(techLine);
+      const techSpacer = document.createElement('div');
+      techSpacer.style.height = '0.5em';
+      section.appendChild(techSpacer);
+    }
     const pointsLine = document.createElement('div');
     const productionCapacity = snapshot.urbanHexCount;
     const productionDetail =
@@ -351,6 +365,9 @@ export function createBuildQueuePopupHandler(deps: BuildQueuePopupDeps) {
         : '(none)';
     pointsLine.innerHTML = `<strong>Production:</strong> ${productionDetail}`;
     section.appendChild(pointsLine);
+    const productionQueueSpacer = document.createElement('div');
+    productionQueueSpacer.style.height = '0.5em';
+    section.appendChild(productionQueueSpacer);
     const queueSummaryLine = document.createElement('div');
     const queueTotalCost = sumQueuedProductionCost(snapshot.entries);
     if (snapshot.entries.length === 0) {

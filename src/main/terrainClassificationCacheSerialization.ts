@@ -6,6 +6,7 @@
 import type { PipelineTerrainKind } from '../shared/pipelineTerrain';
 import type { Res1ProductionContextSnapshot } from '../shared/ipcTypes';
 import type {
+  Res1BaselineUrbanHexCountRow,
   Res4CityOverlayRow,
   Res4RoadRailOverlayRow,
   Res4TransportVectorOverlayRow,
@@ -49,6 +50,28 @@ export function hexContinentNamesFromSnapshot(
   h3Index: string
 ): string[] {
   return [...(snapshot.continentNamesRes1ByH3.get(h3Index) ?? [])];
+}
+
+/**
+ * Lists res1 hexes whose generated urban count can produce units.
+ *
+ * Purpose: The renderer classifies tech from this baseline, not from the live count after air strikes.
+ * When to use: `getRes1BaselineUrbanHexCountsForRenderer`. Pass null before the cache is loaded.
+ * Expected outcome: One row per hex with a positive integer count. An empty cache, a blank hex id, or a hex that produces nothing yields no row.
+ * Exceptions: None.
+ */
+export function res1BaselineUrbanHexCountRowsFromSnapshot(
+  snapshot: TerrainClassificationSnapshot | null
+): Res1BaselineUrbanHexCountRow[] {
+  if (!snapshot) return [];
+  const rows: Res1BaselineUrbanHexCountRow[] = [];
+  for (const [h3Index, urbanHexCount] of snapshot.urbanHexCountByRes1H3.entries()) {
+    if (!h3Index || !Number.isFinite(urbanHexCount)) continue;
+    const count = Math.trunc(urbanHexCount);
+    if (count <= 0) continue;
+    rows.push({ h3Index, urbanHexCount: count });
+  }
+  return rows;
 }
 
 /**

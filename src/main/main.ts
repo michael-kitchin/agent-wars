@@ -61,6 +61,7 @@ import { parseGameSize } from '../shared/gameSize';
 import {
   getHexNamingTooltipLineForRenderer,
   getHexContinentNamesForRenderer,
+  getRes1BaselineUrbanHexCountsForRenderer,
   getRes4CityOverlaysForRenderer,
   getRes4RoadRailOverlaysForRenderer,
   getRes4TransportVectorOverlaysForRenderer,
@@ -280,6 +281,13 @@ function registerIpcHandlers(): void {
     IPC_GAME.getRes4TransportVectorOverlays,
     'main IPC_GAME.getRes4TransportVectorOverlays',
     () => getRes4TransportVectorOverlaysForRenderer(),
+    []
+  );
+  registerLoggedIpcHandler(
+    ipcMain,
+    IPC_GAME.getRes1BaselineUrbanHexCounts,
+    'main IPC_GAME.getRes1BaselineUrbanHexCounts',
+    () => getRes1BaselineUrbanHexCountsForRenderer(),
     []
   );
   ipcMain.handle(

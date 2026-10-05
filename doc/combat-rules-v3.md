@@ -244,7 +244,7 @@ The points are added after the floor of 2, in the same place as the origin bonus
 - **Rolls that change:** the same attack rolls as the origin bonus, including unit counter-fire. High also changes melee defense.
 - **Unchanged:** casualty order and air-strike victim picks (they keep printed defense), infrastructure counter-fire, movement, range, and production.
 
-The unit-flag tooltip lists Tech for a Basic or Advanced unit, with that tier's icon and word. A match with tech off omits the line. With the option off, the combat paragraph does not mention tech. With it on, `assess_unit` reports `techLevel`, `estimate_combat` reports effective values plus `techBonus`, and the briefing Bonus cell names the clause.
+The unit-flag tooltip lists Tech for a Basic or Advanced unit, with that tier's icon and word. The world-hex tooltip and the single-hex build popup use that same icon and word for the tier of units the hex produces, from the hex's generated urban count, including after its cities are destroyed. A match with tech off omits every one of these lines. A hex that produces no units omits its line. A zoomed cell, a battle cell, and the multi-hex build popup omit it ([hex tooltips](ux/hex-tooltips.md), [build popup](ux/build-popup.md)). With the option off, the combat paragraph does not mention tech. With it on, `assess_unit` reports `techLevel`, `estimate_combat` reports effective values plus `techBonus`, and the briefing Bonus cell names the clause.
 
 #### Terrain cover
 

@@ -24,6 +24,7 @@ import type {
 import type {
   HexContinentNamesRequest,
   HexNamingTooltipLineRequest,
+  Res1BaselineUrbanHexCountRow,
   Res4CityOverlayRow,
   Res4RoadRailOverlayRow,
   Res4TransportVectorOverlayRow,
@@ -154,6 +155,15 @@ getRes4RoadRailOverlays: () => Promise<Res4RoadRailOverlayRow[]>;
    * Exceptions: None beyond IPC transport failures.
    */
 getRes4TransportVectorOverlays: () => Promise<Res4TransportVectorOverlayRow[]>;
+  /**
+   * Returns the generated urban-cell count for each res1 hex that can produce units.
+   *
+   * Contract: Counts come from the terrain classification cache. They do not change when air strikes destroy cities.
+   * When to use: Once per renderer session, beside the static res4 overlay load.
+   * Expected outcome: One row per hex with a positive count. Empty when the cache is not loaded. Hexes that produce nothing are absent.
+   * Exceptions: None beyond IPC transport failures. A handler failure returns an empty array.
+   */
+  getRes1BaselineUrbanHexCounts: () => Promise<Res1BaselineUrbanHexCountRow[]>;
   /**
    * Returns the structured naming caption (text plus country spans) for a res1 or res4 hex.
    *

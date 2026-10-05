@@ -13,6 +13,7 @@ export const IPC_GAME = {
   getRes4CityOverlays: 'game:getRes4CityOverlays',
   getRes4RoadRailOverlays: 'game:getRes4RoadRailOverlays',
   getRes4TransportVectorOverlays: 'game:getRes4TransportVectorOverlays',
+  getRes1BaselineUrbanHexCounts: 'game:getRes1BaselineUrbanHexCounts',
   getHexNamingTooltipLine: 'game:getHexNamingTooltipLine',
   getHexContinentNames: 'game:getHexContinentNames',
   listScenarioHomeRegions: 'game:listScenarioHomeRegions',
