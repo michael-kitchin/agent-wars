@@ -16,6 +16,7 @@ Shown in Strategic planning, Resolution playback, and Tactical planning. While t
 - Unit glyphs on their hexes: a white type glyph on the player-colored circle. A hex that holds both sides uses the gray circle and draws that glyph dark. Units that are moving during playback are drawn along the playback, not only at the destination. The glyphs are in the [UI style guide](../ui-style-guide.md).
 - A scale in metric and imperial units.
 - Terrain fill, unless the player is holding T. See [input-map.md](input-map.md).
+- While T is held on the strategic map, and the view is not at battle-detail zoom, each visible world hex shows its code and a production label. The label is the dollars-per-turn line, or the build marker when that marker is already showing. A hex showing that label also shows a line above the code: a tech icon when the hex tooltip would show Tech, and a weather icon when the hex tooltip would show Weather. See [hex-tooltips.md](hex-tooltips.md). A slash with a space on each side separates the two icons. One icon is shown alone. The line is left out when neither icon applies. The icons have no tooltip of their own. The hex tooltip still appears on hover.
 - Overlays from [map-overlays.md](map-overlays.md).
 
 When no match is loaded, the basemap can still be visible under the new-game overlay.
@@ -34,7 +35,7 @@ When no match is loaded, the basemap can still be visible under the new-game ove
 ### Keyboard
 
 - When the player holds W, A, S, D, or an arrow key, under the rules in [input-map.md](input-map.md), the map pans. Opposite directions cancel.
-- When the player holds T, terrain fill hides until release or blur.
+- When the player holds T, terrain fill hides until release or blur. On the strategic map, outside battle-detail zoom, the hex codes and the tech and weather line stay up for that same hold, and they leave on release or blur.
 
 ### Other
 
@@ -48,7 +49,7 @@ When no match is loaded, the basemap can still be visible under the new-game ove
 - Tactical view: battle bounds, battle units, Exit Battle available according to [tactical-battle-controls.md](tactical-battle-controls.md).
 - Input disabled: New game, Game over, Tactical annihilation, or while the tactical battles list is open. Pointer input is off. While the tactical battles list is open, and in Tactical annihilation, pan keys and T still follow [input-map.md](input-map.md).
 - Orders blocked: Resolution playback. The map pans, zooms, and shows tooltips, but does not select, target, or order.
-- Terrain fill hidden: T is held.
+- Terrain fill hidden: T is held. On the strategic map, outside battle-detail zoom, hex codes are shown, and the tech and weather line is shown on hexes that are showing a production label.
 
 ## Invariants
 
@@ -56,6 +57,7 @@ When no match is loaded, the basemap can still be visible under the new-game ove
 - A map gesture during Resolution playback never queues or changes an order.
 - Double-click never zooms the map.
 - Keyboard pan is the app pan, not the map library's own keyboard pan.
+- The tech and weather line above a hex code appears only while T is held, only on the strategic map, only outside battle-detail zoom, and only on a hex that is showing a production label.
 
 ## Strategic and Tactical Differences
 
@@ -65,6 +67,7 @@ When no match is loaded, the basemap can still be visible under the new-game ove
 | Units | Strategic units | Battle sub-units |
 | Clicks outside the area | Not applicable | Error toast, no order |
 | Turn shown on the panel | Strategic turn | Tactical turn |
+| Held T | Hides terrain fill. Outside battle-detail zoom, shows hex codes and the tech and weather line on hexes with a production label | Hides terrain fill |
 
 ## Related Documents
 
@@ -74,6 +77,7 @@ When no match is loaded, the basemap can still be visible under the new-game ove
 - [order-lifecycle.md](order-lifecycle.md)
 - [notifications-and-feedback.md](notifications-and-feedback.md)
 - [resolution-playback.md](resolution-playback.md)
+- [hex-tooltips.md](hex-tooltips.md)
 
 ## Known Deviations
 
@@ -97,3 +101,6 @@ None.
 - `src/renderer/map/tacticalMapView.ts`
 - `src/renderer/map/leafletMainMapProjection.ts`
 - `src/renderer/rendering/unitDrawing.ts`
+- `src/renderer/rendering/res4CityOverlays.ts` (`drawStrategicRes1InspectionHexCodes`)
+- `src/renderer/rendering/inspectionStatusIcons.ts`
+- `src/shared/inspectionStatusIconLine.ts`

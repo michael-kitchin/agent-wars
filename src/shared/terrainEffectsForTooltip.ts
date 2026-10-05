@@ -165,7 +165,7 @@ function formatTerrainEffectLabel(category: EffectCategory, unit: UnitLabel | 'A
  *
  * Purpose: Tooltip HTML uses the same symbol order as the plain prefix, drawn as icons.
  * When to use: While assembling res4 Effects tooltip entries from known symbol strings.
- * Expected outcome: One icon for a single symbol. A slash between icons when more than one symbol applies. An empty string returns `''`.
+ * Expected outcome: One icon for a single symbol. A pipe between icons when more than one symbol applies. An empty string returns `''`.
  * Exceptions: None.
  */
 export function formatTerrainEffectSymbolPrefixHtml(symbols: string): string {

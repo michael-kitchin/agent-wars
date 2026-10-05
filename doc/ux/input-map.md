@@ -24,7 +24,7 @@ Tell an agent which input does what, and which binding wins when two surfaces co
 | Input | Context | Result | Details In |
 | --- | --- | --- | --- |
 | W, A, S, D, and the arrow keys | Not typing in a field, and no Shift, Control, Alt, or Meta | Pans the map. Holding a key keeps panning. Opposite keys cancel. W and Up are the same direction and can be held together. | [map-surface.md](map-surface.md) |
-| T | Same as pan | Hides terrain fill while held, then restores it on release. | [map-surface.md](map-surface.md) |
+| T | Same as pan | Hides terrain fill while held. On the strategic map, outside battle-detail zoom, also shows hex codes and the tech and weather line. Restores the fill and removes those marks on release. | [map-surface.md](map-surface.md) |
 | Shift | Key down or up | Key down refreshes an open stack callout. Key up closes it, including one that is scheduled but not open yet. Shift-click on a unit icon whose hex has one selectable human unit toggles that unit and does not open the callout. Shift-click on an icon with two or more selectable human units, or with none, schedules the callout when a plain click would, and does not toggle a unit. | [selection-model.md](selection-model.md) |
 | Escape | Build popup open | Closes the build popup and does not also close the stack callout. | [build-popup.md](build-popup.md) |
 | Escape | Stack callout open, build popup closed | Closes the stack callout, including one that is scheduled but not open yet. | [stack-callout.md](stack-callout.md) |
@@ -36,12 +36,12 @@ Keys other than these do not pan, toggle terrain, or close popups.
 
 - When the key target is a text field, a text area, a dropdown, or other editable content, T and the pan keys do nothing, and pressing Shift does not refresh an open stack callout. Escape is handled before that check, so it still closes the build popup or the stack callout, and it still chooses Ignore on the tactical battles list. That includes Escape pressed inside the build popup's count field.
 - Focusing an editable field stops keyboard pan immediately. Releasing a pan key still stops that key even if focus moved into a field after the key went down.
-- Window blur stops keyboard pan, clears the held-Shift flag, and restores terrain fill if T was held.
+- Window blur stops keyboard pan, clears the held-Shift flag, and, if T was held, restores terrain fill and removes the inspection marks.
 - Hiding the window stops keyboard pan.
 - Holding Shift, Control, Alt, or Meta stops keyboard pan and does not start a new pan.
 - Key repeat does not start another pan or another terrain hold.
 - Escape closes the build popup before the stack callout. While the tactical battles list is open, Escape only chooses Ignore. A build popup or stack callout under the dialog stays as it is.
-- Holding T to hide terrain fill is a deliberate inspection gesture. It is hold-to-hide, not a toggle.
+- Holding T is a deliberate inspection gesture. Terrain fill stays hidden while the key is down, and the hex codes and tech and weather line stay up when [map-surface.md](map-surface.md) says they are shown. Releasing the key restores the fill and removes those marks. Window blur does the same.
 - The map's own keyboard handling is off, so the pan keys above are the only keyboard pan.
 
 ## Strategic and Tactical Differences

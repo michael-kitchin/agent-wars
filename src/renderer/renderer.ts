@@ -211,6 +211,7 @@ import {
   ensureRangePerimeterAnimation,
 } from './rendering/rangePerimeterOverlay';
 import { drawRes4CityOverlays, drawStrategicRes1InspectionHexCodes } from './rendering/res4CityOverlays';
+import { drawInspectionStatusIcons } from './rendering/inspectionStatusIcons';
 import { applyRes1BaselineUrbanHexCounts, applyRes4CityOverlayRows } from './rendererRes4Hydration';
 import { syncRes4TransportVectorLeafletLayer } from './map/res4TransportVectorLayer';
 import {
@@ -2394,6 +2395,11 @@ function drawGameScene(
     drawRes1ProductionOverlays(ctx);
     drawRes4CityOverlayPass(ctx);
     drawStrategicRes1InspectionHexCodes(ctx, { getExploredHexSet });
+    drawInspectionStatusIcons(ctx, {
+      isHexExploredByPlayer,
+      hasInfraSymbols: (h3Index, unitHexes) => hasVisibleRes1InfrastructureGlyphs(h3Index, false, unitHexes),
+      requestRedraw,
+    });
     drawTerrainInfrastructureOverlays(ctx);
     drawRangePerimeterOverlay(ctx);
     const tb = S.tacticalBattleSnapshot;
@@ -2547,6 +2553,11 @@ function drawGameScene(
   drawRes1ProductionOverlays(ctx);
   drawRes4CityOverlayPass(ctx);
   drawStrategicRes1InspectionHexCodes(ctx, { getExploredHexSet });
+  drawInspectionStatusIcons(ctx, {
+    isHexExploredByPlayer,
+    hasInfraSymbols: (h3Index, unitHexes) => hasVisibleRes1InfrastructureGlyphs(h3Index, false, unitHexes),
+    requestRedraw,
+  });
   drawTerrainInfrastructureOverlays(ctx);
   drawRangePerimeterOverlay(ctx);
   drawStaleEnemyIntel(ctx, state, inferUnitTypeLabelFromId);

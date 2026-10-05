@@ -199,7 +199,7 @@ test('computeTerrainEffectsLineHtml keeps plain clause order and uses status ico
   const html = computeTerrainEffectsLineHtml(input);
   assert.equal(
     html,
-    `${down}All Movement, ${down}Infantry Range, ${blocked}Naval Range, ${blocked}/${down}Armored Range`
+    `${down}All Movement, ${down}Infantry Range, ${blocked}Naval Range, ${blocked}|${down}Armored Range`
   );
   assert.ok(html!.indexOf('Naval Range') < html!.indexOf('Armored Range'));
   assert.equal(html!.includes('(+)'), false);

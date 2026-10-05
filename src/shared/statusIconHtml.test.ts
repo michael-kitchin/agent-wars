@@ -17,7 +17,7 @@ test('effect symbols become icons and other characters are dropped', () => {
   const down = formatStatusIconHtml('down');
   const up = formatStatusIconHtml('up');
   assert.equal(formatEffectSymbolPrefixHtml('x'), blocked);
-  assert.equal(formatEffectSymbolPrefixHtml('x/-/+'), `${blocked}/${down}/${up}`);
+  assert.equal(formatEffectSymbolPrefixHtml('x/-/+'), `${blocked}|${down}|${up}`);
   assert.equal(formatEffectSymbolPrefixHtml('<'), '');
   assert.equal(formatEffectSymbolPrefixHtml(''), '');
 });

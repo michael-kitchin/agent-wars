@@ -1,5 +1,6 @@
 import { cellToChildren } from 'h3-js';
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
+import { res1OverlayBandOffsetPx } from '../../shared/inspectionStatusIconLine';
 import {
   isHexOwnershipVisibleToPerspective,
   resolveHomeRegionOwnerIdentity,
@@ -504,7 +505,7 @@ export function computeRes1OverlayTextY(
   const center = hexCenterPx(h3Index);
   if (!hasOffsetFeatures) return center.y;
   const pts = projectHexBoundaryToContainerPoints(h3Index, map, leaflet);
-  return center.y + spanForProjectedHex(pts) * 0.24;
+  return center.y + res1OverlayBandOffsetPx(spanForProjectedHex(pts));
 }
 
 /**

@@ -17725,6 +17725,45 @@ ${body}`;
     return !rendererSharedState.selectedUnitIds.includes(unitId);
   }
 
+  // src/shared/inspectionStatusIconLine.ts
+  var RES1_OVERLAY_BAND_OFFSET_SPAN_FRAC = 0.24;
+  var INSPECTION_STATUS_ICON_SLASH_TEXT = " / ";
+  var KNOWN_WEATHER = /* @__PURE__ */ new Set(["mild", "rain", "snow", "heat"]);
+  function knownWeather(weather) {
+    if (weather == null || !KNOWN_WEATHER.has(weather)) return null;
+    return weather;
+  }
+  function res1OverlayBandOffsetPx(spanPx) {
+    return spanPx * RES1_OVERLAY_BAND_OFFSET_SPAN_FRAC;
+  }
+  function res1ProductionLabelSurface(input) {
+    if (input.res4Rendered) return "none";
+    if (input.explored && input.humanUrbanProduction && input.buildEntryZoom) return "button";
+    if (!input.explored && !input.mapInspectionHeld) return "none";
+    if (!input.mapInspectionHeld && !input.humanUrbanProduction && !input.controlledByHuman) return "none";
+    return "canvas";
+  }
+  function inspectionStatusIconsForHex(input) {
+    if (input.productionSurface === "none") return null;
+    const tech = input.techBonusEnabled === true && Number.isFinite(input.baselineUrbanHexCount) && input.baselineUrbanHexCount > 0 ? techLevelFromUrbanHexCount(input.baselineUrbanHexCount) : null;
+    const weather = knownWeather(input.weather);
+    if (tech == null && weather == null) return null;
+    return { tech, weather };
+  }
+  function inspectionStatusIconFontPx(input) {
+    if (input.productionSurface === "button" || input.hasInfraSymbols || input.hasVisibleUnits) return 10;
+    return 11;
+  }
+  function inspectionStatusSlashIsBold(controlledByHuman, capacityPerTurn) {
+    return controlledByHuman && capacityPerTurn > 0;
+  }
+  function techInspectionIconAssetPath(level) {
+    return level === "advanced" ? "tech/tech_advanced.svg" : "tech/tech_basic.svg";
+  }
+  function weatherInspectionIconAssetPath(weather) {
+    return weatherIconAssetPath(weather);
+  }
+
   // src/shared/homeRegionRules.ts
   function resolveHomeRegionOwnerIdentity(input) {
     const inHuman = (input.humanHomeRegionHexes ?? []).includes(input.h3Index);
@@ -18723,7 +18762,7 @@ ${body}`;
     const center = hexCenterPx(h3Index);
     if (!hasOffsetFeatures) return center.y;
     const pts = projectHexBoundaryToContainerPoints(h3Index, map, leaflet);
-    return center.y + spanForProjectedHex(pts) * 0.24;
+    return center.y + res1OverlayBandOffsetPx(spanForProjectedHex(pts));
   }
   function drawTerrainInfrastructureOverlays(ctx, deps) {
     if (!rendererSharedState.gameState) return;
@@ -21935,7 +21974,7 @@ ${body}`;
       const kind = EFFECT_SYMBOL_KIND[symbol];
       if (kind) icons.push(formatStatusIconHtml(kind));
     }
-    return icons.join("/");
+    return icons.join("|");
   }
 
   // src/shared/terrainEffectsForTooltip.ts
@@ -29215,6 +29254,129 @@ ${body}`;
     }
   }
 
+  // src/renderer/rendering/inspectionStatusIcons.ts
+  var iconImages = /* @__PURE__ */ new Map();
+  function projectedCentroid2(pts) {
+    let sx = 0;
+    let sy = 0;
+    for (const point of pts) {
+      sx += point.x;
+      sy += point.y;
+    }
+    const count = pts.length;
+    return { x: sx / count, y: sy / count };
+  }
+  function iconImage(src, requestRedraw2) {
+    if (iconImages.has(src)) return iconImages.get(src) ?? null;
+    const img = new Image();
+    img.decoding = "async";
+    iconImages.set(src, img);
+    img.onload = () => {
+      if (iconImages.get(src) === img) requestRedraw2();
+    };
+    img.onerror = () => {
+      if (iconImages.get(src) === img) iconImages.set(src, null);
+    };
+    img.src = src;
+    return iconImages.get(src) ?? null;
+  }
+  function drawFittedIcon(ctx, img, centerX, centerY, iconPx) {
+    if (!img || !img.complete || img.naturalWidth <= 0 || img.naturalHeight <= 0) return;
+    const scale = iconPx / Math.max(img.naturalWidth, img.naturalHeight);
+    const width = img.naturalWidth * scale;
+    const height = img.naturalHeight * scale;
+    ctx.drawImage(img, centerX - width / 2, centerY - height / 2, width, height);
+  }
+  function drawSlash(ctx, centerX, centerY) {
+    ctx.strokeStyle = "#fff";
+    ctx.lineWidth = 1.25;
+    ctx.strokeText(INSPECTION_STATUS_ICON_SLASH_TEXT, centerX, centerY);
+    ctx.fillStyle = "#000";
+    ctx.fillText(INSPECTION_STATUS_ICON_SLASH_TEXT, centerX, centerY);
+  }
+  function drawIconGroup(ctx, deps, placement) {
+    const { centerX, centerY, fontPx, bold, tech, weather } = placement;
+    ctx.font = `${bold ? "bold " : ""}${fontPx}px system-ui, sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    const slashWidth = tech && weather ? ctx.measureText(INSPECTION_STATUS_ICON_SLASH_TEXT).width : 0;
+    const totalWidth = (tech ? fontPx : 0) + slashWidth + (weather ? fontPx : 0);
+    let left = centerX - totalWidth / 2;
+    if (tech) {
+      drawFittedIcon(
+        ctx,
+        iconImage(techInspectionIconAssetPath(tech), deps.requestRedraw),
+        left + fontPx / 2,
+        centerY,
+        fontPx
+      );
+      left += fontPx;
+    }
+    if (tech && weather) {
+      drawSlash(ctx, left + slashWidth / 2, centerY);
+      left += slashWidth;
+    }
+    if (weather) {
+      drawFittedIcon(
+        ctx,
+        iconImage(weatherInspectionIconAssetPath(weather), deps.requestRedraw),
+        left + fontPx / 2,
+        centerY,
+        fontPx
+      );
+    }
+  }
+  function drawInspectionStatusIcons(ctx, deps) {
+    if (!rendererSharedState.gameState || rendererSharedState.tacticalBattleSnapshot || !isMapInspectionModeHeld() || shouldRenderRes4Hexes()) return;
+    const map = getMainLeafletMapForProjection();
+    const leaflet = getLeafletGlobal();
+    if (!map || !leaflet) return;
+    const state = rendererSharedState.gameState;
+    const unitHexes = new Set(state.units.map((unit) => unit.h3Index));
+    const buildEntryZoom = shouldShowBuildEntryZoom();
+    ctx.save();
+    try {
+      for (const hx of state.hexes) {
+        const explored = deps.isHexExploredByPlayer(hx.h3Index);
+        const controlledByHuman = getControllerForHex(state, hx.h3Index) === "human";
+        const humanUrbanProduction = isRes1HexHumanUrbanProduction(state, hx);
+        const surface = res1ProductionLabelSurface({
+          res4Rendered: false,
+          explored,
+          mapInspectionHeld: true,
+          controlledByHuman,
+          humanUrbanProduction,
+          buildEntryZoom
+        });
+        const icons = inspectionStatusIconsForHex({
+          productionSurface: surface,
+          techBonusEnabled: state.techBonusEnabled === true,
+          baselineUrbanHexCount: baselineUrbanHexCountForRes1Hex(hx.h3Index),
+          weather: hx.weather
+        });
+        if (surface === "none" || !icons) continue;
+        const pts = projectHexBoundaryToContainerPoints(hx.h3Index, map, leaflet);
+        if (pts.length === 0) continue;
+        const centroid = projectedCentroid2(pts);
+        const fontPx = inspectionStatusIconFontPx({
+          productionSurface: surface,
+          hasInfraSymbols: deps.hasInfraSymbols(hx.h3Index, unitHexes),
+          hasVisibleUnits: unitHexes.has(hx.h3Index)
+        });
+        drawIconGroup(ctx, deps, {
+          centerX: centroid.x,
+          centerY: centroid.y - res1OverlayBandOffsetPx(spanForProjectedHex(pts)),
+          fontPx,
+          bold: inspectionStatusSlashIsBold(controlledByHuman, getUrbanProductionCapacityForHex2(hx.h3Index)),
+          tech: icons.tech,
+          weather: icons.weather
+        });
+      }
+    } finally {
+      ctx.restore();
+    }
+  }
+
   // src/renderer/map/res4TransportVectorLayer.ts
   var vectorLayer = null;
   var vectorLayerAttached = false;
@@ -30637,6 +30799,11 @@ ${body}`;
       drawRes1ProductionOverlays(ctx);
       drawRes4CityOverlayPass(ctx);
       drawStrategicRes1InspectionHexCodes(ctx, { getExploredHexSet: getExploredHexSet2 });
+      drawInspectionStatusIcons(ctx, {
+        isHexExploredByPlayer: isHexExploredByPlayer2,
+        hasInfraSymbols: (h3Index, unitHexes) => hasVisibleRes1InfrastructureGlyphs2(h3Index, false, unitHexes),
+        requestRedraw
+      });
       drawTerrainInfrastructureOverlays2(ctx);
       drawRangePerimeterOverlay(ctx);
       const tb = rendererSharedState.tacticalBattleSnapshot;
@@ -30783,6 +30950,11 @@ ${body}`;
     drawRes1ProductionOverlays(ctx);
     drawRes4CityOverlayPass(ctx);
     drawStrategicRes1InspectionHexCodes(ctx, { getExploredHexSet: getExploredHexSet2 });
+    drawInspectionStatusIcons(ctx, {
+      isHexExploredByPlayer: isHexExploredByPlayer2,
+      hasInfraSymbols: (h3Index, unitHexes) => hasVisibleRes1InfrastructureGlyphs2(h3Index, false, unitHexes),
+      requestRedraw
+    });
     drawTerrainInfrastructureOverlays2(ctx);
     drawRangePerimeterOverlay(ctx);
     drawStaleEnemyIntel(ctx, state, inferUnitTypeLabelFromId);

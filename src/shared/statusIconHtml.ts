@@ -78,7 +78,7 @@ export function formatStatusIconHtml(kind: StatusIconKind): string {
  *
  * Purpose: A plain prefix such as `x/-` becomes icons in that same character order.
  * When to use: From the terrain-effect HTML formatter after the plain prefix is parsed.
- * Expected outcome: One icon for a single symbol. A slash between icons when more than one symbol applies. `+`, `-`, and `x` map to the single icons. Any other character is skipped. An empty string returns `''`.
+ * Expected outcome: One icon for a single symbol. A pipe between icons when more than one symbol applies. `+`, `-`, and `x` map to the single icons. Any other character is skipped. An empty string returns `''`.
  * Exceptions: None.
  */
 export function formatEffectSymbolPrefixHtml(symbols: string): string {
@@ -87,5 +87,5 @@ export function formatEffectSymbolPrefixHtml(symbols: string): string {
     const kind = EFFECT_SYMBOL_KIND[symbol];
     if (kind) icons.push(formatStatusIconHtml(kind));
   }
-  return icons.join('/');
+  return icons.join('|');
 }
