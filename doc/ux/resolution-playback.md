@@ -21,7 +21,7 @@ The player sees the following stages, skipping any stage the resolution does not
 
 The engine's resolution order is in the [combat rules](../combat-rules-v3.md). This list is the on-screen order.
 
-Dice chips show every die rolled in air combat, ranged combat, and melee combat. A phase's chips appear with its combat lightning, stay through its casualties, and fade out before the next stage starts. They are drawn above every other playback layer.
+Dice chips show every die rolled in air combat, ranged combat, and melee combat. A phase's chips appear with its combat lightning and stay up for twice the time from that lightning through its casualties. They can still be up during later stages, and playback keeps running after the last stage until they fade. They are drawn above every other playback layer.
 
 - Each chip hangs just below the stack it belongs to, and is pulled back inside the map near the edges. Ranged and return-fire rolls sit under the stack that fired. Air strike, anti-air, and infrastructure counter-fire rolls sit under the struck hex. Melee attack and defense rolls sit under the contested hex.
 - Each row shows a tag, then who rolled, then the faces, then the hit number. The tag is ATK for attacks, DEF for melee defense, RET for return fire, and AA for anti-air and infrastructure counter-fire. Who rolled is a small token in the player's color with the unit glyph, or City, Airport, or Port for infrastructure. A face at or below the hit number is a hit and is drawn in green; a miss is drawn in gray-blue. The hit number is shown as `≤N`.
@@ -53,7 +53,7 @@ A map toast can summarize losses the player can see. Combat outside vision is an
 ## States
 
 - Idle: no animation.
-- Playing: one or more stages are on screen. The game-state readout can already show the next planning turn.
+- Playing: one or more stages are on screen, or dice chips are still fading after the last stage. The game-state readout can already show the next planning turn.
 - Finished: the animation is cleared and Strategic planning or Tactical planning continues.
 
 ## Invariants
@@ -63,7 +63,7 @@ A map toast can summarize losses the player can see. Combat outside vision is an
 - A map gesture during playback never queues, changes, or cancels an order, and never changes the unit selection except by right-click.
 - Unknown battles are never described as if the player could see the units.
 - Dice chips never appear on a hex that was outside the player's vision both before and after the turn, or on an unknown battle hex. A stack that dies on a hex that then leaves vision still shows its dice.
-- Dice chips never change playback timing and never take input.
+- Dice chips never take input. They do not change when the other stages play, and playback continues after those stages until the chips fade.
 - Build markers and tactical entry markers never cover dice chips.
 - Dice chips are not drawn on the strategic map while it is zoomed in far enough to hide strategic units.
 

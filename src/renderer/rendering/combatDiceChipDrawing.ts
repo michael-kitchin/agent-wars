@@ -391,8 +391,8 @@ export function areResolutionDiceChipsShowing(anim: ResolutionMoveAnimationState
 /**
  * Draws the dice chips for whichever resolution phase is showing.
  *
- * Purpose: Shows every die rolled in the air strike, ranged, or melee phase while that phase's lightning and casualty
- *   beats play, hung just below the stack that rolled them.
+ * Purpose: Shows every die rolled in the air strike, ranged, or melee phase for twice that phase's lightning-through-casualty
+ *   beat, hung just below the stack that rolled them. The chips can still be up after later stages have finished.
  * When to use: As the last playback draw of a frame, so chips sit above every other playback layer. The caller skips
  *   it when strategic units are hidden at the res4 zoom.
  * Expected outcome: Nothing outside a phase window or when the phase has no recorded rolls. Otherwise one chip per

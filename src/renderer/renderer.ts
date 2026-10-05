@@ -107,6 +107,7 @@ import {
   drawRangedResolutionShotLines,
 } from './rendering/orderDrawing';
 import { areResolutionDiceChipsShowing } from './rendering/combatDiceChipDrawing';
+import { combatDicePlaybackHoldEndMs } from '../shared/combatDiceChips';
 import { drawResolutionCombatAndCasualtyOverlays } from './rendering/resolutionCombatOverlays';
 import { drawStaleEnemyIntel, drawUnits } from './rendering/unitDrawing';
 import { rendererSharedState as S } from './core/state';
@@ -2702,11 +2703,11 @@ function redraw(): void {
 }
 
 /**
- * Defines the `tickResolutionMoveAnimation` function shape (function tickResolutionMoveAnimation(): void).
-
+ * Advances one frame of resolution playback and clears it when the combat stages and dice chips are finished.
+ *
  * Purpose: Advances beat playback one frame and, when the beat ends, restores the sidebar phase line before the last redraw.
  * When to use: From `requestAnimationFrame` while `S.resolutionMoveAnimation` is set.
- * Expected outcome: Redraws each frame. When the duration elapses, clears the animation, refreshes the phase line from the cleared playback flag, then redraws so Exit Battle can enable again.
+ * Expected outcome: Redraws each frame. Combat stages end at `phase.totalMs`. Playback keeps going until stretched dice chips fade, which can be later. Then it clears the animation, refreshes the phase line from the cleared playback flag, and redraws so Exit Battle can enable again.
  * Exceptions: None.
  */
 function tickResolutionMoveAnimation(): void {
@@ -2714,9 +2715,9 @@ function tickResolutionMoveAnimation(): void {
   const anim = S.resolutionMoveAnimation;
   const elapsed = resolutionAnimationElapsedMs(anim);
   const { phase } = buildResolutionPlaybackState(anim, elapsed);
-  const { totalMs } = phase;
+  const playbackEndMs = Math.max(phase.totalMs, combatDicePlaybackHoldEndMs(phase, anim));
   redraw();
-  if (elapsed < totalMs) {
+  if (elapsed < playbackEndMs) {
     S.resolutionMoveAnimationFrameId = requestAnimationFrame(tickResolutionMoveAnimation);
   } else {
     S.resolutionMoveAnimation = null;

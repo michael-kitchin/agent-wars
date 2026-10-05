@@ -8,11 +8,15 @@ import { describe, it } from 'node:test';
 import {
   COMBAT_DICE_FADE_IN_MS,
   COMBAT_DICE_FADE_OUT_MS,
+  COMBAT_DICE_WINDOW_SCALE,
   buildCombatDiceChips,
   combatDiceChipOpacity,
+  combatDicePlaybackHoldEndMs,
+  combatDiceWindowForPhase,
   pickPlaybackDiceRolls,
 } from './combatDiceChips';
 import type { CombatDiceRoll } from './ipc/combatDiceTypes';
+import { getResolutionPlaybackPhase } from './resolutionPlaybackPhase';
 
 const HEX_A = '891f1d48b9fffff';
 const HEX_B = '891f1d48b8fffff';
@@ -96,6 +100,42 @@ describe('combatDiceChipOpacity', () => {
     assert.equal(combatDiceChipOpacity(start + COMBAT_DICE_FADE_IN_MS / 2, start, end), 0.5);
     assert.equal(combatDiceChipOpacity(end - COMBAT_DICE_FADE_OUT_MS / 2, start, end), 0.5);
     assert.equal(combatDiceChipOpacity(start, start, start), 0, 'an empty window shows nothing');
+  });
+});
+
+describe('combatDiceWindowForPhase', () => {
+  it('stretches a chip window to twice its beat and holds playback for the latest one', () => {
+    const phase = getResolutionPlaybackPhase({
+      elapsed: 0,
+      fadeMs: 1000,
+      lightningMs: 400,
+      hasAirStrikeOutbound: false,
+      hasAirStrikeCombat: true,
+      hasAirStrikeCasualties: true,
+      hasAirStrikeReturn: false,
+      hasRangedCombat: false,
+      hasRangedCasualties: false,
+      hasMoves: false,
+      hasMeleeCombat: true,
+      hasMeleeCasualties: false,
+    });
+    const air = combatDiceWindowForPhase(phase, 'airStrike');
+    const airBeatMs = phase.airStrikeReturnStart - phase.airStrikeCombatStart;
+    assert.equal(air.startMs, phase.airStrikeCombatStart);
+    assert.equal(air.endMs, phase.airStrikeCombatStart + airBeatMs * COMBAT_DICE_WINDOW_SCALE);
+    const melee = combatDiceWindowForPhase(phase, 'melee');
+    const meleeBeatMs = phase.totalMs - phase.meleeCombatStart;
+    assert.equal(melee.startMs, phase.meleeCombatStart);
+    assert.equal(melee.endMs, phase.meleeCombatStart + meleeBeatMs * COMBAT_DICE_WINDOW_SCALE);
+    assert.ok(melee.endMs > phase.totalMs);
+    assert.equal(combatDiceWindowForPhase(phase, 'ranged').endMs, phase.rangedCombatStart);
+    assert.equal(combatDicePlaybackHoldEndMs(phase, { rangedDiceRolls: [roll()] }), 0);
+    const hold = combatDicePlaybackHoldEndMs(phase, {
+      airStrikeDiceRolls: [roll()],
+      meleeDiceRolls: [roll({ kind: 'meleeAttack' })],
+    });
+    assert.equal(hold, melee.endMs);
+    assert.equal(combatDicePlaybackHoldEndMs(phase, {}), 0);
   });
 });
 

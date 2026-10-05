@@ -627,11 +627,11 @@ During the resolution phase, the client animates so that combat and death overla
 
 Air strike overlays complete before ranged overlays begin. Ranged overlays never "chase" moved units; melee overlays appear only after movement is complete.
 
-Dice chips listing every die rolled in the air strike, ranged, and melee phases sit on top of every other playback layer, from each phase's lightning through its casualties. They are not drawn on hexes that were outside the player's vision both before and after the turn. See [resolution-playback.md](ux/resolution-playback.md).
+Dice chips listing every die rolled in the air strike, ranged, and melee phases sit on top of every other playback layer. Each phase's chips appear with its lightning and stay up for twice the time from that lightning through its casualties, which can run past the other stages. They are not drawn on hexes that were outside the player's vision both before and after the turn. See [resolution-playback.md](ux/resolution-playback.md).
 
 ### 13.2 Tactical battle animation
 
-Tactical battle animation follows the same principles at the res4 hex grid scale. Movement uses interpolation between res4 hexes. Ranged fire shows directional indicators. Casualties use the same red X overlay. The same dice chips sit on top of every other playback layer from lightning through casualties, on the res4 cells.
+Tactical battle animation follows the same principles at the res4 hex grid scale. Movement uses interpolation between res4 hexes. Ranged fire shows directional indicators. Casualties use the same red X overlay. The same dice chips sit on top of every other playback layer, for twice the time from lightning through casualties, on the res4 cells.
 
 The tactical battle UI displays the res4 hex grid for the parent res1 hex with terrain coloring, road/rail overlays, sub-unit markers by type, and an exit control that triggers voluntary-exit mapping (§12.8).
 

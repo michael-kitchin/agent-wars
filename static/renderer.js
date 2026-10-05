@@ -17730,6 +17730,7 @@ ${body}`;
   var COMBAT_DICE_ROW_MAX_FACES = 3;
   var COMBAT_DICE_FADE_IN_MS = 150;
   var COMBAT_DICE_FADE_OUT_MS = 250;
+  var COMBAT_DICE_WINDOW_SCALE = 2;
   var TAG_BY_KIND = Object.freeze({
     airStrike: "ATK",
     ranged: "ATK",
@@ -17791,9 +17792,20 @@ ${body}`;
     });
   }
   function combatDiceWindowForPhase(phase, which) {
-    if (which === "airStrike") return { startMs: phase.airStrikeCombatStart, endMs: phase.airStrikeReturnStart };
-    if (which === "ranged") return { startMs: phase.rangedCombatStart, endMs: phase.movementStart };
-    return { startMs: phase.meleeCombatStart, endMs: phase.totalMs };
+    const startMs = which === "airStrike" ? phase.airStrikeCombatStart : which === "ranged" ? phase.rangedCombatStart : phase.meleeCombatStart;
+    const beatEndMs = which === "airStrike" ? phase.airStrikeReturnStart : which === "ranged" ? phase.movementStart : phase.totalMs;
+    if (!(beatEndMs > startMs)) return { startMs, endMs: beatEndMs };
+    return { startMs, endMs: startMs + (beatEndMs - startMs) * COMBAT_DICE_WINDOW_SCALE };
+  }
+  function combatDicePlaybackHoldEndMs(phase, rolls) {
+    const ends = ["airStrike", "ranged", "melee"].flatMap((which) => {
+      const list = which === "airStrike" ? rolls.airStrikeDiceRolls : which === "ranged" ? rolls.rangedDiceRolls : rolls.meleeDiceRolls;
+      if (!list?.length) return [];
+      const window2 = combatDiceWindowForPhase(phase, which);
+      if (!(window2.endMs > window2.startMs)) return [];
+      return [window2.endMs];
+    });
+    return ends.reduce((latest, endMs) => Math.max(latest, endMs), 0);
   }
   function combatDiceChipOpacity(elapsedMs, startMs, endMs) {
     if (!(endMs > startMs) || elapsedMs < startMs || elapsedMs >= endMs) return 0;
@@ -31388,9 +31400,9 @@ ${body}`;
     const anim = rendererSharedState.resolutionMoveAnimation;
     const elapsed = resolutionAnimationElapsedMs2(anim);
     const { phase } = buildResolutionPlaybackState2(anim, elapsed);
-    const { totalMs } = phase;
+    const playbackEndMs = Math.max(phase.totalMs, combatDicePlaybackHoldEndMs(phase, anim));
     redraw();
-    if (elapsed < totalMs) {
+    if (elapsed < playbackEndMs) {
       rendererSharedState.resolutionMoveAnimationFrameId = requestAnimationFrame(tickResolutionMoveAnimation);
     } else {
       rendererSharedState.resolutionMoveAnimation = null;

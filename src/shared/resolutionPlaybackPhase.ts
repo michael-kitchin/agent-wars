@@ -101,7 +101,7 @@ export interface ResolutionPlaybackPhase {
    * Milliseconds from playback start until the last stage ends.
    *
    * Contract: Equals the melee casualty stage's end. Empty stages do not add time.
-   * When to use: When deciding whether playback has finished.
+   * When to use: When deciding whether the combat stages have finished. Dice chips can keep playback running past this.
    * Expected outcome: A non-negative duration. A stage that is off adds no time.
    * Exceptions: None.
    */

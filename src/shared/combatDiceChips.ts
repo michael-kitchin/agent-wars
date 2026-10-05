@@ -42,12 +42,23 @@ export const COMBAT_DICE_FADE_IN_MS = 150;
 /**
  * Fade-out time at the end of a phase's chip window.
  *
- * Purpose: Chips leave smoothly before the next stage starts.
+ * Purpose: Chips leave smoothly instead of popping out.
  * When to use: `combatDiceChipOpacity`.
  * Expected outcome: Opacity ramps from 1 to 0 over the last this many milliseconds.
  * Exceptions: None.
  */
 export const COMBAT_DICE_FADE_OUT_MS = 250;
+
+/**
+ * How many times longer a chip stays up than the combat beat it belongs to.
+ *
+ * Purpose: The beat from lightning through casualties is too short to read the rolls.
+ * When to use: `combatDiceWindowForPhase` when stretching a non-empty window.
+ * Expected outcome: A chip window lasts this many times the beat. Later stages and the end of playback are unchanged
+ *   except that playback keeps drawing until the last stretched window ends.
+ * Exceptions: None.
+ */
+export const COMBAT_DICE_WINDOW_SCALE = 2;
 
 /**
  * Short label at the start of each chip row.
@@ -390,19 +401,49 @@ export function buildCombatDiceChips(rolls: readonly CombatDiceRoll[]): CombatDi
 /**
  * Returns the playback time window in which one phase's chips are shown.
  *
- * Purpose: Chips stay up from the phase's lightning beat through its casualty beat without changing the timeline.
+ * Purpose: Chips appear with the phase's lightning and stay long enough to read, even after later stages have moved on.
  * When to use: Each frame, with the phase from `getResolutionPlaybackPhase`.
- * Expected outcome: Air strike: combat start to return start. Ranged: combat start to movement start. Melee: combat
- *   start to the end of playback. The window is empty when that phase has no beats.
+ * Expected outcome: The window starts at the phase's combat lightning. Air strike would otherwise end when the return
+ *   leg starts, ranged when movement starts, and melee when playback's last stage ends. A non-empty window is then
+ *   stretched by `COMBAT_DICE_WINDOW_SCALE`, so it can run into later stages and past the last stage. An empty beat
+ *   stays empty.
  * Exceptions: None.
  */
 export function combatDiceWindowForPhase(
   phase: ResolutionPlaybackPhase,
   which: CombatDicePlaybackPhaseKey
 ): { readonly startMs: number; readonly endMs: number } {
-  if (which === 'airStrike') return { startMs: phase.airStrikeCombatStart, endMs: phase.airStrikeReturnStart };
-  if (which === 'ranged') return { startMs: phase.rangedCombatStart, endMs: phase.movementStart };
-  return { startMs: phase.meleeCombatStart, endMs: phase.totalMs };
+  const startMs =
+    which === 'airStrike' ? phase.airStrikeCombatStart : which === 'ranged' ? phase.rangedCombatStart : phase.meleeCombatStart;
+  const beatEndMs =
+    which === 'airStrike' ? phase.airStrikeReturnStart : which === 'ranged' ? phase.movementStart : phase.totalMs;
+  if (!(beatEndMs > startMs)) return { startMs, endMs: beatEndMs };
+  return { startMs, endMs: startMs + (beatEndMs - startMs) * COMBAT_DICE_WINDOW_SCALE };
+}
+
+/**
+ * Returns how long playback must keep running so every stretched chip window can finish.
+ *
+ * Purpose: Other combat stages end on `phase.totalMs`. A stretched chip can still be fading after that, and clearing
+ *   the animation then would cut it off.
+ * When to use: The playback frame loop, together with `phase.totalMs`. Pass the animation's recorded roll arrays.
+ * Expected outcome: The latest stretched window end among phases that recorded rolls, or 0 when none did. Phases with
+ *   an empty beat contribute nothing.
+ * Exceptions: None.
+ */
+export function combatDicePlaybackHoldEndMs(
+  phase: ResolutionPlaybackPhase,
+  rolls: CombatDicePlaybackFields
+): number {
+  const ends = (['airStrike', 'ranged', 'melee'] as const).flatMap((which) => {
+    const list =
+      which === 'airStrike' ? rolls.airStrikeDiceRolls : which === 'ranged' ? rolls.rangedDiceRolls : rolls.meleeDiceRolls;
+    if (!list?.length) return [];
+    const window = combatDiceWindowForPhase(phase, which);
+    if (!(window.endMs > window.startMs)) return [];
+    return [window.endMs];
+  });
+  return ends.reduce((latest, endMs) => Math.max(latest, endMs), 0);
 }
 
 /**
