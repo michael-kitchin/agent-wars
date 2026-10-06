@@ -68,7 +68,9 @@
   font-size: 0.95rem;
   color: var(--chrome-text);
 }
-.game-over-options label {
+/* Bonus labels and the Game size label. Change the gap here so those dropdowns stay aligned with each other. */
+.game-over-options label,
+.game-over-size-row label {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
@@ -89,6 +91,13 @@
   gap: 0.9rem;
   margin: 0 0 0.7rem 0;
 }
+/* Centers the Game size label and dropdown. The gap lives on the shared label rule above. */
+.game-over-size-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 0 0.7rem 0;
+}
 .game-over-region-cell {
   display: flex;
   flex-direction: column;
@@ -96,12 +105,13 @@
   min-width: 220px;
   text-align: left;
 }
-.game-over-region-cell label {
+.game-over-region-cell label,
+.game-over-size-row label {
   font-size: 0.88rem;
   color: var(--chrome-text);
   font-weight: 600;
 }
-/* One column until a row has a button, so Game size stays full width and the randomize rows gain a square button column. */
+/* One column until a row has a button, so the randomize rows gain a square button column. */
 .game-over-region-controls {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -119,6 +129,12 @@
 .game-over-box select {
   font-size: 12px;
   padding: 0.16rem 0.28rem;
+}
+/* Longest option, not the selected one, so Medium still fits while Small is selected. Regular weight so the bold label does not inherit onto the control and change that width. */
+.game-over-size-row select {
+  width: max-content;
+  flex-shrink: 0;
+  font-weight: 400;
 }
 .game-over-region-controls select {
   min-width: 0;
