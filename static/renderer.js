@@ -21196,7 +21196,7 @@ ${body}`;
     techBonusLevel: "new-game-tech-bonus-select"
   };
   var NEW_GAME_START_MONTH_ID = "new-game-start-month";
-  var NEW_GAME_OPTIONS_ROW_SELECTOR = ".game-over-options";
+  var NEW_GAME_OPTIONS_BLOCK_SELECTOR = ".game-over-options";
   var NEW_GAME_OPTION_SEPARATOR_CLASS = "game-over-options-separator";
   function fogCheckbox() {
     return document.getElementById(NEW_GAME_FOG_CHECKBOX_ID);
@@ -21235,8 +21235,8 @@ ${body}`;
     const rect = neighbor.getBoundingClientRect();
     return separatorMidY >= rect.top && separatorMidY <= rect.bottom;
   }
-  function syncNewGameOptionSeparators(row) {
-    for (const separator of row.querySelectorAll(`.${NEW_GAME_OPTION_SEPARATOR_CLASS}`)) {
+  function syncNewGameOptionSeparators(block) {
+    for (const separator of block.querySelectorAll(`.${NEW_GAME_OPTION_SEPARATOR_CLASS}`)) {
       const rect = separator.getBoundingClientRect();
       const midY = (rect.top + rect.bottom) / 2;
       const joinsNeighbors = isOnSeparatorLine(midY, separator.previousElementSibling) && isOnSeparatorLine(midY, separator.nextElementSibling);
@@ -21244,9 +21244,9 @@ ${body}`;
     }
   }
   function registerNewGameOptionSeparators() {
-    const row = document.querySelector(NEW_GAME_OPTIONS_ROW_SELECTOR);
-    if (!row || typeof ResizeObserver === "undefined") return;
-    new ResizeObserver(() => syncNewGameOptionSeparators(row)).observe(row);
+    const block = document.querySelector(NEW_GAME_OPTIONS_BLOCK_SELECTOR);
+    if (!block || typeof ResizeObserver === "undefined") return;
+    new ResizeObserver(() => syncNewGameOptionSeparators(block)).observe(block);
   }
 
   // src/renderer/gameplay/newGameRegionUi.ts
