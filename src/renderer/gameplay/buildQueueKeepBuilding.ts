@@ -41,19 +41,21 @@ export function canArmKeepBuildingForAll(snapshots: HexBuildQueueSnapshot[]): bo
  *
  * Purpose: Shared DOM for single- and multi-hex Keep building controls.
  * When to use: After queue editors are rendered, at the bottom of the build section.
- * Expected outcome: A labeled checkbox wired to `onChange`; disabled/checked reflect the args.
+ * Expected outcome: A labeled checkbox wired to `onChange`; disabled/checked reflect the args. The label carries `tooltipText`.
  * Exceptions: None.
  */
 export function appendKeepBuildingCheckbox(args: {
   section: HTMLElement;
   checked: boolean;
   disabled: boolean;
+  tooltipText: string;
   onChange: (keepBuilding: boolean) => void | Promise<void>;
 }): void {
   const row = document.createElement('div');
   row.className = 'build-keep-building-row';
   const label = document.createElement('label');
   label.className = 'build-keep-building-label';
+  label.setAttribute('data-control-tooltip', args.tooltipText);
   const checkbox = document.createElement('input');
   checkbox.type = 'checkbox';
   checkbox.className = 'build-keep-building-checkbox';

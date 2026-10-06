@@ -5,6 +5,7 @@
 import type { MeleeCandidateRow } from '../../shared/ipcTypes';
 import { attachFrameToVisibleMap } from '../map/visibleMapFrame';
 import { paintTerrainSwatches } from '../rendering/terrainVisualStyles';
+import { fightTooltipText, ignoreTooltipText } from '../chrome/controlTooltipText';
 
 /**
  * Arguments for opening the melee intercept modal.
@@ -129,15 +130,20 @@ export function openMeleeInterceptModal(args: MeleeInterceptModalOpenArgs): Prom
     fightBtn.textContent = 'Fight';
     fightBtn.disabled = true;
     fightBtn.style.cssText = 'margin-right:8px;padding:4px 14px;';
+    const fightHost = document.createElement('span');
+    fightHost.className = 'control-tooltip-host';
+    fightHost.setAttribute('data-control-tooltip', fightTooltipText);
+    fightHost.appendChild(fightBtn);
 
     const ignoreBtn = document.createElement('button');
     ignoreBtn.type = 'button';
     ignoreBtn.textContent = 'Ignore';
+    ignoreBtn.setAttribute('data-control-tooltip', ignoreTooltipText);
     ignoreBtn.style.cssText = 'padding:4px 14px;';
 
     const btnRow = document.createElement('div');
     btnRow.style.cssText = 'margin-top:4px;display:flex;justify-content:flex-end;align-items:center;gap:8px;flex-shrink:0;';
-    btnRow.appendChild(fightBtn);
+    btnRow.appendChild(fightHost);
     btnRow.appendChild(ignoreBtn);
     panel.appendChild(btnRow);
 

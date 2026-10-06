@@ -6,7 +6,7 @@
 
 This document defines UI aesthetics, control patterns, and application-specific guidelines for the grand strategy wargame. Use it for all UI and map chrome so the product reads as a coherent, serious strategy wargame.
 
-**Implementation status (2.4.0):** The live app is a map-first Electron window: Leaflet world map + canvas overlay, minimap, hex tooltips, stack callout, build-queue popup, OpenRouter side panel, a lower-right update toast and an upper-right message toast, WASD/arrow pan, wheel zoom, NATO-inspired SVG unit glyphs, and tactical-entry magnifiers on contested hexes. The map stays the light cartographic theme (no dark-mode switch). Panels, popups, tooltips, and the message and update toasts use navy chrome `#1b2838` with off-white text so flags and weather icons separate from the pale terrain. Every button, including the map buttons, uses the Ready button's teal; text fields and dropdowns use a lighter teal so they read as editable. Player colors are teal human `#115e59` and rose opponent `#9d174d` on map background `#e0dcd4`. Unbuilt in this guide: save/load UI, replay strip, async turn-file exchange, diplomacy panel, in-app reference manual, and a documented full keyboard-shortcut overlay.
+**Implementation status (2.4.0):** The live app is a map-first Electron window: Leaflet world map + canvas overlay, minimap, hex tooltips, control tips, stack callout, build-queue popup, OpenRouter side panel, a lower-right update toast and an upper-right message toast, WASD/arrow pan, wheel zoom, NATO-inspired SVG unit glyphs, and tactical-entry magnifiers on contested hexes. The map stays the light cartographic theme (no dark-mode switch). Panels, popups, tooltips, and the message and update toasts use navy chrome `#1b2838` with off-white text so flags and weather icons separate from the pale terrain. Every button, including the map buttons, uses the Ready button's teal; text fields and dropdowns use a lighter teal so they read as editable. Player colors are teal human `#115e59` and rose opponent `#9d174d` on map background `#e0dcd4`. Unbuilt in this guide: save/load UI, replay strip, async turn-file exchange, diplomacy panel, in-app reference manual, and a documented full keyboard-shortcut overlay.
 
 When this guide and the running app disagree, the app wins until this file is updated.
 
@@ -43,7 +43,7 @@ When this guide and the running app disagree, the app wins until this file is up
 | Role | Live app | Notes |
 |------|----------|--------|
 | Map canvas bg | `#e0dcd4` | `BACKGROUND_COLOR` |
-| Panel, popup, tooltip, and toast bg | `#1b2838` | Sidebar, legend, hex tooltip, stack callout, build popup, new-game box, tactical-battles dialog, lower-right update toast, and upper-right message toast |
+| Panel, popup, tooltip, and toast bg | `#1b2838` | Sidebar, legend, hex tooltip, control tips, stack callout, build popup, new-game box, tactical-battles dialog, lower-right update toast, and upper-right message toast |
 | Chrome text / muted | `#f4f6f8` / `#b7c4d4` | Off-white body; blue-gray for secondary lines |
 | Chrome error text | `#f0a8a8` | On the navy surfaces only |
 | Button face / border / hover | `#115e59` / `#7dcec8` / `#3a6a8f` | Every button, styled like Ready, with white text. The Randomize AI home region button keeps the opponent rose. The home-region and starting-month randomize buttons match their dropdowns' height. The model-list refresh button matches the Run and New buttons beside it |

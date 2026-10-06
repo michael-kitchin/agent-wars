@@ -8,7 +8,7 @@ Tell the player what a hex contains, and why a hovered order is blocked or chang
 
 ## Availability
 
-The hex tooltip can appear in Strategic planning, Tactical planning, and Resolution playback while the pointer rests on a hex. It does not appear while a unit is selected and the player is aiming a march, ferry, air strike, or ranged attack, with Shift up and resolution playback not running. It also does not appear when the stack callout or the build popup is open, or while a blocked or effects tooltip is showing. Shift inspection and resolution playback still show the hex tooltip. The blocked tooltip appears during hover preview of a march, ranged attack, or air strike. The effects tooltip appears during that same aiming when terrain, weather, or target cover changes the order.
+The hex tooltip can appear in Strategic planning, Tactical planning, and Resolution playback while the pointer rests on a hex. It does not appear while a unit is selected and the player is aiming a march, ferry, air strike, or ranged attack, with Shift up and resolution playback not running. It also does not appear when the stack callout or the build popup is open, while a blocked or effects tooltip is showing, or while a control tip is showing. Shift inspection and resolution playback still show the hex tooltip. The blocked tooltip appears during hover preview of a march, ranged attack, or air strike. The effects tooltip appears during that same aiming when terrain, weather, or target cover changes the order.
 
 ## Information Displayed
 
@@ -49,6 +49,7 @@ The hex tooltip can appear in Strategic planning, Tactical planning, and Resolut
 ### Other
 
 - Opening the stack callout or the build popup hides the hex tooltip.
+- When a control tip appears, the hex tooltip hides. A blocked tooltip or an effects tooltip stays up, and the control tip does not appear with it. See [control-tooltips.md](control-tooltips.md).
 
 ## States
 
@@ -59,7 +60,7 @@ The hex tooltip can appear in Strategic planning, Tactical planning, and Resolut
 
 ## Invariants
 
-- A blocked tooltip and an effects tooltip never show at the same time as the hex tooltip, or at the same time as each other.
+- A blocked tooltip and an effects tooltip never show at the same time as the hex tooltip, or at the same time as each other. A control tip does not show together with any of those three.
 - Fog never reveals ownership the player is not allowed to see.
 - A failed name lookup never invents a name.
 

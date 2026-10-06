@@ -18,6 +18,7 @@ import {
   registerNewGameOptionSeparators,
   resetNewGameOptionControls,
 } from './newGameOptionsUi';
+import { newGameButtonTooltipText } from '../chrome/controlTooltipText';
 
 /**
  * Wires the new-game randomize buttons.
@@ -322,7 +323,10 @@ export function openNewGameOverlayFromModelTab(setMainUIControlsEnabled: (enable
     messageEl.textContent = 'Start a new world map game when ready.';
     messageEl.style.display = '';
   }
-  if (newGameBtn) newGameBtn.textContent = 'Start game';
+  if (newGameBtn) {
+    newGameBtn.textContent = 'Start game';
+    newGameBtn.setAttribute('data-control-tooltip', newGameButtonTooltipText(true));
+  }
   resetNewGameOptionControls();
   void initializeScenarioRegionSelectorsOnOverlayOpen();
   syncGameSizeCapPreview();

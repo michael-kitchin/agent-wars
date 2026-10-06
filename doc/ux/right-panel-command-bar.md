@@ -17,6 +17,7 @@ Shown with the right panel. Ready, Ranged, and the air-strike controls follow th
 - The Ready button. Its label is "Ready", or "AI:" plus the elapsed wait, while opponent planning is still running.
 - The Ranged control. Its label is "Ranged", "Cancel", or "Strike".
 - While Strike targeting is on, a target-type choice: Enemy Units, Production, Airports, or Seaports, and a Cancel button for that targeting.
+- Control tips for Ready, Ranged, Strike, the target-type list, and Cancel are in [control-tooltips.md](control-tooltips.md).
 
 ## Inputs and Responses
 

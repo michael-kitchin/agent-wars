@@ -8,6 +8,7 @@ import {
 } from './precomputedAiState';
 import { AI_CONSULTATION_WAIT_TIMEOUT_MS } from '../../shared/aiConsultationLimits';
 import { isDeferredResolutionPlaybackConsultPending, isWaitingForPrecomputedAiOrders } from './aiPlanningState';
+import { toolGroupTooltipText } from '../chrome/controlTooltipText';
 
 /**
  * Documents the module-scope binding `BACKGROUND_AI_REQUEST_TIMEOUT_MS` (BACKGROUND_AI_REQUEST_TIMEOUT_MS).
@@ -332,16 +333,13 @@ export function renderOpenRouterToolsList(deps: OpenRouterRuntimeDeps): void {
   for (const group of S.openRouterToolGroups) {
     const cell = document.createElement('div');
     cell.className = 'openrouter-tool-cell';
+    const tip = toolGroupTooltipText(group.id);
+    if (tip) cell.setAttribute('data-control-tooltip', tip);
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'openrouter-tool-toggle';
     btn.setAttribute('data-tool-group', group.id);
     btn.setAttribute('aria-pressed', S.enabledToolGroups.has(group.id) ? 'true' : 'false');
-    if (group.id === 'precomputation') {
-      btn.title = "When on, run assess_unit, assess_hex, and estimate_combat before the LLM and inject the Commander's Briefing into the prompt.";
-    } else if (group.id === 'events') {
-      btn.title = 'When on, use event-driven consultation (pending orders or standing-order-only; no background AI request).';
-    }
     btn.textContent = String(S.toolInvocationCounts[group.id] ?? 0);
     btn.addEventListener('click', () => {
       if (S.enabledToolGroups.has(group.id)) {

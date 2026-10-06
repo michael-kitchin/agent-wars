@@ -38,6 +38,12 @@ import {
   UNIT_TYPE_LABELS,
 } from './core/constants';
 import {
+  buildEntryTooltipText,
+  runButtonTooltipText,
+  sealiftDebarkTooltipText,
+  sealiftSelectTooltipText,
+} from './chrome/controlTooltipText';
+import {
   appendOpenRouterLog,
   callReadyWithTimeout,
   hideAiStrategyToast,
@@ -720,6 +726,10 @@ async function renderSealiftSection(units: GameStateSnapshot['units'], calloutEl
         }
         select.value = selectedUnitId ?? '';
         select.dataset.prevLand = selectedUnitId ?? '';
+        const selectHost = document.createElement('span');
+        selectHost.className = 'control-tooltip-host';
+        selectHost.setAttribute('data-control-tooltip', sealiftSelectTooltipText);
+        selectHost.appendChild(select);
         select.addEventListener('change', async () => {
           const selected = select.value.trim();
           if (tacticalSealiftMode) {
@@ -772,12 +782,13 @@ async function renderSealiftSection(units: GameStateSnapshot['units'], calloutEl
           refreshStackCalloutIfOpen();
           requestRedraw();
         });
-        slotRow.appendChild(select);
+        slotRow.appendChild(selectHost);
 
         const debarkBtn = document.createElement('button');
         debarkBtn.type = 'button';
         debarkBtn.className = 'unit-select stack-unit-toggle';
         debarkBtn.textContent = UNIT_DESELECT_GLYPH;
+        debarkBtn.setAttribute('data-control-tooltip', sealiftDebarkTooltipText);
         debarkBtn.disabled = !debarkEnabled;
         debarkBtn.style.visibility = debarkEnabled ? 'visible' : 'hidden';
         debarkBtn.addEventListener('click', async () => {
@@ -1868,7 +1879,7 @@ function syncBuildEntryButton(): void {
     const html = rows
       .map(
         (r) =>
-          `<button type="button" class="build-entry-btn${r.hasCapacity ? ' has-capacity' : ''}${r.selected ? ' selected' : ''}" data-h3-index="${r.h3}" style="left:${r.left}px;top:${r.top}px;transform:translate(-50%, -50%);" aria-label="Open build queue for ${r.h3}" aria-pressed="${r.selected ? 'true' : 'false'}">${r.label}</button>`
+          `<button type="button" class="build-entry-btn${r.hasCapacity ? ' has-capacity' : ''}${r.selected ? ' selected' : ''}" data-h3-index="${r.h3}" data-control-tooltip="${buildEntryTooltipText}" style="left:${r.left}px;top:${r.top}px;transform:translate(-50%, -50%);" aria-label="Open build queue for ${r.h3}" aria-pressed="${r.selected ? 'true' : 'false'}">${r.label}</button>`
       )
       .join('');
     layer.innerHTML = html;
@@ -3152,10 +3163,8 @@ async function syncOpenRouterRunToggleInteractable(): Promise<void> {
     const canEnable = !!keyResult?.hasKey && !!modelId?.trim();
     if (canEnable) {
       runBtn.disabled = false;
-      runBtn.removeAttribute('title');
     } else {
       runBtn.disabled = true;
-      runBtn.title = 'Set API key and model to enable';
       if (S.runButtonOn) {
         S.runButtonOn = false;
         runBtn.setAttribute('aria-pressed', 'false');
@@ -3165,9 +3174,20 @@ async function syncOpenRouterRunToggleInteractable(): Promise<void> {
         updateReadyButtonState();
       }
     }
+    const runTipHost = runBtn.closest('.control-tooltip-host');
+    (runTipHost instanceof HTMLElement ? runTipHost : runBtn).setAttribute(
+      'data-control-tooltip',
+      runButtonTooltipText(canEnable)
+    );
+    runBtn.removeAttribute('title');
   } catch {
     runBtn.disabled = true;
-    runBtn.title = 'Set API key and model to enable';
+    const runTipHost = runBtn.closest('.control-tooltip-host');
+    (runTipHost instanceof HTMLElement ? runTipHost : runBtn).setAttribute(
+      'data-control-tooltip',
+      runButtonTooltipText(false)
+    );
+    runBtn.removeAttribute('title');
   }
 }
 

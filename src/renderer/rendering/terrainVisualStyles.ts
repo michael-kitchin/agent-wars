@@ -8,6 +8,7 @@ import { formatTerrainKindLabel } from '../../shared/terrainKindLabel';
 import { TERRAIN_SWATCH_CLASS_NAME } from '../../shared/terrainSwatchHtml';
 import { appendUrbanLegendRow, urbanSwatchColor } from './terrainLegendUrban';
 import { appendRubbleLegendRow, applyRubbleSwatchPaint } from './terrainLegendRubble';
+import { terrainStyleTooltipText } from '../chrome/controlTooltipText';
 
 /**
  * Documents the module-scope binding `patternCache` (patternCache).
@@ -836,6 +837,7 @@ export function renderTerrainLegend(
   container.style.pointerEvents = 'auto';
   const styleSelect = document.createElement('select');
   styleSelect.setAttribute('aria-label', 'Terrain style');
+  styleSelect.setAttribute('data-control-tooltip', terrainStyleTooltipText);
   const opts = getTerrainStyleOptions();
   for (const o of opts) {
     const opt = document.createElement('option');

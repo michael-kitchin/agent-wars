@@ -18,7 +18,7 @@ Opens in Strategic planning and Tactical planning after a plain click on a unit 
 - When the hex has human units and Shift is not held, a "+ All" control selects the selectable human units.
 - When Shift is held and the hex has human units, "+ All" adds them and "- All" removes them.
 - A close control.
-- A sealift section when the hex has a sealift action. See [order-lifecycle.md](order-lifecycle.md). Each fleet label carries the ship's origin flag. The embark option lists have no flags.
+- A sealift section when the hex has a sealift action. See [order-lifecycle.md](order-lifecycle.md). Each fleet label carries the ship's origin flag. The embark option lists have no flags. Control tips for a slot list and its debark button are in [control-tooltips.md](control-tooltips.md).
 
 Enemy rows have no selection toggle.
 

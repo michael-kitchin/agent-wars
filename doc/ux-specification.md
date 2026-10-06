@@ -27,6 +27,7 @@ Visual styling and the arrangement of items inside an element are out of scope. 
 | The minimap | [map-surface.md](ux/map-surface.md) | [minimap.md](ux/minimap.md) |
 | The terrain legend or terrain style | [map-surface.md](ux/map-surface.md) | [terrain-legend.md](ux/terrain-legend.md) |
 | Hex or order tooltips | [order-lifecycle.md](ux/order-lifecycle.md), [notifications-and-feedback.md](ux/notifications-and-feedback.md) | [hex-tooltips.md](ux/hex-tooltips.md) |
+| A button, field, checkbox, or dropdown tip | [control-tooltips.md](ux/control-tooltips.md) | the element document for that control |
 | The stack callout | [selection-model.md](ux/selection-model.md), [input-map.md](ux/input-map.md) | [stack-callout.md](ux/stack-callout.md) |
 | Single-hex build | [input-map.md](ux/input-map.md), [modes-and-transitions.md](ux/modes-and-transitions.md) | [build-popup.md](ux/build-popup.md) |
 | Multi-hex build | [build-popup.md](ux/build-popup.md) | [multi-hex-build-popup.md](ux/multi-hex-build-popup.md) |
@@ -73,6 +74,7 @@ Element documents share a fixed heading set:
 - [minimap.md](ux/minimap.md): the world overview and how it relates to the main map view.
 - [terrain-legend.md](ux/terrain-legend.md): the terrain legend and any inputs it accepts.
 - [hex-tooltips.md](ux/hex-tooltips.md): the hover information tooltip, whose Effects line includes movement, range, and cover, and the blocked-order and effects tooltips that appear after the pointer rests. The effects tooltip then stays on that cell. The blocked notice hides a short time after the pointer stops.
+- [control-tooltips.md](ux/control-tooltips.md): the one-second tip on buttons, fields, checkboxes, and dropdowns, and the controls that have none.
 - [stack-callout.md](ux/stack-callout.md): the list of units in a hex, the Bonuses tooltip, and how the list changes the selection.
 - [build-popup.md](ux/build-popup.md): the single-hex build queue popup and the markers that open it.
 - [multi-hex-build-popup.md](ux/multi-hex-build-popup.md): the build queue popup used when several build hexes are selected together.

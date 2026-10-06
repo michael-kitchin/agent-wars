@@ -6,6 +6,7 @@ import { setUnitNameContent } from './unitOriginFlags';
 import { initializeScenarioRegionSelectorsOnOverlayOpen } from '../gameplay/newGameRegionUi';
 import { syncGameSizeCapPreview } from '../gameplay/newGameSizeUi';
 import { resetNewGameOptionControls } from '../gameplay/newGameOptionsUi';
+import { newGameButtonTooltipText } from '../chrome/controlTooltipText';
 
 /**
  * Title-cases the strategic phase id from main (`planning` / `resolution`) for the sidebar line.
@@ -156,6 +157,7 @@ export function updateGameOverUI(
   }
   if (newGameBtn) {
     newGameBtn.textContent = noGame ? 'Start game' : 'New game';
+    newGameBtn.setAttribute('data-control-tooltip', newGameButtonTooltipText(noGame));
   }
   if (rangedBtn) rangedBtn.disabled = true;
   updateReadyButtonState();

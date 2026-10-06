@@ -20,6 +20,7 @@ Opens in Strategic planning when two or more build hexes are selected. Selection
 - One template row per queued entry. Each unit-type choice says whether it applies to all selected hexes, to one hex, or to a count of hexes.
 - A Keep building checkbox. It shows as checked only when every selected hex has Keep building on. It can be changed only when every selected hex can arm it.
 - If the queues fail to load, "Failed to load build queues for the selected hexes." That failure shows no Tech line.
+- Control tips for the queue controls and Keep building are in [control-tooltips.md](control-tooltips.md).
 
 Shared row editing is the same as [build-popup.md](build-popup.md). Costs and caps stay in the [combat rules](../combat-rules-v3.md) and [game size and unit caps](../game-size-unit-caps.md).
 

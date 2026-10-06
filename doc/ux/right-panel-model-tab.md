@@ -16,10 +16,11 @@ Shown when the Model tab is selected. This is the tab the panel starts on. The m
 - A cost readout for the current match, as a currency amount. A new match resets it to zero.
 - A model dropdown. It starts as "— Select model —" until models load. Each option shows the model name, then in brackets the combined prompt and completion price per million tokens and the model's reasoning levels, lowest first, abbreviated and separated by slashes, with the default level marked by an asterisk, for example `reasoning: None/Low/Med*/High`. Levels are abbreviated None, Min, Low, Med, High, Xhigh, and Max. A model that reports reasoning without listing levels shows `reasoning: <default level>` or `reasoning: default`.
 - A refresh control labeled "Refresh model list". It, Run, and New are the same height as the model dropdown beside them.
-- A Run button. It is disabled, with the tip "Set API key and model to enable", until both a key and a model are set.
+- A Run button. It stays unavailable until both a key and a model are set.
 - A New button labeled "New".
 - A reasoning effort dropdown on the row directly below the model dropdown, at the same width. It lists only the selected model's reasoning levels, as "High" and so on, and marks the model's default level "(default)". When the model has no default level, or no levels at all, an extra first option reads "Model default". The dropdown is disabled when the model offers fewer than two levels, and before models load.
-- A Tactical battles checkbox, checked by default, to the right of the reasoning dropdown and directly below the refresh control. Its tip says that, when unchecked, the tactical battles list does not appear and melee resolves as if the player chose Ignore every time.
+- A Tactical battles checkbox, checked by default, to the right of the reasoning dropdown and directly below the refresh control. When it is unchecked, the tactical battles list does not appear and melee resolves as if the player chose Ignore every time.
+- Control tips for this tab's fields, buttons, checkbox, and dropdowns are in [control-tooltips.md](control-tooltips.md). The model dropdown keeps the model description tooltip and does not use those tips.
 - A model description tooltip: the selected model's description, one second after the pointer arrives on the model dropdown. Moving on the dropdown does not start that wait again. An empty description shows nothing.
 
 ## Inputs and Responses

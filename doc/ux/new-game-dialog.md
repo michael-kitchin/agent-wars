@@ -19,6 +19,7 @@ Opens in New game and in Game over. See [modes-and-transitions.md](modes-and-tra
 - Cap badges for infantry, armor, naval, and air: gray disks with the map glyphs drawn dark. The numbers are in [game size and unit caps](../game-size-unit-caps.md).
 - Two option lines. The first line is Country bonus, a slash (/) with a small space on each side, then Tech bonus. The second line is Terrain bonus, a slash the same way, then Weather bonus. When a narrow window wraps a line, a slash that would sit at the start or end of that line is hidden. Each label ends with a colon, for example "Tech bonus:". Each dropdown lists Off, Low, and High. Whenever the overlay opens, every dropdown is set to Low. Each dropdown is independent. The next row starts with a Fog of war checkbox, then a slash (/) with a small space on each side, then a "Starting month:" control that lists the full English month names. Whenever the overlay opens, Fog of war is checked and that control shows a random month, the same way the home regions are drawn. To the right of the month is a randomize control labeled "Randomize starting month", a square button the same height and color as the human home-region randomize button. The bonus rules for each level are in [combat rules §4.9](../combat-rules-v3.md).
 - A button labeled "Start game" when no match is loaded or when New opened the overlay, and "New game" when the match is over.
+- Control tips for these choices and that button are in [control-tooltips.md](control-tooltips.md).
 
 ## Inputs and Responses
 

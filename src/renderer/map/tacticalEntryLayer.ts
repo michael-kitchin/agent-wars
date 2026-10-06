@@ -7,6 +7,7 @@ import { computeRes1OverlayTextY } from '../rendering/terrainRendering';
 import { getLeafletGlobal, hexCenterPx } from './mapHelpers';
 import { shouldShowBuildEntryZoom } from './terrainView';
 import { getMainLeafletMap } from './worldLeafletMap';
+import { tacticalEntryTooltipText } from '../chrome/controlTooltipText';
 
 /**
  * Hides the tactical-entry overlay and optionally clears its HTML.
@@ -96,7 +97,7 @@ export function syncTacticalEntryButton(deps: {
     const html = rows
       .map(
         (r) =>
-          `<button type="button" class="tactical-entry-btn" data-h3-index="${r.h3}" style="left:${r.left}px;top:${r.top}px;transform:translate(-50%, -50%);" title="Tactical battle" aria-label="Start tactical battle in ${r.h3}">&#128269;</button>`
+          `<button type="button" class="tactical-entry-btn" data-h3-index="${r.h3}" data-control-tooltip="${tacticalEntryTooltipText}" style="left:${r.left}px;top:${r.top}px;transform:translate(-50%, -50%);" aria-label="Start tactical battle in ${r.h3}">&#128269;</button>`
       )
       .join('');
     layer.innerHTML = html;

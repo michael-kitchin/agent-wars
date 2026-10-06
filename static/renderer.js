@@ -17286,6 +17286,71 @@ ${body}`;
     };
   }
 
+  // src/renderer/chrome/controlTooltipText.ts
+  var startGameButtonTooltipText = "Start the match with the choices on this screen. If the start fails, the screen stays open.";
+  var newMatchButtonTooltipText = "Start a new match with the choices on this screen. This clears your selection and the orders you had queued.";
+  function newGameButtonTooltipText(startGame) {
+    return startGame ? startGameButtonTooltipText : newMatchButtonTooltipText;
+  }
+  var rangedAimTooltipText = "Turn this on, then double-click the target on the map. The button then reads Cancel.";
+  var rangedCancelTooltipText = "Stop aiming a ranged attack. Attacks already in the list stay there.";
+  var strikeAimTooltipText = "Turn this on to aim an air strike. A target list and a Cancel button replace this button.";
+  function rangedButtonTooltipText(label) {
+    if (label === "Cancel") return rangedCancelTooltipText;
+    if (label === "Strike") return strikeAimTooltipText;
+    return rangedAimTooltipText;
+  }
+  var runDisabledTooltipText = "Turn opponent planning on or off. Enter an API key and choose a model first.";
+  var runEnabledTooltipText = "Turn opponent planning on or off. On opens the Tools tab and can hold Ready until a plan exists; off cancels a plan that is still running.";
+  function runButtonTooltipText(enabled) {
+    return enabled ? runEnabledTooltipText : runDisabledTooltipText;
+  }
+  var precomputationTooltipText = "Turn on a summary of units, hexes, and combat that is prepared before the model plans. The number counts uses since the last Ready, and the button stays pressed while this is on.";
+  var eventsTooltipText = "Turn this on to stop a background plan every turn. One plan still runs when the match starts, when you turn Run on, or when you turn this on, and the number counts uses since the last Ready.";
+  var planningTooltipText = "Let the opponent plan routes and measure distances. The number counts uses since the last Ready, and this does nothing when the model cannot use tools.";
+  var assessmentTooltipText = "Let the opponent inspect nearby units and hexes. The number counts uses since the last Ready, and this does nothing when the model cannot use tools.";
+  var estimationTooltipText = "Let the opponent estimate the odds of a fight. The number counts uses since the last Ready, and this does nothing when the model cannot use tools.";
+  var memoryTooltipText = "Let the opponent read notes it has saved. The number counts uses since the last Ready, and this does nothing when the model cannot use tools.";
+  var ordersTooltipText = "Let the opponent look up standing orders. The number counts uses since the last Ready, and this does nothing when the model cannot use tools.";
+  var productionTooltipText = "Let the opponent read and change build queues on the world map, not during a battle. The number counts uses since the last Ready, and this does nothing when the model cannot use tools.";
+  function toolGroupTooltipText(groupId) {
+    switch (groupId) {
+      case "precomputation":
+        return precomputationTooltipText;
+      case "events":
+        return eventsTooltipText;
+      case "planning":
+        return planningTooltipText;
+      case "assessment":
+        return assessmentTooltipText;
+      case "estimation":
+        return estimationTooltipText;
+      case "memory":
+        return memoryTooltipText;
+      case "orders":
+        return ordersTooltipText;
+      case "production":
+        return productionTooltipText;
+      default:
+        return null;
+    }
+  }
+  var terrainStyleTooltipText = "Pick the terrain colors and the map picture under them. The choices are Default, Atlas, Wargame, and Scientific.";
+  var buildEntryTooltipText = "Click to open this hex's build queue. Shift-click adds or removes the hex when several queues are edited together, and the click does nothing during playback or while you are aiming an order.";
+  var tacticalEntryTooltipText = "Click to start or resume the battle in this hex. That also stops world-map playback, and the click does nothing while you are aiming an order.";
+  var buildAddTooltipText = "Add a queue row. It starts as the first unit type this hex can build.";
+  var buildTypeTooltipText = "Change what this row builds. Only types this hex can produce are listed, and a change the game rejects is restored.";
+  var buildCountTooltipText = "Enter how many to build, from 1 to 99, digits only. Other values are corrected, and a count the game rejects is restored.";
+  var keepBuildingTooltipText = "After this queue finishes, keep building its last unit type. You can turn this on only when the hex has rows in the queue, or is already set to keep building.";
+  var multiBuildAddTooltipText = "Add a row and copy it onto every selected hex. A hex that cannot build that type skips the row.";
+  var multiBuildTypeTooltipText = "Change the unit type for this row on every selected hex. A hex that cannot build the type skips it.";
+  var multiBuildCountTooltipText = "Set how many to build on each selected hex, from 1 to 99, digits only. Other values are corrected, and a count the game rejects is restored.";
+  var multiKeepBuildingTooltipText = "After each selected hex finishes its queue, keep building that hex's last unit type. You can change this only when every selected hex can, and it is checked only when every selected hex is already set to keep building.";
+  var sealiftSelectTooltipText = "Choose a land unit to load on this ship, or (none) to empty the slot. This applies immediately, not when you press Ready, and in a battle it also cancels marches for the units you changed.";
+  var sealiftDebarkTooltipText = "Land the unit in this slot now. In a battle, that unit's march is cancelled too.";
+  var fightTooltipText = "Fight the row you selected as a battle, after the rest of this turn resolves. Select a row first; until you do, Fight does nothing.";
+  var ignoreTooltipText = "Skip every melee this turn and continue. Press Escape, or click the dimmed area around this list, to do the same.";
+
   // src/shared/mapKeyboardPanLogic.ts
   var MAP_PAN_BASELINE_INTERVAL_MS = 200;
   var MAP_PAN_HOLD_INTERVAL_MS = Math.round(MAP_PAN_BASELINE_INTERVAL_MS / 1.5);
@@ -18788,6 +18853,7 @@ ${body}`;
     container.style.pointerEvents = "auto";
     const styleSelect = document.createElement("select");
     styleSelect.setAttribute("aria-label", "Terrain style");
+    styleSelect.setAttribute("data-control-tooltip", terrainStyleTooltipText);
     const opts = getTerrainStyleOptions();
     for (const o of opts) {
       const opt = document.createElement("option");
@@ -19421,7 +19487,7 @@ ${body}`;
     const layerKey = rows.map((r) => `${r.h3}|${r.left}|${r.top}`).join(";");
     if (layerKey !== rendererSharedState.lastTacticalEntryLayerKey) {
       const html = rows.map(
-        (r) => `<button type="button" class="tactical-entry-btn" data-h3-index="${r.h3}" style="left:${r.left}px;top:${r.top}px;transform:translate(-50%, -50%);" title="Tactical battle" aria-label="Start tactical battle in ${r.h3}">&#128269;</button>`
+        (r) => `<button type="button" class="tactical-entry-btn" data-h3-index="${r.h3}" data-control-tooltip="${tacticalEntryTooltipText}" style="left:${r.left}px;top:${r.top}px;transform:translate(-50%, -50%);" aria-label="Start tactical battle in ${r.h3}">&#128269;</button>`
       ).join("");
       layer.innerHTML = html;
       rendererSharedState.lastTacticalEntryLayerKey = layerKey;
@@ -21599,6 +21665,7 @@ ${body}`;
     }
     if (newGameBtn) {
       newGameBtn.textContent = noGame ? "Start game" : "New game";
+      newGameBtn.setAttribute("data-control-tooltip", newGameButtonTooltipText(noGame));
     }
     if (rangedBtn) rangedBtn.disabled = true;
     updateReadyButtonState2();
@@ -21661,517 +21728,6 @@ ${body}`;
       }
       rendererSharedState.tacticalOpponentDraft = result.tacticalOpponentPlan;
     }
-  }
-
-  // src/renderer/tactical/tacticalExitButtonDom.ts
-  function syncTacticalExitButtonElementVisibility() {
-    const hud = document.getElementById("tactical-battle-hud");
-    const exitBtn = document.getElementById("tactical-exit-btn");
-    const active = !!rendererSharedState.tacticalBattleSnapshot;
-    const annihilationDialogOpen = rendererSharedState.tacticalAnnihilationOutcomeDialog != null;
-    hud?.classList.toggle("hidden", !active);
-    const playbackDisablesExit = rendererSharedState.tacticalBattleSnapshot != null && rendererSharedState.resolutionMoveAnimation != null;
-    const disabled = !active || !rendererSharedState.tacticalPhasePlanning || playbackDisablesExit;
-    if (exitBtn) {
-      if (annihilationDialogOpen) {
-        exitBtn.classList.add("hidden");
-        exitBtn.disabled = true;
-      } else {
-        exitBtn.classList.remove("hidden");
-        exitBtn.disabled = disabled;
-      }
-    }
-  }
-
-  // src/renderer/tactical/tacticalAnnihilationDialog.ts
-  var TACTICAL_ANNIHILATION_NEUTRAL_MESSAGE = "All units destroyed.";
-  function tacticalAnnihilationMessageForOutcome(outcome) {
-    if (outcome === "human_win") return "You win!";
-    if (outcome === "human_loss") return "You lose.";
-    return TACTICAL_ANNIHILATION_NEUTRAL_MESSAGE;
-  }
-  function openTacticalAnnihilationOutcomeDialog(outcome) {
-    rendererSharedState.tacticalAnnihilationOutcomeDialog = outcome;
-    void window.gameApi?.cancelRequestAiOrders?.();
-    const overlay = document.getElementById("tactical-annihilation-overlay");
-    const messageEl = document.getElementById("tactical-annihilation-message");
-    if (messageEl) messageEl.textContent = tacticalAnnihilationMessageForOutcome(outcome);
-    overlay?.classList.remove("hidden");
-    setMainUIControlsEnabled(false);
-    syncTacticalExitButtonElementVisibility();
-    updateReadyButtonState();
-  }
-  function closeTacticalAnnihilationOutcomeDialog() {
-    rendererSharedState.tacticalAnnihilationOutcomeDialog = null;
-    document.getElementById("tactical-annihilation-overlay")?.classList.add("hidden");
-    setMainUIControlsEnabled(true);
-    syncTacticalExitButtonElementVisibility();
-    updateReadyButtonState();
-  }
-
-  // src/renderer/map/tacticalMapView.ts
-  function enterTacticalMapView(childRes4H3Indexes) {
-    const map = getMainLeafletMap();
-    const L = getLeafletGlobal();
-    if (!map || !L || typeof map.fitBounds !== "function") return;
-    let minLat = 90;
-    let maxLat = -90;
-    let minLng = 180;
-    let maxLng = -180;
-    for (const h3 of childRes4H3Indexes) {
-      const boundary = getHexBoundaryLatLngForLeafletOverlay(h3);
-      for (const [lat, lng] of boundary) {
-        if (lat < minLat) minLat = lat;
-        if (lat > maxLat) maxLat = lat;
-        if (lng < minLng) minLng = lng;
-        if (lng > maxLng) maxLng = lng;
-      }
-    }
-    if (minLat > maxLat) return;
-    const padLat = Math.max(5e-4, (maxLat - minLat) * 0.08);
-    const padLng = Math.max(5e-4, (maxLng - minLng) * 0.08);
-    const sw = { lat: Math.max(-WEB_MERCATOR_MAX_ABS_LAT, minLat - padLat), lng: minLng - padLng };
-    const ne = { lat: Math.min(WEB_MERCATOR_MAX_ABS_LAT, maxLat + padLat), lng: maxLng + padLng };
-    const tacticalBounds = L.latLngBounds(L.latLng(sw.lat, sw.lng), L.latLng(ne.lat, ne.lng));
-    hidePlanningChromeToasts();
-    if (rendererSharedState.preTacticalLeafletMinZoom == null && typeof map.getMinZoom === "function") {
-      rendererSharedState.preTacticalLeafletMinZoom = map.getMinZoom();
-    }
-    if (rendererSharedState.preTacticalLeafletMaxZoom == null && typeof map.getMaxZoom === "function") {
-      rendererSharedState.preTacticalLeafletMaxZoom = map.getMaxZoom();
-    }
-    const tacticalFlyMaxZoom = 14.5;
-    const tacticalAbsoluteMaxZoom = 16;
-    if (typeof map.setMaxZoom === "function") map.setMaxZoom(tacticalAbsoluteMaxZoom);
-    const finalizeTacticalViewZoomAndPan = () => {
-      if (typeof map.setMaxBounds === "function") map.setMaxBounds(tacticalBounds);
-      if (typeof map.getZoom === "function" && typeof map.setMinZoom === "function") {
-        map.setMinZoom(map.getZoom());
-      }
-    };
-    if (typeof map.flyToBounds === "function") {
-      map.flyToBounds(tacticalBounds, { padding: [20, 20], duration: 0.55, maxZoom: tacticalFlyMaxZoom });
-      setTimeout(finalizeTacticalViewZoomAndPan, 750);
-    } else {
-      map.fitBounds?.(tacticalBounds, { padding: [20, 20], animate: true });
-      if (typeof map.once === "function") {
-        map.once("moveend", finalizeTacticalViewZoomAndPan);
-      } else {
-        setTimeout(finalizeTacticalViewZoomAndPan, 200);
-      }
-    }
-  }
-  function exitTacticalMapView() {
-    const map = getMainLeafletMap();
-    const L = getLeafletGlobal();
-    if (!map || !L) {
-      rendererSharedState.preTacticalLeafletMinZoom = null;
-      rendererSharedState.preTacticalLeafletMaxZoom = null;
-      return;
-    }
-    const worldBounds = L.latLngBounds(
-      L.latLng(-WEB_MERCATOR_MAX_ABS_LAT, -180),
-      L.latLng(WEB_MERCATOR_MAX_ABS_LAT, 180)
-    );
-    if (typeof map.setMaxBounds === "function") map.setMaxBounds(worldBounds);
-    if (typeof map.setMinZoom === "function" && rendererSharedState.preTacticalLeafletMinZoom != null) {
-      map.setMinZoom(rendererSharedState.preTacticalLeafletMinZoom);
-    }
-    if (typeof map.setMaxZoom === "function" && rendererSharedState.preTacticalLeafletMaxZoom != null) {
-      map.setMaxZoom(rendererSharedState.preTacticalLeafletMaxZoom);
-    }
-    rendererSharedState.preTacticalLeafletMinZoom = null;
-    rendererSharedState.preTacticalLeafletMaxZoom = null;
-    const home = rendererSharedState.strategicScenarioInitialLeafletView;
-    if (home && typeof map.setView === "function") {
-      map.setView(L.latLng(home.lat, home.lng), home.zoom);
-    } else if (typeof map.fitBounds === "function") {
-      map.fitBounds(worldBounds, { padding: [2, 2], animate: false });
-    }
-  }
-
-  // src/shared/filterOrdersToLivingUnitIds.ts
-  function filterOrdersToLivingUnitIds(rows, livingUnitIds) {
-    return rows.filter((row) => livingUnitIds.has(row.unitId));
-  }
-
-  // src/renderer/tactical/tacticalStrategicOrderUiStash.ts
-  var strategicOrderDraftStash = null;
-  function stashStrategicOrderDraftsForTacticalSession() {
-    if (strategicOrderDraftStash) return;
-    strategicOrderDraftStash = {
-      humanStandingOrders: [...rendererSharedState.humanStandingOrders],
-      pendingRangedAttacks: [...rendererSharedState.pendingRangedAttacks],
-      pendingAirStrikes: [...rendererSharedState.pendingAirStrikes],
-      pendingFerryOrders: [...rendererSharedState.pendingFerryOrders]
-    };
-    rendererSharedState.humanStandingOrders = [];
-    rendererSharedState.pendingRangedAttacks = [];
-    rendererSharedState.pendingAirStrikes = [];
-    rendererSharedState.pendingFerryOrders = [];
-    rendererSharedState.pendingEmbarkOrders = [];
-    rendererSharedState.tacticalPendingMarches = [];
-    rendererSharedState.tacticalOpponentDraft = null;
-    rendererSharedState.rangedModeActive = false;
-    rendererSharedState.airStrikeModeActive = false;
-  }
-  function restoreDraftRowsForLivingUnits(rows, livingUnitIds) {
-    return livingUnitIds ? filterOrdersToLivingUnitIds(rows, livingUnitIds) : rows;
-  }
-  function restoreStrategicOrderDraftsAfterTacticalSession() {
-    if (!strategicOrderDraftStash) return;
-    const units = rendererSharedState.gameState?.units;
-    const livingUnitIds = units ? new Set(units.map((u) => u.id)) : null;
-    rendererSharedState.humanStandingOrders = restoreDraftRowsForLivingUnits(
-      strategicOrderDraftStash.humanStandingOrders,
-      livingUnitIds
-    );
-    rendererSharedState.pendingRangedAttacks = restoreDraftRowsForLivingUnits(
-      strategicOrderDraftStash.pendingRangedAttacks,
-      livingUnitIds
-    );
-    rendererSharedState.pendingAirStrikes = restoreDraftRowsForLivingUnits(
-      strategicOrderDraftStash.pendingAirStrikes,
-      livingUnitIds
-    );
-    rendererSharedState.pendingFerryOrders = restoreDraftRowsForLivingUnits(
-      strategicOrderDraftStash.pendingFerryOrders,
-      livingUnitIds
-    );
-    strategicOrderDraftStash = null;
-    rendererSharedState.tacticalPendingMarches = [];
-    rendererSharedState.pendingEmbarkOrders = [];
-  }
-  function discardStrategicOrderUiStash() {
-    strategicOrderDraftStash = null;
-  }
-
-  // src/shared/abortError.ts
-  function isLikelyAbortError(err) {
-    if (err instanceof Error && err.name === "AbortError") return true;
-    const msg = String(err);
-    return msg.includes("AbortError") || msg.toLowerCase().includes("abort");
-  }
-
-  // src/renderer/openRouter/openRouterRuntime.ts
-  var BACKGROUND_AI_REQUEST_TIMEOUT_MS = AI_CONSULTATION_WAIT_TIMEOUT_MS;
-  var openRouterRuntimeDepsRef = null;
-  var OPEN_ROUTER_LOG_BACKGROUND_AI_CANCEL_SESSION_ENDED = "Tactical AI prefetch cancelled (tactical session ended).";
-  var OPEN_ROUTER_LOG_BACKGROUND_AI_CANCEL_TACTICAL_BATTLE_EXIT = "Background AI request cancelled (exiting tactical battle).";
-  function cancelInFlightBackgroundAiRequestForRendererTeardown(logLine) {
-    if (!rendererSharedState.backgroundRequestInFlight) return;
-    void window.gameApi?.cancelRequestAiOrders?.();
-    rendererSharedState.backgroundRequestInFlight = false;
-    openRouterRuntimeDepsRef?.appendOpenRouterLog(logLine, false);
-    unblockPrecomputedAiPlanningAfterBackgroundFailure();
-    openRouterRuntimeDepsRef?.updateReadyButtonState();
-  }
-  function cancelTacticalScopedBackgroundPrefetchForSessionTeardown() {
-    cancelInFlightBackgroundAiRequestForRendererTeardown(OPEN_ROUTER_LOG_BACKGROUND_AI_CANCEL_SESSION_ENDED);
-  }
-  function syncEventDrivenFromTools() {
-    rendererSharedState.useEventDrivenConsultation = rendererSharedState.enabledToolGroups.has("events");
-  }
-  function strategicPhaseAllowsBackgroundAi() {
-    if (rendererSharedState.gameState?.phase === "planning") return true;
-    return !!(rendererSharedState.tacticalBattleSnapshot && rendererSharedState.tacticalPhasePlanning);
-  }
-  function startBackgroundRequestIfAllowed(deps) {
-    if (rendererSharedState.tacticalAnnihilationOutcomeDialog != null) return;
-    if (isDeferredResolutionPlaybackConsultPending()) return;
-    if (rendererSharedState.backgroundRequestInFlight || !isWaitingForPrecomputedAiOrders() || !strategicPhaseAllowsBackgroundAi()) return;
-    openRouterRuntimeDepsRef = deps;
-    const keyPromise = window.gameApi?.openRouter?.getKey?.();
-    const modelPromise = window.gameApi?.openRouter?.getSelectedModel?.();
-    if (!keyPromise || !modelPromise) return;
-    rendererSharedState.backgroundRequestInFlight = true;
-    Promise.all([keyPromise, modelPromise]).then(([keyResult, modelId]) => {
-      if (!keyResult?.hasKey || !modelId?.trim()) {
-        rendererSharedState.backgroundRequestInFlight = false;
-        deps.appendOpenRouterLog("Run is on but API key or model not set.", true);
-        deps.updateReadyButtonState();
-        return;
-      }
-      if (!rendererSharedState.runButtonOn || !window.gameApi?.requestAiOrders) {
-        rendererSharedState.backgroundRequestInFlight = false;
-        deps.updateReadyButtonState();
-        return;
-      }
-      const enabledToolGroupsPayload = Array.from(rendererSharedState.enabledToolGroups).filter((id) => id !== "events");
-      const requestPromise = window.gameApi.requestAiOrders({ enabledToolGroups: enabledToolGroupsPayload });
-      const timeoutPromise = new Promise((_resolve, reject) => {
-        setTimeout(() => reject(new Error(`AI planning timed out after ${BACKGROUND_AI_REQUEST_TIMEOUT_MS}ms`)), BACKGROUND_AI_REQUEST_TIMEOUT_MS);
-      });
-      Promise.race([requestPromise, timeoutPromise]).then((result) => {
-        rendererSharedState.backgroundRequestInFlight = false;
-        if (rendererSharedState.useEventDrivenConsultation && !rendererSharedState.eventDrivenInitialConsultationDone) {
-          rendererSharedState.eventDrivenInitialConsultationDone = true;
-        }
-        if (rendererSharedState.runButtonOn && result.success) {
-          if (!rendererSharedState.tacticalBattleSnapshot && (result.tacticalBattle != null || result.tacticalOpponentPlan != null)) {
-            deps.appendOpenRouterLog("Discarded tactical prefetch (tactical session no longer active).", false);
-            deps.updateReadyButtonState();
-            return;
-          }
-          applySuccessfulPrecomputedAiResult(result);
-          if (rendererSharedState.tacticalBattleSnapshot && rendererSharedState.tacticalPhasePlanning && hasAiStrategyToastContent({ message: result.message, strategy: result.strategy })) {
-            deps.showAiStrategyToast({ message: result.message, strategy: result.strategy });
-          }
-          if (result.tacticalBattle) {
-            deps.requestRedraw?.();
-          }
-          if (result.toolInvocationCounts) {
-            rendererSharedState.precomputedToolInvocationCounts = { ...result.toolInvocationCounts };
-            for (const [groupId, count] of Object.entries(result.toolInvocationCounts)) {
-              rendererSharedState.toolInvocationCounts[groupId] = count;
-            }
-            deps.updateOpenRouterToolCountLabels();
-          } else {
-            rendererSharedState.precomputedToolInvocationCounts = null;
-          }
-          if (result.cost !== void 0) {
-            rendererSharedState.openRouterGameCost += result.cost;
-            deps.updateOpenRouterCostLabel();
-          }
-        } else if (!result.success) {
-          if (result.error === "Cancelled") {
-            startBackgroundRequestIfAllowed(deps);
-            if (!rendererSharedState.backgroundRequestInFlight) {
-              if (rendererSharedState.runButtonOn) {
-                deps.appendOpenRouterLog(
-                  "AI planning did not restart after the cancel; this beat proceeds without opponent orders.",
-                  true
-                );
-              }
-              unblockPrecomputedAiPlanningAfterBackgroundFailure();
-            }
-          } else {
-            deps.appendOpenRouterLog(`Background planning failed: ${result.error ?? "Unknown error"}`, true);
-            deps.showSidebarError(result.error ?? "Background AI request failed");
-            unblockPrecomputedAiPlanningAfterBackgroundFailure();
-          }
-        }
-        deps.updateReadyButtonState();
-      }).catch((err) => {
-        const msg = String(err);
-        const isAbort = isLikelyAbortError(err);
-        if (!isAbort) {
-          window.gameApi?.cancelRequestAiOrders?.();
-        }
-        rendererSharedState.backgroundRequestInFlight = false;
-        if (isAbort && rendererSharedState.tacticalBattleSnapshot && rendererSharedState.tacticalPhasePlanning) {
-          deps.appendOpenRouterLog("Tactical AI prefetch aborted.", false);
-          deps.updateReadyButtonState();
-          if (isWaitingForPrecomputedAiOrders()) {
-            startBackgroundRequestIfAllowed(deps);
-          }
-          return;
-        }
-        deps.appendOpenRouterLog(`Background planning request rejected: ${msg}`, true);
-        deps.showSidebarError(msg);
-        unblockPrecomputedAiPlanningAfterBackgroundFailure();
-        deps.updateReadyButtonState();
-      });
-    }).catch((err) => {
-      rendererSharedState.backgroundRequestInFlight = false;
-      deps.showSidebarError(String(err));
-      unblockPrecomputedAiPlanningAfterBackgroundFailure();
-      deps.updateReadyButtonState();
-    });
-  }
-  function handleEventDrivenModeTransition(deps, wasEventDriven) {
-    if (!rendererSharedState.runButtonOn || wasEventDriven === rendererSharedState.useEventDrivenConsultation) return;
-    window.gameApi?.cancelRequestAiOrders?.();
-    resetPrecomputedAiState("null");
-    rendererSharedState.eventDrivenInitialConsultationDone = false;
-    startBackgroundRequestIfAllowed(deps);
-  }
-  function renderOpenRouterToolsList(deps) {
-    const container = document.getElementById("openrouter-tools-list");
-    if (!container) return;
-    container.innerHTML = "";
-    for (const group of rendererSharedState.openRouterToolGroups) {
-      const cell = document.createElement("div");
-      cell.className = "openrouter-tool-cell";
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "openrouter-tool-toggle";
-      btn.setAttribute("data-tool-group", group.id);
-      btn.setAttribute("aria-pressed", rendererSharedState.enabledToolGroups.has(group.id) ? "true" : "false");
-      if (group.id === "precomputation") {
-        btn.title = "When on, run assess_unit, assess_hex, and estimate_combat before the LLM and inject the Commander's Briefing into the prompt.";
-      } else if (group.id === "events") {
-        btn.title = "When on, use event-driven consultation (pending orders or standing-order-only; no background AI request).";
-      }
-      btn.textContent = String(rendererSharedState.toolInvocationCounts[group.id] ?? 0);
-      btn.addEventListener("click", () => {
-        if (rendererSharedState.enabledToolGroups.has(group.id)) {
-          rendererSharedState.enabledToolGroups.delete(group.id);
-        } else {
-          rendererSharedState.enabledToolGroups.add(group.id);
-        }
-        btn.setAttribute("aria-pressed", rendererSharedState.enabledToolGroups.has(group.id) ? "true" : "false");
-        btn.textContent = String(rendererSharedState.toolInvocationCounts[group.id] ?? 0);
-        if (group.id === "events") {
-          const wasEventDriven = rendererSharedState.useEventDrivenConsultation;
-          syncEventDrivenFromTools();
-          handleEventDrivenModeTransition(deps, wasEventDriven);
-          deps.updateReadyButtonState();
-        }
-      });
-      cell.appendChild(btn);
-      const label = document.createElement("span");
-      label.className = "openrouter-tool-label";
-      label.textContent = group.label;
-      cell.appendChild(label);
-      container.appendChild(cell);
-    }
-  }
-
-  // src/shared/selectionSupportButtonMode.ts
-  function selectionSupportButtonMode(unitTypes, tacticalBattleActive) {
-    if (unitTypes.length === 0) return "hidden";
-    if (unitTypes.every((unitType) => unitType === "air")) return "strike";
-    const everyUnitCanRangedAttack = unitTypes.every(
-      (unitType) => unitType !== "air" && unitHasDirectRangedPlanning(unitType, tacticalBattleActive)
-    );
-    return everyUnitCanRangedAttack ? "ranged" : "hidden";
-  }
-
-  // src/renderer/gameplay/orderLabelFormatting.ts
-  function resolveAttackerH3ForOrderLabel(unitId, state, tacticalPositions) {
-    if (tacticalPositions && tacticalPositions.length > 0) {
-      const tactical = tacticalPositions.find((u) => u.id === unitId);
-      if (tactical) return tactical.h3Index;
-    }
-    if (!state) return null;
-    const strategic = state.units.find((u) => u.id === unitId);
-    return strategic?.h3Index ?? null;
-  }
-  function computeGridDistanceForLabel(originH3, targetH3) {
-    try {
-      return Math.max(0, gridDistance(originH3, targetH3));
-    } catch {
-      const maxRadius = 128;
-      for (let radius = 0; radius <= maxRadius; radius++) {
-        try {
-          const ring = gridDisk(originH3, radius);
-          if (ring.includes(targetH3)) return radius;
-        } catch {
-          return null;
-        }
-      }
-      return null;
-    }
-  }
-  function formatDistanceLabelForPlannedAttack(state, unitId, targetH3Index, tacticalPositions) {
-    const originH3 = resolveAttackerH3ForOrderLabel(unitId, state, tacticalPositions);
-    if (!originH3) return "?h";
-    const distance = computeGridDistanceForLabel(originH3, targetH3Index);
-    return distance == null ? "?h" : `${distance}h`;
-  }
-  function formatPendingRangedAttackSidebarLabel(state, order, tacticalPositions) {
-    return formatDistanceLabelForPlannedAttack(state, order.unitId, order.targetH3Index, tacticalPositions);
-  }
-  function formatPendingAirStrikeSidebarLabel(state, order, tacticalPositions) {
-    const targetTypeLabel = order.targetType === "units" ? "units" : order.targetType === "urban" ? "urban" : order.targetType === "airport" ? "airport" : "seaport";
-    return `${formatDistanceLabelForPlannedAttack(state, order.unitId, order.targetH3Index, tacticalPositions)} (${targetTypeLabel})`;
-  }
-  function formatPendingFerryOrderSidebarLabel(state, order, tacticalPositions) {
-    const originH3 = resolveAttackerH3ForOrderLabel(order.unitId, state, tacticalPositions);
-    if (!originH3) return "?h (ferry)";
-    const ferryDistance = computeGridDistanceForLabel(originH3, order.destinationH3Index);
-    return `${ferryDistance == null ? "?" : ferryDistance}h (ferry)`;
-  }
-
-  // src/shared/orderPreviewBlockingCopy.ts
-  var MELEE_ENGAGEMENT_LINE = /^\u2022 Melee engagements at \d+ hex(es)?\.\s*$/;
-  var RANGED_ENGAGEMENT_LINE = /^\u2022 Ranged engagements at \d+ hex(es)?\.\s*$/;
-  function composeResolutionMapToastBullets(primary, combatFallback) {
-    if (primary.length > 0) return primary;
-    if (combatFallback.length === 0) return [];
-    const onlyEngagementCounters = combatFallback.every(
-      (line) => MELEE_ENGAGEMENT_LINE.test(line) || RANGED_ENGAGEMENT_LINE.test(line)
-    );
-    if (onlyEngagementCounters) return [];
-    return combatFallback;
-  }
-  function titleCaseTerrainKindToken(kind) {
-    const k = kind.trim();
-    if (!k) return "Unknown";
-    if (k.length === 1) return k.toUpperCase();
-    return k.charAt(0).toUpperCase() + k.slice(1).toLowerCase();
-  }
-  function blockingHoverMessageFromRangedReason(reason) {
-    const r = reason.toLowerCase();
-    if (r.includes("out of range") || r.includes("out of ferry range")) return "Blocked: Range";
-    if (r.includes("line of sight blocked") || r.includes("blocked by mountains")) return "Blocked: Mountain";
-    if (r.includes("no enemy") || r.includes("no eligible")) return "Blocked: No Target";
-    return null;
-  }
-  function stripLeadingUnitLabelForStrikeReason(reason) {
-    const t = reason.trim();
-    const m = t.match(/^[^:]+:\s+(.+)$/s);
-    return m?.[1]?.trim() ? m[1].trim() : t;
-  }
-  function blockingHoverMessageFromAirStrikeReason(reason) {
-    const raw = reason.trim();
-    if (!raw) return null;
-    const r = raw.toLowerCase();
-    if (r.includes("database not initialized")) return null;
-    const tail = stripLeadingUnitLabelForStrikeReason(raw).toLowerCase();
-    if (tail.includes("target out of range") || r.includes("target out of range")) return "Blocked: Range";
-    if (tail.includes("must be based at an intact airport") || tail.includes("based at an intact airport to strike")) {
-      return "Blocked: No base airport";
-    }
-    if (tail.includes("outside the tactical battle footprint")) return "Blocked: Unit outside battle area";
-    if (tail.includes("target is outside the tactical battle")) return "Blocked: Target outside battle";
-    if (tail.includes("contested strategic hex")) return "Blocked: Strike wrong hex";
-    if (tail.includes("unit not in tactical battle")) return "Blocked: Unit not in battle";
-    if (tail.includes("only air units can strike")) return "Blocked: Not an air unit";
-    if (tail.includes("no enemy units")) return "Blocked: No enemies at target";
-    if (tail.includes("no urban infrastructure")) return "Blocked: No urban at target";
-    if (tail.includes("target hex has no airport")) return "Blocked: No airport at target";
-    if (tail.includes("target hex has no seaport")) return "Blocked: No seaport at target";
-    if (tail.includes("not on map")) return "Blocked: Hex not on map";
-    if (tail.includes("only air units can execute strikes")) return "Blocked: Not an air unit";
-    if (tail.includes("must belong to")) return "Blocked: Wrong owner";
-    return "Blocked: Cannot strike here";
-  }
-  function blockingHoverMessageFromMarchInvalidReason(invalidReason, hoveredTerrainKind) {
-    if (!invalidReason) return null;
-    const low = invalidReason.toLowerCase();
-    if (low.includes("database not initialized") || low.includes("unavailable") || low.includes("no selected units")) {
-      return null;
-    }
-    if (low.includes("out of range") || low.includes("out of ferry range")) return "Blocked: Range";
-    if (low.includes("ferry destination must be a human-controlled airport")) return "Blocked: Invalid";
-    if (low.includes("ferry destination must have an intact airport")) return "Blocked: Invalid";
-    if (low.includes("destination airport is not intact")) return "Blocked: Invalid";
-    if (low.includes("origin airport is not intact")) return "Blocked: Invalid";
-    if (low.includes("air units do not use tactical march")) return "Blocked: Air \u2014 use strike mode or ferry (dbl-click)";
-    if (low.includes("line of sight blocked") || low.includes("blocked by mountains")) return "Blocked: Mountain";
-    if (low.includes("land, coastal, or wetlands")) return "Blocked: Coastal, Land, Wetlands";
-    if (low.includes("mixed land/naval")) return "Blocked: Coastal";
-    if (low.includes("cannot move directly from one water or arctic") || low.includes("one water or arctic hex to another")) {
-      return "Blocked: Arctic, Water";
-    }
-    if (low.includes("arctic")) return "Blocked: Arctic";
-    if (low.includes("cannot move directly from one water") || low.includes("water") && low.includes("cannot"))
-      return "Blocked: Water";
-    if (low.includes("mountain")) return "Blocked: Mountain";
-    if (hoveredTerrainKind) {
-      if (low.includes("no valid tactical route") || low.includes("unreachable") || low.includes("invalid for this unit type") || low.includes("outside tactical footprint")) {
-        return `Blocked: ${titleCaseTerrainKindToken(hoveredTerrainKind)}`;
-      }
-    }
-    return null;
-  }
-  function blockingHoverMessageHtmlFromPlainMessage(message) {
-    const t = message.trim();
-    const m = t.match(/^blocked:\s*(.*)$/i);
-    if (!m) return escapeHtmlForOrderPreviewTooltip(t);
-    return `<strong>Blocked:</strong> ${formatTerrainNameListHtml(m[1].trim())}`;
   }
 
   // src/shared/hexNamingCaption.ts
@@ -23088,6 +22644,782 @@ ${body}`;
       namingLineByLookupKey.set(key, null);
       return null;
     }
+  }
+
+  // src/renderer/chrome/controlTooltip.ts
+  var controlTooltipAttr = "data-control-tooltip";
+  var controlTooltipElementId = "control-tooltip";
+  var installed = false;
+  var delayTimer = null;
+  var currentHost = null;
+  var pointerInside = false;
+  var placeFromPointer = false;
+  var suppressedHost = null;
+  var lastClientX = 0;
+  var lastClientY = 0;
+  function tipElement() {
+    return document.getElementById(controlTooltipElementId);
+  }
+  function clearDelayTimer() {
+    if (delayTimer !== null) {
+      clearTimeout(delayTimer);
+      delayTimer = null;
+    }
+  }
+  function hideTip() {
+    clearDelayTimer();
+    const el = tipElement();
+    if (!el) return;
+    el.classList.add("hidden");
+    el.setAttribute("aria-hidden", "true");
+    el.textContent = "";
+  }
+  function orderTipVisible() {
+    for (const id of ["order-block-tooltip", "order-slower-tooltip"]) {
+      const el = document.getElementById(id);
+      if (el && !el.classList.contains("hidden")) return true;
+    }
+    return false;
+  }
+  function hostFromTarget(target) {
+    if (!(target instanceof Element)) return null;
+    const closest = target.closest(`[${controlTooltipAttr}]`);
+    if (closest instanceof HTMLElement) return closest;
+    if (target instanceof HTMLLabelElement && target.htmlFor) {
+      const linked = document.getElementById(target.htmlFor);
+      if (linked instanceof HTMLElement && linked.hasAttribute(controlTooltipAttr)) return linked;
+    }
+    const label = target.closest("label");
+    const descendant = label?.querySelector(`[${controlTooltipAttr}]`);
+    return descendant instanceof HTMLElement ? descendant : null;
+  }
+  function hostText(host) {
+    return (host.getAttribute(controlTooltipAttr) ?? "").trim();
+  }
+  function keyOpensNativeList(ev) {
+    if (ev.key === " " || ev.key === "Spacebar" || ev.key === "Enter") return true;
+    if (ev.key === "ArrowDown" && ev.altKey) return true;
+    if (ev.key === "ArrowDown" || ev.key === "ArrowUp") return true;
+    return false;
+  }
+  function selectForTip(target) {
+    if (!(target instanceof Element)) return null;
+    const select = target instanceof HTMLSelectElement ? target : target.closest("select");
+    if (!(select instanceof HTMLSelectElement)) return null;
+    return hostFromTarget(select) ? select : null;
+  }
+  function showTip(host, text) {
+    const el = tipElement();
+    if (!el) return;
+    clearTerrainTooltipTimer();
+    hideTerrainTooltipVisual();
+    let x = lastClientX;
+    let y = lastClientY;
+    if (!placeFromPointer) {
+      const rect = host.getBoundingClientRect();
+      x = rect.left;
+      y = rect.top;
+    }
+    el.textContent = text;
+    el.style.left = `${x + TOOLTIP_OFFSET_PX}px`;
+    el.style.top = `${y + TOOLTIP_OFFSET_PX}px`;
+    el.classList.remove("hidden");
+    el.setAttribute("aria-hidden", "false");
+    el.setAttribute("role", "tooltip");
+  }
+  function scheduleShow(host) {
+    clearDelayTimer();
+    if (suppressedHost === host) return;
+    const text = hostText(host);
+    if (!text) {
+      hideTip();
+      return;
+    }
+    delayTimer = setTimeout(() => {
+      delayTimer = null;
+      if (currentHost !== host || suppressedHost === host || !hostIsAvailable(host)) return;
+      if (orderTipVisible()) return;
+      const next = hostText(host);
+      if (!next) {
+        hideTip();
+        return;
+      }
+      showTip(host, next);
+    }, HEX_DETAILS_TOOLTIP_DELAY_MS);
+  }
+  function suppressHost(host) {
+    suppressedHost = host;
+    hideTip();
+  }
+  function adoptHost(host, fromPointer, clientX, clientY) {
+    if (fromPointer && host === currentHost) {
+      pointerInside = true;
+      placeFromPointer = true;
+      lastClientX = clientX;
+      lastClientY = clientY;
+      moveVisibleTip(lastClientX, lastClientY);
+      return;
+    }
+    if (!fromPointer && host === currentHost) return;
+    if (currentHost !== host) {
+      hideTip();
+      suppressedHost = null;
+    }
+    currentHost = host;
+    if (fromPointer) {
+      pointerInside = true;
+      placeFromPointer = true;
+      lastClientX = clientX;
+      lastClientY = clientY;
+    } else {
+      pointerInside = pointerIsOn(host);
+      placeFromPointer = pointerInside;
+    }
+    if (suppressedHost === host) return;
+    scheduleShow(host);
+  }
+  function releaseHost(host) {
+    if (suppressedHost === host) suppressedHost = null;
+    if (currentHost !== host) return;
+    pointerInside = false;
+    currentHost = null;
+    hideTip();
+  }
+  function relatedStaysInside(host, related) {
+    if (!(related instanceof Element)) return false;
+    const next = hostFromTarget(related);
+    if (next === host) return true;
+    if (next) return false;
+    return related === host || host.contains(related);
+  }
+  function pointerIsOn(host) {
+    return host.matches(":hover");
+  }
+  function focusIsOn(host) {
+    const active = document.activeElement;
+    if (!(active instanceof Element) || active.closest(".hidden")) return false;
+    return active === host || host.contains(active) || hostFromTarget(active) === host;
+  }
+  function hostIsAvailable(host) {
+    if (!host.isConnected || host.getClientRects().length === 0) return false;
+    const controls = host.matches("button, input, select, textarea") ? [host] : Array.from(host.querySelectorAll("button, input, select, textarea"));
+    if (controls.length === 0) return true;
+    return controls.some((control) => control.getClientRects().length > 0);
+  }
+  function dismissStaleControlTooltip() {
+    if (currentHost && !hostIsAvailable(currentHost)) releaseHost(currentHost);
+  }
+  function moveVisibleTip(clientX, clientY) {
+    const el = tipElement();
+    if (!el || el.classList.contains("hidden")) return;
+    el.style.left = `${clientX + TOOLTIP_OFFSET_PX}px`;
+    el.style.top = `${clientY + TOOLTIP_OFFSET_PX}px`;
+  }
+  function installControlTooltip() {
+    if (installed) return;
+    installed = true;
+    document.addEventListener(
+      "pointerover",
+      (ev) => {
+        const host = hostFromTarget(ev.target);
+        if (!host) return;
+        adoptHost(host, true, ev.clientX, ev.clientY);
+      },
+      true
+    );
+    document.addEventListener(
+      "pointerout",
+      (ev) => {
+        const host = hostFromTarget(ev.target);
+        if (!host || relatedStaysInside(host, ev.relatedTarget)) return;
+        releaseHost(host);
+      },
+      true
+    );
+    document.addEventListener(
+      "pointermove",
+      (ev) => {
+        const host = hostFromTarget(ev.target);
+        if (orderTipVisible()) {
+          if (currentHost) releaseHost(currentHost);
+          return;
+        }
+        if (currentHost && !hostIsAvailable(currentHost)) releaseHost(currentHost);
+        if (host && host !== currentHost) {
+          adoptHost(host, true, ev.clientX, ev.clientY);
+          return;
+        }
+        if (currentHost && host !== currentHost && !pointerIsOn(currentHost) && !focusIsOn(currentHost)) {
+          releaseHost(currentHost);
+        }
+        if (!host || host !== currentHost) return;
+        lastClientX = ev.clientX;
+        lastClientY = ev.clientY;
+        placeFromPointer = true;
+        pointerInside = true;
+        moveVisibleTip(lastClientX, lastClientY);
+      },
+      true
+    );
+    document.addEventListener(
+      "pointerdown",
+      (ev) => {
+        const select = selectForTip(ev.target);
+        if (!select) return;
+        const host = hostFromTarget(select);
+        if (host) suppressHost(host);
+      },
+      true
+    );
+    document.addEventListener(
+      "keydown",
+      (ev) => {
+        if (!keyOpensNativeList(ev)) return;
+        const select = selectForTip(ev.target);
+        if (!select) return;
+        const host = hostFromTarget(select);
+        if (host) suppressHost(host);
+      },
+      true
+    );
+    document.addEventListener(
+      "change",
+      (ev) => {
+        const select = selectForTip(ev.target);
+        if (!select) return;
+        const host = hostFromTarget(select);
+        if (host) suppressHost(host);
+      },
+      true
+    );
+    document.addEventListener(
+      "focusin",
+      (ev) => {
+        const host = hostFromTarget(ev.target);
+        if (!host) return;
+        adoptHost(host, false, lastClientX, lastClientY);
+      },
+      true
+    );
+    document.addEventListener(
+      "focusout",
+      (ev) => {
+        const host = hostFromTarget(ev.target);
+        if (!host || relatedStaysInside(host, ev.relatedTarget)) return;
+        if (pointerInside && currentHost === host) return;
+        releaseHost(host);
+      },
+      true
+    );
+  }
+
+  // src/renderer/tactical/tacticalExitButtonDom.ts
+  function syncTacticalExitButtonElementVisibility() {
+    const hud = document.getElementById("tactical-battle-hud");
+    const exitBtn = document.getElementById("tactical-exit-btn");
+    const active = !!rendererSharedState.tacticalBattleSnapshot;
+    const annihilationDialogOpen = rendererSharedState.tacticalAnnihilationOutcomeDialog != null;
+    hud?.classList.toggle("hidden", !active);
+    const playbackDisablesExit = rendererSharedState.tacticalBattleSnapshot != null && rendererSharedState.resolutionMoveAnimation != null;
+    const disabled = !active || !rendererSharedState.tacticalPhasePlanning || playbackDisablesExit;
+    if (exitBtn) {
+      if (annihilationDialogOpen) {
+        exitBtn.classList.add("hidden");
+        exitBtn.disabled = true;
+      } else {
+        exitBtn.classList.remove("hidden");
+        exitBtn.disabled = disabled;
+      }
+    }
+    dismissStaleControlTooltip();
+  }
+
+  // src/renderer/tactical/tacticalAnnihilationDialog.ts
+  var TACTICAL_ANNIHILATION_NEUTRAL_MESSAGE = "All units destroyed.";
+  function tacticalAnnihilationMessageForOutcome(outcome) {
+    if (outcome === "human_win") return "You win!";
+    if (outcome === "human_loss") return "You lose.";
+    return TACTICAL_ANNIHILATION_NEUTRAL_MESSAGE;
+  }
+  function openTacticalAnnihilationOutcomeDialog(outcome) {
+    rendererSharedState.tacticalAnnihilationOutcomeDialog = outcome;
+    void window.gameApi?.cancelRequestAiOrders?.();
+    const overlay = document.getElementById("tactical-annihilation-overlay");
+    const messageEl = document.getElementById("tactical-annihilation-message");
+    if (messageEl) messageEl.textContent = tacticalAnnihilationMessageForOutcome(outcome);
+    overlay?.classList.remove("hidden");
+    setMainUIControlsEnabled(false);
+    syncTacticalExitButtonElementVisibility();
+    updateReadyButtonState();
+  }
+  function closeTacticalAnnihilationOutcomeDialog() {
+    rendererSharedState.tacticalAnnihilationOutcomeDialog = null;
+    document.getElementById("tactical-annihilation-overlay")?.classList.add("hidden");
+    setMainUIControlsEnabled(true);
+    syncTacticalExitButtonElementVisibility();
+    updateReadyButtonState();
+  }
+
+  // src/renderer/map/tacticalMapView.ts
+  function enterTacticalMapView(childRes4H3Indexes) {
+    const map = getMainLeafletMap();
+    const L = getLeafletGlobal();
+    if (!map || !L || typeof map.fitBounds !== "function") return;
+    let minLat = 90;
+    let maxLat = -90;
+    let minLng = 180;
+    let maxLng = -180;
+    for (const h3 of childRes4H3Indexes) {
+      const boundary = getHexBoundaryLatLngForLeafletOverlay(h3);
+      for (const [lat, lng] of boundary) {
+        if (lat < minLat) minLat = lat;
+        if (lat > maxLat) maxLat = lat;
+        if (lng < minLng) minLng = lng;
+        if (lng > maxLng) maxLng = lng;
+      }
+    }
+    if (minLat > maxLat) return;
+    const padLat = Math.max(5e-4, (maxLat - minLat) * 0.08);
+    const padLng = Math.max(5e-4, (maxLng - minLng) * 0.08);
+    const sw = { lat: Math.max(-WEB_MERCATOR_MAX_ABS_LAT, minLat - padLat), lng: minLng - padLng };
+    const ne = { lat: Math.min(WEB_MERCATOR_MAX_ABS_LAT, maxLat + padLat), lng: maxLng + padLng };
+    const tacticalBounds = L.latLngBounds(L.latLng(sw.lat, sw.lng), L.latLng(ne.lat, ne.lng));
+    hidePlanningChromeToasts();
+    if (rendererSharedState.preTacticalLeafletMinZoom == null && typeof map.getMinZoom === "function") {
+      rendererSharedState.preTacticalLeafletMinZoom = map.getMinZoom();
+    }
+    if (rendererSharedState.preTacticalLeafletMaxZoom == null && typeof map.getMaxZoom === "function") {
+      rendererSharedState.preTacticalLeafletMaxZoom = map.getMaxZoom();
+    }
+    const tacticalFlyMaxZoom = 14.5;
+    const tacticalAbsoluteMaxZoom = 16;
+    if (typeof map.setMaxZoom === "function") map.setMaxZoom(tacticalAbsoluteMaxZoom);
+    const finalizeTacticalViewZoomAndPan = () => {
+      if (typeof map.setMaxBounds === "function") map.setMaxBounds(tacticalBounds);
+      if (typeof map.getZoom === "function" && typeof map.setMinZoom === "function") {
+        map.setMinZoom(map.getZoom());
+      }
+    };
+    if (typeof map.flyToBounds === "function") {
+      map.flyToBounds(tacticalBounds, { padding: [20, 20], duration: 0.55, maxZoom: tacticalFlyMaxZoom });
+      setTimeout(finalizeTacticalViewZoomAndPan, 750);
+    } else {
+      map.fitBounds?.(tacticalBounds, { padding: [20, 20], animate: true });
+      if (typeof map.once === "function") {
+        map.once("moveend", finalizeTacticalViewZoomAndPan);
+      } else {
+        setTimeout(finalizeTacticalViewZoomAndPan, 200);
+      }
+    }
+  }
+  function exitTacticalMapView() {
+    const map = getMainLeafletMap();
+    const L = getLeafletGlobal();
+    if (!map || !L) {
+      rendererSharedState.preTacticalLeafletMinZoom = null;
+      rendererSharedState.preTacticalLeafletMaxZoom = null;
+      return;
+    }
+    const worldBounds = L.latLngBounds(
+      L.latLng(-WEB_MERCATOR_MAX_ABS_LAT, -180),
+      L.latLng(WEB_MERCATOR_MAX_ABS_LAT, 180)
+    );
+    if (typeof map.setMaxBounds === "function") map.setMaxBounds(worldBounds);
+    if (typeof map.setMinZoom === "function" && rendererSharedState.preTacticalLeafletMinZoom != null) {
+      map.setMinZoom(rendererSharedState.preTacticalLeafletMinZoom);
+    }
+    if (typeof map.setMaxZoom === "function" && rendererSharedState.preTacticalLeafletMaxZoom != null) {
+      map.setMaxZoom(rendererSharedState.preTacticalLeafletMaxZoom);
+    }
+    rendererSharedState.preTacticalLeafletMinZoom = null;
+    rendererSharedState.preTacticalLeafletMaxZoom = null;
+    const home = rendererSharedState.strategicScenarioInitialLeafletView;
+    if (home && typeof map.setView === "function") {
+      map.setView(L.latLng(home.lat, home.lng), home.zoom);
+    } else if (typeof map.fitBounds === "function") {
+      map.fitBounds(worldBounds, { padding: [2, 2], animate: false });
+    }
+  }
+
+  // src/shared/filterOrdersToLivingUnitIds.ts
+  function filterOrdersToLivingUnitIds(rows, livingUnitIds) {
+    return rows.filter((row) => livingUnitIds.has(row.unitId));
+  }
+
+  // src/renderer/tactical/tacticalStrategicOrderUiStash.ts
+  var strategicOrderDraftStash = null;
+  function stashStrategicOrderDraftsForTacticalSession() {
+    if (strategicOrderDraftStash) return;
+    strategicOrderDraftStash = {
+      humanStandingOrders: [...rendererSharedState.humanStandingOrders],
+      pendingRangedAttacks: [...rendererSharedState.pendingRangedAttacks],
+      pendingAirStrikes: [...rendererSharedState.pendingAirStrikes],
+      pendingFerryOrders: [...rendererSharedState.pendingFerryOrders]
+    };
+    rendererSharedState.humanStandingOrders = [];
+    rendererSharedState.pendingRangedAttacks = [];
+    rendererSharedState.pendingAirStrikes = [];
+    rendererSharedState.pendingFerryOrders = [];
+    rendererSharedState.pendingEmbarkOrders = [];
+    rendererSharedState.tacticalPendingMarches = [];
+    rendererSharedState.tacticalOpponentDraft = null;
+    rendererSharedState.rangedModeActive = false;
+    rendererSharedState.airStrikeModeActive = false;
+  }
+  function restoreDraftRowsForLivingUnits(rows, livingUnitIds) {
+    return livingUnitIds ? filterOrdersToLivingUnitIds(rows, livingUnitIds) : rows;
+  }
+  function restoreStrategicOrderDraftsAfterTacticalSession() {
+    if (!strategicOrderDraftStash) return;
+    const units = rendererSharedState.gameState?.units;
+    const livingUnitIds = units ? new Set(units.map((u) => u.id)) : null;
+    rendererSharedState.humanStandingOrders = restoreDraftRowsForLivingUnits(
+      strategicOrderDraftStash.humanStandingOrders,
+      livingUnitIds
+    );
+    rendererSharedState.pendingRangedAttacks = restoreDraftRowsForLivingUnits(
+      strategicOrderDraftStash.pendingRangedAttacks,
+      livingUnitIds
+    );
+    rendererSharedState.pendingAirStrikes = restoreDraftRowsForLivingUnits(
+      strategicOrderDraftStash.pendingAirStrikes,
+      livingUnitIds
+    );
+    rendererSharedState.pendingFerryOrders = restoreDraftRowsForLivingUnits(
+      strategicOrderDraftStash.pendingFerryOrders,
+      livingUnitIds
+    );
+    strategicOrderDraftStash = null;
+    rendererSharedState.tacticalPendingMarches = [];
+    rendererSharedState.pendingEmbarkOrders = [];
+  }
+  function discardStrategicOrderUiStash() {
+    strategicOrderDraftStash = null;
+  }
+
+  // src/shared/abortError.ts
+  function isLikelyAbortError(err) {
+    if (err instanceof Error && err.name === "AbortError") return true;
+    const msg = String(err);
+    return msg.includes("AbortError") || msg.toLowerCase().includes("abort");
+  }
+
+  // src/renderer/openRouter/openRouterRuntime.ts
+  var BACKGROUND_AI_REQUEST_TIMEOUT_MS = AI_CONSULTATION_WAIT_TIMEOUT_MS;
+  var openRouterRuntimeDepsRef = null;
+  var OPEN_ROUTER_LOG_BACKGROUND_AI_CANCEL_SESSION_ENDED = "Tactical AI prefetch cancelled (tactical session ended).";
+  var OPEN_ROUTER_LOG_BACKGROUND_AI_CANCEL_TACTICAL_BATTLE_EXIT = "Background AI request cancelled (exiting tactical battle).";
+  function cancelInFlightBackgroundAiRequestForRendererTeardown(logLine) {
+    if (!rendererSharedState.backgroundRequestInFlight) return;
+    void window.gameApi?.cancelRequestAiOrders?.();
+    rendererSharedState.backgroundRequestInFlight = false;
+    openRouterRuntimeDepsRef?.appendOpenRouterLog(logLine, false);
+    unblockPrecomputedAiPlanningAfterBackgroundFailure();
+    openRouterRuntimeDepsRef?.updateReadyButtonState();
+  }
+  function cancelTacticalScopedBackgroundPrefetchForSessionTeardown() {
+    cancelInFlightBackgroundAiRequestForRendererTeardown(OPEN_ROUTER_LOG_BACKGROUND_AI_CANCEL_SESSION_ENDED);
+  }
+  function syncEventDrivenFromTools() {
+    rendererSharedState.useEventDrivenConsultation = rendererSharedState.enabledToolGroups.has("events");
+  }
+  function strategicPhaseAllowsBackgroundAi() {
+    if (rendererSharedState.gameState?.phase === "planning") return true;
+    return !!(rendererSharedState.tacticalBattleSnapshot && rendererSharedState.tacticalPhasePlanning);
+  }
+  function startBackgroundRequestIfAllowed(deps) {
+    if (rendererSharedState.tacticalAnnihilationOutcomeDialog != null) return;
+    if (isDeferredResolutionPlaybackConsultPending()) return;
+    if (rendererSharedState.backgroundRequestInFlight || !isWaitingForPrecomputedAiOrders() || !strategicPhaseAllowsBackgroundAi()) return;
+    openRouterRuntimeDepsRef = deps;
+    const keyPromise = window.gameApi?.openRouter?.getKey?.();
+    const modelPromise = window.gameApi?.openRouter?.getSelectedModel?.();
+    if (!keyPromise || !modelPromise) return;
+    rendererSharedState.backgroundRequestInFlight = true;
+    Promise.all([keyPromise, modelPromise]).then(([keyResult, modelId]) => {
+      if (!keyResult?.hasKey || !modelId?.trim()) {
+        rendererSharedState.backgroundRequestInFlight = false;
+        deps.appendOpenRouterLog("Run is on but API key or model not set.", true);
+        deps.updateReadyButtonState();
+        return;
+      }
+      if (!rendererSharedState.runButtonOn || !window.gameApi?.requestAiOrders) {
+        rendererSharedState.backgroundRequestInFlight = false;
+        deps.updateReadyButtonState();
+        return;
+      }
+      const enabledToolGroupsPayload = Array.from(rendererSharedState.enabledToolGroups).filter((id) => id !== "events");
+      const requestPromise = window.gameApi.requestAiOrders({ enabledToolGroups: enabledToolGroupsPayload });
+      const timeoutPromise = new Promise((_resolve, reject) => {
+        setTimeout(() => reject(new Error(`AI planning timed out after ${BACKGROUND_AI_REQUEST_TIMEOUT_MS}ms`)), BACKGROUND_AI_REQUEST_TIMEOUT_MS);
+      });
+      Promise.race([requestPromise, timeoutPromise]).then((result) => {
+        rendererSharedState.backgroundRequestInFlight = false;
+        if (rendererSharedState.useEventDrivenConsultation && !rendererSharedState.eventDrivenInitialConsultationDone) {
+          rendererSharedState.eventDrivenInitialConsultationDone = true;
+        }
+        if (rendererSharedState.runButtonOn && result.success) {
+          if (!rendererSharedState.tacticalBattleSnapshot && (result.tacticalBattle != null || result.tacticalOpponentPlan != null)) {
+            deps.appendOpenRouterLog("Discarded tactical prefetch (tactical session no longer active).", false);
+            deps.updateReadyButtonState();
+            return;
+          }
+          applySuccessfulPrecomputedAiResult(result);
+          if (rendererSharedState.tacticalBattleSnapshot && rendererSharedState.tacticalPhasePlanning && hasAiStrategyToastContent({ message: result.message, strategy: result.strategy })) {
+            deps.showAiStrategyToast({ message: result.message, strategy: result.strategy });
+          }
+          if (result.tacticalBattle) {
+            deps.requestRedraw?.();
+          }
+          if (result.toolInvocationCounts) {
+            rendererSharedState.precomputedToolInvocationCounts = { ...result.toolInvocationCounts };
+            for (const [groupId, count] of Object.entries(result.toolInvocationCounts)) {
+              rendererSharedState.toolInvocationCounts[groupId] = count;
+            }
+            deps.updateOpenRouterToolCountLabels();
+          } else {
+            rendererSharedState.precomputedToolInvocationCounts = null;
+          }
+          if (result.cost !== void 0) {
+            rendererSharedState.openRouterGameCost += result.cost;
+            deps.updateOpenRouterCostLabel();
+          }
+        } else if (!result.success) {
+          if (result.error === "Cancelled") {
+            startBackgroundRequestIfAllowed(deps);
+            if (!rendererSharedState.backgroundRequestInFlight) {
+              if (rendererSharedState.runButtonOn) {
+                deps.appendOpenRouterLog(
+                  "AI planning did not restart after the cancel; this beat proceeds without opponent orders.",
+                  true
+                );
+              }
+              unblockPrecomputedAiPlanningAfterBackgroundFailure();
+            }
+          } else {
+            deps.appendOpenRouterLog(`Background planning failed: ${result.error ?? "Unknown error"}`, true);
+            deps.showSidebarError(result.error ?? "Background AI request failed");
+            unblockPrecomputedAiPlanningAfterBackgroundFailure();
+          }
+        }
+        deps.updateReadyButtonState();
+      }).catch((err) => {
+        const msg = String(err);
+        const isAbort = isLikelyAbortError(err);
+        if (!isAbort) {
+          window.gameApi?.cancelRequestAiOrders?.();
+        }
+        rendererSharedState.backgroundRequestInFlight = false;
+        if (isAbort && rendererSharedState.tacticalBattleSnapshot && rendererSharedState.tacticalPhasePlanning) {
+          deps.appendOpenRouterLog("Tactical AI prefetch aborted.", false);
+          deps.updateReadyButtonState();
+          if (isWaitingForPrecomputedAiOrders()) {
+            startBackgroundRequestIfAllowed(deps);
+          }
+          return;
+        }
+        deps.appendOpenRouterLog(`Background planning request rejected: ${msg}`, true);
+        deps.showSidebarError(msg);
+        unblockPrecomputedAiPlanningAfterBackgroundFailure();
+        deps.updateReadyButtonState();
+      });
+    }).catch((err) => {
+      rendererSharedState.backgroundRequestInFlight = false;
+      deps.showSidebarError(String(err));
+      unblockPrecomputedAiPlanningAfterBackgroundFailure();
+      deps.updateReadyButtonState();
+    });
+  }
+  function handleEventDrivenModeTransition(deps, wasEventDriven) {
+    if (!rendererSharedState.runButtonOn || wasEventDriven === rendererSharedState.useEventDrivenConsultation) return;
+    window.gameApi?.cancelRequestAiOrders?.();
+    resetPrecomputedAiState("null");
+    rendererSharedState.eventDrivenInitialConsultationDone = false;
+    startBackgroundRequestIfAllowed(deps);
+  }
+  function renderOpenRouterToolsList(deps) {
+    const container = document.getElementById("openrouter-tools-list");
+    if (!container) return;
+    container.innerHTML = "";
+    for (const group of rendererSharedState.openRouterToolGroups) {
+      const cell = document.createElement("div");
+      cell.className = "openrouter-tool-cell";
+      const tip = toolGroupTooltipText(group.id);
+      if (tip) cell.setAttribute("data-control-tooltip", tip);
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "openrouter-tool-toggle";
+      btn.setAttribute("data-tool-group", group.id);
+      btn.setAttribute("aria-pressed", rendererSharedState.enabledToolGroups.has(group.id) ? "true" : "false");
+      btn.textContent = String(rendererSharedState.toolInvocationCounts[group.id] ?? 0);
+      btn.addEventListener("click", () => {
+        if (rendererSharedState.enabledToolGroups.has(group.id)) {
+          rendererSharedState.enabledToolGroups.delete(group.id);
+        } else {
+          rendererSharedState.enabledToolGroups.add(group.id);
+        }
+        btn.setAttribute("aria-pressed", rendererSharedState.enabledToolGroups.has(group.id) ? "true" : "false");
+        btn.textContent = String(rendererSharedState.toolInvocationCounts[group.id] ?? 0);
+        if (group.id === "events") {
+          const wasEventDriven = rendererSharedState.useEventDrivenConsultation;
+          syncEventDrivenFromTools();
+          handleEventDrivenModeTransition(deps, wasEventDriven);
+          deps.updateReadyButtonState();
+        }
+      });
+      cell.appendChild(btn);
+      const label = document.createElement("span");
+      label.className = "openrouter-tool-label";
+      label.textContent = group.label;
+      cell.appendChild(label);
+      container.appendChild(cell);
+    }
+  }
+
+  // src/shared/selectionSupportButtonMode.ts
+  function selectionSupportButtonMode(unitTypes, tacticalBattleActive) {
+    if (unitTypes.length === 0) return "hidden";
+    if (unitTypes.every((unitType) => unitType === "air")) return "strike";
+    const everyUnitCanRangedAttack = unitTypes.every(
+      (unitType) => unitType !== "air" && unitHasDirectRangedPlanning(unitType, tacticalBattleActive)
+    );
+    return everyUnitCanRangedAttack ? "ranged" : "hidden";
+  }
+
+  // src/renderer/gameplay/orderLabelFormatting.ts
+  function resolveAttackerH3ForOrderLabel(unitId, state, tacticalPositions) {
+    if (tacticalPositions && tacticalPositions.length > 0) {
+      const tactical = tacticalPositions.find((u) => u.id === unitId);
+      if (tactical) return tactical.h3Index;
+    }
+    if (!state) return null;
+    const strategic = state.units.find((u) => u.id === unitId);
+    return strategic?.h3Index ?? null;
+  }
+  function computeGridDistanceForLabel(originH3, targetH3) {
+    try {
+      return Math.max(0, gridDistance(originH3, targetH3));
+    } catch {
+      const maxRadius = 128;
+      for (let radius = 0; radius <= maxRadius; radius++) {
+        try {
+          const ring = gridDisk(originH3, radius);
+          if (ring.includes(targetH3)) return radius;
+        } catch {
+          return null;
+        }
+      }
+      return null;
+    }
+  }
+  function formatDistanceLabelForPlannedAttack(state, unitId, targetH3Index, tacticalPositions) {
+    const originH3 = resolveAttackerH3ForOrderLabel(unitId, state, tacticalPositions);
+    if (!originH3) return "?h";
+    const distance = computeGridDistanceForLabel(originH3, targetH3Index);
+    return distance == null ? "?h" : `${distance}h`;
+  }
+  function formatPendingRangedAttackSidebarLabel(state, order, tacticalPositions) {
+    return formatDistanceLabelForPlannedAttack(state, order.unitId, order.targetH3Index, tacticalPositions);
+  }
+  function formatPendingAirStrikeSidebarLabel(state, order, tacticalPositions) {
+    const targetTypeLabel = order.targetType === "units" ? "units" : order.targetType === "urban" ? "urban" : order.targetType === "airport" ? "airport" : "seaport";
+    return `${formatDistanceLabelForPlannedAttack(state, order.unitId, order.targetH3Index, tacticalPositions)} (${targetTypeLabel})`;
+  }
+  function formatPendingFerryOrderSidebarLabel(state, order, tacticalPositions) {
+    const originH3 = resolveAttackerH3ForOrderLabel(order.unitId, state, tacticalPositions);
+    if (!originH3) return "?h (ferry)";
+    const ferryDistance = computeGridDistanceForLabel(originH3, order.destinationH3Index);
+    return `${ferryDistance == null ? "?" : ferryDistance}h (ferry)`;
+  }
+
+  // src/shared/orderPreviewBlockingCopy.ts
+  var MELEE_ENGAGEMENT_LINE = /^\u2022 Melee engagements at \d+ hex(es)?\.\s*$/;
+  var RANGED_ENGAGEMENT_LINE = /^\u2022 Ranged engagements at \d+ hex(es)?\.\s*$/;
+  function composeResolutionMapToastBullets(primary, combatFallback) {
+    if (primary.length > 0) return primary;
+    if (combatFallback.length === 0) return [];
+    const onlyEngagementCounters = combatFallback.every(
+      (line) => MELEE_ENGAGEMENT_LINE.test(line) || RANGED_ENGAGEMENT_LINE.test(line)
+    );
+    if (onlyEngagementCounters) return [];
+    return combatFallback;
+  }
+  function titleCaseTerrainKindToken(kind) {
+    const k = kind.trim();
+    if (!k) return "Unknown";
+    if (k.length === 1) return k.toUpperCase();
+    return k.charAt(0).toUpperCase() + k.slice(1).toLowerCase();
+  }
+  function blockingHoverMessageFromRangedReason(reason) {
+    const r = reason.toLowerCase();
+    if (r.includes("out of range") || r.includes("out of ferry range")) return "Blocked: Range";
+    if (r.includes("line of sight blocked") || r.includes("blocked by mountains")) return "Blocked: Mountain";
+    if (r.includes("no enemy") || r.includes("no eligible")) return "Blocked: No Target";
+    return null;
+  }
+  function stripLeadingUnitLabelForStrikeReason(reason) {
+    const t = reason.trim();
+    const m = t.match(/^[^:]+:\s+(.+)$/s);
+    return m?.[1]?.trim() ? m[1].trim() : t;
+  }
+  function blockingHoverMessageFromAirStrikeReason(reason) {
+    const raw = reason.trim();
+    if (!raw) return null;
+    const r = raw.toLowerCase();
+    if (r.includes("database not initialized")) return null;
+    const tail = stripLeadingUnitLabelForStrikeReason(raw).toLowerCase();
+    if (tail.includes("target out of range") || r.includes("target out of range")) return "Blocked: Range";
+    if (tail.includes("must be based at an intact airport") || tail.includes("based at an intact airport to strike")) {
+      return "Blocked: No base airport";
+    }
+    if (tail.includes("outside the tactical battle footprint")) return "Blocked: Unit outside battle area";
+    if (tail.includes("target is outside the tactical battle")) return "Blocked: Target outside battle";
+    if (tail.includes("contested strategic hex")) return "Blocked: Strike wrong hex";
+    if (tail.includes("unit not in tactical battle")) return "Blocked: Unit not in battle";
+    if (tail.includes("only air units can strike")) return "Blocked: Not an air unit";
+    if (tail.includes("no enemy units")) return "Blocked: No enemies at target";
+    if (tail.includes("no urban infrastructure")) return "Blocked: No urban at target";
+    if (tail.includes("target hex has no airport")) return "Blocked: No airport at target";
+    if (tail.includes("target hex has no seaport")) return "Blocked: No seaport at target";
+    if (tail.includes("not on map")) return "Blocked: Hex not on map";
+    if (tail.includes("only air units can execute strikes")) return "Blocked: Not an air unit";
+    if (tail.includes("must belong to")) return "Blocked: Wrong owner";
+    return "Blocked: Cannot strike here";
+  }
+  function blockingHoverMessageFromMarchInvalidReason(invalidReason, hoveredTerrainKind) {
+    if (!invalidReason) return null;
+    const low = invalidReason.toLowerCase();
+    if (low.includes("database not initialized") || low.includes("unavailable") || low.includes("no selected units")) {
+      return null;
+    }
+    if (low.includes("out of range") || low.includes("out of ferry range")) return "Blocked: Range";
+    if (low.includes("ferry destination must be a human-controlled airport")) return "Blocked: Invalid";
+    if (low.includes("ferry destination must have an intact airport")) return "Blocked: Invalid";
+    if (low.includes("destination airport is not intact")) return "Blocked: Invalid";
+    if (low.includes("origin airport is not intact")) return "Blocked: Invalid";
+    if (low.includes("air units do not use tactical march")) return "Blocked: Air \u2014 use strike mode or ferry (dbl-click)";
+    if (low.includes("line of sight blocked") || low.includes("blocked by mountains")) return "Blocked: Mountain";
+    if (low.includes("land, coastal, or wetlands")) return "Blocked: Coastal, Land, Wetlands";
+    if (low.includes("mixed land/naval")) return "Blocked: Coastal";
+    if (low.includes("cannot move directly from one water or arctic") || low.includes("one water or arctic hex to another")) {
+      return "Blocked: Arctic, Water";
+    }
+    if (low.includes("arctic")) return "Blocked: Arctic";
+    if (low.includes("cannot move directly from one water") || low.includes("water") && low.includes("cannot"))
+      return "Blocked: Water";
+    if (low.includes("mountain")) return "Blocked: Mountain";
+    if (hoveredTerrainKind) {
+      if (low.includes("no valid tactical route") || low.includes("unreachable") || low.includes("invalid for this unit type") || low.includes("outside tactical footprint")) {
+        return `Blocked: ${titleCaseTerrainKindToken(hoveredTerrainKind)}`;
+      }
+    }
+    return null;
+  }
+  function blockingHoverMessageHtmlFromPlainMessage(message) {
+    const t = message.trim();
+    const m = t.match(/^blocked:\s*(.*)$/i);
+    if (!m) return escapeHtmlForOrderPreviewTooltip(t);
+    return `<strong>Blocked:</strong> ${formatTerrainNameListHtml(m[1].trim())}`;
   }
 
   // src/renderer/map/transientPointerTooltipTtl.ts
@@ -24160,6 +24492,7 @@ ${body}`;
       if (mode === "strike") {
         rendererSharedState.rangedModeActive = false;
         btnEl.textContent = "Strike";
+        btnEl.setAttribute("data-control-tooltip", rangedButtonTooltipText("Strike"));
         btnEl.style.display = rendererSharedState.airStrikeModeActive ? "none" : "inline-block";
         if (strikeTypeEl) {
           strikeTypeEl.style.display = rendererSharedState.airStrikeModeActive ? "inline-block" : "none";
@@ -24172,6 +24505,10 @@ ${body}`;
         rendererSharedState.airStrikeModeActive = false;
         btnEl.style.display = "inline-block";
         btnEl.textContent = rendererSharedState.rangedModeActive ? "Cancel" : "Ranged";
+        btnEl.setAttribute(
+          "data-control-tooltip",
+          rangedButtonTooltipText(rendererSharedState.rangedModeActive ? "Cancel" : "Ranged")
+        );
         if (strikeTypeEl) strikeTypeEl.style.display = "none";
         if (strikeCancelEl) strikeCancelEl.style.display = "none";
       } else {
@@ -24368,7 +24705,10 @@ ${body}`;
       messageEl.textContent = "Start a new world map game when ready.";
       messageEl.style.display = "";
     }
-    if (newGameBtn) newGameBtn.textContent = "Start game";
+    if (newGameBtn) {
+      newGameBtn.textContent = "Start game";
+      newGameBtn.setAttribute("data-control-tooltip", newGameButtonTooltipText(true));
+    }
     resetNewGameOptionControls();
     void initializeScenarioRegionSelectorsOnOverlayOpen();
     syncGameSizeCapPreview();
@@ -24421,7 +24761,7 @@ ${body}`;
 
   // src/renderer/core/unitOriginTooltip.ts
   var UNIT_ORIGIN_TOOLTIP_SELECTOR = "[data-unit-origin-tooltip]";
-  var installed = false;
+  var installed2 = false;
   var activeAnchor = null;
   var showTimer = null;
   var lastPointer = { x: 0, y: 0 };
@@ -24530,8 +24870,8 @@ ${body}`;
     positionTooltip(el);
   }
   function installUnitOriginTooltip() {
-    if (installed) return;
-    installed = true;
+    if (installed2) return;
+    installed2 = true;
     document.addEventListener("pointerover", (event) => {
       trackPointer(event);
       const anchor = findAnchor(event.target);
@@ -24836,6 +25176,7 @@ ${body}`;
     row.className = "build-keep-building-row";
     const label = document.createElement("label");
     label.className = "build-keep-building-label";
+    label.setAttribute("data-control-tooltip", args.tooltipText);
     const checkbox = document.createElement("input");
     checkbox.type = "checkbox";
     checkbox.className = "build-keep-building-checkbox";
@@ -25001,6 +25342,7 @@ ${body}`;
     buildBtn.type = "button";
     buildBtn.className = "unit-select stack-unit-toggle";
     buildBtn.textContent = UNIT_SELECT_GLYPH;
+    buildBtn.setAttribute("data-control-tooltip", multiBuildAddTooltipText);
     buildBtn.addEventListener("click", async () => {
       if (buildQueueEditBlockedByPlayback()) return;
       const defaultUnitType = unionTypes[0];
@@ -25020,6 +25362,7 @@ ${body}`;
       const row = document.createElement("div");
       row.className = "build-queue-row";
       const typeSelect = document.createElement("select");
+      typeSelect.setAttribute("data-control-tooltip", multiBuildTypeTooltipText);
       const rowTypes = ALL_BUILD_UNIT_TYPES.filter(
         (unitType) => unionTypes.includes(unitType) || unitType === entry.unitType
       );
@@ -25033,6 +25376,7 @@ ${body}`;
       typeSelect.value = entry.unitType;
       row.appendChild(typeSelect);
       const countInput = document.createElement("input");
+      countInput.setAttribute("data-control-tooltip", multiBuildCountTooltipText);
       countInput.type = "text";
       countInput.className = "build-count-input";
       countInput.maxLength = 2;
@@ -25098,6 +25442,7 @@ ${body}`;
       section,
       checked: areAllKeepBuildingArmed(snapshots),
       disabled: !canArmKeepBuildingForAll(snapshots),
+      tooltipText: multiKeepBuildingTooltipText,
       onChange: async (keepBuilding) => {
         if (buildQueueEditBlockedByPlayback()) {
           void renderMultiBuildQueueIntoMount(deps);
@@ -25303,6 +25648,7 @@ ${body}`;
       buildBtn.type = "button";
       buildBtn.className = "unit-select stack-unit-toggle";
       buildBtn.textContent = UNIT_SELECT_GLYPH;
+      buildBtn.setAttribute("data-control-tooltip", buildAddTooltipText);
       buildBtn.addEventListener("click", async () => {
         if (!window.gameApi?.addHexBuildQueueEntry) return;
         const success = await runBuildQueueMutation({
@@ -25324,6 +25670,7 @@ ${body}`;
         const row = document.createElement("div");
         row.className = "build-queue-row";
         const typeSelect = document.createElement("select");
+        typeSelect.setAttribute("data-control-tooltip", buildTypeTooltipText);
         for (const unitType of options) {
           const opt = document.createElement("option");
           opt.value = unitType;
@@ -25332,6 +25679,7 @@ ${body}`;
         }
         typeSelect.value = entry.unitType;
         const countInput = document.createElement("input");
+        countInput.setAttribute("data-control-tooltip", buildCountTooltipText);
         countInput.type = "text";
         countInput.className = "build-count-input";
         countInput.maxLength = 2;
@@ -25432,6 +25780,7 @@ ${body}`;
         section,
         checked: snapshot.keepBuilding,
         disabled: !canArmKeepBuilding(snapshot),
+        tooltipText: keepBuildingTooltipText,
         onChange: async (keepBuilding) => {
           if (restoreSingleHexQueueIfPlaybackBlocks(mount, h3Index)) return;
           if (!window.gameApi?.setHexesKeepBuilding) return;
@@ -25768,7 +26117,7 @@ ${body}`;
     el.setAttribute("aria-hidden", "false");
     el.setAttribute("role", "tooltip");
   }
-  function keyOpensNativeList(ev) {
+  function keyOpensNativeList2(ev) {
     if (ev.key === " " || ev.key === "Spacebar" || ev.key === "Enter") return true;
     if (ev.key === "ArrowDown" && ev.altKey) return true;
     if (ev.key === "ArrowDown" || ev.key === "ArrowUp") return true;
@@ -25776,15 +26125,15 @@ ${body}`;
   }
   function attachModelDescriptionTooltip(options) {
     const { select, getDescriptionForModelId } = options;
-    let delayTimer = null;
-    let pointerInside = false;
+    let delayTimer2 = null;
+    let pointerInside2 = false;
     let suppressedUntilClosed = false;
-    let lastClientX = 0;
-    let lastClientY = 0;
-    function clearDelayTimer() {
-      if (delayTimer !== null) {
-        clearTimeout(delayTimer);
-        delayTimer = null;
+    let lastClientX2 = 0;
+    let lastClientY2 = 0;
+    function clearDelayTimer2() {
+      if (delayTimer2 !== null) {
+        clearTimeout(delayTimer2);
+        delayTimer2 = null;
       }
     }
     function resolveDescription() {
@@ -25796,26 +26145,26 @@ ${body}`;
       return trimmed || null;
     }
     function clear() {
-      clearDelayTimer();
+      clearDelayTimer2();
       hideTooltipVisual();
     }
-    function scheduleShow() {
-      clearDelayTimer();
-      if (suppressedUntilClosed || !pointerInside) return;
+    function scheduleShow2() {
+      clearDelayTimer2();
+      if (suppressedUntilClosed || !pointerInside2) return;
       const text = resolveDescription();
       if (!text) {
         hideTooltipVisual();
         return;
       }
-      delayTimer = setTimeout(() => {
-        delayTimer = null;
-        if (suppressedUntilClosed || !pointerInside) return;
+      delayTimer2 = setTimeout(() => {
+        delayTimer2 = null;
+        if (suppressedUntilClosed || !pointerInside2) return;
         const next = resolveDescription();
         if (!next) {
           hideTooltipVisual();
           return;
         }
-        showTooltipAt(lastClientX, lastClientY, next);
+        showTooltipAt(lastClientX2, lastClientY2, next);
       }, HEX_DETAILS_TOOLTIP_DELAY_MS);
     }
     function suppressForOpenList() {
@@ -25823,34 +26172,34 @@ ${body}`;
       clear();
     }
     select.addEventListener("pointerenter", (ev) => {
-      pointerInside = true;
-      lastClientX = ev.clientX;
-      lastClientY = ev.clientY;
-      if (!suppressedUntilClosed) scheduleShow();
+      pointerInside2 = true;
+      lastClientX2 = ev.clientX;
+      lastClientY2 = ev.clientY;
+      if (!suppressedUntilClosed) scheduleShow2();
     });
     select.addEventListener("pointerleave", () => {
-      pointerInside = false;
+      pointerInside2 = false;
       suppressedUntilClosed = false;
       clear();
     });
     select.addEventListener("pointermove", (ev) => {
-      lastClientX = ev.clientX;
-      lastClientY = ev.clientY;
+      lastClientX2 = ev.clientX;
+      lastClientY2 = ev.clientY;
       const el = getTooltipEl2();
       if (el && !el.classList.contains("hidden")) {
-        el.style.left = `${lastClientX + TOOLTIP_OFFSET_PX}px`;
-        el.style.top = `${lastClientY + TOOLTIP_OFFSET_PX}px`;
+        el.style.left = `${lastClientX2 + TOOLTIP_OFFSET_PX}px`;
+        el.style.top = `${lastClientY2 + TOOLTIP_OFFSET_PX}px`;
       }
     });
     select.addEventListener("mousedown", () => {
       suppressForOpenList();
     });
     select.addEventListener("keydown", (ev) => {
-      if (keyOpensNativeList(ev)) suppressForOpenList();
+      if (keyOpensNativeList2(ev)) suppressForOpenList();
     });
     select.addEventListener("blur", () => {
       suppressedUntilClosed = false;
-      pointerInside = false;
+      pointerInside2 = false;
       clear();
     });
     select.addEventListener("change", () => {
@@ -27779,13 +28128,18 @@ ${body}`;
       fightBtn.textContent = "Fight";
       fightBtn.disabled = true;
       fightBtn.style.cssText = "margin-right:8px;padding:4px 14px;";
+      const fightHost = document.createElement("span");
+      fightHost.className = "control-tooltip-host";
+      fightHost.setAttribute("data-control-tooltip", fightTooltipText);
+      fightHost.appendChild(fightBtn);
       const ignoreBtn = document.createElement("button");
       ignoreBtn.type = "button";
       ignoreBtn.textContent = "Ignore";
+      ignoreBtn.setAttribute("data-control-tooltip", ignoreTooltipText);
       ignoreBtn.style.cssText = "padding:4px 14px;";
       const btnRow = document.createElement("div");
       btnRow.style.cssText = "margin-top:4px;display:flex;justify-content:flex-end;align-items:center;gap:8px;flex-shrink:0;";
-      btnRow.appendChild(fightBtn);
+      btnRow.appendChild(fightHost);
       btnRow.appendChild(ignoreBtn);
       panel.appendChild(btnRow);
       frame.appendChild(panel);
@@ -28872,6 +29226,7 @@ ${body}`;
   }
   function wireInitCore(deps) {
     try {
+      installControlTooltip();
       initWorldLeafletMaps("main-map", "minimap", () => deps.requestRedraw(), getActiveTerrainStyleBasemapId());
       setMainBasemapFilter(basemapCssFilterForStyle(getActiveTerrainStyleId()));
       const leg = document.getElementById("terrain-legend");
@@ -30225,6 +30580,10 @@ ${body}`;
           }
           select.value = selectedUnitId ?? "";
           select.dataset.prevLand = selectedUnitId ?? "";
+          const selectHost = document.createElement("span");
+          selectHost.className = "control-tooltip-host";
+          selectHost.setAttribute("data-control-tooltip", sealiftSelectTooltipText);
+          selectHost.appendChild(select);
           select.addEventListener("change", async () => {
             const selected = select.value.trim();
             if (tacticalSealiftMode) {
@@ -30276,11 +30635,12 @@ ${body}`;
             refreshStackCalloutIfOpen();
             requestRedraw();
           });
-          slotRow.appendChild(select);
+          slotRow.appendChild(selectHost);
           const debarkBtn = document.createElement("button");
           debarkBtn.type = "button";
           debarkBtn.className = "unit-select stack-unit-toggle";
           debarkBtn.textContent = UNIT_DESELECT_GLYPH;
+          debarkBtn.setAttribute("data-control-tooltip", sealiftDebarkTooltipText);
           debarkBtn.disabled = !debarkEnabled;
           debarkBtn.style.visibility = debarkEnabled ? "visible" : "hidden";
           debarkBtn.addEventListener("click", async () => {
@@ -30856,7 +31216,7 @@ ${body}`;
     const layerKey = rows.map((r) => `${r.h3}|${r.label}|${r.left}|${r.top}|${r.hasCapacity ? 1 : 0}|${r.selected ? 1 : 0}`).join(";");
     if (layerKey !== rendererSharedState.lastBuildEntryLayerKey) {
       const html = rows.map(
-        (r) => `<button type="button" class="build-entry-btn${r.hasCapacity ? " has-capacity" : ""}${r.selected ? " selected" : ""}" data-h3-index="${r.h3}" style="left:${r.left}px;top:${r.top}px;transform:translate(-50%, -50%);" aria-label="Open build queue for ${r.h3}" aria-pressed="${r.selected ? "true" : "false"}">${r.label}</button>`
+        (r) => `<button type="button" class="build-entry-btn${r.hasCapacity ? " has-capacity" : ""}${r.selected ? " selected" : ""}" data-h3-index="${r.h3}" data-control-tooltip="${buildEntryTooltipText}" style="left:${r.left}px;top:${r.top}px;transform:translate(-50%, -50%);" aria-label="Open build queue for ${r.h3}" aria-pressed="${r.selected ? "true" : "false"}">${r.label}</button>`
       ).join("");
       layer.innerHTML = html;
       rendererSharedState.lastBuildEntryLayerKey = layerKey;
@@ -31572,10 +31932,8 @@ ${body}`;
       const canEnable = !!keyResult?.hasKey && !!modelId?.trim();
       if (canEnable) {
         runBtn.disabled = false;
-        runBtn.removeAttribute("title");
       } else {
         runBtn.disabled = true;
-        runBtn.title = "Set API key and model to enable";
         if (rendererSharedState.runButtonOn) {
           rendererSharedState.runButtonOn = false;
           runBtn.setAttribute("aria-pressed", "false");
@@ -31585,9 +31943,20 @@ ${body}`;
           updateReadyButtonState();
         }
       }
+      const runTipHost = runBtn.closest(".control-tooltip-host");
+      (runTipHost instanceof HTMLElement ? runTipHost : runBtn).setAttribute(
+        "data-control-tooltip",
+        runButtonTooltipText(canEnable)
+      );
+      runBtn.removeAttribute("title");
     } catch {
       runBtn.disabled = true;
-      runBtn.title = "Set API key and model to enable";
+      const runTipHost = runBtn.closest(".control-tooltip-host");
+      (runTipHost instanceof HTMLElement ? runTipHost : runBtn).setAttribute(
+        "data-control-tooltip",
+        runButtonTooltipText(false)
+      );
+      runBtn.removeAttribute("title");
     }
   }
   function initOpenRouterUI2() {

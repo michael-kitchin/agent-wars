@@ -14,6 +14,7 @@ The Exit Battle control is shown whenever a battle is active, including during a
 
 - A button labeled "Exit Battle" while a battle is active and annihilation is not showing.
 - The annihilation dialog: "You win!", "You lose.", or "All units destroyed.", plus an Exit Battle button.
+- Control tips for both Exit Battle buttons are in [control-tooltips.md](control-tooltips.md).
 
 ## Inputs and Responses
 

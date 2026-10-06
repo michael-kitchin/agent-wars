@@ -15,8 +15,8 @@ Shown when the Tools tab is selected. The right panel starts on the Model tab. T
 - One row per tool group. The row shows the group's label and a count of uses since the counters were reset.
 - The group list comes from the app. If that list has no Events group, Events is added.
 - What the groups do is described in [AI tools](../ai-tools.md).
-- The precomputation row's tip says it runs assessment before the model and injects the commander's briefing.
-- The Events row's tip says that, when on, consultation is event-driven: pending orders or standing orders only, with no background AI request. The tip is the short form. The first consult after a new game, after Run is turned on, or after Events is turned on is still a background request. Later event-driven turns do not start another one. They use the pending orders from the post-resolution consult, or standing orders. See [Hybrid AI](../hybrid-ai.md).
+- Control tips for these rows are in [control-tooltips.md](control-tooltips.md).
+- The first consult after a new game, after Run is turned on, or after Events is turned on is still a background request. Later event-driven turns do not start another one. They use the pending orders from the post-resolution consult, or standing orders. See [Hybrid AI](../hybrid-ai.md).
 
 ## Inputs and Responses
 

@@ -12,7 +12,7 @@ Shown in Strategic planning during the planning phase, once the map is zoomed in
 
 ## Information Displayed
 
-- One marker per explored contested hex. The marker's tip is "Tactical battle". Its accessible name is "Start tactical battle" plus that hex.
+- One marker per explored contested hex. Its accessible name is "Start tactical battle" plus that hex. The marker's tip is in [control-tooltips.md](control-tooltips.md).
 
 ## Inputs and Responses
 

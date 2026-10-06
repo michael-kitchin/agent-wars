@@ -16,6 +16,12 @@ import {
   canArmKeepBuilding,
 } from './buildQueueKeepBuilding';
 import { escapeBuildPopupHtml, sanitizeBuildCountInputText } from './buildQueuePopupFormatting';
+import {
+  buildAddTooltipText,
+  buildCountTooltipText,
+  buildTypeTooltipText,
+  keepBuildingTooltipText,
+} from '../chrome/controlTooltipText';
 import { formatProducedUnitTechLineHtml } from '../../shared/featureIconHtml';
 import { formatHexNamingCaptionHtml, type HexNamingCaption } from '../../shared/hexNamingCaption';
 import { baselineUrbanHexCountForRes1Hex } from '../rendererRes4Hydration';
@@ -409,6 +415,7 @@ export function createBuildQueuePopupHandler(deps: BuildQueuePopupDeps) {
     buildBtn.type = 'button';
     buildBtn.className = 'unit-select stack-unit-toggle';
     buildBtn.textContent = UNIT_SELECT_GLYPH;
+    buildBtn.setAttribute('data-control-tooltip', buildAddTooltipText);
     buildBtn.addEventListener('click', async () => {
       if (!window.gameApi?.addHexBuildQueueEntry) return;
       const success = await runBuildQueueMutation({
@@ -431,6 +438,7 @@ export function createBuildQueuePopupHandler(deps: BuildQueuePopupDeps) {
       const row = document.createElement('div');
       row.className = 'build-queue-row';
       const typeSelect = document.createElement('select');
+      typeSelect.setAttribute('data-control-tooltip', buildTypeTooltipText);
       for (const unitType of options) {
         const opt = document.createElement('option');
         opt.value = unitType;
@@ -439,6 +447,7 @@ export function createBuildQueuePopupHandler(deps: BuildQueuePopupDeps) {
       }
       typeSelect.value = entry.unitType;
       const countInput = document.createElement('input');
+      countInput.setAttribute('data-control-tooltip', buildCountTooltipText);
       countInput.type = 'text';
       countInput.className = 'build-count-input';
       countInput.maxLength = 2;
@@ -547,6 +556,7 @@ export function createBuildQueuePopupHandler(deps: BuildQueuePopupDeps) {
       section,
       checked: snapshot.keepBuilding,
       disabled: !canArmKeepBuilding(snapshot),
+      tooltipText: keepBuildingTooltipText,
       onChange: async (keepBuilding) => {
         if (restoreSingleHexQueueIfPlaybackBlocks(mount, h3Index)) return;
         if (!window.gameApi?.setHexesKeepBuilding) return;

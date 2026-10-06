@@ -17,6 +17,7 @@ import { hideOrderBlockHexTooltip } from './orderBlockHexTooltip';
 import { clearOrderEffectsTooltipDwell, hideOrderSlowerHexTooltip } from './orderSlowerHexTooltip';
 import { resumeHexTooltipDwellAfterAimingEnds } from './mainMapInteractions';
 import { getMainLeafletMap, initWorldLeafletMaps, setMainBasemapByProviderId, setMainBasemapFilter } from './worldLeafletMap';
+import { installControlTooltip } from '../chrome/controlTooltip';
 
 /**
  * Documents the `InitCoreDeps` interface as a named contract surface (interface InitCoreDeps).
@@ -355,6 +356,7 @@ function tacticalBattlesDialogIsOpen(): boolean {
  */
 export function wireInitCore(deps: InitCoreDeps): void {
   try {
+    installControlTooltip();
     initWorldLeafletMaps('main-map', 'minimap', () => deps.requestRedraw(), getActiveTerrainStyleBasemapId());
     setMainBasemapFilter(basemapCssFilterForStyle(getActiveTerrainStyleId()));
     const leg = document.getElementById('terrain-legend');

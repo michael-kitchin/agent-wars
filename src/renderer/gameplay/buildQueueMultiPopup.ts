@@ -11,6 +11,12 @@ import {
   canArmKeepBuildingForAll,
 } from './buildQueueKeepBuilding';
 import {
+  multiBuildAddTooltipText,
+  multiBuildCountTooltipText,
+  multiBuildTypeTooltipText,
+  multiKeepBuildingTooltipText,
+} from '../chrome/controlTooltipText';
+import {
   buildQueueTemplateFromSnapshot,
   countEligibleBuildHexes,
   createBuildQueueTemplateRow,
@@ -310,6 +316,7 @@ export async function renderMultiBuildQueueIntoMount(deps: MultiBuildQueueRender
   buildBtn.type = 'button';
   buildBtn.className = 'unit-select stack-unit-toggle';
   buildBtn.textContent = UNIT_SELECT_GLYPH;
+  buildBtn.setAttribute('data-control-tooltip', multiBuildAddTooltipText);
   buildBtn.addEventListener('click', async () => {
     if (buildQueueEditBlockedByPlayback()) return;
     const defaultUnitType = unionTypes[0];
@@ -330,6 +337,7 @@ export async function renderMultiBuildQueueIntoMount(deps: MultiBuildQueueRender
     const row = document.createElement('div');
     row.className = 'build-queue-row';
     const typeSelect = document.createElement('select');
+    typeSelect.setAttribute('data-control-tooltip', multiBuildTypeTooltipText);
     const rowTypes = ALL_BUILD_UNIT_TYPES.filter(
       (unitType) => unionTypes.includes(unitType) || unitType === entry.unitType
     );
@@ -344,6 +352,7 @@ export async function renderMultiBuildQueueIntoMount(deps: MultiBuildQueueRender
     row.appendChild(typeSelect);
 
     const countInput = document.createElement('input');
+    countInput.setAttribute('data-control-tooltip', multiBuildCountTooltipText);
     countInput.type = 'text';
     countInput.className = 'build-count-input';
     countInput.maxLength = 2;
@@ -411,6 +420,7 @@ export async function renderMultiBuildQueueIntoMount(deps: MultiBuildQueueRender
     section,
     checked: areAllKeepBuildingArmed(snapshots),
     disabled: !canArmKeepBuildingForAll(snapshots),
+    tooltipText: multiKeepBuildingTooltipText,
     onChange: async (keepBuilding) => {
       if (buildQueueEditBlockedByPlayback()) {
         void renderMultiBuildQueueIntoMount(deps);

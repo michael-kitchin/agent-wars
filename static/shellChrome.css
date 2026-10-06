@@ -314,6 +314,28 @@ body {
   align-items: center;
   justify-content: center;
 }
+.openrouter-model-grid > .control-tooltip-host {
+  display: flex;
+  align-self: stretch;
+  min-width: 0;
+}
+.openrouter-model-grid > .control-tooltip-host > button {
+  align-self: stretch;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  padding-block: 0;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.openrouter-model-grid > .control-tooltip-host > select {
+  width: 100%;
+  min-width: 0;
+  align-self: center;
+  height: auto;
+}
 .openrouter-refresh-btn {
   flex-shrink: 0;
   justify-self: center;

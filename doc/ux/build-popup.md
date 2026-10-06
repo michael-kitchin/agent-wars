@@ -21,6 +21,7 @@ Build markers appear in Strategic planning on explored hexes where the player ca
 - A Keep building checkbox when the queue can arm it.
 - When the hex cannot build, the reason, or "This hex cannot build units."
 - A hex the player does not control shows the production summary and no queue editor.
+- Control tips for a build marker, the queue controls, and Keep building are in [control-tooltips.md](control-tooltips.md).
 
 ## Inputs and Responses
 

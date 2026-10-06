@@ -16,6 +16,7 @@ Opens in the Tactical battles list mode, after Ready reports melee candidates an
 - One row per candidate hex: a choice, the world-hex tooltip (the widest column) for that hex in the same line order (including a country flag before each country name), a human unit summary, and an AI unit summary. An empty summary shows an em dash. See [hex tooltips](hex-tooltips.md).
 - Fight, disabled until a row is chosen.
 - Ignore.
+- Control tips for Fight and Ignore are in [control-tooltips.md](control-tooltips.md).
 
 ## Inputs and Responses
 

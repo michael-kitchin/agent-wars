@@ -12,6 +12,7 @@ import type { TacticalOrderDeps } from './tacticalOrderDeps';
 export type { TacticalOrderDeps } from './tacticalOrderDeps';
 export type { RefreshHoverRoutePreviewOptions } from './hoverRoutePreviewTypes';
 import { refreshHoverRoutePreview } from './hoverRoutePreviewRefresh';
+import { rangedButtonTooltipText } from '../chrome/controlTooltipText';
 export { refreshHoverRoutePreview };
 
 /**
@@ -295,6 +296,7 @@ export function updateRangedSidebar(deps: TacticalOrderDeps): void {
     if (mode === 'strike') {
       S.rangedModeActive = false;
       btnEl.textContent = 'Strike';
+      btnEl.setAttribute('data-control-tooltip', rangedButtonTooltipText('Strike'));
       btnEl.style.display = S.airStrikeModeActive ? 'none' : 'inline-block';
       if (strikeTypeEl) {
         strikeTypeEl.style.display = S.airStrikeModeActive ? 'inline-block' : 'none';
@@ -307,6 +309,10 @@ export function updateRangedSidebar(deps: TacticalOrderDeps): void {
       S.airStrikeModeActive = false;
       btnEl.style.display = 'inline-block';
       btnEl.textContent = S.rangedModeActive ? 'Cancel' : 'Ranged';
+      btnEl.setAttribute(
+        'data-control-tooltip',
+        rangedButtonTooltipText(S.rangedModeActive ? 'Cancel' : 'Ranged')
+      );
       if (strikeTypeEl) strikeTypeEl.style.display = 'none';
       if (strikeCancelEl) strikeCancelEl.style.display = 'none';
     } else {

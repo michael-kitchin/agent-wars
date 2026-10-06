@@ -33,21 +33,21 @@
           <div class="game-over-region-cell">
             <label for="new-game-human-region-select">Human Player:</label>
             <div class="game-over-region-controls">
-              <select id="new-game-human-region-select"></select>
-              <button type="button" id="new-game-human-region-randomize" class="compact-blue-btn compact-square-btn game-over-region-randomize" aria-label="Randomize human home region">↻</button>
+              <select id="new-game-human-region-select" data-control-tooltip="Pick your side's home region. The opponent may start in the same region."></select>
+              <button type="button" id="new-game-human-region-randomize" class="compact-blue-btn compact-square-btn game-over-region-randomize" aria-label="Randomize human home region" data-control-tooltip="Pick one of the listed regions at random for your side, including the region already shown.">↻</button>
             </div>
           </div>
           <div class="game-over-region-cell">
             <label for="new-game-ai-region-select">AI Player:</label>
             <div class="game-over-region-controls">
-              <select id="new-game-ai-region-select"></select>
-              <button type="button" id="new-game-ai-region-randomize" class="compact-blue-btn compact-square-btn compact-opponent-btn game-over-region-randomize" aria-label="Randomize AI home region">↻</button>
+              <select id="new-game-ai-region-select" data-control-tooltip="Pick the opponent's home region. It may be the same as yours."></select>
+              <button type="button" id="new-game-ai-region-randomize" class="compact-blue-btn compact-square-btn compact-opponent-btn game-over-region-randomize" aria-label="Randomize AI home region" data-control-tooltip="Pick one of the listed regions at random for the opponent, including the region already shown.">↻</button>
             </div>
           </div>
         </div>
         <div class="game-over-size-row">
           <label for="new-game-size-select">Game size:
-            <select id="new-game-size-select">
+            <select id="new-game-size-select" data-control-tooltip="Set how many units each side may field. Small is the baseline, Medium doubles it, and Large triples it, without changing the map or the starting forces.">
               <option value="small" selected>Small</option>
               <option value="medium">Medium</option>
               <option value="large">Large</option>
@@ -87,7 +87,7 @@
         <div class="game-over-options">
           <div class="game-over-options-line">
             <label for="new-game-country-bonus-select">Country bonus:
-              <select id="new-game-country-bonus-select">
+              <select id="new-game-country-bonus-select" data-control-tooltip="Choose Off, Low, or High. Low adds 2 and High adds 4 to a unit's attack or defense when it fights in the country where it was built.">
                 <option value="off">Off</option>
                 <option value="low" selected>Low</option>
                 <option value="high">High</option>
@@ -95,7 +95,7 @@
             </label>
             <span class="game-over-options-separator" aria-hidden="true">/</span>
             <label for="new-game-tech-bonus-select">Tech bonus:
-              <select id="new-game-tech-bonus-select">
+              <select id="new-game-tech-bonus-select" data-control-tooltip="Choose Off, Low, or High. Advanced units gain 2 attack at either level, High also adds 2 defense, and Basic units gain nothing.">
                 <option value="off">Off</option>
                 <option value="low" selected>Low</option>
                 <option value="high">High</option>
@@ -104,7 +104,7 @@
           </div>
           <div class="game-over-options-line">
             <label for="new-game-terrain-bonus-select">Terrain bonus:
-              <select id="new-game-terrain-bonus-select">
+              <select id="new-game-terrain-bonus-select" data-control-tooltip="In a battle, Low adds 2 and High adds 4 when a unit fights on the terrain where it was built. Off adds nothing, and a unit that also gets the country bonus receives only the larger of the two.">
                 <option value="off">Off</option>
                 <option value="low" selected>Low</option>
                 <option value="high">High</option>
@@ -112,7 +112,7 @@
             </label>
             <span class="game-over-options-separator" aria-hidden="true">/</span>
             <label for="new-game-weather-bonus-select">Weather bonus:
-              <select id="new-game-weather-bonus-select">
+              <select id="new-game-weather-bonus-select" data-control-tooltip="Choose Off to ignore weather. Low and High slow movement and cut some attacks for units that lack that weather, and High is the harsher penalty.">
                 <option value="off">Off</option>
                 <option value="low" selected>Low</option>
                 <option value="high">High</option>
@@ -121,11 +121,11 @@
           </div>
         </div>
         <div class="game-over-start-month">
-          <label for="new-game-fog-checkbox"><input type="checkbox" id="new-game-fog-checkbox" checked /> Fog of war</label>
+          <label for="new-game-fog-checkbox"><input type="checkbox" id="new-game-fog-checkbox" checked data-control-tooltip="Leave this checked to hide places and enemy units you have not seen. Uncheck it to show the whole map for the next match." /> Fog of war</label>
           <span aria-hidden="true">/</span>
           <label for="new-game-start-month">Starting month:</label>
           <div class="game-over-region-controls">
-            <select id="new-game-start-month">
+            <select id="new-game-start-month" data-control-tooltip="Pick the month the match starts in. Each world-map turn advances one month, and a battle stays in the month that is current.">
               <option value="1" selected>January</option>
               <option value="2">February</option>
               <option value="3">March</option>
@@ -139,10 +139,10 @@
               <option value="11">November</option>
               <option value="12">December</option>
             </select>
-            <button type="button" id="new-game-start-month-randomize" class="compact-blue-btn compact-square-btn game-over-region-randomize" aria-label="Randomize starting month">↻</button>
+            <button type="button" id="new-game-start-month-randomize" class="compact-blue-btn compact-square-btn game-over-region-randomize" aria-label="Randomize starting month" data-control-tooltip="Pick a month at random, including the month already shown.">↻</button>
           </div>
         </div>
-        <button type="button" id="new-game-btn">Start game</button>
+        <button type="button" id="new-game-btn" data-control-tooltip="Start the match with the choices on this screen. If the start fails, the screen stays open.">Start game</button>
       </div>
     </div>
     <div
@@ -155,7 +155,7 @@
     >
       <div class="game-over-box">
         <p id="tactical-annihilation-message"></p>
-        <button type="button" id="tactical-annihilation-exit-btn">Exit Battle</button>
+        <button type="button" id="tactical-annihilation-exit-btn" data-control-tooltip="Close this result and leave the battle. The world-map turn then plays, as it does when you exit during the fight.">Exit Battle</button>
       </div>
     </div>
     <div id="map-toast" class="map-toast hidden" aria-live="polite">
@@ -166,7 +166,7 @@
       <p id="ai-strategy-toast-text"></p>
       <button type="button" id="ai-strategy-toast-dismiss" aria-label="Dismiss">×</button>
     </div>
-    <div id="tactical-battle-hud" class="tactical-battle-hud hidden" role="group" aria-label="Tactical battle controls">
+    <div id="tactical-battle-hud" class="tactical-battle-hud hidden" role="group" aria-label="Tactical battle controls" data-control-tooltip="Leave the battle, bring back your world-map orders, and play that turn. The button does nothing while a battle turn is resolving or playing back.">
       <button type="button" id="tactical-exit-btn" class="tactical-exit-btn" aria-label="Exit battle">Exit Battle</button>
     </div>
   </div>
@@ -175,15 +175,15 @@
       <h2 style="margin-top: 0;">Selected hex</h2>
       <p><strong>Game state</strong><br><span id="sidebar-phase">—</span><br><span id="sidebar-turn">—</span></p>
       <p>
-        <button type="button" id="ready-btn" class="ready-btn">Ready</button>
+        <span class="control-tooltip-host" data-control-tooltip="End this planning step and play out the orders you have queued, on the world map or in a battle. It stays unavailable while the match is over, while the opponent is still planning, or while playback is already running."><button type="button" id="ready-btn" class="ready-btn">Ready</button></span>
         <button type="button" id="ranged-attack-btn" class="ranged-btn" style="display: none;">Ranged</button>
-        <select id="air-strike-target-type" class="ranged-btn" style="display: none;">
+        <select id="air-strike-target-type" class="ranged-btn" style="display: none;" data-control-tooltip="Choose enemy units, production, airports, or seaports. Your next double-click uses that choice until you cancel.">
           <option value="units">Enemy Units</option>
           <option value="urban">Production</option>
           <option value="airport">Airports</option>
           <option value="seaport">Seaports</option>
         </select>
-        <button type="button" id="air-strike-cancel-btn" class="ranged-btn" style="display: none;">Cancel</button>
+        <button type="button" id="air-strike-cancel-btn" class="ranged-btn" style="display: none;" data-control-tooltip="Stop aiming an air strike and show Strike again. Strikes already in the list stay there.">Cancel</button>
       </p>
       <p><strong>Selected unit</strong><br><span id="sidebar-selected-unit">—</span></p>
       <p><strong>Movement orders</strong></p>
@@ -196,8 +196,8 @@
     </div>
     <div id="sidebar-bottom">
       <div class="openrouter-tab-bar" role="tablist" aria-label="AI panel">
-        <button type="button" id="openrouter-tab-tools" role="tab" aria-selected="false" aria-controls="openrouter-tools-panel">Tools</button>
-        <button type="button" id="openrouter-tab-model" role="tab" aria-selected="true" aria-controls="openrouter-model-panel">Model</button>
+        <button type="button" id="openrouter-tab-tools" role="tab" aria-selected="false" aria-controls="openrouter-tools-panel" data-control-tooltip="Show the tools the opponent can use, and turn each group on or off.">Tools</button>
+        <button type="button" id="openrouter-tab-model" role="tab" aria-selected="true" aria-controls="openrouter-model-panel" data-control-tooltip="Show the API key, model, reasoning effort, and the controls for opponent planning and a new match.">Model</button>
       </div>
       <div id="openrouter-tools-panel" class="openrouter-tab-panel" role="tabpanel" aria-labelledby="openrouter-tab-tools" hidden>
         <div id="openrouter-tools-list" class="openrouter-tools-list"></div>
@@ -206,7 +206,7 @@
         <div class="openrouter-row">
           <label for="openrouter-key">API key</label>
           <div class="openrouter-key-row">
-            <input type="password" id="openrouter-key" placeholder="Set key and blur to save" autocomplete="off" />
+            <input type="password" id="openrouter-key" placeholder="Set key and blur to save" autocomplete="off" data-control-tooltip="Enter your OpenRouter key, then click away or press Enter to save it. The key stays hidden after that; clear the field and leave it to forget the saved key." />
             <span id="openrouter-cost" class="openrouter-cost">$0.00</span>
           </div>
         </div>
@@ -216,18 +216,17 @@
             <select id="openrouter-model">
               <option value="">— Select model —</option>
             </select>
-            <button type="button" id="openrouter-refresh-models" class="openrouter-refresh-btn" title="Refresh model list" aria-label="Refresh model list"></button>
-            <button type="button" id="openrouter-run-btn" class="openrouter-tool-toggle" aria-pressed="false" disabled title="Set API key and model to enable">Run</button>
-            <button type="button" id="openrouter-new-btn" class="openrouter-tool-toggle" aria-label="Start a new game">New</button>
-            <select id="openrouter-reasoning-effort" aria-label="Reasoning effort" title="Reasoning effort for the selected model" disabled>
+            <button type="button" id="openrouter-refresh-models" class="openrouter-refresh-btn" aria-label="Refresh model list" data-control-tooltip="Load the model list again. If that fails, the message appears in the AI activity log."></button>
+            <span class="control-tooltip-host" data-control-tooltip="Turn opponent planning on or off. Enter an API key and choose a model first."><button type="button" id="openrouter-run-btn" class="openrouter-tool-toggle" aria-pressed="false" disabled>Run</button></span>
+            <button type="button" id="openrouter-new-btn" class="openrouter-tool-toggle" aria-label="Start a new game" data-control-tooltip="Open the new-game screen during world-map planning. During a battle, or while a turn is playing back, the click does nothing.">New</button>
+            <span class="control-tooltip-host" data-control-tooltip="Choose how much reasoning this model uses. You only see levels this model offers, its default is marked, and the list stays unavailable when it has fewer than two."><select id="openrouter-reasoning-effort" aria-label="Reasoning effort" disabled>
               <option value="">Model default</option>
-            </select>
-            <div class="openrouter-inline-checkbox openrouter-model-grid-checkbox">
+            </select></span>
+            <div class="openrouter-inline-checkbox openrouter-model-grid-checkbox" data-control-tooltip="Leave this checked if you want Ready to let you fight one melee. Uncheck it to skip that list and resolve melee as Ignore.">
               <input
                 type="checkbox"
                 id="openrouter-tactical-battles"
                 checked
-                title="When unchecked, the tactical battles list does not appear; melee resolves as if you chose Ignore every time."
               />
               <label for="openrouter-tactical-battles">Tactical battles</label>
             </div>
@@ -240,6 +239,7 @@
     </div>
   </aside>
   <div id="model-description-tooltip" class="hex-tooltip model-description-tooltip hidden" aria-hidden="true"></div>
+  <div id="control-tooltip" class="hex-tooltip control-tooltip hidden" aria-hidden="true"></div>
   <div id="unit-origin-tooltip" class="hex-tooltip unit-origin-tooltip hidden" aria-hidden="true"></div>
   <script src="vendor/leaflet/leaflet.js"></script>
   <script type="module" src="renderer.js"></script>

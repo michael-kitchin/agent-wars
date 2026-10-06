@@ -17,6 +17,20 @@
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
 }
 .hex-tooltip.hidden { display: none; }
+.control-tooltip {
+  max-width: 20rem;
+  z-index: 8100;
+}
+.control-tooltip-host {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  min-width: 0;
+  vertical-align: middle;
+}
+[data-control-tooltip] :is(button, input, select):disabled {
+  pointer-events: none;
+}
 #order-block-tooltip {
   z-index: 6450;
 }
