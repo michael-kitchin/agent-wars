@@ -109,7 +109,6 @@
   display: flex;
   flex-direction: column;
   gap: 0.22rem;
-  min-width: 220px;
   text-align: left;
 }
 .game-over-region-cell label,
@@ -118,20 +117,13 @@
   color: var(--chrome-text);
   font-weight: 600;
 }
-/* One column until a row has a button, so the randomize rows gain a square button column. */
+/* Select column is the longest option. The randomize button sits in the next column at the same height. */
 .game-over-region-controls {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  align-items: stretch;
-}
-.game-over-region-controls:has(button) {
-  grid-template-columns: minmax(0, 1fr) auto;
-  column-gap: 0.3rem;
-}
-/* Sizes the month dropdown to its longest name and places the randomize button in the next column. */
-.game-over-start-month .game-over-region-controls:has(button) {
   width: max-content;
   grid-template-columns: auto auto;
+  align-items: stretch;
+  column-gap: 0.3rem;
 }
 .game-over-box select {
   font-size: 12px;
@@ -143,8 +135,10 @@
   flex-shrink: 0;
   font-weight: 400;
 }
+/* Longest option, not the selected one. min-width stops the grid from squeezing the closed control below that option. */
 .game-over-region-controls select {
-  min-width: 0;
+  width: max-content;
+  min-width: max-content;
 }
 /* Matches the dropdown beside it. The fixed square size on `.compact-square-btn` is for other buttons. */
 .game-over-box .compact-square-btn.game-over-region-randomize {
