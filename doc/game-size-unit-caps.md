@@ -14,7 +14,7 @@ Caps are per side and per type. Small is the current baseline. Medium is twice S
 
 ## Selection
 
-The player chooses size on the new-game dialog from a **Game size** dropdown (Small / Medium / Large). The dropdown sits on the same line as its label, to the right of that label, with the same gap as the bonus dropdowns, and only as wide as its longest item. It is placed between the home-region selectors and the bonus options row (Country, Tech, Terrain, and Weather). Fog of war sits on the following row, to the left of Starting month. A row of unit tokens under the dropdown shows the selected size’s caps on gray disks, with the map glyphs drawn dark, and the same numbering style as map stack counts.
+The player chooses size on the new-game dialog from a **Game size** dropdown (Small / Medium / Large). The dropdown sits on the same line as its label, to the right of that label, with the same gap as the bonus dropdowns, and only as wide as its longest item. It is placed between the home-region selectors and the bonus options (Country and Tech on one line, Terrain and Weather on the next). Fog of war sits on the following row, to the left of Starting month. A row of unit tokens under the dropdown shows the selected size’s caps on gray disks, with the map glyphs drawn dark, and the same numbering style as map stack counts.
 
 The dropdown keeps its last value for the session. A process restart returns to Small.
 

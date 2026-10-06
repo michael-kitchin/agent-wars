@@ -230,7 +230,7 @@ Penalties apply only to units that lack the tag. They never raise a printed stat
 
 #### Tech bonus (optional)
 
-**Tech bonus** is a new-game dropdown offering Off, Low, and High, defaulting to Low. It sits at the right end of the options row. A match saved with no tech row plays with the bonus off. A saved flag with no level plays at Low.
+**Tech bonus** is a new-game dropdown offering Off, Low, and High, defaulting to Low. It sits on the first bonus line, to the right of Country bonus. A match saved with no tech row plays with the bonus off. A saved flag with no level plays at Low.
 
 A unit's tier is fixed from the generated urban-cell count of its birth res1 hex, not from the live count after air strikes destroy urban cells. Twenty-one or more urban cells is Advanced. Twenty or fewer, a missing birth hex, or an unloaded count is Basic. The tier does not follow the hex the unit stands on now, and it does not change when the unit moves. Tactical sub-units use the parent unit's birth hex.
 

@@ -58,15 +58,22 @@
 }
 .game-over-box p { margin: 0 0 1rem 0; font-size: 1.1rem; font-weight: 600; }
 .game-over-box button { padding: 0.5rem 1rem; font-size: 14px; }
+/* Two lines: Country with Tech, then Terrain with Weather. Each line keeps the slash gap. */
 .game-over-options {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 0.9rem 0;
+  font-size: 0.95rem;
+  color: var(--chrome-text);
+}
+.game-over-options-line {
   display: flex;
   align-items: center;
   justify-content: center;
   flex-wrap: wrap;
   gap: 0.5rem;
-  margin: 0 0 0.9rem 0;
-  font-size: 0.95rem;
-  color: var(--chrome-text);
 }
 /* Bonus labels and the Game size label. Change the gap here so those dropdowns stay aligned with each other. */
 .game-over-options label,

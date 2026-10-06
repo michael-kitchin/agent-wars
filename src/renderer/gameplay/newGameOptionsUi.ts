@@ -37,19 +37,19 @@ const NEW_GAME_BONUS_LEVEL_SELECT_IDS = {
 const NEW_GAME_START_MONTH_ID = 'new-game-start-month';
 
 /**
- * Selector for the wrapping bonus options row.
+ * Selector for the bonus options block.
  *
- * Purpose: Its slash separators are hidden when the row wraps them to a line edge.
+ * Purpose: Its slash separators are hidden when a line wraps a slash to the edge of that line.
  * When to use: `registerNewGameOptionSeparators`.
- * Expected outcome: Matches the row in `static/index.html`.
+ * Expected outcome: Matches the block in `static/index.html`. That block is two lines: Country with Tech, then Terrain with Weather.
  * Exceptions: None.
  */
-const NEW_GAME_OPTIONS_ROW_SELECTOR = '.game-over-options';
+const NEW_GAME_OPTIONS_BLOCK_SELECTOR = '.game-over-options';
 
 /**
  * Class of the slash separators between the bonus dropdowns.
  *
- * Purpose: Finds the separators without depending on their position in the row.
+ * Purpose: Finds the separators without depending on their position on a line.
  * When to use: `syncNewGameOptionSeparators`.
  * Expected outcome: Matches the separator spans in `static/index.html`.
  * Exceptions: None.
@@ -157,7 +157,7 @@ export function resetNewGameOptionControls(): void {
 }
 
 /**
- * Returns true when an element shares a line with a separator in a wrapping row.
+ * Returns true when an element shares a flex line with a separator.
  *
  * Purpose: Items on one flex line can differ in height, so the test uses the separator's vertical midpoint
  *   instead of comparing tops.
@@ -173,16 +173,16 @@ function isOnSeparatorLine(separatorMidY: number, neighbor: Element | null): boo
 }
 
 /**
- * Hides each slash separator that the row wrapped to the start or end of a line.
+ * Hides each slash separator that a line wrapped to its start or end.
  *
- * Purpose: A narrow window wraps the bonus dropdowns, and a slash left at a line edge separates nothing.
- * When to use: Through `registerNewGameOptionSeparators`, whenever the row changes size.
+ * Purpose: A narrow window can wrap one bonus line, and a slash left at a line edge separates nothing.
+ * When to use: Through `registerNewGameOptionSeparators`, whenever the block changes size.
  * Expected outcome: A separator stays visible only when both neighbors are on its line. Hidden separators keep their
- *   space, so hiding one never re-wraps the row.
+ *   space, so hiding one never re-wraps the line.
  * Exceptions: None.
  */
-function syncNewGameOptionSeparators(row: Element): void {
-  for (const separator of row.querySelectorAll<HTMLElement>(`.${NEW_GAME_OPTION_SEPARATOR_CLASS}`)) {
+function syncNewGameOptionSeparators(block: Element): void {
+  for (const separator of block.querySelectorAll<HTMLElement>(`.${NEW_GAME_OPTION_SEPARATOR_CLASS}`)) {
     const rect = separator.getBoundingClientRect();
     const midY = (rect.top + rect.bottom) / 2;
     const joinsNeighbors =
@@ -192,16 +192,16 @@ function syncNewGameOptionSeparators(row: Element): void {
 }
 
 /**
- * Keeps the bonus row's slash separators in step with how the row wraps.
+ * Keeps each bonus line's slash in step with how that line wraps.
  *
- * Purpose: The row's width depends on the window and on the region lists, which load after the dialog opens.
+ * Purpose: Line width depends on the window and on the region lists, which load after the dialog opens.
  * When to use: Once while the renderer is starting.
- * Expected outcome: The separators are checked now and again each time the row changes size, including when the
- *   dialog opens. A missing row or a missing `ResizeObserver` leaves every separator visible.
+ * Expected outcome: The separators are checked now and again each time the block changes size, including when the
+ *   dialog opens. A missing block or a missing `ResizeObserver` leaves every separator visible.
  * Exceptions: None.
  */
 export function registerNewGameOptionSeparators(): void {
-  const row = document.querySelector(NEW_GAME_OPTIONS_ROW_SELECTOR);
-  if (!row || typeof ResizeObserver === 'undefined') return;
-  new ResizeObserver(() => syncNewGameOptionSeparators(row)).observe(row);
+  const block = document.querySelector(NEW_GAME_OPTIONS_BLOCK_SELECTOR);
+  if (!block || typeof ResizeObserver === 'undefined') return;
+  new ResizeObserver(() => syncNewGameOptionSeparators(block)).observe(block);
 }
