@@ -76,6 +76,7 @@ None.
 
 ## Code Entry Points
 
+- `src/renderer/rendering/gameScene.ts`
 - `src/renderer/rendering/rangePerimeterOverlay.ts`
 - `src/renderer/rendering/pathDrawing.ts`
 - `src/renderer/rendering/orderDrawing.ts`

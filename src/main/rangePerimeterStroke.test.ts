@@ -6,6 +6,14 @@ import * as assert from 'assert';
 import * as fs from 'fs';
 import * as path from 'path';
 
+/**
+ * Absolute path of the renderer source tree.
+ *
+ * Purpose: Overlay stroke tests read renderer files relative to this root.
+ * When to use: `readRenderer` joins a path under it.
+ * Expected outcome: A stable absolute directory for source-contract reads.
+ * Exceptions: None.
+ */
 const rendererRoot = path.resolve(process.cwd(), 'src', 'renderer');
 
 /**
@@ -106,7 +114,7 @@ function testPerimeterDashAndCapStayVisibleAtStrategicWidth(): void {
  */
 function testRangePerimeterDashAnimationRemainsWired(): void {
   const overlay = readRenderer(path.join('rendering', 'rangePerimeterOverlay.ts'));
-  const renderer = readRenderer('renderer.ts');
+  const renderer = readRenderer(path.join('rendering', 'gameScene.ts'));
 
   assert.ok(
     overlay.includes('ctx.lineDashOffset = phase') &&

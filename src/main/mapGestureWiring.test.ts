@@ -54,7 +54,7 @@ function testGestureSelectionSnapshotSurvivesDoubleClick(): void {
  */
 function testStackCalloutOpensOnCancellableTimer(): void {
   const selectionPolicySource = readRendererSource('map', 'mapClickSelectionPolicy.ts');
-  const rendererSource = readRendererSource('renderer.ts');
+  const stackCalloutSource = readRendererSource('map', 'stackCallout.ts');
 
   assert.ok(
     selectionPolicySource.includes('function scheduleDeferredStackCallout') &&
@@ -62,7 +62,7 @@ function testStackCalloutOpensOnCancellableTimer(): void {
     'map click selection policy should own the deferred stack callout timer helpers'
   );
   assert.ok(
-    getFunctionSource(rendererSource, 'hideStackCallout').includes('clearDeferredStackCalloutTimer();'),
+    getFunctionSource(stackCalloutSource, 'hideStackCallout').includes('clearDeferredStackCalloutTimer();'),
     'hideStackCallout should cancel a stack callout that has not opened yet'
   );
   assert.ok(
@@ -94,14 +94,6 @@ function testDoubleClickPlanningUsesSharedDecisionTable(): void {
   );
 }
 
-/**
- * Checks that right-click clears the selection everywhere, with no icon-hit exception.
- *
- * Purpose: Air and mixed selections must clear from a right-click on an empty hex as well as on an icon.
- * When to use: Regression signal when refactoring the map context-menu listener.
- * Expected outcome: The listener clears shared selection chrome and never hit-tests icons.
- * Exceptions: AssertionError when the listener is missing or grows an icon-hit branch.
- */
 /**
  * Checks that build markers and multi-hex template edits cannot run during playback.
  *
@@ -140,6 +132,14 @@ function testPlaybackIgnoresBuildMarkersAndTemplateEdits(): void {
   );
 }
 
+/**
+ * Checks that right-click clears the selection everywhere, with no icon-hit exception.
+ *
+ * Purpose: Air and mixed selections must clear from a right-click on an empty hex as well as on an icon.
+ * When to use: Regression signal when refactoring the map context-menu listener.
+ * Expected outcome: The listener clears shared selection chrome and never hit-tests icons.
+ * Exceptions: AssertionError when the listener is missing or grows an icon-hit branch.
+ */
 function testRightClickClearsSelectionWithoutIconException(): void {
   const interactionsSource = readRendererSource('map', 'mainMapInteractions.ts');
   const listenerStart = interactionsSource.indexOf("addEventListener('contextmenu'");

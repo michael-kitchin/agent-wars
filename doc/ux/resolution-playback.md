@@ -93,6 +93,7 @@ None.
 ## Code Entry Points
 
 - `src/renderer/rendering/resolutionPlayback.ts`
+- `src/renderer/rendering/gameScene.ts` (`drawGameScene`, `tickResolutionMoveAnimation`)
 - `src/renderer/rendering/resolutionCombatOverlays.ts`
 - `src/renderer/rendering/combatDiceChipDrawing.ts`
 - `src/shared/combatDiceChips.ts`

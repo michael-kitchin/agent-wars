@@ -2,6 +2,7 @@
 # Paths are relative to the repository root.
 
 dist/main/rendererConsolidation.test.js
+dist/main/rendererStackPopoverContracts.test.js
 dist/main/openRouter/openRouterMatrix.test.js
 dist/main/briefing/map/hexCoordinates.test.js
 dist/main/hexLlmCodeAssignment.test.js

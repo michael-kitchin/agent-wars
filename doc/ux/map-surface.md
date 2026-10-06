@@ -96,6 +96,7 @@ None.
 - `src/renderer/map/mapClickSelectionPolicy.ts`
 - `src/renderer/map/mapKeyboardPan.ts`
 - `src/renderer/map/drawInteraction.ts`
+- `src/renderer/rendering/gameScene.ts`
 - `src/renderer/map/hexGrid.ts`
 - `src/renderer/map/terrainView.ts`
 - `src/renderer/map/tacticalMapView.ts`

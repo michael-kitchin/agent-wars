@@ -17,7 +17,7 @@ import { assertMatches, getFunctionSource } from './testSupport/rendererSourceAs
  * Exceptions: None.
  */
 function testRedrawAndResizeDelegateToSharedScene(): void {
-  const rendererPath = path.resolve(process.cwd(), 'src', 'renderer', 'renderer.ts');
+  const rendererPath = path.resolve(process.cwd(), 'src', 'renderer', 'rendering', 'gameScene.ts');
   const source = fs.readFileSync(rendererPath, 'utf8');
 
   const resizeFn = getFunctionSource(source, 'resizeAndRedraw');
@@ -45,11 +45,11 @@ function testRedrawAndResizeDelegateToSharedScene(): void {
  * Exceptions: None.
  */
 function testRes4ZoomHidesStrategicMapUnits(): void {
-  const rendererPath = path.resolve(process.cwd(), 'src', 'renderer', 'renderer.ts');
+  const gameScenePath = path.resolve(process.cwd(), 'src', 'renderer', 'rendering', 'gameScene.ts');
   const terrainViewPath = path.resolve(process.cwd(), 'src', 'renderer', 'map', 'terrainView.ts');
   const mainMapInteractionsPath = path.resolve(process.cwd(), 'src', 'renderer', 'map', 'mainMapInteractions.ts');
   const drawInteractionPath = path.resolve(process.cwd(), 'src', 'renderer', 'map', 'drawInteraction.ts');
-  const rendererSource = fs.readFileSync(rendererPath, 'utf8');
+  const rendererSource = fs.readFileSync(gameScenePath, 'utf8');
   const terrainViewSource = fs.readFileSync(terrainViewPath, 'utf8');
   const unitDrawingSource = fs.readFileSync(
     path.resolve(process.cwd(), 'src', 'renderer', 'rendering', 'unitDrawing.ts'),
@@ -57,9 +57,13 @@ function testRes4ZoomHidesStrategicMapUnits(): void {
   );
   const mainMapInteractionsSource = fs.readFileSync(mainMapInteractionsPath, 'utf8');
   const drawInteractionSource = fs.readFileSync(drawInteractionPath, 'utf8');
+  const stackCalloutSource = fs.readFileSync(
+    path.resolve(process.cwd(), 'src', 'renderer', 'map', 'stackCallout.ts'),
+    'utf8'
+  );
   const drawSceneFn = getFunctionSource(rendererSource, 'drawGameScene');
-  const showStackCalloutFn = getFunctionSource(rendererSource, 'showStackCallout');
-  const refreshStackCalloutFn = getFunctionSource(rendererSource, 'refreshStackCalloutIfOpen');
+  const showStackCalloutFn = getFunctionSource(stackCalloutSource, 'showStackCallout');
+  const refreshStackCalloutFn = getFunctionSource(stackCalloutSource, 'refreshStackCalloutIfOpen');
   const redrawFn = getFunctionSource(rendererSource, 'redraw');
   const resizeAndRedrawFn = getFunctionSource(rendererSource, 'resizeAndRedraw');
   const drawStaleIntelFn = getFunctionSource(unitDrawingSource, 'drawStaleEnemyIntel');
@@ -132,10 +136,12 @@ function testRes4ZoomHidesStrategicMapUnits(): void {
  */
 function testCommittedPathsRemainVisibleDuringResolutionAnimation(): void {
   const rendererPath = path.resolve(process.cwd(), 'src', 'renderer', 'renderer.ts');
+  const gameScenePath = path.resolve(process.cwd(), 'src', 'renderer', 'rendering', 'gameScene.ts');
   const policyPath = path.resolve(process.cwd(), 'src', 'renderer', 'rendering', 'canvasPreviewPolicy.ts');
   const source = fs.readFileSync(rendererPath, 'utf8');
+  const gameSceneSource = fs.readFileSync(gameScenePath, 'utf8');
   const policySource = fs.readFileSync(policyPath, 'utf8');
-  const drawSceneFn = getFunctionSource(source, 'drawGameScene');
+  const drawSceneFn = getFunctionSource(gameSceneSource, 'drawGameScene');
   const shouldDrawCommittedOrderPathsFn = getFunctionSource(policySource, 'shouldDrawCommittedOrderPaths');
   const shouldDrawHoveredPathPreviewFn = getFunctionSource(policySource, 'shouldDrawHoveredPathPreview');
   const hiddenDuringPreviewFn = getFunctionSource(policySource, 'getCommittedOrderUnitsHiddenDuringPreview');
@@ -196,7 +202,8 @@ function testCommittedPathsRemainVisibleDuringResolutionAnimation(): void {
     'drawGameScene should not suppress committed paths while animation is active'
   );
   assert.ok(
-    !source.includes('S.hideCommittedOrderLinesAfterReady = true;'),
+    !source.includes('S.hideCommittedOrderLinesAfterReady = true;') &&
+      !gameSceneSource.includes('S.hideCommittedOrderLinesAfterReady = true;'),
     'renderer should not force-hide committed paths after ready'
   );
 }
@@ -317,125 +324,6 @@ function testProductionLabelContractsForExploredVsUnexploredHexes(): void {
 }
 
 /**
- * Defines the `testStackCalloutSingleUnitNonShiftClosesPopup` function shape (function testStackCalloutSingleUnitNonShiftClosesPopup(): void).
-
- * Purpose: Supports maintainability by documenting why `testStackCalloutSingleUnitNonShiftClosesPopup` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function testStackCalloutSingleUnitNonShiftClosesPopup(): void {
-  const rendererPath = path.resolve(process.cwd(), 'src', 'renderer', 'renderer.ts');
-  const source = fs.readFileSync(rendererPath, 'utf8');
-  const showStackCalloutFn = getFunctionSource(source, 'showStackCallout');
-  const stackSingleUnitHandlerFn = getFunctionSource(source, 'onStackSingleUnitToggleClick');
-
-  assert.ok(
-    showStackCalloutFn.includes('onStackSingleUnitToggleClick(') &&
-      stackSingleUnitHandlerFn.includes('if (!S.shiftKeyActive) {') &&
-      stackSingleUnitHandlerFn.includes('hideStackCallout();'),
-    'stack single-unit handler should close popup after non-Shift unit button clicks'
-  );
-}
-
-/**
- * Defines the `testStackSealiftWaterStateHidesDebarkAndEmbarkedSelectionControls` function shape (function testStackSealiftWaterStateHidesDebarkAndEmbarkedSelectionControls(): void).
-
- * Purpose: Supports maintainability by documenting why `testStackSealiftWaterStateHidesDebarkAndEmbarkedSelectionControls` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function testStackSealiftEmbarkedSelectionAndDebarkControls(): void {
-  const rendererPath = path.resolve(process.cwd(), 'src', 'renderer', 'renderer.ts');
-  const source = fs.readFileSync(rendererPath, 'utf8');
-  const renderSealiftSectionFn = getFunctionSource(source, 'renderSealiftSection');
-  const removeSealiftSectionFn = getFunctionSource(source, 'removeSealiftSection');
-  const setNonSelectableFn = getFunctionSource(source, 'setStackPopupNonSelectableUnitIds');
-  const applyVisibilityFn = getFunctionSource(source, 'applyStackCalloutSelectionButtonVisibility');
-  const showStackCalloutFn = getFunctionSource(source, 'showStackCallout');
-  const stackSingleUnitHandlerFn = getFunctionSource(source, 'onStackSingleUnitToggleClick');
-  const stackAllActionHandlerFn = getFunctionSource(source, 'onStackAllActionClick');
-
-  assert.ok(
-    renderSealiftSectionFn.includes('.flatMap((row) => [row.slot1UnitId, row.slot2UnitId])') &&
-      renderSealiftSectionFn.includes('setStackPopupNonSelectableUnitIds(calloutEl, nonSelectableEmbarkedIds);'),
-    'sealift rendering should mark all embarked slot occupants as non-selectable in the stack popup'
-  );
-  assert.ok(
-    renderSealiftSectionFn.includes('debarkBtn.style.visibility = debarkEnabled ? \'visible\' : \'hidden\'') &&
-      renderSealiftSectionFn.includes('slotRow.appendChild(debarkBtn)') &&
-      renderSealiftSectionFn.includes('row.debarkSlot1Enabled'),
-    'sealift slot rows should always reserve a debark-control gap and enable it when debarkSlot*Enabled'
-  );
-  assert.ok(
-    setNonSelectableFn.includes('applyStackCalloutSelectionButtonVisibility(calloutEl, nonSelectable);') &&
-      applyVisibilityFn.includes(
-        'btn.style.visibility = nonSelectableUnitIds.has(unitId) ? \'hidden\' : \'visible\';'
-      ),
-    'non-selectable stack-popup units should reserve space for per-unit select/unselect buttons while hiding them'
-  );
-  assert.ok(
-    showStackCalloutFn.includes('getSelectableHumanIdsForStackCallout(units)') &&
-      showStackCalloutFn.includes("onStackAllActionClick('selectAll'") &&
-      showStackCalloutFn.includes("onStackAllActionClick('addAll'") &&
-      showStackCalloutFn.includes("onStackAllActionClick('removeAll'"),
-    'stack callout all-actions should filter through selectable human IDs so embarked land units remain unselectable'
-  );
-  assert.ok(
-    renderSealiftSectionFn.includes('refreshGameStateAfterSealiftChange') &&
-      renderSealiftSectionFn.includes('await refreshGameStateAfterSealiftChange()'),
-    'strategic sealift embark/debark must refresh game state so same-turn select/move sees cleared embark flags'
-  );
-  assert.ok(
-    removeSealiftSectionFn.includes("querySelectorAll('.stack-sealift-section')") &&
-      renderSealiftSectionFn.includes('generation !== sealiftSectionRenderGeneration'),
-    'sealift section must drop stale overlapping renders and remove every existing section before append'
-  );
-  assert.ok(
-    stackSingleUnitHandlerFn.includes('refreshStackCallout: false') &&
-      stackAllActionHandlerFn.includes('refreshStackCallout: false') &&
-      setNonSelectableFn.includes('refreshStackCallout: false'),
-    'callers that already rebuilt the open stack popup must not start a second sealift render via selection sync'
-  );
-}
-
-/**
- * Defines the `testModifierDrivenPopoverCloseRulesCentralized` function shape (function testModifierDrivenPopoverCloseRulesCentralized(): void).
-
- * Purpose: Supports maintainability by documenting why `testModifierDrivenPopoverCloseRulesCentralized` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-function testModifierDrivenPopoverCloseRulesCentralized(): void {
-  const rendererPath = path.resolve(process.cwd(), 'src', 'renderer', 'renderer.ts');
-  const source = fs.readFileSync(rendererPath, 'utf8');
-  const modifierRulesFn = getFunctionSource(source, 'applyModifierDrivenPopoverCloseRules');
-  const initCorePath = path.resolve(process.cwd(), 'src', 'renderer', 'map', 'initCore.ts');
-  const initCoreSource = fs.readFileSync(initCorePath, 'utf8');
-  const wireInitCoreFn = getFunctionSource(initCoreSource, 'wireInitCore');
-
-  assert.ok(
-    modifierRulesFn.includes("if (reason === 'shift_pressed')") &&
-      !modifierRulesFn.includes('hideBuildPopup();') &&
-      modifierRulesFn.includes("if (reason === 'shift_released')") &&
-      modifierRulesFn.includes('hideStackCallout();'),
-    'Shift press should preserve the build popup for multi-select while Shift release closes the stack callout'
-  );
-  assert.ok(
-    wireInitCoreFn.includes("applyModifierDrivenPopoverCloseRules('shift_pressed')") &&
-      wireInitCoreFn.includes("applyModifierDrivenPopoverCloseRules('shift_released')"),
-    'init key handlers should delegate popover-close behavior to shared modifier rule helper'
-  );
-  assert.ok(
-    wireInitCoreFn.includes('shouldRefreshStackCalloutOnShiftKeydown(shiftKeyAlreadyActive)') &&
-      wireInitCoreFn.includes("applyModifierDrivenPopoverCloseRules('shift_pressed')"),
-    'Shift keydown should rebuild stack-callout chrome only on the inactive-to-active transition'
-  );
-}
-
-/**
  * Defines the `testInfrastructureGlyphSetsComeFromRes4Overrides` function shape (function testInfrastructureGlyphSetsComeFromRes4Overrides(): void).
 
  * Purpose: Supports maintainability by documenting why `testInfrastructureGlyphSetsComeFromRes4Overrides` exists.
@@ -446,22 +334,27 @@ function testModifierDrivenPopoverCloseRulesCentralized(): void {
 function testInfrastructureGlyphSetsComeFromRes4Overrides(): void {
   const rendererPath = path.resolve(process.cwd(), 'src', 'renderer', 'renderer.ts');
   const source = fs.readFileSync(rendererPath, 'utf8');
+  const entrySource = fs.readFileSync(
+    path.resolve(process.cwd(), 'src', 'renderer', 'entryCallbacks.ts'),
+    'utf8'
+  );
   const drawInfraFn = getFunctionSource(source, 'drawTerrainInfrastructureOverlays');
   const hasVisibleRes1InfraFn = getFunctionSource(source, 'hasVisibleRes1InfrastructureGlyphs');
 
   assert.ok(
-    source.includes('const nextState = deriveInfrastructureOverlayState(rows);') &&
-      source.includes('terrainInfraRes4Airport = nextState.terrainInfraRes4Airport;') &&
-      source.includes('terrainInfraRes4Seaport = nextState.terrainInfraRes4Seaport;'),
+    entrySource.includes('const nextState = deriveInfrastructureOverlayState(rows);') &&
+      entrySource.includes('terrainInfraRes4Airport = nextState.terrainInfraRes4Airport;') &&
+      entrySource.includes('terrainInfraRes4Seaport = nextState.terrainInfraRes4Seaport;'),
     'applyRes4TerrainOverrides should use centralized derivation for res4 airport/seaport glyph sets'
   );
   assert.ok(
-    source.includes('terrainInfraRes1Airport = nextState.terrainInfraRes1Airport;') &&
-      source.includes('terrainInfraRes1Seaport = nextState.terrainInfraRes1Seaport;'),
+    entrySource.includes('terrainInfraRes1Airport = nextState.terrainInfraRes1Airport;') &&
+      entrySource.includes('terrainInfraRes1Seaport = nextState.terrainInfraRes1Seaport;'),
     'applyRes4TerrainOverrides should use centralized derivation for res1 airport/seaport glyph sets'
   );
   assert.ok(
-    !source.includes('.getTerrainInfrastructureHints()'),
+    !source.includes('.getTerrainInfrastructureHints()') &&
+      !entrySource.includes('.getTerrainInfrastructureHints()'),
     'renderer init should not overwrite live glyph sets with major-only terrain hint snapshots'
   );
   assert.ok(
@@ -487,6 +380,10 @@ function testAirFerryDoubleClickContracts(): void {
   const rendererPath = path.resolve(process.cwd(), 'src', 'renderer', 'renderer.ts');
   const orderDrawingPath = path.resolve(process.cwd(), 'src', 'renderer', 'rendering', 'orderDrawing.ts');
   const source = fs.readFileSync(rendererPath, 'utf8');
+  const gameSceneSource = fs.readFileSync(
+    path.resolve(process.cwd(), 'src', 'renderer', 'rendering', 'gameScene.ts'),
+    'utf8'
+  );
   const orderDrawingSource = fs.readFileSync(orderDrawingPath, 'utf8');
   const initFn = getFunctionSource(source, 'init');
   const pendingOrdersFn = getFunctionSource(source, 'updatePendingOrdersSidebar');
@@ -524,8 +421,8 @@ function testAirFerryDoubleClickContracts(): void {
   const overlayStagesPath = path.resolve(process.cwd(), 'src', 'renderer', 'rendering', 'orderOverlayStages.ts');
   const overlayStagesSource = fs.readFileSync(overlayStagesPath, 'utf8');
   assert.ok(
-    source.includes("from './rendering/orderOverlayStages'") &&
-      source.includes('drawPendingMarchesHoverAndSupportOrderStack({') &&
+    gameSceneSource.includes("from './orderOverlayStages'") &&
+      gameSceneSource.includes('drawPendingMarchesHoverAndSupportOrderStack({') &&
       overlayStagesSource.includes('drawPendingSupportOrderOverlays(') &&
       overlayStagesSource.includes(
         'drawPendingFerryLines(ctx, S.pendingFerryOrders, unitsForOrderLines, hexList);'
@@ -561,11 +458,27 @@ function testAirStrikeAndAirGlyphContracts(): void {
   const tacticalOrdersSource = fs.readFileSync(tacticalOrdersPath, 'utf8');
   const sidebarSupportSource = fs.readFileSync(sidebarSupportPath, 'utf8');
   const rendererConstantsSource = fs.readFileSync(rendererConstantsPath, 'utf8');
-  const inferUnitTypeLabelFromIdFn = getFunctionSource(source, 'inferUnitTypeLabelFromId');
-  assert.ok(inferUnitTypeLabelFromIdFn.length > 0, 'inferUnitTypeLabelFromId must remain declared in renderer.ts');
+  const unitTypeLabelSource = fs.readFileSync(
+    path.resolve(process.cwd(), 'src', 'renderer', 'core', 'unitTypeLabel.ts'),
+    'utf8'
+  );
+  const gameSceneSource = fs.readFileSync(
+    path.resolve(process.cwd(), 'src', 'renderer', 'rendering', 'gameScene.ts'),
+    'utf8'
+  );
+  const resolutionPlaybackSource = fs.readFileSync(
+    path.resolve(process.cwd(), 'src', 'renderer', 'rendering', 'resolutionPlayback.ts'),
+    'utf8'
+  );
+  const wiredEntrySource = fs.readFileSync(
+    path.resolve(process.cwd(), 'src', 'renderer', 'wiredEntryCallbacks.ts'),
+    'utf8'
+  );
+  const inferUnitTypeLabelFromIdFn = getFunctionSource(unitTypeLabelSource, 'inferUnitTypeLabelFromId');
+  assert.ok(inferUnitTypeLabelFromIdFn.length > 0, 'inferUnitTypeLabelFromId must remain declared in unitTypeLabel.ts');
 
   assert.ok(
-    rendererConstantsSource.includes("air: 'S'") && source.includes("from './core/constants'"),
+    rendererConstantsSource.includes("air: 'S'") && wiredEntrySource.includes("from './core/constants'"),
     'air unit type label should render as S'
   );
   assert.ok(
@@ -603,8 +516,8 @@ function testAirStrikeAndAirGlyphContracts(): void {
   assert.ok(
     source.includes('airStrikeOutboundMoves: airStrikeOutboundMoves.length > 0 ? airStrikeOutboundMoves : undefined') &&
       source.includes('airStrikeReturnMoves: airStrikeReturnMoves.length > 0 ? airStrikeReturnMoves : undefined') &&
-      source.includes('inAirStrikeOutbound') &&
-      source.includes('inAirStrikeReturn'),
+      gameSceneSource.includes('inAirStrikeOutbound') &&
+      gameSceneSource.includes('inAirStrikeReturn'),
     'resolution playback should include outbound/return air-strike movement phases'
   );
   assert.ok(
@@ -614,14 +527,14 @@ function testAirStrikeAndAirGlyphContracts(): void {
     'unknown battle announcements should not include known human air-strike target hexes'
   );
   assert.ok(
-    source.includes('phase.inAirStrikeLightning || phase.inAirStrikeCasualty') &&
-      source.includes('h3Index: move.toH3Index') &&
-      source.includes('movingIds = new Set((anim.airStrikeReturnMoves ?? []).map((move) => move.unitId));'),
+    wiredEntrySource.includes('phase.inAirStrikeLightning || phase.inAirStrikeCasualty') &&
+      wiredEntrySource.includes('h3Index: move.toH3Index') &&
+      wiredEntrySource.includes('movingIds = new Set((anim.airStrikeReturnMoves ?? []).map((move) => move.unitId));'),
     'air strike playback should pin strikers at target during combat/casualty and hide survivors at base until return animation completes'
   );
   assert.ok(
-    source.includes('function buildResolutionPlaybackState(') &&
-      source.includes('const { phase } = buildResolutionPlaybackState(anim, elapsed);'),
+    resolutionPlaybackSource.includes('function buildResolutionPlaybackState(') &&
+      gameSceneSource.includes('const { phase } = buildResolutionPlaybackState(anim, elapsed);'),
     'resolution playback phase derivation should be centralized for all unit/scenario animation paths'
   );
   assert.ok(
@@ -664,8 +577,8 @@ function testKillUpdateTextOmitsPlayerSuffixes(): void {
  * Exceptions: None.
  */
 function testRes4RubbleTooltipAndTerrainVariantContracts(): void {
-  const rendererPath = path.resolve(process.cwd(), 'src', 'renderer', 'renderer.ts');
-  const rendererSource = fs.readFileSync(rendererPath, 'utf8');
+  const gameScenePath = path.resolve(process.cwd(), 'src', 'renderer', 'rendering', 'gameScene.ts');
+  const rendererSource = fs.readFileSync(gameScenePath, 'utf8');
   const terrainTooltipStatePath = path.resolve(process.cwd(), 'src', 'renderer', 'map', 'terrainTooltipRes1State.ts');
   const terrainTooltipStateSource = fs.readFileSync(terrainTooltipStatePath, 'utf8');
   const terrainTooltipHtmlPath = path.resolve(process.cwd(), 'src', 'renderer', 'map', 'terrainTooltipHtml.ts');
@@ -733,7 +646,7 @@ function testRes4RubbleTooltipAndTerrainVariantContracts(): void {
  * Exceptions: None.
  */
 function testTacticalDrawBranchSkipsStrategicStaleIntel(): void {
-  const rendererPath = path.resolve(process.cwd(), 'src', 'renderer', 'renderer.ts');
+  const rendererPath = path.resolve(process.cwd(), 'src', 'renderer', 'rendering', 'gameScene.ts');
   const source = fs.readFileSync(rendererPath, 'utf8');
   const drawSceneFn = getFunctionSource(source, 'drawGameScene');
   const tacticalIdx = drawSceneFn.indexOf('if (S.tacticalBattleSnapshot)');
@@ -808,14 +721,6 @@ function testTacticalEntryLayerPlanningAndContestedContracts(): void {
 }
 
 /**
- * Defines the `testTacticalMapViewLocksZoomPanAndRestoresWorld` function shape (function testTacticalMapViewLocksZoomPanAndRestoresWorld(): void).
-
- * Purpose: Static regression tests for milestone-2.1 Phase C Leaflet tactical camera constraints and exit restoration.
- * When to use: CI guard when refactoring `enterTacticalMapView` / `exitTacticalMapView`.
- * Expected outcome: Enter clamps min/max zoom and maxBounds to the tactical footprint with animated bounds; exit restores world maxBounds and saved zoom limits.
- * Exceptions: None.
- */
-/**
  * Defines the `testStrategicAndTacticalBranchesShareOrderOverlayPipeline` function shape.
 
  * Purpose: Guards the shared order-overlay pipeline so tactical/strategic `drawGameScene` paths cannot drop pending support overlays independently.
@@ -824,11 +729,11 @@ function testTacticalEntryLayerPlanningAndContestedContracts(): void {
  * Exceptions: None.
  */
 function testStrategicAndTacticalBranchesShareOrderOverlayPipeline(): void {
-  const rendererPath = path.resolve(process.cwd(), 'src', 'renderer', 'renderer.ts');
+  const rendererPath = path.resolve(process.cwd(), 'src', 'renderer', 'rendering', 'gameScene.ts');
   const source = fs.readFileSync(rendererPath, 'utf8');
   const drawSceneFn = getFunctionSource(source, 'drawGameScene');
   assert.ok(
-    source.includes("from './rendering/orderOverlayStages'") && source.includes('drawPendingMarchesHoverAndSupportOrderStack'),
+    source.includes("from './orderOverlayStages'") && source.includes('drawPendingMarchesHoverAndSupportOrderStack'),
     'renderer should import shared order overlay stack helper'
   );
   const stackCalls = drawSceneFn.match(/drawPendingMarchesHoverAndSupportOrderStack\(/g) ?? [];
@@ -889,6 +794,14 @@ function testParityDiagnosticsBreadcrumbsCoverPlanningAndPositionSourceBoundarie
   );
 }
 
+/**
+ * Defines the `testTacticalMapViewLocksZoomPanAndRestoresWorld` function shape (function testTacticalMapViewLocksZoomPanAndRestoresWorld(): void).
+
+ * Purpose: Static regression tests for Leaflet tactical camera constraints and exit restoration.
+ * When to use: CI guard when refactoring `enterTacticalMapView` / `exitTacticalMapView`.
+ * Expected outcome: Enter clamps min/max zoom and maxBounds to the tactical footprint with animated bounds; exit restores world maxBounds and saved zoom limits.
+ * Exceptions: None.
+ */
 function testTacticalMapViewLocksZoomPanAndRestoresWorld(): void {
   const tacticalMapPath = path.resolve(process.cwd(), 'src', 'renderer', 'map', 'tacticalMapView.ts');
   const source = fs.readFileSync(tacticalMapPath, 'utf8');
@@ -961,136 +874,6 @@ function testResolutionMovingStackGroupsMixedEmbarkedAndNavalMoves(): void {
 }
 
 /**
- * Defines the `testHoverOrderPlanningInteractionLock` function shape.
-
- * Purpose: Guards hover-planning UI lock wiring for selection, tactical entry, and build queue entry points.
- * When to use: Regression signal when refactoring hover preview or map interaction handlers.
- * Expected outcome: `isHoverOrderPlanningActive` and selection replace/toggle guards appear at documented boundaries.
- * Exceptions: None.
- */
-function testHoverOrderPlanningInteractionLock(): void {
-  const policyPath = path.resolve(process.cwd(), 'src', 'renderer', 'rendering', 'canvasPreviewPolicy.ts');
-  const selectionPolicyPath = path.resolve(process.cwd(), 'src', 'renderer', 'map', 'mapClickSelectionPolicy.ts');
-  const tacticalEntryPath = path.resolve(process.cwd(), 'src', 'renderer', 'map', 'tacticalEntryLayer.ts');
-  const drawInteractionPath = path.resolve(process.cwd(), 'src', 'renderer', 'map', 'drawInteraction.ts');
-  const buildPopupPath = path.resolve(process.cwd(), 'src', 'renderer', 'gameplay', 'buildQueuePopup.ts');
-  const rendererPath = path.resolve(process.cwd(), 'src', 'renderer', 'renderer.ts');
-  const policySource = fs.readFileSync(policyPath, 'utf8');
-  const selectionPolicySource = fs.readFileSync(selectionPolicyPath, 'utf8');
-  const tacticalEntrySource = fs.readFileSync(tacticalEntryPath, 'utf8');
-  const drawInteractionSource = fs.readFileSync(drawInteractionPath, 'utf8');
-  const buildPopupSource = fs.readFileSync(buildPopupPath, 'utf8');
-  const rendererSource = fs.readFileSync(rendererPath, 'utf8');
-
-  assert.ok(
-    policySource.includes('function isHoverOrderPlanningActive') &&
-      policySource.includes('function shouldBlockSelectionReplaceDuringHoverPlanning') &&
-      policySource.includes('function shouldBlockToggleSelectionDuringHoverPlanning'),
-    'canvas preview policy should expose hover-planning lock helpers'
-  );
-  assert.ok(
-    selectionPolicySource.includes('shouldBlockToggleSelectionDuringHoverPlanning') &&
-      selectionPolicySource.includes('shouldBlockSelectionReplaceDuringHoverPlanning'),
-    'map click selection policy should respect hover-planning selection guards'
-  );
-  const sidebarSupportPath = path.resolve(process.cwd(), 'src', 'renderer', 'gameplay', 'sidebarSupport.ts');
-  const sidebarSupportSource = fs.readFileSync(sidebarSupportPath, 'utf8');
-  assert.ok(
-    sidebarSupportSource.includes('shouldBlockToggleSelectionDuringHoverPlanning') &&
-      sidebarSupportSource.includes('shouldBlockSelectionReplaceDuringHoverPlanning'),
-    'sidebar unit selection should respect hover-planning selection guards'
-  );
-  assert.ok(
-    rendererSource.includes('isHoverOrderPlanningActive()') &&
-      rendererSource.includes('dismissMapDetailPopoversIfHoverPlanningActive') &&
-      rendererSource.includes('dismissMapDetailPopoversForHoverPlanning'),
-    'renderer should wire hover-planning dismiss through tactical order deps and local helpers'
-  );
-  assert.ok(
-    policySource.includes('function shouldDismissStackCalloutForHoverPlanning'),
-    'a preview of the selected units\' own hex must not count as destination planning for the stack callout'
-  );
-  for (const functionName of [
-    'dismissMapDetailPopoversIfHoverPlanningActive',
-    'showStackCallout',
-    'refreshStackCalloutIfOpen',
-  ]) {
-    const body = getFunctionSource(rendererSource, functionName);
-    assert.ok(
-      body.includes('shouldDismissStackCalloutForHoverPlanning()'),
-      `${functionName} should leave the stack callout up when the pointer is still on the selected units' hex`
-    );
-  }
-  assert.ok(
-    tacticalEntrySource.includes('isHoverOrderPlanningActive()') &&
-      drawInteractionSource.includes('isHoverOrderPlanningActive()') &&
-      buildPopupSource.includes('isHoverOrderPlanningActive()'),
-    'tactical entry and build entry should block while hover planning is active'
-  );
-  const hoverRefreshPath = path.resolve(process.cwd(), 'src', 'renderer', 'gameplay', 'hoverRoutePreviewRefresh.ts');
-  const hoverRefreshSource = fs.readFileSync(hoverRefreshPath, 'utf8');
-  assert.ok(
-    hoverRefreshSource.includes('dismissMapDetailPopoversForHoverPlanning?.()'),
-    'hover preview publish should dismiss map detail popovers when planning is active'
-  );
-  assert.ok(
-    hoverRefreshSource.includes('resolveOrderPreviewEffectsTooltipHtml') &&
-      !hoverRefreshSource.includes('collectTacticalRangedSlowTerrainLabels') &&
-      !hoverRefreshSource.includes('resolveOrderSlowerTooltipHtml'),
-    'hover preview effects tooltip should use resolveOrderPreviewEffectsTooltipHtml and keep ranged collection out of the publisher'
-  );
-  const mainMapPath = path.resolve(process.cwd(), 'src', 'renderer', 'map', 'mainMapInteractions.ts');
-  const mainMapSource = fs.readFileSync(mainMapPath, 'utf8');
-  const pointerMoveAt = mainMapSource.indexOf("addEventListener('pointermove'");
-  const pointerLeaveAt = mainMapSource.indexOf("addEventListener('pointerleave'");
-  const pointerMoveBody = mainMapSource.slice(pointerMoveAt, pointerLeaveAt);
-  const planningInMove = pointerMoveBody.indexOf('hexTooltipSuppressedForOrderPlanning({');
-  const scheduleInMove = pointerMoveBody.indexOf('scheduleHexDetailsTooltip(');
-  assert.ok(
-    planningInMove >= 0 && scheduleInMove > planningInMove,
-    'pointer move should decide order planning before starting the hex tooltip dwell'
-  );
-  const hexRestAnchorAt = mainMapSource.indexOf('let dwellAnchorX');
-  assert.ok(
-    hexRestAnchorAt >= 0 && pointerMoveAt > hexRestAnchorAt,
-    'the hex tooltip rest spot must survive later pointer moves'
-  );
-  assert.ok(
-    pointerMoveBody.includes('restartOrderEffectsDwellIfPointerMoved()') &&
-      pointerMoveBody.includes('restartOrderBlockDwellIfPointerMoved()'),
-    'a planning move inside one cell restarts the effects and blocked tooltip waits before they open'
-  );
-  const pointerDownAt = mainMapSource.indexOf("addEventListener('pointerdown'");
-  const clickAt = mainMapSource.indexOf("addEventListener('click'", pointerDownAt);
-  const pointerDownSource = mainMapSource.slice(pointerDownAt, clickAt);
-  assert.ok(
-    pointerDownSource.includes('hideOrderBlockHexTooltip') &&
-      !pointerDownSource.includes('hideOrderSlowerHexTooltip') &&
-      !pointerDownSource.includes('clearOrderEffectsTooltipDwell'),
-    'a press hides the blocked notice and leaves the effects tooltip in place'
-  );
-  const initCorePath = path.resolve(process.cwd(), 'src', 'renderer', 'map', 'initCore.ts');
-  const initCoreSource = fs.readFileSync(initCorePath, 'utf8');
-  assert.ok(
-    initCoreSource.includes('resumeHexTooltipDwellAfterAimingEnds()'),
-    'Shift inspection starts the hex tooltip wait when the pointer is already resting'
-  );
-  assert.ok(
-    initCoreSource.includes('function beginHoverSupportTargetingMode') &&
-      initCoreSource.includes("beginHoverSupportTargetingMode(deps, 'ranged')") &&
-      initCoreSource.includes("beginHoverSupportTargetingMode(deps, 'air')") &&
-      initCoreSource.includes('hideOrderSlowerHexTooltip()'),
-    'enabling ranged or air-strike mode should hide leftover slower hints and refresh hover preview'
-  );
-  assert.ok(
-    rendererSource.includes('function shouldSuppressTerrainTooltip') &&
-      rendererSource.includes('isHoverOrderPlanningActive()'),
-    'hex details tooltip should be suppressed during hover order planning'
-  );
-}
-
-
-/**
  * Verifies consolidation seams: sanitizer import, stroke helper, tooltip factory, combat overlay extract, draw order.
  *
  * Purpose: Source-text contracts for renderer maintainability extractions that lack canvas unit tests.
@@ -1154,12 +937,12 @@ function testMaintainabilityConsolidationSeams(): void {
     'Ranged and Strike button visibility must share selectionSupportButtonMode'
   );
 
-  const rendererPath = path.resolve(process.cwd(), 'src', 'renderer', 'renderer.ts');
+  const rendererPath = path.resolve(process.cwd(), 'src', 'renderer', 'rendering', 'gameScene.ts');
   const rendererSource = fs.readFileSync(rendererPath, 'utf8');
   const overlaysPath = path.resolve(process.cwd(), 'src', 'renderer', 'rendering', 'resolutionCombatOverlays.ts');
   const overlaysSource = fs.readFileSync(overlaysPath, 'utf8');
   assert.ok(
-    rendererSource.includes("from './rendering/resolutionCombatOverlays'") &&
+    rendererSource.includes("from './resolutionCombatOverlays'") &&
       rendererSource.includes('drawResolutionCombatAndCasualtyOverlays') &&
       overlaysSource.includes('drawCombatLightning') &&
       overlaysSource.includes('drawCasualtyOverlay'),
@@ -1193,9 +976,6 @@ function run(): void {
   testRes4ZoomHidesStrategicMapUnits();
   testCommittedPathsRemainVisibleDuringResolutionAnimation();
   testProductionLabelContractsForExploredVsUnexploredHexes();
-  testStackCalloutSingleUnitNonShiftClosesPopup();
-  testStackSealiftEmbarkedSelectionAndDebarkControls();
-  testModifierDrivenPopoverCloseRulesCentralized();
   testInfrastructureGlyphSetsComeFromRes4Overrides();
   testAirFerryDoubleClickContracts();
   testAirStrikeAndAirGlyphContracts();
@@ -1207,7 +987,6 @@ function run(): void {
   testTacticalEntryLayerPlanningAndContestedContracts();
   testStrategicAndTacticalBranchesShareOrderOverlayPipeline();
   testMainMapInteractionsDelegatesHumanUnitIconSelectionToPolicyModule();
-  testHoverOrderPlanningInteractionLock();
   testParityDiagnosticsBreadcrumbsCoverPlanningAndPositionSourceBoundaries();
   testTacticalMapViewLocksZoomPanAndRestoresWorld();
   testMaintainabilityConsolidationSeams();

@@ -248,7 +248,7 @@ function functionSource(source: string, functionName: string): string {
  * Exceptions: AssertionError when either call site is missing. This test reads source and does not draw pixels.
  */
 test('both scene passes draw the icon row after the hex codes', () => {
-  const rendererPath = path.resolve(process.cwd(), 'src', 'renderer', 'renderer.ts');
+  const rendererPath = path.resolve(process.cwd(), 'src', 'renderer', 'rendering', 'gameScene.ts');
   const source = fs.readFileSync(rendererPath, 'utf8');
   const scene = functionSource(source, 'drawGameScene');
   const marks = [...scene.matchAll(/drawStrategicRes1InspectionHexCodes\(/g)];

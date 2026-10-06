@@ -100,6 +100,7 @@ None.
 - `src/renderer/map/orderBlockHexTooltip.ts`
 - `src/renderer/map/orderSlowerHexTooltip.ts`
 - `src/renderer/map/mainMapInteractions.ts`
+- `src/renderer/entryCallbacks.ts` (`showTerrainTooltip`, `restoreTerrainTooltipAfterPopoverClose`, `scheduleTerrainTooltipRestoreAfterPopoverClose`)
 - `src/renderer/core/constants.ts` (`HEX_DETAILS_TOOLTIP_DELAY_MS`, one second; `HEX_DETAILS_TOOLTIP_REST_PX`, 6 pixels)
 - `src/renderer/gameplay/hoverRoutePreviewRefresh.ts`
 - `src/renderer/gameplay/orderPreviewEffectsContext.ts`

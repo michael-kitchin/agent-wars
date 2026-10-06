@@ -78,7 +78,7 @@ None.
 ## Code Entry Points
 
 - `static/index.html` (`#stack-callout`, `#stack-callout-list`, `#unit-origin-tooltip`)
-- `src/renderer/renderer.ts`
+- `src/renderer/map/stackCallout.ts`
 - `src/renderer/map/mainMapInteractions.ts`
 - `src/renderer/map/mapClickSelectionPolicy.ts`
 - `src/shared/soleSelectableHumanUnit.ts`

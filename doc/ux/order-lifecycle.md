@@ -86,4 +86,5 @@ None.
 - `src/renderer/tactical/tacticalPendingMarchPath.ts`
 - `src/renderer/tactical/tacticalDraftMarchOverlay.ts`
 - `src/renderer/tactical/tacticalEmbarkSealiftMerge.ts`
+- `src/renderer/map/stackCallout.ts`
 - `src/shared/mapPlanningGesture.ts`
