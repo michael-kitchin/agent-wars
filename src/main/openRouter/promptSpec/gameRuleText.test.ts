@@ -117,14 +117,14 @@ test('buildCasualtySortRule uses lowest defence and the engine type order', () =
 });
 
 test('buildOriginBonusRule appears only when a flag applies in the mode', () => {
-  const countryOnly = { countryBonusEnabled: true, terrainBonusEnabled: false };
-  const terrainOnly = { countryBonusEnabled: false, terrainBonusEnabled: true };
+  const countryOnly = { originBonusEnabled: true, terrainBonusEnabled: false };
+  const terrainOnly = { originBonusEnabled: false, terrainBonusEnabled: true };
   assert.equal(buildOriginBonusRule(gates()), null);
   assert.equal(buildOriginBonusRule(gates({ coordinateMode: 'tactical' })), null);
   assert.equal(buildOriginBonusRule(gates({ originBonusSettings: terrainOnly })), null);
 
   const strategic = buildOriginBonusRule(gates({ originBonusSettings: countryOnly }));
-  assert.match(strategic ?? '', /^Country bonus is on: a unit in a hex in the area where it was built adds 2/);
+  assert.match(strategic ?? '', /^Origin bonus is on: a unit in a hex in the area where it was built adds 2/);
   assert.match(strategic ?? '', /Casualty order still uses the printed defense values\.$/);
   assert.doesNotMatch(strategic ?? '', /air unit qualifies/);
   const strategicAir = buildOriginBonusRule(gates({ originBonusSettings: countryOnly, hasAirUnits: true }));
@@ -134,22 +134,22 @@ test('buildOriginBonusRule appears only when a flag applies in the mode', () => 
 });
 
 test('tactical buildOriginBonusRule notes no stacking only when both flags are on', () => {
-  const tactical = (countryBonusEnabled: boolean, terrainBonusEnabled: boolean) =>
+  const tactical = (originBonusEnabled: boolean, terrainBonusEnabled: boolean) =>
     buildOriginBonusRule(
-      gates({ coordinateMode: 'tactical', originBonusSettings: { countryBonusEnabled, terrainBonusEnabled } })
+      gates({ coordinateMode: 'tactical', originBonusSettings: { originBonusEnabled, terrainBonusEnabled } })
     ) ?? '';
   assert.match(tactical(false, true), /^Terrain bonus is on: a unit on a cell/);
   assert.doesNotMatch(tactical(false, true), /do not stack/);
   assert.doesNotMatch(tactical(true, false), /do not stack/);
-  assert.match(tactical(true, true), /Country bonus is on: a unit on a cell.*Terrain bonus is on.*do not stack; the most is \+2\./);
+  assert.match(tactical(true, true), /Origin bonus is on: a unit on a cell.*Terrain bonus is on.*do not stack; the most is \+2\./);
 });
 
 test('the origin bonus sentences keep their exact wording', () => {
   assert.equal(
     buildOriginBonusRule(
-      gates({ originBonusSettings: { countryBonusEnabled: true, terrainBonusEnabled: false }, hasAirUnits: true })
+      gates({ originBonusSettings: { originBonusEnabled: true, terrainBonusEnabled: false }, hasAirUnits: true })
     ),
-    'Country bonus is on: a unit in a hex in the area where it was built adds 2 to every attack or defense value it rolls there, including ranged fire, return fire, melee, and air-strike counter-fire. ' +
+    'Origin bonus is on: a unit in a hex in the area where it was built adds 2 to every attack or defense value it rolls there, including ranged fire, return fire, melee, and air-strike counter-fire. ' +
       'That area is its birth country in a global game and its origin area in a regional game. ' +
       'An air unit qualifies by the hex of its base, whatever it strikes. ' +
       'Casualty order still uses the printed defense values.'
@@ -158,11 +158,11 @@ test('the origin bonus sentences keep their exact wording', () => {
     buildOriginBonusRule(
       gates({
         coordinateMode: 'tactical',
-        originBonusSettings: { countryBonusEnabled: true, terrainBonusEnabled: true },
+        originBonusSettings: { originBonusEnabled: true, terrainBonusEnabled: true },
         hasAirUnits: true,
       })
     ),
-    'Country bonus is on: a unit on a cell in the area where it was built adds 2 to every attack or defense value it rolls there. ' +
+    'Origin bonus is on: a unit on a cell in the area where it was built adds 2 to every attack or defense value it rolls there. ' +
       'That area is its birth country in a global game and its origin area in a regional game. ' +
       "Terrain bonus is on: a unit on a cell whose terrain kind matches its birth terrain kind adds 2 to every attack or defense value it rolls there; urban and rubble do not change a cell's terrain kind. " +
       'The two bonuses do not stack; the most is +2. ' +
@@ -173,16 +173,16 @@ test('the origin bonus sentences keep their exact wording', () => {
 
 test('a High origin bonus states 4, and the stacking note states the larger amount', () => {
   const strategic = buildOriginBonusRule(
-    gates({ originBonusSettings: { countryBonusEnabled: true, terrainBonusEnabled: false, countryBonusLevel: 'high' } })
+    gates({ originBonusSettings: { originBonusEnabled: true, terrainBonusEnabled: false, originBonusLevel: 'high' } })
   );
-  assert.match(strategic ?? '', /^Country bonus is on: a unit in a hex in the area where it was built adds 4 to every attack/);
+  assert.match(strategic ?? '', /^Origin bonus is on: a unit in a hex in the area where it was built adds 4 to every attack/);
   const tactical = buildOriginBonusRule(
     gates({
       coordinateMode: 'tactical',
       originBonusSettings: {
-        countryBonusEnabled: true,
+        originBonusEnabled: true,
         terrainBonusEnabled: true,
-        countryBonusLevel: 'high',
+        originBonusLevel: 'high',
         terrainBonusLevel: 'low',
       },
     })
@@ -194,7 +194,7 @@ test('a High origin bonus states 4, and the stacking note states the larger amou
 test('the weather sentence keeps its exact wording', () => {
   assert.equal(
     buildWeatherRule(
-      gates({ originBonusSettings: { countryBonusEnabled: false, terrainBonusEnabled: false, weatherBonusEnabled: true } })
+      gates({ originBonusSettings: { originBonusEnabled: false, terrainBonusEnabled: false, weatherBonusEnabled: true } })
     ),
     "Weather bonus is on: the month is on the turn line and every beat of a battle shares the enclosing hex's weather. " +
       'Armor strategic movement is 1 in snow or rain, and naval strategic movement is 1 in snow. ' +
@@ -213,7 +213,7 @@ test('the High weather sentence widens the slowing weather and deepens the penal
     buildWeatherRule(
       gates({
         originBonusSettings: {
-          countryBonusEnabled: false,
+          originBonusEnabled: false,
           terrainBonusEnabled: false,
           weatherBonusEnabled: true,
           weatherBonusLevel: 'high',
@@ -318,7 +318,7 @@ test('buildCombatRulesParagraph keeps strike radius out of tactical and MP wordi
   const weatherOn = buildCombatRulesParagraph(
     gates({
       coordinateMode: 'tactical',
-      originBonusSettings: { countryBonusEnabled: false, terrainBonusEnabled: false, weatherBonusEnabled: true },
+      originBonusSettings: { originBonusEnabled: false, terrainBonusEnabled: false, weatherBonusEnabled: true },
     })
   );
   assert.match(weatherOn, /Clear of weather, the point budget is/);
@@ -362,20 +362,20 @@ test('the terrain cover sentences keep their exact wording', () => {
 test('the combat paragraph does not mention a tech bonus when that option is off', () => {
   const paragraph = buildCombatRulesParagraph(gates());
   const weatherOn = buildCombatRulesParagraph(gates({
-    originBonusSettings: { countryBonusEnabled: false, terrainBonusEnabled: false, weatherBonusEnabled: true },
+    originBonusSettings: { originBonusEnabled: false, terrainBonusEnabled: false, weatherBonusEnabled: true },
   }));
   assert.ok(!/tech bonus/i.test(paragraph));
   assert.ok(!/tech bonus/i.test(weatherOn));
-  assert.equal(paragraph.includes('Country bonus is on'), false);
+  assert.equal(paragraph.includes('Origin bonus is on'), false);
   assert.ok(weatherOn.includes('Weather bonus is on'));
 });
 
 test('the combat paragraph names the tech bonus at Low and at High', () => {
   const low = buildCombatRulesParagraph(gates({
-    originBonusSettings: { countryBonusEnabled: false, terrainBonusEnabled: false, techBonusEnabled: true, techBonusLevel: 'low' },
+    originBonusSettings: { originBonusEnabled: false, terrainBonusEnabled: false, techBonusEnabled: true, techBonusLevel: 'low' },
   }));
   const high = buildCombatRulesParagraph(gates({
-    originBonusSettings: { countryBonusEnabled: false, terrainBonusEnabled: false, techBonusEnabled: true, techBonusLevel: 'high' },
+    originBonusSettings: { originBonusEnabled: false, terrainBonusEnabled: false, techBonusEnabled: true, techBonusLevel: 'high' },
   }));
   assert.ok(low.includes('at least 21 urban cells'));
   assert.ok(low.includes('adds 2 to its attack'));
@@ -389,7 +389,7 @@ test('the combat paragraph always states cover, after the weather sentence when 
   const cover = buildTerrainCoverRule('strategic');
   assert.ok(buildCombatRulesParagraph(gates()).includes(cover));
   const weatherOn = gates({
-    originBonusSettings: { countryBonusEnabled: false, terrainBonusEnabled: false, weatherBonusEnabled: true },
+    originBonusSettings: { originBonusEnabled: false, terrainBonusEnabled: false, weatherBonusEnabled: true },
   });
   const paragraph = buildCombatRulesParagraph(weatherOn);
   const weather = buildWeatherRule(weatherOn) ?? '\u0000';

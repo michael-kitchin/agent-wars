@@ -98,7 +98,7 @@ test('battle assess_unit: reports the terrain bonus on a matching cell', () => {
   const fx = buildTacticalToolFixture({
     battleId: 'assess-terrain-bonus',
     terrainByCell: { near: 'forest' },
-    originBonusSettings: { countryBonusEnabled: false, terrainBonusEnabled: true },
+    originBonusSettings: { originBonusEnabled: false, terrainBonusEnabled: true },
     units: [
       {
         id: 'opp-inf',
@@ -120,7 +120,7 @@ test('battle assess_unit: reports the terrain bonus on a matching cell', () => {
   const unit = assess(fx, 'assess_unit', { unitId: 'opp-inf' }).unit as Record<string, unknown> | undefined;
   assert.deepEqual(unit?.originBonusHere, ['terrain']);
   assert.equal(unit?.birthTerrain, 'forest');
-  assert.equal('birthCountry' in (unit ?? {}), false);
+  assert.equal('birthOrigin' in (unit ?? {}), false);
 });
 
 test('battle assess_unit and assess_hex: essential errors', () => {

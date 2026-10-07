@@ -14,7 +14,7 @@ import type { OriginHitBonus } from '../shared/originBonusTypes';
  */
 function assessment(
   unitId: string,
-  originBonusHere?: Array<'country' | 'terrain'>,
+  originBonusHere?: Array<'origin' | 'terrain'>,
   originBonusAmount: OriginHitBonus = 0
 ): UnitAssessmentResult {
   return {
@@ -37,15 +37,15 @@ function assessment(
 
 test('the Bonus column appears when an assessment carries origin bonus reasons', () => {
   const table = buildUnitStatusTable(
-    [assessment('opp-a', ['country'], 2), assessment('opp-b', []), assessment('opp-c', ['country'], 4)],
+    [assessment('opp-a', ['origin'], 2), assessment('opp-b', []), assessment('opp-c', ['origin'], 4)],
     { mode: 'strategic' },
     true
   );
   const [header, , rowA, rowB, rowC] = table.split('\n');
   assert.equal(header, '| Unit ID | Type | Hex | Bonus | Nearest enemy + distance | Threat severity | Action needed |');
-  assert.ok(rowA?.includes('| +2 country |'), rowA);
+  assert.ok(rowA?.includes('| +2 origin |'), rowA);
   assert.ok(rowB?.includes('| — |'), rowB);
-  assert.ok(rowC?.includes('| +4 country |'), rowC);
+  assert.ok(rowC?.includes('| +4 origin |'), rowC);
 });
 
 test('the Weather column names the weather where the unit stands and its tags', () => {

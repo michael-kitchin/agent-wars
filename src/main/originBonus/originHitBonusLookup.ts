@@ -34,11 +34,11 @@ export type OriginHitBonusLookup = (unitId: string, h3Index: string) => OriginHi
 export const noOriginHitBonus: OriginHitBonusLookup = () => 0;
 
 /**
- * Builds the strategic lookup, which applies the country test against each hex's majority country.
+ * Builds the strategic lookup, which applies the origin bonus against each hex's majority country.
  *
  * Purpose: Strategic ranged, melee, and air-strike rolls.
  * When to use: Once per strategic turn resolution.
- * Expected outcome: `noOriginHitBonus` when the country bonus is off; otherwise a closure over an `id -> origin` map built once from `units`.
+ * Expected outcome: `noOriginHitBonus` when the origin bonus is off; otherwise a closure over an `id -> origin` map built once from `units`.
  * Exceptions: None.
  */
 export function createStrategicOriginHitBonusLookup(input: {
@@ -48,7 +48,7 @@ export function createStrategicOriginHitBonusLookup(input: {
 }): OriginHitBonusLookup {
   const { settings, units, countryNameAt } = input;
   logDebug('originHitBonusLookup createStrategicOriginHitBonusLookup', { ...settings, units: units.length });
-  if (!settings.countryBonusEnabled) return noOriginHitBonus;
+  if (!settings.originBonusEnabled) return noOriginHitBonus;
   const originById = new Map(units.map((u) => [u.id, u.origin] as const));
   return (unitId, h3Index) => {
     const sources = originBonusSources({
@@ -81,7 +81,7 @@ export function createTacticalOriginHitBonusLookup(input: {
     battleId: battle.battleId,
     subUnits: battle.subUnits.length,
   });
-  if (!settings.countryBonusEnabled && !settings.terrainBonusEnabled) return noOriginHitBonus;
+  if (!settings.originBonusEnabled && !settings.terrainBonusEnabled) return noOriginHitBonus;
   const originById = new Map(battle.subUnits.map((sub) => [sub.id, sub.origin] as const));
   return (unitId, h3Index) => {
     const sources = originBonusSources({

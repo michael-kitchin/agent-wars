@@ -1,4 +1,4 @@
-import { originFlagImgHtml } from './originArea';
+import { originFlagImgHtml, originPlaceLabelFor } from './originArea';
 import { escapeHtmlText } from './htmlTextFormatting';
 import { formatTerrainKindHtml } from './terrainSwatchHtml';
 import type { UnitOrigin } from './unitOriginTypes';
@@ -19,14 +19,14 @@ import type { TechLevel } from './techBonusTypes';
  */
 export interface UnitOriginTooltipBonuses {
   /**
-   * Country bonus for this match.
+   * Origin bonus for this match.
    *
-   * Contract: The Country line is omitted when this is false.
-   * When to use: `state.countryBonusEnabled`.
-   * Expected outcome: True only for a match that selected the country bonus.
+   * Contract: The Origin line is omitted when this is false.
+   * When to use: `state.originBonusEnabled`.
+   * Expected outcome: True only for a match that selected the origin bonus.
    * Exceptions: None.
    */
-  readonly countryEnabled: boolean;
+  readonly originEnabled: boolean;
   /**
    * Terrain bonus for this match.
    *
@@ -79,7 +79,7 @@ export interface UnitOriginTooltipBonuses {
  *
  * Purpose: A loss line keyed by display name can name two units. The flag is safe to show when both origins present the same birth place, and unsafe when they do not.
  * When to use: Before attaching one origin to a shared display name.
- * Expected outcome: `true` only when every birth field matches.
+ * Expected outcome: `true` only when every birth field matches. An omitted looked-up country matches an explicit null.
  * Exceptions: None.
  */
 export function unitOriginsPresentTheSame(left: UnitOrigin, right: UnitOrigin): boolean {
@@ -92,7 +92,8 @@ export function unitOriginsPresentTheSame(left: UnitOrigin, right: UnitOrigin): 
     left.birthCountryCode === right.birthCountryCode &&
     left.birthAreaId === right.birthAreaId &&
     left.birthAreaName === right.birthAreaName &&
-    left.birthSubdivisionCode === right.birthSubdivisionCode
+    left.birthSubdivisionCode === right.birthSubdivisionCode &&
+    (left.birthOriginCountryName ?? null) === (right.birthOriginCountryName ?? null)
   );
 }
 
@@ -101,7 +102,7 @@ export function unitOriginsPresentTheSame(left: UnitOrigin, right: UnitOrigin): 
  *
  * Purpose: Keeps the bold category label next to its value.
  * When to use: While assembling `formatUnitOriginTooltipHtml`.
- * Expected outcome: `<strong>Country:</strong> …` and the same shape for Terrain and Weather.
+ * Expected outcome: `<strong>Origin:</strong> …` and the same shape for Terrain and Weather.
  * Exceptions: None.
  */
 function bonusRow(label: string, value: string): string {
@@ -113,7 +114,7 @@ function bonusRow(label: string, value: string): string {
  *
  * Purpose: Every flag hover, including loss toasts, lists the bonuses this unit carries. The unit name stays on the label beside the flag.
  * When to use: When creating a unit flag. The result is stored on the flag and assigned to the tooltip's `innerHTML`.
- * Expected outcome: Bold `Bonuses:`, then one row per bonus the unit was born with. Country is the birth country, terrain is the birth terrain, and weather is the birth-hex tags. Tech follows when the match tech bonus is on and the unit has a known tier. A line is omitted when that option is off or the unit has none. No selected bonus is `Bonuses:` and then `None`. Where the unit stands does not change the text.
+ * Expected outcome: Bold `Bonuses:`, then one row per bonus the unit was born with. Origin is the birth place label (the country once, or the brief area name and its country for a subdivision), terrain is the birth terrain, and weather is the birth-hex tags. Tech follows when the match tech bonus is on and the unit has a known tier. A line is omitted when that option is off or the unit has none. No selected bonus is `Bonuses:` and then `None`. Where the unit stands does not change the text.
  * Exceptions: None.
  */
 export function formatUnitOriginTooltipHtml(input: {
@@ -121,15 +122,15 @@ export function formatUnitOriginTooltipHtml(input: {
   readonly bonuses: UnitOriginTooltipBonuses;
 }): string {
   const rows: string[] = [];
-  const areaName = (input.origin.birthAreaName ?? input.origin.birthCountryName)?.trim() ?? '';
-  if (input.bonuses.countryEnabled && areaName.length > 0) {
+  const placeLabel = originPlaceLabelFor(input.origin);
+  if (input.bonuses.originEnabled && placeLabel.length > 0) {
     rows.push(
       bonusRow(
-        'Country',
+        'Origin',
         `${originFlagImgHtml({
           subdivisionCode: input.origin.birthSubdivisionCode ?? null,
           countryCode: input.origin.birthCountryCode,
-        })}${escapeHtmlText(areaName)}`
+        })}${escapeHtmlText(placeLabel)}`
       )
     );
   }

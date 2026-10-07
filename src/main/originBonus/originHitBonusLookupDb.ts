@@ -37,13 +37,13 @@ export function readOriginBonusSettingsFromDb(): OriginBonusSettings {
  *
  * Purpose: Strategic air-strike, ranged, and melee rolls.
  * When to use: Once per strategic turn resolution, before the first rolling phase.
- * Expected outcome: `noOriginHitBonus` without listing units when the country bonus is off; otherwise a lookup over every unit's origin and each hex's majority country.
+ * Expected outcome: `noOriginHitBonus` without listing units when the origin bonus is off; otherwise a lookup over every unit's origin and each hex's majority country.
  * Exceptions: None.
  */
 export function buildStrategicOriginHitBonusLookupFromDb(): OriginHitBonusLookup {
   const settings = readOriginBonusSettingsFromDb();
   logDebug('originHitBonusLookupDb buildStrategicOriginHitBonusLookupFromDb', { ...settings });
-  if (!settings.countryBonusEnabled) return noOriginHitBonus;
+  if (!settings.originBonusEnabled) return noOriginHitBonus;
   const countryNames = getStrategicMajorityCountryNamesFromSnapshot();
   return createStrategicOriginHitBonusLookup({
     settings,

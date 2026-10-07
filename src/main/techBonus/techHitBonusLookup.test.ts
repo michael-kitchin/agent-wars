@@ -13,7 +13,7 @@ import { attackHitThreshold, defenseHitThreshold } from '../combatHitThresholds'
 import { createTechHitBonusLookup, withTechHitBonus } from './techHitBonusLookup';
 import { techLevelForBirthHex } from './techLevelForBirthHex';
 
-const off = { countryBonusEnabled: false, terrainBonusEnabled: false } as const;
+const off = { originBonusEnabled: false, terrainBonusEnabled: false } as const;
 const low = { ...off, techBonusEnabled: true as const, techBonusLevel: 'low' as const };
 const high = { ...off, techBonusEnabled: true as const, techBonusLevel: 'high' as const };
 

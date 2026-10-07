@@ -64,7 +64,7 @@ let areaByTacticalH3: ReadonlyMap<string, OriginArea> | null = null;
 /**
  * Majority origin id of each strategic hex.
  *
- * Purpose: The country bonus on a regional map compares this id with the unit's birth area.
+ * Purpose: The origin bonus on a regional map compares this id with the unit's birth area.
  * When to use: Set with `areaByTacticalH3`.
  * Expected outcome: Ties keep the id that sorts first.
  * Exceptions: None.
@@ -84,7 +84,7 @@ let areaById: ReadonlyMap<string, OriginArea> | null = null;
 /**
  * Loads one region's origin areas from its folder.
  *
- * Purpose: Regional births and the country bonus need the tactical origin file and the manifest catalog.
+ * Purpose: Regional births and the origin bonus need the tactical origin file and the manifest catalog.
  * When to use: After the regional profile is active, so parent hexes use that resolution.
  * Expected outcome: Later lookups see this region until `clearTacticalOriginAreas`.
  * Exceptions: Logs and leaves the maps empty when a file is missing or unreadable. Does not throw.

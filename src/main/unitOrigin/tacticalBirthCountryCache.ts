@@ -13,7 +13,7 @@ import type { BirthCountry } from '../../shared/unitOriginTypes';
 import { logDebug, logError, logTrace } from '../logger';
 import type { TerrainNamingRecordStrategic, TerrainNamingRecordTactical } from '../terrainNamingLoad';
 import { buildStrategicMajorityCountryNameByH3 } from './strategicMajorityCountry';
-import { buildTacticalBirthCountryByH3 } from './tacticalBirthCountry';
+import { buildCanonicalCountryNameByCode, buildTacticalBirthCountryByH3 } from './tacticalBirthCountry';
 import { originAreaForTacticalCell, tacticalOriginAreasLoaded } from './tacticalOriginAreas';
 
 /**
@@ -47,11 +47,39 @@ let tacticalBirthCountryByH3: ReadonlyMap<string, BirthCountry> | null = null;
 let strategicMajorityCountryNameByH3: ReadonlyMap<string, string> | null = null;
 
 /**
+ * Canonical English country name per ISO code for the loaded naming cache.
+ *
+ * Purpose: Origin labels need the strategic country-row spelling, such as United States of America.
+ * When to use: Set by `storeTacticalBirthCountryCache`; read by `countryDisplayNameForCode`.
+ * Expected outcome: `null` until the cache is stored. An empty map is a loaded cache with no country codes.
+ * Exceptions: None.
+ */
+let canonicalCountryNameByCode: ReadonlyMap<string, string> | null = null;
+
+/**
+ * Copies canonical country names under uppercase ISO codes.
+ *
+ * Purpose: Display lookup folds letter case. The birth-country map keeps the codes the naming rows stored.
+ * When to use: While storing the birth cache, on the map from `buildCanonicalCountryNameByCode`.
+ * Expected outcome: One entry per code. The first name is kept when two rows differ only by case. Empty codes are dropped.
+ * Exceptions: None.
+ */
+function displayNamesByUpperCode(names: ReadonlyMap<string, string>): Map<string, string> {
+  const byUpperCode = new Map<string, string>();
+  for (const [code, name] of names) {
+    const key = code.trim().toUpperCase();
+    if (key.length === 0 || byUpperCode.has(key)) continue;
+    byUpperCode.set(key, name);
+  }
+  return byUpperCode;
+}
+
+/**
  * Builds and remembers birth countries from the naming rows the terrain cache just loaded.
  *
  * Purpose: Publishes naming-derived countries for unit birth selection.
  * When to use: At the end of terrain-cache snapshot build, including when no cell has a country.
- * Expected outcome: Later lookups see this map, and the strategic majority-country map derived from it, until `clearTacticalBirthCountryCache`.
+ * Expected outcome: Later lookups see this map, the strategic majority-country map, and the canonical country-name map, until `clearTacticalBirthCountryCache`.
  * Exceptions: None.
  */
 export function storeTacticalBirthCountryCache(
@@ -60,17 +88,41 @@ export function storeTacticalBirthCountryCache(
 ): void {
   const countriesByH3 = buildTacticalBirthCountryByH3({ strategicRecords, tacticalRecords });
   const majorityByStrategic = buildStrategicMajorityCountryNameByH3(countriesByH3, (h3Index) => strategicParentOf(h3Index));
-  logDebug('res4BirthCountryCache storeRes4BirthCountryCache', { cells: countriesByH3.size, strategicHexes: majorityByStrategic.size });
+  const countryNames = displayNamesByUpperCode(buildCanonicalCountryNameByCode(strategicRecords));
+  logDebug('res4BirthCountryCache storeRes4BirthCountryCache', {
+    cells: countriesByH3.size,
+    strategicHexes: majorityByStrategic.size,
+    countryCodes: countryNames.size,
+  });
   tacticalBirthCountryByH3 = countriesByH3;
   strategicMajorityCountryNameByH3 = majorityByStrategic;
+  canonicalCountryNameByCode = countryNames;
+}
+
+/**
+ * Returns the English country name stored for an ISO code on the loaded map.
+ *
+ * Purpose: Subdivision labels append this name. It is the strategic country row, not the birth cell's spelling.
+ * When to use: While mapping a unit row into a snapshot origin, with `birth_country_code`.
+ * Expected outcome: The canonical name, or `null` when the cache is not loaded, the code is empty, or the code has no row. Lookup ignores letter case.
+ * Exceptions: None.
+ */
+export function countryDisplayNameForCode(code: string | null | undefined): string | null {
+  const normalized = code?.trim().toUpperCase() ?? '';
+  logTrace('res4BirthCountryCache countryDisplayNameForCode', {
+    code: normalized.length > 0 ? normalized : null,
+    loaded: canonicalCountryNameByCode !== null,
+  });
+  if (!canonicalCountryNameByCode || normalized.length === 0) return null;
+  return canonicalCountryNameByCode.get(normalized) ?? null;
 }
 
 /**
  * Returns the majority country name of every strategic hex that has one.
  *
- * Purpose: Strategic place country for the country bonus, read by snapshot assembly and combat resolution.
+ * Purpose: Strategic place country for the origin bonus, read by snapshot assembly and combat resolution.
  * When to use: Once per snapshot or turn; look hexes up in the returned map.
- * Expected outcome: The loaded map, or an empty map (after logging an error) when the cache is not loaded, so callers keep running with no country bonus.
+ * Expected outcome: The loaded map, or an empty map (after logging an error) when the cache is not loaded, so callers keep running with no origin bonus.
  * Exceptions: None.
  */
 export function getStrategicMajorityCountryNamesFromSnapshot(): ReadonlyMap<string, string> {
@@ -106,7 +158,7 @@ export function getTacticalBirthCountryFromSnapshot(h3Index: string): BirthCount
 /**
  * Collects the birth-country names of the given tactical cells for a battle snapshot.
  *
- * Purpose: Tactical place country for the country bonus, frozen when the battle starts.
+ * Purpose: Tactical place country for the origin bonus, frozen when the battle starts.
  * When to use: Once per new tactical battle, with its footprint cells.
  * Expected outcome: A record of the cells that have a country, or `undefined` when none do or the cache is not loaded (an error is logged), so the battle still starts.
  * Exceptions: None.
@@ -139,11 +191,12 @@ export function tacticalCountryNamesForCells(cells: readonly string[]): Record<s
  *
  * Purpose: Matches `clearTerrainClassificationCacheForTests`, so a rebuilt cache cannot see stale countries.
  * When to use: Whenever the terrain classification cache is cleared.
- * Expected outcome: The next tactical lookup throws, and the strategic lookup returns an empty map, until the cache is stored again.
+ * Expected outcome: The next tactical lookup throws, and the strategic and country-name lookups return no row, until the cache is stored again.
  * Exceptions: None.
  */
 export function clearTacticalBirthCountryCache(): void {
   logDebug('res4BirthCountryCache clearRes4BirthCountryCache');
   tacticalBirthCountryByH3 = null;
   strategicMajorityCountryNameByH3 = null;
+  canonicalCountryNameByCode = null;
 }

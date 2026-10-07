@@ -31,7 +31,7 @@ Emitted before `mainBlock`, in this order.
 | Naval land-target routing hint | `NAVAL_PLAN_ROUTE_LAND_TARGET_HINT` | `hasNaval && planningEnabled` | omitted |
 | Assessment / estimate hints | `combatTargetHint`, `combatAssessHint` | assessment or estimation on **and** no precomputed briefing | omitted when a briefing is attached |
 
-`buildCombatRulesParagraph` joins, in order: dice + per-type stats from `buildCombatStatsLine` (`getAttack` / `getDefense` / `getRange`, with the die size and hit-number limits from `combatDice.ts`); `buildCasualtySortRule`; `buildOriginBonusRule` when `originBonusSettings` has a flag that applies in the mode (country bonus on the strategic map, either flag in battle); `buildTechBonusRule` when the tech bonus is on; `buildWeatherRule` when the weather bonus is on; `buildTerrainCoverRule` always; `buildResolutionOrderRule` (embark, air strikes, ranged fire, movement, cargo sync, ferry, melee); `Ranged uses pre-move positions.`; one-attack-per-unit plus `buildRangedReachRule` plus the tempo sentence; `buildMovementBudgetRule`; `buildDestinationOccupancyRule`; naval clause when `hasNavalUnits`; `buildAirEmploymentRule` when `hasAirUnits`; `buildHoldFireRule` when `ordersEnabled`.
+`buildCombatRulesParagraph` joins, in order: dice + per-type stats from `buildCombatStatsLine` (`getAttack` / `getDefense` / `getRange`, with the die size and hit-number limits from `combatDice.ts`); `buildCasualtySortRule`; `buildOriginBonusRule` when `originBonusSettings` has a flag that applies in the mode (origin bonus on the strategic map, either flag in battle); `buildTechBonusRule` when the tech bonus is on; `buildWeatherRule` when the weather bonus is on; `buildTerrainCoverRule` always; `buildResolutionOrderRule` (embark, air strikes, ranged fire, movement, cargo sync, ferry, melee); `Ranged uses pre-move positions.`; one-attack-per-unit plus `buildRangedReachRule` plus the tempo sentence; `buildMovementBudgetRule`; `buildDestinationOccupancyRule`; naval clause when `hasNavalUnits`; `buildAirEmploymentRule` when `hasAirUnits`; `buildHoldFireRule` when `ordersEnabled`.
 
 Present dice sentence: `Combat: d20 per shot — an attack hits on a roll at or below its attack value and a defensive melee roll hits at or below its defense value, after the changes below. Penalties and cover never lower an attack value below 2 before bonuses, and no value exceeds 17.`
 
@@ -48,11 +48,11 @@ Emit order as coded. All headings quoted exactly (`promptSpec/sectionHeadings.ts
 | `## Unit Status and Threats` | `formatBriefing` | always | header plus `(No AI units)` |
 | (omniscient hop line) | `OMNISCIENT_GRID_PROXIMITY_BRIEFING_LINE` | fog off and a strategic cell | omitted |
 | (fog intel-staleness + path-distance lines) | `buildIntelStalenessRule` then `FOG_PATH_DISTANCE_BRIEFING_LINE` | fog on, on the strategic map | omitted when fog is off or in battle |
-| (unit status table) | `buildUnitStatusTable` | always; a `Bonus` column follows `Hex` only when the assessments carry `originBonusHere` (country bonus on) | header plus `(No AI units)` |
+| (unit status table) | `buildUnitStatusTable` | always; a `Bonus` column follows `Hex` only when the assessments carry `originBonusHere` (origin bonus on) | header plus `(No AI units)` |
 | `## Attention Flags` | `formatBriefing` | always | `None.` |
 | `# Operational Map` | `buildStrategicOperationalMapSectionMarkdown` | `operational.trim().length > 0` | heading plus `(No units — map not rendered.)` when neither side has units |
 | `### Best Options This Turn` | `formatBestOptionsThisTurnSubsection` | at least one aggregated row | heading and table omitted |
-| `## Supplemental Hex Intelligence` | `buildSupplementalHexIntelligenceBlock` | `precomputed.hexAssessments.length > 0`; each bullet appends `; country <name>` when the hex assessment carries a country (country bonus on) | omitted |
+| `## Supplemental Hex Intelligence` | `buildSupplementalHexIntelligenceBlock` | `precomputed.hexAssessments.length > 0`; each bullet appends `; origin <id>` when the hex assessment carries an origin place id (origin bonus on) | omitted |
 | `## Recent Turn Notes` | `buildRecentTurnNotesSection` | at least one of the previous 3 turns has a message, strategy, or loss | omitted |
 | `# Production Status` | `buildProductionBriefingBlock` | `flags.productionEnabled` | omitted |
 | `## Controlled Hex Queues` | same | `queues.length > 0` | `No currently controlled hexes with editable production queues.` |

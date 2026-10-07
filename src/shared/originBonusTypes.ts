@@ -1,5 +1,5 @@
 /**
- * Shapes for the optional origin bonuses: a unit standing in its birth country, or (in battles) on its birth terrain kind,
+ * Shapes for the optional origin bonus and terrain bonus: a unit standing in its birth country, or (in battles) on its birth terrain kind,
  * adds 2 (Low) or 4 (High) to the threshold of every hit roll it makes.
  *
  * Purpose: Shared by main-process dice, AI tools, and renderer tooltips so every surface speaks the same vocabulary.
@@ -25,10 +25,10 @@ export type OriginHitBonus = 0 | 2 | 4;
  *
  * Purpose: Lets tools, briefings, and tooltips name the reason without restating the rules.
  * When to use: Elements of `originBonusSources` results.
- * Expected outcome: `country` for the country bonus, `terrain` for the terrain bonus.
+ * Expected outcome: `origin` for the origin bonus, `terrain` for the terrain bonus.
  * Exceptions: None.
  */
-export type OriginBonusSource = 'country' | 'terrain';
+export type OriginBonusSource = 'origin' | 'terrain';
 
 /**
  * Where a roll happens, which decides which bonuses can apply.
@@ -50,14 +50,14 @@ export type OriginBonusTheater = 'strategic' | 'tactical';
  */
 export interface OriginBonusSettings {
   /**
-   * Whether the country bonus is on.
+   * Whether the origin bonus is on.
    *
-   * Contract: Mirrors the `country_bonus_enabled` match setting.
-   * When to use: Before the country test.
+   * Contract: Mirrors the `origin_bonus_enabled` match setting.
+   * When to use: Before the origin bonus comparison.
    * Expected outcome: `true` lets a unit in its birth country qualify.
    * Exceptions: None.
    */
-  readonly countryBonusEnabled: boolean;
+  readonly originBonusEnabled: boolean;
   /**
    * Whether the terrain bonus is on.
    *
@@ -77,14 +77,14 @@ export interface OriginBonusSettings {
    */
   readonly weatherBonusEnabled?: boolean;
   /**
-   * How strong the country bonus is.
+   * How strong the origin bonus is.
    *
-   * Contract: Read only when `countryBonusEnabled` is true. Missing means low.
+   * Contract: Read only when `originBonusEnabled` is true. Missing means low.
    * When to use: Through `originBonusLevelFor`, never directly.
    * Expected outcome: Picks the amount a qualifying unit adds.
    * Exceptions: None.
    */
-  readonly countryBonusLevel?: ActiveBonusLevel;
+  readonly originBonusLevel?: ActiveBonusLevel;
   /**
    * How strong the terrain bonus is.
    *

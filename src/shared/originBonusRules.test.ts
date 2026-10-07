@@ -10,7 +10,7 @@ import type { OriginBonusSettings } from './originBonusTypes';
 import type { UnitOrigin } from './unitOriginTypes';
 
 /** Settings with both bonuses on. */
-const BOTH_ON: OriginBonusSettings = { countryBonusEnabled: true, terrainBonusEnabled: true };
+const BOTH_ON: OriginBonusSettings = { originBonusEnabled: true, terrainBonusEnabled: true };
 
 /** A plains-born French unit used by most cases. */
 const FRENCH_PLAINS: UnitOrigin = {
@@ -26,7 +26,7 @@ test('the country test matches the birth country by name and needs the flag', ()
   const at = (countryName: string | null) => ({ countryName, terrainKind: null });
   assert.deepEqual(
     originBonusSources({ settings: BOTH_ON, theater: 'strategic', origin: FRENCH_PLAINS, place: at('France') }),
-    ['country']
+    ['origin']
   );
   assert.deepEqual(
     originBonusSources({ settings: BOTH_ON, theater: 'strategic', origin: FRENCH_PLAINS, place: at('Spain') }),
@@ -84,18 +84,18 @@ test('both reasons are listed but the bonus does not stack', () => {
     origin: FRENCH_PLAINS,
     place: { countryName: 'France', terrainKind: 'plains' },
   });
-  assert.deepEqual(sources, ['country', 'terrain']);
+  assert.deepEqual(sources, ['origin', 'terrain']);
   assert.equal(originHitBonusFromSources(sources, BOTH_ON), 2);
 });
 
 test('a High bonus adds 4 and the larger level wins when both reasons apply', () => {
-  const countryHigh: OriginBonusSettings = { ...BOTH_ON, countryBonusLevel: 'high', terrainBonusLevel: 'low' };
-  const terrainHigh: OriginBonusSettings = { ...BOTH_ON, countryBonusLevel: 'low', terrainBonusLevel: 'high' };
-  assert.equal(originHitBonusFromSources(['country'], countryHigh), 4);
-  assert.equal(originHitBonusFromSources(['country', 'terrain'], countryHigh), 4);
-  assert.equal(originHitBonusFromSources(['country'], terrainHigh), 2);
+  const countryHigh: OriginBonusSettings = { ...BOTH_ON, originBonusLevel: 'high', terrainBonusLevel: 'low' };
+  const terrainHigh: OriginBonusSettings = { ...BOTH_ON, originBonusLevel: 'low', terrainBonusLevel: 'high' };
+  assert.equal(originHitBonusFromSources(['origin'], countryHigh), 4);
+  assert.equal(originHitBonusFromSources(['origin', 'terrain'], countryHigh), 4);
+  assert.equal(originHitBonusFromSources(['origin'], terrainHigh), 2);
   assert.equal(originHitBonusFromSources([], countryHigh), 0);
-  assert.equal(formatOriginBonusTableCell(['country'], 4), '+4 country');
+  assert.equal(formatOriginBonusTableCell(['origin'], 4), '+4 origin');
 });
 
 test('a regional area id matches that place and not a different area', () => {
@@ -108,7 +108,7 @@ test('a regional area id matches that place and not a different area', () => {
   const at = (countryName: string) => ({ countryName, terrainKind: null });
   assert.deepEqual(
     originBonusSources({ settings: BOTH_ON, theater: 'strategic', origin, place: at('US-CA') }),
-    ['country']
+    ['origin']
   );
   assert.deepEqual(
     originBonusSources({ settings: BOTH_ON, theater: 'strategic', origin, place: at('US-NY') }),

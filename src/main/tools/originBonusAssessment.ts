@@ -17,7 +17,9 @@ import {
   strategicOriginBonusPlace,
   tacticalOriginBonusPlace,
 } from '../../shared/originBonusRules';
+import { originPlaceLabelFor } from '../../shared/originArea';
 import type { OriginBonusSettings, OriginBonusSource, OriginHitBonus } from '../../shared/originBonusTypes';
+import type { UnitOrigin } from '../../shared/unitOriginTypes';
 import type { PipelineTerrainKind } from '../../shared/pipelineTerrain';
 import type { TacticalBattleSnapshot, TacticalSubUnitSnapshot } from '../../shared/tacticalBattleTypes';
 
@@ -35,7 +37,7 @@ export interface OriginBonusUnitFields {
    *
    * Contract: Present when a flag that applies to the mode is on; empty when the unit does not qualify.
    * When to use: Deciding whether to fight from the current position.
-   * Expected outcome: Subset of `['country', 'terrain']`.
+   * Expected outcome: Subset of `['origin', 'terrain']`.
    * Exceptions: None.
    */
   readonly originBonusHere?: OriginBonusSource[];
@@ -49,14 +51,14 @@ export interface OriginBonusUnitFields {
    */
   readonly originBonusAmount?: OriginHitBonus;
   /**
-   * Birth country name of the unit.
+   * Birth place label of the unit.
    *
-   * Contract: Present when the country bonus is on; `null` for units without a country.
-   * When to use: Finding places where the unit would qualify.
-   * Expected outcome: Canonical country name.
+   * Contract: Present when the origin bonus is on; `null` when the unit has no name to show. This is the display label, not the hex place id.
+   * When to use: Showing the model the same place text as the bonus tooltip.
+   * Expected outcome: The origin place label, or `null` when the unit has no area name and no looked-up country.
    * Exceptions: None.
    */
-  readonly birthCountry?: string | null;
+  readonly birthOrigin?: string | null;
   /**
    * Normalized birth terrain kind of the unit.
    *
@@ -69,11 +71,25 @@ export interface OriginBonusUnitFields {
 }
 
 /**
+ * The birth place text sent with a unit assessment.
+ *
+ * Purpose: The model sees the same place label as the bonus tooltip.
+ * When to use: The `birthOrigin` field while the origin bonus is on.
+ * Expected outcome: The origin place label, or `null` when the unit has no name to show.
+ * Exceptions: None.
+ */
+function birthPlaceLabel(origin: UnitOrigin | null | undefined): string | null {
+  if (!origin) return null;
+  const label = originPlaceLabelFor(origin);
+  return label.length > 0 ? label : null;
+}
+
+/**
  * Builds the strategic `assess_unit` origin bonus fields.
  *
- * Purpose: The strategic map uses the country test only.
+ * Purpose: The strategic map uses the origin bonus only.
  * When to use: At the end of the strategic `unit` block.
- * Expected outcome: `originBonusHere`, `originBonusAmount`, and `birthCountry` when the country bonus is on, otherwise `{}`.
+ * Expected outcome: `originBonusHere`, `originBonusAmount`, and `birthOrigin` when the origin bonus is on, otherwise `{}`.
  * Exceptions: None.
  */
 export function strategicOriginBonusUnitFields(
@@ -82,7 +98,7 @@ export function strategicOriginBonusUnitFields(
 ): OriginBonusUnitFields {
   const settings = originBonusSettingsFromSnapshot(state);
   logTrace('originBonusAssessment strategicOriginBonusUnitFields', { unitId: unit.id, ...settings });
-  if (!settings.countryBonusEnabled) return {};
+  if (!settings.originBonusEnabled) return {};
   const sources = originBonusSources({
     settings,
     theater: 'strategic',
@@ -92,7 +108,7 @@ export function strategicOriginBonusUnitFields(
   return {
     originBonusHere: sources,
     originBonusAmount: originHitBonusFromSources(sources, settings),
-    birthCountry: unit.origin?.birthAreaName ?? unit.origin?.birthCountryName ?? null,
+    birthOrigin: birthPlaceLabel(unit.origin),
   };
 }
 
@@ -101,7 +117,7 @@ export function strategicOriginBonusUnitFields(
  *
  * Purpose: Battles use both tests, judged at the sub-unit's own cell so the answer matches the dice.
  * When to use: At the end of the tactical `unit` block.
- * Expected outcome: `originBonusHere` and `originBonusAmount` when either flag is on, plus `birthCountry` and/or `birthTerrain` per flag; `{}` when both are off.
+ * Expected outcome: `originBonusHere` and `originBonusAmount` when either flag is on, plus `birthOrigin` and/or `birthTerrain` per flag; `{}` when both are off.
  * Exceptions: None.
  */
 export function tacticalOriginBonusUnitFields(
@@ -110,7 +126,7 @@ export function tacticalOriginBonusUnitFields(
   subUnit: TacticalSubUnitSnapshot
 ): OriginBonusUnitFields {
   logTrace('originBonusAssessment tacticalOriginBonusUnitFields', { subUnitId: subUnit.id, ...settings });
-  if (!settings.countryBonusEnabled && !settings.terrainBonusEnabled) return {};
+  if (!settings.originBonusEnabled && !settings.terrainBonusEnabled) return {};
   const sources = originBonusSources({
     settings,
     theater: 'tactical',
@@ -120,8 +136,8 @@ export function tacticalOriginBonusUnitFields(
   return {
     originBonusHere: sources,
     originBonusAmount: originHitBonusFromSources(sources, settings),
-    ...(settings.countryBonusEnabled
-      ? { birthCountry: subUnit.origin?.birthAreaName ?? subUnit.origin?.birthCountryName ?? null }
+    ...(settings.originBonusEnabled
+      ? { birthOrigin: birthPlaceLabel(subUnit.origin) }
       : {}),
     ...(settings.terrainBonusEnabled ? { birthTerrain: normalizeOriginTerrainKind(subUnit.origin?.birthTerrainKind) } : {}),
   };
@@ -132,14 +148,14 @@ export function tacticalOriginBonusUnitFields(
  *
  * Purpose: Lets the AI see which country a hex counts as.
  * When to use: In the `assess_hex` result, after `terrain`.
- * Expected outcome: `{ country }` when the country bonus is on (`null` for hexes without one), otherwise `{}`.
+ * Expected outcome: `{ origin }` when the origin bonus is on (`null` for hexes without one), otherwise `{}`.
  * Exceptions: None.
  */
 export function strategicOriginBonusHexFields(
   state: GameStateSnapshot,
   strategicH3Index: string
-): { readonly country?: string | null } {
+): { readonly origin?: string | null } {
   const settings = originBonusSettingsFromSnapshot(state);
   logTrace('originBonusAssessment strategicOriginBonusHexFields', { strategicH3Index, ...settings });
-  return settings.countryBonusEnabled ? { country: strategicHexCountryNameAt(state, strategicH3Index) } : {};
+  return settings.originBonusEnabled ? { origin: strategicHexCountryNameAt(state, strategicH3Index) } : {};
 }

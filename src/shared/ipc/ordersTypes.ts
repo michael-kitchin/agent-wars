@@ -362,14 +362,14 @@ aiHomeRegion?: string;
    */
 gameSize?: GameSize;
     /**
-   * How strong the new match's country bonus is.
+   * How strong the new match's origin bonus is.
    *
    * Contract: A missing or unknown field means off; the new-game dialog always sends an explicit level.
-   * When to use: `game:newGame` from the new-game dialog's Country bonus control.
-   * Expected outcome: Persisted as `game_config.country_bonus_enabled` and `game_config.country_bonus_level`.
+   * When to use: `game:newGame` from the new-game dialog's Origin bonus control.
+   * Expected outcome: Persisted as `game_config.origin_bonus_enabled` and `game_config.origin_bonus_level`.
    * Exceptions: None.
    */
-countryBonusLevel?: BonusLevel;
+originBonusLevel?: BonusLevel;
     /**
    * How strong the new match's terrain bonus is.
    *

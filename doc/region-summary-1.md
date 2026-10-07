@@ -157,7 +157,7 @@ The movement and cover rules barely affect the global game (8% of res1 land hexe
 - **Origin units:** for each country, the finest of Natural Earth admin-1, the NE admin-1 `region` field, or the whole country whose median area is at least half a strategic hex (43,400 km² at res2, 6,200 km² at res3).
   - Spain is overridden to its autonomous communities, which have flags.
   - Counts are the units present in the map.
-  - Origin units give new units their name and flag, and the existing country bonus keys on them in regional mode.
+  - Origin units give new units their name and flag, and the existing origin bonus keys on them in regional mode.
   - Where no flag exists, use the country flag plus the NE `postal` code. The naming pipeline needs `iso_3166_2` added to its state rows.
 - **Side groups:** the share is the group's fraction of the map's tactical urban cells. Land hexes are assigned to the group holding the majority of each hex's res4 land cells. Groups are drawn from province membership or the NE `region` / `region_sub` fields. The coordinate splits are:
   - Turkey west/east at 35°E (province centroid).

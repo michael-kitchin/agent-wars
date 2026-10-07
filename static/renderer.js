@@ -3171,6 +3171,21 @@
     const src = escapeHtmlText(originFlagAssetPath(input));
     return `<img class="${COUNTRY_FLAG_CLASS_NAME}" src="${src}" alt="" aria-hidden="true" draggable="false">`;
   }
+  function formatOriginPlaceLabel(input) {
+    const areaName = input.areaName?.trim() ?? "";
+    const countryName = input.countryName?.trim() ?? "";
+    if (!input.hasSubdivision) return countryName.length > 0 ? countryName : areaName;
+    if (areaName.length > 0 && countryName.length > 0 && areaName !== countryName) return `${areaName}, ${countryName}`;
+    return areaName.length > 0 ? areaName : countryName;
+  }
+  function originPlaceLabelFor(origin) {
+    const subdivisionCode = origin.birthSubdivisionCode?.trim() ?? "";
+    return formatOriginPlaceLabel({
+      areaName: origin.birthAreaName ?? origin.birthCountryName,
+      countryName: origin.birthOriginCountryName,
+      hasSubdivision: subdivisionCode.length > 0
+    });
+  }
 
   // src/shared/lossSummary.ts
   var LOSS_ENTRY_LIST_MAX = 5;
@@ -18113,7 +18128,7 @@
     high: 4
   });
   var ORIGIN_BONUS_OFF = Object.freeze({
-    countryBonusEnabled: false,
+    originBonusEnabled: false,
     terrainBonusEnabled: false
   });
   var TERRAIN_KIND_ALIASES = Object.freeze({
@@ -18183,22 +18198,22 @@
 
   // src/shared/unitOriginTooltipText.ts
   function unitOriginsPresentTheSame(left, right) {
-    return left.birthH3Index === right.birthH3Index && left.birthTacticalH3Index === right.birthTacticalH3Index && left.birthTerrainKind === right.birthTerrainKind && left.birthIsUrban === right.birthIsUrban && left.birthCountryName === right.birthCountryName && left.birthCountryCode === right.birthCountryCode && left.birthAreaId === right.birthAreaId && left.birthAreaName === right.birthAreaName && left.birthSubdivisionCode === right.birthSubdivisionCode;
+    return left.birthH3Index === right.birthH3Index && left.birthTacticalH3Index === right.birthTacticalH3Index && left.birthTerrainKind === right.birthTerrainKind && left.birthIsUrban === right.birthIsUrban && left.birthCountryName === right.birthCountryName && left.birthCountryCode === right.birthCountryCode && left.birthAreaId === right.birthAreaId && left.birthAreaName === right.birthAreaName && left.birthSubdivisionCode === right.birthSubdivisionCode && (left.birthOriginCountryName ?? null) === (right.birthOriginCountryName ?? null);
   }
   function bonusRow(label, value) {
     return `<strong>${label}:</strong> ${value}`;
   }
   function formatUnitOriginTooltipHtml(input) {
     const rows = [];
-    const areaName = (input.origin.birthAreaName ?? input.origin.birthCountryName)?.trim() ?? "";
-    if (input.bonuses.countryEnabled && areaName.length > 0) {
+    const placeLabel = originPlaceLabelFor(input.origin);
+    if (input.bonuses.originEnabled && placeLabel.length > 0) {
       rows.push(
         bonusRow(
-          "Country",
+          "Origin",
           `${originFlagImgHtml({
             subdivisionCode: input.origin.birthSubdivisionCode ?? null,
             countryCode: input.origin.birthCountryCode
-          })}${escapeHtmlText(areaName)}`
+          })}${escapeHtmlText(placeLabel)}`
         )
       );
     }
@@ -18247,7 +18262,7 @@ ${body}`;
   function selectedBonusOptions() {
     const state = rendererSharedState.gameState;
     return {
-      countryEnabled: state?.countryBonusEnabled === true,
+      originEnabled: state?.originBonusEnabled === true,
       terrainEnabled: state?.terrainBonusEnabled === true,
       weatherEnabled: state?.weatherBonusEnabled === true,
       techEnabled: state?.techBonusEnabled === true
@@ -22703,7 +22718,7 @@ ${body}`;
   // src/renderer/gameplay/newGameOptionsUi.ts
   var NEW_GAME_FOG_CHECKBOX_ID = "new-game-fog-checkbox";
   var NEW_GAME_BONUS_LEVEL_SELECT_IDS = {
-    countryBonusLevel: "new-game-country-bonus-select",
+    originBonusLevel: "new-game-origin-bonus-select",
     terrainBonusLevel: "new-game-terrain-bonus-select",
     weatherBonusLevel: "new-game-weather-bonus-select",
     techBonusLevel: "new-game-tech-bonus-select"
@@ -22721,7 +22736,7 @@ ${body}`;
     const levelOf = (id) => parseBonusLevel(optionSelect(id)?.value, "off");
     return {
       fogOfWarEnabled: fogCheckbox()?.checked !== false,
-      countryBonusLevel: levelOf(NEW_GAME_BONUS_LEVEL_SELECT_IDS.countryBonusLevel),
+      originBonusLevel: levelOf(NEW_GAME_BONUS_LEVEL_SELECT_IDS.originBonusLevel),
       terrainBonusLevel: levelOf(NEW_GAME_BONUS_LEVEL_SELECT_IDS.terrainBonusLevel),
       weatherBonusLevel: levelOf(NEW_GAME_BONUS_LEVEL_SELECT_IDS.weatherBonusLevel),
       techBonusLevel: levelOf(NEW_GAME_BONUS_LEVEL_SELECT_IDS.techBonusLevel)

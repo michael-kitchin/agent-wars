@@ -258,7 +258,7 @@ export interface TacticalBattleSnapshot {
    * Birth country name per tactical cell inside the footprint, the same value used for unit births.
    *
    * Contract: Keys are a subset of `tacticalChildH3Indexes` and list only cells that have a country. Set when the battle snapshot is created.
-   * When to use: The country test of origin bonuses for a tactical cell.
+   * When to use: The origin bonus comparison for a tactical cell.
    * Expected outcome: Omitted on legacy saves and when no footprint cell has a country; a missing cell has no country.
    * Exceptions: None.
    */

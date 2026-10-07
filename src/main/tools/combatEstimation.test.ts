@@ -377,7 +377,7 @@ function frenchOrigin(birthH3Index: string): UnitOrigin {
 }
 
 /**
- * Verifies ranged estimates report the country bonus of an attacker standing in its birth country.
+ * Verifies ranged estimates report the origin bonus of an attacker standing in its birth country.
  *
  * Purpose: Estimates must use the same effective values as live dice.
  * When to use: After changing estimate thresholds or the strategic theater lookup.
@@ -387,7 +387,7 @@ function frenchOrigin(birthH3Index: string): UnitOrigin {
  */
 function testRangedEstimateReportsCountryBonus(): void {
   const h3 = '891f1d48b9fffff';
-  const state = (countryBonusEnabled: boolean, countryBonusLevel?: 'high'): GameStateSnapshot => ({
+  const state = (originBonusEnabled: boolean, originBonusLevel?: 'high'): GameStateSnapshot => ({
     hexes: [{ h3Index: h3, terrain: 'land', terrainKind: 'plains', countryName: 'France' }],
     units: [
       { id: 'opponent-armor-1', player: 'opponent', unitType: 'armor', h3Index: h3, origin: frenchOrigin(h3) },
@@ -396,8 +396,8 @@ function testRangedEstimateReportsCountryBonus(): void {
     phase: 'planning',
     turnNumber: 1,
     pendingOrders: [],
-    countryBonusEnabled,
-    ...(countryBonusLevel ? { countryBonusLevel } : {}),
+    originBonusEnabled,
+    ...(originBonusLevel ? { originBonusLevel } : {}),
   });
   const latLngByH3 = new Map<string, [number, number]>([[h3, [0.5, 0.5]]]);
   const args = { engagementType: 'ranged', attackers: { units: ['opponent-armor-1'] }, targetHex: [0.5, 0.5] };
@@ -437,7 +437,7 @@ function testMeleeEstimateJudgesAttackerAtTarget(): void {
     phase: 'planning',
     turnNumber: 1,
     pendingOrders: [],
-    countryBonusEnabled: true,
+    originBonusEnabled: true,
   };
   const latLngByH3 = new Map<string, [number, number]>([
     [from, [0.4, 0.4]],

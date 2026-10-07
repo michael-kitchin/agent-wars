@@ -1,7 +1,7 @@
 /**
  * Majority birth country per strategic hex.
  *
- * Purpose: Gives each strategic hex one country name for the country bonus, derived from the same tactical countries units are born with.
+ * Purpose: Gives each strategic hex one country name for the origin bonus, derived from the same tactical countries units are born with.
  * When to use: Built once with the tactical birth-country cache; read through `getStrategicMajorityCountryNamesFromSnapshot`.
  * Expected outcome: Pure; the same inputs always give the same map.
  * Exceptions: None.

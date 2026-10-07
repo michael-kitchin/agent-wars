@@ -205,14 +205,14 @@ export interface ResetGameForNewMatchOptions {
    */
   readonly gameSize?: GameSize;
   /**
-   * How strong the country bonus is.
+   * How strong the origin bonus is.
    *
    * Contract: Parsed by `parseBonusLevel`; missing or unknown means off, so callers that predate the setting keep the old dice.
-   * When to use: The new-game dialog's Country bonus control.
-   * Expected outcome: Persisted as `country_bonus_enabled` and `country_bonus_level`.
+   * When to use: The new-game dialog's Origin bonus control.
+   * Expected outcome: Persisted as `origin_bonus_enabled` and `origin_bonus_level`.
    * Exceptions: None.
    */
-  readonly countryBonusLevel?: BonusLevel;
+  readonly originBonusLevel?: BonusLevel;
   /**
    * How strong the terrain bonus is.
    *
@@ -292,7 +292,7 @@ export function resetGameForNewMatch(deps: ResetGameDeps, options?: ResetGameFor
   const fogOfWarEnabled = options?.fogOfWarEnabled !== false;
   const gameSize = parseGameSize(options?.gameSize);
   const originBonusSettings = originBonusSettingsFromLevels({
-    country: parseBonusLevel(options?.countryBonusLevel, 'off'),
+    origin: parseBonusLevel(options?.originBonusLevel, 'off'),
     terrain: parseBonusLevel(options?.terrainBonusLevel, 'off'),
     weather: parseBonusLevel(options?.weatherBonusLevel, 'off'),
     startMonth: options?.startMonth,

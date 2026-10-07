@@ -1,5 +1,5 @@
 /**
- * Pure rules for the optional origin bonuses, shared by main-process dice, AI tools, and renderer tooltips.
+ * Pure rules for the optional origin bonus and terrain bonus, shared by main-process dice, AI tools, and renderer tooltips.
  *
  * Purpose: One place decides whether a unit qualifies, so live dice, estimates, briefings, and tooltips never disagree.
  * When to use: Any code that needs to know whether a unit's roll gets a bonus, and how large it is.
@@ -43,7 +43,7 @@ export const ORIGIN_HIT_BONUS_BY_LEVEL: Readonly<Record<ActiveBonusLevel, Exclud
  * Exceptions: None.
  */
 export const ORIGIN_BONUS_OFF: OriginBonusSettings = Object.freeze({
-  countryBonusEnabled: false,
+  originBonusEnabled: false,
   terrainBonusEnabled: false,
 });
 
@@ -89,11 +89,11 @@ export function normalizeOriginTerrainKind(raw: string | null | undefined): Pipe
 export function originBonusSettingsFromSnapshot(
   state: Pick<
     GameStateSnapshot,
-    | 'countryBonusEnabled'
+    | 'originBonusEnabled'
     | 'terrainBonusEnabled'
     | 'weatherBonusEnabled'
     | 'startMonth'
-    | 'countryBonusLevel'
+    | 'originBonusLevel'
     | 'terrainBonusLevel'
     | 'weatherBonusLevel'
     | 'techBonusEnabled'
@@ -101,9 +101,9 @@ export function originBonusSettingsFromSnapshot(
   >
 ): OriginBonusSettings {
   return {
-    countryBonusEnabled: state.countryBonusEnabled === true,
+    originBonusEnabled: state.originBonusEnabled === true,
     terrainBonusEnabled: state.terrainBonusEnabled === true,
-    ...(state.countryBonusEnabled === true && state.countryBonusLevel ? { countryBonusLevel: state.countryBonusLevel } : {}),
+    ...(state.originBonusEnabled === true && state.originBonusLevel ? { originBonusLevel: state.originBonusLevel } : {}),
     ...(state.terrainBonusEnabled === true && state.terrainBonusLevel ? { terrainBonusLevel: state.terrainBonusLevel } : {}),
     ...(state.weatherBonusEnabled === true
       ? {
@@ -130,7 +130,7 @@ export function originBonusSettingsFromSnapshot(
  * Exceptions: None.
  */
 export function originBonusSettingsFromLevels(input: {
-  readonly country: BonusLevel;
+  readonly origin: BonusLevel;
   readonly terrain: BonusLevel;
   readonly weather: BonusLevel;
   readonly startMonth?: number;
@@ -144,12 +144,12 @@ export function originBonusSettingsFromLevels(input: {
    */
   readonly tech?: BonusLevel;
 }): OriginBonusSettings {
-  const { country, terrain, weather, startMonth, tech = 'off' } = input;
+  const { origin, terrain, weather, startMonth, tech = 'off' } = input;
   return {
-    countryBonusEnabled: country !== 'off',
+    originBonusEnabled: origin !== 'off',
     terrainBonusEnabled: terrain !== 'off',
     weatherBonusEnabled: weather !== 'off',
-    ...(country !== 'off' ? { countryBonusLevel: country } : {}),
+    ...(origin !== 'off' ? { originBonusLevel: origin } : {}),
     ...(terrain !== 'off' ? { terrainBonusLevel: terrain } : {}),
     ...(weather !== 'off' ? { weatherBonusLevel: weather } : {}),
     ...(tech !== 'off' ? { techBonusEnabled: true as const, techBonusLevel: tech } : {}),
@@ -166,8 +166,8 @@ export function originBonusSettingsFromLevels(input: {
  * Exceptions: None.
  */
 export function originBonusLevelFor(settings: OriginBonusSettings, source: OriginBonusSource): BonusLevel {
-  return source === 'country'
-    ? bonusLevelOf(settings.countryBonusEnabled, settings.countryBonusLevel)
+  return source === 'origin'
+    ? bonusLevelOf(settings.originBonusEnabled, settings.originBonusLevel)
     : bonusLevelOf(settings.terrainBonusEnabled, settings.terrainBonusLevel);
 }
 
@@ -176,7 +176,7 @@ export function originBonusLevelFor(settings: OriginBonusSettings, source: Origi
  *
  * Purpose: The one matcher behind dice, estimates, assessments, briefings, and tooltips.
  * When to use: With the place where the roll happens (see the place helpers below).
- * Expected outcome: `[]`, `['country']`, `['terrain']`, or `['country', 'terrain']`. Terrain is checked only in the
+ * Expected outcome: `[]`, `['origin']`, `['terrain']`, or `['origin', 'terrain']`. Terrain is checked only in the
  *   tactical theater. A missing origin or any `null` field never matches.
  * Exceptions: None.
  */
@@ -190,8 +190,8 @@ export function originBonusSources(input: {
   if (!origin) return [];
   const sources: OriginBonusSource[] = [];
   const areaId = origin.birthAreaId ?? origin.birthCountryName;
-  if (settings.countryBonusEnabled && areaId !== null && areaId === place.countryName) {
-    sources.push('country');
+  if (settings.originBonusEnabled && areaId !== null && areaId === place.countryName) {
+    sources.push('origin');
   }
   if (theater === 'tactical' && settings.terrainBonusEnabled) {
     const birthKind = normalizeOriginTerrainKind(origin.birthTerrainKind);
@@ -239,7 +239,7 @@ export function originHitBonusFromSources(
  *
  * Purpose: Keeps the table cell wording next to the other origin bonus text.
  * When to use: `buildUnitStatusTable` when the Bonus column is shown, with the unit's sources and the amount they add.
- * Expected outcome: `+2 country`, `+4 country, terrain`, and so on, or `—` when there are no sources or the amount is 0.
+ * Expected outcome: `+2 origin`, `+4 origin, terrain`, and so on, or `—` when there are no sources or the amount is 0.
  * Exceptions: None.
  */
 export function formatOriginBonusTableCell(sources: ReadonlyArray<OriginBonusSource>, amount: OriginHitBonus): string {
@@ -277,7 +277,7 @@ const countryNameByHexesArray = new WeakMap<GameStateSnapshot['hexes'], Readonly
 /**
  * Returns the majority country name of a strategic hex from a snapshot.
  *
- * Purpose: Strategic places use the hex's majority country, which main puts on snapshot hexes when the country bonus is on.
+ * Purpose: Strategic places use the hex's majority country, which main puts on snapshot hexes when the origin bonus is on.
  * When to use: Strategic estimates, assessments, and tooltips.
  * Expected outcome: The name, or `null` when the hex is unknown, has no country, or the snapshot omits countries.
  * Exceptions: None.
@@ -294,7 +294,7 @@ export function strategicHexCountryNameAt(state: Pick<GameStateSnapshot, 'hexes'
 /**
  * Describes a strategic hex as an origin bonus place.
  *
- * Purpose: The strategic map uses the country test only.
+ * Purpose: The strategic map uses the origin bonus only.
  * When to use: For any strategic roll or assessment, with the unit's hex at roll time.
  * Expected outcome: The hex's majority country and a `null` terrain kind.
  * Exceptions: None.

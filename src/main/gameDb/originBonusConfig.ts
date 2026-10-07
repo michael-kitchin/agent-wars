@@ -10,14 +10,14 @@ import type { OriginBonusSettings } from '../../shared/originBonusTypes';
 import type { GameConfigKvDbOps } from './gameConfigKv';
 
 /**
- * `game_config` key for the country bonus flag.
+ * `game_config` key for the origin bonus flag.
  *
- * Purpose: Frozen persisted key; renaming it would silently turn the flag off in saved matches.
+ * Purpose: The current match setting. A database from an older user version is discarded, so this key is not read from an older file.
  * When to use: `persistOriginBonusSettings` / `readPersistedOriginBonusSettings` only.
- * Expected outcome: Stable string `country_bonus_enabled` with value `'1'` or `'0'`.
+ * Expected outcome: Stable string `origin_bonus_enabled` with value `'1'` or `'0'`.
  * Exceptions: None.
  */
-export const COUNTRY_BONUS_CONFIG_KEY = 'country_bonus_enabled';
+export const ORIGIN_BONUS_CONFIG_KEY = 'origin_bonus_enabled';
 
 /**
  * `game_config` key for the terrain bonus flag.
@@ -40,14 +40,14 @@ export const TERRAIN_BONUS_CONFIG_KEY = 'terrain_bonus_enabled';
 export const WEATHER_BONUS_CONFIG_KEY = 'weather_bonus_enabled';
 
 /**
- * `game_config` key for the country bonus level.
+ * `game_config` key for the origin bonus level.
  *
- * Purpose: Frozen persisted key. A missing row means low, which is how matches saved before levels existed play.
+ * Purpose: The current match setting. A missing row means low. A database from an older user version is discarded, so this key is not read from an older file.
  * When to use: `persistOriginBonusSettings` / `readPersistedOriginBonusSettings` only.
- * Expected outcome: Stable string `country_bonus_level` with value `'low'` or `'high'`.
+ * Expected outcome: Stable string `origin_bonus_level` with value `'low'` or `'high'`.
  * Exceptions: None.
  */
-export const COUNTRY_BONUS_LEVEL_CONFIG_KEY = 'country_bonus_level';
+export const ORIGIN_BONUS_LEVEL_CONFIG_KEY = 'origin_bonus_level';
 
 /**
  * `game_config` key for the terrain bonus level.
@@ -114,10 +114,10 @@ export function persistOriginBonusSettings(
   logDebug('gameDb persistOriginBonusSettings', { ...settings });
   if (ops.hasDb && !ops.hasDb()) return;
   const upsert = 'INSERT OR REPLACE INTO game_config (key, value) VALUES (?, ?)';
-  ops.run(upsert, [COUNTRY_BONUS_CONFIG_KEY, settings.countryBonusEnabled ? '1' : '0']);
+  ops.run(upsert, [ORIGIN_BONUS_CONFIG_KEY, settings.originBonusEnabled ? '1' : '0']);
   ops.run(upsert, [TERRAIN_BONUS_CONFIG_KEY, settings.terrainBonusEnabled ? '1' : '0']);
   ops.run(upsert, [WEATHER_BONUS_CONFIG_KEY, settings.weatherBonusEnabled === true ? '1' : '0']);
-  ops.run(upsert, [COUNTRY_BONUS_LEVEL_CONFIG_KEY, settings.countryBonusLevel ?? 'low']);
+  ops.run(upsert, [ORIGIN_BONUS_LEVEL_CONFIG_KEY, settings.originBonusLevel ?? 'low']);
   ops.run(upsert, [TERRAIN_BONUS_LEVEL_CONFIG_KEY, settings.terrainBonusLevel ?? 'low']);
   ops.run(upsert, [WEATHER_BONUS_LEVEL_CONFIG_KEY, settings.weatherBonusLevel ?? 'low']);
   ops.run(upsert, [TECH_BONUS_CONFIG_KEY, settings.techBonusEnabled === true ? '1' : '0']);
@@ -139,15 +139,15 @@ export function readPersistedOriginBonusSettings(ops: Pick<GameConfigKvDbOps, 'g
   const valueOf = (key: string): string | undefined =>
     ops.getOne<{ value: string }>('SELECT value FROM game_config WHERE key = ?', [key])?.value;
   const levelOf = (key: string): ActiveBonusLevel => parseActiveBonusLevel(valueOf(key));
-  const countryBonusEnabled = valueOf(COUNTRY_BONUS_CONFIG_KEY) === '1';
+  const originBonusEnabled = valueOf(ORIGIN_BONUS_CONFIG_KEY) === '1';
   const terrainBonusEnabled = valueOf(TERRAIN_BONUS_CONFIG_KEY) === '1';
   const weatherBonusEnabled = valueOf(WEATHER_BONUS_CONFIG_KEY) === '1';
   const techBonusEnabled = valueOf(TECH_BONUS_CONFIG_KEY) === '1';
   return {
-    countryBonusEnabled,
+    originBonusEnabled,
     terrainBonusEnabled,
     weatherBonusEnabled,
-    ...(countryBonusEnabled ? { countryBonusLevel: levelOf(COUNTRY_BONUS_LEVEL_CONFIG_KEY) } : {}),
+    ...(originBonusEnabled ? { originBonusLevel: levelOf(ORIGIN_BONUS_LEVEL_CONFIG_KEY) } : {}),
     ...(terrainBonusEnabled ? { terrainBonusLevel: levelOf(TERRAIN_BONUS_LEVEL_CONFIG_KEY) } : {}),
     ...(weatherBonusEnabled ? { weatherBonusLevel: levelOf(WEATHER_BONUS_LEVEL_CONFIG_KEY) } : {}),
     ...(techBonusEnabled ? { techBonusEnabled: true as const, techBonusLevel: levelOf(TECH_BONUS_LEVEL_CONFIG_KEY) } : {}),

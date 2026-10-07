@@ -79,7 +79,7 @@ function minimalOrigin(birthH3Index: string): UnitOrigin {
 /**
  * Picks a birth cell in `birthH3Index` (intact urban first, then land) and returns the unit's origin.
  *
- * Purpose: Birth metadata for unit flags, the origin tooltip, and the origin bonuses when the match has them on.
+ * Purpose: Birth metadata for unit flags, the origin tooltip, and the origin bonus and terrain bonus when the match has them on.
  * When to use: Right before inserting a unit row; pass the result to `insertUnitRow`.
  * Expected outcome: Deterministic for the same game seed, unit id, and terrain; `birthTerrainKind` is a valid pipeline kind or `null`.
  * Exceptions: None; any error is logged and the minimal origin is returned so a spawn never fails.

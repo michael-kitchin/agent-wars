@@ -168,7 +168,7 @@ test('battle: a defender on its birth terrain shows the terrain bonus', () => {
   const { fx, at } = setup({
     battleId: 'estimate-terrain-bonus',
     terrainByCell: { far: 'forest' },
-    originBonusSettings: { countryBonusEnabled: false, terrainBonusEnabled: true },
+    originBonusSettings: { originBonusEnabled: false, terrainBonusEnabled: true },
     units: [
       { id: 'opp-arm', player: 'opponent', unitType: 'armor', cell: 'near' },
       {

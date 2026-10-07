@@ -176,7 +176,7 @@ function getCurrentTurnNumberFromDb(ops: FogDbOps): number {
  *
  * Purpose: The base every player view, AI consultation, and renderer update starts from.
  * When to use: Through `getGameStateForPlayer` for player-facing views; directly only when omniscient state is intended.
- * Expected outcome: All hexes, units, turn, scenario, size, and both origin bonus flags. With the country bonus on,
+ * Expected outcome: All hexes, units, turn, scenario, size, and both origin bonus flags. With the origin bonus on,
  *   each hex also carries its majority `countryName` (`null` when it has none).
  * Exceptions: Propagates SQLite errors from `deps.ops`.
  */
@@ -211,7 +211,7 @@ export function getGameStateSnapshot(deps: FogDeps): GameStateSnapshot {
     }
   }
   const originBonusSettings = readPersistedOriginBonusSettings(ops);
-  const countryNames = originBonusSettings.countryBonusEnabled
+  const countryNames = originBonusSettings.originBonusEnabled
     ? tacticalOriginAreasLoaded()
       ? strategicMajorityOriginIds()
       : getStrategicMajorityCountryNamesFromSnapshot()
@@ -285,9 +285,9 @@ export function getGameStateSnapshot(deps: FogDeps): GameStateSnapshot {
   const startMonth = parseStartMonth(originBonusSettings.startMonth);
   const turnNumber = turnRow?.turnNumber ?? 1;
   const originFlags = {
-    countryBonusEnabled: originBonusSettings.countryBonusEnabled,
+    originBonusEnabled: originBonusSettings.originBonusEnabled,
     terrainBonusEnabled: originBonusSettings.terrainBonusEnabled,
-    ...(originBonusSettings.countryBonusEnabled ? { countryBonusLevel: originBonusSettings.countryBonusLevel ?? 'low' } : {}),
+    ...(originBonusSettings.originBonusEnabled ? { originBonusLevel: originBonusSettings.originBonusLevel ?? 'low' } : {}),
     ...(originBonusSettings.terrainBonusEnabled ? { terrainBonusLevel: originBonusSettings.terrainBonusLevel ?? 'low' } : {}),
     ...(techOn ? { techBonusEnabled: true as const, techBonusLevel: originBonusSettings.techBonusLevel ?? 'low' } : {}),
   };

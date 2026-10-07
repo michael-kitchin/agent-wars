@@ -1,8 +1,8 @@
 /**
  * Birth metadata for units: where a unit was created and which country that place belongs to.
  *
- * Purpose: Shared shapes for origin selection (main), persistence, snapshots, renderer flags, and origin bonuses.
- * When to use: Import these types wherever unit origin flows. Rules use them only through origin bonuses, when the match has those flags on.
+ * Purpose: Shared shapes for origin selection (main), persistence, snapshots, renderer flags, and origin bonus and terrain bonus.
+ * When to use: Import these types wherever unit origin flows. Rules use them only through origin bonus and terrain bonus, when the match has those flags on.
  * Expected outcome: Plain readonly data with no behavior.
  * Exceptions: None.
  */
@@ -47,7 +47,7 @@ export interface UnitOrigin {
    * Whether the birth cell was intact urban.
    *
    * Contract: `true` only when the chosen tactical cell was urban and not rubble. `false` when the cell is land, or when the hex had no birth cell.
-   * When to use: Telling two origins apart when they share a country and terrain kind. The origin tooltip does not show this flag, and origin bonuses ignore it.
+   * When to use: Telling two origins apart when they share a country and terrain kind. The origin tooltip does not show this flag, and the origin bonus and the terrain bonus ignore it.
    * Expected outcome: Independent of `birthTerrainKind`, which stays the cell's base kind.
    * Exceptions: None.
    */
@@ -74,7 +74,7 @@ export interface UnitOrigin {
    * Id of the area where the unit was built.
    *
    * Contract: On the global map this equals `birthCountryName`. On a regional map it is the origin unit id. Omitted on origins built before the field existed.
-   * When to use: The country bonus comparison.
+   * When to use: The origin bonus comparison.
    * Expected outcome: Null when the birth cell has no country and no origin area.
    * Exceptions: None.
    */
@@ -97,6 +97,15 @@ export interface UnitOrigin {
    * Exceptions: None.
    */
   readonly birthSubdivisionCode?: string | null;
+  /**
+   * English country name for `birthCountryCode`, from the loaded map's strategic country rows.
+   *
+   * Contract: Display only. Not stored in SQL. Null when the naming cache has no row for the code.
+   * When to use: The origin place label. Do not use `birthCountryName` for this; that field is the birth cell's country.
+   * Expected outcome: `United States of America` for `US` when that is the strategic country row. Null leaves a subdivision labeled by its area name alone.
+   * Exceptions: None.
+   */
+  readonly birthOriginCountryName?: string | null;
 }
 
 /**

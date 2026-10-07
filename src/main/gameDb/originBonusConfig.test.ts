@@ -2,8 +2,8 @@ import * as assert from 'assert';
 import { withTempGameDb } from '../testSupport/withTempGameDb';
 import { dbGetOne, dbRun, getGameStateForPlayer, isDbReady, resetGameForNewMatch } from '../gameDb';
 import {
-  COUNTRY_BONUS_CONFIG_KEY,
-  COUNTRY_BONUS_LEVEL_CONFIG_KEY,
+  ORIGIN_BONUS_CONFIG_KEY,
+  ORIGIN_BONUS_LEVEL_CONFIG_KEY,
   readPersistedOriginBonusSettings,
   START_MONTH_CONFIG_KEY,
   TERRAIN_BONUS_CONFIG_KEY,
@@ -22,7 +22,7 @@ import {
  * Expected outcome: Country, terrain, then weather level keys.
  * Exceptions: None.
  */
-const LEVEL_KEYS = [COUNTRY_BONUS_LEVEL_CONFIG_KEY, TERRAIN_BONUS_LEVEL_CONFIG_KEY, WEATHER_BONUS_LEVEL_CONFIG_KEY] as const;
+const LEVEL_KEYS = [ORIGIN_BONUS_LEVEL_CONFIG_KEY, TERRAIN_BONUS_LEVEL_CONFIG_KEY, WEATHER_BONUS_LEVEL_CONFIG_KEY] as const;
 
 /**
  * Reads one persisted `game_config` value.
@@ -48,27 +48,27 @@ function testFlagsPersistOnResetAndReachSnapshots(): void {
   withTempGameDb('aw-originbonus-', () => {
     for (const player of ['human', 'opponent'] as const) {
       const state = getGameStateForPlayer(player);
-      assert.strictEqual(state.countryBonusEnabled, false);
+      assert.strictEqual(state.originBonusEnabled, false);
       assert.strictEqual(state.terrainBonusEnabled, false);
     }
 
-    resetGameForNewMatch({ countryBonusLevel: 'low', terrainBonusLevel: 'low' });
-    assert.strictEqual(configValue(COUNTRY_BONUS_CONFIG_KEY), '1');
+    resetGameForNewMatch({ originBonusLevel: 'low', terrainBonusLevel: 'low' });
+    assert.strictEqual(configValue(ORIGIN_BONUS_CONFIG_KEY), '1');
     assert.strictEqual(configValue(TERRAIN_BONUS_CONFIG_KEY), '1');
     for (const player of ['human', 'opponent'] as const) {
       const state = getGameStateForPlayer(player);
-      assert.strictEqual(state.countryBonusEnabled, true);
+      assert.strictEqual(state.originBonusEnabled, true);
       assert.strictEqual(state.terrainBonusEnabled, true);
     }
 
     resetGameForNewMatch();
-    assert.strictEqual(configValue(COUNTRY_BONUS_CONFIG_KEY), '0');
+    assert.strictEqual(configValue(ORIGIN_BONUS_CONFIG_KEY), '0');
     assert.strictEqual(configValue(TERRAIN_BONUS_CONFIG_KEY), '0');
     assert.strictEqual(configValue(WEATHER_BONUS_CONFIG_KEY), '0');
     assert.strictEqual(configValue(START_MONTH_CONFIG_KEY), '1');
     for (const key of LEVEL_KEYS) assert.strictEqual(configValue(key), 'low');
     const allOff = getGameStateForPlayer('human');
-    assert.ok(!('countryBonusLevel' in allOff) && !('terrainBonusLevel' in allOff) && !('weatherBonusLevel' in allOff));
+    assert.ok(!('originBonusLevel' in allOff) && !('terrainBonusLevel' in allOff) && !('weatherBonusLevel' in allOff));
 
     resetGameForNewMatch({ weatherBonusLevel: 'low', startMonth: 6 });
     assert.strictEqual(configValue(WEATHER_BONUS_CONFIG_KEY), '1');
@@ -90,12 +90,12 @@ function testFlagsPersistOnResetAndReachSnapshots(): void {
  */
 function testHighLevelsPersistAndReachSnapshots(): void {
   withTempGameDb('aw-originbonus-high-', () => {
-    resetGameForNewMatch({ countryBonusLevel: 'high', weatherBonusLevel: 'high' });
-    assert.strictEqual(configValue(COUNTRY_BONUS_LEVEL_CONFIG_KEY), 'high');
+    resetGameForNewMatch({ originBonusLevel: 'high', weatherBonusLevel: 'high' });
+    assert.strictEqual(configValue(ORIGIN_BONUS_LEVEL_CONFIG_KEY), 'high');
     assert.strictEqual(configValue(WEATHER_BONUS_LEVEL_CONFIG_KEY), 'high');
     for (const player of ['human', 'opponent'] as const) {
       const state = getGameStateForPlayer(player);
-      assert.strictEqual(state.countryBonusLevel, 'high');
+      assert.strictEqual(state.originBonusLevel, 'high');
       assert.strictEqual(state.weatherBonusLevel, 'high');
       assert.ok(!('terrainBonusLevel' in state));
     }
@@ -112,26 +112,26 @@ function testHighLevelsPersistAndReachSnapshots(): void {
  */
 function testMissingLevelRowsReadAsLow(): void {
   withTempGameDb('aw-originbonus-legacy-', () => {
-    resetGameForNewMatch({ countryBonusLevel: 'low', terrainBonusLevel: 'low', weatherBonusLevel: 'low' });
+    resetGameForNewMatch({ originBonusLevel: 'low', terrainBonusLevel: 'low', weatherBonusLevel: 'low' });
     for (const key of LEVEL_KEYS) dbRun('DELETE FROM game_config WHERE key = ?', [key]);
     const settings = readPersistedOriginBonusSettings({ getOne: dbGetOne, hasDb: isDbReady });
-    assert.strictEqual(settings.countryBonusLevel, 'low');
+    assert.strictEqual(settings.originBonusLevel, 'low');
     assert.strictEqual(settings.terrainBonusLevel, 'low');
     assert.strictEqual(settings.weatherBonusLevel, 'low');
   });
 }
 
 /**
- * Locks that hex country names appear on the snapshot only with the country bonus on.
+ * Locks that hex country names appear on the snapshot only with the origin bonus on.
  *
- * Purpose: With both flags off the snapshot must stay unchanged; with the country bonus on, hexes need a country to judge units by.
+ * Purpose: With both flags off the snapshot must stay unchanged; with the origin bonus on, hexes need a country to judge units by.
  * When to use: After changing snapshot hex assembly or the strategic majority-country cache.
  * Expected outcome: On, at least one hex has a non-null `countryName`; off, no hex has the property.
  * Exceptions: None.
  */
 function testHexCountryNamesFollowCountryBonus(): void {
   withTempGameDb('aw-originbonus-hex-', () => {
-    resetGameForNewMatch({ countryBonusLevel: 'low' });
+    resetGameForNewMatch({ originBonusLevel: 'low' });
     const onHexes = getGameStateForPlayer('human').hexes;
     assert.ok(onHexes.some((hex) => typeof hex.countryName === 'string' && hex.countryName.length > 0));
 

@@ -311,7 +311,7 @@ function registerIpcHandlers(): void {
   ipcMain.handle(IPC_GAME.newGame, (_event, payload: NewGameIpcPayload | undefined) => {
     const fogOfWarEnabled = payload?.fogOfWarEnabled !== false;
     const gameSize = parseGameSize(payload?.gameSize);
-    const countryBonusLevel = parseBonusLevel(payload?.countryBonusLevel, 'off');
+    const originBonusLevel = parseBonusLevel(payload?.originBonusLevel, 'off');
     const terrainBonusLevel = parseBonusLevel(payload?.terrainBonusLevel, 'off');
     const weatherBonusLevel = parseBonusLevel(payload?.weatherBonusLevel, 'off');
     const techBonusLevel = parseBonusLevel(payload?.techBonusLevel, 'off');
@@ -319,7 +319,7 @@ function registerIpcHandlers(): void {
     logDebug('main game:newGame', {
       fogOfWarEnabled,
       gameSize,
-      countryBonusLevel,
+      originBonusLevel,
       terrainBonusLevel,
       weatherBonusLevel,
       techBonusLevel,
@@ -335,7 +335,7 @@ function registerIpcHandlers(): void {
       gameSize,
       humanHomeRegion: payload?.humanHomeRegion,
       aiHomeRegion: payload?.aiHomeRegion,
-      countryBonusLevel,
+      originBonusLevel,
       terrainBonusLevel,
       weatherBonusLevel,
       techBonusLevel,

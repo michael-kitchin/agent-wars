@@ -284,17 +284,17 @@ Each row is a pair of gates that would otherwise fight. The resolution column ma
 | Air unit whose base is not intact or not controlled | It cannot ferry. The air table's base columns carry this, and the coaching must not tell such a unit to reposition. |
 | Tactical destination beyond the beat budget | The order is clamped to the first reachable leg, not rejected. The coaching states the clamp so the model does not read partial movement as a failed order. |
 | Distances are hop counts **and** the mode is tactical | The caveat line is omitted, because its gate requires a strategic cell. Tactical step counts inside one footprint do not carry the same distortion. |
-| Terrain bonus on **and** country bonus off **and** strategic | No surface changes. Terrain matching is battle-only, so the strategic prompt must not mention an origin bonus. |
+| Terrain bonus on **and** origin bonus off **and** strategic | No surface changes. Terrain matching is battle-only, so the strategic prompt must not mention an origin bonus. |
 
-## 8. Origin bonuses
+## 8. Origin bonus and terrain bonus
 
-Gate: `state.countryBonusEnabled` and `state.terrainBonusEnabled` with their levels (`countryBonusLevel`, `terrainBonusLevel`), read through `originBonusSettingsFromSnapshot` into `GameRuleTextGates.originBonusSettings`. On the strategic map only the country bonus applies; in battle either flag applies. With no applicable flag, every surface is byte-for-byte unchanged. Low and High differ only in the amounts: at Low the rule text says `adds 2`, the `Bonus` cell reads `+2 …`, and `originBonus` and `originBonusAmount` report 2; at High the rule text says `adds 4`, the stacking sentence names the larger amount, the `Bonus` cell reads `+4 …`, and `originBonus` and `originBonusAmount` report 4.
+Gate: `state.originBonusEnabled` and `state.terrainBonusEnabled` with their levels (`originBonusLevel`, `terrainBonusLevel`), read through `originBonusSettingsFromSnapshot` into `GameRuleTextGates.originBonusSettings`. On the strategic map only the origin bonus applies; in battle either flag applies. With no applicable flag, every surface is byte-for-byte unchanged. Low and High differ only in the amounts: at Low the rule text says `adds 2`, the `Bonus` cell reads `+2 …`, and `originBonus` and `originBonusAmount` report 2; at High the rule text says `adds 4`, the stacking sentence names the larger amount, the `Bonus` cell reads `+4 …`, and `originBonus` and `originBonusAmount` report 4.
 
 | Surface | Contract |
 | --- | --- |
-| system | The combat paragraph adds `buildOriginBonusRule` after the casualty rule. The Unit Status table gains a `Bonus` column after `Hex`. With the country bonus on, Supplemental Hex Intelligence bullets append the hex's country. |
+| system | The combat paragraph adds `buildOriginBonusRule` after the casualty rule. The Unit Status table gains a `Bonus` column after `Hex`. With the origin bonus on, Supplemental Hex Intelligence bullets append `; origin` and the place id. |
 | user | unchanged |
-| tools | Names, descriptions, and schemas unchanged. `estimate_combat` reports effective values and `originBonus` (2 or 4); `assess_unit` adds `originBonusHere`, `originBonusAmount`, `birthCountry`, and in battle `birthTerrain`; `assess_hex` adds `country`. |
+| tools | Tool names stay the same. `estimate_combat` reports effective values and `originBonus` (2 or 4); `assess_unit` adds `originBonusHere`, `originBonusAmount`, `birthOrigin` (the place label, not the place id), and in battle `birthTerrain`; `assess_hex` adds `origin` (the place id). |
 | envelope | unchanged |
 | coaching | unchanged |
 | empty-state | A unit that does not qualify reads `—` in the `Bonus` column, `[]` in `originBonusHere`, and 0 in `originBonusAmount`. |

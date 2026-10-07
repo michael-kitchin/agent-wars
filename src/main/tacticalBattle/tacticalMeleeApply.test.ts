@@ -109,12 +109,12 @@ test('tactical melee adds the terrain bonus only while the terrain flag is on', 
       ],
     };
     const rollEight = () => (8 - 0.5) / COMBAT_DIE_SIDES;
-    persistOriginBonusSettings({ run: dbRun, hasDb: isDbReady }, { countryBonusEnabled: false, terrainBonusEnabled: true });
+    persistOriginBonusSettings({ run: dbRun, hasDb: isDbReady }, { originBonusEnabled: false, terrainBonusEnabled: true });
     assert.deepEqual(
       applyTacticalMeleeAfterSupportOrders(snap, rollEight).meleeRemovedUnits.map((u) => u.id),
       ['opp-n']
     );
-    persistOriginBonusSettings({ run: dbRun, hasDb: isDbReady }, { countryBonusEnabled: false, terrainBonusEnabled: false });
+    persistOriginBonusSettings({ run: dbRun, hasDb: isDbReady }, { originBonusEnabled: false, terrainBonusEnabled: false });
     assert.deepEqual(applyTacticalMeleeAfterSupportOrders(snap, rollEight).meleeRemovedUnits, []);
   });
 });

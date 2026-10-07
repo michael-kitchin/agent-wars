@@ -66,7 +66,7 @@ export interface NewUnitRow {
   /**
    * Birth metadata, or `null` to leave the birth columns empty.
    *
-   * Contract: Drives the unit flag, and the origin bonuses when the match has them on.
+   * Contract: Drives the unit flag, and the origin bonus and terrain bonus when the match has them on.
    * When to use: The `birth_*` columns, including `birth_is_urban` (1 when the birth cell is intact urban).
    * Expected outcome: Each field maps to its column.
    * Exceptions: None.

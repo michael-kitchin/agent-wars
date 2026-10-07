@@ -266,8 +266,8 @@ export function executeAssessment(
  *
  * Purpose: Gives the AI one unit's surroundings, threats, supply, orders, and origin bonus status in one call.
  * When to use: From `executeAssessment` outside tactical battles; `state` should already be the AI's fogged view.
- * Expected outcome: `status: 'ok'` with a `unit` block; it carries `originBonusHere` and `birthCountry` only while
- *   the country bonus is on. `status: 'error'` when the unit is not found.
+ * Expected outcome: `status: 'ok'` with a `unit` block; it carries `originBonusHere` and `birthOrigin` only while
+ *   the origin bonus is on. `status: 'error'` when the unit is not found.
  * Exceptions: None.
  */
 function executeAssessUnit(
@@ -537,7 +537,7 @@ function executeAssessUnit(
  *
  * Purpose: Gives the AI one hex's terrain, passability, occupants, control, and country in one call.
  * When to use: From `executeAssessment` outside tactical battles, after the briefing hex code is decoded to `position`.
- * Expected outcome: `status: 'ok'` with the hex fields; `country` appears only while the country bonus is on.
+ * Expected outcome: `status: 'ok'` with the hex fields; `origin` appears only while the origin bonus is on.
  *   `status: 'error'` when `position` does not resolve to a map hex.
  * Exceptions: None.
  */

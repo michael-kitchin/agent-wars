@@ -10,6 +10,7 @@
 import { logTrace } from '../logger';
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import type { UnitOrigin } from '../../shared/unitOriginTypes';
+import { countryDisplayNameForCode } from '../unitOrigin/tacticalBirthCountryCache';
 import { subdivisionCodeForAreaId } from '../unitOrigin/tacticalOriginAreas';
 
 /**
@@ -169,6 +170,7 @@ function unitOriginFromRow(row: DbUnitSnapshotRow): UnitOrigin | undefined {
     birthAreaId: row.birth_area_id ?? row.birth_country_name ?? null,
     birthAreaName: row.birth_area_name ?? row.birth_country_name ?? null,
     birthSubdivisionCode: subdivisionCodeForAreaId(row.birth_area_id ?? null),
+    birthOriginCountryName: countryDisplayNameForCode(row.birth_country_code),
   };
 }
 

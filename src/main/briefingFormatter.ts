@@ -554,8 +554,8 @@ export function buildUnitStatusTable(
  *
  * Purpose: Shows the AI terrain and passability for hexes of interest without spending tool calls.
  * When to use: Strategic briefings, after precomputation has run the hex assessments.
- * Expected outcome: A section with one bullet per entry; `; country X` is added only when the assessment
- *   carried a country, meaning the country bonus is on. Empty string when there are no entries.
+ * Expected outcome: A section with one bullet per entry; `; origin X` is added only when the assessment
+ *   carried an origin place id, meaning the origin bonus is on. Empty string when there are no entries.
  * Exceptions: None.
  */
 function buildSupplementalHexIntelligenceBlock(hexAssessments: HexAssessmentEntry[], ctx: CoordinateContext): string {
@@ -568,8 +568,8 @@ function buildSupplementalHexIntelligenceBlock(hexAssessments: HexAssessmentEntr
     const passableBy = Array.isArray(r.passableBy) ? (r.passableBy as string[]).join(', ') : '';
     const notes = Array.isArray(r.strategicNotes) ? (r.strategicNotes as string[]).filter((x) => typeof x === 'string') : [];
     const noteStr = notes.length > 0 ? ` notes: ${notes.join('; ')}` : '';
-    const countryStr = typeof r.country === 'string' ? `; country ${r.country}` : '';
-    bullets.push(`- ${posStr}: terrain ${terrain}; passableBy: ${passableBy || 'unknown'}${countryStr}${noteStr}`);
+    const originStr = typeof r.origin === 'string' ? `; origin ${r.origin}` : '';
+    bullets.push(`- ${posStr}: terrain ${terrain}; passableBy: ${passableBy || 'unknown'}${originStr}${noteStr}`);
   }
   return markdownHeading2(SECTION_TITLE_SUPPLEMENTAL_HEX_INTELLIGENCE) + bullets.join('\n');
 }

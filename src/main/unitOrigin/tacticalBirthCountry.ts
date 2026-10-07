@@ -140,7 +140,7 @@ function pickBirthCountryFromRows(record: TerrainNamingRecordTactical): BirthCou
  * Expected outcome: After sorting rows by name, the first name seen per code wins.
  * Exceptions: None.
  */
-function buildCanonicalCountryNameByCode(strategicRecords: ReadonlyArray<TerrainNamingRecordStrategic>): Map<string, string> {
+export function buildCanonicalCountryNameByCode(strategicRecords: ReadonlyArray<TerrainNamingRecordStrategic>): Map<string, string> {
   const rows = strategicRecords
     .flatMap((record) => record.countries)
     .filter((row): row is TerrainNamingCountryRow & { countryCode: string } => row.countryCode !== null)

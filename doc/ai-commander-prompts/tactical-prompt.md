@@ -65,7 +65,7 @@ At most five sentences. The first is always the beat number, own sub-unit count,
 
 #### `## Unit Status and Threats`
 
-Same six columns as strategic: `Unit ID`, `Type`, `Hex`, `Nearest enemy + distance`, `Threat severity`, `Action needed`. When an origin bonus flag or the tech bonus is on, a `Bonus` column follows `Hex`. Origin reads `+2 country`, `+2 terrain`, `+2 country, terrain`, or the number 4 when the larger applicable level is High. Tech appends `tech +2 attack` at Low, or `tech +2 attack and defense` at High, for an Advanced sub-unit. A row with neither reads `—`.
+Same six columns as strategic: `Unit ID`, `Type`, `Hex`, `Nearest enemy + distance`, `Threat severity`, `Action needed`. When an origin bonus flag or the tech bonus is on, a `Bonus` column follows `Hex`. Origin reads `+2 origin`, `+2 terrain`, `+2 origin, terrain`, or the number 4 when the larger applicable level is High. Tech appends `tech +2 attack` at Low, or `tech +2 attack and defense` at High, for an Advanced sub-unit. A row with neither reads `—`.
 
 - **No standing-order column.** Standing orders do not act in a beat, so a column for them would invite the model to rely on one. The row's current-order value is null by construction even when the parent unit has a standing order at strategic level.
 - **No quiet annotation.** Every sub-unit in the footprint is in the battle; there is no rear area.

@@ -203,22 +203,22 @@ export function buildCasualtySortRule(): string {
  */
 export function buildOriginBonusRule(gates: GameRuleTextGates): string | null {
   logTrace('promptSpec buildOriginBonusRule', { ...gates });
-  const { countryBonusEnabled, terrainBonusEnabled } = gates.originBonusSettings;
+  const { originBonusEnabled, terrainBonusEnabled } = gates.originBonusSettings;
   const tactical = gates.coordinateMode === 'tactical';
   const terrainApplies = tactical && terrainBonusEnabled;
-  if (!countryBonusEnabled && !terrainApplies) return null;
+  if (!originBonusEnabled && !terrainApplies) return null;
   const place = tactical ? 'cell' : 'hex';
   const onPlace = tactical ? 'on a cell' : 'in a hex';
-  const countryAmount = originHitBonusForSource(gates.originBonusSettings, 'country');
+  const originAmount = originHitBonusForSource(gates.originBonusSettings, 'origin');
   const terrainAmount = originHitBonusForSource(gates.originBonusSettings, 'terrain');
   const rollClause = (amount: number): string => `adds ${amount} to every attack or defense value it rolls there`;
   const parts: string[] = [];
-  if (countryBonusEnabled) {
+  if (originBonusEnabled) {
     const strategicDetail = tactical
       ? ''
       : ', including ranged fire, return fire, melee, and air-strike counter-fire';
     parts.push(
-      `Country bonus is on: a unit ${onPlace} in the area where it was built ${rollClause(countryAmount)}${strategicDetail}. ` +
+      `Origin bonus is on: a unit ${onPlace} in the area where it was built ${rollClause(originAmount)}${strategicDetail}. ` +
         'That area is its birth country in a global game and its origin area in a regional game.'
     );
   }
@@ -227,8 +227,8 @@ export function buildOriginBonusRule(gates: GameRuleTextGates): string | null {
       `Terrain bonus is on: a unit on a cell whose terrain kind matches its birth terrain kind ${rollClause(terrainAmount)}; urban and rubble do not change a cell's terrain kind.`
     );
   }
-  if (countryBonusEnabled && terrainApplies) {
-    parts.push(`The two bonuses do not stack; the most is +${Math.max(countryAmount, terrainAmount)}.`);
+  if (originBonusEnabled && terrainApplies) {
+    parts.push(`The two bonuses do not stack; the most is +${Math.max(originAmount, terrainAmount)}.`);
   }
   if (gates.hasAirUnits) parts.push(`An air unit qualifies by the ${place} of its base, whatever it strikes.`);
   parts.push('Casualty order still uses the printed defense values.');

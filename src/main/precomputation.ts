@@ -87,7 +87,7 @@ result: {
        *
        * Contract: Present only when a flag that applies to the mode is on; empty when the unit does not qualify.
        * When to use: The briefing's Unit Status Bonus column.
-       * Expected outcome: Subset of `['country', 'terrain']`.
+       * Expected outcome: Subset of `['origin', 'terrain']`.
        * Exceptions: None.
        */
       originBonusHere?: readonly OriginBonusSource[];

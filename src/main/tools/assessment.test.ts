@@ -517,11 +517,11 @@ function testFogOffOmitsStaleIntelGhost(): void {
 }
 
 /**
- * Verifies the country bonus fields of `assess_unit` and `assess_hex` follow the snapshot flag.
+ * Verifies the origin bonus fields of `assess_unit` and `assess_hex` follow the snapshot flag.
  *
  * Purpose: The AI needs to know where its units get the origin bonus; with the flag off, results must be unchanged.
  * When to use: After changing assessment origin bonus fields.
- * Expected outcome: On, the unit block has `originBonusHere: ['country']` and `birthCountry`, and the hex has `country`; off, none of the three keys.
+ * Expected outcome: On, the unit block has `originBonusHere: ['origin']` and `birthOrigin`, and the hex has `origin`; off, none of the three keys.
  * Exceptions: None.
  */
 function testCountryBonusFieldsFollowFlag(): void {
@@ -545,21 +545,21 @@ function testCountryBonusFieldsFollowFlag(): void {
     ]
   );
   const hexes = state.hexes.map((h) => ({ ...h, countryName: 'France' }));
-  const on: GameStateSnapshot = { ...state, hexes, countryBonusEnabled: true };
+  const on: GameStateSnapshot = { ...state, hexes, originBonusEnabled: true };
   const position = coordMap.latLngByH3.get(strategicOrigin)!;
   const assessHex = (s: GameStateSnapshot) =>
     executeAssessment('assess_hex', { position }, s, coordMap.latLngByH3, coordMap.resolveToH3);
 
   const unitOn = assess(on, coordMap, 'opponent-armor-1').unit as Record<string, unknown>;
-  assert.deepStrictEqual(unitOn.originBonusHere, ['country']);
+  assert.deepStrictEqual(unitOn.originBonusHere, ['origin']);
   assert.strictEqual(unitOn.originBonusAmount, 2);
-  assert.strictEqual(unitOn.birthCountry, 'France');
-  assert.strictEqual(assessHex(on).country, 'France');
+  assert.strictEqual(unitOn.birthOrigin, 'France');
+  assert.strictEqual(assessHex(on).origin, 'France');
 
   const off: GameStateSnapshot = { ...state, hexes };
   const unitOff = assess(off, coordMap, 'opponent-armor-1').unit as Record<string, unknown>;
-  assert.ok(!('originBonusHere' in unitOff) && !('originBonusAmount' in unitOff) && !('birthCountry' in unitOff));
-  assert.ok(!('country' in assessHex(off)));
+  assert.ok(!('originBonusHere' in unitOff) && !('originBonusAmount' in unitOff) && !('birthOrigin' in unitOff));
+  assert.ok(!('origin' in assessHex(off)));
 }
 
 /**

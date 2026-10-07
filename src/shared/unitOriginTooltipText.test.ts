@@ -16,7 +16,7 @@ const PARIS_STRATEGIC = latLngToCell(48.85, 2.35, 1);
  * Exceptions: None.
  */
 const NONE: UnitOriginTooltipBonuses = {
-  countryEnabled: false,
+  originEnabled: false,
   terrainEnabled: false,
   weatherEnabled: false,
   techEnabled: false,
@@ -35,16 +35,15 @@ test('the tooltip lists the bonuses the unit was born with', () => {
   const html = formatUnitOriginTooltipHtml({
     origin,
     bonuses: {
-      countryEnabled: true,
+      originEnabled: true,
       terrainEnabled: true,
       weatherEnabled: true,
       techEnabled: false,
       weatherTags: ['snow', 'rain'],
     },
   });
-  assert.match(html, /^<strong>Bonuses:<\/strong>\n<strong>Country:<\/strong> /);
+  assert.match(html, /^<strong>Bonuses:<\/strong>\n<strong>Origin:<\/strong> /);
   assert.ok(!html.includes('\n\n'));
-  assert.ok(!html.includes('<strong>Origin:</strong>'));
   assert.ok(html.includes('France'));
   assert.ok(html.includes('flags/fr.svg'));
   assert.ok(html.includes('<strong>Terrain:</strong> <span class="terrain-swatch" data-terrain-kind="plains" aria-hidden="true"></span>Plains'));
@@ -60,7 +59,7 @@ test('a turned-off option is omitted, and weather tags render snow, then rain, t
   const html = formatUnitOriginTooltipHtml({
     origin,
     bonuses: {
-      countryEnabled: false,
+      originEnabled: false,
       terrainEnabled: true,
       weatherEnabled: true,
       techEnabled: false,
@@ -68,7 +67,7 @@ test('a turned-off option is omitted, and weather tags render snow, then rain, t
     },
   });
   assert.ok(html.includes('<strong>Terrain:</strong> <span class="terrain-swatch" data-terrain-kind="plains" aria-hidden="true"></span>Plains'));
-  assert.ok(!html.includes('<strong>Country:</strong>'));
+  assert.ok(!html.includes('<strong>Origin:</strong>'));
   assert.ok(html.indexOf('weather/snow.svg') < html.indexOf('weather/heat.svg'));
   assert.ok(!html.includes('<strong>Bonuses:</strong>\nNone'));
 });
@@ -77,14 +76,14 @@ test('no selected bonus, or a unit with none of them, collapses the Bonuses bloc
   const collapsed = formatUnitOriginTooltipHtml({ origin, bonuses: NONE });
   assert.ok(collapsed.includes('<strong>Bonuses:</strong>\nNone'));
   assert.ok(!collapsed.includes('<strong>Tech:</strong>'));
-  assert.ok(!collapsed.includes('<strong>Country:</strong>'));
+  assert.ok(!collapsed.includes('<strong>Origin:</strong>'));
   assert.ok(!collapsed.includes('<strong>Terrain:</strong>'));
   assert.ok(!collapsed.includes('<strong>Weather:</strong>'));
 
   const allEmpty = formatUnitOriginTooltipHtml({
     origin: { ...origin, birthCountryName: null, birthTerrainKind: null },
     bonuses: {
-      countryEnabled: true,
+      originEnabled: true,
       terrainEnabled: true,
       weatherEnabled: true,
       techEnabled: false,
@@ -95,14 +94,14 @@ test('no selected bonus, or a unit with none of them, collapses the Bonuses bloc
   assert.ok(!allEmpty.includes('<strong>Weather:</strong> None'));
 });
 
-test('a unit with no birth country omits Country, and a country name is escaped', () => {
-  const enabled = { ...NONE, countryEnabled: true };
+test('a unit with no birth place omits Origin, and a country name is escaped', () => {
+  const enabled = { ...NONE, originEnabled: true };
   const unknown = formatUnitOriginTooltipHtml({
     origin: { ...origin, birthCountryName: null, birthCountryCode: null },
     bonuses: enabled,
   });
   assert.ok(unknown.includes('<strong>Bonuses:</strong>\nNone'));
-  assert.ok(!unknown.includes('<strong>Country:</strong>'));
+  assert.ok(!unknown.includes('<strong>Origin:</strong>'));
 
   const escaped = formatUnitOriginTooltipHtml({
     origin: { ...origin, birthCountryName: 'A<B' },
@@ -110,6 +109,38 @@ test('a unit with no birth country omits Country, and a country name is escaped'
   });
   assert.ok(escaped.includes('A&lt;B'));
   assert.ok(!escaped.includes('<strong>A<B</strong>'));
+});
+
+test('a subdivision origin shows the brief name and the looked-up country', () => {
+  const enabled = { ...NONE, originEnabled: true };
+  const labeled = formatUnitOriginTooltipHtml({
+    origin: {
+      ...origin,
+      birthAreaName: 'Colorado',
+      birthCountryName: 'France',
+      birthCountryCode: 'US',
+      birthSubdivisionCode: 'US-CO',
+      birthOriginCountryName: 'United States of America',
+    },
+    bonuses: enabled,
+  });
+  assert.ok(labeled.includes('Colorado, United States of America'));
+  assert.ok(!labeled.includes('France'));
+
+  const missingCountry = formatUnitOriginTooltipHtml({
+    origin: {
+      ...origin,
+      birthAreaName: 'Colorado',
+      birthCountryName: 'France',
+      birthCountryCode: 'US',
+      birthSubdivisionCode: 'US-CO',
+    },
+    bonuses: enabled,
+  });
+  assert.ok(missingCountry.includes('Colorado'));
+  assert.ok(!missingCountry.includes('Colorado,'));
+  assert.ok(!missingCountry.includes('France'));
+  assert.ok(!missingCountry.includes('United States'));
 });
 
 /**
@@ -146,11 +177,12 @@ test('the Tech row names Basic or Advanced, and a missing tier stays None', () =
  *
  * Purpose: Loss toasts share one flag per display name, so two units from the same place must still get that flag.
  * When to use: From this file's runner.
- * Expected outcome: Matching copies return true; a different birth hex returns false.
+ * Expected outcome: Matching copies return true. A missing looked-up country matches an explicit null. A different birth hex returns false.
  * Exceptions: AssertionError when the comparison drifts.
  */
 test('origins that present the same flag and tooltip match, and a different birth hex does not', () => {
   const copy: UnitOrigin = { ...origin };
   assert.equal(unitOriginsPresentTheSame(origin, copy), true);
+  assert.equal(unitOriginsPresentTheSame(origin, { ...origin, birthOriginCountryName: null }), true);
   assert.equal(unitOriginsPresentTheSame(origin, { ...origin, birthH3Index: 'not-a-hex' }), false);
 });

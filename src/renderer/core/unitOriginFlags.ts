@@ -99,10 +99,10 @@ export function resolveUnitOrigin(unitId: string): UnitOrigin | null {
  * Expected outcome: Each flag is true only when the snapshot field is exactly true. A missing game state leaves every option off.
  * Exceptions: None.
  */
-function selectedBonusOptions(): Pick<UnitOriginTooltipBonuses, 'countryEnabled' | 'terrainEnabled' | 'weatherEnabled' | 'techEnabled'> {
+function selectedBonusOptions(): Pick<UnitOriginTooltipBonuses, 'originEnabled' | 'terrainEnabled' | 'weatherEnabled' | 'techEnabled'> {
   const state = S.gameState;
   return {
-    countryEnabled: state?.countryBonusEnabled === true,
+    originEnabled: state?.originBonusEnabled === true,
     terrainEnabled: state?.terrainBonusEnabled === true,
     weatherEnabled: state?.weatherBonusEnabled === true,
     techEnabled: state?.techBonusEnabled === true,
@@ -112,7 +112,7 @@ function selectedBonusOptions(): Pick<UnitOriginTooltipBonuses, 'countryEnabled'
 /**
  * Builds the Bonus block for a unit that is still on the map.
  *
- * Purpose: Country and terrain come from the birth record. Weather tags come from the live row, then the birth-hex cache.
+ * Purpose: Origin and terrain come from the birth record. Weather tags come from the live row, then the birth-hex cache.
  * When to use: Live unit labels.
  * Expected outcome: Each selected option is enabled. The block does not change when the unit moves.
  * Exceptions: None.
@@ -204,7 +204,7 @@ export function createUnitOriginFlagImage(input: {
 /**
  * Builds a flag for a unit that is no longer on the map.
  *
- * Purpose: Loss toasts share the live tooltip, without a country or terrain bonus for a unit that has nowhere to stand.
+ * Purpose: Loss toasts share the live tooltip, without an origin or terrain bonus for a unit that has nowhere to stand.
  * When to use: When a loss line names a victim whose origin is known.
  * Expected outcome: The victim's birth-country flag, with a tooltip of any remembered weather tags.
  * Exceptions: None.

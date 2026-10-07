@@ -19,11 +19,11 @@ const FRENCH_COASTAL: UnitOrigin = {
   birthIsUrban: false,
 };
 
-/** Country bonus on, terrain bonus off. */
-const COUNTRY_ONLY: OriginBonusSettings = { countryBonusEnabled: true, terrainBonusEnabled: false };
+/** Origin bonus on, terrain bonus off. */
+const COUNTRY_ONLY: OriginBonusSettings = { originBonusEnabled: true, terrainBonusEnabled: false };
 
-/** Terrain bonus on, country bonus off. */
-const TERRAIN_ONLY: OriginBonusSettings = { countryBonusEnabled: false, terrainBonusEnabled: true };
+/** Terrain bonus on, origin bonus off. */
+const TERRAIN_ONLY: OriginBonusSettings = { originBonusEnabled: false, terrainBonusEnabled: true };
 
 /**
  * Builds a one-unit battle on a coastal cell with no country data.
@@ -85,9 +85,9 @@ test('withOriginHitBonus adds the field only to qualifying units', () => {
   assert.equal(high[0]!.originHitBonus, 4);
 });
 
-test('the strategic lookup gives 4 with the country bonus at High', () => {
+test('the strategic lookup gives 4 with the origin bonus at High', () => {
   const lookup = createStrategicOriginHitBonusLookup({
-    settings: { ...COUNTRY_ONLY, countryBonusLevel: 'high' },
+    settings: { ...COUNTRY_ONLY, originBonusLevel: 'high' },
     units: [{ id: 'u1', origin: FRENCH_COASTAL }],
     countryNameAt: () => 'France',
   });

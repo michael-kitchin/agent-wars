@@ -52,12 +52,12 @@ export const gameSizeSelectTooltipText =
 
 /**
  * Purpose: Names Off, Low, and High and what Low and High add.
- * When to use: `#new-game-country-bonus-select`.
+ * When to use: `#new-game-origin-bonus-select`.
  * Expected outcome: The control tip shows this sentence.
  * Exceptions: None.
  */
-export const countryBonusSelectTooltipText =
-  "Choose Off, Low, or High. Low adds 2 and High adds 4 to a unit's attack or defense when it fights in the country where it was built.";
+export const originBonusSelectTooltipText =
+  'Low adds 2 and High adds 4 when a unit fights in the area where it was built: a country in a global game, and the origin area in a regional game.';
 
 /**
  * Purpose: Names who gains attack and defense, and that Basic units gain nothing.
@@ -69,13 +69,13 @@ export const techBonusSelectTooltipText =
   'Choose Off, Low, or High. Advanced units gain 2 attack at either level, High also adds 2 defense, and Basic units gain nothing.';
 
 /**
- * Purpose: Says the bonus is for battles and does not stack with the country bonus.
+ * Purpose: Says the bonus is for battles and does not stack with the origin bonus.
  * When to use: `#new-game-terrain-bonus-select`.
  * Expected outcome: The control tip shows this sentence.
  * Exceptions: None.
  */
 export const terrainBonusSelectTooltipText =
-  'In a battle, Low adds 2 and High adds 4 when a unit fights on the terrain where it was built. Off adds nothing, and a unit that also gets the country bonus receives only the larger of the two.';
+  'In a battle, Low adds 2 and High adds 4 when a unit fights on the terrain where it was built. Off adds nothing, and a unit that also gets the origin bonus receives only the larger of the two.';
 
 /**
  * Purpose: Says Off ignores weather and that High is the harsher penalty.

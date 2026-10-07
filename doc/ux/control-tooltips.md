@@ -33,9 +33,9 @@ The tip can appear whenever the control can receive the pointer or keyboard focu
 - Opponent side: Pick the opponent's side. It stays different from yours.
 - Randomize opponent side: Pick one of the other sides at random for the opponent.
 - Game size: Set how many units each side may field. Small is the baseline, Medium doubles it, and Large triples it, without changing the map or the starting forces.
-- Country bonus: Low adds 2 and High adds 4 when a unit fights in the area where it was built: a country in a global game, and the origin area in a regional game.
+- Origin bonus: Low adds 2 and High adds 4 when a unit fights in the area where it was built: a country in a global game, and the origin area in a regional game.
 - Tech bonus: Choose Off, Low, or High. Advanced units gain 2 attack at either level, High also adds 2 defense, and Basic units gain nothing.
-- Terrain bonus: In a battle, Low adds 2 and High adds 4 when a unit fights on the terrain where it was built. Off adds nothing, and a unit that also gets the country bonus receives only the larger of the two.
+- Terrain bonus: In a battle, Low adds 2 and High adds 4 when a unit fights on the terrain where it was built. Off adds nothing, and a unit that also gets the origin bonus receives only the larger of the two.
 - Weather bonus: Choose Off to ignore weather. Low and High slow movement and cut some attacks for units that lack that weather, and High is the harsher penalty.
 - Fog of war: Leave this checked to hide places and enemy units you have not seen. Uncheck it to show the whole map for the next match.
 - Starting month: Pick the month the match starts in. Each world-map turn advances one month, and a battle stays in the month that is current.

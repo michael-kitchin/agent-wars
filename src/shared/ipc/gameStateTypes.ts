@@ -31,8 +31,8 @@ hexes: {
     /**
      * Majority country name of this strategic hex: the country of most of its tactical cells, ties broken by name.
      *
-     * Contract: Present only when the match has the country bonus on; `null` when no cell in the hex has a country.
-     * When to use: The country test of origin bonuses on the strategic map.
+     * Contract: Present only when the match has the origin bonus on; `null` when no cell in the hex has a country.
+     * When to use: The origin bonus comparison on the strategic map.
      * Expected outcome: Static geography, not intel, so fog masking keeps it.
      * Exceptions: None.
      */
@@ -118,7 +118,7 @@ units: {
     /**
      * Birth metadata: birth hex, birth cell, terrain, whether that cell is urban, and country.
      *
-     * Contract: Absent for rows created without it (tests, older inserts). Drives origin bonuses only when the match has the country or terrain bonus on.
+     * Contract: Absent for rows created without it (tests, older inserts). Drives the origin bonus and the terrain bonus only when the match has that bonus on.
      * When to use: Renderer unit flags, the origin tooltip, and origin bonus checks.
      * Expected outcome: Set on every unit inserted by seeding or production.
      * Exceptions: None.
@@ -214,14 +214,14 @@ fogOfWarEnabled?: boolean;
    */
 gameSize?: GameSize;
     /**
-   * Whether this match has the country bonus on.
+   * Whether this match has the origin bonus on.
    *
    * Contract: Always a boolean on snapshots built from a persisted match; omitted on test fixtures, which means off.
    * When to use: Read through `originBonusSettingsFromSnapshot` before any origin bonus check.
    * Expected outcome: When true, a unit in its birth country adds the level's amount to the threshold of every hit roll it makes.
    * Exceptions: None.
    */
-countryBonusEnabled?: boolean;
+originBonusEnabled?: boolean;
     /**
    * Whether this match has the terrain bonus on.
    *
@@ -241,14 +241,14 @@ terrainBonusEnabled?: boolean;
    */
 weatherBonusEnabled?: boolean;
     /**
-   * How strong the country bonus is.
+   * How strong the origin bonus is.
    *
-   * Contract: Present exactly when `countryBonusEnabled` is true. Missing next to a true flag means low.
+   * Contract: Present exactly when `originBonusEnabled` is true. Missing next to a true flag means low.
    * When to use: Read through `originBonusSettingsFromSnapshot`, never directly.
    * Expected outcome: Picks the amount a qualifying unit adds.
    * Exceptions: None.
    */
-countryBonusLevel?: ActiveBonusLevel;
+originBonusLevel?: ActiveBonusLevel;
     /**
    * How strong the terrain bonus is.
    *

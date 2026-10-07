@@ -340,7 +340,7 @@ export function buildStrategicCombatEstimationTheater(state: GameStateSnapshot):
  * carrier's cell); and the battle resolution rule that land cargo embarked at sea sits out ranged combat but not melee.
  * When to use: Every `estimate_combat` call during a tactical battle.
  * Expected outcome: A theater over `battle.subUnits`. Air attackers are rejected because battle air strikes use
- * different dice than ranged fire. Origin bonuses follow `settings` and the battle's frozen cell data.
+ * different dice than ranged fire. Origin bonus and terrain bonus follow `settings` and the battle's frozen cell data.
  * Exceptions: None.
  */
 export function buildTacticalCombatEstimationTheater(
