@@ -8,6 +8,7 @@ import type { AirStrikeTargetType } from '../../shared/ipcTypes';
 import { fallbackDisplayNameFromUnitId } from '../../shared/unitDisplayNames';
 import { AIR_STRIKE_RANGE_HEXES, formatFerryOutOfRangeReason, formatTargetOutOfRangeReason } from '../../shared/tacticalRanges';
 import { logTrace } from '../logger';
+import { isNeutralBorderHex } from '../../shared/h3Resolutions';
 import { isWithinAirFerryGridRange, isWithinAirStrikeGridRange } from './gridRange';
 import { hasEnemyUnitsAtHex, loadOwnedStrategicUnit } from './ownedUnitGuards';
 import { readPersistedOriginBonusSettings } from '../gameDb/originBonusConfig';
@@ -75,7 +76,7 @@ export function validateAirStrikeOrder(
   if (!withinStrikeRange) return { valid: false, reason: formatTargetOutOfRangeReason(unit.unit_type, AIR_STRIKE_RANGE_HEXES) };
 
   const baseInfrastructure = getStrategicInfrastructureForHex(unit.h3_index);
-  if (baseInfrastructure.airportCount <= 0) {
+  if (isNeutralBorderHex(unit.h3_index) || baseInfrastructure.airportCount <= 0) {
     return { valid: false, reason: 'Air unit must be based at an intact airport to strike' };
   }
 
@@ -131,7 +132,7 @@ export function validateFerryOrder(
   const origin = getStrategicInfrastructureForHex(unit.h3_index);
   if (origin.airportCount <= 0) return { valid: false, reason: 'Origin airport is not intact' };
   const destination = getStrategicInfrastructureForHex(destinationH3Index);
-  if (destination.airportCount <= 0) return { valid: false, reason: 'Destination airport is not intact' };
+  if (isNeutralBorderHex(destinationH3Index) || destination.airportCount <= 0) return { valid: false, reason: 'Destination airport is not intact' };
   const controller = getHexController(destinationH3Index);
   if (controller !== unit.player) return { valid: false, reason: 'Destination airport must be controlled by unit owner' };
   return { valid: true };

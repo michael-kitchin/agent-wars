@@ -2,10 +2,14 @@ const { buildElectronBuilderConfig } = require('./scripts/electronBuilderBaseCon
 const {
   buildElectronBuilderGeneratedFileEntries,
   buildElectronBuilderGeneratedResourceFilter,
+  buildElectronBuilderRegionalZipFileEntries,
+  buildElectronBuilderRegionalZipResource,
 } = require('./scripts/electronBuilderGeneratedFiles.cjs');
 
 const generatedTerrainFiles = buildElectronBuilderGeneratedFileEntries();
 const generatedTerrainResourceFilter = buildElectronBuilderGeneratedResourceFilter();
+const regionalZipFiles = buildElectronBuilderRegionalZipFileEntries();
+const regionalZipResource = buildElectronBuilderRegionalZipResource();
 
 module.exports = buildElectronBuilderConfig({
   publish: [],
@@ -16,6 +20,7 @@ module.exports = buildElectronBuilderConfig({
     'package.json',
     'node_modules',
     ...generatedTerrainFiles,
+    ...regionalZipFiles,
   ],
   extraResources: [
     {
@@ -23,6 +28,7 @@ module.exports = buildElectronBuilderConfig({
       to: 'data/generated',
       filter: generatedTerrainResourceFilter,
     },
+    regionalZipResource,
   ],
   winTarget: ['zip'],
   linuxTarget: ['dir'],

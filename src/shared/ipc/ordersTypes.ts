@@ -406,6 +406,33 @@ startMonth?: number;
    * Exceptions: None.
    */
 techBonusLevel?: BonusLevel;
+    /**
+   * Map to start.
+   *
+   * Contract: Omitted or `global` starts the world map. A regional id starts that pack.
+   * When to use: The Regional tab's Start button.
+   * Expected outcome: Main persists `game_map_id` and seeds that footprint.
+   * Exceptions: None.
+   */
+gameMapId?: string;
+    /**
+   * Human side group.
+   *
+   * Contract: Required with a regional `gameMapId`. Ignored for the global map.
+   * When to use: The Regional tab.
+   * Expected outcome: That group's land hexes become the human home.
+   * Exceptions: None.
+   */
+humanSideGroupId?: string;
+    /**
+   * AI side group.
+   *
+   * Contract: Required with a regional `gameMapId`, and different from the human group.
+   * When to use: The Regional tab.
+   * Expected outcome: That group's land hexes become the AI home.
+   * Exceptions: None.
+   */
+aiSideGroupId?: string;
 }
 
 /**

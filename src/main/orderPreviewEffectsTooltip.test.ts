@@ -15,6 +15,7 @@ import {
   type OrderPreviewRangedTerrainBattle,
 } from '../shared/orderPreviewEffectsTooltip';
 import { TOOLTIP_SECTION_GAP_HTML } from '../shared/tooltipSectionGap';
+import { formatStatusIconHtml } from '../shared/statusIconHtml';
 import { tacticalCell } from './tacticalBattle/testSupport/tacticalHexFixtures';
 
 const snowIcon = '<img class="weather-icon" src="weather/snow.svg" alt="" aria-hidden="true" />Snow';
@@ -74,6 +75,60 @@ test('resolveOrderPreviewEffectsTooltipHtml names origin weather that slows a st
     })
   );
   assert.equal(html, `<strong>Slower:</strong> ${snowIcon}`);
+});
+
+test('a legal armor march onto a stop hex shows the blocked clause and keeps a weather slowdown', () => {
+  const blocked = `${formatStatusIconHtml('blocked')}Armored Movement`;
+  const stopped = resolveOrderPreviewEffectsTooltipHtml(
+    legal({
+      kind: 'strategicMarch',
+      destinationStopsArmor: true,
+      units: [{ unitType: 'armor', originWeather: 'mild', weatherTags: [] }],
+    })
+  );
+  assert.equal(stopped, `<strong>Effects:</strong> ${blocked}`);
+  assert.equal(stopped?.includes(formatStatusIconHtml('down')), false);
+  const slowed = resolveOrderPreviewEffectsTooltipHtml(
+    legal({
+      kind: 'strategicMarch',
+      destinationStopsArmor: true,
+      units: [{ unitType: 'armor', originWeather: 'snow', weatherTags: [] }],
+    })
+  );
+  assert.equal(
+    slowed,
+    `<strong>Slower:</strong> ${snowIcon}${TOOLTIP_SECTION_GAP_HTML}<strong>Effects:</strong> ${blocked}`
+  );
+  assert.equal(
+    resolveOrderPreviewEffectsTooltipHtml(
+      legal({
+        kind: 'strategicMarch',
+        destinationStopsArmor: true,
+        validForAll: false,
+        units: [{ unitType: 'armor', originWeather: 'mild', weatherTags: [] }],
+      })
+    ),
+    null
+  );
+});
+
+test('rugged and city cover lead the planning Cover line', () => {
+  const rugged = resolveOrderPreviewEffectsTooltipHtml(
+    legal({
+      kind: 'ranged',
+      units: [{ unitType: 'armor', originWeather: 'mild', weatherTags: [] }],
+      targetCover: { terrainKind: 'wetlands', rugged: true },
+    })
+  );
+  assert.equal(rugged, `<strong>Cover:</strong> ${formatStatusIconHtml('doubleUp')}Rugged`);
+  const city = resolveOrderPreviewEffectsTooltipHtml(
+    legal({
+      kind: 'airStrike',
+      units: [{ unitType: 'air', originWeather: 'mild', weatherTags: ['snow', 'rain', 'heat'] }],
+      targetCover: { terrainKind: 'plains', city: true },
+    })
+  );
+  assert.equal(city, `<strong>Cover:</strong> ${formatStatusIconHtml('up')}City`);
 });
 
 test('resolveOrderPreviewEffectsTooltipHtml names snow when it shortens a strategic ferry', () => {

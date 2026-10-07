@@ -1,4 +1,5 @@
 import { getHexBoundaryLatLngForLeafletOverlay, WEB_MERCATOR_MAX_ABS_LAT } from './hexGrid';
+import { restoreLoadedMapExtent } from './mapExtent';
 import { getLeafletGlobal } from './mapHelpers';
 import { getMainLeafletMap } from './worldLeafletMap';
 import { rendererSharedState as S } from '../core/state';
@@ -114,11 +115,7 @@ export function exitTacticalMapView(): void {
     S.preTacticalLeafletMaxZoom = null;
     return;
   }
-  const worldBounds = L.latLngBounds(
-    L.latLng(-WEB_MERCATOR_MAX_ABS_LAT, -180),
-    L.latLng(WEB_MERCATOR_MAX_ABS_LAT, 180)
-  );
-  if (typeof map.setMaxBounds === 'function') map.setMaxBounds(worldBounds);
+  restoreLoadedMapExtent();
   if (typeof map.setMinZoom === 'function' && S.preTacticalLeafletMinZoom != null) {
     map.setMinZoom(S.preTacticalLeafletMinZoom);
   }
@@ -130,7 +127,7 @@ export function exitTacticalMapView(): void {
   const home = S.strategicScenarioInitialLeafletView;
   if (home && typeof map.setView === 'function') {
     map.setView(L.latLng(home.lat, home.lng), home.zoom);
-  } else if (typeof map.fitBounds === 'function') {
-    map.fitBounds(worldBounds, { padding: [2, 2], animate: false });
+  } else {
+    restoreLoadedMapExtent(true);
   }
 }

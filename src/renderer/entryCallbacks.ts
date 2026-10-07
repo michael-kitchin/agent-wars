@@ -334,6 +334,15 @@ export async function applyGameStateSnapshot(
     redraw?: boolean;
   } = {}
 ): Promise<void> {
+  const previousMapId = S.gameState?.gameMap?.id;
+  if (nextState.gameMap && previousMapId !== nextState.gameMap.id) {
+    sessionStaticTacticalOverlaysLoaded = false;
+    sessionBaselineUrbanHexCountsLoaded = false;
+  }
+  if (nextState.gameMapLoadError && nextState.gameMapLoadError !== lastShownMapLoadError) {
+    lastShownMapLoadError = nextState.gameMapLoadError;
+    showMapToast(nextState.gameMapLoadError);
+  }
   return applyGameStateSnapshotFromModule(
     {
       rebuildUnitDisplayNameLookup,
@@ -530,6 +539,16 @@ let sessionStaticTacticalOverlaysLoaded = false;
  * Exceptions: None.
  */
 let sessionBaselineUrbanHexCountsLoaded = false;
+
+/**
+ * Last map-load error already shown in a toast.
+ *
+ * Purpose: A refreshed snapshot must not repeat the same toast.
+ * When to use: `applyGameStateSnapshot` when `gameMapLoadError` is set.
+ * Expected outcome: The toast appears once per distinct message.
+ * Exceptions: None.
+ */
+let lastShownMapLoadError: string | null = null;
 
 /**
  * Fetches static tactical overlay IPC payloads once per session unless `forceReload` is set.

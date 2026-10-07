@@ -53,6 +53,7 @@ export function buildOrderPreviewEffectsTooltipInput(
     rangedBattle: kind === 'ranged' ? battle : null,
     rangedPreviewUnitIds: args.preview.data.previews.map((row) => row.unitId),
     targetCover: kind === 'ranged' || kind === 'airStrike' ? targetCoverPlace(args.preview.hoveredH3Index) : null,
+    destinationStopsArmor: kind === 'strategicMarch' && destinationStopsArmor(args.preview.hoveredH3Index),
   };
 }
 
@@ -74,7 +75,26 @@ function targetCoverPlace(hoveredH3Index: string): TerrainCoverPlace | null {
   if (!state) return null;
   const enemyHere = state.units.some((unit) => unit.player !== 'human' && unit.h3Index === hoveredH3Index);
   if (!enemyHere) return null;
-  return { terrainKind: state.hexes.find((hex) => hex.h3Index === hoveredH3Index)?.terrainKind ?? null };
+  const hex = state.hexes.find((row) => row.h3Index === hoveredH3Index);
+  return {
+    terrainKind: hex?.terrainKind ?? null,
+    rugged: hex?.rugged === true,
+    city: hex?.city === true,
+  };
+}
+
+/**
+ * True when the hovered strategic hex ends an armor move and armor is selected.
+ *
+ * Purpose: The planning tooltip only names the stop for a legal armor march onto that hex.
+ * When to use: From `buildOrderPreviewEffectsTooltipInput` for a strategic march.
+ * Expected outcome: True when a selected armor unit's destination is rugged, arctic, or city.
+ * Exceptions: None.
+ */
+function destinationStopsArmor(hoveredH3Index: string): boolean {
+  const hex = S.gameState?.hexes.find((row) => row.h3Index === hoveredH3Index);
+  if (!hex || !(hex.rugged === true || hex.arctic === true || hex.city === true)) return false;
+  return strategicSelection().some((unit) => unit.unitType === 'armor');
 }
 
 /**

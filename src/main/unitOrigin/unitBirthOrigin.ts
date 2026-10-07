@@ -14,6 +14,7 @@ import type { BasicDbOps } from '../gameDb/dbOps';
 import { getGameSeedWithOps } from '../gameDb/gameConfigKv';
 import { logDebug, logError } from '../logger';
 import { getTacticalBirthCountryFromSnapshot } from './tacticalBirthCountryCache';
+import { originAreaForTacticalCell, tacticalOriginAreasLoaded } from './tacticalOriginAreas';
 import { selectUnitBirthOrigin, type TacticalBirthCandidate } from './unitBirthCellSelection';
 
 /**
@@ -69,6 +70,9 @@ function minimalOrigin(birthH3Index: string): UnitOrigin {
     birthIsUrban: false,
     birthCountryName: null,
     birthCountryCode: null,
+    birthAreaId: null,
+    birthAreaName: null,
+    birthSubdivisionCode: null,
   };
 }
 
@@ -102,6 +106,7 @@ export function resolveUnitBirthOrigin(ops: BasicDbOps, args: { unitId: string; 
       tacticalCandidates,
       seedKey: `${seed}:${unitId}`,
       birthCountryForTactical: getTacticalBirthCountryFromSnapshot,
+      originAreaForTactical: tacticalOriginAreasLoaded() ? originAreaForTacticalCell : undefined,
     });
     const terrainKind = selected.birthTerrainKind;
     const origin: UnitOrigin = {

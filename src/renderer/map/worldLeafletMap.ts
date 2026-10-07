@@ -485,6 +485,18 @@ export function getMainLeafletMap(): VendorLeafletMap | null {
 }
 
 /**
+ * Returns the overview map, which does not accept pan or zoom input.
+ *
+ * Purpose: Regional extent fitting must include the minimap as well as the main map.
+ * When to use: From the map-extent applier only.
+ * Expected outcome: The minimap created in `initWorldLeafletMaps`, or null before init.
+ * Exceptions: None.
+ */
+export function getMiniLeafletMap(): VendorLeafletMap | null {
+  return miniMap;
+}
+
+/**
  * Applies a CSS filter to one Leaflet tile pane and clears leftover per-tile filters.
  *
  * Purpose: Wargame invert must darken raster tiles without touching hex overlay, units, or chrome.

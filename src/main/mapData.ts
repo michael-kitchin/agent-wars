@@ -5,6 +5,7 @@
 
 import { getRes0Cells, cellToChildren, cellToLatLng } from 'h3-js';
 import { registerActiveGameMapReset } from '../shared/activeGameMap';
+import { loadedStrategicFootprint } from '../shared/loadedStrategicFootprint';
 import { GLOBAL_STRATEGIC_H3_RESOLUTION, strategicH3Resolution } from '../shared/h3Resolutions';
 
 /**
@@ -50,6 +51,8 @@ registerActiveGameMapReset(resetOrderedHexListCache);
  * Exceptions: None.
  */
 export function getOrderedHexList(): string[] {
+  const footprint = loadedStrategicFootprint();
+  if (footprint) return [...footprint];
   if (cachedWorldHexList !== null) return cachedWorldHexList;
   const res0 = getRes0Cells();
   const out: string[] = [];

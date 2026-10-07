@@ -1,5 +1,5 @@
-import { logDebug } from '../logger';
-import { getScenarioHomeRegionHexes, resolveScenarioHomeRegions } from '../regionScenario';
+import { logDebug, logError } from '../logger';
+import { getScenarioHomeRegionHexes, resolveScenarioHomeRegions, resolveSideGroupHomeNames } from '../regionScenario';
 import type { GuardedDbRunAndGetAllOps } from './dbOps';
 import { persistGameSize } from './gameSizeConfig';
 import { persistOriginBonusSettings } from './originBonusConfig';
@@ -8,6 +8,12 @@ import { parseGameSize, type GameSize } from '../../shared/gameSize';
 import { originBonusSettingsFromLevels } from '../../shared/originBonusRules';
 import { logHomeRegionControlParity } from './seeding/initialFlexAirSlot';
 import { persistRegionVsRegionScenarioState } from './scenarioState';
+import {
+  assertRegionalSideGroupsDistinct,
+  ensureGameMapLoaded,
+  loadedGameMapId,
+  requireGameMapId,
+} from '../gameMap/loadGameMap';
 
 /**
  * Documents the `ResetGameDeps` interface as a named contract surface (interface ResetGameDeps extends GuardedDbRunAndGetAllOps).
@@ -243,6 +249,33 @@ export interface ResetGameForNewMatchOptions {
    * Exceptions: None.
    */
   readonly techBonusLevel?: BonusLevel;
+  /**
+   * Map to start, or omitted for the global map.
+   *
+   * Contract: Missing or `global` keeps the world map. A catalog id starts that region.
+   * When to use: The Regional tab's Start button.
+   * Expected outcome: Persisted as `game_map_id` before hexes are seeded.
+   * Exceptions: None.
+   */
+  readonly gameMapId?: string;
+  /**
+   * Human side group on a regional map.
+   *
+   * Contract: Required when `gameMapId` is regional. Ignored for the global map.
+   * When to use: The Regional tab's human side selector.
+   * Expected outcome: Resolved to that group's display name.
+   * Exceptions: None.
+   */
+  readonly humanSideGroupId?: string;
+  /**
+   * AI side group on a regional map.
+   *
+   * Contract: Required when `gameMapId` is regional, and different from the human group.
+   * When to use: The Regional tab's AI side selector.
+   * Expected outcome: Resolved to that group's display name.
+   * Exceptions: None.
+   */
+  readonly aiSideGroupId?: string;
 }
 
 /**
@@ -265,17 +298,33 @@ export function resetGameForNewMatch(deps: ResetGameDeps, options?: ResetGameFor
     startMonth: options?.startMonth,
     tech: parseBonusLevel(options?.techBonusLevel, 'off'),
   });
-  const { humanHomeRegion, aiHomeRegion } = resolveScenarioHomeRegions(options);
-  logDebug('gameDb resetGameForNewMatch', { fogOfWarEnabled, gameSize, humanHomeRegion, aiHomeRegion, ...originBonusSettings });
+  logDebug('gameDb resetGameForNewMatch', {
+    fogOfWarEnabled,
+    gameSize,
+    ...originBonusSettings,
+    gameMapId: options?.gameMapId ?? null,
+  });
   if (!deps.hasDb()) return;
+  const mapId = requireGameMapId(options?.gameMapId);
+  if (mapId !== 'global') {
+    assertRegionalSideGroupsDistinct(mapId, options?.humanSideGroupId, options?.aiSideGroupId);
+  }
+  const previousMapId = loadedGameMapId();
+  ensureGameMapLoaded(mapId);
   const { run } = deps;
+  try {
+  run('BEGIN');
+  const homes = mapId === 'global'
+    ? resolveScenarioHomeRegions(options)
+    : resolveSideGroupHomeNames(options?.humanSideGroupId ?? '', options?.aiSideGroupId ?? '');
+  logDebug('gameDb resetGameForNewMatch: map', { mapId, ...homes, previousMapId });
   run('DELETE FROM units');
   run('DELETE FROM hexes');
-  run("INSERT OR REPLACE INTO game_config (key, value) VALUES ('map_size', 'world')");
+  run('INSERT OR REPLACE INTO game_config (key, value) VALUES (?, ?)', ['game_map_id', mapId]);
   run('INSERT OR REPLACE INTO game_config (key, value) VALUES (?, ?)', ['fog_of_war_enabled', fogOfWarEnabled ? '1' : '0']);
   persistGameSize({ run, hasDb: deps.hasDb }, gameSize);
   persistOriginBonusSettings({ run, hasDb: deps.hasDb }, originBonusSettings);
-  persistRegionVsRegionScenarioState({ run }, { humanHomeRegion, aiHomeRegion });
+  persistRegionVsRegionScenarioState({ run }, homes);
   run("DELETE FROM game_config WHERE key = 'game_seed'");
   run("DELETE FROM game_config WHERE key LIKE 'unit_display_sequence_%'");
   // Identifier ordinals may restart at 1 because `DELETE FROM units` already ran above.
@@ -307,8 +356,25 @@ export function resetGameForNewMatch(deps: ResetGameDeps, options?: ResetGameFor
   run('DELETE FROM res_s_build_queue');
   run('DELETE FROM res_s_build_progress');
   seedInitialHexControlFromUnitOccupancy(deps);
-  seedInitialHexControlFromHomeRegions(deps, { humanHomeRegion, aiHomeRegion });
-  logHomeRegionControlParity(deps, new Set(getScenarioHomeRegionHexes(humanHomeRegion)), new Set(getScenarioHomeRegionHexes(aiHomeRegion)));
+  seedInitialHexControlFromHomeRegions(deps, homes);
+  logHomeRegionControlParity(deps, new Set(getScenarioHomeRegionHexes(homes.humanHomeRegion)), new Set(getScenarioHomeRegionHexes(homes.aiHomeRegion)));
   deps.refreshFogOfWarIntelFromCurrentState();
+  run('COMMIT');
+  } catch (err) {
+    try {
+      run('ROLLBACK');
+    } catch (rollbackErr) {
+      logError('gameDb resetGameForNewMatch: rollback failed', rollbackErr);
+    }
+    logError('gameDb resetGameForNewMatch: failed after map load', err);
+    if (previousMapId && previousMapId !== mapId) {
+      try {
+        ensureGameMapLoaded(previousMapId);
+      } catch (restoreErr) {
+        logError('gameDb resetGameForNewMatch: restore failed', restoreErr);
+      }
+    }
+    throw err;
+  }
   deps.saveDatabase();
 }

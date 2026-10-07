@@ -3,7 +3,7 @@ const REGIONS_DIR_SEGMENTS = ['data', 'generated', 'regions'];
 
 /**
  * JSON files packed for one region.
- * The app does not load these yet. Extraction skips a file that was never zipped.
+ * The app extracts one region's archives the first time that region is played.
  */
 const REGIONAL_JSON_FILES = Object.freeze([
   'region_manifest.json',

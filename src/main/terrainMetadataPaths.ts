@@ -90,6 +90,16 @@ const STRATEGIC_WEATHER_SEGMENTS = ['data', 'generated', 'terrain_res1_weather.j
 let testOverrideRoot: string | null = null;
 
 /**
+ * Directory of the regional pack currently being read, or null for the global files.
+ *
+ * Purpose: The same resolvers serve the world pack and one extracted region.
+ * When to use: Set before a regional load and cleared for the global map.
+ * Expected outcome: Null uses `terrain_res1_*` and `terrain_res4_*` names.
+ * Exceptions: None.
+ */
+let activePackDirectory: string | null = null;
+
+/**
  * Defines the `setTerrainMetadataPathOverrideForTests` function shape (export function setTerrainMetadataPathOverrideForTests(overrideRoot: string | null): void).
 
  * Purpose: Supports maintainability by documenting why `setTerrainMetadataPathOverrideForTests` exists.
@@ -118,6 +128,43 @@ export function clearTerrainMetadataPathOverrideForTests(): void {
 }
 
 /**
+ * Points terrain readers at one extracted regional folder, or back at the global files.
+ *
+ * Purpose: Regional JSON uses `terrain_res_s_*` and `terrain_res_t_*` names in that folder.
+ * When to use: Before loading a regional pack, and with null before loading the global pack.
+ * Expected outcome: Later resolvers read that directory. Null restores the global file names.
+ * Exceptions: None.
+ */
+export function setActiveTerrainPackDirectory(directory: string | null): void {
+  logDebug('terrainMetadataPaths setActiveTerrainPackDirectory', { directory });
+  activePackDirectory = directory;
+}
+
+/**
+ * Resolves one file inside the active regional folder.
+ *
+ * Purpose: Required pack files fail the load when they are missing. Optional overlays do not.
+ * When to use: From each resolver while a pack directory is set.
+ * Expected outcome: The absolute path, or null when `optional` is set and the file is absent.
+ * Exceptions: Throws when a required file is missing.
+ */
+function resolveActivePackFile(label: string, packFileName: string, optional: boolean): string | null {
+  if (!activePackDirectory) return null;
+  const candidate = path.join(activePackDirectory, packFileName);
+  if (fs.existsSync(candidate)) {
+    logDebug('terrainMetadataPaths resolveActivePackFile: found', { label, path: candidate });
+    return candidate;
+  }
+  if (optional) {
+    logDebug('terrainMetadataPaths resolveActivePackFile: missing optional', { label, path: candidate });
+    return null;
+  }
+  const msg = `terrain metadata file "${label}" not found at ${candidate}`;
+  logError('terrainMetadataPaths resolveActivePackFile: missing file', new Error(msg));
+  throw new Error(msg);
+}
+
+/**
  * Defines the `pathCandidates` function shape (function pathCandidates(...segments: string[]): string[]).
 
  * Purpose: Supports maintainability by documenting why `pathCandidates` exists.
@@ -125,7 +172,7 @@ export function clearTerrainMetadataPathOverrideForTests(): void {
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-function pathCandidates(...segments: string[]): string[] {
+export function pathCandidates(...segments: string[]): string[] {
   const roots: string[] = [];
   if (testOverrideRoot) roots.push(testOverrideRoot);
   roots.push(path.join(__dirname, '..', '..'));
@@ -159,7 +206,8 @@ function pathCandidates(...segments: string[]): string[] {
  */
 export function resolveTerrainStrategicMetadataPath(): string {
   logDebug('terrainMetadataPaths resolveTerrainRes1MetadataPath');
-  return resolveFirstExisting('terrain_res1_metadata.json', [...STRATEGIC_SEGMENTS]);
+  return resolveActivePackFile('terrain_res_s_metadata.json', 'terrain_res_s_metadata.json', false)
+    ?? resolveFirstExisting('terrain_res1_metadata.json', [...STRATEGIC_SEGMENTS]);
 }
 
 /**
@@ -172,7 +220,21 @@ export function resolveTerrainStrategicMetadataPath(): string {
  */
 export function resolveTerrainTacticalMetadataPath(): string {
   logDebug('terrainMetadataPaths resolveTerrainRes4MetadataPath');
-  return resolveFirstExisting('terrain_res4_metadata.json', [...TACTICAL_SEGMENTS]);
+  return resolveActivePackFile('terrain_res_t_metadata.json', 'terrain_res_t_metadata.json', false)
+    ?? resolveFirstExisting('terrain_res4_metadata.json', [...TACTICAL_SEGMENTS]);
+}
+
+/**
+ * Locates the world strategic naming file, ignoring any regional pack directory.
+ *
+ * Purpose: The Global tab lists UN subregions even while a regional pack is loaded.
+ * When to use: `listScenarioHomeRegions`.
+ * Expected outcome: Absolute path to `terrain_res1_naming.json`.
+ * Exceptions: Throws when that file is not in any candidate root.
+ */
+export function resolveBundledGlobalStrategicNamingPath(): string {
+  logDebug('terrainMetadataPaths resolveBundledGlobalStrategicNamingPath');
+  return resolveFirstExisting('terrain_res1_naming.json', [...STRATEGIC_NAMING_SEGMENTS]);
 }
 
 /**
@@ -185,7 +247,8 @@ export function resolveTerrainTacticalMetadataPath(): string {
  */
 export function resolveTerrainStrategicNamingPath(): string {
   logDebug('terrainMetadataPaths resolveTerrainRes1NamingPath');
-  return resolveFirstExisting('terrain_res1_naming.json', [...STRATEGIC_NAMING_SEGMENTS]);
+  return resolveActivePackFile('terrain_res_s_naming.json', 'terrain_res_s_naming.json', false)
+    ?? resolveFirstExisting('terrain_res1_naming.json', [...STRATEGIC_NAMING_SEGMENTS]);
 }
 
 /**
@@ -198,7 +261,8 @@ export function resolveTerrainStrategicNamingPath(): string {
  */
 export function resolveTerrainTacticalNamingPath(): string {
   logDebug('terrainMetadataPaths resolveTerrainRes4NamingPath');
-  return resolveFirstExisting('terrain_res4_naming.json', [...TACTICAL_NAMING_SEGMENTS]);
+  return resolveActivePackFile('terrain_res_t_naming.json', 'terrain_res_t_naming.json', false)
+    ?? resolveFirstExisting('terrain_res4_naming.json', [...TACTICAL_NAMING_SEGMENTS]);
 }
 
 /**
@@ -211,7 +275,8 @@ export function resolveTerrainTacticalNamingPath(): string {
  */
 export function resolveTerrainStrategicLandMassPath(): string {
   logDebug('terrainMetadataPaths resolveTerrainRes1LandMassPath');
-  return resolveFirstExisting('terrain_res1_landmass.json', [...STRATEGIC_LANDMASS_SEGMENTS]);
+  return resolveActivePackFile('terrain_res_s_landmass.json', 'terrain_res_s_landmass.json', false)
+    ?? resolveFirstExisting('terrain_res1_landmass.json', [...STRATEGIC_LANDMASS_SEGMENTS]);
 }
 
 /**
@@ -224,7 +289,8 @@ export function resolveTerrainStrategicLandMassPath(): string {
  */
 export function resolveTerrainStrategicWeatherPath(): string {
   logDebug('terrainMetadataPaths resolveTerrainRes1WeatherPath');
-  return resolveFirstExisting('terrain_res1_weather.json', [...STRATEGIC_WEATHER_SEGMENTS]);
+  return resolveActivePackFile('terrain_res_s_weather.json', 'terrain_res_s_weather.json', false)
+    ?? resolveFirstExisting('terrain_res1_weather.json', [...STRATEGIC_WEATHER_SEGMENTS]);
 }
 
 /**
@@ -237,6 +303,9 @@ export function resolveTerrainStrategicWeatherPath(): string {
  */
 export function resolveTerrainTacticalRoadRailSidesPathOptional(): string | null {
   logDebug('terrainMetadataPaths resolveTerrainRes4RoadRailSidesPathOptional');
+  if (activePackDirectory) {
+    return resolveActivePackFile('terrain_res_t_road_rail_sides.json', 'terrain_res_t_road_rail_sides.json', true);
+  }
   const candidates = pathCandidates(...TACTICAL_ROAD_RAIL_SIDES_SEGMENTS);
   for (const p of candidates) {
     if (fs.existsSync(p)) {
@@ -260,6 +329,9 @@ export function resolveTerrainTacticalRoadRailSidesPathOptional(): string | null
  */
 export function resolveTerrainTacticalRoadRailVectorsPathOptional(): string | null {
   logDebug('terrainMetadataPaths resolveTerrainRes4RoadRailVectorsPathOptional');
+  if (activePackDirectory) {
+    return resolveActivePackFile('terrain_res_t_road_rail_vectors.json', 'terrain_res_t_road_rail_vectors.json', true);
+  }
   const candidates = pathCandidates(...TACTICAL_ROAD_RAIL_VECTORS_SEGMENTS);
   for (const p of candidates) {
     if (fs.existsSync(p)) {

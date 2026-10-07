@@ -92,8 +92,9 @@ export function insertUnitRow(run: (sql: string, params?: unknown[]) => unknown,
   run(
     `INSERT INTO units (
        id, player, unit_type, display_order, h3_index,
-       birth_h3_index, birth_res_t_h3_index, birth_terrain_kind, birth_is_urban, birth_country_name, birth_country_code
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       birth_h3_index, birth_res_t_h3_index, birth_terrain_kind, birth_is_urban, birth_country_name, birth_country_code,
+       birth_area_id, birth_area_name
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       row.id,
       row.player,
@@ -106,6 +107,8 @@ export function insertUnitRow(run: (sql: string, params?: unknown[]) => unknown,
       row.origin == null ? null : row.origin.birthIsUrban ? 1 : 0,
       row.origin?.birthCountryName ?? null,
       row.origin?.birthCountryCode ?? null,
+      row.origin?.birthAreaId ?? row.origin?.birthCountryName ?? null,
+      row.origin?.birthAreaName ?? row.origin?.birthCountryName ?? null,
     ]
   );
 }

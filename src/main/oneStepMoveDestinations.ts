@@ -4,6 +4,8 @@
  */
 
 import { gridDisk, gridDistance } from 'h3-js';
+import { isOnMap } from '../shared/loadedStrategicFootprint';
+import { armorMoveEndsOnHex } from '../shared/strategicTerrainFlags';
 import { isDbReady, type GameStateSnapshot } from './gameDb';
 import { logDebug, logTrace } from './logger';
 import { passabilityAllowsNavalUnit } from '../shared/pipelineTerrain';
@@ -213,6 +215,7 @@ function computeValidDestinations(
       hexSet,
       data: getStrategicLandMassByH3(),
       maxDepth: range,
+      endMoveOnEnter: unit.unitType === 'armor' ? armorMoveEndsOnHex : undefined,
     })];
   }
 
@@ -236,7 +239,7 @@ function computeValidDestinations(
   try {
     const candidates = gridDisk(unit.h3Index, range);
     for (const h3 of candidates) {
-      if (h3 === unit.h3Index || !hexSet.has(h3)) continue;
+      if (h3 === unit.h3Index || !hexSet.has(h3) || !isOnMap(h3)) continue;
       if (!applyNavalFilter(h3)) continue;
       valid.push(h3);
     }

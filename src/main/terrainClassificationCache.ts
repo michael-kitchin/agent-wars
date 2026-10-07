@@ -3,7 +3,9 @@
  */
 
 import { activeGameMap } from '../shared/activeGameMap';
-import { strategicParentOf } from '../shared/h3Resolutions';
+import { setStrategicTerrainFlags } from '../shared/strategicTerrainFlags';
+import { buildStrategicTerrainFlagSets } from './strategicTerrainFlagBuild';
+import { strategicH3Resolution, strategicParentOf, tacticalH3Resolution } from '../shared/h3Resolutions';
 import { logDebug, logError, logTrace } from './logger';
 import type { PipelineTerrainKind } from '../shared/pipelineTerrain';
 import type { StrategicProductionContextSnapshot } from '../shared/ipcTypes';
@@ -15,8 +17,6 @@ import {
 import {
   DEFAULT_CLASSIFIER_THRESHOLDS,
   DEFAULT_NODATA_FALLBACK_TERRAIN,
-  METADATA_CHILD_RESOLUTION,
-  METADATA_PARENT_RESOLUTION,
   loadTerrainStrategicMetadataBundled,
   loadTerrainTacticalMetadataBundled,
   recordHasMajorAirport,
@@ -231,14 +231,16 @@ function buildSnapshot(): TerrainClassificationSnapshot {
   const tacticalEnv = loadTerrainTacticalMetadataBundled();
   const namingStrategicEnv = loadTerrainStrategicNamingBundled();
   const namingTacticalEnv = loadTerrainTacticalNamingBundled();
-  if (strategicEnv.resolution !== METADATA_PARENT_RESOLUTION) {
+  const expectedStrategic = strategicH3Resolution();
+  const expectedTactical = tacticalH3Resolution();
+  if (strategicEnv.resolution !== expectedStrategic) {
     throw new Error(
-      `terrain metadata: res1 resolution ${strategicEnv.resolution} != expected ${METADATA_PARENT_RESOLUTION}`
+      `terrain metadata: strategic resolution ${strategicEnv.resolution} != expected ${expectedStrategic}`
     );
   }
-  if (tacticalEnv.resolution !== METADATA_CHILD_RESOLUTION) {
+  if (tacticalEnv.resolution !== expectedTactical) {
     throw new Error(
-      `terrain metadata: res4 resolution ${tacticalEnv.resolution} != expected ${METADATA_CHILD_RESOLUTION}`
+      `terrain metadata: tactical resolution ${tacticalEnv.resolution} != expected ${expectedTactical}`
     );
   }
   if (tacticalEnv.record_count <= 0) {
@@ -246,14 +248,14 @@ function buildSnapshot(): TerrainClassificationSnapshot {
       'terrain metadata: terrain_res4_metadata.json has no records; regenerate with npm run terrain:generate'
     );
   }
-  if (namingStrategicEnv.resolution !== METADATA_PARENT_RESOLUTION) {
+  if (namingStrategicEnv.resolution !== expectedStrategic) {
     throw new Error(
-      `terrain naming: res1 resolution ${namingStrategicEnv.resolution} != expected ${METADATA_PARENT_RESOLUTION}`
+      `terrain naming: strategic resolution ${namingStrategicEnv.resolution} != expected ${expectedStrategic}`
     );
   }
-  if (namingTacticalEnv.resolution !== METADATA_CHILD_RESOLUTION) {
+  if (namingTacticalEnv.resolution !== expectedTactical) {
     throw new Error(
-      `terrain naming: res4 resolution ${namingTacticalEnv.resolution} != expected ${METADATA_CHILD_RESOLUTION}`
+      `terrain naming: tactical resolution ${namingTacticalEnv.resolution} != expected ${expectedTactical}`
     );
   }
   if (namingTacticalEnv.record_count <= 0) {
@@ -399,6 +401,14 @@ function buildSnapshot(): TerrainClassificationSnapshot {
     strategicLandMassHexes: strategicLandMassByH3.size,
   });
   storeTacticalBirthCountryCache(namingStrategicEnv.records as TerrainNamingRecordStrategic[], namingTacticalEnv.records as TerrainNamingRecordTactical[]);
+  setStrategicTerrainFlags(
+    buildStrategicTerrainFlagSets({
+      records: tacticalEnv.records as HexMetadataRecordTactical[],
+      thresholds: t,
+      nodataFallback: nodata,
+      urbanHexCountByStrategicH3,
+    })
+  );
   return {
     strategicKindByH3,
     tacticalOverrideRows,
@@ -415,6 +425,12 @@ function buildSnapshot(): TerrainClassificationSnapshot {
     strategicNamingRecords: namingStrategicEnv.records as TerrainNamingRecordStrategic[],
     strategicLandMassByH3,
   };
+}
+
+export function clearTerrainClassificationCache(): void {
+  logDebug('terrainClassificationCache clearTerrainClassificationCache');
+  cached = null;
+  setStrategicTerrainFlags(null);
 }
 
 /**
@@ -695,5 +711,6 @@ export function getCachedSeaportCountByStrategicH3(): ReadonlyMap<string, number
 export function clearTerrainClassificationCacheForTests(): void {
   logDebug('terrainClassificationCache clearTerrainClassificationCacheForTests');
   cached = null;
+  setStrategicTerrainFlags(null);
   clearTacticalBirthCountryCache();
 }

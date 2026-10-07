@@ -25,8 +25,15 @@ The tip can appear whenever the control can receive the pointer or keyboard focu
 - Randomize human home region: Pick one of the listed regions at random for your side, including the region already shown.
 - Opponent home region: Pick the opponent's home region. It may be the same as yours.
 - Randomize opponent home region: Pick one of the listed regions at random for the opponent, including the region already shown.
+- Global tab: Start on the world map and pick a home region for each side.
+- Regional tab: Start on one region and pick a different side group for each player.
+- Region: Pick the region both sides fight over. Changing it draws two different sides again.
+- Human side: Pick your side. It stays different from the opponent's side.
+- Randomize human side: Pick one of the other sides at random for your side.
+- Opponent side: Pick the opponent's side. It stays different from yours.
+- Randomize opponent side: Pick one of the other sides at random for the opponent.
 - Game size: Set how many units each side may field. Small is the baseline, Medium doubles it, and Large triples it, without changing the map or the starting forces.
-- Country bonus: Choose Off, Low, or High. Low adds 2 and High adds 4 to a unit's attack or defense when it fights in the country where it was built.
+- Country bonus: Low adds 2 and High adds 4 when a unit fights in the area where it was built: a country in a global game, and the origin area in a regional game.
 - Tech bonus: Choose Off, Low, or High. Advanced units gain 2 attack at either level, High also adds 2 defense, and Basic units gain nothing.
 - Terrain bonus: In a battle, Low adds 2 and High adds 4 when a unit fights on the terrain where it was built. Off adds nothing, and a unit that also gets the country bonus receives only the larger of the two.
 - Weather bonus: Choose Off to ignore weather. Low and High slow movement and cut some attacks for units that lack that weather, and High is the harsher penalty.

@@ -32,7 +32,9 @@ When you change one of these, update `combat-rules-v3.md` (and any table that qu
 | Attack / defense / strategic move / strategic range | `src/main/combatConstants.ts`, `src/shared/rangePerimeterModel.ts` |
 | Die size, hit-number floor and cap, infrastructure counter-fire | `src/main/combatDice.ts` |
 | Terrain cover by target terrain | `TERRAIN_COVER_BY_CATEGORY` and `URBAN_OR_RUBBLE_TERRAIN_COVER` in `src/shared/terrainCoverRules.ts` |
-| Unit costs and build prerequisites | `unitCostFor` and `buildMinimumUrbanCells` in `src/shared/gameRules.ts`. The global column is copied into `src/shared/productionConfig.ts` and `src/main/productionRules.ts`. Regional columns live in `src/shared/regionalRulesCatalog.ts` and are not applied until a regional map is loaded. |
+| Unit costs and build prerequisites | `unitCostFor` and `buildMinimumUrbanCells` in `src/shared/gameRules.ts`. The global column is copied into `src/shared/productionConfig.ts` and `src/main/productionRules.ts`. Regional columns live in `src/shared/regionalRulesCatalog.ts` and apply when that regional map is loaded. |
+| Armor stop and strategic city or rugged cover | `armorMoveEndsOnHex` and `strategicTerrainFlagsFor` in `src/shared/strategicTerrainFlags.ts`. Cover columns are in `terrainCoverPairFor` in `src/shared/terrainCoverRules.ts`. |
+| Loaded map extent | `mapExtentBoxForHexes` in `src/shared/mapExtent.ts`. The renderer applies it from `src/renderer/map/mapExtent.ts`. |
 | Per-side caps by game size | `src/shared/productionConfig.ts` (`MAX_UNITS_PER_TYPE`), `src/shared/gameSize.ts` |
 | Fog vision radii | `VISION_RANGE_BY_UNIT_TYPE` in `src/main/visibility.ts` |
 | Origin bonus size and matching | `ORIGIN_HIT_BONUS_BY_LEVEL` and `originBonusSources` in `src/shared/originBonusRules.ts` |

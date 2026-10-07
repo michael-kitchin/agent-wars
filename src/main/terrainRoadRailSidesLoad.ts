@@ -4,6 +4,7 @@
 
 import * as fs from 'fs';
 import { logDebug, logError } from './logger';
+import { tacticalH3Resolution } from '../shared/h3Resolutions';
 import { resolveTerrainTacticalRoadRailSidesPathOptional } from './terrainMetadataPaths';
 
 /**
@@ -94,8 +95,9 @@ export function parseTerrainTacticalRoadRailSidesJson(text: string): TerrainRoad
     throw new Error('terrain road/rail sides: schema_version must be a non-empty string');
   }
   const resolution = root.resolution;
-  if (typeof resolution !== 'number' || resolution !== 4) {
-    throw new Error('terrain road/rail sides: resolution must be number 4');
+  const expectedResolution = tacticalH3Resolution();
+  if (typeof resolution !== 'number' || resolution !== expectedResolution) {
+    throw new Error(`terrain road/rail sides: resolution must be number ${expectedResolution}`);
   }
   const recordsRaw = root.records;
   if (!Array.isArray(recordsRaw)) throw new Error('terrain road/rail sides: records must be an array');

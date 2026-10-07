@@ -9,6 +9,7 @@
  */
 
 import { cellToChildren, cellToLatLng, getRes0Cells } from 'h3-js';
+import { loadedStrategicFootprint } from './loadedStrategicFootprint';
 import { registerActiveGameMapReset } from './activeGameMap';
 import {
   strategicH3Resolution,
@@ -72,11 +73,14 @@ export function sortCellsForStableLlmCodes(cells: readonly string[]): string[] {
  * Exceptions: Propagates H3 library failures.
  */
 export function buildStrategicH3ToCodeMap(): Map<string, string> {
-  const res0 = getRes0Cells();
-  const strategicSet = new Set<string>();
-  for (const r0 of res0) {
-    for (const child of cellToChildren(r0, strategicH3Resolution())) {
-      strategicSet.add(child);
+  const footprint = loadedStrategicFootprint();
+  const strategicSet = new Set<string>(footprint ?? []);
+  if (!footprint) {
+    const res0 = getRes0Cells();
+    for (const r0 of res0) {
+      for (const child of cellToChildren(r0, strategicH3Resolution())) {
+        strategicSet.add(child);
+      }
     }
   }
   const sorted = sortCellsForStableLlmCodes([...strategicSet]);

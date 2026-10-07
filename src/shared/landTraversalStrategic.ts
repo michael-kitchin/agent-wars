@@ -4,6 +4,7 @@
  */
 
 import { gridDisk } from 'h3-js';
+import { isOnMap } from './loadedStrategicFootprint';
 
 /**
  * Documents the module-scope binding `STRATEGIC_LAND_MAX_WATER_PCT` (STRATEGIC_LAND_MAX_WATER_PCT).
@@ -182,8 +183,9 @@ export function getLandMassReachableHexes(args: {
   data: LandMassByH3;
   maxDepth: number;
   blocked?: ReadonlySet<string>;
+  endMoveOnEnter?: (h3: string) => boolean;
 }): Set<string> {
-  const { originH3, hexSet, data, maxDepth, blocked } = args;
+  const { originH3, hexSet, data, maxDepth, blocked, endMoveOnEnter } = args;
   const reachable = new Set<string>();
   if (!hexSet.has(originH3)) return reachable;
   if (blocked?.has(originH3)) return reachable;
@@ -198,6 +200,7 @@ export function getLandMassReachableHexes(args: {
     queueIndex += 1;
     const depth = depthByH3.get(current) ?? 0;
     if (depth >= maxDepth) continue;
+    if (current !== originH3 && endMoveOnEnter?.(current)) continue;
 
     let neighbors: string[];
     try {
@@ -207,7 +210,7 @@ export function getLandMassReachableHexes(args: {
     }
 
     for (const neighbor of neighbors) {
-      if (neighbor === current || !hexSet.has(neighbor)) continue;
+      if (neighbor === current || !hexSet.has(neighbor) || !isOnMap(neighbor)) continue;
       if (blocked?.has(neighbor)) continue;
       if (reachable.has(neighbor)) continue;
       if (!canLandUnitTraverseEdge(current, neighbor, data)) continue;

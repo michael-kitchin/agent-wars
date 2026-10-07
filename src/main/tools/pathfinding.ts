@@ -5,6 +5,7 @@
  */
 
 import type { GameStateSnapshot } from '../gameDb';
+import { armorMoveEndsOnHex } from '../../shared/strategicTerrainFlags';
 import {
   getNavalStrategicDistanceAndTurns,
   navalLookupForHexState,
@@ -616,7 +617,8 @@ export function executePlanRouteWithSession(
           session.terrainByH3,
           domain,
           localBlocked,
-          domain === 'land' ? session.landMass : undefined
+          domain === 'land' ? session.landMass : undefined,
+          domain === 'land' && unit.unitType === 'armor' ? armorMoveEndsOnHex : undefined
         ),
       h3ToLatLng: (h3) => h3ToLatLng(h3, session.latLngByH3, 'cellCenter'),
     });
@@ -755,7 +757,8 @@ export function executeCheckDistance(
     passableFor,
     movementBudget,
     undefined,
-    landMass
+    landMass,
+    unitType === 'armor' ? armorMoveEndsOnHex : undefined
   );
   if (!result) {
     return {

@@ -1,4 +1,5 @@
 import { cellToLatLng } from 'h3-js';
+import { isOnMap } from '../../../shared/loadedStrategicFootprint';
 import { getOrderedHexList, getWorldUnitCounts } from '../../mapData';
 import { logDebug, logError } from '../../logger';
 import {
@@ -393,7 +394,7 @@ export function trySeedScenarioRegionVsRegion(deps: RegionScenarioSeedDeps): boo
     'SELECT h3_index, terrain, terrain_kind FROM hexes'
   );
   const terrainByH3 = new Map(terrainRows.map((row) => [row.h3_index, row]));
-  const allCandidates: SpawnCandidate[] = hexes.map((h3) => {
+  const allCandidates: SpawnCandidate[] = hexes.filter((h3) => isOnMap(h3)).map((h3) => {
     const [lat, lng] = cellToLatLng(h3);
     const terrain = terrainByH3.get(h3)?.terrain ?? 'land';
     return { h3, lat, lng, terrain };

@@ -70,6 +70,33 @@ export interface UnitOrigin {
    * Exceptions: None.
    */
   readonly birthCountryCode: string | null;
+  /**
+   * Id of the area where the unit was built.
+   *
+   * Contract: On the global map this equals `birthCountryName`. On a regional map it is the origin unit id. Omitted on origins built before the field existed.
+   * When to use: The country bonus comparison.
+   * Expected outcome: Null when the birth cell has no country and no origin area.
+   * Exceptions: None.
+   */
+  readonly birthAreaId?: string | null;
+  /**
+   * Display name of the area where the unit was built.
+   *
+   * Contract: On the global map this equals `birthCountryName`. On a regional map it is the origin area's name.
+   * When to use: Unit labels and the origin tooltip.
+   * Expected outcome: Null when `birthAreaId` is null.
+   * Exceptions: None.
+   */
+  readonly birthAreaName?: string | null;
+  /**
+   * ISO 3166-2 code of the birth area, when it has one.
+   *
+   * Contract: Not parsed from `birthAreaId`. Null on the global map and for areas without a subdivision code.
+   * When to use: The subdivision flag allow-list.
+   * Expected outcome: Null uses the national flag for `birthCountryCode`.
+   * Exceptions: None.
+   */
+  readonly birthSubdivisionCode?: string | null;
 }
 
 /**

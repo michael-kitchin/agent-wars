@@ -200,6 +200,20 @@
   font-size: 0.78rem;
   font-weight: 600;
   color: var(--chrome-text);
+  white-space: nowrap;
+}
+.game-over-tab-bar {
+  margin: 0 0 0.75rem 0;
+}
+.game-over-regional-region {
+  display: flex;
+  justify-content: center;
+  margin: 0 0 0.75rem 0;
+}
+.game-over-box p.game-over-advanced-tech {
+  text-align: center;
+  margin: 0.15rem 0 0.35rem 0;
+  font-size: 0.78rem;
 }
 .map-toast p { margin: 0; flex: 1; white-space: pre-line; }
 #map-toast-dismiss {

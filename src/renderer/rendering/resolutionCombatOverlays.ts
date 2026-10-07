@@ -2,7 +2,8 @@ import type { ResolutionMoveAnimationState } from '../core/state';
 import { shouldHideStrategicMapUnitsForZoom } from '../map/terrainView';
 import { drawResolutionDiceChips } from './combatDiceChipDrawing';
 import { buildResolutionPlaybackState } from './resolutionPlayback';
-import { drawCasualtyOverlay, drawCombatLightning, drawUnknownBattleMarkers } from './unitDrawing';
+import { drawCombatLightning, drawCasualtyOverlay } from './resolutionSymbolDrawing';
+import { drawUnknownBattleMarkers } from './unitDrawing';
 
 /**
  * Draws resolution-phase combat lightning, casualty overlays, and then dice chips for the current playback phase.
@@ -10,7 +11,7 @@ import { drawCasualtyOverlay, drawCombatLightning, drawUnknownBattleMarkers } fr
  * Purpose: Single implementation for tactical and strategic `drawGameScene` so combat/casualty selection cannot drift.
  * When to use: After shot connectors and unit markers; pass the already-computed `elapsed` ms for the animation. This
  *   must stay the final playback draw call in each `drawGameScene` branch so the dice chips stay on top.
- * Expected outcome: Lightning (and unknown battle markers) then casualty overlays when the phase windows are active,
+ * Expected outcome: The combat bolt and unknown-battle markers while a lightning window is active, then the destruction mark and unknown-battle markers while a casualty window is active,
  *   then dice chips drawn last, above every other playback layer. Chips are skipped when strategic units are hidden
  *   at the tactical zoom.
  * Exceptions: None; no-ops when hex lists are empty for the active phase.
@@ -40,7 +41,7 @@ export function drawResolutionCombatAndCasualtyOverlays(
     const unknownSet = new Set(anim.unknownCombatHexes ?? []);
     const knownCombatHexes = combatHexes.filter((h3) => !unknownSet.has(h3));
     const unknownCombatHexes = combatHexes.filter((h3) => unknownSet.has(h3));
-    drawCombatLightning(ctx, width, height, knownCombatHexes, hexList, pulseOpacity);
+    drawCombatLightning(ctx, knownCombatHexes, pulseOpacity);
     drawUnknownBattleMarkers(ctx, unknownCombatHexes, pulseOpacity);
   }
   const casualtyHexes = phase.inAirStrikeCasualty
@@ -60,7 +61,7 @@ export function drawResolutionCombatAndCasualtyOverlays(
     const unknownSet = new Set(anim.unknownCasualtyHexes ?? []);
     const knownCasualtyHexes = casualtyHexes.filter((h3) => !unknownSet.has(h3));
     const unknownCasualtyHexes = casualtyHexes.filter((h3) => unknownSet.has(h3));
-    drawCasualtyOverlay(ctx, width, height, knownCasualtyHexes, hexList, pulseOpacity);
+    drawCasualtyOverlay(ctx, knownCasualtyHexes, pulseOpacity);
     drawUnknownBattleMarkers(ctx, unknownCasualtyHexes, pulseOpacity);
   }
   if (anim && !shouldHideStrategicMapUnitsForZoom()) {

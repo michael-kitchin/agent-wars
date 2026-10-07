@@ -1,4 +1,5 @@
 import { computeGridPathCellsPure } from '../../shared/h3GridRangePure';
+import { isNeutralBorderHex } from '../../shared/h3Resolutions';
 import {
   allocateNextUnitDisplayOrder,
   allocateNextUnitIdOrdinal,
@@ -332,6 +333,7 @@ export function processProductionAfterControlResolution(): {
       continue;
     }
 
+    const neutralBorder = isNeutralBorderHex(control.h3Index);
     const storedPoints = getBuildProgressPointsForHex(control.h3Index);
     const capArray = controllerPlayerId === 'opponent' ? capReachedByPlayer.opponent : capReachedByPlayer.human;
     const capSet = new Set(capArray);
@@ -343,7 +345,7 @@ export function processProductionAfterControlResolution(): {
         remainingCount: row.remainingCount,
       }))
       .sort((a, b) => a.queueIndex - b.queueIndex || a.id - b.id);
-    let points = Math.max(0, Math.trunc(storedPoints)) + Math.max(0, Math.trunc(urbanHexCount));
+    let points = Math.max(0, Math.trunc(storedPoints)) + (neutralBorder ? 0 : Math.max(0, Math.trunc(urbanHexCount)));
     const simulatedCountsByType = new Map<BuildUnitType, number>();
     for (const unitType of DEPLOYMENT_CAP_TYPE_ORDER) {
       simulatedCountsByType.set(unitType, unitCountsByPlayerType.get(`${controllerPlayerId}:${unitType}`) ?? 0);
@@ -351,7 +353,11 @@ export function processProductionAfterControlResolution(): {
     const spawnedUnitTypes: BuildUnitType[] = [];
     let blockedByCapType: BuildUnitType | null = null;
     let lastDepletedUnitType: BuildUnitType | null = null;
-    const availableTypes = getAvailableBuildUnitTypes(urbanHexCount, seaportCount, airportCount);
+    const availableTypes = getAvailableBuildUnitTypes(
+      neutralBorder ? 0 : urbanHexCount,
+      seaportCount,
+      airportCount
+    );
     const maxLoopIterations = 10_000;
     let loopIterations = 0;
 

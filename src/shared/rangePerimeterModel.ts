@@ -3,6 +3,7 @@
  */
 
 import { gridDisk } from 'h3-js';
+import { isOnMap } from './loadedStrategicFootprint';
 import { AIR_STRIKE_RANGE_HEXES, unitHasTacticalRangedBaseline } from './tacticalRanges';
 import type { TacticalBattleSnapshot, TacticalSubUnitSnapshot } from './tacticalBattleTypes';
 import {
@@ -79,7 +80,7 @@ export function buildStrategicRangedRangeSet(units: readonly RangePerimeterUnitI
     const range = strategicRangedRangeHexesForUnitType(u.unitType);
     if (range < 1) continue;
     try {
-      for (const h of gridDisk(u.h3Index, range)) out.add(h);
+      for (const h of gridDisk(u.h3Index, range)) if (isOnMap(h)) out.add(h);
     } catch {
       // skip unit
     }
@@ -99,7 +100,7 @@ export function buildStrategicAirStrikeRangeSet(units: readonly RangePerimeterUn
   const out = new Set<string>();
   for (const u of units) {
     try {
-      for (const h of gridDisk(u.h3Index, AIR_STRIKE_RANGE_HEXES)) out.add(h);
+      for (const h of gridDisk(u.h3Index, AIR_STRIKE_RANGE_HEXES)) if (isOnMap(h)) out.add(h);
     } catch {
       // skip unit
     }

@@ -12,6 +12,7 @@ const fs = require('fs');
 const path = require('path');
 
 const { GENERATED_TERRAIN_JSON_FILES } = require('./generated-data-manifest.cjs');
+const { REGIONS_DIR_SEGMENTS } = require('./generated-regional-manifest.cjs');
 
 const repoRoot = path.resolve(__dirname, '..');
 const generatedDir = path.join(repoRoot, 'data', 'generated');
@@ -46,6 +47,48 @@ function assertExtractedGeneratedJsonForPack() {
         'Run npm run generated:extract (commit *.json.zip archives, not extracted JSON).',
     );
   }
+  assertRegionalCatalogZips();
+}
+
+/**
+ * Fails the pack when a catalog region has no manifest archive.
+ *
+ * Purpose: A packaged app cannot list or play a region whose zip was never committed.
+ * When to use: From the pre-pack check, and from the packaged-tree check.
+ * Expected outcome: Returns when every catalog id has a non-empty `region_manifest.json.zip`.
+ * Exceptions: Throws listing the ids that have no archive.
+ */
+function assertRegionalCatalogZips(regionsDir = path.join(repoRoot, ...REGIONS_DIR_SEGMENTS)) {
+  const missing = [];
+  for (const regionId of catalogRegionIds()) {
+    const zipPath = path.join(regionsDir, regionId, 'region_manifest.json.zip');
+    if (!fs.existsSync(zipPath) || !fs.statSync(zipPath).isFile() || fs.statSync(zipPath).size <= 0) {
+      missing.push(regionId);
+    }
+  }
+  if (missing.length > 0) {
+    throw new Error(
+      `generated-data-pack-assert: catalog regions missing region_manifest.json.zip: ${missing.join(', ')}`,
+    );
+  }
+}
+
+/**
+ * Reads regional catalog folder ids from the typed catalog.
+ *
+ * Purpose: The pack check stays aligned with `REGIONAL_RULES_BY_ID` without a second id list.
+ * When to use: Before asserting that each id has a zip.
+ * Expected outcome: One id per `regionalMapRules` row.
+ * Exceptions: Throws when the catalog file has no rows.
+ */
+function catalogRegionIds() {
+  const catalogPath = path.join(repoRoot, 'src', 'shared', 'regionalRulesCatalog.ts');
+  const text = fs.readFileSync(catalogPath, 'utf8');
+  const ids = [...text.matchAll(/^  ([a-z0-9_]+): regionalMapRules\(/gm)].map((match) => match[1]);
+  if (ids.length === 0) {
+    throw new Error('generated-data-pack-assert: regional catalog has no ids');
+  }
+  return ids;
 }
 
 /**
@@ -104,6 +147,27 @@ function assertPackagedGeneratedJson(releaseDir = path.join(repoRoot, 'release')
     throw new Error(
       `generated-data-pack-assert: packaged app is missing terrain JSON: ${failures.join(', ')}. ` +
         `Searched under ${releaseDir} in: ${packagedDirs.join('; ')}`,
+    );
+  }
+  assertPackagedRegionalZips(packagedDirs, releaseDir);
+}
+
+/**
+ * Ensures each catalog region archive was copied into a packaged `data/generated` tree.
+ */
+function assertPackagedRegionalZips(packagedDirs, releaseDir) {
+  const failures = [];
+  for (const regionId of catalogRegionIds()) {
+    const present = packagedDirs.some((dir) => {
+      const zipPath = path.join(dir, 'regions', regionId, 'region_manifest.json.zip');
+      return fs.existsSync(zipPath) && fs.statSync(zipPath).isFile() && fs.statSync(zipPath).size > 0;
+    });
+    if (!present) failures.push(regionId);
+  }
+  if (failures.length > 0) {
+    throw new Error(
+      `generated-data-pack-assert: packaged app is missing regional archives: ${failures.join(', ')}. ` +
+        `Searched under ${releaseDir}`,
     );
   }
 }

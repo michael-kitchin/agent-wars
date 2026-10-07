@@ -53,17 +53,17 @@ Attack and defense are hit numbers on a d20: 3 hits 15% of the time, 7 hits 35%,
 - **Range 2:** Unit can attack enemies in hexes at distance 1 or 2. Range is H3 grid distance (same metric as movement).
 - **Range 3 (air only):** Unit can strike any hex within 3 hexes of its base airport. Air units do not use incremental movement — they strike from their base and return in the same phase.
 - **Move 0 (air):** Air units have no incremental movement. They reposition via ferry orders (up to 4 hexes between owned airports, one action per turn — see §4.4). Ferry range (4) is longer than strike range (3). A ferry into snow can be 2 hexes when the weather bonus is on (§4.9).
-- **Cost:** Each res1 hex generates production points equal to its res4 urban hex count per turn (`buildProductionIncomeRule`). Points accumulate toward the queued unit; when accumulated points meet or exceed the cost, the unit spawns and excess carries over immediately. A hex produces as many units per turn as its rate and caps allow. Air also requires an airport at the hex; naval requires a seaport.
+- **Cost:** Each strategic hex generates production points equal to its tactical urban-cell count per turn (`buildProductionIncomeRule`). On the global map those are res1 hexes and res4 cells. Points accumulate toward the queued unit; when accumulated points meet or exceed the cost, the unit spawns and excess carries over immediately. A hex produces as many units per turn as its rate and caps allow. Air also requires an airport at the hex; naval requires a seaport. A neutral-border hex produces nothing and cannot host an air or naval base. Urban cells on that hex stay on the map.
 
   Examples: a hex with 5 urban hexes produces one infantry (cost 20) every 4 turns. A hex with 10 urban hexes and a seaport queues a naval unit (cost 100): it spawns on turn 10 when accumulated production first reaches 100.
 
   The costs and urban minimums in the roster are the global map. `unitCostFor` and `buildMinimumUrbanCells` in `src/shared/gameRules.ts` read the active map. Infantry's urban minimum stays 1. Regional columns are in `src/shared/regionalRulesCatalog.ts` and are not used until a regional map is loaded.
 
-  Air strikes that destroy urban cells permanently reduce the production rate. On the global map one strategic hit destroys 9 tactical urban cells (`strategicUrbanCellsDestroyedPerHit` in `src/shared/gameRules.ts`).
+  Air strikes that destroy urban cells permanently reduce the production rate. On the global map one strategic hit destroys 9 tactical urban cells (`strategicUrbanCellsDestroyedPerHit` in `src/shared/gameRules.ts`). On a regional map the same hit destroys that map's `strategicStrikeUrbanCells` from `src/shared/regionalRulesCatalog.ts`.
 
-  Each new unit records where it was born: its res1 hex, and one res4 cell inside that hex when the hex has land. An intact urban cell is chosen when the hex has one; otherwise any land cell. Rubble is not intact urban. A hex with no land cell records no cell, uses that hex's own terrain, and has no country. The chosen cell also stores its terrain, whether it is intact urban, and its country from the naming data ([terrain pipeline](terrain-pipeline.md)). The origin drives the flag on unit names and the optional origin bonuses (§4.9). Hovering the flag lists the bonuses the unit was born with and does not repeat the birth place ([stack callout](ux/stack-callout.md)). Those lines stay the same after the unit moves. With the country and terrain bonuses off, the origin has no effect on dice and AI prompts do not mention an origin bonus.
+  Each new unit records where it was born: its strategic hex, and one tactical cell inside that hex when the hex has land. An intact urban cell is chosen when the hex has one; otherwise any land cell. Rubble is not intact urban. A hex with no land cell records no cell, uses that hex's own terrain, and has no country. The chosen cell also stores its terrain, whether it is intact urban, and its country from the naming data ([terrain pipeline](terrain-pipeline.md)). On the global map the unit's area id and area name are that country name. On a regional map the area is the origin unit of the birth cell: the stored id, the display name, and that origin's country code. The country bonus matches the area id, which is the country name on the global map and the origin id on a regional map. Labels use the area name. The flag is the subdivision SVG when the origin's `iso_3166_2` has a file under `static/flags/subdivisions/`, otherwise the national flag for the country code. The origin drives the flag on unit names and the optional origin bonuses (§4.9). Hovering the flag lists the bonuses the unit was born with and does not repeat the birth place ([stack callout](ux/stack-callout.md)). Those lines stay the same after the unit moves. With the country and terrain bonuses off, the origin has no effect on dice and AI prompts do not mention an origin bonus.
 
-- **Strategic movement** is a flat hex budget (`getMovementBudget`): infantry 1, armor 2, naval 2, air 0. Terrain does **not** modify strategic movement costs. With the weather bonus on, armor and naval can be shorter (§4.9). Naval movement is restricted to water and coastal hexes (`NAVAL_MOVEMENT_PROMPT_RULE`).
+- **Strategic movement** is a flat hex budget (`getMovementBudget`): infantry 1, armor 2, naval 2, air 0. Entering a hex does not cost extra movement. Armor that enters a rugged, arctic, or city hex ends its move there; armor already on that hex may leave. With the weather bonus on, armor and naval can be shorter (§4.9). That shorter budget does not stack with the armor stop. Naval movement is restricted to water and coastal hexes (`NAVAL_MOVEMENT_PROMPT_RULE`).
 
 ---
 
@@ -101,7 +101,7 @@ Attack and defense are hit numbers on a d20: 3 hits 15% of the time, 7 hits 35%,
 - **Naval vs. land:** Naval can use range 2 to hit land units within 2 hexes. Armor in a land hex may attack naval in an adjacent water hex; infantry may not on the strategic map. See §6 (Coastal bombardment).
 - **Air vs. ground/naval:** Air units strike during the air strike phase (before ranged). When targeting units, defending ground/naval units with **strategic** range ≥ 1 in the target hex may return fire at their attack value — no range-to-base check. Infantry cannot return fire against air on the strategic map. In a tactical battle, defending sub-units with a tactical ranged baseline (including infantry) may counter-fire; see §12.5. When targeting infrastructure, only the infrastructure's fixed counter-fire roll applies.
 - **Ground vs. air (base attack):** Air units do not participate in melee. If an enemy ground unit enters a hex containing an airport with a based air unit, the air unit is destroyed (see §6).
-- **Strategic terrain combat modifiers:** Terrain cover only (§4.9, "Terrain cover"). A target hex whose main terrain is forest, mountain, or wetlands lowers ranged and air-strike hit numbers. Strategic ranged and air strikes are not blocked by terrain or intervening units.
+- **Strategic terrain combat modifiers:** Terrain cover (§4.9, "Terrain cover"), plus city cover of 2 against ground and naval fire and 1 against air strikes, and rugged cover of 2 against ground and naval fire. Each column uses the higher of those values. A target hex whose main terrain is forest, mountain, or wetlands lowers ranged and air-strike hit numbers. Strategic ranged and air strikes are not blocked by terrain or intervening units.
 - **Tactical terrain combat modifiers:** Implemented. See §12.4 and §12.5 (enter-hex costs, origin MP collapse, forest/urban/rubble range cap, road/rail enter costs, mountain LOS).
 
 ---
@@ -192,10 +192,10 @@ Two new-game dropdowns, **Country bonus** and **Terrain bonus**, each offer Off,
 
 The highest printed attack is 10, so origin alone reaches 14, under the cap of 17. The highest defense hit number from origin alone is 11.
 
-- **Country bonus (strategic and tactical):** the unit's birth country equals the country of the place where it rolls. Countries match by canonical name, not by code. On the strategic map, a hex's country is its **majority country**: the country with the most res4 cells inside the hex, with ties going to the name that sorts first. A hex with no counted cells has no country. In a battle, a cell's country is that cell's own country, the same value used for unit births.
+- **Country bonus (strategic and tactical):** the unit's area id equals the place id where it rolls. On the global map that id is the country name, matched by the canonical name and not by code. On a regional map that id is the origin-unit id. On the strategic map, a hex's place id is the majority value among its tactical cells: the country name on the global map, or the origin id on a regional map. Ties go to the value that sorts first. A hex with no counted cells has no place id. In a battle, a cell's place id is that cell's own value, the same one used for unit births.
 - **Terrain bonus (tactical only):** the unit's birth terrain kind equals the cell's effective terrain kind. Urban and rubble are flags, not kinds, and never affect the match. The strategic map ignores this flag.
 - **No stacking:** a unit that qualifies on both counts adds only the larger of the two amounts. For example, country High and terrain Low add 4.
-- **Who qualifies:** a unit without a recorded origin, or with a missing birth country or terrain, never qualifies for that test. Tactical sub-units use their parent unit's origin.
+- **Who qualifies:** a unit without a recorded origin never qualifies. A missing birth area skips the country test. A missing birth terrain skips the terrain test. Tactical sub-units use their parent unit's origin.
 - **Where a unit stands:** air strikes and ranged fire use pre-move positions; melee uses the melee hex or cell. An air unit is judged at its base, whatever it strikes. Cargo shares its carrier's position.
 - **Rolls that change:** ranged fire and return fire (including standing-order defend fire), both melee rolls, air strikes on units and on infrastructure, air-strike counter-fire by defending units, and tactical ranged fire at infrastructure.
 - **The origin bonus does not change:** infrastructure's fixed counter-fire, every casualty sort and air-strike victim pick (they keep the printed defense values), movement, ranges, enter costs, ferry range, sub-unit counts, and production. Weather, below, is a separate option.
@@ -234,7 +234,7 @@ Penalties apply only to units that lack the tag. They never raise a printed stat
 
 **Tech bonus** is a new-game dropdown offering Off, Low, and High, defaulting to Low. It sits on the first bonus line, to the right of Country bonus. A match saved with no tech row plays with the bonus off. A saved flag with no level plays at Low.
 
-A unit's tier is fixed from the generated urban-cell count of its birth strategic hex, not from the live count after air strikes destroy urban cells. The Advanced cutoff is `advancedTechMinUrbanCells()`, 21 urban cells on the global map. That many or more is Advanced. Fewer, a missing birth hex, or an unloaded count is Basic. The tier does not follow the hex the unit stands on now, and it does not change when the unit moves. Tactical sub-units use the parent unit's birth hex.
+A unit's tier is fixed from the generated urban-cell count of its birth strategic hex, not from the live count after air strikes destroy urban cells. The Advanced cutoff is `advancedTechMinUrbanCells()`: 21 urban cells on the global map, and that map's catalog threshold when a regional map is loaded. That many or more is Advanced. Fewer, a missing birth hex, or an unloaded count is Basic. The tier does not follow the hex the unit stands on now, and it does not change when the unit moves. Tactical sub-units use the parent unit's birth hex.
 
 | Level | Advanced attack | Advanced defense | Basic |
 |---|---|---|---|
@@ -263,7 +263,7 @@ Cover lowers the shooter's attack hit number based on the **target's** terrain. 
 - **Applies to:** ranged fire at units and air strikes on units, on the strategic map and in battles. Cover is subtracted together with any weather penalty, before the floor of 2.
 - **Never applies to:** melee, return fire, anti-air counter-fire, air strikes on infrastructure, battle ranged fire at infrastructure, and infrastructure counter-fire.
 - **Shared by the target:** cover belongs to the target hex or cell, not to each defender. Every unit there shares it, including fleets and embarked cargo in a coastal hex whose main terrain is forest or mountain. It is applied once per shot, before hits are assigned by casualty order.
-- **Strategic source:** the target hex's main terrain, `hexes.terrain_kind`, which is the dominant detail-cell kind stored at seeding and never changes during a match. Urban does not give cover on the strategic map.
+- **Strategic source:** the target hex's main terrain, `hexes.terrain_kind`, which is the dominant detail-cell kind stored at seeding and never changes during a match. A city hex also has cover 2 against ground and naval fire and 1 against air strikes. A rugged hex also has cover 2 against ground and naval fire. Each column uses the higher of the terrain cover and those values. The urban and rubble flags do not add cover on the strategic map.
 - **Battle source:** the target cell's effective terrain kind (a cell without its own kind takes the battle hex's kind, as movement does), plus its urban and rubble flags. When a cell has both, the larger cover applies in each column.
 
 `estimate_combat` subtracts the same cover from ranged attack values, and the AI combat rules paragraph always states it. Hex tooltips include that cover on the Effects line, with an up icon for 1 and a double up icon for 2, labeled Ground & Naval Cover and Air Cover. The effects tooltip names the cover source while aiming at covered units ([hex tooltips](ux/hex-tooltips.md)).
@@ -363,7 +363,7 @@ No player input during steps 2–11 except the melee-intercept dialog at step 9.
 - **Multiple air units at same airport:** Multiple air units may be based at the same airport. If the airport is destroyed, all co-located air units are destroyed.
 - **Ferry to occupied airport:** An air unit may ferry to an airport that already has air units. No stacking limit for air units at airports.
 - **Self-strikes (scorched earth):** A player may order an air unit to strike their own infrastructure. Self-striking an airport with your own air units based there destroys those air units. Counter-fire rules apply normally.
-- **Multiple strikes on same hex:** Multiple air units may strike the same target hex in the same turn. Each strike resolves independently. Two urban strikes on the global map destroy up to 18 tactical urban cells (9 per hit, capped at remaining). Two strikes on the same airport: the first destroys it; the second finds no airport and misses.
+- **Multiple strikes on same hex:** Multiple air units may strike the same target hex in the same turn. Each strike resolves independently. Two urban strikes on the global map destroy up to 18 tactical urban cells (9 per hit, capped at remaining). On a regional map each hit destroys that map's catalog count. Two strikes on the same airport: the first destroys it; the second finds no airport and misses.
 - **Air unit survival and territorial control:** The post-melee air check uses **hex ownership**, not enemy unit presence. If an enemy ground unit enters an airport hex during movement, territorial control changes immediately — even if that enemy unit is subsequently destroyed in melee. Recapturing an airport hex requires a separate ground action on a subsequent turn.
 - **No interception in transit:** Air units executing a ferry order cannot be attacked during transit. The ferry is an instantaneous relocation.
 - **Visibility (fog on):** Vision is a per-type H3 disk (`VISION_RANGE_BY_UNIT_TYPE`): infantry **1**, armor **2**, naval **2**, air **3** (air measured from the base airport). Unexplored hexes are never seen. Explored-but-not-visible hexes show last-known terrain without current enemy units. Last-known enemy positions persist for `STALE_INTEL_TURNS` (2) turns, then drop. Own home-region hexes and the shared home-region intersection are force-visible in the `region_vs_region` scenario. Fog can be turned off for a match; then every cell is visible.
@@ -414,7 +414,7 @@ An air unit may target infrastructure at a hex within its 3-hex strike radius in
 
 Cover never applies to strikes on infrastructure or to infrastructure counter-fire. The fixed counter-fire numbers are `INFRASTRUCTURE_COUNTER_FIRE_THRESHOLD` in `src/main/combatDice.ts`.
 
-**Target: Urban hex.** The air unit rolls d20, hit if roll ≤ 10. On hit, tactical urban cells at the target strategic hex are permanently destroyed: **9** on the global map (`strategicUrbanCellsDestroyedPerHit()`), or all remaining if fewer remain. Counter-fire: roll d20; the air unit is destroyed if roll ≤ 3 (15% risk).
+**Target: Urban hex.** The air unit rolls d20, hit if roll ≤ 10. On hit, tactical urban cells at the target strategic hex are permanently destroyed: **9** on the global map (`strategicUrbanCellsDestroyedPerHit()`), or that map's catalog value on a regional map, or all remaining if fewer remain. Counter-fire: roll d20; the air unit is destroyed if roll ≤ 3 (15% risk).
 
 **Target: Airport.** The air unit rolls d20, hit if roll ≤ 10. On hit, the airport is permanently destroyed. Any air units based at the destroyed airport are also destroyed immediately. Counter-fire: roll d20; the air unit is destroyed if roll ≤ 7 (35% risk).
 
@@ -431,7 +431,7 @@ Destroyed urban hexes, airports, and seaports do not rebuild. This applies globa
 | Target type | Air attack value | Counter-fire source | Counter-fire threshold |
 |-------------|-----------------|---------------------|----------------------|
 | Enemy units | 10 (50%), less air cover | Each defending unit with range ≥ 1 in target hex rolls independently | Defender's attack value (no range-to-base check) |
-| Urban hex | 10 (50%), destroys 9 tactical cells on the global map | Ground defenses (fixed roll, unaffected by hex occupation) | ≤ 3 (15%) |
+| Urban hex | 10 (50%), destroys 9 tactical cells on the global map, or the regional catalog value | Ground defenses (fixed roll, unaffected by hex occupation) | ≤ 3 (15%) |
 | Airport | 10 (50%) | AA defenses (fixed roll, unaffected by hex occupation) | ≤ 7 (35%) |
 | Seaport | 10 (50%) | Seaport defenses (fixed roll, unaffected by hex occupation) | ≤ 3 (15%) |
 
@@ -464,7 +464,7 @@ If a naval unit carrying cargo is destroyed, all embarked units are destroyed wi
 ## 10. Optional extensions (later)
 
 - **Multi-round melee:** Multiple rounds of melee in the same hex until one side is eliminated or a cap is reached.
-- **Strategic terrain modifiers beyond cover:** Terrain cover is live on both maps (§4.9); strategic terrain does not otherwise change movement or range. Tactical terrain modifiers are live (§12).
+- **Strategic terrain modifiers beyond cover:** Armor stop and strategic cover are live on both maps (§3). Tactical terrain modifiers are live (§12).
 - **Unit hit points:** Instead of one hit = one unit lost.
 - **Infrastructure rebuilding:** If permanent destruction proves too punishing.
 - **Additional unit types.**
@@ -565,7 +565,7 @@ At the tactical level, all unit types have a positive ranged baseline (`RANGED_R
 - **Air-strike AA:** tactical infantry may counter-fire when an air strike targets their hex, because infantry has a positive tactical ranged baseline.
 - Legal targets include enemy-occupied cells **and** strikeable infrastructure (urban, airport, seaport, or active non-rubble road/rail).
 
-Ranged attacks use the same A&A-style dice as strategic combat. Casualty assignment follows the standard fixed priority. With the origin bonuses on, a unit on a cell matching its birth country or birth terrain kind adds 2 (Low) or 4 (High) to its rolls there (§4.9, "Origin bonuses"). An Advanced unit adds its tech bonus on top (§4.9, "Tech bonus").
+Ranged attacks use the same A&A-style dice as strategic combat. Casualty assignment follows the standard fixed priority. With the origin bonuses on, a unit on a cell in the area where it was built, or on a cell whose terrain kind matches its birth terrain, adds 2 (Low) or 4 (High) to its rolls there (§4.9, "Origin bonuses"). That area is its birth country on the global map and its origin area on a regional map. An Advanced unit adds its tech bonus on top (§4.9, "Tech bonus").
 
 **Terrain cover in battles:** a shot at units on a forest, mountain, wetlands, urban, or rubble cell takes that cell's cover (§4.9, "Terrain cover"). The attacker-cell range cap above and the target-cell cover are separate rules and can both apply to one shot. Cover never applies to ranged fire at infrastructure. Infantry firing at an urban cell drops from 3 to the floor of 2.
 
@@ -643,7 +643,7 @@ The tactical battle UI displays the res4 hex grid for the parent res1 hex with t
 
 The shipped scenario id is `region_vs_region`. Details: [region-vs-region.md](region-vs-region.md). After combat, production, and control updates, `evaluateRegionControlWinnerAtEndOfTurn` may name a winner:
 
-1. **Control:** You control every res1 hex in the enemy home region, and the enemy does not symmetrically control yours.
-2. **Urban elimination:** The enemy home region's urban count sums to zero, and your home region still has at least one urban hex. Mutual zero (scorched earth both homes) is not an urban-only win.
+1. **Control:** You control every strategic hex in the enemy home, and the enemy does not symmetrically control yours.
+2. **Urban elimination:** The enemy home's tactical urban count sums to zero, and your home still has at least one urban cell. Mutual zero (scorched earth both homes) is not an urban-only win.
 
 If one side has no remaining strategic units, the match also ends (force elimination in finalize). Both home-region outlines stay visible on the map regardless of fog.

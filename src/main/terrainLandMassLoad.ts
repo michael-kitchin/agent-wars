@@ -2,6 +2,7 @@
 
 import { readJsonFileOrThrow } from './jsonFileHelpers';
 import { logDebug, logTrace } from './logger';
+import { strategicH3Resolution } from '../shared/h3Resolutions';
 import type { StrategicLandMassRecord } from '../shared/landTraversalStrategic';
 import { resolveTerrainStrategicLandMassPath } from './terrainMetadataPaths';
 
@@ -259,8 +260,9 @@ export function parseStrategicLandMassEnvelope(parsed: unknown): StrategicLandMa
     logDebug('terrainLandMassLoad parseRes1LandMassEnvelope: water_pct_source', waterPctSource);
   }
   const resolution = env.resolution;
-  if (resolution !== 1) {
-    throw new Error(`landmass JSON: resolution ${String(resolution)} != expected 1`);
+  const expectedResolution = strategicH3Resolution();
+  if (resolution !== expectedResolution) {
+    throw new Error(`landmass JSON: resolution ${String(resolution)} != expected ${expectedResolution}`);
   }
   const recordsRaw = env.records;
   if (!Array.isArray(recordsRaw)) {
@@ -313,7 +315,7 @@ export function parseStrategicLandMassEnvelope(parsed: unknown): StrategicLandMa
 
   return {
     schema_version: EXPECTED_LANDMASS_SCHEMA_VERSION,
-    resolution: 1,
+    resolution: expectedResolution,
     generated_at_utc: String(env.generated_at_utc ?? ''),
     polygon_source: polygonSource,
     water_pct_source: waterPctSource,

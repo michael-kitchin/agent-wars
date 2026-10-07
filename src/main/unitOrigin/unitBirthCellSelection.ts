@@ -8,6 +8,7 @@
  */
 import { hashStringToUint32 } from '../../shared/stableHash';
 import type { BirthCountry, UnitOrigin } from '../../shared/unitOriginTypes';
+import type { OriginArea } from './tacticalOriginAreas';
 
 /**
  * One tactical child of the birth hex that a unit could be born in.
@@ -101,6 +102,15 @@ export interface UnitBirthOriginSelectionInput {
    * Exceptions: None.
    */
   readonly birthCountryForTactical: (h3Index: string) => BirthCountry | null;
+  /**
+   * Looks up the regional origin area of a tactical cell.
+   *
+   * Contract: Omitted on the global map. Returns null when the cell has no origin.
+   * When to use: Passed by `resolveUnitBirthOrigin` while a regional pack is loaded.
+   * Expected outcome: The area's id, name, and country code replace the global country-as-area fields. The country code is the area's own code.
+   * Exceptions: None.
+   */
+  readonly originAreaForTactical?: (h3Index: string) => OriginArea | null;
 }
 
 /**
@@ -124,15 +134,22 @@ export function selectUnitBirthOrigin(input: UnitBirthOriginSelectionInput): Uni
       birthIsUrban: false,
       birthCountryName: null,
       birthCountryCode: null,
+      birthAreaId: null,
+      birthAreaName: null,
+      birthSubdivisionCode: null,
     };
   }
   const country = input.birthCountryForTactical(cell.h3Index);
+  const area = input.originAreaForTactical?.(cell.h3Index) ?? null;
   return {
     birthH3Index: input.birthH3Index,
     birthTacticalH3Index: cell.h3Index,
     birthTerrainKind: cell.terrainKind,
     birthIsUrban: cell.isIntactUrban,
     birthCountryName: country?.name ?? null,
-    birthCountryCode: country?.code ?? null,
+    birthCountryCode: area?.countryCode ?? country?.code ?? null,
+    birthAreaId: area?.id ?? country?.name ?? null,
+    birthAreaName: area?.name ?? country?.name ?? null,
+    birthSubdivisionCode: area?.iso3166_2 ?? null,
   };
 }

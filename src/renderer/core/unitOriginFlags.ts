@@ -1,4 +1,5 @@
-import { COUNTRY_FLAG_CLASS_NAME, countryFlagAssetPath } from '../../shared/countryFlags';
+import { COUNTRY_FLAG_CLASS_NAME } from '../../shared/countryFlags';
+import { originFlagAssetPath } from '../../shared/originArea';
 import type { GameStateSnapshot } from '../../shared/ipc/gameStateTypes';
 import { LOSS_CAUSE_KEYS, type TurnLossSummary } from '../../shared/lossSummary';
 import { parseTacticalSubUnitId } from '../../shared/unitIds';
@@ -189,7 +190,10 @@ export function createUnitOriginFlagImage(input: {
 }): HTMLImageElement {
   const img = document.createElement('img');
   img.className = COUNTRY_FLAG_CLASS_NAME;
-  img.src = countryFlagAssetPath(input.origin.birthCountryCode);
+  img.src = originFlagAssetPath({
+    subdivisionCode: input.origin.birthSubdivisionCode ?? null,
+    countryCode: input.origin.birthCountryCode,
+  });
   img.alt = '';
   img.setAttribute('aria-hidden', 'true');
   img.draggable = false;

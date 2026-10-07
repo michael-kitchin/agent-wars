@@ -23,7 +23,7 @@ The naming files list the countries, states, cities, and water bodies that overl
 
 Regenerate with `python -m scripts.naming_pipeline.generate_hex_naming run`, then `npm run generated:zip`. Only the `.json.zip` files are tracked.
 
-The main process uses the codes for the flags in hex tooltips and for each new unit's country of origin. National flag images are vendored in `static/flags/`. Subdivision SVGs, one file per ISO 3166-2 code, are in `static/flags/subdivisions/` with `ATTRIBUTION.md`. The match still shows the national flag. See [`static/flags/README.md`](../static/flags/README.md).
+The main process uses the codes for the flags in hex tooltips and for each new unit's country of origin. National flag images are vendored in `static/flags/`. A global unit shows that national flag. A regional unit shows the subdivision SVG when the origin area's `iso_3166_2` has a file under `static/flags/subdivisions/`, and otherwise the national flag for the area's country code. Attribution for those files is in `subdivisions/ATTRIBUTION.md`. See [`static/flags/README.md`](../static/flags/README.md).
 
 A birth cell's country is its largest city (population, then lower scalerank, then name). With no city that names a country, it is the country row with the most states in the cell, then lower scalerank, then name. With no country row, it is the country of the most prominent state. The stored name is the canonical country name for that ISO code. A cell with none of those rows has no country.
 
@@ -53,7 +53,7 @@ Parent-child mapping is H3's native hierarchy (three steps, 343 tactical cells u
 
 ## Regional Packs
 
-Regional maps live under `data/generated/regions/<region_id>/`. Each folder holds a manifest plus strategic (`res_s`) and tactical (`res_t`) JSON. Manifest schema 1.1.0 records side groups and origin areas. The economy numbers for those maps are in `src/shared/regionalRulesCatalog.ts`. The app does not load these packs yet. The runbook is [scripts/regional_pipeline/README.md](../scripts/regional_pipeline/README.md).
+Regional maps live under `data/generated/regions/<region_id>/`. Each folder holds a manifest plus strategic (`res_s`) and tactical (`res_t`) JSON. Manifest schema 1.1.0 records side groups and origin areas. The economy numbers for those maps are in `src/shared/regionalRulesCatalog.ts`. The app loads one pack when a regional match starts. A packaged app ships the zip archives and extracts that one region into the user-data folder the first time it is played. The runbook is [scripts/regional_pipeline/README.md](../scripts/regional_pipeline/README.md).
 
 ## Related
 

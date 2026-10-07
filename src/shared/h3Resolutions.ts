@@ -1,5 +1,6 @@
 import { cellToChildren, cellToParent, getResolution, latLngToCell } from 'h3-js';
 import { activeGameMap } from './activeGameMap';
+import { loadedHexRole } from './loadedStrategicFootprint';
 
 /**
  * H3 resolution of the global strategic map.
@@ -130,12 +131,11 @@ export function tacticalCellAt(lat: number, lng: number): string {
 /**
  * Returns false until hex roles are loaded for the active map.
  *
- * Purpose: Neutral-border hexes produce nothing and cannot host bases. The role table is not read yet, so every hex is treated as an ordinary hex.
- * When to use: Do not branch on this until a loaded map supplies hex roles. Callers that do branch today treat every hex as ordinary.
- * Expected outcome: False for every index.
+ * Purpose: Neutral-border hexes produce nothing and cannot host bases.
+ * When to use: Production, build queues, and air-base checks.
+ * Expected outcome: True only when the loaded role is `neutral_border`. The global map has no roles, so this is false.
  * Exceptions: None.
  */
 export function isNeutralBorderHex(h3Index: string): boolean {
-  void h3Index;
-  return false;
+  return loadedHexRole(h3Index) === 'neutral_border';
 }

@@ -9,6 +9,8 @@ const { GENERATED_TERRAIN_JSON_FILES } = require('./generated-data-manifest.cjs'
 const {
   buildElectronBuilderGeneratedFileEntries,
   buildElectronBuilderGeneratedResourceFilter,
+  buildElectronBuilderRegionalZipFileEntries,
+  buildElectronBuilderRegionalZipResource,
 } = require('./electronBuilderGeneratedFiles.cjs');
 
 function testVersionedIdentityContract() {
@@ -54,6 +56,26 @@ function testGeneratedTerrainResourcesContract() {
       `electron-builder files must include data/generated/${filename}`
     );
   }
+  const regionalFiles = buildElectronBuilderRegionalZipFileEntries();
+  const regionalResource = buildElectronBuilderRegionalZipResource();
+  assert.deepStrictEqual(regionalFiles, ['data/generated/regions/**/*.json.zip']);
+  assert.deepStrictEqual(regionalResource.filter, ['**/*.json.zip']);
+  assert.ok(
+    Array.isArray(buildConfig.files) && buildConfig.files.includes('data/generated/regions/**/*.json.zip'),
+    'electron-builder files must ship regional zips'
+  );
+  assert.ok(
+    Array.isArray(buildConfig.files) && !buildConfig.files.includes('data/generated/regions/**/*.json'),
+    'electron-builder files must not ship extracted regional JSON'
+  );
+  const regionalEntry =
+    Array.isArray(buildConfig.extraResources) &&
+    buildConfig.extraResources.find((item) => item && item.to === 'data/generated/regions');
+  assert.ok(regionalEntry, 'electron-builder extraResources must include regional zips');
+  assert.ok(
+    Array.isArray(regionalEntry.filter) && regionalEntry.filter.includes('**/*.json.zip'),
+    'regional extraResources filter must keep zip archives'
+  );
 }
 
 function testWindowsZipTargetContract() {

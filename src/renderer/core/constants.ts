@@ -388,25 +388,6 @@ export const MULTI_PLAYER_GLYPH_FILTER = 'brightness(0.133)';
 export const OWNERSHIP_BORDER_ALPHA = 0.75;
 
 /**
- * Documents the module-scope binding `LIGHTNING_COLOR` (LIGHTNING_COLOR).
-
- * Purpose: Supports maintainability by documenting why `LIGHTNING_COLOR` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-export const LIGHTNING_COLOR = '#f0d000';
-/**
- * Documents the module-scope binding `CASUALTY_X_COLOR` (CASUALTY_X_COLOR).
-
- * Purpose: Supports maintainability by documenting why `CASUALTY_X_COLOR` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-export const CASUALTY_X_COLOR = '#c03030';
-
-/**
  * Stroke color for ranged-attack perimeter, planned, and planning-hover lines.
  *
  * Purpose: Distinguishes ranged targeting geometry from air-strike strokes at a glance.

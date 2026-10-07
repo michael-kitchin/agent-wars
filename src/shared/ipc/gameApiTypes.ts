@@ -16,6 +16,7 @@ import type {
   SetHexesKeepBuildingResult,
 } from './productionTypes';
 import type { GameStateSnapshot } from './gameStateTypes';
+import type { GameMapListEntry } from '../gameMapList';
 import type {
   EndTacticalBattleIpcResult,
   StartTacticalBattleIpcResult,
@@ -191,6 +192,15 @@ getHexContinentNames: (payload: HexContinentNamesRequest) => Promise<string[]>;
    * Exceptions: None.
    */
 listScenarioHomeRegions: () => Promise<string[]>;
+    /**
+   * Lists the global map and every extracted regional pack.
+   *
+   * Contract: Each row has a display name, side groups, unit costs, and the Advanced threshold. Tactical terrain is not read.
+   * When to use: When the new-game overlay opens.
+   * Expected outcome: Maps and side groups sorted by display name.
+   * Exceptions: Rejects on IPC transport failures.
+   */
+listGameMaps: () => Promise<GameMapListEntry[]>;
     /**
    * Specifies the contract for the `newGame` member (newGame: (payload?: NewGameIpcPayload) => Promise<GameStateSnapshot>;).
 

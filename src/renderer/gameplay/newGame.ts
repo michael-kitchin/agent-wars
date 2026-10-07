@@ -19,6 +19,9 @@ import {
   resetNewGameOptionControls,
 } from './newGameOptionsUi';
 import { newGameButtonTooltipText } from '../chrome/controlTooltipText';
+import { installRendererGameMap } from '../core/installRendererGameMap';
+import { prepareNewGameMapPanel, readNewGameMapChoice, regionalStartBlocked, registerNewGameMapControls } from './newGameMapUi';
+import { showMapToast } from '../openRouter/openRouterUiHelpers';
 
 /**
  * Wires the new-game randomize buttons.
@@ -234,12 +237,16 @@ setMainUIControlsEnabled: (enabled: boolean) => void;
  * Exceptions: None; click handler errors are caught.
  */
 export function registerNewGameButton(deps: NewGameDeps): void {
-  void initializeScenarioRegionSelectorsOnOverlayOpen();
   registerRegionRandomizeButtons();
+  registerNewGameMapControls();
   registerGameSizeSelect();
   registerNewGameOptionSeparators();
   document.getElementById('new-game-btn')?.addEventListener('click', async () => {
     if (!window.gameApi?.newGame) return;
+    if (regionalStartBlocked()) {
+      showMapToast('This map has no two sides.');
+      return;
+    }
     try {
       const selectedRegions = getSelectedScenarioRegions();
       const state = (await window.gameApi.newGame({
@@ -247,8 +254,10 @@ export function registerNewGameButton(deps: NewGameDeps): void {
         startMonth: readNewGameStartMonth(),
         humanHomeRegion: selectedRegions.humanHomeRegion,
         aiHomeRegion: selectedRegions.aiHomeRegion,
+        ...readNewGameMapChoice(),
         gameSize: readSelectedGameSizeFromDocument(),
       })) as GameStateSnapshot;
+      installRendererGameMap(state);
       await deps.refreshTacticalTerrainOverridesForRenderer({ reloadStaticOverlays: true });
       S.gameState = state;
       S.strategicScenarioInitialLeafletView = null;
@@ -293,6 +302,7 @@ export function registerNewGameButton(deps: NewGameDeps): void {
       deps.resizeAndRedraw();
     } catch (err) {
       console.error('newGame failed:', err);
+      showMapToast('The new game did not start. This screen stays open.');
     }
   });
 }
@@ -329,6 +339,7 @@ export function openNewGameOverlayFromModelTab(setMainUIControlsEnabled: (enable
   }
   resetNewGameOptionControls();
   void initializeScenarioRegionSelectorsOnOverlayOpen();
+  void prepareNewGameMapPanel();
   syncGameSizeCapPreview();
   overlay?.classList.remove('hidden');
   setMainUIControlsEnabled(false);

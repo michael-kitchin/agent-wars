@@ -104,8 +104,6 @@
   var MULTI_PLAYER_STROKE = "#222222";
   var MULTI_PLAYER_GLYPH_FILTER = "brightness(0.133)";
   var OWNERSHIP_BORDER_ALPHA = 0.75;
-  var LIGHTNING_COLOR = "#f0d000";
-  var CASUALTY_X_COLOR = "#c03030";
   var RANGE_PERIMETER_RANGED_COLOR = "#a06020";
   var RANGE_PERIMETER_AIR_STRIKE_COLOR = "#7a3db5";
   var RANGE_PERIMETER_WIDTH_MULTIPLIER = 2;
@@ -1329,6 +1327,1851 @@
     return `<img class="${COUNTRY_FLAG_CLASS_NAME}" src="${src}" alt="" aria-hidden="true" draggable="false">`;
   }
 
+  // src/shared/subdivisionFlagCodes.ts
+  var SUBDIVISION_FLAG_CODES = /* @__PURE__ */ new Set([
+    "ad-02",
+    "ad-03",
+    "ad-05",
+    "ad-06",
+    "ad-07",
+    "ad-08",
+    "ae-aj",
+    "ae-az",
+    "ae-du",
+    "ae-fu",
+    "ae-sh",
+    "ae-uq",
+    "af-kab",
+    "af-pan",
+    "ag-10",
+    "al-01",
+    "al-02",
+    "al-03",
+    "al-06",
+    "al-07",
+    "al-11",
+    "al-12",
+    "am-er",
+    "ar-a",
+    "ar-b",
+    "ar-c",
+    "ar-d",
+    "ar-e",
+    "ar-f",
+    "ar-g",
+    "ar-h",
+    "ar-j",
+    "ar-k",
+    "ar-n",
+    "ar-p",
+    "ar-q",
+    "ar-r",
+    "ar-s",
+    "ar-t",
+    "ar-u",
+    "ar-v",
+    "ar-w",
+    "ar-x",
+    "ar-y",
+    "ar-z",
+    "at-2",
+    "at-3",
+    "at-4",
+    "at-5",
+    "at-6",
+    "at-7",
+    "at-8",
+    "at-9",
+    "au-act",
+    "au-nsw",
+    "au-nt",
+    "au-qld",
+    "au-sa",
+    "au-tas",
+    "au-vic",
+    "au-wa",
+    "az-ba",
+    "az-nx",
+    "ba-brc",
+    "ba-srp",
+    "be-bru",
+    "be-van",
+    "be-vbr",
+    "be-vlg",
+    "be-vli",
+    "be-vov",
+    "be-vwv",
+    "be-wal",
+    "be-wbr",
+    "be-wht",
+    "be-wlg",
+    "be-wlx",
+    "be-wna",
+    "bh-13",
+    "bh-14",
+    "bh-15",
+    "bh-17",
+    "bo-b",
+    "bo-c",
+    "bo-h",
+    "bo-l",
+    "bo-n",
+    "bo-o",
+    "bo-p",
+    "bo-s",
+    "bo-t",
+    "bq-bo",
+    "bq-sa",
+    "bq-se",
+    "br-ac",
+    "br-al",
+    "br-am",
+    "br-ap",
+    "br-ba",
+    "br-ce",
+    "br-df",
+    "br-es",
+    "br-go",
+    "br-ma",
+    "br-mg",
+    "br-ms",
+    "br-mt",
+    "br-pa",
+    "br-pb",
+    "br-pe",
+    "br-pi",
+    "br-pr",
+    "br-rn",
+    "br-ro",
+    "br-rr",
+    "br-rs",
+    "br-sc",
+    "br-se",
+    "br-sp",
+    "br-to",
+    "bw-ga",
+    "by-br",
+    "by-hm",
+    "by-ho",
+    "by-hr",
+    "by-ma",
+    "by-mi",
+    "by-vi",
+    "ca-ab",
+    "ca-bc",
+    "ca-mb",
+    "ca-nb",
+    "ca-nl",
+    "ca-ns",
+    "ca-nt",
+    "ca-nu",
+    "ca-on",
+    "ca-qc",
+    "ca-sk",
+    "ca-yt",
+    "cd-kn",
+    "cd-sa",
+    "cg-16",
+    "ch-ag",
+    "ch-ai",
+    "ch-ar",
+    "ch-be",
+    "ch-bl",
+    "ch-bs",
+    "ch-fr",
+    "ch-ge",
+    "ch-gl",
+    "ch-gr",
+    "ch-ju",
+    "ch-lu",
+    "ch-ne",
+    "ch-nw",
+    "ch-ow",
+    "ch-sg",
+    "ch-sh",
+    "ch-so",
+    "ch-sz",
+    "ch-tg",
+    "ch-ti",
+    "ch-ur",
+    "ch-vd",
+    "ch-vs",
+    "ch-zg",
+    "ch-zh",
+    "cl-ai",
+    "cl-an",
+    "cl-ap",
+    "cl-at",
+    "cl-bi",
+    "cl-co",
+    "cl-li",
+    "cl-ll",
+    "cl-lr",
+    "cl-ma",
+    "cl-ml",
+    "cl-nb",
+    "cl-rm",
+    "cl-ta",
+    "cl-vs",
+    "cn-hk",
+    "cn-mo",
+    "co-ama",
+    "co-ant",
+    "co-ara",
+    "co-atl",
+    "co-bol",
+    "co-boy",
+    "co-cal",
+    "co-caq",
+    "co-cas",
+    "co-cau",
+    "co-ces",
+    "co-cho",
+    "co-cor",
+    "co-cun",
+    "co-dc",
+    "co-gua",
+    "co-guv",
+    "co-hui",
+    "co-lag",
+    "co-mag",
+    "co-met",
+    "co-nar",
+    "co-nsa",
+    "co-put",
+    "co-qui",
+    "co-ris",
+    "co-san",
+    "co-sap",
+    "co-suc",
+    "co-tol",
+    "co-vac",
+    "co-vau",
+    "co-vid",
+    "cr-a",
+    "cr-c",
+    "cr-g",
+    "cr-l",
+    "cr-p",
+    "cr-sj",
+    "cu-06",
+    "cu-11",
+    "cu-14",
+    "cv-mo",
+    "cv-pr",
+    "cv-sm",
+    "cz-10",
+    "cz-20",
+    "cz-31",
+    "cz-32",
+    "cz-41",
+    "cz-42",
+    "cz-51",
+    "cz-52",
+    "cz-53",
+    "cz-63",
+    "cz-64",
+    "cz-71",
+    "cz-72",
+    "cz-80",
+    "de-bb",
+    "de-be",
+    "de-bw",
+    "de-by",
+    "de-hb",
+    "de-he",
+    "de-hh",
+    "de-mv",
+    "de-ni",
+    "de-nw",
+    "de-rp",
+    "de-sh",
+    "de-sl",
+    "de-sn",
+    "de-st",
+    "de-th",
+    "dk-81",
+    "dk-82",
+    "dk-83",
+    "dk-84",
+    "dk-85",
+    "do-18",
+    "do-23",
+    "do-28",
+    "ec-a",
+    "ec-b",
+    "ec-c",
+    "ec-d",
+    "ec-e",
+    "ec-f",
+    "ec-g",
+    "ec-i",
+    "ec-l",
+    "ec-m",
+    "ec-n",
+    "ec-o",
+    "ec-r",
+    "ec-s",
+    "ec-sd",
+    "ec-se",
+    "ec-t",
+    "ec-u",
+    "ec-w",
+    "ec-x",
+    "ec-y",
+    "ec-z",
+    "ee-130",
+    "ee-141",
+    "ee-142",
+    "ee-171",
+    "ee-184",
+    "ee-191",
+    "ee-198",
+    "ee-214",
+    "ee-245",
+    "ee-247",
+    "ee-251",
+    "ee-255",
+    "ee-272",
+    "ee-283",
+    "ee-284",
+    "ee-291",
+    "ee-293",
+    "ee-296",
+    "ee-303",
+    "ee-305",
+    "ee-317",
+    "ee-321",
+    "ee-338",
+    "ee-353",
+    "ee-37",
+    "ee-39",
+    "ee-424",
+    "ee-430",
+    "ee-431",
+    "ee-432",
+    "ee-442",
+    "ee-446",
+    "ee-45",
+    "ee-478",
+    "ee-480",
+    "ee-50",
+    "ee-503",
+    "ee-511",
+    "ee-514",
+    "ee-52",
+    "ee-528",
+    "ee-557",
+    "ee-56",
+    "ee-567",
+    "ee-586",
+    "ee-60",
+    "ee-615",
+    "ee-618",
+    "ee-622",
+    "ee-624",
+    "ee-638",
+    "ee-64",
+    "ee-651",
+    "ee-653",
+    "ee-661",
+    "ee-663",
+    "ee-668",
+    "ee-68",
+    "ee-689",
+    "ee-698",
+    "ee-708",
+    "ee-71",
+    "ee-712",
+    "ee-714",
+    "ee-719",
+    "ee-726",
+    "ee-732",
+    "ee-735",
+    "ee-74",
+    "ee-784",
+    "ee-79",
+    "ee-793",
+    "ee-796",
+    "ee-803",
+    "ee-809",
+    "ee-81",
+    "ee-824",
+    "ee-834",
+    "ee-84",
+    "ee-855",
+    "ee-87",
+    "ee-890",
+    "ee-897",
+    "ee-901",
+    "ee-903",
+    "ee-907",
+    "ee-917",
+    "ee-919",
+    "ee-928",
+    "eg-alx",
+    "eg-asn",
+    "eg-bh",
+    "eg-bns",
+    "eg-dk",
+    "eg-dt",
+    "eg-js",
+    "eg-kfs",
+    "eg-pts",
+    "eg-shr",
+    "eg-sin",
+    "eg-suz",
+    "es-a",
+    "es-ab",
+    "es-an",
+    "es-ar",
+    "es-as",
+    "es-b",
+    "es-ba",
+    "es-bi",
+    "es-bu",
+    "es-cb",
+    "es-cc",
+    "es-ce",
+    "es-cl",
+    "es-cm",
+    "es-cn",
+    "es-co",
+    "es-cs",
+    "es-ct",
+    "es-cu",
+    "es-ex",
+    "es-ga",
+    "es-gc",
+    "es-gi",
+    "es-gr",
+    "es-ib",
+    "es-l",
+    "es-le",
+    "es-lo",
+    "es-lu",
+    "es-m",
+    "es-mc",
+    "es-md",
+    "es-ml",
+    "es-mu",
+    "es-na",
+    "es-nc",
+    "es-o",
+    "es-or",
+    "es-pm",
+    "es-po",
+    "es-pv",
+    "es-ri",
+    "es-s",
+    "es-sa",
+    "es-ss",
+    "es-t",
+    "es-te",
+    "es-v",
+    "es-vc",
+    "es-vi",
+    "es-z",
+    "es-za",
+    "et-aa",
+    "et-af",
+    "et-am",
+    "et-be",
+    "et-ga",
+    "et-ha",
+    "et-or",
+    "et-si",
+    "et-sn",
+    "et-so",
+    "et-sw",
+    "et-ti",
+    "fi-01",
+    "fi-03",
+    "fi-04",
+    "fi-05",
+    "fi-06",
+    "fi-07",
+    "fi-08",
+    "fi-11",
+    "fi-13",
+    "fi-15",
+    "fi-16",
+    "fi-17",
+    "fi-18",
+    "fm-ksa",
+    "fm-pni",
+    "fm-trk",
+    "fm-yap",
+    "fr-01",
+    "fr-02",
+    "fr-03",
+    "fr-04",
+    "fr-05",
+    "fr-06",
+    "fr-07",
+    "fr-09",
+    "fr-10",
+    "fr-11",
+    "fr-12",
+    "fr-13",
+    "fr-14",
+    "fr-15",
+    "fr-16",
+    "fr-17",
+    "fr-18",
+    "fr-19",
+    "fr-20r",
+    "fr-21",
+    "fr-22",
+    "fr-23",
+    "fr-24",
+    "fr-25",
+    "fr-26",
+    "fr-27",
+    "fr-28",
+    "fr-29",
+    "fr-2a",
+    "fr-2b",
+    "fr-30",
+    "fr-31",
+    "fr-32",
+    "fr-33",
+    "fr-34",
+    "fr-35",
+    "fr-36",
+    "fr-37",
+    "fr-38",
+    "fr-39",
+    "fr-40",
+    "fr-41",
+    "fr-42",
+    "fr-43",
+    "fr-44",
+    "fr-45",
+    "fr-46",
+    "fr-47",
+    "fr-48",
+    "fr-49",
+    "fr-50",
+    "fr-51",
+    "fr-52",
+    "fr-53",
+    "fr-54",
+    "fr-55",
+    "fr-56",
+    "fr-57",
+    "fr-58",
+    "fr-59",
+    "fr-60",
+    "fr-61",
+    "fr-63",
+    "fr-64",
+    "fr-65",
+    "fr-66",
+    "fr-68",
+    "fr-69",
+    "fr-69m",
+    "fr-6ae",
+    "fr-70",
+    "fr-71",
+    "fr-72",
+    "fr-73",
+    "fr-74",
+    "fr-75c",
+    "fr-76",
+    "fr-77",
+    "fr-78",
+    "fr-79",
+    "fr-80",
+    "fr-81",
+    "fr-82",
+    "fr-83",
+    "fr-84",
+    "fr-85",
+    "fr-86",
+    "fr-87",
+    "fr-88",
+    "fr-89",
+    "fr-90",
+    "fr-91",
+    "fr-92",
+    "fr-93",
+    "fr-94",
+    "fr-95",
+    "fr-971",
+    "fr-972",
+    "fr-973",
+    "fr-974",
+    "fr-976",
+    "fr-ara",
+    "fr-bfc",
+    "fr-bl",
+    "fr-bre",
+    "fr-cp",
+    "fr-cvl",
+    "fr-ges",
+    "fr-hdf",
+    "fr-idf",
+    "fr-mf",
+    "fr-naq",
+    "fr-nc",
+    "fr-nor",
+    "fr-occ",
+    "fr-pac",
+    "fr-pdl",
+    "fr-pf",
+    "fr-pm",
+    "fr-tf",
+    "fr-wf",
+    "ga-1",
+    "ga-2",
+    "ga-3",
+    "ga-4",
+    "ga-5",
+    "ga-6",
+    "ga-7",
+    "ga-8",
+    "ga-9",
+    "gb-abd",
+    "gb-abe",
+    "gb-agy",
+    "gb-ann",
+    "gb-bdf",
+    "gb-bir",
+    "gb-bkm",
+    "gb-bns",
+    "gb-cam",
+    "gb-cbf",
+    "gb-cgn",
+    "gb-chw",
+    "gb-cma",
+    "gb-con",
+    "gb-cov",
+    "gb-crf",
+    "gb-dby",
+    "gb-dev",
+    "gb-dor",
+    "gb-dur",
+    "gb-edh",
+    "gb-eln",
+    "gb-els",
+    "gb-eng",
+    "gb-erw",
+    "gb-ery",
+    "gb-ess",
+    "gb-esx",
+    "gb-fal",
+    "gb-fln",
+    "gb-fmo",
+    "gb-glg",
+    "gb-gls",
+    "gb-gwn",
+    "gb-ham",
+    "gb-hef",
+    "gb-hrt",
+    "gb-ios",
+    "gb-iow",
+    "gb-ken",
+    "gb-lan",
+    "gb-lec",
+    "gb-lin",
+    "gb-lnd",
+    "gb-man",
+    "gb-mon",
+    "gb-mry",
+    "gb-nbl",
+    "gb-nfk",
+    "gb-ngm",
+    "gb-nir",
+    "gb-nnh",
+    "gb-ntt",
+    "gb-ork",
+    "gb-pem",
+    "gb-ply",
+    "gb-por",
+    "gb-pow",
+    "gb-rct",
+    "gb-rut",
+    "gb-sct",
+    "gb-sfk",
+    "gb-shr",
+    "gb-som",
+    "gb-sry",
+    "gb-stg",
+    "gb-sts",
+    "gb-vgl",
+    "gb-war",
+    "gb-wbk",
+    "gb-wil",
+    "gb-wls",
+    "gb-wnh",
+    "gb-wor",
+    "gb-wsx",
+    "gb-yor",
+    "gb-zet",
+    "ge-ab",
+    "ge-aj",
+    "ge-gu",
+    "ge-im",
+    "ge-ka",
+    "ge-rl",
+    "ge-sj",
+    "ge-sk",
+    "ge-tb",
+    "gh-aa",
+    "gh-ah",
+    "gh-ep",
+    "gl-ku",
+    "gl-qe",
+    "gl-sm",
+    "gm-b",
+    "gr-69",
+    "gr-a",
+    "gr-b",
+    "gr-c",
+    "gt-01",
+    "gt-03",
+    "gt-05",
+    "gt-07",
+    "gt-08",
+    "gt-16",
+    "gt-21",
+    "gy-cu",
+    "gy-de",
+    "gy-eb",
+    "gy-es",
+    "gy-ma",
+    "gy-pm",
+    "gy-pt",
+    "gy-ud",
+    "gy-ut",
+    "hn-cp",
+    "hn-oc",
+    "hn-sb",
+    "hn-yo",
+    "hr-01",
+    "hr-02",
+    "hr-04",
+    "hr-09",
+    "hr-12",
+    "hr-14",
+    "hr-15",
+    "hr-16",
+    "hr-17",
+    "hr-18",
+    "hr-20",
+    "hr-21",
+    "hu-ba",
+    "hu-bk",
+    "hu-de",
+    "hu-du",
+    "hu-er",
+    "hu-gs",
+    "hu-gy",
+    "hu-he",
+    "hu-hv",
+    "hu-kv",
+    "hu-nk",
+    "hu-ny",
+    "hu-sd",
+    "hu-sf",
+    "hu-sh",
+    "hu-sk",
+    "hu-sn",
+    "hu-ss",
+    "hu-st",
+    "hu-tb",
+    "hu-ve",
+    "hu-vm",
+    "hu-ze",
+    "id-ac",
+    "id-ba",
+    "id-bb",
+    "id-be",
+    "id-bt",
+    "id-go",
+    "id-ja",
+    "id-jb",
+    "id-ji",
+    "id-jk",
+    "id-jt",
+    "id-kb",
+    "id-ki",
+    "id-kr",
+    "id-ks",
+    "id-kt",
+    "id-ku",
+    "id-ma",
+    "id-mu",
+    "id-nb",
+    "id-nt",
+    "id-pa",
+    "id-pb",
+    "id-ri",
+    "id-sb",
+    "id-sg",
+    "id-sn",
+    "id-sr",
+    "id-ss",
+    "id-st",
+    "id-yo",
+    "ie-c",
+    "ie-l",
+    "ie-m",
+    "ie-u",
+    "il-jm",
+    "il-ta",
+    "iq-ba",
+    "iq-kr",
+    "iq-sd",
+    "is-rkv",
+    "it-21",
+    "it-23",
+    "it-25",
+    "it-32",
+    "it-36",
+    "it-42",
+    "it-45",
+    "it-55",
+    "it-57",
+    "it-62",
+    "it-65",
+    "it-67",
+    "it-72",
+    "it-75",
+    "it-77",
+    "it-78",
+    "it-82",
+    "it-88",
+    "it-al",
+    "it-an",
+    "it-aq",
+    "it-at",
+    "it-av",
+    "it-ba",
+    "it-bg",
+    "it-bo",
+    "it-br",
+    "it-bz",
+    "it-cb",
+    "it-co",
+    "it-ct",
+    "it-cz",
+    "it-fe",
+    "it-fi",
+    "it-go",
+    "it-kr",
+    "it-lc",
+    "it-le",
+    "it-li",
+    "it-lo",
+    "it-mb",
+    "it-me",
+    "it-mi",
+    "it-ms",
+    "it-na",
+    "it-nu",
+    "it-or",
+    "it-pc",
+    "it-pe",
+    "it-pi",
+    "it-pr",
+    "it-pt",
+    "it-pz",
+    "it-ra",
+    "it-re",
+    "it-rn",
+    "it-sa",
+    "it-so",
+    "it-ss",
+    "it-su",
+    "it-sv",
+    "it-ta",
+    "it-tn",
+    "it-to",
+    "it-tr",
+    "it-ud",
+    "it-va",
+    "it-vb",
+    "it-ve",
+    "it-vr",
+    "jp-01",
+    "jp-02",
+    "jp-03",
+    "jp-04",
+    "jp-05",
+    "jp-06",
+    "jp-07",
+    "jp-08",
+    "jp-09",
+    "jp-10",
+    "jp-11",
+    "jp-12",
+    "jp-13",
+    "jp-14",
+    "jp-15",
+    "jp-16",
+    "jp-17",
+    "jp-18",
+    "jp-19",
+    "jp-20",
+    "jp-21",
+    "jp-22",
+    "jp-23",
+    "jp-24",
+    "jp-25",
+    "jp-26",
+    "jp-27",
+    "jp-28",
+    "jp-29",
+    "jp-30",
+    "jp-31",
+    "jp-32",
+    "jp-33",
+    "jp-34",
+    "jp-35",
+    "jp-36",
+    "jp-37",
+    "jp-38",
+    "jp-39",
+    "jp-40",
+    "jp-41",
+    "jp-42",
+    "jp-43",
+    "jp-44",
+    "jp-45",
+    "jp-46",
+    "jp-47",
+    "ke-04",
+    "ke-13",
+    "ke-19",
+    "ke-24",
+    "ke-28",
+    "ke-30",
+    "ke-45",
+    "ke-46",
+    "kg-b",
+    "kg-c",
+    "kg-gb",
+    "kg-go",
+    "kg-n",
+    "kg-o",
+    "kg-t",
+    "kg-y",
+    "km-a",
+    "km-g",
+    "km-m",
+    "kn-n",
+    "kr-11",
+    "kr-26",
+    "kr-27",
+    "kr-28",
+    "kr-29",
+    "kr-30",
+    "kr-31",
+    "kr-41",
+    "kr-42",
+    "kr-43",
+    "kr-44",
+    "kr-45",
+    "kr-46",
+    "kr-47",
+    "kr-48",
+    "kr-49",
+    "kr-50",
+    "kz-23",
+    "kz-35",
+    "kz-55",
+    "kz-71",
+    "kz-75",
+    "li-01",
+    "li-02",
+    "li-03",
+    "li-04",
+    "li-05",
+    "li-06",
+    "li-07",
+    "li-08",
+    "li-09",
+    "li-10",
+    "li-11",
+    "lk-4",
+    "lk-6",
+    "lk-8",
+    "lr-bg",
+    "lr-bm",
+    "lr-cm",
+    "lr-gb",
+    "lr-gg",
+    "lr-gk",
+    "lr-gp",
+    "lr-lo",
+    "lr-mg",
+    "lr-mo",
+    "lr-my",
+    "lr-ni",
+    "lr-rg",
+    "lr-ri",
+    "lr-si",
+    "lt-01",
+    "lt-04",
+    "lt-08",
+    "lt-09",
+    "lt-10",
+    "lt-15",
+    "lt-20",
+    "lt-25",
+    "lt-28",
+    "lt-32",
+    "lt-33",
+    "lt-35",
+    "lt-37",
+    "lt-40",
+    "lt-43",
+    "lt-45",
+    "lt-47",
+    "lt-49",
+    "lt-51",
+    "lt-52",
+    "lt-53",
+    "lt-54",
+    "lt-55",
+    "lt-56",
+    "lt-57",
+    "lt-58",
+    "lt-59",
+    "lt-al",
+    "lt-kl",
+    "lt-ku",
+    "lt-mr",
+    "lt-sa",
+    "lt-ut",
+    "lt-vl",
+    "lu-wi",
+    "lv-011",
+    "lv-022",
+    "lv-041",
+    "lv-042",
+    "lv-050",
+    "lv-052",
+    "lv-062",
+    "lv-077",
+    "lv-080",
+    "lv-106",
+    "lv-111",
+    "lv-113",
+    "lv-jel",
+    "lv-jur",
+    "lv-lpx",
+    "lv-rez",
+    "lv-rix",
+    "lv-ven",
+    "ma-07",
+    "md-br",
+    "md-ca",
+    "md-cu",
+    "md-du",
+    "md-ed",
+    "md-fl",
+    "md-ga",
+    "md-re",
+    "md-sn",
+    "md-so",
+    "md-un",
+    "me-06",
+    "me-15",
+    "me-16",
+    "me-17",
+    "me-18",
+    "me-19",
+    "me-20",
+    "me-24",
+    "mh-alk",
+    "mh-ebo",
+    "mh-kwa",
+    "mh-maj",
+    "mh-mil",
+    "mh-nmk",
+    "mh-uja",
+    "mh-wth",
+    "mk-101",
+    "mk-103",
+    "mk-104",
+    "mk-105",
+    "mk-106",
+    "mk-109",
+    "mk-201",
+    "mk-202",
+    "mk-203",
+    "mk-204",
+    "mk-205",
+    "mk-206",
+    "mk-207",
+    "mk-208",
+    "mk-210",
+    "mk-211",
+    "mk-301",
+    "mk-303",
+    "mk-304",
+    "mk-307",
+    "mk-308",
+    "mk-311",
+    "mk-312",
+    "mk-313",
+    "mk-401",
+    "mk-402",
+    "mk-403",
+    "mk-404",
+    "mk-407",
+    "mk-408",
+    "mk-409",
+    "mk-410",
+    "mk-501",
+    "mk-502",
+    "mk-503",
+    "mk-504",
+    "mk-506",
+    "mk-507",
+    "mk-508",
+    "mk-509",
+    "mk-601",
+    "mk-602",
+    "mk-603",
+    "mk-605",
+    "mk-606",
+    "mk-607",
+    "mk-608",
+    "mk-609",
+    "mk-701",
+    "mk-702",
+    "mk-703",
+    "mk-704",
+    "mk-705",
+    "mk-706",
+    "mk-802",
+    "mk-803",
+    "mk-805",
+    "mk-806",
+    "mk-807",
+    "mk-808",
+    "mk-809",
+    "mk-810",
+    "mk-811",
+    "mk-812",
+    "mk-815",
+    "mk-817",
+    "mm-01",
+    "mm-03",
+    "mm-04",
+    "mm-06",
+    "mm-07",
+    "mm-11",
+    "mm-12",
+    "mm-13",
+    "mm-14",
+    "mm-15",
+    "mm-16",
+    "mm-17",
+    "mm-18",
+    "mn-035",
+    "mn-037",
+    "mn-039",
+    "mn-041",
+    "mn-043",
+    "mn-046",
+    "mn-047",
+    "mn-049",
+    "mn-051",
+    "mn-053",
+    "mn-055",
+    "mn-057",
+    "mn-059",
+    "mn-061",
+    "mn-063",
+    "mn-064",
+    "mn-065",
+    "mn-067",
+    "mn-071",
+    "mn-1",
+    "mt-01",
+    "mt-02",
+    "mt-03",
+    "mt-04",
+    "mt-06",
+    "mt-07",
+    "mt-08",
+    "mt-09",
+    "mt-10",
+    "mt-11",
+    "mt-12",
+    "mt-13",
+    "mt-14",
+    "mt-15",
+    "mt-16",
+    "mt-17",
+    "mt-18",
+    "mt-19",
+    "mt-20",
+    "mt-22",
+    "mt-23",
+    "mt-24",
+    "mt-25",
+    "mt-26",
+    "mt-27",
+    "mt-28",
+    "mt-29",
+    "mt-30",
+    "mt-31",
+    "mt-32",
+    "mt-33",
+    "mt-34",
+    "mt-35",
+    "mt-36",
+    "mt-37",
+    "mt-38",
+    "mt-40",
+    "mt-41",
+    "mt-42",
+    "mt-43",
+    "mt-44",
+    "mt-45",
+    "mt-46",
+    "mt-47",
+    "mt-48",
+    "mt-49",
+    "mt-50",
+    "mt-51",
+    "mt-52",
+    "mt-53",
+    "mt-54",
+    "mt-55",
+    "mt-56",
+    "mt-57",
+    "mt-58",
+    "mt-59",
+    "mt-60",
+    "mt-61",
+    "mt-62",
+    "mt-63",
+    "mt-64",
+    "mt-65",
+    "mt-66",
+    "mt-67",
+    "mt-68",
+    "mu-pl",
+    "mu-ro",
+    "mx-bcn",
+    "mx-bcs",
+    "mx-chh",
+    "mx-gro",
+    "mx-gua",
+    "mx-jal",
+    "mx-mic",
+    "mx-mor",
+    "mx-nle",
+    "mx-pue",
+    "mx-roo",
+    "mx-son",
+    "mx-tab",
+    "mx-tam",
+    "mx-tla",
+    "mx-yuc",
+    "my-01",
+    "my-02",
+    "my-03",
+    "my-04",
+    "my-05",
+    "my-06",
+    "my-07",
+    "my-08",
+    "my-09",
+    "my-10",
+    "my-11",
+    "my-12",
+    "my-13",
+    "my-14",
+    "my-15",
+    "my-16",
+    "ng-ak",
+    "ng-by",
+    "ng-fc",
+    "ng-go",
+    "ng-kt",
+    "ng-os",
+    "ng-oy",
+    "ng-ta",
+    "ni-an",
+    "ni-as",
+    "ni-bo",
+    "ni-ca",
+    "ni-ci",
+    "ni-co",
+    "ni-es",
+    "ni-le",
+    "ni-md",
+    "ni-mn",
+    "ni-mt",
+    "ni-ri",
+    "ni-sj",
+    "nl-aw",
+    "nl-bq1",
+    "nl-bq2",
+    "nl-bq3",
+    "nl-cw",
+    "nl-dr",
+    "nl-fl",
+    "nl-fr",
+    "nl-ge",
+    "nl-gr",
+    "nl-li",
+    "nl-nb",
+    "nl-nh",
+    "nl-ov",
+    "nl-sx",
+    "nl-ut",
+    "nl-ze",
+    "nl-zh",
+    "no-03",
+    "no-11",
+    "no-15",
+    "no-18",
+    "no-34",
+    "no-38",
+    "no-46",
+    "no-50",
+    "no-54",
+    "nz-auk",
+    "nz-cit",
+    "nz-nsn",
+    "nz-ota",
+    "pa-1",
+    "pa-10",
+    "pa-2",
+    "pa-3",
+    "pa-4",
+    "pa-5",
+    "pa-6",
+    "pa-7",
+    "pa-9",
+    "pa-em",
+    "pa-ky",
+    "pa-nb",
+    "pe-ama",
+    "pe-anc",
+    "pe-apu",
+    "pe-aya",
+    "pe-caj",
+    "pe-cal",
+    "pe-cus",
+    "pe-huc",
+    "pe-huv",
+    "pe-ica",
+    "pe-jun",
+    "pe-lal",
+    "pe-lam",
+    "pe-lim",
+    "pe-lma",
+    "pe-lor",
+    "pe-mdd",
+    "pe-moq",
+    "pe-pas",
+    "pe-piu",
+    "pe-pun",
+    "pe-tac",
+    "pe-tum",
+    "pg-cpk",
+    "pg-cpm",
+    "pg-ebr",
+    "pg-ehg",
+    "pg-hla",
+    "pg-jwk",
+    "pg-mba",
+    "pg-mpm",
+    "pg-mrl",
+    "pg-ncd",
+    "pg-nik",
+    "pg-nsb",
+    "pg-san",
+    "pg-shm",
+    "pg-wbk",
+    "pg-whm",
+    "pg-wpd",
+    "ph-14",
+    "ph-bas",
+    "ph-boh",
+    "ph-buk",
+    "ph-cag",
+    "ph-que",
+    "ph-slu",
+    "ph-sun",
+    "pk-ba",
+    "pk-gb",
+    "pk-jk",
+    "pk-kp",
+    "pk-pb",
+    "pk-sd",
+    "pl-02",
+    "pl-04",
+    "pl-06",
+    "pl-08",
+    "pl-10",
+    "pl-12",
+    "pl-14",
+    "pl-16",
+    "pl-18",
+    "pl-20",
+    "pl-22",
+    "pl-24",
+    "pl-26",
+    "pl-28",
+    "pl-30",
+    "pl-32",
+    "pt-20",
+    "pt-30",
+    "pw-002",
+    "pw-010",
+    "pw-050",
+    "pw-100",
+    "pw-214",
+    "pw-218",
+    "pw-224",
+    "pw-226",
+    "pw-227",
+    "pw-350",
+    "pw-370",
+    "py-1",
+    "py-10",
+    "py-11",
+    "py-12",
+    "py-13",
+    "py-14",
+    "py-15",
+    "py-16",
+    "py-19",
+    "py-4",
+    "py-5",
+    "py-6",
+    "py-8",
+    "py-asu",
+    "ro-ab",
+    "ro-ar",
+    "ro-b",
+    "ro-bh",
+    "ro-cv",
+    "ro-gr",
+    "ro-il",
+    "rs-00",
+    "rs-14",
+    "rs-km",
+    "rs-vo",
+    "ru-ad",
+    "ru-al",
+    "ru-alt",
+    "ru-amu",
+    "ru-ast",
+    "ru-ba",
+    "ru-bel",
+    "ru-bry",
+    "ru-bu",
+    "ru-ce",
+    "ru-che",
+    "ru-chu",
+    "ru-cu",
+    "ru-da",
+    "ru-in",
+    "ru-irk",
+    "ru-kam",
+    "ru-kb",
+    "ru-kc",
+    "ru-kem",
+    "ru-kgd",
+    "ru-kgn",
+    "ru-kha",
+    "ru-khm",
+    "ru-kir",
+    "ru-kk",
+    "ru-kl",
+    "ru-klu",
+    "ru-ko",
+    "ru-kos",
+    "ru-kr",
+    "ru-krs",
+    "ru-kya",
+    "ru-len",
+    "ru-lip",
+    "ru-mag",
+    "ru-me",
+    "ru-mo",
+    "ru-mos",
+    "ru-mow",
+    "ru-mur",
+    "ru-nen",
+    "ru-ngr",
+    "ru-niz",
+    "ru-nvs",
+    "ru-oms",
+    "ru-per",
+    "ru-pri",
+    "ru-psk",
+    "ru-ros",
+    "ru-rya",
+    "ru-sa",
+    "ru-sak",
+    "ru-sam",
+    "ru-se",
+    "ru-smo",
+    "ru-spe",
+    "ru-sta",
+    "ru-sve",
+    "ru-ta",
+    "ru-tam",
+    "ru-tul",
+    "ru-tve",
+    "ru-ty",
+    "ru-tyu",
+    "ru-ud",
+    "ru-uly",
+    "ru-vgg",
+    "ru-vla",
+    "ru-vlg",
+    "ru-vor",
+    "ru-yan",
+    "ru-yar",
+    "ru-yev",
+    "ru-zab",
+    "sb-ct",
+    "sb-ml",
+    "sb-rb",
+    "sb-te",
+    "se-ab",
+    "se-ac",
+    "se-bd",
+    "se-c",
+    "se-d",
+    "se-e",
+    "se-f",
+    "se-g",
+    "se-h",
+    "se-i",
+    "se-k",
+    "se-m",
+    "se-n",
+    "se-o",
+    "se-s",
+    "se-t",
+    "se-u",
+    "se-w",
+    "se-x",
+    "se-y",
+    "se-z",
+    "sh-hl",
+    "sh-ta",
+    "si-002",
+    "si-003",
+    "si-004",
+    "si-011",
+    "si-012",
+    "si-013",
+    "si-017",
+    "si-022",
+    "si-023",
+    "si-026",
+    "si-027",
+    "si-029",
+    "si-030",
+    "si-032",
+    "si-033",
+    "si-034",
+    "si-036",
+    "si-040",
+    "si-041",
+    "si-043",
+    "si-047",
+    "si-048",
+    "si-050",
+    "si-052",
+    "si-057",
+    "si-061",
+    "si-069",
+    "si-070",
+    "si-071",
+    "si-080",
+    "si-082",
+    "si-085",
+    "si-090",
+    "si-094",
+    "si-096",
+    "si-099",
+    "si-104",
+    "si-106",
+    "si-108",
+    "si-109",
+    "si-122",
+    "si-125",
+    "si-128",
+    "si-132",
+    "si-133",
+    "si-147",
+    "si-150",
+    "si-151",
+    "si-158",
+    "si-160",
+    "si-163",
+    "si-167",
+    "si-168",
+    "si-172",
+    "si-192",
+    "si-200",
+    "si-204",
+    "si-206",
+    "si-208",
+    "si-211",
+    "si-213",
+    "sk-bc",
+    "sk-bl",
+    "sk-ki",
+    "sk-ni",
+    "sk-pv",
+    "sk-ta",
+    "sk-tc",
+    "sk-zi",
+    "sm-01",
+    "sm-02",
+    "sm-03",
+    "sm-04",
+    "sm-05",
+    "sm-06",
+    "sm-07",
+    "sm-08",
+    "sm-09",
+    "so-bk",
+    "so-bn",
+    "so-br",
+    "so-by",
+    "so-ga",
+    "so-hi",
+    "so-jd",
+    "so-jh",
+    "so-mu",
+    "so-nu",
+    "so-sd",
+    "so-sh",
+    "st-p",
+    "sv-ca",
+    "sv-ch",
+    "sv-li",
+    "sv-mo",
+    "sv-sa",
+    "sv-sv",
+    "sv-un",
+    "sv-us",
+    "th-10",
+    "th-12",
+    "th-13",
+    "th-14",
+    "th-15",
+    "th-21",
+    "th-22",
+    "th-26",
+    "th-33",
+    "th-34",
+    "th-35",
+    "th-41",
+    "th-42",
+    "th-45",
+    "th-46",
+    "th-48",
+    "th-50",
+    "th-51",
+    "th-53",
+    "th-54",
+    "th-55",
+    "th-57",
+    "th-62",
+    "th-64",
+    "th-65",
+    "th-67",
+    "th-70",
+    "th-71",
+    "th-73",
+    "th-74",
+    "th-76",
+    "th-77",
+    "th-80",
+    "th-81",
+    "th-82",
+    "th-83",
+    "th-85",
+    "th-90",
+    "th-92",
+    "th-93",
+    "th-94",
+    "th-96",
+    "tw-cha",
+    "tw-cyi",
+    "tw-cyq",
+    "tw-hsq",
+    "tw-hsz",
+    "tw-hua",
+    "tw-ila",
+    "tw-kee",
+    "tw-khh",
+    "tw-kin",
+    "tw-lie",
+    "tw-mia",
+    "tw-nan",
+    "tw-nwt",
+    "tw-pen",
+    "tw-pif",
+    "tw-tao",
+    "tw-tnn",
+    "tw-tpe",
+    "tw-ttt",
+    "tw-txg",
+    "tw-yun",
+    "ua-05",
+    "ua-07",
+    "ua-09",
+    "ua-12",
+    "ua-14",
+    "ua-18",
+    "ua-21",
+    "ua-23",
+    "ua-26",
+    "ua-30",
+    "ua-32",
+    "ua-35",
+    "ua-40",
+    "ua-43",
+    "ua-46",
+    "ua-51",
+    "ua-53",
+    "ua-56",
+    "ua-59",
+    "ua-61",
+    "ua-63",
+    "ua-65",
+    "ua-68",
+    "ua-71",
+    "ua-74",
+    "ua-77",
+    "us-ak",
+    "us-al",
+    "us-ar",
+    "us-as",
+    "us-az",
+    "us-ca",
+    "us-co",
+    "us-ct",
+    "us-dc",
+    "us-de",
+    "us-ga",
+    "us-gu",
+    "us-hi",
+    "us-ia",
+    "us-il",
+    "us-in",
+    "us-ks",
+    "us-ky",
+    "us-ma",
+    "us-md",
+    "us-me",
+    "us-mi",
+    "us-mn",
+    "us-mo",
+    "us-mp",
+    "us-ms",
+    "us-mt",
+    "us-nc",
+    "us-nd",
+    "us-nh",
+    "us-nj",
+    "us-nm",
+    "us-nv",
+    "us-ny",
+    "us-oh",
+    "us-ok",
+    "us-or",
+    "us-pr",
+    "us-ri",
+    "us-sc",
+    "us-sd",
+    "us-tn",
+    "us-tx",
+    "us-um",
+    "us-ut",
+    "us-vi",
+    "us-wa",
+    "us-wy",
+    "uy-ar",
+    "uy-ca",
+    "uy-cl",
+    "uy-co",
+    "uy-du",
+    "uy-la",
+    "uy-pa",
+    "uy-rn",
+    "uy-ro",
+    "uy-sa",
+    "uy-sj",
+    "uy-so",
+    "uy-tt",
+    "uz-qr",
+    "uz-tk",
+    "ve-a",
+    "ve-b",
+    "ve-c",
+    "ve-e",
+    "ve-f",
+    "ve-g",
+    "ve-h",
+    "ve-i",
+    "ve-j",
+    "ve-k",
+    "ve-l",
+    "ve-m",
+    "ve-n",
+    "ve-o",
+    "ve-p",
+    "ve-s",
+    "ve-t",
+    "ve-u",
+    "ve-v",
+    "ve-w",
+    "ve-x",
+    "ve-z",
+    "vu-map",
+    "vu-pam",
+    "vu-sam",
+    "vu-see",
+    "vu-tae",
+    "wf-al",
+    "wf-sg",
+    "wf-uv",
+    "za-mp",
+    "zm-01",
+    "zm-02",
+    "zm-03",
+    "zm-04",
+    "zm-05",
+    "zm-06",
+    "zm-07",
+    "zm-10"
+  ]);
+
+  // src/shared/originArea.ts
+  function originFlagAssetPath(input) {
+    const subdivision = input.subdivisionCode?.trim().toLowerCase() ?? "";
+    if (subdivision.length > 0 && SUBDIVISION_FLAG_CODES.has(subdivision)) {
+      return `flags/subdivisions/${subdivision}.svg`;
+    }
+    return countryFlagAssetPath(input.countryCode);
+  }
+  function originFlagImgHtml(input) {
+    const src = escapeHtmlText(originFlagAssetPath(input));
+    return `<img class="${COUNTRY_FLAG_CLASS_NAME}" src="${src}" alt="" aria-hidden="true" draggable="false">`;
+  }
+
   // src/shared/lossSummary.ts
   var LOSS_ENTRY_LIST_MAX = 5;
   var GROUP_LABEL_BY_TYPE = {
@@ -1705,8 +3548,15 @@
   function registerActiveGameMapReset(reset) {
     profileResetters.push(reset);
   }
+  function assignActiveProfile(profile) {
+    activeProfile = profile;
+    for (const reset of profileResetters) reset();
+  }
   function activeGameMap() {
     return activeProfile;
+  }
+  function setActiveGameMap(profile) {
+    assignActiveProfile(profile);
   }
 
   // src/shared/gameRules.ts
@@ -16333,16 +18183,24 @@
 
   // src/shared/unitOriginTooltipText.ts
   function unitOriginsPresentTheSame(left, right) {
-    return left.birthH3Index === right.birthH3Index && left.birthTacticalH3Index === right.birthTacticalH3Index && left.birthTerrainKind === right.birthTerrainKind && left.birthIsUrban === right.birthIsUrban && left.birthCountryName === right.birthCountryName && left.birthCountryCode === right.birthCountryCode;
+    return left.birthH3Index === right.birthH3Index && left.birthTacticalH3Index === right.birthTacticalH3Index && left.birthTerrainKind === right.birthTerrainKind && left.birthIsUrban === right.birthIsUrban && left.birthCountryName === right.birthCountryName && left.birthCountryCode === right.birthCountryCode && left.birthAreaId === right.birthAreaId && left.birthAreaName === right.birthAreaName && left.birthSubdivisionCode === right.birthSubdivisionCode;
   }
   function bonusRow(label, value) {
     return `<strong>${label}:</strong> ${value}`;
   }
   function formatUnitOriginTooltipHtml(input) {
     const rows = [];
-    const countryName = input.origin.birthCountryName?.trim() ?? "";
-    if (input.bonuses.countryEnabled && countryName.length > 0) {
-      rows.push(bonusRow("Country", `${countryFlagImgHtml(input.origin.birthCountryCode)}${escapeHtmlText(countryName)}`));
+    const areaName = (input.origin.birthAreaName ?? input.origin.birthCountryName)?.trim() ?? "";
+    if (input.bonuses.countryEnabled && areaName.length > 0) {
+      rows.push(
+        bonusRow(
+          "Country",
+          `${originFlagImgHtml({
+            subdivisionCode: input.origin.birthSubdivisionCode ?? null,
+            countryCode: input.origin.birthCountryCode
+          })}${escapeHtmlText(areaName)}`
+        )
+      );
     }
     const terrainKind = input.origin.birthTerrainKind?.trim() ?? "";
     if (input.bonuses.terrainEnabled && terrainKind.length > 0) {
@@ -16428,7 +18286,10 @@ ${body}`;
   function createUnitOriginFlagImage(input) {
     const img = document.createElement("img");
     img.className = COUNTRY_FLAG_CLASS_NAME;
-    img.src = countryFlagAssetPath(input.origin.birthCountryCode);
+    img.src = originFlagAssetPath({
+      subdivisionCode: input.origin.birthSubdivisionCode ?? null,
+      countryCode: input.origin.birthCountryCode
+    });
     img.alt = "";
     img.setAttribute("aria-hidden", "true");
     img.draggable = false;
@@ -16903,6 +18764,68 @@ ${body}`;
     return i >= 0 ? i : 0;
   }
 
+  // src/shared/mapExtent.ts
+  var MERCATOR_LAT = 85.05112877980659;
+  var extentReferenceLng = null;
+  function setMapExtentReferenceLng(lng) {
+    extentReferenceLng = lng;
+  }
+  function mapExtentReferenceLng() {
+    return extentReferenceLng;
+  }
+  function longitudeIntervalFromCenters(longitudes) {
+    const sorted = longitudes.filter((lng) => Number.isFinite(lng)).sort((a, b) => a - b);
+    if (sorted.length === 0) return null;
+    let largestGap = sorted[0] + 360 - sorted[sorted.length - 1];
+    let west = sorted[0];
+    let east = sorted[sorted.length - 1];
+    for (let i = 0; i < sorted.length - 1; i += 1) {
+      const gap = sorted[i + 1] - sorted[i];
+      if (gap > largestGap) {
+        largestGap = gap;
+        west = sorted[i + 1];
+        east = sorted[i] + 360;
+      }
+    }
+    const crossesAntimeridian = east > 180 || west < -180;
+    return {
+      west,
+      east,
+      referenceLng: (west + east) / 2,
+      crossesAntimeridian
+    };
+  }
+  function mapExtentBoxForHexes(interval, h3Indexes) {
+    if (!interval) return null;
+    let south = 90;
+    let north = -90;
+    let west = interval.west;
+    let east = interval.east;
+    for (const h3 of h3Indexes) {
+      const [, centerLng] = cellToLatLng(h3);
+      for (const [lat, lng] of cellToBoundary(h3)) {
+        const alignedToCell = alignTo(lng, centerLng);
+        const aligned = alignTo(alignedToCell, interval.referenceLng);
+        const clampedLat = Math.max(-MERCATOR_LAT, Math.min(MERCATOR_LAT, lat));
+        south = Math.min(south, clampedLat);
+        north = Math.max(north, clampedLat);
+        west = Math.min(west, aligned);
+        east = Math.max(east, aligned);
+      }
+    }
+    if (south > north) {
+      south = -MERCATOR_LAT;
+      north = MERCATOR_LAT;
+    }
+    return { south, west, north, east, referenceLng: interval.referenceLng };
+  }
+  function alignTo(lng, refLng) {
+    let shifted = lng;
+    while (shifted - refLng > 180) shifted -= 360;
+    while (refLng - shifted > 180) shifted += 360;
+    return shifted;
+  }
+
   // src/renderer/map/hexGrid.ts
   var WEB_MERCATOR_MAX_ABS_LAT = 85.05112877980659;
   function clampLatForWebMercatorDisplay(lat) {
@@ -16911,9 +18834,10 @@ ${body}`;
     return lat;
   }
   function alignLngToReference(lng, refLng) {
+    const reference = mapExtentReferenceLng() ?? refLng;
     let l = lng;
-    while (l - refLng > 180) l -= 360;
-    while (refLng - l > 180) l += 360;
+    while (l - reference > 180) l -= 360;
+    while (reference - l > 180) l += 360;
     return l;
   }
   function getHexBoundaryLatLngForLeafletOverlay(h3Index) {
@@ -17025,7 +18949,7 @@ ${body}`;
       });
       return;
     }
-    const worldBounds = leafletRef.latLngBounds(
+    const worldBounds2 = leafletRef.latLngBounds(
       leafletRef.latLng(-WEB_MERCATOR_MAX_ABS_LAT, -180),
       leafletRef.latLng(WEB_MERCATOR_MAX_ABS_LAT, 180)
     );
@@ -17036,7 +18960,7 @@ ${body}`;
       zoomDelta: 0.5,
       wheelPxPerZoomLevel: 80,
       worldCopyJump: true,
-      maxBounds: worldBounds,
+      maxBounds: worldBounds2,
       maxBoundsViscosity: 1,
       /* App-owned WASD/arrow screen pan; avoid Leaflet’s default keyboard panBy. */
       keyboard: false,
@@ -17047,7 +18971,7 @@ ${body}`;
     });
     const startIdx = getRasterBasemapChainStartIndex(initialBasemapProviderId ?? "esri_world_shaded_relief");
     mountRasterBasemap(leafletRef, mainMap, true, startIdx, "main");
-    mainMap.fitBounds(worldBounds, { padding: [2, 2], animate: false });
+    mainMap.fitBounds(worldBounds2, { padding: [2, 2], animate: false });
     mainMap.doubleClickZoom.disable();
     try {
       leafletRef.control.scale({
@@ -17069,7 +18993,7 @@ ${body}`;
       keyboard: false
     });
     mountRasterBasemap(leafletRef, miniMap, false, startIdx, "mini");
-    miniMap.fitBounds(worldBounds, { padding: [1, 1], animate: false });
+    miniMap.fitBounds(worldBounds2, { padding: [1, 1], animate: false });
     miniMap.setZoom(miniMap.getZoom());
     mainMap.on("move", notifyMainViewChanged);
     mainMap.on("zoom", notifyMainViewChanged);
@@ -17115,6 +19039,9 @@ ${body}`;
   function getMainLeafletMap() {
     return mainMap;
   }
+  function getMiniLeafletMap() {
+    return miniMap;
+  }
   function applyTilePaneFilter(map, filter) {
     try {
       const pane = map?.getPanes?.()?.tilePane;
@@ -17154,6 +19081,26 @@ ${body}`;
     notifyMainViewChanged();
   }
 
+  // src/shared/loadedStrategicFootprint.ts
+  var footprint = null;
+  var footprintSet = null;
+  var hexRoles = null;
+  function setLoadedStrategicFootprint(hexes, roles) {
+    footprint = hexes ? [...hexes] : null;
+    footprintSet = hexes ? new Set(hexes) : null;
+    hexRoles = hexes && roles ? new Map(roles) : null;
+  }
+  function loadedStrategicFootprint() {
+    return footprint ? [...footprint] : null;
+  }
+  function isOnMap(h3Index) {
+    if (!footprintSet) return true;
+    return footprintSet.has(h3Index);
+  }
+  function loadedHexRole(h3Index) {
+    return hexRoles?.get(h3Index) ?? null;
+  }
+
   // src/shared/h3Resolutions.ts
   function strategicH3Resolution() {
     return activeGameMap().strategicResolution;
@@ -17175,6 +19122,9 @@ ${body}`;
   }
   function tacticalCellAt(lat, lng) {
     return latLngToCell(lat, lng, tacticalH3Resolution());
+  }
+  function isNeutralBorderHex(h3Index) {
+    return loadedHexRole(h3Index) === "neutral_border";
   }
 
   // src/shared/mapKeyboardPanLogic.ts
@@ -18677,7 +20627,7 @@ ${body}`;
       if (weatherLabel) push(weatherLabel);
     }
     const terrainForTransport = buildTacticalTerrainKindResolverFromSnapshot(battle);
-    const footprint = new Set(battle.tacticalChildH3Indexes);
+    const footprint2 = new Set(battle.tacticalChildH3Indexes);
     const marchGoalH3 = pathH3[pathH3.length - 1];
     for (let i = 1; i < pathH3.length; i++) {
       const prev = pathH3[i - 1];
@@ -18698,7 +20648,7 @@ ${body}`;
         fromH3: prev,
         prevOfFrom: i >= 2 ? pathH3[i - 2] : null,
         marchGoalH3,
-        tacticalSet: footprint,
+        tacticalSet: footprint2,
         weatherEnabled: battle.weatherBonusEnabled === true,
         weather: battle.weather,
         weatherTags: subUnit.weatherTags
@@ -18913,11 +20863,14 @@ ${body}`;
     return decorated.map((d) => d.h3);
   }
   function buildStrategicH3ToCodeMap() {
-    const res0 = getRes0Cells();
-    const strategicSet = /* @__PURE__ */ new Set();
-    for (const r0 of res0) {
-      for (const child of cellToChildren(r0, strategicH3Resolution())) {
-        strategicSet.add(child);
+    const footprint2 = loadedStrategicFootprint();
+    const strategicSet = new Set(footprint2 ?? []);
+    if (!footprint2) {
+      const res0 = getRes0Cells();
+      for (const r0 of res0) {
+        for (const child of cellToChildren(r0, strategicH3Resolution())) {
+          strategicSet.add(child);
+        }
       }
     }
     const sorted = sortCellsForStableLlmCodes([...strategicSet]);
@@ -19237,10 +21190,14 @@ ${body}`;
   var URBAN_OR_RUBBLE_TERRAIN_COVER = Object.freeze({ surface: 2, air: 1 });
   function terrainCoverPairFor(place) {
     const terrain = TERRAIN_COVER_BY_CATEGORY[normalizeDbTerrainKindToTacticalCategory(place.terrainKind ?? "", "land")];
-    if (place.isUrban !== true && place.isRubble !== true) return terrain;
+    const urbanSurface = place.isUrban === true || place.isRubble === true ? URBAN_OR_RUBBLE_TERRAIN_COVER.surface : 0;
+    const urbanAir = place.isUrban === true || place.isRubble === true ? URBAN_OR_RUBBLE_TERRAIN_COVER.air : 0;
+    const citySurface = place.city === true ? 2 : 0;
+    const cityAir = place.city === true ? 1 : 0;
+    const ruggedSurface = place.rugged === true ? 2 : 0;
     return {
-      surface: Math.max(terrain.surface, URBAN_OR_RUBBLE_TERRAIN_COVER.surface),
-      air: Math.max(terrain.air, URBAN_OR_RUBBLE_TERRAIN_COVER.air)
+      surface: Math.max(terrain.surface, urbanSurface, citySurface, ruggedSurface),
+      air: Math.max(terrain.air, urbanAir, cityAir)
     };
   }
   function terrainCoverFor(place, shooter) {
@@ -19286,6 +21243,11 @@ ${body}`;
     if (movement == null) return cover;
     if (cover == null) return movement;
     return `${movement}, ${cover}`;
+  }
+  function strategicHexEffectsBodyHtml(resolution, stopsArmor, cover, tacticalMovementHtml) {
+    const armorStop = resolution === 1 && stopsArmor ? `${formatStatusIconHtml("blocked")}Armored Movement` : null;
+    const coverHtml = cover ? formatTerrainCoverTooltipHtml(cover) : null;
+    return joinHexTooltipEffectsHtml(armorStop ?? tacticalMovementHtml, coverHtml);
   }
 
   // src/renderer/rendererTacticalHydration.ts
@@ -19402,8 +21364,8 @@ ${body}`;
   function coverPair(state, namingTarget) {
     if (!namingTarget) return null;
     if (namingTarget.resolution === 1) {
-      const terrainKind = rendererSharedState.gameState?.hexes.find((h) => h.h3Index === namingTarget.h3Index)?.terrainKind;
-      return terrainKind ? terrainCoverPairFor({ terrainKind }) : null;
+      const hex = rendererSharedState.gameState?.hexes.find((row) => row.h3Index === namingTarget.h3Index);
+      return hex?.terrainKind ? terrainCoverPairFor({ terrainKind: hex.terrainKind, rugged: hex.rugged === true, city: hex.city === true }) : null;
     }
     return terrainCoverPairFor({ terrainKind: state.terrainKind, isUrban: state.isUrban, isRubble: state.isRubble });
   }
@@ -19418,10 +21380,15 @@ ${body}`;
     const weatherLine = weather ? `<strong>Weather:</strong> ${formatWeatherIconHtml(weather)}` : null;
     const featuresLine = state.strategicFeaturesSummary != null ? `<strong>Features:</strong> ${formatTerrainNameListHtml(state.strategicFeaturesSummary)}` : state.features.length > 0 ? `<strong>Features:</strong> ${state.features.map((label) => formatFeatureLabelHtml(label)).join(", ")}` : null;
     const pair = coverPair(state, namingTarget);
-    const coverHtml = pair == null ? null : formatTerrainCoverTooltipHtml(pair);
-    const effectsHtml = joinHexTooltipEffectsHtml(movementRangeHtml(state, namingTarget), coverHtml);
+    const effectsHtml = strategicHexEffectsBodyHtml(
+      namingTarget?.resolution ?? null,
+      namingTarget?.resolution === 1 && strategicHexStopsArmor(namingTarget.h3Index),
+      pair,
+      movementRangeHtml(state, namingTarget)
+    );
     const effectsLine2 = effectsHtml ? `<strong>Effects:</strong> ${effectsHtml}` : null;
-    const productionLine = state.urbanHexCount == null ? null : state.urbanHexCount > 0 ? `<strong>Production:</strong> $${state.urbanHexCount.toLocaleString()} / turn` : `<strong>Production:</strong> (none)`;
+    const neutralBorder = namingTarget?.resolution === 1 && isNeutralBorderHex(namingTarget.h3Index);
+    const productionLine = state.urbanHexCount == null ? null : state.urbanHexCount > 0 && !neutralBorder ? `<strong>Production:</strong> $${state.urbanHexCount.toLocaleString()} / turn` : `<strong>Production:</strong> (none)`;
     const resolution = namingTarget?.resolution;
     const orderedLines = resolution === 1 ? [controlLine, productionLine, techLine, featuresLine, terrainLine, weatherLine, effectsLine2] : resolution === 4 ? [featuresLine, techLine, controlLine, terrainLine, weatherLine, effectsLine2, productionLine] : [techLine, controlLine, terrainLine, weatherLine, featuresLine, effectsLine2, productionLine];
     const bodyParts = orderedLines.filter((line) => line != null);
@@ -19457,6 +21424,10 @@ ${body}`;
       techBonusEnabled: rendererSharedState.gameState?.techBonusEnabled === true,
       baselineUrbanHexCount: baselineUrbanHexCountForStrategicHex(namingTarget.h3Index)
     });
+  }
+  function strategicHexStopsArmor(h3Index) {
+    const hex = rendererSharedState.gameState?.hexes.find((row) => row.h3Index === h3Index);
+    return hex?.rugged === true || hex?.arctic === true || hex?.city === true;
   }
   function getCachedTerrainTooltipHtml(state, namingCaption, namingTarget) {
     const key = terrainTooltipContentKey(state, namingCaption, namingTarget);
@@ -20838,6 +22809,176 @@ ${body}`;
     };
   }
 
+  // src/shared/gameMapList.ts
+  function formatUnitCostLabel(cost) {
+    return `($${cost})`;
+  }
+  function formatAdvancedTechLine(advancedMinUrbanCells) {
+    return `Advanced tech: $${advancedMinUrbanCells}+ hexes`;
+  }
+  function pickDistinctIndexes(length, random = Math.random) {
+    if (length < 2) return null;
+    const first = Math.floor(random() * length);
+    let second = Math.floor(random() * (length - 1));
+    if (second >= first) second += 1;
+    return { first, second };
+  }
+  function pickIndexExcept(length, otherIndex, random = Math.random) {
+    if (length < 2) return null;
+    let next = Math.floor(random() * (length - 1));
+    if (next >= otherIndex) next += 1;
+    return next;
+  }
+
+  // src/renderer/chrome/selectTabPanel.ts
+  function selectTabPanel(activeTabId, tabs) {
+    for (const tab of tabs) {
+      const selected = tab.tabId === activeTabId;
+      const tabEl = document.getElementById(tab.tabId);
+      const panelEl = document.getElementById(tab.panelId);
+      tabEl?.setAttribute("aria-selected", selected ? "true" : "false");
+      if (selected) {
+        panelEl?.classList.add("active");
+        panelEl?.removeAttribute("hidden");
+      } else {
+        panelEl?.classList.remove("active");
+        panelEl?.setAttribute("hidden", "");
+      }
+    }
+  }
+
+  // src/renderer/gameplay/newGameMapUi.ts
+  var NEW_GAME_TABS = [
+    { tabId: "new-game-tab-global", panelId: "new-game-panel-global" },
+    { tabId: "new-game-tab-regional", panelId: "new-game-panel-regional" }
+  ];
+  var loadedMaps = [];
+  var controlsRegistered = false;
+  function registerNewGameMapControls() {
+    if (controlsRegistered) return;
+    controlsRegistered = true;
+    document.getElementById("new-game-tab-global")?.addEventListener("click", () => selectNewGameTab("global"));
+    document.getElementById("new-game-tab-regional")?.addEventListener("click", () => selectNewGameTab("regional"));
+    document.getElementById("new-game-region-select")?.addEventListener("change", () => {
+      applySelectedRegionSides(true);
+      if (regionalTabSelected()) applyVisibleCosts();
+    });
+    document.getElementById("new-game-human-side-randomize")?.addEventListener("click", () => randomizeOneRegionalSide("human"));
+    document.getElementById("new-game-ai-side-randomize")?.addEventListener("click", () => randomizeOneRegionalSide("ai"));
+  }
+  async function prepareNewGameMapPanel() {
+    const maps = await window.gameApi?.listGameMaps?.();
+    if (!Array.isArray(maps) || maps.length === 0) return;
+    loadedMaps = maps;
+    fillRegionSelect(maps.filter((entry) => entry.id !== "global"));
+    randomizeRegionalMap();
+    const currentId = rendererSharedState.gameState?.gameMap?.id;
+    selectNewGameTab(currentId && currentId !== "global" ? "regional" : "global");
+  }
+  function readNewGameMapChoice() {
+    if (!regionalTabSelected()) return {};
+    return {
+      gameMapId: selectValue("new-game-region-select"),
+      humanSideGroupId: selectValue("new-game-human-side-select"),
+      aiSideGroupId: selectValue("new-game-ai-side-select")
+    };
+  }
+  function regionalStartBlocked() {
+    return regionalTabSelected() && selectedSideGroups().length < 2;
+  }
+  function selectNewGameTab(which) {
+    selectTabPanel(which === "regional" ? "new-game-tab-regional" : "new-game-tab-global", NEW_GAME_TABS);
+    applyVisibleCosts();
+    syncStartEnabled();
+  }
+  function fillRegionSelect(regions) {
+    const select = document.getElementById("new-game-region-select");
+    if (!select) return;
+    select.innerHTML = "";
+    for (const region of regions) {
+      const option = document.createElement("option");
+      option.value = region.id;
+      option.textContent = region.displayName;
+      select.appendChild(option);
+    }
+  }
+  function randomizeRegionalMap() {
+    const select = document.getElementById("new-game-region-select");
+    if (select && select.options.length > 0) {
+      select.selectedIndex = Math.floor(Math.random() * select.options.length);
+    }
+    applySelectedRegionSides(true);
+  }
+  function applySelectedRegionSides(randomize) {
+    const groups = selectedSideGroups();
+    fillSideSelect("new-game-human-side-select", groups);
+    fillSideSelect("new-game-ai-side-select", groups);
+    const advanced = document.getElementById("new-game-advanced-tech");
+    const entry = selectedRegionalEntry();
+    if (advanced && entry) advanced.textContent = formatAdvancedTechLine(entry.advancedMinUrbanCells);
+    if (!randomize) return;
+    const picked = pickDistinctIndexes(groups.length);
+    const human = document.getElementById("new-game-human-side-select");
+    const ai = document.getElementById("new-game-ai-side-select");
+    if (!picked || !human || !ai) return;
+    human.selectedIndex = picked.first;
+    ai.selectedIndex = picked.second;
+  }
+  function randomizeOneRegionalSide(which) {
+    const groups = selectedSideGroups();
+    const human = document.getElementById("new-game-human-side-select");
+    const ai = document.getElementById("new-game-ai-side-select");
+    if (!human || !ai) return;
+    const target = which === "human" ? human : ai;
+    const otherIndex = which === "human" ? ai.selectedIndex : human.selectedIndex;
+    const next = pickIndexExcept(groups.length, otherIndex);
+    if (next === null) return;
+    target.selectedIndex = next;
+  }
+  function applyVisibleCosts() {
+    const entry = regionalTabSelected() ? selectedRegionalEntry() : loadedMaps.find((map) => map.id === "global");
+    if (!entry) return;
+    setCost("new-game-cost-infantry", entry.costs.infantry);
+    setCost("new-game-cost-armor", entry.costs.armor);
+    setCost("new-game-cost-naval", entry.costs.naval);
+    setCost("new-game-cost-air", entry.costs.air);
+  }
+  function setCost(id, cost) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = formatUnitCostLabel(cost);
+  }
+  function syncStartEnabled() {
+    const button = document.getElementById("new-game-btn");
+    if (!button) return;
+    const blocked = regionalStartBlocked();
+    button.disabled = blocked;
+    if (blocked) showMapToast("This map has no two sides.");
+  }
+  function selectedSideGroups() {
+    return selectedRegionalEntry()?.sideGroups ?? [];
+  }
+  function selectedRegionalEntry() {
+    const id = selectValue("new-game-region-select");
+    return loadedMaps.find((entry) => entry.id === id) ?? null;
+  }
+  function regionalTabSelected() {
+    return document.getElementById("new-game-tab-regional")?.getAttribute("aria-selected") === "true";
+  }
+  function selectValue(id) {
+    return document.getElementById(id)?.value ?? "";
+  }
+  function fillSideSelect(id, groups) {
+    const select = document.getElementById(id);
+    if (!select) return;
+    select.innerHTML = "";
+    for (const group of groups) {
+      const option = document.createElement("option");
+      option.value = group.id;
+      option.textContent = group.displayName;
+      select.appendChild(option);
+    }
+  }
+
   // src/shared/ipc/productionTypes.ts
   var ALL_BUILD_UNIT_TYPES = ["infantry", "armor", "naval", "air"];
   function isBuildUnitType(value) {
@@ -21127,6 +23268,7 @@ ${body}`;
     resetNewGameOptionControls();
     if (wasHidden) {
       void initializeScenarioRegionSelectorsOnOverlayOpen();
+      void prepareNewGameMapPanel();
     }
     syncGameSizeCapPreview();
     setMainUIControlsEnabled(false);
@@ -21546,9 +23688,9 @@ ${body}`;
     return host.matches(":hover");
   }
   function focusIsOn(host) {
-    const active = document.activeElement;
-    if (!(active instanceof Element) || active.closest(".hidden")) return false;
-    return active === host || host.contains(active) || hostFromTarget(active) === host;
+    const active2 = document.activeElement;
+    if (!(active2 instanceof Element) || active2.closest(".hidden")) return false;
+    return active2 === host || host.contains(active2) || hostFromTarget(active2) === host;
   }
   function hostIsAvailable(host) {
     if (!host.isConnected || host.getClientRects().length === 0) return false;
@@ -21667,11 +23809,11 @@ ${body}`;
   function syncTacticalExitButtonElementVisibility() {
     const hud = document.getElementById("tactical-battle-hud");
     const exitBtn = document.getElementById("tactical-exit-btn");
-    const active = !!rendererSharedState.tacticalBattleSnapshot;
+    const active2 = !!rendererSharedState.tacticalBattleSnapshot;
     const annihilationDialogOpen = rendererSharedState.tacticalAnnihilationOutcomeDialog != null;
-    hud?.classList.toggle("hidden", !active);
+    hud?.classList.toggle("hidden", !active2);
     const playbackDisablesExit = rendererSharedState.tacticalBattleSnapshot != null && rendererSharedState.resolutionMoveAnimation != null;
-    const disabled = !active || !rendererSharedState.tacticalPhasePlanning || playbackDisablesExit;
+    const disabled = !active2 || !rendererSharedState.tacticalPhasePlanning || playbackDisablesExit;
     if (exitBtn) {
       if (annihilationDialogOpen) {
         exitBtn.classList.add("hidden");
@@ -21708,6 +23850,108 @@ ${body}`;
     setMainUIControlsEnabled(true);
     syncTacticalExitButtonElementVisibility();
     updateReadyButtonState();
+  }
+
+  // src/renderer/map/mapExtent.ts
+  var active = "world";
+  var appliedKey = "";
+  var resizeListenerAttached = false;
+  var activeBounds = null;
+  var lockedMinZoom = null;
+  function applyLoadedMapExtent(target, fit = true) {
+    active = target;
+    const maps = extentMaps();
+    if (!maps) return;
+    if (target === "world") {
+      activeBounds = null;
+      lockedMinZoom = null;
+      setMapExtentReferenceLng(null);
+      const bounds2 = worldBounds(maps.leaflet);
+      applyToMap(maps.main, bounds2, true, 1.5, fit);
+      applyToMap(maps.mini, bounds2, true, 0, fit);
+      return;
+    }
+    setMapExtentReferenceLng(target.referenceLng);
+    const bounds = maps.leaflet.latLngBounds(
+      maps.leaflet.latLng(target.south, target.west, true),
+      maps.leaflet.latLng(target.north, target.east, true)
+    );
+    activeBounds = bounds;
+    if (fit) maps.main.setMinZoom?.(0);
+    applyToMap(maps.main, bounds, false, null, fit);
+    applyToMap(maps.mini, bounds, false, 0, fit);
+    if (fit && maps.main.getZoom && maps.main.setMinZoom) {
+      lockedMinZoom = maps.main.getZoom();
+      maps.main.setMinZoom(lockedMinZoom);
+    } else if (lockedMinZoom != null) {
+      maps.main.setMinZoom?.(lockedMinZoom);
+    }
+    attachResize(maps.main);
+  }
+  function restoreLoadedMapExtent(fit = false) {
+    applyLoadedMapExtent(active, fit);
+  }
+  function syncMapExtentToSnapshot(state) {
+    const mapId = state.gameMap?.id ?? "global";
+    const first = state.hexes[0]?.h3Index ?? "";
+    const last = state.hexes[state.hexes.length - 1]?.h3Index ?? "";
+    const key = state.hexes.length === 0 ? `${mapId}:empty` : `${mapId}:${state.hexes.length}:${first}:${last}`;
+    if (!extentMaps()) return;
+    if (key === appliedKey) return;
+    if (mapId === "global" || state.hexes.length === 0) {
+      applyLoadedMapExtent("world", true);
+      appliedKey = key;
+      return;
+    }
+    const longitudes = state.hexes.map((hex) => cellToLatLng(hex.h3Index)[1]);
+    const box = mapExtentBoxForHexes(
+      longitudeIntervalFromCenters(longitudes),
+      state.hexes.map((hex) => hex.h3Index)
+    );
+    if (!box) return;
+    applyLoadedMapExtent(box, true);
+    appliedKey = key;
+  }
+  function extentMaps() {
+    const leaflet = globalThis.L;
+    const main = getMainLeafletMap();
+    if (!leaflet || !main) return null;
+    const mini = getMiniLeafletMap();
+    return { leaflet, main, mini };
+  }
+  function worldBounds(leaflet) {
+    return leaflet.latLngBounds(
+      leaflet.latLng(-WEB_MERCATOR_MAX_ABS_LAT, -180),
+      leaflet.latLng(WEB_MERCATOR_MAX_ABS_LAT, 180)
+    );
+  }
+  function applyToMap(map, bounds, worldCopyJump, minZoom, fit) {
+    if (!map) return;
+    if (map.options) map.options.worldCopyJump = worldCopyJump;
+    map.setMaxBounds?.(bounds);
+    if (minZoom != null) map.setMinZoom?.(minZoom);
+    if (fit) map.fitBounds?.(bounds, { padding: [2, 2], animate: false });
+  }
+  function attachResize(map) {
+    if (resizeListenerAttached || !map.on) return;
+    resizeListenerAttached = true;
+    let recomputing = false;
+    map.on("resize", () => {
+      if (recomputing || active === "world" || activeBounds == null) return;
+      recomputing = true;
+      try {
+        const view = map;
+        const zoom = view.getZoom?.() ?? 0;
+        const center = view.getCenter?.();
+        view.setMinZoom?.(0);
+        view.fitBounds?.(activeBounds, { padding: [2, 2], animate: false });
+        const fitted = view.getZoom?.() ?? zoom;
+        view.setMinZoom?.(fitted);
+        if (center && view.setView) view.setView(center, Math.max(fitted, zoom));
+      } finally {
+        recomputing = false;
+      }
+    });
   }
 
   // src/renderer/map/tacticalMapView.ts
@@ -21770,11 +24014,7 @@ ${body}`;
       rendererSharedState.preTacticalLeafletMaxZoom = null;
       return;
     }
-    const worldBounds = L.latLngBounds(
-      L.latLng(-WEB_MERCATOR_MAX_ABS_LAT, -180),
-      L.latLng(WEB_MERCATOR_MAX_ABS_LAT, 180)
-    );
-    if (typeof map.setMaxBounds === "function") map.setMaxBounds(worldBounds);
+    restoreLoadedMapExtent();
     if (typeof map.setMinZoom === "function" && rendererSharedState.preTacticalLeafletMinZoom != null) {
       map.setMinZoom(rendererSharedState.preTacticalLeafletMinZoom);
     }
@@ -21786,8 +24026,8 @@ ${body}`;
     const home = rendererSharedState.strategicScenarioInitialLeafletView;
     if (home && typeof map.setView === "function") {
       map.setView(L.latLng(home.lat, home.lng), home.zoom);
-    } else if (typeof map.fitBounds === "function") {
-      map.fitBounds(worldBounds, { padding: [2, 2], animate: false });
+    } else {
+      restoreLoadedMapExtent(true);
     }
   }
 
@@ -22113,57 +24353,6 @@ ${body}`;
     for (const h3Index of hexes) {
       const { x, y } = hexCenterPx(h3Index);
       drawOneUnitMarker(ctx, x, y, "#7a7a7a", "?", "#202020");
-    }
-    ctx.restore();
-  }
-  function drawCombatLightning(ctx, canvasWidth, canvasHeight, combatHexes, hexList, opacity) {
-    if (combatHexes.length === 0 || opacity <= 0) return;
-    void canvasWidth;
-    void canvasHeight;
-    void hexList;
-    ctx.save();
-    ctx.globalAlpha = opacity;
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-    const h = 18;
-    for (const h3Index of combatHexes) {
-      const { x, y } = hexCenterPx(h3Index);
-      ctx.beginPath();
-      ctx.moveTo(x, y - h);
-      ctx.lineTo(x + 6, y - 4);
-      ctx.lineTo(x - 4, y + 6);
-      ctx.lineTo(x + 5, y + h);
-      ctx.strokeStyle = "#000";
-      ctx.lineWidth = 5;
-      ctx.stroke();
-      ctx.strokeStyle = LIGHTNING_COLOR;
-      ctx.lineWidth = 3;
-      ctx.stroke();
-    }
-    ctx.restore();
-  }
-  function drawCasualtyOverlay(ctx, canvasWidth, canvasHeight, casualtyHexes, hexList, opacity) {
-    if (casualtyHexes.length === 0 || opacity <= 0) return;
-    void canvasWidth;
-    void canvasHeight;
-    void hexList;
-    ctx.save();
-    ctx.globalAlpha = opacity;
-    ctx.lineCap = "round";
-    const size = 20;
-    for (const h3Index of casualtyHexes) {
-      const { x, y } = hexCenterPx(h3Index);
-      ctx.beginPath();
-      ctx.moveTo(x - size, y - size);
-      ctx.lineTo(x + size, y + size);
-      ctx.moveTo(x + size, y - size);
-      ctx.lineTo(x - size, y + size);
-      ctx.strokeStyle = "#000";
-      ctx.lineWidth = 6;
-      ctx.stroke();
-      ctx.strokeStyle = CASUALTY_X_COLOR;
-      ctx.lineWidth = 4;
-      ctx.stroke();
     }
     ctx.restore();
   }
@@ -23312,7 +25501,7 @@ ${body}`;
       const range = strategicRangedRangeHexesForUnitType(u.unitType);
       if (range < 1) continue;
       try {
-        for (const h of gridDisk(u.h3Index, range)) out.add(h);
+        for (const h of gridDisk(u.h3Index, range)) if (isOnMap(h)) out.add(h);
       } catch {
       }
     }
@@ -23322,13 +25511,13 @@ ${body}`;
     const out = /* @__PURE__ */ new Set();
     for (const u of units) {
       try {
-        for (const h of gridDisk(u.h3Index, AIR_STRIKE_RANGE_HEXES)) out.add(h);
+        for (const h of gridDisk(u.h3Index, AIR_STRIKE_RANGE_HEXES)) if (isOnMap(h)) out.add(h);
       } catch {
       }
     }
     return out;
   }
-  function buildTacticalRangedRangeSet(battle, subUnits, footprint) {
+  function buildTacticalRangedRangeSet(battle, subUnits, footprint2) {
     const out = /* @__PURE__ */ new Set();
     for (const u of subUnits) {
       const anchor = tacticalMovementTerrainAnchorH3(u, battle.subUnits);
@@ -23336,15 +25525,15 @@ ${body}`;
       if (range < 1) continue;
       try {
         for (const h of gridDisk(anchor, range)) {
-          if (footprint.has(h)) out.add(h);
+          if (footprint2.has(h)) out.add(h);
         }
       } catch {
       }
     }
     return out;
   }
-  function buildTacticalAirStrikeRangeSet(footprint) {
-    return new Set(footprint);
+  function buildTacticalAirStrikeRangeSet(footprint2) {
+    return new Set(footprint2);
   }
 
   // src/shared/selectionSupportButtonMode.ts
@@ -24114,8 +26303,14 @@ ${body}`;
       const weather = unit.originWeather;
       if (weather && !weathers.includes(weather)) weathers.push(weather);
     }
-    if (weathers.length === 0) return null;
-    return `<strong>Slower:</strong> ${weathers.map((weather) => formatWeatherIconHtml(weather)).join(", ")}`;
+    const parts = [];
+    if (weathers.length > 0) {
+      parts.push(`<strong>Slower:</strong> ${weathers.map((weather) => formatWeatherIconHtml(weather)).join(", ")}`);
+    }
+    if (input.destinationStopsArmor === true) {
+      parts.push(`<strong>Effects:</strong> ${formatStatusIconHtml("blocked")}Armored Movement`);
+    }
+    return parts.length > 0 ? parts.join(TOOLTIP_SECTION_GAP_HTML) : null;
   }
   function strategicFerryHtml(input) {
     const shortened = input.units.some(
@@ -24170,8 +26365,20 @@ ${body}`;
   }
   function coverLine(place, shooter) {
     if (!place || terrainCoverFor(place, shooter) <= 0) return null;
+    const extra = strategicCoverRaiseLabel(place, shooter);
+    if (extra) {
+      const value = terrainCoverFor(place, shooter);
+      const icon = formatStatusIconHtml(value >= 2 ? "doubleUp" : "up");
+      return `<strong>Cover:</strong> ${icon}${extra}`;
+    }
     const source = terrainCoverSourceLabel(place);
     return source ? `<strong>Cover:</strong> ${labelHtml(source)}` : null;
+  }
+  function strategicCoverRaiseLabel(place, shooter) {
+    const without = terrainCoverFor({ ...place, rugged: false, city: false }, shooter);
+    if (place.city === true && terrainCoverFor({ ...place, rugged: false }, shooter) > without) return "City";
+    if (place.rugged === true && terrainCoverFor(place, shooter) > without) return "Rugged";
+    return null;
   }
   function joinSections(sections) {
     const present = sections.filter((section) => section !== null);
@@ -24221,7 +26428,8 @@ ${body}`;
       marchImpact: args.preview.data.orderPreviewTerrainImpact ?? null,
       rangedBattle: kind === "ranged" ? battle : null,
       rangedPreviewUnitIds: args.preview.data.previews.map((row) => row.unitId),
-      targetCover: kind === "ranged" || kind === "airStrike" ? targetCoverPlace(args.preview.hoveredH3Index) : null
+      targetCover: kind === "ranged" || kind === "airStrike" ? targetCoverPlace(args.preview.hoveredH3Index) : null,
+      destinationStopsArmor: kind === "strategicMarch" && destinationStopsArmor(args.preview.hoveredH3Index)
     };
   }
   function targetCoverPlace(hoveredH3Index) {
@@ -24234,7 +26442,17 @@ ${body}`;
     if (!state) return null;
     const enemyHere = state.units.some((unit) => unit.player !== "human" && unit.h3Index === hoveredH3Index);
     if (!enemyHere) return null;
-    return { terrainKind: state.hexes.find((hex) => hex.h3Index === hoveredH3Index)?.terrainKind ?? null };
+    const hex = state.hexes.find((row) => row.h3Index === hoveredH3Index);
+    return {
+      terrainKind: hex?.terrainKind ?? null,
+      rugged: hex?.rugged === true,
+      city: hex?.city === true
+    };
+  }
+  function destinationStopsArmor(hoveredH3Index) {
+    const hex = rendererSharedState.gameState?.hexes.find((row) => row.h3Index === hoveredH3Index);
+    if (!hex || !(hex.rugged === true || hex.arctic === true || hex.city === true)) return false;
+    return strategicSelection().some((unit) => unit.unitType === "armor");
   }
   function effectsKind(preview) {
     if (preview.renderAsSupportTargeting === "ranged") return "ranged";
@@ -25625,12 +27843,12 @@ ${body}`;
     if (!isRangePerimeterModeActive()) return null;
     const tactical = rendererSharedState.tacticalBattleSnapshot;
     if (tactical) {
-      const footprint = new Set(tactical.tacticalChildH3Indexes);
+      const footprint2 = new Set(tactical.tacticalChildH3Indexes);
       const selected2 = tactical.subUnits.filter((s) => rendererSharedState.selectedUnitIds.includes(s.id));
       if (selected2.length === 0) return null;
       try {
-        if (rendererSharedState.airStrikeModeActive) return buildTacticalAirStrikeRangeSet(footprint);
-        return buildTacticalRangedRangeSet(tactical, selected2, footprint);
+        if (rendererSharedState.airStrikeModeActive) return buildTacticalAirStrikeRangeSet(footprint2);
+        return buildTacticalRangedRangeSet(tactical, selected2, footprint2);
       } catch (err) {
         console.error("computeSelectedRangeHexSetFromState tactical failed", err);
         return null;
@@ -25958,6 +28176,42 @@ ${body}`;
     }
   }
 
+  // src/renderer/rendering/resolutionSymbolDrawing.ts
+  var COMBAT_LIGHTNING_SRC = "resolution/lightning_bolt.svg";
+  var DESTRUCTION_MARK_SRC = "resolution/x_destroyed.svg";
+  var COMBAT_LIGHTNING_PX = 44;
+  var DESTRUCTION_MARK_PX = 52;
+  function startResolutionSymbolLoad(src) {
+    const img = new Image();
+    img.decoding = "async";
+    img.src = src;
+    return img;
+  }
+  var resolutionSymbolImage = {
+    lightning: startResolutionSymbolLoad(COMBAT_LIGHTNING_SRC),
+    destroyed: startResolutionSymbolLoad(DESTRUCTION_MARK_SRC)
+  };
+  function drawSymbolsOnHexes(ctx, hexes, opacity, img, sizePx) {
+    if (hexes.length === 0 || opacity <= 0) return;
+    if (!img.complete || img.naturalWidth <= 0 || img.naturalHeight <= 0) return;
+    const half = sizePx / 2;
+    ctx.save();
+    ctx.globalAlpha = opacity;
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    for (const h3Index of hexes) {
+      const { x, y } = hexCenterPx(h3Index);
+      ctx.drawImage(img, x - half, y - half, sizePx, sizePx);
+    }
+    ctx.restore();
+  }
+  function drawCombatLightning(ctx, combatHexes, opacity) {
+    drawSymbolsOnHexes(ctx, combatHexes, opacity, resolutionSymbolImage.lightning, COMBAT_LIGHTNING_PX);
+  }
+  function drawCasualtyOverlay(ctx, casualtyHexes, opacity) {
+    drawSymbolsOnHexes(ctx, casualtyHexes, opacity, resolutionSymbolImage.destroyed, DESTRUCTION_MARK_PX);
+  }
+
   // src/renderer/rendering/resolutionCombatOverlays.ts
   function drawResolutionCombatAndCasualtyOverlays(ctx, width, height, anim, hexList, elapsed) {
     const { phase } = buildResolutionPlaybackState(anim, elapsed);
@@ -25971,7 +28225,7 @@ ${body}`;
       const unknownSet = new Set(anim.unknownCombatHexes ?? []);
       const knownCombatHexes = combatHexes.filter((h3) => !unknownSet.has(h3));
       const unknownCombatHexes = combatHexes.filter((h3) => unknownSet.has(h3));
-      drawCombatLightning(ctx, width, height, knownCombatHexes, hexList, pulseOpacity);
+      drawCombatLightning(ctx, knownCombatHexes, pulseOpacity);
       drawUnknownBattleMarkers(ctx, unknownCombatHexes, pulseOpacity);
     }
     const casualtyHexes = phase.inAirStrikeCasualty ? anim.airStrikeCasualtyHexes : phase.inRangedCasualty ? anim.rangedCasualtyHexes ?? anim.casualtyHexes : phase.inMeleeCasualty ? anim.meleeCasualtyHexes : void 0;
@@ -25981,7 +28235,7 @@ ${body}`;
       const unknownSet = new Set(anim.unknownCasualtyHexes ?? []);
       const knownCasualtyHexes = casualtyHexes.filter((h3) => !unknownSet.has(h3));
       const unknownCasualtyHexes = casualtyHexes.filter((h3) => unknownSet.has(h3));
-      drawCasualtyOverlay(ctx, width, height, knownCasualtyHexes, hexList, pulseOpacity);
+      drawCasualtyOverlay(ctx, knownCasualtyHexes, pulseOpacity);
       drawUnknownBattleMarkers(ctx, unknownCasualtyHexes, pulseOpacity);
     }
     if (anim && !shouldHideStrategicMapUnitsForZoom()) {
@@ -26552,6 +28806,42 @@ ${body}`;
     return unitId;
   }
 
+  // src/shared/strategicTerrainFlags.ts
+  var ruggedHexes = /* @__PURE__ */ new Set();
+  var arcticHexes = /* @__PURE__ */ new Set();
+  var cityHexes = /* @__PURE__ */ new Set();
+  function setStrategicTerrainFlags(next) {
+    if (!next) {
+      ruggedHexes = /* @__PURE__ */ new Set();
+      arcticHexes = /* @__PURE__ */ new Set();
+      cityHexes = /* @__PURE__ */ new Set();
+      return;
+    }
+    ruggedHexes = new Set(next.rugged);
+    arcticHexes = new Set(next.arctic);
+    cityHexes = new Set(next.city);
+  }
+
+  // src/renderer/core/installRendererGameMap.ts
+  function installRendererGameMap(state) {
+    if (!state.gameMap) return;
+    setActiveGameMap(state.gameMap);
+    setStrategicTerrainFlags({
+      rugged: state.hexes.filter((hex) => hex.rugged === true).map((hex) => hex.h3Index),
+      arctic: state.hexes.filter((hex) => hex.arctic === true).map((hex) => hex.h3Index),
+      city: state.hexes.filter((hex) => hex.city === true).map((hex) => hex.h3Index)
+    });
+    if (state.gameMap.id === "global") {
+      setLoadedStrategicFootprint(null);
+      return;
+    }
+    const roles = /* @__PURE__ */ new Map();
+    for (const hex of state.hexes) {
+      if (hex.mapRole) roles.set(hex.h3Index, hex.mapRole);
+    }
+    setLoadedStrategicFootprint(state.hexes.map((hex) => hex.h3Index), roles);
+  }
+
   // src/renderer/gameplay/newGame.ts
   function registerRegionRandomizeButtons() {
     document.getElementById("new-game-human-region-randomize")?.addEventListener("click", () => {
@@ -26565,12 +28855,16 @@ ${body}`;
     });
   }
   function registerNewGameButton(deps) {
-    void initializeScenarioRegionSelectorsOnOverlayOpen();
     registerRegionRandomizeButtons();
+    registerNewGameMapControls();
     registerGameSizeSelect();
     registerNewGameOptionSeparators();
     document.getElementById("new-game-btn")?.addEventListener("click", async () => {
       if (!window.gameApi?.newGame) return;
+      if (regionalStartBlocked()) {
+        showMapToast("This map has no two sides.");
+        return;
+      }
       try {
         const selectedRegions = getSelectedScenarioRegions();
         const state = await window.gameApi.newGame({
@@ -26578,8 +28872,10 @@ ${body}`;
           startMonth: readNewGameStartMonth(),
           humanHomeRegion: selectedRegions.humanHomeRegion,
           aiHomeRegion: selectedRegions.aiHomeRegion,
+          ...readNewGameMapChoice(),
           gameSize: readSelectedGameSizeFromDocument()
         });
+        installRendererGameMap(state);
         await deps.refreshTacticalTerrainOverridesForRenderer({ reloadStaticOverlays: true });
         rendererSharedState.gameState = state;
         rendererSharedState.strategicScenarioInitialLeafletView = null;
@@ -26624,6 +28920,7 @@ ${body}`;
         deps.resizeAndRedraw();
       } catch (err) {
         console.error("newGame failed:", err);
+        showMapToast("The new game did not start. This screen stays open.");
       }
     });
   }
@@ -26649,6 +28946,7 @@ ${body}`;
     }
     resetNewGameOptionControls();
     void initializeScenarioRegionSelectorsOnOverlayOpen();
+    void prepareNewGameMapPanel();
     syncGameSizeCapPreview();
     overlay?.classList.remove("hidden");
     setMainUIControlsEnabled2(false);
@@ -27197,8 +29495,8 @@ ${body}`;
   // src/renderer/gameplay/buildQueuePopup.ts
   function isBuildQueueSelectInPopupFocused() {
     const popup = document.getElementById("build-popup");
-    const active = document.activeElement;
-    return !!popup && active instanceof HTMLSelectElement && popup.contains(active);
+    const active2 = document.activeElement;
+    return !!popup && active2 instanceof HTMLSelectElement && popup.contains(active2);
   }
   function isBuildPopupOrEntryTarget(target) {
     if (!(target instanceof Node)) return false;
@@ -28858,6 +31156,8 @@ ${body}`;
     );
   }
   async function applyGameStateSnapshot(deps, nextState, options = {}) {
+    installRendererGameMap(nextState);
+    syncMapExtentToSnapshot(nextState);
     const previousState = rendererSharedState.gameState;
     rendererSharedState.gameState = nextState;
     deps.reconcileTacticalBattleAfterStrategicSnapshot(nextState);
@@ -29046,6 +31346,15 @@ ${body}`;
     return refreshGameStateAfterBuildQueueChange({ applyGameStateSnapshot: applyGameStateSnapshot2 });
   }
   async function applyGameStateSnapshot2(nextState, options = {}) {
+    const previousMapId = rendererSharedState.gameState?.gameMap?.id;
+    if (nextState.gameMap && previousMapId !== nextState.gameMap.id) {
+      sessionStaticTacticalOverlaysLoaded = false;
+      sessionBaselineUrbanHexCountsLoaded = false;
+    }
+    if (nextState.gameMapLoadError && nextState.gameMapLoadError !== lastShownMapLoadError) {
+      lastShownMapLoadError = nextState.gameMapLoadError;
+      showMapToast(nextState.gameMapLoadError);
+    }
     return applyGameStateSnapshot(
       {
         rebuildUnitDisplayNameLookup,
@@ -29157,6 +31466,7 @@ ${body}`;
   }
   var sessionStaticTacticalOverlaysLoaded = false;
   var sessionBaselineUrbanHexCountsLoaded = false;
+  var lastShownMapLoadError = null;
   async function ensureStaticTacticalOverlaysLoaded(forceReload) {
     if (!(sessionStaticTacticalOverlaysLoaded && !forceReload)) {
       const api = window.gameApi;
@@ -29674,24 +31984,11 @@ ${body}`;
     deps.updateOpenRouterCostLabel();
     const tabTools = document.getElementById("openrouter-tab-tools");
     const tabModel = document.getElementById("openrouter-tab-model");
-    const panelTools = document.getElementById("openrouter-tools-panel");
-    const panelModel = document.getElementById("openrouter-model-panel");
-    function setActiveTab(active) {
-      if (active === "model") {
-        tabTools?.setAttribute("aria-selected", "false");
-        tabModel?.setAttribute("aria-selected", "true");
-        panelTools?.classList.remove("active");
-        panelTools?.setAttribute("hidden", "");
-        panelModel?.classList.add("active");
-        panelModel?.removeAttribute("hidden");
-      } else {
-        tabTools?.setAttribute("aria-selected", "true");
-        tabModel?.setAttribute("aria-selected", "false");
-        panelTools?.classList.add("active");
-        panelTools?.removeAttribute("hidden");
-        panelModel?.classList.remove("active");
-        panelModel?.setAttribute("hidden", "");
-      }
+    function setActiveTab(active2) {
+      selectTabPanel(active2 === "model" ? "openrouter-tab-model" : "openrouter-tab-tools", [
+        { tabId: "openrouter-tab-tools", panelId: "openrouter-tools-panel" },
+        { tabId: "openrouter-tab-model", panelId: "openrouter-model-panel" }
+      ]);
     }
     tabTools?.addEventListener("click", () => setActiveTab("tools"));
     tabModel?.addEventListener("click", () => setActiveTab("model"));

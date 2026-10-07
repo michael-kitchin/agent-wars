@@ -10,6 +10,7 @@ import {
   setKeepBuildingForHex,
 } from '../gameDb';
 import { logDebug, logError, logTrace } from '../logger';
+import { isNeutralBorderHex } from '../../shared/h3Resolutions';
 import {
   BUILD_ENTRY_MAX_COUNT,
   BUILD_ENTRY_MIN_COUNT,
@@ -248,13 +249,16 @@ noBuildReason: string | null;
  * Exceptions: None.
  */
 function buildProductionEligibilityView(
+  h3Index: string,
   productionContext: StrategicProductionContextSnapshot
 ): ProductionEligibilityView {
-  const availableUnitTypes = getAvailableBuildUnitTypes(
-    productionContext.urbanHexCount,
-    productionContext.seaportCount,
-    productionContext.airportCount
-  );
+  const availableUnitTypes = isNeutralBorderHex(h3Index)
+    ? []
+    : getAvailableBuildUnitTypes(
+        productionContext.urbanHexCount,
+        productionContext.seaportCount,
+        productionContext.airportCount
+      );
   const buildSectionVisible = availableUnitTypes.length > 0;
   return {
     ...productionContext,
@@ -298,7 +302,7 @@ function syncStandingOrderAfterQueueMutation(h3Index: string): void {
 function buildQueueViewForRequester(h3Index: string, requestingPlayerId: string): HexBuildQueueView {
   const controllerPlayerId = getHexController(h3Index);
   const controlledByRequester = controllerPlayerId === requestingPlayerId;
-  const productionView = buildProductionEligibilityView(getStrategicInfrastructureForHex(h3Index));
+  const productionView = buildProductionEligibilityView(h3Index, getStrategicInfrastructureForHex(h3Index));
   const standing = getKeepBuildingForHex(h3Index);
   return {
     h3Index,

@@ -38,7 +38,7 @@ When this guide and the running app disagree, the app wins until this file is up
   - **Semantic states** (e.g., success/warning/error only where needed).
 - Avoid saturated primaries everywhere; accents should read clearly without dominating the map or panels.
 
-**Implemented palette (2.4.0). Map colors live in `src/renderer/core/constants.ts`. Panel chrome tokens, and the shared button and field rules, are the `:root` variables in `static/shellChrome.css`. Map overlays and popups are in `static/overlayChrome.css`. Toasts and the new-game box are in `static/feedbackChrome.css`. The dual-theme rows below are a reference. Chrome is already the navy in the live table; those terrain rows are not a second map theme:**
+**Implemented palette (2.4.0). Map colors live in `src/renderer/core/constants.ts`, except the combat bolt and the casualty mark, which take their colors from the SVGs named below. Panel chrome tokens, and the shared button and field rules, are the `:root` variables in `static/shellChrome.css`. Map overlays and popups are in `static/overlayChrome.css`. Toasts and the new-game box are in `static/feedbackChrome.css`. The dual-theme rows below are a reference. Chrome is already the navy in the live table; those terrain rows are not a second map theme:**
 
 | Role | Live app | Notes |
 |------|----------|--------|
@@ -53,8 +53,8 @@ When this guide and the running app disagree, the app wins until this file is up
 | Player 2 (opponent) | `#9d174d` | Distinct from human |
 | Selection / slower / warning | `#a06020` | Range perimeter (ranged) |
 | Air-strike perimeter | `#7a3db5` | Distinct from ground ranged |
-| Combat lightning | `#f0d000` | Resolution overlay |
-| Casualty X | `#c03030` | Removal overlay |
+| Combat lightning | `#F5C400` | Resolution overlay. The bolt is `resolution/lightning_bolt.svg`, with a `#8A6D00` outline |
+| Casualty X | `#E53935` | Removal overlay. The mark is `resolution/x_destroyed.svg`, with an `#8E1C1A` outline |
 | Dice chip bg / border | `#1b2838` at 92% / `#5a7090` | Resolution dice chips, with the chrome text and muted colors for text and tags. Mini-token outlines are `#7dcec8` (human) and `#f0b4c8` (opponent). See `src/renderer/rendering/combatDiceChipDrawing.ts` |
 | Dice hit / miss | `#86efac` / `#8aa0b8` | Die faces on resolution dice chips |
 | Mixed stack fill / stroke | `#b0b0b0` / `#222222` | Multi-player hex |
@@ -180,12 +180,12 @@ When this guide and the running app disagree, the app wins until this file is up
 
 ### 3.5 Multi-Resolution and Attention
 
-- **Zoom levels (live):** Strategic H3 resolution 1 and tactical resolution 4 on the global map. Tactical mode clamps pan/zoom to the footprint. Entry is a map magnifier on contested hexes and/or a Fight/Ignore melee-intercept dialog. Exit restores world bounds.
+- **Zoom levels (live):** Strategic H3 resolution 1 and tactical resolution 4 on the global map. A regional map uses that pack's strategic resolution, and tactical cells are three levels below it. Tactical mode clamps pan and zoom to the footprint. Entry is a map magnifier on contested hexes and/or a Fight/Ignore melee-intercept dialog. Exit restores the loaded map's bounds.
 - **Attention/focus:** If the game later shows where the player or AI focused attention, use a restrained overlay that doesn’t obscure terrain or units.
 
 ### 3.6 Scenarios, Save/Load, and Onboarding
 
-- **New game (live):** Overlay with human/AI home-region selectors, Game size dropdown and cap badges that draw the map glyphs dark on gray disks, two option lines (Country bonus / Tech bonus, then Terrain bonus / Weather bonus) of dropdowns (Off, Low, High, default Low) whose labels end in colons, a following row with Fog of war, a slash separator, and a "Starting month:" dropdown and a square randomize button matching the human home-region button, and New game. The live scenario id is `region_vs_region`.
+- **New game (live):** Overlay with Global and Regional tabs. Global has human/AI home-region selectors. Regional has one centered region selector and human/AI side-group selectors, each with a randomize button, plus an Advanced tech line. After each unit type, its price in parentheses, such as Infantry ($20), follows the selected tab and region. Game size dropdown and cap badges draw the map glyphs dark on gray disks. Two option lines (Country bonus / Tech bonus, then Terrain bonus / Weather bonus) of dropdowns (Off, Low, High, default Low) whose labels end in colons sit outside the tabs, then a row with Fog of war, a slash separator, and a "Starting month:" dropdown and a square randomize button matching the human home-region button, and New game. The live scenario id is `region_vs_region`.
 - **Save/Load:** **Not shipped.** Target: named saves, overwrite confirmation, auto-save visibility.
 - **End-game summary:** Live overlay reports winner and offers New game; territory-over-time charts are still target.
 - **Tutorial/onboarding:** Not shipped.

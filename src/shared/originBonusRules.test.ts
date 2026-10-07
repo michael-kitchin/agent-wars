@@ -98,3 +98,21 @@ test('a High bonus adds 4 and the larger level wins when both reasons apply', ()
   assert.equal(formatOriginBonusTableCell(['country'], 4), '+4 country');
 });
 
+test('a regional area id matches that place and not a different area', () => {
+  const origin: UnitOrigin = {
+    ...FRENCH_PLAINS,
+    birthAreaId: 'US-CA',
+    birthAreaName: 'California',
+    birthCountryName: 'United States',
+  };
+  const at = (countryName: string) => ({ countryName, terrainKind: null });
+  assert.deepEqual(
+    originBonusSources({ settings: BOTH_ON, theater: 'strategic', origin, place: at('US-CA') }),
+    ['country']
+  );
+  assert.deepEqual(
+    originBonusSources({ settings: BOTH_ON, theater: 'strategic', origin, place: at('US-NY') }),
+    []
+  );
+});
+

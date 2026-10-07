@@ -28,6 +28,7 @@ import type {
   AirStrikeTargetType,
   HexBuildQueueSnapshot,
   NewGameIpcPayload,
+  GameMapListEntry,
   ResolveMeleeInterceptIpcPayload,
   NotifyResolutionPlaybackCompletePayload,
   PostResolutionConsultationPushPayload,
@@ -63,6 +64,7 @@ const IPC_GAME = {
   getHexNamingTooltipLine: 'game:getHexNamingTooltipLine',
   getHexContinentNames: 'game:getHexContinentNames',
   listScenarioHomeRegions: 'game:listScenarioHomeRegions',
+  listGameMaps: 'game:listGameMaps',
   newGame: 'game:newGame',
   submitOrders: 'game:submitOrders',
   listHumanStandingOrders: 'game:listHumanStandingOrders',
@@ -252,6 +254,16 @@ getHexContinentNames: (payload: HexContinentNamesRequest): Promise<string[]> =>
    */
 listScenarioHomeRegions: (): Promise<string[]> =>
     ipcRenderer.invoke(IPC_GAME.listScenarioHomeRegions),
+    /**
+   * Lists maps for the new-game dialog.
+   *
+   * Purpose: The overlay needs names, sides, and prices without a tactical load.
+   * When to use: When the overlay opens.
+   * Expected outcome: The same rows `listGameMaps` builds in the main process.
+   * Exceptions: Rejects when the IPC channel fails.
+   */
+listGameMaps: (): Promise<GameMapListEntry[]> =>
+    ipcRenderer.invoke(IPC_GAME.listGameMaps),
     /**
    * Documents the object literal property `newGame` (newGame: (payload?: NewGameIpcPayload): Promise<GameStateSnapshot> => ipcRenderer.invoke('game:newGame', payload)).
 

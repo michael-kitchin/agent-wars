@@ -218,7 +218,8 @@ export function buildOriginBonusRule(gates: GameRuleTextGates): string | null {
       ? ''
       : ', including ranged fire, return fire, melee, and air-strike counter-fire';
     parts.push(
-      `Country bonus is on: a unit ${onPlace} whose country is its birth country ${rollClause(countryAmount)}${strategicDetail}.`
+      `Country bonus is on: a unit ${onPlace} in the area where it was built ${rollClause(countryAmount)}${strategicDetail}. ` +
+        'That area is its birth country in a global game and its origin area in a regional game.'
     );
   }
   if (terrainApplies) {
@@ -358,7 +359,7 @@ export function buildTerrainCoverRule(mode: PromptCoordinateMode): string {
   ].filter((clause): clause is string => clause !== null);
   const ignored = tactical
     ? 'Melee, return fire, anti-air fire, and shots at infrastructure ignore cover.'
-    : 'Melee, return fire, anti-air fire, and strikes on infrastructure ignore cover.';
+    : 'Melee, return fire, anti-air fire, and strikes on infrastructure ignore cover. A city hex uses the higher of its terrain cover and city cover in each column. A rugged hex uses the higher of its terrain cover and rugged ground cover.';
   return `Terrain cover: ${[...clauses, ignored].join(' ')}`;
 }
 
@@ -418,7 +419,8 @@ export function buildMovementBudgetRule(mode: PromptCoordinateMode): string {
   }
   return (
     `Movement budgets: ${getMovementBudget('infantry')} cell for infantry, ` +
-    `${getMovementBudget('armor')} for armor and naval, and air never marches.`
+    `${getMovementBudget('armor')} for armor and naval, and air never marches. ` +
+    'Armor that enters a rugged, arctic, or city hex ends its move there. Armor already on that hex may leave.'
   );
 }
 

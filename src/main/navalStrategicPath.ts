@@ -8,6 +8,7 @@
  */
 
 import { gridDisk } from 'h3-js';
+import { isOnMap } from '../shared/loadedStrategicFootprint';
 import { logError, logTrace } from './logger';
 import { getCachedSeaportCountByStrategicH3 } from './terrainClassificationCache';
 import {
@@ -311,7 +312,7 @@ export function navalLookupForHexState(
  */
 function defaultNeighborsOf(h3: string): string[] {
   try {
-    return gridDisk(h3, 1).filter((n) => n !== h3);
+    return gridDisk(h3, 1).filter((n) => n !== h3 && isOnMap(n));
   } catch (err) {
     logError('navalStrategicPath defaultNeighborsOf: gridDisk threw', err);
     return [];

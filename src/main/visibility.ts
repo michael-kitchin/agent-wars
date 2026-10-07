@@ -4,6 +4,7 @@
  */
 
 import { gridDisk } from 'h3-js';
+import { isOnMap } from '../shared/loadedStrategicFootprint';
 import type { GameStateSnapshot } from '../shared/ipcTypes';
 import { logError, logTrace } from './logger';
 
@@ -97,7 +98,7 @@ export function computeVisibleHexesForSide(
     try {
       const disk = gridDisk(unit.h3Index, radius);
       for (const h3 of disk) {
-        if (mapHexSet.has(h3)) visible.add(h3);
+        if (mapHexSet.has(h3) && isOnMap(h3)) visible.add(h3);
       }
     } catch (err) {
       // Keep visibility robust even if one origin cell errors.

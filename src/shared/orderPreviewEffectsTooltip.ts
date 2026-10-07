@@ -25,6 +25,7 @@ import {
   weatherAttackPenalty,
   weatherSlowsMovement,
 } from './weatherBonusRules';
+import { formatStatusIconHtml } from './statusIconHtml';
 import { formatWeatherIconHtml } from './weatherIcons';
 import type { WeatherState } from './weatherBonusTypes';
 
@@ -102,6 +103,15 @@ export type OrderPreviewEffectsTooltipInput = {
    * Exceptions: None.
    */
   readonly targetCover?: TerrainCoverPlace | null;
+  /**
+   * The strategic march destination stops armor.
+   *
+   * Contract: True only for a legal armor march onto a rugged, arctic, or city hex.
+   * When to use: The renderer sets it from the destination hex's flags.
+   * Expected outcome: The march tooltip adds an Effects line with the blocked icon.
+   * Exceptions: None.
+   */
+  readonly destinationStopsArmor?: boolean;
 };
 
 const WEATHER_WORDS: Readonly<Record<string, WeatherState>> = Object.freeze({
@@ -169,9 +179,9 @@ function tacticalMarchHtml(
 /**
  * Names origin weather that cuts a strategic march.
  *
- * Purpose: Strategic terrain does not change movement, so only weather belongs on this line.
+ * Purpose: Weather can slow the march, and a rugged, arctic, or city destination ends an armor move.
  * When to use: A legal strategic march.
- * Expected outcome: One `Slower:` line, or null when no selected unit is slowed. Infantry and air never match.
+ * Expected outcome: A `Slower:` line when weather slows a selected unit, an `Effects:` line when the destination stops armor, or null when neither applies.
  * Exceptions: None.
  */
 function strategicMarchHtml(input: OrderPreviewEffectsTooltipInput): string | null {
@@ -190,8 +200,14 @@ function strategicMarchHtml(input: OrderPreviewEffectsTooltipInput): string | nu
     const weather = unit.originWeather;
     if (weather && !weathers.includes(weather)) weathers.push(weather);
   }
-  if (weathers.length === 0) return null;
-  return `<strong>Slower:</strong> ${weathers.map((weather) => formatWeatherIconHtml(weather)).join(', ')}`;
+  const parts: string[] = [];
+  if (weathers.length > 0) {
+    parts.push(`<strong>Slower:</strong> ${weathers.map((weather) => formatWeatherIconHtml(weather)).join(', ')}`);
+  }
+  if (input.destinationStopsArmor === true) {
+    parts.push(`<strong>Effects:</strong> ${formatStatusIconHtml('blocked')}Armored Movement`);
+  }
+  return parts.length > 0 ? parts.join(TOOLTIP_SECTION_GAP_HTML) : null;
 }
 
 /**
@@ -283,8 +299,29 @@ function airStrikeHtml(input: OrderPreviewEffectsTooltipInput): string | null {
  */
 function coverLine(place: TerrainCoverPlace | null | undefined, shooter: TerrainCoverShooter): string | null {
   if (!place || terrainCoverFor(place, shooter) <= 0) return null;
+  const extra = strategicCoverRaiseLabel(place, shooter);
+  if (extra) {
+    const value = terrainCoverFor(place, shooter);
+    const icon = formatStatusIconHtml(value >= 2 ? 'doubleUp' : 'up');
+    return `<strong>Cover:</strong> ${icon}${extra}`;
+  }
   const source = terrainCoverSourceLabel(place);
   return source ? `<strong>Cover:</strong> ${labelHtml(source)}` : null;
+}
+
+/**
+ * Names rugged or city when that flag is why this column is above the other sources.
+ *
+ * Purpose: The planning Cover line uses the same icons as the hex Effects line for those two reasons.
+ * When to use: From `coverLine` before the terrain-kind source.
+ * Expected outcome: `City` when the city flag raises the column, otherwise `Rugged` when the rugged flag does. Null when forest, mountain, wetlands, urban, or rubble already account for the value.
+ * Exceptions: None.
+ */
+function strategicCoverRaiseLabel(place: TerrainCoverPlace, shooter: TerrainCoverShooter): 'Rugged' | 'City' | null {
+  const without = terrainCoverFor({ ...place, rugged: false, city: false }, shooter);
+  if (place.city === true && terrainCoverFor({ ...place, rugged: false }, shooter) > without) return 'City';
+  if (place.rugged === true && terrainCoverFor(place, shooter) > without) return 'Rugged';
+  return null;
 }
 
 /**

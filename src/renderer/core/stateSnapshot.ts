@@ -3,6 +3,8 @@ import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { applyInitialCameraForState } from '../map/mapHelpers';
 import { tacticalReleaseRendererSessionForNewStrategicMatch } from '../tactical/tacticalUiOrchestration';
 import { rendererSharedState as S } from './state';
+import { installRendererGameMap } from './installRendererGameMap';
+import { syncMapExtentToSnapshot } from '../map/mapExtent';
 
 /**
  * Documents the `ApplySnapshotDeps` interface as a named contract surface (interface ApplySnapshotDeps).
@@ -284,6 +286,8 @@ export async function applyGameStateSnapshot(
     redraw?: boolean;
   } = {}
 ): Promise<void> {
+  installRendererGameMap(nextState);
+  syncMapExtentToSnapshot(nextState);
   const previousState = S.gameState;
   S.gameState = nextState;
   deps.reconcileTacticalBattleAfterStrategicSnapshot(nextState);

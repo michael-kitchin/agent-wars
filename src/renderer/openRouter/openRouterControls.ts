@@ -2,6 +2,7 @@ import type { PostResolutionConsultationPushPayload } from '../../shared/ipcType
 import type { AiStrategyToastFields } from '../../shared/aiStrategyToastContent';
 import type { OpenRouterModel } from '../../shared/ipc/openRouterTypes';
 import { formatModelOptionLabel } from '../../shared/openRouterModelDisplay';
+import { selectTabPanel } from '../chrome/selectTabPanel';
 import { rendererSharedState as S } from '../core/state';
 import {
   readTacticalBattlesInterceptPromptEnabled,
@@ -267,25 +268,12 @@ export function initOpenRouterUI(deps: OpenRouterUiDeps): void {
 
   const tabTools = document.getElementById('openrouter-tab-tools');
   const tabModel = document.getElementById('openrouter-tab-model');
-  const panelTools = document.getElementById('openrouter-tools-panel');
-  const panelModel = document.getElementById('openrouter-model-panel');
 
   function setActiveTab(active: 'tools' | 'model'): void {
-    if (active === 'model') {
-      tabTools?.setAttribute('aria-selected', 'false');
-      tabModel?.setAttribute('aria-selected', 'true');
-      panelTools?.classList.remove('active');
-      panelTools?.setAttribute('hidden', '');
-      panelModel?.classList.add('active');
-      panelModel?.removeAttribute('hidden');
-    } else {
-      tabTools?.setAttribute('aria-selected', 'true');
-      tabModel?.setAttribute('aria-selected', 'false');
-      panelTools?.classList.add('active');
-      panelTools?.removeAttribute('hidden');
-      panelModel?.classList.remove('active');
-      panelModel?.setAttribute('hidden', '');
-    }
+    selectTabPanel(active === 'model' ? 'openrouter-tab-model' : 'openrouter-tab-tools', [
+      { tabId: 'openrouter-tab-tools', panelId: 'openrouter-tools-panel' },
+      { tabId: 'openrouter-tab-model', panelId: 'openrouter-model-panel' },
+    ]);
   }
 
   tabTools?.addEventListener('click', () => setActiveTab('tools'));

@@ -799,7 +799,7 @@ function testParityDiagnosticsBreadcrumbsCoverPlanningAndPositionSourceBoundarie
 
  * Purpose: Static regression tests for Leaflet tactical camera constraints and exit restoration.
  * When to use: CI guard when refactoring `enterTacticalMapView` / `exitTacticalMapView`.
- * Expected outcome: Enter clamps min/max zoom and maxBounds to the tactical footprint with animated bounds; exit restores world maxBounds and saved zoom limits.
+ * Expected outcome: Enter clamps min/max zoom and maxBounds to the tactical footprint with animated bounds; exit restores the loaded map extent and saved zoom limits.
  * Exceptions: None.
  */
 function testTacticalMapViewLocksZoomPanAndRestoresWorld(): void {
@@ -824,12 +824,12 @@ function testTacticalMapViewLocksZoomPanAndRestoresWorld(): void {
   );
   const exitFn = getFunctionSource(source, 'exitTacticalMapView');
   assert.ok(
-    exitFn.includes('map.setMaxBounds(worldBounds)'),
-    'exitTacticalMapView should restore world maxBounds after tactical mode'
+    exitFn.includes('restoreLoadedMapExtent()'),
+    'exitTacticalMapView should restore the loaded map extent after tactical mode'
   );
   assert.ok(
-    exitFn.includes('map.fitBounds(worldBounds') || exitFn.includes('map.fitBounds?.(worldBounds'),
-    'exitTacticalMapView should fit the default strategic world view after restoring zoom limits'
+    exitFn.includes('restoreLoadedMapExtent(true)'),
+    'exitTacticalMapView should fit the loaded map extent when no strategic home view was saved'
   );
   assert.ok(
     exitFn.includes('map.setMinZoom(S.preTacticalLeafletMinZoom)') &&
@@ -941,12 +941,19 @@ function testMaintainabilityConsolidationSeams(): void {
   const rendererSource = fs.readFileSync(rendererPath, 'utf8');
   const overlaysPath = path.resolve(process.cwd(), 'src', 'renderer', 'rendering', 'resolutionCombatOverlays.ts');
   const overlaysSource = fs.readFileSync(overlaysPath, 'utf8');
+  const symbolPath = path.resolve(process.cwd(), 'src', 'renderer', 'rendering', 'resolutionSymbolDrawing.ts');
+  const symbolSource = fs.readFileSync(symbolPath, 'utf8');
   assert.ok(
     rendererSource.includes("from './resolutionCombatOverlays'") &&
       rendererSource.includes('drawResolutionCombatAndCasualtyOverlays') &&
-      overlaysSource.includes('drawCombatLightning') &&
-      overlaysSource.includes('drawCasualtyOverlay'),
-    'resolution combat overlays should be extracted and draw lightning before casualties'
+      overlaysSource.includes('drawCombatLightning(ctx, knownCombatHexes, pulseOpacity)') &&
+      overlaysSource.includes('drawCasualtyOverlay(ctx, knownCasualtyHexes, pulseOpacity)') &&
+      overlaysSource.indexOf('drawCombatLightning') < overlaysSource.indexOf('drawCasualtyOverlay') &&
+      symbolSource.includes('resolution/lightning_bolt.svg') &&
+      symbolSource.includes('resolution/x_destroyed.svg') &&
+      !symbolSource.includes('agent_wars_icons') &&
+      symbolSource.includes('ctx.globalAlpha = opacity'),
+    'resolution combat overlays should draw the status bolt and destruction mark at the pulse opacity, lightning before casualties'
   );
 
   const drawGameSceneFn = getFunctionSource(rendererSource, 'drawGameScene');

@@ -13,6 +13,7 @@ import {
   type TerrainCover,
   type TerrainCoverShooter,
 } from '../../shared/terrainCoverRules';
+import { strategicTerrainFlagsFor } from '../../shared/strategicTerrainFlags';
 import type { HitThresholdUnit } from '../combatHitThresholds';
 import { logDebug } from '../logger';
 
@@ -49,15 +50,21 @@ export type StrategicTerrainCoverHex = { readonly h3Index: string; readonly terr
 /**
  * Builds the strategic lookup, which reads each hex's dominant terrain kind.
  *
- * Purpose: Strategic ranged fire and air strikes on units.
+ * Purpose: Strategic ranged fire and air strikes on units, including city and rugged cover.
  * When to use: Once per strategic turn resolution, from the hex rows loaded before movement.
- * Expected outcome: A closure over an `h3Index -> terrainKind` map built once. Strategic hexes never count as urban or rubble; a hex missing from the list gives 0.
+ * Expected outcome: A closure over an `h3Index -> terrainKind` map built once. A hex also takes city and rugged cover from the loaded strategic flags. Strategic hexes never count as urban or rubble; a hex missing from the list gives 0 unless those flags are set.
  * Exceptions: None.
  */
 export function createStrategicTerrainCoverLookup(hexes: ReadonlyArray<StrategicTerrainCoverHex>): TerrainCoverLookup {
   logDebug('terrainCoverLookup createStrategicTerrainCoverLookup', { hexes: hexes.length });
   const terrainKindByH3 = new Map(hexes.map((h) => [h.h3Index, h.terrainKind] as const));
-  return (targetH3Index, shooter) => terrainCoverFor({ terrainKind: terrainKindByH3.get(targetH3Index) }, shooter);
+  return (targetH3Index, shooter) => {
+    const flags = strategicTerrainFlagsFor(targetH3Index);
+    return terrainCoverFor(
+      { terrainKind: terrainKindByH3.get(targetH3Index), rugged: flags.rugged, city: flags.city },
+      shooter
+    );
+  };
 }
 
 /**

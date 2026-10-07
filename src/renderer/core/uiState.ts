@@ -4,6 +4,7 @@ import { formatWeatherIconHtml } from '../../shared/weatherIcons';
 import { rendererSharedState as S } from './state';
 import { setUnitNameContent } from './unitOriginFlags';
 import { initializeScenarioRegionSelectorsOnOverlayOpen } from '../gameplay/newGameRegionUi';
+import { prepareNewGameMapPanel } from '../gameplay/newGameMapUi';
 import { syncGameSizeCapPreview } from '../gameplay/newGameSizeUi';
 import { resetNewGameOptionControls } from '../gameplay/newGameOptionsUi';
 import { newGameButtonTooltipText } from '../chrome/controlTooltipText';
@@ -143,6 +144,7 @@ export function updateGameOverUI(
   resetNewGameOptionControls();
   if (wasHidden) {
     void initializeScenarioRegionSelectorsOnOverlayOpen();
+    void prepareNewGameMapPanel();
   }
   syncGameSizeCapPreview();
   setMainUIControlsEnabled(false);

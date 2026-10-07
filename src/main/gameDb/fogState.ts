@@ -8,10 +8,14 @@ import {
   computeIntersectingHomeRegionHexes,
   getForcedVisibleHomeRegionHexesForPlayer,
 } from '../../shared/homeRegionRules';
-import { logDebug, logTrace } from '../logger';
+import { activeGameMap } from '../../shared/activeGameMap';
+import { loadedStrategicFootprint } from '../../shared/loadedStrategicFootprint';
+import { logDebug, logError, logTrace } from '../logger';
 import type { StrategicInfrastructureRow } from './controlInfrastructure';
 import type { GuardedDbOps } from './dbOps';
 import { getScenarioHomeRegionHexes } from '../regionScenario';
+import { gameMapLoadError } from '../gameMap/loadGameMap';
+import { strategicTerrainFlagsFor } from '../../shared/strategicTerrainFlags';
 import { loadScenarioState, REGION_VS_REGION_SCENARIO_ID } from './scenarioState';
 import { readPersistedGameSize } from './gameSizeConfig';
 import { readPersistedOriginBonusSettings } from './originBonusConfig';
@@ -19,6 +23,7 @@ import { calendarMonthName, parseStartMonth } from '../../shared/weatherBonusRul
 import { techLevelForBirthHex } from '../techBonus/techLevelForBirthHex';
 import { displayWeatherForHex, weatherTagsForBirthHex } from '../weather/weatherPackLoad';
 import { getStrategicMajorityCountryNamesFromSnapshot } from '../unitOrigin/tacticalBirthCountryCache';
+import { strategicMajorityOriginIds, tacticalOriginAreasLoaded } from '../unitOrigin/tacticalOriginAreas';
 
 /**
  * How many turns a last-known enemy position remains visible after contact is lost.
@@ -181,21 +186,55 @@ export function getGameStateSnapshot(deps: FogDeps): GameStateSnapshot {
   if (!ops.hasDb()) {
     return { hexes: [], units: [], phase: 'planning', turnNumber: 1, pendingOrders: [] };
   }
+  const loadError = gameMapLoadError();
+  if (loadError) {
+    logError('getGameStateSnapshot: map load error', new Error(loadError));
+    return { hexes: [], units: [], phase: 'planning', turnNumber: 1, pendingOrders: [], gameMapLoadError: loadError };
+  }
 
   const hexCount = ops.getOne<{ c: number }>('SELECT COUNT(*) AS c FROM hexes');
   const hasHexes = !!hexCount && hexCount.c > 0;
   const ordered = hasHexes ? getOrderedHexList() : [];
+  const footprint = loadedStrategicFootprint();
+  if (footprint && hasHexes) {
+    const databaseHexes = new Set(ops.getAll<{ h3_index: string }>('SELECT h3_index FROM hexes').map((row) => row.h3_index));
+    const footprintHexes = new Set(footprint);
+    let missing = 0;
+    let extra = 0;
+    for (const h3Index of footprint) if (!databaseHexes.has(h3Index)) missing += 1;
+    for (const h3Index of databaseHexes) if (!footprintHexes.has(h3Index)) extra += 1;
+    if (missing > 0 || extra > 0) {
+      logError(
+        'getGameStateSnapshot: footprint does not match hexes',
+        new Error(`${missing} footprint hexes are missing from the database; ${extra} database hexes are off the footprint`)
+      );
+    }
+  }
   const originBonusSettings = readPersistedOriginBonusSettings(ops);
-  const countryNames = originBonusSettings.countryBonusEnabled ? getStrategicMajorityCountryNamesFromSnapshot() : null;
-  const hexRows: GameStateSnapshot['hexes'] = ordered.map((h3Index) => {
-    const row = ops.getOne<{ terrain: string; terrain_kind: string }>('SELECT terrain, terrain_kind FROM hexes WHERE h3_index = ?', [h3Index]);
-    return {
+  const countryNames = originBonusSettings.countryBonusEnabled
+    ? tacticalOriginAreasLoaded()
+      ? strategicMajorityOriginIds()
+      : getStrategicMajorityCountryNamesFromSnapshot()
+    : null;
+  const hexRows: GameStateSnapshot['hexes'] = [];
+  for (const h3Index of ordered) {
+    const row = ops.getOne<{ terrain: string; terrain_kind: string; map_role: string | null }>(
+      'SELECT terrain, terrain_kind, map_role FROM hexes WHERE h3_index = ?',
+      [h3Index]
+    );
+    if (!row) continue;
+    const flags = strategicTerrainFlagsFor(h3Index);
+    hexRows.push({
       h3Index,
-      terrain: row?.terrain ?? 'land',
-      terrainKind: row?.terrain_kind ?? 'plains',
+      terrain: row.terrain,
+      terrainKind: row.terrain_kind,
+      ...(row.map_role ? { mapRole: row.map_role } : {}),
+      ...(flags.rugged ? { rugged: true } : {}),
+      ...(flags.arctic ? { arctic: true } : {}),
+      ...(flags.city ? { city: true } : {}),
       ...(countryNames ? { countryName: countryNames.get(h3Index) ?? null } : {}),
-    };
-  });
+    });
+  }
   const unitRows = deps.listUnitsForSnapshot();
   const turnRow = ops.getOne<{ phase: string; turnNumber: number }>('SELECT phase, turn_number AS turnNumber FROM turn_state WHERE id = 1');
   const orderRows = ops.getAll<{ unitId: string; toH3Index: string }>('SELECT unit_id AS unitId, to_h3_index AS toH3Index FROM pending_orders');
@@ -280,7 +319,7 @@ export function getGameStateSnapshot(deps: FogDeps): GameStateSnapshot {
         }
       : {}),
   };
-  return withFogMetadata(withScenarioMetadata(snapshot, ops), isFogOfWarEnabled(ops));
+  return withFogMetadata(withScenarioMetadata({ ...snapshot, gameMap: activeGameMap() }, ops), isFogOfWarEnabled(ops));
 }
 
 /**

@@ -29,6 +29,11 @@
     <div id="game-over-overlay" class="game-over-overlay hidden" aria-live="polite">
       <div class="game-over-box">
         <p id="game-over-message"></p>
+        <div class="openrouter-tab-bar game-over-tab-bar" role="tablist">
+          <button type="button" id="new-game-tab-global" role="tab" aria-selected="true" aria-controls="new-game-panel-global" data-control-tooltip="Start on the world map and pick a home region for each side.">Global</button>
+          <button type="button" id="new-game-tab-regional" role="tab" aria-selected="false" aria-controls="new-game-panel-regional" data-control-tooltip="Start on one region and pick a different side group for each player.">Regional</button>
+        </div>
+        <div id="new-game-panel-global" class="openrouter-tab-panel active" role="tabpanel" aria-labelledby="new-game-tab-global">
         <div class="game-over-region-row">
           <div class="game-over-region-cell">
             <label for="new-game-human-region-select">Human Player:</label>
@@ -45,6 +50,31 @@
             </div>
           </div>
         </div>
+        </div>
+        <div id="new-game-panel-regional" class="openrouter-tab-panel" role="tabpanel" aria-labelledby="new-game-tab-regional" hidden>
+          <div class="game-over-regional-region">
+            <label for="new-game-region-select">Region:
+              <select id="new-game-region-select" data-control-tooltip="Pick the region both sides fight over. Changing it draws two different sides again."></select>
+            </label>
+          </div>
+          <div class="game-over-region-row">
+            <div class="game-over-region-cell">
+              <label for="new-game-human-side-select">Human Player:</label>
+              <div class="game-over-region-controls">
+                <select id="new-game-human-side-select" data-control-tooltip="Pick your side. It stays different from the opponent's side."></select>
+                <button type="button" id="new-game-human-side-randomize" class="compact-blue-btn compact-square-btn game-over-region-randomize" aria-label="Randomize human side" data-control-tooltip="Pick one of the other sides at random for your side.">↻</button>
+              </div>
+            </div>
+            <div class="game-over-region-cell">
+              <label for="new-game-ai-side-select">AI Player:</label>
+              <div class="game-over-region-controls">
+                <select id="new-game-ai-side-select" data-control-tooltip="Pick the opponent's side. It stays different from yours."></select>
+                <button type="button" id="new-game-ai-side-randomize" class="compact-blue-btn compact-square-btn compact-opponent-btn game-over-region-randomize" aria-label="Randomize AI side" data-control-tooltip="Pick one of the other sides at random for the opponent.">↻</button>
+              </div>
+            </div>
+          </div>
+          <p id="new-game-advanced-tech" class="game-over-advanced-tech"></p>
+        </div>
         <div class="game-over-size-row">
           <label for="new-game-size-select">Game size:
             <select id="new-game-size-select" data-control-tooltip="Set how many units each side may field. Small is the baseline, Medium doubles it, and Large triples it, without changing the map or the starting forces.">
@@ -60,34 +90,34 @@
               <img src="units/infantry.svg" alt="" />
               <span id="new-game-size-cap-infantry" class="game-over-size-badge">12</span>
             </div>
-            <div class="game-over-size-name">Infantry</div>
+            <div class="game-over-size-name">Infantry <span id="new-game-cost-infantry">($20)</span></div>
           </div>
           <div class="game-over-size-cap">
             <div class="game-over-size-token">
               <img src="units/armor.svg" alt="" />
               <span id="new-game-size-cap-armor" class="game-over-size-badge">8</span>
             </div>
-            <div class="game-over-size-name">Armor</div>
+            <div class="game-over-size-name">Armor <span id="new-game-cost-armor">($40)</span></div>
           </div>
           <div class="game-over-size-cap">
             <div class="game-over-size-token">
               <img src="units/naval.svg" alt="" />
               <span id="new-game-size-cap-naval" class="game-over-size-badge">8</span>
             </div>
-            <div class="game-over-size-name">Naval</div>
+            <div class="game-over-size-name">Naval <span id="new-game-cost-naval">($100)</span></div>
           </div>
           <div class="game-over-size-cap">
             <div class="game-over-size-token">
               <img src="units/air.svg" alt="" />
               <span id="new-game-size-cap-air" class="game-over-size-badge">6</span>
             </div>
-            <div class="game-over-size-name">Air</div>
+            <div class="game-over-size-name">Air <span id="new-game-cost-air">($60)</span></div>
           </div>
         </div>
         <div class="game-over-options">
           <div class="game-over-options-line">
             <label for="new-game-country-bonus-select">Country bonus:
-              <select id="new-game-country-bonus-select" data-control-tooltip="Choose Off, Low, or High. Low adds 2 and High adds 4 to a unit's attack or defense when it fights in the country where it was built.">
+              <select id="new-game-country-bonus-select" data-control-tooltip="Low adds 2 and High adds 4 when a unit fights in the area where it was built: a country in a global game, and the origin area in a regional game.">
                 <option value="off">Off</option>
                 <option value="low" selected>Low</option>
                 <option value="high">High</option>

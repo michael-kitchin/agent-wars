@@ -5,6 +5,7 @@ import type { GameSize } from '../gameSize';
 import type { UnitOrigin } from '../unitOriginTypes';
 import type { TechLevel } from '../techBonusTypes';
 import type { WeatherState } from '../weatherBonusTypes';
+import type { GameMapProfile } from '../gameMapTypes';
 
 /**
  * Documents the `GameStateSnapshot` interface as a named contract surface (export interface GameStateSnapshot).
@@ -36,6 +37,42 @@ hexes: {
      * Exceptions: None.
      */
     countryName?: string | null;
+    /**
+     * Manifest role of this strategic hex.
+     *
+     * Contract: `member_land`, `sea`, or `neutral_border` on a regional map. Absent on the global map.
+     * When to use: Neutral-border checks in the renderer after a snapshot arrives.
+     * Expected outcome: Null when the column is null.
+     * Exceptions: None.
+     */
+    mapRole?: string | null;
+    /**
+     * Armor ends its move on this hex because it is rugged.
+     *
+     * Contract: Omitted when false. Present on visible snapshot hexes after classification.
+     * When to use: Effects lines and strategic cover.
+     * Expected outcome: True only when at least half the land cells pass the mountain test.
+     * Exceptions: None.
+     */
+    rugged?: boolean;
+    /**
+     * Armor ends its move on this hex because it is arctic.
+     *
+     * Contract: Omitted when false. Does not add cover.
+     * When to use: The armor-stop Effects clause.
+     * Expected outcome: True only when at least half the land cells classify as arctic.
+     * Exceptions: None.
+     */
+    arctic?: boolean;
+    /**
+     * Armor ends its move on this hex because it is a city, and both cover columns can rise.
+     *
+     * Contract: Omitted when false. A city has a generated urban count of at least 86.
+     * When to use: Effects lines and strategic cover.
+     * Expected outcome: True only for those hexes.
+     * Exceptions: None.
+     */
+    city?: boolean;
     /**
      * Display weather of this strategic hex for the current month.
      *
@@ -275,6 +312,24 @@ techBonusLevel?: ActiveBonusLevel;
    * Exceptions: None.
    */
 scenarioId?: 'region_vs_region';
+    /**
+   * Profile of the map this snapshot was built from.
+   *
+   * Contract: Present when a database is open. The renderer copies it before drawing.
+   * When to use: Costs, resolutions, and the start screen's current tab.
+   * Expected outcome: The global profile or the loaded regional profile.
+   * Exceptions: None.
+   */
+gameMap?: GameMapProfile;
+    /**
+   * Why the saved map could not be loaded.
+   *
+   * Contract: Present only when startup could not read the saved pack. The hex list is then empty.
+   * When to use: The start overlay toast.
+   * Expected outcome: A short error message. Absent after a successful load.
+   * Exceptions: None.
+   */
+gameMapLoadError?: string;
     /**
    * Specifies the contract for the `humanHomeRegion` member (humanHomeRegion?: string;).
 

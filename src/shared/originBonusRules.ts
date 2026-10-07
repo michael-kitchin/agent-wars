@@ -189,7 +189,8 @@ export function originBonusSources(input: {
   const { settings, theater, origin, place } = input;
   if (!origin) return [];
   const sources: OriginBonusSource[] = [];
-  if (settings.countryBonusEnabled && origin.birthCountryName !== null && origin.birthCountryName === place.countryName) {
+  const areaId = origin.birthAreaId ?? origin.birthCountryName;
+  if (settings.countryBonusEnabled && areaId !== null && areaId === place.countryName) {
     sources.push('country');
   }
   if (theater === 'tactical' && settings.terrainBonusEnabled) {

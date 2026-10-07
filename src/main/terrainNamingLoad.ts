@@ -3,6 +3,7 @@
 import { getResolution } from 'h3-js';
 import { readJsonFileOrThrow } from './jsonFileHelpers';
 import { logDebug, logTrace } from './logger';
+import { strategicH3Resolution, tacticalH3Resolution } from '../shared/h3Resolutions';
 import { resolveTerrainStrategicNamingPath, resolveTerrainTacticalNamingPath } from './terrainMetadataPaths';
 
 /**
@@ -635,7 +636,9 @@ function parseNamingEnvelope(raw: unknown, expectedResolution: number): TerrainN
     throw new Error(`terrain naming: record_count ${recordCount} != len(records) ${recs.length}`);
   }
   const parseRow =
-    expectedResolution === 4 ? (r: unknown) => parseTacticalRow(r, 4) : (r: unknown) => parseStrategicRow(r, 1);
+    expectedResolution === tacticalH3Resolution()
+      ? (r: unknown) => parseTacticalRow(r, expectedResolution)
+      : (r: unknown) => parseStrategicRow(r, expectedResolution);
   const records = recs.map((r, i) => {
     try {
       return parseRow(r);
@@ -700,10 +703,13 @@ export function namesForFirstOccurringScalerankList(
  * Expected outcome: Parsed naming envelope at resolution 1.
  * Exceptions: Rethrows read and parse failures. Throws when the envelope fails validation.
  */
-export function loadTerrainStrategicNamingFromPath(absPath: string): TerrainNamingEnvelope {
-  logDebug('terrainNamingLoad loadTerrainRes1NamingFromPath', { absPath });
+export function loadTerrainStrategicNamingFromPath(
+  absPath: string,
+  expectedResolution = strategicH3Resolution()
+): TerrainNamingEnvelope {
+  logDebug('terrainNamingLoad loadTerrainRes1NamingFromPath', { absPath, expectedResolution });
   const parsed = readJsonFileOrThrow(absPath, 'terrainNamingLoad loadTerrainRes1NamingFromPath');
-  return parseNamingEnvelope(parsed, 1);
+  return parseNamingEnvelope(parsed, expectedResolution);
 }
 
 /**
@@ -714,10 +720,13 @@ export function loadTerrainStrategicNamingFromPath(absPath: string): TerrainNami
  * Expected outcome: Parsed naming envelope at resolution 4.
  * Exceptions: Rethrows read and parse failures. Throws when the envelope fails validation.
  */
-export function loadTerrainTacticalNamingFromPath(absPath: string): TerrainNamingEnvelope {
-  logDebug('terrainNamingLoad loadTerrainRes4NamingFromPath', { absPath });
+export function loadTerrainTacticalNamingFromPath(
+  absPath: string,
+  expectedResolution = tacticalH3Resolution()
+): TerrainNamingEnvelope {
+  logDebug('terrainNamingLoad loadTerrainRes4NamingFromPath', { absPath, expectedResolution });
   const parsed = readJsonFileOrThrow(absPath, 'terrainNamingLoad loadTerrainRes4NamingFromPath');
-  return parseNamingEnvelope(parsed, 4);
+  return parseNamingEnvelope(parsed, expectedResolution);
 }
 
 /**

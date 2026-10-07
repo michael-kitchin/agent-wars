@@ -49,6 +49,21 @@ function landcoverDictNonEmpty(r: HexMetadataRecordStrategic): boolean {
 }
 
 /**
+ * True when a tactical cell meets the mountain test, even if forest or arctic would win the kind label.
+ *
+ * Purpose: Rugged hexes count forested cells that are still mountainous.
+ * When to use: While counting rugged land cells for one strategic hex.
+ * Expected outcome: True when ruggedness or the slope-and-elevation pair crosses the pack thresholds.
+ * Exceptions: None.
+ */
+export function tacticalCellPassesMountainTest(r: HexMetadataRecordStrategic, t: ClassifierThresholds): boolean {
+  const triOk = r.tri_mean != null && r.tri_mean >= t.mountain_tri_mean_min;
+  const slopeOk = r.slope_mean != null && r.slope_mean >= t.mountain_slope_mean_min;
+  const elevOk = r.elevation_max != null && r.elevation_max >= t.mountain_elevation_max_min;
+  return triOk || (slopeOk && elevOk);
+}
+
+/**
  * Defines the `classifyInteriorBiome` function shape (function classifyInteriorBiome( r: HexMetadataRecordStrategic, t: ClassifierThresholds ): Exclude<PipelineTerrainKind, 'water' | 'coastal' | 'wetlands'> {).
 
  * Purpose: Supports maintainability by documenting why `classifyInteriorBiome` exists.
@@ -65,10 +80,7 @@ function classifyInteriorBiome(
   const c11 = r.desert_mean ?? 0;
   if (c10 >= t.arctic_dominant_min) return 'arctic';
   if (forest >= t.forest_dominant_min) return 'forest';
-  const triOk = r.tri_mean != null && r.tri_mean >= t.mountain_tri_mean_min;
-  const slopeOk = r.slope_mean != null && r.slope_mean >= t.mountain_slope_mean_min;
-  const elevOk = r.elevation_max != null && r.elevation_max >= t.mountain_elevation_max_min;
-  if (triOk || (slopeOk && elevOk)) return 'mountain';
+  if (tacticalCellPassesMountainTest(r, t)) return 'mountain';
   if (c11 >= t.desert_barren_min) return 'desert';
   return 'plains';
 }

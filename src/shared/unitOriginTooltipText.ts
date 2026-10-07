@@ -1,4 +1,4 @@
-import { countryFlagImgHtml } from './countryFlags';
+import { originFlagImgHtml } from './originArea';
 import { escapeHtmlText } from './htmlTextFormatting';
 import { formatTerrainKindHtml } from './terrainSwatchHtml';
 import type { UnitOrigin } from './unitOriginTypes';
@@ -89,7 +89,10 @@ export function unitOriginsPresentTheSame(left: UnitOrigin, right: UnitOrigin): 
     left.birthTerrainKind === right.birthTerrainKind &&
     left.birthIsUrban === right.birthIsUrban &&
     left.birthCountryName === right.birthCountryName &&
-    left.birthCountryCode === right.birthCountryCode
+    left.birthCountryCode === right.birthCountryCode &&
+    left.birthAreaId === right.birthAreaId &&
+    left.birthAreaName === right.birthAreaName &&
+    left.birthSubdivisionCode === right.birthSubdivisionCode
   );
 }
 
@@ -118,9 +121,17 @@ export function formatUnitOriginTooltipHtml(input: {
   readonly bonuses: UnitOriginTooltipBonuses;
 }): string {
   const rows: string[] = [];
-  const countryName = input.origin.birthCountryName?.trim() ?? '';
-  if (input.bonuses.countryEnabled && countryName.length > 0) {
-    rows.push(bonusRow('Country', `${countryFlagImgHtml(input.origin.birthCountryCode)}${escapeHtmlText(countryName)}`));
+  const areaName = (input.origin.birthAreaName ?? input.origin.birthCountryName)?.trim() ?? '';
+  if (input.bonuses.countryEnabled && areaName.length > 0) {
+    rows.push(
+      bonusRow(
+        'Country',
+        `${originFlagImgHtml({
+          subdivisionCode: input.origin.birthSubdivisionCode ?? null,
+          countryCode: input.origin.birthCountryCode,
+        })}${escapeHtmlText(areaName)}`
+      )
+    );
   }
   const terrainKind = input.origin.birthTerrainKind?.trim() ?? '';
   if (input.bonuses.terrainEnabled && terrainKind.length > 0) {

@@ -14,6 +14,7 @@ import { logDebug, logError, logTrace } from '../logger';
 import type { TerrainNamingRecordStrategic, TerrainNamingRecordTactical } from '../terrainNamingLoad';
 import { buildStrategicMajorityCountryNameByH3 } from './strategicMajorityCountry';
 import { buildTacticalBirthCountryByH3 } from './tacticalBirthCountry';
+import { originAreaForTacticalCell, tacticalOriginAreasLoaded } from './tacticalOriginAreas';
 
 /**
  * Shared empty answer for `getStrategicMajorityCountryNamesFromSnapshot` before the cache loads.
@@ -113,12 +114,19 @@ export function getTacticalBirthCountryFromSnapshot(h3Index: string): BirthCount
 export function tacticalCountryNamesForCells(cells: readonly string[]): Record<string, string> | undefined {
   logTrace('res4BirthCountryCache res4CountryNamesForCells', { cells: cells.length });
   try {
-    const namesByH3 = Object.fromEntries(
-      cells.flatMap((cell) => {
-        const name = getTacticalBirthCountryFromSnapshot(cell)?.name;
-        return name ? [[cell, name] as const] : [];
-      })
-    );
+    const namesByH3 = tacticalOriginAreasLoaded()
+      ? Object.fromEntries(
+          cells.flatMap((cell) => {
+            const areaId = originAreaForTacticalCell(cell)?.id;
+            return areaId ? [[cell, areaId] as const] : [];
+          })
+        )
+      : Object.fromEntries(
+          cells.flatMap((cell) => {
+            const name = getTacticalBirthCountryFromSnapshot(cell)?.name;
+            return name ? [[cell, name] as const] : [];
+          })
+        );
     return Object.keys(namesByH3).length > 0 ? namesByH3 : undefined;
   } catch (err) {
     logError('res4BirthCountryCache res4CountryNamesForCells: lookup failed', { cells: cells.length, err });

@@ -4,6 +4,7 @@ import { formatStatusIconHtml } from './statusIconHtml';
 import {
   formatTerrainCoverTooltipHtml,
   joinHexTooltipEffectsHtml,
+  strategicHexEffectsBodyHtml,
   terrainCoverFor,
   terrainCoverPairFor,
   terrainCoverShooterForUnitType,
@@ -60,4 +61,22 @@ test('the source label prefers rubble, then urban, then the terrain kind', () =>
   assert.equal(terrainCoverSourceLabel({ terrainKind: 'forest', isUrban: true }), 'Urban');
   assert.equal(terrainCoverSourceLabel({ terrainKind: 'forest' }), 'Forest');
   assert.equal(terrainCoverSourceLabel({ terrainKind: 'plains' }), null);
+});
+
+test('a forest city covers 2/1 and a rugged wetlands hex covers 2/0', () => {
+  assert.deepEqual(terrainCoverPairFor({ terrainKind: 'forest', city: true }), { surface: 2, air: 1 });
+  assert.deepEqual(terrainCoverPairFor({ terrainKind: 'wetlands', rugged: true }), { surface: 2, air: 0 });
+});
+
+test('a strategic stop hex names armored movement and cover, and a battle cell does not', () => {
+  const blocked = `${formatStatusIconHtml('blocked')}Armored Movement`;
+  const ground = `${formatStatusIconHtml('doubleUp')}Ground &amp; Naval Cover`;
+  const air = `${formatStatusIconHtml('up')}Air Cover`;
+  const rugged = strategicHexEffectsBodyHtml(1, true, terrainCoverPairFor({ terrainKind: 'plains', rugged: true }), null);
+  assert.equal(rugged, `${blocked}, ${ground}`);
+  assert.equal(rugged!.includes(formatStatusIconHtml('down')), false);
+  const city = strategicHexEffectsBodyHtml(1, true, terrainCoverPairFor({ terrainKind: 'plains', city: true }), null);
+  assert.equal(city, `${blocked}, ${ground}, ${air}`);
+  assert.equal(strategicHexEffectsBodyHtml(1, false, terrainCoverPairFor({ terrainKind: 'plains' }), null), null);
+  assert.equal(strategicHexEffectsBodyHtml(4, true, terrainCoverPairFor({ terrainKind: 'plains' }), null), null);
 });

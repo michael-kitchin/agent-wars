@@ -1,4 +1,5 @@
 import { logDebug, logError } from '../../logger';
+import { loadedHexRole } from '../../../shared/loadedStrategicFootprint';
 import { getOrderedHexList } from '../../mapData';
 import { assertTerrainMetadataMatchesHexList } from '../../terrainMetadataLoad';
 import {
@@ -50,7 +51,12 @@ export function seedHexesFromTerrainMetadata(): void {
       throw new Error(`terrain metadata missing h3_index ${h3}`);
     }
     const terrain = pipelineTerrainToPassability(kind);
-    run('INSERT INTO hexes (h3_index, terrain, terrain_kind) VALUES (?, ?, ?)', [h3, terrain, kind]);
+    run('INSERT INTO hexes (h3_index, terrain, terrain_kind, map_role) VALUES (?, ?, ?, ?)', [
+      h3,
+      terrain,
+      kind,
+      loadedHexRole(h3),
+    ]);
   }
 }
 

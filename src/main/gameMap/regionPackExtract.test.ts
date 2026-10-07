@@ -1,0 +1,106 @@
+import assert from 'node:assert/strict';
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
+import { test } from 'node:test';
+import { strToU8, zipSync } from 'fflate';
+import { setTerrainMetadataPathOverrideForTests } from '../terrainMetadataPaths';
+import {
+  regionPackDirectory,
+  regionalPackJsonFiles,
+  setRegionPackUserDataRootForTests,
+} from './regionPackExtract';
+
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { REGIONAL_JSON_FILES } = require('../../../scripts/generated-regional-manifest.cjs') as {
+  REGIONAL_JSON_FILES: readonly string[];
+};
+
+/**
+ * Builds a temp tree with `data/generated/regions/<id>/`.
+ *
+ * Purpose: The path override has to look like a repository root.
+ * When to use: At the start of each extract test.
+ * Expected outcome: The region directory path.
+ * Exceptions: None.
+ */
+function makeRegionRoot(regionId: string): { root: string; regionDirectory: string; userData: string } {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'region-pack-'));
+  const regionDirectory = path.join(root, 'data', 'generated', 'regions', regionId);
+  const userData = path.join(root, 'user-data');
+  fs.mkdirSync(regionDirectory, { recursive: true });
+  fs.mkdirSync(userData, { recursive: true });
+  return { root, regionDirectory, userData };
+}
+
+test('the packed JSON names match the packaging manifest', () => {
+  assert.deepEqual([...regionalPackJsonFiles()], [...REGIONAL_JSON_FILES]);
+});
+
+test('a zip-only region is extracted once into user data', () => {
+  const regionId = 'sample_pack';
+  const { root, regionDirectory, userData } = makeRegionRoot(regionId);
+  const zip = zipSync({ 'region_manifest.json': strToU8('{"schema_version":"1.1.0"}') });
+  fs.writeFileSync(path.join(regionDirectory, 'region_manifest.json.zip'), zip);
+  setTerrainMetadataPathOverrideForTests(root);
+  setRegionPackUserDataRootForTests(userData);
+  try {
+    const extracted = regionPackDirectory(regionId);
+    const expected = path.join(userData, 'generated-regions', regionId);
+    assert.equal(extracted, expected);
+    assert.equal(fs.readFileSync(path.join(expected, 'region_manifest.json'), 'utf8'), '{"schema_version":"1.1.0"}');
+    assert.ok(fs.existsSync(path.join(expected, 'pack.ready')));
+    assert.equal(regionPackDirectory(regionId), expected);
+    assert.equal(fs.existsSync(path.join(userData, 'generated-regions', `.${regionId}.extracting`)), false);
+  } finally {
+    setTerrainMetadataPathOverrideForTests(null);
+    setRegionPackUserDataRootForTests(null);
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('a missing extracted JSON file is restored from the zip', () => {
+  const regionId = 'sample_pack';
+  const { root, regionDirectory, userData } = makeRegionRoot(regionId);
+  const manifest = zipSync({ 'region_manifest.json': strToU8('{"schema_version":"1.1.0"}') });
+  const weather = zipSync({ 'terrain_res_s_weather.json': strToU8('{"cells":[]}') });
+  fs.writeFileSync(path.join(regionDirectory, 'region_manifest.json.zip'), manifest);
+  fs.writeFileSync(path.join(regionDirectory, 'terrain_res_s_weather.json.zip'), weather);
+  setTerrainMetadataPathOverrideForTests(root);
+  setRegionPackUserDataRootForTests(userData);
+  try {
+    const extracted = regionPackDirectory(regionId);
+    assert.ok(extracted);
+    const weatherPath = path.join(extracted, 'terrain_res_s_weather.json');
+    fs.rmSync(weatherPath);
+    assert.equal(regionPackDirectory(regionId), extracted);
+    assert.equal(fs.readFileSync(weatherPath, 'utf8'), '{"cells":[]}');
+    assert.equal(fs.existsSync(path.join(userData, 'generated-regions', `.${regionId}.extracting`)), false);
+  } finally {
+    setTerrainMetadataPathOverrideForTests(null);
+    setRegionPackUserDataRootForTests(null);
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('extracted repo JSON is used and a broken zip leaves no temp directory', () => {
+  const regionId = 'sample_pack';
+  const { root, regionDirectory, userData } = makeRegionRoot(regionId);
+  fs.writeFileSync(path.join(regionDirectory, 'region_manifest.json'), '{}');
+  setTerrainMetadataPathOverrideForTests(root);
+  setRegionPackUserDataRootForTests(userData);
+  try {
+    assert.equal(regionPackDirectory(regionId), regionDirectory);
+    assert.equal(fs.existsSync(path.join(userData, 'generated-regions', regionId)), false);
+    fs.rmSync(path.join(regionDirectory, 'region_manifest.json'));
+    fs.writeFileSync(path.join(regionDirectory, 'region_manifest.json.zip'), Buffer.from('not-a-zip'));
+    assert.throws(() => regionPackDirectory(regionId));
+    const parent = path.join(userData, 'generated-regions');
+    assert.equal(fs.existsSync(path.join(parent, `.${regionId}.extracting`)), false);
+    assert.equal(fs.existsSync(path.join(parent, regionId)), false);
+  } finally {
+    setTerrainMetadataPathOverrideForTests(null);
+    setRegionPackUserDataRootForTests(null);
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});

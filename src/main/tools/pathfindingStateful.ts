@@ -163,8 +163,13 @@ function buildBlockedSetSignature(blocked: Set<string> | undefined): string {
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-function buildDestinationCacheKey(originH3: string, destinationH3: string, blocked: Set<string> | undefined): string {
-  return `${originH3}->${destinationH3}|blocked:${buildBlockedSetSignature(blocked)}`;
+function buildDestinationCacheKey(
+  originH3: string,
+  destinationH3: string,
+  blocked: Set<string> | undefined,
+  armorStop: boolean
+): string {
+  return `${originH3}->${destinationH3}|blocked:${buildBlockedSetSignature(blocked)}|stop:${armorStop ? '1' : '0'}`;
 }
 
 /**
@@ -179,10 +184,11 @@ function getOrCreateStatefulDestinationCache(
   session: StatefulLandSearchSessionData,
   originH3: string,
   destinationH3: string,
-  blocked: Set<string> | undefined
+  blocked: Set<string> | undefined,
+  armorStop: boolean
 ): StatefulDestinationCache {
   const byDestination = session.statefulCache.deadStateByDestination;
-  const destinationCacheKey = buildDestinationCacheKey(originH3, destinationH3, blocked);
+  const destinationCacheKey = buildDestinationCacheKey(originH3, destinationH3, blocked, armorStop);
   const existing = byDestination.get(destinationCacheKey);
   const now = Date.now();
   if (existing) {
@@ -233,6 +239,7 @@ function findLandPathWithLandMassRule(payload: {
   destinationH3: string;
   session: StatefulLandSearchSessionData;
   blocked?: Set<string>;
+  endMoveOnEnter?: (h3: string) => boolean;
 }): { path: string[] | null; stats: StatefulSearchStats } {
   const stats: StatefulSearchStats = {
     expandedStateCount: 0,
@@ -253,7 +260,8 @@ function findLandPathWithLandMassRule(payload: {
     payload.session,
     payload.originH3,
     payload.destinationH3,
-    payload.blocked
+    payload.blocked,
+    payload.endMoveOnEnter != null
   );
   const deadStateSet = destinationCache.deadStateSet;
 
@@ -272,6 +280,7 @@ function findLandPathWithLandMassRule(payload: {
       foundH3 = current;
       break;
     }
+    if (current !== payload.originH3 && payload.endMoveOnEnter?.(current)) continue;
     let neighbors: string[] = [];
     try {
       neighbors = gridDisk(current, 1);
@@ -329,12 +338,14 @@ export function findLandPathWithStatefulOptionalAvoidanceRetry(payload: {
   blocked?: Set<string>;
   warnings?: string[];
   blockedRetryWarning?: string;
+  endMoveOnEnter?: (h3: string) => boolean;
 }): { path: string[] | null; stats: StatefulSearchStats } {
   const firstAttempt = findLandPathWithLandMassRule({
     originH3: payload.originH3,
     destinationH3: payload.destinationH3,
     session: payload.session,
     blocked: payload.blocked,
+    endMoveOnEnter: payload.endMoveOnEnter,
   });
   if (firstAttempt.path || !payload.blocked) return firstAttempt;
   const retryAttempt = findLandPathWithLandMassRule({
@@ -342,6 +353,7 @@ export function findLandPathWithStatefulOptionalAvoidanceRetry(payload: {
     destinationH3: payload.destinationH3,
     session: payload.session,
     blocked: undefined,
+    endMoveOnEnter: payload.endMoveOnEnter,
   });
   if (retryAttempt.path && payload.blockedRetryWarning && payload.warnings) {
     payload.warnings.push(payload.blockedRetryWarning);

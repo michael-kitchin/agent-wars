@@ -43,6 +43,8 @@ test('only intact urban cells are chosen when any exist', () => {
     assert.equal(origin.birthTerrainKind, 'coastal');
     assert.equal(origin.birthCountryCode, 'FR');
     assert.equal(origin.birthCountryName, 'France');
+    assert.equal(origin.birthAreaId, 'France');
+    assert.equal(origin.birthAreaName, 'France');
     assert.equal(origin.birthIsUrban, true);
   }
 });
@@ -65,7 +67,22 @@ test('an all-water hex has no birth cell and falls back to the res1 terrain', ()
     birthIsUrban: false,
     birthCountryName: null,
     birthCountryCode: null,
+    birthAreaId: null,
+    birthAreaName: null,
+    birthSubdivisionCode: null,
   });
+});
+
+test('a regional origin area replaces the area fields and the country code', () => {
+  const origin = selectUnitBirthOrigin({
+    ...input([cell('b', 'plains', true)]),
+    originAreaForTactical: () => ({ id: 'US-CA', name: 'California', countryCode: 'US', iso3166_2: 'US-CA' }),
+  });
+  assert.equal(origin.birthCountryName, 'France');
+  assert.equal(origin.birthCountryCode, 'US');
+  assert.equal(origin.birthAreaId, 'US-CA');
+  assert.equal(origin.birthAreaName, 'California');
+  assert.equal(origin.birthSubdivisionCode, 'US-CA');
 });
 
 test('selection is deterministic, ignores input order, and varies across seed keys', () => {

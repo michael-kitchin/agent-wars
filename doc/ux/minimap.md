@@ -1,10 +1,10 @@
 # Minimap
 
-The world overview beside the main map.
+The loaded-map overview beside the main map.
 
 ## Purpose
 
-Show where the main view sits in the world once the player has zoomed in.
+Show where the main view sits in the loaded map once the player has zoomed in.
 
 ## Availability
 
@@ -12,7 +12,7 @@ Shown with the map in every mode where the map container is visible. It does not
 
 ## Information Displayed
 
-- A world overview using the same basemap family as the main map.
+- An overview of the loaded map, the Mercator world in a global match and the region's hexes in a regional match, using the same basemap family as the main map.
 - A rectangle for the main view when the main view covers less of the world than the overview. When the main view is wide enough, the rectangle is removed.
 
 The rectangle tracks pan and zoom of the main map.
@@ -43,7 +43,7 @@ The rectangle tracks pan and zoom of the main map.
 
 ## Strategic and Tactical Differences
 
-The minimap keeps the world overview in both theaters. It does not switch to a battle-only overview when Tactical planning starts. During a battle the main view is the battle area, so the view rectangle shows where the battle is in the world.
+The minimap keeps the loaded map's extent in both theaters. During a battle the main view is the battle area, so the view rectangle shows where the battle is in that extent.
 
 ## Related Documents
 

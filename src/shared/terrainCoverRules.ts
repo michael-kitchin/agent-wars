@@ -53,6 +53,8 @@ export type TerrainCoverPlace = {
   readonly terrainKind?: string | null;
   readonly isUrban?: boolean;
   readonly isRubble?: boolean;
+  readonly rugged?: boolean;
+  readonly city?: boolean;
 };
 
 /**
@@ -99,17 +101,21 @@ export function terrainCoverShooterForUnitType(unitType: string): TerrainCoverSh
 /**
  * Returns both cover columns for a place.
  *
- * Purpose: The one place that combines terrain cover with urban and rubble cover.
+ * Purpose: The one place that combines terrain, urban, rubble, city, and rugged cover.
  * When to use: Tooltips that show both columns, and `terrainCoverFor`.
- * Expected outcome: The category row, raised per column to the urban/rubble row when either flag is set. Unknown or empty kinds read as plains, so they give 0/0.
+ * Expected outcome: Each column is the higher of the terrain row, the urban or rubble row when that flag is set, city cover (2 ground and naval, 1 air), and rugged ground cover (2). Rugged does not raise air cover. Unknown or empty kinds read as plains, so they give 0/0 unless a city or rugged flag is set.
  * Exceptions: None.
  */
 export function terrainCoverPairFor(place: TerrainCoverPlace): TerrainCoverPair {
   const terrain = TERRAIN_COVER_BY_CATEGORY[normalizeDbTerrainKindToTacticalCategory(place.terrainKind ?? '', 'land')];
-  if (place.isUrban !== true && place.isRubble !== true) return terrain;
+  const urbanSurface = place.isUrban === true || place.isRubble === true ? URBAN_OR_RUBBLE_TERRAIN_COVER.surface : 0;
+  const urbanAir = place.isUrban === true || place.isRubble === true ? URBAN_OR_RUBBLE_TERRAIN_COVER.air : 0;
+  const citySurface = place.city === true ? 2 : 0;
+  const cityAir = place.city === true ? 1 : 0;
+  const ruggedSurface = place.rugged === true ? 2 : 0;
   return {
-    surface: Math.max(terrain.surface, URBAN_OR_RUBBLE_TERRAIN_COVER.surface) as TerrainCover,
-    air: Math.max(terrain.air, URBAN_OR_RUBBLE_TERRAIN_COVER.air) as TerrainCover,
+    surface: Math.max(terrain.surface, urbanSurface, citySurface, ruggedSurface) as TerrainCover,
+    air: Math.max(terrain.air, urbanAir, cityAir) as TerrainCover,
   };
 }
 
@@ -252,4 +258,24 @@ export function joinHexTooltipEffectsHtml(movementRangeHtml: string | null, cove
   if (movement == null) return cover;
   if (cover == null) return movement;
   return `${movement}, ${cover}`;
+}
+
+/**
+ * Builds the Effects body for a hex tooltip.
+ *
+ * Purpose: A strategic stop and strategic cover belong on world hexes. A battle cell keeps its own movement line.
+ * When to use: From the terrain tooltip formatter, and from tests of that line.
+ * Expected outcome: A world hex that stops armor leads with the blocked icon and `Armored Movement`, then cover. A plains hex with no cover returns null. A battle cell uses `tacticalMovementHtml` and does not add the armor-stop clause.
+ * Exceptions: None.
+ */
+export function strategicHexEffectsBodyHtml(
+  resolution: number | null,
+  stopsArmor: boolean,
+  cover: TerrainCoverPair | null,
+  tacticalMovementHtml: string | null
+): string | null {
+  const armorStop =
+    resolution === 1 && stopsArmor ? `${formatStatusIconHtml('blocked')}Armored Movement` : null;
+  const coverHtml = cover ? formatTerrainCoverTooltipHtml(cover) : null;
+  return joinHexTooltipEffectsHtml(armorStop ?? tacticalMovementHtml, coverHtml);
 }

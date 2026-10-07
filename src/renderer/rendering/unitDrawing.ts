@@ -1,5 +1,5 @@
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
-import { CASUALTY_X_COLOR, COUNT_BADGE_OFFSET, LIGHTNING_COLOR, MULTI_PLAYER_FILL, MULTI_PLAYER_GLYPH_FILTER, MULTI_PLAYER_STROKE, PLAYER_COLORS, STACK_OFFSET_X, STACK_OFFSET_Y, UNIT_RADIUS, UNIT_TYPE_LABELS } from '../core/constants';
+import { COUNT_BADGE_OFFSET, MULTI_PLAYER_FILL, MULTI_PLAYER_GLYPH_FILTER, MULTI_PLAYER_STROKE, PLAYER_COLORS, STACK_OFFSET_X, STACK_OFFSET_Y, UNIT_RADIUS, UNIT_TYPE_LABELS } from '../core/constants';
 import { rendererSharedState as S } from '../core/state';
 import { hexCenterPx } from '../map/mapHelpers';
 import { shouldHideStrategicMapUnitsForZoom } from '../map/terrainView';
@@ -383,89 +383,6 @@ export function drawUnknownBattleMarkers(
   for (const h3Index of hexes) {
     const { x, y } = hexCenterPx(h3Index);
     drawOneUnitMarker(ctx, x, y, '#7a7a7a', '?', '#202020');
-  }
-  ctx.restore();
-}
-
-/**
- * Defines the `drawCombatLightning` function shape (export function drawCombatLightning( ctx: CanvasRenderingContext2D, canvasWidth: number, canvasHeight: number, combatHexes: string[], hexList: st).
-
- * Purpose: Supports maintainability by documenting why `drawCombatLightning` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-export function drawCombatLightning(
-  ctx: CanvasRenderingContext2D,
-  canvasWidth: number,
-  canvasHeight: number,
-  combatHexes: string[],
-  hexList: string[],
-  opacity: number
-): void {
-  if (combatHexes.length === 0 || opacity <= 0) return;
-  void canvasWidth;
-  void canvasHeight;
-  void hexList;
-  ctx.save();
-  ctx.globalAlpha = opacity;
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-  const h = 18;
-  for (const h3Index of combatHexes) {
-    const { x, y } = hexCenterPx(h3Index);
-    ctx.beginPath();
-    ctx.moveTo(x, y - h);
-    ctx.lineTo(x + 6, y - 4);
-    ctx.lineTo(x - 4, y + 6);
-    ctx.lineTo(x + 5, y + h);
-    ctx.strokeStyle = '#000';
-    ctx.lineWidth = 5;
-    ctx.stroke();
-    ctx.strokeStyle = LIGHTNING_COLOR;
-    ctx.lineWidth = 3;
-    ctx.stroke();
-  }
-  ctx.restore();
-}
-
-/**
- * Defines the `drawCasualtyOverlay` function shape (export function drawCasualtyOverlay( ctx: CanvasRenderingContext2D, canvasWidth: number, canvasHeight: number, casualtyHexes: string[], hexList:).
-
- * Purpose: Supports maintainability by documenting why `drawCasualtyOverlay` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-export function drawCasualtyOverlay(
-  ctx: CanvasRenderingContext2D,
-  canvasWidth: number,
-  canvasHeight: number,
-  casualtyHexes: string[],
-  hexList: string[],
-  opacity: number
-): void {
-  if (casualtyHexes.length === 0 || opacity <= 0) return;
-  void canvasWidth;
-  void canvasHeight;
-  void hexList;
-  ctx.save();
-  ctx.globalAlpha = opacity;
-  ctx.lineCap = 'round';
-  const size = 20;
-  for (const h3Index of casualtyHexes) {
-    const { x, y } = hexCenterPx(h3Index);
-    ctx.beginPath();
-    ctx.moveTo(x - size, y - size);
-    ctx.lineTo(x + size, y + size);
-    ctx.moveTo(x + size, y - size);
-    ctx.lineTo(x - size, y + size);
-    ctx.strokeStyle = '#000';
-    ctx.lineWidth = 6;
-    ctx.stroke();
-    ctx.strokeStyle = CASUALTY_X_COLOR;
-    ctx.lineWidth = 4;
-    ctx.stroke();
   }
   ctx.restore();
 }

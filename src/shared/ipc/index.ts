@@ -14,3 +14,4 @@ export * from './deferredPlaybackConsultAbandoned';
 export * from './humanOrderPreviewTypes';
 export * from './sealiftTypes';
 export * from './gameApiTypes';
+export type { GameMapListEntry } from '../gameMapList';

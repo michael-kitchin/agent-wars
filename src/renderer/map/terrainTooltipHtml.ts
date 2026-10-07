@@ -18,12 +18,12 @@ import {
   resolveHomeRegionOwnerIdentity,
 } from '../../shared/homeRegionRules';
 import { computeTerrainEffectsLineHtml } from '../../shared/terrainEffectsForTooltip';
+import { isNeutralBorderHex } from '../../shared/h3Resolutions';
 import { formatFeatureLabelHtml, formatProducedUnitTechLineHtml } from '../../shared/featureIconHtml';
 import { formatRubbleSwatchHtml, formatTerrainKindHtml, formatTerrainNameListHtml, formatUrbanSwatchHtml } from '../../shared/terrainSwatchHtml';
 import { formatWeatherIconHtml } from '../../shared/weatherIcons';
 import {
-  formatTerrainCoverTooltipHtml,
-  joinHexTooltipEffectsHtml,
+  strategicHexEffectsBodyHtml,
   terrainCoverPairFor,
   type TerrainCoverPair,
 } from '../../shared/terrainCoverRules';
@@ -31,6 +31,7 @@ import { TOOLTIP_SECTION_GAP_HTML } from '../../shared/tooltipSectionGap';
 import { rendererSharedState as S } from '../core/state';
 import { baselineUrbanHexCountForStrategicHex } from '../rendererTacticalHydration';
 import type { NamingLookupTarget, TerrainTooltipState } from './terrainTooltipTypes';
+
 /**
  * Renders the bold LLM hex-code badge (`(XX)` or `(XX.YY)`) that prefixes tooltip copy for the active naming target.
  *
@@ -180,14 +181,16 @@ function movementRangeHtml(state: TerrainTooltipState, namingTarget: NamingLooku
  *
  * Purpose: The Effects line and the tooltip cache key share one lookup.
  * When to use: From `formatTerrainTooltipHtml` and `terrainTooltipContentKey`.
- * Expected outcome: For a world hex, the stored terrain kind with no urban or rubble, or null when that kind is missing. For any other resolution, the cell's kind plus its urban and rubble flags. Null when there is no target.
+ * Expected outcome: For a world hex, the stored terrain kind plus that hex's rugged and city flags, or null when the kind is missing. For any other resolution, the cell's kind plus its urban and rubble flags. Null when there is no target.
  * Exceptions: None.
  */
 function coverPair(state: TerrainTooltipState, namingTarget: NamingLookupTarget | null): TerrainCoverPair | null {
   if (!namingTarget) return null;
   if (namingTarget.resolution === 1) {
-    const terrainKind = S.gameState?.hexes.find((h) => h.h3Index === namingTarget.h3Index)?.terrainKind;
-    return terrainKind ? terrainCoverPairFor({ terrainKind }) : null;
+    const hex = S.gameState?.hexes.find((row) => row.h3Index === namingTarget.h3Index);
+    return hex?.terrainKind
+      ? terrainCoverPairFor({ terrainKind: hex.terrainKind, rugged: hex.rugged === true, city: hex.city === true })
+      : null;
   }
   return terrainCoverPairFor({ terrainKind: state.terrainKind, isUrban: state.isUrban, isRubble: state.isRubble });
 }
@@ -222,13 +225,18 @@ function formatTerrainTooltipHtml(
         ? `<strong>Features:</strong> ${state.features.map((label) => formatFeatureLabelHtml(label)).join(', ')}`
         : null;
   const pair = coverPair(state, namingTarget);
-  const coverHtml = pair == null ? null : formatTerrainCoverTooltipHtml(pair);
-  const effectsHtml = joinHexTooltipEffectsHtml(movementRangeHtml(state, namingTarget), coverHtml);
+  const effectsHtml = strategicHexEffectsBodyHtml(
+    namingTarget?.resolution ?? null,
+    namingTarget?.resolution === 1 && strategicHexStopsArmor(namingTarget.h3Index),
+    pair,
+    movementRangeHtml(state, namingTarget)
+  );
   const effectsLine = effectsHtml ? `<strong>Effects:</strong> ${effectsHtml}` : null;
+  const neutralBorder = namingTarget?.resolution === 1 && isNeutralBorderHex(namingTarget.h3Index);
   const productionLine =
     state.urbanHexCount == null
       ? null
-      : state.urbanHexCount > 0
+      : state.urbanHexCount > 0 && !neutralBorder
         ? `<strong>Production:</strong> $${state.urbanHexCount.toLocaleString()} / turn`
         : `<strong>Production:</strong> (none)`;
   const resolution = namingTarget?.resolution;
@@ -295,6 +303,19 @@ function producedUnitTechLineHtml(namingTarget: NamingLookupTarget | null): stri
     techBonusEnabled: S.gameState?.techBonusEnabled === true,
     baselineUrbanHexCount: baselineUrbanHexCountForStrategicHex(namingTarget.h3Index),
   });
+}
+
+/**
+ * True when a strategic hex ends an armor move.
+ *
+ * Purpose: The Effects line names the stop once for rugged, arctic, and city.
+ * When to use: While formatting a world-hex tooltip.
+ * Expected outcome: True when the snapshot hex has any of the three flags.
+ * Exceptions: None.
+ */
+function strategicHexStopsArmor(h3Index: string): boolean {
+  const hex = S.gameState?.hexes.find((row) => row.h3Index === h3Index);
+  return hex?.rugged === true || hex?.arctic === true || hex?.city === true;
 }
 
 /**

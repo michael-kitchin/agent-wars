@@ -14,6 +14,7 @@ import {
   getTacticalTerrainOverridesForRendererFromGame,
   listScenarioHomeRegions,
 } from './gameDb';
+import { listGameMaps } from './gameMap/listGameMaps';
 import {
   submitOrders,
   ready,
@@ -306,6 +307,7 @@ function registerIpcHandlers(): void {
     return getHexContinentNamesForRenderer({ h3Index: payload.h3Index });
   });
   ipcMain.handle(IPC_GAME.listScenarioHomeRegions, () => listScenarioHomeRegions());
+  ipcMain.handle(IPC_GAME.listGameMaps, () => listGameMaps());
   ipcMain.handle(IPC_GAME.newGame, (_event, payload: NewGameIpcPayload | undefined) => {
     const fogOfWarEnabled = payload?.fogOfWarEnabled !== false;
     const gameSize = parseGameSize(payload?.gameSize);
@@ -324,6 +326,9 @@ function registerIpcHandlers(): void {
       startMonth,
       requestedHumanHomeRegion: payload?.humanHomeRegion ?? '',
       requestedAiHomeRegion: payload?.aiHomeRegion ?? '',
+      gameMapId: payload?.gameMapId ?? null,
+      humanSideGroupId: payload?.humanSideGroupId ?? null,
+      aiSideGroupId: payload?.aiSideGroupId ?? null,
     });
     resetGameForNewMatch({
       fogOfWarEnabled,
@@ -335,6 +340,9 @@ function registerIpcHandlers(): void {
       weatherBonusLevel,
       techBonusLevel,
       startMonth,
+      gameMapId: payload?.gameMapId,
+      humanSideGroupId: payload?.humanSideGroupId,
+      aiSideGroupId: payload?.aiSideGroupId,
     });
     clearDeferredPlaybackConsultPending();
     clearStrategicPreviousHexMemory();

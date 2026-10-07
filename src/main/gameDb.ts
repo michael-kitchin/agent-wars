@@ -8,7 +8,9 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import Database from 'better-sqlite3';
-import { ensureTerrainClassificationCacheLoaded } from './terrainClassificationCache';
+import { ensureGameMapLoaded, setGameMapLoadError } from './gameMap/loadGameMap';
+import { REGIONAL_RULES_BY_ID, type RegionalGameMapId } from '../shared/regionalRulesCatalog';
+import type { GameMapId } from '../shared/gameMapTypes';
 import { logDebug, logError, logTrace } from './logger';
 import { closeDbHandle, gameDbOps, getAll, getOne, hasDbHandle, run, setDbHandle } from './gameDb/dbConnection';
 import { resolveUnitBirthOrigin } from './unitOrigin/unitBirthOrigin';
@@ -120,7 +122,7 @@ export {
  * Expected outcome: On first launch after a bump, the old match database fails validation, is renamed aside, and a fresh one is created.
  * Exceptions: None.
  */
-export const EXPECTED_USER_VERSION = 17;
+export const EXPECTED_USER_VERSION = 19;
 
 /**
  * Documents the module-scope binding `GAME_DB_FILE_NAME` (GAME_DB_FILE_NAME).
@@ -233,6 +235,13 @@ export function openGameDatabaseAtPathForTests(absPath: string): void {
 
   if (!fs.existsSync(absPath)) {
     createFreshGameDatabaseAt(absPath);
+    try {
+      loadStoredGameMap();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setGameMapLoadError(message);
+      logError('gameDb openGameDatabaseAtPathForTests: map load failed', err);
+    }
     return;
   }
 
@@ -284,6 +293,39 @@ function silentRecoverCorruptDatabase(canonicalPath: string): void {
 }
 
 /**
+ * Loads the map named in `game_config`, or the global map when that key is absent.
+ *
+ * Purpose: Startup must use the saved pack, and a missing key means the existing world match.
+ * When to use: After the database handle is open, and before infrastructure backfill.
+ * Expected outcome: The terrain caches match that map. An unknown id logs and loads the global map.
+ * Exceptions: Propagates a pack-load failure so the caller can leave the database in place.
+ */
+function loadStoredGameMap(): boolean {
+  logDebug('gameDb loadStoredGameMap');
+  if (!hasDbHandle()) {
+    setGameMapLoadError(null);
+    return false;
+  }
+  const hexCount = dbGetOne<{ c: number }>('SELECT COUNT(*) AS c FROM hexes')?.c ?? 0;
+  const stored = dbGetOne<{ value: string }>("SELECT value FROM game_config WHERE key = 'game_map_id'")?.value;
+  let id: GameMapId | null = null;
+  if (stored && stored !== 'global') {
+    if (stored in REGIONAL_RULES_BY_ID) id = stored as RegionalGameMapId;
+    else logError('gameDb loadStoredGameMap: unknown map', new Error(stored));
+  } else if (stored === 'global' || hexCount > 0) {
+    id = 'global';
+  }
+  if (!id) {
+    logDebug('gameDb loadStoredGameMap: no match, skipping terrain');
+    setGameMapLoadError(null);
+    return false;
+  }
+  ensureGameMapLoaded(id);
+  setGameMapLoadError(null);
+  return true;
+}
+
+/**
  * Defines the `initDatabase` function shape (export async function initDatabase(): Promise<void>).
 
  * Purpose: Supports maintainability by documenting why `initDatabase` exists.
@@ -305,11 +347,18 @@ export async function initDatabase(): Promise<void> {
 
   if (!fs.existsSync(canonicalPath)) {
     createFreshGameDatabaseAt(canonicalPath);
-    ensureTerrainClassificationCacheLoaded();
+    try {
+      loadStoredGameMap();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setGameMapLoadError(message);
+      logError('gameDb initDatabase: map load failed', err);
+    }
     return;
   }
 
   let d: InstanceType<typeof Database> | null = null;
+  let openedExisting = false;
   try {
     d = new Database(canonicalPath);
     applyGameDbPragmas(d);
@@ -320,9 +369,19 @@ export async function initDatabase(): Promise<void> {
     ensureTurnStateRow();
     repairStrandedStrategicResolutionPhaseOnDbBootstrap();
     seedGameSeedIfMissing();
-    ensureTerrainClassificationCacheLoaded();
-    backfillInfrastructureStateFromMetadataIfMissing();
-    reconcileStrategicInfrastructureCountsFromTacticalOverrides();
+    let mapLoaded = false;
+    try {
+      mapLoaded = loadStoredGameMap();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setGameMapLoadError(message);
+      logError('gameDb initDatabase: map load failed', err);
+    }
+    if (mapLoaded) {
+      backfillInfrastructureStateFromMetadataIfMissing();
+      reconcileStrategicInfrastructureCountsFromTacticalOverrides();
+    }
+    openedExisting = true;
     logDebug('gameDb initDatabase: opened existing', { canonicalPath });
   } catch (err) {
     if (d) {
@@ -340,8 +399,15 @@ export async function initDatabase(): Promise<void> {
     });
   }
 
-  // Keep terrain metadata failures distinct from DB recovery.
-  ensureTerrainClassificationCacheLoaded();
+  if (!openedExisting) {
+    try {
+      loadStoredGameMap();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setGameMapLoadError(message);
+      logError('gameDb initDatabase: map load failed', err);
+    }
+  }
   refreshFogOfWarIntelFromCurrentState();
 }
 

@@ -11,7 +11,8 @@ export function getFullDdl(): string {
     CREATE TABLE IF NOT EXISTS hexes (
       h3_index TEXT PRIMARY KEY,
       terrain TEXT NOT NULL CHECK (terrain IN ('land', 'water', 'coastal', 'wetlands')),
-      terrain_kind TEXT NOT NULL CHECK (terrain_kind IN ('water', 'coastal', 'wetlands', 'plains', 'forest', 'mountain', 'desert', 'arctic'))
+      terrain_kind TEXT NOT NULL CHECK (terrain_kind IN ('water', 'coastal', 'wetlands', 'plains', 'forest', 'mountain', 'desert', 'arctic')),
+      map_role TEXT CHECK (map_role IS NULL OR map_role IN ('member_land', 'sea', 'neutral_border'))
     );
 
     CREATE TABLE IF NOT EXISTS units (
@@ -26,6 +27,8 @@ export function getFullDdl(): string {
       birth_is_urban INTEGER,
       birth_country_name TEXT,
       birth_country_code TEXT,
+      birth_area_id TEXT,
+      birth_area_name TEXT,
       FOREIGN KEY (h3_index) REFERENCES hexes(h3_index)
     );
 

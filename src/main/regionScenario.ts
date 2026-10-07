@@ -1,5 +1,7 @@
 import { logDebug, logError, logTrace } from './logger';
-import { ensureTerrainClassificationCacheLoaded, getTerrainStrategicNamingRecordsFromSnapshot } from './terrainClassificationCache';
+import { loadTerrainStrategicNamingFromPath } from './terrainNamingLoad';
+import { resolveBundledGlobalStrategicNamingPath } from './terrainMetadataPaths';
+import { GLOBAL_STRATEGIC_H3_RESOLUTION } from '../shared/h3Resolutions';
 
 /**
  * Documents the module-scope binding `PASSABLE_LAND_TERRAIN_KINDS` (PASSABLE_LAND_TERRAIN_KINDS).
@@ -30,6 +32,77 @@ const PASSABLE_LAND_TERRAIN_KINDS = new Set([
 let cachedRegionHexesByName: Map<string, string[]> | null = null;
 
 /**
+ * Side groups of the loaded regional map, or null on the global map.
+ *
+ * Purpose: Home hexes and display names come from the manifest, not from UN subregion names.
+ * When to use: Set by `installSideGroupHomes` during a regional load.
+ * Expected outcome: Null means `getScenarioHomeRegionHexes` uses the naming cache.
+ * Exceptions: None.
+ */
+let sideGroupHomes: { id: string; displayName: string; hexes: readonly string[] }[] | null = null;
+
+/**
+ * Installs regional side groups as the home areas for the current match.
+ *
+ * Purpose: Seeding and victory look up hexes by the group's id or display name.
+ * When to use: After a regional manifest is read, and with null when the global map is installed.
+ * Expected outcome: Later home-hex lookups for those names return that group's land hexes.
+ * Exceptions: None.
+ */
+export function installSideGroupHomes(
+  groups: readonly { id: string; displayName: string; hexes: readonly string[] }[] | null
+): void {
+  logDebug('regionScenario installSideGroupHomes', { groupCount: groups?.length ?? 0 });
+  sideGroupHomes = groups ? groups.map((group) => ({ ...group, hexes: [...group.hexes] })) : null;
+}
+
+/**
+ * Resolves two different side groups to the names stored on the match.
+ *
+ * Purpose: The dialog sends group ids. Prompts and victory use the display names.
+ * When to use: `resetGameForNewMatch` when the chosen map is regional.
+ * Expected outcome: The two display names. The hex lists are already installed under those names.
+ * Exceptions: Throws when a group is unknown or both sides picked the same group.
+ */
+export function resolveSideGroupHomeNames(
+  humanSideGroupId: string,
+  aiSideGroupId: string
+): { humanHomeRegion: string; aiHomeRegion: string } {
+  logDebug('regionScenario resolveSideGroupHomeNames', { humanSideGroupId, aiSideGroupId });
+  if (!sideGroupHomes) {
+    const err = new Error('No side groups are loaded');
+    logError('regionScenario resolveSideGroupHomeNames: none loaded', err);
+    throw err;
+  }
+  if (humanSideGroupId === aiSideGroupId) {
+    const err = new Error('The two sides must be different groups');
+    logError('regionScenario resolveSideGroupHomeNames: same group', err);
+    throw err;
+  }
+  const human = sideGroupHomes.find((group) => group.id === humanSideGroupId);
+  const ai = sideGroupHomes.find((group) => group.id === aiSideGroupId);
+  if (!human || !ai) {
+    const err = new Error('Unknown side group');
+    logError('regionScenario resolveSideGroupHomeNames: unknown', { humanSideGroupId, aiSideGroupId, err });
+    throw err;
+  }
+  return { humanHomeRegion: human.displayName, aiHomeRegion: ai.displayName };
+}
+
+/**
+ * Drops the cached UN-subregion hex lists.
+ *
+ * Purpose: A map change must not keep names built from the previous naming file.
+ * When to use: Before reloading terrain, and from tests that swap fixtures.
+ * Expected outcome: The next global home-hex lookup rebuilds from the loaded naming snapshot.
+ * Exceptions: None.
+ */
+export function clearScenarioRegionCache(): void {
+  logDebug('regionScenario clearScenarioRegionCache');
+  cachedRegionHexesByName = null;
+}
+
+/**
  * Defines the `buildRegionHexCache` function shape (function buildRegionHexCache(): Map<string, string[]> { logDebug('regionScenario buildRegionHexCache'); const env = loadTerrainStrategicNamingBundled(); con).
 
  * Purpose: Supports maintainability by documenting why `buildRegionHexCache` exists.
@@ -39,8 +112,11 @@ let cachedRegionHexesByName: Map<string, string[]> | null = null;
  */
 function buildRegionHexCache(): Map<string, string[]> {
   logDebug('regionScenario buildRegionHexCache');
-  ensureTerrainClassificationCacheLoaded();
-  const records = getTerrainStrategicNamingRecordsFromSnapshot();
+  const env = loadTerrainStrategicNamingFromPath(
+    resolveBundledGlobalStrategicNamingPath(),
+    GLOBAL_STRATEGIC_H3_RESOLUTION
+  );
+  const records = env.records;
   const byRegion = new Map<string, Set<string>>();
   for (const row of records) {
     for (const country of row.countries) {
@@ -134,6 +210,8 @@ export function getScenarioHomeRegionHexes(regionName: string): string[] {
   logTrace('regionScenario getScenarioHomeRegionHexes', { regionName });
   const key = regionName.trim();
   if (!key) return [];
+  const group = sideGroupHomes?.find((entry) => entry.id === key || entry.displayName === key);
+  if (group) return [...group.hexes];
   return [...(getRegionHexCache().get(key) ?? [])];
 }
 
@@ -158,5 +236,5 @@ export function isScenarioPassableLandTerrainKind(terrainKind: string): boolean 
  * Exceptions: None.
  */
 export function clearScenarioRegionCacheForTests(): void {
-  cachedRegionHexesByName = null;
+  clearScenarioRegionCache();
 }

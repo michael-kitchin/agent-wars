@@ -7,6 +7,7 @@
 import { gridDisk } from 'h3-js';
 import type { GameStateSnapshot } from '../gameDb';
 import { getDistanceAndTurns, terrainIsPassableForDomain } from '../pathfinding';
+import { armorMoveEndsOnHex } from '../../shared/strategicTerrainFlags';
 import type { PassableDomain } from '../pathfinding';
 import { passabilityAllowsNavalUnit } from '../../shared/pipelineTerrain';
 import { landUnitCanOccupyHex } from '../../shared/landTraversalStrategic';
@@ -167,7 +168,8 @@ function getPathDistanceAndTurns(
     passableFor,
     movementBudget,
     blocked,
-    landMass
+    landMass,
+    unitType === 'armor' ? armorMoveEndsOnHex : undefined
   );
 }
 

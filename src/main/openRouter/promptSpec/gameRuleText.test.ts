@@ -124,7 +124,7 @@ test('buildOriginBonusRule appears only when a flag applies in the mode', () => 
   assert.equal(buildOriginBonusRule(gates({ originBonusSettings: terrainOnly })), null);
 
   const strategic = buildOriginBonusRule(gates({ originBonusSettings: countryOnly }));
-  assert.match(strategic ?? '', /^Country bonus is on: a unit in a hex whose country is its birth country adds 2/);
+  assert.match(strategic ?? '', /^Country bonus is on: a unit in a hex in the area where it was built adds 2/);
   assert.match(strategic ?? '', /Casualty order still uses the printed defense values\.$/);
   assert.doesNotMatch(strategic ?? '', /air unit qualifies/);
   const strategicAir = buildOriginBonusRule(gates({ originBonusSettings: countryOnly, hasAirUnits: true }));
@@ -149,7 +149,8 @@ test('the origin bonus sentences keep their exact wording', () => {
     buildOriginBonusRule(
       gates({ originBonusSettings: { countryBonusEnabled: true, terrainBonusEnabled: false }, hasAirUnits: true })
     ),
-    'Country bonus is on: a unit in a hex whose country is its birth country adds 2 to every attack or defense value it rolls there, including ranged fire, return fire, melee, and air-strike counter-fire. ' +
+    'Country bonus is on: a unit in a hex in the area where it was built adds 2 to every attack or defense value it rolls there, including ranged fire, return fire, melee, and air-strike counter-fire. ' +
+      'That area is its birth country in a global game and its origin area in a regional game. ' +
       'An air unit qualifies by the hex of its base, whatever it strikes. ' +
       'Casualty order still uses the printed defense values.'
   );
@@ -161,7 +162,8 @@ test('the origin bonus sentences keep their exact wording', () => {
         hasAirUnits: true,
       })
     ),
-    'Country bonus is on: a unit on a cell whose country is its birth country adds 2 to every attack or defense value it rolls there. ' +
+    'Country bonus is on: a unit on a cell in the area where it was built adds 2 to every attack or defense value it rolls there. ' +
+      'That area is its birth country in a global game and its origin area in a regional game. ' +
       "Terrain bonus is on: a unit on a cell whose terrain kind matches its birth terrain kind adds 2 to every attack or defense value it rolls there; urban and rubble do not change a cell's terrain kind. " +
       'The two bonuses do not stack; the most is +2. ' +
       'An air unit qualifies by the cell of its base, whatever it strikes. ' +
@@ -173,7 +175,7 @@ test('a High origin bonus states 4, and the stacking note states the larger amou
   const strategic = buildOriginBonusRule(
     gates({ originBonusSettings: { countryBonusEnabled: true, terrainBonusEnabled: false, countryBonusLevel: 'high' } })
   );
-  assert.match(strategic ?? '', /^Country bonus is on: a unit in a hex whose country is its birth country adds 4 to every attack/);
+  assert.match(strategic ?? '', /^Country bonus is on: a unit in a hex in the area where it was built adds 4 to every attack/);
   const tactical = buildOriginBonusRule(
     gates({
       coordinateMode: 'tactical',
@@ -234,6 +236,7 @@ test('buildMovementBudgetRule quotes engine budgets and states that air never ma
   const strategic = buildMovementBudgetRule('strategic');
   assert.ok(strategic.includes(String(getMovementBudget('armor'))));
   assert.match(strategic, /air (never marches|does not march)/i);
+  assert.match(strategic, /Armor that enters a rugged, arctic, or city hex ends its move there/);
   assert.doesNotMatch(strategic, /urban or rubble/i);
   const tactical = buildMovementBudgetRule('tactical');
   assert.ok(tactical.includes(String(MOVEMENT_RANGE_BY_UNIT_TYPE.armor)));
@@ -344,7 +347,9 @@ test('the terrain cover sentences keep their exact wording', () => {
     buildTerrainCoverRule('strategic'),
     'Terrain cover: ranged fire at a hex whose main terrain is forest or mountain needs a roll 2 lower, or 1 lower for wetlands. ' +
       'An air strike on units in a hex whose main terrain is forest needs a roll 1 lower. ' +
-      'Melee, return fire, anti-air fire, and strikes on infrastructure ignore cover.'
+      'Melee, return fire, anti-air fire, and strikes on infrastructure ignore cover. ' +
+      'A city hex uses the higher of its terrain cover and city cover in each column. ' +
+      'A rugged hex uses the higher of its terrain cover and rugged ground cover.'
   );
   assert.equal(
     buildTerrainCoverRule('tactical'),

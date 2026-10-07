@@ -1,10 +1,11 @@
 # Regional Packs
 
-These folders are offline data for the 23 maps in `data/region-summary-1.md`. The game does not load them yet.
+The game loads one of these packs when a regional match starts. They are the 23 maps in `data/region-summary-1.md`. The manifest carries side groups and origin units. A packaged app ships `*.json.zip` and extracts one region the first time it is played.
 
 Each region is a directory under `data/generated/regions/<region_id>/`:
 
-- `region_manifest.json` lists the strategic cells and the role of each cell (`land`, `sea`, or `neutral_border`).
+- `region_manifest.json` lists the strategic cells and the role of each cell (`land`, `sea`, or `neutral_border`). It also lists `side_groups` and `origin_units`.
+- `terrain_res_t_origin_units.json` maps each tactical land cell to an origin unit id.
 - `terrain_res_s_metadata.json` and `terrain_res_t_metadata.json` are strategic and tactical terrain.
 - `terrain_res_s_naming.json` and `terrain_res_t_naming.json` are the matching names. City rows are only in the tactical file.
 - `terrain_res_s_landmass.json` and `terrain_res_s_weather.json` cover the strategic cells.

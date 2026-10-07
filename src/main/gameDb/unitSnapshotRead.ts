@@ -10,6 +10,7 @@
 import { logTrace } from '../logger';
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import type { UnitOrigin } from '../../shared/unitOriginTypes';
+import { subdivisionCodeForAreaId } from '../unitOrigin/tacticalOriginAreas';
 
 /**
  * Raw `units` table row shape used when listing units for strategic snapshots.
@@ -128,6 +129,24 @@ interface DbUnitSnapshotRow extends Record<string, unknown> {
    * Exceptions: None.
    */
   birth_country_code: string | null;
+  /**
+   * Birth area id, or SQL null.
+   *
+   * Contract: Country name on a global unit. Origin unit id on a regional unit.
+   * When to use: Maps to `origin.birthAreaId`.
+   * Expected outcome: Preserved verbatim.
+   * Exceptions: None.
+   */
+  birth_area_id: string | null;
+  /**
+   * Birth area display name, or SQL null.
+   *
+   * Contract: Same as the country name on a global unit.
+   * When to use: Maps to `origin.birthAreaName`.
+   * Expected outcome: Preserved verbatim.
+   * Exceptions: None.
+   */
+  birth_area_name: string | null;
 }
 
 /**
@@ -147,6 +166,9 @@ function unitOriginFromRow(row: DbUnitSnapshotRow): UnitOrigin | undefined {
     birthIsUrban: row.birth_is_urban === 1,
     birthCountryName: row.birth_country_name ?? null,
     birthCountryCode: row.birth_country_code ?? null,
+    birthAreaId: row.birth_area_id ?? row.birth_country_name ?? null,
+    birthAreaName: row.birth_area_name ?? row.birth_country_name ?? null,
+    birthSubdivisionCode: subdivisionCodeForAreaId(row.birth_area_id ?? null),
   };
 }
 
@@ -197,6 +219,8 @@ export function listUnitsForSnapshotWithGetAll(
             u.birth_is_urban,
             u.birth_country_name,
             u.birth_country_code,
+            u.birth_area_id,
+            u.birth_area_name,
             uta.naval_unit_id AS embarked_on_naval_unit_id
      FROM units u
      LEFT JOIN unit_transport_assignments uta ON uta.land_unit_id = u.id`

@@ -4,6 +4,7 @@
  */
 
 import { cellToBoundary, cellToLatLng, cellToLocalIj } from 'h3-js';
+import { mapExtentReferenceLng } from '../../shared/mapExtent';
 
 /**
  * Documents the module-scope binding `WEB_MERCATOR_MAX_ABS_LAT` (WEB_MERCATOR_MAX_ABS_LAT).
@@ -32,15 +33,16 @@ export function clampLatForWebMercatorDisplay(lat: number): number {
 /**
  * Defines the `alignLngToReference` function shape (export function alignLngToReference(lng: number, refLng: number): number).
 
- * Purpose: Supports maintainability by documenting why `alignLngToReference` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Purpose: Keeps hex edges in one unwrapped frame. A regional extent reference wins over the caller's local reference.
+ * When to use: When converting H3 boundaries, paths, and labels to Leaflet longitudes.
+ * Expected outcome: The returned longitude is within 180° of the active extent reference, or of `refLng` on the global map.
  * Exceptions: None.
  */
 export function alignLngToReference(lng: number, refLng: number): number {
+  const reference = mapExtentReferenceLng() ?? refLng;
   let l = lng;
-  while (l - refLng > 180) l -= 360;
-  while (refLng - l > 180) l += 360;
+  while (l - reference > 180) l -= 360;
+  while (reference - l > 180) l += 360;
   return l;
 }
 

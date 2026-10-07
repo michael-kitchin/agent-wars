@@ -6,7 +6,7 @@ import { logDebug, logTrace } from './logger';
 import type { PipelineTerrainKind } from '../shared/pipelineTerrain';
 import { resolveTerrainStrategicMetadataPath, resolveTerrainTacticalMetadataPath } from './terrainMetadataPaths';
 import { GLOBAL_GAME_MAP } from '../shared/activeGameMap';
-import { STRATEGIC_H3_RESOLUTION, TACTICAL_H3_RESOLUTION } from '../shared/h3Resolutions';
+import { strategicH3Resolution, STRATEGIC_H3_RESOLUTION, tacticalH3Resolution, TACTICAL_H3_RESOLUTION } from '../shared/h3Resolutions';
 
 /**
  * Documents the module-scope binding `EXPECTED_HEX_METADATA_SCHEMA_VERSION` (EXPECTED_HEX_METADATA_SCHEMA_VERSION).
@@ -785,7 +785,9 @@ function parseMetadataEnvelope(raw: unknown, expectedResolution: number): HexMet
     throw new Error(`terrain metadata: record_count ${recordCount} != len(records) ${recs.length}`);
   }
   const parseRow =
-    expectedResolution === 4 ? (r: unknown) => parseTacticalRow(r, 4) : (r: unknown) => parseStrategicRow(r, 1);
+    expectedResolution === tacticalH3Resolution()
+      ? (r: unknown) => parseTacticalRow(r, expectedResolution)
+      : (r: unknown) => parseStrategicRow(r, expectedResolution);
   const records = recs.map((r, i) => {
     try {
       return parseRow(r);
@@ -818,7 +820,7 @@ function parseMetadataEnvelope(raw: unknown, expectedResolution: number): HexMet
 export function loadTerrainStrategicMetadataFromPath(absPath: string): HexMetadataEnvelope {
   logDebug('terrainMetadataLoad loadTerrainRes1MetadataFromPath', { absPath });
   const parsed = readJsonFileOrThrow(absPath, 'terrainMetadataLoad loadTerrainRes1MetadataFromPath');
-  return parseMetadataEnvelope(parsed, 1);
+  return parseMetadataEnvelope(parsed, strategicH3Resolution());
 }
 
 /**
@@ -832,7 +834,7 @@ export function loadTerrainStrategicMetadataFromPath(absPath: string): HexMetada
 export function loadTerrainTacticalMetadataFromPath(absPath: string): HexMetadataEnvelope {
   logDebug('terrainMetadataLoad loadTerrainRes4MetadataFromPath', { absPath });
   const parsed = readJsonFileOrThrow(absPath, 'terrainMetadataLoad loadTerrainRes4MetadataFromPath');
-  return parseMetadataEnvelope(parsed, 4);
+  return parseMetadataEnvelope(parsed, tacticalH3Resolution());
 }
 
 /**

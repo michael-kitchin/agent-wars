@@ -6,6 +6,7 @@
  */
 
 import { gridDisk } from 'h3-js';
+import { isOnMap } from '../shared/loadedStrategicFootprint';
 import { logDebug, logError, logTrace } from './logger';
 import { getMovementBudget } from './combatConstants';
 import type { BonusLevel } from '../shared/bonusLevel';
@@ -71,7 +72,7 @@ export function terrainIsPassableForDomain(terrain: string | undefined, passable
 function breadthFirstHexSearch(
   originH3: string,
   canEnter: (fromH3: string, toH3: string) => boolean,
-  options: { stopAtH3?: string; onGridDiskError?: (err: unknown) => void }
+  options: { stopAtH3?: string; onGridDiskError?: (err: unknown) => void; endMoveOnEnter?: (h3: string) => boolean }
 ): Map<string, string> {
   const queue: string[] = [originH3];
   const parent = new Map<string, string>();
@@ -79,6 +80,7 @@ function breadthFirstHexSearch(
   while (queue.length > 0) {
     const current = queue.shift()!;
     if (options.stopAtH3 !== undefined && current === options.stopAtH3) break;
+    if (current !== originH3 && options.endMoveOnEnter?.(current)) continue;
     let neighbors: string[];
     try {
       neighbors = gridDisk(current, 1);
@@ -87,7 +89,7 @@ function breadthFirstHexSearch(
       continue;
     }
     for (const n of neighbors) {
-      if (n === current || parent.has(n)) continue;
+      if (n === current || parent.has(n) || !isOnMap(n)) continue;
       if (!canEnter(current, n)) continue;
       parent.set(n, current);
       queue.push(n);
@@ -131,7 +133,8 @@ export function findPath(
   terrainByH3: Map<string, string>,
   passableFor: PassableDomain,
   blocked?: Set<string>,
-  landMass?: LandMassByH3
+  landMass?: LandMassByH3,
+  endMoveOnEnter?: (h3: string) => boolean
 ): string[] | null {
   findPathInvocationCount += 1;
   logTrace('pathfinding findPath', {
@@ -163,6 +166,7 @@ export function findPath(
       (fromH3, toH3) => hexSet.has(toH3) && !blocked?.has(toH3) && canLandUnitTraverseEdge(fromH3, toH3, landMass),
       {
         stopAtH3: destinationH3,
+        endMoveOnEnter,
         onGridDiskError: (err) => logError('pathfinding findPath: gridDisk threw', err),
       }
     );
@@ -180,6 +184,7 @@ export function findPath(
 
   const parent = breadthFirstHexSearch(originH3, (_fromH3, toH3) => passable(toH3), {
     stopAtH3: destinationH3,
+    endMoveOnEnter,
     onGridDiskError: (err) => logError('pathfinding findPath: gridDisk threw', err),
   });
   if (!parent.has(destinationH3)) return null;
@@ -200,7 +205,8 @@ export function getReachableHexes(
   terrainByH3: Map<string, string>,
   passableFor: PassableDomain,
   blocked?: Set<string>,
-  landMass?: LandMassByH3
+  landMass?: LandMassByH3,
+  endMoveOnEnter?: (h3: string) => boolean
 ): Set<string> {
   if (passableFor === 'land') {
     if (!landMass) {
@@ -212,7 +218,7 @@ export function getReachableHexes(
       breadthFirstHexSearch(
         originH3,
         (fromH3, toH3) => hexSet.has(toH3) && !blocked?.has(toH3) && canLandUnitTraverseEdge(fromH3, toH3, landMass),
-        {}
+        { endMoveOnEnter }
       ).keys()
     );
   }
@@ -224,7 +230,7 @@ export function getReachableHexes(
     return terrainIsPassableForDomain(terrain, passableFor);
   };
   if (!passable(originH3)) return new Set();
-  return new Set(breadthFirstHexSearch(originH3, (_fromH3, toH3) => passable(toH3), {}).keys());
+  return new Set(breadthFirstHexSearch(originH3, (_fromH3, toH3) => passable(toH3), { endMoveOnEnter }).keys());
 }
 
 /**
@@ -295,10 +301,11 @@ export function getDistanceAndTurns(
   passableFor: PassableDomain,
   movementBudget: number,
   blocked?: Set<string>,
-  landMass?: LandMassByH3
+  landMass?: LandMassByH3,
+  endMoveOnEnter?: (h3: string) => boolean
 ): { hexDistance: number; estimatedTurns: number } | null {
   logTrace('pathfinding getDistanceAndTurns', { passableFor });
-  const path = findPath(originH3, destinationH3, hexSet, terrainByH3, passableFor, blocked, landMass);
+  const path = findPath(originH3, destinationH3, hexSet, terrainByH3, passableFor, blocked, landMass, endMoveOnEnter);
   if (!path || path.length === 0) return null;
   const hexDistance = path.length - 1; // steps between hexes
   if (hexDistance <= 0) return { hexDistance: 0, estimatedTurns: 0 };

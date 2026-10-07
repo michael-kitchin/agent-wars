@@ -52,6 +52,11 @@ function isMonthRecord(value: unknown): value is WeatherMonthRecord {
   );
 }
 
+export function clearWeatherPackCache(): void {
+  logDebug('weatherPackLoad clearWeatherPackCache');
+  yearsByHex = null;
+}
+
 /**
  * Reads and caches the weather pack.
  *

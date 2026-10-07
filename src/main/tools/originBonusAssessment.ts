@@ -92,7 +92,7 @@ export function strategicOriginBonusUnitFields(
   return {
     originBonusHere: sources,
     originBonusAmount: originHitBonusFromSources(sources, settings),
-    birthCountry: unit.origin?.birthCountryName ?? null,
+    birthCountry: unit.origin?.birthAreaName ?? unit.origin?.birthCountryName ?? null,
   };
 }
 
@@ -120,7 +120,9 @@ export function tacticalOriginBonusUnitFields(
   return {
     originBonusHere: sources,
     originBonusAmount: originHitBonusFromSources(sources, settings),
-    ...(settings.countryBonusEnabled ? { birthCountry: subUnit.origin?.birthCountryName ?? null } : {}),
+    ...(settings.countryBonusEnabled
+      ? { birthCountry: subUnit.origin?.birthAreaName ?? subUnit.origin?.birthCountryName ?? null }
+      : {}),
     ...(settings.terrainBonusEnabled ? { birthTerrain: normalizeOriginTerrainKind(subUnit.origin?.birthTerrainKind) } : {}),
   };
 }
