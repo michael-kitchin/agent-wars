@@ -12,7 +12,8 @@ import sys
 from pathlib import Path
 
 from .logging_utils import configure_logging
-from .road_rail_sides import LINE_COVERAGE_QA_BUFFER_DEGREES_DEFAULT, RoadRailSidesExporter
+from .road_rail_sides import LINE_COVERAGE_QA_BUFFER_DEGREES_DEFAULT
+from .road_rail_sides_export import RoadRailSidesExporter
 
 LOGGER = logging.getLogger(__name__)
 

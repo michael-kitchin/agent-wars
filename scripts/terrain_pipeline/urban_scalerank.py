@@ -67,18 +67,20 @@ def load_urban_union_wgs84(shapefile_path: Path) -> BaseGeometry:
     return u
 
 
-def load_urban_contexts_by_scalerank(
+def load_urban_geometries_by_scalerank(
     shapefile_path: Path,
-) -> tuple[OceanPredicateContext, List[Tuple[int, OceanPredicateContext]]]:
+) -> tuple[BaseGeometry, list[tuple[int, BaseGeometry]]]:
     """
     Why this exists:
-        Build one prepared mask per distinct urban ``scalerank`` plus the aggregate urban mask.
+        Load urban polygons once so callers can clip them before building predicate indexes.
     When to use:
-        Res-4 metadata export urban breakdown.
+        Before ``load_urban_contexts_by_scalerank`` or a regional metadata export.
     What to expect:
-        Returns ``(aggregate_ctx, sorted list of (scalerank, ctx))``; sparse callers skip ranks with no intersection.
+        ``(aggregate union, sorted (scalerank, union) pairs)``. Empty rank unions are omitted.
+        Raises ``FileNotFoundError`` when the shapefile is missing and ``ValueError`` when it has no polygons.
     """
 
+    LOGGER.debug("Loading urban geometries from %s.", shapefile_path)
     if not shapefile_path.is_file():
         raise FileNotFoundError(f"Urban shapefile not found: {shapefile_path}")
 
@@ -102,16 +104,33 @@ def load_urban_contexts_by_scalerank(
         raise ValueError(f"No urban geometries in {shapefile_path}")
 
     aggregate = make_valid(unary_union(all_parts))
-    aggregate_ctx = build_ocean_predicate_context(aggregate)
-
-    per_rank_ctxs: List[Tuple[int, OceanPredicateContext]] = []
+    per_rank: list[tuple[int, BaseGeometry]] = []
     for sr in sorted(by_rank.keys()):
-        geoms = by_rank[sr]
-        union_rank = make_valid(unary_union(geoms))
+        union_rank = make_valid(unary_union(by_rank[sr]))
         if union_rank.is_empty:
             continue
-        per_rank_ctxs.append((sr, build_ocean_predicate_context(union_rank)))
+        per_rank.append((sr, union_rank))
+    LOGGER.debug("Loaded urban aggregate and %d rank unions from %s.", len(per_rank), shapefile_path)
+    return aggregate, per_rank
 
+
+def load_urban_contexts_by_scalerank(
+    shapefile_path: Path,
+) -> tuple[OceanPredicateContext, List[Tuple[int, OceanPredicateContext]]]:
+    """
+    Why this exists:
+        Build one prepared mask per distinct urban ``scalerank`` plus the aggregate urban mask.
+    When to use:
+        Res-4 metadata export urban breakdown.
+    What to expect:
+        Returns ``(aggregate_ctx, sorted list of (scalerank, ctx))``; sparse callers skip ranks with no intersection.
+    """
+
+    aggregate, per_rank = load_urban_geometries_by_scalerank(shapefile_path)
+    aggregate_ctx = build_ocean_predicate_context(aggregate)
+    per_rank_ctxs: List[Tuple[int, OceanPredicateContext]] = [
+        (sr, build_ocean_predicate_context(geom)) for sr, geom in per_rank
+    ]
     LOGGER.info(
         "Urban scalerank contexts: aggregate + %d rank-specific union(s) from %s.",
         len(per_rank_ctxs),

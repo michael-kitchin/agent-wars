@@ -139,8 +139,14 @@ def build_ocean_predicate_context(ocean_union_wgs84: BaseGeometry) -> OceanPredi
     What to expect:
         For global high-resolution products (e.g. Natural Earth 10m ocean), **reprojecting the dissolved union**
         to EPSG:3857 can take **many minutes** and dominate wall time; per-cell tests are then much cheaper than
-        raw ``Geometry.covers`` on the full multipolygon each time.
+        raw ``Geometry.covers`` on the full multipolygon each time. An empty input returns a context that
+        intersects nothing, which is what a regional clip produces when the map contains no water polygons.
     """
+
+    if ocean_union_wgs84.is_empty:
+        LOGGER.debug("Ocean mask input is empty; preparing an empty polygon.")
+        empty = Polygon()
+        return OceanPredicateContext(ocean_3857=empty, _prepared=prep(empty))
 
     LOGGER.info(
         "Ocean mask: preparing Web Mercator geometry and predicate index (10m-scale global union: "
@@ -270,11 +276,28 @@ def mask_metrics_for_cell_polygon(
     """
 
     cell_3857 = _cell_polygon_wgs84_to_3857(cell_poly_wgs84)
+    return _mask_metrics_for_projected_cell(cell_3857, mask_ctx)
+
+
+def _mask_metrics_for_projected_cell(
+    cell_3857: Polygon,
+    mask_ctx: OceanPredicateContext,
+) -> MaskPolygonMetrics:
+    """
+    Why this exists:
+        Score one already-projected cell against several masks without projecting it again.
+    When to use:
+        From ``mask_metrics_for_cell_polygon`` and from the metadata cell loop.
+    What to expect:
+        Same flags as ``mask_metrics_for_cell_polygon``. Coverage and intersection are both
+        measured, and every boundary edge is counted, including when the cell misses the mask.
+    """
+
     covers = mask_ctx.covers(cell_3857)
     intersects = mask_ctx.intersects(cell_3857)
-    covered, n = _count_edges_fully_covered_by_ocean(cell_3857, mask_ctx)
+    covered, total = _count_edges_fully_covered_by_ocean(cell_3857, mask_ctx)
     return MaskPolygonMetrics(
-        total_edges=n,
+        total_edges=total,
         mask_edges=covered,
         mask_covers_cell=covers,
         intersects=intersects,

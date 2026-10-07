@@ -11,9 +11,8 @@ from scripts.naming_pipeline.generate_hex_naming import (
     _normalize_water_name,
     _resolve_field_names,
     _validate_inputs,
-    _write_res1_json,
-    _write_res4_json,
 )
+from scripts.naming_pipeline.naming_json_writers import write_strategic_naming_json, write_tactical_naming_json
 
 
 class GenerateHexNamingTests(unittest.TestCase):
@@ -54,8 +53,8 @@ class GenerateHexNamingTests(unittest.TestCase):
                 )
                 conn.commit()
 
-                _write_res1_json(conn, ["81003ffffffffff"], out_res1)
-                _write_res4_json(conn, ["8400001ffffffff"], out_res4)
+                write_strategic_naming_json(conn, ["81003ffffffffff"], out_res1, resolution=1)
+                write_tactical_naming_json(conn, ["8400001ffffffff"], out_res4, resolution=4)
 
                 res1 = json.loads(out_res1.read_text(encoding="utf-8"))
                 self.assertEqual(1, res1["resolution"])
@@ -99,8 +98,8 @@ class GenerateHexNamingTests(unittest.TestCase):
                 )
                 conn.commit()
 
-                _write_res1_json(conn, ["81003ffffffffff"], out_res1)
-                _write_res4_json(conn, ["8400001ffffffff"], out_res4)
+                write_strategic_naming_json(conn, ["81003ffffffffff"], out_res1, resolution=1)
+                write_tactical_naming_json(conn, ["8400001ffffffff"], out_res4, resolution=4)
 
                 res1 = json.loads(out_res1.read_text(encoding="utf-8"))
                 water_res1 = res1["records"][0]["water"]
@@ -135,6 +134,46 @@ class GenerateHexNamingTests(unittest.TestCase):
         self.assertEqual("POP_EST", resolved["pop_est"])
         self.assertEqual("continent", resolved["continent"])
         self.assertEqual("SUBREGION", resolved["subregion"])
+
+    def test_tactical_writer_records_requested_resolution(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            out_path = Path(td) / "tactical.json"
+            conn = sqlite3.connect(":memory:")
+            try:
+                _init_tables(conn)
+                write_tactical_naming_json(conn, ["8600001ffffffff"], out_path, resolution=6)
+            finally:
+                conn.close()
+            payload = json.loads(out_path.read_text(encoding="utf-8"))
+            self.assertEqual(6, payload["resolution"])
+
+    def test_unsorted_cells_keep_every_country(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            out_path = Path(td) / "terrain_res_s_naming.json"
+            conn = sqlite3.connect(":memory:")
+            try:
+                _init_tables(conn)
+                conn.executescript(
+                    """
+                    INSERT INTO countries_res1(cell, name, continent, region, population) VALUES
+                    ('81003ffffffffff', 'Later', 'A', 'B', 2),
+                    ('81001ffffffffff', 'Earlier', 'A', 'B', 1);
+                    """
+                )
+                conn.commit()
+                write_strategic_naming_json(
+                    conn,
+                    ["81003ffffffffff", "81001ffffffffff"],
+                    out_path,
+                    resolution=1,
+                )
+            finally:
+                conn.close()
+            records = json.loads(out_path.read_text(encoding="utf-8"))["records"]
+            self.assertEqual(
+                [("81001ffffffffff", "Earlier"), ("81003ffffffffff", "Later")],
+                [(row["h3_index"], row["countries"][0]["name"]) for row in records],
+            )
 
 
 if __name__ == "__main__":

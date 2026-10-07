@@ -8,11 +8,8 @@ anchored at the north-most side midpoint, for tactical glyph rendering and routi
 from __future__ import annotations
 
 import hashlib
-import json
 import logging
 import math
-from dataclasses import dataclass
-from datetime import UTC, datetime
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, Iterable, Sequence
@@ -72,16 +69,18 @@ _EDGE_INTERIOR_TOL = 1e-9
 _LINE_LENGTH_TOL = 1e-12
 
 
-def _feature_has_export_scalerank(props: Mapping[str, Any] | None) -> bool:
+def feature_has_scalerank_in_range(
+    props: Mapping[str, Any] | None,
+    scalerank_min: int,
+    scalerank_max: int,
+) -> bool:
     """
     Why this exists:
-        Limit route geometry to Natural Earth features tagged as major (``scalerank`` 0–4) so tactical overlays stay readable.
+        Keep route features whose Natural Earth scalerank falls in a caller-chosen inclusive range.
     When to use:
-        Immediately after reading each road/rail feature, before geometry work.
+        Immediately after reading each road or rail feature, before geometry work.
     What to expect:
-        Returns False when ``scalerank`` is missing or outside ``ROAD_RAIL_EXPORT_SCALERANK_MIN``..``ROAD_RAIL_EXPORT_SCALERANK_MAX``.
-    Exceptions:
-        Non-numeric ``scalerank`` values are treated as excluded (returns False).
+        Returns False when ``scalerank`` is missing, non-numeric, or outside the range.
     """
 
     if props is None:
@@ -90,14 +89,27 @@ def _feature_has_export_scalerank(props: Mapping[str, Any] | None) -> bool:
     if raw is None:
         return False
     try:
-        v = int(float(raw))
+        value = int(float(raw))
     except (TypeError, ValueError):
         LOGGER.debug("road_rail_sides: skipping feature with non-numeric scalerank=%r.", raw)
         return False
-    ok = ROAD_RAIL_EXPORT_SCALERANK_MIN <= v <= ROAD_RAIL_EXPORT_SCALERANK_MAX
+    ok = scalerank_min <= value <= scalerank_max
     if not ok:
-        LOGGER.log(_LOG_TRACE, "road_rail_sides: scalerank=%d outside export range; skipping.", v)
+        LOGGER.log(_LOG_TRACE, "road_rail_sides: scalerank=%d outside export range %d..%d; skipping.", value, scalerank_min, scalerank_max)
     return ok
+
+
+def _feature_has_export_scalerank(props: Mapping[str, Any] | None) -> bool:
+    """
+    Why this exists:
+        Limit the global route export to scalerank 0–4.
+    When to use:
+        The global road and rail exporters.
+    What to expect:
+        Same result as ``feature_has_scalerank_in_range`` with the global min and max.
+    """
+
+    return feature_has_scalerank_in_range(props, ROAD_RAIL_EXPORT_SCALERANK_MIN, ROAD_RAIL_EXPORT_SCALERANK_MAX)
 
 
 def _sha256_file(path: Path) -> str:
@@ -168,182 +180,14 @@ def _geometry_wgs84(
     return geom
 
 
-def h3_overlap_cells_res4(geom_wgs84: BaseGeometry) -> list[str]:
-    """
-    Why this exists:
-        Map polygon geometry to candidate res4 H3 cells using the same overlap contract as naming export.
-    When to use:
-        When a buffered route is represented as a polygon or when polygonal sources are added later.
-    What to expect:
-        Returns a de-duplicated sorted list of cell ids; may be empty for geometries outside coverage.
-    """
-
-    LOGGER.debug("h3_overlap_cells_res4: polygon overlap cell query.")
-    h3shape = h3.geo_to_h3shape(geom_wgs84.__geo_interface__)
-    cells = list(h3.h3shape_to_cells_experimental(h3shape, RESOLUTION, contain="overlap"))
-    return sorted(set(cells))
-
-
-def _expand_h3_cells_disk1(cells: Iterable[str]) -> set[str]:
-    """
-    Why this exists:
-        Widen a res4 cell set by one H3 grid step so near-miss neighbors are included as export candidates.
-    When to use:
-        After point sampling along lines that reach high absolute latitude (see ``_LINE_CELL_DISK1_EXPAND_MIN_ABS_LAT``).
-    What to expect:
-        Returns a superset of the input ids; logs nothing; skips invalid indices defensively.
-    """
-
-    out: set[str] = set(cells)
-    for c in cells:
-        try:
-            out.update(h3.grid_disk(c, 1))
-        except Exception as exc:
-            LOGGER.debug("grid_disk(1) skipped for cell=%s: %s", c, exc)
-    return out
-
-
-def h3_cells_for_linestring_res4(
-    line: LineString,
-    *,
-    use_fast_segment_grid_path: bool = DEFAULT_FAST_MODE,
-) -> list[str]:
-    """
-    Why this exists:
-        ``h3.geo_to_h3shape`` does not accept GeoJSON ``LineString`` inputs, so route features must be
-        mapped to cells via deterministic densified sampling along the polyline in WGS84 degree space.
-    When to use:
-        Before clipping each route segment to individual cell polygons for side detection.
-    What to expect:
-        Returns a sorted de-duplicated list of res4 indices. Default mode uses per-segment
-        ``h3.grid_path_cells`` for speed; fallback mode uses bounded arclength densification.
-        For high-latitude lines (``|lat| >= _LINE_CELL_DISK1_EXPAND_MIN_ABS_LAT``), ring-1
-        expansion is applied to reduce misses from distortion.
-    """
-
-    LOGGER.debug(
-        "h3_cells_for_linestring_res4: deriving candidate cells (length=%s, mode=%s).",
-        line.length,
-        "fast" if use_fast_segment_grid_path else "high-fidelity",
-    )
-    if line.is_empty or line.length <= _LINE_LENGTH_TOL:
-        return []
-
-    cells: set[str] = set()
-    coords = list(line.coords)
-    endpoint_cells: list[str] = []
-    for lon, lat in coords:
-        c = h3.latlng_to_cell(lat, lon, RESOLUTION)
-        endpoint_cells.append(c)
-        cells.add(c)
-
-    if use_fast_segment_grid_path:
-        for i in range(len(endpoint_cells) - 1):
-            c0 = endpoint_cells[i]
-            c1 = endpoint_cells[i + 1]
-            if c0 == c1:
-                continue
-            try:
-                cells.update(h3.grid_path_cells(c0, c1))
-            except Exception:
-                x0, y0 = coords[i]
-                x1, y1 = coords[i + 1]
-                seg = LineString([(x0, y0), (x1, y1)])
-                slen = float(seg.length)
-                if slen > _LINE_LENGTH_TOL:
-                    pt = seg.interpolate(0.5 * slen)
-                    cells.add(h3.latlng_to_cell(float(pt.y), float(pt.x), RESOLUTION))
-    else:
-        length = float(line.length)
-        interior_count = min(
-            _MAX_LINE_GLOBAL_INTERIOR_SAMPLES,
-            max(1, int(math.ceil(length / LINE_TO_CELL_STEP_DEGREES))),
-        )
-        for k in range(1, interior_count + 1):
-            pt = line.interpolate(length * (k / (interior_count + 1)))
-            cells.add(h3.latlng_to_cell(float(pt.y), float(pt.x), RESOLUTION))
-
-    max_abs_lat = max(abs(float(xy[1])) for xy in coords)
-    if max_abs_lat >= _LINE_CELL_DISK1_EXPAND_MIN_ABS_LAT:
-        cells = _expand_h3_cells_disk1(cells)
-
-    return sorted(cells)
-
-
-def h3_cells_for_linestring_res4_buffered(
-    line: LineString,
-    buffer_deg: float = LINE_COVERAGE_QA_BUFFER_DEGREES_DEFAULT,
-) -> set[str]:
-    """
-    Why this exists:
-        QA baseline for route-to-cell coverage: ``h3.geo_to_h3shape`` accepts polygons, so a thin buffer
-        around the line yields an overlap cell set to compare against densified point sampling.
-    When to use:
-        Only from ``compare_linestring_cell_coverage_res4`` or the ``qa-line-coverage`` CLI path.
-    What to expect:
-        Returns res4 cell ids overlapping the buffered corridor; may include a few cells not hit by
-        ``h3_cells_for_linestring_res4`` when the buffer is wider than the sampling grid.
-    """
-
-    LOGGER.debug(
-        "h3_cells_for_linestring_res4_buffered: buffer_deg=%s line.length=%s.",
-        buffer_deg,
-        line.length,
-    )
-    if line.is_empty or line.length <= _LINE_LENGTH_TOL:
-        return set()
-
-    buf = line.buffer(buffer_deg)
-    if buf.is_empty:
-        return set()
-    if not buf.is_valid:
-        buf = buf.buffer(0)
-    if buf.is_empty:
-        return set()
-
-    cells: set[str] = set()
-    if isinstance(buf, Polygon):
-        cells.update(h3_overlap_cells_res4(buf))
-    elif isinstance(buf, MultiPolygon):
-        for part in buf.geoms:
-            if not part.is_empty:
-                cells.update(h3_overlap_cells_res4(part))
-    return cells
-
-
-def compare_linestring_cell_coverage_res4(
-    line: LineString,
-    *,
-    buffer_deg: float = LINE_COVERAGE_QA_BUFFER_DEGREES_DEFAULT,
-    use_fast_segment_grid_path: bool = DEFAULT_FAST_MODE,
-) -> dict[str, Any]:
-    """
-    Why this exists:
-        Quantify differences between production densified cell discovery and buffered-polygon overlap.
-    When to use:
-        QA runs and unit tests; not used in the main export path.
-    What to expect:
-        Returns counts and sorted cell id lists for ``cells_only_in_buffered`` (pipeline would miss)
-        and ``cells_only_in_densified`` (buffer corridor missed or discretization noise).
-    """
-
-    LOGGER.debug("compare_linestring_cell_coverage_res4: comparing coverage methods.")
-    dense = set(
-        h3_cells_for_linestring_res4(
-            line,
-            use_fast_segment_grid_path=use_fast_segment_grid_path,
-        )
-    )
-    buff = h3_cells_for_linestring_res4_buffered(line, buffer_deg=buffer_deg)
-    only_buff = sorted(buff - dense)
-    only_dense = sorted(dense - buff)
-    return {
-        "n_densified": len(dense),
-        "n_buffered": len(buff),
-        "cells_only_in_buffered": only_buff,
-        "cells_only_in_densified": only_dense,
-        "has_mismatch": bool(only_buff or only_dense),
-    }
+# Imported after the sampling constants so the cell helpers can read them.
+from .road_rail_cells import (
+    compare_linestring_cell_coverage_res4,
+    h3_cells_for_linestring,
+    h3_cells_for_linestring_res4,
+    h3_cells_for_linestring_res4_buffered,
+    h3_overlap_cells_res4,
+)
 
 
 def _midpoint_lat_lon(a: tuple[float, float], b: tuple[float, float]) -> tuple[float, float]:
@@ -428,14 +272,113 @@ def ordered_cell_boundary_edges(poly: Polygon) -> list[LineString]:
         p1 = (coords[(i + 1) % n][0], coords[(i + 1) % n][1])
         forward_edges.append(LineString([p0, p1]))
 
-    cen = oriented.centroid
+    return _order_edges_clockwise_from_north(oriented, forward_edges)
+
+
+def ordered_cell_boundary_edges_for_cell(cell: str) -> list[LineString]:
+    """
+    Why this exists:
+        Build the same clockwise side list when an H3 boundary has extra points.
+    When to use:
+        Road and rail export, instead of calling ``ordered_cell_boundary_edges`` on ``cell_polygon``.
+    What to expect:
+        Returns 5 or 6 sides. A cell whose boundary only has those corners matches
+        ``ordered_cell_boundary_edges``. A face-crossing cell keeps each extra point on the
+        side between the two real corners, so the mask length stays 5 or 6.
+        Raises ``ValueError`` when the boundary cannot be paired with the cell vertices.
+    """
+
+    LOGGER.debug("ordered_cell_boundary_edges_for_cell: cell=%s.", cell)
+    poly = cell_polygon(cell)
+    coords = list(poly.exterior.coords)
+    if coords and coords[0] == coords[-1]:
+        coords = coords[:-1]
+    if len(coords) in (5, 6):
+        return ordered_cell_boundary_edges(poly)
+    edges = _edges_between_cell_vertices(cell)
+    return _order_edges_clockwise_from_north(poly, edges)
+
+
+def _unwrap_lonlat(points: list[tuple[float, float]]) -> list[tuple[float, float]]:
+    """
+    Why this exists:
+        Keep boundary vertices in the same longitude branch as ``cell_polygon``.
+    When to use:
+        Before matching H3 vertices to a boundary that crosses the antimeridian.
+    What to expect:
+        Returns the same points when the longitude span is at most 180 degrees.
+        Otherwise negative longitudes are shifted by 360.
+    """
+
+    lngs = [lng for lng, _ in points]
+    if not lngs or max(lngs) - min(lngs) <= 180.0:
+        return points
+    return [(lng + 360.0, lat) if lng < 0 else (lng, lat) for lng, lat in points]
+
+
+def _edges_between_cell_vertices(cell: str) -> list[LineString]:
+    """
+    Why this exists:
+        Turn one H3 boundary ring into one linestring per pentagon or hexagon side.
+    When to use:
+        When ``cell_to_boundary`` includes points that are not cell vertices.
+    What to expect:
+        One ``LineString`` per vertex. Intermediate boundary points stay on the side
+        they fall between. Raises ``ValueError`` when the matched vertex count is not 5 or 6.
+    """
+
+    vertex_lonlat = _unwrap_lonlat(
+        [(lng, lat) for lat, lng in (h3.vertex_to_latlng(vertex) for vertex in h3.cell_to_vertexes(cell))]
+    )
+    boundary_lonlat = _unwrap_lonlat([(lng, lat) for lat, lng in h3.cell_to_boundary(cell)])
+
+    def is_vertex(lng: float, lat: float) -> bool:
+        return any(
+            abs(lng - vertex_lng) <= _CORNER_TOL and abs(lat - vertex_lat) <= _CORNER_TOL
+            for vertex_lng, vertex_lat in vertex_lonlat
+        )
+
+    vertex_indexes = [index for index, (lng, lat) in enumerate(boundary_lonlat) if is_vertex(lng, lat)]
+    if len(vertex_indexes) not in (5, 6):
+        message = (
+            f"Cell {cell} boundary matched {len(vertex_indexes)} vertices; expected 5 or 6."
+        )
+        LOGGER.error(message)
+        raise ValueError(message)
+
+    edges: list[LineString] = []
+    count = len(vertex_indexes)
+    for index in range(count):
+        start = vertex_indexes[index]
+        end = vertex_indexes[(index + 1) % count]
+        if end > start:
+            coords = boundary_lonlat[start : end + 1]
+        else:
+            coords = boundary_lonlat[start:] + boundary_lonlat[: end + 1]
+        edges.append(LineString(coords))
+    return edges
+
+
+def _order_edges_clockwise_from_north(poly: Polygon, forward_edges: list[LineString]) -> list[LineString]:
+    """
+    Why this exists:
+        Apply the north-most midpoint anchor after the ring has been split into sides.
+    When to use:
+        From ``ordered_cell_boundary_edges`` and from the face-crossing cell path.
+    What to expect:
+        Returns the same edges, rotated so index 0 is the clockwise side whose endpoint
+        midpoint is farthest north. Equal latitudes break toward the smaller longitude.
+    """
+
+    n = len(forward_edges)
+    cen = poly.centroid
     cen_lon, cen_lat = float(cen.x), float(cen.y)
 
     edge_angles: list[tuple[float, int]] = []
     for i, edge in enumerate(forward_edges):
         lat, lon = _midpoint_lat_lon(
             (edge.coords[0][0], edge.coords[0][1]),
-            (edge.coords[1][0], edge.coords[1][1]),
+            (edge.coords[-1][0], edge.coords[-1][1]),
         )
         ang = _cw_angle_from_north(lon, lat, cen_lon, cen_lat)
         edge_angles.append((ang, i))
@@ -445,11 +388,14 @@ def ordered_cell_boundary_edges(poly: Polygon) -> list[LineString]:
     best_i = 0
     best_lat, best_lon = _midpoint_lat_lon(
         (forward_edges[0].coords[0][0], forward_edges[0].coords[0][1]),
-        (forward_edges[0].coords[1][0], forward_edges[0].coords[1][1]),
+        (forward_edges[0].coords[-1][0], forward_edges[0].coords[-1][1]),
     )
     for i in range(1, n):
-        e = forward_edges[i]
-        lat, lon = _midpoint_lat_lon((e.coords[0][0], e.coords[0][1]), (e.coords[1][0], e.coords[1][1]))
+        edge = forward_edges[i]
+        lat, lon = _midpoint_lat_lon(
+            (edge.coords[0][0], edge.coords[0][1]),
+            (edge.coords[-1][0], edge.coords[-1][1]),
+        )
         if lat > best_lat + _CORNER_TOL:
             best_i = i
             best_lat, best_lon = lat, lon
@@ -458,8 +404,7 @@ def ordered_cell_boundary_edges(poly: Polygon) -> list[LineString]:
             best_lat, best_lon = lat, lon
 
     start_pos = next(idx for idx, (_, edge_i) in enumerate(edge_angles) if edge_i == best_i)
-    ordered = [forward_edges[edge_angles[(start_pos + k) % n][1]] for k in range(n)]
-    return ordered
+    return [forward_edges[edge_angles[(start_pos + k) % n][1]] for k in range(n)]
 
 
 def _point_on_closed_segment_interior(
@@ -487,6 +432,45 @@ def _point_on_closed_segment_interior(
     return t > _EDGE_INTERIOR_TOL and t < 1.0 - _EDGE_INTERIOR_TOL
 
 
+def _point_on_edge_interior(px: float, py: float, edge: LineString) -> bool:
+    """
+    Why this exists:
+        Treat a hit as a side touch when it is not on a corner of that side.
+    When to use:
+        Point intersections and near-miss checks against one ordered boundary edge.
+    What to expect:
+        A two-point edge uses the closed-segment interior test. A longer edge, used when a
+        face crossing adds a boundary point, also counts that intermediate point as interior.
+    """
+
+    coords = list(edge.coords)
+    if len(coords) < 2:
+        return False
+    if len(coords) == 2:
+        return _point_on_closed_segment_interior(
+            px,
+            py,
+            coords[0][0],
+            coords[0][1],
+            coords[1][0],
+            coords[1][1],
+        )
+    ax, ay = coords[0][0], coords[0][1]
+    bx, by = coords[-1][0], coords[-1][1]
+    if abs(px - ax) <= _EDGE_INTERIOR_TOL and abs(py - ay) <= _EDGE_INTERIOR_TOL:
+        return False
+    if abs(px - bx) <= _EDGE_INTERIOR_TOL and abs(py - by) <= _EDGE_INTERIOR_TOL:
+        return False
+    for index in range(len(coords) - 1):
+        sx, sy = coords[index][0], coords[index][1]
+        ex, ey = coords[index + 1][0], coords[index + 1][1]
+        if _point_on_closed_segment_interior(px, py, sx, sy, ex, ey):
+            return True
+        if index > 0 and abs(px - sx) <= _EDGE_INTERIOR_TOL and abs(py - sy) <= _EDGE_INTERIOR_TOL:
+            return True
+    return False
+
+
 def _edge_touched_by_clipped_route(edge: LineString, clipped: BaseGeometry) -> bool:
     """
     Why this exists:
@@ -512,9 +496,7 @@ def _edge_touched_by_clipped_route(edge: LineString, clipped: BaseGeometry) -> b
             return False
         if edge_pt.distance(clipped_pt) > _EDGE_INTERIOR_TOL:
             return False
-        ax, ay = edge.coords[0][0], edge.coords[0][1]
-        bx, by = edge.coords[1][0], edge.coords[1][1]
-        return _point_on_closed_segment_interior(edge_pt.x, edge_pt.y, ax, ay, bx, by)
+        return _point_on_edge_interior(edge_pt.x, edge_pt.y, edge)
 
     if isinstance(inter, LineString):
         return inter.length > _LINE_LENGTH_TOL
@@ -523,14 +505,10 @@ def _edge_touched_by_clipped_route(edge: LineString, clipped: BaseGeometry) -> b
         return any(ls.length > _LINE_LENGTH_TOL for ls in inter.geoms)
 
     if isinstance(inter, Point):
-        ax, ay = edge.coords[0][0], edge.coords[0][1]
-        bx, by = edge.coords[1][0], edge.coords[1][1]
-        return _point_on_closed_segment_interior(inter.x, inter.y, ax, ay, bx, by)
+        return _point_on_edge_interior(inter.x, inter.y, edge)
 
     if isinstance(inter, MultiPoint):
-        ax, ay = edge.coords[0][0], edge.coords[0][1]
-        bx, by = edge.coords[1][0], edge.coords[1][1]
-        return any(_point_on_closed_segment_interior(pt.x, pt.y, ax, ay, bx, by) for pt in inter.geoms)
+        return any(_point_on_edge_interior(pt.x, pt.y, edge) for pt in inter.geoms)
 
     if inter.geom_type == "GeometryCollection":
         return any(
@@ -578,8 +556,7 @@ def side_touch_mask_for_cell(cell: str, clipped_route_wgs84: BaseGeometry) -> li
     """
 
     LOGGER.debug("side_touch_mask_for_cell: computing mask for cell=%s.", cell)
-    poly = cell_polygon(cell)
-    edges = ordered_cell_boundary_edges(poly)
+    edges = ordered_cell_boundary_edges_for_cell(cell)
     return side_touch_mask_for_edges(edges, clipped_route_wgs84)
 
 
@@ -601,381 +578,3 @@ def _merge_bool_masks(a: Sequence[bool], b: Sequence[bool]) -> list[bool]:
     return [x or y for x, y in zip(a, b, strict=True)]
 
 
-@dataclass
-class RoadRailSidesExporter:
-    """
-    Why this exists:
-        Run validation and export res4 road/rail side masks into a single JSON artifact.
-    When to use:
-        Invoked from ``road_rail_sides_cli`` after arguments are parsed.
-    What to expect:
-        Writes ``terrain_res4_road_rail_sides.json`` under the configured output directory.
-    """
-
-    data_root: Path
-    output_dir: Path
-    road_shapefile_name: str = "ne_10m_roads.shp"
-    rail_shapefile_name: str = "ne_10m_railroads.shp"
-    output_filename: str = "terrain_res4_road_rail_sides.json"
-
-    def road_path(self) -> Path:
-        """
-        Why this exists:
-            Resolve the road shapefile path for validation and hashing.
-        When to use:
-            Before opening Natural Earth roads.
-        What to expect:
-            Returns ``data_root / road_shapefile_name``.
-        """
-
-        LOGGER.log(_LOG_TRACE, "road_path getter resolved for road_rail_sides exporter.")
-        return self.data_root / self.road_shapefile_name
-
-    def rail_path(self) -> Path:
-        """
-        Why this exists:
-            Resolve the railroad shapefile path for validation and hashing.
-        When to use:
-            Before opening Natural Earth railroads.
-        What to expect:
-            Returns ``data_root / rail_shapefile_name``.
-        """
-
-        LOGGER.log(_LOG_TRACE, "rail_path getter resolved for road_rail_sides exporter.")
-        return self.data_root / self.rail_shapefile_name
-
-    def output_path(self) -> Path:
-        """
-        Why this exists:
-            Resolve the JSON output path for writers and tests.
-        When to use:
-            After validation succeeds and before streaming records.
-        What to expect:
-            Returns ``output_dir / output_filename``.
-        """
-
-        LOGGER.log(_LOG_TRACE, "output_path getter resolved for road_rail_sides exporter.")
-        return self.output_dir / self.output_filename
-
-    def validate_inputs(self) -> None:
-        """
-        Why this exists:
-            Fail fast when required Natural Earth inputs are missing or unreadable.
-        When to use:
-            First step of ``run_all`` or standalone ``validate`` CLI.
-        What to expect:
-            Raises ``FileNotFoundError`` when paths are missing; may raise driver errors for corrupt data.
-        """
-
-        LOGGER.debug("road_rail_sides: validating inputs at data_root=%s.", self.data_root)
-        for label, path in (("road", self.road_path()), ("rail", self.rail_path())):
-            if not path.is_file():
-                raise FileNotFoundError(f"Missing {label} shapefile: {path}")
-            with fiona.open(path) as src:
-                _ = src.schema
-        LOGGER.info("road_rail_sides: input validation passed (road and rail readable).")
-
-    def run_export(
-        self,
-        *,
-        max_features: int | None = None,
-        use_fast_segment_grid_path: bool = DEFAULT_FAST_MODE,
-    ) -> None:
-        """
-        Why this exists:
-            Scan road and rail shapefiles and write the merged touched-cell JSON export.
-        When to use:
-            After ``validate_inputs`` succeeds.
-        What to expect:
-            Creates parent directories as needed and overwrites the output JSON atomically via write+replace.
-        """
-
-        LOGGER.debug(
-            "road_rail_sides: starting export (max_features=%s, mode=%s).",
-            max_features,
-            "fast" if use_fast_segment_grid_path else "high-fidelity",
-        )
-        self.output_dir.mkdir(parents=True, exist_ok=True)
-
-        masks_by_cell: dict[str, tuple[list[bool], list[bool]]] = {}
-        cell_polygon_cache: dict[str, Polygon] = {}
-        cell_edges_cache: dict[str, list[LineString]] = {}
-
-        def accumulate(layer: str, path: Path) -> None:
-            LOGGER.debug("road_rail_sides: scanning %s layer at %s.", layer, path)
-            processed = 0
-            skipped_scalerank = 0
-            with fiona.open(path) as src:
-                xy_transform = _feature_transformer(src)
-                for feature in src:
-                    if max_features is not None and processed >= max_features:
-                        LOGGER.debug(
-                            "road_rail_sides: max_features=%d reached; stopping %s scan.",
-                            max_features,
-                            layer,
-                        )
-                        break
-                    processed += 1
-                    raw_props = feature.get("properties")
-                    props = raw_props if isinstance(raw_props, Mapping) else None
-                    if not _feature_has_export_scalerank(props):
-                        skipped_scalerank += 1
-                        continue
-                    geom = _geometry_wgs84(feature.get("geometry"), xy_transform)
-                    if geom is None:
-                        continue
-
-                    for line in iter_route_linestrings(geom):
-                        if line.is_empty or line.length <= _LINE_LENGTH_TOL:
-                            continue
-                        try:
-                            cells = h3_cells_for_linestring_res4(
-                                line,
-                                use_fast_segment_grid_path=use_fast_segment_grid_path,
-                            )
-                        except Exception as exc:
-                            LOGGER.error(
-                                "road_rail_sides: H3 overlap failed for %s feature id=%s: %s",
-                                layer,
-                                feature.get("id"),
-                                exc,
-                                exc_info=True,
-                            )
-                            raise
-
-                        for cell in cells:
-                            poly = cell_polygon_cache.get(cell)
-                            if poly is None:
-                                poly = cell_polygon(cell)
-                                cell_polygon_cache[cell] = poly
-                            clipped = line.intersection(poly)
-                            if clipped.is_empty:
-                                continue
-                            edges = cell_edges_cache.get(cell)
-                            if edges is None:
-                                edges = ordered_cell_boundary_edges(poly)
-                                cell_edges_cache[cell] = edges
-                            mask = side_touch_mask_for_edges(edges, clipped)
-                            if not any(mask):
-                                continue
-
-                            if cell not in masks_by_cell:
-                                masks_by_cell[cell] = (
-                                    [False] * len(mask),
-                                    [False] * len(mask),
-                                )
-
-                            road_mask, rail_mask = masks_by_cell[cell]
-                            if layer == "road":
-                                road_mask = _merge_bool_masks(road_mask, mask)
-                            else:
-                                rail_mask = _merge_bool_masks(rail_mask, mask)
-
-                            masks_by_cell[cell] = (road_mask, rail_mask)
-
-                    if processed % 5000 == 0:
-                        LOGGER.debug(
-                            "road_rail_sides: processed %d features from %s.",
-                            processed,
-                            layer,
-                        )
-
-            LOGGER.info(
-                "road_rail_sides: %s layer scalerank filter skipped %d of %d features (kept scalerank %d..%d).",
-                layer,
-                skipped_scalerank,
-                processed,
-                ROAD_RAIL_EXPORT_SCALERANK_MIN,
-                ROAD_RAIL_EXPORT_SCALERANK_MAX,
-            )
-
-        accumulate("road", self.road_path())
-        accumulate("rail", self.rail_path())
-        LOGGER.info(
-            "road_rail_sides: global road+rail scan complete; %d res4 cells indexed before merge/write (scalerank %d..%d).",
-            len(masks_by_cell),
-            ROAD_RAIL_EXPORT_SCALERANK_MIN,
-            ROAD_RAIL_EXPORT_SCALERANK_MAX,
-        )
-
-        records: list[dict[str, Any]] = []
-        for cell in sorted(masks_by_cell.keys()):
-            road_mask, rail_mask = masks_by_cell[cell]
-            if not any(road_mask) and not any(rail_mask):
-                continue
-            if len(road_mask) != len(rail_mask):
-                raise RuntimeError(f"Inconsistent mask lengths for cell={cell}")
-            records.append(
-                {
-                    "h3_index": cell,
-                    "road_sides": road_mask,
-                    "rail_sides": rail_mask,
-                }
-            )
-
-        envelope: dict[str, Any] = {
-            "schema_version": ROAD_RAIL_SIDES_SCHEMA_VERSION,
-            "resolution": RESOLUTION,
-            "generated_at_utc": datetime.now(UTC).isoformat(),
-            "record_count": len(records),
-            "route_scalerank_filter": {
-                "min": ROAD_RAIL_EXPORT_SCALERANK_MIN,
-                "max": ROAD_RAIL_EXPORT_SCALERANK_MAX,
-            },
-            "side_ordering_contract": SIDE_ORDERING_CONTRACT,
-            "inputs": [
-                {"role": "road", "path": str(self.road_path()), "sha256": _sha256_file(self.road_path())},
-                {"role": "rail", "path": str(self.rail_path()), "sha256": _sha256_file(self.rail_path())},
-            ],
-            "records": records,
-        }
-
-        out_path = self.output_path()
-        tmp_path = out_path.with_suffix(out_path.suffix + ".tmp")
-        LOGGER.debug("road_rail_sides: writing %d records to %s.", len(records), out_path)
-        with tmp_path.open("w", encoding="utf-8", newline="\n") as f:
-            json.dump(envelope, f, indent=2, ensure_ascii=False)
-            f.write("\n")
-        tmp_path.replace(out_path)
-        LOGGER.info("road_rail_sides: wrote %s (%d records).", out_path, len(records))
-        if len(records) == 0:
-            LOGGER.error(
-                "road_rail_sides: export produced zero records; check scalerank filter vs shapefile attributes.",
-            )
-
-    def run_qa_line_cell_coverage(
-        self,
-        *,
-        max_features: int | None = None,
-        buffer_deg: float = LINE_COVERAGE_QA_BUFFER_DEGREES_DEFAULT,
-        max_example_lines: int = 12,
-        use_fast_segment_grid_path: bool = DEFAULT_FAST_MODE,
-    ) -> dict[str, Any]:
-        """
-        Why this exists:
-            Compare densified line-to-res4 cell discovery (used in export) against a thin-buffer polygon
-            overlap baseline so missed cells can be detected before relying on export output alone.
-        When to use:
-            From the ``qa-line-coverage`` CLI subcommand or ad-hoc validation after changing sampling constants.
-        What to expect:
-            Validates shapefile readability first, then scans each layer and returns summary counts plus a
-            short list of example mismatches; logs an INFO summary.
-        """
-
-        LOGGER.debug(
-            "road_rail_sides: QA line cell coverage (max_features=%s buffer_deg=%s max_example_lines=%d mode=%s).",
-            max_features,
-            buffer_deg,
-            max_example_lines,
-            "fast" if use_fast_segment_grid_path else "high-fidelity",
-        )
-        self.validate_inputs()
-
-        lines_compared = 0
-        lines_with_buffered_only = 0
-        lines_with_dense_only = 0
-        total_buffered_only_cells = 0
-        total_dense_only_cells = 0
-        examples: list[dict[str, Any]] = []
-
-        def scan(layer: str, path: Path) -> None:
-            nonlocal lines_compared, lines_with_buffered_only, lines_with_dense_only
-            nonlocal total_buffered_only_cells, total_dense_only_cells
-
-            processed = 0
-            with fiona.open(path) as src:
-                xy_transform = _feature_transformer(src)
-                for feature in src:
-                    if max_features is not None and processed >= max_features:
-                        LOGGER.debug(
-                            "road_rail_sides: QA max_features=%d reached for %s.",
-                            max_features,
-                            layer,
-                        )
-                        break
-                    processed += 1
-                    qa_props = feature.get("properties")
-                    qa_props_map = qa_props if isinstance(qa_props, Mapping) else None
-                    if not _feature_has_export_scalerank(qa_props_map):
-                        continue
-                    geom = _geometry_wgs84(feature.get("geometry"), xy_transform)
-                    if geom is None:
-                        continue
-
-                    for line in iter_route_linestrings(geom):
-                        if line.is_empty or line.length <= _LINE_LENGTH_TOL:
-                            continue
-                        cmp = compare_linestring_cell_coverage_res4(
-                            line,
-                            buffer_deg=buffer_deg,
-                            use_fast_segment_grid_path=use_fast_segment_grid_path,
-                        )
-                        lines_compared += 1
-                        ob = cmp["cells_only_in_buffered"]
-                        od = cmp["cells_only_in_densified"]
-                        if ob:
-                            lines_with_buffered_only += 1
-                            total_buffered_only_cells += len(ob)
-                        if od:
-                            lines_with_dense_only += 1
-                            total_dense_only_cells += len(od)
-                        if cmp["has_mismatch"] and len(examples) < max_example_lines:
-                            examples.append(
-                                {
-                                    "layer": layer,
-                                    "feature_id": feature.get("id"),
-                                    "line_wkt_prefix": line.wkt[:240],
-                                    "cells_only_in_buffered": ob,
-                                    "cells_only_in_densified": od,
-                                }
-                            )
-
-        scan("road", self.road_path())
-        scan("rail", self.rail_path())
-
-        summary: dict[str, Any] = {
-            "mode": "fast" if use_fast_segment_grid_path else "high-fidelity",
-            "buffer_deg": buffer_deg,
-            "lines_compared": lines_compared,
-            "lines_with_cells_only_in_buffered": lines_with_buffered_only,
-            "lines_with_cells_only_in_densified": lines_with_dense_only,
-            "total_cells_only_in_buffered": total_buffered_only_cells,
-            "total_cells_only_in_densified": total_dense_only_cells,
-            "example_mismatches": examples,
-        }
-        LOGGER.info(
-            "road_rail_sides QA: compared %d line parts; "
-            "lines_with_cells_only_in_buffered=%d (export would miss those cells); "
-            "lines_with_cells_only_in_densified=%d; "
-            "example rows=%d.",
-            lines_compared,
-            lines_with_buffered_only,
-            lines_with_dense_only,
-            len(examples),
-        )
-        if examples:
-            LOGGER.info("road_rail_sides QA: first example mismatch detail: %s", examples[0])
-        return summary
-
-    def run_all(
-        self,
-        *,
-        max_features: int | None = None,
-        use_fast_segment_grid_path: bool = DEFAULT_FAST_MODE,
-    ) -> None:
-        """
-        Why this exists:
-            Validate inputs then perform export in one reliable entrypoint.
-        When to use:
-            Normal CLI ``run`` path.
-        What to expect:
-            Raises on validation failure before writing partial outputs.
-        """
-
-        LOGGER.debug("road_rail_sides: run_all starting.")
-        self.validate_inputs()
-        self.run_export(
-            max_features=max_features,
-            use_fast_segment_grid_path=use_fast_segment_grid_path,
-        )
-        LOGGER.info("road_rail_sides: run_all complete.")

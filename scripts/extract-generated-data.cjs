@@ -1,8 +1,11 @@
 /* eslint-disable no-console */
 const fs = require('fs');
 const path = require('path');
-const { spawnSync } = require('child_process');
 const { resolvePythonExecutable } = require('./resolve-python.cjs');
+const {
+  extractZip,
+  shouldExtractGeneratedJson,
+} = require('./generated-data-zip-helpers.cjs');
 
 const { GENERATED_TERRAIN_JSON_FILES } = require('./generated-data-manifest.cjs');
 
@@ -18,36 +21,6 @@ const REQUIRED_GENERATED_JSON_FILES = GENERATED_TERRAIN_JSON_FILES;
  * When to use: Before calling Python zip extraction in `main`.
  * Expected outcome: True when JSON is missing, empty, or older than the archive.
  */
-function shouldExtractGeneratedJson(zipPath, jsonPath) {
-  if (!fs.existsSync(jsonPath)) return true;
-  const jsonStat = fs.statSync(jsonPath);
-  if (jsonStat.size <= 0) return true;
-  if (!fs.existsSync(zipPath)) return false;
-  const zipStat = fs.statSync(zipPath);
-  return zipStat.mtimeMs > jsonStat.mtimeMs;
-}
-
-function extractZip(pythonCmd, zipFilename, jsonFilename) {
-  const py = [
-    'import pathlib, zipfile',
-    `base = pathlib.Path(r'''${generatedDir}''')`,
-    `z = base / r'''${zipFilename}'''`,
-    `out = base / r'''${jsonFilename}'''`,
-    'with zipfile.ZipFile(z, "r") as zf:',
-    `    with zf.open(r'''${jsonFilename}''') as src, out.open("wb") as dst:`,
-    '        dst.write(src.read())',
-  ].join('\n');
-  const result = spawnSync(pythonCmd, ['-c', py], {
-    cwd: generatedDir,
-    encoding: 'utf8',
-  });
-  if (result.status !== 0) {
-    const detail = result.stderr || result.stdout || 'unknown extraction error';
-    throw new Error(`extract-generated-data: failed to extract ${zipFilename}: ${detail}`.trim());
-  }
-  console.log(`extracted ${zipFilename} -> ${jsonFilename}`);
-}
-
 function assertRequiredGeneratedJsonFilesPresent() {
   const missing = [];
   for (const filename of REQUIRED_GENERATED_JSON_FILES) {
@@ -90,7 +63,7 @@ function main() {
       const zipPath = path.join(generatedDir, zipFilename);
       const jsonPath = path.join(generatedDir, jsonFilename);
       if (!shouldExtractGeneratedJson(zipPath, jsonPath)) continue;
-      extractZip(pythonCmd, zipFilename, jsonFilename);
+      extractZip(pythonCmd, generatedDir, zipFilename, jsonFilename);
     }
   }
   assertRequiredGeneratedJsonFilesPresent();

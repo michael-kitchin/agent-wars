@@ -3,9 +3,11 @@ from __future__ import annotations
 import unittest
 from pathlib import Path
 
+import h3
 from shapely.geometry import GeometryCollection, LineString, MultiLineString, Point
 
 from scripts.terrain_pipeline import road_rail_sides as rr
+from scripts.terrain_pipeline.road_rail_sides_export import RoadRailSidesExporter
 from scripts.terrain_pipeline.sampling import cell_polygon
 
 
@@ -51,6 +53,11 @@ class RoadRailSidesTests(unittest.TestCase):
         cell = h3.latlng_to_cell(40.7128, -74.0060, 4)
         poly = cell_polygon(cell)
         edges = rr.ordered_cell_boundary_edges(poly)
+        via_cell = rr.ordered_cell_boundary_edges_for_cell(cell)
+        self.assertEqual(
+            [list(edge.coords) for edge in edges],
+            [list(edge.coords) for edge in via_cell],
+        )
         self.assertEqual(6, len(edges))
         mids = []
         for e in edges:
@@ -61,6 +68,13 @@ class RoadRailSidesTests(unittest.TestCase):
             mids.append((lat, lon))
         max_lat = max(m[0] for m in mids)
         self.assertAlmostEqual(max_lat, mids[0][0], places=6)
+
+    def test_face_crossing_cell_keeps_six_sides(self) -> None:
+        cell = "850194dbfffffff"
+        self.assertEqual(7, len(h3.cell_to_boundary(cell)))
+        edges = rr.ordered_cell_boundary_edges_for_cell(cell)
+        self.assertEqual(6, len(edges))
+        self.assertTrue(any(len(list(edge.coords)) > 2 for edge in edges))
 
     def test_merge_bool_masks(self) -> None:
         self.assertEqual(
@@ -90,7 +104,7 @@ class RoadRailSidesTests(unittest.TestCase):
         self.assertGreater(len(buff), 0)
 
     def test_validate_inputs_missing_file_raises(self) -> None:
-        exporter = rr.RoadRailSidesExporter(
+        exporter = RoadRailSidesExporter(
             data_root=Path("F:/NonexistentDataRootForTests"),
             output_dir=Path("data/generated"),
         )
@@ -108,6 +122,16 @@ class RoadRailSidesTests(unittest.TestCase):
         self.assertFalse(rr._feature_has_export_scalerank({"scalerank": None}))
         self.assertFalse(rr._feature_has_export_scalerank(None))
         self.assertFalse(rr._feature_has_export_scalerank({}))
+
+    def test_scalerank_range_keeps_rank_six_and_drops_rank_seven(self) -> None:
+        self.assertTrue(rr.feature_has_scalerank_in_range({"scalerank": 6}, 0, 6))
+        self.assertFalse(rr.feature_has_scalerank_in_range({"scalerank": 7}, 0, 6))
+
+    def test_linestring_cells_follow_requested_resolution(self) -> None:
+        line = LineString([(-74.02, 40.71), (-74.00, 40.71)])
+        cells = rr.h3_cells_for_linestring(line, resolution=6, use_fast_segment_grid_path=True)
+        self.assertGreater(len(cells), 0)
+        self.assertTrue(all(h3.get_resolution(cell) == 6 for cell in cells))
 
 
 if __name__ == "__main__":

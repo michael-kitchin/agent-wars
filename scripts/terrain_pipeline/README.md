@@ -52,7 +52,7 @@ Res-4 records include all res-1 fields plus urban metrics:
    - water masks: defaults **`ne_10m_ocean.shp`**, **`ne_10m_lakes.shp`**
    - urban polygons: default **`ne_10m_urban_areas.shp`**
    - airports: default **`ne_10m_airports.shp`** (`featurecla == "Airport"`)
-   - seaports: default **`ne_10m_ports.shp`** (`featurecla == "Seaport"`)
+   - seaports: default **`ne_10m_ports.shp`** (`featurecla == "Port"`)
 
    Ocean drives res-1 water; lakes are merged with ocean for res-4 water; urban polygons are applied only to res-4 cells that are not fully in water. Airport/seaport points are assigned to exactly one hex per resolution using `h3.latlng_to_cell(...)`. Paths are `InputRasterSet.root` / `InputRasterSet.*_shapefile_name` in `config.py`. Phase 1 validates these files are present and readable. Sidecar files (`.dbf`, `.shx`, `.prj`, …) must accompany each `.shp` where required by the driver.
 
@@ -227,6 +227,8 @@ Override DB user only if not `postgres` (see `DbConfig.user` in `config.py`).
 ## Renderer overlays (city / transport display)
 
 Pipeline artifacts feed the Electron **main** terrain classification cache and IPC getters; the **renderer** draws res4 city stars, labels, optional Leaflet vector lines, and canvas transport chords using those payloads. Refactors and file-size work for that side of the stack are planned in [`.spec/maintainability-consolidation-execution-plan-v4.md`](../.spec/maintainability-consolidation-execution-plan-v4.md) (incremental consolidation) and [`.spec/file-size-decomposition-plan-v1.md`](../.spec/file-size-decomposition-plan-v1.md) (broader `renderer.ts` / IPC type decomposition). This README stays focused on **offline generation**; use those specs when changing overlay modules or splitting the renderer entry file.
+
+Regional packs, which the app does not load yet, are described in [../regional_pipeline/README.md](../regional_pipeline/README.md).
 
 ## Troubleshooting
 

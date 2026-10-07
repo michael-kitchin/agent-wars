@@ -23,8 +23,8 @@ from .geography_regions import RegionFeature, load_geography_region_features
 from .metadata_io import write_json_document
 from .res1_water_pct import (
     assert_corridor_water_pct_below_threshold,
-    compute_res1_water_pct_from_res4,
-    load_res4_metadata_by_h3,
+    compute_water_pct_from_children,
+    load_metadata_rows_by_h3,
     res4_metadata_path,
 )
 from .sampling import cell_polygon, _ensure_proj_data_env
@@ -48,13 +48,43 @@ LANDMASS_SPOT_CHECK_HEXES: dict[str, str] = {
 
 
 @dataclass(frozen=True)
-class Res1LandMassRecord:
-    """Precomputed land-mass metrics for one res-1 H3 cell."""
+class LandMassRecord:
+    """
+    Why this exists:
+        Hold continent, island, and water-fraction metrics for one strategic cell.
+    When to use:
+        Inside landmass export, before serializing a JSON row.
+    What to expect:
+        ``water_pct`` is 0–100. Id tuples are sorted and may be empty.
+    """
 
+    # Strategic H3 index this row describes.
     h3_index: str
+    # Percent of tactical children classified as water.
     water_pct: float
+    # Natural Earth ids of overlapping continent-tier polygons.
     continent_ids: tuple[int, ...]
+    # Natural Earth ids of overlapping islands that pass the area floor.
     island_ids: tuple[int, ...]
+
+
+@dataclass(frozen=True)
+class GeographyIndex:
+    """
+    Why this exists:
+        Keep continent and island polygons together with the spatial index used to query them.
+    When to use:
+        Pass one index into ``build_landmass_records``.
+    What to expect:
+        ``island_tree`` is ``None`` when no island passed the area floor.
+    """
+
+    # Continent and isthmus polygons.
+    continent_tier: tuple[RegionFeature, ...]
+    # Islands at or above the area floor used to build this index.
+    islands: tuple[RegionFeature, ...]
+    # Spatial index over island polygons, or None when ``islands`` is empty.
+    island_tree: STRtree | None
 
 
 def _generate_cells_for_resolution(resolution: int) -> list[str]:
@@ -66,6 +96,24 @@ def _generate_cells_for_resolution(resolution: int) -> list[str]:
 
 def _geography_regions_path(config: PipelineConfig) -> Path:
     return config.input_rasters.root / config.input_rasters.geography_regions_shapefile_name
+
+
+def load_geography_index(config: PipelineConfig, island_min_area_km2: float) -> GeographyIndex:
+    """
+    Why this exists:
+        Load continent and island polygons at the island floor a pack requires.
+    When to use:
+        Once per landmass export. Pass the global 2000 km² floor for the global pack.
+    What to expect:
+        Raises when the geography shapefile is missing or invalid. A smaller floor keeps more islands.
+    """
+
+    LOGGER.debug("Loading geography index (island_min_area_km2=%s).", island_min_area_km2)
+    geo_path = _geography_regions_path(config)
+    continent_tier, islands = load_geography_region_features(geo_path, island_min_area_km2)
+    island_geoms = [island.geometry_wgs84 for island in islands]
+    island_tree = STRtree(island_geoms) if island_geoms else None
+    return GeographyIndex(tuple(continent_tier), tuple(islands), island_tree)
 
 
 def _laea_transformer(lon: float, lat: float) -> Transformer:
@@ -171,7 +219,9 @@ def compute_res1_landmass_record(
     island_features: Sequence[RegionFeature],
     res4_metadata_by_h3: dict[str, dict[str, Any]],
     config: PipelineConfig,
-) -> Res1LandMassRecord:
+    *,
+    child_resolution: int = 4,
+) -> LandMassRecord:
     """
     Why this exists:
         Assemble one landmass row from geography region membership and res4-derived water fraction.
@@ -186,13 +236,14 @@ def compute_res1_landmass_record(
         island_tree,
         island_features,
     )
-    water_pct = compute_res1_water_pct_from_res4(
+    water_pct = compute_water_pct_from_children(
         h3_index,
         res4_metadata_by_h3,
         config.thresholds,
+        child_resolution=child_resolution,
         nodata_fallback=config.nodata_fallback_terrain,
     )
-    return Res1LandMassRecord(
+    return LandMassRecord(
         h3_index=h3_index,
         water_pct=water_pct,
         continent_ids=continent_ids,
@@ -200,7 +251,7 @@ def compute_res1_landmass_record(
     )
 
 
-def record_to_json_dict(record: Res1LandMassRecord) -> dict[str, Any]:
+def record_to_json_dict(record: LandMassRecord) -> dict[str, Any]:
     """Serialize one landmass row with stable key order."""
     return {
         "h3_index": record.h3_index,
@@ -210,14 +261,63 @@ def record_to_json_dict(record: Res1LandMassRecord) -> dict[str, Any]:
     }
 
 
+def build_landmass_records(
+    cells: Sequence[str],
+    geography: GeographyIndex,
+    child_rows_by_h3: dict[str, dict[str, Any]],
+    config: PipelineConfig,
+    *,
+    child_resolution: int,
+) -> list[LandMassRecord]:
+    """
+    Why this exists:
+        Compute landmass rows for an explicit strategic cell list.
+    When to use:
+        After the geography index and tactical metadata rows are loaded.
+    What to expect:
+        One record per cell, in input order. Logs progress every 100 cells.
+    """
+
+    LOGGER.debug("Building landmass records for %d cells (child_resolution=%d).", len(cells), child_resolution)
+    records: list[LandMassRecord] = []
+    for idx, h3_index in enumerate(cells):
+        if idx == 0 or (idx + 1) % 100 == 0:
+            LOGGER.debug("Computing landmass metrics: %d / %d cells.", idx + 1, len(cells))
+        records.append(
+            compute_res1_landmass_record(
+                h3_index,
+                geography.continent_tier,
+                geography.island_tree,
+                geography.islands,
+                child_rows_by_h3,
+                config,
+                child_resolution=child_resolution,
+            )
+        )
+    return records
+
+
 def build_landmass_envelope(
     *,
     records: Sequence[dict[str, Any]],
     island_min_area_km2: float,
+    resolution: int = 1,
+    water_pct_method: str = "res4_child_water_terrain_fraction",
+    water_pct_requires: tuple[str, ...] = ("terrain_res4_metadata.json",),
 ) -> dict[str, Any]:
+    """
+    Why this exists:
+        Wrap landmass rows in the envelope the global file already uses.
+    When to use:
+        Immediately before writing the landmass JSON.
+    What to expect:
+        Defaults reproduce the global resolution-1 envelope, including the water-percent method string.
+    """
+
+    LOGGER.debug("Building landmass envelope for %d records at resolution %d.", len(records), resolution)
     return {
         "schema_version": LANDMASS_SCHEMA_VERSION,
-        "resolution": 1,
+        "resolution": resolution,
         "generated_at_utc": datetime.now(UTC).isoformat(),
         "record_count": len(records),
         "polygon_source": {
@@ -228,14 +328,14 @@ def build_landmass_envelope(
             "island_min_area_km2": island_min_area_km2,
         },
         "water_pct_source": {
-            "method": "res4_child_water_terrain_fraction",
-            "requires": ["terrain_res4_metadata.json"],
+            "method": water_pct_method,
+            "requires": list(water_pct_requires),
         },
         "records": list(records),
     }
 
 
-def build_qa_summary(records: Sequence[Res1LandMassRecord]) -> dict[str, Any]:
+def build_qa_summary(records: Sequence[LandMassRecord]) -> dict[str, Any]:
     """Aggregate counts and named spot-check rows for manual review."""
     with_continents = sum(1 for r in records if r.continent_ids)
     with_islands = sum(1 for r in records if r.island_ids)
@@ -276,27 +376,16 @@ class LandMassExporter:
     def run(self) -> Path:
         LOGGER.debug("LandMassExporter.run starting.")
         cfg = self.config
-        geo_path = _geography_regions_path(cfg)
-        continent_tier, islands = load_geography_region_features(geo_path, cfg.island_min_area_km2)
-        island_geoms = [i.geometry_wgs84 for i in islands]
-        island_tree = STRtree(island_geoms) if island_geoms else None
-        res4_by_h3 = load_res4_metadata_by_h3(res4_metadata_path(cfg))
-
+        geography = load_geography_index(cfg, cfg.island_min_area_km2)
+        child_rows = load_metadata_rows_by_h3(res4_metadata_path(cfg))
         cells = _generate_cells_for_resolution(cfg.res_parent)
-        records: list[Res1LandMassRecord] = []
-        for idx, h3_index in enumerate(cells):
-            if idx == 0 or (idx + 1) % 100 == 0:
-                LOGGER.debug("Computing landmass metrics: %d / %d cells.", idx + 1, len(cells))
-            records.append(
-                compute_res1_landmass_record(
-                    h3_index,
-                    continent_tier,
-                    island_tree,
-                    islands,
-                    res4_by_h3,
-                    cfg,
-                )
-            )
+        records = build_landmass_records(
+            cells,
+            geography,
+            child_rows,
+            cfg,
+            child_resolution=cfg.res_child,
+        )
 
         json_records = [record_to_json_dict(r) for r in records]
         assert_corridor_water_pct_below_threshold(

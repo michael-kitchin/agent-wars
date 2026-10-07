@@ -33,13 +33,15 @@ from shapely.geometry import Point, shape
 from shapely.geometry.base import BaseGeometry
 from shapely.ops import transform
 
+from scripts.terrain_pipeline.geometry_bounds import bounds_intersect, clip_polygonal_to_bounds
+
 from .country_codes import build_country_code_by_adm0_a3, resolve_country_code
+from .naming_json_writers import write_strategic_naming_json, write_tactical_naming_json
 from .naming_tables import init_naming_tables as _init_tables
 from .water_names import normalize_water_name as _normalize_water_name
 
 LOGGER = logging.getLogger(__name__)
 
-SCHEMA_VERSION = "1.2.0"
 DEFAULT_DATA_ROOT = Path("F:/Data")
 DEFAULT_OUTPUT_RES1 = Path("data/generated/terrain_res1_naming.json")
 DEFAULT_OUTPUT_RES4 = Path("data/generated/terrain_res4_naming.json")
@@ -51,45 +53,40 @@ LAKES_SHP = "ne_10m_lakes.shp"
 MARINE_POLYS_SHP = "ne_10m_geography_marine_polys.shp"
 
 WGS84 = CRS.from_epsg(4326)
+
+
+@dataclass(frozen=True)
+class NamingScope:
+    """
+    Why this exists:
+        Carry the resolutions, cell lists, and optional clip for one naming export.
+    When to use:
+        Pass one scope into ``run_naming_export``. The global pack uses ``global_naming_scope``.
+    What to expect:
+        ``filter_cells`` limits inserts to the cell tuples. ``clip_bounds`` of ``None`` leaves polygons unclipped.
+    """
+
+    # H3 resolution for countries, states, and water at the strategic level.
+    strategic_resolution: int
+    # H3 resolution for the tactical file, including city points.
+    tactical_resolution: int
+    # Strategic cells to write, sorted.
+    strategic_cells: tuple[str, ...]
+    # Tactical cells to write, sorted.
+    tactical_cells: tuple[str, ...]
+    # When True, rows outside the cell sets above are skipped on insert.
+    filter_cells: bool
+    # WGS84 bounds for clipping polygons before H3 overlap. None means no clip.
+    clip_bounds: tuple[float, float, float, float] | None
+
+
+# Canonical shapefile fields each layer must provide. Lookup is case-insensitive.
 REQUIRED_FIELDS_BY_LAYER: dict[str, tuple[str, ...]] = {
     "countries": ("name", "continent", "subregion", "pop_est", "scalerank", "adm0_a3", "iso_a2", "iso_a2_eh"),
     "states": ("name", "admin", "scalerank", "adm0_a3"),
     "cities": ("name", "adm1name", "adm0name", "pop_max", "scalerank", "adm0_a3", "iso_a2"),
     "water": ("name", "scalerank"),
 }
-
-
-@dataclass
-class RowGroupCursor:
-    """
-    Why this exists:
-        Stream grouped SQLite rows by H3 cell without loading all rows into memory.
-    When to use:
-        While writing very large JSON outputs for all global hexes.
-    What to expect:
-        `take_for_cell` returns the grouped rows for the requested cell or an empty list.
-    """
-
-    iterator: Iterator[tuple[str, Any]]
-    current: tuple[str, Any] | None = None
-
-    def take_for_cell(self, cell: str) -> list[Any]:
-        """
-        Why this exists:
-            Return rows for one cell while preserving sorted-stream order.
-        When to use:
-            Per-cell JSON assembly in output writing loops.
-        What to expect:
-            Returns sorted rows for `cell` and advances the internal iterator.
-        """
-
-        rows: list[Any] = []
-        while self.current is not None and self.current[0] < cell:
-            self.current = next(self.iterator, None)
-        while self.current is not None and self.current[0] == cell:
-            rows.append(self.current[1])
-            self.current = next(self.iterator, None)
-        return rows
 
 
 def configure_logging(verbose: bool) -> None:
@@ -253,16 +250,81 @@ def _load_country_code_by_adm0_a3(countries_path: Path) -> dict[str, str | None]
         )
 
 
+def _scope_id_sets(scope: NamingScope) -> tuple[frozenset[str] | None, frozenset[str] | None]:
+    """
+    Why this exists:
+        Build the strategic and tactical membership sets once per insert, not once per feature.
+    When to use:
+        At the start of each insert function.
+    What to expect:
+        ``(None, None)`` when filtering is off, which keeps every overlap cell.
+    """
+
+    if not scope.filter_cells:
+        return None, None
+    return frozenset(scope.strategic_cells), frozenset(scope.tactical_cells)
+
+
+def _clip_for_scope(geom: BaseGeometry, scope: NamingScope) -> BaseGeometry | None:
+    """
+    Why this exists:
+        Limit polygon overlap work to a regional box without changing the global path.
+    When to use:
+        Before ``_h3_overlap_cells`` for country, state, and water polygons.
+    What to expect:
+        The original geometry when ``clip_bounds`` is ``None``. ``None`` when the feature misses the box
+        or the clip is empty.
+    """
+
+    if scope.clip_bounds is None:
+        return geom
+    if not bounds_intersect(geom.bounds, scope.clip_bounds):
+        return None
+    clipped = clip_polygonal_to_bounds(geom, scope.clip_bounds)
+    if clipped.is_empty:
+        return None
+    return clipped
+
+
+def _scoped_overlap_cells(
+    geom: BaseGeometry,
+    scope: NamingScope,
+    strategic_ids: frozenset[str] | None,
+    tactical_ids: frozenset[str] | None,
+) -> tuple[list[str], list[str]]:
+    """
+    Why this exists:
+        Map one polygon to strategic and tactical cells under the scope's filters.
+    When to use:
+        Inside country, state, and water inserts.
+    What to expect:
+        Two lists. A strategic cell is kept only against ``strategic_ids``, and a tactical cell only
+        against ``tactical_ids``. The lists are empty when the clip drops the polygon.
+    """
+
+    prepared = _clip_for_scope(geom, scope)
+    if prepared is None:
+        return [], []
+    strategic_cells = _h3_overlap_cells(prepared, scope.strategic_resolution)
+    tactical_cells = _h3_overlap_cells(prepared, scope.tactical_resolution)
+    if strategic_ids is not None:
+        strategic_cells = [cell for cell in strategic_cells if cell in strategic_ids]
+    if tactical_ids is not None:
+        tactical_cells = [cell for cell in tactical_cells if cell in tactical_ids]
+    return strategic_cells, tactical_cells
+
+
 def _insert_countries(
     conn: sqlite3.Connection,
     countries_path: Path,
     *,
     code_by_adm0_a3: dict[str, str | None],
-    res4_cell_filter: set[str] | None = None,
+    scope: NamingScope,
 ) -> None:
     if not countries_path.is_file():
         raise FileNotFoundError(f"Country shapefile not found: {countries_path}")
     LOGGER.debug("Loading countries from %s", countries_path)
+    strategic_ids, tactical_ids = _scope_id_sets(scope)
     with fiona.open(countries_path) as src:
         xy_transform = _feature_transformer(src)
         schema_props = (src.schema or {}).get("properties") or {}
@@ -283,10 +345,7 @@ def _insert_countries(
                 if geom_wgs84 is None:
                     continue
 
-                cells_res1 = _h3_overlap_cells(geom_wgs84, 1)
-                cells_res4 = _h3_overlap_cells(geom_wgs84, 4)
-                if res4_cell_filter is not None:
-                    cells_res4 = [cell for cell in cells_res4 if cell in res4_cell_filter]
+                cells_res1, cells_res4 = _scoped_overlap_cells(geom_wgs84, scope, strategic_ids, tactical_ids)
                 conn.executemany(
                     """
                     INSERT OR IGNORE INTO countries_res1(cell, name, continent, region, population, scalerank, country_code)
@@ -310,11 +369,12 @@ def _insert_states(
     states_path: Path,
     *,
     code_by_adm0_a3: dict[str, str | None],
-    res4_cell_filter: set[str] | None = None,
+    scope: NamingScope,
 ) -> None:
     if not states_path.is_file():
         raise FileNotFoundError(f"State shapefile not found: {states_path}")
     LOGGER.debug("Loading states from %s", states_path)
+    strategic_ids, tactical_ids = _scope_id_sets(scope)
     with fiona.open(states_path) as src:
         xy_transform = _feature_transformer(src)
         schema_props = (src.schema or {}).get("properties") or {}
@@ -333,10 +393,7 @@ def _insert_states(
                 if geom_wgs84 is None:
                     continue
 
-                cells_res1 = _h3_overlap_cells(geom_wgs84, 1)
-                cells_res4 = _h3_overlap_cells(geom_wgs84, 4)
-                if res4_cell_filter is not None:
-                    cells_res4 = [cell for cell in cells_res4 if cell in res4_cell_filter]
+                cells_res1, cells_res4 = _scoped_overlap_cells(geom_wgs84, scope, strategic_ids, tactical_ids)
                 conn.executemany(
                     """
                     INSERT OR IGNORE INTO states_res1(cell, name, country, scalerank, country_code)
@@ -360,11 +417,12 @@ def _insert_cities(
     cities_path: Path,
     *,
     code_by_adm0_a3: dict[str, str | None],
-    res4_cell_filter: set[str] | None = None,
+    scope: NamingScope,
 ) -> None:
     if not cities_path.is_file():
         raise FileNotFoundError(f"City shapefile not found: {cities_path}")
     LOGGER.debug("Loading cities from %s", cities_path)
+    _strategic_ids, tactical_ids = _scope_id_sets(scope)
     with fiona.open(cities_path) as src:
         xy_transform = _feature_transformer(src)
         schema_props = (src.schema or {}).get("properties") or {}
@@ -383,10 +441,10 @@ def _insert_cities(
                 geom_wgs84 = _feature_geometry_wgs84(feature.get("geometry"), xy_transform)
                 if geom_wgs84 is None:
                     continue
-                cell = _h3_cell_for_city_point(geom_wgs84, 4)
+                cell = _h3_cell_for_city_point(geom_wgs84, scope.tactical_resolution)
                 if cell is None:
                     continue
-                if res4_cell_filter is not None and cell not in res4_cell_filter:
+                if tactical_ids is not None and cell not in tactical_ids:
                     continue
 
                 code = resolve_country_code(props.get(fields["adm0_a3"]), props.get(fields["iso_a2"]), code_by_adm0_a3)
@@ -406,7 +464,7 @@ def _insert_water(
     water_path: Path,
     water_type: str,
     *,
-    res4_cell_filter: set[str] | None = None,
+    scope: NamingScope,
 ) -> None:
     """
     Why this exists:
@@ -420,6 +478,7 @@ def _insert_water(
     if not water_path.is_file():
         raise FileNotFoundError(f"Water shapefile not found: {water_path}")
     LOGGER.debug("Loading water (%s) from %s", water_type, water_path)
+    strategic_ids, tactical_ids = _scope_id_sets(scope)
     with fiona.open(water_path) as src:
         xy_transform = _feature_transformer(src)
         schema_props = (src.schema or {}).get("properties") or {}
@@ -437,10 +496,7 @@ def _insert_water(
                 if geom_wgs84 is None:
                     continue
 
-                cells_res1 = _h3_overlap_cells(geom_wgs84, 1)
-                cells_res4 = _h3_overlap_cells(geom_wgs84, 4)
-                if res4_cell_filter is not None:
-                    cells_res4 = [cell for cell in cells_res4 if cell in res4_cell_filter]
+                cells_res1, cells_res4 = _scoped_overlap_cells(geom_wgs84, scope, strategic_ids, tactical_ids)
                 conn.executemany(
                     """
                     INSERT OR IGNORE INTO water_res1(cell, name, type, scalerank)
@@ -459,182 +515,6 @@ def _insert_water(
                     LOGGER.debug("Processed %d %s water features.", idx, water_type)
 
 
-def _group_rows(
-    rows: Iterable[tuple[str, Any]],
-) -> Iterator[tuple[str, Any]]:
-    for row in rows:
-        yield row[0], row[1]
-
-
-def _make_group_cursor(rows: Iterable[tuple[str, Any]]) -> RowGroupCursor:
-    iterator = _group_rows(rows)
-    first = next(iterator, None)
-    return RowGroupCursor(iterator=iterator, current=first)
-
-
-def _write_pretty_record(f: TextIO, record: dict[str, Any], *, line_prefix: str = "    ") -> None:
-    """
-    Why this exists:
-        Emit one array element as multi-line pretty JSON while streaming large files.
-    When to use:
-        Inside `_write_res1_json` / `_write_res4_json` for each `records` entry.
-    What to expect:
-        Writes `json.dumps(..., indent=2)` with every line prefixed for correct nesting.
-    """
-
-    for line in json.dumps(record, ensure_ascii=False, indent=2).split("\n"):
-        f.write(f"{line_prefix}{line}\n")
-
-
-def _write_res1_json(conn: sqlite3.Connection, cells: list[str], out_path: Path) -> None:
-    states_cursor = _make_group_cursor(
-        conn.execute(
-            """
-            SELECT cell, json_object(
-                'name', name, 'country', country, 'scalerank', scalerank, 'country_code', country_code
-            )
-            FROM states_res1
-            ORDER BY cell ASC, scalerank ASC, name ASC
-            """
-        )
-    )
-    countries_cursor = _make_group_cursor(
-        conn.execute(
-            """
-            SELECT cell, json_object(
-                'name', name,
-                'continent', continent,
-                'region', region,
-                'population', population,
-                'scalerank', scalerank,
-                'country_code', country_code
-            )
-            FROM countries_res1
-            ORDER BY cell ASC, scalerank ASC, name ASC
-            """
-        )
-    )
-    water_cursor = _make_group_cursor(
-        conn.execute(
-            """
-            SELECT cell, json_object('name', name, 'type', type, 'scalerank', scalerank)
-            FROM water_res1
-            ORDER BY cell ASC, scalerank ASC, name ASC
-            """
-        )
-    )
-
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    generated_at = datetime.now(UTC).isoformat()
-    with out_path.open("w", encoding="utf-8", newline="\n") as f:
-        f.write("{\n")
-        f.write(f'  "schema_version": "{SCHEMA_VERSION}",\n')
-        f.write('  "resolution": 1,\n')
-        f.write(f'  "generated_at_utc": {json.dumps(generated_at)},\n')
-        f.write(f'  "record_count": {len(cells)},\n')
-        f.write('  "records": [\n')
-        first = True
-        for idx, cell in enumerate(cells, start=1):
-            states = [json.loads(v) for v in states_cursor.take_for_cell(cell)]
-            countries = [json.loads(v) for v in countries_cursor.take_for_cell(cell)]
-            water = [json.loads(v) for v in water_cursor.take_for_cell(cell)]
-            record = {"h3_index": cell, "states": states, "countries": countries, "water": water}
-            if not first:
-                f.write(",\n")
-            _write_pretty_record(f, record)
-            first = False
-            if idx % 100000 == 0:
-                LOGGER.debug("Wrote %d/%d res1 records.", idx, len(cells))
-        f.write("\n  ]\n")
-        f.write("}\n")
-
-
-def _write_res4_json(conn: sqlite3.Connection, cells: list[str], out_path: Path) -> None:
-    cities_cursor = _make_group_cursor(
-        conn.execute(
-            """
-            SELECT cell, json_object(
-                'name', name,
-                'state', state,
-                'country', country,
-                'population', population,
-                'scalerank', scalerank,
-                'country_code', country_code
-            )
-            FROM cities_res4
-            ORDER BY cell ASC, scalerank ASC, name ASC
-            """
-        )
-    )
-    states_cursor = _make_group_cursor(
-        conn.execute(
-            """
-            SELECT cell, json_object(
-                'name', name, 'country', country, 'scalerank', scalerank, 'country_code', country_code
-            )
-            FROM states_res4
-            ORDER BY cell ASC, scalerank ASC, name ASC
-            """
-        )
-    )
-    countries_cursor = _make_group_cursor(
-        conn.execute(
-            """
-            SELECT cell, json_object(
-                'name', name,
-                'continent', continent,
-                'region', region,
-                'population', population,
-                'scalerank', scalerank,
-                'country_code', country_code
-            )
-            FROM countries_res4
-            ORDER BY cell ASC, scalerank ASC, name ASC
-            """
-        )
-    )
-    water_cursor = _make_group_cursor(
-        conn.execute(
-            """
-            SELECT cell, json_object('name', name, 'type', type, 'scalerank', scalerank)
-            FROM water_res4
-            ORDER BY cell ASC, scalerank ASC, name ASC
-            """
-        )
-    )
-
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    generated_at = datetime.now(UTC).isoformat()
-    with out_path.open("w", encoding="utf-8", newline="\n") as f:
-        f.write("{\n")
-        f.write(f'  "schema_version": "{SCHEMA_VERSION}",\n')
-        f.write('  "resolution": 4,\n')
-        f.write(f'  "generated_at_utc": {json.dumps(generated_at)},\n')
-        f.write(f'  "record_count": {len(cells)},\n')
-        f.write('  "records": [\n')
-        first = True
-        for idx, cell in enumerate(cells, start=1):
-            cities = [json.loads(v) for v in cities_cursor.take_for_cell(cell)]
-            states = [json.loads(v) for v in states_cursor.take_for_cell(cell)]
-            countries = [json.loads(v) for v in countries_cursor.take_for_cell(cell)]
-            water = [json.loads(v) for v in water_cursor.take_for_cell(cell)]
-            record = {
-                "h3_index": cell,
-                "cities": cities,
-                "states": states,
-                "countries": countries,
-                "water": water,
-            }
-            if not first:
-                f.write(",\n")
-            _write_pretty_record(f, record)
-            first = False
-            if idx % 100000 == 0:
-                LOGGER.debug("Wrote %d/%d res4 records.", idx, len(cells))
-        f.write("\n  ]\n")
-        f.write("}\n")
-
-
 def run_pipeline(
     *,
     data_root: Path,
@@ -651,35 +531,84 @@ def run_pipeline(
         Writes `terrain_res1_naming.json` and `terrain_res4_naming.json` with stable row ordering.
     """
 
+    scope = global_naming_scope(max_child_cells)
+    run_naming_export(
+        data_root=data_root,
+        scope=scope,
+        output_strategic=output_res1,
+        output_tactical=output_res4,
+    )
+
+
+def global_naming_scope(max_child_cells: int | None) -> NamingScope:
+    """
+    Why this exists:
+        Build the cell lists the global naming files use, including the optional tactical cap.
+    When to use:
+        From ``run_pipeline`` before ``run_naming_export``.
+    What to expect:
+        Strategic cells are the full resolution-1 set even when tactical cells are capped.
+        ``filter_cells`` is true only when the tactical list is capped. ``clip_bounds`` is ``None``.
+    """
+
+    LOGGER.debug("Building global naming scope (max_child_cells=%s).", max_child_cells)
+    strategic_cells = tuple(_generate_cells_for_resolution(1))
+    tactical_cells = _generate_cells_for_resolution(4)
+    if max_child_cells is not None:
+        tactical_cells = tactical_cells[: max(0, max_child_cells)]
+    LOGGER.info("Prepared %d res1 cells and %d res4 cells.", len(strategic_cells), len(tactical_cells))
+    return NamingScope(
+        strategic_resolution=1,
+        tactical_resolution=4,
+        strategic_cells=strategic_cells,
+        tactical_cells=tuple(tactical_cells),
+        filter_cells=max_child_cells is not None,
+        clip_bounds=None,
+    )
+
+
+def run_naming_export(
+    *,
+    data_root: Path,
+    scope: NamingScope,
+    output_strategic: Path,
+    output_tactical: Path,
+) -> None:
+    """
+    Why this exists:
+        Insert Natural Earth rows for one scope and write both naming files.
+    When to use:
+        After ``NamingScope`` is known, for the global pack or a regional pack.
+    What to expect:
+        Writes the two JSON files. Raises ``FileNotFoundError`` when a shapefile is missing.
+    """
+
+    LOGGER.debug(
+        "Running naming export for resolutions %d/%d (%d strategic cells, %d tactical cells).",
+        scope.strategic_resolution,
+        scope.tactical_resolution,
+        len(scope.strategic_cells),
+        len(scope.tactical_cells),
+    )
     countries_path = data_root / COUNTRIES_SHP
     states_path = data_root / STATES_SHP
     cities_path = data_root / CITIES_SHP
     lakes_path = data_root / LAKES_SHP
     marine_polys_path = data_root / MARINE_POLYS_SHP
-
-    LOGGER.debug("Generating global H3 cell lists for resolutions 1 and 4.")
-    res1_cells = _generate_cells_for_resolution(1)
-    res4_cells = _generate_cells_for_resolution(4)
-    if max_child_cells is not None:
-        res4_cells = res4_cells[: max(0, max_child_cells)]
-    LOGGER.info("Prepared %d res1 cells and %d res4 cells.", len(res1_cells), len(res4_cells))
-
     conn, temp_dir = _open_temp_db()
     try:
         LOGGER.debug("Using temporary SQLite database at %s.", temp_dir)
         _init_tables(conn)
-        res4_cell_filter = set(res4_cells) if max_child_cells is not None else None
         code_by_adm0_a3 = _load_country_code_by_adm0_a3(countries_path)
-        _insert_countries(conn, countries_path, code_by_adm0_a3=code_by_adm0_a3, res4_cell_filter=res4_cell_filter)
-        _insert_states(conn, states_path, code_by_adm0_a3=code_by_adm0_a3, res4_cell_filter=res4_cell_filter)
-        _insert_cities(conn, cities_path, code_by_adm0_a3=code_by_adm0_a3, res4_cell_filter=res4_cell_filter)
-        _insert_water(conn, lakes_path, "lake", res4_cell_filter=res4_cell_filter)
-        _insert_water(conn, marine_polys_path, "ocean", res4_cell_filter=res4_cell_filter)
-
-        LOGGER.info("Writing res1 naming JSON to %s", output_res1)
-        _write_res1_json(conn, res1_cells, output_res1)
-        LOGGER.info("Writing res4 naming JSON to %s", output_res4)
-        _write_res4_json(conn, res4_cells, output_res4)
+        _insert_countries(conn, countries_path, code_by_adm0_a3=code_by_adm0_a3, scope=scope)
+        _insert_states(conn, states_path, code_by_adm0_a3=code_by_adm0_a3, scope=scope)
+        _insert_cities(conn, cities_path, code_by_adm0_a3=code_by_adm0_a3, scope=scope)
+        _insert_water(conn, lakes_path, "lake", scope=scope)
+        _insert_water(conn, marine_polys_path, "ocean", scope=scope)
+        LOGGER.info("Writing res1 naming JSON to %s", output_strategic)
+        write_strategic_naming_json(conn, list(scope.strategic_cells), output_strategic, resolution=scope.strategic_resolution)
+        LOGGER.info("Writing res4 naming JSON to %s", output_tactical)
+        write_tactical_naming_json(conn, list(scope.tactical_cells), output_tactical, resolution=scope.tactical_resolution)
     finally:
         conn.close()
         shutil.rmtree(temp_dir, ignore_errors=True)

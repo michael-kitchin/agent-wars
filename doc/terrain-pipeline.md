@@ -51,6 +51,10 @@ Parent-child mapping is H3's native hierarchy (res 1 → res 4 spans three steps
 - Not a live GIS query at play time. Regeneration is an offline `npm run terrain:generate` (metadata CLI, then road/rail sides). High-fidelity road/rail and vector CLIs are separate npm scripts (see root `package.json`).
 - Not player-facing save data. Destroyed urban/airports/seaports are match state on top of the generated baseline.
 
+## Regional Packs
+
+Regional maps live under `data/generated/regions/<region_id>/`. Each folder holds a manifest plus strategic (`res_s`) and tactical (`res_t`) JSON. The app does not load these packs yet. The runbook is [scripts/regional_pipeline/README.md](../scripts/regional_pipeline/README.md).
+
 ## Related
 
 - Movement, combat, and weather: [combat-rules-v3.md](combat-rules-v3.md) §4.9 and §12

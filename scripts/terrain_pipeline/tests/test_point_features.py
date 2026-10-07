@@ -12,6 +12,7 @@ from scripts.terrain_pipeline.point_features import (
     SCALERANK_SENTINEL,
     LabeledPoint,
     PointCountIndex,
+    build_pair_indexes,
     load_filtered_points_wgs84,
     normalize_scalerank,
     validate_point_shapefile_contract,
@@ -71,6 +72,24 @@ class PointFeatureTests(unittest.TestCase):
                 )
             with self.assertRaises(ValueError):
                 validate_point_shapefile_contract(path, featurecla_value="Seaport")
+
+    def test_build_pair_indexes_rejects_ports_file_with_no_port_features(self) -> None:
+        schema = {
+            "geometry": "Point",
+            "properties": {"featurecla": "str", "scalerank": "str"},
+        }
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            for name, label in (("airports.shp", "Airport"), ("ports.shp", "Seaport")):
+                with fiona.open(root / name, "w", driver="ESRI Shapefile", crs="EPSG:4326", schema=schema) as dst:
+                    dst.write(
+                        {
+                            "geometry": mapping(Point(1.0, 1.0)),
+                            "properties": {"featurecla": label, "scalerank": "1"},
+                        }
+                    )
+            with self.assertRaises(ValueError):
+                build_pair_indexes(root, "airports.shp", "ports.shp", (4,))
 
     def test_point_count_index_totals_match_sparse_rows(self) -> None:
         points = [

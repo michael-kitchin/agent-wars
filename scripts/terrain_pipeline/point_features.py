@@ -220,13 +220,24 @@ def build_pair_indexes(
     When to use:
         Start of ``TerrainMetadataExporter.run``.
     What to expect:
-        Raises on missing files; empty indexes if no matching features.
+        Raises on a missing file. Raises ``ValueError`` when the ports file has no ``Port`` features, so a wrong label stops the export before the cell loop.
     """
 
+    LOGGER.debug(
+        "build_pair_indexes root=%s airports=%s seaports=%s resolutions=%s.",
+        config_root,
+        airport_filename,
+        seaport_filename,
+        tuple(resolutions),
+    )
     airport_path = config_root / airport_filename
     seaport_path = config_root / seaport_filename
     airports = load_filtered_points_wgs84(airport_path, featurecla_value="Airport")
-    seaports = load_filtered_points_wgs84(seaport_path, featurecla_value="Seaport")
+    seaports = load_filtered_points_wgs84(seaport_path, featurecla_value="Port")
+    if not seaports:
+        message = f"Point shapefile {seaport_path} has no features with featurecla='Port'."
+        LOGGER.error(message)
+        raise ValueError(message)
     air_idx = PointCountIndex(resolutions)
     seaport_idx = PointCountIndex(resolutions)
     air_idx.ingest_points(airports)

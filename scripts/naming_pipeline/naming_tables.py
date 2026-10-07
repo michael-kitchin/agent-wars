@@ -1,4 +1,7 @@
-"""Temporary SQLite tables the hex-naming generator fills before it writes JSON."""
+"""Temporary SQLite tables the hex-naming generator fills before it writes JSON.
+
+The ``res1`` tables hold strategic rows and the ``res4`` tables hold tactical rows, for any resolution pair.
+"""
 
 from __future__ import annotations
 

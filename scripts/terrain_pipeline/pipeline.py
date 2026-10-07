@@ -135,7 +135,7 @@ class TerrainPipeline:
             )
             port_count = validate_point_shapefile_contract(
                 seaport_path,
-                featurecla_value="Seaport",
+                featurecla_value="Port",
             )
         except Exception as exc:
             LOGGER.error(

@@ -1,8 +1,8 @@
 /* eslint-disable no-console */
 const fs = require('fs');
 const path = require('path');
-const { spawnSync } = require('child_process');
 const { resolvePythonExecutable } = require('./resolve-python.cjs');
+const { zipJsonFile } = require('./generated-data-zip-helpers.cjs');
 
 const { GENERATED_TERRAIN_JSON_FILES } = require('./generated-data-manifest.cjs');
 
@@ -10,27 +10,6 @@ const generatedDir = path.join(process.cwd(), 'data', 'generated');
 
 /** JSON blobs under data/generated that we archive for git + extract at build time (see extract-generated-data.cjs). */
 const GENERATED_JSON_TO_ZIP = GENERATED_TERRAIN_JSON_FILES;
-
-function zipJsonFile(pythonCmd, jsonFilename) {
-  const zipFilename = `${jsonFilename}.zip`;
-  const py = [
-    'import zipfile, pathlib',
-    `base = pathlib.Path(r'''${generatedDir}''')`,
-    `src = base / r'''${jsonFilename}'''`,
-    `dst = base / r'''${zipFilename}'''`,
-    'with zipfile.ZipFile(dst, "w", compression=zipfile.ZIP_DEFLATED) as zf:',
-    `    zf.write(src, arcname=r'''${jsonFilename}''')`,
-  ].join('\n');
-  const result = spawnSync(pythonCmd, ['-c', py], {
-    cwd: generatedDir,
-    encoding: 'utf8',
-  });
-  if (result.status !== 0) {
-    const detail = result.stderr || result.stdout || 'unknown zip error';
-    throw new Error(`zip-generated-data: failed to archive ${jsonFilename}: ${detail}`.trim());
-  }
-  console.log(`zipped ${jsonFilename} -> ${zipFilename}`);
-}
 
 function main() {
   if (!fs.existsSync(generatedDir)) {
@@ -55,7 +34,7 @@ function main() {
       'zip-generated-data: no Python found. Install Python 3 and ensure `python3` or `python` is on PATH, or set PYTHON to the interpreter path.',
     );
   }
-  for (const jsonFilename of present) zipJsonFile(pythonCmd, jsonFilename);
+  for (const jsonFilename of present) zipJsonFile(pythonCmd, generatedDir, jsonFilename);
 }
 
 try {

@@ -43,6 +43,16 @@ class OceanMaskTests(unittest.TestCase):
             outside = box(10.0, 10.0, 12.0, 12.0)
             self.assertEqual("no_water", ocean_relation_for_cell_polygons(outside, ocean_ctx))
 
+    def test_empty_mask_reports_no_water(self) -> None:
+        context = build_ocean_predicate_context(Polygon())
+        geom = box(-1.0, -1.0, 1.0, 1.0)
+        self.assertEqual("no_water", ocean_relation_for_cell_polygons(geom, context))
+        metrics = mask_metrics_for_cell_polygon(geom, context)
+        self.assertFalse(metrics.intersects)
+        self.assertFalse(metrics.all_in_mask)
+        self.assertEqual(0, metrics.mask_edges)
+        self.assertGreaterEqual(metrics.total_edges, 3)
+
     def test_mask_metrics_align_with_ocean_relation(self) -> None:
         schema = {"geometry": "Polygon", "properties": {"id": "int"}}
         with tempfile.TemporaryDirectory() as td:
@@ -74,6 +84,7 @@ class OceanMaskTests(unittest.TestCase):
                 elif expected == "no_water":
                     self.assertFalse(m.all_in_mask)
                     self.assertFalse(m.intersects)
+                    self.assertEqual(0, m.mask_edges)
                 else:
                     self.assertFalse(m.all_in_mask)
                     self.assertTrue(m.intersects)

@@ -5,12 +5,8 @@ import unittest
 from pathlib import Path
 
 from scripts.terrain_pipeline.config import ClassifierThresholds, InputRasterSet, PipelineConfig
-from scripts.terrain_pipeline.metadata_pipeline import (
-    TerrainMetadataExporter,
-    _open_required_rasters,
-    _water_context_for_resolution,
-    compose_forest_mean,
-)
+from scripts.terrain_pipeline.metadata_export_core import load_metadata_mask_sources, open_metadata_rasters
+from scripts.terrain_pipeline.metadata_pipeline import TerrainMetadataExporter, compose_forest_mean
 
 
 class MetadataForestMeanTests(unittest.TestCase):
@@ -33,14 +29,14 @@ class MetadataPipelineFailureTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             cfg = PipelineConfig(input_rasters=InputRasterSet(root=Path(td)))
             with self.assertRaises(FileNotFoundError):
-                _water_context_for_resolution(cfg, cfg.res_parent)
+                load_metadata_mask_sources(cfg)
 
     def test_missing_raster_fails(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             cfg = PipelineConfig(input_rasters=InputRasterSet(root=Path(td)))
-            with self.assertLogs("scripts.terrain_pipeline.metadata_pipeline", level="ERROR"):
+            with self.assertLogs("scripts.terrain_pipeline.metadata_export_core", level="ERROR"):
                 with self.assertRaises(Exception):
-                    _open_required_rasters(cfg)
+                    open_metadata_rasters(cfg)
 
     def test_invalid_thresholds_fail_fast(self) -> None:
         cfg = PipelineConfig(
