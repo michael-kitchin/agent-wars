@@ -80,7 +80,7 @@ export function buildDefaultTacticalBattleActivationSideEffects(
     setPhasePlanning: (planning) => {
       S.tacticalPhasePlanning = planning;
     },
-    enterRes4View: enterTacticalMapView,
+    enterTacticalView: enterTacticalMapView,
     setStrategicSidebarTactical: tacticalApplyStrategicSidebarForTacticalMode,
     refreshTacticalExitHud: tacticalUpdateExitButtonVisibility,
     scheduleAnnihilationExit: bindings.scheduleAnnihilationExit,
@@ -95,7 +95,7 @@ export function buildDefaultTacticalBattleActivationSideEffects(
  * Dependency bundle for `startTacticalBattleFromEntryHex` so parameter parsing tools see a single function-body `{`.
  *
  * Contract: Mirrors the renderer bootstrap wiring for magnifier-driven tactical IPC without importing `renderer.ts`.
- * When to use: Passed from `renderer.ts` when launching tactical battles from contested res1 hexes.
+ * When to use: Passed from `renderer.ts` when launching tactical battles from contested strategic hexes.
  * Expected outcome: IPC availability, popup suppression, and activation side-effect factory are all explicit.
  * Exceptions: None.
  */
@@ -105,7 +105,7 @@ export type StartTacticalBattleFromEntryHexDeps = {
   getActivationSideEffects: () => TacticalRendererStartBattleSideEffects;
   onMissingStartTacticalBattleIpc: () => void;
   /**
-   * Runs immediately before tactical activation so magnifier entry matches the melee-intercept Fight → `tacticalAutoStartRes1H3Index` path (clear drafts, reload standing orders from main, refresh strategic sidebars).
+   * Runs immediately before tactical activation so magnifier entry matches the melee-intercept Fight → `tacticalAutoStartStrategicH3Index` path (clear drafts, reload standing orders from main, refresh strategic sidebars).
    *
    * Purpose: Keeps the right-hand orders panel aligned with main state and emptied for tactical drafts once `stashStrategicOrderDraftsForTacticalSession` runs inside activation.
    * When to use: Wired from the renderer; omit only in tests that stub tactical IPC without strategic UI.
@@ -116,15 +116,15 @@ export type StartTacticalBattleFromEntryHexDeps = {
 };
 
 /**
- * IPC + UI preflight for starting tactical battle from a contested res1 magnifier target.
+ * IPC + UI preflight for starting tactical battle from a contested strategic magnifier target.
  *
  * Contract: Invokes `tacticalRendererApplyStartBattleIpcResult` with fresh activation side effects.
  * When to use: Map hit-testing and direct `.tactical-entry-btn` clicks after `hideBuildPopup` is appropriate.
- * Expected outcome: Tactical res4 mode on success; error toasts preserve milestone-2.1 messaging.
+ * Expected outcome: Tactical tactical mode on success; error toasts preserve milestone-2.1 messaging.
  * Exceptions: None; missing IPC short-circuits through `onMissingStartTacticalBattleIpc`.
  */
 export async function startTacticalBattleFromEntryHex(
-  enclosingRes1H3Index: string,
+  enclosingStrategicH3Index: string,
   deps: StartTacticalBattleFromEntryHexDeps
 ): Promise<void> {
   if (deps.prepareStrategicUiBeforeTacticalStart) {
@@ -132,7 +132,7 @@ export async function startTacticalBattleFromEntryHex(
   }
   const resumedSession =
     S.gameState?.tacticalBattleSession &&
-    S.gameState.tacticalBattleSession.enclosingRes1H3Index === enclosingRes1H3Index &&
+    S.gameState.tacticalBattleSession.enclosingStrategicH3Index === enclosingStrategicH3Index &&
     !S.tacticalBattleSnapshot
       ? S.gameState.tacticalBattleSession
       : null;
@@ -147,7 +147,7 @@ export async function startTacticalBattleFromEntryHex(
     return;
   }
   deps.hideBuildPopup();
-  const result: StartTacticalBattleIpcResult = await ipc({ enclosingRes1H3Index });
+  const result: StartTacticalBattleIpcResult = await ipc({ enclosingStrategicH3Index });
   tacticalRendererApplyStartBattleIpcResult(result, deps.getActivationSideEffects());
 }
 
@@ -156,7 +156,7 @@ export async function startTacticalBattleFromEntryHex(
  *
  * Contract: Does not perform IPC; assumes strategic `getGameState` already validated the snapshot.
  * When to use: `applyGameStateSnapshot` when `nextState.tacticalBattleSession` attaches a battle the renderer lacked.
- * Expected outcome: Tactical HUD and res4 bounds match a freshly started tactical session.
+ * Expected outcome: Tactical HUD and tactical bounds match a freshly started tactical session.
  * Exceptions: None.
  */
 export function activateRestoredTacticalBattleFromMainSnapshot(

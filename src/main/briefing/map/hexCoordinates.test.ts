@@ -1,9 +1,9 @@
 /**
- * Contract tests for the global strategic res1 hex-code registry (Phase 1 style).
+ * Contract tests for the global strategic hex-code registry (Phase 1 style).
  *
  * Purpose: Guards uniqueness, full round-trip coverage, and deterministic rebuild behavior without coupling to OpenRouter.
  * When to use: Run via `npm test` after `build:main`; failures indicate registry ordering or H3 enumeration drift.
- * Expected outcome: Every strategic res1 cell maps to a distinct code and survives explicit re-initialization.
+ * Expected outcome: Every strategic cell maps to a distinct code and survives explicit re-initialization.
  * Exceptions: None; assertions surface regressions as test failures.
  */
 
@@ -13,7 +13,7 @@ import {
   getHexCodeForContext,
   getH3IndexForCode,
   initStrategicCoordinateRegistry,
-  listStrategicRes1H3Indexes,
+  listStrategicH3Indexes,
 } from './hexCoordinates';
 
 /**
@@ -27,31 +27,31 @@ import {
 const STRATEGIC_CTX = { mode: 'strategic' as const };
 
 /**
- * Defines the `testStrategicCodesAreUniqueAcrossAllRes1Cells` function shape (function testStrategicCodesAreUniqueAcrossAllRes1Cells(): void).
+ * Defines the `testStrategicCodesAreUniqueAcrossAllStrategicCells` function shape (function testStrategicCodesAreUniqueAcrossAllStrategicCells(): void).
 
- * Purpose: Ensures the 2-character code space is not reused across the full strategic Earth res1 set.
+ * Purpose: Ensures the 2-character code space is not reused across the full strategic Earth strategic set.
  * When to use: Regression guard whenever registry assignment logic changes.
  * Expected outcome: Set size equals population count for derived codes.
  * Exceptions: None.
  */
-function testStrategicCodesAreUniqueAcrossAllRes1Cells(): void {
+function testStrategicCodesAreUniqueAcrossAllCells(): void {
   ensureStrategicCoordinateRegistryInitialized();
-  const cells = listStrategicRes1H3Indexes();
+  const cells = listStrategicH3Indexes();
   const codes = cells.map((h3) => getHexCodeForContext(h3, STRATEGIC_CTX));
   assert.strictEqual(new Set(codes).size, codes.length, 'strategic res1 codes must be unique');
 }
 
 /**
- * Defines the `testStrategicFullRoundTripForEveryRes1Cell` function shape (function testStrategicFullRoundTripForEveryRes1Cell(): void).
+ * Defines the `testStrategicFullRoundTripForEveryStrategicCell` function shape (function testStrategicFullRoundTripForEveryStrategicCell(): void).
 
  * Purpose: Verifies encode/decode symmetry for every registered strategic cell.
  * When to use: After changes to `sortCellsForRegistry`, resolution constants, or alphabet ordering.
- * Expected outcome: `getH3IndexForCode(getHexCodeForContext(h3))` returns the same res1 index.
+ * Expected outcome: `getH3IndexForCode(getHexCodeForContext(h3))` returns the same strategic index.
  * Exceptions: None.
  */
-function testStrategicFullRoundTripForEveryRes1Cell(): void {
+function testStrategicFullRoundTripForEveryCell(): void {
   ensureStrategicCoordinateRegistryInitialized();
-  for (const h3 of listStrategicRes1H3Indexes()) {
+  for (const h3 of listStrategicH3Indexes()) {
     const code = getHexCodeForContext(h3, STRATEGIC_CTX);
     assert.ok(code && code.length === 2, `expected two-character code for ${h3}`);
     assert.strictEqual(getH3IndexForCode(code, STRATEGIC_CTX), h3);
@@ -68,7 +68,7 @@ function testStrategicFullRoundTripForEveryRes1Cell(): void {
  */
 function testStrategicRegistryStableAcrossExplicitReInit(): void {
   initStrategicCoordinateRegistry();
-  const sample = listStrategicRes1H3Indexes()[0]!;
+  const sample = listStrategicH3Indexes()[0]!;
   const before = getHexCodeForContext(sample, STRATEGIC_CTX);
   initStrategicCoordinateRegistry();
   const after = getHexCodeForContext(sample, STRATEGIC_CTX);
@@ -76,16 +76,16 @@ function testStrategicRegistryStableAcrossExplicitReInit(): void {
 }
 
 /**
- * Defines the `testStrategicRes1FastPathMatchesRoundTrip` function shape (function testStrategicRes1FastPathMatchesRoundTrip(): void).
+ * Defines the `testStrategicFastPathMatchesRoundTrip` function shape (function testStrategicFastPathMatchesRoundTrip(): void).
 
- * Purpose: Confirms res1-index fast-path encoding still round-trips through the strategic registry.
+ * Purpose: Confirms strategic-index fast-path encoding still round-trips through the strategic registry.
  * When to use: After changes to `getHexCodeForContext` strategic branch.
- * Expected outcome: Sample res1 cell encodes to a two-character code and decodes back to the same index.
+ * Expected outcome: Sample strategic cell encodes to a two-character code and decodes back to the same index.
  * Exceptions: None.
  */
-function testStrategicRes1FastPathMatchesRoundTrip(): void {
+function testStrategicFastPathMatchesRoundTrip(): void {
   ensureStrategicCoordinateRegistryInitialized();
-  const sample = listStrategicRes1H3Indexes()[0]!;
+  const sample = listStrategicH3Indexes()[0]!;
   const code = getHexCodeForContext(sample, STRATEGIC_CTX);
   assert.ok(code && code.length === 2);
   assert.strictEqual(getH3IndexForCode(code, STRATEGIC_CTX), sample);
@@ -100,10 +100,10 @@ function testStrategicRes1FastPathMatchesRoundTrip(): void {
  * Exceptions: None.
  */
 function run(): void {
-  testStrategicCodesAreUniqueAcrossAllRes1Cells();
-  testStrategicFullRoundTripForEveryRes1Cell();
+  testStrategicCodesAreUniqueAcrossAllCells();
+  testStrategicFullRoundTripForEveryCell();
   testStrategicRegistryStableAcrossExplicitReInit();
-  testStrategicRes1FastPathMatchesRoundTrip();
+  testStrategicFastPathMatchesRoundTrip();
   console.log('hexCoordinates.test.ts passed');
 }
 

@@ -16,7 +16,7 @@ import {
 } from './tacticalTerrainCombatModifiers';
 
 /**
- * Theater for return-fire geometry (strategic res1 vs tactical res4).
+ * Theater for return-fire geometry (strategic vs tactical).
  *
  * Purpose: Selects strategic ranged/strike tables vs tactical direct-fire terrain filters.
  * When to use: Every call to `canDefenderReturnFireAtAttackerHex`.
@@ -48,7 +48,7 @@ export type ReturnFireEligibilityContext = {
    *
    * Purpose: Mirrors `validateAirStrikeOrder` / tactical air strike airport checks without importing the DB.
    * When to use: Required for air eligibility; omit ⇒ air ineligible (fail closed).
-   * Expected outcome: True only when airport count at the air base (strategic hex or tactical parent res1) is positive.
+   * Expected outcome: True only when airport count at the air base (strategic hex or tactical parent strategic) is positive.
    * Exceptions: None.
    */
   hasIntactAirportAtAirBase?: (unitH3: string) => boolean;
@@ -62,7 +62,7 @@ export type ReturnFireEligibilityContext = {
    */
   tacticalBattle?: TacticalBattleTerrainPick;
   /**
-   * Res4 footprint set for tactical ground return fire.
+   * Tactical footprint set for tactical ground return fire.
    *
    * Purpose: Same footprint membership gate as direct-fire apply filters.
    * When to use: Required with `tacticalBattle` for tactical non-air; omit ⇒ tactical ground ineligible.

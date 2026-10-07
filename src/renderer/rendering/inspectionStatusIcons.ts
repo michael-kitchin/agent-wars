@@ -3,7 +3,7 @@
  *
  * Purpose: The held-T world map shows those icons on hexes that already show a production label.
  * When to use: Immediately after the strategic hex-code pass.
- * Expected outcome: While T is held on the strategic world map, a centered icon row one production-band above each code. Nothing in a tactical battle, at res4 zoom, or when T is released.
+ * Expected outcome: While T is held on the strategic world map, a centered icon row one production-band above each code. Nothing in a tactical battle, at tactical zoom, or when T is released.
  * Exceptions: A missing map or a failed image load leaves that icon blank. The function does not throw.
  */
 
@@ -12,8 +12,8 @@ import {
   inspectionStatusIconFontPx,
   inspectionStatusIconsForHex,
   inspectionStatusSlashIsBold,
-  res1OverlayBandOffsetPx,
-  res1ProductionLabelSurface,
+  strategicOverlayBandOffsetPx,
+  strategicProductionLabelSurface,
   techInspectionIconAssetPath,
   weatherInspectionIconAssetPath,
 } from '../../shared/inspectionStatusIconLine';
@@ -24,17 +24,17 @@ import {
   getUrbanProductionCapacityForHex,
   getControllerForHex,
   isMapInspectionModeHeld,
-  isRes1HexHumanUrbanProduction,
+  isStrategicHexHumanUrbanProduction,
 } from '../gameplay/productionOverlayHelpers';
 import { getLeafletGlobal } from '../map/mapHelpers';
 import { getMainLeafletMapForProjection } from '../map/leafletMainMapProjection';
 import {
   projectHexBoundaryToContainerPoints,
-  shouldRenderRes4Hexes,
+  shouldRenderTacticalHexes,
   shouldShowBuildEntryZoom,
   spanForProjectedHex,
 } from '../map/terrainView';
-import { baselineUrbanHexCountForRes1Hex } from '../rendererRes4Hydration';
+import { baselineUrbanHexCountForStrategicHex } from '../rendererTacticalHydration';
 
 /**
  * Callbacks the scene already owns.
@@ -278,12 +278,12 @@ function drawIconGroup(
  * Draws tech and weather icons above world-hex codes while inspection is held.
  *
  * Purpose: Shows the same tech tier and weather the hex tooltip names, on hexes that already show a production label.
- * When to use: On the next line after each `drawStrategicRes1InspectionHexCodes` call.
- * Expected outcome: No-op in a tactical battle, at res4 zoom, or when T is not held. Otherwise one row per labeled hex.
+ * When to use: On the next line after each `drawStrategicInspectionHexCodes` call.
+ * Expected outcome: No-op in a tactical battle, at tactical zoom, or when T is not held. Otherwise one row per labeled hex.
  * Exceptions: A missing map returns without drawing. Image errors leave a blank square.
  */
 export function drawInspectionStatusIcons(ctx: CanvasRenderingContext2D, deps: InspectionStatusIconDrawDeps): void {
-  if (!S.gameState || S.tacticalBattleSnapshot || !isMapInspectionModeHeld() || shouldRenderRes4Hexes()) return;
+  if (!S.gameState || S.tacticalBattleSnapshot || !isMapInspectionModeHeld() || shouldRenderTacticalHexes()) return;
   const map = getMainLeafletMapForProjection();
   const leaflet = getLeafletGlobal();
   if (!map || !leaflet) return;
@@ -295,9 +295,9 @@ export function drawInspectionStatusIcons(ctx: CanvasRenderingContext2D, deps: I
     for (const hx of state.hexes) {
       const explored = deps.isHexExploredByPlayer(hx.h3Index);
       const controlledByHuman = getControllerForHex(state, hx.h3Index) === 'human';
-      const humanUrbanProduction = isRes1HexHumanUrbanProduction(state, hx);
-      const surface = res1ProductionLabelSurface({
-        res4Rendered: false,
+      const humanUrbanProduction = isStrategicHexHumanUrbanProduction(state, hx);
+      const surface = strategicProductionLabelSurface({
+        tacticalRendered: false,
         explored,
         mapInspectionHeld: true,
         controlledByHuman,
@@ -307,7 +307,7 @@ export function drawInspectionStatusIcons(ctx: CanvasRenderingContext2D, deps: I
       const icons = inspectionStatusIconsForHex({
         productionSurface: surface,
         techBonusEnabled: state.techBonusEnabled === true,
-        baselineUrbanHexCount: baselineUrbanHexCountForRes1Hex(hx.h3Index),
+        baselineUrbanHexCount: baselineUrbanHexCountForStrategicHex(hx.h3Index),
         weather: hx.weather,
       });
       if (surface === 'none' || !icons) continue;
@@ -321,7 +321,7 @@ export function drawInspectionStatusIcons(ctx: CanvasRenderingContext2D, deps: I
       });
       drawIconGroup(ctx, deps, {
         centerX: centroid.x,
-        centerY: centroid.y - res1OverlayBandOffsetPx(spanForProjectedHex(pts)),
+        centerY: centroid.y - strategicOverlayBandOffsetPx(spanForProjectedHex(pts)),
         fontPx,
         bold: inspectionStatusSlashIsBold(controlledByHuman, getUrbanProductionCapacityForHex(hx.h3Index)),
         tech: icons.tech,

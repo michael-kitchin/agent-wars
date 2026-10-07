@@ -3,9 +3,9 @@
  */
 
 import * as fs from 'fs';
-import type { Res4TransportVectorOverlayRow } from '../shared/ipc/terrainHexTypes';
+import type { TacticalTransportVectorOverlayRow } from '../shared/ipc/terrainHexTypes';
 import { logDebug, logError } from './logger';
-import { resolveTerrainRes4RoadRailVectorsPathOptional } from './terrainMetadataPaths';
+import { resolveTerrainTacticalRoadRailVectorsPathOptional } from './terrainMetadataPaths';
 
 /**
  * Defines the `isRecord` function shape (function isRecord(x: unknown): x is Record<string, unknown>).
@@ -23,7 +23,7 @@ function isRecord(x: unknown): x is Record<string, unknown> {
  * Defines the `parsePointTuple` function shape (function parsePointTuple(x: unknown, rowIndex: number, pointIndex: number): [number, number] | null).
 
  * Purpose: Validates one `[lat, lng]` tuple while rejecting non-finite coordinates.
- * When to use: While parsing each row in `parseTerrainRes4RoadRailVectorsJson`.
+ * When to use: While parsing each row in `parseTerrainTacticalRoadRailVectorsJson`.
  * Expected outcome: Returns normalized numeric tuple or `null` when the point is invalid.
  * Exceptions: None.
  */
@@ -48,14 +48,14 @@ function parsePointTuple(x: unknown, rowIndex: number, pointIndex: number): [num
 const SUPPORTED_VECTOR_SCHEMA_VERSIONS = new Set(['0.1.0']);
 
 /**
- * Defines the `parseTerrainRes4RoadRailVectorsJson` function shape (export function parseTerrainRes4RoadRailVectorsJson(text: string): Res4TransportVectorOverlayRow[]).
+ * Defines the `parseTerrainTacticalRoadRailVectorsJson` function shape (export function parseTerrainTacticalRoadRailVectorsJson(text: string): TacticalTransportVectorOverlayRow[]).
 
  * Purpose: Parses optional display-only vector JSON into validated renderer IPC rows.
  * When to use: Unit tests and main-process file loads after reading UTF-8 text.
  * Expected outcome: Returns only rows with valid `kind` and at least two valid points.
  * Exceptions: Throws when root shape is invalid JSON object, rows array is missing, or `schema_version` is present and unsupported.
  */
-export function parseTerrainRes4RoadRailVectorsJson(text: string): Res4TransportVectorOverlayRow[] {
+export function parseTerrainTacticalRoadRailVectorsJson(text: string): TacticalTransportVectorOverlayRow[] {
   const root = JSON.parse(text) as unknown;
   if (!isRecord(root)) throw new Error('terrain road/rail vectors: root must be an object');
   const schema = root.schema_version;
@@ -64,7 +64,7 @@ export function parseTerrainRes4RoadRailVectorsJson(text: string): Res4Transport
   }
   const rowsRaw = root.rows;
   if (!Array.isArray(rowsRaw)) throw new Error('terrain road/rail vectors: rows must be an array');
-  const out: Res4TransportVectorOverlayRow[] = [];
+  const out: TacticalTransportVectorOverlayRow[] = [];
   for (let i = 0; i < rowsRaw.length; i++) {
     const row = rowsRaw[i];
     if (!isRecord(row)) continue;
@@ -84,23 +84,23 @@ export function parseTerrainRes4RoadRailVectorsJson(text: string): Res4Transport
 }
 
 /**
- * Defines the `loadTerrainRes4RoadRailVectorsBundled` function shape (export function loadTerrainRes4RoadRailVectorsBundled(): Res4TransportVectorOverlayRow[]).
+ * Defines the `loadTerrainTacticalRoadRailVectorsBundled` function shape (export function loadTerrainTacticalRoadRailVectorsBundled(): TacticalTransportVectorOverlayRow[]).
 
  * Purpose: Loads optional generated vector data for Leaflet transport overlays when the artifact ships with the app.
  * When to use: During terrain classification snapshot build after metadata/naming loads.
  * Expected outcome: Empty array when artifact is missing or invalid; otherwise validated rows.
  * Exceptions: None; failures are logged and degraded to empty output.
  */
-export function loadTerrainRes4RoadRailVectorsBundled(): Res4TransportVectorOverlayRow[] {
+export function loadTerrainTacticalRoadRailVectorsBundled(): TacticalTransportVectorOverlayRow[] {
   logDebug('terrainRoadRailVectorsLoad loadTerrainRes4RoadRailVectorsBundled: start');
-  const path = resolveTerrainRes4RoadRailVectorsPathOptional();
+  const path = resolveTerrainTacticalRoadRailVectorsPathOptional();
   if (!path) {
     logDebug('terrainRoadRailVectorsLoad loadTerrainRes4RoadRailVectorsBundled: skipped (missing file)');
     return [];
   }
   try {
     const text = fs.readFileSync(path, 'utf8');
-    const rows = parseTerrainRes4RoadRailVectorsJson(text);
+    const rows = parseTerrainTacticalRoadRailVectorsJson(text);
     logDebug('terrainRoadRailVectorsLoad loadTerrainRes4RoadRailVectorsBundled: done', {
       path,
       rowCount: rows.length,

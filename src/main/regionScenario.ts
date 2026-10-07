@@ -1,5 +1,5 @@
 import { logDebug, logError, logTrace } from './logger';
-import { ensureTerrainClassificationCacheLoaded, getTerrainRes1NamingRecordsFromSnapshot } from './terrainClassificationCache';
+import { ensureTerrainClassificationCacheLoaded, getTerrainStrategicNamingRecordsFromSnapshot } from './terrainClassificationCache';
 
 /**
  * Documents the module-scope binding `PASSABLE_LAND_TERRAIN_KINDS` (PASSABLE_LAND_TERRAIN_KINDS).
@@ -30,7 +30,7 @@ const PASSABLE_LAND_TERRAIN_KINDS = new Set([
 let cachedRegionHexesByName: Map<string, string[]> | null = null;
 
 /**
- * Defines the `buildRegionHexCache` function shape (function buildRegionHexCache(): Map<string, string[]> { logDebug('regionScenario buildRegionHexCache'); const env = loadTerrainRes1NamingBundled(); con).
+ * Defines the `buildRegionHexCache` function shape (function buildRegionHexCache(): Map<string, string[]> { logDebug('regionScenario buildRegionHexCache'); const env = loadTerrainStrategicNamingBundled(); con).
 
  * Purpose: Supports maintainability by documenting why `buildRegionHexCache` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
@@ -40,7 +40,7 @@ let cachedRegionHexesByName: Map<string, string[]> | null = null;
 function buildRegionHexCache(): Map<string, string[]> {
   logDebug('regionScenario buildRegionHexCache');
   ensureTerrainClassificationCacheLoaded();
-  const records = getTerrainRes1NamingRecordsFromSnapshot();
+  const records = getTerrainStrategicNamingRecordsFromSnapshot();
   const byRegion = new Map<string, Set<string>>();
   for (const row of records) {
     for (const country of row.countries) {

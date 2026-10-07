@@ -21,7 +21,7 @@ export function getFullDdl(): string {
       display_order INTEGER,
       h3_index TEXT NOT NULL,
       birth_h3_index TEXT,
-      birth_res4_h3_index TEXT,
+      birth_res_t_h3_index TEXT,
       birth_terrain_kind TEXT,
       birth_is_urban INTEGER,
       birth_country_name TEXT,
@@ -142,12 +142,12 @@ export function getFullDdl(): string {
       PRIMARY KEY (player_id, enemy_unit_id)
     );
 
-    CREATE TABLE IF NOT EXISTS res1_control (
+    CREATE TABLE IF NOT EXISTS res_s_control (
       h3_index TEXT PRIMARY KEY,
       controller_player_id TEXT
     );
 
-    CREATE TABLE IF NOT EXISTS res1_build_queue (
+    CREATE TABLE IF NOT EXISTS res_s_build_queue (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       h3_index TEXT NOT NULL,
       queue_index INTEGER NOT NULL,
@@ -156,7 +156,7 @@ export function getFullDdl(): string {
       UNIQUE (h3_index, queue_index)
     );
 
-    CREATE TABLE IF NOT EXISTS res1_build_progress (
+    CREATE TABLE IF NOT EXISTS res_s_build_progress (
       h3_index TEXT PRIMARY KEY,
       stored_points INTEGER NOT NULL DEFAULT 0,
       keep_building INTEGER NOT NULL DEFAULT 0 CHECK (keep_building IN (0, 1)),
@@ -166,14 +166,14 @@ export function getFullDdl(): string {
       )
     );
 
-    CREATE TABLE IF NOT EXISTS res1_infrastructure (
+    CREATE TABLE IF NOT EXISTS res_s_infrastructure (
       h3_index TEXT PRIMARY KEY,
       urban_hex_count INTEGER NOT NULL DEFAULT 0,
       airport_count INTEGER NOT NULL DEFAULT 0,
       seaport_count INTEGER NOT NULL DEFAULT 0
     );
 
-    CREATE TABLE IF NOT EXISTS res4_feature_overrides (
+    CREATE TABLE IF NOT EXISTS res_t_feature_overrides (
       h3_index TEXT PRIMARY KEY,
       parent_h3_index TEXT NOT NULL,
       terrain_kind TEXT NOT NULL,

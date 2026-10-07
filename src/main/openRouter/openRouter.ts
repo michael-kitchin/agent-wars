@@ -12,8 +12,8 @@ import { logDebug, logError, logTrace } from '../logger';
 import type { GameStateSnapshot } from '../gameDb';
 import { dbGetOne, dbRun } from '../gameDb';
 import { LATLNG_DECIMAL_PLACES } from '../mapData';
-import { landUnitCanOccupyHex, LAND_UNIT_ROUTE_STEP_BLOCKED_REASON } from '../../shared/landTraversalRes1';
-import { getRes1LandMassByH3 } from '../terrainClassificationCache';
+import { landUnitCanOccupyHex, LAND_UNIT_ROUTE_STEP_BLOCKED_REASON } from '../../shared/landTraversalStrategic';
+import { getStrategicLandMassByH3 } from '../terrainClassificationCache';
 import {
   getValidDestinations,
 } from '../oneStepMoveDestinations';
@@ -413,7 +413,7 @@ function validateAiOrder(
       return { valid: false, reason: NAVAL_DESTINATION_MUST_BE_WATER_COASTAL };
     }
   }
-  if ((unit.unitType === 'infantry' || unit.unitType === 'armor') && !landUnitCanOccupyHex(order.toH3Index, getRes1LandMassByH3())) {
+  if ((unit.unitType === 'infantry' || unit.unitType === 'armor') && !landUnitCanOccupyHex(order.toH3Index, getStrategicLandMassByH3())) {
     return { valid: false, reason: 'Land units must move to a hex that overlaps a continent or large island.' };
   }
   if (unit.unitType === 'infantry' || unit.unitType === 'armor') {

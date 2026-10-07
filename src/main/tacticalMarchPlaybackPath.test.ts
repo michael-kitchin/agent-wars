@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 import { gridDisk, gridPathCells } from 'h3-js';
 import { clipTacticalMarchPathToDestination } from '../shared/tacticalMarchPlaybackPath.js';
 import { tacticalMarchFirstStopAlongPath } from './tacticalBattle/tacticalRulesAdapter.js';
-import { tacticalRes4Cell, firstRingCellDistinctFrom } from './tacticalBattle/testSupport/tacticalRes4HexFixtures.js';
+import { tacticalCell, firstRingCellDistinctFrom } from './tacticalBattle/testSupport/tacticalHexFixtures.js';
 
 /**
  * Documents the function binding `testClipTruncatesToDestination` (testClipTruncatesToDestination).
@@ -42,13 +42,13 @@ function testClipUndefinedWhenTooShort(): void {
 /**
  * Documents the function binding `testMarchFirstStopPrefixHasMultipleVertices` (testMarchFirstStopPrefixHasMultipleVertices).
  *
- * Purpose: Locks playback `pathH3Indexes` shape for bent res4 marches (not a single chord).
+ * Purpose: Locks playback `pathH3Indexes` shape for bent tactical marches (not a single chord).
  * When to use: Regression after edits to march planning or commit playback assembly.
  * Expected outcome: `pathH3Prefix` length ≥ 3 when two budgeted steps lie on a ≥3-cell grid path inside the footprint.
  * Exceptions: Assertion failure if H3 geometry assumptions drift.
  */
 function testMarchFirstStopPrefixHasMultipleVertices(): void {
-  const a = tacticalRes4Cell(46, 58);
+  const a = tacticalCell(46, 58);
   const ring = [...gridDisk(a, 3)];
   let chain: string[] = [];
   for (const h of ring) {
@@ -61,9 +61,9 @@ function testMarchFirstStopPrefixHasMultipleVertices(): void {
     }
   }
   assert.ok(chain.length >= 4, `expected long enough test chain from gridDisk(3), got ${chain.length}`);
-  const res4Set = new Set(chain);
+  const tacticalSet = new Set(chain);
   const goal = chain[chain.length - 1]!;
-  const r = tacticalMarchFirstStopAlongPath(a, goal, 2, res4Set, undefined, 'infantry');
+  const r = tacticalMarchFirstStopAlongPath(a, goal, 2, tacticalSet, undefined, 'infantry');
   assert.ok(r.pathH3Prefix && r.pathH3Prefix.length >= 3, `expected path prefix, got ${r.pathH3Prefix?.length}`);
   assert.strictEqual(r.pathH3Prefix![0], a);
   assert.ok(r.pathH3Prefix!.includes(r.stopH3));
@@ -80,10 +80,10 @@ function testMarchFirstStopPrefixHasMultipleVertices(): void {
  * Exceptions: None.
  */
 function testTwoCellPrefixAfterClip(): void {
-  const center = tacticalRes4Cell(45, 57);
+  const center = tacticalCell(45, 57);
   const neighbor = firstRingCellDistinctFrom(center);
-  const res4Set = new Set([center, neighbor]);
-  const r = tacticalMarchFirstStopAlongPath(center, neighbor, 4, res4Set, undefined, 'infantry');
+  const tacticalSet = new Set([center, neighbor]);
+  const r = tacticalMarchFirstStopAlongPath(center, neighbor, 4, tacticalSet, undefined, 'infantry');
   const playback = clipTacticalMarchPathToDestination(r.stopH3, r.pathH3Prefix);
   assert.ok(playback && playback.length === 2);
   assert.strictEqual(playback![0], center);

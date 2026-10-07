@@ -1,5 +1,5 @@
 /**
- * Small canvas color helpers shared by terrain fills and res4 city overlay strokes.
+ * Small canvas color helpers shared by terrain fills and tactical city overlay strokes.
  * When to use: Anywhere a hex stroke/fill needs an `rgba(...)` string from a `#rgb` / `#rrggbb` source (terrain outlines, city label halos, city marker rims).
  */
 

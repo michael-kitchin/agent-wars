@@ -8,12 +8,12 @@ import { test } from 'node:test';
 import { gridDisk, gridDistance } from 'h3-js';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { validateTacticalGroupRangedTarget } from './tacticalGroupRangedTargetValidation';
-import { res4GridDiskNeighborsOrdered } from '../../shared/tacticalRes4TransportLink';
-import { firstRingCellDistinctFrom, tacticalRes1Cell, tacticalRes4UnderRes1Corner } from '../tacticalBattle/testSupport/tacticalRes4HexFixtures';
+import { tacticalGridDiskNeighborsOrdered } from '../../shared/tacticalTransportLink';
+import { firstRingCellDistinctFrom, tacticalParentCell, tacticalUnderCorner } from '../tacticalBattle/testSupport/tacticalHexFixtures';
 
 test('validateTacticalGroupRangedTarget accepts opponent naval ranged to adjacent human on clear plains', () => {
-  const res1 = tacticalRes1Cell(7, 8);
-  const h0 = tacticalRes4UnderRes1Corner(7, 8);
+  const strategic = tacticalParentCell(7, 8);
+  const h0 = tacticalUnderCorner(7, 8);
   const h1 = firstRingCellDistinctFrom(h0);
   assert.ok(gridDistance(h0, h1) >= 1);
   const ring = [...gridDisk(h0, 2)];
@@ -23,13 +23,13 @@ test('validateTacticalGroupRangedTarget accepts opponent naval ranged to adjacen
   }
   const snap: TacticalBattleSnapshot = {
     battleId: 'tb-rg-accept',
-    enclosingRes1H3Index: res1,
-    res4ChildH3Indexes: ring,
+    enclosingStrategicH3Index: strategic,
+    tacticalChildH3Indexes: ring,
     strategicTurnNumber: 1,
     tacticalTurnNumber: 1,
     strategicHexTerrain: 'land',
     strategicHexTerrainKind: 'plains',
-    res4TerrainKindByH3: terrain,
+    tacticalTerrainKindByH3: terrain,
     subUnits: [
       {
         id: 'opp-n0',
@@ -59,8 +59,8 @@ test('validateTacticalGroupRangedTarget accepts opponent naval ranged to adjacen
 });
 
 test('validateTacticalGroupRangedTarget rejects opponent naval when mountain LOS blocks', () => {
-  const res1 = tacticalRes1Cell(8, 9);
-  const h0 = tacticalRes4UnderRes1Corner(8, 9);
+  const strategic = tacticalParentCell(8, 9);
+  const h0 = tacticalUnderCorner(8, 9);
   const ring = [...gridDisk(h0, 2)];
   const inner = new Set(gridDisk(h0, 1));
   const hFar = ring.find((h) => !inner.has(h));
@@ -73,13 +73,13 @@ test('validateTacticalGroupRangedTarget rejects opponent naval when mountain LOS
   }
   const snap: TacticalBattleSnapshot = {
     battleId: 'tb-rg-los',
-    enclosingRes1H3Index: res1,
-    res4ChildH3Indexes: ring,
+    enclosingStrategicH3Index: strategic,
+    tacticalChildH3Indexes: ring,
     strategicTurnNumber: 1,
     tacticalTurnNumber: 1,
     strategicHexTerrain: 'land',
     strategicHexTerrainKind: 'plains',
-    res4TerrainKindByH3: terrain,
+    tacticalTerrainKindByH3: terrain,
     subUnits: [
       {
         id: 'opp-nm0',
@@ -110,8 +110,8 @@ test('validateTacticalGroupRangedTarget rejects opponent naval when mountain LOS
 });
 
 test('validateTacticalGroupRangedTarget accepts infantry shot at empty urban cell from snapshot flags', () => {
-  const res1 = tacticalRes1Cell(9, 10);
-  const h0 = tacticalRes4UnderRes1Corner(9, 10);
+  const strategic = tacticalParentCell(9, 10);
+  const h0 = tacticalUnderCorner(9, 10);
   const hUrban = firstRingCellDistinctFrom(h0);
   const ring = [...gridDisk(h0, 2)];
   assert.ok(ring.includes(hUrban));
@@ -119,14 +119,14 @@ test('validateTacticalGroupRangedTarget accepts infantry shot at empty urban cel
   for (const h of ring) terrain[h] = 'plains';
   const snap: TacticalBattleSnapshot = {
     battleId: 'tb-rg-infra-only',
-    enclosingRes1H3Index: res1,
-    res4ChildH3Indexes: ring,
+    enclosingStrategicH3Index: strategic,
+    tacticalChildH3Indexes: ring,
     strategicTurnNumber: 1,
     tacticalTurnNumber: 1,
     strategicHexTerrain: 'land',
     strategicHexTerrainKind: 'plains',
-    res4TerrainKindByH3: terrain,
-    res4IsUrbanByH3: { [hUrban]: true },
+    tacticalTerrainKindByH3: terrain,
+    tacticalIsUrbanByH3: { [hUrban]: true },
     subUnits: [
       {
         id: 'hum-inf-urban',
@@ -148,27 +148,27 @@ test('validateTacticalGroupRangedTarget accepts infantry shot at empty urban cel
 });
 
 test('validateTacticalGroupRangedTarget accepts infantry shot at road-only strikeable cell', () => {
-  const res1 = tacticalRes1Cell(10, 11);
-  const h0 = tacticalRes4UnderRes1Corner(10, 11);
+  const strategic = tacticalParentCell(10, 11);
+  const h0 = tacticalUnderCorner(10, 11);
   const hRoad = firstRingCellDistinctFrom(h0);
   const ring = [...gridDisk(h0, 2)];
   assert.ok(ring.includes(hRoad));
   const terrain: Record<string, string> = {};
   for (const h of ring) terrain[h] = 'plains';
-  const n = res4GridDiskNeighborsOrdered(hRoad).length;
+  const n = tacticalGridDiskNeighborsOrdered(hRoad).length;
   const roadSides = Array.from({ length: n }, () => true);
   const railSides = Array.from({ length: n }, () => false);
   const snap: TacticalBattleSnapshot = {
     battleId: 'tb-rg-transport',
-    enclosingRes1H3Index: res1,
-    res4ChildH3Indexes: ring,
+    enclosingStrategicH3Index: strategic,
+    tacticalChildH3Indexes: ring,
     strategicTurnNumber: 1,
     tacticalTurnNumber: 1,
     strategicHexTerrain: 'land',
     strategicHexTerrainKind: 'plains',
-    res4TerrainKindByH3: terrain,
-    res4RoadSidesByH3: { [hRoad]: roadSides },
-    res4RailSidesByH3: { [hRoad]: railSides },
+    tacticalTerrainKindByH3: terrain,
+    tacticalRoadSidesByH3: { [hRoad]: roadSides },
+    tacticalRailSidesByH3: { [hRoad]: railSides },
     subUnits: [
       {
         id: 'hum-inf-road',

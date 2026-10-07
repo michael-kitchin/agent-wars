@@ -208,7 +208,7 @@ export function getRecentTurnNotes(
  * Deletes tactical turn-note rows, optionally scoped to one battle id.
  *
  * Purpose: Resets tactical history when a new battle starts.
- * When to use: `startTacticalBattleForEnclosingRes1Hex` after installing a fresh battle snapshot.
+ * When to use: `startTacticalBattleForEnclosingStrategicHex` after installing a fresh battle snapshot.
  * Expected outcome: All `scope='tactical'` rows removed, or only rows for the given `battleId` when provided.
  * Exceptions: Logs at error on failure; does not throw.
  */

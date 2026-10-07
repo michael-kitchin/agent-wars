@@ -11,7 +11,7 @@ from typing import Any
 from scripts.naming_pipeline.naming_json_writers import SCHEMA_VERSION as NAMING_SCHEMA_VERSION
 from scripts.terrain_pipeline.metadata_models import TERRAIN_HEX_METADATA_SCHEMA_VERSION
 
-from .region_manifest import RegionManifest, read_manifest
+from .region_manifest import SIDE_GROUP_MANIFEST_SCHEMA_VERSION, RegionManifest, read_manifest
 from .region_paths import REGIONS_ROOT, RegionPaths
 
 LOGGER = logging.getLogger(__name__)
@@ -169,6 +169,7 @@ def check_region_pack(region_id: str, root: Path = REGIONS_ROOT) -> list[CheckRe
     results.extend(_weather_results(paths.weather_s, strategic_cells))
     results.extend(_sides_results(paths.road_rail_sides_t, manifest, tactical_cells))
     results.extend(_vector_results(paths.road_rail_vectors_t))
+    results.extend(_side_group_results(paths))
     return results
 
 
@@ -320,3 +321,46 @@ def _vector_results(path: Path) -> list[CheckResult]:
     if any(row.get("kind") not in {"road", "rail"} for row in rows):
         return [CheckResult(path.name, "FAIL", "a row kind is not road or rail")]
     return [CheckResult(path.name, "PASS", f"{len(rows)} rows")]
+
+
+def _side_group_results(paths: RegionPaths) -> list[CheckResult]:
+    """
+    Why this exists:
+        Require side groups to partition land hexes after origins have been written.
+    When to use:
+        From ``check_region_pack``.
+    What to expect:
+        FAIL when the manifest is not schema 1.1.0, a group has no land hex, or the origin file is missing.
+        Does not read tactical metadata.
+    """
+
+    LOGGER.debug("_side_group_results path=%s.", paths.manifest)
+    document = json.loads(paths.manifest.read_text(encoding="utf-8"))
+    if document.get("schema_version") != SIDE_GROUP_MANIFEST_SCHEMA_VERSION:
+        return [CheckResult(paths.manifest.name, "FAIL", "schema_version is not 1.1.0")]
+    groups = document.get("side_groups") or []
+    if not groups:
+        return [CheckResult(paths.manifest.name, "FAIL", "side_groups missing")]
+    counts: dict[str, int] = {str(group["id"]): 0 for group in groups}
+    land = 0
+    for entry in document.get("hexes", []):
+        if entry.get("role") != "land":
+            if entry.get("side_group_id"):
+                return [CheckResult(paths.manifest.name, "FAIL", f"{entry.get('h3_index')} is not land but has a group")]
+            continue
+        land += 1
+        group_id = entry.get("side_group_id")
+        if group_id not in counts:
+            return [CheckResult(paths.manifest.name, "FAIL", f"{entry.get('h3_index')} has no known side group")]
+        counts[str(group_id)] += 1
+    empty = [group_id for group_id, count in counts.items() if count == 0]
+    if empty:
+        return [CheckResult(paths.manifest.name, "FAIL", f"empty groups: {', '.join(empty)}")]
+    if sum(counts.values()) != land:
+        return [CheckResult(paths.manifest.name, "FAIL", "groups do not sum to land hexes")]
+    if not paths.origin_units_t.is_file():
+        return [CheckResult(paths.origin_units_t.name, "FAIL", "file missing")]
+    origin = json.loads(paths.origin_units_t.read_text(encoding="utf-8"))
+    if origin.get("region_id") != document.get("region_id") or not origin.get("records"):
+        return [CheckResult(paths.origin_units_t.name, "FAIL", "origin records missing")]
+    return [CheckResult("side-groups", "PASS", f"{len(groups)} groups, {land} land hexes")]

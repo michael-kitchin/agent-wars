@@ -66,14 +66,14 @@ showSidebarError: (message: string) => void;
    */
 callReadyWithTimeout: (payload: GameReadyIpcPayload) => Promise<ReadyResult>;
     /**
-   * Specifies the contract for the `refreshRes4TerrainOverridesForRenderer` member (refreshRes4TerrainOverridesForRenderer: () => Promise<void>;).
+   * Specifies the contract for the `refreshTacticalTerrainOverridesForRenderer` member (refreshTacticalTerrainOverridesForRenderer: () => Promise<void>;).
 
-   * Contract: Describes stable behavior for callers of `refreshRes4TerrainOverridesForRenderer` in this codebase.
+   * Contract: Describes stable behavior for callers of `refreshTacticalTerrainOverridesForRenderer` in this codebase.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-refreshRes4TerrainOverridesForRenderer: () => Promise<void>;
+refreshTacticalTerrainOverridesForRenderer: () => Promise<void>;
     /**
    * Specifies the contract for the `applyGameStateSnapshot` member (applyGameStateSnapshot: ( nextState: GameStateSnapshot, options: { refreshStandingOrders?: boolean; updateGameStateSidebarUi?: boolean;).
 
@@ -282,7 +282,7 @@ startBackgroundRequestIfAllowed: () => void;
     /**
    * Specifies the contract for the `buildMeleeInterceptHexPopupHtml` member (buildMeleeInterceptHexPopupHtml: (h3Index: string) => Promise<string>;).
 
-   * Contract: Tooltip-equivalent HTML for a res1 hex used in the melee intercept modal.
+   * Contract: Tooltip-equivalent HTML for a strategic hex used in the melee intercept modal.
    * When to use: Each candidate row while the modal is open.
    * Expected outcome: Safe HTML suitable for `innerHTML` in a table cell.
    * Exceptions: None.
@@ -300,8 +300,8 @@ openMeleeInterceptModal: (args: MeleeInterceptModalOpenArgs) => Promise<MeleeInt
     /**
    * Specifies the contract for the `startTacticalBattleFromInterceptHex` member (startTacticalBattleFromInterceptHex: (h3Index: string) => Promise<void>;).
 
-   * Contract: Enters tactical combat for the given res1 hex after strategic resolution completes.
-   * When to use: When `ReadyResult.tacticalAutoStartRes1H3Index` is set after Fight.
+   * Contract: Enters tactical combat for the given strategic hex after strategic resolution completes.
+   * When to use: When `ReadyResult.tacticalAutoStartStrategicH3Index` is set after Fight.
    * Expected outcome: Same UX as magnifier tactical entry; failures surface as map toasts only.
    * Exceptions: None.
    */

@@ -11,18 +11,18 @@ import {
   effectiveTacticalRangedMaxRangeForAttacker,
   tacticalMountainBlocksImplicitLosForAirArmorNavalRanged,
   tacticalMountainLosBlockedState,
-  tacticalRes4UrbanRubbleFlagRecordsForFootprint,
-  tacticalRes4CellIsUrbanOrRubble,
+  tacticalUrbanRubbleFlagRecordsForFootprint,
+  tacticalCellIsUrbanOrRubble,
   tacticalRangedDirectFirePassesTerrainAndRange,
-  tacticalRes4BriefingLandWater,
+  tacticalBriefingLandWater,
 } from '../../shared/tacticalTerrainCombatModifiers';
 import { MOVEMENT_RANGE_BY_UNIT_TYPE, RANGED_RANGE_BY_UNIT_TYPE } from '../../shared/tacticalRanges';
-import { res4GridDiskNeighborsOrdered } from '../../shared/tacticalRes4TransportLink';
+import { tacticalGridDiskNeighborsOrdered } from '../../shared/tacticalTransportLink';
 import {
   firstRingCellDistinctFrom,
-  tacticalRes4Cell,
-  tacticalRes4PentagonCrossingPair,
-} from './testSupport/tacticalRes4HexFixtures';
+  tacticalCell,
+  tacticalPentagonCrossingPair,
+} from './testSupport/tacticalHexFixtures';
 
 /**
  * Builds a road or rail side mask with every neighbor slot set.
@@ -33,31 +33,31 @@ import {
  * Exceptions: None.
  */
 function allSidesTrue(cell: string): boolean[] {
-  return Array.from({ length: res4GridDiskNeighborsOrdered(cell).length }, () => true);
+  return Array.from({ length: tacticalGridDiskNeighborsOrdered(cell).length }, () => true);
 }
 
 const baseBattle = {
   strategicHexTerrain: 'land',
   strategicHexTerrainKind: 'plains',
-  res4TerrainKindByH3: {} as Record<string, string>,
+  tacticalTerrainKindByH3: {} as Record<string, string>,
 };
 
 test('tacticalRes4UrbanRubbleFlagRecordsForFootprint marks rubble even when terrain kind stays plains', () => {
-  const cell = tacticalRes4Cell(46, 56);
-  const flags = tacticalRes4UrbanRubbleFlagRecordsForFootprint([cell], [
+  const cell = tacticalCell(46, 56);
+  const flags = tacticalUrbanRubbleFlagRecordsForFootprint([cell], [
     { h3Index: cell, terrainKind: 'plains', isUrban: false, isRubble: true },
   ]);
-  assert.equal(flags.res4IsRubbleByH3?.[cell], true);
-  assert.equal(flags.res4IsUrbanByH3?.[cell], undefined);
-  const battle = { ...baseBattle, res4TerrainKindByH3: { [cell]: 'plains' }, ...flags };
-  assert.equal(tacticalRes4CellIsUrbanOrRubble(battle, cell), true);
+  assert.equal(flags.tacticalIsRubbleByH3?.[cell], true);
+  assert.equal(flags.tacticalIsUrbanByH3?.[cell], undefined);
+  const battle = { ...baseBattle, tacticalTerrainKindByH3: { [cell]: 'plains' }, ...flags };
+  assert.equal(tacticalCellIsUrbanOrRubble(battle, cell), true);
 });
 
 test('armor on plains keeps the baseline tactical march budget (not reduced like forest armor)', () => {
-  const plains = tacticalRes4Cell(41, 51);
+  const plains = tacticalCell(41, 51);
   const battlePlains = {
     ...baseBattle,
-    res4TerrainKindByH3: { [plains]: 'plains' },
+    tacticalTerrainKindByH3: { [plains]: 'plains' },
   };
   const armorOnPlains = {
     id: 'a-plains',
@@ -75,11 +75,11 @@ test('armor on plains keeps the baseline tactical march budget (not reduced like
 });
 
 test('armor in forest uses infantry movement budget; infantry in urban uses 1 MP', () => {
-  const forest = tacticalRes4Cell(42, 52);
-  const urban = tacticalRes4Cell(42, 53);
+  const forest = tacticalCell(42, 52);
+  const urban = tacticalCell(42, 53);
   const battleForest = {
     ...baseBattle,
-    res4TerrainKindByH3: { [forest]: 'forest' },
+    tacticalTerrainKindByH3: { [forest]: 'forest' },
   };
   const armorOnForest = {
     id: 'a1',
@@ -92,8 +92,8 @@ test('armor in forest uses infantry movement budget; infantry in urban uses 1 MP
 
   const battleUrban = {
     ...baseBattle,
-    res4IsUrbanByH3: { [urban]: true },
-    res4TerrainKindByH3: { [urban]: 'plains' },
+    tacticalIsUrbanByH3: { [urban]: true },
+    tacticalTerrainKindByH3: { [urban]: 'plains' },
   };
   const infOnUrban = {
     id: 'i1',
@@ -106,10 +106,10 @@ test('armor in forest uses infantry movement budget; infantry in urban uses 1 MP
 });
 
 test('tactical march budget is never zero for non-air; air stays at zero (no res4 march leg)', () => {
-  const cell = tacticalRes4Cell(48, 58);
+  const cell = tacticalCell(48, 58);
   const battle = {
     ...baseBattle,
-    res4TerrainKindByH3: { [cell]: 'plains' },
+    tacticalTerrainKindByH3: { [cell]: 'plains' },
   };
   const air = {
     id: 't-air',
@@ -131,23 +131,23 @@ test('tactical march budget is never zero for non-air; air stays at zero (no res
 });
 
 test('armor in forest caps tactical ranged range to 1', () => {
-  const cell = tacticalRes4Cell(43, 53);
+  const cell = tacticalCell(43, 53);
   const battle = {
     ...baseBattle,
-    res4TerrainKindByH3: { [cell]: 'forest' },
+    tacticalTerrainKindByH3: { [cell]: 'forest' },
   };
   assert.equal(effectiveTacticalRangedMaxRangeForAttacker(battle, 'armor', cell), 1);
   assert.equal(effectiveTacticalRangedMaxRangeForAttacker(battle, 'naval', cell), 10);
 });
 
 test('armor and infantry on a road or rail keep tactical ranged baselines', () => {
-  const roadCell = tacticalRes4Cell(60, 70);
-  const railCell = tacticalRes4Cell(60, 71);
+  const roadCell = tacticalCell(60, 70);
+  const railCell = tacticalCell(60, 71);
   const roadBattle = {
     ...baseBattle,
-    res4TerrainKindByH3: { [roadCell]: 'desert', [railCell]: 'desert' },
-    res4RoadSidesByH3: { [roadCell]: allSidesTrue(roadCell) },
-    res4RailSidesByH3: { [railCell]: allSidesTrue(railCell) },
+    tacticalTerrainKindByH3: { [roadCell]: 'desert', [railCell]: 'desert' },
+    tacticalRoadSidesByH3: { [roadCell]: allSidesTrue(roadCell) },
+    tacticalRailSidesByH3: { [railCell]: allSidesTrue(railCell) },
   };
   assert.equal(effectiveTacticalRangedMaxRangeForAttacker(roadBattle, 'armor', roadCell), RANGED_RANGE_BY_UNIT_TYPE.armor);
   assert.equal(effectiveTacticalRangedMaxRangeForAttacker(roadBattle, 'naval', roadCell), RANGED_RANGE_BY_UNIT_TYPE.naval);
@@ -155,15 +155,15 @@ test('armor and infantry on a road or rail keep tactical ranged baselines', () =
 });
 
 test('forest urban and rubble still cap infantry and armor ranged range', () => {
-  const forestCell = tacticalRes4Cell(62, 70);
-  const urbanCell = tacticalRes4Cell(62, 71);
-  const rubbleCell = tacticalRes4Cell(63, 70);
+  const forestCell = tacticalCell(62, 70);
+  const urbanCell = tacticalCell(62, 71);
+  const rubbleCell = tacticalCell(63, 70);
   const battle = {
     ...baseBattle,
-    res4TerrainKindByH3: { [forestCell]: 'forest', [urbanCell]: 'plains', [rubbleCell]: 'plains' },
-    res4IsUrbanByH3: { [urbanCell]: true },
-    res4IsRubbleByH3: { [rubbleCell]: true },
-    res4RoadSidesByH3: {
+    tacticalTerrainKindByH3: { [forestCell]: 'forest', [urbanCell]: 'plains', [rubbleCell]: 'plains' },
+    tacticalIsUrbanByH3: { [urbanCell]: true },
+    tacticalIsRubbleByH3: { [rubbleCell]: true },
+    tacticalRoadSidesByH3: {
       [forestCell]: allSidesTrue(forestCell),
       [rubbleCell]: allSidesTrue(rubbleCell),
     },
@@ -174,11 +174,11 @@ test('forest urban and rubble still cap infantry and armor ranged range', () => 
 });
 
 test('naval ranged blocked when implicit LOS crosses mountain; infantry not subject to mountain LOS', () => {
-  const a = tacticalRes4Cell(44, 54);
+  const a = tacticalCell(44, 54);
   const b = firstRingCellDistinctFrom(a);
   const battle = {
     ...baseBattle,
-    res4TerrainKindByH3: {
+    tacticalTerrainKindByH3: {
       [a]: 'plains',
       [b]: 'mountain',
     },
@@ -193,10 +193,10 @@ test('naval ranged blocked when implicit LOS crosses mountain; infantry not subj
 });
 
 test('clear terrain stays shootable when the LOS trace crosses an icosahedron face boundary', () => {
-  const pair = tacticalRes4PentagonCrossingPair();
+  const pair = tacticalPentagonCrossingPair();
   const battle = {
     ...baseBattle,
-    res4TerrainKindByH3: Object.fromEntries(pair.res4ChildH3Indexes.map((h) => [h, 'plains'])),
+    tacticalTerrainKindByH3: Object.fromEntries(pair.tacticalChildH3Indexes.map((h) => [h, 'plains'])),
   };
 
   for (const unitType of ['air', 'armor', 'naval'] as const) {
@@ -207,11 +207,11 @@ test('clear terrain stays shootable when the LOS trace crosses an icosahedron fa
 });
 
 test('mountain still blocks LOS across an icosahedron face boundary', () => {
-  const pair = tacticalRes4PentagonCrossingPair();
+  const pair = tacticalPentagonCrossingPair();
   const battle = {
     ...baseBattle,
-    res4TerrainKindByH3: {
-      ...Object.fromEntries(pair.res4ChildH3Indexes.map((h) => [h, 'plains'])),
+    tacticalTerrainKindByH3: {
+      ...Object.fromEntries(pair.tacticalChildH3Indexes.map((h) => [h, 'plains'])),
       [pair.crossingH3Index]: 'mountain',
     },
   };
@@ -223,7 +223,7 @@ test('mountain still blocks LOS across an icosahedron face boundary', () => {
 });
 
 test('tacticalRes4BriefingLandWater classifies wetlands as land even when the parent hex is water', () => {
-  const wetlands = tacticalRes4Cell(12, 34);
+  const wetlands = tacticalCell(12, 34);
   const ring = [...gridDisk(wetlands, 1)].filter((h) => h !== wetlands);
   const openWater = ring[0]!;
   const coastal = ring[1] ?? firstRingCellDistinctFrom(openWater);
@@ -231,20 +231,20 @@ test('tacticalRes4BriefingLandWater classifies wetlands as land even when the pa
   const battle = {
     strategicHexTerrain: 'water',
     strategicHexTerrainKind: 'ocean',
-    res4TerrainKindByH3: { [wetlands]: 'wetlands', [openWater]: 'water', [coastal]: 'coastal' },
+    tacticalTerrainKindByH3: { [wetlands]: 'wetlands', [openWater]: 'water', [coastal]: 'coastal' },
   };
-  assert.equal(tacticalRes4BriefingLandWater(battle, wetlands), 'land');
-  assert.equal(tacticalRes4BriefingLandWater(battle, coastal), 'land');
-  assert.equal(tacticalRes4BriefingLandWater(battle, openWater), 'water');
+  assert.equal(tacticalBriefingLandWater(battle, wetlands), 'land');
+  assert.equal(tacticalBriefingLandWater(battle, coastal), 'land');
+  assert.equal(tacticalBriefingLandWater(battle, openWater), 'water');
 });
 
 test('tacticalRangedDirectFirePassesTerrainAndRange rejects naval shot through mountain footprint', () => {
-  const a = tacticalRes4Cell(45, 55);
+  const a = tacticalCell(45, 55);
   const b = firstRingCellDistinctFrom(a);
   const ring = new Set([a, b]);
   const battle = {
     ...baseBattle,
-    res4TerrainKindByH3: { [a]: 'plains', [b]: 'mountain' },
+    tacticalTerrainKindByH3: { [a]: 'plains', [b]: 'mountain' },
   };
   assert.equal(tacticalRangedDirectFirePassesTerrainAndRange(battle, ring, 'naval', a, b), false);
 });

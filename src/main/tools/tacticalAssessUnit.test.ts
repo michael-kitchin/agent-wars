@@ -107,7 +107,7 @@ test('battle assess_unit: reports the terrain bonus on a matching cell', () => {
         cell: 'near',
         origin: {
           birthH3Index: 'unused',
-          birthRes4H3Index: null,
+          birthTacticalH3Index: null,
           birthTerrainKind: 'forest',
           birthIsUrban: false,
           birthCountryName: null,

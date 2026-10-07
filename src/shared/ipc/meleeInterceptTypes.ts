@@ -10,9 +10,9 @@ export interface MeleeCandidateRow {
     /**
    * Specifies the contract for the `h3Index` member (h3Index: string;).
 
-   * Contract: Res1 cell id where melee would resolve.
+   * Contract: Strategic cell id where melee would resolve.
    * When to use: Row key and tactical auto-start target after Fight.
-   * Expected outcome: Valid res1 index present in the strategic map.
+   * Expected outcome: Valid strategic index present in the strategic map.
    * Exceptions: None.
    */
 h3Index: string;
@@ -66,7 +66,7 @@ decision: 'fight' | 'ignore';
     /**
    * Specifies the contract for the `selectedH3Index` member (selectedH3Index?: string;).
 
-   * Contract: Required when `decision` is fight; must be one of the candidate res1 hex ids.
+   * Contract: Required when `decision` is fight; must be one of the candidate strategic hex ids.
    * When to use: Fight path only.
    * Expected outcome: That hex is excluded from strategic melee resolution for this turn.
    * Exceptions: None.

@@ -1,5 +1,5 @@
 /**
- * Stable 2-character code registries for strategic res1 and tactical res4 H3 cells.
+ * Stable 2-character code registries for strategic and tactical H3 cells.
  *
  * Purpose: Provides deterministic, context-scoped codes for LLM-facing coordinates without exposing raw H3 strings.
  * When to use: Initialize once per strategic process and per tactical battle before briefing or tool translation.
@@ -7,13 +7,18 @@
  * Exceptions: Throws if registry used before initialization for the requested context.
  */
 
-import { cellToChildren, cellToLatLng, getResolution, latLngToCell } from 'h3-js';
+import { cellToLatLng } from 'h3-js';
 import {
-  buildStrategicRes1H3ToCodeMap,
+  buildStrategicH3ToCodeMap,
   indexToCode,
   sortCellsForStableLlmCodes,
 } from '../../../shared/hexLlmCodeAssignment';
-import { STRATEGIC_H3_RESOLUTION, TACTICAL_H3_RESOLUTION } from '../../../shared/h3Resolutions';
+import {
+  isStrategicCell,
+  strategicCellAt,
+  tacticalCellAt,
+  tacticalChildrenOf,
+} from '../../../shared/h3Resolutions';
 import { logDebug, logError, logTrace } from '../../logger';
 import type { CoordinateContext } from './coordinateContext';
 import { HEX_CODE_PATTERN } from './coordinateContext';
@@ -23,21 +28,21 @@ let strategicCodeToH3: Map<string, string> | null = null;
 
 const tacticalRegistries = new Map<
   string,
-  { h3ToCode: Map<string, string>; codeToH3: Map<string, string>; parentRes1: string }
+  { h3ToCode: Map<string, string>; codeToH3: Map<string, string>; parentStrategic: string }
 >();
 
 /**
- * Initializes the global strategic res1 registry (all Earth res1 children of res0 cells).
+ * Initializes the global strategic registry (all Earth strategic children of res0 cells).
  *
  * Purpose: Phase 1 registry build; safe to call multiple times (rebuilds identical maps).
  * When to use: Before any strategic briefing, tool translation, or parser validation for strategic mode.
- * Expected outcome: `strategicH3ToCode`/`strategicCodeToH3` populated for all res1 cells.
+ * Expected outcome: `strategicH3ToCode`/`strategicCodeToH3` populated for all strategic cells.
  * Exceptions: Propagates H3 library failures as errors.
  */
 export function initStrategicCoordinateRegistry(): void {
   logDebug('hex-coordinates initStrategicCoordinateRegistry: building strategic res1 registry');
   try {
-    const h3ToCode = new Map(buildStrategicRes1H3ToCodeMap());
+    const h3ToCode = new Map(buildStrategicH3ToCodeMap());
     const codeToH3 = new Map<string, string>();
     for (const [h3, code] of h3ToCode.entries()) {
       codeToH3.set(code, h3);
@@ -54,20 +59,20 @@ export function initStrategicCoordinateRegistry(): void {
 }
 
 /**
- * Initializes a tactical res4 registry for one battle under its enclosing res1 parent.
+ * Initializes a tactical registry for one battle under its enclosing strategic parent.
  *
  * Purpose: Tactical codes are stable for the battle only; they reuse the 2-character space independently of strategic codes.
  * When to use: At tactical AI consultation start, keyed by `battleId`.
- * Expected outcome: Codes cover all res4 children returned by H3 for the parent cell.
+ * Expected outcome: Codes cover all tactical children returned by H3 for the parent cell.
  * Exceptions: Throws if children cannot be enumerated.
  */
-export function initTacticalCoordinateRegistry(battleId: string, enclosingRes1H3Index: string): void {
+export function initTacticalCoordinateRegistry(battleId: string, enclosingStrategicH3Index: string): void {
   logDebug('hex-coordinates initTacticalCoordinateRegistry: building tactical res4 registry', {
     battleId,
-    enclosingRes1H3Index,
+    enclosingStrategicH3Index,
   });
   try {
-    const children = sortCellsForStableLlmCodes(cellToChildren(enclosingRes1H3Index, TACTICAL_H3_RESOLUTION));
+    const children = sortCellsForStableLlmCodes(tacticalChildrenOf(enclosingStrategicH3Index));
     const h3ToCode = new Map<string, string>();
     const codeToH3 = new Map<string, string>();
     for (let i = 0; i < children.length; i++) {
@@ -76,7 +81,7 @@ export function initTacticalCoordinateRegistry(battleId: string, enclosingRes1H3
       h3ToCode.set(h3, code);
       codeToH3.set(code, h3);
     }
-    tacticalRegistries.set(battleId, { h3ToCode, codeToH3, parentRes1: enclosingRes1H3Index });
+    tacticalRegistries.set(battleId, { h3ToCode, codeToH3, parentStrategic: enclosingStrategicH3Index });
     logDebug('hex-coordinates initTacticalCoordinateRegistry: complete', {
       battleId,
       cellCount: h3ToCode.size,
@@ -98,16 +103,16 @@ export function initTacticalCoordinateRegistry(battleId: string, enclosingRes1H3
 export function getHexCodeForContext(h3Index: string, context: CoordinateContext): string | undefined {
   logTrace('hex-coordinates getHexCodeForContext', { h3Index, mode: context.mode });
   if (context.mode === 'strategic') {
-    const res1 =
-      getResolution(h3Index) === STRATEGIC_H3_RESOLUTION
+    const strategic =
+      isStrategicCell(h3Index)
         ? h3Index
-        : latLngToCell(...cellToLatLng(h3Index), STRATEGIC_H3_RESOLUTION);
-    return strategicH3ToCode?.get(res1);
+        : strategicCellAt(...cellToLatLng(h3Index));
+    return strategicH3ToCode?.get(strategic);
   }
   const battleId = context.battleId;
   if (!battleId) return undefined;
   const [lat, lng] = cellToLatLng(h3Index);
-  const h4 = latLngToCell(lat, lng, TACTICAL_H3_RESOLUTION);
+  const h4 = tacticalCellAt(lat, lng);
   return tacticalRegistries.get(battleId)?.h3ToCode.get(h4);
 }
 
@@ -157,14 +162,14 @@ export function ensureStrategicCoordinateRegistryInitialized(): void {
 }
 
 /**
- * Lists every strategic res1 H3 index currently registered (post-init).
+ * Lists every strategic H3 index currently registered (post-init).
  *
  * Purpose: Supports bounding-box selection without importing private registry maps.
- * When to use: `computeMapHexes` and tests that need a full-world res1 universe.
- * Expected outcome: One entry per registered res1 cell; order is not guaranteed.
+ * When to use: `computeMapHexes` and tests that need a full-world strategic universe.
+ * Expected outcome: One entry per registered strategic cell; order is not guaranteed.
  * Exceptions: Throws if the strategic registry has not been initialized.
  */
-export function listStrategicRes1H3Indexes(): string[] {
+export function listStrategicH3Indexes(): string[] {
   ensureStrategicCoordinateRegistryInitialized();
   if (!strategicCodeToH3) {
     const err = new Error('hex-coordinates: strategic registry missing after init');

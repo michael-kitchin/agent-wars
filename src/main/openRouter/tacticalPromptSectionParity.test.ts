@@ -24,10 +24,10 @@ import { buildLatLngCoordinateMap } from '../mapData';
 import { getSubscriptions, replaceSubscriptions } from '../callbackSubscriptions';
 import { buildTacticalAiPlanState } from '../tacticalBattle/buildTacticalAiPlanState';
 import {
-  tacticalRes1Cell,
-  tacticalRes4UnderRes1Corner,
+  tacticalParentCell,
+  tacticalUnderCorner,
   firstRingCellDistinctFrom,
-} from '../tacticalBattle/testSupport/tacticalRes4HexFixtures';
+} from '../tacticalBattle/testSupport/tacticalHexFixtures';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { getInjectionText as getStandingOrderInjectionText } from '../tools/standingOrders';
 import { buildAirOperationsBriefingBlock } from './briefingSectionsAirOps';
@@ -74,14 +74,14 @@ function buildLandBattleFixture(options?: {
   opponentSubId: string;
   parentId: string;
   humanSubId: string;
-  res4Opp: string;
-  res4Hum: string;
+  tacticalOpp: string;
+  tacticalHum: string;
 } {
   const battleId = options?.battleId ?? 'parity-land-battle';
-  const res1 = tacticalRes1Cell(12, 34);
-  const res4Children = [...cellToChildren(res1, 4)];
-  const res4Opp = tacticalRes4UnderRes1Corner(12, 34, { latEpsilon: 0.01 });
-  const res4Hum = firstRingCellDistinctFrom(res4Opp);
+  const parentCell = tacticalParentCell(12, 34);
+  const tacticalChildren = [...cellToChildren(parentCell, 4)];
+  const tacticalOpp = tacticalUnderCorner(12, 34, { latEpsilon: 0.01 });
+  const tacticalHum = firstRingCellDistinctFrom(tacticalOpp);
   const parentId = 'opp-parent-armor-1';
   const opponentSubId = `${parentId}:01`;
   const humanSubId = 'hum-parent-inf-1:01';
@@ -91,7 +91,7 @@ function buildLandBattleFixture(options?: {
       parentUnitId: parentId,
       player: 'opponent',
       unitType: 'armor',
-      h3Index: res4Opp,
+      h3Index: tacticalOpp,
       displayName: 'Opp Armor (01)',
     },
     {
@@ -99,7 +99,7 @@ function buildLandBattleFixture(options?: {
       parentUnitId: 'hum-parent-inf-1',
       player: 'human',
       unitType: 'infantry',
-      h3Index: res4Hum,
+      h3Index: tacticalHum,
       displayName: 'Hum Infantry (01)',
     },
   ];
@@ -109,7 +109,7 @@ function buildLandBattleFixture(options?: {
       parentUnitId: 'opp-parent-air-1',
       player: 'opponent',
       unitType: 'air',
-      h3Index: res4Opp,
+      h3Index: tacticalOpp,
       displayName: 'Opp Air (01)',
     });
   }
@@ -121,7 +121,7 @@ function buildLandBattleFixture(options?: {
       parentUnitId: 'opp-parent-naval-1',
       player: 'opponent',
       unitType: 'naval',
-      h3Index: res4Opp,
+      h3Index: tacticalOpp,
       displayName: 'Opp Naval (01)',
     });
     if (options.embarkInfantryOnNaval) {
@@ -130,7 +130,7 @@ function buildLandBattleFixture(options?: {
         parentUnitId: 'opp-parent-inf-1',
         player: 'opponent',
         unitType: 'infantry',
-        h3Index: res4Opp,
+        h3Index: tacticalOpp,
         displayName: 'Opp Infantry (01)',
         embarkedOnSubUnitId: navalId,
       });
@@ -138,8 +138,8 @@ function buildLandBattleFixture(options?: {
   }
   const battle: TacticalBattleSnapshot = {
     battleId,
-    enclosingRes1H3Index: res1,
-    res4ChildH3Indexes: res4Children,
+    enclosingStrategicH3Index: parentCell,
+    tacticalChildH3Indexes: tacticalChildren,
     strategicTurnNumber: 1,
     tacticalTurnNumber: 3,
     strategicHexTerrain: 'land',
@@ -149,14 +149,14 @@ function buildLandBattleFixture(options?: {
   const strategic: GameStateSnapshot = {
     turnNumber: 1,
     phase: 'planning',
-    hexes: [{ h3Index: res1, terrain: 'land', terrainKind: 'plains' }],
+    hexes: [{ h3Index: parentCell, terrain: 'land', terrainKind: 'plains' }],
     units: [],
     pendingOrders: [],
   };
   const planState = buildTacticalAiPlanState(strategic, battle);
   const { latLngByH3 } = buildLatLngCoordinateMap(planState.hexes.map((h) => h.h3Index));
-  initTacticalCoordinateRegistry(battleId, res1);
-  return { battle, planState, latLngByH3, opponentSubId, parentId, humanSubId, res4Opp, res4Hum };
+  initTacticalCoordinateRegistry(battleId, parentCell);
+  return { battle, planState, latLngByH3, opponentSubId, parentId, humanSubId, tacticalOpp, tacticalHum };
 }
 
 /**
@@ -195,7 +195,7 @@ test('looksLikeTacticalSubUnitId accepts compact and legacy shapes', () => {
 
 test('lightweight assessments report nearest enemy distance and critical adjacency', () => {
   withTempDb(() => {
-    const { battle, opponentSubId, humanSubId, res4Opp, res4Hum } = buildLandBattleFixture();
+    const { battle, opponentSubId, humanSubId, tacticalOpp, tacticalHum } = buildLandBattleFixture();
     const assessments = buildLightweightTacticalUnitAssessments(battle);
     assert.equal(assessments.length, 1);
     const row = assessments[0]!;
@@ -203,7 +203,7 @@ test('lightweight assessments report nearest enemy distance and critical adjacen
     const nearest = row.result.nearbyEnemies[0];
     assert.ok(nearest);
     assert.equal(nearest.unitId, humanSubId);
-    assert.equal(nearest.hexDistance, gridDistance(res4Opp, res4Hum));
+    assert.equal(nearest.hexDistance, gridDistance(tacticalOpp, tacticalHum));
     assert.equal(nearest.inMeleeRange, nearest.hexDistance <= 1);
     if (nearest.inMeleeRange) {
       assert.ok(row.result.threats.some((t) => t.severity === 'critical'));
@@ -216,13 +216,13 @@ test('lightweight assessments report nearest enemy distance and critical adjacen
 
 test('lightweight assessments reuse nearby-enemy geometry for stacked same-type sub-units', () => {
   withTempDb(() => {
-    const { battle, humanSubId, res4Opp } = buildLandBattleFixture();
+    const { battle, humanSubId, tacticalOpp } = buildLandBattleFixture();
     battle.subUnits.push({
       id: 'opp-parent-armor-2:01',
       parentUnitId: 'opp-parent-armor-2',
       player: 'opponent',
       unitType: 'armor',
-      h3Index: res4Opp,
+      h3Index: tacticalOpp,
       displayName: 'Opp Armor (02)',
     });
     battle.subUnits.push({
@@ -230,7 +230,7 @@ test('lightweight assessments reuse nearby-enemy geometry for stacked same-type 
       parentUnitId: 'opp-parent-inf-stack',
       player: 'opponent',
       unitType: 'infantry',
-      h3Index: res4Opp,
+      h3Index: tacticalOpp,
       displayName: 'Opp Infantry (01)',
     });
     const assessments = buildLightweightTacticalUnitAssessments(battle);

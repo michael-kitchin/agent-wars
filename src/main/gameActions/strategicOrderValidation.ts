@@ -4,7 +4,7 @@ import {
   LAND_UNIT_DESTINATION_NOT_LANDMASS_REASON,
   getLandMassRouteBlockReason,
   landUnitCanOccupyHex,
-} from '../../shared/landTraversalRes1';
+} from '../../shared/landTraversalStrategic';
 import { formatTargetOutOfRangeReason } from '../../shared/tacticalRanges';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { buildStrategicUnitDisplayLabelResolver, fallbackDisplayNameFromUnitId } from '../../shared/unitDisplayNames';
@@ -20,7 +20,7 @@ import {
 import { getValidDestinations } from '../oneStepMoveDestinations';
 import { getActiveTacticalBattleSnapshot, isTacticalBattleActive } from '../tacticalBattle/tacticalBattleSession';
 import { validateTacticalGroupFerryTarget } from '../tacticalBattle/tacticalFerryAirportGuards';
-import { getRes1LandMassByH3 } from '../terrainClassificationCache';
+import { getStrategicLandMassByH3 } from '../terrainClassificationCache';
 import { strategicRangeOnState } from '../weather/weatherMatch';
 import { validateAirStrikeOrder, validateFerryOrder } from './airValidation';
 import type { SubmitOrdersResult } from './gameActionsTypes';
@@ -162,7 +162,7 @@ export function validateOrder(
       return { valid: false, reason: NAVAL_DESTINATION_MUST_BE_WATER_COASTAL };
     }
   }
-  if ((unit.unit_type === 'infantry' || unit.unit_type === 'armor') && !landUnitCanOccupyHex(toH3Index, getRes1LandMassByH3())) {
+  if ((unit.unit_type === 'infantry' || unit.unit_type === 'armor') && !landUnitCanOccupyHex(toH3Index, getStrategicLandMassByH3())) {
     return { valid: false, reason: LAND_UNIT_DESTINATION_NOT_LANDMASS_REASON };
   }
   if (isLandUnitType(unit.unit_type)) {
@@ -191,7 +191,7 @@ export function validateOrder(
       if (routeH3[routeH3.length - 1] !== h3) routeH3.push(h3);
     }
     if (routeH3[routeH3.length - 1] !== toH3Index) routeH3.push(toH3Index);
-    const landMassBlock = getLandMassRouteBlockReason(routeH3, getRes1LandMassByH3());
+    const landMassBlock = getLandMassRouteBlockReason(routeH3, getStrategicLandMassByH3());
     if (landMassBlock) return { valid: false, reason: landMassBlock };
   }
 

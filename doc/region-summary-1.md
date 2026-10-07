@@ -111,7 +111,7 @@ Hits are air-strike hits on urban cells. The average side is the map's land hexe
 - Tech tier still comes from the generated urban count of a unit's birth hex.
 
 **Air strikes on cities**
-- Urban cells destroyed per strategic air-strike hit = max(1, round(3 × scale)). This keeps a hit worth the same production, measured in units, as in the global game.
+- Urban cells destroyed per strategic air-strike hit = max(1, round(9 × scale)), with half-up rounding. The global map destroys 9. This keeps a hit worth the same production, measured in units, as in the global game. Those integers are in `src/shared/regionalRulesCatalog.ts` (`strategicUrbanCellsDestroyedPerHit` once a map is active). Table 3 above still shows the earlier estimates, which used a global hit of 3.
 - Hits on infrastructure in battles stay at one cell.
 
 **Strategic movement**
@@ -194,9 +194,9 @@ The movement and cover rules barely affect the global game (8% of res1 land hexe
 5. **Urban data quality.** The scalerank ≤ 5 filter drops 68% of India's and 79% of Bangladesh's urban res4 cells, and Cuba has 3 urban cells at any scalerank. It also decides balance questions: the UK holds 52% of Northern Europe's urban cells with the filter and 27% without. Fix this before trusting any economy or side-group number, especially on the thin maps. EarthEnv consensus class 9 (urban/built-up, 1 km) is already on disk and worth comparing.
 6. **Naval and air minimums** were matched across all producing hexes. Ports and airports haven't been counted at the regional resolutions.
 7. **One price scale per map** means that on the thinner maps infantry builds 13–36% faster and fleets 10–31% slower than in the global game (Table 2, last column). Per-unit scales would fix build times but distort relative prices.
-8. **Small samples.** The Advanced share lands at 15% (Middle Africa north) and 30% (Middle Africa south) instead of 21–27% on the other maps. Middle Africa north's cells-per-hit value sits on the 1-or-2 rounding boundary (1.5). Using 2 brings its median city to 2.5 hits.
+8. **Small samples.** The Advanced share lands at 15% (Middle Africa north) and 30% (Middle Africa south) instead of 21–27% on the other maps. Middle Africa north's scale of 0.50 is 4.5 cells under a global hit of 9, and the catalog stores 5.
 9. **Engine work** (rough estimate 50–100 hours):
-   - Resolution becomes a per-match setting instead of a constant (`STRATEGIC_H3_RESOLUTION`, `TACTICAL_H3_RESOLUTION`, a dozen `cellToParent(x, 1)` calls, `getResolution(...) === 1/4` checks, `res1_*`/`res4_*` tables, and startup-loaded global terrain caches).
+   - Resolution is read from the active map (`strategicH3Resolution`, `tacticalH3Resolution`). The active map is still the global one, resolutions 1 and 4. SQLite objects for the two grids are named `res_s_` and `res_t_`. Loading a chosen map's pack at match start, and moving the missing-data check off startup, is not in the engine yet.
    - Per-map data packs loaded at match start, with the missing-data check moved from startup.
    - The neutral-border rule.
    - EarthEnv 1 km topography for res6 maps (5 km grids give 2–3 pixels per res6 cell).

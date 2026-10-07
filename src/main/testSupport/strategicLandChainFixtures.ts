@@ -10,10 +10,10 @@
  */
 
 import { gridDisk, gridDistance } from 'h3-js';
-import { canLandUnitTraverseEdge, landUnitCanOccupyHex } from '../../shared/landTraversalRes1';
+import { canLandUnitTraverseEdge, landUnitCanOccupyHex } from '../../shared/landTraversalStrategic';
 import type { GameStateSnapshot } from '../gameDb';
 import { getOrderedHexList } from '../mapData';
-import { ensureTerrainClassificationCacheLoaded, getRes1LandMassByH3 } from '../terrainClassificationCache';
+import { ensureTerrainClassificationCacheLoaded, getStrategicLandMassByH3 } from '../terrainClassificationCache';
 
 /**
  * Finds a land-mass hex chain whose hop count equals H3 grid distance (a geodesic on occupiable land).
@@ -26,7 +26,7 @@ import { ensureTerrainClassificationCacheLoaded, getRes1LandMassByH3 } from '../
  */
 export function findGeodesicLandMassChain(hops: number): string[] {
   ensureTerrainClassificationCacheLoaded();
-  const data = getRes1LandMassByH3();
+  const data = getStrategicLandMassByH3();
   const allHexes = getOrderedHexList();
   const onMap = new Set(allHexes);
   for (const origin of allHexes) {
@@ -86,9 +86,9 @@ export function buildLandChainState(args: {
     hexes: args.chain.map((h3Index) => ({ h3Index, terrain: 'land', terrainKind: 'plains' })),
     units: args.units,
     pendingOrders: [],
-    res1Infrastructure: args.urbanOnStep1
+    strategicInfrastructure: args.urbanOnStep1
       ? [{ h3Index: args.chain[1]!, urbanHexCount: 2, airportCount: 0, seaportCount: 0 }]
       : [],
-    res1Control: [],
+    strategicControl: [],
   };
 }

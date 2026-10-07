@@ -15,6 +15,7 @@ const REGIONAL_JSON_FILES = Object.freeze([
   'terrain_res_s_weather.json',
   'terrain_res_t_road_rail_sides.json',
   'terrain_res_t_road_rail_vectors.json',
+  'terrain_res_t_origin_units.json',
 ]);
 
 module.exports = {

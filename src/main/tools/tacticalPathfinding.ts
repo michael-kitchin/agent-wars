@@ -1,16 +1,16 @@
 /**
- * Tactical pathfinding: plan_route / check_distance via res4 march planner (not strategic land-mass).
+ * Tactical pathfinding: plan_route / check_distance via tactical march planner (not strategic land-mass).
  */
 
 import { computeGridDistanceWithPathFallbackPure } from '../../shared/h3GridRangePure';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
-import { planTacticalRes4MarchWithSessionCache } from '../tacticalBattle/tacticalMovementPlanningCache';
+import { planTacticalMarchWithSessionCache } from '../tacticalBattle/tacticalMovementPlanningCache';
 import { tacticalLandMarchBestEffortPlanTowardOrderedHex } from '../tacticalBattle/tacticalSnapshotGuards';
 import { checkDistanceTagSourceUnit } from './pathfindingDistanceHelpers';
 import { effectiveTacticalMovementPointBudgetForMarchLeg } from '../../shared/tacticalTerrainCombatModifiers';
 import {
   buildTacticalTerrainKindResolverFromSnapshot,
-  isNavalRes4TacticalCellNavigable,
+  isNavalTacticalCellNavigable,
 } from '../../shared/tacticalTerrainMovement';
 import type { GameStateSnapshot } from '../gameDb';
 import { logDebug, logError } from '../logger';
@@ -56,21 +56,21 @@ type CheckDistanceOk = {
 type CheckDistanceError = { status: 'error'; error: string };
 
 /**
- * Builds the res4 footprint set for a tactical plan_route, optionally excluding other-player hexes.
+ * Builds the tactical footprint set for a tactical plan_route, optionally excluding other-player hexes.
  *
  * Purpose: Mirrors strategic avoidEnemies by removing enemy-occupied cells while keeping origin and destination.
- * When to use: Before `planTacticalRes4MarchWithSessionCache` when the model requests (or defaults to) avoidance.
- * Expected outcome: Subset of `battle.res4ChildH3Indexes`; destination always retained when inside the footprint.
+ * When to use: Before `planTacticalMarchWithSessionCache` when the model requests (or defaults to) avoidance.
+ * Expected outcome: Subset of `battle.tacticalChildH3Indexes`; destination always retained when inside the footprint.
  * Exceptions: None.
  */
-function buildTacticalRouteRes4Set(
+function buildTacticalRouteSet(
   battle: TacticalBattleSnapshot,
   originH3: string,
   destinationH3: string,
   avoidEnemies: boolean,
   moverPlayer: string
 ): Set<string> {
-  const base = new Set(battle.res4ChildH3Indexes);
+  const base = new Set(battle.tacticalChildH3Indexes);
   if (!avoidEnemies) return base;
   const enemyOccupied = new Set<string>();
   for (const u of battle.subUnits) {
@@ -91,29 +91,29 @@ function buildTacticalRouteRes4Set(
 }
 
 /**
- * Picks the nearest naval-navigable res4 cell to a land reference hex inside the battle footprint.
+ * Picks the nearest naval-navigable tactical cell to a land reference hex inside the battle footprint.
  *
  * Purpose: Mirrors strategic plan_route land→water redirect so naval units can route toward land targets.
  * When to use: Before tactical naval plan_route / check_distance when the requested destination is not navigable for naval.
  * Expected outcome: Closest navigable footprint cell by H3 distance, or undefined when none exist.
  * Exceptions: None; distances use the shared BFS fallback so a cell across a face crossing stays a candidate.
  */
-function nearestNavigableNavalRes4To(
+function nearestNavigableNavalTacticalTo(
   battle: TacticalBattleSnapshot,
   landRefH3: string,
-  res4Set: ReadonlySet<string>
+  tacticalSet: ReadonlySet<string>
 ): string | undefined {
   const terrain = buildTacticalTerrainKindResolverFromSnapshot(battle);
   let best: string | undefined;
   let bestD = Infinity;
-  for (const h3 of res4Set) {
-    const resolved = terrain.effectiveKindForRes4Hex(h3);
+  for (const h3 of tacticalSet) {
+    const resolved = terrain.effectiveKindForTacticalHex(h3);
     if (
-      !isNavalRes4TacticalCellNavigable({
+      !isNavalTacticalCellNavigable({
         resolvedKindForCell: resolved,
         parentTerrain: terrain.parentTerrain,
         parentTerrainKind: terrain.parentTerrainKind,
-        isSeaportCell: terrain.isSeaportRes4?.(h3) === true,
+        isSeaportCell: terrain.isSeaportTactical?.(h3) === true,
       })
     ) {
       continue;
@@ -130,7 +130,7 @@ function nearestNavigableNavalRes4To(
 /**
  * Plans a tactical land/naval march and builds a Tool1 plan_route success payload truncated to the first Ready leg.
  *
- * Purpose: Fixes tactical AI plan_route when strategic res1 land-mass rejects every res4 cell.
+ * Purpose: Fixes tactical AI plan_route when strategic land-mass rejects every tactical cell.
  * When to use: `executePathfinding` when `tacticalBattle` is set for `plan_route`.
  * Expected outcome: `orderToH3` = `firstStopWithinBudget.stopH3` (same truncation as human Ready); avoidEnemies honored with unblock retry.
  * Exceptions: Returns PlanRouteError for air, unknown units, off-footprint cells, or unreachable destinations.
@@ -174,21 +174,21 @@ export function executeTacticalPlanRoute(
       return { status: 'error', error: 'Invalid destination hex' };
     }
     const originH3 = unit.h3Index;
-    const footprint = new Set(battle.res4ChildH3Indexes);
+    const footprint = new Set(battle.tacticalChildH3Indexes);
     if (!footprint.has(originH3) || !footprint.has(destH3)) {
       return { status: 'error', error: 'Origin or destination is outside the tactical battle footprint.' };
     }
     const warnings: string[] = [];
     if (unit.unitType === 'naval') {
       const terrain = buildTacticalTerrainKindResolverFromSnapshot(battle);
-      const destNavigable = isNavalRes4TacticalCellNavigable({
-        resolvedKindForCell: terrain.effectiveKindForRes4Hex(destH3),
+      const destNavigable = isNavalTacticalCellNavigable({
+        resolvedKindForCell: terrain.effectiveKindForTacticalHex(destH3),
         parentTerrain: terrain.parentTerrain,
         parentTerrainKind: terrain.parentTerrainKind,
-        isSeaportCell: terrain.isSeaportRes4?.(destH3) === true,
+        isSeaportCell: terrain.isSeaportTactical?.(destH3) === true,
       });
       if (!destNavigable) {
-        const waterHex = nearestNavigableNavalRes4To(battle, destH3, footprint);
+        const waterHex = nearestNavigableNavalTacticalTo(battle, destH3, footprint);
         if (waterHex) {
           destH3 = waterHex;
           warnings.push('Naval destination redirected to nearest water/coastal/seaport hex in the tactical footprint.');
@@ -224,11 +224,11 @@ export function executeTacticalPlanRoute(
     );
     const avoidEnemies = options?.avoidEnemies !== false;
 
-    const tryPlan = (res4Set: Set<string>) =>
-      planTacticalRes4MarchWithSessionCache(battle, {
+    const tryPlan = (tacticalSet: Set<string>) =>
+      planTacticalMarchWithSessionCache(battle, {
         fromH3: originH3,
         toH3: destH3,
-        res4Set,
+        tacticalSet,
         unitTypeForMovement: unit.unitType,
         movementPointBudget: Math.max(0, budget),
         weatherEnabled: battle.weatherBonusEnabled === true,
@@ -236,7 +236,7 @@ export function executeTacticalPlanRoute(
         weatherTags: sub?.weatherTags,
       });
 
-    let plan = tryPlan(buildTacticalRouteRes4Set(battle, originH3, destH3, avoidEnemies, unit.player));
+    let plan = tryPlan(buildTacticalRouteSet(battle, originH3, destH3, avoidEnemies, unit.player));
     if (!plan.reachable && avoidEnemies) {
       plan = tryPlan(footprint);
       if (plan.reachable) {
@@ -249,7 +249,7 @@ export function executeTacticalPlanRoute(
         battle,
         fromH3: originH3,
         orderedToH3: destH3,
-        res4Set: footprint,
+        tacticalSet: footprint,
         moveType: unit.unitType,
         movementPointBudget: budget,
         weatherTags: sub?.weatherTags,
@@ -329,9 +329,9 @@ export function executeTacticalPlanRoute(
 }
 
 /**
- * Tactical check_distance using res4 march cost/path instead of strategic land-mass BFS.
+ * Tactical check_distance using tactical march cost/path instead of strategic land-mass BFS.
  *
- * Purpose: Lets the model compare approach options inside a battle without false “unreachable” from res1 land-mass.
+ * Purpose: Lets the model compare approach options inside a battle without false “unreachable” from strategic land-mass.
  * When to use: `executePathfinding` when `tacticalBattle` is set for `check_distance`.
  * Expected outcome: hexDistance from path length; estimatedTurns from MP cost / budget; reachable when a finite path exists.
  * Weather budgets and enter costs use the tags of the sub-unit `checkDistanceTagSourceUnit` picks on the start cell, as
@@ -354,7 +354,7 @@ export function executeTacticalCheckDistance(
   });
   const fromH3 = resolveToH3(from[0], from[1]);
   const toH3 = resolveToH3(to[0], to[1]);
-  const footprint = new Set(battle.res4ChildH3Indexes);
+  const footprint = new Set(battle.tacticalChildH3Indexes);
   if (!fromH3 || !toH3 || !footprint.has(fromH3) || !footprint.has(toH3)) {
     return { status: 'error', error: 'Invalid hex position' };
   }
@@ -366,14 +366,14 @@ export function executeTacticalCheckDistance(
   let toH3Resolved = toH3;
   if (unitType === 'naval') {
     const terrain = buildTacticalTerrainKindResolverFromSnapshot(battle);
-    const destNavigable = isNavalRes4TacticalCellNavigable({
-      resolvedKindForCell: terrain.effectiveKindForRes4Hex(toH3Resolved),
+    const destNavigable = isNavalTacticalCellNavigable({
+      resolvedKindForCell: terrain.effectiveKindForTacticalHex(toH3Resolved),
       parentTerrain: terrain.parentTerrain,
       parentTerrainKind: terrain.parentTerrainKind,
-      isSeaportCell: terrain.isSeaportRes4?.(toH3Resolved) === true,
+      isSeaportCell: terrain.isSeaportTactical?.(toH3Resolved) === true,
     });
     if (!destNavigable) {
-      const waterHex = nearestNavigableNavalRes4To(battle, toH3Resolved, footprint);
+      const waterHex = nearestNavigableNavalTacticalTo(battle, toH3Resolved, footprint);
       if (waterHex) toH3Resolved = waterHex;
     }
   }

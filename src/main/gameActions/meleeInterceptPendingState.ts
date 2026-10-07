@@ -57,7 +57,7 @@ rngInvocationsBeforeMelee: number;
     /**
    * Specifies the contract for the `hexList` member (hexList: string[];).
 
-   * Contract: Ordered strategic res1 hex list used for combat iteration.
+   * Contract: Ordered strategic hex list used for combat iteration.
    * When to use: Passed back into `runMeleePhase`.
    * Expected outcome: Same ordering as pause-time ready.
    * Exceptions: None.

@@ -12,16 +12,16 @@ import { resetTacticalMovementPlanningCacheForTests } from './tacticalMovementPl
 import { tacticalComputeMovementOrderOutcome } from './tacticalSnapshotGuards';
 import {
   firstRingCellDistinctFrom,
-  tacticalRes1Cell,
-  tacticalRes4Cell,
-} from './testSupport/tacticalRes4HexFixtures';
+  tacticalParentCell,
+  tacticalCell,
+} from './testSupport/tacticalHexFixtures';
 
 beforeEach(() => {
   resetTacticalMovementPlanningCacheForTests();
 });
 
 test('opponent march outside res4 footprint fails (same gate as consultation mergedMovement loop)', () => {
-  const center = tacticalRes4Cell(39, 49);
+  const center = tacticalCell(39, 49);
   const outside = firstRingCellDistinctFrom(center);
   const subUnits = [
     {
@@ -35,22 +35,22 @@ test('opponent march outside res4 footprint fails (same gate as consultation mer
   ];
   const battle: TacticalBattleSnapshot = {
     battleId: 'footprint-gate',
-    enclosingRes1H3Index: tacticalRes1Cell(39, 49),
-    res4ChildH3Indexes: [center],
+    enclosingStrategicH3Index: tacticalParentCell(39, 49),
+    tacticalChildH3Indexes: [center],
     strategicTurnNumber: 1,
     tacticalTurnNumber: 1,
     strategicHexTerrain: 'land',
     strategicHexTerrainKind: 'plains',
     subUnits,
   };
-  const res4Set = new Set(battle.res4ChildH3Indexes);
+  const tacticalSet = new Set(battle.tacticalChildH3Indexes);
   const sub = [...battle.subUnits];
   const byId = new Map(sub.map((u, i) => [u.id, i] as const));
   const outcome = tacticalComputeMovementOrderOutcome({
     byId,
     sub,
     order: { unitId: 'opp:01', toH3Index: outside },
-    res4Set,
+    tacticalSet,
     battle,
   });
   assert.equal(outcome.ok, false);
@@ -58,7 +58,7 @@ test('opponent march outside res4 footprint fails (same gate as consultation mer
 });
 
 test('opponent armor march blocked by mountain neighbor fails with planner context (terrain-weighted parity)', () => {
-  const center = tacticalRes4Cell(40, 50);
+  const center = tacticalCell(40, 50);
   const neighbor = firstRingCellDistinctFrom(center);
   const subUnits = [
     {
@@ -72,23 +72,23 @@ test('opponent armor march blocked by mountain neighbor fails with planner conte
   ];
   const battle: TacticalBattleSnapshot = {
     battleId: 'terrain-gate',
-    enclosingRes1H3Index: tacticalRes1Cell(40, 50),
-    res4ChildH3Indexes: [center, neighbor],
+    enclosingStrategicH3Index: tacticalParentCell(40, 50),
+    tacticalChildH3Indexes: [center, neighbor],
     strategicTurnNumber: 1,
     tacticalTurnNumber: 1,
     strategicHexTerrain: 'land',
     strategicHexTerrainKind: 'plains',
-    res4TerrainKindByH3: { [neighbor]: 'mountain' },
+    tacticalTerrainKindByH3: { [neighbor]: 'mountain' },
     subUnits,
   };
-  const res4Set = new Set(battle.res4ChildH3Indexes);
+  const tacticalSet = new Set(battle.tacticalChildH3Indexes);
   const sub = [...battle.subUnits];
   const byId = new Map(sub.map((u, i) => [u.id, i] as const));
   const outcome = tacticalComputeMovementOrderOutcome({
     byId,
     sub,
     order: { unitId: 'opp:01', toH3Index: neighbor },
-    res4Set,
+    tacticalSet,
     battle,
   });
   assert.equal(outcome.ok, false);
@@ -97,7 +97,7 @@ test('opponent armor march blocked by mountain neighbor fails with planner conte
 });
 
 test('opponent infantry on urban (budget 1): distant explicit_move clamps to first leg, not dropped', () => {
-  const center = tacticalRes4Cell(5, 6);
+  const center = tacticalCell(5, 6);
   const ring1 = new Set(gridDisk(center, 1));
   const disk2 = [...gridDisk(center, 2)];
   const footprint = new Set(disk2);
@@ -115,36 +115,36 @@ test('opponent infantry on urban (budget 1): distant explicit_move clamps to fir
   ];
   const battle: TacticalBattleSnapshot = {
     battleId: 'clamp-urban',
-    enclosingRes1H3Index: tacticalRes1Cell(5, 6),
-    res4ChildH3Indexes: [...footprint],
+    enclosingStrategicH3Index: tacticalParentCell(5, 6),
+    tacticalChildH3Indexes: [...footprint],
     strategicTurnNumber: 1,
     tacticalTurnNumber: 1,
     strategicHexTerrain: 'land',
     strategicHexTerrainKind: 'plains',
-    res4IsUrbanByH3: { [center]: true },
+    tacticalIsUrbanByH3: { [center]: true },
     subUnits,
   };
-  const res4Set = new Set(battle.res4ChildH3Indexes);
+  const tacticalSet = new Set(battle.tacticalChildH3Indexes);
   const sub = [...battle.subUnits];
   const byId = new Map(sub.map((u, i) => [u.id, i] as const));
   const outcome = tacticalComputeMovementOrderOutcome({
     byId,
     sub,
     order: { unitId: 'opp:01', toH3Index: far },
-    res4Set,
+    tacticalSet,
     battle,
   });
   assert.ok(outcome.ok);
   assert.notEqual(outcome.appliedToH3Index, center);
   assert.notEqual(outcome.appliedToH3Index, far);
-  assert.ok(res4Set.has(outcome.appliedToH3Index));
+  assert.ok(tacticalSet.has(outcome.appliedToH3Index));
 });
 
 test('armor on urban: unreachable full goal still moves one step toward ordered hex (best-effort neighbor)', () => {
   const fromH3 = '84969b5ffffffff';
   const orderedToH3 = '84969bbffffffff';
   const foot = [...new Set([...gridDisk(fromH3, 3)])];
-  const res4Set = new Set(foot);
+  const tacticalSet = new Set(foot);
   const subUnits = [
     {
       id: 'opp:armor-urban',
@@ -157,13 +157,13 @@ test('armor on urban: unreachable full goal still moves one step toward ordered 
   ];
   const battle: TacticalBattleSnapshot = {
     battleId: 'best-effort-realhex',
-    enclosingRes1H3Index: '8196bffffffffff',
-    res4ChildH3Indexes: foot,
+    enclosingStrategicH3Index: '8196bffffffffff',
+    tacticalChildH3Indexes: foot,
     strategicTurnNumber: 1,
     tacticalTurnNumber: 13,
     strategicHexTerrain: 'land',
     strategicHexTerrainKind: 'plains',
-    res4IsUrbanByH3: { [fromH3]: true },
+    tacticalIsUrbanByH3: { [fromH3]: true },
     subUnits,
   };
   const sub = [...battle.subUnits];
@@ -172,7 +172,7 @@ test('armor on urban: unreachable full goal still moves one step toward ordered 
     byId,
     sub,
     order: { unitId: 'opp:armor-urban', toH3Index: orderedToH3 },
-    res4Set,
+    tacticalSet,
     battle,
   });
   assert.ok(outcome.ok);
@@ -185,7 +185,7 @@ test('best-effort neighbor may stack onto a friendly-occupied cell', () => {
   const orderedToH3 = '84969bbffffffff';
   const friendH3 = '84969b1ffffffff';
   const foot = [...new Set([...gridDisk(fromH3, 3)])];
-  const res4Set = new Set(foot);
+  const tacticalSet = new Set(foot);
   const subUnits = [
     {
       id: 'opp:armor-urban',
@@ -206,13 +206,13 @@ test('best-effort neighbor may stack onto a friendly-occupied cell', () => {
   ];
   const battle: TacticalBattleSnapshot = {
     battleId: 'best-effort-friendly',
-    enclosingRes1H3Index: '8196bffffffffff',
-    res4ChildH3Indexes: foot,
+    enclosingStrategicH3Index: '8196bffffffffff',
+    tacticalChildH3Indexes: foot,
     strategicTurnNumber: 1,
     tacticalTurnNumber: 13,
     strategicHexTerrain: 'land',
     strategicHexTerrainKind: 'plains',
-    res4IsUrbanByH3: { [fromH3]: true },
+    tacticalIsUrbanByH3: { [fromH3]: true },
     subUnits,
   };
   const sub = [...battle.subUnits];
@@ -221,7 +221,7 @@ test('best-effort neighbor may stack onto a friendly-occupied cell', () => {
     byId,
     sub,
     order: { unitId: 'opp:armor-urban', toH3Index: orderedToH3 },
-    res4Set,
+    tacticalSet,
     battle,
   });
   assert.equal(outcome.ok, true);

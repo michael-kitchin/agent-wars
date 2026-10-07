@@ -9,11 +9,11 @@ import {
 import { setUnitNameContent } from '../core/unitOriginFlags';
 import { mergePendingTacticalEmbarkOrdersIntoSealiftState } from '../tactical/tacticalEmbarkSealiftMerge';
 import { getMainLeafletMap } from './worldLeafletMap';
-import { shouldHideStrategicMapUnitsForRes4Zoom } from './terrainView';
+import { shouldHideStrategicMapUnitsForZoom } from './terrainView';
 import { clearDeferredStackCalloutTimer } from './mapClickSelectionPolicy';
 import { isOrderBlockHexTooltipVisible } from './orderBlockHexTooltip';
 import { isOrderSlowerHexTooltipVisible } from './orderSlowerHexTooltip';
-import { clearTerrainTooltipTimer, hideTerrainTooltipVisual } from './terrainTooltipRes1State';
+import { clearTerrainTooltipTimer, hideTerrainTooltipVisual } from './terrainTooltipStrategicState';
 import { sealiftDebarkTooltipText, sealiftSelectTooltipText } from '../chrome/controlTooltipText';
 import { showMapToast } from '../openRouter/openRouterUiHelpers';
 import {
@@ -598,7 +598,7 @@ export async function renderSealiftSection(units: GameStateSnapshot['units'], ca
   const h3Index = units[0]?.h3Index;
   if (!h3Index) return;
   const tacticalSealiftMode = !!(
-    S.tacticalBattleSnapshot?.res4ChildH3Indexes.includes(h3Index) &&
+    S.tacticalBattleSnapshot?.tacticalChildH3Indexes.includes(h3Index) &&
     window.gameApi?.getTacticalSealiftStackState &&
     window.gameApi?.updateTacticalSealiftSlot
   );
@@ -795,7 +795,7 @@ export function showStackCallout(
   clientY: number
 ): void {
   if (shouldDismissStackCalloutForHoverPlanning()) return;
-  if (shouldHideStrategicMapUnitsForRes4Zoom()) {
+  if (shouldHideStrategicMapUnitsForZoom()) {
     hideStackCallout();
     return;
   }
@@ -947,7 +947,7 @@ export function refreshStackCalloutIfOpen(): void {
     hideStackCallout();
     return;
   }
-  if (shouldHideStrategicMapUnitsForRes4Zoom()) {
+  if (shouldHideStrategicMapUnitsForZoom()) {
     hideStackCallout();
     return;
   }

@@ -1,4 +1,4 @@
-import { getStrategicRes1HexCode } from '../../shared/hexLlmCodeAssignment';
+import { getStrategicHexCode } from '../../shared/hexLlmCodeAssignment';
 import type { BuildUnitType, HexBuildQueueSnapshot } from '../../shared/ipcTypes';
 import { resolutionPlaybackBlocksMapOrders } from '../../shared/mapOrderGestureGate';
 import { estimateTurnsToCompleteQueuedProduction, sumQueuedProductionCost } from '../../shared/productionConfig';
@@ -24,7 +24,7 @@ import {
 } from '../chrome/controlTooltipText';
 import { formatProducedUnitTechLineHtml } from '../../shared/featureIconHtml';
 import { formatHexNamingCaptionHtml, type HexNamingCaption } from '../../shared/hexNamingCaption';
-import { baselineUrbanHexCountForRes1Hex } from '../rendererRes4Hydration';
+import { baselineUrbanHexCountForStrategicHex } from '../rendererTacticalHydration';
 
 /**
  * Re-exports build-count sanitizer for existing `buildQueuePopup` import paths.
@@ -82,14 +82,14 @@ export function isBuildPopupOrEntryTarget(target: EventTarget | null): boolean {
  */
 interface BuildQueuePopupDeps {
     /**
-   * Specifies the contract for the `shouldRenderRes4Hexes` member (shouldRenderRes4Hexes: () => boolean;).
+   * Specifies the contract for the `shouldRenderTacticalHexes` member (shouldRenderTacticalHexes: () => boolean;).
 
-   * Contract: Describes stable behavior for callers of `shouldRenderRes4Hexes` in this codebase.
+   * Contract: Describes stable behavior for callers of `shouldRenderTacticalHexes` in this codebase.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-shouldRenderRes4Hexes: () => boolean;
+shouldRenderTacticalHexes: () => boolean;
     /**
    * Specifies the contract for the `hideStackCallout` member (hideStackCallout: () => void;).
 
@@ -334,8 +334,8 @@ export function createBuildQueuePopupHandler(deps: BuildQueuePopupDeps) {
 
     const section = document.createElement('div');
     section.className = 'build-queue-section';
-    const res1Code = getStrategicRes1HexCode(h3Index);
-    const llmPrefixHtml = res1Code ? `<strong>(${escapeBuildPopupHtml(res1Code)})</strong> ` : '';
+    const strategicCode = getStrategicHexCode(h3Index);
+    const llmPrefixHtml = strategicCode ? `<strong>(${escapeBuildPopupHtml(strategicCode)})</strong> ` : '';
     if (namingCaption && namingCaption.text.trim().length > 0) {
       const descriptionLine = document.createElement('div');
       descriptionLine.innerHTML = `${llmPrefixHtml}${formatHexNamingCaptionHtml(namingCaption)}`;
@@ -353,7 +353,7 @@ export function createBuildQueuePopupHandler(deps: BuildQueuePopupDeps) {
     }
     const techLineHtml = formatProducedUnitTechLineHtml({
       techBonusEnabled: S.gameState?.techBonusEnabled === true,
-      baselineUrbanHexCount: baselineUrbanHexCountForRes1Hex(h3Index),
+      baselineUrbanHexCount: baselineUrbanHexCountForStrategicHex(h3Index),
     });
     if (techLineHtml) {
       const techLine = document.createElement('div');
@@ -617,7 +617,7 @@ export function createBuildQueuePopupHandler(deps: BuildQueuePopupDeps) {
   ): Promise<void> {
     if (resolutionPlaybackBlocksMapOrders(S.resolutionMoveAnimation)) return;
     const lifecycleRevision = popupLifecycleRevision;
-    if (isHoverOrderPlanningActive() || deps.shouldRenderRes4Hexes()) return;
+    if (isHoverOrderPlanningActive() || deps.shouldRenderTacticalHexes()) return;
     S.selectedHexIndex = h3Index;
     const popup = document.getElementById('build-popup');
     const popupOpen = !!popup && !popup.classList.contains('hidden');
@@ -708,8 +708,8 @@ export function createBuildQueuePopupHandler(deps: BuildQueuePopupDeps) {
   /**
    * Closes the build popup and drops its in-memory queue.
    *
-   * Purpose: Res4 zoom and battle maps call this on redraw to keep the popup from covering the cells. A popup that is already closed must not touch the hex tooltip.
-   * When to use: Build-entry dismissal, and the res4 branch of `syncBuildEntryButton`.
+   * Purpose: Tactical zoom and battle maps call this on redraw to keep the popup from covering the cells. A popup that is already closed must not touch the hex tooltip.
+   * When to use: Build-entry dismissal, and the tactical branch of `syncBuildEntryButton`.
    * Expected outcome: An open popup hides, and the hex tooltip can return after that close. An already closed popup leaves the hex-tooltip dwell running.
    * Exceptions: None.
    */
@@ -743,7 +743,7 @@ export function createBuildQueuePopupHandler(deps: BuildQueuePopupDeps) {
    * Purpose: Presents production controls at the click point while dismissing
    * upper/lower-right toasts that would obscure planning UI.
    * When to use: After a successful build-entry click that is not blocked by hover
-   * order planning or res4 tactical hex rendering.
+   * order planning or tactical hex rendering.
    * Expected outcome: Popup is positioned and shown with queue content; planning
    * chrome toasts are hidden once (not suppressed for later show calls). Early
    * returns leave toast visibility unchanged.
@@ -751,7 +751,7 @@ export function createBuildQueuePopupHandler(deps: BuildQueuePopupDeps) {
    */
   function showBuildPopup(h3Index: string, clientX: number, clientY: number): void {
     if (isHoverOrderPlanningActive()) return;
-    if (deps.shouldRenderRes4Hexes()) return;
+    if (deps.shouldRenderTacticalHexes()) return;
     deps.hideStackCallout();
     deps.clearTerrainTooltipTimer();
     deps.hideTerrainTooltipVisual();
@@ -772,7 +772,7 @@ export function createBuildQueuePopupHandler(deps: BuildQueuePopupDeps) {
   }
 
   function refreshBuildPopupIfOpen(): void {
-    if (deps.shouldRenderRes4Hexes()) {
+    if (deps.shouldRenderTacticalHexes()) {
       hideBuildPopup();
       return;
     }

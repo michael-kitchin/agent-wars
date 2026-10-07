@@ -94,7 +94,7 @@ saveDatabase: () => void;
 function seedInitialHexControlFromUnitOccupancy(deps: ResetGameDeps): void {
   const { run, getAll } = deps;
   logDebug('gameDb seedInitialHexControlFromUnitOccupancy');
-  run('DELETE FROM res1_control');
+  run('DELETE FROM res_s_control');
   const rows = getAll<{ h3Index: string; distinctPlayers: number; solePlayer: string | null }>(
     `SELECT h3_index AS h3Index,
             COUNT(DISTINCT player) AS distinctPlayers,
@@ -105,7 +105,7 @@ function seedInitialHexControlFromUnitOccupancy(deps: ResetGameDeps): void {
   );
   for (const row of rows) {
     if (row.distinctPlayers === 1 && row.solePlayer) {
-      run('INSERT INTO res1_control (h3_index, controller_player_id) VALUES (?, ?)', [row.h3Index, row.solePlayer]);
+      run('INSERT INTO res_s_control (h3_index, controller_player_id) VALUES (?, ?)', [row.h3Index, row.solePlayer]);
     }
   }
 }
@@ -134,12 +134,12 @@ function seedInitialHexControlFromHomeRegions(
       intersectingHexCount += 1;
       continue;
     }
-    run('INSERT OR REPLACE INTO res1_control (h3_index, controller_player_id) VALUES (?, ?)', [h3Index, 'human']);
+    run('INSERT OR REPLACE INTO res_s_control (h3_index, controller_player_id) VALUES (?, ?)', [h3Index, 'human']);
     forcedHumanControlCount += 1;
   }
   for (const h3Index of aiHomeHexes) {
     if (humanHomeHexes.has(h3Index)) continue;
-    run('INSERT OR REPLACE INTO res1_control (h3_index, controller_player_id) VALUES (?, ?)', [h3Index, 'opponent']);
+    run('INSERT OR REPLACE INTO res_s_control (h3_index, controller_player_id) VALUES (?, ?)', [h3Index, 'opponent']);
     forcedOpponentControlCount += 1;
   }
   logDebug('gameDb seedInitialHexControlFromHomeRegions', {
@@ -303,9 +303,9 @@ export function resetGameForNewMatch(deps: ResetGameDeps, options?: ResetGameFor
   run('DELETE FROM ai_memory');
   run('DELETE FROM player_hex_intel');
   run('DELETE FROM player_unit_intel');
-  run('DELETE FROM res1_control');
-  run('DELETE FROM res1_build_queue');
-  run('DELETE FROM res1_build_progress');
+  run('DELETE FROM res_s_control');
+  run('DELETE FROM res_s_build_queue');
+  run('DELETE FROM res_s_build_progress');
   seedInitialHexControlFromUnitOccupancy(deps);
   seedInitialHexControlFromHomeRegions(deps, { humanHomeRegion, aiHomeRegion });
   logHomeRegionControlParity(deps, new Set(getScenarioHomeRegionHexes(humanHomeRegion)), new Set(getScenarioHomeRegionHexes(aiHomeRegion)));

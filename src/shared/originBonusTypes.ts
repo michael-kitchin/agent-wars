@@ -35,7 +35,7 @@ export type OriginBonusSource = 'country' | 'terrain';
  *
  * Purpose: The terrain bonus applies only in tactical battles.
  * When to use: Input to `originBonusSources`.
- * Expected outcome: `strategic` for the res1 map, `tactical` for res4 battles.
+ * Expected outcome: `strategic` for the strategic map, `tactical` for tactical battles.
  * Exceptions: None.
  */
 export type OriginBonusTheater = 'strategic' | 'tactical';
@@ -144,7 +144,7 @@ export interface OriginBonusPlace {
   /**
    * Country name of the place.
    *
-   * Contract: Majority country of a res1 hex, or the birth country of a res4 cell; `null` when unknown.
+   * Contract: Majority country of a strategic hex, or the birth country of a tactical cell; `null` when unknown.
    * When to use: Compared with `UnitOrigin.birthCountryName`.
    * Expected outcome: Canonical country display name.
    * Exceptions: None.

@@ -13,8 +13,8 @@ assert.ok(destination);
 
 const airOnlyBattle: TacticalBattleSnapshot = {
   battleId: 'test-battle',
-  enclosingRes1H3Index: origin,
-  res4ChildH3Indexes: [origin, destination],
+  enclosingStrategicH3Index: origin,
+  tacticalChildH3Indexes: [origin, destination],
   strategicTurnNumber: 1,
   tacticalTurnNumber: 1,
   subUnits: [

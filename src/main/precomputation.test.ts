@@ -13,11 +13,11 @@ import {
   runPrecomputation,
   type PrecomputationCoordMap,
 } from './precomputation';
-import { getRes1LandMassByH3 } from './terrainClassificationCache';
+import { getStrategicLandMassByH3 } from './terrainClassificationCache';
 import {
   canLandUnitTraverseEdge,
   landUnitCanOccupyHex,
-} from '../shared/landTraversalRes1';
+} from '../shared/landTraversalStrategic';
 
 /**
  * Picks two adjacent hexes that land units can traverse, then fills to `hexCount`.
@@ -31,7 +31,7 @@ import {
 function buildLandConnectedHexList(hexCount: number): string[] {
   const allHexes = getOrderedHexList();
   const allSet = new Set(allHexes);
-  const landMass = getRes1LandMassByH3();
+  const landMass = getStrategicLandMassByH3();
   let originH3: string | undefined;
   let neighborH3: string | undefined;
   for (const candidate of allHexes) {
@@ -157,7 +157,7 @@ function testRunPrecomputationSkipHexAssessments(): void {
 }
 
 /**
- * Verifies fog-off res1 precomputation lists a human beyond radius 4.
+ * Verifies fog-off strategic precomputation lists a human beyond radius 4.
  *
  * Purpose: Unit Status nearest-enemy must see omniscient grid targets when fog is off.
  * When to use: After changing runUnitAssessments / assess_unit omniscient scan.

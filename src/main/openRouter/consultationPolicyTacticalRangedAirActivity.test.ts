@@ -14,8 +14,8 @@ import {
 
 const minimalBattle: TacticalBattleSnapshot = {
   battleId: 'bt-policy',
-  enclosingRes1H3Index: '811f3ffffffffff',
-  res4ChildH3Indexes: ['842830fffffffff'],
+  enclosingStrategicH3Index: '811f3ffffffffff',
+  tacticalChildH3Indexes: ['842830fffffffff'],
   strategicTurnNumber: 1,
   tacticalTurnNumber: 1,
   subUnits: [

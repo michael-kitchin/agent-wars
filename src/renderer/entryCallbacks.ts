@@ -6,14 +6,14 @@ import { dismissMapDetailPopoversIfHoverPlanningActive, hideStackCallout, isClie
 import { redraw, requestRedraw } from './rendering/gameScene';
 import { getMainLeafletMap } from './map/worldLeafletMap';
 import { deriveInfrastructureOverlayState } from './rendering/infrastructureOverlayState';
-import type { GameStateSnapshot, Res4CityOverlayRow, Res4RoadRailOverlayRow, Res4TransportVectorOverlayRow } from '../shared/ipcTypes';
+import type { GameStateSnapshot, TacticalCityOverlayRow, TacticalRoadRailOverlayRow, TacticalTransportVectorOverlayRow } from '../shared/ipcTypes';
 import { buildUnitDisplayNameLookup, fallbackDisplayNameFromUnitId } from '../shared/unitDisplayNames';
 
 import { TOOLTIP_OFFSET_PX } from './core/constants';
 import { runButtonTooltipText } from './chrome/controlTooltipText';
 import { appendOpenRouterLog, showAiStrategyToast, showMapToast, updateOpenRouterCostLabel, updateOpenRouterToolCountLabels, updateReadyButtonState } from './openRouter/openRouterUiHelpers';
-import { hitTestHexAtContainerPixel, hitTestTacticalRes4HexAtContainerPixel } from './map/mapHelpers';
-import { shouldRenderRes4Hexes } from './map/terrainView';
+import { hitTestHexAtContainerPixel, hitTestTacticalHexAtContainerPixel } from './map/mapHelpers';
+import { shouldRenderTacticalHexes } from './map/terrainView';
 
 import { clearSelection, isHexExploredByPlayer, reconcileSelectionToCurrentState, replaceSelection, toggleUnitSelection } from './core/selection';
 import { setMainUIControlsEnabled, updateGameOverUI as updateGameOverUIFromModule, updateGameStateSidebar, updateSidebar as updateSidebarFromModule } from './core/uiState';
@@ -32,12 +32,12 @@ import { resetPrecomputedAiState } from './openRouter/precomputedAiState';
 import { clearPendingTacticalOrders, refreshHoverRoutePreview as refreshHoverRoutePreviewFromModule, type RefreshHoverRoutePreviewOptions } from './gameplay/tacticalOrders';
 import { prepareStrategicPlanningUiBeforeTacticalAutoStart, type ReadyHandlerDeps } from './gameplay/readyHandler';
 
-import { buildMeleeInterceptHexPopupHtmlForRes1 as buildMeleeInterceptHexPopupHtmlForRes1FromModule } from './gameplay/meleeInterceptHexTooltip';
+import { buildMeleeInterceptHexPopupHtmlForStrategic as buildMeleeInterceptHexPopupHtmlForStrategicFromModule } from './gameplay/meleeInterceptHexTooltip';
 import type { NamingLookupTarget, TerrainTooltipState } from './map/terrainTooltipTypes';
-import { clearRes1TooltipSummaryCaches, clearTerrainTooltipTimer, getCachedNamingLineForTarget, getCachedTerrainTooltipHtml, hideTerrainTooltipVisual, namingLookupTargetForPointer, terrainStateForPointer, terrainTooltipStateForRes1Hex } from './map/terrainTooltipRes1State';
+import { clearStrategicTooltipSummaryCaches, clearTerrainTooltipTimer, getCachedNamingLineForTarget, getCachedTerrainTooltipHtml, hideTerrainTooltipVisual, namingLookupTargetForPointer, terrainStateForPointer, terrainTooltipStateForStrategicHex } from './map/terrainTooltipStrategicState';
 import { paintTerrainSwatches } from './rendering/terrainVisualStyles';
 
-import { applyRes1BaselineUrbanHexCounts, applyRes4CityOverlayRows } from './rendererRes4Hydration';
+import { applyStrategicBaselineUrbanHexCounts, applyTacticalCityOverlayRows } from './rendererTacticalHydration';
 import { applyGameStateSnapshot as applyGameStateSnapshotFromModule, refreshGameStateAfterBuildQueueChange as refreshGameStateAfterBuildQueueChangeFromModule, updateClientStaleEnemyIntel } from './core/stateSnapshot';
 import { applySelectionFromSidebarUnitButton as applySelectionFromSidebarUnitButtonFromModule, clearSidebarError, formatUnitArrowLabel as formatUnitArrowLabelFromModule, showSidebarError as showSidebarErrorFromModule, syncUiAfterSelectionChange as syncUiAfterSelectionChangeFromModule } from './gameplay/sidebarSupport';
 import { createSidebarOrderRow } from './gameplay/sidebarOrderRow';
@@ -86,7 +86,7 @@ export interface EntryCallbacksHost {
    * Expected outcome: Glyph visibility matches the entry wrapper.
    * Exceptions: Calling before bind throws.
    */
-  hasVisibleRes1InfrastructureGlyphs: (h3Index: string, res4On: boolean, unitHexes: Set<string>) => boolean;
+  hasVisibleStrategicInfrastructureGlyphs: (h3Index: string, tacticalOn: boolean, unitHexes: Set<string>) => boolean;
   /**
    * Builds kill-toast formatters from the renderer entry.
    *
@@ -142,7 +142,7 @@ export let updateRangedSidebar: EntryCallbacksHost['updateRangedSidebar'] = () =
  * Expected outcome: The entry wrapper runs.
  * Exceptions: Throws if the host is not bound.
  */
-export let hasVisibleRes1InfrastructureGlyphs: EntryCallbacksHost['hasVisibleRes1InfrastructureGlyphs'] = () => {
+export let hasVisibleStrategicInfrastructureGlyphs: EntryCallbacksHost['hasVisibleStrategicInfrastructureGlyphs'] = () => {
   throw new Error('entry callbacks host is not bound');
 };
 
@@ -170,7 +170,7 @@ export function bindEntryCallbacksHost(host: EntryCallbacksHost): void {
   maybeScheduleTacticalAnnihilationExit = host.maybeScheduleTacticalAnnihilationExit;
   updatePendingOrdersSidebar = host.updatePendingOrdersSidebar;
   updateRangedSidebar = host.updateRangedSidebar;
-  hasVisibleRes1InfrastructureGlyphs = host.hasVisibleRes1InfrastructureGlyphs;
+  hasVisibleStrategicInfrastructureGlyphs = host.hasVisibleStrategicInfrastructureGlyphs;
   buildKillToastFormatterBundle = host.buildKillToastFormatterBundle;
 }
 
@@ -248,7 +248,7 @@ let buildQueuePopupController: ReturnType<typeof createBuildQueuePopupHandler> |
 function getBuildQueuePopupController(): ReturnType<typeof createBuildQueuePopupHandler> {
   if (buildQueuePopupController) return buildQueuePopupController;
   buildQueuePopupController = createBuildQueuePopupHandler({
-    shouldRenderRes4Hexes,
+    shouldRenderTacticalHexes,
     hideStackCallout,
     clearTerrainTooltipTimer,
     hideTerrainTooltipVisual,
@@ -265,14 +265,14 @@ function getBuildQueuePopupController(): ReturnType<typeof createBuildQueuePopup
  *
  * Purpose: Centralizes dependency wiring for `syncTacticalEntryButton` beside build-entry sync.
  * When to use: Each canvas resize/redraw while strategic planning may show tactical entry.
- * Expected outcome: DOM under `#tactical-entry-layer` matches contested explored res1 hexes.
+ * Expected outcome: DOM under `#tactical-entry-layer` matches contested explored strategic hexes.
  * Exceptions: None.
  */
 export function syncTacticalEntryButtonOverlay(): void {
   tacticalSyncTacticalEntryButtonOverlay({
     isHexExploredByPlayer,
-    hasRes1OverlayOffsetFeatures: (h3Index, visibleUnitHexes) =>
-      hasVisibleRes1InfrastructureGlyphs(h3Index, shouldRenderRes4Hexes(), visibleUnitHexes),
+    hasStrategicOverlayOffsetFeatures: (h3Index, visibleUnitHexes) =>
+      hasVisibleStrategicInfrastructureGlyphs(h3Index, shouldRenderTacticalHexes(), visibleUnitHexes),
   });
 }
 
@@ -281,7 +281,7 @@ export function syncTacticalEntryButtonOverlay(): void {
  *
  * Purpose: Deduplicates the `TacticalRendererStartBattleSideEffects` literal previously repeated in `applyGameStateSnapshot`.
  * When to use: Passed to `startTacticalBattleFromEntryHexFromModule` and `activateRestoredTacticalBattleFromMainSnapshot`.
- * Expected outcome: Identical sequencing for sidebar suppression, res4 entry, HUD refresh, and redraw.
+ * Expected outcome: Identical sequencing for sidebar suppression, tactical entry, HUD refresh, and redraw.
  * Exceptions: None.
  */
 export function getTacticalBattleActivationSideEffects(): TacticalRendererStartBattleSideEffects {
@@ -339,7 +339,7 @@ export async function applyGameStateSnapshot(
       rebuildUnitDisplayNameLookup,
       reconcileSelectionToCurrentState,
       updateClientStaleEnemyIntel,
-      clearRes1TooltipSummaryCaches,
+      clearStrategicTooltipSummaryCaches,
       refreshHumanStandingOrders,
       updateGameStateSidebar,
       updateRangedSidebar,
@@ -420,7 +420,7 @@ export async function restoreTerrainTooltipAfterPopoverClose(): Promise<void> {
     const y = S.lastPointerClientY - rect.top;
     const tb = S.tacticalBattleSnapshot;
     if (tb) {
-      hoverH3 = hitTestTacticalRes4HexAtContainerPixel(x, y, tb);
+      hoverH3 = hitTestTacticalHexAtContainerPixel(x, y, tb);
     } else {
       const set = new Set(S.gameState.hexes.map((h) => h.h3Index));
       hoverH3 = hitTestHexAtContainerPixel(x, y, set);
@@ -487,14 +487,14 @@ export function rebuildUnitDisplayNameLookup(state: GameStateSnapshot | null): v
 }
 
 /**
- * Defines the `applyRes4TerrainOverrides` function shape (function applyRes4TerrainOverrides(rows: Array<{ h3Index: string; terrainKind: string; isUrban: boolean; isAirport?: boolean; isSeaport?: boolean).
+ * Defines the `applyTacticalTerrainOverrides` function shape (function applyTacticalTerrainOverrides(rows: Array<{ h3Index: string; terrainKind: string; isUrban: boolean; isAirport?: boolean; isSeaport?: boolean).
 
- * Purpose: Supports maintainability by documenting why `applyRes4TerrainOverrides` exists.
+ * Purpose: Supports maintainability by documenting why `applyTacticalTerrainOverrides` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function applyRes4TerrainOverrides(rows: Array<{
+export function applyTacticalTerrainOverrides(rows: Array<{
   h3Index: string;
   terrainKind: string;
   isUrban: boolean;
@@ -503,26 +503,26 @@ export function applyRes4TerrainOverrides(rows: Array<{
   isRubble?: boolean;
 }>): void {
   const nextState = deriveInfrastructureOverlayState(rows);
-  S.res4TerrainOverridesByH3 = nextState.res4TerrainOverridesByH3;
-  S.terrainInfraRes1Airport = nextState.terrainInfraRes1Airport;
-  S.terrainInfraRes1Seaport = nextState.terrainInfraRes1Seaport;
-  S.terrainInfraRes4Airport = nextState.terrainInfraRes4Airport;
-  S.terrainInfraRes4Seaport = nextState.terrainInfraRes4Seaport;
-  clearRes1TooltipSummaryCaches();
+  S.tacticalTerrainOverridesByH3 = nextState.tacticalTerrainOverridesByH3;
+  S.terrainInfraStrategicAirport = nextState.terrainInfraStrategicAirport;
+  S.terrainInfraStrategicSeaport = nextState.terrainInfraStrategicSeaport;
+  S.terrainInfraTacticalAirport = nextState.terrainInfraTacticalAirport;
+  S.terrainInfraTacticalSeaport = nextState.terrainInfraTacticalSeaport;
+  clearStrategicTooltipSummaryCaches();
 }
 
 /**
- * Tracks whether static res4 city/road/rail/vector overlays were fetched this renderer session.
+ * Tracks whether static tactical city/road/rail/vector overlays were fetched this renderer session.
  *
  * Purpose: Avoids repeating large static IPC payloads on every Ready refresh.
  * When to use: Cleared when `reloadStaticOverlays` is true (New Game path).
  * Expected outcome: Static overlays load once per session unless explicitly reset.
  * Exceptions: None.
  */
-let sessionStaticRes4OverlaysLoaded = false;
+let sessionStaticTacticalOverlaysLoaded = false;
 
 /**
- * Tracks whether the generated res1 urban counts were fetched this renderer session.
+ * Tracks whether the generated strategic urban counts were fetched this renderer session.
  *
  * Purpose: Those counts never change within a session, so a failed fetch can retry without refetching the city overlays.
  * When to use: Cleared in effect when `reloadStaticOverlays` is true (New Game path) by passing forceReload.
@@ -532,47 +532,47 @@ let sessionStaticRes4OverlaysLoaded = false;
 let sessionBaselineUrbanHexCountsLoaded = false;
 
 /**
- * Fetches static res4 overlay IPC payloads once per session unless `forceReload` is set.
+ * Fetches static tactical overlay IPC payloads once per session unless `forceReload` is set.
  *
  * Purpose: Static overlays never change within a session, so they load separately from the dynamic terrain-override
  * refresh and are not refetched on every map refresh.
  * When to use: Before every map refresh; skipped when already loaded and not forced.
- * Expected outcome: City, road, and rail overlays are applied, then the generated res1 urban counts load. A failure of that count load leaves the overlays in place.
+ * Expected outcome: City, road, and rail overlays are applied, then the generated strategic urban counts load. A failure of that count load leaves the overlays in place.
  * Exceptions: A city, road, or rail IPC failure rethrows for the caller to log. A baseline-count failure is logged inside `ensureBaselineUrbanHexCountsLoaded` and does not rethrow.
  */
-export async function ensureStaticRes4OverlaysLoaded(forceReload: boolean): Promise<void> {
-  if (!(sessionStaticRes4OverlaysLoaded && !forceReload)) {
+export async function ensureStaticTacticalOverlaysLoaded(forceReload: boolean): Promise<void> {
+  if (!(sessionStaticTacticalOverlaysLoaded && !forceReload)) {
     const api = window.gameApi;
     if (!api) return;
-    const cityPromise = api.getRes4CityOverlays ? api.getRes4CityOverlays() : Promise.resolve<Res4CityOverlayRow[]>([]);
-    const roadRailPromise = api.getRes4RoadRailOverlays
-      ? api.getRes4RoadRailOverlays()
-      : Promise.resolve<Res4RoadRailOverlayRow[]>([]);
-    const vectorsPromise = api.getRes4TransportVectorOverlays
-      ? api.getRes4TransportVectorOverlays()
-      : Promise.resolve<Res4TransportVectorOverlayRow[]>([]);
+    const cityPromise = api.getTacticalCityOverlays ? api.getTacticalCityOverlays() : Promise.resolve<TacticalCityOverlayRow[]>([]);
+    const roadRailPromise = api.getTacticalRoadRailOverlays
+      ? api.getTacticalRoadRailOverlays()
+      : Promise.resolve<TacticalRoadRailOverlayRow[]>([]);
+    const vectorsPromise = api.getTacticalTransportVectorOverlays
+      ? api.getTacticalTransportVectorOverlays()
+      : Promise.resolve<TacticalTransportVectorOverlayRow[]>([]);
     const [cityRows, roadRailRows, vectorRows] = await Promise.all([cityPromise, roadRailPromise, vectorsPromise]);
-    applyRes4CityOverlayRows(cityRows, roadRailRows, vectorRows);
-    sessionStaticRes4OverlaysLoaded = true;
+    applyTacticalCityOverlayRows(cityRows, roadRailRows, vectorRows);
+    sessionStaticTacticalOverlaysLoaded = true;
   }
   await ensureBaselineUrbanHexCountsLoaded(forceReload);
 }
 
 /**
- * Fetches generated res1 urban counts once per session unless `forceReload` is set.
+ * Fetches generated strategic urban counts once per session unless `forceReload` is set.
  *
  * Purpose: Tech lines use this baseline. A failure here must not drop the city, road, or rail overlays.
- * When to use: From `ensureStaticRes4OverlaysLoaded`, including when that load is skipped because overlays are already present.
- * Expected outcome: `baselineUrbanHexCountByRes1H3` is replaced. A thrown IPC call is logged and the previous map is left as it was.
+ * When to use: From `ensureStaticTacticalOverlaysLoaded`, including when that load is skipped because overlays are already present.
+ * Expected outcome: `baselineUrbanHexCountByStrategicH3` is replaced. A thrown IPC call is logged and the previous map is left as it was.
  * Exceptions: Logs to console and does not rethrow.
  */
 export async function ensureBaselineUrbanHexCountsLoaded(forceReload: boolean): Promise<void> {
   if (sessionBaselineUrbanHexCountsLoaded && !forceReload) return;
   const api = window.gameApi;
-  if (!api?.getRes1BaselineUrbanHexCounts) return;
+  if (!api?.getStrategicBaselineUrbanHexCounts) return;
   try {
-    const rows = await api.getRes1BaselineUrbanHexCounts();
-    applyRes1BaselineUrbanHexCounts(rows);
+    const rows = await api.getStrategicBaselineUrbanHexCounts();
+    applyStrategicBaselineUrbanHexCounts(rows);
     sessionBaselineUrbanHexCountsLoaded = true;
   } catch (err) {
     console.error('getRes1BaselineUrbanHexCounts failed:', err);
@@ -580,20 +580,20 @@ export async function ensureBaselineUrbanHexCountsLoaded(forceReload: boolean): 
 }
 
 /**
- * Defines the `refreshRes4TerrainOverridesForRenderer` function shape (async function refreshRes4TerrainOverridesForRenderer(): Promise<void>).
+ * Defines the `refreshTacticalTerrainOverridesForRenderer` function shape (async function refreshTacticalTerrainOverridesForRenderer(): Promise<void>).
 
- * Purpose: Refreshes dynamic res4 terrain overrides on every call; static overlays load once per session (or when `reloadStaticOverlays` is true).
+ * Purpose: Refreshes dynamic tactical terrain overrides on every call; static overlays load once per session (or when `reloadStaticOverlays` is true).
  * When to use: Map init, New Game, Ready, and infrastructure-damage refresh triggers.
  * Expected outcome: Dynamic rubble/airport/seaport state updates; static overlays unchanged on routine Ready.
  * Exceptions: Logs failure to console; does not throw to callers.
  */
-export async function refreshRes4TerrainOverridesForRenderer(options?: { reloadStaticOverlays?: boolean }): Promise<void> {
+export async function refreshTacticalTerrainOverridesForRenderer(options?: { reloadStaticOverlays?: boolean }): Promise<void> {
   const api = window.gameApi;
-  if (!api?.getRes4TerrainOverrides) return;
+  if (!api?.getTacticalTerrainOverrides) return;
   try {
-    await ensureStaticRes4OverlaysLoaded(options?.reloadStaticOverlays === true);
-    const rows = await api.getRes4TerrainOverrides();
-    applyRes4TerrainOverrides(rows);
+    await ensureStaticTacticalOverlaysLoaded(options?.reloadStaticOverlays === true);
+    const rows = await api.getTacticalTerrainOverrides();
+    applyTacticalTerrainOverrides(rows);
     requestRedraw();
   } catch (err) {
     console.error('refreshRes4TerrainOverridesForRenderer failed:', err);
@@ -708,7 +708,7 @@ export async function prepareStrategicUiBeforeTacticalStartFromMagnifier(): Prom
  *
  * Purpose: Preserves the historical `startTacticalBattleFromEntryHex` symbol for map wiring while shrinking `renderer.ts`.
  * When to use: Tactical entry layer hit tests and `#tactical-entry-layer` button handlers.
- * Expected outcome: Same toasts and res4 transition as `startTacticalBattleFromEntryHexFromModule`; resumes an existing main-process session when the clicked hex matches without a redundant `startTacticalBattle` IPC.
+ * Expected outcome: Same toasts and tactical transition as `startTacticalBattleFromEntryHexFromModule`; resumes an existing main-process session when the clicked hex matches without a redundant `startTacticalBattle` IPC.
  * Exceptions: None; missing IPC surfaces through the shared unavailable toast.
  */
 export async function startTacticalBattleFromEntryHex(h3: string): Promise<void> {
@@ -731,10 +731,10 @@ export async function startTacticalBattleFromEntryHex(h3: string): Promise<void>
  * Expected outcome: Delegates to `meleeInterceptHexTooltip` with live naming/terrain readers.
  * Exceptions: None.
  */
-export async function buildMeleeInterceptHexPopupHtmlForRes1(h3Index: string): Promise<string> {
-  return buildMeleeInterceptHexPopupHtmlForRes1FromModule(h3Index, {
+export async function buildMeleeInterceptHexPopupHtmlForStrategic(h3Index: string): Promise<string> {
+  return buildMeleeInterceptHexPopupHtmlForStrategicFromModule(h3Index, {
     getCachedNamingLineForTarget,
-    terrainTooltipStateForRes1Hex,
+    terrainTooltipStateForStrategicHex,
     getCachedTerrainTooltipHtml,
   });
 }

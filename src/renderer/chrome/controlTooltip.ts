@@ -1,5 +1,5 @@
 import { HEX_DETAILS_TOOLTIP_DELAY_MS, TOOLTIP_OFFSET_PX } from '../core/constants';
-import { clearTerrainTooltipTimer, hideTerrainTooltipVisual } from '../map/terrainTooltipRes1State';
+import { clearTerrainTooltipTimer, hideTerrainTooltipVisual } from '../map/terrainTooltipStrategicState';
 
 /**
  * Attribute that carries one control's tip sentence.

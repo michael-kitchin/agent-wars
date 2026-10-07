@@ -36,11 +36,11 @@ function testStrikeableInfraCountsOnlyHumanControlled(): void {
       phase: 'planning',
       turnNumber: 1,
       pendingOrders: [],
-      res1Control: [
+      strategicControl: [
         { h3Index: base, controllerPlayerId: 'opponent' },
         { h3Index: humanHex, controllerPlayerId: 'human' },
       ],
-      res1Infrastructure: [
+      strategicInfrastructure: [
         { h3Index: base, urbanHexCount: 0, airportCount: 1, seaportCount: 0 },
         { h3Index: uncontrolled, urbanHexCount: 5, airportCount: 1, seaportCount: 0 },
         { h3Index: humanHex, urbanHexCount: 8, airportCount: 1, seaportCount: 1 },
@@ -107,11 +107,11 @@ function testFerryDestinationsHonorSnowRange(): void {
         startMonth: 1,
         weatherBonusEnabled,
         pendingOrders: [],
-        res1Control: [
+        strategicControl: [
           { h3Index: base, controllerPlayerId: 'opponent' },
           { h3Index: snowHex, controllerPlayerId: 'opponent' },
         ],
-        res1Infrastructure: [
+        strategicInfrastructure: [
           { h3Index: base, urbanHexCount: 0, airportCount: 1, seaportCount: 0 },
           { h3Index: snowHex, urbanHexCount: 0, airportCount: 1, seaportCount: 0 },
         ],

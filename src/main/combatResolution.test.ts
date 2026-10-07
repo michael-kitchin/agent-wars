@@ -187,7 +187,7 @@ function testRangedEmptyTargetOmitsShotLinesWithoutCombatHexes(): void {
 /**
  * Verifies strategic infantry does not return fire or emit return-fire shot lines.
  *
- * Purpose: Infantry is melee-only on the res1 map; adjacent bombardment must not draw reverse connectors or kills.
+ * Purpose: Infantry is melee-only on the strategic map; adjacent bombardment must not draw reverse connectors or kills.
  * When to use: After changing `RANGE.infantry` or return-fire eligibility.
  * Expected outcome: Direct-fire connector may exist; no return-fire kill or connector.
  * Exceptions: None.
@@ -307,7 +307,7 @@ function testTacticalArmorDistance2ReturnFireOnPlains(): void {
   const battle = {
     strategicHexTerrain: 'land' as const,
     strategicHexTerrainKind: 'plains',
-    res4TerrainKindByH3: { [defenderHex]: 'plains', [at2!]: 'plains' },
+    tacticalTerrainKindByH3: { [defenderHex]: 'plains', [at2!]: 'plains' },
   };
   const attackers = [makeUnit('atk', 'human', 'armor', at2!)];
   const defenders = [makeUnit('def', 'opponent', 'armor', defenderHex)];
@@ -337,7 +337,7 @@ function testTacticalMountainBlocksArmorReturnFire(): void {
   const battle = {
     strategicHexTerrain: 'land' as const,
     strategicHexTerrainKind: 'plains',
-    res4TerrainKindByH3: { [defenderHex]: 'plains', [neighbor!]: 'mountain' },
+    tacticalTerrainKindByH3: { [defenderHex]: 'plains', [neighbor!]: 'mountain' },
   };
   const attackers = [makeUnit('atk', 'human', 'armor', neighbor!)];
   const defenders = [makeUnit('def', 'opponent', 'armor', defenderHex)];

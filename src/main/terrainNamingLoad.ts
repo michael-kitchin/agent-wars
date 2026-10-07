@@ -3,7 +3,7 @@
 import { getResolution } from 'h3-js';
 import { readJsonFileOrThrow } from './jsonFileHelpers';
 import { logDebug, logTrace } from './logger';
-import { resolveTerrainRes1NamingPath, resolveTerrainRes4NamingPath } from './terrainMetadataPaths';
+import { resolveTerrainStrategicNamingPath, resolveTerrainTacticalNamingPath } from './terrainMetadataPaths';
 
 /**
  * Documents the module-scope binding `EXPECTED_HEX_NAMING_SCHEMA_VERSION` (EXPECTED_HEX_NAMING_SCHEMA_VERSION).
@@ -250,14 +250,14 @@ scalerank: number | null;
 }
 
 /**
- * Documents the `TerrainNamingRecordRes1` interface as a named contract surface (export interface TerrainNamingRecordRes1).
+ * Documents the `TerrainNamingRecordStrategic` interface as a named contract surface (export interface TerrainNamingRecordStrategic).
 
- * Purpose: Supports maintainability by documenting why `TerrainNamingRecordRes1` exists.
+ * Purpose: Supports maintainability by documenting why `TerrainNamingRecordStrategic` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export interface TerrainNamingRecordRes1 {
+export interface TerrainNamingRecordStrategic {
     /**
    * Specifies the contract for the `h3_index` member (h3_index: string;).
 
@@ -297,14 +297,14 @@ countries: TerrainNamingCountryRow[];
 }
 
 /**
- * Documents the `TerrainNamingRecordRes4` interface as a named contract surface (export interface TerrainNamingRecordRes4 extends TerrainNamingRecordRes1).
+ * Documents the `TerrainNamingRecordTactical` interface as a named contract surface (export interface TerrainNamingRecordTactical extends TerrainNamingRecordStrategic).
 
- * Purpose: Supports maintainability by documenting why `TerrainNamingRecordRes4` exists.
+ * Purpose: Supports maintainability by documenting why `TerrainNamingRecordTactical` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export interface TerrainNamingRecordRes4 extends TerrainNamingRecordRes1 {
+export interface TerrainNamingRecordTactical extends TerrainNamingRecordStrategic {
     /**
    * Specifies the contract for the `cities` member (cities: TerrainNamingCityRow[];).
 
@@ -353,14 +353,14 @@ resolution: number;
    */
 record_count: number;
     /**
-   * Specifies the contract for the `records` member (records: TerrainNamingRecordRes1[] | TerrainNamingRecordRes4[];).
+   * Specifies the contract for the `records` member (records: TerrainNamingRecordStrategic[] | TerrainNamingRecordTactical[];).
 
    * Contract: Describes stable behavior for callers of `records` in this codebase.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-records: TerrainNamingRecordRes1[] | TerrainNamingRecordRes4[];
+records: TerrainNamingRecordStrategic[] | TerrainNamingRecordTactical[];
 }
 
 /**
@@ -523,7 +523,7 @@ function readCountryArray(r: Record<string, unknown>, key: string): TerrainNamin
  * Parses the `water` array from a naming JSON record.
  *
  * Purpose: Validates lake/ocean rows emitted by the Python naming pipeline.
- * When to use: From `parseRes1Row` for every res1/res4 naming record.
+ * When to use: From `parseStrategicRow` for every strategic/tactical naming record.
  * Expected outcome: Array of `TerrainNamingWaterRow` with required `name` and `type`.
  * Exceptions: Throws when `type` is not `ocean` or `lake`.
  */
@@ -545,10 +545,10 @@ function readWaterArray(r: Record<string, unknown>, key: string): TerrainNamingW
 }
 
 /**
- * Parses the `cities` array from a res4 naming JSON record.
+ * Parses the `cities` array from a tactical naming JSON record.
  *
  * Purpose: Validates city rows, including the country code used for flags and birth countries.
- * When to use: From `parseRes4Row`.
+ * When to use: From `parseTacticalRow`.
  * Expected outcome: Array of `TerrainNamingCityRow`; `state` and `country` may be `null`.
  * Exceptions: Throws when the value is not an array, a row is not an object, or a field is invalid.
  */
@@ -569,14 +569,14 @@ function readCityArray(r: Record<string, unknown>, key: string): TerrainNamingCi
 }
 
 /**
- * Defines the `parseRes1Row` function shape (function parseRes1Row(raw: unknown, resolution: number): TerrainNamingRecordRes1).
+ * Defines the `parseStrategicRow` function shape (function parseStrategicRow(raw: unknown, resolution: number): TerrainNamingRecordStrategic).
 
- * Purpose: Supports maintainability by documenting why `parseRes1Row` exists.
+ * Purpose: Supports maintainability by documenting why `parseStrategicRow` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-function parseRes1Row(raw: unknown, resolution: number): TerrainNamingRecordRes1 {
+function parseStrategicRow(raw: unknown, resolution: number): TerrainNamingRecordStrategic {
   if (!isRecord(raw)) throw new Error('terrain naming: record must be an object');
   const h3Index = readStr(raw, 'h3_index');
   if (getResolution(h3Index) !== resolution) {
@@ -591,16 +591,16 @@ function parseRes1Row(raw: unknown, resolution: number): TerrainNamingRecordRes1
 }
 
 /**
- * Defines the `parseRes4Row` function shape (function parseRes4Row(raw: unknown, resolution: number): TerrainNamingRecordRes4).
+ * Defines the `parseTacticalRow` function shape (function parseTacticalRow(raw: unknown, resolution: number): TerrainNamingRecordTactical).
 
- * Purpose: Supports maintainability by documenting why `parseRes4Row` exists.
+ * Purpose: Supports maintainability by documenting why `parseTacticalRow` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-function parseRes4Row(raw: unknown, resolution: number): TerrainNamingRecordRes4 {
+function parseTacticalRow(raw: unknown, resolution: number): TerrainNamingRecordTactical {
   if (!isRecord(raw)) throw new Error('terrain naming: record must be an object');
-  const base = parseRes1Row(raw, resolution);
+  const base = parseStrategicRow(raw, resolution);
   return {
     ...base,
     cities: readCityArray(raw, 'cities'),
@@ -635,7 +635,7 @@ function parseNamingEnvelope(raw: unknown, expectedResolution: number): TerrainN
     throw new Error(`terrain naming: record_count ${recordCount} != len(records) ${recs.length}`);
   }
   const parseRow =
-    expectedResolution === 4 ? (r: unknown) => parseRes4Row(r, 4) : (r: unknown) => parseRes1Row(r, 1);
+    expectedResolution === 4 ? (r: unknown) => parseTacticalRow(r, 4) : (r: unknown) => parseStrategicRow(r, 1);
   const records = recs.map((r, i) => {
     try {
       return parseRow(r);
@@ -643,7 +643,7 @@ function parseNamingEnvelope(raw: unknown, expectedResolution: number): TerrainN
       const msg = e instanceof Error ? e.message : String(e);
       throw new Error(`terrain naming: records[${i}]: ${msg}`);
     }
-  }) as TerrainNamingRecordRes1[] | TerrainNamingRecordRes4[];
+  }) as TerrainNamingRecordStrategic[] | TerrainNamingRecordTactical[];
   const seen = new Set<string>();
   for (const row of records) {
     if (seen.has(row.h3_index)) throw new Error(`terrain naming: duplicate h3_index ${row.h3_index}`);
@@ -693,55 +693,55 @@ export function namesForFirstOccurringScalerankList(
 }
 
 /**
- * Loads and validates a res1 terrain naming JSON file.
+ * Loads and validates a strategic terrain naming JSON file.
  *
  * Purpose: Entry point for strategic place-name data on disk.
  * When to use: Bundled load and any caller that already has an absolute naming path.
  * Expected outcome: Parsed naming envelope at resolution 1.
  * Exceptions: Rethrows read and parse failures. Throws when the envelope fails validation.
  */
-export function loadTerrainRes1NamingFromPath(absPath: string): TerrainNamingEnvelope {
+export function loadTerrainStrategicNamingFromPath(absPath: string): TerrainNamingEnvelope {
   logDebug('terrainNamingLoad loadTerrainRes1NamingFromPath', { absPath });
   const parsed = readJsonFileOrThrow(absPath, 'terrainNamingLoad loadTerrainRes1NamingFromPath');
   return parseNamingEnvelope(parsed, 1);
 }
 
 /**
- * Loads and validates a res4 terrain naming JSON file.
+ * Loads and validates a tactical terrain naming JSON file.
  *
  * Purpose: Entry point for tactical place-name data on disk.
  * When to use: Bundled load and any caller that already has an absolute naming path.
  * Expected outcome: Parsed naming envelope at resolution 4.
  * Exceptions: Rethrows read and parse failures. Throws when the envelope fails validation.
  */
-export function loadTerrainRes4NamingFromPath(absPath: string): TerrainNamingEnvelope {
+export function loadTerrainTacticalNamingFromPath(absPath: string): TerrainNamingEnvelope {
   logDebug('terrainNamingLoad loadTerrainRes4NamingFromPath', { absPath });
   const parsed = readJsonFileOrThrow(absPath, 'terrainNamingLoad loadTerrainRes4NamingFromPath');
   return parseNamingEnvelope(parsed, 4);
 }
 
 /**
- * Defines the `loadTerrainRes1NamingBundled` function shape (export function loadTerrainRes1NamingBundled(): TerrainNamingEnvelope).
+ * Defines the `loadTerrainStrategicNamingBundled` function shape (export function loadTerrainStrategicNamingBundled(): TerrainNamingEnvelope).
 
- * Purpose: Supports maintainability by documenting why `loadTerrainRes1NamingBundled` exists.
+ * Purpose: Supports maintainability by documenting why `loadTerrainStrategicNamingBundled` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function loadTerrainRes1NamingBundled(): TerrainNamingEnvelope {
+export function loadTerrainStrategicNamingBundled(): TerrainNamingEnvelope {
   logTrace('terrainNamingLoad loadTerrainRes1NamingBundled');
-  return loadTerrainRes1NamingFromPath(resolveTerrainRes1NamingPath());
+  return loadTerrainStrategicNamingFromPath(resolveTerrainStrategicNamingPath());
 }
 
 /**
- * Defines the `loadTerrainRes4NamingBundled` function shape (export function loadTerrainRes4NamingBundled(): TerrainNamingEnvelope).
+ * Defines the `loadTerrainTacticalNamingBundled` function shape (export function loadTerrainTacticalNamingBundled(): TerrainNamingEnvelope).
 
- * Purpose: Supports maintainability by documenting why `loadTerrainRes4NamingBundled` exists.
+ * Purpose: Supports maintainability by documenting why `loadTerrainTacticalNamingBundled` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function loadTerrainRes4NamingBundled(): TerrainNamingEnvelope {
+export function loadTerrainTacticalNamingBundled(): TerrainNamingEnvelope {
   logTrace('terrainNamingLoad loadTerrainRes4NamingBundled');
-  return loadTerrainRes4NamingFromPath(resolveTerrainRes4NamingPath());
+  return loadTerrainTacticalNamingFromPath(resolveTerrainTacticalNamingPath());
 }

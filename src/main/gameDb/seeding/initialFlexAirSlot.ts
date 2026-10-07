@@ -69,7 +69,7 @@ function sortH3Deterministic(hexes: string[], latLngByH3: Map<string, [number, n
  */
 function airportH3InRegion(deps: FlexAirSlotDeps, regionHexSet: Set<string>): string[] {
   const rows = deps.getAll<{ h3_index: string }>(
-    'SELECT h3_index FROM res1_infrastructure WHERE airport_count > 0 AND airport_count IS NOT NULL'
+    'SELECT h3_index FROM res_s_infrastructure WHERE airport_count > 0 AND airport_count IS NOT NULL'
   );
   const out: string[] = [];
   for (const row of rows) {
@@ -224,7 +224,7 @@ export function logHomeRegionControlParity(
     aiHexCount: aiHomeHexes.size,
   });
   const rows = deps.getAll<{ h3_index: string; controller_player_id: string | null }>(
-    'SELECT h3_index, controller_player_id FROM res1_control'
+    'SELECT h3_index, controller_player_id FROM res_s_control'
   );
   for (const row of rows) {
     const h3 = row.h3_index;

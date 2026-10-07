@@ -32,7 +32,7 @@ export function tacticalEmbarkedLandExcludedFromRangedInput(
   if (!emb) return false;
   const naval = subUnits.find((x) => x.id === emb);
   if (!naval || naval.unitType !== 'naval') return false;
-  const kind = battle.res4TerrainKindByH3?.[naval.h3Index] ?? battle.strategicHexTerrainKind ?? 'plains';
+  const kind = battle.tacticalTerrainKindByH3?.[naval.h3Index] ?? battle.strategicHexTerrainKind ?? 'plains';
   tacticalLogQuery('tacticalCombatInput tacticalEmbarkedLandExcludedFromRangedInput', {
     battleId: battle.battleId,
     subUnitId: u.id,
@@ -54,12 +54,12 @@ export function tacticalEmbarkedLandExcludedFromRangedInput(
 export function buildTacticalReturnFireContext(battle: TacticalBattleSnapshot): ReturnFireEligibilityContext {
   tacticalLogQuery('tacticalCombatInput buildTacticalReturnFireContext', {
     battleId: battle.battleId,
-    footprintCellCount: battle.res4ChildH3Indexes.length,
+    footprintCellCount: battle.tacticalChildH3Indexes.length,
   });
   return {
     theater: 'tactical',
     tacticalBattle: battle,
-    tacticalFootprint: new Set(battle.res4ChildH3Indexes),
+    tacticalFootprint: new Set(battle.tacticalChildH3Indexes),
     hasIntactAirportAtAirBase: hasIntactAirportAtTacticalAirBase,
   };
 }

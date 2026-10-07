@@ -1,15 +1,15 @@
 /**
- * Selects which strategic res1 cells appear on the ASCII operational map for a turn.
+ * Selects which strategic cells appear on the ASCII operational map for a turn.
  *
  * Purpose: Implements the plan's unit-centered viewport with buffer and antimeridian-safe longitude handling.
  * When to use: After strategic registry initialization and before grid projection.
- * Expected outcome: A bounded subset of global res1 cells around observed forces.
+ * Expected outcome: A bounded subset of global strategic cells around observed forces.
  * Exceptions: None for empty inputs beyond returning an empty list.
  */
 
 import { cellToLatLng } from 'h3-js';
 import { logDebug, logTrace } from '../../logger';
-import { listStrategicRes1H3Indexes } from './hexCoordinates';
+import { listStrategicH3Indexes } from './hexCoordinates';
 
 /**
  * Wraps a longitude delta to (-180, 180] degrees.
@@ -48,7 +48,7 @@ function circularMeanLongitudeDegrees(longitudes: number[]): number {
 }
 
 /**
- * Returns all res1 H3 indices whose centers fall inside the buffered unit bounding window.
+ * Returns all strategic H3 indices whose centers fall inside the buffered unit bounding window.
  *
  * Purpose: Phase 2 bounding box selection feeding the ASCII renderer.
  * When to use: Callers that need a unit-centered strategic window (not the full-world AI operational map).
@@ -86,7 +86,7 @@ export function computeMapHexes(
   const lngDeltaMin = minLngDelta - lngBuffer;
   const lngDeltaMax = maxLngDelta + lngBuffer;
 
-  const all = listStrategicRes1H3Indexes();
+  const all = listStrategicH3Indexes();
   const out: string[] = [];
   for (const h3 of all) {
     const [lat, lng] = cellToLatLng(h3);

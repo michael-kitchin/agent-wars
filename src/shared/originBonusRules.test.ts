@@ -15,7 +15,7 @@ const BOTH_ON: OriginBonusSettings = { countryBonusEnabled: true, terrainBonusEn
 /** A plains-born French unit used by most cases. */
 const FRENCH_PLAINS: UnitOrigin = {
   birthH3Index: '81fb3ffffffffff',
-  birthRes4H3Index: null,
+  birthTacticalH3Index: null,
   birthTerrainKind: 'plains',
   birthCountryName: 'France',
   birthCountryCode: 'FR',

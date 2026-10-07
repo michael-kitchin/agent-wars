@@ -29,7 +29,7 @@ export interface RequestOrdersResult {
    */
   success: true;
   /**
-   * Validated movement orders (unit id → destination res0/res4 index as applicable to mode).
+   * Validated movement orders (unit id → destination res0/tactical index as applicable to mode).
    *
    * Contract: Each `unitId` exists in the current state for the acting player; destinations pass the same validators as human orders.
    * When to use: Apply after a successful `requestOrdersFlow` when movement tools produced rows.
@@ -190,7 +190,7 @@ export interface RequestOrdersError {
  *
  * Purpose: Passes per-request overrides without expanding the main positional parameter list.
  * When to use: Call sites pass only fields they need; omit for default full strategic tool surface.
- * Expected outcome: `tacticalAiBattle` switches validation and prompt projection to res4 tactical semantics when set.
+ * Expected outcome: `tacticalAiBattle` switches validation and prompt projection to tactical semantics when set.
  * Exceptions: None.
  */
 export interface RequestOrdersOptions {
@@ -231,9 +231,9 @@ export interface RequestOrdersOptions {
    */
   usePrecomputation?: boolean;
   /**
-   * Active tactical snapshot for res4-only AI order requests.
+   * Active tactical snapshot for tactical-only AI order requests.
    *
-   * Contract: When set, validation targets tactical sub-units and res4 geometry only.
+   * Contract: When set, validation targets tactical sub-units and tactical geometry only.
    * When to use: `game:requestAiOrders` while a tactical session is active.
    * Expected outcome: Strategic production/memory tooling is omitted from prompts.
    * Exceptions: None.

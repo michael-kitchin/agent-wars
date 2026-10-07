@@ -117,7 +117,7 @@ export function buildFinalJsonContractInstruction(args: {
     : '';
   const rangedReachClause =
     coordinateMode === 'tactical'
-      ? 'every type with a res4 reach, infantry included'
+      ? 'every type with a tactical reach, infantry included'
       : 'units with a strategic ranged reach of at least one, never infantry';
   const sharedMoveFireClause = `explicit_move (include "destination": briefing hex code for this ${coordinateMode === 'tactical' ? "beat's march" : "turn's move"}; auto-debarks embarked cargo before marching), ranged_attack (include exactly one of targetHexCode or targetUnitId; ${rangedReachClause})${sealiftActionClause}`;
   const actorIdClause =

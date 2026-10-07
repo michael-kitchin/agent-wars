@@ -12,11 +12,11 @@ test('every seeded unit is born in its starting hex, in a cell inside that hex',
     for (const unit of units) {
       assert.equal(unit.origin?.birthH3Index, unit.h3Index, `unit ${unit.id} birth hex`);
     }
-    const withCell = units.filter((unit) => unit.origin?.birthRes4H3Index);
+    const withCell = units.filter((unit) => unit.origin?.birthTacticalH3Index);
     assert.ok(withCell.length > 0, 'at least one seeded unit has a birth cell');
     for (const unit of withCell) {
       const origin = unit.origin!;
-      assert.equal(cellToParent(origin.birthRes4H3Index!, 1), unit.h3Index, `unit ${unit.id} birth cell parent`);
+      assert.equal(cellToParent(origin.birthTacticalH3Index!, 1), unit.h3Index, `unit ${unit.id} birth cell parent`);
       assert.ok(origin.birthTerrainKind && isPipelineTerrainKind(origin.birthTerrainKind), `unit ${unit.id} terrain`);
       assert.equal(typeof origin.birthIsUrban, 'boolean', `unit ${unit.id} urban flag`);
     }

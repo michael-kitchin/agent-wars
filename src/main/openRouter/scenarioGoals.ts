@@ -15,7 +15,7 @@ export const REGION_VS_REGION_SCENARIO_WIN_CONTROL_SNIPPET =
 
 /** Substring matched by matrix tests for the urban-elimination branch of the scenario objective. */
 export const REGION_VS_REGION_SCENARIO_WIN_URBAN_SNIPPET =
-  'Eliminating all urban production (res4 urban hexes) in the enemy home region';
+  'Eliminating all urban production (tactical urban hexes) in the enemy home region';
 
 const REGION_VS_REGION_SCENARIO_WIN_BLOCK =
   '- Win at end of turn by either:\n' +

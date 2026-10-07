@@ -9,9 +9,9 @@ import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { cellToParent, gridDisk } from 'h3-js';
 import { gridHopDistanceBetween } from '../tools/assessUnitProximity';
 import {
-  tacticalRes4PentagonCrossingPair,
-  tacticalRes4UnderRes1Corner,
-} from '../tacticalBattle/testSupport/tacticalRes4HexFixtures';
+  tacticalPentagonCrossingPair,
+  tacticalUnderCorner,
+} from '../tacticalBattle/testSupport/tacticalHexFixtures';
 import { buildLightweightTacticalUnitAssessments } from './tacticalBriefingAssessments';
 
 /**
@@ -23,16 +23,16 @@ import { buildLightweightTacticalUnitAssessments } from './tacticalBriefingAsses
  * Exceptions: None.
  */
 function crossingBattleFixture(): { battle: TacticalBattleSnapshot; hopDistance: number } {
-  const pair = tacticalRes4PentagonCrossingPair();
+  const pair = tacticalPentagonCrossingPair();
   const battle: TacticalBattleSnapshot = {
     battleId: 'tb-briefing-crossing',
-    enclosingRes1H3Index: pair.res1H3Index,
-    res4ChildH3Indexes: pair.res4ChildH3Indexes,
+    enclosingStrategicH3Index: pair.strategicH3Index,
+    tacticalChildH3Indexes: pair.tacticalChildH3Indexes,
     strategicTurnNumber: 1,
     tacticalTurnNumber: 1,
     strategicHexTerrain: 'land',
     strategicHexTerrainKind: 'plains',
-    res4TerrainKindByH3: Object.fromEntries(pair.res4ChildH3Indexes.map((h) => [h, 'plains'])),
+    tacticalTerrainKindByH3: Object.fromEntries(pair.tacticalChildH3Indexes.map((h) => [h, 'plains'])),
     subUnits: [
       {
         id: 'opp-armor:01',
@@ -71,20 +71,20 @@ test('tactical Unit Status reports the real distance to an enemy gridDistance ca
 });
 
 test('tactical Unit Status does not treat urban armor as in range of an enemy three hops away', () => {
-  const origin = tacticalRes4UnderRes1Corner(12, 34, { latEpsilon: 0.01 });
+  const origin = tacticalUnderCorner(12, 34, { latEpsilon: 0.01 });
   const far = [...gridDisk(origin, 3)].find((h) => gridHopDistanceBetween(origin, h) === 3);
   assert.ok(far, 'need a res4 cell three hops from origin');
-  const res1 = cellToParent(origin, 1);
+  const strategic = cellToParent(origin, 1);
   const battle: TacticalBattleSnapshot = {
     battleId: 'tb-urban-range',
-    enclosingRes1H3Index: res1,
-    res4ChildH3Indexes: [...gridDisk(origin, 3)],
+    enclosingStrategicH3Index: strategic,
+    tacticalChildH3Indexes: [...gridDisk(origin, 3)],
     strategicTurnNumber: 1,
     tacticalTurnNumber: 1,
     strategicHexTerrain: 'land',
     strategicHexTerrainKind: 'plains',
-    res4TerrainKindByH3: Object.fromEntries([...gridDisk(origin, 3)].map((h) => [h, 'plains'])),
-    res4IsUrbanByH3: { [origin]: true },
+    tacticalTerrainKindByH3: Object.fromEntries([...gridDisk(origin, 3)].map((h) => [h, 'plains'])),
+    tacticalIsUrbanByH3: { [origin]: true },
     subUnits: [
       {
         id: 'opp-armor:01',
@@ -113,19 +113,19 @@ test('tactical Unit Status does not treat urban armor as in range of an enemy th
 });
 
 test('tactical Unit Status does not treat mountain-blocked armor as in ranged range', () => {
-  const origin = tacticalRes4UnderRes1Corner(12, 34, { latEpsilon: 0.01 });
+  const origin = tacticalUnderCorner(12, 34, { latEpsilon: 0.01 });
   const neighbor = [...gridDisk(origin, 1)].find((h) => h !== origin);
   assert.ok(neighbor, 'need a ring-1 neighbor');
-  const res1 = cellToParent(origin, 1);
+  const strategic = cellToParent(origin, 1);
   const battle: TacticalBattleSnapshot = {
     battleId: 'tb-mountain-los',
-    enclosingRes1H3Index: res1,
-    res4ChildH3Indexes: [...gridDisk(origin, 1)],
+    enclosingStrategicH3Index: strategic,
+    tacticalChildH3Indexes: [...gridDisk(origin, 1)],
     strategicTurnNumber: 1,
     tacticalTurnNumber: 1,
     strategicHexTerrain: 'land',
     strategicHexTerrainKind: 'plains',
-    res4TerrainKindByH3: { [origin]: 'plains', [neighbor]: 'mountain' },
+    tacticalTerrainKindByH3: { [origin]: 'plains', [neighbor]: 'mountain' },
     subUnits: [
       {
         id: 'opp-armor:01',

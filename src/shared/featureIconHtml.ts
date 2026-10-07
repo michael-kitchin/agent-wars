@@ -101,10 +101,10 @@ export function formatTechTierHtml(level: TechLevel): string {
 }
 
 /**
- * Returns the Tech line for units a res1 hex will produce, or null when that line does not apply.
+ * Returns the Tech line for units a strategic hex will produce, or null when that line does not apply.
  *
  * Purpose: The hex tooltip and the build popup name the hex's tier with the same icon and word as a unit tooltip.
- * When to use: Under the hex name on a res1 surface, passing the match's tech flag and the hex's generated urban count.
+ * When to use: Under the hex name on a strategic surface, passing the match's tech flag and the hex's generated urban count.
  * Expected outcome: Null when tech is off, or when the count is not finite or not positive. Otherwise `Tech:` plus the Basic or Advanced icon. Low and High use the same line.
  * Exceptions: None.
  */

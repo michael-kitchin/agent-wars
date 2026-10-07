@@ -55,7 +55,7 @@ export interface NewUnitRow {
    */
   readonly displayOrder: number;
   /**
-   * The res1 hex the unit starts in.
+   * The strategic hex the unit starts in.
    *
    * Contract: Must exist in `hexes`.
    * When to use: The `h3_index` column.
@@ -86,13 +86,13 @@ export function insertUnitRow(run: (sql: string, params?: unknown[]) => unknown,
   logDebug('unitInsert insertUnitRow', {
     id: row.id,
     h3Index: row.h3Index,
-    birthRes4H3Index: row.origin?.birthRes4H3Index ?? null,
+    birthTacticalH3Index: row.origin?.birthTacticalH3Index ?? null,
     birthCountryCode: row.origin?.birthCountryCode ?? null,
   });
   run(
     `INSERT INTO units (
        id, player, unit_type, display_order, h3_index,
-       birth_h3_index, birth_res4_h3_index, birth_terrain_kind, birth_is_urban, birth_country_name, birth_country_code
+       birth_h3_index, birth_res_t_h3_index, birth_terrain_kind, birth_is_urban, birth_country_name, birth_country_code
      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       row.id,
@@ -101,7 +101,7 @@ export function insertUnitRow(run: (sql: string, params?: unknown[]) => unknown,
       row.displayOrder,
       row.h3Index,
       row.origin?.birthH3Index ?? null,
-      row.origin?.birthRes4H3Index ?? null,
+      row.origin?.birthTacticalH3Index ?? null,
       row.origin?.birthTerrainKind ?? null,
       row.origin == null ? null : row.origin.birthIsUrban ? 1 : 0,
       row.origin?.birthCountryName ?? null,

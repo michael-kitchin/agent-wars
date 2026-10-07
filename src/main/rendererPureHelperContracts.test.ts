@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import { readRendererSource } from './testSupport/rendererSourceAssertions';
 
 test('terrain tooltip uses shared HTML escaping', () => {
-  const assembly = readRendererSource('map', 'terrainTooltipRes1State.ts');
+  const assembly = readRendererSource('map', 'terrainTooltipStrategicState.ts');
   const html = readRendererSource('map', 'terrainTooltipHtml.ts');
   assert.ok(!assembly.includes('function escapeHtml('), 'local escapeHtml should be gone');
   assert.ok(!html.includes('function escapeHtml('), 'tooltip HTML should not define a local escapeHtml');

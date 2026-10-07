@@ -7,6 +7,7 @@ import {
   directoryViolations,
   isCamelCaseIdentifier,
   isKebabCaseSegment,
+  containsResolutionAbbreviation,
   isNumberedToolName,
   isPascalCaseIdentifier,
   kebabToCamel,
@@ -273,6 +274,35 @@ function collectFileViolations(absFile: string, repoRoot: string, out: Violation
 }
 
 /**
+ * Records identifiers under `src/` that still contain `res1` or `res4`.
+ *
+ * Purpose: The strategic/tactical rename must not leave the old abbreviations in names.
+ * When to use: While scanning each `src/` source file. String literals are not identifiers and are ignored.
+ * Expected outcome: One `resolutionToken` row per distinct identifier spelling in the file.
+ * Exceptions: None.
+ */
+function collectResolutionTokenViolations(sf: ts.SourceFile, filePathPosix: string, out: Violation[]): void {
+  const seen = new Set<string>();
+  const visit = (node: ts.Node): void => {
+    if (ts.isIdentifier(node) && containsResolutionAbbreviation(node.text)) {
+      seen.add(node.text);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sf);
+  const stem = path.basename(filePathPosix).replace(/\.test\.ts$/, '').replace(/\.ts$/, '');
+  if (containsResolutionAbbreviation(stem)) seen.add(stem);
+  for (const name of seen) {
+    out.push({
+      category: 'resolutionToken',
+      filePath: filePathPosix,
+      currentName: name,
+      detail: 'Identifiers in src/ must not contain res1 or res4',
+    });
+  }
+}
+
+/**
  * Scans in-scope TypeScript for naming-contract violations.
  *
  * Purpose: Read-only inventory used by `naming:report` and later `naming:check`.
@@ -312,6 +342,7 @@ export function scanRepository(repoRoot: string): ScanReport {
     if (!norm.endsWith('.ts')) continue;
     const rel = path.relative(repoRoot, sf.fileName).replace(/\\/g, '/');
     collectExportViolations(sf, rel, violations);
+    collectResolutionTokenViolations(sf, rel, violations);
   }
 
   const toolingTsconfigs = ['tsconfig.tools-orienting-comments.json', 'tsconfig.tools-naming.json'];

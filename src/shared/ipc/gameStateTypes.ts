@@ -28,7 +28,7 @@ hexes: {
     terrain: string;
     terrainKind: string;
     /**
-     * Majority country name of this res1 hex: the country of most of its res4 cells, ties broken by name.
+     * Majority country name of this strategic hex: the country of most of its tactical cells, ties broken by name.
      *
      * Contract: Present only when the match has the country bonus on; `null` when no cell in the hex has a country.
      * When to use: The country test of origin bonuses on the strategic map.
@@ -37,7 +37,7 @@ hexes: {
      */
     countryName?: string | null;
     /**
-     * Display weather of this res1 hex for the current month.
+     * Display weather of this strategic hex for the current month.
      *
      * Contract: Present only when the weather bonus is on and this hex is explored. Omitted under fog.
      * When to use: Hex tooltips and strategic movement penalties.
@@ -357,23 +357,23 @@ turnNumber: number;
    */
 pendingOrders: { unitId: string; toH3Index: string }[];
     /**
-   * Specifies the contract for the `res1Control` member (res1Control?: { h3Index: string; controllerPlayerId: string | null }[];).
+   * Specifies the contract for the `strategicControl` member (strategicControl?: { h3Index: string; controllerPlayerId: string | null }[];).
 
-   * Contract: Describes stable behavior for callers of `res1Control` in this codebase.
+   * Contract: Describes stable behavior for callers of `strategicControl` in this codebase.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-res1Control?: { h3Index: string; controllerPlayerId: string | null }[];
+strategicControl?: { h3Index: string; controllerPlayerId: string | null }[];
     /**
-   * Specifies the contract for the `res1BuildQueueTotals` member (res1BuildQueueTotals?: { h3Index: string; queuedUnits: number; nextUnitType: BuildUnitType | null; nextRemainingCount: number | null; s).
+   * Specifies the contract for the `strategicBuildQueueTotals` member (strategicBuildQueueTotals?: { h3Index: string; queuedUnits: number; nextUnitType: BuildUnitType | null; nextRemainingCount: number | null; s).
 
-   * Contract: Describes stable behavior for callers of `res1BuildQueueTotals` in this codebase.
+   * Contract: Describes stable behavior for callers of `strategicBuildQueueTotals` in this codebase.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-res1BuildQueueTotals?: {
+strategicBuildQueueTotals?: {
     h3Index: string;
     queuedUnits: number;
     nextUnitType: BuildUnitType | null;
@@ -381,14 +381,14 @@ res1BuildQueueTotals?: {
     storedPoints: number;
   }[];
     /**
-   * Specifies the contract for the `res1Infrastructure` member (res1Infrastructure?: { h3Index: string; urbanHexCount: number; airportCount: number; seaportCount: number; }[];).
+   * Specifies the contract for the `strategicInfrastructure` member (strategicInfrastructure?: { h3Index: string; urbanHexCount: number; airportCount: number; seaportCount: number; }[];).
 
-   * Contract: Describes stable behavior for callers of `res1Infrastructure` in this codebase.
+   * Contract: Describes stable behavior for callers of `strategicInfrastructure` in this codebase.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-res1Infrastructure?: {
+strategicInfrastructure?: {
     h3Index: string;
     urbanHexCount: number;
     airportCount: number;
@@ -416,7 +416,7 @@ winner?: string;
    * Specifies the contract for the `tacticalBattleSession` member (tacticalBattleSession?: TacticalBattleSnapshot;).
 
    * Contract: Present when the main process holds an active tactical battle (including sessions restored from SQLite after restart).
-   * When to use: Renderer `applyGameStateSnapshot` re-enters tactical res4 mode when this field is populated.
+   * When to use: Renderer `applyGameStateSnapshot` re-enters tactical mode when this field is populated.
    * Expected outcome: Matches in-memory tactical state in the main process; omitted when no tactical session exists.
    * Exceptions: None.
    */

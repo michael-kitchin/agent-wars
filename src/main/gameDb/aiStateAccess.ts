@@ -281,7 +281,7 @@ export function getRecentTurnNotes(
  * Clears persisted tactical turn-note history when starting or resetting tactical battles.
  *
  * Purpose: Public facade over `turnNotesHistory.clearTacticalTurnNotes`.
- * When to use: `startTacticalBattleForEnclosingRes1Hex` before recording notes for the new battle.
+ * When to use: `startTacticalBattleForEnclosingStrategicHex` before recording notes for the new battle.
  * Expected outcome: Tactical rows removed; strategic history preserved.
  * Exceptions: None; underlying module logs errors without throwing.
  */

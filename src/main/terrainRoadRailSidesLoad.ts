@@ -1,15 +1,15 @@
 /**
- * Loads and validates `terrain_res4_road_rail_sides.json` for res4 tactical transport overlay masks.
+ * Loads and validates `terrain_res4_road_rail_sides.json` for tactical transport overlay masks.
  */
 
 import * as fs from 'fs';
 import { logDebug, logError } from './logger';
-import { resolveTerrainRes4RoadRailSidesPathOptional } from './terrainMetadataPaths';
+import { resolveTerrainTacticalRoadRailSidesPathOptional } from './terrainMetadataPaths';
 
 /**
  * Documents the `TerrainRoadRailSidesRecord` interface as a named contract surface (export interface TerrainRoadRailSidesRecord).
 
- * Purpose: Describes one res4 cell's validated side masks after JSON parsing.
+ * Purpose: Describes one tactical cell's validated side masks after JSON parsing.
  * When to use: When building in-memory maps for renderer IPC responses.
  * Expected outcome: `roadSides` and `railSides` are same-length boolean arrays of length 5 or 6.
  * Exceptions: None.
@@ -48,7 +48,7 @@ railSides: boolean[];
  * Defines the `isRecord` function shape (function isRecord(x: unknown): x is Record<string, unknown>).
 
  * Purpose: Narrows unknown JSON nodes to string-keyed records for field validation.
- * When to use: Inside `parseTerrainRes4RoadRailSidesJson` while walking the envelope.
+ * When to use: Inside `parseTerrainTacticalRoadRailSidesJson` while walking the envelope.
  * Expected outcome: Type guard success only for non-null objects.
  * Exceptions: None.
  */
@@ -79,14 +79,14 @@ function readBoolArray(r: Record<string, unknown>, key: string): boolean[] {
 }
 
 /**
- * Defines the `parseTerrainRes4RoadRailSidesJson` function shape (export function parseTerrainRes4RoadRailSidesJson(text: string): TerrainRoadRailSidesRecord[]).
+ * Defines the `parseTerrainTacticalRoadRailSidesJson` function shape (export function parseTerrainTacticalRoadRailSidesJson(text: string): TerrainRoadRailSidesRecord[]).
 
  * Purpose: Strictly parses road/rail JSON text into validated in-memory records for overlay maps.
  * When to use: Unit tests and bundled file loads where the caller already read UTF-8 text from disk.
  * Expected outcome: Returns deduplicated rows keyed by `h3_index` in file order (later duplicates override earlier ones).
  * Exceptions: Throws descriptive errors when required envelope fields or per-record masks are invalid.
  */
-export function parseTerrainRes4RoadRailSidesJson(text: string): TerrainRoadRailSidesRecord[] {
+export function parseTerrainTacticalRoadRailSidesJson(text: string): TerrainRoadRailSidesRecord[] {
   const root = JSON.parse(text) as unknown;
   if (!isRecord(root)) throw new Error('terrain road/rail sides: root must be an object');
   const schemaVersion = root.schema_version;
@@ -118,23 +118,23 @@ export function parseTerrainRes4RoadRailSidesJson(text: string): TerrainRoadRail
 }
 
 /**
- * Defines the `loadTerrainRes4RoadRailSidesBundled` function shape (export function loadTerrainRes4RoadRailSidesBundled(): Map<string, { roadSides: boolean[]; railSides: boolean[] }>).
+ * Defines the `loadTerrainTacticalRoadRailSidesBundled` function shape (export function loadTerrainTacticalRoadRailSidesBundled(): Map<string, { roadSides: boolean[]; railSides: boolean[] }>).
 
  * Purpose: Reads optional bundled JSON from resolved metadata paths and returns a lookup map for overlay IPC.
  * When to use: During `terrainClassificationCache` snapshot construction after naming/metadata loads succeed.
  * Expected outcome: Empty map when the file is absent or unparsable after error logging; otherwise all valid rows indexed by h3.
  * Exceptions: None; failures are logged and surfaced as an empty map.
  */
-export function loadTerrainRes4RoadRailSidesBundled(): Map<string, { roadSides: boolean[]; railSides: boolean[] }> {
+export function loadTerrainTacticalRoadRailSidesBundled(): Map<string, { roadSides: boolean[]; railSides: boolean[] }> {
   logDebug('terrainRoadRailSidesLoad loadTerrainRes4RoadRailSidesBundled: start');
-  const path = resolveTerrainRes4RoadRailSidesPathOptional();
+  const path = resolveTerrainTacticalRoadRailSidesPathOptional();
   if (!path) {
     logDebug('terrainRoadRailSidesLoad loadTerrainRes4RoadRailSidesBundled: skipped (missing file)');
     return new Map();
   }
   try {
     const text = fs.readFileSync(path, 'utf8');
-    const rows = parseTerrainRes4RoadRailSidesJson(text);
+    const rows = parseTerrainTacticalRoadRailSidesJson(text);
     const map = new Map<string, { roadSides: boolean[]; railSides: boolean[] }>();
     for (const row of rows) {
       map.set(row.h3Index, { roadSides: [...row.roadSides], railSides: [...row.railSides] });

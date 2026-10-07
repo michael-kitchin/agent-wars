@@ -4,13 +4,13 @@
 
 import { gridDisk } from 'h3-js';
 import { computeGridDistanceWithPathFallbackPure } from '../../shared/h3GridRangePure';
-import type { TacticalMarchPlanResult } from '../../shared/tacticalRes4MovementPlanner';
+import type { TacticalMarchPlanResult } from '../../shared/tacticalMovementPlanner';
 import type { TacticalBattleSnapshot, TacticalSubUnitSnapshot } from '../../shared/tacticalBattleTypes';
 import {
   buildLandMarchStepLegalityDetailAlongPath,
   summarizeLandMarchStepLegalityAlongPath,
-} from '../../shared/tacticalRes4LandMarchContinuity';
-import { planTacticalRes4MarchWithSessionCache } from './tacticalMovementPlanningCache';
+} from '../../shared/tacticalLandMarchContinuity';
+import { planTacticalMarchWithSessionCache } from './tacticalMovementPlanningCache';
 import {
   buildTacticalTerrainKindResolverFromSnapshot,
   tacticalMovementUnitTypeForPathfinding,
@@ -22,57 +22,57 @@ import { logDebug } from '../logger';
 /**
  * Snapshot fields required to rebuild the tactical terrain resolver for march debug previews.
  *
- * Purpose: Keeps `tacticalCompute*MovementOrderOutcome` and `logTacticalMarchPlanOk` aligned with `planTacticalRes4MarchWithSessionCache`.
+ * Purpose: Keeps `tacticalCompute*MovementOrderOutcome` and `logTacticalMarchPlanOk` aligned with `planTacticalMarchWithSessionCache`.
  * When to use: Typing `battle` arguments that must support transport overlay reconstruction.
  * Expected outcome: Same shape as `buildTacticalTerrainKindResolverFromSnapshot` input.
  * Exceptions: None.
  */
 type TacticalBattleSnapshotMarchTerrainPick = Pick<
   TacticalBattleSnapshot,
-  | 'res4TerrainKindByH3'
+  | 'tacticalTerrainKindByH3'
   | 'strategicHexTerrain'
   | 'strategicHexTerrainKind'
-  | 'res4IsSeaportByH3'
-  | 'res4IsUrbanByH3'
-  | 'res4IsRubbleByH3'
-  | 'res4RoadSidesByH3'
-  | 'res4RailSidesByH3'
+  | 'tacticalIsSeaportByH3'
+  | 'tacticalIsUrbanByH3'
+  | 'tacticalIsRubbleByH3'
+  | 'tacticalRoadSidesByH3'
+  | 'tacticalRailSidesByH3'
 >;
 
-/** Snapshot slice passed into `planTacticalRes4MarchWithSessionCache` from movement outcome helpers. */
+/** Snapshot slice passed into `planTacticalMarchWithSessionCache` from movement outcome helpers. */
 type TacticalMarchPlanBattleArgs = Pick<
   TacticalBattleSnapshot,
   | 'battleId'
   | 'tacticalTurnNumber'
   | 'subUnits'
-  | 'res4ChildH3Indexes'
-  | 'res4TerrainKindByH3'
+  | 'tacticalChildH3Indexes'
+  | 'tacticalTerrainKindByH3'
   | 'strategicHexTerrain'
   | 'strategicHexTerrainKind'
-  | 'res4IsSeaportByH3'
-  | 'res4IsUrbanByH3'
-  | 'res4IsRubbleByH3'
-  | 'res4RoadSidesByH3'
-  | 'res4RailSidesByH3'
+  | 'tacticalIsSeaportByH3'
+  | 'tacticalIsUrbanByH3'
+  | 'tacticalIsRubbleByH3'
+  | 'tacticalRoadSidesByH3'
+  | 'tacticalRailSidesByH3'
   | 'weather'
   | 'weatherBonusEnabled'
   | 'weatherBonusLevel'
 >;
 
 /**
- * Lists res4 footprint neighbors of `fromH3` on the H3 grid (ring-1), excluding the origin cell.
+ * Lists tactical footprint neighbors of `fromH3` on the H3 grid (ring-1), excluding the origin cell.
  *
  * Purpose: Drives best-effort land march recovery when the continuity planner cannot route to the ordered hex but a
  * shorter goal (a neighbor as `toH3`) changes per-step transport rules so a one-step plan may still exist.
  * When to use: Only from `tacticalLandMarchBestEffortPlanTowardOrderedHex` after a `no_path` failure to the full goal.
- * Expected outcome: Only indexes present in `res4Set`; empty when `gridDisk` throws for malformed input.
+ * Expected outcome: Only indexes present in `tacticalSet`; empty when `gridDisk` throws for malformed input.
  * Exceptions: None; failures degrade to an empty list.
  */
-function landRes4FootprintRing1Neighbors(fromH3: string, res4Set: ReadonlySet<string>): string[] {
+function landTacticalFootprintRing1Neighbors(fromH3: string, tacticalSet: ReadonlySet<string>): string[] {
   const out: string[] = [];
   try {
     for (const n of gridDisk(fromH3, 1)) {
-      if (n !== fromH3 && res4Set.has(n)) out.push(n);
+      if (n !== fromH3 && tacticalSet.has(n)) out.push(n);
     }
   } catch {
     return out;
@@ -81,7 +81,7 @@ function landRes4FootprintRing1Neighbors(fromH3: string, res4Set: ReadonlySet<st
 }
 
 /**
- * When marching to the ordered res4 hex is `no_path`, searches one-step destinations (each ring-1 neighbor as a
+ * When marching to the ordered tactical hex is `no_path`, searches one-step destinations (each ring-1 neighbor as a
  * mini-goal) and returns the cheapest plan whose first leg strictly reduces H3 grid distance to `orderedToH3`.
  *
  * Purpose: `planInfantryArmorLandContinuityMarch` depends on `marchGoalH3` for transport-aware edge costs; the model
@@ -91,7 +91,7 @@ function landRes4FootprintRing1Neighbors(fromH3: string, res4Set: ReadonlySet<st
  * primary plan to the ordered hex fails, for infantry/armor with a positive MP budget, when grid distance from origin to
  * the ordered hex is at least two (adjacent failures stay authoritative).
  * Expected outcome: `null` when no neighbor yields a reachable one-beat plan that strictly approaches `orderedToH3`.
- * Exceptions: None; distances come from the shared BFS fallback, so a res4 pair spanning an icosahedron face crossing
+ * Exceptions: None; distances come from the shared BFS fallback, so a tactical pair spanning an icosahedron face crossing
  * still yields a candidate instead of disabling recovery for the whole beat. Friendly-occupied neighbors stay
  * eligible so units may stack.
  */
@@ -99,7 +99,7 @@ export function tacticalLandMarchBestEffortPlanTowardOrderedHex(args: {
   battle: TacticalMarchPlanBattleArgs;
   fromH3: string;
   orderedToH3: string;
-  res4Set: ReadonlySet<string>;
+  tacticalSet: ReadonlySet<string>;
   moveType: string;
   movementPointBudget: number;
   weatherTags?: readonly import('../../shared/weatherBonusTypes').WeatherState[] | null;
@@ -115,14 +115,14 @@ export function tacticalLandMarchBestEffortPlanTowardOrderedHex(args: {
   if (args.moveType !== 'infantry' && args.moveType !== 'armor') return null;
   const d0 = computeGridDistanceWithPathFallbackPure(args.fromH3, args.orderedToH3);
   if (d0 === null || d0 <= 1) return null;
-  const neighbors = landRes4FootprintRing1Neighbors(args.fromH3, args.res4Set);
+  const neighbors = landTacticalFootprintRing1Neighbors(args.fromH3, args.tacticalSet);
   let best: TacticalMarchPlanResult | null = null;
   let bestRank = Infinity;
   for (const n of neighbors) {
-    const p = planTacticalRes4MarchWithSessionCache(args.battle, {
+    const p = planTacticalMarchWithSessionCache(args.battle, {
       fromH3: args.fromH3,
       toH3: n,
-      res4Set: args.res4Set,
+      tacticalSet: args.tacticalSet,
       unitTypeForMovement: args.moveType,
       movementPointBudget: Math.max(0, args.movementPointBudget),
       weatherEnabled: args.battle.weatherBonusEnabled === true,
@@ -145,20 +145,20 @@ export function tacticalLandMarchBestEffortPlanTowardOrderedHex(args: {
 }
 
 /**
- * Builds a compact comma-separated list of effective res4 terrain kind strings along a planned path for debug triage.
+ * Builds a compact comma-separated list of effective tactical terrain kind strings along a planned path for debug triage.
  *
- * Purpose: Correlates accepted tactical routes with snapshot `res4TerrainKindByH3` (and parent kind fallback) without dumping full H3 lists.
- * When to use: Only from debug logging after a successful `planTacticalRes4MarchWithSessionCache` result.
+ * Purpose: Correlates accepted tactical routes with snapshot `tacticalTerrainKindByH3` (and parent kind fallback) without dumping full H3 lists.
+ * When to use: Only from debug logging after a successful `planTacticalMarchWithSessionCache` result.
  * Expected outcome: Short string for typical paths; middle elided when the path is long.
  * Exceptions: None.
  */
-function res4KindPreviewAlongPath(
-  battle: Pick<TacticalBattleSnapshot, 'res4TerrainKindByH3' | 'strategicHexTerrainKind'>,
+function tacticalKindPreviewAlongPath(
+  battle: Pick<TacticalBattleSnapshot, 'tacticalTerrainKindByH3' | 'strategicHexTerrainKind'>,
   path: readonly string[] | null
 ): string | null {
   if (!path?.length) return null;
   const row = (h: string): string => {
-    const raw = battle.res4TerrainKindByH3?.[h];
+    const raw = battle.tacticalTerrainKindByH3?.[h];
     if (raw != null && String(raw).trim().length > 0) return String(raw).trim();
     return battle.strategicHexTerrainKind ?? 'plains';
   };
@@ -171,7 +171,7 @@ function res4KindPreviewAlongPath(
  * Emits debug-level structured context for a reachable tactical march plan (human or opponent).
  *
  * Purpose: Makes `debug.log` useful at default debug settings when investigating mountain vs transport and multi-turn reachability.
- * When to use: After `planTacticalRes4MarchWithSessionCache` returns `reachable: true` inside movement outcome helpers.
+ * When to use: After `planTacticalMarchWithSessionCache` returns `reachable: true` inside movement outcome helpers.
  * Expected outcome: One line per validated order with path head/tail, costs, and terrain kind preview.
  * Exceptions: None.
  */
@@ -179,7 +179,7 @@ function logTacticalMarchPlanOk(args: {
   player: 'human' | 'opponent';
   battle: Pick<
     TacticalBattleSnapshot,
-    'battleId' | 'tacticalTurnNumber' | 'res4TerrainKindByH3' | 'strategicHexTerrainKind'
+    'battleId' | 'tacticalTurnNumber' | 'tacticalTerrainKindByH3' | 'strategicHexTerrainKind'
   > &
     TacticalBattleSnapshotMarchTerrainPick;
   unitId: string;
@@ -189,7 +189,7 @@ function logTacticalMarchPlanOk(args: {
   toH3: string;
   budget: number;
   plan: TacticalMarchPlanResult;
-  res4Set: ReadonlySet<string>;
+  tacticalSet: ReadonlySet<string>;
 }): void {
   const path = args.plan.pathToDestination;
   const terrain =
@@ -203,7 +203,7 @@ function logTacticalMarchPlanOk(args: {
           unitTypeForMovement: args.moveType,
           terrain,
           marchGoalH3: args.toH3,
-          res4Set: args.res4Set,
+          tacticalSet: args.tacticalSet,
         })
       : null;
   const landMarchDetail =
@@ -212,7 +212,7 @@ function logTacticalMarchPlanOk(args: {
       unitTypeForMovement: args.moveType,
       terrain,
       marchGoalH3: args.toH3,
-      res4Set: args.res4Set,
+      tacticalSet: args.tacticalSet,
     }) : null;
   const stepLegalityDetailPayload =
     landMarchDetail == null
@@ -240,7 +240,7 @@ function logTacticalMarchPlanOk(args: {
     pathLen: path?.length ?? 0,
     pathHead: path?.slice(0, 4) ?? [],
     pathTail: path?.slice(-3) ?? [],
-    terrainKindsAlongPath: res4KindPreviewAlongPath(args.battle, path),
+    terrainKindsAlongPath: tacticalKindPreviewAlongPath(args.battle, path),
     stepLegalityAlongPath: landMarch,
     ...stepLegalityDetailPayload,
   });
@@ -275,21 +275,21 @@ type TacticalMovementOrderOutcomeArgs = {
   byId: ReadonlyMap<string, number>;
   sub: readonly TacticalSubUnitSnapshot[];
   order: { unitId: string; toH3Index: string };
-  res4Set: ReadonlySet<string>;
+  tacticalSet: ReadonlySet<string>;
   battle: Pick<
     TacticalBattleSnapshot,
     | 'battleId'
     | 'tacticalTurnNumber'
     | 'subUnits'
-    | 'res4ChildH3Indexes'
-    | 'res4TerrainKindByH3'
+    | 'tacticalChildH3Indexes'
+    | 'tacticalTerrainKindByH3'
     | 'strategicHexTerrain'
     | 'strategicHexTerrainKind'
-    | 'res4IsSeaportByH3'
-    | 'res4IsUrbanByH3'
-    | 'res4IsRubbleByH3'
-    | 'res4RoadSidesByH3'
-    | 'res4RailSidesByH3'
+    | 'tacticalIsSeaportByH3'
+    | 'tacticalIsUrbanByH3'
+    | 'tacticalIsRubbleByH3'
+    | 'tacticalRoadSidesByH3'
+    | 'tacticalRailSidesByH3'
     | 'weather'
     | 'weatherBonusEnabled'
     | 'weatherBonusLevel'
@@ -332,7 +332,7 @@ function tacticalComputeMovementOrderOutcomeForPlayer(
       context: { unitId: args.order.unitId },
     };
   }
-  if (!args.res4Set.has(args.order.toH3Index)) {
+  if (!args.tacticalSet.has(args.order.toH3Index)) {
     return {
       ok: false,
       reason: 'outside_footprint',
@@ -364,10 +364,10 @@ function tacticalComputeMovementOrderOutcomeForPlayer(
     return { ok: false, reason: 'air_no_march', context: { unitId: args.order.unitId } };
   }
   const budget = effectiveTacticalMovementPointBudgetForMarchLeg(args.battle, pathfindUnit, args.sub, moveType);
-  let plan = planTacticalRes4MarchWithSessionCache(args.battle, {
+  let plan = planTacticalMarchWithSessionCache(args.battle, {
     fromH3: u.h3Index,
     toH3: args.order.toH3Index,
-    res4Set: args.res4Set,
+    tacticalSet: args.tacticalSet,
     unitTypeForMovement: moveType,
       movementPointBudget: Math.max(0, budget),
       weatherEnabled: args.battle.weatherBonusEnabled === true,
@@ -381,7 +381,7 @@ function tacticalComputeMovementOrderOutcomeForPlayer(
             battle: args.battle,
             fromH3: u.h3Index,
             orderedToH3: args.order.toH3Index,
-            res4Set: args.res4Set,
+            tacticalSet: args.tacticalSet,
             moveType,
             movementPointBudget: Math.max(0, budget),
             weatherTags: pathfindUnit.weatherTags,
@@ -462,7 +462,7 @@ function tacticalComputeMovementOrderOutcomeForPlayer(
     toH3: args.order.toH3Index,
     budget,
     plan,
-    res4Set: args.res4Set,
+    tacticalSet: args.tacticalSet,
   });
   return { ok: true, idx, appliedToH3Index };
 }
@@ -509,15 +509,15 @@ export function tacticalFindSubUnitIndexById(subUnits: readonly { id: string }[]
 }
 
 /**
- * Returns true when a res4 child hex id lies inside the tactical footprint set.
+ * Returns true when a tactical child hex id lies inside the tactical footprint set.
  *
  * Contract: Thin wrapper over `Set#has` to keep tactical footprint checks named consistently.
- * When to use: Ferry destination checks and any other res4 membership test against `res4ChildH3Indexes`.
+ * When to use: Ferry destination checks and any other tactical membership test against `tacticalChildH3Indexes`.
  * Expected outcome: True iff the tactical snapshot lists the cell.
  * Exceptions: None.
  */
-export function tacticalRes4FootprintContains(res4Set: ReadonlySet<string>, h3Index: string): boolean {
-  return res4Set.has(h3Index);
+export function tacticalFootprintContains(tacticalSet: ReadonlySet<string>, h3Index: string): boolean {
+  return tacticalSet.has(h3Index);
 }
 
 /**

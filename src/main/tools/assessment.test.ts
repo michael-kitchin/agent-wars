@@ -13,11 +13,11 @@ import { executeAssessment } from './assessment';
  * Finds two world-map cells at exact H3 grid distance `dist`.
  *
  * Purpose: Avoids pentagon `gridDistance` failures around lat/lng (0,0).
- * When to use: Tiny assess_unit fixtures that must sit on real res1 indexes.
+ * When to use: Tiny assess_unit fixtures that must sit on real strategic indexes.
  * Expected outcome: Pair with `gridDistance === dist`.
  * Exceptions: Throws when no pair exists on the ordered hex list.
  */
-function res1PairAtGridDistance(dist: number): [string, string] {
+function strategicPairAtGridDistance(dist: number): [string, string] {
   const hexes = getOrderedHexList();
   for (const origin of hexes) {
     let ring: string[];
@@ -42,7 +42,7 @@ function res1PairAtGridDistance(dist: number): [string, string] {
  * Finds a cell at exact H3 grid distance `dist` from `origin`.
  *
  * Purpose: Adjacent and two-hop fixtures share one lookup so pentagon holes are skipped the same way.
- * When to use: In-range and moderate-ETA cases relative to `res1Origin`.
+ * When to use: In-range and moderate-ETA cases relative to `strategicOrigin`.
  * Expected outcome: `gridDistance(origin, result) === dist`.
  * Exceptions: Throws when no pair exists on the disk.
  */
@@ -68,11 +68,11 @@ function cellAtExactGridDistance(origin: string, dist: number): string {
  * Finds two world-map cells where H3 `gridDistance` throws.
  *
  * Purpose: Covers the global-map assess_unit gap when pentagon-crossing hops are skipped.
- * When to use: Fog-off res1 cases that must still list a nearest enemy.
+ * When to use: Fog-off strategic cases that must still list a nearest enemy.
  * Expected outcome: Pair for which `gridDistance` throws.
  * Exceptions: Throws when no such pair exists on the ordered hex list.
  */
-function res1PairWhereGridDistanceThrows(): [string, string] {
+function strategicPairWhereGridDistanceThrows(): [string, string] {
   const hexes = getOrderedHexList();
   for (const origin of hexes) {
     for (const other of hexes) {
@@ -88,50 +88,50 @@ function res1PairWhereGridDistanceThrows(): [string, string] {
 }
 
 /**
- * Documents the module-scope binding `res1Origin` (res1Origin).
+ * Documents the module-scope binding `strategicOrigin` (strategicOrigin).
  *
  * Purpose: Strategic-map origin for tiny fixtures.
  * When to use: Omniscient and path-scan assess_unit cases.
  * Expected outcome: First cell of the distance-5 pair.
  * Exceptions: None.
  */
-const [res1Origin, res1Far] = res1PairAtGridDistance(5);
+const [strategicOrigin, strategicFar] = strategicPairAtGridDistance(5);
 /**
- * Documents the module-scope binding `res1Adjacent` (res1Adjacent).
+ * Documents the module-scope binding `strategicAdjacent` (strategicAdjacent).
  *
- * Purpose: In-range armor shot hex from `res1Origin`.
+ * Purpose: In-range armor shot hex from `strategicOrigin`.
  * When to use: canAttackThisTurn in-range case.
- * Expected outcome: Grid distance 1 from `res1Origin`.
+ * Expected outcome: Grid distance 1 from `strategicOrigin`.
  * Exceptions: None.
  */
-const res1Adjacent = cellAtExactGridDistance(res1Origin, 1);
+const strategicAdjacent = cellAtExactGridDistance(strategicOrigin, 1);
 /**
- * Documents the module-scope binding `res1AtTwo` (res1AtTwo).
+ * Documents the module-scope binding `strategicAtTwo` (strategicAtTwo).
  *
  * Purpose: Reverse-ETA moderate band (infantry closes in 2 turns) without entering weapon range.
  * When to use: Fog-off severity moderate case.
- * Expected outcome: Grid distance 2 from `res1Origin`.
+ * Expected outcome: Grid distance 2 from `strategicOrigin`.
  * Exceptions: None.
  */
-const res1AtTwo = cellAtExactGridDistance(res1Origin, 2);
+const strategicAtTwo = cellAtExactGridDistance(strategicOrigin, 2);
 /**
- * Documents the module-scope binding `res4Origin` (res4Origin).
+ * Documents the module-scope binding `tacticalOrigin` (tacticalOrigin).
  *
  * Purpose: Tactical-resolution cell so the omniscient gate stays closed.
- * When to use: Fog-off + res4 assessed unit.
- * Expected outcome: A res4 child of `res1Origin`.
+ * When to use: Fog-off + tactical assessed unit.
+ * Expected outcome: A tactical child of `strategicOrigin`.
  * Exceptions: None.
  */
-const res4Origin = cellToChildren(res1Origin, 4)[0]!;
+const tacticalOrigin = cellToChildren(strategicOrigin, 4)[0]!;
 /**
- * Documents the module-scope binding `res4Far` (res4Far).
+ * Documents the module-scope binding `tacticalFar` (tacticalFar).
  *
- * Purpose: Distant tactical cell paired with `res4Origin`.
- * When to use: Fog-off res4 fallback to path+radius.
- * Expected outcome: A res4 child of `res1Far` (grid distance > 4).
+ * Purpose: Distant tactical cell paired with `tacticalOrigin`.
+ * When to use: Fog-off tactical fallback to path+radius.
+ * Expected outcome: A tactical child of `strategicFar` (grid distance > 4).
  * Exceptions: None.
  */
-const res4Far = cellToChildren(res1Far, 4)[0]!;
+const tacticalFar = cellToChildren(strategicFar, 4)[0]!;
 
 /**
  * Builds a tiny snapshot and coordinate map for assess_unit.
@@ -170,19 +170,19 @@ function assess(state: GameStateSnapshot, coordMap: ReturnType<typeof buildLatLn
 }
 
 /**
- * Verifies fog-off res1 includes a human beyond radius 4 at grid distance.
+ * Verifies fog-off strategic includes a human beyond radius 4 at grid distance.
  *
  * Purpose: Core omniscient-scan contract for the Unit Status nearest-enemy gap.
  * When to use: After changing the assess_unit omniscient branch.
  * Expected outcome: human-infantry-1 at hexDistance 5 with armor ETA 3.
  * Exceptions: None.
  */
-function testFogOffRes1IncludesDistantEnemy(): void {
+function testFogOffStrategicIncludesDistantEnemy(): void {
   const { state, coordMap } = buildAssessState(
-    [res1Origin, res1Far],
+    [strategicOrigin, strategicFar],
     [
-      { id: 'opponent-armor-1', player: 'opponent', unitType: 'armor', h3Index: res1Origin },
-      { id: 'human-infantry-1', player: 'human', unitType: 'infantry', h3Index: res1Far },
+      { id: 'opponent-armor-1', player: 'opponent', unitType: 'armor', h3Index: strategicOrigin },
+      { id: 'human-infantry-1', player: 'human', unitType: 'infantry', h3Index: strategicFar },
     ],
     false
   );
@@ -211,10 +211,10 @@ function testFogOffRes1IncludesDistantEnemy(): void {
  */
 function testFogOnExcludesDistantEnemy(): void {
   const { state, coordMap } = buildAssessState(
-    [res1Origin, res1Far],
+    [strategicOrigin, strategicFar],
     [
-      { id: 'opponent-armor-1', player: 'opponent', unitType: 'armor', h3Index: res1Origin },
-      { id: 'human-infantry-1', player: 'human', unitType: 'infantry', h3Index: res1Far },
+      { id: 'opponent-armor-1', player: 'opponent', unitType: 'armor', h3Index: strategicOrigin },
+      { id: 'human-infantry-1', player: 'human', unitType: 'infantry', h3Index: strategicFar },
     ],
     true
   );
@@ -225,19 +225,19 @@ function testFogOnExcludesDistantEnemy(): void {
 }
 
 /**
- * Verifies fog-off on res4 does not take the omniscient scan.
+ * Verifies fog-off on tactical does not take the omniscient scan.
  *
  * Purpose: Tactical snapshots force fog off; resolution 4 must keep radius 4.
  * When to use: After changing the omniscient gate.
- * Expected outcome: Distant res4 human is absent.
+ * Expected outcome: Distant tactical human is absent.
  * Exceptions: None.
  */
-function testFogOffRes4ExcludesDistantEnemy(): void {
+function testFogOffTacticalExcludesDistantEnemy(): void {
   const { state, coordMap } = buildAssessState(
-    [res4Origin, res4Far],
+    [tacticalOrigin, tacticalFar],
     [
-      { id: 'opponent-armor-1', player: 'opponent', unitType: 'armor', h3Index: res4Origin },
-      { id: 'human-infantry-1', player: 'human', unitType: 'infantry', h3Index: res4Far },
+      { id: 'opponent-armor-1', player: 'opponent', unitType: 'armor', h3Index: tacticalOrigin },
+      { id: 'human-infantry-1', player: 'human', unitType: 'infantry', h3Index: tacticalFar },
     ],
     false
   );
@@ -257,10 +257,10 @@ function testFogOffRes4ExcludesDistantEnemy(): void {
  */
 function testFogOffIncludesDistantFriendly(): void {
   const { state, coordMap } = buildAssessState(
-    [res1Origin, res1Far],
+    [strategicOrigin, strategicFar],
     [
-      { id: 'opponent-armor-1', player: 'opponent', unitType: 'armor', h3Index: res1Origin },
-      { id: 'opponent-infantry-1', player: 'opponent', unitType: 'infantry', h3Index: res1Far },
+      { id: 'opponent-armor-1', player: 'opponent', unitType: 'armor', h3Index: strategicOrigin },
+      { id: 'opponent-infantry-1', player: 'opponent', unitType: 'infantry', h3Index: strategicFar },
     ],
     false
   );
@@ -281,10 +281,10 @@ function testFogOffIncludesDistantFriendly(): void {
  */
 function testFogOffAirOtherUnitNullReverseEta(): void {
   const { state, coordMap } = buildAssessState(
-    [res1Origin, res1Far],
+    [strategicOrigin, strategicFar],
     [
-      { id: 'opponent-armor-1', player: 'opponent', unitType: 'armor', h3Index: res1Origin },
-      { id: 'human-air-1', player: 'human', unitType: 'air', h3Index: res1Far },
+      { id: 'opponent-armor-1', player: 'opponent', unitType: 'armor', h3Index: strategicOrigin },
+      { id: 'human-air-1', player: 'human', unitType: 'air', h3Index: strategicFar },
     ],
     false
   );
@@ -311,11 +311,11 @@ function testFogOffAirOtherUnitNullReverseEta(): void {
  */
 function testFogOffCanAttackThisTurnInRangeOnly(): void {
   const { state, coordMap } = buildAssessState(
-    [res1Origin, res1Adjacent, res1Far],
+    [strategicOrigin, strategicAdjacent, strategicFar],
     [
-      { id: 'opponent-armor-1', player: 'opponent', unitType: 'armor', h3Index: res1Origin },
-      { id: 'human-armor-1', player: 'human', unitType: 'armor', h3Index: res1Adjacent },
-      { id: 'human-infantry-1', player: 'human', unitType: 'infantry', h3Index: res1Far },
+      { id: 'opponent-armor-1', player: 'opponent', unitType: 'armor', h3Index: strategicOrigin },
+      { id: 'human-armor-1', player: 'human', unitType: 'armor', h3Index: strategicAdjacent },
+      { id: 'human-infantry-1', player: 'human', unitType: 'infantry', h3Index: strategicFar },
     ],
     false
   );
@@ -338,10 +338,10 @@ function testFogOffCanAttackThisTurnInRangeOnly(): void {
  */
 function testFogOffSameHexIsMeleeCritical(): void {
   const { state, coordMap } = buildAssessState(
-    [res1Origin],
+    [strategicOrigin],
     [
-      { id: 'opponent-armor-1', player: 'opponent', unitType: 'armor', h3Index: res1Origin },
-      { id: 'human-infantry-1', player: 'human', unitType: 'infantry', h3Index: res1Origin },
+      { id: 'opponent-armor-1', player: 'opponent', unitType: 'armor', h3Index: strategicOrigin },
+      { id: 'human-infantry-1', player: 'human', unitType: 'infantry', h3Index: strategicOrigin },
     ],
     false
   );
@@ -378,10 +378,10 @@ function testFogOffSameHexIsMeleeCritical(): void {
  */
 function testFogOffReverseEtaTwoIsModerate(): void {
   const { state, coordMap } = buildAssessState(
-    [res1Origin, res1AtTwo],
+    [strategicOrigin, strategicAtTwo],
     [
-      { id: 'opponent-armor-1', player: 'opponent', unitType: 'armor', h3Index: res1Origin },
-      { id: 'human-infantry-1', player: 'human', unitType: 'infantry', h3Index: res1AtTwo },
+      { id: 'opponent-armor-1', player: 'opponent', unitType: 'armor', h3Index: strategicOrigin },
+      { id: 'human-infantry-1', player: 'human', unitType: 'infantry', h3Index: strategicAtTwo },
     ],
     false
   );
@@ -404,10 +404,10 @@ function testFogOffReverseEtaTwoIsModerate(): void {
  */
 function testFogOffAirAssessedUnitNullOwnEta(): void {
   const { state, coordMap } = buildAssessState(
-    [res1Origin, res1Adjacent],
+    [strategicOrigin, strategicAdjacent],
     [
-      { id: 'opponent-air-1', player: 'opponent', unitType: 'air', h3Index: res1Origin },
-      { id: 'human-infantry-1', player: 'human', unitType: 'infantry', h3Index: res1Adjacent },
+      { id: 'opponent-air-1', player: 'opponent', unitType: 'air', h3Index: strategicOrigin },
+      { id: 'human-infantry-1', player: 'human', unitType: 'infantry', h3Index: strategicAdjacent },
     ],
     false
   );
@@ -434,7 +434,7 @@ function testFogOffAirAssessedUnitNullOwnEta(): void {
  * Exceptions: None.
  */
 function testFogOffIncludesPentagonCrossingEnemy(): void {
-  const [origin, far] = res1PairWhereGridDistanceThrows();
+  const [origin, far] = strategicPairWhereGridDistanceThrows();
   const { state, coordMap } = buildAssessState(
     [origin, far],
     [
@@ -491,10 +491,10 @@ function testFogOnIncludesInRadiusPentagonCrossingEnemy(): void {
  */
 function testFogOffOmitsStaleIntelGhost(): void {
   const { state, coordMap } = buildAssessState(
-    [res1Origin, res1Adjacent],
+    [strategicOrigin, strategicAdjacent],
     [
-      { id: 'opponent-armor-1', player: 'opponent', unitType: 'armor', h3Index: res1Origin },
-      { id: 'human-infantry-1', player: 'human', unitType: 'infantry', h3Index: res1Adjacent },
+      { id: 'opponent-armor-1', player: 'opponent', unitType: 'armor', h3Index: strategicOrigin },
+      { id: 'human-infantry-1', player: 'human', unitType: 'infantry', h3Index: strategicAdjacent },
     ],
     false
   );
@@ -502,7 +502,7 @@ function testFogOffOmitsStaleIntelGhost(): void {
   state.enemyIntel = [
     {
       unitId: 'human-ghost-1',
-      lastKnownH3Index: res1Adjacent,
+      lastKnownH3Index: strategicAdjacent,
       lastKnownLatLng: [0, 0],
       intelState: 'stale',
       lastSeenTurn: 1,
@@ -526,16 +526,16 @@ function testFogOffOmitsStaleIntelGhost(): void {
  */
 function testCountryBonusFieldsFollowFlag(): void {
   const { state, coordMap } = buildAssessState(
-    [res1Origin],
+    [strategicOrigin],
     [
       {
         id: 'opponent-armor-1',
         player: 'opponent',
         unitType: 'armor',
-        h3Index: res1Origin,
+        h3Index: strategicOrigin,
         origin: {
-          birthH3Index: res1Origin,
-          birthRes4H3Index: null,
+          birthH3Index: strategicOrigin,
+          birthTacticalH3Index: null,
           birthTerrainKind: 'plains',
           birthIsUrban: false,
           birthCountryName: 'France',
@@ -546,7 +546,7 @@ function testCountryBonusFieldsFollowFlag(): void {
   );
   const hexes = state.hexes.map((h) => ({ ...h, countryName: 'France' }));
   const on: GameStateSnapshot = { ...state, hexes, countryBonusEnabled: true };
-  const position = coordMap.latLngByH3.get(res1Origin)!;
+  const position = coordMap.latLngByH3.get(strategicOrigin)!;
   const assessHex = (s: GameStateSnapshot) =>
     executeAssessment('assess_hex', { position }, s, coordMap.latLngByH3, coordMap.resolveToH3);
 
@@ -571,9 +571,9 @@ function testCountryBonusFieldsFollowFlag(): void {
  * Exceptions: Propagates assertion errors.
  */
 function run(): void {
-  testFogOffRes1IncludesDistantEnemy();
+  testFogOffStrategicIncludesDistantEnemy();
   testFogOnExcludesDistantEnemy();
-  testFogOffRes4ExcludesDistantEnemy();
+  testFogOffTacticalExcludesDistantEnemy();
   testFogOffIncludesDistantFriendly();
   testFogOffAirOtherUnitNullReverseEta();
   testFogOffCanAttackThisTurnInRangeOnly();

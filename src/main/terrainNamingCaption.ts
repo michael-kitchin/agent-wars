@@ -1,5 +1,5 @@
 /**
- * Chooses and builds the hex naming caption for res1 and res4 naming records.
+ * Chooses and builds the hex naming caption for strategic and tactical naming records.
  *
  * Purpose: Caption selection (cities, then states, then countries, then water) with country spans for flags.
  * When to use: From the terrain classification cache when precomputing per-hex captions.
@@ -12,8 +12,8 @@ import {
   TOOLTIP_NAME_LIST_MAX_ITEMS,
   type TerrainNamingCityRow,
   type TerrainNamingCountryRow,
-  type TerrainNamingRecordRes1,
-  type TerrainNamingRecordRes4,
+  type TerrainNamingRecordStrategic,
+  type TerrainNamingRecordTactical,
   type TerrainNamingStateRow,
   type TerrainNamingWaterRow,
 } from './terrainNamingLoad';
@@ -184,8 +184,8 @@ function countryHeadingFlag(
 /**
  * Builds the city caption: `Country: City1, City2 (State); Country2: ...`.
  *
- * Purpose: Most specific res4 caption when a few cities cover the cell's states and countries.
- * When to use: From `preferredNamingCaptionForRes4Record`.
+ * Purpose: Most specific tactical caption when a few cities cover the cell's states and countries.
+ * When to use: From `preferredNamingCaptionForTacticalRecord`.
  * Expected outcome: Countries flagged; cities grouped by state in first-occurrence order.
  * Exceptions: None.
  */
@@ -216,7 +216,7 @@ function buildGroupedCitiesCaption(rows: ReadonlyArray<TerrainNamingCityRow>): H
  * Builds the state caption: `Country: State1, State2; Country2: ...`.
  *
  * Purpose: Caption when a few states cover the cell's countries and continents.
- * When to use: From the preferred res1 and res4 caption functions.
+ * When to use: From the preferred strategic and tactical caption functions.
  * Expected outcome: Countries flagged; states plain.
  * Exceptions: None.
  */
@@ -234,7 +234,7 @@ function buildGroupedStatesCaption(rows: ReadonlyArray<TerrainNamingStateRow>): 
  * Builds the country caption: `Continent: Country1, Country2; ...`.
  *
  * Purpose: Broadest geographic caption, used when states are too many or missing.
- * When to use: From the preferred res1 and res4 caption functions.
+ * When to use: From the preferred strategic and tactical caption functions.
  * Expected outcome: Continent headings plain; every country item flagged.
  * Exceptions: None.
  */
@@ -332,14 +332,14 @@ function statesCoverAllContinents(
 }
 
 /**
- * Chooses the res4 geographic caption: cities, then states, then countries.
+ * Chooses the tactical geographic caption: cities, then states, then countries.
  *
  * Purpose: Most specific caption that still names every state and country the cell touches.
- * When to use: From `namingCaptionForRes4Record`, or directly in tests.
+ * When to use: From `namingCaptionForTacticalRecord`, or directly in tests.
  * Expected outcome: A caption, or `null` when the cell has no geographic rows.
  * Exceptions: None.
  */
-export function preferredNamingCaptionForRes4Record(record: TerrainNamingRecordRes4): HexNamingCaption | null {
+export function preferredNamingCaptionForTacticalRecord(record: TerrainNamingRecordTactical): HexNamingCaption | null {
   const firstRankCities = sortRowsByScalerankAscending(record.cities).slice(0, TOOLTIP_NAME_LIST_MAX_ITEMS);
   if (
     firstRankCities.length > 0 &&
@@ -348,18 +348,18 @@ export function preferredNamingCaptionForRes4Record(record: TerrainNamingRecordR
   ) {
     return buildGroupedCitiesCaption(firstRankCities);
   }
-  return preferredNamingCaptionForRes1Record(record);
+  return preferredNamingCaptionForStrategicRecord(record);
 }
 
 /**
- * Chooses the res1 geographic caption: states, then countries.
+ * Chooses the strategic geographic caption: states, then countries.
  *
  * Purpose: Strategic hex caption that names every country and continent the hex touches.
- * When to use: From `namingCaptionForRes1Record`, and as the res4 fallback after cities.
+ * When to use: From `namingCaptionForStrategicRecord`, and as the tactical fallback after cities.
  * Expected outcome: A caption, or `null` when the record has no states or countries.
  * Exceptions: None.
  */
-export function preferredNamingCaptionForRes1Record(record: TerrainNamingRecordRes1): HexNamingCaption | null {
+export function preferredNamingCaptionForStrategicRecord(record: TerrainNamingRecordStrategic): HexNamingCaption | null {
   const firstRankStates = sortRowsByScalerankAscending(record.states).slice(0, TOOLTIP_NAME_LIST_MAX_ITEMS);
   if (
     firstRankStates.length > 0 &&
@@ -376,7 +376,7 @@ export function preferredNamingCaptionForRes1Record(record: TerrainNamingRecordR
  * Formats lake and ocean rows into the shared water caption.
  *
  * Purpose: Keeps water captions identical at both resolutions.
- * When to use: From the res1 and res4 water caption functions.
+ * When to use: From the strategic and tactical water caption functions.
  * Expected outcome: Comma-separated scalerank groups (descending rank; null rank first; names sorted), or `null` when empty.
  * Exceptions: None.
  */
@@ -395,57 +395,57 @@ function buildWaterCaption(water: ReadonlyArray<TerrainNamingWaterRow>): HexNami
 }
 
 /**
- * Builds the water-body caption for a res1 hex.
+ * Builds the water-body caption for a strategic hex.
  *
  * Purpose: Fallback when the hex has no geographic naming rows.
- * When to use: From `namingCaptionForRes1Record`.
+ * When to use: From `namingCaptionForStrategicRecord`.
  * Expected outcome: Water caption with no spans, or `null` when there is no water.
  * Exceptions: None.
  */
-export function waterNamingCaptionForRes1Record(record: TerrainNamingRecordRes1): HexNamingCaption | null {
+export function waterNamingCaptionForStrategicRecord(record: TerrainNamingRecordStrategic): HexNamingCaption | null {
   return buildWaterCaption(record.water);
 }
 
 /**
- * Builds the water-body caption for a res4 cell.
+ * Builds the water-body caption for a tactical cell.
  *
  * Purpose: Fallback when the cell has no geographic naming rows.
- * When to use: From `namingCaptionForRes4Record`.
- * Expected outcome: Same format as the res1 water caption.
+ * When to use: From `namingCaptionForTacticalRecord`.
+ * Expected outcome: Same format as the strategic water caption.
  * Exceptions: None.
  */
-export function waterNamingCaptionForRes4Record(record: TerrainNamingRecordRes1): HexNamingCaption | null {
+export function waterNamingCaptionForTacticalRecord(record: TerrainNamingRecordStrategic): HexNamingCaption | null {
   return buildWaterCaption(record.water);
 }
 
 /**
- * Resolves the res1 caption: geographic first, then water.
+ * Resolves the strategic caption: geographic first, then water.
  *
- * Purpose: Single entry point for res1 captions in the terrain classification cache.
- * When to use: From `buildSnapshot` when precomputing `namingCaptionsRes1ByH3`.
+ * Purpose: Single entry point for strategic captions in the terrain classification cache.
+ * When to use: From `buildSnapshot` when precomputing `namingCaptionsStrategicByH3`.
  * Expected outcome: A caption, or `null` when the hex has no naming rows.
  * Exceptions: None.
  */
-export function namingCaptionForRes1Record(record: TerrainNamingRecordRes1): HexNamingCaption | null {
-  return preferredNamingCaptionForRes1Record(record) ?? waterNamingCaptionForRes1Record(record);
+export function namingCaptionForStrategicRecord(record: TerrainNamingRecordStrategic): HexNamingCaption | null {
+  return preferredNamingCaptionForStrategicRecord(record) ?? waterNamingCaptionForStrategicRecord(record);
 }
 
 /**
- * Resolves the res4 caption: geographic first, then water.
+ * Resolves the tactical caption: geographic first, then water.
  *
- * Purpose: Single entry point for res4 captions in the terrain classification cache.
- * When to use: From `buildSnapshot` when precomputing `namingCaptionsRes4ByH3`.
+ * Purpose: Single entry point for tactical captions in the terrain classification cache.
+ * When to use: From `buildSnapshot` when precomputing `namingCaptionsTacticalByH3`.
  * Expected outcome: A caption, or `null` when the cell has no naming rows.
  * Exceptions: None.
  */
-export function namingCaptionForRes4Record(record: TerrainNamingRecordRes4): HexNamingCaption | null {
-  return preferredNamingCaptionForRes4Record(record) ?? waterNamingCaptionForRes4Record(record);
+export function namingCaptionForTacticalRecord(record: TerrainNamingRecordTactical): HexNamingCaption | null {
+  return preferredNamingCaptionForTacticalRecord(record) ?? waterNamingCaptionForTacticalRecord(record);
 }
 
 /**
  * Builds the per-hex caption map, sharing one object among hexes with identical captions.
  *
- * Purpose: Neighboring res4 cells often share a caption; interning keeps the cache small.
+ * Purpose: Neighboring tactical cells often share a caption; interning keeps the cache small.
  * When to use: From `buildSnapshot`, once per resolution, with the matching caption function.
  * Expected outcome: Map from `h3_index` to caption; hexes without a caption or with empty text are omitted.
  * Exceptions: None.

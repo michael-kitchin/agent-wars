@@ -131,7 +131,7 @@ function rosterState(units: GameStateSnapshot['units']): GameStateSnapshot {
 }
 
 test('fog: hop-distance caveat only with fog off at strategic resolution; staleness only with fog on', () => {
-  const res1 = getOrderedHexList()[0]!;
+  const strategic = getOrderedHexList()[0]!;
   const origin = latLngToCell(0, 0, 3);
   const assessments: UnitAssessmentResult[] = [
     {
@@ -147,10 +147,10 @@ test('fog: hop-distance caveat only with fog off at strategic resolution; stalen
   ];
   const precomputed = { unitAssessments: assessments, hexAssessments: [] };
   const base: GameStateSnapshot = {
-    hexes: [{ h3Index: res1, terrain: 'land', terrainKind: 'plains' }],
+    hexes: [{ h3Index: strategic, terrain: 'land', terrainKind: 'plains' }],
     units: [
-      { id: 'opponent-armor-1', player: 'opponent', unitType: 'armor', h3Index: res1 },
-      { id: 'human-inf-1', player: 'human', unitType: 'infantry', h3Index: res1 },
+      { id: 'opponent-armor-1', player: 'opponent', unitType: 'armor', h3Index: strategic },
+      { id: 'human-inf-1', player: 'human', unitType: 'infantry', h3Index: strategic },
     ],
     phase: 'planning',
     turnNumber: 2,

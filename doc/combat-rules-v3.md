@@ -4,7 +4,7 @@
 
 This document describes combat, movement, production, fog, sealift, and optional tactical battles. **Live engine symbols under `src/` are first authority.** Constants cited here are the values in those symbols as of 2.4.0.
 
-Rules are divided into two layers: **strategic** (H3 res1, the primary game) and **tactical** (H3 res4, optional zoom-in battles). Those resolutions are `STRATEGIC_H3_RESOLUTION` and `TACTICAL_H3_RESOLUTION` in `src/shared/h3Resolutions.ts`. Both layers use **WEGO** simultaneous resolution. A tactical battle pauses the rest of the strategic map until it ends.
+Rules are divided into two layers: **strategic** (the primary game) and **tactical** (optional zoom-in battles). On the global map those layers are H3 resolution 1 and resolution 4. The active map supplies both through `strategicH3Resolution` and `tacticalH3Resolution` in `src/shared/h3Resolutions.ts`. `GLOBAL_STRATEGIC_H3_RESOLUTION` and `GLOBAL_TACTICAL_H3_RESOLUTION` are the global values. Both layers use **WEGO** simultaneous resolution. A tactical battle pauses the rest of the strategic map until it ends.
 
 **Stated needs addressed:**
 1. **Offensive and defensive strengths** — §3 and §2 (unit roster).
@@ -25,7 +25,7 @@ Rules are divided into two layers: **strategic** (H3 res1, the primary game) and
 - **Participant IDs:** At the start of combat resolution, each side with at least one unit in any combat is assigned a unique random integer ID from the game RNG. Melee ordering uses these IDs.
 - **RNG:** A single game seed plus turn number produces deterministic replay for a given order set.
 - **Infrastructure destruction is permanent.** Destroyed urban cells, airports, and seaports do not rebuild.
-- **Tactical battles are optional.** Contested res1 hexes can be fought at res4, or resolved with strategic dice.
+- **Tactical battles are optional.** Contested strategic hexes can be fought on the tactical grid, or resolved with strategic dice.
 
 ---
 
@@ -57,7 +57,9 @@ Attack and defense are hit numbers on a d20: 3 hits 15% of the time, 7 hits 35%,
 
   Examples: a hex with 5 urban hexes produces one infantry (cost 20) every 4 turns. A hex with 10 urban hexes and a seaport queues a naval unit (cost 100): it spawns on turn 10 when accumulated production first reaches 100.
 
-  Air strikes that destroy urban hexes (3 res4 hexes per hit) permanently reduce the production rate.
+  The costs and urban minimums in the roster are the global map. `unitCostFor` and `buildMinimumUrbanCells` in `src/shared/gameRules.ts` read the active map. Infantry's urban minimum stays 1. Regional columns are in `src/shared/regionalRulesCatalog.ts` and are not used until a regional map is loaded.
+
+  Air strikes that destroy urban cells permanently reduce the production rate. On the global map one strategic hit destroys 9 tactical urban cells (`strategicUrbanCellsDestroyedPerHit` in `src/shared/gameRules.ts`).
 
   Each new unit records where it was born: its res1 hex, and one res4 cell inside that hex when the hex has land. An intact urban cell is chosen when the hex has one; otherwise any land cell. Rubble is not intact urban. A hex with no land cell records no cell, uses that hex's own terrain, and has no country. The chosen cell also stores its terrain, whether it is intact urban, and its country from the naming data ([terrain pipeline](terrain-pipeline.md)). The origin drives the flag on unit names and the optional origin bonuses (§4.9). Hovering the flag lists the bonuses the unit was born with and does not repeat the birth place ([stack callout](ux/stack-callout.md)). Those lines stay the same after the unit moves. With the country and terrain bonuses off, the origin has no effect on dice and AI prompts do not mention an origin bonus.
 
@@ -232,7 +234,7 @@ Penalties apply only to units that lack the tag. They never raise a printed stat
 
 **Tech bonus** is a new-game dropdown offering Off, Low, and High, defaulting to Low. It sits on the first bonus line, to the right of Country bonus. A match saved with no tech row plays with the bonus off. A saved flag with no level plays at Low.
 
-A unit's tier is fixed from the generated urban-cell count of its birth res1 hex, not from the live count after air strikes destroy urban cells. Twenty-one or more urban cells is Advanced. Twenty or fewer, a missing birth hex, or an unloaded count is Basic. The tier does not follow the hex the unit stands on now, and it does not change when the unit moves. Tactical sub-units use the parent unit's birth hex.
+A unit's tier is fixed from the generated urban-cell count of its birth strategic hex, not from the live count after air strikes destroy urban cells. The Advanced cutoff is `advancedTechMinUrbanCells()`, 21 urban cells on the global map. That many or more is Advanced. Fewer, a missing birth hex, or an unloaded count is Basic. The tier does not follow the hex the unit stands on now, and it does not change when the unit moves. Tactical sub-units use the parent unit's birth hex.
 
 | Level | Advanced attack | Advanced defense | Basic |
 |---|---|---|---|
@@ -361,7 +363,7 @@ No player input during steps 2–11 except the melee-intercept dialog at step 9.
 - **Multiple air units at same airport:** Multiple air units may be based at the same airport. If the airport is destroyed, all co-located air units are destroyed.
 - **Ferry to occupied airport:** An air unit may ferry to an airport that already has air units. No stacking limit for air units at airports.
 - **Self-strikes (scorched earth):** A player may order an air unit to strike their own infrastructure. Self-striking an airport with your own air units based there destroys those air units. Counter-fire rules apply normally.
-- **Multiple strikes on same hex:** Multiple air units may strike the same target hex in the same turn. Each strike resolves independently. Two urban strikes destroy up to 6 res4 urban hexes (3 per hit, capped at remaining). Two strikes on the same airport: the first destroys it; the second finds no airport and misses.
+- **Multiple strikes on same hex:** Multiple air units may strike the same target hex in the same turn. Each strike resolves independently. Two urban strikes on the global map destroy up to 18 tactical urban cells (9 per hit, capped at remaining). Two strikes on the same airport: the first destroys it; the second finds no airport and misses.
 - **Air unit survival and territorial control:** The post-melee air check uses **hex ownership**, not enemy unit presence. If an enemy ground unit enters an airport hex during movement, territorial control changes immediately — even if that enemy unit is subsequently destroyed in melee. Recapturing an airport hex requires a separate ground action on a subsequent turn.
 - **No interception in transit:** Air units executing a ferry order cannot be attacked during transit. The ferry is an instantaneous relocation.
 - **Visibility (fog on):** Vision is a per-type H3 disk (`VISION_RANGE_BY_UNIT_TYPE`): infantry **1**, armor **2**, naval **2**, air **3** (air measured from the base airport). Unexplored hexes are never seen. Explored-but-not-visible hexes show last-known terrain without current enemy units. Last-known enemy positions persist for `STALE_INTEL_TURNS` (2) turns, then drop. Own home-region hexes and the shared home-region intersection are force-visible in the `region_vs_region` scenario. Fog can be turned off for a match; then every cell is visible.
@@ -412,7 +414,7 @@ An air unit may target infrastructure at a hex within its 3-hex strike radius in
 
 Cover never applies to strikes on infrastructure or to infrastructure counter-fire. The fixed counter-fire numbers are `INFRASTRUCTURE_COUNTER_FIRE_THRESHOLD` in `src/main/combatDice.ts`.
 
-**Target: Urban hex.** The air unit rolls d20, hit if roll ≤ 10. On hit, **3 res4 urban hexes** at the target res1 hex are permanently destroyed (or all remaining if fewer than 3 remain). Counter-fire: roll d20; the air unit is destroyed if roll ≤ 3 (15% risk).
+**Target: Urban hex.** The air unit rolls d20, hit if roll ≤ 10. On hit, tactical urban cells at the target strategic hex are permanently destroyed: **9** on the global map (`strategicUrbanCellsDestroyedPerHit()`), or all remaining if fewer remain. Counter-fire: roll d20; the air unit is destroyed if roll ≤ 3 (15% risk).
 
 **Target: Airport.** The air unit rolls d20, hit if roll ≤ 10. On hit, the airport is permanently destroyed. Any air units based at the destroyed airport are also destroyed immediately. Counter-fire: roll d20; the air unit is destroyed if roll ≤ 7 (35% risk).
 
@@ -429,7 +431,7 @@ Destroyed urban hexes, airports, and seaports do not rebuild. This applies globa
 | Target type | Air attack value | Counter-fire source | Counter-fire threshold |
 |-------------|-----------------|---------------------|----------------------|
 | Enemy units | 10 (50%), less air cover | Each defending unit with range ≥ 1 in target hex rolls independently | Defender's attack value (no range-to-base check) |
-| Urban hex | 10 (50%), destroys 3 res4 hexes | Ground defenses (fixed roll, unaffected by hex occupation) | ≤ 3 (15%) |
+| Urban hex | 10 (50%), destroys 9 tactical cells on the global map | Ground defenses (fixed roll, unaffected by hex occupation) | ≤ 3 (15%) |
 | Airport | 10 (50%) | AA defenses (fixed roll, unaffected by hex occupation) | ≤ 7 (35%) |
 | Seaport | 10 (50%) | Seaport defenses (fixed roll, unaffected by hex occupation) | ≤ 3 (15%) |
 
@@ -494,7 +496,7 @@ The tactical game is a separate combat layer on the res4 hex grid within one res
 
 Two entry paths:
 
-1. **Planning-time magnifier.** During strategic planning, contested **explored** res1 hexes show a tactical-entry control on the map. Clicking it starts a battle for that hex (`startTacticalBattleForEnclosingRes1Hex`). The strategic turn stays in planning until the battle ends.
+1. **Planning-time magnifier.** During strategic planning, contested **explored** strategic hexes show a tactical-entry control on the map. Clicking it starts a battle for that hex (`startTacticalBattleForEnclosingHex`). The strategic turn stays in planning until the battle ends.
 2. **Melee intercept.** During strategic resolution, if melee is about to resolve in a contested hex, the engine can pause and offer **Fight** (enter tactical) or **Ignore** (continue strategic melee). The enclosing turn remains in `resolution` until the intercept is answered and, if fought, until the battle ends.
 
 The AI opponent does not choose whether to enter. If the human declines, standard strategic resolution applies.

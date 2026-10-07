@@ -23,7 +23,7 @@ import type { ResolutionMove, ResolutionPlaybackMove } from '../core/types';
 /**
  * Minimal attacker row for drawing pending ranged, air, and ferry order lines on the map canvas.
  *
- * Purpose: Lets tactical res4 sub-units supply `id` + `h3Index` without pretending they are full strategic `units` rows.
+ * Purpose: Lets tactical sub-units supply `id` + `h3Index` without pretending they are full strategic `units` rows.
  * When to use: Pass strategic `state.units` or tactical `subUnits` mapped to `{ id, h3Index }` into order overlay drawers.
  * Expected outcome: Same stroke geometry as the legacy strategic-only path when ids match pending order payloads.
  * Exceptions: None.

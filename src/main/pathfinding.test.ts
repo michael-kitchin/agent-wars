@@ -7,7 +7,7 @@ import * as assert from 'assert';
 import { gridDisk, gridDistance, latLngToCell } from 'h3-js';
 import { findPath, getReachableHexes, partitionPathByTurn } from './pathfinding';
 import { findGeodesicLandMassChain } from './testSupport/strategicLandChainFixtures';
-import { getRes1LandMassByH3 } from './terrainClassificationCache';
+import { getStrategicLandMassByH3 } from './terrainClassificationCache';
 
 /**
  * Defines the `testSingleStepInfantry` function shape (function testSingleStepInfantry(): void).
@@ -284,7 +284,7 @@ function testFindPathOnLandChain(): void {
   const { chain, hexSet } = landChainWorld();
   const origin = chain[0]!;
   const destination = chain[2]!;
-  const path = findPath(origin, destination, hexSet, new Map(), 'land', undefined, getRes1LandMassByH3());
+  const path = findPath(origin, destination, hexSet, new Map(), 'land', undefined, getStrategicLandMassByH3());
   assert.ok(path);
   assert.strictEqual(path[0], origin);
   assert.strictEqual(path[path.length - 1], destination);
@@ -311,7 +311,7 @@ function testFindPathLandRejectsBlockedDestination(): void {
     new Map(),
     'land',
     new Set([chain[2]!]),
-    getRes1LandMassByH3()
+    getStrategicLandMassByH3()
   );
   assert.strictEqual(path, null);
 }
@@ -326,7 +326,7 @@ function testFindPathLandRejectsBlockedDestination(): void {
  */
 function testReachableLandChainExcludesBlockedCell(): void {
   const { chain, hexSet } = landChainWorld();
-  const landMass = getRes1LandMassByH3();
+  const landMass = getStrategicLandMassByH3();
   const open = getReachableHexes(chain[0]!, hexSet, new Map(), 'land', undefined, landMass);
   assert.strictEqual(open.size, chain.length);
   for (const cell of chain) assert.ok(open.has(cell));

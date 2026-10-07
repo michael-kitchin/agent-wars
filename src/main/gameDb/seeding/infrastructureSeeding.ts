@@ -3,15 +3,15 @@ import { getOrderedHexList } from '../../mapData';
 import { assertTerrainMetadataMatchesHexList } from '../../terrainMetadataLoad';
 import {
   ensureTerrainClassificationCacheLoaded,
-  getRes1ProductionContext,
-  getRes4FeatureRowsForSeeding,
-  getTerrainRes1KindsFromCache,
+  getStrategicProductionContext,
+  getTacticalFeatureRowsForSeeding,
+  getTerrainStrategicKindsFromCache,
 } from '../../terrainClassificationCache';
 import { pipelineTerrainToPassability } from '../../terrainPassability';
 import { gameDbOps, getAll, run } from '../dbConnection';
 import {
-  ensureRes1InfrastructureSyncTriggers,
-  reconcileRes1InfrastructureCountsFromRes4Overrides,
+  ensureStrategicInfrastructureSyncTriggers,
+  reconcileStrategicInfrastructureCountsFromTacticalOverrides,
 } from '../controlInfrastructureAccess';
 
 /**
@@ -23,9 +23,9 @@ import {
  * Exceptions: None.
  */
 const INFRASTRUCTURE_SYNC_TRIGGER_NAMES = [
-  'res4_sync_res1_after_insert',
-  'res4_sync_res1_after_delete',
-  'res4_sync_res1_after_update',
+  'res_t_sync_res_s_after_insert',
+  'res_t_sync_res_s_after_delete',
+  'res_t_sync_res_s_after_update',
 ] as const;
 
 /**
@@ -41,7 +41,7 @@ export function seedHexesFromTerrainMetadata(): void {
   if (!gameDbOps.hasDb()) return;
   ensureTerrainClassificationCacheLoaded();
   const hexes = getOrderedHexList();
-  const byH3 = getTerrainRes1KindsFromCache();
+  const byH3 = getTerrainStrategicKindsFromCache();
   assertTerrainMetadataMatchesHexList(byH3, hexes);
   for (const h3 of hexes) {
     const kind = byH3.get(h3);
@@ -69,20 +69,20 @@ export function seedInfrastructureStateFromMetadata(): void {
     run(`DROP TRIGGER IF EXISTS ${triggerName}`);
   }
   try {
-    run('DELETE FROM res1_infrastructure');
-    run('DELETE FROM res4_feature_overrides');
-    const { res1Rows, res4Rows } = getInfrastructureSeedRowsFromMetadata();
-    for (const row of res1Rows) {
-      insertRes1InfrastructureRow(row.h3Index, row.urbanHexCount, row.airportCount, row.seaportCount);
+    run('DELETE FROM res_s_infrastructure');
+    run('DELETE FROM res_t_feature_overrides');
+    const { strategicRows, tacticalRows } = getInfrastructureSeedRowsFromMetadata();
+    for (const row of strategicRows) {
+      insertStrategicInfrastructureRow(row.h3Index, row.urbanHexCount, row.airportCount, row.seaportCount);
     }
-    for (const row of res4Rows) {
-      insertRes4FeatureOverrideSeedRow(row);
+    for (const row of tacticalRows) {
+      insertTacticalFeatureOverrideSeedRow(row);
     }
   } finally {
-    // Bulk reseed already writes canonical res1 counts, so restoring triggers afterwards avoids N-per-row trigger overhead.
-    ensureRes1InfrastructureSyncTriggers();
+    // Bulk reseed already writes canonical strategic counts, so restoring triggers afterwards avoids N-per-row trigger overhead.
+    ensureStrategicInfrastructureSyncTriggers();
   }
-  const { changedHexCount } = reconcileRes1InfrastructureCountsFromRes4Overrides();
+  const { changedHexCount } = reconcileStrategicInfrastructureCountsFromTacticalOverrides();
   logDebug('gameDb seedInfrastructureStateFromMetadata: post-seed reconciliation complete', { changedHexCount });
 }
 
@@ -101,42 +101,42 @@ export function backfillInfrastructureStateFromMetadataIfMissing(): void {
   if (hexRows.length <= 0) return;
 
   const existingInfra = new Set(
-    getAll<{ h3Index: string }>('SELECT h3_index AS h3Index FROM res1_infrastructure').map((r) => r.h3Index)
+    getAll<{ h3Index: string }>('SELECT h3_index AS h3Index FROM res_s_infrastructure').map((r) => r.h3Index)
   );
-  const existingRes4Overrides = new Set(
-    getAll<{ h3Index: string }>('SELECT h3_index AS h3Index FROM res4_feature_overrides').map((r) => r.h3Index)
+  const existingTacticalOverrides = new Set(
+    getAll<{ h3Index: string }>('SELECT h3_index AS h3Index FROM res_t_feature_overrides').map((r) => r.h3Index)
   );
-  const { res1Rows, res4Rows } = getInfrastructureSeedRowsFromMetadata();
+  const { strategicRows, tacticalRows } = getInfrastructureSeedRowsFromMetadata();
   let insertedInfra = 0;
-  for (const row of res1Rows) {
+  for (const row of strategicRows) {
     if (existingInfra.has(row.h3Index)) continue;
-    insertRes1InfrastructureRow(row.h3Index, row.urbanHexCount, row.airportCount, row.seaportCount);
+    insertStrategicInfrastructureRow(row.h3Index, row.urbanHexCount, row.airportCount, row.seaportCount);
     insertedInfra += 1;
   }
-  let insertedRes4 = 0;
-  for (const row of res4Rows) {
-    if (existingRes4Overrides.has(row.h3Index)) continue;
-    insertRes4FeatureOverrideSeedRow(row);
-    insertedRes4 += 1;
+  let insertedTactical = 0;
+  for (const row of tacticalRows) {
+    if (existingTacticalOverrides.has(row.h3Index)) continue;
+    insertTacticalFeatureOverrideSeedRow(row);
+    insertedTactical += 1;
   }
 
-  if (insertedInfra > 0 || insertedRes4 > 0) {
+  if (insertedInfra > 0 || insertedTactical > 0) {
     logDebug('gameDb backfillInfrastructureStateFromMetadataIfMissing: inserted missing rows', {
       insertedInfra,
-      insertedRes4,
+      insertedTactical,
     });
   }
 }
 
 /**
- * Documents the `InfrastructureSeedRes1Row` interface as a named contract surface (interface InfrastructureSeedRes1Row).
+ * Documents the `InfrastructureSeedStrategicRow` interface as a named contract surface (interface InfrastructureSeedStrategicRow).
 
- * Purpose: Supports maintainability by documenting why `InfrastructureSeedRes1Row` exists.
+ * Purpose: Supports maintainability by documenting why `InfrastructureSeedStrategicRow` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-interface InfrastructureSeedRes1Row {
+interface InfrastructureSeedStrategicRow {
     /**
    * Specifies the contract for the `h3Index` member (h3Index: string;).
 
@@ -185,23 +185,23 @@ seaportCount: number;
  */
 interface InfrastructureSeedRows {
     /**
-   * Specifies the contract for the `res1Rows` member (res1Rows: InfrastructureSeedRes1Row[];).
+   * Specifies the contract for the `strategicRows` member (strategicRows: InfrastructureSeedStrategicRow[];).
 
-   * Contract: Describes stable behavior for callers of `res1Rows` in this codebase.
+   * Contract: Describes stable behavior for callers of `strategicRows` in this codebase.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-res1Rows: InfrastructureSeedRes1Row[];
+strategicRows: InfrastructureSeedStrategicRow[];
     /**
-   * Specifies the contract for the `res4Rows` member (res4Rows: ReturnType<typeof getRes4FeatureRowsForSeeding>;).
+   * Specifies the contract for the `tacticalRows` member (tacticalRows: ReturnType<typeof getTacticalFeatureRowsForSeeding>;).
 
-   * Contract: Describes stable behavior for callers of `res4Rows` in this codebase.
+   * Contract: Describes stable behavior for callers of `tacticalRows` in this codebase.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-res4Rows: ReturnType<typeof getRes4FeatureRowsForSeeding>;
+tacticalRows: ReturnType<typeof getTacticalFeatureRowsForSeeding>;
 }
 
 /**
@@ -213,8 +213,8 @@ res4Rows: ReturnType<typeof getRes4FeatureRowsForSeeding>;
  * Exceptions: None.
  */
 function getInfrastructureSeedRowsFromMetadata(): InfrastructureSeedRows {
-  const res1Rows: InfrastructureSeedRes1Row[] = getOrderedHexList().map((h3Index) => {
-    const ctx = getRes1ProductionContext({ h3Index });
+  const strategicRows: InfrastructureSeedStrategicRow[] = getOrderedHexList().map((h3Index) => {
+    const ctx = getStrategicProductionContext({ h3Index });
     return {
       h3Index,
       urbanHexCount: ctx.urbanHexCount,
@@ -222,43 +222,43 @@ function getInfrastructureSeedRowsFromMetadata(): InfrastructureSeedRows {
       seaportCount: ctx.seaportCount,
     };
   });
-  const res4Rows = getRes4FeatureRowsForSeeding()
+  const tacticalRows = getTacticalFeatureRowsForSeeding()
     .filter((row) => row.isUrban || row.isAirport || row.isSeaport);
-  return { res1Rows, res4Rows };
+  return { strategicRows, tacticalRows };
 }
 
 /**
- * Defines the `insertRes1InfrastructureRow` function shape (function insertRes1InfrastructureRow().
+ * Defines the `insertStrategicInfrastructureRow` function shape (function insertStrategicInfrastructureRow().
 
- * Purpose: Supports maintainability by documenting why `insertRes1InfrastructureRow` exists.
+ * Purpose: Supports maintainability by documenting why `insertStrategicInfrastructureRow` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-function insertRes1InfrastructureRow(
+function insertStrategicInfrastructureRow(
   h3Index: string,
   urbanHexCount: number,
   airportCount: number,
   seaportCount: number
 ): void {
   run(
-    `INSERT INTO res1_infrastructure (h3_index, urban_hex_count, airport_count, seaport_count)
+    `INSERT INTO res_s_infrastructure (h3_index, urban_hex_count, airport_count, seaport_count)
      VALUES (?, ?, ?, ?)`,
     [h3Index, urbanHexCount, airportCount, seaportCount]
   );
 }
 
 /**
- * Defines the `insertRes4FeatureOverrideSeedRow` function shape (function insertRes4FeatureOverrideSeedRow(row: ReturnType<typeof getRes4FeatureRowsForSeeding>[number]): void).
+ * Defines the `insertTacticalFeatureOverrideSeedRow` function shape (function insertTacticalFeatureOverrideSeedRow(row: ReturnType<typeof getTacticalFeatureRowsForSeeding>[number]): void).
 
- * Purpose: Supports maintainability by documenting why `insertRes4FeatureOverrideSeedRow` exists.
+ * Purpose: Supports maintainability by documenting why `insertTacticalFeatureOverrideSeedRow` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-function insertRes4FeatureOverrideSeedRow(row: ReturnType<typeof getRes4FeatureRowsForSeeding>[number]): void {
+function insertTacticalFeatureOverrideSeedRow(row: ReturnType<typeof getTacticalFeatureRowsForSeeding>[number]): void {
   run(
-    `INSERT INTO res4_feature_overrides (
+    `INSERT INTO res_t_feature_overrides (
        h3_index, parent_h3_index, terrain_kind, is_urban, is_airport, is_seaport, is_rubble
      ) VALUES (?, ?, ?, ?, ?, ?, 0)`,
     [row.h3Index, row.parentH3Index, row.terrainKind, row.isUrban ? 1 : 0, row.isAirport ? 1 : 0, row.isSeaport ? 1 : 0]

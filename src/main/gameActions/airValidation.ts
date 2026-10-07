@@ -2,7 +2,7 @@ import {
   dbGetOne,
   getHexController,
   getMapHexSet,
-  getRes1InfrastructureForHex,
+  getStrategicInfrastructureForHex,
 } from '../gameDb';
 import type { AirStrikeTargetType } from '../../shared/ipcTypes';
 import { fallbackDisplayNameFromUnitId } from '../../shared/unitDisplayNames';
@@ -74,7 +74,7 @@ export function validateAirStrikeOrder(
   const withinStrikeRange = isWithinAirStrikeGridRange(unit.h3_index, targetH3Index, 'validateAirStrikeOrder');
   if (!withinStrikeRange) return { valid: false, reason: formatTargetOutOfRangeReason(unit.unit_type, AIR_STRIKE_RANGE_HEXES) };
 
-  const baseInfrastructure = getRes1InfrastructureForHex(unit.h3_index);
+  const baseInfrastructure = getStrategicInfrastructureForHex(unit.h3_index);
   if (baseInfrastructure.airportCount <= 0) {
     return { valid: false, reason: 'Air unit must be based at an intact airport to strike' };
   }
@@ -84,7 +84,7 @@ export function validateAirStrikeOrder(
     return { valid: true };
   }
 
-  const targetInfrastructure = getRes1InfrastructureForHex(targetH3Index);
+  const targetInfrastructure = getStrategicInfrastructureForHex(targetH3Index);
   if (targetType === 'urban' && targetInfrastructure.urbanHexCount <= 0) {
     return { valid: false, reason: 'Target hex has no urban infrastructure' };
   }
@@ -128,9 +128,9 @@ export function validateFerryOrder(
   );
   const withinFerryRange = isWithinAirFerryGridRange(unit.h3_index, destinationH3Index, 'validateFerryOrder', ferryRange);
   if (!withinFerryRange) return { valid: false, reason: formatFerryOutOfRangeReason(ferryRange) };
-  const origin = getRes1InfrastructureForHex(unit.h3_index);
+  const origin = getStrategicInfrastructureForHex(unit.h3_index);
   if (origin.airportCount <= 0) return { valid: false, reason: 'Origin airport is not intact' };
-  const destination = getRes1InfrastructureForHex(destinationH3Index);
+  const destination = getStrategicInfrastructureForHex(destinationH3Index);
   if (destination.airportCount <= 0) return { valid: false, reason: 'Destination airport is not intact' };
   const controller = getHexController(destinationH3Index);
   if (controller !== unit.player) return { valid: false, reason: 'Destination airport must be controlled by unit owner' };

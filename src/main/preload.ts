@@ -14,11 +14,11 @@ import type {
   HumanOrderPreviewResult,
   HumanOrderGroupPreviewResult,
   HumanStandingOrderSnapshot,
-  Res1BaselineUrbanHexCountRow,
-  Res4TerrainOverrideRow,
-  Res4CityOverlayRow,
-  Res4RoadRailOverlayRow,
-  Res4TransportVectorOverlayRow,
+  StrategicBaselineUrbanHexCountRow,
+  TacticalTerrainOverrideRow,
+  TacticalCityOverlayRow,
+  TacticalRoadRailOverlayRow,
+  TacticalTransportVectorOverlayRow,
   HexNamingTooltipLineRequest,
   HexContinentNamesRequest,
   BuildUnitType,
@@ -55,11 +55,11 @@ import type { HexNamingCaption } from '../shared/hexNamingCaption';
  */
 const IPC_GAME = {
   getState: 'game:getState',
-  getRes4TerrainOverrides: 'game:getRes4TerrainOverrides',
-  getRes4CityOverlays: 'game:getRes4CityOverlays',
-  getRes4RoadRailOverlays: 'game:getRes4RoadRailOverlays',
-  getRes4TransportVectorOverlays: 'game:getRes4TransportVectorOverlays',
-  getRes1BaselineUrbanHexCounts: 'game:getRes1BaselineUrbanHexCounts',
+  getTacticalTerrainOverrides: 'game:getRes4TerrainOverrides',
+  getTacticalCityOverlays: 'game:getRes4CityOverlays',
+  getTacticalRoadRailOverlays: 'game:getRes4RoadRailOverlays',
+  getTacticalTransportVectorOverlays: 'game:getRes4TransportVectorOverlays',
+  getStrategicBaselineUrbanHexCounts: 'game:getRes1BaselineUrbanHexCounts',
   getHexNamingTooltipLine: 'game:getHexNamingTooltipLine',
   getHexContinentNames: 'game:getHexContinentNames',
   listScenarioHomeRegions: 'game:listScenarioHomeRegions',
@@ -174,56 +174,56 @@ const gameApi = {
 getGameState: (): Promise<GameStateSnapshot> =>
     ipcRenderer.invoke(IPC_GAME.getState),
     /**
-   * Documents the object literal property `getRes4TerrainOverrides` (getRes4TerrainOverrides: (): Promise<Res4TerrainOverrideRow[]> => ipcRenderer.invoke('game:getRes4TerrainOverrides')).
+   * Documents the object literal property `getTacticalTerrainOverrides` (getTacticalTerrainOverrides: (): Promise<TacticalTerrainOverrideRow[]> => ipcRenderer.invoke('game:getTacticalTerrainOverrides')).
 
-   * Purpose: Supports maintainability by documenting why `getRes4TerrainOverrides` exists.
+   * Purpose: Supports maintainability by documenting why `getTacticalTerrainOverrides` exists.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-getRes4TerrainOverrides: (): Promise<Res4TerrainOverrideRow[]> =>
-    ipcRenderer.invoke(IPC_GAME.getRes4TerrainOverrides),
+getTacticalTerrainOverrides: (): Promise<TacticalTerrainOverrideRow[]> =>
+    ipcRenderer.invoke(IPC_GAME.getTacticalTerrainOverrides),
     /**
-   * Documents the object literal property `getRes4CityOverlays` (getRes4CityOverlays: (): Promise<Res4CityOverlayRow[]> => ipcRenderer.invoke('game:getRes4CityOverlays')).
+   * Documents the object literal property `getTacticalCityOverlays` (getTacticalCityOverlays: (): Promise<TacticalCityOverlayRow[]> => ipcRenderer.invoke('game:getTacticalCityOverlays')).
 
-   * Purpose: Supports maintainability by documenting why `getRes4CityOverlays` exists.
+   * Purpose: Supports maintainability by documenting why `getTacticalCityOverlays` exists.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-getRes4CityOverlays: (): Promise<Res4CityOverlayRow[]> => ipcRenderer.invoke(IPC_GAME.getRes4CityOverlays),
+getTacticalCityOverlays: (): Promise<TacticalCityOverlayRow[]> => ipcRenderer.invoke(IPC_GAME.getTacticalCityOverlays),
     /**
-   * Documents the object literal property `getRes4RoadRailOverlays` (getRes4RoadRailOverlays: (): Promise<Res4RoadRailOverlayRow[]> => ipcRenderer.invoke('game:getRes4RoadRailOverlays')).
+   * Documents the object literal property `getTacticalRoadRailOverlays` (getTacticalRoadRailOverlays: (): Promise<TacticalRoadRailOverlayRow[]> => ipcRenderer.invoke('game:getTacticalRoadRailOverlays')).
 
-   * Purpose: Supports maintainability by documenting why `getRes4RoadRailOverlays` exists.
+   * Purpose: Supports maintainability by documenting why `getTacticalRoadRailOverlays` exists.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-getRes4RoadRailOverlays: (): Promise<Res4RoadRailOverlayRow[]> =>
-    ipcRenderer.invoke(IPC_GAME.getRes4RoadRailOverlays),
+getTacticalRoadRailOverlays: (): Promise<TacticalRoadRailOverlayRow[]> =>
+    ipcRenderer.invoke(IPC_GAME.getTacticalRoadRailOverlays),
     /**
-   * Documents the object literal property `getRes4TransportVectorOverlays` (getRes4TransportVectorOverlays: (): Promise<Res4TransportVectorOverlayRow[]> => ipcRenderer.invoke('game:getRes4TransportVectorOverlays')).
+   * Documents the object literal property `getTacticalTransportVectorOverlays` (getTacticalTransportVectorOverlays: (): Promise<TacticalTransportVectorOverlayRow[]> => ipcRenderer.invoke('game:getTacticalTransportVectorOverlays')).
 
    * Purpose: Exposes optional display-only road/rail vectors for the Leaflet transport overlay.
-   * When to use: Renderer startup hydration alongside res4 terrain/city/side-mask overlay data.
+   * When to use: Renderer startup hydration alongside tactical terrain/city/side-mask overlay data.
    * Expected outcome: Returns empty when the optional vector artifact is missing.
    * Exceptions: None.
    */
-getRes4TransportVectorOverlays: (): Promise<Res4TransportVectorOverlayRow[]> =>
-    ipcRenderer.invoke(IPC_GAME.getRes4TransportVectorOverlays),
+getTacticalTransportVectorOverlays: (): Promise<TacticalTransportVectorOverlayRow[]> =>
+    ipcRenderer.invoke(IPC_GAME.getTacticalTransportVectorOverlays),
   /**
-   * Fetches the generated urban-cell count for each res1 hex that can produce units.
+   * Fetches the generated urban-cell count for each strategic hex that can produce units.
    *
    * Purpose: The hex tooltip and the build popup classify tech from this baseline, which air strikes do not change.
-   * When to use: Once per renderer session, beside the static res4 overlay load.
+   * When to use: Once per renderer session, beside the static tactical overlay load.
    * Expected outcome: Resolves to rows with a positive count, or an empty array when the cache is not loaded.
    * Exceptions: Rejects on IPC transport failures. A handler failure resolves to an empty array.
    */
-  getRes1BaselineUrbanHexCounts: (): Promise<Res1BaselineUrbanHexCountRow[]> =>
-    ipcRenderer.invoke(IPC_GAME.getRes1BaselineUrbanHexCounts),
+  getStrategicBaselineUrbanHexCounts: (): Promise<StrategicBaselineUrbanHexCountRow[]> =>
+    ipcRenderer.invoke(IPC_GAME.getStrategicBaselineUrbanHexCounts),
   /**
-   * Fetches the structured naming caption (text plus country spans) for a res1 or res4 hex.
+   * Fetches the structured naming caption (text plus country spans) for a strategic or tactical hex.
    *
    * Purpose: Feeds hover tooltips, the build popup, and the melee-intercept hex cell, which add flags from the spans.
    * When to use: Through the renderer's caption cache rather than per hover.
@@ -325,14 +325,14 @@ registerPostTacticalBeatConsultationListener: (callback: (payload: TacticalPostB
     postTacticalBeatConsultationListener = callback;
   },
     /**
-   * Documents the object literal property `startTacticalBattle` (startTacticalBattle: (payload: { enclosingRes1H3Index: string }): Promise<StartTacticalBattleIpcResult> => ipcRenderer.invoke('game:startTacticalBattle', payload)).
+   * Documents the object literal property `startTacticalBattle` (startTacticalBattle: (payload: { enclosingStrategicH3Index: string }): Promise<StartTacticalBattleIpcResult> => ipcRenderer.invoke('game:startTacticalBattle', payload)).
 
    * Purpose: Exposes milestone-2.1 tactical battle entry to the renderer with the same contract as the main-process handler.
    * When to use: After the player activates a contested-hex tactical entry control during strategic planning.
-   * Expected outcome: Returns a tactical snapshot on success for res4-scoped rendering and interaction.
+   * Expected outcome: Returns a tactical snapshot on success for tactical-scoped rendering and interaction.
    * Exceptions: None.
    */
-startTacticalBattle: (payload: { enclosingRes1H3Index: string }): Promise<StartTacticalBattleIpcResult> =>
+startTacticalBattle: (payload: { enclosingStrategicH3Index: string }): Promise<StartTacticalBattleIpcResult> =>
     ipcRenderer.invoke(IPC_GAME.startTacticalBattle, payload),
     /**
    * Documents the object literal property `endTacticalBattle` (endTacticalBattle: (): Promise<EndTacticalBattleIpcResult> => ipcRenderer.invoke('game:endTacticalBattle')).

@@ -19,7 +19,7 @@ const WATER_SEAPORT_NO_CONTROL = '812a3ffffffffff';
 /**
  * Builds a minimal strategic snapshot for sealift briefing assertions.
  *
- * Purpose: Avoid a live DB while still using valid res1 indexes so `gridDistance` can score nearest embark.
+ * Purpose: Avoid a live DB while still using valid strategic indexes so `gridDistance` can score nearest embark.
  * When to use: Strategic `buildSealiftBriefingBlock` cases in this file.
  * Expected outcome: `format` can be a stub; hex/unit/control/infra arrays drive the table.
  * Exceptions: None.
@@ -27,8 +27,8 @@ const WATER_SEAPORT_NO_CONTROL = '812a3ffffffffff';
 function sealiftSnapshot(args: {
   navalH3: string;
   hexes: GameStateSnapshot['hexes'];
-  control?: NonNullable<GameStateSnapshot['res1Control']>;
-  infra?: NonNullable<GameStateSnapshot['res1Infrastructure']>;
+  control?: NonNullable<GameStateSnapshot['strategicControl']>;
+  infra?: NonNullable<GameStateSnapshot['strategicInfrastructure']>;
   extraUnits?: GameStateSnapshot['units'];
 }): GameStateSnapshot {
   return {
@@ -40,8 +40,8 @@ function sealiftSnapshot(args: {
     phase: 'planning',
     turnNumber: 1,
     pendingOrders: [],
-    res1Control: args.control ?? [],
-    res1Infrastructure: args.infra ?? [],
+    strategicControl: args.control ?? [],
+    strategicInfrastructure: args.infra ?? [],
   } as GameStateSnapshot;
 }
 

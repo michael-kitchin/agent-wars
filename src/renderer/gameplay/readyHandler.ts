@@ -346,7 +346,7 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
           deps
         );
       }
-      await deps.refreshRes4TerrainOverridesForRenderer();
+      await deps.refreshTacticalTerrainOverridesForRenderer();
       deps.updatePendingOrdersSidebar();
       deps.updateRangedSidebar();
       deps.updateSidebar();
@@ -424,7 +424,7 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
         deps.updateReadyButtonState();
         return;
       }
-      await deps.refreshRes4TerrainOverridesForRenderer();
+      await deps.refreshTacticalTerrainOverridesForRenderer();
       const pausedState = (await window.gameApi.getGameState()) as GameStateSnapshot;
       await deps.applyGameStateSnapshot(pausedState, {
         refreshStandingOrders: false,
@@ -461,7 +461,7 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
 
     resetPrecomputedAiState('null');
     const humanMoves: ResolutionMove[] = readyResult.humanMoves ?? [];
-    await deps.refreshRes4TerrainOverridesForRenderer();
+    await deps.refreshTacticalTerrainOverridesForRenderer();
     const nextState = (await window.gameApi.getGameState()) as GameStateSnapshot;
     const state = nextState;
     await deps.applyGameStateSnapshot(state, {
@@ -579,8 +579,8 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
     deps.updateReadyButtonState();
     if (S.runButtonOn && !S.pendingDeferredStrategicPostResolutionConsult) deps.startBackgroundRequestIfAllowed();
     deps.redraw();
-    if (readyResult.tacticalAutoStartRes1H3Index) {
-      await deps.startTacticalBattleFromInterceptHex(readyResult.tacticalAutoStartRes1H3Index);
+    if (readyResult.tacticalAutoStartH3Index) {
+      await deps.startTacticalBattleFromInterceptHex(readyResult.tacticalAutoStartH3Index);
       if (S.runButtonOn && !S.pendingDeferredStrategicPostResolutionConsult) deps.startBackgroundRequestIfAllowed();
     }
   } catch (err) {
@@ -612,7 +612,7 @@ export type PrepareStrategicPlanningUiBeforeTacticalAutoStartDeps = {
 /**
  * Clears tactical-order draft slices, reloads human standing orders from main, and refreshes strategic sidebars (pending orders, ranged/air panel, unit sidebar).
  *
- * Purpose: Single sequence shared by `handleReadyButtonClick` immediately before `tacticalAutoStartRes1H3Index` tactical entry and magnifier `prepareStrategicUiBeforeTacticalStart` so Fight and magnifier paths cannot drift.
+ * Purpose: Single sequence shared by `handleReadyButtonClick` immediately before `tacticalAutoStartStrategicH3Index` tactical entry and magnifier `prepareStrategicUiBeforeTacticalStart` so Fight and magnifier paths cannot drift.
  * When to use: After strategic resolution updates game state and before activating tactical battle from the same planning turn.
  * Expected outcome: Right-hand panels reflect `listHumanStandingOrders` and empty tactical drafts before `stashStrategicOrderDraftsForTacticalSession` runs inside tactical activation.
  * Exceptions: None.

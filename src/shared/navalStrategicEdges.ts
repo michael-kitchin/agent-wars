@@ -3,7 +3,7 @@
  *
  * Purpose: Single predicate set so pathfinding, reachable sets, preview, commit, and AI validation
  * share berth-not-canal connectivity without promoting seaports to coastal.
- * When to use: Strategic naval movement only; tactical res4 uses `tacticalNavalEnterNeighborCost`.
+ * When to use: Strategic naval movement only; tactical uses `tacticalNavalEnterNeighborCost`.
  * Expected outcome: Transit hexes form the sail graph; land seaports are occupy-only endpoints.
  * Exceptions: None; callers supply native terrain and seaport flags (no database access here).
  */

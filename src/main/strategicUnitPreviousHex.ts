@@ -1,5 +1,5 @@
 /**
- * In-memory record of each unit's last strategic res1 h3 index before its current position.
+ * In-memory record of each unit's last strategic h3 index before its current position.
  * Used for tactical entry-edge placement; cleared on new game. Not persisted in SQLite (milestone 2.1 scope).
  */
 
@@ -35,10 +35,10 @@ export function rememberStrategicHexBeforeMove(unitId: string, fromH3Index: stri
 }
 
 /**
- * Returns the last remembered strategic res1 hex for a unit, if any.
+ * Returns the last remembered strategic hex for a unit, if any.
  *
  * Contract: Read-only lookup; does not mutate the map.
- * When to use: `computeTacticalBattleSnapshot` to bias res4 placement toward the recorded approach direction.
+ * When to use: `computeTacticalBattleSnapshot` to bias tactical placement toward the recorded approach direction.
  * Expected outcome: Undefined when unknown or after `clearStrategicPreviousHexMemory`.
  * Exceptions: None.
  */

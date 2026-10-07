@@ -11,7 +11,8 @@ export type ViolationCategory =
   | 'fileCasing'
   | 'bannedSuffix'
   | 'numberedTool'
-  | 'exportCasing';
+  | 'exportCasing'
+  | 'resolutionToken';
 
 /**
  * One contract violation found in a scan.

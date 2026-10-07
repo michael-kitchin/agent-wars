@@ -1,7 +1,7 @@
 /**
  * Battle fixture for tests of the tactical AI tools (march estimates, combat estimates, unit assessments).
  *
- * Purpose: One three-cell line (near, mid, far) deep inside a single res1 parent, so tool tests can place sub-units at
+ * Purpose: One three-cell line (near, mid, far) deep inside a single strategic parent, so tool tests can place sub-units at
  * known hop distances and override terrain per cell without repeating H3 discovery code.
  * When to use: Tests under `src/main/tools` that call tactical tool executors.
  * Expected outcome: Deterministic geometry: `near`–`mid` and `mid`–`far` are adjacent, `near`–`far` is two hops apart.
@@ -14,7 +14,7 @@ import type { OriginBonusSettings } from '../../../shared/originBonusTypes';
 import type { TacticalBattleSnapshot, TacticalSubUnitSnapshot } from '../../../shared/tacticalBattleTypes';
 import type { UnitOrigin } from '../../../shared/unitOriginTypes';
 import { buildTacticalAiPlanState } from '../buildTacticalAiPlanState';
-import { tacticalRes1Cell } from './tacticalRes4HexFixtures';
+import { tacticalParentCell } from './tacticalHexFixtures';
 
 /**
  * Named cells in the fixture line.
@@ -65,7 +65,7 @@ export interface TacticalToolFixtureUnit {
   /**
    * Line position the sub-unit stands on.
    *
-   * Contract: Resolved to the matching res4 cell.
+   * Contract: Resolved to the matching tactical cell.
    * When to use: Every fixture unit.
    * Expected outcome: Snapshot `h3Index` is that cell.
    * Exceptions: None.
@@ -119,11 +119,11 @@ export interface TacticalToolFixtureOptions {
    */
   readonly units: readonly TacticalToolFixtureUnit[];
   /**
-   * Res4 terrain kind overrides, such as `forest` or `water`, keyed by line position.
+   * Tactical terrain kind overrides, such as `forest` or `water`, keyed by line position.
    *
    * Contract: Cells without an override use the battle's plains default.
    * When to use: Terrain-dependent range, movement, or sealift tests.
-   * Expected outcome: Written into `res4TerrainKindByH3`.
+   * Expected outcome: Written into `tacticalTerrainKindByH3`.
    * Exceptions: None.
    */
   readonly terrainByCell?: Readonly<Partial<Record<TacticalToolFixtureCell, string>>>;
@@ -150,7 +150,7 @@ export interface TacticalToolFixture {
   /**
    * Battle snapshot with the requested sub-units and terrain.
    *
-   * Contract: Footprint is the radius-3 disk around `near`, limited to the parent res1 cell.
+   * Contract: Footprint is the radius-3 disk around `near`, limited to the parent strategic cell.
    * When to use: The `tacticalBattle` argument of tool executors.
    * Expected outcome: Plains by default.
    * Exceptions: None.
@@ -184,7 +184,7 @@ export interface TacticalToolFixture {
    */
   readonly resolveToH3: (lat: number, lng: number) => string | undefined;
   /**
-   * Res4 cell for each line position.
+   * Tactical cell for each line position.
    *
    * Contract: `near`–`mid` and `mid`–`far` adjacent; `near`–`far` two hops.
    * When to use: Assertions and tool arguments that need a cell.
@@ -202,8 +202,8 @@ export interface TacticalToolFixture {
  * Expected outcome: Cells with the documented adjacency.
  * Exceptions: Throws when no such line exists.
  */
-function findFixtureLine(near: string, res1: string): Record<TacticalToolFixtureCell, string> {
-  const sameParent = gridDisk(near, 2).filter((h) => h !== near && cellToParent(h, 1) === res1);
+function findFixtureLine(near: string, strategic: string): Record<TacticalToolFixtureCell, string> {
+  const sameParent = gridDisk(near, 2).filter((h) => h !== near && cellToParent(h, 1) === strategic);
   for (const far of sameParent) {
     if (gridDistance(near, far) !== 2) continue;
     const mid = sameParent.find((h) => gridDistance(near, h) === 1 && gridDistance(h, far) === 1);
@@ -221,13 +221,13 @@ function findFixtureLine(near: string, res1: string): Record<TacticalToolFixture
  * Exceptions: Throws when the line cannot be found.
  */
 export function buildTacticalToolFixture(options: TacticalToolFixtureOptions): TacticalToolFixture {
-  const res1 = tacticalRes1Cell(12, 34);
-  const near = cellToCenterChild(res1, 4);
-  const cells = findFixtureLine(near, res1);
-  const footprint = gridDisk(near, 3).filter((h) => cellToParent(h, 1) === res1);
-  const res4TerrainKindByH3: Record<string, string> = {};
+  const parentCell = tacticalParentCell(12, 34);
+  const near = cellToCenterChild(parentCell, 4);
+  const cells = findFixtureLine(near, parentCell);
+  const footprint = gridDisk(near, 3).filter((h) => cellToParent(h, 1) === parentCell);
+  const tacticalTerrainKindByH3: Record<string, string> = {};
   for (const [cell, kind] of Object.entries(options.terrainByCell ?? {})) {
-    if (kind) res4TerrainKindByH3[cells[cell as TacticalToolFixtureCell]] = kind;
+    if (kind) tacticalTerrainKindByH3[cells[cell as TacticalToolFixtureCell]] = kind;
   }
   const subUnits: TacticalSubUnitSnapshot[] = options.units.map((u) => ({
     id: u.id,
@@ -241,19 +241,19 @@ export function buildTacticalToolFixture(options: TacticalToolFixtureOptions): T
   }));
   const battle: TacticalBattleSnapshot = {
     battleId: options.battleId,
-    enclosingRes1H3Index: res1,
-    res4ChildH3Indexes: footprint,
+    enclosingStrategicH3Index: parentCell,
+    tacticalChildH3Indexes: footprint,
     strategicTurnNumber: 1,
     tacticalTurnNumber: 1,
     strategicHexTerrain: 'land',
     strategicHexTerrainKind: 'plains',
-    res4TerrainKindByH3,
+    tacticalTerrainKindByH3,
     subUnits,
   };
   const strategic: GameStateSnapshot = {
     turnNumber: 1,
     phase: 'planning',
-    hexes: [{ h3Index: res1, terrain: 'land', terrainKind: 'plains' }],
+    hexes: [{ h3Index: parentCell, terrain: 'land', terrainKind: 'plains' }],
     units: [],
     pendingOrders: [],
     ...(options.originBonusSettings ?? {}),

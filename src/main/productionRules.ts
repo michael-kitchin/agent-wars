@@ -2,6 +2,9 @@
  * Centralized constants and pure queue-production helpers for milestone 1.4.
  */
 
+import { GLOBAL_GAME_MAP } from '../shared/activeGameMap';
+import { buildMinimumUrbanCells } from '../shared/gameRules';
+import { logDebug } from './logger';
 import {
   applyProduction as applyProductionShared,
   computeKeepBuildingRefillCount as computeKeepBuildingRefillCountShared,
@@ -149,14 +152,14 @@ export const BUILD_PREREQUISITES_BY_TYPE: Readonly<Record<BuildUnitType, BuildPr
    */
 infantry: { minUrbanHexes: 1, minSeaports: 0 },
     /**
-   * Documents the object literal property `armor` (armor: { minUrbanHexes: 2, minSeaports: 0 }).
+   * Documents the object literal property `armor` (armor minimum urban cells come from the global profile).
 
    * Purpose: Supports maintainability by documenting why `armor` exists.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-armor: { minUrbanHexes: 2, minSeaports: 0 },
+armor: { minUrbanHexes: GLOBAL_GAME_MAP.rules.armorMinUrbanCells, minSeaports: 0 },
     /**
    * Documents the object literal property `naval` (naval: { minUrbanHexes: 10, minSeaports: 1 }).
 
@@ -165,7 +168,7 @@ armor: { minUrbanHexes: 2, minSeaports: 0 },
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-naval: { minUrbanHexes: 10, minSeaports: 1 },
+naval: { minUrbanHexes: GLOBAL_GAME_MAP.rules.navalMinUrbanCells, minSeaports: 1 },
     /**
    * Documents the object literal property `air` (air: { minUrbanHexes: 5, minSeaports: 0 }).
 
@@ -174,7 +177,7 @@ naval: { minUrbanHexes: 10, minSeaports: 1 },
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-air: { minUrbanHexes: 5, minSeaports: 0 },
+air: { minUrbanHexes: GLOBAL_GAME_MAP.rules.airMinUrbanCells, minSeaports: 0 },
 };
 
 /**
@@ -228,11 +231,11 @@ export function isValidBuildCount(value: number): boolean {
 }
 
 /**
- * Defines the `getAvailableBuildUnitTypes` function shape (export function getAvailableBuildUnitTypes().
-
- * Purpose: Supports maintainability by documenting why `getAvailableBuildUnitTypes` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Lists unit types a hex may queue from its urban cells, seaports, and airports.
+ *
+ * Purpose: The urban gate follows the active map. Seaport minimums stay on the static prerequisite table.
+ * When to use: Build menus and prompt sentences that need the types a hex can start.
+ * Expected outcome: Infantry needs one urban cell. Armor, air, and naval need `buildMinimumUrbanCells`. Naval also needs its seaport minimum. Air needs an airport.
  * Exceptions: None.
  */
 export function getAvailableBuildUnitTypes(
@@ -240,12 +243,14 @@ export function getAvailableBuildUnitTypes(
   seaportCount: number,
   airportCount = 0
 ): BuildUnitType[] {
-  return ALL_BUILD_UNIT_TYPES.filter((unitType) => {
+  const available = ALL_BUILD_UNIT_TYPES.filter((unitType) => {
     const req = BUILD_PREREQUISITES_BY_TYPE[unitType];
-    if (urbanHexCount < req.minUrbanHexes || seaportCount < req.minSeaports) return false;
+    if (urbanHexCount < buildMinimumUrbanCells(unitType) || seaportCount < req.minSeaports) return false;
     if (unitType === 'air') return airportCount > 0;
     return true;
   });
+  logDebug('getAvailableBuildUnitTypes', { urbanHexCount, seaportCount, airportCount, available });
+  return available;
 }
 
 /**

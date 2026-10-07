@@ -1,15 +1,14 @@
-import { cellToParent } from 'h3-js';
-import { STRATEGIC_H3_RESOLUTION } from '../../shared/h3Resolutions';
+import { strategicParentOf } from '../../shared/h3Resolutions';
 
 /**
- * Documents the `Res4OverlayInfrastructureRow` interface as a named contract surface (export interface Res4OverlayInfrastructureRow).
+ * Documents the `TacticalOverlayInfrastructureRow` interface as a named contract surface (export interface TacticalOverlayInfrastructureRow).
 
- * Purpose: Supports maintainability by documenting why `Res4OverlayInfrastructureRow` exists.
+ * Purpose: Supports maintainability by documenting why `TacticalOverlayInfrastructureRow` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export interface Res4OverlayInfrastructureRow {
+export interface TacticalOverlayInfrastructureRow {
     /**
    * Specifies the contract for the `h3Index` member (h3Index: string;).
 
@@ -67,14 +66,14 @@ isRubble?: boolean;
 }
 
 /**
- * Documents the `Res4OverlayEntry` interface as a named contract surface (export interface Res4OverlayEntry).
+ * Documents the `TacticalOverlayEntry` interface as a named contract surface (export interface TacticalOverlayEntry).
 
- * Purpose: Supports maintainability by documenting why `Res4OverlayEntry` exists.
+ * Purpose: Supports maintainability by documenting why `TacticalOverlayEntry` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export interface Res4OverlayEntry {
+export interface TacticalOverlayEntry {
     /**
    * Specifies the contract for the `terrainKind` member (terrainKind: string;).
 
@@ -132,50 +131,50 @@ isRubble: boolean;
  */
 export interface InfrastructureOverlayStateSnapshot {
     /**
-   * Specifies the contract for the `res4TerrainOverridesByH3` member (res4TerrainOverridesByH3: Map<string, Res4OverlayEntry>;).
+   * Specifies the contract for the `tacticalTerrainOverridesByH3` member (tacticalTerrainOverridesByH3: Map<string, TacticalOverlayEntry>;).
 
-   * Contract: Describes stable behavior for callers of `res4TerrainOverridesByH3` in this codebase.
+   * Contract: Describes stable behavior for callers of `tacticalTerrainOverridesByH3` in this codebase.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-res4TerrainOverridesByH3: Map<string, Res4OverlayEntry>;
+tacticalTerrainOverridesByH3: Map<string, TacticalOverlayEntry>;
     /**
-   * Specifies the contract for the `terrainInfraRes1Airport` member (terrainInfraRes1Airport: Set<string>;).
+   * Specifies the contract for the `terrainInfraStrategicAirport` member (terrainInfraStrategicAirport: Set<string>;).
 
-   * Contract: Describes stable behavior for callers of `terrainInfraRes1Airport` in this codebase.
+   * Contract: Describes stable behavior for callers of `terrainInfraStrategicAirport` in this codebase.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-terrainInfraRes1Airport: Set<string>;
+terrainInfraStrategicAirport: Set<string>;
     /**
-   * Specifies the contract for the `terrainInfraRes1Seaport` member (terrainInfraRes1Seaport: Set<string>;).
+   * Specifies the contract for the `terrainInfraStrategicSeaport` member (terrainInfraStrategicSeaport: Set<string>;).
 
-   * Contract: Describes stable behavior for callers of `terrainInfraRes1Seaport` in this codebase.
+   * Contract: Describes stable behavior for callers of `terrainInfraStrategicSeaport` in this codebase.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-terrainInfraRes1Seaport: Set<string>;
+terrainInfraStrategicSeaport: Set<string>;
     /**
-   * Specifies the contract for the `terrainInfraRes4Airport` member (terrainInfraRes4Airport: Set<string>;).
+   * Specifies the contract for the `terrainInfraTacticalAirport` member (terrainInfraTacticalAirport: Set<string>;).
 
-   * Contract: Describes stable behavior for callers of `terrainInfraRes4Airport` in this codebase.
+   * Contract: Describes stable behavior for callers of `terrainInfraTacticalAirport` in this codebase.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-terrainInfraRes4Airport: Set<string>;
+terrainInfraTacticalAirport: Set<string>;
     /**
-   * Specifies the contract for the `terrainInfraRes4Seaport` member (terrainInfraRes4Seaport: Set<string>;).
+   * Specifies the contract for the `terrainInfraTacticalSeaport` member (terrainInfraTacticalSeaport: Set<string>;).
 
-   * Contract: Describes stable behavior for callers of `terrainInfraRes4Seaport` in this codebase.
+   * Contract: Describes stable behavior for callers of `terrainInfraTacticalSeaport` in this codebase.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-terrainInfraRes4Seaport: Set<string>;
+terrainInfraTacticalSeaport: Set<string>;
 }
 
 /**
@@ -187,9 +186,9 @@ terrainInfraRes4Seaport: Set<string>;
  * Exceptions: None.
  */
 export function deriveInfrastructureOverlayState(
-  rows: Res4OverlayInfrastructureRow[]
+  rows: TacticalOverlayInfrastructureRow[]
 ): InfrastructureOverlayStateSnapshot {
-  const res4TerrainOverridesByH3 = new Map(
+  const tacticalTerrainOverridesByH3 = new Map(
     rows.map((r) => [
       r.h3Index,
       {
@@ -201,21 +200,21 @@ export function deriveInfrastructureOverlayState(
       },
     ])
   );
-  const terrainInfraRes4Airport = new Set(rows.filter((row) => !!row.isAirport).map((row) => row.h3Index));
-  const terrainInfraRes4Seaport = new Set(rows.filter((row) => !!row.isSeaport).map((row) => row.h3Index));
-  const terrainInfraRes1Airport = new Set<string>();
-  const terrainInfraRes1Seaport = new Set<string>();
+  const terrainInfraTacticalAirport = new Set(rows.filter((row) => !!row.isAirport).map((row) => row.h3Index));
+  const terrainInfraTacticalSeaport = new Set(rows.filter((row) => !!row.isSeaport).map((row) => row.h3Index));
+  const terrainInfraStrategicAirport = new Set<string>();
+  const terrainInfraStrategicSeaport = new Set<string>();
   for (const row of rows) {
     if (!row.isAirport && !row.isSeaport) continue;
-    const parentH3 = cellToParent(row.h3Index, STRATEGIC_H3_RESOLUTION);
-    if (row.isAirport) terrainInfraRes1Airport.add(parentH3);
-    if (row.isSeaport) terrainInfraRes1Seaport.add(parentH3);
+    const parentH3 = strategicParentOf(row.h3Index);
+    if (row.isAirport) terrainInfraStrategicAirport.add(parentH3);
+    if (row.isSeaport) terrainInfraStrategicSeaport.add(parentH3);
   }
   return {
-    res4TerrainOverridesByH3,
-    terrainInfraRes1Airport,
-    terrainInfraRes1Seaport,
-    terrainInfraRes4Airport,
-    terrainInfraRes4Seaport,
+    tacticalTerrainOverridesByH3,
+    terrainInfraStrategicAirport,
+    terrainInfraStrategicSeaport,
+    terrainInfraTacticalAirport,
+    terrainInfraTacticalSeaport,
   };
 }

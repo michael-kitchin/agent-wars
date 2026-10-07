@@ -1,5 +1,5 @@
 /**
- * DB-backed contracts for tactical snapshot synthesis: planning gate, res1 validation, placement determinism, session IPC edges.
+ * DB-backed contracts for tactical snapshot synthesis: planning gate, strategic validation, placement determinism, session IPC edges.
  * Run with: node dist/main/tacticalBattle/computeTacticalBattleSnapshotDb.test.js
  */
 
@@ -17,7 +17,7 @@ import {
   applyValidatedOpponentTacticalOrders,
   endTacticalBattleSession,
   getActiveTacticalBattleSnapshot,
-  startTacticalBattleForEnclosingRes1Hex,
+  startTacticalBattleForEnclosingHex,
 } from './tacticalBattleSession';
 import { getTacticalSealiftStackStateForHex } from './tacticalSealiftStackState';
 import {
@@ -25,33 +25,33 @@ import {
   tacticalDbFixtureSetStrategicPlanningPhase,
   tacticalDbFixtureWithTempDbContestedPlanning,
 } from './testSupport/tacticalDbFixture';
-import { tacticalRes4Cell } from './testSupport/tacticalRes4HexFixtures';
+import { tacticalCell } from './testSupport/tacticalHexFixtures';
 
 tacticalDbFixtureRegisterDefaultAfterEach();
 
 test('computeTacticalBattleSnapshot rejects non-res1 enclosing index', () => {
   withTempGameDb('aw-tactical-snap-r1-', () => {
     tacticalDbFixtureSetStrategicPlanningPhase();
-    const res4 = tacticalRes4Cell(40.7, -74.0);
-    const r = computeTacticalBattleSnapshot(res4, 'battle-non-r1');
+    const tacticalIndex = tacticalCell(40.7, -74.0);
+    const r = computeTacticalBattleSnapshot(tacticalIndex, 'battle-non-r1');
     assert.equal(r.snapshot, null);
     assert.ok(r.failureReason && /res1/i.test(r.failureReason));
   });
 });
 
 test('computeTacticalBattleSnapshot returns null when strategic phase is not planning', () => {
-  tacticalDbFixtureWithTempDbContestedPlanning('aw-tactical-snap-phase-', ({ targetRes1H3 }) => {
+  tacticalDbFixtureWithTempDbContestedPlanning('aw-tactical-snap-phase-', ({ targetStrategicH3 }) => {
     dbRun(`UPDATE turn_state SET phase = 'resolution' WHERE id = 1`);
-    const r = computeTacticalBattleSnapshot(targetRes1H3, 'battle-wrong-phase');
+    const r = computeTacticalBattleSnapshot(targetStrategicH3, 'battle-wrong-phase');
     assert.equal(r.snapshot, null);
     assert.ok(r.failureReason && /planning/i.test(r.failureReason));
   });
 });
 
 test('computeTacticalBattleSnapshot succeeds in resolution when allowDuringStrategicResolution is true', () => {
-  tacticalDbFixtureWithTempDbContestedPlanning('aw-tactical-snap-phase-allow-', ({ targetRes1H3 }) => {
+  tacticalDbFixtureWithTempDbContestedPlanning('aw-tactical-snap-phase-allow-', ({ targetStrategicH3 }) => {
     dbRun(`UPDATE turn_state SET phase = 'resolution' WHERE id = 1`);
-    const r = computeTacticalBattleSnapshot(targetRes1H3, 'battle-resolution-probe', {
+    const r = computeTacticalBattleSnapshot(targetStrategicH3, 'battle-resolution-probe', {
       allowDuringStrategicResolution: true,
     });
     assert.ok(r.snapshot, r.failureReason ?? 'expected snapshot');
@@ -59,10 +59,10 @@ test('computeTacticalBattleSnapshot succeeds in resolution when allowDuringStrat
 });
 
 test('computeTacticalBattleSnapshot is deterministic for identical battle id and DB state', () => {
-  tacticalDbFixtureWithTempDbContestedPlanning('aw-tactical-snap-det-', ({ targetRes1H3 }) => {
+  tacticalDbFixtureWithTempDbContestedPlanning('aw-tactical-snap-det-', ({ targetStrategicH3 }) => {
     const battleId = 'deterministic-placement-seed';
-    const a = computeTacticalBattleSnapshot(targetRes1H3, battleId);
-    const b = computeTacticalBattleSnapshot(targetRes1H3, battleId);
+    const a = computeTacticalBattleSnapshot(targetStrategicH3, battleId);
+    const b = computeTacticalBattleSnapshot(targetStrategicH3, battleId);
     assert.ok(a.snapshot && b.snapshot);
     const players = new Set(a.snapshot.subUnits.map((sub) => sub.player));
     assert.ok(players.has('human') && players.has('opponent'));
@@ -85,9 +85,9 @@ test('computeTacticalBattleSnapshot is deterministic for identical battle id and
 });
 
 test('computeTacticalBattleSnapshot records placed baseline counts by parent id', () => {
-  tacticalDbFixtureWithTempDbContestedPlanning('aw-tactical-snap-baseline-', ({ targetRes1H3 }) => {
+  tacticalDbFixtureWithTempDbContestedPlanning('aw-tactical-snap-baseline-', ({ targetStrategicH3 }) => {
     const battleId = 'baseline-map-probe';
-    const result = computeTacticalBattleSnapshot(targetRes1H3, battleId);
+    const result = computeTacticalBattleSnapshot(targetStrategicH3, battleId);
     assert.ok(result.snapshot, result.failureReason ?? 'expected snapshot');
     const byParent = result.snapshot!.initialPlacedSubUnitCountByParentId;
     assert.ok(byParent, 'expected baseline counts map');
@@ -101,8 +101,8 @@ test('computeTacticalBattleSnapshot records placed baseline counts by parent id'
 });
 
 test('computeTacticalBattleSnapshot copies each parent origin onto its sub-units', () => {
-  tacticalDbFixtureWithTempDbContestedPlanning('aw-tactical-snap-origin-', ({ targetRes1H3 }) => {
-    const result = computeTacticalBattleSnapshot(targetRes1H3, 'origin-copy-probe');
+  tacticalDbFixtureWithTempDbContestedPlanning('aw-tactical-snap-origin-', ({ targetStrategicH3 }) => {
+    const result = computeTacticalBattleSnapshot(targetStrategicH3, 'origin-copy-probe');
     assert.ok(result.snapshot, result.failureReason ?? 'expected snapshot');
     const originByParentId = new Map(listUnitsForSnapshot().map((u) => [u.id, u.origin]));
     assert.ok(result.snapshot.subUnits.some((sub) => sub.origin), 'expected at least one sub-unit with an origin');
@@ -113,10 +113,10 @@ test('computeTacticalBattleSnapshot copies each parent origin onto its sub-units
 });
 
 test('startTacticalBattleForEnclosingRes1Hex rejects a second start while session is active', () => {
-  tacticalDbFixtureWithTempDbContestedPlanning('aw-tactical-snap-dup-', ({ targetRes1H3 }) => {
-    const first = startTacticalBattleForEnclosingRes1Hex(targetRes1H3);
+  tacticalDbFixtureWithTempDbContestedPlanning('aw-tactical-snap-dup-', ({ targetStrategicH3 }) => {
+    const first = startTacticalBattleForEnclosingHex(targetStrategicH3);
     assert.equal(first.success, true);
-    const second = startTacticalBattleForEnclosingRes1Hex(targetRes1H3);
+    const second = startTacticalBattleForEnclosingHex(targetStrategicH3);
     assert.equal(second.success, false);
     assert.ok(second.reason);
   });
@@ -131,8 +131,8 @@ test('applyValidatedOpponentTacticalOrders fails when no tactical session is act
 });
 
 test('active tactical session writes game_config and clears on endTacticalBattleSession', () => {
-  tacticalDbFixtureWithTempDbContestedPlanning('aw-tactical-persist-key-', ({ targetRes1H3 }) => {
-    const started = startTacticalBattleForEnclosingRes1Hex(targetRes1H3);
+  tacticalDbFixtureWithTempDbContestedPlanning('aw-tactical-persist-key-', ({ targetStrategicH3 }) => {
+    const started = startTacticalBattleForEnclosingHex(targetStrategicH3);
     assert.equal(started.success, true);
     const row = dbGetOne<{ value: string }>("SELECT value FROM game_config WHERE key = 'tactical_battle_snapshot_json_v1'");
     assert.ok(row?.value);
@@ -153,12 +153,12 @@ test('active tactical session writes game_config and clears on endTacticalBattle
 });
 
 test('updateTacticalSealiftSlot embarks then debarks and syncs strategic transport rows', () => {
-  tacticalDbFixtureWithTempDbContestedPlanning('aw-tactical-sealift-slot-ipc-', ({ targetRes1H3 }) => {
-    const started = startTacticalBattleForEnclosingRes1Hex(targetRes1H3);
+  tacticalDbFixtureWithTempDbContestedPlanning('aw-tactical-sealift-slot-ipc-', ({ targetStrategicH3 }) => {
+    const started = startTacticalBattleForEnclosingHex(targetStrategicH3);
     assert.equal(started.success, true);
     const snap = started.battle!;
     let stackHex: string | null = null;
-    for (const h of snap.res4ChildH3Indexes) {
+    for (const h of snap.tacticalChildH3Indexes) {
       const st = getTacticalSealiftStackStateForHex(h);
       if (st.showSealiftSection && st.navalRows.length > 0 && st.landOptions.length > 0 && !st.controlsDisabled) {
         stackHex = h;
@@ -206,7 +206,7 @@ test('updateTacticalSealiftSlot embarks then debarks and syncs strategic transpo
 });
 
 test('Phase E: melee tactical-entry filter keeps contested res1 during resolution pause', () => {
-  tacticalDbFixtureWithTempDbContestedPlanning('aw-melee-filter-phasee-', ({ targetRes1H3 }) => {
+  tacticalDbFixtureWithTempDbContestedPlanning('aw-melee-filter-phasee-', ({ targetStrategicH3 }) => {
     dbRun(`UPDATE turn_state SET phase = 'resolution' WHERE id = 1`);
     const hexList = getOrderedHexList();
     const combatUnitsAfter: CombatUnit[] = listUnitsForSnapshot().map((u) => ({
@@ -217,10 +217,10 @@ test('Phase E: melee tactical-entry filter keeps contested res1 during resolutio
       displayOrder: u.displayOrder ?? 0,
     }));
     const raw = listMeleeCandidateHexes(combatUnitsAfter, hexList);
-    assert.ok(raw.includes(targetRes1H3), `expected raw melee candidate at ${targetRes1H3}`);
+    assert.ok(raw.includes(targetStrategicH3), `expected raw melee candidate at ${targetStrategicH3}`);
     const filtered = filterMeleeCandidateHexesWithTacticalEntry(raw, { allowDuringStrategicResolution: true });
     assert.ok(
-      filtered.includes(targetRes1H3),
+      filtered.includes(targetStrategicH3),
       `tactical probe should retain fixture hex; raw=${JSON.stringify(raw)} filtered=${JSON.stringify(filtered)}`
     );
   });

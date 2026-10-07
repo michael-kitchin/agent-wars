@@ -426,7 +426,7 @@ export interface AfterTacticalBeatResolutionResult {
 /**
  * Event-driven tactical post-beat consultation: subscriptions + tactical-only mandatory rules, then optional LLM call.
  *
- * Purpose: Mirrors strategic `afterResolution` for res4 battles without writing strategic `setAiPendingOrders`.
+ * Purpose: Mirrors strategic `afterResolution` for tactical battles without writing strategic `setAiPendingOrders`.
  * When to use: After a successful `commitHumanTacticalDraftOrders` when the renderer sent event-driven flags.
  * Expected outcome: Buffered `tacticalOpponentPlan` when subscriptions, tactical mandatory rules, idle-opponent policy, or observable human beat actions demand a consultation pass. Successful `requestOrders` results without a prebuilt `tacticalOpponentPlan` are normalized from `orders` arrays so tool counts and strategy still reach IPC.
  * Exceptions: Swallows LLM failures after logging; clears strategic pending orders when skipping or failing.

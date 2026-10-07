@@ -7,77 +7,77 @@ import * as path from 'path';
 import { logDebug, logError } from './logger';
 
 /**
- * Documents the module-scope binding `RES1_SEGMENTS` (RES1_SEGMENTS).
+ * Documents the module-scope binding `STRATEGIC_SEGMENTS` (STRATEGIC_SEGMENTS).
 
- * Purpose: Supports maintainability by documenting why `RES1_SEGMENTS` exists.
+ * Purpose: Supports maintainability by documenting why `STRATEGIC_SEGMENTS` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-const RES1_SEGMENTS = ['data', 'generated', 'terrain_res1_metadata.json'] as const;
+const STRATEGIC_SEGMENTS = ['data', 'generated', 'terrain_res1_metadata.json'] as const;
 /**
- * Documents the module-scope binding `RES4_SEGMENTS` (RES4_SEGMENTS).
+ * Documents the module-scope binding `TACTICAL_SEGMENTS` (TACTICAL_SEGMENTS).
 
- * Purpose: Supports maintainability by documenting why `RES4_SEGMENTS` exists.
+ * Purpose: Supports maintainability by documenting why `TACTICAL_SEGMENTS` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-const RES4_SEGMENTS = ['data', 'generated', 'terrain_res4_metadata.json'] as const;
+const TACTICAL_SEGMENTS = ['data', 'generated', 'terrain_res4_metadata.json'] as const;
 /**
- * Documents the module-scope binding `RES1_NAMING_SEGMENTS` (RES1_NAMING_SEGMENTS).
+ * Documents the module-scope binding `STRATEGIC_NAMING_SEGMENTS` (STRATEGIC_NAMING_SEGMENTS).
 
- * Purpose: Supports maintainability by documenting why `RES1_NAMING_SEGMENTS` exists.
+ * Purpose: Supports maintainability by documenting why `STRATEGIC_NAMING_SEGMENTS` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-const RES1_NAMING_SEGMENTS = ['data', 'generated', 'terrain_res1_naming.json'] as const;
+const STRATEGIC_NAMING_SEGMENTS = ['data', 'generated', 'terrain_res1_naming.json'] as const;
 /**
- * Documents the module-scope binding `RES4_NAMING_SEGMENTS` (RES4_NAMING_SEGMENTS).
+ * Documents the module-scope binding `TACTICAL_NAMING_SEGMENTS` (TACTICAL_NAMING_SEGMENTS).
 
- * Purpose: Supports maintainability by documenting why `RES4_NAMING_SEGMENTS` exists.
+ * Purpose: Supports maintainability by documenting why `TACTICAL_NAMING_SEGMENTS` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-const RES4_NAMING_SEGMENTS = ['data', 'generated', 'terrain_res4_naming.json'] as const;
+const TACTICAL_NAMING_SEGMENTS = ['data', 'generated', 'terrain_res4_naming.json'] as const;
 /**
- * Documents the module-scope binding `RES4_ROAD_RAIL_SIDES_SEGMENTS` (RES4_ROAD_RAIL_SIDES_SEGMENTS).
+ * Documents the module-scope binding `TACTICAL_ROAD_RAIL_SIDES_SEGMENTS` (TACTICAL_ROAD_RAIL_SIDES_SEGMENTS).
 
- * Purpose: Supports maintainability by documenting why `RES4_ROAD_RAIL_SIDES_SEGMENTS` exists.
+ * Purpose: Supports maintainability by documenting why `TACTICAL_ROAD_RAIL_SIDES_SEGMENTS` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-const RES4_ROAD_RAIL_SIDES_SEGMENTS = ['data', 'generated', 'terrain_res4_road_rail_sides.json'] as const;
+const TACTICAL_ROAD_RAIL_SIDES_SEGMENTS = ['data', 'generated', 'terrain_res4_road_rail_sides.json'] as const;
 /**
- * Documents the module-scope binding `RES4_ROAD_RAIL_VECTORS_SEGMENTS` (RES4_ROAD_RAIL_VECTORS_SEGMENTS).
+ * Documents the module-scope binding `TACTICAL_ROAD_RAIL_VECTORS_SEGMENTS` (TACTICAL_ROAD_RAIL_VECTORS_SEGMENTS).
 
  * Purpose: Candidate segments for optional Leaflet road/rail display-vector JSON lookup (non-gameplay).
- * When to use: `resolveTerrainRes4RoadRailVectorsPathOptional` path probing.
+ * When to use: `resolveTerrainTacticalRoadRailVectorsPathOptional` path probing.
  * Expected outcome: Matches `data/generated/terrain_res4_road_rail_vectors.json`.
  * Exceptions: None.
  */
-const RES4_ROAD_RAIL_VECTORS_SEGMENTS = ['data', 'generated', 'terrain_res4_road_rail_vectors.json'] as const;
+const TACTICAL_ROAD_RAIL_VECTORS_SEGMENTS = ['data', 'generated', 'terrain_res4_road_rail_vectors.json'] as const;
 /**
- * Documents the module-scope binding `RES1_LANDMASS_SEGMENTS` (RES1_LANDMASS_SEGMENTS).
+ * Documents the module-scope binding `STRATEGIC_LANDMASS_SEGMENTS` (STRATEGIC_LANDMASS_SEGMENTS).
 
  * Purpose: Candidate path segments for res-1 land-mass JSON used by strategic land-unit pathfinding.
- * When to use: `resolveTerrainRes1LandMassPath` path probing.
+ * When to use: `resolveTerrainStrategicLandMassPath` path probing.
  * Expected outcome: Matches `data/generated/terrain_res1_landmass.json`.
  * Exceptions: None.
  */
-const RES1_LANDMASS_SEGMENTS = ['data', 'generated', 'terrain_res1_landmass.json'] as const;
+const STRATEGIC_LANDMASS_SEGMENTS = ['data', 'generated', 'terrain_res1_landmass.json'] as const;
 /**
- * Path segments for the res1 weather pack.
+ * Path segments for the strategic weather pack.
  *
  * Purpose: Campaign weather is a generated file, not a live climate query.
- * When to use: `resolveTerrainRes1WeatherPath`.
+ * When to use: `resolveTerrainStrategicWeatherPath`.
  * Expected outcome: Matches `data/generated/terrain_res1_weather.json`.
  * Exceptions: None.
  */
-const RES1_WEATHER_SEGMENTS = ['data', 'generated', 'terrain_res1_weather.json'] as const;
+const STRATEGIC_WEATHER_SEGMENTS = ['data', 'generated', 'terrain_res1_weather.json'] as const;
 
 /**
  * Documents the module-scope binding `testOverrideRoot` (testOverrideRoot: string | null).
@@ -150,94 +150,94 @@ function pathCandidates(...segments: string[]): string[] {
 }
 
 /**
- * Defines the `resolveTerrainRes1MetadataPath` function shape (export function resolveTerrainRes1MetadataPath(): string).
+ * Defines the `resolveTerrainStrategicMetadataPath` function shape (export function resolveTerrainStrategicMetadataPath(): string).
 
- * Purpose: Supports maintainability by documenting why `resolveTerrainRes1MetadataPath` exists.
+ * Purpose: Supports maintainability by documenting why `resolveTerrainStrategicMetadataPath` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function resolveTerrainRes1MetadataPath(): string {
+export function resolveTerrainStrategicMetadataPath(): string {
   logDebug('terrainMetadataPaths resolveTerrainRes1MetadataPath');
-  return resolveFirstExisting('terrain_res1_metadata.json', [...RES1_SEGMENTS]);
+  return resolveFirstExisting('terrain_res1_metadata.json', [...STRATEGIC_SEGMENTS]);
 }
 
 /**
- * Defines the `resolveTerrainRes4MetadataPath` function shape (export function resolveTerrainRes4MetadataPath(): string).
+ * Defines the `resolveTerrainTacticalMetadataPath` function shape (export function resolveTerrainTacticalMetadataPath(): string).
 
- * Purpose: Supports maintainability by documenting why `resolveTerrainRes4MetadataPath` exists.
+ * Purpose: Supports maintainability by documenting why `resolveTerrainTacticalMetadataPath` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function resolveTerrainRes4MetadataPath(): string {
+export function resolveTerrainTacticalMetadataPath(): string {
   logDebug('terrainMetadataPaths resolveTerrainRes4MetadataPath');
-  return resolveFirstExisting('terrain_res4_metadata.json', [...RES4_SEGMENTS]);
+  return resolveFirstExisting('terrain_res4_metadata.json', [...TACTICAL_SEGMENTS]);
 }
 
 /**
- * Defines the `resolveTerrainRes1NamingPath` function shape (export function resolveTerrainRes1NamingPath(): string).
+ * Defines the `resolveTerrainStrategicNamingPath` function shape (export function resolveTerrainStrategicNamingPath(): string).
 
- * Purpose: Supports maintainability by documenting why `resolveTerrainRes1NamingPath` exists.
+ * Purpose: Supports maintainability by documenting why `resolveTerrainStrategicNamingPath` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function resolveTerrainRes1NamingPath(): string {
+export function resolveTerrainStrategicNamingPath(): string {
   logDebug('terrainMetadataPaths resolveTerrainRes1NamingPath');
-  return resolveFirstExisting('terrain_res1_naming.json', [...RES1_NAMING_SEGMENTS]);
+  return resolveFirstExisting('terrain_res1_naming.json', [...STRATEGIC_NAMING_SEGMENTS]);
 }
 
 /**
- * Defines the `resolveTerrainRes4NamingPath` function shape (export function resolveTerrainRes4NamingPath(): string).
+ * Defines the `resolveTerrainTacticalNamingPath` function shape (export function resolveTerrainTacticalNamingPath(): string).
 
- * Purpose: Supports maintainability by documenting why `resolveTerrainRes4NamingPath` exists.
+ * Purpose: Supports maintainability by documenting why `resolveTerrainTacticalNamingPath` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function resolveTerrainRes4NamingPath(): string {
+export function resolveTerrainTacticalNamingPath(): string {
   logDebug('terrainMetadataPaths resolveTerrainRes4NamingPath');
-  return resolveFirstExisting('terrain_res4_naming.json', [...RES4_NAMING_SEGMENTS]);
+  return resolveFirstExisting('terrain_res4_naming.json', [...TACTICAL_NAMING_SEGMENTS]);
 }
 
 /**
- * Defines the `resolveTerrainRes1LandMassPath` function shape (export function resolveTerrainRes1LandMassPath(): string).
+ * Defines the `resolveTerrainStrategicLandMassPath` function shape (export function resolveTerrainStrategicLandMassPath(): string).
 
- * Purpose: Supports maintainability by documenting why `resolveTerrainRes1LandMassPath` exists.
+ * Purpose: Supports maintainability by documenting why `resolveTerrainStrategicLandMassPath` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function resolveTerrainRes1LandMassPath(): string {
+export function resolveTerrainStrategicLandMassPath(): string {
   logDebug('terrainMetadataPaths resolveTerrainRes1LandMassPath');
-  return resolveFirstExisting('terrain_res1_landmass.json', [...RES1_LANDMASS_SEGMENTS]);
+  return resolveFirstExisting('terrain_res1_landmass.json', [...STRATEGIC_LANDMASS_SEGMENTS]);
 }
 
 /**
- * Locates the res1 weather pack.
+ * Locates the strategic weather pack.
  *
  * Purpose: Startup and weather reads fail the same way as a missing terrain file.
  * When to use: `ensureWeatherPackLoaded`.
  * Expected outcome: Absolute path to `terrain_res1_weather.json`.
  * Exceptions: Throws when no candidate exists.
  */
-export function resolveTerrainRes1WeatherPath(): string {
+export function resolveTerrainStrategicWeatherPath(): string {
   logDebug('terrainMetadataPaths resolveTerrainRes1WeatherPath');
-  return resolveFirstExisting('terrain_res1_weather.json', [...RES1_WEATHER_SEGMENTS]);
+  return resolveFirstExisting('terrain_res1_weather.json', [...STRATEGIC_WEATHER_SEGMENTS]);
 }
 
 /**
- * Defines the `resolveTerrainRes4RoadRailSidesPathOptional` function shape (export function resolveTerrainRes4RoadRailSidesPathOptional(): string | null).
+ * Defines the `resolveTerrainTacticalRoadRailSidesPathOptional` function shape (export function resolveTerrainTacticalRoadRailSidesPathOptional(): string | null).
 
  * Purpose: Locates optional `terrain_res4_road_rail_sides.json` without throwing so packaged/dev trees missing the artifact can still boot.
- * When to use: While loading res4 transport overlay masks during terrain classification snapshot build.
+ * When to use: While loading tactical transport overlay masks during terrain classification snapshot build.
  * Expected outcome: Returns an absolute filesystem path when a candidate exists; otherwise null after debug logging.
  * Exceptions: None.
  */
-export function resolveTerrainRes4RoadRailSidesPathOptional(): string | null {
+export function resolveTerrainTacticalRoadRailSidesPathOptional(): string | null {
   logDebug('terrainMetadataPaths resolveTerrainRes4RoadRailSidesPathOptional');
-  const candidates = pathCandidates(...RES4_ROAD_RAIL_SIDES_SEGMENTS);
+  const candidates = pathCandidates(...TACTICAL_ROAD_RAIL_SIDES_SEGMENTS);
   for (const p of candidates) {
     if (fs.existsSync(p)) {
       logDebug('terrainMetadataPaths resolveTerrainRes4RoadRailSidesPathOptional: found', { path: p });
@@ -251,16 +251,16 @@ export function resolveTerrainRes4RoadRailSidesPathOptional(): string | null {
 }
 
 /**
- * Defines the `resolveTerrainRes4RoadRailVectorsPathOptional` function shape (export function resolveTerrainRes4RoadRailVectorsPathOptional(): string | null).
+ * Defines the `resolveTerrainTacticalRoadRailVectorsPathOptional` function shape (export function resolveTerrainTacticalRoadRailVectorsPathOptional(): string | null).
 
  * Purpose: Locates optional display-only road/rail vector JSON without forcing the app to fail when absent.
  * When to use: During terrain cache hydration for Leaflet transport vector overlays.
  * Expected outcome: Returns absolute path to `terrain_res4_road_rail_vectors.json` when present, else null.
  * Exceptions: None.
  */
-export function resolveTerrainRes4RoadRailVectorsPathOptional(): string | null {
+export function resolveTerrainTacticalRoadRailVectorsPathOptional(): string | null {
   logDebug('terrainMetadataPaths resolveTerrainRes4RoadRailVectorsPathOptional');
-  const candidates = pathCandidates(...RES4_ROAD_RAIL_VECTORS_SEGMENTS);
+  const candidates = pathCandidates(...TACTICAL_ROAD_RAIL_VECTORS_SEGMENTS);
   for (const p of candidates) {
     if (fs.existsSync(p)) {
       logDebug('terrainMetadataPaths resolveTerrainRes4RoadRailVectorsPathOptional: found', { path: p });

@@ -231,8 +231,8 @@ async function testRequestAiOrdersSuccess(): Promise<void> {
 async function testRequestAiOrdersTacticalBuffersOpponentPlan(): Promise<void> {
   const tacticalSnap: TacticalBattleSnapshot = {
     battleId: 'tb-ipc-test',
-    enclosingRes1H3Index: '891f1d48b9fffff',
-    res4ChildH3Indexes: ['891f1d48b9fffff'],
+    enclosingStrategicH3Index: '891f1d48b9fffff',
+    tacticalChildH3Indexes: ['891f1d48b9fffff'],
     strategicTurnNumber: 1,
     tacticalTurnNumber: 1,
     subUnits: ipcTestTacticalSubUnits,
@@ -285,8 +285,8 @@ async function testRequestAiOrdersTacticalBuffersOpponentPlan(): Promise<void> {
 async function testRequestAiOrdersTacticalSucceedsDuringStrategicResolution(): Promise<void> {
   const tacticalSnap: TacticalBattleSnapshot = {
     battleId: 'tb-resolution-phase',
-    enclosingRes1H3Index: '891f1d48b9fffff',
-    res4ChildH3Indexes: ['891f1d48b9fffff'],
+    enclosingStrategicH3Index: '891f1d48b9fffff',
+    tacticalChildH3Indexes: ['891f1d48b9fffff'],
     strategicTurnNumber: 1,
     tacticalTurnNumber: 1,
     subUnits: ipcTestTacticalSubUnits,
@@ -328,8 +328,8 @@ async function testRequestAiOrdersTacticalSucceedsDuringStrategicResolution(): P
 async function testRequestAiOrdersTacticalAnnihilationBlocksLlm(): Promise<void> {
   const tacticalSnap: TacticalBattleSnapshot = {
     battleId: 'tb-annihilation-ipc',
-    enclosingRes1H3Index: '891f1d48b9fffff',
-    res4ChildH3Indexes: ['891f1d48b9fffff'],
+    enclosingStrategicH3Index: '891f1d48b9fffff',
+    tacticalChildH3Indexes: ['891f1d48b9fffff'],
     strategicTurnNumber: 1,
     tacticalTurnNumber: 1,
     subUnits: [
@@ -661,9 +661,9 @@ const minimalResolvedReady: ReadyResult = {
 /**
  * Defines the `testHandleResolveMeleeInterceptForwardsTacticalAutoStartOnFight` function shape (async function testHandleResolveMeleeInterceptForwardsTacticalAutoStartOnFight(): Promise<void>).
 
- * Purpose: Locks Phase E contract that IPC mirrors `tacticalAutoStartRes1H3Index` only when the resolve layer returns it (Fight path).
+ * Purpose: Locks Phase E contract that IPC mirrors `tacticalAutoStartStrategicH3Index` only when the resolve layer returns it (Fight path).
  * When to use: Regression guard for melee intercept completion wiring.
- * Expected outcome: Handler output includes the same res1 index the mocked `resolveMeleeIntercept` returned.
+ * Expected outcome: Handler output includes the same strategic index the mocked `resolveMeleeIntercept` returned.
  * Exceptions: None.
  */
 async function testHandleResolveMeleeInterceptForwardsTacticalAutoStartOnFight(): Promise<void> {
@@ -678,7 +678,7 @@ async function testHandleResolveMeleeInterceptForwardsTacticalAutoStartOnFight()
     requestOrders: async (): Promise<RequestAiOrdersResult> => ({ success: false, error: 'unused' }),
     resolveMeleeIntercept: (): ReadyResult => ({
       ...minimalResolvedReady,
-      tacticalAutoStartRes1H3Index: fightHex,
+      tacticalAutoStartH3Index: fightHex,
     }),
   };
   const result = await handleResolveMeleeIntercept(
@@ -693,7 +693,7 @@ async function testHandleResolveMeleeInterceptForwardsTacticalAutoStartOnFight()
     deps
   );
   assert.strictEqual(result.success, true);
-  assert.strictEqual((result as { tacticalAutoStartRes1H3Index?: string }).tacticalAutoStartRes1H3Index, fightHex);
+  assert.strictEqual((result as { tacticalAutoStartH3Index?: string }).tacticalAutoStartH3Index, fightHex);
 }
 
 /**
@@ -701,7 +701,7 @@ async function testHandleResolveMeleeInterceptForwardsTacticalAutoStartOnFight()
 
  * Purpose: Locks Phase E contract that Ignore does not surface tactical auto-start on the IPC completion payload.
  * When to use: Regression guard paired with the Fight forwarding test.
- * Expected outcome: `tacticalAutoStartRes1H3Index` is absent when the mocked resolve result omits it.
+ * Expected outcome: `tacticalAutoStartStrategicH3Index` is absent when the mocked resolve result omits it.
  * Exceptions: None.
  */
 /**
@@ -769,7 +769,7 @@ async function testHandleResolveMeleeInterceptOmitsTacticalAutoStartOnIgnore(): 
     deps
   );
   assert.strictEqual(result.success, true);
-  assert.strictEqual((result as { tacticalAutoStartRes1H3Index?: string }).tacticalAutoStartRes1H3Index, undefined);
+  assert.strictEqual((result as { tacticalAutoStartH3Index?: string }).tacticalAutoStartH3Index, undefined);
 }
 
 async function runAll(): Promise<void> {

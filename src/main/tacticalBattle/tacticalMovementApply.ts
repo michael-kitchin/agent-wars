@@ -12,7 +12,7 @@ import {
 /**
  * Returns a new tactical snapshot with opponent sub-unit positions updated from validated movement orders.
  *
- * Contract: Only `player === 'opponent'` sub-units move; destinations must lie in `battle.res4ChildH3Indexes`; reachability uses §12.4 terrain-weighted paths and terrain-adjusted movement-point budgets from `tacticalTerrainCombatModifiers`.
+ * Contract: Only `player === 'opponent'` sub-units move; destinations must lie in `battle.tacticalChildH3Indexes`; reachability uses §12.4 terrain-weighted paths and terrain-adjusted movement-point budgets from `tacticalTerrainCombatModifiers`.
  * When to use: After `requestOrders` returns movement orders for tactical AI, before mutating `activeTacticalBattle` in the main process.
  * Expected outcome: Immutable copy of `battle` with at most one position change per matched order (later duplicate `unitId` entries in `orders` overwrite earlier ones).
  * Exceptions: None; unknown unit ids or invalid destinations are skipped with trace logs.
@@ -25,11 +25,11 @@ export function projectTacticalSnapshotAfterOpponentMovementOrders(
     battleId: battle.battleId,
     orderCount: orders.length,
   });
-  const res4Set = new Set(battle.res4ChildH3Indexes);
+  const tacticalSet = new Set(battle.tacticalChildH3Indexes);
   const sub: TacticalSubUnitSnapshot[] = battle.subUnits.map((u) => ({ ...u }));
   const byId = new Map(sub.map((u, i) => [u.id, i] as const));
   for (const o of orders) {
-    const outcome = tacticalComputeMovementOrderOutcome({ byId, sub, order: o, res4Set, battle });
+    const outcome = tacticalComputeMovementOrderOutcome({ byId, sub, order: o, tacticalSet, battle });
     if (!outcome.ok) {
       tacticalLogQuery('projectTacticalSnapshotAfterOpponentMovementOrders skip', {
         reason: outcome.reason,
@@ -66,7 +66,7 @@ export function projectTacticalSnapshotAfterOpponentMovementOrders(
 /**
  * Returns a new tactical snapshot with human sub-unit positions updated from validated movement orders.
  *
- * Purpose: Applies human-only march deltas with the same res4 footprint and range rules as opponent projection.
+ * Purpose: Applies human-only march deltas with the same tactical footprint and range rules as opponent projection.
  * When to use: After the main process validates human tactical march IPC, before mutating `activeTacticalBattle`.
  * Expected outcome: Immutable copy of `battle` with at most one position change per matched order (later duplicate `unitId` entries overwrite earlier ones).
  * Exceptions: None; unknown unit ids or invalid destinations are skipped with trace logs.
@@ -79,11 +79,11 @@ export function projectTacticalSnapshotAfterHumanMovementOrders(
     battleId: battle.battleId,
     orderCount: orders.length,
   });
-  const res4Set = new Set(battle.res4ChildH3Indexes);
+  const tacticalSet = new Set(battle.tacticalChildH3Indexes);
   const sub: TacticalSubUnitSnapshot[] = battle.subUnits.map((u) => ({ ...u }));
   const byId = new Map(sub.map((u, i) => [u.id, i] as const));
   for (const o of orders) {
-    const outcome = tacticalComputeHumanMovementOrderOutcome({ byId, sub, order: o, res4Set, battle });
+    const outcome = tacticalComputeHumanMovementOrderOutcome({ byId, sub, order: o, tacticalSet, battle });
     if (!outcome.ok) {
       tacticalLogQuery('projectTacticalSnapshotAfterHumanMovementOrders skip', {
         reason: outcome.reason,

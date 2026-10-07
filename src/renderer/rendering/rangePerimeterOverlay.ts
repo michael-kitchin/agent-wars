@@ -45,7 +45,7 @@ function isRangePerimeterModeActive(): boolean {
 export function buildRangePerimeterSignature(): string {
   if (!isRangePerimeterModeActive()) return '';
   const mode = S.airStrikeModeActive ? 'air' : 'ranged';
-  const battleKey = S.tacticalBattleSnapshot?.enclosingRes1H3Index ?? 'strategic';
+  const battleKey = S.tacticalBattleSnapshot?.enclosingStrategicH3Index ?? 'strategic';
   const ids = [...S.selectedUnitIds].sort().join(',');
   return `${mode}|${battleKey}|${ids}`;
 }
@@ -63,7 +63,7 @@ function computeSelectedRangeHexSetFromState(): Set<string> | null {
 
   const tactical = S.tacticalBattleSnapshot;
   if (tactical) {
-    const footprint = new Set(tactical.res4ChildH3Indexes);
+    const footprint = new Set(tactical.tacticalChildH3Indexes);
     const selected = tactical.subUnits.filter((s) => S.selectedUnitIds.includes(s.id));
     if (selected.length === 0) return null;
     try {

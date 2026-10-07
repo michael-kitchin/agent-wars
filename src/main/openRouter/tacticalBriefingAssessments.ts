@@ -172,7 +172,7 @@ function assessTacticalOpponentUnit(
   });
   const selfH3 = effectiveH3(unit, byId);
   const [lat, lng] = cellToLatLng(selfH3);
-  const footprint = new Set(battle.res4ChildH3Indexes);
+  const footprint = new Set(battle.tacticalChildH3Indexes);
 
   const nearby = humans
     .flatMap((enemy) => {

@@ -26,9 +26,9 @@ import { parseStrategicUnitId } from '../shared/unitIds';
  * Exceptions: None.
  */
 const INFRASTRUCTURE_SYNC_TRIGGER_NAMES = [
-  'res4_sync_res1_after_delete',
-  'res4_sync_res1_after_insert',
-  'res4_sync_res1_after_update',
+  'res_t_sync_res_s_after_delete',
+  'res_t_sync_res_s_after_insert',
+  'res_t_sync_res_s_after_update',
 ] as const;
 
 /**
@@ -170,8 +170,8 @@ function testResetSeedsInfrastructureState(gameDb: typeof import('./gameDb')): v
   try {
     gameDb.openGameDatabaseAtPathForTests(p);
     gameDb.resetGameForNewMatch();
-    const infraRows = gameDb.dbGetOne<{ c: number }>('SELECT COUNT(*) AS c FROM res1_infrastructure');
-    const featureRows = gameDb.dbGetOne<{ c: number }>('SELECT COUNT(*) AS c FROM res4_feature_overrides');
+    const infraRows = gameDb.dbGetOne<{ c: number }>('SELECT COUNT(*) AS c FROM res_s_infrastructure');
+    const featureRows = gameDb.dbGetOne<{ c: number }>('SELECT COUNT(*) AS c FROM res_t_feature_overrides');
     assert.ok((infraRows?.c ?? 0) > 0, 'expected resetGameForNewMatch to seed res1 infrastructure rows');
     assert.ok((featureRows?.c ?? 0) > 0, 'expected resetGameForNewMatch to seed res4 feature rows');
   } finally {
@@ -181,20 +181,20 @@ function testResetSeedsInfrastructureState(gameDb: typeof import('./gameDb')): v
 }
 
 /**
- * Defines the `testRendererRes4OverridesIncludeInfrastructureFeatureRows` function shape (function testRendererRes4OverridesIncludeInfrastructureFeatureRows(gameDb: typeof import('./gameDb')): void).
+ * Defines the `testRendererTacticalOverridesIncludeInfrastructureFeatureRows` function shape (function testRendererTacticalOverridesIncludeInfrastructureFeatureRows(gameDb: typeof import('./gameDb')): void).
 
- * Purpose: Supports maintainability by documenting why `testRendererRes4OverridesIncludeInfrastructureFeatureRows` exists.
+ * Purpose: Supports maintainability by documenting why `testRendererTacticalOverridesIncludeInfrastructureFeatureRows` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-function testRendererRes4OverridesIncludeInfrastructureFeatureRows(gameDb: typeof import('./gameDb')): void {
+function testRendererTacticalOverridesIncludeInfrastructureFeatureRows(gameDb: typeof import('./gameDb')): void {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-gamedb-'));
   const p = path.join(dir, 't.sqlite');
   try {
     gameDb.openGameDatabaseAtPathForTests(p);
     gameDb.resetGameForNewMatch();
-    const rows = gameDb.getRes4TerrainOverridesForRendererFromGame();
+    const rows = gameDb.getTacticalTerrainOverridesForRendererFromGame();
     const airportRows = rows.filter((row) => row.isAirport === true).length;
     const seaportRows = rows.filter((row) => row.isSeaport === true).length;
     assert.ok(airportRows > 0, 'expected renderer override payload to include airport feature rows');
@@ -458,14 +458,14 @@ function testWrongUserVersionRecovers(gameDb: typeof import('./gameDb'), sqliteD
 }
 
 /**
- * Defines the `getRes1CountsDerivedFromRes4` function shape (function getRes1CountsDerivedFromRes4( gameDb: typeof import('./gameDb'), h3Index: string ): { urbanHexCount: number; airportCount: number; seaportCount:).
+ * Defines the `getStrategicCountsDerivedFromTactical` function shape (function getStrategicCountsDerivedFromTactical( gameDb: typeof import('./gameDb'), h3Index: string ): { urbanHexCount: number; airportCount: number; seaportCount:).
 
- * Purpose: Supports maintainability by documenting why `getRes1CountsDerivedFromRes4` exists.
+ * Purpose: Supports maintainability by documenting why `getStrategicCountsDerivedFromTactical` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-function getRes1CountsDerivedFromRes4(
+function getStrategicCountsDerivedFromTactical(
   gameDb: typeof import('./gameDb'),
   h3Index: string
 ): { urbanHexCount: number; airportCount: number; seaportCount: number } {
@@ -473,7 +473,7 @@ function getRes1CountsDerivedFromRes4(
     `SELECT COALESCE(SUM(CASE WHEN is_urban = 1 THEN 1 ELSE 0 END), 0) AS urbanHexCount,
             COALESCE(SUM(CASE WHEN is_airport = 1 THEN 1 ELSE 0 END), 0) AS airportCount,
             COALESCE(SUM(CASE WHEN is_seaport = 1 THEN 1 ELSE 0 END), 0) AS seaportCount
-     FROM res4_feature_overrides
+     FROM res_t_feature_overrides
      WHERE parent_h3_index = ?`,
     [h3Index]
   );
@@ -485,30 +485,30 @@ function getRes1CountsDerivedFromRes4(
 }
 
 /**
- * Defines the `assertRes1MatchesRes4RollupForHex` function shape (function assertRes1MatchesRes4RollupForHex(gameDb: typeof import('./gameDb'), h3Index: string): void).
+ * Defines the `assertStrategicMatchesTacticalRollupForHex` function shape (function assertStrategicMatchesTacticalRollupForHex(gameDb: typeof import('./gameDb'), h3Index: string): void).
 
- * Purpose: Supports maintainability by documenting why `assertRes1MatchesRes4RollupForHex` exists.
+ * Purpose: Supports maintainability by documenting why `assertStrategicMatchesTacticalRollupForHex` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-function assertRes1MatchesRes4RollupForHex(gameDb: typeof import('./gameDb'), h3Index: string): void {
-  const expected = getRes1CountsDerivedFromRes4(gameDb, h3Index);
-  const actual = gameDb.getRes1InfrastructureForHex(h3Index);
+function assertStrategicMatchesTacticalRollupForHex(gameDb: typeof import('./gameDb'), h3Index: string): void {
+  const expected = getStrategicCountsDerivedFromTactical(gameDb, h3Index);
+  const actual = gameDb.getStrategicInfrastructureForHex(h3Index);
   assert.strictEqual(actual.urbanHexCount, expected.urbanHexCount);
   assert.strictEqual(actual.airportCount, expected.airportCount);
   assert.strictEqual(actual.seaportCount, expected.seaportCount);
 }
 
 /**
- * Defines the `testOpenExistingDatabaseReconcilesRes1InfrastructureDrift` function shape (function testOpenExistingDatabaseReconcilesRes1InfrastructureDrift(gameDb: typeof import('./gameDb')): void).
+ * Defines the `testOpenExistingDatabaseReconcilesStrategicInfrastructureDrift` function shape (function testOpenExistingDatabaseReconcilesStrategicInfrastructureDrift(gameDb: typeof import('./gameDb')): void).
 
- * Purpose: Supports maintainability by documenting why `testOpenExistingDatabaseReconcilesRes1InfrastructureDrift` exists.
+ * Purpose: Supports maintainability by documenting why `testOpenExistingDatabaseReconcilesStrategicInfrastructureDrift` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-function testOpenExistingDatabaseReconcilesRes1InfrastructureDrift(gameDb: typeof import('./gameDb')): void {
+function testOpenExistingDatabaseReconcilesStrategicInfrastructureDrift(gameDb: typeof import('./gameDb')): void {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-gamedb-'));
   const p = path.join(dir, 't.sqlite');
   try {
@@ -516,20 +516,20 @@ function testOpenExistingDatabaseReconcilesRes1InfrastructureDrift(gameDb: typeo
     gameDb.resetGameForNewMatch();
     const target = gameDb.dbGetOne<{ h3Index: string }>(
       `SELECT h3_index AS h3Index
-       FROM res1_infrastructure
+       FROM res_s_infrastructure
        WHERE seaport_count > 0 OR airport_count > 0 OR urban_hex_count > 0
        ORDER BY h3_index ASC
        LIMIT 1`
     );
     assert.ok(target?.h3Index, 'expected at least one infrastructure-bearing hex');
     gameDb.dbRun(
-      'UPDATE res1_infrastructure SET urban_hex_count = 0, airport_count = 0, seaport_count = 0 WHERE h3_index = ?',
+      'UPDATE res_s_infrastructure SET urban_hex_count = 0, airport_count = 0, seaport_count = 0 WHERE h3_index = ?',
       [target!.h3Index]
     );
     gameDb.closeGameDatabaseForTests();
 
     gameDb.openGameDatabaseAtPathForTests(p);
-    assertRes1MatchesRes4RollupForHex(gameDb, target!.h3Index);
+    assertStrategicMatchesTacticalRollupForHex(gameDb, target!.h3Index);
   } finally {
     gameDb.closeGameDatabaseForTests();
     fs.rmSync(dir, { recursive: true, force: true });
@@ -537,14 +537,14 @@ function testOpenExistingDatabaseReconcilesRes1InfrastructureDrift(gameDb: typeo
 }
 
 /**
- * Defines the `testRes1InfrastructureStaysInSyncWhenRes4FeaturesChange` function shape (function testRes1InfrastructureStaysInSyncWhenRes4FeaturesChange(gameDb: typeof import('./gameDb')): void).
+ * Defines the `testStrategicInfrastructureStaysInSyncWhenTacticalFeaturesChange` function shape (function testStrategicInfrastructureStaysInSyncWhenTacticalFeaturesChange(gameDb: typeof import('./gameDb')): void).
 
- * Purpose: Supports maintainability by documenting why `testRes1InfrastructureStaysInSyncWhenRes4FeaturesChange` exists.
+ * Purpose: Supports maintainability by documenting why `testStrategicInfrastructureStaysInSyncWhenTacticalFeaturesChange` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-function testRes1InfrastructureStaysInSyncWhenRes4FeaturesChange(gameDb: typeof import('./gameDb')): void {
+function testStrategicInfrastructureStaysInSyncWhenTacticalFeaturesChange(gameDb: typeof import('./gameDb')): void {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-gamedb-'));
   const p = path.join(dir, 't.sqlite');
   try {
@@ -552,26 +552,26 @@ function testRes1InfrastructureStaysInSyncWhenRes4FeaturesChange(gameDb: typeof 
     gameDb.resetGameForNewMatch();
     const targetRows = [
       gameDb.dbGetOne<{ h3Index: string; parentH3Index: string }>(
-        'SELECT h3_index AS h3Index, parent_h3_index AS parentH3Index FROM res4_feature_overrides WHERE is_urban = 1 LIMIT 1'
+        'SELECT h3_index AS h3Index, parent_h3_index AS parentH3Index FROM res_t_feature_overrides WHERE is_urban = 1 LIMIT 1'
       ),
       gameDb.dbGetOne<{ h3Index: string; parentH3Index: string }>(
-        'SELECT h3_index AS h3Index, parent_h3_index AS parentH3Index FROM res4_feature_overrides WHERE is_airport = 1 LIMIT 1'
+        'SELECT h3_index AS h3Index, parent_h3_index AS parentH3Index FROM res_t_feature_overrides WHERE is_airport = 1 LIMIT 1'
       ),
       gameDb.dbGetOne<{ h3Index: string; parentH3Index: string }>(
-        'SELECT h3_index AS h3Index, parent_h3_index AS parentH3Index FROM res4_feature_overrides WHERE is_seaport = 1 LIMIT 1'
+        'SELECT h3_index AS h3Index, parent_h3_index AS parentH3Index FROM res_t_feature_overrides WHERE is_seaport = 1 LIMIT 1'
       ),
     ];
     assert.ok(targetRows[0], 'expected at least one urban res4 feature row');
     assert.ok(targetRows[1], 'expected at least one airport res4 feature row');
     assert.ok(targetRows[2], 'expected at least one seaport res4 feature row');
 
-    gameDb.updateRes4FeatureOverrideRow(targetRows[0]!.h3Index, { isUrban: false, isRubble: true });
-    gameDb.updateRes4FeatureOverrideRow(targetRows[1]!.h3Index, { isAirport: false, isRubble: true });
-    gameDb.updateRes4FeatureOverrideRow(targetRows[2]!.h3Index, { isSeaport: false, isRubble: true });
+    gameDb.updateTacticalFeatureOverrideRow(targetRows[0]!.h3Index, { isUrban: false, isRubble: true });
+    gameDb.updateTacticalFeatureOverrideRow(targetRows[1]!.h3Index, { isAirport: false, isRubble: true });
+    gameDb.updateTacticalFeatureOverrideRow(targetRows[2]!.h3Index, { isSeaport: false, isRubble: true });
 
     const touchedParents = [...new Set(targetRows.map((row) => row!.parentH3Index))];
     for (const parentH3Index of touchedParents) {
-      assertRes1MatchesRes4RollupForHex(gameDb, parentH3Index);
+      assertStrategicMatchesTacticalRollupForHex(gameDb, parentH3Index);
     }
   } finally {
     gameDb.closeGameDatabaseForTests();
@@ -593,9 +593,9 @@ function testOpenExistingDatabaseInstallsInfrastructureSyncTriggers(gameDb: type
   try {
     gameDb.openGameDatabaseAtPathForTests(p);
     gameDb.resetGameForNewMatch();
-    gameDb.dbRun('DROP TRIGGER IF EXISTS res4_sync_res1_after_insert');
-    gameDb.dbRun('DROP TRIGGER IF EXISTS res4_sync_res1_after_delete');
-    gameDb.dbRun('DROP TRIGGER IF EXISTS res4_sync_res1_after_update');
+    gameDb.dbRun('DROP TRIGGER IF EXISTS res_t_sync_res_s_after_insert');
+    gameDb.dbRun('DROP TRIGGER IF EXISTS res_t_sync_res_s_after_delete');
+    gameDb.dbRun('DROP TRIGGER IF EXISTS res_t_sync_res_s_after_update');
     gameDb.closeGameDatabaseForTests();
 
     gameDb.openGameDatabaseAtPathForTests(p);
@@ -603,7 +603,7 @@ function testOpenExistingDatabaseInstallsInfrastructureSyncTriggers(gameDb: type
       `SELECT name
        FROM sqlite_master
        WHERE type = 'trigger'
-         AND name IN ('res4_sync_res1_after_insert', 'res4_sync_res1_after_delete', 'res4_sync_res1_after_update')
+         AND name IN ('res_t_sync_res_s_after_insert', 'res_t_sync_res_s_after_delete', 'res_t_sync_res_s_after_update')
        ORDER BY name ASC`
     ).map((row) => row.name);
     assert.deepStrictEqual(triggerNames, INFRASTRUCTURE_SYNC_TRIGGER_NAMES);
@@ -633,12 +633,12 @@ function findAirStrikeOriginAndTargetForInfrastructureType(
         : 'seaport_count > 0';
   const targetRows = gameDb.dbGetAll<{ h3Index: string }>(
     `SELECT h3_index AS h3Index
-     FROM res1_infrastructure
+     FROM res_s_infrastructure
      WHERE ${targetWhereClause}`
   );
   const originRows = gameDb.dbGetAll<{ h3Index: string }>(
     `SELECT h3_index AS h3Index
-     FROM res1_infrastructure
+     FROM res_s_infrastructure
      WHERE airport_count > 0`
   );
   for (const target of targetRows) {
@@ -656,14 +656,14 @@ function findAirStrikeOriginAndTargetForInfrastructureType(
 }
 
 /**
- * Defines the `testAirStrikeInfrastructureDestructionPreservesRes1Res4Parity` function shape (function testAirStrikeInfrastructureDestructionPreservesRes1Res4Parity().
+ * Defines the `testAirStrikeInfrastructureDestructionPreservesStrategicTacticalParity` function shape (function testAirStrikeInfrastructureDestructionPreservesStrategicTacticalParity().
 
- * Purpose: Supports maintainability by documenting why `testAirStrikeInfrastructureDestructionPreservesRes1Res4Parity` exists.
+ * Purpose: Supports maintainability by documenting why `testAirStrikeInfrastructureDestructionPreservesStrategicTacticalParity` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-function testAirStrikeInfrastructureDestructionPreservesRes1Res4Parity(
+function testAirStrikeInfrastructureDestructionPreservesStrategicTacticalParity(
   gameDb: typeof import('./gameDb'),
   targetType: Exclude<AirStrikeTargetType, 'units'>
 ): void {
@@ -702,7 +702,7 @@ function testAirStrikeInfrastructureDestructionPreservesRes1Res4Parity(
       ],
       'strike and counter-fire rolls are recorded on the target hex'
     );
-    assertRes1MatchesRes4RollupForHex(gameDb, targetH3Index);
+    assertStrategicMatchesTacticalRollupForHex(gameDb, targetH3Index);
   } finally {
     gameDb.closeGameDatabaseForTests();
     fs.rmSync(dir, { recursive: true, force: true });
@@ -787,26 +787,26 @@ function testAllocateNextUnitIdOrdinalThrowsWhenDatabaseClosed(gameDb: typeof im
 }
 
 /**
- * Defines the `testRendererRes4OverridesCacheReflectsDbChanges` function shape (function testRendererRes4OverridesCacheReflectsDbChanges(gameDb)).
+ * Defines the `testRendererTacticalOverridesCacheReflectsDbChanges` function shape (function testRendererTacticalOverridesCacheReflectsDbChanges(gameDb)).
 
  * Purpose: Asserts renderer override fetch contract (stable rows when DB unchanged; updated rows after flag mutation).
- * When to use: Regression guard after changes to `res4RendererOverrideCache.ts`.
- * Expected outcome: Consecutive fetches match before mutation; `isRubble` reflects DB update after `updateRes4FeatureOverrideRow`.
+ * When to use: Regression guard after changes to `tacticalRendererOverrideCache.ts`.
+ * Expected outcome: Consecutive fetches match before mutation; `isRubble` reflects DB update after `updateTacticalFeatureOverrideRow`.
  * Exceptions: None; uses temporary SQLite file under `os.tmpdir()`.
  */
-function testRendererRes4OverridesCacheReflectsDbChanges(gameDb: typeof import('./gameDb')): void {
+function testRendererTacticalOverridesCacheReflectsDbChanges(gameDb: typeof import('./gameDb')): void {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-gamedb-cache-'));
   const p = path.join(dir, 't.sqlite');
   try {
     gameDb.openGameDatabaseAtPathForTests(p);
     gameDb.resetGameForNewMatch();
-    const before = gameDb.getRes4TerrainOverridesForRendererFromGame();
-    const again = gameDb.getRes4TerrainOverridesForRendererFromGame();
+    const before = gameDb.getTacticalTerrainOverridesForRendererFromGame();
+    const again = gameDb.getTacticalTerrainOverridesForRendererFromGame();
     assert.deepStrictEqual(before, again, 'unchanged DB must return equivalent rows');
     const target = before.find((row) => row.isUrban && !row.isRubble);
     assert.ok(target, 'expected an urban row to mutate for cache invalidation test');
-    gameDb.updateRes4FeatureOverrideRow(target!.h3Index, { isRubble: true });
-    const after = gameDb.getRes4TerrainOverridesForRendererFromGame();
+    gameDb.updateTacticalFeatureOverrideRow(target!.h3Index, { isRubble: true });
+    const after = gameDb.getTacticalTerrainOverridesForRendererFromGame();
     const updated = after.find((row) => row.h3Index === target!.h3Index);
     assert.strictEqual(updated?.isRubble, true, 'DB mutation must appear in subsequent fetch');
   } finally {
@@ -838,19 +838,19 @@ function run(): void {
   testResetClearsStandingOrdersAndMemory(gameDb);
   testResetRegeneratesTerrain(gameDb);
   testResetSeedsInfrastructureState(gameDb);
-  testRendererRes4OverridesIncludeInfrastructureFeatureRows(gameDb);
-  testRendererRes4OverridesCacheReflectsDbChanges(gameDb);
+  testRendererTacticalOverridesIncludeInfrastructureFeatureRows(gameDb);
+  testRendererTacticalOverridesCacheReflectsDbChanges(gameDb);
   testUnitDisplayOrderIsIndependentPerPlayer(gameDb);
   testUnitIdOrdinalIsIndependentPerPlayerAndResets(gameDb);
   testAllocateNextUnitIdOrdinalThrowsWhenDatabaseClosed(gameDb);
   testScenarioHomeRegionListIsSortedUnique(gameDb);
   testResetNormalizesInvalidScenarioHomeRegions(gameDb);
-  testOpenExistingDatabaseReconcilesRes1InfrastructureDrift(gameDb);
+  testOpenExistingDatabaseReconcilesStrategicInfrastructureDrift(gameDb);
   testOpenExistingDatabaseInstallsInfrastructureSyncTriggers(gameDb);
-  testRes1InfrastructureStaysInSyncWhenRes4FeaturesChange(gameDb);
-  testAirStrikeInfrastructureDestructionPreservesRes1Res4Parity(gameDb, 'urban');
-  testAirStrikeInfrastructureDestructionPreservesRes1Res4Parity(gameDb, 'airport');
-  testAirStrikeInfrastructureDestructionPreservesRes1Res4Parity(gameDb, 'seaport');
+  testStrategicInfrastructureStaysInSyncWhenTacticalFeaturesChange(gameDb);
+  testAirStrikeInfrastructureDestructionPreservesStrategicTacticalParity(gameDb, 'urban');
+  testAirStrikeInfrastructureDestructionPreservesStrategicTacticalParity(gameDb, 'airport');
+  testAirStrikeInfrastructureDestructionPreservesStrategicTacticalParity(gameDb, 'seaport');
   testSeededUnitsUseRegionalSpawnContracts(gameDb);
   testFogOfWarToggleVisibilityContract(gameDb);
   testHomeRegionVisibilityAndInitialControlContracts(gameDb);

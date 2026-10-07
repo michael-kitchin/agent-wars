@@ -43,11 +43,11 @@ export type BestOptionsInterestIndex = {
    */
   friendlyUnitsByHex: ReadonlyMap<string, ReadonlyArray<{ id: string; unitType: string }>>;
   /**
-   * Res1 controller by hex; `null` / missing means uncontrolled.
+   * Strategic controller by hex; `null` / missing means uncontrolled.
    *
    * Contract: Missing keys are treated as `null`.
    * When to use: Strategic interesting-infrastructure control check.
-   * Expected outcome: Same mapping as snapshot `res1Control`.
+   * Expected outcome: Same mapping as snapshot `strategicControl`.
    * Exceptions: None.
    */
   controlByHex: ReadonlyMap<string, string | null>;
@@ -56,7 +56,7 @@ export type BestOptionsInterestIndex = {
    *
    * Contract: Missing keys are treated as zeros.
    * When to use: Strategic interesting-infrastructure presence.
-   * Expected outcome: Same mapping as snapshot `res1Infrastructure`.
+   * Expected outcome: Same mapping as snapshot `strategicInfrastructure`.
    * Exceptions: None.
    */
   infraByHex: ReadonlyMap<string, { urban: number; seaport: number; airport: number }>;
@@ -67,11 +67,11 @@ export type BestOptionsInterestIndex = {
  *
  * Purpose: Lets ground-move and ranged this-turn filters share one `rowByH3` map without repeating the override shape.
  * When to use: `TacticalBestOptionsInterestContext` and `keepsTacticalBestOptionsThisTurnHex` only.
- * Expected outcome: Matches `listRes4FeatureOverridesForGame` fields consumed by the interest predicate.
+ * Expected outcome: Matches `listTacticalFeatureOverridesForGame` fields consumed by the interest predicate.
  * Exceptions: None.
  */
 export type TacticalBestOptionsFeatureRow = {
-  /** Res4 index this override describes. */
+  /** Tactical index this override describes. */
   h3Index: string;
   /** True when the override marks an intact urban tile. */
   isUrban: boolean;
@@ -88,21 +88,21 @@ export type TacticalBestOptionsFeatureRow = {
  *
  * Purpose: Keeps ground-move and ranged filters on one occupancy/control rule without growing argument lists.
  * When to use: `filterTacticalGroundMoveHexesForThisTurnOptionsTable` and `filterTacticalRangedHexesForThisTurnOptionsTable`.
- * Expected outcome: Callers pass sets and the enclosing res1 controller once per `collectAggregatedPossibleActionRows` invocation.
+ * Expected outcome: Callers pass sets and the enclosing strategic controller once per `collectAggregatedPossibleActionRows` invocation.
  * Exceptions: None.
  */
 export type TacticalBestOptionsInterestContext = {
   /**
    * Tactical battle snapshot used for occupancy and snapshot-map infra flags.
    *
-   * Contract: `subUnits` and optional `res4IsUrbanByH3` / `res4IsSeaportByH3` must match the briefing battle.
+   * Contract: `subUnits` and optional `tacticalIsUrbanByH3` / `tacticalIsSeaportByH3` must match the briefing battle.
    * When to use: Building interest context once per `collectAggregatedPossibleActionRows` call.
    * Expected outcome: Same battle object the legal-move collectors already received.
    * Exceptions: None.
    */
   battle: TacticalBattleSnapshot;
   /**
-   * Res4 cells occupied by human sub-units.
+   * Tactical cells occupied by human sub-units.
    *
    * Contract: Presence is the tactical enemy-occupied signal.
    * When to use: Tactical interest and approach nearest-enemy set.
@@ -111,7 +111,7 @@ export type TacticalBestOptionsInterestContext = {
    */
   humanOccupiedH3: ReadonlySet<string>;
   /**
-   * Res4 cells occupied by AI sub-units.
+   * Tactical cells occupied by AI sub-units.
    *
    * Contract: Presence blocks interesting infra unless the cell is also human-occupied.
    * When to use: Tactical interesting-infrastructure occupancy.
@@ -120,20 +120,20 @@ export type TacticalBestOptionsInterestContext = {
    */
   friendlyOccupiedH3: ReadonlySet<string>;
   /**
-   * Controller of the enclosing res1 cell (`null` when uncontrolled).
+   * Controller of the enclosing strategic cell (`null` when uncontrolled).
    *
    * Contract: Matches strategic `controller === null` for infrastructure interest.
    * When to use: Tactical interesting-infrastructure control check.
-   * Expected outcome: `indexed.controlByHex.get(enclosingRes1H3Index) ?? null`.
+   * Expected outcome: `indexed.controlByHex.get(enclosingStrategicH3Index) ?? null`.
    * Exceptions: None.
    */
   enclosingController: string | null;
   /**
-   * Feature-override rows keyed by res4 hex.
+   * Feature-override rows keyed by tactical hex.
    *
    * Contract: Missing keys mean no override; rubble rows are not interesting infra.
    * When to use: Tactical urban/airport/seaport detection alongside snapshot maps.
-   * Expected outcome: Footprint overrides for the enclosing res1 only.
+   * Expected outcome: Footprint overrides for the enclosing strategic only.
    * Exceptions: None.
    */
   rowByH3: ReadonlyMap<string, TacticalBestOptionsFeatureRow>;
@@ -208,7 +208,7 @@ function nearestEnemyUnitIdsSummary(indexed: BestOptionsInterestIndex, fromH3: s
 }
 
 /**
- * Restricts **Best Options This Turn** move/melee rows to enemy-occupied hexes or uncontrolled res1 cells that still show urban, airport, or seaport infrastructure and are not friendly-occupied.
+ * Restricts **Best Options This Turn** move/melee rows to enemy-occupied hexes or uncontrolled strategic cells that still show urban, airport, or seaport infrastructure and are not friendly-occupied.
  *
  * Purpose: Strategic interest filter for the Commander Best Options table (same shape as tactical: enemy ∪ interesting infra).
  * When to use: Only from `collectAggregatedPossibleActionRows` when `forThisTurnOptionsTable` is true for non-air units in **strategic** mode (air ferry lists skip this filter).
@@ -242,15 +242,15 @@ export function filterGroundMoveHexesForThisTurnOptionsTable(
  *
  * Purpose: Matches strategic `controller === null` for infrastructure while never listing friendly-occupied cities as Best Options.
  * When to use: Tactical this-turn ground-move and ranged hex filters only.
- * Expected outcome: True for human-occupied cells; true for urban/airport/seaport only when the enclosing res1 is uncontrolled and no friendly sub-unit occupies the cell.
+ * Expected outcome: True for human-occupied cells; true for urban/airport/seaport only when the enclosing strategic is uncontrolled and no friendly sub-unit occupies the cell.
  * Exceptions: None.
  */
 function keepsTacticalBestOptionsThisTurnHex(h3: string, ctx: TacticalBestOptionsInterestContext): boolean {
   const enemyOccupied = ctx.humanOccupiedH3.has(h3);
   const row = ctx.rowByH3.get(h3);
   const hasInfra =
-    !!ctx.battle.res4IsUrbanByH3?.[h3] ||
-    !!ctx.battle.res4IsSeaportByH3?.[h3] ||
+    !!ctx.battle.tacticalIsUrbanByH3?.[h3] ||
+    !!ctx.battle.tacticalIsSeaportByH3?.[h3] ||
     (!!row && !row.isRubble && (row.isUrban || row.isAirport || row.isSeaport));
   const interestingInfrastructure =
     ctx.enclosingController === null && hasInfra && !ctx.friendlyOccupiedH3.has(h3);
@@ -258,9 +258,9 @@ function keepsTacticalBestOptionsThisTurnHex(h3: string, ctx: TacticalBestOption
 }
 
 /**
- * Restricts tactical Best Options move/melee rows to human-occupied res4 cells or uncontrolled urban/airport/seaport infrastructure.
+ * Restricts tactical Best Options move/melee rows to human-occupied tactical cells or uncontrolled urban/airport/seaport infrastructure.
  *
- * Purpose: Same Best Options interest shape as strategic (`keepsBestOptionsThisTurnInterestHex`) using enclosing-res1 control plus occupancy.
+ * Purpose: Same Best Options interest shape as strategic (`keepsBestOptionsThisTurnInterestHex`) using enclosing-strategic control plus occupancy.
  * When to use: Only from `collectAggregatedPossibleActionRows` when `forThisTurnOptionsTable` and `tacticalBattle` are set for non-air units.
  * Expected outcome: Subset of `hexes` in caller iteration order; friendly-occupied cities are dropped so approach fallback can run.
  * Exceptions: None.
@@ -374,9 +374,9 @@ export function applyInterestOrApproach(args: {
 }
 
 /**
- * Describes res4 urban/airport/seaport on a tactical Best Options target hex.
+ * Describes tactical urban/airport/seaport on a tactical Best Options target hex.
  *
- * Purpose: Target Infrastructure must match the same flags the tactical interest filter uses; strategic res1 infra maps are keyed by the parent hex, not res4 children.
+ * Purpose: Target Infrastructure must match the same flags the tactical interest filter uses; strategic infra maps are keyed by the parent hex, not tactical children.
  * When to use: `appendRowsForLegalHexes` for tactical this-turn rows.
  * Expected outcome: Comma-separated `urban` / `seaport` / `airport`, or `—` when none remain.
  * Exceptions: None.
@@ -386,11 +386,11 @@ export function describeTacticalBestOptionsInfrastructure(
   ctx: TacticalBestOptionsInterestContext
 ): string {
   const row = ctx.rowByH3.get(h3);
-  const rubble = !!ctx.battle.res4IsRubbleByH3?.[h3] || !!row?.isRubble;
+  const rubble = !!ctx.battle.tacticalIsRubbleByH3?.[h3] || !!row?.isRubble;
   if (rubble) return '—';
   const parts: string[] = [];
-  if (ctx.battle.res4IsUrbanByH3?.[h3] || row?.isUrban) parts.push('urban');
-  if (ctx.battle.res4IsSeaportByH3?.[h3] || row?.isSeaport) parts.push('seaport');
+  if (ctx.battle.tacticalIsUrbanByH3?.[h3] || row?.isUrban) parts.push('urban');
+  if (ctx.battle.tacticalIsSeaportByH3?.[h3] || row?.isSeaport) parts.push('seaport');
   if (row?.isAirport) parts.push('airport');
   return parts.length > 0 ? parts.join(', ') : '—';
 }
@@ -398,7 +398,7 @@ export function describeTacticalBestOptionsInfrastructure(
 /**
  * Urban presence used to rank tactical Best Options rows (0 or 1).
  *
- * Purpose: Per-unit capping still prefers urban capture when approach is not in play; res1 `urbanHexCount` is the wrong key at res4.
+ * Purpose: Per-unit capping still prefers urban capture when approach is not in play; strategic `urbanHexCount` is the wrong key at tactical.
  * When to use: `appendRowsForLegalHexes` for tactical this-turn rows.
  * Expected outcome: `1` when `describeTacticalBestOptionsInfrastructure` includes urban; otherwise `0`.
  * Exceptions: None.
@@ -433,7 +433,7 @@ export function filterStrategicAirStrikeHexesForThisTurnOptionsTable(
 }
 
 /**
- * Drops non-enemy res4 air-strike targets from the Best Options This Turn table.
+ * Drops non-enemy tactical air-strike targets from the Best Options This Turn table.
  *
  * Purpose: Same tempo-rule filter as tactical ranged: empty urban tiles must not appear as this-beat strikes. Callers pass the battle footprint (not the strategic 3-hex disk).
  * When to use: Only from `collectAggregatedPossibleActionRows` when `forThisTurnOptionsTable` and `tacticalBattle` are set, after listing footprint hexes.
@@ -455,10 +455,10 @@ export function filterTacticalAirStrikeHexesForThisTurnOptionsTable(
 }
 
 /**
- * Drops non-enemy res4 ranged targets from the Best Options This Turn table.
+ * Drops non-enemy tactical ranged targets from the Best Options This Turn table.
  *
  * Purpose: Legal infra-only shots stay valid at order validation; the Commander table must not list empty-city / road shots that crowd out approaching observed humans (tempo rule says shoot if listed).
- * When to use: Only from `collectAggregatedPossibleActionRows` after `collectTacticalLegalRangedTargetRes4Hexes` when `forThisTurnOptionsTable` and `tacticalBattle` are set.
+ * When to use: Only from `collectAggregatedPossibleActionRows` after `collectTacticalLegalRangedTargetTacticalHexes` when `forThisTurnOptionsTable` and `tacticalBattle` are set.
  * Expected outcome: Subset of `hexes` that are human-occupied.
  * Exceptions: None.
  */

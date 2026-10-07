@@ -13,9 +13,9 @@ import {
   resolutionAnimationElapsedMs,
   type ResolutionPlaybackState,
 } from '../rendering/resolutionPlayback';
-import { hexCenterPx, hitTestHexAtContainerPixel, hitTestTacticalRes4HexAtContainerPixel } from './mapHelpers';
+import { hexCenterPx, hitTestHexAtContainerPixel, hitTestTacticalHexAtContainerPixel } from './mapHelpers';
 import { getMainLeafletMap } from './worldLeafletMap';
-import { shouldHideStrategicMapUnitsForRes4Zoom } from './terrainView';
+import { shouldHideStrategicMapUnitsForZoom } from './terrainView';
 
 /**
  * Documents the `DrawInteractionDeps` interface as a named contract surface (interface DrawInteractionDeps).
@@ -278,12 +278,12 @@ export function updateMapInteractionCursor(clientX: number, clientY: number, dep
     const py = clientY - rect.top;
     const hexSet = new Set(S.gameState.hexes.map((h) => h.h3Index));
     const tb = S.tacticalBattleSnapshot;
-    const hit = tb ? hitTestTacticalRes4HexAtContainerPixel(px, py, tb) : hitTestHexAtContainerPixel(px, py, hexSet);
+    const hit = tb ? hitTestTacticalHexAtContainerPixel(px, py, tb) : hitTestHexAtContainerPixel(px, py, hexSet);
     if (hit) {
       const { unitsToDraw, movingIds } = getUnitsForDrawWithMovingIds(S.gameState, deps);
       const drawnAtHit = unitsToDraw.filter((u) => u.h3Index === hit && !movingIds?.has(u.id));
       if (
-        !shouldHideStrategicMapUnitsForRes4Zoom() &&
+        !shouldHideStrategicMapUnitsForZoom() &&
         drawnAtHit.length > 0 &&
         containerPixelHitsDrawnUnitIcon(px, py, hit, drawnAtHit.length)
       ) {

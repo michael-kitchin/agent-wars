@@ -48,14 +48,14 @@ h3Index: string;
 }
 
 /**
- * Documents the `Res4TerrainOverrideRow` interface as a named contract surface (export interface Res4TerrainOverrideRow).
+ * Documents the `TacticalTerrainOverrideRow` interface as a named contract surface (export interface TacticalTerrainOverrideRow).
 
- * Purpose: Supports maintainability by documenting why `Res4TerrainOverrideRow` exists.
+ * Purpose: Supports maintainability by documenting why `TacticalTerrainOverrideRow` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export interface Res4TerrainOverrideRow {
+export interface TacticalTerrainOverrideRow {
     /**
    * Specifies the contract for the `h3Index` member (h3Index: string;).
 
@@ -113,14 +113,14 @@ isRubble?: boolean;
 }
 
 /**
- * Documents the `Res4CityOverlayRow` interface as a named contract surface (export interface Res4CityOverlayRow).
+ * Documents the `TacticalCityOverlayRow` interface as a named contract surface (export interface TacticalCityOverlayRow).
 
- * Purpose: Bundles a res4 hex key with the reduced city label shown only during map inspection while res4 is active.
- * When to use: IPC payloads from `game:getRes4CityOverlays` and renderer cache hydration.
+ * Purpose: Bundles a tactical hex key with the reduced city label shown only during map inspection while tactical is active.
+ * When to use: IPC payloads from `game:getTacticalCityOverlays` and renderer cache hydration.
  * Expected outcome: `label` is already filtered to scalerank 0..4 ties per the naming reduction contract.
  * Exceptions: None.
  */
-export interface Res4CityOverlayRow {
+export interface TacticalCityOverlayRow {
     /**
    * Specifies the contract for the `h3Index` member (h3Index: string;).
 
@@ -142,14 +142,14 @@ label: string;
 }
 
 /**
- * Documents the `Res4RoadRailOverlayRow` interface as a named contract surface (export interface Res4RoadRailOverlayRow).
+ * Documents the `TacticalRoadRailOverlayRow` interface as a named contract surface (export interface TacticalRoadRailOverlayRow).
 
  * Purpose: Exposes boolean side masks for tactical road/rail glyphs aligned to the exported side ordering contract.
- * When to use: IPC payloads from `game:getRes4RoadRailOverlays` after startup load of `terrain_res4_road_rail_sides.json`.
+ * When to use: IPC payloads from `game:getTacticalRoadRailOverlays` after startup load of `terrain_res4_road_rail_sides.json`.
  * Expected outcome: `roadSides` and `railSides` share equal length 5 or 6 and align index-by-index to canonical sides.
  * Exceptions: None.
  */
-export interface Res4RoadRailOverlayRow {
+export interface TacticalRoadRailOverlayRow {
     /**
    * Specifies the contract for the `h3Index` member (h3Index: string;).
 
@@ -180,14 +180,14 @@ railSides: boolean[];
 }
 
 /**
- * Documents the `Res4TransportVectorOverlayRow` interface as a named contract surface (export interface Res4TransportVectorOverlayRow).
+ * Documents the `TacticalTransportVectorOverlayRow` interface as a named contract surface (export interface TacticalTransportVectorOverlayRow).
 
  * Purpose: Carries display-only road/rail polyline geometry for the optional Leaflet transport vector overlay.
- * When to use: IPC payloads from `game:getRes4TransportVectorOverlays` when `terrain_res4_road_rail_vectors.json` is bundled.
+ * When to use: IPC payloads from `game:getTacticalTransportVectorOverlays` when `terrain_res4_road_rail_vectors.json` is bundled.
  * Expected outcome: `kind` selects styling (`road` or `rail`), and `points` contains ordered WGS84 `[lat, lng]` pairs.
  * Exceptions: None.
  */
-export interface Res4TransportVectorOverlayRow {
+export interface TacticalTransportVectorOverlayRow {
     /**
    * Specifies the contract for the `kind` member (kind: 'road' | 'rail';).
 
@@ -209,25 +209,25 @@ points: [number, number][];
 }
 
 /**
- * One res1 hex and the generated urban-cell count that sets the tech tier of units born there.
+ * One strategic hex and the generated urban-cell count that sets the tech tier of units born there.
  *
  * Purpose: The renderer classifies a hex without using the live production count, which air strikes can lower.
- * When to use: IPC payloads from `game:getRes1BaselineUrbanHexCounts`.
+ * When to use: IPC payloads from `game:getStrategicBaselineUrbanHexCounts`.
  * Expected outcome: `urbanHexCount` is an integer of at least 1. Hexes that produce nothing are absent.
  * Exceptions: None.
  */
-export interface Res1BaselineUrbanHexCountRow {
+export interface StrategicBaselineUrbanHexCountRow {
   /**
-   * Res1 hex this count belongs to.
+   * Strategic hex this count belongs to.
    *
    * Contract: The parent hex id used by tooltips and the build popup.
    * When to use: As the map key after hydration.
-   * Expected outcome: A non-empty res1 H3 index.
+   * Expected outcome: A non-empty strategic H3 index.
    * Exceptions: None.
    */
   h3Index: string;
   /**
-   * Generated urban res4 cells inside the hex.
+   * Generated urban tactical cells inside the hex.
    *
    * Contract: The baseline used to classify Basic and Advanced. It does not fall when cities are destroyed.
    * When to use: `formatProducedUnitTechLineHtml`.

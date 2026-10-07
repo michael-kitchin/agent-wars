@@ -11,7 +11,7 @@ import { getActiveTacticalBattleSnapshotRef } from './activeTacticalBattleRef';
 import { tacticalLogQuery } from './tacticalLogging';
 
 /**
- * Returns sealift UI state for one res4 stack hex from the committed tactical snapshot (human sub-units only).
+ * Returns sealift UI state for one tactical stack hex from the committed tactical snapshot (human sub-units only).
  *
  * Purpose: Enables the renderer stack callout during tactical battles while `updateSealiftSlot` is blocked on the strategic path.
  * When to use: `gameActions.getTacticalSealiftStackState` IPC when `isTacticalBattleActive()` and the hex lies in the tactical footprint.
@@ -23,13 +23,13 @@ export function getTacticalSealiftStackStateForHex(h3Index: string): SealiftStac
   const empty = emptySealiftStackState(h3Index);
   const snap = getActiveTacticalBattleSnapshotRef();
   if (!snap) return empty;
-  const footprint = new Set(snap.res4ChildH3Indexes);
+  const footprint = new Set(snap.tacticalChildH3Indexes);
   if (!footprint.has(h3Index)) return empty;
   return buildTacticalSealiftStackStateFromSnapshot(snap, h3Index);
 }
 
 /**
- * Builds `SealiftStackState` rows for human mixed land/naval stacks at one tactical res4 hex.
+ * Builds `SealiftStackState` rows for human mixed land/naval stacks at one tactical hex.
  *
  * Purpose: Shared implementation for tactical sealift IPC without coupling sealift DB assignment readers to sub-unit ids.
  * When to use: `getTacticalSealiftStackStateForHex` and tactical sealift slot IPC after session and footprint guards succeed.

@@ -15,7 +15,7 @@ import {
   type OrderPreviewRangedTerrainBattle,
 } from '../shared/orderPreviewEffectsTooltip';
 import { TOOLTIP_SECTION_GAP_HTML } from '../shared/tooltipSectionGap';
-import { tacticalRes4Cell } from './tacticalBattle/testSupport/tacticalRes4HexFixtures';
+import { tacticalCell } from './tacticalBattle/testSupport/tacticalHexFixtures';
 
 const snowIcon = '<img class="weather-icon" src="weather/snow.svg" alt="" aria-hidden="true" />Snow';
 const rainIcon = '<img class="weather-icon" src="weather/rain.svg" alt="" aria-hidden="true" />Rain';
@@ -88,11 +88,11 @@ test('resolveOrderPreviewEffectsTooltipHtml names snow when it shortens a strate
 });
 
 test('resolveOrderPreviewEffectsTooltipHtml names the attacker cell and unit-hex weather for a ranged shot', () => {
-  const cell = tacticalRes4Cell(43, 53);
+  const cell = tacticalCell(43, 53);
   const rangedBattle = {
     strategicHexTerrain: 'land',
     strategicHexTerrainKind: 'plains',
-    res4TerrainKindByH3: { [cell]: 'forest' },
+    tacticalTerrainKindByH3: { [cell]: 'forest' },
     subUnits: [
       {
         id: 'armor-1',

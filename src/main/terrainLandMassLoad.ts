@@ -2,8 +2,8 @@
 
 import { readJsonFileOrThrow } from './jsonFileHelpers';
 import { logDebug, logTrace } from './logger';
-import type { Res1LandMassRecord } from '../shared/landTraversalRes1';
-import { resolveTerrainRes1LandMassPath } from './terrainMetadataPaths';
+import type { StrategicLandMassRecord } from '../shared/landTraversalStrategic';
+import { resolveTerrainStrategicLandMassPath } from './terrainMetadataPaths';
 
 /**
  * Documents the module-scope binding `EXPECTED_LANDMASS_SCHEMA_VERSION` (EXPECTED_LANDMASS_SCHEMA_VERSION).
@@ -54,7 +54,7 @@ export interface LandMassPolygonSource {
   /**
    * Property name on Natural Earth features used as stable numeric ids.
    *
-   * Contract: Names the id column joined into res1 landmass records.
+   * Contract: Names the id column joined into strategic landmass records.
    * When to use: Cross-referencing ``continentIds`` / ``islandIds`` with source GIS data.
    * Expected outcome: ``NE_ID`` for production v2 exports.
    * Exceptions: None.
@@ -74,16 +74,16 @@ export interface LandMassPolygonSource {
 /**
  * Documents the `LandMassWaterPctSource` interface as a named contract surface (export interface LandMassWaterPctSource).
 
- * Purpose: Describes how res1 ``water_pct`` was derived in v2 landmass JSON.
+ * Purpose: Describes how strategic ``water_pct`` was derived in v2 landmass JSON.
  * When to use: Loader DEBUG logs and pipeline documentation cross-checks.
- * Expected outcome: Names res4 metadata dependency and aggregation method.
+ * Expected outcome: Names tactical metadata dependency and aggregation method.
  * Exceptions: None.
  */
 export interface LandMassWaterPctSource {
   /**
-   * Aggregation method used to derive res1 ``water_pct`` from res4 child cells.
+   * Aggregation method used to derive strategic ``water_pct`` from tactical child cells.
    *
-   * Contract: Names the Python reducer applied across res4 metadata.
+   * Contract: Names the Python reducer applied across tactical metadata.
    * When to use: Loader DEBUG logs and landmass pipeline documentation.
    * Expected outcome: Stable method label matching v2 export metadata.
    * Exceptions: None.
@@ -94,21 +94,21 @@ export interface LandMassWaterPctSource {
    *
    * Contract: Read-only list of generated data file names or logical dependencies.
    * When to use: Verifying regeneration order for v2 landmass exports.
-   * Expected outcome: Includes res4 terrain metadata paths used by the Python pipeline.
+   * Expected outcome: Includes tactical terrain metadata paths used by the Python pipeline.
    * Exceptions: None.
    */
   requires: readonly string[];
 }
 
 /**
- * Documents the `Res1LandMassEnvelope` interface as a named contract surface (export interface Res1LandMassEnvelope).
+ * Documents the `StrategicLandMassEnvelope` interface as a named contract surface (export interface StrategicLandMassEnvelope).
 
- * Purpose: Supports maintainability by documenting why `Res1LandMassEnvelope` exists.
+ * Purpose: Supports maintainability by documenting why `StrategicLandMassEnvelope` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export interface Res1LandMassEnvelope {
+export interface StrategicLandMassEnvelope {
     /**
    * Specifies the contract for the `schema_version` member (schema_version: string;).
 
@@ -148,9 +148,9 @@ polygon_source?: LandMassPolygonSource;
   /**
    * Specifies the contract for the `water_pct_source` member (water_pct_source?: LandMassWaterPctSource;).
 
-   * Contract: Optional v2 provenance for res4-derived water fraction.
+   * Contract: Optional v2 provenance for tactical-derived water fraction.
    * When to use: After schema 2.0.0 landmass regeneration.
-   * Expected outcome: Documents res4 metadata dependency for ``water_pct``.
+   * Expected outcome: Documents tactical metadata dependency for ``water_pct``.
    * Exceptions: None.
    */
 water_pct_source?: LandMassWaterPctSource;
@@ -173,25 +173,25 @@ island_min_area_km2: number;
    */
 record_count: number;
     /**
-   * Specifies the contract for the `records` member (records: Res1LandMassJsonRecord[];).
+   * Specifies the contract for the `records` member (records: StrategicLandMassJsonRecord[];).
 
    * Contract: Describes stable behavior for callers of `records` in this codebase.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-records: Res1LandMassJsonRecord[];
+records: StrategicLandMassJsonRecord[];
 }
 
 /**
- * Documents the `Res1LandMassJsonRecord` interface as a named contract surface (export interface Res1LandMassJsonRecord).
+ * Documents the `StrategicLandMassJsonRecord` interface as a named contract surface (export interface StrategicLandMassJsonRecord).
 
- * Purpose: Supports maintainability by documenting why `Res1LandMassJsonRecord` exists.
+ * Purpose: Supports maintainability by documenting why `StrategicLandMassJsonRecord` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export interface Res1LandMassJsonRecord {
+export interface StrategicLandMassJsonRecord {
     /**
    * Specifies the contract for the `h3_index` member (h3_index: string;).
 
@@ -231,14 +231,14 @@ island_ids: number[];
 }
 
 /**
- * Defines the `parseRes1LandMassEnvelope` function shape (export function parseRes1LandMassEnvelope(parsed: unknown): Res1LandMassEnvelope).
+ * Defines the `parseStrategicLandMassEnvelope` function shape (export function parseStrategicLandMassEnvelope(parsed: unknown): StrategicLandMassEnvelope).
 
- * Purpose: Supports maintainability by documenting why `parseRes1LandMassEnvelope` exists.
+ * Purpose: Supports maintainability by documenting why `parseStrategicLandMassEnvelope` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function parseRes1LandMassEnvelope(parsed: unknown): Res1LandMassEnvelope {
+export function parseStrategicLandMassEnvelope(parsed: unknown): StrategicLandMassEnvelope {
   logTrace('terrainLandMassLoad parseRes1LandMassEnvelope');
   if (!parsed || typeof parsed !== 'object') {
     throw new Error('landmass JSON: expected object envelope');
@@ -273,7 +273,7 @@ export function parseRes1LandMassEnvelope(parsed: unknown): Res1LandMassEnvelope
     );
   }
 
-  const records: Res1LandMassJsonRecord[] = [];
+  const records: StrategicLandMassJsonRecord[] = [];
   const seenH3 = new Set<string>();
   for (const row of recordsRaw) {
     if (!row || typeof row !== 'object') {
@@ -327,7 +327,7 @@ export function parseRes1LandMassEnvelope(parsed: unknown): Res1LandMassEnvelope
  * Parses optional v2 polygon provenance from a landmass envelope object.
  *
  * Purpose: Surface geography-region export metadata to callers without failing on absent fields.
- * When to use: Inside ``parseRes1LandMassEnvelope`` after schema version check.
+ * When to use: Inside ``parseStrategicLandMassEnvelope`` after schema version check.
  * Expected outcome: Undefined when missing or malformed; structured object when valid.
  * Exceptions: None.
  */
@@ -360,8 +360,8 @@ function parsePolygonSource(raw: unknown): LandMassPolygonSource | undefined {
 /**
  * Parses optional v2 water-percent provenance from a landmass envelope object.
  *
- * Purpose: Document res4 metadata sourcing for ``water_pct`` in loader diagnostics.
- * When to use: Inside ``parseRes1LandMassEnvelope`` after schema version check.
+ * Purpose: Document tactical metadata sourcing for ``water_pct`` in loader diagnostics.
+ * When to use: Inside ``parseStrategicLandMassEnvelope`` after schema version check.
  * Expected outcome: Undefined when missing or malformed; structured object when valid.
  * Exceptions: None.
  */
@@ -378,7 +378,7 @@ function parseWaterPctSource(raw: unknown): LandMassWaterPctSource | undefined {
  * Resolves island minimum area from v2 ``polygon_source`` or legacy v1 root field.
  *
  * Purpose: Keep loader compatible while envelope layout moves under ``polygon_source``.
- * When to use: Building ``Res1LandMassEnvelope`` from parsed JSON.
+ * When to use: Building ``StrategicLandMassEnvelope`` from parsed JSON.
  * Expected outcome: Numeric km² threshold; zero when neither source is present.
  * Exceptions: None.
  */
@@ -389,16 +389,16 @@ function resolveIslandMinAreaKm2(env: Record<string, unknown>): number {
 }
 
 /**
- * Defines the `buildRes1LandMassByH3` function shape (export function buildRes1LandMassByH3(envelope: Res1LandMassEnvelope): Map<string, Res1LandMassRecord>).
+ * Defines the `buildStrategicLandMassByH3` function shape (export function buildStrategicLandMassByH3(envelope: StrategicLandMassEnvelope): Map<string, StrategicLandMassRecord>).
 
- * Purpose: Supports maintainability by documenting why `buildRes1LandMassByH3` exists.
+ * Purpose: Supports maintainability by documenting why `buildStrategicLandMassByH3` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function buildRes1LandMassByH3(envelope: Res1LandMassEnvelope): Map<string, Res1LandMassRecord> {
+export function buildStrategicLandMassByH3(envelope: StrategicLandMassEnvelope): Map<string, StrategicLandMassRecord> {
   logDebug('terrainLandMassLoad buildRes1LandMassByH3', { recordCount: envelope.record_count });
-  const out = new Map<string, Res1LandMassRecord>();
+  const out = new Map<string, StrategicLandMassRecord>();
   for (const row of envelope.records) {
     out.set(row.h3_index, {
       h3Index: row.h3_index,
@@ -411,30 +411,30 @@ export function buildRes1LandMassByH3(envelope: Res1LandMassEnvelope): Map<strin
 }
 
 /**
- * Loads and validates a res1 land-mass JSON file.
+ * Loads and validates a strategic land-mass JSON file.
  *
  * Purpose: Entry point for strategic land-mass data on disk.
  * When to use: Bundled load and any caller that already has an absolute land-mass path.
  * Expected outcome: Parsed land-mass envelope.
  * Exceptions: Rethrows read and parse failures. Throws when the envelope fails validation.
  */
-export function loadTerrainRes1LandMassFromPath(absPath: string): Res1LandMassEnvelope {
+export function loadTerrainStrategicLandMassFromPath(absPath: string): StrategicLandMassEnvelope {
   logDebug('terrainLandMassLoad loadTerrainRes1LandMassFromPath', { absPath });
   const parsed = readJsonFileOrThrow(absPath, 'terrainLandMassLoad loadTerrainRes1LandMassFromPath');
-  return parseRes1LandMassEnvelope(parsed);
+  return parseStrategicLandMassEnvelope(parsed);
 }
 
 /**
- * Defines the `loadTerrainRes1LandMassBundled` function shape (export function loadTerrainRes1LandMassBundled(): Res1LandMassEnvelope).
+ * Defines the `loadTerrainStrategicLandMassBundled` function shape (export function loadTerrainStrategicLandMassBundled(): StrategicLandMassEnvelope).
 
- * Purpose: Supports maintainability by documenting why `loadTerrainRes1LandMassBundled` exists.
+ * Purpose: Supports maintainability by documenting why `loadTerrainStrategicLandMassBundled` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function loadTerrainRes1LandMassBundled(): Res1LandMassEnvelope {
+export function loadTerrainStrategicLandMassBundled(): StrategicLandMassEnvelope {
   logTrace('terrainLandMassLoad loadTerrainRes1LandMassBundled');
-  return loadTerrainRes1LandMassFromPath(resolveTerrainRes1LandMassPath());
+  return loadTerrainStrategicLandMassFromPath(resolveTerrainStrategicLandMassPath());
 }
 
 /**
@@ -446,7 +446,7 @@ export function loadTerrainRes1LandMassBundled(): Res1LandMassEnvelope {
  * Exceptions: None.
  */
 export function assertLandMassMatchesHexList(
-  byH3: ReadonlyMap<string, Res1LandMassRecord>,
+  byH3: ReadonlyMap<string, StrategicLandMassRecord>,
   expectedHexes: readonly string[]
 ): void {
   logTrace('terrainLandMassLoad assertLandMassMatchesHexList', { expectedCount: expectedHexes.length });

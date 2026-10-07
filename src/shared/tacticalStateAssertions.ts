@@ -17,7 +17,7 @@ export type TacticalBoundaryOutcome = { ok: true } | { ok: false; code: string }
 /**
  * Returns whether a new tactical session may start when no battle is already active in the main process.
  *
- * Contract: Pure; does not log; mirrors the duplicate-start guard in `startTacticalBattleForEnclosingRes1Hex`.
+ * Contract: Pure; does not log; mirrors the duplicate-start guard in `startTacticalBattleForEnclosingStrategicHex`.
  * When to use: Before allocating a tactical battle id when `activeTacticalBattle` may already be populated.
  * Expected outcome: `ok: false` with `code: 'concurrent_session'` when `alreadyActive` is true.
  * Exceptions: None.

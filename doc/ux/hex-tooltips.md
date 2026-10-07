@@ -94,7 +94,7 @@ None.
 ## Code Entry Points
 
 - `static/index.html` (`#hex-tooltip`, `#order-block-tooltip`, `#order-slower-tooltip`)
-- `src/renderer/map/terrainTooltipRes1State.ts`
+- `src/renderer/map/terrainTooltipStrategicState.ts`
 - `src/renderer/map/terrainTooltipHtml.ts`
 - `src/renderer/map/terrainTooltipTypes.ts`
 - `src/renderer/map/orderBlockHexTooltip.ts`

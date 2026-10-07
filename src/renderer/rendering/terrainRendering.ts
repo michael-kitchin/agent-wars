@@ -1,6 +1,6 @@
-import { cellToChildren } from 'h3-js';
+import { tacticalChildrenOf } from '../../shared/h3Resolutions';
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
-import { res1OverlayBandOffsetPx } from '../../shared/inspectionStatusIconLine';
+import { strategicOverlayBandOffsetPx } from '../../shared/inspectionStatusIconLine';
 import {
   isHexOwnershipVisibleToPerspective,
   resolveHomeRegionOwnerIdentity,
@@ -10,14 +10,14 @@ import {
 } from '../../shared/homeRegionRules';
 import { getHexBoundaryLatLngForLeafletOverlay } from '../map/hexGrid';
 import { getActiveHexStrokeStyle, fillHexTerrain } from './terrainVisualStyles';
-import { drawTerrainInfrastructureGlyphs, RES4_TERRAIN_INFRA_GLYPH_AREA_SCALE } from './terrainInfrastructureOverlay';
-import { DETAIL_H3_RESOLUTION, MULTI_PLAYER_FILL, OWNERSHIP_BORDER_ALPHA, PLAYER_COLORS } from '../core/constants';
+import { drawTerrainInfrastructureGlyphs, TACTICAL_TERRAIN_INFRA_GLYPH_AREA_SCALE } from './terrainInfrastructureOverlay';
+import { MULTI_PLAYER_FILL, OWNERSHIP_BORDER_ALPHA, PLAYER_COLORS } from '../core/constants';
 import { getLeafletGlobal, hexCenterPx } from '../map/mapHelpers';
 import {
   projectHexBoundaryToContainerPoints,
-  shouldConsiderRes4ChildrenForViewport,
-  shouldDrawRes4ChildHexInViewport,
-  shouldRenderRes4Hexes,
+  shouldConsiderTacticalChildrenForViewport,
+  shouldDrawTacticalChildHexInViewport,
+  shouldRenderTacticalHexes,
   spanForProjectedHex,
 } from '../map/terrainView';
 import { rendererSharedState as S } from '../core/state';
@@ -68,14 +68,14 @@ interface TerrainRenderingDeps {
    */
 getExploredHexSet: (state: GameStateSnapshot | null) => Set<string>;
     /**
-   * Specifies the contract for the `getRes1DominantTerrainKind` member (getRes1DominantTerrainKind: (h3: string, parentKind: string) => string;).
+   * Specifies the contract for the `getStrategicDominantTerrainKind` member (getStrategicDominantTerrainKind: (h3: string, parentKind: string) => string;).
 
-   * Contract: Describes stable behavior for callers of `getRes1DominantTerrainKind` in this codebase.
+   * Contract: Describes stable behavior for callers of `getStrategicDominantTerrainKind` in this codebase.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-getRes1DominantTerrainKind: (h3: string, parentKind: string) => string;
+getStrategicDominantTerrainKind: (h3: string, parentKind: string) => string;
     /**
    * Specifies the contract for the `isMapInspectionModeHeld` member (isMapInspectionModeHeld: () => boolean;).
 
@@ -86,23 +86,23 @@ getRes1DominantTerrainKind: (h3: string, parentKind: string) => string;
    */
 isMapInspectionModeHeld: () => boolean;
     /**
-   * Specifies the contract for the `infraGlyphsAllowedForRes1Hex` member (infraGlyphsAllowedForRes1Hex: (h3: string) => boolean;).
+   * Specifies the contract for the `infraGlyphsAllowedForStrategicHex` member (infraGlyphsAllowedForStrategicHex: (h3: string) => boolean;).
 
-   * Contract: Describes stable behavior for callers of `infraGlyphsAllowedForRes1Hex` in this codebase.
+   * Contract: Describes stable behavior for callers of `infraGlyphsAllowedForStrategicHex` in this codebase.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-infraGlyphsAllowedForRes1Hex: (h3: string) => boolean;
+infraGlyphsAllowedForStrategicHex: (h3: string) => boolean;
     /**
-   * Specifies the contract for the `infraGlyphsAllowedForRes4Child` member (infraGlyphsAllowedForRes4Child: (parentH3: string, childH3: string) => boolean;).
+   * Specifies the contract for the `infraGlyphsAllowedForTacticalChild` member (infraGlyphsAllowedForTacticalChild: (parentH3: string, childH3: string) => boolean;).
 
-   * Contract: Describes stable behavior for callers of `infraGlyphsAllowedForRes4Child` in this codebase.
+   * Contract: Describes stable behavior for callers of `infraGlyphsAllowedForTacticalChild` in this codebase.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-infraGlyphsAllowedForRes4Child: (parentH3: string, childH3: string) => boolean;
+infraGlyphsAllowedForTacticalChild: (parentH3: string, childH3: string) => boolean;
 }
 
 /**
@@ -114,7 +114,7 @@ infraGlyphsAllowedForRes4Child: (parentH3: string, childH3: string) => boolean;
  * Exceptions: None.
  */
 function buildControlByHex(state: GameStateSnapshot): Map<string, string | null> {
-  return new Map((state.res1Control ?? []).map((row) => [row.h3Index, row.controllerPlayerId]));
+  return new Map((state.strategicControl ?? []).map((row) => [row.h3Index, row.controllerPlayerId]));
 }
 
 /**
@@ -251,8 +251,8 @@ export function drawTerrainHexes(ctx: CanvasRenderingContext2D, deps: TerrainRen
   if (!S.gameState) return;
   if (S.tacticalBattleSnapshot) return;
   const exploredHexes = deps.getExploredHexSet(S.gameState);
-  const res4Active = shouldRenderRes4Hexes();
-  if (res4Active) return;
+  const tacticalActive = shouldRenderTacticalHexes();
+  if (tacticalActive) return;
   const map = getMainLeafletMap() as { latLngToContainerPoint: (ll: unknown) => { x: number; y: number } } | null;
   if (!map) return;
   const mapWithZoom = map as { getZoom?: () => number };
@@ -268,7 +268,7 @@ export function drawTerrainHexes(ctx: CanvasRenderingContext2D, deps: TerrainRen
       const p = map.latLngToContainerPoint(L.latLng(lat, lng));
       return { x: p.x, y: p.y };
     });
-    const kind = deps.getRes1DominantTerrainKind(
+    const kind = deps.getStrategicDominantTerrainKind(
       hx.h3Index,
       hx.terrainKind ??
         (hx.terrain === 'water' ? 'water' : hx.terrain === 'coastal' ? 'coastal' : hx.terrain === 'wetlands' ? 'wetlands' : 'plains')
@@ -285,8 +285,8 @@ export function drawTerrainHexes(ctx: CanvasRenderingContext2D, deps: TerrainRen
     const explored = exploredHexes.has(hx.h3Index);
     if (explored && !deps.isMapInspectionModeHeld()) {
       fillHexTerrain(ctx, kind, drawClosedPath, {
-        fillAndHatchAlphaScale: !res4Active && S.hoveredHexH3 === hx.h3Index ? 2 : 1,
-        landHoverFill: !res4Active && S.hoveredHexH3 === hx.h3Index && kind === 'plains',
+        fillAndHatchAlphaScale: !tacticalActive && S.hoveredHexH3 === hx.h3Index ? 2 : 1,
+        landHoverFill: !tacticalActive && S.hoveredHexH3 === hx.h3Index && kind === 'plains',
         isUrban: false,
       });
     }
@@ -345,15 +345,15 @@ export function drawTerrainHexes(ctx: CanvasRenderingContext2D, deps: TerrainRen
 }
 
 /**
- * Defines the `drawRes4TerrainHexes` function shape (export function drawRes4TerrainHexes(ctx: CanvasRenderingContext2D, deps: TerrainRenderingDeps): void).
+ * Defines the `drawTacticalTerrainHexes` function shape (export function drawTacticalTerrainHexes(ctx: CanvasRenderingContext2D, deps: TerrainRenderingDeps): void).
 
- * Purpose: Supports maintainability by documenting why `drawRes4TerrainHexes` exists.
+ * Purpose: Supports maintainability by documenting why `drawTacticalTerrainHexes` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function drawRes4TerrainHexes(ctx: CanvasRenderingContext2D, deps: TerrainRenderingDeps): void {
-  if (!S.gameState || !shouldRenderRes4Hexes()) return;
+export function drawTacticalTerrainHexes(ctx: CanvasRenderingContext2D, deps: TerrainRenderingDeps): void {
+  if (!S.gameState || !shouldRenderTacticalHexes()) return;
   const exploredHexes = deps.getExploredHexSet(S.gameState);
   const map = getMainLeafletMap() as
     | {
@@ -369,24 +369,24 @@ export function drawRes4TerrainHexes(ctx: CanvasRenderingContext2D, deps: Terrai
   const stroke = getActiveHexStrokeStyle();
   const tactical = S.tacticalBattleSnapshot;
   for (const parent of S.gameState.hexes) {
-    if (tactical && parent.h3Index !== tactical.enclosingRes1H3Index) continue;
+    if (tactical && parent.h3Index !== tactical.enclosingStrategicH3Index) continue;
     if (!tactical && !exploredHexes.has(parent.h3Index)) continue;
-    if (!shouldConsiderRes4ChildrenForViewport(parent.h3Index, map, L, viewportWidth, viewportHeight)) continue;
+    if (!shouldConsiderTacticalChildrenForViewport(parent.h3Index, map, L, viewportWidth, viewportHeight)) continue;
     const parentKind =
       parent.terrainKind ??
       (parent.terrain === 'water' ? 'water' : parent.terrain === 'coastal' ? 'coastal' : parent.terrain === 'wetlands' ? 'wetlands' : 'plains');
-    let children = S.res4ChildrenByParent.get(parent.h3Index);
+    let children = S.tacticalChildrenByParent.get(parent.h3Index);
     if (!children) {
-      children = cellToChildren(parent.h3Index, DETAIL_H3_RESOLUTION);
-      S.res4ChildrenByParent.set(parent.h3Index, children);
+      children = tacticalChildrenOf(parent.h3Index);
+      S.tacticalChildrenByParent.set(parent.h3Index, children);
     }
     for (const child of children) {
-      const override = S.res4TerrainOverridesByH3.get(child);
+      const override = S.tacticalTerrainOverridesByH3.get(child);
       const terrainKind = override?.terrainKind ?? parentKind;
       const isUrban = override?.isUrban ?? false;
       const isRubble = override?.isRubble ?? false;
       const pts = projectHexBoundaryToContainerPoints(child, map, L);
-      if (!shouldDrawRes4ChildHexInViewport(pts, viewportWidth, viewportHeight)) continue;
+      if (!shouldDrawTacticalChildHexInViewport(pts, viewportWidth, viewportHeight)) continue;
       const drawClosedPath = (): void => {
         ctx.beginPath();
         for (let i = 0; i < pts.length; i++) {
@@ -425,7 +425,7 @@ export function drawScenarioHomeRegionOutlines(ctx: CanvasRenderingContext2D): v
   if (!state) return;
   const homeRegionHexes = [...new Set([...(state.humanHomeRegionHexes ?? []), ...(state.aiHomeRegionHexes ?? [])])];
   if (homeRegionHexes.length === 0) return;
-  if (!shouldRenderRes4Hexes()) return;
+  if (!shouldRenderTacticalHexes()) return;
   const map = getMainLeafletMap() as { latLngToContainerPoint: (ll: unknown) => { x: number; y: number }; getZoom?: () => number } | null;
   if (!map) return;
   const L = getLeafletGlobal();
@@ -471,32 +471,32 @@ export function drawScenarioHomeRegionOutlines(ctx: CanvasRenderingContext2D): v
 }
 
 /**
- * Defines the `hasVisibleRes1InfrastructureGlyphs` function shape (export function hasVisibleRes1InfrastructureGlyphs( h3Index: string, res4On: boolean, unitHexes: Set<string>, deps: TerrainRenderingDeps ): boolean).
+ * Defines the `hasVisibleStrategicInfrastructureGlyphs` function shape (export function hasVisibleStrategicInfrastructureGlyphs( h3Index: string, tacticalOn: boolean, unitHexes: Set<string>, deps: TerrainRenderingDeps ): boolean).
 
- * Purpose: Supports maintainability by documenting why `hasVisibleRes1InfrastructureGlyphs` exists.
+ * Purpose: Supports maintainability by documenting why `hasVisibleStrategicInfrastructureGlyphs` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function hasVisibleRes1InfrastructureGlyphs(
+export function hasVisibleStrategicInfrastructureGlyphs(
   h3Index: string,
-  res4On: boolean,
+  tacticalOn: boolean,
   unitHexes: Set<string>,
   deps: TerrainRenderingDeps
 ): boolean {
   void unitHexes;
-  return !res4On && deps.infraGlyphsAllowedForRes1Hex(h3Index) && (S.terrainInfraRes1Airport.has(h3Index) || S.terrainInfraRes1Seaport.has(h3Index));
+  return !tacticalOn && deps.infraGlyphsAllowedForStrategicHex(h3Index) && (S.terrainInfraStrategicAirport.has(h3Index) || S.terrainInfraStrategicSeaport.has(h3Index));
 }
 
 /**
- * Defines the `computeRes1OverlayTextY` function shape (export function computeRes1OverlayTextY( h3Index: string, map: { latLngToContainerPoint: (ll: unknown) => { x: number; y: number } }, L: { latLng: (lat).
+ * Defines the `computeStrategicOverlayTextY` function shape (export function computeStrategicOverlayTextY( h3Index: string, map: { latLngToContainerPoint: (ll: unknown) => { x: number; y: number } }, L: { latLng: (lat).
 
- * Purpose: Supports maintainability by documenting why `computeRes1OverlayTextY` exists.
+ * Purpose: Supports maintainability by documenting why `computeStrategicOverlayTextY` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function computeRes1OverlayTextY(
+export function computeStrategicOverlayTextY(
   h3Index: string,
   map: { latLngToContainerPoint: (ll: unknown) => { x: number; y: number } },
   leaflet: { latLng: (lat: number, lng: number) => unknown },
@@ -505,13 +505,13 @@ export function computeRes1OverlayTextY(
   const center = hexCenterPx(h3Index);
   if (!hasOffsetFeatures) return center.y;
   const pts = projectHexBoundaryToContainerPoints(h3Index, map, leaflet);
-  return center.y + res1OverlayBandOffsetPx(spanForProjectedHex(pts));
+  return center.y + strategicOverlayBandOffsetPx(spanForProjectedHex(pts));
 }
 
 /**
  * Defines the `drawTerrainInfrastructureOverlays` function shape (export function drawTerrainInfrastructureOverlays(ctx: CanvasRenderingContext2D, deps: TerrainRenderingDeps): void).
 
- * Purpose: Renders res1/res4 airport and seaport glyphs on the overlay canvas (skipped entirely while map inspection T is held).
+ * Purpose: Renders strategic/tactical airport and seaport glyphs on the overlay canvas (skipped entirely while map inspection T is held).
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
@@ -533,13 +533,13 @@ export function drawTerrainInfrastructureOverlays(ctx: CanvasRenderingContext2D,
   const zoomStrokeScale = getMapZoomStrokeScale(zoom);
   const outlineScreenPx = Math.max(0.5, 0.58 * zoomStrokeScale);
   const L = getLeafletGlobal();
-  const res4On = shouldRenderRes4Hexes();
+  const tacticalOn = shouldRenderTacticalHexes();
 
-  if (!res4On) {
+  if (!tacticalOn) {
     for (const hx of S.gameState.hexes) {
-      if (!deps.infraGlyphsAllowedForRes1Hex(hx.h3Index)) continue;
-      const ap = S.terrainInfraRes1Airport.has(hx.h3Index);
-      const pt = S.terrainInfraRes1Seaport.has(hx.h3Index);
+      if (!deps.infraGlyphsAllowedForStrategicHex(hx.h3Index)) continue;
+      const ap = S.terrainInfraStrategicAirport.has(hx.h3Index);
+      const pt = S.terrainInfraStrategicSeaport.has(hx.h3Index);
       if (!ap && !pt) continue;
       const boundary = getHexBoundaryLatLngForLeafletOverlay(hx.h3Index);
       const pts = boundary.map(([lat, lng]: [number, number]) => {
@@ -561,25 +561,25 @@ export function drawTerrainInfrastructureOverlays(ctx: CanvasRenderingContext2D,
   const viewportHeight = Math.max(1, container.clientHeight);
   const tactical = S.tacticalBattleSnapshot;
   for (const parent of S.gameState.hexes) {
-    if (tactical && parent.h3Index !== tactical.enclosingRes1H3Index) continue;
-    let children = S.res4ChildrenByParent.get(parent.h3Index);
+    if (tactical && parent.h3Index !== tactical.enclosingStrategicH3Index) continue;
+    let children = S.tacticalChildrenByParent.get(parent.h3Index);
     if (!children) {
-      children = cellToChildren(parent.h3Index, DETAIL_H3_RESOLUTION);
-      S.res4ChildrenByParent.set(parent.h3Index, children);
+      children = tacticalChildrenOf(parent.h3Index);
+      S.tacticalChildrenByParent.set(parent.h3Index, children);
     }
-    if (!shouldConsiderRes4ChildrenForViewport(parent.h3Index, map, L, viewportWidth, viewportHeight)) continue;
+    if (!shouldConsiderTacticalChildrenForViewport(parent.h3Index, map, L, viewportWidth, viewportHeight)) continue;
     for (const child of children) {
-      if (!tactical && !deps.infraGlyphsAllowedForRes4Child(parent.h3Index, child)) continue;
-      const ap = S.terrainInfraRes4Airport.has(child);
-      const pt = S.terrainInfraRes4Seaport.has(child);
+      if (!tactical && !deps.infraGlyphsAllowedForTacticalChild(parent.h3Index, child)) continue;
+      const ap = S.terrainInfraTacticalAirport.has(child);
+      const pt = S.terrainInfraTacticalSeaport.has(child);
       if (!ap && !pt) continue;
       const pts = projectHexBoundaryToContainerPoints(child, map, L);
-      if (!shouldDrawRes4ChildHexInViewport(pts, viewportWidth, viewportHeight)) continue;
+      if (!shouldDrawTacticalChildHexInViewport(pts, viewportWidth, viewportHeight)) continue;
       drawTerrainInfrastructureGlyphs(ctx, pts, {
         showAirport: ap,
         showSeaport: pt,
         outlineScreenPx,
-        glyphAreaScale: RES4_TERRAIN_INFRA_GLYPH_AREA_SCALE,
+        glyphAreaScale: TACTICAL_TERRAIN_INFRA_GLYPH_AREA_SCALE,
       });
     }
   }

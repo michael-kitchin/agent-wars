@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="1600" height="1e3" version="1.1" viewBox="0 0 423.33 264.58" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+<defs>
+<style type="text/css">.str1 {stroke:#0000CC;stroke-width:24}
+    .str2 {stroke:#0000CC;stroke-width:48}
+    .str0 {stroke:#0000CC;stroke-width:214}
+    .fil1 {fill:#0000CC}
+    .fil2 {fill:#FFD700}
+    .fil0 {fill:#FFFFFF}</style>
+<style type="text/css">.fil0 {fill:#0083C4}
+    .fil1 {fill:#F4F195}</style>
+<style type="text/css"><![CDATA[
+    .str3 {stroke:black;stroke-width:0.25;stroke-linecap:round;stroke-linejoin:round}
+    .str0 {stroke:black;stroke-width:0.27}
+    .str1 {stroke:black;stroke-width:0.27;stroke-linejoin:round}
+    .str2 {stroke:black;stroke-width:0.27;stroke-linecap:round;stroke-linejoin:round}
+    .fil1 {fill:none}
+    .fil2 {fill:#008F4C}
+    .fil0 {fill:#996633}
+    .fil3 {fill:#CC9933}
+   ]]></style>
+</defs>
+<g transform="translate(-699.13 9.0202)">
+<rect transform="rotate(90 -2542.5 -3343.8)" x="1978.8" y="-5645.7" width="291.04" height="3148.3" fill="#ccc" fill-rule="evenodd" style="paint-order:markers stroke fill"/>
+</g>
+<g transform="translate(-6585.4 -792.29)">
+<text x="5718.2529" y="1481.4202" stroke="#aa8800" stroke-width=".20052"><tspan x="5718.2529" y="1481.4202" stroke-width=".20052"/></text>
+<text x="5718.1445" y="1481.0281" stroke="#aa8800" stroke-width=".20052"><tspan x="5718.1445" y="1481.0281" stroke-width=".20052"/></text>
+<text transform="scale(.89528 1.117)" x="6512.4731" y="1385.3013" stroke="#aa8800" stroke-width=".11378"><tspan x="6512.4731" y="1385.3013" stroke-width=".11378"/></text>
+<text transform="scale(.89528 1.117)" x="6512.4116" y="1385.0786" stroke="#aa8800" stroke-width=".11378"><tspan x="6512.4116" y="1385.0786" stroke-width=".11378"/></text>
+<text transform="scale(.99942 1.0006)" x="5402.1143" y="1512.7477" stroke="#aa8800" stroke-width=".21781"><tspan x="5402.1143" y="1512.7477" stroke-width=".21781"/></text>
+<text transform="scale(.99942 1.0006)" x="5401.9966" y="1512.3218" stroke="#aa8800" stroke-width=".21781"><tspan x="5401.9966" y="1512.3218" stroke-width=".21781"/></text>
+<text transform="scale(.89476 1.1176)" x="6170.1738" y="1418.4382" stroke="#aa8800" stroke-width=".1236"><tspan x="6170.1738" y="1418.4382" stroke-width=".1236"/></text>
+<text transform="scale(.89476 1.1176)" x="6170.1069" y="1418.1964" stroke="#aa8800" stroke-width=".1236"><tspan x="6170.1069" y="1418.1964" stroke-width=".1236"/></text>
+<text transform="scale(.99942 1.0006)" x="4992.4756" y="1312.4274" stroke="#aa8800" stroke-width=".15127"><tspan x="4992.4756" y="1312.4274" stroke-width=".15127"/></text>
+<text transform="scale(.99942 1.0006)" x="4992.394" y="1312.1315" stroke="#aa8800" stroke-width=".15127"><tspan x="4992.394" y="1312.1315" stroke-width=".15127"/></text>
+<text transform="scale(.89476 1.1176)" x="5671.0093" y="1219.5115" stroke="#aa8800" stroke-width=".085838"><tspan x="5671.0093" y="1219.5115" stroke-width=".085838"/></text>
+<text transform="scale(.89476 1.1176)" x="5670.9629" y="1219.3436" stroke="#aa8800" stroke-width=".085838"><tspan x="5670.9629" y="1219.3436" stroke-width=".085838"/></text>
+<text x="6211.1445" y="1706.9159" stroke="#aa8800" stroke-width=".25811"><tspan x="6211.1445" y="1706.9159" stroke-width=".25811"/></text>
+<text x="6211.0049" y="1706.411" stroke="#aa8800" stroke-width=".25811"><tspan x="6211.0049" y="1706.411" stroke-width=".25811"/></text>
+<g transform="matrix(.89528 0 0 1.117 6420.1 1078.5)" stroke="#a80" stroke-width=".14647">
+<text x="-71.961395" y="638.52686"><tspan x="-71.961395" y="638.52686" stroke-width=".14647"/></text>
+<text x="-72.040619" y="638.2403"><tspan x="-72.040619" y="638.2403" stroke-width=".14647"/></text>
+</g>
+<text x="6712.9316" y="1644.1698" stroke-width=".26458"><tspan x="6712.9316" y="1656.8805" stroke-width=".26458"/></text>
+<text x="6077.1445" y="1325.5944" stroke-width=".26458"><tspan x="6077.1445" y="1340.6855" stroke-width=".26458"/></text>
+<rect x="6585.4" y="792.29" width="423.33" height="264.58" fill="#24bcf4" fill-rule="evenodd" style="paint-order:markers stroke fill"/>
+<path d="m6585.4 1056.9 317.5-264.58h105.83l-317.5 264.58z" fill="#d9142b"/>
+<path d="m6797.1 837.43 19.569 60.22 63.32 2e-3 -51.226 37.22 19.565 60.222-51.228-37.217-51.228 37.217 19.565-60.222-51.226-37.221 63.32-2e-3z" fill="#f9e421" fill-rule="evenodd" style="paint-order:normal"/>
+</g>
+<style type="text/css">.st0{fill:#BF0A30;}
+	.st1{fill:#FFFFFF;}
+	.st2{fill:#002868;}
+	.st3{fill:none;stroke:#BE2326;stroke-miterlimit:10;}</style>
+</svg>

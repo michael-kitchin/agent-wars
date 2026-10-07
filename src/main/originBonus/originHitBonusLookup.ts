@@ -44,7 +44,7 @@ export const noOriginHitBonus: OriginHitBonusLookup = () => 0;
 export function createStrategicOriginHitBonusLookup(input: {
   readonly settings: OriginBonusSettings;
   readonly units: ReadonlyArray<{ readonly id: string; readonly origin?: UnitOrigin }>;
-  readonly countryNameAt: (res1H3Index: string) => string | null;
+  readonly countryNameAt: (strategicH3Index: string) => string | null;
 }): OriginHitBonusLookup {
   const { settings, units, countryNameAt } = input;
   logDebug('originHitBonusLookup createStrategicOriginHitBonusLookup', { ...settings, units: units.length });

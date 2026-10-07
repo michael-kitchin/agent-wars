@@ -80,7 +80,7 @@ function buildFixtureState(hexes: string[]): GameStateSnapshot {
       { id: 'human-infantry-1', player: 'human', unitType: 'infantry', h3Index: hexes[1]! },
     ],
     exploredHexes: [hexes[0]!, hexes[1]!, hexes[2]!],
-    res1Control: [
+    strategicControl: [
       { h3Index: hexes[0]!, controllerPlayerId: 'opponent' },
       { h3Index: hexes[1]!, controllerPlayerId: 'opponent' },
       { h3Index: hexes[2]!, controllerPlayerId: 'human' },
@@ -167,7 +167,7 @@ function testTacticalSystemPromptAllowsInfantryRanged(): void {
     'tactical combat summary must list infantry ranged baseline'
   );
   assert.ok(
-    prompt.includes('Infantry and armor fire at their res4 baselines'),
+    prompt.includes('Infantry and armor fire at their tactical baselines'),
     'tactical coaching must allow infantry ranged_attack and state terrain caps'
   );
   assert.ok(

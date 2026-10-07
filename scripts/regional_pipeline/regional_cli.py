@@ -17,6 +17,7 @@ from .footprint import classify_footprint, sweep_footprint_counts
 from .footprint_inputs import build_footprint_candidates, load_footprint_inputs
 from .member_geometry import load_admin_layers, validate_member_codes
 from .region_catalog import REGION_DEFINITIONS, all_region_ids, region_by_id
+from .origin_assignment import assign_region_origins
 from .region_manifest import build_manifest_document, write_manifest
 from .region_paths import REGIONAL_QA_DIR, REGIONS_ROOT, RegionPaths
 from .scalerank_policy import policy_for_tactical_resolution
@@ -72,6 +73,12 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--steps", type=str, default=",".join(STEP_ORDER))
     run.add_argument("--skip-existing", action="store_true")
     run.add_argument("--max-tactical-cells", type=int, default=None)
+    origins = sub.add_parser("origins", parents=[common], help="Write side groups and tactical origin units.")
+    origins.add_argument("--data-root", type=str, default="F:/Data")
+    origins_choice = origins.add_mutually_exclusive_group(required=True)
+    origins_choice.add_argument("--region", type=str)
+    origins_choice.add_argument("--all", action="store_true")
+    origins.add_argument("--force", action="store_true", help="Rewrite a region that already has side groups.")
     check = sub.add_parser("check", parents=[common], help="Check regional packs against their manifests.")
     check_choice = check.add_mutually_exclusive_group(required=True)
     check_choice.add_argument("--region", type=str)
@@ -292,6 +299,19 @@ def main(argv: list[str] | None = None) -> int:
                 ),
             )
             return 0
+        if args.command == "origins":
+            region_ids = [args.region] if args.region else all_region_ids()
+            failed = False
+            for region_id in region_ids:
+                try:
+                    counts = assign_region_origins(region_id, Path(args.data_root), force=args.force)
+                    print(f"{region_id} " + " ".join(f"{group}={count}" for group, count in counts.items()))
+                except ValueError as exc:
+                    failed = True
+                    LOGGER.error("Origins failed for %s.", region_id, exc_info=True)
+                    print(f"{region_id} ERROR")
+                    print(exc)
+            return 1 if failed else 0
         if args.command == "check":
             region_ids = [args.region] if args.region else all_region_ids()
             failed = False

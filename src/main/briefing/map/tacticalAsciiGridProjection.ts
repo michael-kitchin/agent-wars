@@ -1,8 +1,8 @@
 /**
- * Projects a tactical res4 battle footprint onto row/column slots for ASCII operational maps.
+ * Projects a tactical battle footprint onto row/column slots for ASCII operational maps.
  *
- * Purpose: Latitude clustering (`projectToGrid` with multi-degree thresholds) collapses an entire res1 res4
- * child set into one or two rows; this module uses H3 `cellToLocalIj` so each res4 maps to a distinct offset row
+ * Purpose: Latitude clustering (`projectToGrid` with multi-degree thresholds) collapses an entire strategic tactical
+ * child set into one or two rows; this module uses H3 `cellToLocalIj` so each tactical maps to a distinct offset row
  * in the same odd-row layout consumed by `renderHexAsciiMap`.
  * When to use: Only from `buildTacticalOperationalMapSectionMarkdown` after `initTacticalCoordinateRegistry`.
  * Expected outcome: `HexGrid` with one `GridCell` per input index, no duplicate `(row,col)`, `numRows` large enough
@@ -20,7 +20,7 @@ import type { GridCell, HexGrid } from './hexGridProjection';
  * Converts H3 local IJ (anchored at `origin`) to odd-r offset hex coordinates for ASCII row/col placement.
  *
  * Purpose: Matches the odd-row horizontal offset convention used by `renderHexAsciiMap` (odd rows indented).
- * When to use: Once per cell inside `projectTacticalRes4FootprintToAsciiGrid`.
+ * When to use: Once per cell inside `projectTacticalFootprintToAsciiGrid`.
  * Expected outcome: Integer `row` / `col` before normalization to non-negative indices.
  * Exceptions: None; pure arithmetic.
  */
@@ -33,10 +33,10 @@ function localIjToOddRRowCol(i: number, j: number): { row: number; col: number }
 }
 
 /**
- * Picks an origin res4 cell such that `cellToLocalIj(origin, h)` succeeds for every `h` in the footprint when possible.
+ * Picks an origin tactical cell such that `cellToLocalIj(origin, h)` succeeds for every `h` in the footprint when possible.
  *
  * Purpose: Mitigates rare H3 pentagon / distance failures when a single lexicographic minimum is a bad anchor.
- * When to use: Before projecting all cells in `projectTacticalRes4FootprintToAsciiGrid`.
+ * When to use: Before projecting all cells in `projectTacticalFootprintToAsciiGrid`.
  * Expected outcome: Returns first working origin from sorted candidates, or sorted[0] after logging.
  * Exceptions: None; swallows per-cell IJ errors during probing.
  */
@@ -62,14 +62,14 @@ function pickTacticalAsciiOrigin(h3Indices: readonly string[]): string {
 }
 
 /**
- * Builds a `HexGrid` for tactical res4 ASCII maps using local IJ coordinates relative to a stable origin.
+ * Builds a `HexGrid` for tactical ASCII maps using local IJ coordinates relative to a stable origin.
  *
  * Purpose: Replaces latitude-band clustering for tactical-only prompts so the LLM sees a 2D layout of the battle.
  * When to use: From `buildTacticalOperationalMapSectionMarkdown` instead of `projectToGrid` for tactical context.
  * Expected outcome: `cells.length === h3Indices.length` and unique `(row,col)` per cell when IJ succeeds for all.
  * Exceptions: Throws if a cell lacks a tactical briefing code in `context` (same contract as `projectToGrid`).
  */
-export function projectTacticalRes4FootprintToAsciiGrid(
+export function projectTacticalFootprintToAsciiGrid(
   h3Indices: readonly string[],
   context: CoordinateContext
 ): HexGrid {

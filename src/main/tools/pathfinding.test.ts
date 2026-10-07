@@ -8,7 +8,7 @@ import { gridDisk, latLngToCell } from 'h3-js';
 import { createPathfindingSession, executePlanRouteWithSession } from './pathfinding';
 import { resetPlanningPhaseSessionCacheForTests } from './pathfindingSessionCache';
 import type { GameStateSnapshot } from '../gameDb';
-import type { Res1LandMassRecord } from '../../shared/landTraversalRes1';
+import type { StrategicLandMassRecord } from '../../shared/landTraversalStrategic';
 import { ensureTerrainClassificationCacheLoaded } from '../terrainClassificationCache';
 
 /**
@@ -22,8 +22,8 @@ import { ensureTerrainClassificationCacheLoaded } from '../terrainClassification
 function landMassForHexes(
   hexes: readonly string[],
   opts?: { waterPct?: number; continentIds?: number[]; islandIds?: number[] }
-): Map<string, Res1LandMassRecord> {
-  const out = new Map<string, Res1LandMassRecord>();
+): Map<string, StrategicLandMassRecord> {
+  const out = new Map<string, StrategicLandMassRecord>();
   for (const h3Index of hexes) {
     out.set(h3Index, {
       h3Index,

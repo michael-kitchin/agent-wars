@@ -74,7 +74,7 @@ export interface StandingOrderComputedRoutePayload {
    */
   totalPath: [number, number][];
   /**
-   * res1 H3 where the cached route was planned; display reuse when the unit is still at this cell.
+   * strategic H3 where the cached route was planned; display reuse when the unit is still at this cell.
    *
    * Contract: Matches the unit cell at route assignment or turn refresh; `listHumanStandingOrders` reuses `cachedRouteSegments` only when current H3 equals this value.
    * When to use: Persisted in `computed_route` after `toComputedRoutePayload`; read by standing-order list IPC for stable overlay rendering.

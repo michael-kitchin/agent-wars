@@ -122,7 +122,7 @@ export function rememberComputedHexList(
  *
  * Purpose: Best Options was running one Dijkstra per opponent pawn; same origin, type, budget, weather tags, and embark
  * state share dests, because tags change the weather open-ground cost.
- * When to use: `collectAggregatedPossibleActionRows` before `collectTacticalLegalMoveDestinationRes4Hexes`.
+ * When to use: `collectAggregatedPossibleActionRows` before `collectTacticalLegalMoveDestinationTacticalHexes`.
  * Expected outcome: Air units share one empty dest list; unknown ids get a unique key; embarked cargo shares one empty dest list.
  * Exceptions: None.
  */
@@ -147,7 +147,7 @@ export function tacticalLegalMoveDestCacheKey(
  * Cache key for tactical ranged target rings shared by stacked same-type attackers.
  *
  * Purpose: Ranged discovery scans the footprint per attacker; same anchor and type share legal hexes.
- * When to use: `collectAggregatedPossibleActionRows` before `collectTacticalLegalRangedTargetRes4Hexes`.
+ * When to use: `collectAggregatedPossibleActionRows` before `collectTacticalLegalRangedTargetTacticalHexes`.
  * Expected outcome: Missing attackers get a unique empty key; embarked cargo uses the host hex as anchor.
  * Exceptions: None.
  */

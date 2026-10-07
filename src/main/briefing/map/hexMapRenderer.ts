@@ -20,7 +20,7 @@ import type { HexGrid, GridCell } from './hexGridProjection';
  */
 export interface HexMapCellState {
   /**
-   * Land vs water classification for the res4 cell backing this map tile.
+   * Land vs water classification for the tactical cell backing this map tile.
    *
    * Contract: `'water'` suppresses land-only overlays; `'land'` participates in structural and presence overlays when discovered.
    * When to use: Populated from terrain metadata for each projected grid cell before ASCII rendering.

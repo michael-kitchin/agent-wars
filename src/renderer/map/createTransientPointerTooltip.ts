@@ -1,6 +1,6 @@
 import { TOOLTIP_OFFSET_PX } from '../core/constants';
 import { rendererSharedState as S } from '../core/state';
-import { clearTerrainTooltipTimer, hideTerrainTooltipVisual } from './terrainTooltipRes1State';
+import { clearTerrainTooltipTimer, hideTerrainTooltipVisual } from './terrainTooltipStrategicState';
 import { createTransientPointerTooltipTtl } from './transientPointerTooltipTtl';
 
 /**

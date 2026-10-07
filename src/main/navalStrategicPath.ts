@@ -9,7 +9,7 @@
 
 import { gridDisk } from 'h3-js';
 import { logError, logTrace } from './logger';
-import { getCachedSeaportCountByRes1H3 } from './terrainClassificationCache';
+import { getCachedSeaportCountByStrategicH3 } from './terrainClassificationCache';
 import {
   estimateNavalStrategicTurns,
   isLandSeaportHex,
@@ -205,7 +205,7 @@ export function createNavalStrategicHexLookup(
  * Indexes seaport counts from a game-state infrastructure list.
  *
  * Purpose: Avoid repeating Map construction at every naval call site.
- * When to use: Pass `state.res1Infrastructure` (or an empty array when absent).
+ * When to use: Pass `state.strategicInfrastructure` (or an empty array when absent).
  * Expected outcome: Hexes omitted from the list have count 0 via `Map.get` defaulting in the lookup.
  * Exceptions: None.
  */
@@ -218,7 +218,7 @@ export function seaportCountByH3FromInfra(
 /**
  * Fills seaport counts from the classification cache only for hexes the snapshot omitted.
  *
- * Purpose: World-map ports still appear when `res1_infrastructure` is sparse, without restoring a
+ * Purpose: World-map ports still appear when `res_s_infrastructure` is sparse, without restoring a
  * destroyed port whose snapshot row is present with count 0.
  * When to use: `seaportCountByH3ForNavalLookup` after indexing snapshot infra.
  * Expected outcome: Existing snapshot keys are unchanged (including explicit zeros); missing keys
@@ -244,7 +244,7 @@ export function mergeCachedSeaportsIntoInfraMap(
 /**
  * Builds seaport counts from snapshot infrastructure plus the classification-cache map.
  *
- * Purpose: Classification-cache seaports must participate in berth lookup when `res1_infrastructure` is sparse,
+ * Purpose: Classification-cache seaports must participate in berth lookup when `res_s_infrastructure` is sparse,
  * without a per-hex live DB probe and without treating destroyed ports as berths.
  * When to use: Production naval lookups over a real game snapshot.
  * Expected outcome: Snapshot rows win, including `seaportCount === 0`. Cache only fills omitted hexes.
@@ -254,7 +254,7 @@ export function seaportCountByH3ForNavalLookup(
   hexes: ReadonlyArray<{ h3Index: string }>,
   infra: ReadonlyArray<{ h3Index: string; seaportCount: number }> | undefined
 ): Map<string, number> {
-  const cachedSeaports = getCachedSeaportCountByRes1H3();
+  const cachedSeaports = getCachedSeaportCountByStrategicH3();
   const map = mergeCachedSeaportsIntoInfraMap(seaportCountByH3FromInfra(infra), cachedSeaports);
   logTrace('navalStrategicPath seaportCountByH3ForNavalLookup', {
     hexCount: hexes.length,

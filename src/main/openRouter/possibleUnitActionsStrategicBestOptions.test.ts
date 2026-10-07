@@ -9,14 +9,14 @@
 
 import * as assert from 'assert';
 import { cellToLatLng, gridDisk, gridDistance } from 'h3-js';
-import { canLandUnitTraverseEdge, landUnitCanOccupyHex } from '../../shared/landTraversalRes1';
+import { canLandUnitTraverseEdge, landUnitCanOccupyHex } from '../../shared/landTraversalStrategic';
 import type { GameStateSnapshot } from '../gameDb';
 import {
   ensureStrategicCoordinateRegistryInitialized,
   getH3IndexForCode,
 } from '../briefing/map/hexCoordinates';
 import { getOrderedHexList, LATLNG_DECIMAL_PLACES } from '../mapData';
-import { ensureTerrainClassificationCacheLoaded, getRes1LandMassByH3 } from '../terrainClassificationCache';
+import { ensureTerrainClassificationCacheLoaded, getStrategicLandMassByH3 } from '../terrainClassificationCache';
 import { AIR_FERRY_RANGE_HEXES } from '../../shared/tacticalRanges';
 import {
   buildLandChainState as chainState,
@@ -39,7 +39,7 @@ import { suggestApproachDestinationsForOrderlessUnits } from '../tools/orderless
  */
 function findGeodesicWaterChain(hops: number): string[] {
   ensureTerrainClassificationCacheLoaded();
-  const data = getRes1LandMassByH3();
+  const data = getStrategicLandMassByH3();
   const allHexes = getOrderedHexList();
   const onMap = new Set(allHexes);
   const isWater = (h3: string) => !landUnitCanOccupyHex(h3, data);
@@ -278,8 +278,8 @@ function testStrategicBestOptionsNavalApproachWhenEnemyOutOfReach(): void {
       { id: 'human-naval-far', player: 'human', unitType: 'naval', h3Index: enemy },
     ],
     pendingOrders: [],
-    res1Infrastructure: [],
-    res1Control: [],
+    strategicInfrastructure: [],
+    strategicControl: [],
   };
   const rows = collectStrategicThisTurnRows(state).filter((r) => r.unitId === 'opponent-naval-mover');
   const approaches = rows.filter((r) => r.actionTypes.includes('approach'));
@@ -333,13 +333,13 @@ function testStrategicBestOptionsAirStrikesOmitFriendlyAndUncontrolledInfra(): v
       { id: 'human-infantry-1', player: 'human', unitType: 'infantry', h3Index: enemyHex },
     ],
     pendingOrders: [],
-    res1Infrastructure: [
+    strategicInfrastructure: [
       { h3Index: base, urbanHexCount: 0, airportCount: 1, seaportCount: 0 },
       { h3Index: ownUrban, urbanHexCount: 8, airportCount: 1, seaportCount: 0 },
       { h3Index: humanUrban, urbanHexCount: 5, airportCount: 0, seaportCount: 0 },
       { h3Index: uncontrolledUrban, urbanHexCount: 3, airportCount: 0, seaportCount: 0 },
     ],
-    res1Control: [
+    strategicControl: [
       { h3Index: base, controllerPlayerId: 'opponent' },
       { h3Index: ownUrban, controllerPlayerId: 'opponent' },
       { h3Index: humanUrban, controllerPlayerId: 'human' },
@@ -449,7 +449,7 @@ function pentagonEdgeApproachFixture(): {
   if (originDist === null) {
     throw new Error('expected disk-fallback distance from KE to EY');
   }
-  const land = getRes1LandMassByH3();
+  const land = getStrategicLandMassByH3();
   const onMap = new Set(getOrderedHexList());
   const landDests = gridDisk(origin, 1).filter(
     (h) => h !== origin && onMap.has(h) && landUnitCanOccupyHex(h, land) && canLandUnitTraverseEdge(origin, h, land)
@@ -495,8 +495,8 @@ function testStrategicBestOptionsApproachWhenGridDistanceThrows(): void {
       { id: 'human-inf-far', player: 'human', unitType: 'infantry', h3Index: enemy },
     ],
     pendingOrders: [],
-    res1Infrastructure: [{ h3Index: emptyUrban, urbanHexCount: 2, airportCount: 0, seaportCount: 0 }],
-    res1Control: [],
+    strategicInfrastructure: [{ h3Index: emptyUrban, urbanHexCount: 2, airportCount: 0, seaportCount: 0 }],
+    strategicControl: [],
   };
   const rows = collectStrategicThisTurnRows(state).filter((r) => r.unitId === 'opponent-inf-mover');
   assert.ok(
@@ -668,11 +668,11 @@ function testStrategicBestOptionsKeepsFerryDestWhenGridDistanceThrows(): void {
     ],
     units: [{ id: 'opponent-air-1', player: 'opponent', unitType: 'air', h3Index: origin }],
     pendingOrders: [],
-    res1Infrastructure: [
+    strategicInfrastructure: [
       { h3Index: origin, urbanHexCount: 0, airportCount: 1, seaportCount: 0 },
       { h3Index: dest, urbanHexCount: 4, airportCount: 1, seaportCount: 0 },
     ],
-    res1Control: [
+    strategicControl: [
       { h3Index: origin, controllerPlayerId: 'opponent' },
       { h3Index: dest, controllerPlayerId: 'opponent' },
     ],

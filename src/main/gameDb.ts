@@ -32,9 +32,9 @@ import {
 import { getMapHexSetWithGetAll } from './gameDb/mapHexRead';
 import { listUnitsForSnapshotWithGetAll } from './gameDb/unitSnapshotRead';
 import {
-  ensureRes1InfrastructureSyncTriggers,
-  listRes1InfrastructureRows,
-  reconcileRes1InfrastructureCountsFromRes4Overrides,
+  ensureStrategicInfrastructureSyncTriggers,
+  listStrategicInfrastructureRows,
+  reconcileStrategicInfrastructureCountsFromTacticalOverrides,
   runInfrastructureStartupConsistencyPass,
 } from './gameDb/controlInfrastructureAccess';
 import {
@@ -68,29 +68,29 @@ import {
 export type { GameStateSnapshot } from '../shared/ipcTypes';
 export type { AiLossEventSinceConsultation } from './gameDb/aiState';
 export type { TurnConsultationNoteTexts, TurnNoteRow, TurnNotesScope } from './gameDb/turnNotesHistory';
-export type { BuildQueueRow, HexControlRow, Res1InfrastructureRow, Res4FeatureOverrideRow } from './gameDb/controlInfrastructure';
+export type { BuildQueueRow, HexControlRow, StrategicInfrastructureRow, TacticalFeatureOverrideRow } from './gameDb/controlInfrastructure';
 export {
   clearBuildQueueAndProgressForHex,
-  ensureRes1InfrastructureSyncTriggers,
+  ensureStrategicInfrastructureSyncTriggers,
   getBuildProgressPointsForHex,
   getHexControlMap,
   getHexController,
   getKeepBuildingForHex,
-  getRes1InfrastructureForHex,
-  getRes4TerrainOverridesForRendererFromGame,
-  insertRes4FeatureOverrideRubbleRow,
+  getStrategicInfrastructureForHex,
+  getTacticalTerrainOverridesForRendererFromGame,
+  insertTacticalFeatureOverrideRubbleRow,
   listAllHexControls,
   listBuildQueueRowsForHex,
-  listRes1InfrastructureRows,
-  listRes4FeatureOverridesForGame,
-  reconcileRes1InfrastructureCountsFromRes4Overrides,
+  listStrategicInfrastructureRows,
+  listTacticalFeatureOverridesForGame,
+  reconcileStrategicInfrastructureCountsFromTacticalOverrides,
   replaceBuildQueueForHex,
   setBuildProgressPointsForHex,
   setHexController,
   setKeepBuildingForHex,
-  setRes1InfrastructureForHex,
+  setStrategicInfrastructureForHex,
   sumUrbanHexCountForHexes,
-  updateRes4FeatureOverrideRow,
+  updateTacticalFeatureOverrideRow,
 } from './gameDb/controlInfrastructureAccess';
 export {
   addAiLossEventsSinceConsultation,
@@ -120,7 +120,7 @@ export {
  * Expected outcome: On first launch after a bump, the old match database fails validation, is renamed aside, and a fresh one is created.
  * Exceptions: None.
  */
-export const EXPECTED_USER_VERSION = 16;
+export const EXPECTED_USER_VERSION = 17;
 
 /**
  * Documents the module-scope binding `GAME_DB_FILE_NAME` (GAME_DB_FILE_NAME).
@@ -211,7 +211,7 @@ export function createFreshGameDatabaseAt(canonicalPath: string): void {
   setDbHandle(database);
   applyGameDbPragmas(database);
   database.exec(getFullDdl());
-  ensureRes1InfrastructureSyncTriggers();
+  ensureStrategicInfrastructureSyncTriggers();
   ensureTurnStateRow();
   database.pragma(`user_version = ${EXPECTED_USER_VERSION}`);
   seedGameSeedIfMissing();
@@ -322,7 +322,7 @@ export async function initDatabase(): Promise<void> {
     seedGameSeedIfMissing();
     ensureTerrainClassificationCacheLoaded();
     backfillInfrastructureStateFromMetadataIfMissing();
-    reconcileRes1InfrastructureCountsFromRes4Overrides();
+    reconcileStrategicInfrastructureCountsFromTacticalOverrides();
     logDebug('gameDb initDatabase: opened existing', { canonicalPath });
   } catch (err) {
     if (d) {
@@ -477,7 +477,7 @@ function getFogDeps() {
   return {
     ops: gameDbOps,
     listUnitsForSnapshot,
-    listRes1InfrastructureRows,
+    listStrategicInfrastructureRows,
   };
 }
 

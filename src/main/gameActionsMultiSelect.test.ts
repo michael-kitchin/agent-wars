@@ -26,7 +26,7 @@ import {
 } from './gameActions/landMovementConstraints';
 import {
   LAND_UNIT_DESTINATION_NOT_LANDMASS_REASON,
-} from '../shared/landTraversalRes1';
+} from '../shared/landTraversalStrategic';
 import {
   hexSupportsMixedLandAndNaval,
 } from './gameActions/humanMarchPreviewMixedSelection';
@@ -389,8 +389,8 @@ function testPreviewGroupedRejectsAirUnitsForMarchPlanning(): void {
       airportPair!.originH3,
     ]);
 
-    dbRun('INSERT OR REPLACE INTO res1_control (h3_index, controller_player_id) VALUES (?, ?)', [airportPair!.destinationH3, 'human']);
-    dbRun('INSERT OR REPLACE INTO res1_control (h3_index, controller_player_id) VALUES (?, ?)', [airportPair!.originH3, 'human']);
+    dbRun('INSERT OR REPLACE INTO res_s_control (h3_index, controller_player_id) VALUES (?, ?)', [airportPair!.destinationH3, 'human']);
+    dbRun('INSERT OR REPLACE INTO res_s_control (h3_index, controller_player_id) VALUES (?, ?)', [airportPair!.originH3, 'human']);
     const result = previewHumanMarchOrders([airUnitId], airportPair!.destinationH3);
     const outOfRangeReason = result.invalidReason ?? null;
     const hasExpectedOutOfRangeReason =
@@ -419,8 +419,8 @@ function testPreviewGroupedAcceptsAirFerryDestinationWithinRange(): void {
       'air',
       airportPair!.originH3,
     ]);
-    dbRun('INSERT OR REPLACE INTO res1_control (h3_index, controller_player_id) VALUES (?, ?)', [airportPair!.destinationH3, 'human']);
-    dbRun('INSERT OR REPLACE INTO res1_control (h3_index, controller_player_id) VALUES (?, ?)', [airportPair!.originH3, 'human']);
+    dbRun('INSERT OR REPLACE INTO res_s_control (h3_index, controller_player_id) VALUES (?, ?)', [airportPair!.destinationH3, 'human']);
+    dbRun('INSERT OR REPLACE INTO res_s_control (h3_index, controller_player_id) VALUES (?, ?)', [airportPair!.originH3, 'human']);
     const result = previewHumanMarchOrders([airUnitId], airportPair!.destinationH3);
     assert.strictEqual(result.validForAll, true);
     assert.strictEqual(result.previews.length, 1);

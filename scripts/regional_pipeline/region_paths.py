@@ -31,6 +31,8 @@ WEATHER_S_FILENAME: Final = "terrain_res_s_weather.json"
 ROAD_RAIL_SIDES_T_FILENAME: Final = "terrain_res_t_road_rail_sides.json"
 # Tactical road and rail vector filename.
 ROAD_RAIL_VECTORS_T_FILENAME: Final = "terrain_res_t_road_rail_vectors.json"
+# Tactical origin-unit filename. One record per non-water tactical cell.
+ORIGIN_UNITS_T_FILENAME: Final = "terrain_res_t_origin_units.json"
 # Landmass QA filename inside the region qa folder.
 LANDMASS_QA_FILENAME: Final = "landmass_qa.json"
 # Cross-region QA folder.
@@ -194,6 +196,19 @@ class RegionPaths:
         """
 
         return self._child(ROAD_RAIL_VECTORS_T_FILENAME)
+
+    @property
+    def origin_units_t(self) -> Path:
+        """
+        Why this exists:
+            Locate the tactical origin-unit records.
+        When to use:
+            After assigning side groups, and when a pack check looks for the file.
+        What to expect:
+            The origin-unit JSON path inside the region folder.
+        """
+
+        return self._child(ORIGIN_UNITS_T_FILENAME)
 
     @property
     def qa_dir(self) -> Path:

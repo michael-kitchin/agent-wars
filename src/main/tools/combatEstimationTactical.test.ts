@@ -178,7 +178,7 @@ test('battle: a defender on its birth terrain shows the terrain bonus', () => {
         cell: 'far',
         origin: {
           birthH3Index: 'unused',
-          birthRes4H3Index: null,
+          birthTacticalH3Index: null,
           birthTerrainKind: 'forests',
           birthIsUrban: false,
           birthCountryName: null,

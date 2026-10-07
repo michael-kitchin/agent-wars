@@ -10,13 +10,13 @@ import {
   projectTacticalSnapshotAfterValidatedHumanSupportOrders,
   projectTacticalSnapshotAfterValidatedOpponentOrders,
 } from './tacticalCompositeOrdersApply';
-import { tacticalRes1Cell, tacticalRes4UnderRes1Corner } from './testSupport/tacticalRes4HexFixtures';
+import { tacticalParentCell, tacticalUnderCorner } from './testSupport/tacticalHexFixtures';
 import { dbRun } from '../gameDb';
 import { withTempGameDb } from '../testSupport/withTempGameDb';
 
 test('composite apply strips naval ranged orders when implicit LOS crosses mountain res4', () => {
-  const res1 = tacticalRes1Cell(8, 9);
-  const h0 = tacticalRes4UnderRes1Corner(8, 9);
+  const strategic = tacticalParentCell(8, 9);
+  const h0 = tacticalUnderCorner(8, 9);
   const ring = [...gridDisk(h0, 2)];
   const inner = new Set(gridDisk(h0, 1));
   const hFar = ring.find((h) => !inner.has(h));
@@ -30,13 +30,13 @@ test('composite apply strips naval ranged orders when implicit LOS crosses mount
   const navalCount = 3;
   const snap: TacticalBattleSnapshot = {
     battleId: 'tb-r-mtn',
-    enclosingRes1H3Index: res1,
-    res4ChildH3Indexes: ring,
+    enclosingStrategicH3Index: strategic,
+    tacticalChildH3Indexes: ring,
     strategicTurnNumber: 1,
     tacticalTurnNumber: 1,
     strategicHexTerrain: 'land',
     strategicHexTerrainKind: 'plains',
-    res4TerrainKindByH3: terrain,
+    tacticalTerrainKindByH3: terrain,
     subUnits: [
       ...Array.from({ length: navalCount }, (_, i) => ({
         id: `opp-nm${i}`,
@@ -67,8 +67,8 @@ test('composite apply strips naval ranged orders when implicit LOS crosses mount
 });
 
 test('composite apply removes one human sub-unit per opponent ranged order', () => {
-  const res1 = tacticalRes1Cell(8, 9);
-  const h0 = tacticalRes4UnderRes1Corner(8, 9);
+  const strategic = tacticalParentCell(8, 9);
+  const h0 = tacticalUnderCorner(8, 9);
   const ring = [...gridDisk(h0, 2)];
   const inner = new Set(gridDisk(h0, 1));
   const hFar = ring.find((h) => !inner.has(h));
@@ -78,8 +78,8 @@ test('composite apply removes one human sub-unit per opponent ranged order', () 
   const navalCount = 15;
   const snap: TacticalBattleSnapshot = {
     battleId: 'tb-r',
-    enclosingRes1H3Index: res1,
-    res4ChildH3Indexes: ring,
+    enclosingStrategicH3Index: strategic,
+    tacticalChildH3Indexes: ring,
     strategicTurnNumber: 1,
     tacticalTurnNumber: 1,
     subUnits: [
@@ -113,13 +113,13 @@ test('composite apply removes one human sub-unit per opponent ranged order', () 
 });
 
 test('composite embark assigns embarkedOnSubUnitId and syncs land hex to naval', () => {
-  const res1 = tacticalRes1Cell(1, 2);
-  const hx = tacticalRes4UnderRes1Corner(1, 2, { latEpsilon: 0.03 });
+  const strategic = tacticalParentCell(1, 2);
+  const hx = tacticalUnderCorner(1, 2, { latEpsilon: 0.03 });
   const ring = gridDisk(hx, 1);
   const snap: TacticalBattleSnapshot = {
     battleId: 'tb-e',
-    enclosingRes1H3Index: res1,
-    res4ChildH3Indexes: [...ring],
+    enclosingStrategicH3Index: strategic,
+    tacticalChildH3Indexes: [...ring],
     strategicTurnNumber: 1,
     tacticalTurnNumber: 1,
     subUnits: [
@@ -152,8 +152,8 @@ test('composite embark assigns embarkedOnSubUnitId and syncs land hex to naval',
 
 test('human support separates ranged kill edges from air strike kill edges', () => {
   withTempGameDb('aw-tac-composite-human-', () => {
-  const res1 = tacticalRes1Cell(5, 6);
-  const h0 = tacticalRes4UnderRes1Corner(5, 6);
+  const strategic = tacticalParentCell(5, 6);
+  const h0 = tacticalUnderCorner(5, 6);
   const ring = [...gridDisk(h0, 1)];
   const h1 = ring.find((h) => h !== h0);
   const h2 = ring.find((h) => h !== h0 && h !== h1);
@@ -162,8 +162,8 @@ test('human support separates ranged kill edges from air strike kill edges', () 
   }
   const snap: TacticalBattleSnapshot = {
     battleId: 'tb-hsplit',
-    enclosingRes1H3Index: res1,
-    res4ChildH3Indexes: ring,
+    enclosingStrategicH3Index: strategic,
+    tacticalChildH3Indexes: ring,
     strategicTurnNumber: 1,
     tacticalTurnNumber: 1,
     subUnits: [

@@ -1,16 +1,17 @@
-import { cellToParent } from 'h3-js';
+import { strategicUrbanCellsDestroyedPerHit } from '../../shared/gameRules';
+import { strategicParentOf } from '../../shared/h3Resolutions';
 import {
   dbGetAll,
   dbGetOne,
   dbRun,
   getKeepBuildingForHex,
-  getRes1InfrastructureForHex,
+  getStrategicInfrastructureForHex,
   listBuildQueueRowsForHex,
-  listRes4FeatureOverridesForGame,
+  listTacticalFeatureOverridesForGame,
   replaceBuildQueueForHex,
   clearBuildQueueAndProgressForHex,
   setKeepBuildingForHex,
-  updateRes4FeatureOverrideRow,
+  updateTacticalFeatureOverrideRow,
 } from '../gameDb';
 import { logDebug } from '../logger';
 import { getAvailableBuildUnitTypes } from '../productionRules';
@@ -38,14 +39,6 @@ import { validateAirStrikeOrder } from './airValidation';
 import { isEmbarkedLandUnitOnWater } from './sealift';
 
 /**
- * Explains why this constant exists: upper bound on how many res4 urban cells one successful **strategic** urban infrastructure air strike may turn to rubble **per air unit order** (same cap regardless of how many sub-units the row represents).
- * When to use: Only the non-tactical urban branch of `applyInfrastructureDestructionEffects`; tactical urban strikes that pin a res4 cell stay at one cell.
- * What to expect: Actual count is `Math.min(this value, current res1 urban_hex_count)` and may be lower if fewer eligible res4 override rows exist.
- * Exceptions: None.
- */
-const MAX_URBAN_RES4_CELLS_DESTROYED_PER_STRATEGIC_URBAN_AIR_STRIKE = 9;
-
-/**
  * Removes illegal build-queue rows after infrastructure changes and syncs Keep building.
  *
  * Purpose: Keeps queued types and Keep-building standing orders aligned with current eligibility.
@@ -56,7 +49,7 @@ const MAX_URBAN_RES4_CELLS_DESTROYED_PER_STRATEGIC_URBAN_AIR_STRIKE = 9;
  */
 export function pruneBuildQueueForInfrastructureState(h3Index: string): void {
   logDebug('pruneBuildQueueForInfrastructureState', { h3Index });
-  const infra = getRes1InfrastructureForHex(h3Index);
+  const infra = getStrategicInfrastructureForHex(h3Index);
   if (infra.urbanHexCount <= 0) {
     clearBuildQueueAndProgressForHex(h3Index);
     return;
@@ -104,21 +97,21 @@ export function pruneBuildQueueForInfrastructureState(h3Index: string): void {
 }
 
 /**
- * Defines the `replaceRandomRes4FeaturesWithRubble` function shape (function replaceRandomRes4FeaturesWithRubble( h3Index: string, feature: 'urban' | 'airport' | 'seaport', count: number, next: () => number ): numbe).
+ * Defines the `replaceRandomTacticalFeaturesWithRubble` function shape (function replaceRandomTacticalFeaturesWithRubble( h3Index: string, feature: 'urban' | 'airport' | 'seaport', count: number, next: () => number ): numbe).
 
- * Purpose: Supports maintainability by documenting why `replaceRandomRes4FeaturesWithRubble` exists.
+ * Purpose: Supports maintainability by documenting why `replaceRandomTacticalFeaturesWithRubble` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-function replaceRandomRes4FeaturesWithRubble(
+function replaceRandomTacticalFeaturesWithRubble(
   h3Index: string,
   feature: 'urban' | 'airport' | 'seaport',
   count: number,
   next: () => number
 ): number {
   if (count <= 0) return 0;
-  const candidates = listRes4FeatureOverridesForGame().filter((row) => {
+  const candidates = listTacticalFeatureOverridesForGame().filter((row) => {
     if (row.parentH3Index !== h3Index) return false;
     if (row.isRubble) return false;
     if (feature === 'urban') return row.isUrban;
@@ -130,7 +123,7 @@ function replaceRandomRes4FeaturesWithRubble(
   while (pool.length > 0 && changed < count) {
     const idx = Math.floor(next() * pool.length);
     const row = pool.splice(idx, 1)[0]!;
-    updateRes4FeatureOverrideRow(row.h3Index, {
+    updateTacticalFeatureOverrideRow(row.h3Index, {
       isRubble: true,
       isUrban: feature === 'urban' ? false : row.isUrban,
       isAirport: feature === 'airport' ? false : row.isAirport,
@@ -166,19 +159,19 @@ export function destroyBasedAirUnitsAtHex(
 /**
  * Documents optional behavior flags for `applyInfrastructureDestructionEffects` as a named contract surface.
  *
- * Purpose: Lets tactical urban strikes convert a single targeted res4 cell to rubble while strategic strikes keep random multi-cell destruction under the parent res1 (capped per air unit by `MAX_URBAN_RES4_CELLS_DESTROYED_PER_STRATEGIC_URBAN_AIR_STRIKE`).
- * When to use: Pass from tactical projection when resolving urban infrastructure strikes at res4 resolution; omit for strategic resolution and non-urban strikes.
- * Expected outcome: When `tacticalUrbanStrikeTargetRes4H3` is set with `targetType === 'urban'`, at most that res4 urban override becomes rubble if it belongs to `h3Index` and is eligible.
+ * Purpose: Lets tactical urban strikes convert a single targeted tactical cell to rubble while strategic strikes keep random multi-cell destruction under the parent strategic, capped by the active map's strike cell count.
+ * When to use: Pass from tactical projection when resolving urban infrastructure strikes at tactical resolution; omit for strategic resolution and non-urban strikes.
+ * Expected outcome: When `tacticalUrbanStrikeTargetTacticalH3` is set with `targetType === 'urban'`, at most that tactical urban override becomes rubble if it belongs to `h3Index` and is eligible.
  * Exceptions: None.
  */
 export type ApplyInfrastructureDestructionOptions = {
   /**
-   * Explains why this field exists: pins tactical urban rubble conversion to the res4 cell the player selected.
-   * When to use: Set only for tactical human urban strikes (pass the clicked res4 H3 id); omit for strategic strikes and other target types.
-   * What to expect: The res1 `h3Index` argument must equal `cellToParent` of this value; the matching override row must be urban and not already rubble, or no change occurs.
+   * Explains why this field exists: pins tactical urban rubble conversion to the tactical cell the player selected.
+   * When to use: Set only for tactical human urban strikes (pass the clicked tactical H3 id); omit for strategic strikes and other target types.
+   * What to expect: The strategic `h3Index` argument must equal `cellToParent` of this value; the matching override row must be urban and not already rubble, or no change occurs.
    * Exceptions: None.
    */
-  tacticalUrbanStrikeTargetRes4H3?: string;
+  tacticalUrbanStrikeTargetH3?: string;
 };
 
 /**
@@ -198,30 +191,35 @@ export function applyInfrastructureDestructionEffects(
   destroyedAirUnits: Array<{ id: string; player: string; unit_type: string; h3_index: string; display_order: number | null }>;
   changedRubbleCount: number;
 } {
-  const current = getRes1InfrastructureForHex(h3Index);
+  logDebug('applyInfrastructureDestructionEffects', {
+    h3Index,
+    targetType,
+    tacticalUrbanStrikeTargetH3: options?.tacticalUrbanStrikeTargetH3,
+  });
+  const current = getStrategicInfrastructureForHex(h3Index);
   const result = {
     destroyedAirUnits: [] as Array<{ id: string; player: string; unit_type: string; h3_index: string; display_order: number | null }>,
     changedRubbleCount: 0,
   };
   if (targetType === 'urban') {
-    const tacticalRes4 = options?.tacticalUrbanStrikeTargetRes4H3?.trim();
-    if (tacticalRes4) {
-      if (cellToParent(tacticalRes4, 1) !== h3Index) {
-        logDebug('applyInfrastructureDestructionEffects tactical urban parent mismatch', { tacticalRes4, h3Index });
+    const tacticalStrikeTarget = options?.tacticalUrbanStrikeTargetH3?.trim();
+    if (tacticalStrikeTarget) {
+      if (strategicParentOf(tacticalStrikeTarget) !== h3Index) {
+        logDebug('applyInfrastructureDestructionEffects tactical urban parent mismatch', { tacticalStrikeTarget, h3Index });
         return result;
       }
-      const match = listRes4FeatureOverridesForGame().find(
-        (row) => row.h3Index === tacticalRes4 && row.parentH3Index === h3Index && row.isUrban && !row.isRubble
+      const match = listTacticalFeatureOverridesForGame().find(
+        (row) => row.h3Index === tacticalStrikeTarget && row.parentH3Index === h3Index && row.isUrban && !row.isRubble
       );
       if (!match) {
-        logDebug('applyInfrastructureDestructionEffects tactical urban no eligible res4 row', { tacticalRes4, h3Index });
+        logDebug('applyInfrastructureDestructionEffects tactical urban no eligible res4 row', { tacticalStrikeTarget, h3Index });
         return result;
       }
       logDebug('applyInfrastructureDestructionEffects tactical urban converting targeted res4 to rubble', {
-        tacticalRes4,
+        tacticalStrikeTarget,
         h3Index,
       });
-      updateRes4FeatureOverrideRow(match.h3Index, {
+      updateTacticalFeatureOverrideRow(match.h3Index, {
         isRubble: true,
         isUrban: false,
         isAirport: match.isAirport,
@@ -231,9 +229,9 @@ export function applyInfrastructureDestructionEffects(
       pruneBuildQueueForInfrastructureState(h3Index);
       return result;
     }
-    const destroyCount = Math.min(MAX_URBAN_RES4_CELLS_DESTROYED_PER_STRATEGIC_URBAN_AIR_STRIKE, current.urbanHexCount);
+    const destroyCount = Math.min(strategicUrbanCellsDestroyedPerHit(), current.urbanHexCount);
     if (destroyCount <= 0) return result;
-    result.changedRubbleCount = replaceRandomRes4FeaturesWithRubble(h3Index, 'urban', destroyCount, next);
+    result.changedRubbleCount = replaceRandomTacticalFeaturesWithRubble(h3Index, 'urban', destroyCount, next);
     if (result.changedRubbleCount > 0) {
       pruneBuildQueueForInfrastructureState(h3Index);
     }
@@ -241,7 +239,7 @@ export function applyInfrastructureDestructionEffects(
   }
   if (targetType === 'airport') {
     if (current.airportCount <= 0) return result;
-    result.changedRubbleCount = replaceRandomRes4FeaturesWithRubble(h3Index, 'airport', 1, next);
+    result.changedRubbleCount = replaceRandomTacticalFeaturesWithRubble(h3Index, 'airport', 1, next);
     if (result.changedRubbleCount > 0) {
       result.destroyedAirUnits = destroyBasedAirUnitsAtHex(h3Index);
       pruneBuildQueueForInfrastructureState(h3Index);
@@ -250,7 +248,7 @@ export function applyInfrastructureDestructionEffects(
   }
   if (targetType === 'seaport') {
     if (current.seaportCount <= 0) return result;
-    result.changedRubbleCount = replaceRandomRes4FeaturesWithRubble(h3Index, 'seaport', 1, next);
+    result.changedRubbleCount = replaceRandomTacticalFeaturesWithRubble(h3Index, 'seaport', 1, next);
     if (result.changedRubbleCount > 0) {
       pruneBuildQueueForInfrastructureState(h3Index);
     }

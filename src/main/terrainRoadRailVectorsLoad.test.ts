@@ -3,7 +3,7 @@
  */
 
 import * as assert from 'assert';
-import { parseTerrainRes4RoadRailVectorsJson } from './terrainRoadRailVectorsLoad';
+import { parseTerrainTacticalRoadRailVectorsJson } from './terrainRoadRailVectorsLoad';
 
 /**
  * Defines the `testParseValidRows` function shape (function testParseValidRows(): void).
@@ -14,7 +14,7 @@ import { parseTerrainRes4RoadRailVectorsJson } from './terrainRoadRailVectorsLoa
  * Exceptions: None.
  */
 function testParseValidRows(): void {
-  const rows = parseTerrainRes4RoadRailVectorsJson(
+  const rows = parseTerrainTacticalRoadRailVectorsJson(
     JSON.stringify({
       schema_version: '0.1.0',
       rows: [
@@ -38,7 +38,7 @@ function testParseValidRows(): void {
  * Exceptions: None.
  */
 function testSkipsInvalidRows(): void {
-  const rows = parseTerrainRes4RoadRailVectorsJson(
+  const rows = parseTerrainTacticalRoadRailVectorsJson(
     JSON.stringify({
       rows: [
         { kind: 'road', points: [[46.2, 6.1]] },
@@ -61,8 +61,8 @@ function testSkipsInvalidRows(): void {
  * Exceptions: None.
  */
 function testThrowsOnInvalidEnvelope(): void {
-  assert.throws(() => parseTerrainRes4RoadRailVectorsJson(JSON.stringify({ schema_version: 'x', rows: [] })));
-  assert.throws(() => parseTerrainRes4RoadRailVectorsJson(JSON.stringify({ schema_version: '0.1.0' })));
+  assert.throws(() => parseTerrainTacticalRoadRailVectorsJson(JSON.stringify({ schema_version: 'x', rows: [] })));
+  assert.throws(() => parseTerrainTacticalRoadRailVectorsJson(JSON.stringify({ schema_version: '0.1.0' })));
 }
 
 /**

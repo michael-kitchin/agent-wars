@@ -25,29 +25,29 @@ export const TACTICAL_AI_PROMPT_STRATEGIC_SECTION_MARKERS = [
 /**
  * Serializes the active tactical battle into a plain-text block suitable for appending to a tactical system prompt.
  *
- * Contract: Includes only res4 geometry, turn counters, and sub-unit rows; never includes strategic tool JSON keys listed in `TACTICAL_AI_PROMPT_STRATEGIC_SECTION_MARKERS`.
+ * Contract: Includes only tactical geometry, turn counters, and sub-unit rows; never includes strategic tool JSON keys listed in `TACTICAL_AI_PROMPT_STRATEGIC_SECTION_MARKERS`.
  * When to use: Once `requestOrders` gains a tactical mode, prepend or append this block instead of strategic briefing sections.
- * Expected outcome: Deterministic line-oriented text the model can ground on for res4-scoped orders.
+ * Expected outcome: Deterministic line-oriented text the model can ground on for tactical-scoped orders.
  * Exceptions: None.
  */
 export function buildTacticalAiOrdersContextBlock(snapshot: TacticalBattleSnapshot): string {
   tacticalLogQuery('buildTacticalAiOrdersContextBlock', {
     battleId: snapshot.battleId,
     subUnitCount: snapshot.subUnits.length,
-    res4Count: snapshot.res4ChildH3Indexes.length,
+    tacticalCount: snapshot.tacticalChildH3Indexes.length,
   });
   const lines = [
     '=== Tactical battle (resolution-4) context ===',
     `battle_id: ${snapshot.battleId}`,
-    `enclosing_res1: ${snapshot.enclosingRes1H3Index}`,
+    `enclosing_strategic: ${snapshot.enclosingStrategicH3Index}`,
     `strategic_turn_number: ${snapshot.strategicTurnNumber}`,
     `tactical_turn_number: ${snapshot.tacticalTurnNumber}`,
-    'res4_cells:',
-    ...snapshot.res4ChildH3Indexes.map((h) => `  - ${h}`),
+    'tactical_cells:',
+    ...snapshot.tacticalChildH3Indexes.map((h) => `  - ${h}`),
     'tactical_sub_units:',
     ...snapshot.subUnits.map(
       (u) =>
-        `  - id=${u.id} parent=${u.parentUnitId} player=${u.player} type=${u.unitType} res4=${u.h3Index} display_name=${JSON.stringify(u.displayName)}`
+        `  - id=${u.id} parent=${u.parentUnitId} player=${u.player} type=${u.unitType} tactical=${u.h3Index} display_name=${JSON.stringify(u.displayName)}`
     ),
   ];
   return `${lines.join('\n')}\n`;

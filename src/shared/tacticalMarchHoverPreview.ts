@@ -1,9 +1,9 @@
 /**
- * Pure construction of march hover preview payloads for tactical (res4) battles so the renderer can
+ * Pure construction of march hover preview payloads for tactical battles so the renderer can
  * mirror strategic `HumanOrderGroupPreviewResult` without calling `previewHumanMarchOrders` (blocked in main).
  */
 
-import { cellToLatLng, getResolution, gridDistance } from 'h3-js';
+import { cellToLatLng, gridDistance } from 'h3-js';
 import {
   buildHumanOrderGroupPreviewEnvelope,
   groupedTacticalMarchPreviewUnitIds,
@@ -19,7 +19,7 @@ import type {
   OrderPreviewTerrainImpact,
   TacticalDraftPreviewResult,
 } from './ipc/humanOrderPreviewTypes';
-import { planTacticalRes4March } from './tacticalRes4MovementPlanner';
+import { planTacticalMarch } from './tacticalMovementPlanner';
 import { collectTacticalMarchTerrainImpact, sortSlowTerrainLabels } from './orderPreviewSlowTerrainTooltip';
 import { effectiveTacticalMovementPointBudgetForMarchLeg } from './tacticalTerrainCombatModifiers';
 import {
@@ -27,7 +27,7 @@ import {
   tacticalMovementUnitTypeForPathfinding,
   tacticalTerrainLayerSignature,
 } from './tacticalTerrainMovement';
-import { TACTICAL_H3_RESOLUTION } from './h3Resolutions';
+import { isTacticalCell } from './h3Resolutions';
 
 /** Renderer-only march plan memo bound (LRU by Map insertion order). */
 const MAX_TACTICAL_HOVER_PLAN_MEMO = 64;
@@ -36,7 +36,7 @@ const MAX_TACTICAL_HOVER_PLAN_MEMO = 64;
  * Stable fingerprint of tactical sub-unit positions for hover memo invalidation.
  *
  * Purpose: Mirrors main-process `tacticalMovementPlanningCache` invalidation intent for renderer-only previews.
- * When to use: `ensureTacticalHoverPlanMemo` before caching `planTacticalRes4March` results.
+ * When to use: `ensureTacticalHoverPlanMemo` before caching `planTacticalMarch` results.
  * Expected outcome: Deterministic string for a given `subUnits` array.
  * Exceptions: None.
  */
@@ -48,7 +48,7 @@ function tacticalHoverSubUnitPlacementSignature(subUnits: readonly { id: string;
 }
 
 let tacticalHoverPlanMemoKey = '';
-const tacticalHoverPlanMemo = new Map<string, ReturnType<typeof planTacticalRes4March>>();
+const tacticalHoverPlanMemo = new Map<string, ReturnType<typeof planTacticalMarch>>();
 
 /**
  * Resets the renderer-side tactical march plan memo when the tactical battle environment changes.
@@ -89,7 +89,7 @@ function buildPreviewForSubUnit(args: {
   battle: TacticalBattleSnapshot;
   unitId: string;
   hoveredH3Index: string;
-  res4Set: ReadonlySet<string>;
+  tacticalSet: ReadonlySet<string>;
   overridePathH3Indexes?: readonly string[];
 }): { preview: HumanOrderPreviewResult; pathH3Indexes: string[] | null } {
   const invalid = (preview: HumanOrderPreviewResult): { preview: HumanOrderPreviewResult; pathH3Indexes: null } => ({
@@ -104,14 +104,14 @@ function buildPreviewForSubUnit(args: {
   let resOk = true;
   try {
     resOk =
-      getResolution(origin) === TACTICAL_H3_RESOLUTION && getResolution(args.hoveredH3Index) === TACTICAL_H3_RESOLUTION;
+      isTacticalCell(origin) && isTacticalCell(args.hoveredH3Index);
   } catch {
     resOk = false;
   }
   if (!resOk) {
     return invalid({ valid: false, showInvalidMarker: true, invalidReason: 'Invalid tactical cell', segments: [] });
   }
-  if (!args.res4Set.has(args.hoveredH3Index)) {
+  if (!args.tacticalSet.has(args.hoveredH3Index)) {
     return invalid({ valid: false, showInvalidMarker: true, invalidReason: 'Outside tactical footprint', segments: [] });
   }
   try {
@@ -150,10 +150,10 @@ function buildPreviewForSubUnit(args: {
     tacticalHoverPlanMemo.delete(memoKey);
     tacticalHoverPlanMemo.set(memoKey, plan);
   } else {
-    plan = planTacticalRes4March({
+    plan = planTacticalMarch({
       fromH3: origin,
       toH3: args.hoveredH3Index,
-      res4Set: args.res4Set,
+      tacticalSet: args.tacticalSet,
       unitTypeForMovement: moveType,
       movementPointBudget: Math.max(0, budget),
       terrain,
@@ -225,9 +225,9 @@ function buildPreviewForSubUnit(args: {
 }
 
 /**
- * Builds a grouped march hover preview for selected tactical sub-units toward a hovered res4 cell.
+ * Builds a grouped march hover preview for selected tactical sub-units toward a hovered tactical cell.
  *
- * Purpose: Supplies `drawHoverRoutePreview` with the same data shape as strategic previews while respecting res4 footprint and §12.4 movement budgets.
+ * Purpose: Supplies `drawHoverRoutePreview` with the same data shape as strategic previews while respecting tactical footprint and §12.4 movement budgets.
  * When to use: Renderer `refreshHoverRoutePreview` when `S.tacticalBattleSnapshot` is set and ranged/air modes are off.
  * Expected outcome: One preview per selected sub-unit when the selection mixes land and naval; otherwise one preview per distinct origin (naval preferred on mixed stacks), with solid edges for the current turn and dashed continuation for future turns.
  * Exceptions: None; returns empty previews when there are no eligible human sub-units in `unitIds`.
@@ -237,7 +237,7 @@ export function buildTacticalMarchHoverPreview(
   unitIds: readonly string[],
   hoveredH3Index: string | null
 ): HumanOrderGroupPreviewResult {
-  const res4Set = new Set(battle.res4ChildH3Indexes);
+  const tacticalSet = new Set(battle.tacticalChildH3Indexes);
   const uniqueIds = uniqueTacticalMarchPreviewUnitIds(unitIds);
   const selectedHuman = uniqueIds
     .map((id) => battle.subUnits.find((u) => u.id === id && u.player === 'human'))
@@ -265,7 +265,7 @@ export function buildTacticalMarchHoverPreview(
       battle,
       unitId,
       hoveredH3Index,
-      res4Set,
+      tacticalSet,
     }).preview,
   }));
   const budgets = previewUnitIds.map((id) => {
@@ -330,7 +330,7 @@ export function tacticalHoverSolidEdgeCapByOriginH3(
 /**
  * Builds a single human sub-unit march preview toward a drafted destination cell for tactical overlay rendering.
  *
- * Purpose: Reuses the same res4 terrain-aware planner as hover (`planTacticalRes4March`) so solid pending-Ready
+ * Purpose: Reuses the same tactical terrain-aware planner as hover (`planTacticalMarch`) so solid pending-Ready
  * march lines match the route execution and hover preview; avoids geometric `gridPathCells` polylines that ignore terrain costs.
  * When to use: Renderer only (e.g. `drawTacticalPendingMarchPlanLines`); main-process commit validation remains authoritative.
  * Expected outcome: `segments` mirror `buildTacticalMarchHoverPreview` for one unit and destination; unreachable legs yield `valid: false` with empty segments.
@@ -342,12 +342,12 @@ export function buildTacticalMarchDraftDestinationPreview(
   destinationH3Index: string,
   options?: { overridePathH3Indexes?: readonly string[] }
 ): TacticalDraftPreviewResult {
-  const res4Set = new Set(battle.res4ChildH3Indexes);
+  const tacticalSet = new Set(battle.tacticalChildH3Indexes);
   return buildPreviewForSubUnit({
     battle,
     unitId: subUnitId,
     hoveredH3Index: destinationH3Index,
-    res4Set,
+    tacticalSet,
     overridePathH3Indexes: options?.overridePathH3Indexes,
   });
 }

@@ -4,12 +4,12 @@
 
 import * as assert from 'assert';
 import type { ClassifierThresholds } from './terrainMetadataLoad';
-import type { HexMetadataRecordRes1, HexMetadataRecordRes4 } from './terrainMetadataLoad';
+import type { HexMetadataRecordStrategic, HexMetadataRecordTactical } from './terrainMetadataLoad';
 import { recordHasMajorAirport, recordHasMajorSeaport } from './terrainMetadataLoad';
 import {
   classifyCellWithoutUrbanOverride,
-  classifyRes4TerrainKind,
-  isRes4UrbanOverlayHex,
+  classifyTacticalTerrainKind,
+  isTacticalUrbanOverlayHex,
   waterRelationFromMaskMetrics,
 } from './terrainClassifierFromMetadata';
 
@@ -79,14 +79,14 @@ mountain_elevation_max_min: 700,
 };
 
 /**
- * Defines the `baseRow` function shape (function baseRow(partial: Partial<HexMetadataRecordRes1>): HexMetadataRecordRes1).
+ * Defines the `baseRow` function shape (function baseRow(partial: Partial<HexMetadataRecordStrategic>): HexMetadataRecordStrategic).
 
  * Purpose: Supports maintainability by documenting why `baseRow` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-function baseRow(partial: Partial<HexMetadataRecordRes1>): HexMetadataRecordRes1 {
+function baseRow(partial: Partial<HexMetadataRecordStrategic>): HexMetadataRecordStrategic {
   return {
     h3_index: '81003ffffffffff',
     total_edges: 6,
@@ -192,15 +192,15 @@ function testInteriorForest(): void {
 }
 
 /**
- * Defines the `testRes4UrbanOverride` function shape (function testRes4UrbanOverride(): void).
+ * Defines the `testTacticalUrbanOverride` function shape (function testTacticalUrbanOverride(): void).
 
- * Purpose: Supports maintainability by documenting why `testRes4UrbanOverride` exists.
+ * Purpose: Supports maintainability by documenting why `testTacticalUrbanOverride` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-function testRes4UrbanOverride(): void {
-  const r: HexMetadataRecordRes4 = {
+function testTacticalUrbanOverride(): void {
+  const r: HexMetadataRecordTactical = {
     ...baseRow({
       all_water: false,
       intersects_water: false,
@@ -213,20 +213,20 @@ function testRes4UrbanOverride(): void {
     urban_edges: 2,
     urban_by_scalerank: [{ scalerank: 5, all_urban: false, intersects_urban: true, urban_edges: 2 }],
   };
-  assert.strictEqual(classifyRes4TerrainKind(r, t, 'water'), 'plains');
-  assert.ok(isRes4UrbanOverlayHex(r));
+  assert.strictEqual(classifyTacticalTerrainKind(r, t, 'water'), 'plains');
+  assert.ok(isTacticalUrbanOverlayHex(r));
 }
 
 /**
- * Defines the `testRes4NoUrbanWhenFullyWater` function shape (function testRes4NoUrbanWhenFullyWater(): void).
+ * Defines the `testTacticalNoUrbanWhenFullyWater` function shape (function testTacticalNoUrbanWhenFullyWater(): void).
 
- * Purpose: Supports maintainability by documenting why `testRes4NoUrbanWhenFullyWater` exists.
+ * Purpose: Supports maintainability by documenting why `testTacticalNoUrbanWhenFullyWater` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-function testRes4NoUrbanWhenFullyWater(): void {
-  const r: HexMetadataRecordRes4 = {
+function testTacticalNoUrbanWhenFullyWater(): void {
+  const r: HexMetadataRecordTactical = {
     ...baseRow({
       all_water: true,
       intersects_water: true,
@@ -239,20 +239,20 @@ function testRes4NoUrbanWhenFullyWater(): void {
     urban_edges: 6,
     urban_by_scalerank: [{ scalerank: 4, all_urban: true, intersects_urban: true, urban_edges: 6 }],
   };
-  assert.strictEqual(classifyRes4TerrainKind(r, t, 'water'), 'water');
-  assert.ok(isRes4UrbanOverlayHex(r));
+  assert.strictEqual(classifyTacticalTerrainKind(r, t, 'water'), 'water');
+  assert.ok(isTacticalUrbanOverlayHex(r));
 }
 
 /**
- * Defines the `testRes4UrbanOverlayScalerankGate` function shape (function testRes4UrbanOverlayScalerankGate(): void).
+ * Defines the `testTacticalUrbanOverlayScalerankGate` function shape (function testTacticalUrbanOverlayScalerankGate(): void).
 
- * Purpose: Supports maintainability by documenting why `testRes4UrbanOverlayScalerankGate` exists.
+ * Purpose: Supports maintainability by documenting why `testTacticalUrbanOverlayScalerankGate` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-function testRes4UrbanOverlayScalerankGate(): void {
-  const r: HexMetadataRecordRes4 = {
+function testTacticalUrbanOverlayScalerankGate(): void {
+  const r: HexMetadataRecordTactical = {
     ...baseRow({
       all_water: false,
       intersects_water: false,
@@ -265,19 +265,19 @@ function testRes4UrbanOverlayScalerankGate(): void {
     urban_edges: 2,
     urban_by_scalerank: [{ scalerank: 6, all_urban: false, intersects_urban: true, urban_edges: 2 }],
   };
-  assert.ok(!isRes4UrbanOverlayHex(r));
+  assert.ok(!isTacticalUrbanOverlayHex(r));
 }
 
 /**
- * Defines the `testRes4UrbanOverlayIntersectionWithoutEdgeCrossing` function shape (function testRes4UrbanOverlayIntersectionWithoutEdgeCrossing(): void).
+ * Defines the `testTacticalUrbanOverlayIntersectionWithoutEdgeCrossing` function shape (function testTacticalUrbanOverlayIntersectionWithoutEdgeCrossing(): void).
 
- * Purpose: Supports maintainability by documenting why `testRes4UrbanOverlayIntersectionWithoutEdgeCrossing` exists.
+ * Purpose: Supports maintainability by documenting why `testTacticalUrbanOverlayIntersectionWithoutEdgeCrossing` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-function testRes4UrbanOverlayIntersectionWithoutEdgeCrossing(): void {
-  const r: HexMetadataRecordRes4 = {
+function testTacticalUrbanOverlayIntersectionWithoutEdgeCrossing(): void {
+  const r: HexMetadataRecordTactical = {
     ...baseRow({
       all_water: false,
       intersects_water: false,
@@ -290,7 +290,7 @@ function testRes4UrbanOverlayIntersectionWithoutEdgeCrossing(): void {
     urban_edges: 0,
     urban_by_scalerank: [{ scalerank: 5, all_urban: false, intersects_urban: true, urban_edges: 0 }],
   };
-  assert.ok(isRes4UrbanOverlayHex(r));
+  assert.ok(isTacticalUrbanOverlayHex(r));
 }
 
 /**
@@ -323,10 +323,10 @@ function main(): void {
   testInWaterWithLandcoverIsWater();
   testWetlandsBandWithLandcoverIsWetlands();
   testInteriorForest();
-  testRes4UrbanOverride();
-  testRes4NoUrbanWhenFullyWater();
-  testRes4UrbanOverlayScalerankGate();
-  testRes4UrbanOverlayIntersectionWithoutEdgeCrossing();
+  testTacticalUrbanOverride();
+  testTacticalNoUrbanWhenFullyWater();
+  testTacticalUrbanOverlayScalerankGate();
+  testTacticalUrbanOverlayIntersectionWithoutEdgeCrossing();
   testMajorInfrastructureGates();
   console.log('terrainClassifierFromMetadata.test: ok');
 }

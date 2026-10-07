@@ -41,12 +41,12 @@ Example: the const identifier `TOOL2_NAMES` may become `ASSESSMENT_TOOL_NAMES`, 
 | Standing-order type strings | `'defend'`, `'march'`, `'pursue'`, `'patrol'`, `'hold_fire'` | Persisted and parsed |
 | Envelope action strings | `'assign_order'`, `'cancel_order'` | Parsed JSON from the model |
 | Prompt section heading text | Strings asserted in prompt-spec tests | Model-facing copy |
-| SQLite tables and columns | `turn_number` and siblings | On-disk schema |
+| SQLite tables and columns | `turn_number` and siblings. The strategic and tactical grids use the prefixes `res_s_` and `res_t_` (`res_s_control`, `res_t_feature_overrides`, `units.birth_res_t_h3_index`). | On-disk schema |
 | DB row type properties that mirror SQL | `TurnStateRow = { turn_number }` | Boundary mirror |
 | OpenRouter HTTP fields | `max_tokens`, `tool_calls`, `response_format`, `reasoning.effort`, `plugins`; models-list fields such as `supported_parameters`, `supported_efforts`, `top_provider.max_completion_tokens` | Vendor API |
 | Structured-output identifiers | `'orders_envelope'` schema name, `'response-healing'` plugin id | Vendor API |
 | `game_config` keys | `'openrouter_selected_model'`, `'openrouter_selected_reasoning_effort'` | Persisted settings |
-| Persisted JSON keys | Saved games; `data/generated/` terrain JSON | On-disk compatibility |
+| Persisted JSON keys | Saved games; `data/generated/` terrain JSON. Global pack filenames such as `terrain_res1_naming.json` and `terrain_res4_naming.json` stay as stored. | On-disk compatibility |
 | Electron entry filenames | `src/main/main.ts`, `src/main/preload.ts` | `"main": "dist/main/main.js"` in `package.json` |
 | Renderer bundle entry | `src/renderer/renderer.ts` | `build:renderer` esbuild entry |
 | Module augmentation filename | `src/main/better-sqlite3.d.ts` | Must match the `better-sqlite3` module |
@@ -94,14 +94,14 @@ When dropping `Impl` from a function, if `foo` already exists as a public wrappe
 
 ## Approved abbreviations
 
-`res1`, `res4`, `h3`, `db`, `ipc`, `ui`, `ai`, `llm`. Do not invent `cfg` or `ctx` as exported names (`context` is acceptable). Domain words `tactical` and `strategic` stay when they disambiguate.
+`h3`, `db`, `ipc`, `ui`, `ai`, `llm`. Do not invent `cfg` or `ctx` as exported names (`context` is acceptable). Do not abbreviate the two map layers as `res1` or `res4` in TypeScript identifiers or file stems. Domain words `tactical` and `strategic` stay when they disambiguate. Persisted SQL for those layers uses `res_s` and `res_t`, as in the frozen-names table. IPC channel strings already listed in this file are unchanged.
 
 ---
 
 ## Length and concision rubric (judgement)
 
 - Prefer the shorter name when both names convey the same meaning.
-- Do not strip a word that distinguishes tactical from strategic, or res1 from res4.
+- Do not strip a word that distinguishes tactical from strategic.
 - File names: typically 2–4 camelCase words. Exported functions: typically 2–5.
 - A name is wrong if a new developer searching for the concept would not find it.
 

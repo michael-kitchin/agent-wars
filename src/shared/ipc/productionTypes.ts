@@ -31,14 +31,14 @@ export function isBuildUnitType(value: unknown): value is BuildUnitType {
 }
 
 /**
- * Documents the `Res1ProductionContextSnapshot` interface as a named contract surface (export interface Res1ProductionContextSnapshot).
+ * Documents the `StrategicProductionContextSnapshot` interface as a named contract surface (export interface StrategicProductionContextSnapshot).
 
- * Purpose: Supports maintainability by documenting why `Res1ProductionContextSnapshot` exists.
+ * Purpose: Supports maintainability by documenting why `StrategicProductionContextSnapshot` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export interface Res1ProductionContextSnapshot {
+export interface StrategicProductionContextSnapshot {
     /**
    * Specifies the contract for the `urbanHexCount` member (urbanHexCount: number;).
 
@@ -152,41 +152,41 @@ controllerPlayerId: string | null;
    */
 controlledByRequester: boolean;
     /**
-   * Specifies the contract for the `urbanHexCount` member (urbanHexCount: Res1ProductionContextSnapshot['urbanHexCount'];).
+   * Specifies the contract for the `urbanHexCount` member (urbanHexCount: StrategicProductionContextSnapshot['urbanHexCount'];).
 
    * Contract: Describes stable behavior for callers of `urbanHexCount` in this codebase.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-urbanHexCount: Res1ProductionContextSnapshot['urbanHexCount'];
+urbanHexCount: StrategicProductionContextSnapshot['urbanHexCount'];
     /**
    * Specifies the contract for the `storedPoints` member (storedPoints: number;).
 
    * Contract: Carry-over production points for this hex before the next urban capacity pulse is applied.
    * When to use: UI that simulates queue completion time or mirrors in-game production banked points.
-   * Expected outcome: Non-negative integer matching `res1_build_progress.stored_points` for the same hex.
+   * Expected outcome: Non-negative integer matching `res_s_build_progress.stored_points` for the same hex.
    * Exceptions: None.
    */
 storedPoints: number;
     /**
-   * Specifies the contract for the `airportCount` member (airportCount: Res1ProductionContextSnapshot['airportCount'];).
+   * Specifies the contract for the `airportCount` member (airportCount: StrategicProductionContextSnapshot['airportCount'];).
 
    * Contract: Describes stable behavior for callers of `airportCount` in this codebase.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-airportCount: Res1ProductionContextSnapshot['airportCount'];
+airportCount: StrategicProductionContextSnapshot['airportCount'];
     /**
-   * Specifies the contract for the `seaportCount` member (seaportCount: Res1ProductionContextSnapshot['seaportCount'];).
+   * Specifies the contract for the `seaportCount` member (seaportCount: StrategicProductionContextSnapshot['seaportCount'];).
 
    * Contract: Describes stable behavior for callers of `seaportCount` in this codebase.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-seaportCount: Res1ProductionContextSnapshot['seaportCount'];
+seaportCount: StrategicProductionContextSnapshot['seaportCount'];
     /**
    * Specifies the contract for the `availableUnitTypes` member (availableUnitTypes: BuildUnitType[];).
 
@@ -228,7 +228,7 @@ entries: HexBuildQueueEntrySnapshot[];
    *
    * Contract: True when the hex should auto-refill after the queue empties.
    * When to use: Build popup checkbox state and engine same-turn refill.
-   * Expected outcome: Matches `res1_build_progress.keep_building` for the hex.
+   * Expected outcome: Matches `res_s_build_progress.keep_building` for the hex.
    * Exceptions: None.
    */
   keepBuilding: boolean;
@@ -237,7 +237,7 @@ entries: HexBuildQueueEntrySnapshot[];
    *
    * Contract: Last valid standing unit type, or null when Keep building is off.
    * When to use: Checkbox labeling/diagnostics and engine refill.
-   * Expected outcome: Matches `res1_build_progress.keep_building_unit_type`, or null when disarmed.
+   * Expected outcome: Matches `res_s_build_progress.keep_building_unit_type`, or null when disarmed.
    * Exceptions: None.
    */
   keepBuildingUnitType: BuildUnitType | null;

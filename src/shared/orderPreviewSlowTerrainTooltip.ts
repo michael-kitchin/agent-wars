@@ -10,17 +10,17 @@
 import { formatTransportIconsHtml, transportLineSpecified } from './featureIconHtml';
 import { formatTerrainNameListHtml } from './terrainSwatchHtml';
 import {
-  effectiveRes4TerrainKindString,
+  effectiveTacticalTerrainKindString,
   effectiveTacticalMovementPointBudgetForMarchLeg,
   effectiveTacticalRangedMaxRangeForAttacker,
   tacticalMovementTerrainAnchorH3,
-  tacticalRes4CellIsForestClass,
-  tacticalRes4CellIsMountain,
+  tacticalCellIsForestClass,
+  tacticalCellIsMountain,
 } from './tacticalTerrainCombatModifiers';
 import type { TacticalBattleTerrainPick } from './tacticalTerrainCombatModifiers';
 import type { TacticalBattleSnapshot, TacticalSubUnitSnapshot } from './tacticalBattleTypes';
 import { MOVEMENT_RANGE_BY_UNIT_TYPE, RANGED_RANGE_BY_UNIT_TYPE } from './tacticalRanges';
-import { landInfantryArmorEnterCost } from './tacticalRes4LandMarchContinuity';
+import { landInfantryArmorEnterCost } from './tacticalLandMarchContinuity';
 import {
   formatWeatherLabel,
   tacticalWeatherOpenGroundCost,
@@ -312,9 +312,9 @@ export function collectTacticalMarchTerrainImpact(args: {
   const eff = effectiveTacticalMovementPointBudgetForMarchLeg(battle, subUnit, battle.subUnits, moveType);
   if (eff < baseLine) {
     const anchor = tacticalMovementTerrainAnchorH3(subUnit, battle.subUnits);
-    if (battle.res4IsRubbleByH3?.[anchor]) push('Rubble');
-    else if (battle.res4IsUrbanByH3?.[anchor]) push('Urban');
-    else if (subUnit.unitType === 'armor' && tacticalRes4CellIsForestClass(battle, anchor)) push('Forest');
+    if (battle.tacticalIsRubbleByH3?.[anchor]) push('Rubble');
+    else if (battle.tacticalIsUrbanByH3?.[anchor]) push('Urban');
+    else if (subUnit.unitType === 'armor' && tacticalCellIsForestClass(battle, anchor)) push('Forest');
     const terrainOnly = effectiveTacticalMovementPointBudgetForMarchLeg(
       { ...battle, weatherBonusEnabled: false },
       subUnit,
@@ -326,17 +326,17 @@ export function collectTacticalMarchTerrainImpact(args: {
   }
 
   const terrainForTransport = buildTacticalTerrainKindResolverFromSnapshot(battle);
-  const footprint = new Set(battle.res4ChildH3Indexes);
+  const footprint = new Set(battle.tacticalChildH3Indexes);
   const marchGoalH3 = pathH3[pathH3.length - 1]!;
   for (let i = 1; i < pathH3.length; i++) {
     const prev = pathH3[i - 1]!;
     const h = pathH3[i]!;
-    if (battle.res4IsRubbleByH3?.[h]) {
+    if (battle.tacticalIsRubbleByH3?.[h]) {
       push('Rubble');
       continue;
     }
-    const urban = battle.res4IsUrbanByH3?.[h] === true;
-    const rawKind = effectiveRes4TerrainKindString(battle, h);
+    const urban = battle.tacticalIsUrbanByH3?.[h] === true;
+    const rawKind = effectiveTacticalTerrainKindString(battle, h);
     const parent = battle.strategicHexTerrain ?? 'land';
     const cat = normalizeDbTerrainKindToTacticalCategory(String(rawKind).toLowerCase(), parent);
     const cost = tacticalEnterHexMovementCost(moveType, cat);
@@ -347,7 +347,7 @@ export function collectTacticalMarchTerrainImpact(args: {
       fromH3: prev,
       prevOfFrom: i >= 2 ? pathH3[i - 2]! : null,
       marchGoalH3,
-      res4Set: footprint,
+      tacticalSet: footprint,
       weatherEnabled: battle.weatherBonusEnabled === true,
       weather: battle.weather,
       weatherTags: subUnit.weatherTags,
@@ -355,8 +355,8 @@ export function collectTacticalMarchTerrainImpact(args: {
     const usedLineRate = Number.isFinite(stepCost) && stepCost < 1;
     if (usedLineRate) {
       roadRail = true;
-      const railSides = battle.res4RailSidesByH3?.[h];
-      const roadSides = battle.res4RoadSidesByH3?.[h];
+      const railSides = battle.tacticalRailSidesByH3?.[h];
+      const roadSides = battle.tacticalRoadSidesByH3?.[h];
       if (railSides?.some((side) => side === true)) usedRail = true;
       else if (roadSides?.some((side) => side === true)) usedRoad = true;
       continue;
@@ -383,11 +383,11 @@ export function collectTacticalMarchTerrainImpact(args: {
     if (Number.isFinite(cost) && openGround > cost && (battle.weather === 'snow' || battle.weather === 'rain')) {
       push(formatWeatherLabel(battle.weather));
     }
-    if (tacticalRes4CellIsForestClass(battle, h) && (subUnit.unitType === 'armor' || subUnit.unitType === 'infantry')) {
+    if (tacticalCellIsForestClass(battle, h) && (subUnit.unitType === 'armor' || subUnit.unitType === 'infantry')) {
       push('Forest');
       continue;
     }
-    if (subUnit.unitType === 'infantry' && tacticalRes4CellIsMountain(battle, h)) {
+    if (subUnit.unitType === 'infantry' && tacticalCellIsMountain(battle, h)) {
       push('Mountain');
     }
   }
@@ -400,7 +400,7 @@ export function collectTacticalMarchTerrainImpact(args: {
 }
 
 /**
- * Resolves tactical march “slow terrain” copy from anchor throttling and/or expensive cells along the res4 path.
+ * Resolves tactical march “slow terrain” copy from anchor throttling and/or expensive cells along the tactical path.
  *
  * Purpose: Backward-compatible first-label return matching pre-union behavior (including `Road/Rail` alone).
  * When to use: Callers that still expect `string | null` only.
@@ -439,9 +439,9 @@ export function pickTacticalRangedSlowTerrainDisplayTitle(
   const baseline = RANGED_RANGE_BY_UNIT_TYPE[unitType] ?? 0;
   const eff = effectiveTacticalRangedMaxRangeForAttacker(battle, unitType, anchor);
   if (eff >= baseline) return null;
-  if (battle.res4IsRubbleByH3?.[anchor]) return 'Rubble';
-  if (battle.res4IsUrbanByH3?.[anchor]) return 'Urban';
-  if (tacticalRes4CellIsForestClass(battle, anchor)) return 'Forest';
+  if (battle.tacticalIsRubbleByH3?.[anchor]) return 'Rubble';
+  if (battle.tacticalIsUrbanByH3?.[anchor]) return 'Urban';
+  if (tacticalCellIsForestClass(battle, anchor)) return 'Forest';
   return null;
 }
 

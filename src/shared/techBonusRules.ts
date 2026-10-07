@@ -7,7 +7,9 @@
  * Exceptions: None.
  */
 
+import { GLOBAL_GAME_MAP } from './activeGameMap';
 import type { BonusLevel } from './bonusLevel';
+import { advancedTechMinUrbanCells } from './gameRules';
 import { formatOriginBonusTableCell } from './originBonusRules';
 import type { OriginBonusSettings, OriginHitBonus, OriginBonusSource } from './originBonusTypes';
 import type { TechHitBonus, TechLevel } from './techBonusTypes';
@@ -17,10 +19,10 @@ import type { TechHitBonus, TechLevel } from './techBonusTypes';
  *
  * Purpose: The cut is on the generated baseline count, not the live count after air strikes.
  * When to use: `techLevelFromUrbanHexCount`.
- * Expected outcome: Twenty-one. A count of 20 is still Basic.
+ * Expected outcome: The global profile's Advanced threshold, which is 21. A count of 20 is still Basic on that map.
  * Exceptions: None.
  */
-export const TECH_ADVANCED_MIN_URBAN_HEX_COUNT = 21;
+export const TECH_ADVANCED_MIN_URBAN_HEX_COUNT = GLOBAL_GAME_MAP.rules.advancedMinUrbanCells;
 
 /**
  * Points an Advanced unit adds.
@@ -37,12 +39,12 @@ export const TECH_HIT_BONUS: TechHitBonus = Object.freeze({ attack: 2, defense: 
  *
  * Purpose: The tier is a fact about the hex, independent of whether the match uses it.
  * When to use: When a unit is stamped or a lookup is built. A missing count is Basic.
- * Expected outcome: `advanced` at `TECH_ADVANCED_MIN_URBAN_HEX_COUNT` or more; otherwise `basic`.
+ * Expected outcome: `advanced` when the count reaches `advancedTechMinUrbanCells()` for the active map; otherwise `basic`. The exported constant stays the global threshold.
  * Exceptions: None.
  */
 export function techLevelFromUrbanHexCount(urbanHexCount: number | null | undefined): TechLevel {
   if (urbanHexCount == null || !Number.isFinite(urbanHexCount)) return 'basic';
-  return urbanHexCount >= TECH_ADVANCED_MIN_URBAN_HEX_COUNT ? 'advanced' : 'basic';
+  return urbanHexCount >= advancedTechMinUrbanCells() ? 'advanced' : 'basic';
 }
 
 /**

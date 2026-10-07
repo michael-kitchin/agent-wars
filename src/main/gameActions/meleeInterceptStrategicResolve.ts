@@ -16,7 +16,7 @@ import { failIfDatabaseNotReady, failIfTacticalBattleActive } from './readyStrat
  *
  * Purpose: Clears pending snapshot only after token and phase validation; mirrors legacy `gameActions.resolveMeleeIntercept`.
  * When to use: Exported through `gameActions.resolveMeleeIntercept` only.
- * Expected outcome: Completed `ReadyResult` or structured failure; Fight may attach `tacticalAutoStartRes1H3Index`.
+ * Expected outcome: Completed `ReadyResult` or structured failure; Fight may attach `tacticalAutoStartStrategicH3Index`.
  * Exceptions: Caught and converted to `{ success: false, reason }` at the `gameActions` boundary.
  */
 export function executeResolveMeleeIntercept(payload: ResolveMeleeInterceptIpcPayload): ReadyResult {
@@ -80,7 +80,7 @@ export function executeResolveMeleeIntercept(payload: ResolveMeleeInterceptIpcPa
     return baseResult;
   }
   if (payload.decision === 'fight' && payload.selectedH3Index) {
-    return { ...baseResult, tacticalAutoStartRes1H3Index: payload.selectedH3Index };
+    return { ...baseResult, tacticalAutoStartH3Index: payload.selectedH3Index };
   }
   return baseResult;
 }

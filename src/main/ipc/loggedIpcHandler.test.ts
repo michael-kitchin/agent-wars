@@ -28,7 +28,7 @@ function testHappyPathReturnsHandlerValue(): void {
 /**
  * Verifies thrown handlers return the fallback value.
  *
- * Purpose: Essential failure path matching res4 overlay handlers.
+ * Purpose: Essential failure path matching tactical overlay handlers.
  * When to use: After changing catch/fallback behavior.
  * Expected outcome: Listener returns `fallback` when `handler` throws.
  * Exceptions: None.

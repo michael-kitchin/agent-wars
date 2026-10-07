@@ -1,62 +1,51 @@
 /**
  * Resolves a new unit's birth origin from the database and the terrain cache.
  *
- * Purpose: Gathers the birth hex's res4 cells and delegates the pick to `selectUnitBirthOrigin`.
+ * Purpose: Gathers the birth hex's tactical cells and delegates the pick to `selectUnitBirthOrigin`.
  * When to use: Once per unit insert, from seeding and production.
  * Expected outcome: Never throws and never touches gameplay random streams.
  * Exceptions: None; errors are logged and yield a minimal origin.
  */
-import { cellToChildren } from 'h3-js';
 import { isPipelineTerrainKind } from '../../shared/pipelineTerrain';
 import type { UnitOrigin } from '../../shared/unitOriginTypes';
-import { TACTICAL_H3_RESOLUTION } from '../../shared/h3Resolutions';
-import { getRes4TerrainOverridesForRendererFromGame } from '../gameDb/controlInfrastructure';
+import { tacticalChildrenOf } from '../../shared/h3Resolutions';
+import { getTacticalTerrainOverridesForRendererFromGame } from '../gameDb/controlInfrastructure';
 import type { BasicDbOps } from '../gameDb/dbOps';
 import { getGameSeedWithOps } from '../gameDb/gameConfigKv';
 import { logDebug, logError } from '../logger';
-import { getRes4BirthCountryFromSnapshot } from './res4BirthCountryCache';
-import { selectUnitBirthOrigin, type Res4BirthCandidate } from './unitBirthCellSelection';
+import { getTacticalBirthCountryFromSnapshot } from './tacticalBirthCountryCache';
+import { selectUnitBirthOrigin, type TacticalBirthCandidate } from './unitBirthCellSelection';
 
 /**
- * Resolution of the res4 cells a unit can be born in.
+ * One row of the merged tactical terrain overrides.
  *
- * Purpose: Matches the terrain cache's res4 naming and override data.
- * When to use: With `cellToChildren` on the birth hex.
- * Expected outcome: Always equals the shared tactical resolution (4).
- * Exceptions: None.
- */
-const BIRTH_CELL_RESOLUTION = TACTICAL_H3_RESOLUTION;
-
-/**
- * One row of the merged res4 terrain overrides.
- *
- * Purpose: Names the element type returned by `getRes4TerrainOverridesForRendererFromGame`.
+ * Purpose: Names the element type returned by `getTacticalTerrainOverridesForRendererFromGame`.
  * When to use: Indexing override rows by cell.
  * Expected outcome: Matches the function's return element type.
  * Exceptions: None.
  */
-type Res4OverrideRow = ReturnType<typeof getRes4TerrainOverridesForRendererFromGame>[number];
+type TacticalOverrideRow = ReturnType<typeof getTacticalTerrainOverridesForRendererFromGame>[number];
 
 /**
- * Override rows indexed by res4 cell, memoized per returned row array.
+ * Override rows indexed by tactical cell, memoized per returned row array.
  *
  * Purpose: The override reader returns the same array while the database is unchanged, so the index is built once.
  * When to use: Through `overrideRowsByH3` only.
  * Expected outcome: Entries disappear with their arrays.
  * Exceptions: None.
  */
-const overrideIndexByRows = new WeakMap<ReadonlyArray<Res4OverrideRow>, ReadonlyMap<string, Res4OverrideRow>>();
+const overrideIndexByRows = new WeakMap<ReadonlyArray<TacticalOverrideRow>, ReadonlyMap<string, TacticalOverrideRow>>();
 
 /**
- * Returns the current res4 overrides indexed by cell.
+ * Returns the current tactical overrides indexed by cell.
  *
  * Purpose: Constant-time lookups while building birth candidates.
  * When to use: Once per `resolveUnitBirthOrigin` call.
  * Expected outcome: The memoized index for the current override rows.
  * Exceptions: Propagates database errors.
  */
-function overrideRowsByH3(ops: BasicDbOps): ReadonlyMap<string, Res4OverrideRow> {
-  const rows = getRes4TerrainOverridesForRendererFromGame(ops);
+function overrideRowsByH3(ops: BasicDbOps): ReadonlyMap<string, TacticalOverrideRow> {
+  const rows = getTacticalTerrainOverridesForRendererFromGame(ops);
   const existing = overrideIndexByRows.get(rows);
   if (existing) return existing;
   const index = new Map(rows.map((row) => [row.h3Index, row] as const));
@@ -75,7 +64,7 @@ function overrideRowsByH3(ops: BasicDbOps): ReadonlyMap<string, Res4OverrideRow>
 function minimalOrigin(birthH3Index: string): UnitOrigin {
   return {
     birthH3Index,
-    birthRes4H3Index: null,
+    birthTacticalH3Index: null,
     birthTerrainKind: null,
     birthIsUrban: false,
     birthCountryName: null,
@@ -95,24 +84,24 @@ export function resolveUnitBirthOrigin(ops: BasicDbOps, args: { unitId: string; 
   const { unitId, birthH3Index } = args;
   try {
     const seed = getGameSeedWithOps(ops);
-    const res1Kind =
+    const strategicKind =
       ops.getOne<{ terrain_kind: string }>('SELECT terrain_kind FROM hexes WHERE h3_index = ?', [birthH3Index])
         ?.terrain_kind ?? null;
     const overrides = overrideRowsByH3(ops);
-    const res4Candidates: Res4BirthCandidate[] = cellToChildren(birthH3Index, BIRTH_CELL_RESOLUTION).map((h3Index) => {
+    const tacticalCandidates: TacticalBirthCandidate[] = tacticalChildrenOf(birthH3Index).map((h3Index) => {
       const row = overrides.get(h3Index);
       return {
         h3Index,
-        terrainKind: row?.terrainKind ?? res1Kind ?? 'water',
+        terrainKind: row?.terrainKind ?? strategicKind ?? 'water',
         isIntactUrban: !!row?.isUrban && !row?.isRubble,
       };
     });
     const selected = selectUnitBirthOrigin({
       birthH3Index,
-      res1TerrainKind: res1Kind,
-      res4Candidates,
+      strategicTerrainKind: strategicKind,
+      tacticalCandidates,
       seedKey: `${seed}:${unitId}`,
-      birthCountryForRes4: getRes4BirthCountryFromSnapshot,
+      birthCountryForTactical: getTacticalBirthCountryFromSnapshot,
     });
     const terrainKind = selected.birthTerrainKind;
     const origin: UnitOrigin = {
@@ -122,7 +111,7 @@ export function resolveUnitBirthOrigin(ops: BasicDbOps, args: { unitId: string; 
     logDebug('unitBirthOrigin resolveUnitBirthOrigin', {
       unitId,
       birthH3Index,
-      birthRes4H3Index: origin.birthRes4H3Index,
+      birthTacticalH3Index: origin.birthTacticalH3Index,
       birthTerrainKind: origin.birthTerrainKind,
       birthIsUrban: origin.birthIsUrban,
       birthCountryCode: origin.birthCountryCode,

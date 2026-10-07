@@ -3,7 +3,7 @@ import {
   canLandUnitTraverseEdge,
   landUnitCanOccupyHex,
   type LandMassByH3,
-} from '../../shared/landTraversalRes1';
+} from '../../shared/landTraversalStrategic';
 import { logError } from '../logger';
 
 /**

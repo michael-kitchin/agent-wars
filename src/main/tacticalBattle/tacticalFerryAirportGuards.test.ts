@@ -11,15 +11,15 @@ import {
   collectTacticalLegalFerryDestinationHexes,
   tacticalFerryAirportRejectionReason,
   tacticalFerryApplyOutcome,
-  tacticalRes4CellHasIntactAirport,
+  tacticalCellHasIntactAirport,
   validateTacticalGroupFerryTarget,
 } from './tacticalFerryAirportGuards';
 import { applyTacticalFerryPhaseOnBattle } from './tacticalStrategicOrderPhases';
 import {
   firstRingCellDistinctFrom,
-  tacticalRes1Cell,
-  tacticalRes4UnderRes1Corner,
-} from './testSupport/tacticalRes4HexFixtures';
+  tacticalParentCell,
+  tacticalUnderCorner,
+} from './testSupport/tacticalHexFixtures';
 
 /**
  * Builds a one-air-unit tactical snapshot with optional origin/dest airport flags.
@@ -27,7 +27,7 @@ import {
  * Purpose: Isolates ferry airport contracts without SQLite or a live session.
  * When to use: Apply-phase tests in this file.
  * Expected outcome: Footprint is the origin disk; dest is a distinct ring-1 neighbor.
- * Exceptions: Throws when the ring has no neighbor (should not happen at res4).
+ * Exceptions: Throws when the ring has no neighbor (should not happen at tactical).
  */
 function airFerryBattle(args: {
   battleId: string;
@@ -37,8 +37,8 @@ function airFerryBattle(args: {
   originRubble?: boolean;
   player: 'human' | 'opponent';
 }): { battle: TacticalBattleSnapshot; origin: string; dest: string; unitId: string } {
-  const res1 = tacticalRes1Cell(22, 24);
-  const origin = tacticalRes4UnderRes1Corner(22, 24);
+  const strategic = tacticalParentCell(22, 24);
+  const origin = tacticalUnderCorner(22, 24);
   const dest = firstRingCellDistinctFrom(origin);
   const ring = [...gridDisk(origin, 1)];
   const unitId = `${args.player}-air-ferry`;
@@ -50,21 +50,21 @@ function airFerryBattle(args: {
     h3Index: origin,
     displayName: '1st Air (ferry)',
   };
-  const res4IsAirportByH3: Record<string, boolean> = {};
-  if (args.originAirport) res4IsAirportByH3[origin] = true;
-  if (args.destAirport) res4IsAirportByH3[dest] = true;
-  const res4IsRubbleByH3: Record<string, boolean> = {};
-  if (args.destRubble) res4IsRubbleByH3[dest] = true;
-  if (args.originRubble) res4IsRubbleByH3[origin] = true;
+  const tacticalIsAirportByH3: Record<string, boolean> = {};
+  if (args.originAirport) tacticalIsAirportByH3[origin] = true;
+  if (args.destAirport) tacticalIsAirportByH3[dest] = true;
+  const tacticalIsRubbleByH3: Record<string, boolean> = {};
+  if (args.destRubble) tacticalIsRubbleByH3[dest] = true;
+  if (args.originRubble) tacticalIsRubbleByH3[origin] = true;
   const battle: TacticalBattleSnapshot = {
     battleId: args.battleId,
-    enclosingRes1H3Index: res1,
-    res4ChildH3Indexes: ring,
+    enclosingStrategicH3Index: strategic,
+    tacticalChildH3Indexes: ring,
     strategicTurnNumber: 1,
     tacticalTurnNumber: 1,
     subUnits: [air],
-    res4IsAirportByH3,
-    res4IsRubbleByH3,
+    tacticalIsAirportByH3,
+    tacticalIsRubbleByH3,
   };
   return { battle, origin, dest, unitId };
 }
@@ -160,8 +160,8 @@ test('tacticalRes4CellHasIntactAirport is false for omitted, rubble, or missing 
     destRubble: true,
     player: 'human',
   });
-  assert.equal(tacticalRes4CellHasIntactAirport(battle, origin), true);
-  assert.equal(tacticalRes4CellHasIntactAirport(battle, dest), false);
+  assert.equal(tacticalCellHasIntactAirport(battle, origin), true);
+  assert.equal(tacticalCellHasIntactAirport(battle, dest), false);
   assert.equal(tacticalFerryAirportRejectionReason(battle, origin, dest), 'Destination airport is not intact');
 });
 

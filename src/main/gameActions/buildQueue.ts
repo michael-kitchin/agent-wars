@@ -6,7 +6,7 @@ import {
   getHexController,
   listBuildQueueRowsForHex,
   replaceBuildQueueForHex,
-  getRes1InfrastructureForHex,
+  getStrategicInfrastructureForHex,
   setKeepBuildingForHex,
 } from '../gameDb';
 import { logDebug, logError, logTrace } from '../logger';
@@ -21,7 +21,7 @@ import {
 import type {
   ApplyBuildQueueTemplateResult,
   BuildQueueTemplateEntry,
-  Res1ProductionContextSnapshot,
+  StrategicProductionContextSnapshot,
   SetHexesKeepBuildingResult,
 } from '../../shared/ipcTypes';
 import { isTacticalBattleActive } from '../tacticalBattle/tacticalBattleSession';
@@ -202,14 +202,14 @@ entries: HexBuildQueueEntryView[];
 }
 
 /**
- * Documents the `ProductionEligibilityView` interface as a named contract surface (interface ProductionEligibilityView extends Res1ProductionContextSnapshot).
+ * Documents the `ProductionEligibilityView` interface as a named contract surface (interface ProductionEligibilityView extends StrategicProductionContextSnapshot).
 
  * Purpose: Supports maintainability by documenting why `ProductionEligibilityView` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-interface ProductionEligibilityView extends Res1ProductionContextSnapshot {
+interface ProductionEligibilityView extends StrategicProductionContextSnapshot {
     /**
    * Specifies the contract for the `availableUnitTypes` member (availableUnitTypes: BuildUnitType[];).
 
@@ -248,7 +248,7 @@ noBuildReason: string | null;
  * Exceptions: None.
  */
 function buildProductionEligibilityView(
-  productionContext: Res1ProductionContextSnapshot
+  productionContext: StrategicProductionContextSnapshot
 ): ProductionEligibilityView {
   const availableUnitTypes = getAvailableBuildUnitTypes(
     productionContext.urbanHexCount,
@@ -298,7 +298,7 @@ function syncStandingOrderAfterQueueMutation(h3Index: string): void {
 function buildQueueViewForRequester(h3Index: string, requestingPlayerId: string): HexBuildQueueView {
   const controllerPlayerId = getHexController(h3Index);
   const controlledByRequester = controllerPlayerId === requestingPlayerId;
-  const productionView = buildProductionEligibilityView(getRes1InfrastructureForHex(h3Index));
+  const productionView = buildProductionEligibilityView(getStrategicInfrastructureForHex(h3Index));
   const standing = getKeepBuildingForHex(h3Index);
   return {
     h3Index,
@@ -391,7 +391,7 @@ export function executeAddHexBuildQueueEntry(h3Index: string, requestingPlayerId
     if (!defaultUnitType) return { success: false, reason: 'No unit types are currently available for this hex.' };
     const currentRows = listBuildQueueRowsForHex(h3Index);
     dbRun(
-      `INSERT INTO res1_build_queue (h3_index, queue_index, unit_type, remaining_count)
+      `INSERT INTO res_s_build_queue (h3_index, queue_index, unit_type, remaining_count)
        VALUES (?, ?, ?, ?)`,
       [h3Index, currentRows.length, defaultUnitType, BUILD_ENTRY_MIN_COUNT]
     );
@@ -436,9 +436,9 @@ export function executeUpdateHexBuildQueueEntry(
         reason: `Build count must be an integer from ${BUILD_ENTRY_MIN_COUNT} to ${BUILD_ENTRY_MAX_COUNT}.`,
       };
     }
-    const row = dbGetOne<{ id: number }>('SELECT id FROM res1_build_queue WHERE id = ? AND h3_index = ?', [entryId, h3Index]);
+    const row = dbGetOne<{ id: number }>('SELECT id FROM res_s_build_queue WHERE id = ? AND h3_index = ?', [entryId, h3Index]);
     if (!row) return { success: false, reason: 'Build queue entry not found.' };
-    dbRun('UPDATE res1_build_queue SET unit_type = ?, remaining_count = ? WHERE id = ?', [unitType, count, entryId]);
+    dbRun('UPDATE res_s_build_queue SET unit_type = ?, remaining_count = ? WHERE id = ?', [unitType, count, entryId]);
     syncStandingOrderAfterQueueMutation(h3Index);
     return { success: true, queue: buildQueueViewForRequester(h3Index, requestingPlayerId) };
   } catch (err) {

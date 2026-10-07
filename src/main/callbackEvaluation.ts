@@ -504,7 +504,7 @@ export function evaluateMandatoryOverrides(
 }
 
 /**
- * Mandatory re-consult triggers after a tactical WEGO beat (res4 sub-units), without strategic standing-order noise.
+ * Mandatory re-consult triggers after a tactical WEGO beat (tactical sub-units), without strategic standing-order noise.
  *
  * Purpose: Event-driven tactical uses the same subscription machinery as strategic, but `evaluateMandatoryOverrides`
  * references strategic parent units and DB standing orders that do not apply to sub-unit ids.

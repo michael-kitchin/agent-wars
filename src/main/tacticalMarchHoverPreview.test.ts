@@ -20,8 +20,8 @@ test('buildTacticalMarchHoverPreview marks in-range neighbor as valid', () => {
   assert.ok(neighbor);
   const battle: TacticalBattleSnapshot = {
     battleId: 'b1',
-    enclosingRes1H3Index: center,
-    res4ChildH3Indexes: ringCells,
+    enclosingStrategicH3Index: center,
+    tacticalChildH3Indexes: ringCells,
     strategicTurnNumber: 1,
     tacticalTurnNumber: 1,
     subUnits: [
@@ -49,8 +49,8 @@ test('buildTacticalMarchHoverPreview treats a friendly-occupied neighbor as a va
   assert.ok(neighbor);
   const battle: TacticalBattleSnapshot = {
     battleId: 'b-stack-hover',
-    enclosingRes1H3Index: center,
-    res4ChildH3Indexes: ringCells,
+    enclosingStrategicH3Index: center,
+    tacticalChildH3Indexes: ringCells,
     strategicTurnNumber: 1,
     tacticalTurnNumber: 1,
     subUnits: [
@@ -84,8 +84,8 @@ test('buildTacticalMarchDraftDestinationPreview matches hover path for one pendi
   assert.ok(neighbor);
   const battle: TacticalBattleSnapshot = {
     battleId: 'b-draft',
-    enclosingRes1H3Index: center,
-    res4ChildH3Indexes: ringCells,
+    enclosingStrategicH3Index: center,
+    tacticalChildH3Indexes: ringCells,
     strategicTurnNumber: 1,
     tacticalTurnNumber: 1,
     subUnits: [
@@ -113,8 +113,8 @@ test('buildTacticalMarchHoverPreview rejects destinations outside the footprint'
   assert.ok(!ringCells.includes(outside));
   const battle: TacticalBattleSnapshot = {
     battleId: 'b2',
-    enclosingRes1H3Index: center,
-    res4ChildH3Indexes: ringCells,
+    enclosingStrategicH3Index: center,
+    tacticalChildH3Indexes: ringCells,
     strategicTurnNumber: 1,
     tacticalTurnNumber: 1,
     subUnits: [
@@ -139,13 +139,13 @@ test('buildTacticalMarchHoverPreview blocks mixed land and naval stacks when onl
   assert.ok(neighbor);
   const battle: TacticalBattleSnapshot = {
     battleId: 'b-naval-stack',
-    enclosingRes1H3Index: center,
-    res4ChildH3Indexes: ring,
+    enclosingStrategicH3Index: center,
+    tacticalChildH3Indexes: ring,
     strategicTurnNumber: 1,
     tacticalTurnNumber: 1,
     strategicHexTerrain: 'land',
     strategicHexTerrainKind: 'coastal',
-    res4TerrainKindByH3: {
+    tacticalTerrainKindByH3: {
       [center]: 'plains',
       [neighbor]: 'water',
     },
@@ -184,13 +184,13 @@ test('buildTacticalMarchHoverPreview prefers naval path for homogeneous infantry
   assert.ok(neighbor);
   const battle: TacticalBattleSnapshot = {
     battleId: 'b-naval-stack',
-    enclosingRes1H3Index: center,
-    res4ChildH3Indexes: ring,
+    enclosingStrategicH3Index: center,
+    tacticalChildH3Indexes: ring,
     strategicTurnNumber: 1,
     tacticalTurnNumber: 1,
     strategicHexTerrain: 'land',
     strategicHexTerrainKind: 'coastal',
-    res4TerrainKindByH3: {
+    tacticalTerrainKindByH3: {
       [center]: 'plains',
       [neighbor]: 'water',
     },
@@ -227,13 +227,13 @@ test('buildTacticalMarchHoverPreview accepts mixed land and naval stacks for sha
   assert.ok(coastalNeighbor);
   const battle: TacticalBattleSnapshot = {
     battleId: 'b-mixed-coastal',
-    enclosingRes1H3Index: center,
-    res4ChildH3Indexes: ring,
+    enclosingStrategicH3Index: center,
+    tacticalChildH3Indexes: ring,
     strategicTurnNumber: 1,
     tacticalTurnNumber: 1,
     strategicHexTerrain: 'land',
     strategicHexTerrainKind: 'coastal',
-    res4TerrainKindByH3: {
+    tacticalTerrainKindByH3: {
       [center]: 'plains',
       [coastalNeighbor]: 'coastal',
     },
@@ -269,8 +269,8 @@ test('buildTacticalMarchHoverPreview keeps distant in-footprint destination vali
   assert.ok(far);
   const battle: TacticalBattleSnapshot = {
     battleId: 'b4',
-    enclosingRes1H3Index: center,
-    res4ChildH3Indexes: ringCells,
+    enclosingStrategicH3Index: center,
+    tacticalChildH3Indexes: ringCells,
     strategicTurnNumber: 1,
     tacticalTurnNumber: 1,
     subUnits: [
@@ -297,8 +297,8 @@ test('tacticalHoverSolidEdgeCapByOriginH3 holds a land stack to its slowest sub-
   assert.ok(far);
   const battle: TacticalBattleSnapshot = {
     battleId: 'b-solid-cap',
-    enclosingRes1H3Index: center,
-    res4ChildH3Indexes: cells,
+    enclosingStrategicH3Index: center,
+    tacticalChildH3Indexes: cells,
     strategicTurnNumber: 1,
     tacticalTurnNumber: 1,
     subUnits: [
@@ -321,8 +321,8 @@ test('formatTacticalDraftMarchPendingOrderTargetLabel reports res4 grid steps wi
   assert.ok(b);
   const battle: TacticalBattleSnapshot = {
     battleId: 'b3',
-    enclosingRes1H3Index: a,
-    res4ChildH3Indexes: [...gridDisk(a, 2)],
+    enclosingStrategicH3Index: a,
+    tacticalChildH3Indexes: [...gridDisk(a, 2)],
     strategicTurnNumber: 1,
     tacticalTurnNumber: 1,
     subUnits: [

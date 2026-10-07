@@ -21,9 +21,9 @@ import type { TacticalOpponentPlanPayload } from '../../shared/ipc/consultationP
 import { gridDisk } from 'h3-js';
 import {
   firstRingCellDistinctFrom,
-  tacticalRes1Cell,
-  tacticalRes4UnderRes1Corner,
-} from '../tacticalBattle/testSupport/tacticalRes4HexFixtures';
+  tacticalParentCell,
+  tacticalUnderCorner,
+} from '../tacticalBattle/testSupport/tacticalHexFixtures';
 import { afterTacticalBeatResolution } from './afterResolution';
 import {
   runEventDrivenAfterTacticalBeatConsultation,
@@ -56,22 +56,22 @@ function withFreshDb(run: () => Promise<void>): Promise<void> {
 
 test('afterTacticalBeatResolution invokes LLM when opponent had no beat-time unit actions', async () => {
   await withFreshDb(async () => {
-    const res1 = tacticalRes1Cell(12, 34);
-    const res4 = tacticalRes4UnderRes1Corner(12, 34, { latEpsilon: 0.01 });
+    const strategic = tacticalParentCell(12, 34);
+    const tacticalIndex = tacticalUnderCorner(12, 34, { latEpsilon: 0.01 });
     const state: GameStateSnapshot = {
       turnNumber: 2,
       phase: 'planning',
-      hexes: [{ h3Index: res1, terrain: 'land', terrainKind: 'plains' }],
+      hexes: [{ h3Index: strategic, terrain: 'land', terrainKind: 'plains' }],
       units: [
-        { id: 'human-1', player: 'human', unitType: 'infantry', h3Index: res4 },
-        { id: 'opp-sub-1', player: 'opponent', unitType: 'armor', h3Index: res4 },
+        { id: 'human-1', player: 'human', unitType: 'infantry', h3Index: tacticalIndex },
+        { id: 'opp-sub-1', player: 'opponent', unitType: 'armor', h3Index: tacticalIndex },
       ],
       pendingOrders: [],
     };
     const tacticalBattle: TacticalBattleSnapshot = {
       battleId: 'bt-no-events',
-      enclosingRes1H3Index: res1,
-      res4ChildH3Indexes: [res4],
+      enclosingStrategicH3Index: strategic,
+      tacticalChildH3Indexes: [tacticalIndex],
       strategicTurnNumber: 2,
       tacticalTurnNumber: 1,
       subUnits: [
@@ -80,7 +80,7 @@ test('afterTacticalBeatResolution invokes LLM when opponent had no beat-time uni
           parentUnitId: 'hum-p',
           player: 'human',
           unitType: 'infantry',
-          h3Index: res4,
+          h3Index: tacticalIndex,
           displayName: 'Hum A',
         },
         {
@@ -88,7 +88,7 @@ test('afterTacticalBeatResolution invokes LLM when opponent had no beat-time uni
           parentUnitId: 'opp-parent-1',
           player: 'opponent',
           unitType: 'armor',
-          h3Index: res4,
+          h3Index: tacticalIndex,
           displayName: 'Opp A',
         },
       ],
@@ -116,20 +116,20 @@ test('afterTacticalBeatResolution invokes LLM when opponent had no beat-time uni
 
 test('afterTacticalBeatResolution skips LLM when opponent marched and no mandatory or subscription events', async () => {
   await withFreshDb(async () => {
-    const res1 = tacticalRes1Cell(12, 34);
-    const res4a = tacticalRes4UnderRes1Corner(12, 34, { latEpsilon: 0.01 });
-    const res4b = firstRingCellDistinctFrom(res4a);
+    const strategic = tacticalParentCell(12, 34);
+    const tacticala = tacticalUnderCorner(12, 34, { latEpsilon: 0.01 });
+    const tacticalb = firstRingCellDistinctFrom(tacticala);
     const state: GameStateSnapshot = {
       turnNumber: 2,
       phase: 'planning',
-      hexes: [{ h3Index: res1, terrain: 'land', terrainKind: 'plains' }],
+      hexes: [{ h3Index: strategic, terrain: 'land', terrainKind: 'plains' }],
       units: [],
       pendingOrders: [],
     };
     const tacticalBattle: TacticalBattleSnapshot = {
       battleId: 'bt-opp-march',
-      enclosingRes1H3Index: res1,
-      res4ChildH3Indexes: [...new Set([res4a, res4b])].sort(),
+      enclosingStrategicH3Index: strategic,
+      tacticalChildH3Indexes: [...new Set([tacticala, tacticalb])].sort(),
       strategicTurnNumber: 2,
       tacticalTurnNumber: 1,
       subUnits: [
@@ -138,7 +138,7 @@ test('afterTacticalBeatResolution skips LLM when opponent marched and no mandato
           parentUnitId: 'hum-p',
           player: 'human',
           unitType: 'infantry',
-          h3Index: res4b,
+          h3Index: tacticalb,
           displayName: 'Hum A',
         },
         {
@@ -146,14 +146,14 @@ test('afterTacticalBeatResolution skips LLM when opponent marched and no mandato
           parentUnitId: 'opp-parent-1',
           player: 'opponent',
           unitType: 'armor',
-          h3Index: res4a,
+          h3Index: tacticala,
           displayName: 'Opp A',
         },
       ],
     };
     const playback: TacticalCommitResolutionPlayback = {
       humanMoves: [],
-      opponentMoves: [{ unitId: 'opp-sub-1', fromH3Index: res4a, toH3Index: res4b }],
+      opponentMoves: [{ unitId: 'opp-sub-1', fromH3Index: tacticala, toH3Index: tacticalb }],
     };
     let calls = 0;
     const res = await afterTacticalBeatResolution(state, tacticalBattle, playback, {
@@ -173,23 +173,23 @@ test('afterTacticalBeatResolution skips LLM when opponent marched and no mandato
 
 test('afterTacticalBeatResolution invokes LLM when human marched even if opponent marched without mandatory', async () => {
   await withFreshDb(async () => {
-    const res1 = tacticalRes1Cell(12, 34);
-    const res4a = tacticalRes4UnderRes1Corner(12, 34, { latEpsilon: 0.01 });
-    const res4b = firstRingCellDistinctFrom(res4a);
-    const res4c = [...gridDisk(res4a, 2)].find((h) => h !== res4a && h !== res4b) ?? firstRingCellDistinctFrom(res4b);
-    const res4d = firstRingCellDistinctFrom(res4c);
-    const footprint = [...new Set([res4a, res4b, res4c, res4d])].sort();
+    const strategic = tacticalParentCell(12, 34);
+    const tacticala = tacticalUnderCorner(12, 34, { latEpsilon: 0.01 });
+    const tacticalb = firstRingCellDistinctFrom(tacticala);
+    const tacticalc = [...gridDisk(tacticala, 2)].find((h) => h !== tacticala && h !== tacticalb) ?? firstRingCellDistinctFrom(tacticalb);
+    const tacticald = firstRingCellDistinctFrom(tacticalc);
+    const footprint = [...new Set([tacticala, tacticalb, tacticalc, tacticald])].sort();
     const state: GameStateSnapshot = {
       turnNumber: 2,
       phase: 'planning',
-      hexes: [{ h3Index: res1, terrain: 'land', terrainKind: 'plains' }],
+      hexes: [{ h3Index: strategic, terrain: 'land', terrainKind: 'plains' }],
       units: [],
       pendingOrders: [],
     };
     const tacticalBattle: TacticalBattleSnapshot = {
       battleId: 'bt-human-obs',
-      enclosingRes1H3Index: res1,
-      res4ChildH3Indexes: footprint,
+      enclosingStrategicH3Index: strategic,
+      tacticalChildH3Indexes: footprint,
       strategicTurnNumber: 2,
       tacticalTurnNumber: 1,
       subUnits: [
@@ -198,7 +198,7 @@ test('afterTacticalBeatResolution invokes LLM when human marched even if opponen
           parentUnitId: 'hum-p',
           player: 'human',
           unitType: 'infantry',
-          h3Index: res4a,
+          h3Index: tacticala,
           displayName: 'Hum A',
         },
         {
@@ -206,14 +206,14 @@ test('afterTacticalBeatResolution invokes LLM when human marched even if opponen
           parentUnitId: 'opp-parent-1',
           player: 'opponent',
           unitType: 'armor',
-          h3Index: res4c,
+          h3Index: tacticalc,
           displayName: 'Opp A',
         },
       ],
     };
     const playback: TacticalCommitResolutionPlayback = {
-      humanMoves: [{ unitId: 'hum-sub-1', fromH3Index: res4a, toH3Index: res4b }],
-      opponentMoves: [{ unitId: 'opp-sub-1', fromH3Index: res4c, toH3Index: res4d }],
+      humanMoves: [{ unitId: 'hum-sub-1', fromH3Index: tacticala, toH3Index: tacticalb }],
+      opponentMoves: [{ unitId: 'opp-sub-1', fromH3Index: tacticalc, toH3Index: tacticald }],
     };
     let calls = 0;
     const res = await afterTacticalBeatResolution(state, tacticalBattle, playback, {
@@ -233,19 +233,19 @@ test('afterTacticalBeatResolution invokes LLM when human marched even if opponen
 
 test('afterTacticalBeatResolution invokes requestOrders when opponent loss fires tactical mandatory', async () => {
   await withFreshDb(async () => {
-    const res1 = tacticalRes1Cell(12, 34);
-    const res4 = tacticalRes4UnderRes1Corner(12, 34, { latEpsilon: 0.01 });
+    const strategic = tacticalParentCell(12, 34);
+    const tacticalIndex = tacticalUnderCorner(12, 34, { latEpsilon: 0.01 });
     const state: GameStateSnapshot = {
       turnNumber: 2,
       phase: 'planning',
-      hexes: [{ h3Index: res1, terrain: 'land', terrainKind: 'plains' }],
+      hexes: [{ h3Index: strategic, terrain: 'land', terrainKind: 'plains' }],
       units: [],
       pendingOrders: [],
     };
     const tacticalBattle: TacticalBattleSnapshot = {
       battleId: 'bt-mandatory',
-      enclosingRes1H3Index: res1,
-      res4ChildH3Indexes: [res4],
+      enclosingStrategicH3Index: strategic,
+      tacticalChildH3Indexes: [tacticalIndex],
       strategicTurnNumber: 2,
       tacticalTurnNumber: 1,
       subUnits: [
@@ -254,7 +254,7 @@ test('afterTacticalBeatResolution invokes requestOrders when opponent loss fires
           parentUnitId: 'hum-p',
           player: 'human',
           unitType: 'infantry',
-          h3Index: res4,
+          h3Index: tacticalIndex,
           displayName: 'Hum A',
         },
         {
@@ -262,14 +262,14 @@ test('afterTacticalBeatResolution invokes requestOrders when opponent loss fires
           parentUnitId: 'opp-parent-1',
           player: 'opponent',
           unitType: 'armor',
-          h3Index: res4,
+          h3Index: tacticalIndex,
           displayName: 'Opp A',
         },
       ],
     };
     const playback: TacticalCommitResolutionPlayback = {
       humanMoves: [],
-      rangedRemovedUnits: [{ id: 'opp-sub-1', player: 'opponent', unitType: 'armor', h3Index: res4 }],
+      rangedRemovedUnits: [{ id: 'opp-sub-1', player: 'opponent', unitType: 'armor', h3Index: tacticalIndex }],
     };
     let calls = 0;
     const res = await afterTacticalBeatResolution(state, tacticalBattle, playback, {
@@ -289,20 +289,20 @@ test('afterTacticalBeatResolution invokes requestOrders when opponent loss fires
 
 test('afterTacticalBeatResolution skips LLM when roster is terminal (annihilation)', async () => {
   await withFreshDb(async () => {
-    const res1 = tacticalRes1Cell(12, 34);
-    const res4a = tacticalRes4UnderRes1Corner(12, 34, { latEpsilon: 0.01 });
-    const res4b = firstRingCellDistinctFrom(res4a);
+    const strategic = tacticalParentCell(12, 34);
+    const tacticala = tacticalUnderCorner(12, 34, { latEpsilon: 0.01 });
+    const tacticalb = firstRingCellDistinctFrom(tacticala);
     const state: GameStateSnapshot = {
       turnNumber: 2,
       phase: 'planning',
-      hexes: [{ h3Index: res1, terrain: 'land', terrainKind: 'plains' }],
+      hexes: [{ h3Index: strategic, terrain: 'land', terrainKind: 'plains' }],
       units: [],
       pendingOrders: [],
     };
     const tacticalBattle: TacticalBattleSnapshot = {
       battleId: 'bt-annihilation',
-      enclosingRes1H3Index: res1,
-      res4ChildH3Indexes: [...new Set([res4a, res4b])].sort(),
+      enclosingStrategicH3Index: strategic,
+      tacticalChildH3Indexes: [...new Set([tacticala, tacticalb])].sort(),
       strategicTurnNumber: 2,
       tacticalTurnNumber: 1,
       subUnits: [
@@ -311,13 +311,13 @@ test('afterTacticalBeatResolution skips LLM when roster is terminal (annihilatio
           parentUnitId: 'hum-p',
           player: 'human',
           unitType: 'infantry',
-          h3Index: res4b,
+          h3Index: tacticalb,
           displayName: 'Hum A',
         },
       ],
     };
     const playback: TacticalCommitResolutionPlayback = {
-      humanMoves: [{ unitId: 'hum-sub-1', fromH3Index: res4a, toH3Index: res4b }],
+      humanMoves: [{ unitId: 'hum-sub-1', fromH3Index: tacticala, toH3Index: tacticalb }],
     };
     let calls = 0;
     const res = await afterTacticalBeatResolution(state, tacticalBattle, playback, {
@@ -337,22 +337,22 @@ test('afterTacticalBeatResolution skips LLM when roster is terminal (annihilatio
 
 test('afterTacticalBeatResolution builds plan from orders and forwards tool counts when requestOrders omits tacticalOpponentPlan', async () => {
   await withFreshDb(async () => {
-    const res1 = tacticalRes1Cell(12, 34);
-    const res4 = tacticalRes4UnderRes1Corner(12, 34, { latEpsilon: 0.01 });
+    const strategic = tacticalParentCell(12, 34);
+    const tacticalIndex = tacticalUnderCorner(12, 34, { latEpsilon: 0.01 });
     const state: GameStateSnapshot = {
       turnNumber: 2,
       phase: 'planning',
-      hexes: [{ h3Index: res1, terrain: 'land', terrainKind: 'plains' }],
+      hexes: [{ h3Index: strategic, terrain: 'land', terrainKind: 'plains' }],
       units: [
-        { id: 'human-1', player: 'human', unitType: 'infantry', h3Index: res4 },
-        { id: 'opp-sub-1', player: 'opponent', unitType: 'armor', h3Index: res4 },
+        { id: 'human-1', player: 'human', unitType: 'infantry', h3Index: tacticalIndex },
+        { id: 'opp-sub-1', player: 'opponent', unitType: 'armor', h3Index: tacticalIndex },
       ],
       pendingOrders: [],
     };
     const tacticalBattle: TacticalBattleSnapshot = {
       battleId: 'bt-raw-orders-shape',
-      enclosingRes1H3Index: res1,
-      res4ChildH3Indexes: [res4],
+      enclosingStrategicH3Index: strategic,
+      tacticalChildH3Indexes: [tacticalIndex],
       strategicTurnNumber: 2,
       tacticalTurnNumber: 1,
       subUnits: [
@@ -361,7 +361,7 @@ test('afterTacticalBeatResolution builds plan from orders and forwards tool coun
           parentUnitId: 'hum-p',
           player: 'human',
           unitType: 'infantry',
-          h3Index: res4,
+          h3Index: tacticalIndex,
           displayName: 'Hum A',
         },
         {
@@ -369,7 +369,7 @@ test('afterTacticalBeatResolution builds plan from orders and forwards tool coun
           parentUnitId: 'opp-parent-1',
           player: 'opponent',
           unitType: 'armor',
-          h3Index: res4,
+          h3Index: tacticalIndex,
           displayName: 'Opp A',
         },
       ],
@@ -381,7 +381,7 @@ test('afterTacticalBeatResolution builds plan from orders and forwards tool coun
       hasKey: () => true,
       requestOrders: async () => ({
         success: true,
-        orders: [{ unitId: 'opp-sub-1', toH3Index: res4 }],
+        orders: [{ unitId: 'opp-sub-1', toH3Index: tacticalIndex }],
         strategy: 'push armor',
         message: 'This close, hesitation is already a casualty.',
         toolInvocationCounts: { planning: 7, assessment: 0 },
@@ -399,22 +399,22 @@ test('afterTacticalBeatResolution builds plan from orders and forwards tool coun
 
 test('runEventDrivenAfterTacticalBeatConsultation forwards message onto IPC consult fields', async () => {
   await withFreshDb(async () => {
-    const res1 = tacticalRes1Cell(12, 34);
-    const res4 = tacticalRes4UnderRes1Corner(12, 34, { latEpsilon: 0.01 });
+    const strategic = tacticalParentCell(12, 34);
+    const tacticalIndex = tacticalUnderCorner(12, 34, { latEpsilon: 0.01 });
     const state: GameStateSnapshot = {
       turnNumber: 2,
       phase: 'planning',
-      hexes: [{ h3Index: res1, terrain: 'land', terrainKind: 'plains' }],
+      hexes: [{ h3Index: strategic, terrain: 'land', terrainKind: 'plains' }],
       units: [
-        { id: 'human-1', player: 'human', unitType: 'infantry', h3Index: res4 },
-        { id: 'opp-sub-1', player: 'opponent', unitType: 'armor', h3Index: res4 },
+        { id: 'human-1', player: 'human', unitType: 'infantry', h3Index: tacticalIndex },
+        { id: 'opp-sub-1', player: 'opponent', unitType: 'armor', h3Index: tacticalIndex },
       ],
       pendingOrders: [],
     };
     const tacticalBattle: TacticalBattleSnapshot = {
       battleId: 'bt-message-ipc',
-      enclosingRes1H3Index: res1,
-      res4ChildH3Indexes: [res4],
+      enclosingStrategicH3Index: strategic,
+      tacticalChildH3Indexes: [tacticalIndex],
       strategicTurnNumber: 2,
       tacticalTurnNumber: 1,
       subUnits: [
@@ -423,7 +423,7 @@ test('runEventDrivenAfterTacticalBeatConsultation forwards message onto IPC cons
           parentUnitId: 'hum-p',
           player: 'human',
           unitType: 'infantry',
-          h3Index: res4,
+          h3Index: tacticalIndex,
           displayName: 'Hum A',
         },
         {
@@ -431,7 +431,7 @@ test('runEventDrivenAfterTacticalBeatConsultation forwards message onto IPC cons
           parentUnitId: 'opp-parent-1',
           player: 'opponent',
           unitType: 'armor',
-          h3Index: res4,
+          h3Index: tacticalIndex,
           displayName: 'Opp A',
         },
       ],

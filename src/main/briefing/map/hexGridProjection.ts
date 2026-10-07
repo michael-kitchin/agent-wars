@@ -2,7 +2,7 @@
  * Projects a set of H3 cells onto a 2D row/column grid for ASCII rendering.
  *
  * Purpose: Phase 2 spatial backbone: stable row/column layout for a bounded hex set.
- * When to use: After selecting strategic cells (full-world res1 list) or tactical footprint selection.
+ * When to use: After selecting strategic cells (full-world strategic list) or tactical footprint selection.
  * Expected outcome: Deterministic `(row,col)` per input cell for the same inputs and threshold.
  * Exceptions: None for normal Earth coordinates; relies on H3 centers from `cellToLatLng`.
  */

@@ -19,11 +19,11 @@ import type { WeatherState } from './weatherBonusTypes';
 export type TacticalBattlePlayerId = 'human' | 'opponent';
 
 /**
- * One tactical sub-unit placed on a res4 hex; ephemeral and not part of strategic unit caps.
+ * One tactical sub-unit placed on a tactical hex; ephemeral and not part of strategic unit caps.
  *
  * Contract: Describes a single drawable tactical pawn derived from one strategic parent unit.
  * When to use: Renderer draws these instead of strategic units while `TacticalBattleSnapshot` is active.
- * Expected outcome: Each entry has a unique `id`, valid res4 `h3Index`, and a known `unitType`.
+ * Expected outcome: Each entry has a unique `id`, valid tactical `h3Index`, and a known `unitType`.
  * Exceptions: None.
  */
 export interface TacticalSubUnitSnapshot {
@@ -64,11 +64,11 @@ export interface TacticalSubUnitSnapshot {
    */
   unitType: string;
   /**
-   * Host res4 cell for this sub-unit.
+   * Host tactical cell for this sub-unit.
    *
-   * Contract: Resolution-4 H3 index contained in the enclosing res1 parent.
+   * Contract: Resolution-4 H3 index contained in the enclosing strategic parent.
    * When to use: Canvas placement and Leaflet tactical bounds fitting.
-   * Expected outcome: Index is a child of `enclosingRes1H3Index` for the battle.
+   * Expected outcome: Index is a child of `enclosingStrategicH3Index` for the battle.
    * Exceptions: None.
    */
   h3Index: string;
@@ -122,9 +122,9 @@ export interface TacticalSubUnitSnapshot {
 /**
  * Serializable tactical battle state returned to the renderer after a successful start.
  *
- * Contract: Complete tactical footprint for one contested res1 hex at a fixed strategic turn.
+ * Contract: Complete tactical footprint for one contested strategic hex at a fixed strategic turn.
  * When to use: Stored in renderer shared state while tactical mode is active.
- * Expected outcome: `res4ChildH3Indexes` covers all cells that may receive tactical rendering.
+ * Expected outcome: `tacticalChildH3Indexes` covers all cells that may receive tactical rendering.
  * Exceptions: None.
  */
 export interface TacticalBattleSnapshot {
@@ -132,29 +132,29 @@ export interface TacticalBattleSnapshot {
    * Session key for logs and deterministic placement seeds.
    *
    * Contract: Unique per tactical start attempt in practice.
-   * When to use: Tie-breaking res4 ordering alongside placement algorithms.
+   * When to use: Tie-breaking tactical ordering alongside placement algorithms.
    * Expected outcome: Non-empty string.
    * Exceptions: None.
    */
   battleId: string;
   /**
-   * Strategic res1 hex enclosing this tactical battle.
+   * Strategic strategic hex enclosing this tactical battle.
    *
-   * Contract: Must be the res1 cell that was contested when the battle started.
+   * Contract: Must be the strategic cell that was contested when the battle started.
    * When to use: Terrain subsetting and re-entry prevention.
-   * Expected outcome: Valid res1 H3 index present in strategic state.
+   * Expected outcome: Valid strategic H3 index present in strategic state.
    * Exceptions: None.
    */
-  enclosingRes1H3Index: string;
+  enclosingStrategicH3Index: string;
   /**
-   * All res4 descendants of the enclosing hex that participate in tactical rendering.
+   * All tactical descendants of the enclosing hex that participate in tactical rendering.
    *
-   * Contract: Subset of `cellToChildren(enclosingRes1H3Index, 4)` order is not significant.
-   * When to use: Leaflet `fitBounds` and res4 terrain drawing filters.
+   * Contract: Subset of `cellToChildren(enclosingStrategicH3Index, 4)` order is not significant.
+   * When to use: Leaflet `fitBounds` and tactical terrain drawing filters.
    * Expected outcome: Non-empty for a successfully started battle.
    * Exceptions: None.
    */
-  res4ChildH3Indexes: string[];
+  tacticalChildH3Indexes: string[];
   /**
    * Strategic turn number captured when tactical mode began.
    *
@@ -165,7 +165,7 @@ export interface TacticalBattleSnapshot {
    */
   strategicTurnNumber: number;
   /**
-   * Display weather of the enclosing res1 hex for this battle's month.
+   * Display weather of the enclosing strategic hex for this battle's month.
    *
    * Contract: Present when the match has the weather bonus on. Every beat of the battle uses this one value.
    * When to use: The turn line, tactical movement, and tactical dice.
@@ -219,97 +219,97 @@ export interface TacticalBattleSnapshot {
    */
   tacticalTurnNumber: number;
   /**
-   * Strategic `terrain` column for the enclosing res1 hex when the battle was opened.
+   * Strategic `terrain` column for the enclosing strategic hex when the battle was opened.
    *
    * Contract: Same vocabulary as strategic `hexes.terrain` (`land`, `water`, …).
-   * When to use: Tactical movement §12.4 normalization when a res4 child has no override row.
+   * When to use: Tactical movement §12.4 normalization when a tactical child has no override row.
    * Expected outcome: Present on newly built snapshots; optional on older persisted JSON (defaults to `land` in planners).
    * Exceptions: None.
    */
   strategicHexTerrain?: string;
   /**
-   * Strategic `terrain_kind` for the enclosing res1 hex when the battle was opened.
+   * Strategic `terrain_kind` for the enclosing strategic hex when the battle was opened.
    *
    * Contract: Typical values include `plains`, `forest`, `mountain`, … matching GIS pipeline output.
-   * When to use: Fallback tactical terrain for res4 cells without per-cell override in `res4TerrainKindByH3`.
+   * When to use: Fallback tactical terrain for tactical cells without per-cell override in `tacticalTerrainKindByH3`.
    * Expected outcome: Present on newly built snapshots; optional on older persisted JSON (defaults to `plains` in planners).
    * Exceptions: None.
    */
   strategicHexTerrainKind?: string;
   /**
-   * Per-res4 effective `terrain_kind` inside the tactical footprint (override or parent fallback at snapshot build).
+   * Per-tactical effective `terrain_kind` inside the tactical footprint (override or parent fallback at snapshot build).
    *
-   * Contract: Keys are a subset of `res4ChildH3Indexes`; omitted keys inherit `strategicHexTerrainKind` in movement code.
+   * Contract: Keys are a subset of `tacticalChildH3Indexes`; omitted keys inherit `strategicHexTerrainKind` in movement code.
    * When to use: Renderer hover preview and main-process march planning without re-querying SQLite.
    * Expected outcome: Omitted or empty when absent (legacy saves); populated for new `computeTacticalBattleSnapshot` results.
    * Exceptions: None.
    */
-  res4TerrainKindByH3?: Record<string, string>;
+  tacticalTerrainKindByH3?: Record<string, string>;
   /**
-   * Per-res4 seaport facility flags inside the footprint (only rows where `res4_feature_overrides.is_seaport` is set at snapshot build).
+   * Per-tactical seaport facility flags inside the footprint (only rows where `res_t_feature_overrides.is_seaport` is set at snapshot build).
    *
-   * Contract: Keys are a subset of `res4ChildH3Indexes`; omitted keys mean the cell is not a seaport facility tile. Populated from the game DB, not from merged renderer/GIS convenience rows.
+   * Contract: Keys are a subset of `tacticalChildH3Indexes`; omitted keys mean the cell is not a seaport facility tile. Populated from the game DB, not from merged renderer/GIS convenience rows.
    * When to use: Tactical naval movement — ships may enter seaport cells from water, but not chain adjacent seaport→seaport steps.
    * Expected outcome: Omitted or empty on legacy saves; populated for new `computeTacticalBattleSnapshot` results.
    * Exceptions: None.
    */
-  res4IsSeaportByH3?: Record<string, boolean>;
+  tacticalIsSeaportByH3?: Record<string, boolean>;
   /**
-   * Birth country name per res4 cell inside the footprint, the same value used for unit births.
+   * Birth country name per tactical cell inside the footprint, the same value used for unit births.
    *
-   * Contract: Keys are a subset of `res4ChildH3Indexes` and list only cells that have a country. Set when the battle snapshot is created.
+   * Contract: Keys are a subset of `tacticalChildH3Indexes` and list only cells that have a country. Set when the battle snapshot is created.
    * When to use: The country test of origin bonuses for a tactical cell.
    * Expected outcome: Omitted on legacy saves and when no footprint cell has a country; a missing cell has no country.
    * Exceptions: None.
    */
-  res4CountryNameByH3?: Record<string, string>;
+  tacticalCountryNameByH3?: Record<string, string>;
   /**
-   * Per-res4 airport facility flags inside the footprint (only rows where `res4_feature_overrides.is_airport` is set at snapshot build).
+   * Per-tactical airport facility flags inside the footprint (only rows where `res_t_feature_overrides.is_airport` is set at snapshot build).
    *
-   * Contract: Keys are a subset of `res4ChildH3Indexes`; omitted keys mean the cell is not an airport facility tile. Populated from the game DB, not from merged renderer/GIS convenience rows.
+   * Contract: Keys are a subset of `tacticalChildH3Indexes`; omitted keys mean the cell is not an airport facility tile. Populated from the game DB, not from merged renderer/GIS convenience rows.
    * When to use: Tactical operational-map A/a/B glyphs; air placement already reads the same override rows at snapshot build.
    * Expected outcome: Omitted or empty on legacy saves; populated for new `computeTacticalBattleSnapshot` results and refreshed after infrastructure strikes.
    * Exceptions: None.
    */
-  res4IsAirportByH3?: Record<string, boolean>;
+  tacticalIsAirportByH3?: Record<string, boolean>;
   /**
-   * Per-res4 urban **infrastructure** cells (not rubble) inside the footprint at snapshot build / refresh.
+   * Per-tactical urban **infrastructure** cells (not rubble) inside the footprint at snapshot build / refresh.
    *
-   * Contract: Keys are a subset of `res4ChildH3Indexes`; true means merged `getRes4TerrainOverridesForRendererFromGame` row has `isUrban` and not `isRubble`.
+   * Contract: Keys are a subset of `tacticalChildH3Indexes`; true means merged `getTacticalTerrainOverridesForRendererFromGame` row has `isUrban` and not `isRubble`.
    * When to use: Tactical movement and ranged caps that treat urban tiles like dense terrain without inferring from `terrain_kind` alone.
    * Expected outcome: Omitted or empty on legacy saves; refreshed with terrain after tactical infrastructure strikes.
    * Exceptions: None.
    */
-  res4IsUrbanByH3?: Record<string, boolean>;
+  tacticalIsUrbanByH3?: Record<string, boolean>;
   /**
-   * Per-res4 rubble cells inside the footprint (infrastructure destroyed to rubble).
+   * Per-tactical rubble cells inside the footprint (infrastructure destroyed to rubble).
    *
-   * Contract: Keys from merged override rows with `isRubble`; authoritative even when `res4TerrainKindByH3` still shows a base pipeline kind.
+   * Contract: Keys from merged override rows with `isRubble`; authoritative even when `tacticalTerrainKindByH3` still shows a base pipeline kind.
    * When to use: Same combat/movement modifiers as urban for armor/infantry budgets and ranged range cap.
    * Expected outcome: Omitted when no rubble child exists; may grow after urban air strikes refresh the snapshot.
    * Exceptions: None.
    */
-  res4IsRubbleByH3?: Record<string, boolean>;
+  tacticalIsRubbleByH3?: Record<string, boolean>;
   /**
-   * Per-res4 road side masks (pent/hex boolean arrays) inside the footprint, from terrain classification cache.
+   * Per-tactical road side masks (pent/hex boolean arrays) inside the footprint, from terrain classification cache.
    *
-   * Contract: Optional map keyed by res4 `h3Index` with boolean side arrays matching bundled road-rail geometry for that cell.
+   * Contract: Optional map keyed by tactical `h3Index` with boolean side arrays matching bundled road-rail geometry for that cell.
    * Purpose: Tactical land march may follow road edges at plains-equivalent cost and cross otherwise blocked terrain when rubble does not suppress the cell.
    * When to use: `buildTacticalTerrainKindResolverFromSnapshot` transport edges and ranged transport targeting.
-   * Expected outcome: When present, keys are a subset of `res4ChildH3Indexes`; each array length matches bundled `terrain_res4_road_rail_sides.json` for that cell.
+   * Expected outcome: When present, keys are a subset of `tacticalChildH3Indexes`; each array length matches bundled `terrain_res4_road_rail_sides.json` for that cell.
    * Exceptions: Omitted when cache is empty or cell has no road overlay row.
    */
-  res4RoadSidesByH3?: Record<string, readonly boolean[]>;
+  tacticalRoadSidesByH3?: Record<string, readonly boolean[]>;
   /**
-   * Per-res4 rail side masks paired in length with `res4RoadSidesByH3` for the same cell keys.
+   * Per-tactical rail side masks paired in length with `tacticalRoadSidesByH3` for the same cell keys.
    *
-   * Contract: Optional map keyed like `res4RoadSidesByH3` with parallel rail-side boolean arrays per cell.
+   * Contract: Optional map keyed like `tacticalRoadSidesByH3` with parallel rail-side boolean arrays per cell.
    * Purpose: Same gameplay contract as roads for tactical transport links.
-   * When to use: Same as `res4RoadSidesByH3`.
+   * When to use: Same as `tacticalRoadSidesByH3`.
    * Expected outcome: Parallel arrays per `h3Index`; omitted when absent.
    * Exceptions: None.
    */
-  res4RailSidesByH3?: Record<string, readonly boolean[]>;
+  tacticalRailSidesByH3?: Record<string, readonly boolean[]>;
   /**
    * Per-parent tactical baseline counts captured when this battle snapshot was created.
    *
@@ -324,14 +324,14 @@ export interface TacticalBattleSnapshot {
    *
    * Contract: May be shorter than theoretical totals when parents are unplaceable.
    * When to use: Tactical `drawUnits` input.
-   * Expected outcome: Every `h3Index` lies in `res4ChildH3Indexes` and passability holds.
+   * Expected outcome: Every `h3Index` lies in `tacticalChildH3Indexes` and passability holds.
    * Exceptions: None.
    */
   subUnits: TacticalSubUnitSnapshot[];
 }
 
 /**
- * IPC result for starting a tactical battle from a contested res1 hex during strategic planning.
+ * IPC result for starting a tactical battle from a contested strategic hex during strategic planning.
  *
  * Contract: Renderer interprets `success` plus optional `battle` and error `reason`.
  * When to use: Return payload from `game:startTacticalBattle` and `GameApi.startTacticalBattle`.
@@ -360,14 +360,14 @@ export interface StartTacticalBattleIpcResult {
   /**
    * Tactical snapshot for renderer when `success` is true.
    *
-   * Contract: Serializable tactical layout including sub-units and res4 footprint.
+   * Contract: Serializable tactical layout including sub-units and tactical footprint.
    * When to use: Assigned to renderer shared state to enter tactical map mode.
    * Expected outcome: Defined iff `success` is true and validation passed.
    * Exceptions: None.
    */
   battle?: TacticalBattleSnapshot;
   /**
-   * Parent units that could not be given tactical sub-units (e.g. no passable res4 cell).
+   * Parent units that could not be given tactical sub-units (e.g. no passable tactical cell).
    *
    * Contract: Each entry matches a parent display name; may be empty or omitted when none skipped.
    * When to use: Renderer shows a single error-style toast listing skipped parents.

@@ -1,5 +1,5 @@
 /**
- * Tactical res4 melee resolution after movement and support orders commit on a tactical turn.
+ * Tactical tactical melee resolution after movement and support orders commit on a tactical turn.
  */
 
 import { createCombatRng, runMeleePhase } from '../combatResolution';
@@ -56,12 +56,12 @@ function tacticalSubUnitsAsCombatUnits(subUnits: readonly TacticalSubUnitSnapsho
 }
 
 /**
- * Runs one strategic-style melee pass over every res4 cell in the footprint after support projection.
+ * Runs one strategic-style melee pass over every tactical cell in the footprint after support projection.
  *
  * Purpose: Completes the tactical WEGO beat so co-located opposing sub-units fight with combat-die resolution instead of
  * persisting indefinitely without combat; kill lines and removal snapshots feed the same toast path as strategic Ready.
  * When to use: End of `applyHumanTacticalDraftBeatInStrategicOrder` / `commitHumanTacticalDraftOrders` after air+ranged, march, optional human embark, ferry, and cargo sync.
- * Expected outcome: Updated `battle.subUnits` with melee casualties removed; empty melee arrays when no contested res4 hexes.
+ * Expected outcome: Updated `battle.subUnits` with melee casualties removed; empty melee arrays when no contested tactical hexes.
  *   Each melee roll adds the roller's origin bonus at its cell, read from the persisted match flags and this `battle`.
  *   `meleeDiceRolls` lists every melee die in roll order, anchored on the contested cell, for playback.
  * Exceptions: None; delegates RNG to `createCombatRng` and melee logic to `runMeleePhase` when `combatNext` is omitted.
@@ -80,7 +80,7 @@ export function applyTacticalMeleeAfterSupportOrders(
   tacticalLogQuery('applyTacticalMeleeAfterSupportOrders', {
     battleId: battle.battleId,
     subCount: battle.subUnits.length,
-    res4CellCount: battle.res4ChildH3Indexes.length,
+    tacticalCellCount: battle.tacticalChildH3Indexes.length,
   });
   const combatUnits = withTechHitBonus(
     withOriginHitBonus(
@@ -98,7 +98,7 @@ export function applyTacticalMeleeAfterSupportOrders(
         tacticalSubUnitLayoutSeed32(battle.subUnits)) >>>
         0
     );
-  const meleeResult = runMeleePhase(combatUnits, battle.res4ChildH3Indexes, next);
+  const meleeResult = runMeleePhase(combatUnits, battle.tacticalChildH3Indexes, next);
   const meleeDiceRolls = meleeResult.diceRolls ?? [];
   if (meleeResult.removedUnitIds.length === 0) {
     tacticalLogMutate('applyTacticalMeleeAfterSupportOrders no casualties', {

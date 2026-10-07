@@ -22,7 +22,8 @@ import { buildTechBonusRule } from './gameRuleTechText';
 import { STALE_INTEL_TURNS } from '../../gameDb/fogState';
 import { logDebug, logTrace } from '../../logger';
 import { ALL_BUILD_UNIT_TYPES } from '../../../shared/ipc/productionTypes';
-import { BUILD_PREREQUISITES_BY_TYPE, UNIT_COST_BY_TYPE } from '../../productionRules';
+import { BUILD_PREREQUISITES_BY_TYPE } from '../../productionRules';
+import { buildMinimumUrbanCells, unitCostFor } from '../../../shared/gameRules';
 import { NAVAL_MOVEMENT_PROMPT_RULE } from '../../navalMovementMessages';
 import {
   AIR_FERRY_RANGE_HEXES,
@@ -33,7 +34,7 @@ import {
 import {
   TACTICAL_TRANSPORT_RAIL_BUDGET_MULTIPLIER,
   TACTICAL_TRANSPORT_ROAD_BUDGET_MULTIPLIER,
-} from '../../../shared/tacticalRes4TransportLink';
+} from '../../../shared/tacticalTransportLink';
 import { originHitBonusForSource } from '../../../shared/originBonusRules';
 import type { OriginBonusSettings } from '../../../shared/originBonusTypes';
 import {
@@ -123,7 +124,7 @@ function periodNoun(mode: PromptCoordinateMode): 'turn' | 'beat' {
 /**
  * Per-type attack, defense, and reach clause for the combat stats sentence.
  *
- * Purpose: Reach wording differs by mode: strategic uses `getRange`, tactical uses the res4 table,
+ * Purpose: Reach wording differs by mode: strategic uses `getRange`, tactical uses the tactical table,
  * and air in battle is "anywhere" rather than a number.
  * When to use: Inside `buildCombatStatsLine`.
  * Expected outcome: `, range N`, `, melee only`, or `, strike anywhere in the battle`.
@@ -424,7 +425,7 @@ export function buildMovementBudgetRule(mode: PromptCoordinateMode): string {
 /**
  * Infantry (and mode-specific) ranged reach, including tactical terrain caps and mountain LOS.
  *
- * Purpose: Strategic infantry is melee-only. Tactical infantry and armor have res4 baselines; forest, urban, or rubble caps infantry and armor to 1; mountain blocks armor/naval/air LOS.
+ * Purpose: Strategic infantry is melee-only. Tactical infantry and armor have tactical baselines; forest, urban, or rubble caps infantry and armor to 1; mountain blocks armor/naval/air LOS.
  * When to use: Combat paragraph after the one-attack-per-unit clause.
  * Expected outcome: Strategic melee-only sentence, or tactical baselines plus the engine cap and LOS rules.
  * Exceptions: None.
@@ -433,7 +434,7 @@ export function buildRangedReachRule(mode: PromptCoordinateMode): string {
   logTrace('promptSpec buildRangedReachRule', { mode });
   if (mode === 'tactical') {
     return (
-      `Infantry and armor fire at their res4 baselines (infantry ${RANGED_RANGE_BY_UNIT_TYPE.infantry}, armor ${RANGED_RANGE_BY_UNIT_TYPE.armor}); ` +
+      `Infantry and armor fire at their tactical baselines (infantry ${RANGED_RANGE_BY_UNIT_TYPE.infantry}, armor ${RANGED_RANGE_BY_UNIT_TYPE.armor}); ` +
       'forest, urban, or rubble on the attacker\'s cell caps infantry and armor to range 1. ' +
       'Mountain along the line of sight blocks armor and naval shots (infantry is exempt). Air strikes and ferry are not blocked by mountains. ' +
       'Close to melee when out of range.'
@@ -493,15 +494,15 @@ export function buildProductionIncomeRule(): string {
  *
  * Purpose: The production status block must not retype costs or urban minima as literals.
  * When to use: Production Status rules line.
- * Expected outcome: Each buildable type names `UNIT_COST_BY_TYPE` and `BUILD_PREREQUISITES_BY_TYPE`; air also requires an airport.
+ * Expected outcome: Each buildable type names its cost from `unitCostFor` and its urban minimum from `buildMinimumUrbanCells`. Seaport minimums come from `BUILD_PREREQUISITES_BY_TYPE`. Air also requires an airport.
  * Exceptions: None.
  */
 export function buildProductionCostRulesLine(): string {
   logTrace('promptSpec buildProductionCostRulesLine', {});
   const parts = ALL_BUILD_UNIT_TYPES.map((unitType) => {
-    const cost = UNIT_COST_BY_TYPE[unitType];
+    const cost = unitCostFor(unitType);
     const req = BUILD_PREREQUISITES_BY_TYPE[unitType];
-    const extras: string[] = [`min urban ${req.minUrbanHexes}`];
+    const extras: string[] = [`min urban ${buildMinimumUrbanCells(unitType)}`];
     if (req.minSeaports > 0) extras.push(`min seaports ${req.minSeaports}`);
     if (unitType === 'air') extras.push('requires airport');
     return `${unitType} cost ${cost} (${extras.join(' + ')})`;

@@ -71,6 +71,18 @@ export function isNumberedToolName(name: string): boolean {
 }
 
 /**
+ * Returns true when an identifier still uses the old resolution abbreviations.
+ *
+ * Purpose: Keeps `res1` and `res4` out of TypeScript names after the strategic/tactical rename.
+ * When to use: On identifier text in `src/` TypeScript. Do not call it on string literal contents.
+ * Expected outcome: True for `getRes1Naming` and `RES4_SYNC`. False for `strategicH3Resolution` and `terrain`.
+ * Exceptions: None.
+ */
+export function containsResolutionAbbreviation(name: string): boolean {
+  return /res[14]/i.test(name);
+}
+
+/**
  * Converts a kebab-case segment to camelCase.
  *
  * Purpose: Supplies a deterministic suggested name for kebab path violations.

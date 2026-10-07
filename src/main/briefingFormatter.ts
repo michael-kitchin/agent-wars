@@ -4,11 +4,13 @@
  * plus memory, standing-order, and active callbacks sections.
  */
 
+import { strategicCellAt, tacticalCellAt } from '../shared/h3Resolutions';
+
 import type { GameStateSnapshot } from './gameDb';
 import { buildRecentTurnNotesSection } from './briefing/recentTurnNotesSection';
 import type { PrecomputationResult, UnitAssessmentResult, HexAssessmentEntry } from './precomputation';
 import type { CallbackSubscription } from './callbackSubscriptions';
-import { cellToLatLng, latLngToCell } from 'h3-js';
+import { cellToLatLng } from 'h3-js';
 import { LATLNG_DECIMAL_PLACES } from './mapData';
 import { logDebug, logTrace } from './logger';
 import { buildStrategicOperationalMapSectionMarkdown } from './briefing/map/briefingMapSection';
@@ -91,7 +93,7 @@ const WARNING_STATUSES = new Set([
  */
 function formatPosStrategicHex(ll: [number, number], ctx: CoordinateContext): string {
   try {
-    const h3 = latLngToCell(ll[0], ll[1], ctx.mode === 'strategic' ? 1 : 4);
+    const h3 = ctx.mode === 'strategic' ? strategicCellAt(ll[0], ll[1]) : tacticalCellAt(ll[0], ll[1]);
     return h3ToCode(h3, ctx);
   } catch {
     return `[${ll[0].toFixed(LATLNG_DECIMAL_PLACES)}, ${ll[1].toFixed(LATLNG_DECIMAL_PLACES)}]`;
@@ -335,9 +337,9 @@ function standingMarchRecedesFromNearestEnemy(assessment: UnitAssessmentResult):
   const enemyPos = nearest?.position;
   if (!Array.isArray(enemyPos) || enemyPos.length < 2) return false;
   try {
-    const unitH3 = latLngToCell(Number(unitPos[0]), Number(unitPos[1]), 1);
-    const destH3 = latLngToCell(Number(dest[0]), Number(dest[1]), 1);
-    const enemyH3 = latLngToCell(Number(enemyPos[0]), Number(enemyPos[1]), 1);
+    const unitH3 = strategicCellAt(Number(unitPos[0]), Number(unitPos[1]));
+    const destH3 = strategicCellAt(Number(dest[0]), Number(dest[1]));
+    const enemyH3 = strategicCellAt(Number(enemyPos[0]), Number(enemyPos[1]));
     return marchStepRecedesFromEnemy(unitH3, destH3, enemyH3);
   } catch {
     return false;
@@ -696,7 +698,7 @@ export function buildAttentionFlags(
  *
  * Purpose: Fog-off strategic assessments report H3 grid distance; the model must not treat that as a legal march ETA.
  * When to use: formatBriefing immediately after the Unit Status heading (caller appends a blank line before the table).
- * Expected outcome: The shared briefing line when fog is off and hexes are res1; otherwise empty.
+ * Expected outcome: The shared briefing line when fog is off and hexes are strategic; otherwise empty.
  * Exceptions: Empty hex list yields empty string.
  */
 function omniscientGridProximityBriefingLine(state: GameStateSnapshot): string {

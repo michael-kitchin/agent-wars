@@ -13,19 +13,19 @@ import {
 import { AIR_STRIKE_RANGE_HEXES } from './tacticalRanges';
 
 /**
- * Res4 cell from lat/lng for tactical fixtures.
+ * Tactical cell from lat/lng for tactical fixtures.
  *
  * Purpose: Avoid hard-coded H3 literals in eligibility cases.
  * When to use: Inside this test file only.
- * Expected outcome: Valid res4 index.
+ * Expected outcome: Valid tactical index.
  * Exceptions: None for Earth-range test coordinates.
  */
-function res4(lat: number, lng: number): string {
+function tacticalIndex(lat: number, lng: number): string {
   return latLngToCell(lat, lng, 4);
 }
 
 /**
- * First ring-1 neighbor of a res4 cell.
+ * First ring-1 neighbor of a tactical cell.
  *
  * Purpose: Stable distance-1 pair for LOS / range cases.
  * When to use: Mountain and adjacent tactical fixtures.
@@ -39,20 +39,20 @@ function neighborOf(center: string): string {
 }
 
 /**
- * Strategic res1 cell used for distance fixtures.
+ * Strategic strategic cell used for distance fixtures.
  *
  * Purpose: Strategic range cases need valid H3 pairs.
  * When to use: Strategic theater tests.
- * Expected outcome: Valid res1 index.
+ * Expected outcome: Valid strategic index.
  * Exceptions: None.
  */
-function res1(lat: number, lng: number): string {
+function strategic(lat: number, lng: number): string {
   return latLngToCell(lat, lng, 1);
 }
 
 describe('canDefenderReturnFireAtAttackerHex', () => {
   it('denies strategic infantry at distance 1', () => {
-    const defenderHex = res1(40, -106);
+    const defenderHex = strategic(40, -106);
     const attackerHex = [...gridDisk(defenderHex, 1)].find((h) => h !== defenderHex)!;
     const ctx: ReturnFireEligibilityContext = { theater: 'strategic' };
     assert.equal(
@@ -62,7 +62,7 @@ describe('canDefenderReturnFireAtAttackerHex', () => {
   });
 
   it('allows strategic armor at distance 1', () => {
-    const defenderHex = res1(40, -105);
+    const defenderHex = strategic(40, -105);
     const attackerHex = [...gridDisk(defenderHex, 1)].find((h) => h !== defenderHex)!;
     const ctx: ReturnFireEligibilityContext = { theater: 'strategic' };
     assert.equal(
@@ -72,7 +72,7 @@ describe('canDefenderReturnFireAtAttackerHex', () => {
   });
 
   it('denies strategic naval at distance 3', () => {
-    const defenderHex = res1(41, -104);
+    const defenderHex = strategic(41, -104);
     const far = [...gridDisk(defenderHex, 3)].find((h) => {
       try {
         return gridDistance(defenderHex, h) === 3;
@@ -89,7 +89,7 @@ describe('canDefenderReturnFireAtAttackerHex', () => {
   });
 
   it('allows strategic air within strike range with airport', () => {
-    const defenderHex = res1(42, -103);
+    const defenderHex = strategic(42, -103);
     const attackerHex = [...gridDisk(defenderHex, 1)].find((h) => h !== defenderHex)!;
     const ctx: ReturnFireEligibilityContext = {
       theater: 'strategic',
@@ -102,7 +102,7 @@ describe('canDefenderReturnFireAtAttackerHex', () => {
   });
 
   it('denies strategic air within strike range without airport', () => {
-    const defenderHex = res1(42, -102);
+    const defenderHex = strategic(42, -102);
     const attackerHex = [...gridDisk(defenderHex, 1)].find((h) => h !== defenderHex)!;
     const ctx: ReturnFireEligibilityContext = {
       theater: 'strategic',
@@ -115,7 +115,7 @@ describe('canDefenderReturnFireAtAttackerHex', () => {
   });
 
   it('denies strategic air when airport callback is omitted', () => {
-    const defenderHex = res1(42, -101);
+    const defenderHex = strategic(42, -101);
     const attackerHex = [...gridDisk(defenderHex, 1)].find((h) => h !== defenderHex)!;
     assert.equal(
       canDefenderReturnFireAtAttackerHex(
@@ -128,7 +128,7 @@ describe('canDefenderReturnFireAtAttackerHex', () => {
   });
 
   it('denies strategic air beyond strike range even with airport', () => {
-    const defenderHex = res1(43, -100);
+    const defenderHex = strategic(43, -100);
     const far = [...gridDisk(defenderHex, AIR_STRIKE_RANGE_HEXES + 1)].find((h) => {
       try {
         return gridDistance(defenderHex, h) > AIR_STRIKE_RANGE_HEXES;
@@ -148,7 +148,7 @@ describe('canDefenderReturnFireAtAttackerHex', () => {
   });
 
   it('allows tactical armor at distance 2 on clear plains (reach expansion)', () => {
-    const a = res4(46, 56);
+    const a = tacticalIndex(46, 56);
     const disk2 = [...gridDisk(a, 2)].filter((h) => h !== a);
     const at2 = disk2.find((h) => {
       try {
@@ -162,7 +162,7 @@ describe('canDefenderReturnFireAtAttackerHex', () => {
     const battle = {
       strategicHexTerrain: 'land' as const,
       strategicHexTerrainKind: 'plains',
-      res4TerrainKindByH3: { [a]: 'plains', [at2!]: 'plains' },
+      tacticalTerrainKindByH3: { [a]: 'plains', [at2!]: 'plains' },
     };
     const ctx: ReturnFireEligibilityContext = {
       theater: 'tactical',
@@ -176,7 +176,7 @@ describe('canDefenderReturnFireAtAttackerHex', () => {
   });
 
   it('denies tactical armor at distance 2 when forest caps range to 1', () => {
-    const a = res4(47, 57);
+    const a = tacticalIndex(47, 57);
     const disk2 = [...gridDisk(a, 2)].filter((h) => h !== a);
     const at2 = disk2.find((h) => {
       try {
@@ -190,7 +190,7 @@ describe('canDefenderReturnFireAtAttackerHex', () => {
     const battle = {
       strategicHexTerrain: 'land' as const,
       strategicHexTerrainKind: 'plains',
-      res4TerrainKindByH3: { [a]: 'forest', [at2!]: 'plains' },
+      tacticalTerrainKindByH3: { [a]: 'forest', [at2!]: 'plains' },
     };
     const ctx: ReturnFireEligibilityContext = {
       theater: 'tactical',
@@ -204,13 +204,13 @@ describe('canDefenderReturnFireAtAttackerHex', () => {
   });
 
   it('denies tactical armor/naval when mountain blocks LOS; allows infantry', () => {
-    const a = res4(48, 58);
+    const a = tacticalIndex(48, 58);
     const b = neighborOf(a);
     const footprint = new Set([a, b]);
     const battle = {
       strategicHexTerrain: 'land' as const,
       strategicHexTerrainKind: 'plains',
-      res4TerrainKindByH3: { [a]: 'plains', [b]: 'mountain' },
+      tacticalTerrainKindByH3: { [a]: 'plains', [b]: 'mountain' },
     };
     assert.ok(gridPathCells(a, b).length >= 1);
     const ctx: ReturnFireEligibilityContext = {
@@ -224,7 +224,7 @@ describe('canDefenderReturnFireAtAttackerHex', () => {
   });
 
   it('denies tactical ground when battle or footprint is missing', () => {
-    const a = res4(49, 59);
+    const a = tacticalIndex(49, 59);
     const b = neighborOf(a);
     assert.equal(
       canDefenderReturnFireAtAttackerHex({ unitType: 'armor', h3Index: a }, b, { theater: 'tactical' }),
@@ -239,7 +239,7 @@ describe('canDefenderReturnFireAtAttackerHex', () => {
           tacticalBattle: {
             strategicHexTerrain: 'land',
             strategicHexTerrainKind: 'plains',
-            res4TerrainKindByH3: { [a]: 'plains' },
+            tacticalTerrainKindByH3: { [a]: 'plains' },
           },
         }
       ),
@@ -248,12 +248,12 @@ describe('canDefenderReturnFireAtAttackerHex', () => {
   });
 
   it('allows tactical air with airport even when mountain would block ranged-mode air', () => {
-    const a = res4(50, 60);
+    const a = tacticalIndex(50, 60);
     const b = neighborOf(a);
     const battle = {
       strategicHexTerrain: 'land' as const,
       strategicHexTerrainKind: 'plains',
-      res4TerrainKindByH3: { [a]: 'plains', [b]: 'mountain' },
+      tacticalTerrainKindByH3: { [a]: 'plains', [b]: 'mountain' },
     };
     const ctx: ReturnFireEligibilityContext = {
       theater: 'tactical',
@@ -265,7 +265,7 @@ describe('canDefenderReturnFireAtAttackerHex', () => {
   });
 
   it('denies tactical air without airport', () => {
-    const a = res4(51, 61);
+    const a = tacticalIndex(51, 61);
     const b = neighborOf(a);
     const ctx: ReturnFireEligibilityContext = {
       theater: 'tactical',
@@ -275,7 +275,7 @@ describe('canDefenderReturnFireAtAttackerHex', () => {
   });
 
   it('denies air when airport callback throws', () => {
-    const defenderHex = res1(42, -99);
+    const defenderHex = strategic(42, -99);
     const attackerHex = [...gridDisk(defenderHex, 1)].find((h) => h !== defenderHex)!;
     assert.equal(
       canDefenderReturnFireAtAttackerHex(

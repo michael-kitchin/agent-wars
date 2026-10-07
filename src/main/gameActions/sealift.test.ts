@@ -19,7 +19,7 @@ import {
   shouldSkipEmbarkedLandIndependentMove,
   executeSealiftSlotUpdate,
 } from './sealift';
-import { getRes1ProductionContext } from '../terrainClassificationCache';
+import { getStrategicProductionContext } from '../terrainClassificationCache';
 
 /**
  * Defines the `withTempDb` function shape (function withTempDb(runCase: () => void): void).
@@ -82,12 +82,12 @@ function setHexTerrain(h3Index: string, terrain: 'land' | 'coastal' | 'water'): 
  */
 function setPortControl(h3Index: string, controllerPlayerId: 'human' | 'opponent', seaportCount = 1): void {
   dbRun(
-    `INSERT INTO res1_infrastructure (h3_index, urban_hex_count, airport_count, seaport_count)
+    `INSERT INTO res_s_infrastructure (h3_index, urban_hex_count, airport_count, seaport_count)
      VALUES (?, 0, 0, ?)
      ON CONFLICT(h3_index) DO UPDATE SET seaport_count = excluded.seaport_count`,
     [h3Index, seaportCount]
   );
-  dbRun('INSERT OR REPLACE INTO res1_control (h3_index, controller_player_id) VALUES (?, ?)', [h3Index, controllerPlayerId]);
+  dbRun('INSERT OR REPLACE INTO res_s_control (h3_index, controller_player_id) VALUES (?, ?)', [h3Index, controllerPlayerId]);
 }
 
 /**
@@ -104,19 +104,19 @@ function prepareWaterHex(
 ): void {
   dbRun('UPDATE hexes SET terrain = ?, terrain_kind = ? WHERE h3_index = ?', ['water', 'water', h3Index]);
   dbRun(
-    `INSERT INTO res1_infrastructure (h3_index, urban_hex_count, airport_count, seaport_count)
+    `INSERT INTO res_s_infrastructure (h3_index, urban_hex_count, airport_count, seaport_count)
      VALUES (?, 0, 0, ?)
      ON CONFLICT(h3_index) DO UPDATE SET seaport_count = excluded.seaport_count`,
     [h3Index, options.seaportCount]
   );
   if (options.controllerPlayerId) {
-    dbRun('INSERT OR REPLACE INTO res1_control (h3_index, controller_player_id) VALUES (?, ?)', [
+    dbRun('INSERT OR REPLACE INTO res_s_control (h3_index, controller_player_id) VALUES (?, ?)', [
       h3Index,
       options.controllerPlayerId,
     ]);
     return;
   }
-  dbRun('DELETE FROM res1_control WHERE h3_index = ?', [h3Index]);
+  dbRun('DELETE FROM res_s_control WHERE h3_index = ?', [h3Index]);
 }
 
 /**
@@ -157,8 +157,8 @@ function testApplyEmbarkOrdersEnforcesCapacityAndReassignment(): void {
               ri.seaport_count AS seaportCount,
               rc.controller_player_id AS controllerPlayerId
        FROM hexes hx
-       LEFT JOIN res1_infrastructure ri ON ri.h3_index = hx.h3_index
-       LEFT JOIN res1_control rc ON rc.h3_index = hx.h3_index
+       LEFT JOIN res_s_infrastructure ri ON ri.h3_index = hx.h3_index
+       LEFT JOIN res_s_control rc ON rc.h3_index = hx.h3_index
        WHERE hx.h3_index = ?`,
       [coastalHex]
     );
@@ -241,7 +241,7 @@ function testApplyEmbarkOrdersRejectsAtSeaAndNoPort(): void {
     const coastalNoPortHex = pickHex(3);
     setHexTerrain(waterHex, 'water');
     setHexTerrain(coastalNoPortHex, 'coastal');
-    dbRun('UPDATE res1_infrastructure SET seaport_count = 0 WHERE h3_index = ?', [coastalNoPortHex]);
+    dbRun('UPDATE res_s_infrastructure SET seaport_count = 0 WHERE h3_index = ?', [coastalNoPortHex]);
 
     insertUnit('opponent-naval-water', 'opponent', 'naval', waterHex);
     insertUnit('opponent-inf-water', 'opponent', 'infantry', waterHex);
@@ -410,26 +410,26 @@ function testCanManualDebarkFromHexCoastalWaterPortAndOpenWater(): void {
       (hex) =>
         hex.terrain === 'water' &&
         hex.h3Index !== waterPortHex &&
-        getRes1ProductionContext({ h3Index: hex.h3Index }).seaportCount === 0
+        getStrategicProductionContext({ h3Index: hex.h3Index }).seaportCount === 0
     )?.h3Index;
     assert.ok(openWaterHex, 'expected open water hex without seaport in classification cache');
     dbRun(
-      `INSERT INTO res1_infrastructure (h3_index, urban_hex_count, airport_count, seaport_count)
+      `INSERT INTO res_s_infrastructure (h3_index, urban_hex_count, airport_count, seaport_count)
        VALUES (?, 0, 0, 0)
        ON CONFLICT(h3_index) DO UPDATE SET seaport_count = 0`,
       [openWaterHex]
     );
-    dbRun('DELETE FROM res1_control WHERE h3_index = ?', [openWaterHex]);
+    dbRun('DELETE FROM res_s_control WHERE h3_index = ?', [openWaterHex]);
     assert.strictEqual(canManualDebarkFromHex(openWaterHex, 'human'), false);
     const uncontrolledWaterPort = pickHex(12);
     setHexTerrain(uncontrolledWaterPort, 'water');
     dbRun(
-      `INSERT INTO res1_infrastructure (h3_index, urban_hex_count, airport_count, seaport_count)
+      `INSERT INTO res_s_infrastructure (h3_index, urban_hex_count, airport_count, seaport_count)
        VALUES (?, 0, 0, 1)
        ON CONFLICT(h3_index) DO UPDATE SET seaport_count = 1`,
       [uncontrolledWaterPort]
     );
-    dbRun('DELETE FROM res1_control WHERE h3_index = ?', [uncontrolledWaterPort]);
+    dbRun('DELETE FROM res_s_control WHERE h3_index = ?', [uncontrolledWaterPort]);
     assert.strictEqual(canManualDebarkFromHex(uncontrolledWaterPort, 'human'), false);
   });
 }
@@ -729,12 +729,12 @@ function testLandSeaportSealiftWithoutControl(): void {
     const landPortHex = pickHex(7);
     setHexTerrain(landPortHex, 'land');
     dbRun(
-      `INSERT INTO res1_infrastructure (h3_index, urban_hex_count, airport_count, seaport_count)
+      `INSERT INTO res_s_infrastructure (h3_index, urban_hex_count, airport_count, seaport_count)
        VALUES (?, 0, 0, 1)
        ON CONFLICT(h3_index) DO UPDATE SET seaport_count = 1`,
       [landPortHex]
     );
-    dbRun('DELETE FROM res1_control WHERE h3_index = ?', [landPortHex]);
+    dbRun('DELETE FROM res_s_control WHERE h3_index = ?', [landPortHex]);
     insertUnit('human-naval-land-port', 'human', 'naval', landPortHex);
     insertUnit('human-inf-land-port', 'human', 'infantry', landPortHex);
     applyEmbarkOrdersForPlayer(

@@ -102,6 +102,6 @@ None.
 - `src/renderer/map/tacticalMapView.ts`
 - `src/renderer/map/leafletMainMapProjection.ts`
 - `src/renderer/rendering/unitDrawing.ts`
-- `src/renderer/rendering/res4CityOverlays.ts` (`drawStrategicRes1InspectionHexCodes`)
+- `src/renderer/rendering/tacticalCityOverlays.ts` (`drawStrategicInspectionHexCodes`)
 - `src/renderer/rendering/inspectionStatusIcons.ts`
 - `src/shared/inspectionStatusIconLine.ts`

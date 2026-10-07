@@ -12,7 +12,7 @@ import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { combatDicePlaybackFields } from '../combatDiceRecording';
 import { effectiveTacticalMovementPointBudgetForMarchLeg } from '../../shared/tacticalTerrainCombatModifiers';
 import { tacticalMovementUnitTypeForPathfinding } from '../../shared/tacticalTerrainMovement';
-import { isDbReady, reconcileRes1InfrastructureCountsFromRes4Overrides } from '../gameDb';
+import { isDbReady, reconcileStrategicInfrastructureCountsFromTacticalOverrides } from '../gameDb';
 import { logDebug, logError } from '../logger';
 import { holdFireUnitIdsForPlayer } from '../tools/standingOrders';
 import {
@@ -63,7 +63,7 @@ export function sanitizeOpponentTacticalDraftForReadyCommit(
     embarkCount: draft?.embarkOrders.length ?? 0,
   });
   if (!draft) return undefined;
-  const res4Set = new Set(preBattle.res4ChildH3Indexes);
+  const tacticalSet = new Set(preBattle.tacticalChildH3Indexes);
   const sub = [...preBattle.subUnits];
   const byId = new Map(sub.map((u, i) => [u.id, i] as const));
   let dropped = 0;
@@ -75,7 +75,7 @@ export function sanitizeOpponentTacticalDraftForReadyCommit(
       byId,
       sub,
       order: o,
-      res4Set,
+      tacticalSet,
       battle: preBattle,
     });
     if (!outcome.ok) {
@@ -279,19 +279,19 @@ export function commitHumanTacticalDraftOrders(args: {
       explicitRangedCount: explicitRanged.length,
       explicitAirCount: explicitAir.length,
     });
-    const res4Set = new Set(preBattle.res4ChildH3Indexes);
+    const tacticalSet = new Set(preBattle.tacticalChildH3Indexes);
     const terrainBattle = {
       battleId: preBattle.battleId,
       tacticalTurnNumber: preBattle.tacticalTurnNumber,
       subUnits: preBattle.subUnits,
-      res4TerrainKindByH3: preBattle.res4TerrainKindByH3,
+      tacticalTerrainKindByH3: preBattle.tacticalTerrainKindByH3,
       strategicHexTerrain: preBattle.strategicHexTerrain,
       strategicHexTerrainKind: preBattle.strategicHexTerrainKind,
-      ...(preBattle.res4IsSeaportByH3 ? { res4IsSeaportByH3: preBattle.res4IsSeaportByH3 } : {}),
-      ...(preBattle.res4IsUrbanByH3 ? { res4IsUrbanByH3: preBattle.res4IsUrbanByH3 } : {}),
-      ...(preBattle.res4IsRubbleByH3 ? { res4IsRubbleByH3: preBattle.res4IsRubbleByH3 } : {}),
-      ...(preBattle.res4RoadSidesByH3 ? { res4RoadSidesByH3: preBattle.res4RoadSidesByH3 } : {}),
-      ...(preBattle.res4RailSidesByH3 ? { res4RailSidesByH3: preBattle.res4RailSidesByH3 } : {}),
+      ...(preBattle.tacticalIsSeaportByH3 ? { tacticalIsSeaportByH3: preBattle.tacticalIsSeaportByH3 } : {}),
+      ...(preBattle.tacticalIsUrbanByH3 ? { tacticalIsUrbanByH3: preBattle.tacticalIsUrbanByH3 } : {}),
+      ...(preBattle.tacticalIsRubbleByH3 ? { tacticalIsRubbleByH3: preBattle.tacticalIsRubbleByH3 } : {}),
+      ...(preBattle.tacticalRoadSidesByH3 ? { tacticalRoadSidesByH3: preBattle.tacticalRoadSidesByH3 } : {}),
+      ...(preBattle.tacticalRailSidesByH3 ? { tacticalRailSidesByH3: preBattle.tacticalRailSidesByH3 } : {}),
       ...(preBattle.weatherBonusEnabled ? { weatherBonusEnabled: true as const, weatherBonusLevel: preBattle.weatherBonusLevel, weather: preBattle.weather } : {}),
     };
     const appliedMovementOrders: { unitId: string; toH3Index: string }[] = [];
@@ -315,7 +315,7 @@ export function commitHumanTacticalDraftOrders(args: {
         from,
         o.toH3Index,
         maxEdges,
-        res4Set,
+        tacticalSet,
         terrainBattle,
         moveType,
         sub.weatherTags
@@ -344,7 +344,7 @@ export function commitHumanTacticalDraftOrders(args: {
     const support = beat;
     const postMovementBattle = beat.battleAfterMovementBeforeFerry;
     if ((support.infrastructureDestroyedEvents?.length ?? 0) > 0) {
-      const { changedHexCount } = reconcileRes1InfrastructureCountsFromRes4Overrides();
+      const { changedHexCount } = reconcileStrategicInfrastructureCountsFromTacticalOverrides();
       logDebug('gameActions commitHumanTacticalDraftOrders reconciled res1 infrastructure after tactical strikes', {
         changedHexCount,
         eventCount: support.infrastructureDestroyedEvents.length,
@@ -406,7 +406,7 @@ export function commitHumanTacticalDraftOrders(args: {
             from,
             o.toH3Index,
             oppMaxEdges,
-            res4Set,
+            tacticalSet,
             terrainBattle,
             oppMoveType,
             su.weatherTags

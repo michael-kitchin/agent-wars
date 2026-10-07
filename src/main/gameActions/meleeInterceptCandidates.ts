@@ -10,7 +10,7 @@ import { computeTacticalBattleSnapshot } from '../tacticalBattle/computeTactical
 const UNIT_CATEGORY_ORDER = ['air', 'armor', 'infantry', 'naval'] as const;
 
 /**
- * Lists res1 hexes where at least two players still have land-relevant combat units after movement and ranged.
+ * Lists strategic hexes where at least two players still have land-relevant combat units after movement and ranged.
  *
  * Purpose: Mirrors `runMeleePhase` eligibility without consuming RNG or mutating unit lists.
  * When to use: Immediately before melee during strategic ready to decide whether to pause for intercept.

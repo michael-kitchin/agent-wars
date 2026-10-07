@@ -12,7 +12,7 @@ import {
 /** A coastal-born French unit. */
 const FRENCH_COASTAL: UnitOrigin = {
   birthH3Index: '81fb3ffffffffff',
-  birthRes4H3Index: null,
+  birthTacticalH3Index: null,
   birthTerrainKind: 'coastal',
   birthCountryName: 'France',
   birthCountryCode: 'FR',
@@ -36,12 +36,12 @@ const TERRAIN_ONLY: OriginBonusSettings = { countryBonusEnabled: false, terrainB
 function coastalBattle(): TacticalBattleSnapshot {
   return {
     battleId: 'origin-lookup-test',
-    enclosingRes1H3Index: 'hex-a',
-    res4ChildH3Indexes: ['cell-a'],
+    enclosingStrategicH3Index: 'hex-a',
+    tacticalChildH3Indexes: ['cell-a'],
     strategicTurnNumber: 1,
     tacticalTurnNumber: 1,
     strategicHexTerrainKind: 'plains',
-    res4TerrainKindByH3: { 'cell-a': 'coastal' },
+    tacticalTerrainKindByH3: { 'cell-a': 'coastal' },
     subUnits: [
       {
         id: 'sub-1',

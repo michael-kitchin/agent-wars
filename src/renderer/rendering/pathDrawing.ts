@@ -218,7 +218,7 @@ export function drawStandingOrderLines(
 /**
  * Draws semi-transparent planned march polylines for human tactical draft orders (Ready not yet pressed).
  *
- * Purpose: Mirrors strategic `drawStandingOrderLines` / hover styling so drafted res4 moves remain visible under units.
+ * Purpose: Mirrors strategic `drawStandingOrderLines` / hover styling so drafted tactical moves remain visible under units.
  * When to use: Only from the tactical `drawGameScene` branch while `S.tacticalPendingMarches` is non-empty.
  * Expected outcome: One route per draft row from snapshot `h3Index` to `destinationH3Index` at full opacity (matching strategic standing-order lines), solid for current-turn movement and dashed for future-turn continuation, using the same terrain-aware path as hover and commit.
  * Exceptions: Skips rows when the sub-unit row is missing or `buildTacticalMarchDraftDestinationPreview` yields no drawable segments.

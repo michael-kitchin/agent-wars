@@ -113,7 +113,7 @@ function testStrategicAirStrikeDiskSize(): void {
 /**
  * Defines the `testTacticalAirStrikeEqualsFootprint` function shape (function testTacticalAirStrikeEqualsFootprint(): void).
  *
- * Purpose: Verifies tactical air-strike perimeter uses the full res4 footprint.
+ * Purpose: Verifies tactical air-strike perimeter uses the full tactical footprint.
  * When to use: Regression test for `buildTacticalAirStrikeRangeSet`.
  * Expected outcome: Returned set equals the input footprint.
  * Exceptions: None.
@@ -133,13 +133,13 @@ function testTacticalAirStrikeEqualsFootprint(): void {
  * Exceptions: None.
  */
 function minimalTacticalBattle(
-  res4: string[],
+  tacticalIndex: string[],
   subUnits: TacticalBattleSnapshot['subUnits']
 ): TacticalBattleSnapshot {
   return {
     battleId: 'test-battle',
-    enclosingRes1H3Index: ORIGIN,
-    res4ChildH3Indexes: res4,
+    enclosingStrategicH3Index: ORIGIN,
+    tacticalChildH3Indexes: tacticalIndex,
     strategicTurnNumber: 1,
     tacticalTurnNumber: 1,
     subUnits,
@@ -168,7 +168,7 @@ function testTacticalRangedClipsToFootprint(): void {
       displayName: 'Inf 1',
     },
   ]);
-  const footprint = new Set(battle.res4ChildH3Indexes);
+  const footprint = new Set(battle.tacticalChildH3Indexes);
   const set = buildTacticalRangedRangeSet(battle, battle.subUnits, footprint);
   for (const h of set) assert.ok(footprint.has(h));
   assert.ok(set.has(anchor));

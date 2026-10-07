@@ -94,7 +94,7 @@ lastBuildEntryLayerKey: null as string | null,
 
    * Purpose: Holds the active tactical battle layout and sub-units while the renderer is in tactical map mode.
    * When to use: Set after a successful `startTacticalBattle` IPC; cleared when the tactical session ends.
-   * Expected outcome: When non-null, terrain and unit drawing use tactical res4 constraints instead of global strategic view.
+   * Expected outcome: When non-null, terrain and unit drawing use tactical constraints instead of global strategic view.
    * Exceptions: None.
    */
 tacticalBattleSnapshot: null as TacticalBattleSnapshot | null,
@@ -172,41 +172,41 @@ preTacticalLeafletMaxZoom: null as number | null,
 strategicScenarioInitialLeafletView: null as { lat: number; lng: number; zoom: number } | null,
 
     /**
-   * Documents the object literal property `res1DominantTerrainKindByH3` (res1DominantTerrainKindByH3: new Map<string, string>()).
+   * Documents the object literal property `strategicDominantTerrainKindByH3` (strategicDominantTerrainKindByH3: new Map<string, string>()).
 
-   * Purpose: Supports maintainability by documenting why `res1DominantTerrainKindByH3` exists.
+   * Purpose: Supports maintainability by documenting why `strategicDominantTerrainKindByH3` exists.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-res1DominantTerrainKindByH3: new Map<string, string>(),
+strategicDominantTerrainKindByH3: new Map<string, string>(),
     /**
-   * Documents the object literal property `res1TerrainSummaryByH3` (res1TerrainSummaryByH3: new Map<string, string>()).
+   * Documents the object literal property `strategicTerrainSummaryByH3` (strategicTerrainSummaryByH3: new Map<string, string>()).
 
-   * Purpose: Supports maintainability by documenting why `res1TerrainSummaryByH3` exists.
+   * Purpose: Supports maintainability by documenting why `strategicTerrainSummaryByH3` exists.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-res1TerrainSummaryByH3: new Map<string, string>(),
+strategicTerrainSummaryByH3: new Map<string, string>(),
     /**
-   * Documents the object literal property `res1FeaturesSummaryByH3` (res1FeaturesSummaryByH3: new Map<string, string | null>()).
+   * Documents the object literal property `strategicFeaturesSummaryByH3` (strategicFeaturesSummaryByH3: new Map<string, string | null>()).
 
-   * Purpose: Supports maintainability by documenting why `res1FeaturesSummaryByH3` exists.
+   * Purpose: Supports maintainability by documenting why `strategicFeaturesSummaryByH3` exists.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-res1FeaturesSummaryByH3: new Map<string, string | null>(),
+strategicFeaturesSummaryByH3: new Map<string, string | null>(),
     /**
-   * Documents the object literal property `res1FeatureCountsByH3` (res1FeatureCountsByH3: new Map< string, { airportCount: number; seaportCount: number } >()).
+   * Documents the object literal property `strategicFeatureCountsByH3` (strategicFeatureCountsByH3: new Map< string, { airportCount: number; seaportCount: number } >()).
 
-   * Purpose: Supports maintainability by documenting why `res1FeatureCountsByH3` exists.
+   * Purpose: Supports maintainability by documenting why `strategicFeatureCountsByH3` exists.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-res1FeatureCountsByH3: new Map<
+strategicFeatureCountsByH3: new Map<
     string,
     { airportCount: number; seaportCount: number }
   >(),
@@ -250,7 +250,7 @@ terrainTooltipRestoreTimer: null as ReturnType<typeof setTimeout> | null,
    */
 selectedHexIndex: null as string | null,
     /**
-   * Ordered res1 hex ids controlled by the build-popup multi-selection (insertion order).
+   * Ordered strategic hex ids controlled by the build-popup multi-selection (insertion order).
    *
    * Purpose: Keeps production-hex selection independent from unit selection and the scalar map hex.
    * When to use: Build-entry button chrome, Shift-toggle policy, and multi-hex popup rendering.
@@ -435,7 +435,7 @@ pendingFerryOrders: [] as FerryOrder[],
 
    * Purpose: Queues human sealift embark drafts as tactical sub-unit pairs until tactical Ready commits them (strategic `updateSealiftSlot` is blocked during tactical battles).
    * When to use: Stack callout sealift controls while `tacticalBattleSnapshot` is set; clear on tactical Ready commit, exit, stash, or new game.
-   * Expected outcome: Each row assigns one land sub-unit id to one naval sub-unit id co-located on the same res4 hex.
+   * Expected outcome: Each row assigns one land sub-unit id to one naval sub-unit id co-located on the same tactical hex.
    * Exceptions: None.
    */
 pendingEmbarkOrders: [] as EmbarkOrder[],
@@ -444,7 +444,7 @@ pendingEmbarkOrders: [] as EmbarkOrder[],
 
    * Purpose: Holds human tactical march rows shown in the pending-orders sidebar while a tactical battle is active; distinct from strategic standing orders.
    * When to use: Append after tactical march validation succeeds (draft, before Ready); clear on tactical Ready commit, advance turn, exit, stash, or new game.
-   * Expected outcome: Sidebar lists res4 destinations keyed by tactical sub-unit ids; optional `pathH3Indexes` and `cachedSegments` keep overlay polylines stable across beats.
+   * Expected outcome: Sidebar lists tactical destinations keyed by tactical sub-unit ids; optional `pathH3Indexes` and `cachedSegments` keep overlay polylines stable across beats.
    * Exceptions: None.
    */
 tacticalPendingMarches: [] as TacticalPendingMarchRow[],
@@ -566,107 +566,107 @@ gameState: null as GameStateSnapshot | null,
    */
 unitDisplayNameById: new Map<string, string>(),
     /**
-   * Documents the object literal property `res4TerrainOverridesByH3` (res4TerrainOverridesByH3: new Map< string, { terrainKind: string; isUrban: boolean; isAirport: boolean; isSeaport: boolean; isRubble: boolean } >()).
+   * Documents the object literal property `tacticalTerrainOverridesByH3` (tacticalTerrainOverridesByH3: new Map< string, { terrainKind: string; isUrban: boolean; isAirport: boolean; isSeaport: boolean; isRubble: boolean } >()).
 
-   * Purpose: Supports maintainability by documenting why `res4TerrainOverridesByH3` exists.
+   * Purpose: Supports maintainability by documenting why `tacticalTerrainOverridesByH3` exists.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-res4TerrainOverridesByH3: new Map<
+tacticalTerrainOverridesByH3: new Map<
     string,
     { terrainKind: string; isUrban: boolean; isAirport: boolean; isSeaport: boolean; isRubble: boolean }
   >(),
     /**
-   * Documents the object literal property `res4CityOverlayLabelByH3` (res4CityOverlayLabelByH3: new Map<string, string>()).
+   * Documents the object literal property `tacticalCityOverlayLabelByH3` (tacticalCityOverlayLabelByH3: new Map<string, string>()).
 
-   * Purpose: Caches reduced res4 city labels for the res4 city overlay while res4 hexes are visible.
+   * Purpose: Caches reduced tactical city labels for the tactical city overlay while tactical hexes are visible.
    * When to use: Hydrated at startup from main-process IPC; read only from terrain overlay passes.
-   * Expected outcome: Keys are res4 child indexes; values are display strings already tie-broken per naming rules.
+   * Expected outcome: Keys are tactical child indexes; values are display strings already tie-broken per naming rules.
    * Exceptions: None.
    */
-res4CityOverlayLabelByH3: new Map<string, string>(),
+tacticalCityOverlayLabelByH3: new Map<string, string>(),
     /**
-   * Generated urban-cell count for each res1 hex that can produce units.
+   * Generated urban-cell count for each strategic hex that can produce units.
    *
    * Purpose: The hex tooltip and the build popup classify tech from this baseline, which air strikes do not change.
-   * When to use: Hydrated once per session from `game:getRes1BaselineUrbanHexCounts`. A missing hex produces nothing.
-   * Expected outcome: Keys are res1 indexes. Values are integers of at least 1.
+   * When to use: Hydrated once per session from `game:getStrategicBaselineUrbanHexCounts`. A missing hex produces nothing.
+   * Expected outcome: Keys are strategic indexes. Values are integers of at least 1.
    * Exceptions: None.
    */
-baselineUrbanHexCountByRes1H3: new Map<string, number>(),
+baselineUrbanHexCountByStrategicH3: new Map<string, number>(),
     /**
-   * Documents the object literal property `res4RoadRailSidesByH3` (res4RoadRailSidesByH3: new Map<string, { roadSides: boolean[]; railSides: boolean[] }>()).
+   * Documents the object literal property `tacticalRoadRailSidesByH3` (tacticalRoadRailSidesByH3: new Map<string, { roadSides: boolean[]; railSides: boolean[] }>()).
 
-   * Purpose: Caches road/rail side masks for res4 cells used by the res4 transport overlay renderer (gameplay truth: booleans).
-   * When to use: Hydrated once per session from `game:getRes4RoadRailOverlays` alongside terrain overrides.
+   * Purpose: Caches road/rail side masks for tactical cells used by the tactical transport overlay renderer (gameplay truth: booleans).
+   * When to use: Hydrated once per session from `game:getTacticalRoadRailOverlays` alongside terrain overrides.
    * Expected outcome: Parallel boolean arrays match the exported JSON contract for each stored cell.
    * Exceptions: None.
    */
-res4RoadRailSidesByH3: new Map<string, { roadSides: boolean[]; railSides: boolean[] }>(),
+tacticalRoadRailSidesByH3: new Map<string, { roadSides: boolean[]; railSides: boolean[] }>(),
     /**
-   * Documents the object literal property `res4TransportVectorOverlayRows` (res4TransportVectorOverlayRows: [] as Array<{ kind: 'road' | 'rail'; points: [number, number][] }>).
+   * Documents the object literal property `tacticalTransportVectorOverlayRows` (tacticalTransportVectorOverlayRows: [] as Array<{ kind: 'road' | 'rail'; points: [number, number][] }>).
 
    * Purpose: Caches optional display-only transport polylines for the Leaflet vector overlay.
-   * When to use: Hydrated from `game:getRes4TransportVectorOverlays`; consumed by the renderer Leaflet layer sync.
+   * When to use: Hydrated from `game:getTacticalTransportVectorOverlays`; consumed by the renderer Leaflet layer sync.
    * Expected outcome: Empty array when vector artifact is absent; populated rows use WGS84 `[lat, lng]` tuples.
    * Exceptions: None.
    */
-res4TransportVectorOverlayRows: [] as Array<{ kind: 'road' | 'rail'; points: [number, number][] }>,
+tacticalTransportVectorOverlayRows: [] as Array<{ kind: 'road' | 'rail'; points: [number, number][] }>,
     /**
-   * Documents the object literal property `terrainInfraRes1Airport` (terrainInfraRes1Airport: new Set<string>()).
+   * Documents the object literal property `terrainInfraStrategicAirport` (terrainInfraStrategicAirport: new Set<string>()).
 
-   * Purpose: Supports maintainability by documenting why `terrainInfraRes1Airport` exists.
+   * Purpose: Supports maintainability by documenting why `terrainInfraStrategicAirport` exists.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-terrainInfraRes1Airport: new Set<string>(),
+terrainInfraStrategicAirport: new Set<string>(),
     /**
-   * Documents the object literal property `terrainInfraRes1Seaport` (terrainInfraRes1Seaport: new Set<string>()).
+   * Documents the object literal property `terrainInfraStrategicSeaport` (terrainInfraStrategicSeaport: new Set<string>()).
 
-   * Purpose: Supports maintainability by documenting why `terrainInfraRes1Seaport` exists.
+   * Purpose: Supports maintainability by documenting why `terrainInfraStrategicSeaport` exists.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-terrainInfraRes1Seaport: new Set<string>(),
+terrainInfraStrategicSeaport: new Set<string>(),
     /**
-   * Documents the object literal property `terrainInfraRes4Airport` (terrainInfraRes4Airport: new Set<string>()).
+   * Documents the object literal property `terrainInfraTacticalAirport` (terrainInfraTacticalAirport: new Set<string>()).
 
-   * Purpose: Supports maintainability by documenting why `terrainInfraRes4Airport` exists.
+   * Purpose: Supports maintainability by documenting why `terrainInfraTacticalAirport` exists.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-terrainInfraRes4Airport: new Set<string>(),
+terrainInfraTacticalAirport: new Set<string>(),
     /**
-   * Documents the object literal property `terrainInfraRes4Seaport` (terrainInfraRes4Seaport: new Set<string>()).
+   * Documents the object literal property `terrainInfraTacticalSeaport` (terrainInfraTacticalSeaport: new Set<string>()).
 
-   * Purpose: Supports maintainability by documenting why `terrainInfraRes4Seaport` exists.
+   * Purpose: Supports maintainability by documenting why `terrainInfraTacticalSeaport` exists.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-terrainInfraRes4Seaport: new Set<string>(),
+terrainInfraTacticalSeaport: new Set<string>(),
     /**
-   * Documents the object literal property `res4ChildrenByParent` (res4ChildrenByParent: new Map<string, string[]>()).
+   * Documents the object literal property `tacticalChildrenByParent` (tacticalChildrenByParent: new Map<string, string[]>()).
 
-   * Purpose: Supports maintainability by documenting why `res4ChildrenByParent` exists.
+   * Purpose: Supports maintainability by documenting why `tacticalChildrenByParent` exists.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-res4ChildrenByParent: new Map<string, string[]>(),
+tacticalChildrenByParent: new Map<string, string[]>(),
     /**
-   * Documents the object literal property `res4Visible` (res4Visible: false).
+   * Documents the object literal property `tacticalVisible` (tacticalVisible: false).
 
-   * Purpose: Supports maintainability by documenting why `res4Visible` exists.
+   * Purpose: Supports maintainability by documenting why `tacticalVisible` exists.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-res4Visible: false,
+tacticalVisible: false,
 
     /**
    * Documents the object literal property `resolutionMoveAnimation` (resolutionMoveAnimation: null as ResolutionMoveAnimationState).

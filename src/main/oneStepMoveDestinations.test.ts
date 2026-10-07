@@ -20,9 +20,9 @@ import { strategicMovementHexes } from '../shared/weatherBonusRules';
 import { getOrderedHexList } from './mapData';
 import {
   ensureTerrainClassificationCacheLoaded,
-  getRes1LandMassByH3,
+  getStrategicLandMassByH3,
 } from './terrainClassificationCache';
-import { landUnitCanOccupyHex } from '../shared/landTraversalRes1';
+import { landUnitCanOccupyHex } from '../shared/landTraversalStrategic';
 import {
   isLandSeaportHex,
   navalMayOccupyHex,
@@ -97,7 +97,7 @@ function getValidDestinationsFullScan(
   const range = strategicMovementHexes(unit.unitType);
   const lookup = createNavalStrategicHexLookup(
     state.hexes,
-    seaportCountByH3ForNavalLookup(state.hexes, state.res1Infrastructure)
+    seaportCountByH3ForNavalLookup(state.hexes, state.strategicInfrastructure)
   );
   return navalReachableByEdgeScan(unit.h3Index, range, lookup);
 }
@@ -117,8 +117,8 @@ function minimalState(hexIndexes: string[]): GameStateSnapshot {
     hexes: hexIndexes.map((h3Index) => ({ h3Index, terrain: 'plains' as const, terrainKind: 'plains' })),
     units: [],
     pendingOrders: [],
-    res1Infrastructure: [],
-    res1Control: [],
+    strategicInfrastructure: [],
+    strategicControl: [],
     playerPerspective: 'human',
     fogOfWarEnabled: false,
     visibleHexes: hexIndexes,
@@ -239,7 +239,7 @@ function testGetValidDestinationsKeepsOccupiedHexes(): void {
   ensureTerrainClassificationCacheLoaded();
   resetValidDestinationsCacheForTests();
   const hexList = getOrderedHexList();
-  const landMass = getRes1LandMassByH3();
+  const landMass = getStrategicLandMassByH3();
   const emptyState = minimalState(hexList);
   let origin: string | null = null;
   let occupied: string | undefined;

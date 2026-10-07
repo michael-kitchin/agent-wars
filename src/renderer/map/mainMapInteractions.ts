@@ -2,7 +2,7 @@ import type { AirStrikeTargetType, GameStateSnapshot } from '../../shared/ipcTyp
 import type { NamingLookupTarget, TerrainTooltipState } from './terrainTooltipTypes';
 import { HEX_DETAILS_TOOLTIP_DELAY_MS, HEX_DETAILS_TOOLTIP_REST_PX } from '../core/constants';
 import { isHoverOrderPlanningActive } from '../rendering/canvasPreviewPolicy';
-import { hitTestHexAtContainerPixel, hitTestTacticalRes4HexAtContainerPixel } from './mapHelpers';
+import { hitTestHexAtContainerPixel, hitTestTacticalHexAtContainerPixel } from './mapHelpers';
 import { rendererSharedState as S } from '../core/state';
 import { clearMapSelectionChrome, isEmbarkedLandUnitBlockedForSelection } from '../core/selection';
 import { getMainLeafletMap } from './worldLeafletMap';
@@ -38,7 +38,7 @@ import {
   repositionOrderSlowerHexTooltipIfVisible,
   restartOrderEffectsDwellIfPointerMoved,
 } from './orderSlowerHexTooltip';
-import { shouldHideStrategicMapUnitsForRes4Zoom } from './terrainView';
+import { shouldHideStrategicMapUnitsForZoom } from './terrainView';
 
 /**
  * Documents the `MainMapInteractionDeps` interface as a named contract surface (interface MainMapInteractionDeps).
@@ -104,23 +104,23 @@ refreshHoverRoutePreview: (options?: import('../gameplay/tacticalOrders').Refres
    */
 detailHitAtClientPixel: (clientX: number, clientY: number, mapHexSet: Set<string>) => string | null;
     /**
-   * Specifies the contract for the `terrainStateForPointer` member (terrainStateForPointer: (clientX: number, clientY: number, fallbackRes1H3: string | null) => TerrainTooltipState;).
+   * Specifies the contract for the `terrainStateForPointer` member (terrainStateForPointer: (clientX: number, clientY: number, fallbackStrategicH3: string | null) => TerrainTooltipState;).
 
    * Contract: Describes stable behavior for callers of `terrainStateForPointer` in this codebase.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-terrainStateForPointer: (clientX: number, clientY: number, fallbackRes1H3: string | null) => TerrainTooltipState;
+terrainStateForPointer: (clientX: number, clientY: number, fallbackStrategicH3: string | null) => TerrainTooltipState;
     /**
-   * Specifies the contract for the `namingLookupTargetForPointer` member (namingLookupTargetForPointer: (clientX: number, clientY: number, fallbackRes1H3: string | null) => NamingLookupTarget | null;).
+   * Specifies the contract for the `namingLookupTargetForPointer` member (namingLookupTargetForPointer: (clientX: number, clientY: number, fallbackStrategicH3: string | null) => NamingLookupTarget | null;).
 
    * Contract: Describes stable behavior for callers of `namingLookupTargetForPointer` in this codebase.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-namingLookupTargetForPointer: (clientX: number, clientY: number, fallbackRes1H3: string | null) => NamingLookupTarget | null;
+namingLookupTargetForPointer: (clientX: number, clientY: number, fallbackStrategicH3: string | null) => NamingLookupTarget | null;
     /**
    * Specifies the contract for the `showTerrainTooltip` member (showTerrainTooltip: (clientX: number, clientY: number, state: TerrainTooltipState, namingTarget: NamingLookupTarget | null) => Promise<void>;).
 
@@ -398,10 +398,10 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
     const y = clientY - rect.top;
     const tb = S.tacticalBattleSnapshot;
     if (tb) {
-      // Do not fall back to strategic res1 hit-testing while tactical is active: `gameState.hexes`
-      // still covers the globe at res1, so coordinates outside the battle footprint would keep a
-      // stale res1 `hit` and the hex tooltip would never clear when the pointer leaves the res4 grid.
-      return hitTestTacticalRes4HexAtContainerPixel(x, y, tb);
+      // Do not fall back to strategic hit-testing while tactical is active: `gameState.hexes`
+      // still covers the globe at strategic, so coordinates outside the battle footprint would keep a
+      // stale strategic `hit` and the hex tooltip would never clear when the pointer leaves the tactical grid.
+      return hitTestTacticalHexAtContainerPixel(x, y, tb);
     }
     const set = new Set(S.gameState.hexes.map((h) => h.h3Index));
     return hitTestHexAtContainerPixel(x, y, set);
@@ -416,7 +416,7 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
    * Exceptions: None.
    */
   function pointerHitsDrawnUnitIcon(clientX: number, clientY: number, h3Index: string): boolean {
-    if (shouldHideStrategicMapUnitsForRes4Zoom()) return false;
+    if (shouldHideStrategicMapUnitsForZoom()) return false;
     if (!S.gameState) return false;
     const map = getMainLeafletMap() as { getContainer: () => HTMLElement } | null;
     if (!map) return false;
@@ -451,7 +451,7 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
   }
 
   /**
-   * Resolves the res4/res1 hex of the primary selected unit for click-vs-selection clearing logic.
+   * Resolves the tactical/strategic hex of the primary selected unit for click-vs-selection clearing logic.
    *
    * Contract: Uses tactical sub-units when `S.tacticalBattleSnapshot` is set; otherwise strategic `state.units`.
    * When to use: Single-click map handler when comparing `hit` to the selected unit's current cell.
@@ -650,7 +650,7 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
       h3: hit,
       unitsToDraw: drawn.unitsToDraw,
       movingIds: drawn.movingIds,
-      unitsHidden: shouldHideStrategicMapUnitsForRes4Zoom(),
+      unitsHidden: shouldHideStrategicMapUnitsForZoom(),
       pointerOnToken: hit !== null && pointerHitsDrawnUnitIcon(e.clientX, e.clientY, hit),
       blocked:
         resolutionPlaybackBlocksMapOrders(S.resolutionMoveAnimation) ||

@@ -3,11 +3,13 @@
  *
  * Purpose: Cheap omniscient nearest-enemy / nearest-friendly scoring without path BFS.
  * When to use: assess_unit and strategic briefing copy that must know whether the unbounded grid scan applies.
- * Expected outcome: Gate is true only for fogOfWarEnabled === false and H3 resolution 1; distances are neighbor hop counts; turns never divide by a sub-1 budget.
+ * Expected outcome: Gate is true only for fogOfWarEnabled === false and a strategic cell on the active map; distances are neighbor hop counts; turns never divide by a sub-1 budget.
  * Exceptions: Invalid H3 indexes make the gate false; hop search skips invalid or unreachable cells.
  */
 
-import { getResolution, gridDisk, gridDistance, isValidCell } from 'h3-js';
+import { isStrategicCell } from '../../shared/h3Resolutions';
+
+import { gridDisk, gridDistance, isValidCell } from 'h3-js';
 import { computeGridDistanceWithPathFallbackPure } from '../../shared/h3GridRangePure';
 import { getRange } from '../combatConstants';
 import { logDebug, logError, logTrace } from '../logger';
@@ -38,7 +40,7 @@ export interface OmniscientGridProximityArgs {
   /**
    * H3 index whose resolution selects strategic vs tactical geometry.
    *
-   * Contract: Must be resolution 1 for the unbounded grid scan. Resolution 4 (tactical) is never omniscient.
+   * Contract: Must be a strategic cell on the active map. A tactical cell is never omniscient.
    * When to use: Assessed unit `h3Index`, or `state.hexes[0].h3Index` in strategic briefings.
    * Expected outcome: Invalid indexes fail the gate.
    * Exceptions: None.
@@ -49,9 +51,9 @@ export interface OmniscientGridProximityArgs {
 /**
  * True when assess_unit should include every other unit and score them with grid hops.
  *
- * Purpose: Combines the match fog setting with strategic (res1) geometry so tactical snapshots that force fog off do not take this path.
+ * Purpose: Combines the match fog setting with strategic geometry so tactical snapshots that force fog off do not take this path.
  * When to use: Before the assess_unit scan and before inserting the briefing honesty line.
- * Expected outcome: True only for `fogOfWarEnabled === false` and `getResolution(h3Index) === 1`.
+ * Expected outcome: True only for `fogOfWarEnabled === false` and `isStrategicCell(h3Index)`.
  * Exceptions: Returns false if resolution lookup throws.
  */
 export function usesOmniscientGridProximity(args: OmniscientGridProximityArgs): boolean {
@@ -61,7 +63,7 @@ export function usesOmniscientGridProximity(args: OmniscientGridProximityArgs): 
   });
   if (args.fogOfWarEnabled !== false) return false;
   try {
-    return getResolution(args.h3Index) === 1;
+    return isStrategicCell(args.h3Index);
   } catch (err) {
     logError('assessUnitProximity usesOmniscientGridProximity: resolution lookup failed', {
       h3Index: args.h3Index,
@@ -76,7 +78,7 @@ export function usesOmniscientGridProximity(args: OmniscientGridProximityArgs): 
  *
  * Purpose: The path-versus-Best-Options sentence is only meaningful at strategic resolution under fog.
  * When to use: `formatBriefing` after the omniscient hop line is skipped.
- * Expected outcome: True only for `fogOfWarEnabled === true` and `getResolution(h3Index) === 1`.
+ * Expected outcome: True only for `fogOfWarEnabled === true` and `isStrategicCell(h3Index)`.
  * Exceptions: Returns false if resolution lookup throws.
  */
 export function usesFogPathDistanceBriefing(args: OmniscientGridProximityArgs): boolean {
@@ -86,7 +88,7 @@ export function usesFogPathDistanceBriefing(args: OmniscientGridProximityArgs): 
   });
   if (args.fogOfWarEnabled !== true) return false;
   try {
-    return getResolution(args.h3Index) === 1;
+    return isStrategicCell(args.h3Index);
   } catch (err) {
     logError('assessUnitProximity usesFogPathDistanceBriefing: resolution lookup failed', {
       h3Index: args.h3Index,
@@ -291,7 +293,7 @@ export const OMNISCIENT_GRID_PROXIMITY_BRIEFING_LINE =
  *
  * Purpose: Fog-on assessments print path length while Best Options dests use this-turn legal hops, so a unit can
  * close this turn even when the printed path is longer than one movement budget.
- * When to use: Strategic formatBriefing immediately after the intel staleness sentence when fog is on at res1.
+ * When to use: Strategic formatBriefing immediately after the intel staleness sentence when fog is on at strategic.
  * Expected outcome: Tells the model to copy Best Options Target Hexes rather than treating printed path length as the move budget.
  * Exceptions: None.
  */
@@ -358,7 +360,7 @@ export interface OmniscientProximityUnit {
  * Named arguments for the unbounded grid nearby scan.
  *
  * Purpose: One object for the collector so assess_unit stays under the argument-count limit.
- * When to use: Fog-off res1 `executeAssessUnit` branch.
+ * When to use: Fog-off strategic `executeAssessUnit` branch.
  * Expected outcome: Nearby lists, threats, and in-range attack rows only.
  * Exceptions: None.
  */

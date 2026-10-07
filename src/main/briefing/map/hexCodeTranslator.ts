@@ -7,8 +7,8 @@
  * Exceptions: Throws when codes are unknown for the active context.
  */
 
-import { cellToLatLng, latLngToCell } from 'h3-js';
-import { STRATEGIC_H3_RESOLUTION, TACTICAL_H3_RESOLUTION } from '../../../shared/h3Resolutions';
+import { cellToLatLng } from 'h3-js';
+import { strategicCellAt, tacticalCellAt } from '../../../shared/h3Resolutions';
 import { LATLNG_DECIMAL_PLACES } from '../../mapData';
 import { logError, logTrace } from '../../logger';
 import type { CoordinateContext } from './coordinateContext';
@@ -87,8 +87,8 @@ export function latLngToCode(lat: number, lng: number, context: CoordinateContex
   try {
     const res =
       context.mode === 'strategic'
-        ? latLngToCell(lat, lng, STRATEGIC_H3_RESOLUTION)
-        : latLngToCell(lat, lng, TACTICAL_H3_RESOLUTION);
+        ? strategicCellAt(lat, lng)
+        : tacticalCellAt(lat, lng);
     const code = getHexCodeForContext(res, context);
     if (!code) {
       throw new Error(`hex-code-translator: lat/lng snaps to unregistered cell for mode=${context.mode}`);

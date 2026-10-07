@@ -28,7 +28,7 @@ candidates: MeleeCandidateRow[];
     /**
    * Specifies the contract for the `buildHexPopupHtml` member (buildHexPopupHtml: (h3Index: string) => Promise<string>;).
 
-   * Contract: Returns inner HTML equivalent to the hex tooltip for the given res1 hex.
+   * Contract: Returns inner HTML equivalent to the hex tooltip for the given strategic hex.
    * When to use: Per-row terrain/features column.
    * Expected outcome: Safe HTML for insertion into a table cell (already escaped by formatter).
    * Exceptions: IPC failures may yield a short fallback string without throwing.
@@ -57,7 +57,7 @@ decision: 'fight' | 'ignore';
     /**
    * Specifies the contract for the `selectedH3Index` member (selectedH3Index?: string;).
 
-   * Contract: Res1 hex id for Fight; omitted for Ignore.
+   * Contract: Strategic hex id for Fight; omitted for Ignore.
    * When to use: Fight path only.
    * Expected outcome: One of the candidate hex ids.
    * Exceptions: None.

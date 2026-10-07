@@ -21,8 +21,8 @@ test('formatTacticalDraftMarchPendingOrderTargetLabel returns zero distance when
   const center = latLngToCell(1, 2, 4);
   const battle: TacticalBattleSnapshot = {
     battleId: 'b',
-    enclosingRes1H3Index: center,
-    res4ChildH3Indexes: [...gridDisk(center, 1)],
+    enclosingStrategicH3Index: center,
+    tacticalChildH3Indexes: [...gridDisk(center, 1)],
     strategicTurnNumber: 1,
     tacticalTurnNumber: 1,
     subUnits: [],
@@ -35,8 +35,8 @@ test('formatTacticalDraftMarchPendingOrderTargetLabel falls back safely on inval
   const center = latLngToCell(3, 4, 4);
   const battle: TacticalBattleSnapshot = {
     battleId: 'b2',
-    enclosingRes1H3Index: center,
-    res4ChildH3Indexes: [...gridDisk(center, 1)],
+    enclosingStrategicH3Index: center,
+    tacticalChildH3Indexes: [...gridDisk(center, 1)],
     strategicTurnNumber: 1,
     tacticalTurnNumber: 1,
     subUnits: [

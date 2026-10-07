@@ -142,7 +142,7 @@ test('isInfantryOrArmorTacticalSpawnCell rejects water and arctic normalized til
  *
  * Purpose: Exercises `tacticalLandUnitMayOccupyCellWithoutTransport` without a full battle snapshot.
  * When to use: Snapshot placement contract tests in this file.
- * Expected outcome: `effectiveKindForRes4Hex` returns mapped kinds; urban/rubble flags match the sets.
+ * Expected outcome: `effectiveKindForTacticalHex` returns mapped kinds; urban/rubble flags match the sets.
  * Exceptions: None.
  */
 function occupancyResolver(args: {
@@ -153,13 +153,13 @@ function occupancyResolver(args: {
   return {
     parentTerrain: 'land',
     parentTerrainKind: 'plains',
-    effectiveKindForRes4Hex(h3: string): string {
+    effectiveKindForTacticalHex(h3: string): string {
       return args.kinds[h3] ?? 'plains';
     },
-    isUrbanRes4(h3: string): boolean {
+    isUrbanTactical(h3: string): boolean {
       return args.urban?.has(h3) === true;
     },
-    isRubbleRes4(h3: string): boolean {
+    isRubbleTactical(h3: string): boolean {
       return args.rubble?.has(h3) === true;
     },
   };
@@ -213,8 +213,8 @@ test('tacticalSnapshotHasPlacedUnitsForBothSides requires at least one human and
 test('TacticalBattleSnapshot round-trips through JSON for IPC-sized payloads', () => {
   const snap: TacticalBattleSnapshot = {
     battleId: 'tb-test',
-    enclosingRes1H3Index: '811fbffffffffff',
-    res4ChildH3Indexes: ['811fafffffffff', '811fbffffffffff'],
+    enclosingStrategicH3Index: '811fbffffffffff',
+    tacticalChildH3Indexes: ['811fafffffffff', '811fbffffffffff'],
     strategicTurnNumber: 3,
     tacticalTurnNumber: 1,
     subUnits: [

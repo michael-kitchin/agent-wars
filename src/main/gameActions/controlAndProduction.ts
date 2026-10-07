@@ -9,7 +9,7 @@ import {
   getBuildProgressPointsForHex,
   getKeepBuildingForHex,
   getHexControlMap,
-  getRes1InfrastructureForHex,
+  getStrategicInfrastructureForHex,
   listAllHexControls,
   listBuildQueueRowsForHex,
   replaceBuildQueueForHex,
@@ -27,9 +27,9 @@ import { resolveUnitBirthOrigin } from '../unitOrigin/unitBirthOrigin';
 import {
   computeKeepBuildingRefillCount,
   getAvailableBuildUnitTypes,
-  UNIT_COST_BY_TYPE,
   type BuildUnitType,
 } from '../productionRules';
+import { unitCostFor } from '../../shared/gameRules';
 
 /**
  * Documents the `DeployedUnitsByType` type alias (type DeployedUnitsByType).
@@ -224,7 +224,7 @@ function spawnProducedUnitsForHex(
 }
 
 /**
- * Reconciles `res1_control` after combat and movement using per-hex land and air occupancy plus optional traversal hints.
+ * Reconciles `res_s_control` after combat and movement using per-hex land and air occupancy plus optional traversal hints.
  *
  * Purpose: Grants sole-player hexes to that player, preserves contested hexes until co-occupancy clears, and applies
  * traversal-based capture when a hex ends empty but only one side moved through it this turn.
@@ -234,7 +234,7 @@ function spawnProducedUnitsForHex(
  * `destroyAirUnitsWithInvalidBase` would delete the air before a Fight→tactical handoff.
  * Exceptions: None; propagates database errors from helpers.
  */
-export function resolveRes1ControlAfterCombatAndMovement(
+export function resolveStrategicControlAfterCombatAndMovement(
   traversedHexesByPlayer?: Record<'human' | 'opponent', Set<string>>
 ): ControlTransition[] {
   logDebug('gameActions resolveRes1ControlAfterCombatAndMovement', {
@@ -323,7 +323,7 @@ export function processProductionAfterControlResolution(): {
   for (const control of controls) {
     const controllerPlayerId = control.controllerPlayerId;
     if (!controllerPlayerId) continue;
-    const { urbanHexCount, seaportCount, airportCount } = getRes1InfrastructureForHex(control.h3Index);
+    const { urbanHexCount, seaportCount, airportCount } = getStrategicInfrastructureForHex(control.h3Index);
     if (urbanHexCount <= 0) continue;
 
     const queueRows = listBuildQueueRowsForHex(control.h3Index);
@@ -386,7 +386,7 @@ export function processProductionAfterControlResolution(): {
       }
 
       const entry = queueWorking[0]!;
-      const cost = UNIT_COST_BY_TYPE[entry.unitType];
+      const cost = unitCostFor(entry.unitType);
       const currentCount = simulatedCountsByType.get(entry.unitType) ?? 0;
       const maxCount = maxUnitsPerType[entry.unitType];
       if (currentCount >= maxCount) {

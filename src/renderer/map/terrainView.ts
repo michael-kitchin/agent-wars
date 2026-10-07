@@ -1,11 +1,10 @@
-import { latLngToCell } from 'h3-js';
+import { strategicCellAt } from '../../shared/h3Resolutions';
 import { getHexBoundaryLatLngForLeafletOverlay } from './hexGrid';
 import {
   BUILD_ENTRY_ZOOM_STEPS_FROM_DEFAULT,
   MAIN_MAP_WHEEL_ZOOM_STEP,
-  RES4_HIDE_THRESHOLD_VIEW_FRACTION,
-  RES4_SHOW_THRESHOLD_VIEW_FRACTION,
-  WORLD_H3_RESOLUTION,
+  TACTICAL_HIDE_THRESHOLD_VIEW_FRACTION,
+  TACTICAL_SHOW_THRESHOLD_VIEW_FRACTION,
 } from '../core/constants';
 import { rendererSharedState as S } from '../core/state';
 import { getLeafletGlobal } from './mapHelpers';
@@ -13,14 +12,14 @@ import { getMainLeafletMap } from './worldLeafletMap';
 import { projectedPolygonOverlapsViewport } from '../rendering/renderGeometry';
 
 /**
- * Defines the `computeRes1HexFillFraction` function shape (export function computeRes1HexFillFraction(): number).
+ * Defines the `computeStrategicHexFillFraction` function shape (export function computeStrategicHexFillFraction(): number).
 
- * Purpose: Supports maintainability by documenting why `computeRes1HexFillFraction` exists.
+ * Purpose: Supports maintainability by documenting why `computeStrategicHexFillFraction` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function computeRes1HexFillFraction(): number {
+export function computeStrategicHexFillFraction(): number {
   if (!S.gameState || S.gameState.hexes.length === 0) return 0;
   const map = getMainLeafletMap() as
     | {
@@ -39,7 +38,7 @@ export function computeRes1HexFillFraction(): number {
   const centerLatLng = map.containerPointToLatLng(L.point(center.x, center.y));
   let sampleH3: string;
   try {
-    sampleH3 = latLngToCell(centerLatLng.lat, centerLatLng.lng, WORLD_H3_RESOLUTION);
+    sampleH3 = strategicCellAt(centerLatLng.lat, centerLatLng.lng);
   } catch {
     sampleH3 = S.gameState.hexes[0]!.h3Index;
   }
@@ -65,34 +64,34 @@ export function computeRes1HexFillFraction(): number {
 }
 
 /**
- * Defines the `shouldRenderRes4Hexes` function shape (export function shouldRenderRes4Hexes(): boolean).
+ * Defines the `shouldRenderTacticalHexes` function shape (export function shouldRenderTacticalHexes(): boolean).
 
- * Purpose: Supports maintainability by documenting why `shouldRenderRes4Hexes` exists.
+ * Purpose: Supports maintainability by documenting why `shouldRenderTacticalHexes` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function shouldRenderRes4Hexes(): boolean {
+export function shouldRenderTacticalHexes(): boolean {
   if (S.tacticalBattleSnapshot) return true;
-  const fillFraction = computeRes1HexFillFraction();
-  if (S.res4Visible) {
-    if (fillFraction <= RES4_HIDE_THRESHOLD_VIEW_FRACTION) S.res4Visible = false;
-    return S.res4Visible;
+  const fillFraction = computeStrategicHexFillFraction();
+  if (S.tacticalVisible) {
+    if (fillFraction <= TACTICAL_HIDE_THRESHOLD_VIEW_FRACTION) S.tacticalVisible = false;
+    return S.tacticalVisible;
   }
-  if (fillFraction >= RES4_SHOW_THRESHOLD_VIEW_FRACTION) S.res4Visible = true;
-  return S.res4Visible;
+  if (fillFraction >= TACTICAL_SHOW_THRESHOLD_VIEW_FRACTION) S.tacticalVisible = true;
+  return S.tacticalVisible;
 }
 
 /**
- * Returns true when res4 detail zoom is active on the strategic map and unit markers should not be drawn or hit-tested.
+ * Returns true when tactical detail zoom is active on the strategic map and unit markers should not be drawn or hit-tested.
  *
- * Purpose: Tactical battles always render res4 hexes but must still show units and stack callouts; strategic res4 zoom hides them for terrain inspection.
+ * Purpose: Tactical battles always render tactical hexes but must still show units and stack callouts; strategic tactical zoom hides them for terrain inspection.
  * When to use: Canvas unit draws, stale-intel marker suppression, stack callout lifecycle, and map pointer hit-testing on unit icons.
- * Expected outcome: `true` only when `shouldRenderRes4Hexes()` is true and no tactical battle snapshot is active.
+ * Expected outcome: `true` only when `shouldRenderTacticalHexes()` is true and no tactical battle snapshot is active.
  * Exceptions: None.
  */
-export function shouldHideStrategicMapUnitsForRes4Zoom(): boolean {
-  return shouldRenderRes4Hexes() && !S.tacticalBattleSnapshot;
+export function shouldHideStrategicMapUnitsForZoom(): boolean {
+  return shouldRenderTacticalHexes() && !S.tacticalBattleSnapshot;
 }
 
 /**
@@ -155,33 +154,33 @@ export function projectHexBoundaryToContainerPoints(
 }
 
 /**
- * Defines the `shouldConsiderRes4ChildrenForViewport` function shape (export function shouldConsiderRes4ChildrenForViewport( parentRes1H3Index: string, map: { latLngToContainerPoint: (ll: unknown) => { x: number; y: number } }, L: { latLng: (lat: number, lng: number) => unknown }, viewportWidth: number, viewportHeight: number ): boolean).
+ * Defines the `shouldConsiderTacticalChildrenForViewport` function shape (export function shouldConsiderTacticalChildrenForViewport( parentStrategicH3Index: string, map: { latLngToContainerPoint: (ll: unknown) => { x: number; y: number } }, L: { latLng: (lat: number, lng: number) => unknown }, viewportWidth: number, viewportHeight: number ): boolean).
 
- * Purpose: Single shared **parent** res1 viewport gate before iterating res4 children (terrain fills, infra glyphs, city overlays).
+ * Purpose: Single shared **parent** strategic viewport gate before iterating tactical children (terrain fills, infra glyphs, city overlays).
  * When to use: After tactical/exploration filters on the parent row and before `cellToChildren` / child projection work when the parent ring is fully offscreen.
  * Expected outcome: `true` iff the parent hex boundary intersects the Leaflet container viewport in screen space (same contract as `projectedPolygonOverlapsViewport`).
  * Exceptions: None; returns `false` when projection yields an empty ring.
  */
-export function shouldConsiderRes4ChildrenForViewport(
-  parentRes1H3Index: string,
+export function shouldConsiderTacticalChildrenForViewport(
+  parentStrategicH3Index: string,
   map: { latLngToContainerPoint: (ll: unknown) => { x: number; y: number } },
   leaflet: { latLng: (lat: number, lng: number) => unknown },
   viewportWidth: number,
   viewportHeight: number
 ): boolean {
-  const parentPts = projectHexBoundaryToContainerPoints(parentRes1H3Index, map, leaflet);
+  const parentPts = projectHexBoundaryToContainerPoints(parentStrategicH3Index, map, leaflet);
   return projectedPolygonOverlapsViewport(parentPts, viewportWidth, viewportHeight);
 }
 
 /**
- * Defines the `shouldDrawRes4ChildHexInViewport` function shape (export function shouldDrawRes4ChildHexInViewport( pts: { x: number; y: number }[], viewportWidth: number, viewportHeight: number ): boolean).
+ * Defines the `shouldDrawTacticalChildHexInViewport` function shape (export function shouldDrawTacticalChildHexInViewport( pts: { x: number; y: number }[], viewportWidth: number, viewportHeight: number ): boolean).
 
- * Purpose: Named res4 **child** viewport cull that mirrors `shouldConsiderRes4ChildrenForViewport` naming; delegates to `projectedPolygonOverlapsViewport` without re-projecting.
+ * Purpose: Named tactical **child** viewport cull that mirrors `shouldConsiderTacticalChildrenForViewport` naming; delegates to `projectedPolygonOverlapsViewport` without re-projecting.
  * When to use: Right after `projectHexBoundaryToContainerPoints(childH3, map, L)` when branching before fill/glyph/label work.
  * Expected outcome: `true` iff the child ring intersects the Leaflet container viewport in screen space.
  * Exceptions: None; empty `pts` yields `false` via `projectedPolygonOverlapsViewport`.
  */
-export function shouldDrawRes4ChildHexInViewport(
+export function shouldDrawTacticalChildHexInViewport(
   pts: { x: number; y: number }[],
   viewportWidth: number,
   viewportHeight: number

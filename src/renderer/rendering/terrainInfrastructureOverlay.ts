@@ -253,14 +253,14 @@ const GLYPH_AIR_PIXEL_FACTOR = 0.22;
 const GLYPH_ANCHOR_TO_AIR_RATIO = 1.03;
 
 /**
- * Documents the module-scope binding `RES4_TERRAIN_INFRA_GLYPH_AREA_SCALE` (RES4_TERRAIN_INFRA_GLYPH_AREA_SCALE).
+ * Documents the module-scope binding `TACTICAL_TERRAIN_INFRA_GLYPH_AREA_SCALE` (TACTICAL_TERRAIN_INFRA_GLYPH_AREA_SCALE).
 
- * Purpose: Supports maintainability by documenting why `RES4_TERRAIN_INFRA_GLYPH_AREA_SCALE` exists.
+ * Purpose: Supports maintainability by documenting why `TACTICAL_TERRAIN_INFRA_GLYPH_AREA_SCALE` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export const RES4_TERRAIN_INFRA_GLYPH_AREA_SCALE = 1.2;
+export const TACTICAL_TERRAIN_INFRA_GLYPH_AREA_SCALE = 1.2;
 
 /**
  * Documents the module-scope binding `SOLO_TERRAIN_INFRA_GLYPH_AREA_SCALE` (SOLO_TERRAIN_INFRA_GLYPH_AREA_SCALE).

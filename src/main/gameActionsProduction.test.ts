@@ -9,7 +9,7 @@ import {
   replaceBuildQueueForHex,
   setBuildProgressPointsForHex,
   setKeepBuildingForHex,
-  setRes1InfrastructureForHex,
+  setStrategicInfrastructureForHex,
 } from './gameDb';
 import {
   getHexBuildQueue,
@@ -25,7 +25,7 @@ import { pruneBuildQueueForInfrastructureState } from './gameActions/airStrikeRe
 import {
   collectTraversedHexesByPlayer,
   processProductionAfterControlResolution,
-  resolveRes1ControlAfterCombatAndMovement,
+  resolveStrategicControlAfterCombatAndMovement,
 } from './gameActions/controlAndProduction';
 import { getMaxUnitsPerType } from './productionCaps';
 import { persistGameSize } from './gameDb/gameSizeConfig';
@@ -63,7 +63,7 @@ function findBuildableHumanControlledHex(): string {
   // Stabilize production contract tests by provisioning one controlled hex with minimal infrastructure.
   const fallbackHex = state.hexes.find((hx) => getHexBuildQueue(hx.h3Index, 'human').controllerPlayerId === 'human');
   if (fallbackHex) {
-    setRes1InfrastructureForHex(fallbackHex.h3Index, { urbanHexCount: 1, airportCount: 0, seaportCount: 0 });
+    setStrategicInfrastructureForHex(fallbackHex.h3Index, { urbanHexCount: 1, airportCount: 0, seaportCount: 0 });
     const queue = getHexBuildQueue(fallbackHex.h3Index, 'human');
     if (queue.buildSectionVisible && queue.availableUnitTypes.length > 0) {
       return fallbackHex.h3Index;
@@ -174,8 +174,8 @@ function testTypeChangeAfterCountEditKeepsCount(): void {
 function testBatchBuildQueueTemplateContracts(): void {
   withTempDb(() => {
     const [coastalHex, inlandHex] = findTwoHumanControlledHexes();
-    setRes1InfrastructureForHex(coastalHex, { urbanHexCount: 10, airportCount: 0, seaportCount: 1 });
-    setRes1InfrastructureForHex(inlandHex, { urbanHexCount: 10, airportCount: 0, seaportCount: 0 });
+    setStrategicInfrastructureForHex(coastalHex, { urbanHexCount: 10, airportCount: 0, seaportCount: 1 });
+    setStrategicInfrastructureForHex(inlandHex, { urbanHexCount: 10, airportCount: 0, seaportCount: 0 });
 
     const apply = applyBuildQueueTemplateToHexes(
       [coastalHex, inlandHex, 'invalid-h3-index'],
@@ -265,7 +265,7 @@ function testControlTakeoverClearsQueueAndProgress(): void {
     const update = updateHexBuildQueueEntry(targetHex, firstEntry.id, 'infantry', 1, 'human');
     assert.strictEqual(update.success, true);
     dbRun(
-      `INSERT OR REPLACE INTO res1_build_progress (h3_index, stored_points) VALUES (?, ?)`,
+      `INSERT OR REPLACE INTO res_s_build_progress (h3_index, stored_points) VALUES (?, ?)`,
       [targetHex, 9]
     );
 
@@ -282,7 +282,7 @@ function testControlTakeoverClearsQueueAndProgress(): void {
     assert.strictEqual(post.controllerPlayerId, 'opponent');
     assert.strictEqual(post.entries.length, 0);
     const progressRow = dbGetOne<{ stored_points: number }>(
-      'SELECT stored_points FROM res1_build_progress WHERE h3_index = ?',
+      'SELECT stored_points FROM res_s_build_progress WHERE h3_index = ?',
       [targetHex]
     );
     assert.strictEqual(progressRow, undefined);
@@ -324,7 +324,7 @@ function testTraversedIntermediateHexCapturesControl(): void {
 
     // Put the intermediate hex under opponent control and empty, so traversal capture is observable.
     dbRun('UPDATE units SET h3_index = ? WHERE h3_index = ? AND id <> ?', [armor!.h3Index, intermediateHex, armor!.id]);
-    dbRun('INSERT OR REPLACE INTO res1_control (h3_index, controller_player_id) VALUES (?, ?)', [intermediateHex, 'opponent']);
+    dbRun('INSERT OR REPLACE INTO res_s_control (h3_index, controller_player_id) VALUES (?, ?)', [intermediateHex, 'opponent']);
     dbRun('DELETE FROM units WHERE player = ?', ['opponent']);
 
     const submit = submitOrders({
@@ -365,7 +365,7 @@ function testNavalOccupancyGrantsControl(): void {
   withTempDb(() => {
     const targetHex = findNavalPassableHex();
     dbRun('DELETE FROM units WHERE h3_index = ?', [targetHex]);
-    dbRun('INSERT OR REPLACE INTO res1_control (h3_index, controller_player_id) VALUES (?, ?)', [targetHex, 'opponent']);
+    dbRun('INSERT OR REPLACE INTO res_s_control (h3_index, controller_player_id) VALUES (?, ?)', [targetHex, 'opponent']);
     dbRun('INSERT INTO units (id, player, unit_type, h3_index) VALUES (?, ?, ?, ?)', [
       'human-naval-control-grant',
       'human',
@@ -373,7 +373,7 @@ function testNavalOccupancyGrantsControl(): void {
       targetHex,
     ]);
 
-    const transitions = resolveRes1ControlAfterCombatAndMovement();
+    const transitions = resolveStrategicControlAfterCombatAndMovement();
     const post = getHexBuildQueue(targetHex, 'human');
 
     assert.strictEqual(post.controllerPlayerId, 'human');
@@ -396,7 +396,7 @@ function testNavalMixedOccupancyContestsControl(): void {
   withTempDb(() => {
     const targetHex = findNavalPassableHex();
     dbRun('DELETE FROM units WHERE h3_index = ?', [targetHex]);
-    dbRun('INSERT OR REPLACE INTO res1_control (h3_index, controller_player_id) VALUES (?, ?)', [targetHex, 'human']);
+    dbRun('INSERT OR REPLACE INTO res_s_control (h3_index, controller_player_id) VALUES (?, ?)', [targetHex, 'human']);
     dbRun('INSERT INTO units (id, player, unit_type, h3_index) VALUES (?, ?, ?, ?)', [
       'human-naval-control-contest',
       'human',
@@ -410,7 +410,7 @@ function testNavalMixedOccupancyContestsControl(): void {
       targetHex,
     ]);
 
-    const transitions = resolveRes1ControlAfterCombatAndMovement();
+    const transitions = resolveStrategicControlAfterCombatAndMovement();
     const post = getHexBuildQueue(targetHex, 'human');
 
     assert.strictEqual(post.controllerPlayerId, 'human');
@@ -425,7 +425,7 @@ function testNavalMixedOccupancyContestsControl(): void {
 /**
  * Defines the `testLandArmorPlusEnemyAirContestsControl` function shape (function testLandArmorPlusEnemyAirContestsControl(): void).
  *
- * Purpose: Regression guard for Fight→tactical when human armor shares a res1 hex with opponent air after movement.
+ * Purpose: Regression guard for Fight→tactical when human armor shares a strategic hex with opponent air after movement.
  * When to use: `gameActionsProduction.test.ts` harness.
  * Expected outcome: Control must not flip to the land-only side while enemy air remains; otherwise finalize removes air
  * as stranded and tactical start fails with “not contested”.
@@ -438,7 +438,7 @@ function testLandArmorPlusEnemyAirContestsControl(): void {
     if (!landHex) throw new Error('Expected a land hex for armor/air co-occupancy test.');
     const targetHex = landHex.h3Index;
     dbRun('DELETE FROM units WHERE h3_index = ?', [targetHex]);
-    dbRun('INSERT OR REPLACE INTO res1_control (h3_index, controller_player_id) VALUES (?, ?)', [targetHex, 'opponent']);
+    dbRun('INSERT OR REPLACE INTO res_s_control (h3_index, controller_player_id) VALUES (?, ?)', [targetHex, 'opponent']);
     dbRun('INSERT INTO units (id, player, unit_type, h3_index) VALUES (?, ?, ?, ?)', [
       'human-armor-air-contest',
       'human',
@@ -452,7 +452,7 @@ function testLandArmorPlusEnemyAirContestsControl(): void {
       targetHex,
     ]);
 
-    const transitions = resolveRes1ControlAfterCombatAndMovement();
+    const transitions = resolveStrategicControlAfterCombatAndMovement();
     const post = getHexBuildQueue(targetHex, 'human');
 
     assert.strictEqual(post.controllerPlayerId, 'opponent');
@@ -503,13 +503,13 @@ function testNavalTraversedIntermediateHexCapturesControl(): void {
     assert.notStrictEqual(intermediateHex, naval!.h3Index);
 
     dbRun('UPDATE units SET h3_index = ? WHERE h3_index = ? AND id <> ?', [naval!.h3Index, intermediateHex, naval!.id]);
-    dbRun('INSERT OR REPLACE INTO res1_control (h3_index, controller_player_id) VALUES (?, ?)', [intermediateHex, 'opponent']);
+    dbRun('INSERT OR REPLACE INTO res_s_control (h3_index, controller_player_id) VALUES (?, ?)', [intermediateHex, 'opponent']);
 
     const traversed = collectTraversedHexesByPlayer(
       [{ unitId: naval!.id, toH3Index: destination!.h3Index }],
       [{ id: naval!.id, player: naval!.player, h3Index: naval!.h3Index, unitType: naval!.unitType }]
     );
-    const transitions = resolveRes1ControlAfterCombatAndMovement(traversed);
+    const transitions = resolveStrategicControlAfterCombatAndMovement(traversed);
     const postIntermediate = getHexBuildQueue(intermediateHex, 'human');
 
     assert.strictEqual(postIntermediate.controllerPlayerId, 'human');
@@ -553,7 +553,7 @@ function testProductionBlocksWhenFirstEnqueuedUnitTypeAtCap(): void {
       );
     }
     dbRun(
-      `INSERT OR REPLACE INTO res1_build_progress (h3_index, stored_points)
+      `INSERT OR REPLACE INTO res_s_build_progress (h3_index, stored_points)
        VALUES (?, 9)`,
       [targetHex]
     );
@@ -570,7 +570,7 @@ function testProductionBlocksWhenFirstEnqueuedUnitTypeAtCap(): void {
     assert.strictEqual(queueAfter.entries[0]?.unitType, 'infantry');
     assert.strictEqual(queueAfter.entries[0]?.count, 1);
     const progressAfter = dbGetOne<{ stored_points: number }>(
-      'SELECT stored_points FROM res1_build_progress WHERE h3_index = ?',
+      'SELECT stored_points FROM res_s_build_progress WHERE h3_index = ?',
       [targetHex]
     )?.stored_points ?? 0;
     assert.ok(progressAfter > 9, 'stored points should continue accumulating while blocked by cap');
@@ -606,7 +606,7 @@ function testProductionSpawnsPastSmallCapWhenMedium(): void {
       );
     }
     dbRun(
-      `INSERT OR REPLACE INTO res1_build_progress (h3_index, stored_points)
+      `INSERT OR REPLACE INTO res_s_build_progress (h3_index, stored_points)
        VALUES (?, 20)`,
       [targetHex]
     );
@@ -625,7 +625,7 @@ function testProductionSpawnsPastSmallCapWhenMedium(): void {
       (u) => u.player === 'human' && u.unitType === 'infantry' && !u.id.startsWith('human-infantry-medium-under-')
     );
     assert.strictEqual(spawned?.origin?.birthH3Index, targetHex, 'produced unit is born in the producing hex');
-    const birthCell = spawned?.origin?.birthRes4H3Index;
+    const birthCell = spawned?.origin?.birthTacticalH3Index;
     if (birthCell) assert.strictEqual(cellToParent(birthCell, 1), targetHex, 'birth cell lies inside the producing hex');
 
     dbRun("DELETE FROM units WHERE player = 'human' AND unit_type = 'infantry'");
@@ -638,7 +638,7 @@ function testProductionSpawnsPastSmallCapWhenMedium(): void {
       );
     }
     dbRun(
-      `INSERT OR REPLACE INTO res1_build_progress (h3_index, stored_points)
+      `INSERT OR REPLACE INTO res_s_build_progress (h3_index, stored_points)
        VALUES (?, 9)`,
       [targetHex]
     );
@@ -658,7 +658,7 @@ function testProductionSpawnsPastSmallCapWhenMedium(): void {
     )?.c ?? 0;
     assert.strictEqual(infantryAfterBlock, mediumCap);
     const progressAfter = dbGetOne<{ stored_points: number }>(
-      'SELECT stored_points FROM res1_build_progress WHERE h3_index = ?',
+      'SELECT stored_points FROM res_s_build_progress WHERE h3_index = ?',
       [targetHex]
     )?.stored_points ?? 0;
     assert.ok(progressAfter > 9, 'stored points should continue accumulating while blocked by medium cap');
@@ -676,14 +676,14 @@ function testProductionSpawnsPastSmallCapWhenMedium(): void {
 function testAirBuildRequiresAirportInfrastructure(): void {
   withTempDb(() => {
     const targetHex = findBuildableHumanControlledHex();
-    setRes1InfrastructureForHex(targetHex, { urbanHexCount: 4, airportCount: 1, seaportCount: 0 });
+    setStrategicInfrastructureForHex(targetHex, { urbanHexCount: 4, airportCount: 1, seaportCount: 0 });
     const queueWithoutUrban = getHexBuildQueue(targetHex, 'human');
     assert.ok(
       !queueWithoutUrban.availableUnitTypes.includes('air'),
       'expected air unit type to be unavailable without minimum urban production capacity'
     );
 
-    setRes1InfrastructureForHex(targetHex, { urbanHexCount: 5, airportCount: 0, seaportCount: 0 });
+    setStrategicInfrastructureForHex(targetHex, { urbanHexCount: 5, airportCount: 0, seaportCount: 0 });
     const queueWithoutAirport = getHexBuildQueue(targetHex, 'human');
     assert.ok(
       !queueWithoutAirport.availableUnitTypes.includes('air'),
@@ -696,7 +696,7 @@ function testAirBuildRequiresAirportInfrastructure(): void {
     const forceAirWithoutAirport = updateHexBuildQueueEntry(targetHex, entry.id, 'air', entry.count, 'human');
     assert.strictEqual(forceAirWithoutAirport.success, false);
 
-    setRes1InfrastructureForHex(targetHex, { urbanHexCount: 5, airportCount: 1, seaportCount: 0 });
+    setStrategicInfrastructureForHex(targetHex, { urbanHexCount: 5, airportCount: 1, seaportCount: 0 });
     const queueWithAirport = getHexBuildQueue(targetHex, 'human');
     assert.ok(
       queueWithAirport.availableUnitTypes.includes('air'),
@@ -718,21 +718,21 @@ function testAirBuildRequiresAirportInfrastructure(): void {
 function testNavalBuildRequiresSeaportAndUrbanInfrastructure(): void {
   withTempDb(() => {
     const targetHex = findBuildableHumanControlledHex();
-    setRes1InfrastructureForHex(targetHex, { urbanHexCount: 9, airportCount: 0, seaportCount: 1 });
+    setStrategicInfrastructureForHex(targetHex, { urbanHexCount: 9, airportCount: 0, seaportCount: 1 });
     const queueWithoutUrban = getHexBuildQueue(targetHex, 'human');
     assert.ok(
       !queueWithoutUrban.availableUnitTypes.includes('naval'),
       'expected naval unit type to be unavailable without minimum urban production capacity'
     );
 
-    setRes1InfrastructureForHex(targetHex, { urbanHexCount: 1, airportCount: 0, seaportCount: 0 });
+    setStrategicInfrastructureForHex(targetHex, { urbanHexCount: 1, airportCount: 0, seaportCount: 0 });
     const queueWithoutSeaport = getHexBuildQueue(targetHex, 'human');
     assert.ok(
       !queueWithoutSeaport.availableUnitTypes.includes('naval'),
       'expected naval unit type to be unavailable without a seaport'
     );
 
-    setRes1InfrastructureForHex(targetHex, { urbanHexCount: 10, airportCount: 0, seaportCount: 1 });
+    setStrategicInfrastructureForHex(targetHex, { urbanHexCount: 10, airportCount: 0, seaportCount: 1 });
     const queueWithSeaport = getHexBuildQueue(targetHex, 'human');
     assert.ok(
       queueWithSeaport.availableUnitTypes.includes('naval'),
@@ -807,7 +807,7 @@ function testKeepBuildingSameTurnRefill(): void {
     const h3 = findBuildableHumanControlledHex();
 
     // Owner example: $40, 1 infantry queued, Keep building → 2 deployed, 1 residue.
-    setRes1InfrastructureForHex(h3, { urbanHexCount: 40, airportCount: 0, seaportCount: 0 });
+    setStrategicInfrastructureForHex(h3, { urbanHexCount: 40, airportCount: 0, seaportCount: 0 });
     replaceBuildQueueForHex(h3, [{ unitType: 'infantry', remainingCount: 1 }]);
     setKeepBuildingForHex(h3, true, 'infantry');
     setBuildProgressPointsForHex(h3, 0);
@@ -858,7 +858,7 @@ function testKeepBuildingSameTurnRefill(): void {
     assert.strictEqual(afterEmptyStart.entries[0]?.count, 1);
 
     // Cap stall: refill inserts 2 armor; spend blocked; standing order remains.
-    setRes1InfrastructureForHex(h3, { urbanHexCount: 100, airportCount: 0, seaportCount: 0 });
+    setStrategicInfrastructureForHex(h3, { urbanHexCount: 100, airportCount: 0, seaportCount: 0 });
     replaceBuildQueueForHex(h3, []);
     setKeepBuildingForHex(h3, true, 'armor');
     setBuildProgressPointsForHex(h3, 0);
@@ -880,7 +880,7 @@ function testKeepBuildingSameTurnRefill(): void {
     assert.strictEqual(armorPulse.keepBuildingUnitType, 'armor');
 
     // Ineligible standing type at refill → clear Keep building; leave queue empty.
-    setRes1InfrastructureForHex(h3, { urbanHexCount: 40, airportCount: 0, seaportCount: 0 });
+    setStrategicInfrastructureForHex(h3, { urbanHexCount: 40, airportCount: 0, seaportCount: 0 });
     replaceBuildQueueForHex(h3, []);
     setKeepBuildingForHex(h3, true, 'naval');
     setBuildProgressPointsForHex(h3, 0);
@@ -891,7 +891,7 @@ function testKeepBuildingSameTurnRefill(): void {
     assert.strictEqual(afterIneligible.keepBuildingUnitType, null);
 
     // Finite queue without Keep building still stops when empty (no auto-refill).
-    setRes1InfrastructureForHex(h3, { urbanHexCount: 40, airportCount: 0, seaportCount: 0 });
+    setStrategicInfrastructureForHex(h3, { urbanHexCount: 40, airportCount: 0, seaportCount: 0 });
     replaceBuildQueueForHex(h3, [{ unitType: 'infantry', remainingCount: 1 }]);
     setKeepBuildingForHex(h3, false, null);
     setBuildProgressPointsForHex(h3, 0);
@@ -924,14 +924,14 @@ function testKeepBuildingSameTurnRefill(): void {
 function testKeepBuildingPruneStandingOrderSync(): void {
   withTempDb(() => {
     const h3 = findBuildableHumanControlledHex();
-    setRes1InfrastructureForHex(h3, { urbanHexCount: 5, airportCount: 1, seaportCount: 0 });
+    setStrategicInfrastructureForHex(h3, { urbanHexCount: 5, airportCount: 1, seaportCount: 0 });
     replaceBuildQueueForHex(h3, [
       { unitType: 'infantry', remainingCount: 1 },
       { unitType: 'air', remainingCount: 1 },
     ]);
     setKeepBuildingForHex(h3, true, 'air');
 
-    setRes1InfrastructureForHex(h3, { urbanHexCount: 5, airportCount: 0, seaportCount: 0 });
+    setStrategicInfrastructureForHex(h3, { urbanHexCount: 5, airportCount: 0, seaportCount: 0 });
     pruneBuildQueueForInfrastructureState(h3);
     const afterPrune = getHexBuildQueue(h3, 'human');
     assert.deepStrictEqual(
@@ -943,7 +943,7 @@ function testKeepBuildingPruneStandingOrderSync(): void {
 
     replaceBuildQueueForHex(h3, []);
     setKeepBuildingForHex(h3, true, 'air');
-    setRes1InfrastructureForHex(h3, { urbanHexCount: 5, airportCount: 0, seaportCount: 0 });
+    setStrategicInfrastructureForHex(h3, { urbanHexCount: 5, airportCount: 0, seaportCount: 0 });
     pruneBuildQueueForInfrastructureState(h3);
     const emptyGap = getKeepBuildingForHex(h3);
     assert.strictEqual(emptyGap.keepBuilding, false);

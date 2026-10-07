@@ -16,18 +16,18 @@ import { dbRun, isDbReady } from '../gameDb';
 import { persistOriginBonusSettings } from '../gameDb/originBonusConfig';
 import { COMBAT_DIE_SIDES } from '../combatDice';
 import { applyTacticalMeleeAfterSupportOrders } from './tacticalMeleeApply';
-import { firstRingCellDistinctFrom, tacticalRes1Cell, tacticalRes4UnderRes1Corner } from './testSupport/tacticalRes4HexFixtures';
+import { firstRingCellDistinctFrom, tacticalParentCell, tacticalUnderCorner } from './testSupport/tacticalHexFixtures';
 import { withTempGameDb } from '../testSupport/withTempGameDb';
 
 test('tactical melee adjudicates co-located opposing sub-units on the same res4 hex', () => {
   withTempGameDb('aw-tactical-melee-', () => {
-    const res1 = tacticalRes1Cell(3, 4);
-    const h0 = tacticalRes4UnderRes1Corner(3, 4);
+    const strategic = tacticalParentCell(3, 4);
+    const h0 = tacticalUnderCorner(3, 4);
     const ring = [...gridDisk(h0, 1)];
     const snap: TacticalBattleSnapshot = {
       battleId: 'tb-melee-contract',
-      enclosingRes1H3Index: res1,
-      res4ChildH3Indexes: ring,
+      enclosingStrategicH3Index: strategic,
+      tacticalChildH3Indexes: ring,
       strategicTurnNumber: 1,
       tacticalTurnNumber: 1,
       subUnits: [
@@ -71,11 +71,11 @@ test('tactical melee adjudicates co-located opposing sub-units on the same res4 
 
 test('tactical melee adds the terrain bonus only while the terrain flag is on', () => {
   withTempGameDb('aw-tactical-melee-origin-', () => {
-    const res1 = tacticalRes1Cell(4, 4);
-    const h0 = tacticalRes4UnderRes1Corner(4, 4);
+    const strategic = tacticalParentCell(4, 4);
+    const h0 = tacticalUnderCorner(4, 4);
     const coastalBorn: UnitOrigin = {
-      birthH3Index: res1,
-      birthRes4H3Index: h0,
+      birthH3Index: strategic,
+      birthTacticalH3Index: h0,
       birthTerrainKind: 'coastal',
       birthIsUrban: false,
       birthCountryName: null,
@@ -83,11 +83,11 @@ test('tactical melee adds the terrain bonus only while the terrain flag is on', 
     };
     const snap: TacticalBattleSnapshot = {
       battleId: 'tb-melee-origin',
-      enclosingRes1H3Index: res1,
-      res4ChildH3Indexes: [...gridDisk(h0, 1)],
+      enclosingStrategicH3Index: strategic,
+      tacticalChildH3Indexes: [...gridDisk(h0, 1)],
       strategicTurnNumber: 1,
       tacticalTurnNumber: 1,
-      res4TerrainKindByH3: { [h0]: 'coastal' },
+      tacticalTerrainKindByH3: { [h0]: 'coastal' },
       subUnits: [
         {
           id: 'hum-n',
@@ -121,14 +121,14 @@ test('tactical melee adds the terrain bonus only while the terrain flag is on', 
 
 test('tactical melee skips hexes with a single side after support', () => {
   withTempGameDb('aw-tactical-melee-skip-', () => {
-    const res1 = tacticalRes1Cell(5, 5);
-    const h0 = tacticalRes4UnderRes1Corner(5, 5);
+    const strategic = tacticalParentCell(5, 5);
+    const h0 = tacticalUnderCorner(5, 5);
     const h1 = firstRingCellDistinctFrom(h0);
     const ring = [...gridDisk(h0, 1)];
     const snap: TacticalBattleSnapshot = {
       battleId: 'tb-melee-skip',
-      enclosingRes1H3Index: res1,
-      res4ChildH3Indexes: ring,
+      enclosingStrategicH3Index: strategic,
+      tacticalChildH3Indexes: ring,
       strategicTurnNumber: 2,
       tacticalTurnNumber: 1,
       subUnits: [

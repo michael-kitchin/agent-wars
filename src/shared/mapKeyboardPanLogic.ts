@@ -250,7 +250,7 @@ export function keyboardPanModeSpeed(tactical: boolean): number {
 /**
  * Maps a single cardinal direction to net axes for wrapper APIs.
  *
- * Purpose: Lets `getNeighborForPan` / `panMapOneRes1Hex` stay as thin wrappers over the axes API.
+ * Purpose: Lets `getNeighborForPan` / `panMapOneStrategicHex` stay as thin wrappers over the axes API.
  * When to use: When a caller still has a single `PanAxisKey` / `PanDirection`.
  * Expected outcome: Unit vector on one axis.
  * Exceptions: None.

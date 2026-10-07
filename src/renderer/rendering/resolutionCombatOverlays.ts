@@ -1,5 +1,5 @@
 import type { ResolutionMoveAnimationState } from '../core/state';
-import { shouldHideStrategicMapUnitsForRes4Zoom } from '../map/terrainView';
+import { shouldHideStrategicMapUnitsForZoom } from '../map/terrainView';
 import { drawResolutionDiceChips } from './combatDiceChipDrawing';
 import { buildResolutionPlaybackState } from './resolutionPlayback';
 import { drawCasualtyOverlay, drawCombatLightning, drawUnknownBattleMarkers } from './unitDrawing';
@@ -12,7 +12,7 @@ import { drawCasualtyOverlay, drawCombatLightning, drawUnknownBattleMarkers } fr
  *   must stay the final playback draw call in each `drawGameScene` branch so the dice chips stay on top.
  * Expected outcome: Lightning (and unknown battle markers) then casualty overlays when the phase windows are active,
  *   then dice chips drawn last, above every other playback layer. Chips are skipped when strategic units are hidden
- *   at the res4 zoom.
+ *   at the tactical zoom.
  * Exceptions: None; no-ops when hex lists are empty for the active phase.
  */
 export function drawResolutionCombatAndCasualtyOverlays(
@@ -63,7 +63,7 @@ export function drawResolutionCombatAndCasualtyOverlays(
     drawCasualtyOverlay(ctx, width, height, knownCasualtyHexes, hexList, pulseOpacity);
     drawUnknownBattleMarkers(ctx, unknownCasualtyHexes, pulseOpacity);
   }
-  if (anim && !shouldHideStrategicMapUnitsForRes4Zoom()) {
+  if (anim && !shouldHideStrategicMapUnitsForZoom()) {
     drawResolutionDiceChips(ctx, width, height, anim, elapsed);
   }
 }

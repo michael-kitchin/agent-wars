@@ -2,10 +2,8 @@
  * Entry callbacks that other extracted callbacks do not call.
  */
 
-import {
-  cellToParent,
-  latLngToCell,
-} from 'h3-js';
+import { strategicParentOf, tacticalCellAt } from '../shared/h3Resolutions';
+
 import {
   hideStackCallout,
 } from './map/stackCallout';
@@ -30,8 +28,6 @@ import {
 } from './rendering/resolutionPlayback';
 import {
   BACKGROUND_COLOR,
-  DETAIL_H3_RESOLUTION,
-  WORLD_H3_RESOLUTION,
 } from './core/constants';
 
 import {
@@ -50,7 +46,7 @@ import {
   getLeafletGlobal,
 } from './map/mapHelpers';
 import {
-  shouldRenderRes4Hexes,
+  shouldRenderTacticalHexes,
 } from './map/terrainView';
 import {
   tryHandleTacticalEntryAtClientXY as tryHandleTacticalEntryAtClientXYFromModule,
@@ -113,18 +109,18 @@ import {
 
 
 import {
-  clearRes1TooltipSummaryCaches,
-  getRes1DominantTerrainKind,
-  infraGlyphsAllowedForRes1Hex,
-  infraGlyphsAllowedForRes4Child,
-} from './map/terrainTooltipRes1State';
+  clearStrategicTooltipSummaryCaches,
+  getStrategicDominantTerrainKind,
+  infraGlyphsAllowedForStrategicHex,
+  infraGlyphsAllowedForTacticalChild,
+} from './map/terrainTooltipStrategicState';
 
 import {
-  drawRes4TerrainHexes as drawRes4TerrainHexesFromModule,
+  drawTacticalTerrainHexes as drawTacticalTerrainHexesFromModule,
 } from './rendering/terrainRendering';
 import {
-  drawRes4CityOverlays,
-} from './rendering/res4CityOverlays';
+  drawTacticalCityOverlays,
+} from './rendering/tacticalCityOverlays';
 
 import {
   refreshGameStateAfterSealiftChange as refreshGameStateAfterSealiftChangeFromModule,
@@ -141,12 +137,12 @@ import {
   handleBuildEntryClick,
   applyGameStateSnapshot,
   rebuildUnitDisplayNameLookup,
-  refreshRes4TerrainOverridesForRenderer,
+  refreshTacticalTerrainOverridesForRenderer,
   formatUnknownBattleAnnouncement,
   startBackgroundRequestIfAllowed,
   renderOpenRouterToolsList,
   startTacticalBattleFromEntryHex,
-  buildMeleeInterceptHexPopupHtmlForRes1,
+  buildMeleeInterceptHexPopupHtmlForStrategic,
   updateSidebar,
   updateGameOverUI,
   openNewGameOverlayFromModelTab,
@@ -223,7 +219,7 @@ export function detailHitAtClientPixel(
   clientY: number,
   mapHexSet: Set<string>
 ): string | null {
-  if (!S.gameState || !shouldRenderRes4Hexes()) return null;
+  if (!S.gameState || !shouldRenderTacticalHexes()) return null;
   const exploredHexes = getExploredHexSet(S.gameState);
   const map = getMainLeafletMap() as
     | {
@@ -237,8 +233,8 @@ export function detailHitAtClientPixel(
   const rect = map.getContainer().getBoundingClientRect();
   const latlng = map.containerPointToLatLng(L.point(clientX - rect.left, clientY - rect.top));
   try {
-    const detailH3 = latLngToCell(latlng.lat, latlng.lng, DETAIL_H3_RESOLUTION);
-    const parentH3 = cellToParent(detailH3, WORLD_H3_RESOLUTION);
+    const detailH3 = tacticalCellAt(latlng.lat, latlng.lng);
+    const parentH3 = strategicParentOf(detailH3);
     if (!exploredHexes.has(parentH3)) return null;
     return mapHexSet.has(parentH3) ? detailH3 : null;
   } catch {
@@ -247,33 +243,33 @@ export function detailHitAtClientPixel(
 }
 
 /**
- * Defines the `drawRes4TerrainHexes` function shape (function drawRes4TerrainHexes(ctx: CanvasRenderingContext2D): void).
+ * Defines the `drawTacticalTerrainHexes` function shape (function drawTacticalTerrainHexes(ctx: CanvasRenderingContext2D): void).
 
- * Purpose: Supports maintainability by documenting why `drawRes4TerrainHexes` exists.
+ * Purpose: Supports maintainability by documenting why `drawTacticalTerrainHexes` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function drawRes4TerrainHexes(ctx: CanvasRenderingContext2D): void {
-  return drawRes4TerrainHexesFromModule(ctx, {
+export function drawTacticalTerrainHexes(ctx: CanvasRenderingContext2D): void {
+  return drawTacticalTerrainHexesFromModule(ctx, {
     getExploredHexSet,
-    getRes1DominantTerrainKind,
+    getStrategicDominantTerrainKind,
     isMapInspectionModeHeld,
-    infraGlyphsAllowedForRes1Hex,
-    infraGlyphsAllowedForRes4Child,
+    infraGlyphsAllowedForStrategicHex,
+    infraGlyphsAllowedForTacticalChild,
   });
 }
 
 /**
- * Paints res4 road/rail segments and city marks before infrastructure glyphs so airport/seaport symbols cover city markers.
+ * Paints tactical road/rail segments and city marks before infrastructure glyphs so airport/seaport symbols cover city markers.
 
- * Purpose: Keeps drawable order stable: terrain strokes, res4 city marker/labels (canvas), then infra glyphs; road/rail lines are on the Leaflet vector layer under this canvas.
- * When to use: After `drawRes4TerrainHexes` (and res1 production overlays when applicable), before `drawTerrainInfrastructureOverlays`.
- * Expected outcome: No-op unless res4 is active; visibility follows `drawRes4CityOverlays` (res4 gate + exploration parity with terrain).
- * Exceptions: None; delegates drawing to `drawRes4CityOverlays`.
+ * Purpose: Keeps drawable order stable: terrain strokes, tactical city marker/labels (canvas), then infra glyphs; road/rail lines are on the Leaflet vector layer under this canvas.
+ * When to use: After `drawTacticalTerrainHexes` (and strategic production overlays when applicable), before `drawTerrainInfrastructureOverlays`.
+ * Expected outcome: No-op unless tactical is active; visibility follows `drawTacticalCityOverlays` (tactical gate + exploration parity with terrain).
+ * Exceptions: None; delegates drawing to `drawTacticalCityOverlays`.
  */
-export function drawRes4CityOverlayPass(ctx: CanvasRenderingContext2D): void {
-  drawRes4CityOverlays(ctx, {
+export function drawTacticalCityOverlayPass(ctx: CanvasRenderingContext2D): void {
+  drawTacticalCityOverlays(ctx, {
     getExploredHexSet,
   });
 }
@@ -373,7 +369,7 @@ export function tryHandleBuildEntryAtClientXY(
  *
  * Purpose: Bridges map overlay clicks to `startTacticalBattle` IPC and tactical map entry.
  * When to use: Main map interactions before build-entry handling returns.
- * Expected outcome: On success, renderer enters tactical res4 view; on failure, shows a toast.
+ * Expected outcome: On success, renderer enters tactical view; on failure, shows a toast.
  * Exceptions: None.
  */
 export async function tryHandleTacticalEntryAtClientXY(clientX: number, clientY: number): Promise<boolean> {
@@ -395,7 +391,7 @@ export function createReadyHandlerDeps(): ReadyHandlerDeps {
     updateOpenRouterToolCountLabels,
     showSidebarError,
     callReadyWithTimeout,
-    refreshRes4TerrainOverridesForRenderer,
+    refreshTacticalTerrainOverridesForRenderer,
     applyGameStateSnapshot,
     buildAirStrikeOutboundPlaybackMoves,
     buildAirStrikeReturnPlaybackMoves,
@@ -417,7 +413,7 @@ export function createReadyHandlerDeps(): ReadyHandlerDeps {
     updateGameOverUI,
     startBackgroundRequestIfAllowed,
     redraw,
-    buildMeleeInterceptHexPopupHtml: buildMeleeInterceptHexPopupHtmlForRes1,
+    buildMeleeInterceptHexPopupHtml: buildMeleeInterceptHexPopupHtmlForStrategic,
     openMeleeInterceptModal,
     startTacticalBattleFromInterceptHex: startTacticalBattleFromEntryHex,
     scheduleTacticalAnnihilationExit: maybeScheduleTacticalAnnihilationExit,
@@ -452,12 +448,12 @@ export function updateMapInteractionCursor(clientX: number, clientY: number): vo
  */
 export function initNewGameButton(): void {
   registerNewGameButton({
-    refreshRes4TerrainOverridesForRenderer,
+    refreshTacticalTerrainOverridesForRenderer,
     rebuildUnitDisplayNameLookup,
     reconcileSelectionToCurrentState,
     updateClientStaleEnemyIntel,
     applyInitialCameraForState,
-    clearRes1TooltipSummaryCaches,
+    clearStrategicTooltipSummaryCaches,
     clearPendingTacticalOrders,
     hideStackCallout,
     updateOpenRouterCostLabel,

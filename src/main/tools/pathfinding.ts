@@ -26,8 +26,8 @@ import {
   PLAN_ROUTE_WARNING_ALREADY_AT_REDIRECTED_HEX,
   PLAN_ROUTE_WARNING_LAND_REDIRECT,
 } from '../navalMovementMessages';
-import { getRes1LandMassByH3 } from '../terrainClassificationCache';
-import type { LandMassByH3 } from '../../shared/landTraversalRes1';
+import { getStrategicLandMassByH3 } from '../terrainClassificationCache';
+import type { LandMassByH3 } from '../../shared/landTraversalStrategic';
 import {
   checkDistanceTagSourceUnit,
   nearestWaterHexTo,
@@ -184,7 +184,7 @@ export function createPathfindingSession(
   const hexSet = new Set(hexList);
   const terrainByH3 = buildNormalizedTerrainByH3(state.hexes);
   const { terrainByH3: rawTerrainByH3, terrainKindByH3 } = buildTerrainMapsFromHexRows(state.hexes);
-  const landMass = landMassOverride ?? getRes1LandMassByH3();
+  const landMass = landMassOverride ?? getStrategicLandMassByH3();
   const session: PathfindingSession = {
     state,
     latLngByH3,
@@ -711,7 +711,7 @@ export function executeCheckDistance(
       ? navalLookupForHexState(
           pathfindingSession ?? state,
           state.hexes,
-          state.res1Infrastructure
+          state.strategicInfrastructure
         )
       : undefined;
   if (unitType === 'naval' && navalLookup) {
@@ -746,7 +746,7 @@ export function executeCheckDistance(
     };
   }
 
-  const landMass = passableFor === 'land' ? getRes1LandMassByH3() : undefined;
+  const landMass = passableFor === 'land' ? getStrategicLandMassByH3() : undefined;
   const result = getDistanceAndTurns(
     fromH3,
     toH3,
@@ -806,7 +806,7 @@ export function executePathfinding(
   resolveToH3: (lat: number, lng: number) => string | undefined,
   pathfindingSession?: PathfindingSession,
   /**
-   * When set, plan_route / check_distance use the tactical res4 march planner (Ready truncation) instead of strategic land-mass pathfinding.
+   * When set, plan_route / check_distance use the tactical march planner (Ready truncation) instead of strategic land-mass pathfinding.
    */
   tacticalBattle?: TacticalBattleSnapshot
 ): Record<string, unknown> {

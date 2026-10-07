@@ -83,8 +83,8 @@ None.
 - `src/renderer/rendering/orderOverlayStages.ts`
 - `src/renderer/rendering/hoverPreview.ts`
 - `src/renderer/rendering/canvasPreviewPolicy.ts`
-- `src/renderer/rendering/res4CityOverlays.ts`
-- `src/renderer/map/res4TransportVectorLayer.ts`
+- `src/renderer/rendering/tacticalCityOverlays.ts`
+- `src/renderer/map/tacticalTransportVectorLayer.ts`
 - `src/renderer/rendering/terrainInfrastructureOverlay.ts`
 - `src/renderer/rendering/infrastructureOverlayState.ts`
 - `src/renderer/rendering/resolutionCombatOverlays.ts`

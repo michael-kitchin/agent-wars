@@ -85,7 +85,7 @@ export interface UnitOriginTooltipBonuses {
 export function unitOriginsPresentTheSame(left: UnitOrigin, right: UnitOrigin): boolean {
   return (
     left.birthH3Index === right.birthH3Index &&
-    left.birthRes4H3Index === right.birthRes4H3Index &&
+    left.birthTacticalH3Index === right.birthTacticalH3Index &&
     left.birthTerrainKind === right.birthTerrainKind &&
     left.birthIsUrban === right.birthIsUrban &&
     left.birthCountryName === right.birthCountryName &&

@@ -37,7 +37,7 @@ fromH3Index: string;
    */
 toH3Index: string;
     /**
-   * When set (tactical playback), ordered res4 vertices from `fromH3Index` through `toH3Index` for path-following animation.
+   * When set (tactical playback), ordered tactical vertices from `fromH3Index` through `toH3Index` for path-following animation.
    *
    * Contract: Omitted for strategic Ready; when present, length is at least 2 and endpoints match `fromH3Index` / `toH3Index`.
    * When to use: Tactical `commitHumanTacticalDraftOrders` resolution payload copied into `S.resolutionMoveAnimation.moves`.

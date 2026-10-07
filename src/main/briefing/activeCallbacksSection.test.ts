@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { CoordinateContext } from './map/coordinateContext';
-import { ensureStrategicCoordinateRegistryInitialized, listStrategicRes1H3Indexes } from './map/hexCoordinates';
+import { ensureStrategicCoordinateRegistryInitialized, listStrategicH3Indexes } from './map/hexCoordinates';
 import { h3ToCode } from './map/hexCodeTranslator';
 import { buildActiveCallbacksSection, formatCallbackLine } from './activeCallbacksSection';
 
@@ -22,7 +22,7 @@ test('infrastructure_destroyed without params describes an unfiltered watch', ()
 
 test('infrastructure_destroyed Details cell names targetType and cell code', () => {
   ensureStrategicCoordinateRegistryInitialized();
-  const h3Index = listStrategicRes1H3Indexes()[0];
+  const h3Index = listStrategicH3Indexes()[0];
   assert.ok(h3Index, 'expected at least one strategic cell');
   const cell = h3ToCode(h3Index, strategicCtx);
   const line = formatCallbackLine(

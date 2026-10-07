@@ -5,8 +5,8 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { dbGetOne, dbRun, getGameState, setRes1InfrastructureForHex } from '../gameDb';
-import { ZERO_RES1_INFRA_COUNTS } from '../testSupport/res1TestFixtures';
+import { dbGetOne, dbRun, getGameState, setStrategicInfrastructureForHex } from '../gameDb';
+import { ZERO_STRATEGIC_INFRA_COUNTS } from '../testSupport/strategicTestFixtures';
 import { withTempGameDb } from '../testSupport/withTempGameDb';
 import { destroyAirUnitsWithInvalidBase } from './invalidAirBase';
 
@@ -16,9 +16,9 @@ test('destroyAirUnitsWithInvalidBase retains human air on opponent hex while ene
     const landHex = state.hexes.find((hx) => hx.terrainKind !== 'water' && hx.terrain !== 'water');
     assert.ok(landHex);
     const h = landHex!.h3Index;
-    setRes1InfrastructureForHex(h, ZERO_RES1_INFRA_COUNTS);
+    setStrategicInfrastructureForHex(h, ZERO_STRATEGIC_INFRA_COUNTS);
     dbRun('DELETE FROM units WHERE h3_index = ?', [h]);
-    dbRun('INSERT OR REPLACE INTO res1_control (h3_index, controller_player_id) VALUES (?, ?)', [h, 'opponent']);
+    dbRun('INSERT OR REPLACE INTO res_s_control (h3_index, controller_player_id) VALUES (?, ?)', [h, 'opponent']);
     dbRun('INSERT INTO units (id, player, unit_type, h3_index) VALUES (?, ?, ?, ?)', [
       'human-air-contested-base',
       'human',
@@ -48,9 +48,9 @@ test('destroyAirUnitsWithInvalidBase still removes sole stranded human air on en
     const landHex = state.hexes.find((hx) => hx.terrainKind !== 'water' && hx.terrain !== 'water');
     assert.ok(landHex);
     const h = landHex!.h3Index;
-    setRes1InfrastructureForHex(h, ZERO_RES1_INFRA_COUNTS);
+    setStrategicInfrastructureForHex(h, ZERO_STRATEGIC_INFRA_COUNTS);
     dbRun('DELETE FROM units WHERE h3_index = ?', [h]);
-    dbRun('INSERT OR REPLACE INTO res1_control (h3_index, controller_player_id) VALUES (?, ?)', [h, 'opponent']);
+    dbRun('INSERT OR REPLACE INTO res_s_control (h3_index, controller_player_id) VALUES (?, ?)', [h, 'opponent']);
     dbRun('INSERT INTO units (id, player, unit_type, h3_index) VALUES (?, ?, ?, ?)', [
       'human-air-stranded-solo',
       'human',

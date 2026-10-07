@@ -9,10 +9,9 @@
  * Exceptions: Missing or unreadable standing-order routes yield an empty move map (all friendlies treated as stay-put).
  */
 
-import { latLngToCell } from 'h3-js';
 import { dbGetAll, isDbReady } from '../gameDb';
 import { logError, logTrace } from '../logger';
-import { METADATA_PARENT_RESOLUTION } from '../terrainMetadataLoad';
+import { strategicCellAt } from '../../shared/h3Resolutions';
 import {
   parseStandingOrderComputedRoute,
   type StandingOrderRow,
@@ -72,7 +71,7 @@ export function stayPutFriendlyOccupiedHexes(
  * Purpose: Briefing assembly cannot wait for Ready's standing-order generator; the persisted next step is the dest
  * the engine will apply unless the model overrides it.
  * When to use: Strategic Best Options and orderless suggestion occupancy, when SQLite is open.
- * Expected outcome: `unitId → dest h3` for rows whose computed next step resolves to a res1 cell other than a dummy origin.
+ * Expected outcome: `unitId → dest h3` for rows whose computed next step resolves to a strategic cell other than a dummy origin.
  * Exceptions: Returns an empty map when the database is not ready or the query fails.
  */
 export function readStandingThisPeriodMoves(playerId: string): Map<string, string> {
@@ -91,7 +90,7 @@ export function readStandingThisPeriodMoves(playerId: string): Map<string, strin
       if (lat === 0 && lng === 0 && computed.totalPath.length === 0) continue;
       let destH3: string;
       try {
-        destH3 = latLngToCell(lat, lng, METADATA_PARENT_RESOLUTION);
+        destH3 = strategicCellAt(lat, lng);
       } catch {
         continue;
       }

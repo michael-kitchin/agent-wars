@@ -5,7 +5,7 @@ import { formatUnitOriginTooltipHtml, unitOriginsPresentTheSame } from './unitOr
 import type { UnitOriginTooltipBonuses } from './unitOriginTooltipText';
 import type { UnitOrigin } from './unitOriginTypes';
 
-const PARIS_RES1 = latLngToCell(48.85, 2.35, 1);
+const PARIS_STRATEGIC = latLngToCell(48.85, 2.35, 1);
 
 /**
  * Bonus flags with every option off.
@@ -23,8 +23,8 @@ const NONE: UnitOriginTooltipBonuses = {
 };
 
 const origin: UnitOrigin = {
-  birthH3Index: PARIS_RES1,
-  birthRes4H3Index: null,
+  birthH3Index: PARIS_STRATEGIC,
+  birthTacticalH3Index: null,
   birthTerrainKind: 'plains',
   birthCountryName: 'France',
   birthCountryCode: 'FR',

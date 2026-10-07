@@ -372,7 +372,7 @@ function cloneAssessmentForStackedUnit(
 /**
  * Runs assess_unit for every opponent unit and collects successful payloads.
  *
- * Purpose: Feeds Unit Status / Attention Flags. When fog is off on res1, each call uses grid hops for all other units.
+ * Purpose: Feeds Unit Status / Attention Flags. When fog is off on strategic, each call uses grid hops for all other units.
  * When to use: Strategic precomputation before formatBriefing.
  * Expected outcome: One result per opponent unit whose assess_unit returned ok with nearbyEnemies. Same-hex same-type stacks reuse one scan.
  * Exceptions: Failed assessments are logged and omitted.

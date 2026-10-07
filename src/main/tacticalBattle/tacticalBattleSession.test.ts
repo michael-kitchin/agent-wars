@@ -12,7 +12,7 @@ import {
   endTacticalBattleSessionForHumanVoluntaryExitBailout,
   getActiveTacticalBattleSnapshot,
   isTacticalBattleActive,
-  startTacticalBattleForEnclosingRes1Hex,
+  startTacticalBattleForEnclosingHex,
 } from './tacticalBattleSession';
 import {
   tacticalDbFixtureRegisterDefaultAfterEach,
@@ -99,8 +99,8 @@ function setCustomSurvivorCountForParent(parentUnitId: string, keepCount: number
 }
 
 test('human voluntary bailout deletes strategic parent when survivors are strictly less than half baseline', () => {
-  tacticalDbFixtureWithTempDbContestedPlanning('aw-tactical-bailout-below-half-', ({ targetRes1H3 }) => {
-    const started = startTacticalBattleForEnclosingRes1Hex(targetRes1H3);
+  tacticalDbFixtureWithTempDbContestedPlanning('aw-tactical-bailout-below-half-', ({ targetStrategicH3 }) => {
+    const started = startTacticalBattleForEnclosingHex(targetStrategicH3);
     assert.equal(started.success, true, started.reason);
     const picked = pickParentForTest('human', 3);
     const baseline = tacticalSubUnitCountForStrategicUnitType(picked.unitType);
@@ -113,8 +113,8 @@ test('human voluntary bailout deletes strategic parent when survivors are strict
 });
 
 test('human voluntary bailout keeps strategic parent when survivors are exactly half baseline', () => {
-  tacticalDbFixtureWithTempDbContestedPlanning('aw-tactical-bailout-exact-half-', ({ targetRes1H3 }) => {
-    const started = startTacticalBattleForEnclosingRes1Hex(targetRes1H3);
+  tacticalDbFixtureWithTempDbContestedPlanning('aw-tactical-bailout-exact-half-', ({ targetStrategicH3 }) => {
+    const started = startTacticalBattleForEnclosingHex(targetStrategicH3);
     assert.equal(started.success, true, started.reason);
     const picked = pickEvenBaselineParentForTest('human');
     const baseline = tacticalSubUnitCountForStrategicUnitType(picked.unitType);
@@ -127,8 +127,8 @@ test('human voluntary bailout keeps strategic parent when survivors are exactly 
 });
 
 test('human voluntary bailout skips threshold elimination when one side is annihilated in snapshot', () => {
-  tacticalDbFixtureWithTempDbContestedPlanning('aw-tactical-bailout-annihilation-skip-', ({ targetRes1H3 }) => {
-    const started = startTacticalBattleForEnclosingRes1Hex(targetRes1H3);
+  tacticalDbFixtureWithTempDbContestedPlanning('aw-tactical-bailout-annihilation-skip-', ({ targetStrategicH3 }) => {
+    const started = startTacticalBattleForEnclosingHex(targetStrategicH3);
     assert.equal(started.success, true, started.reason);
     const snap = getActiveTacticalBattleSnapshot();
     assert.ok(snap);
@@ -142,8 +142,8 @@ test('human voluntary bailout skips threshold elimination when one side is annih
 });
 
 test('legacy snapshot fallback uses theoretical baseline during human voluntary bailout', () => {
-  tacticalDbFixtureWithTempDbContestedPlanning('aw-tactical-bailout-legacy-fallback-', ({ targetRes1H3 }) => {
-    const started = startTacticalBattleForEnclosingRes1Hex(targetRes1H3);
+  tacticalDbFixtureWithTempDbContestedPlanning('aw-tactical-bailout-legacy-fallback-', ({ targetStrategicH3 }) => {
+    const started = startTacticalBattleForEnclosingHex(targetStrategicH3);
     assert.equal(started.success, true, started.reason);
     const picked = pickParentForTest('human', 3);
     const theoreticalBaseline = tacticalSubUnitCountForStrategicUnitType(picked.unitType);
@@ -162,8 +162,8 @@ test('legacy snapshot fallback uses theoretical baseline during human voluntary 
 });
 
 test('human voluntary bailout can eliminate multiple strategic parents in one exit', () => {
-  tacticalDbFixtureWithTempDbContestedPlanning('aw-tactical-bailout-multi-parent-', ({ targetRes1H3 }) => {
-    const started = startTacticalBattleForEnclosingRes1Hex(targetRes1H3);
+  tacticalDbFixtureWithTempDbContestedPlanning('aw-tactical-bailout-multi-parent-', ({ targetStrategicH3 }) => {
+    const started = startTacticalBattleForEnclosingHex(targetStrategicH3);
     assert.equal(started.success, true, started.reason);
     const humanPicked = pickParentForTest('human', 3);
     const opponentPicked = pickParentForTest('opponent', 3);
@@ -180,8 +180,8 @@ test('human voluntary bailout can eliminate multiple strategic parents in one ex
 });
 
 test('non-voluntary teardown path does not apply bailout elimination', () => {
-  tacticalDbFixtureWithTempDbContestedPlanning('aw-tactical-bailout-scope-', ({ targetRes1H3 }) => {
-    const started = startTacticalBattleForEnclosingRes1Hex(targetRes1H3);
+  tacticalDbFixtureWithTempDbContestedPlanning('aw-tactical-bailout-scope-', ({ targetStrategicH3 }) => {
+    const started = startTacticalBattleForEnclosingHex(targetStrategicH3);
     assert.equal(started.success, true, started.reason);
     const picked = pickParentForTest('human', 3);
     const baseline = tacticalSubUnitCountForStrategicUnitType(picked.unitType);

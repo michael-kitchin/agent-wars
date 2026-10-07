@@ -5,9 +5,9 @@
 
 import type { TacticalBattleSnapshot } from './tacticalBattleTypes';
 import {
-  tacticalRes4TransportMarchAdjacentPairAllowsStep,
-  type TacticalRes4TransportMasks,
-} from './tacticalRes4TransportLink';
+  tacticalTransportMarchAdjacentPairAllowsStep,
+  type TacticalTransportMasks,
+} from './tacticalTransportLink';
 
 /**
  * Normalized tactical terrain bucket used for movement cost lookup.
@@ -28,74 +28,74 @@ export type TacticalMovementCategory =
   | 'water';
 
 /**
- * Context for resolving effective tactical terrain on a res4 cell.
+ * Context for resolving effective tactical terrain on a tactical cell.
  *
- * Contract: `effectiveKindForRes4Hex` returns the tactical kind string before category normalization.
+ * Contract: `effectiveKindForTacticalHex` returns the tactical kind string before category normalization.
  * When to use: Building `TacticalTerrainContext` from a `TacticalBattleSnapshot` or test fixtures.
  * Expected outcome: Deterministic kind per `h3` for a fixed snapshot.
  * Exceptions: None.
  */
 export type TacticalTerrainKindResolver = {
   /**
-   * Returns true when this res4 cell counts as **urban infrastructure** (not rubble) for forced march enter cost.
+   * Returns true when this tactical cell counts as **urban infrastructure** (not rubble) for forced march enter cost.
    *
    * Contract: Optional; when absent, land enter-hex costs use terrain category only.
    * When to use: Tactical march planner to apply urban=1 MP enter override for infantry/armor.
-   * Expected outcome: Matches snapshot `res4IsUrbanByH3` for the active battle.
+   * Expected outcome: Matches snapshot `tacticalIsUrbanByH3` for the active battle.
    * Exceptions: None.
    */
-  isUrbanRes4?: (h3: string) => boolean;
+  isUrbanTactical?: (h3: string) => boolean;
   /**
-   * Returns true when this res4 cell is **rubble** for forced march enter cost and naval blocking.
+   * Returns true when this tactical cell is **rubble** for forced march enter cost and naval blocking.
    *
    * Contract: Optional; when absent, rubble forcing and naval land blocking are skipped.
    * When to use: Tactical march planner for rubble=2 land enters and `tacticalNavalEnterNeighborCost` land-like blocks.
-   * Expected outcome: Matches snapshot `res4IsRubbleByH3`.
+   * Expected outcome: Matches snapshot `tacticalIsRubbleByH3`.
    * Exceptions: None.
    */
-  isRubbleRes4?: (h3: string) => boolean;
+  isRubbleTactical?: (h3: string) => boolean;
   /**
-   * Returns true when this res4 cell is a seaport facility (naval may berth; blocks seaport→seaport march steps).
+   * Returns true when this tactical cell is a seaport facility (naval may berth; blocks seaport→seaport march steps).
    *
    * Contract: Optional for tests and legacy snapshots; when absent, callers treat every cell as non-seaport.
    * When to use: Naval tactical enter-hex rules alongside native water/coastal categories.
    * Expected outcome: Stable boolean for a fixed snapshot row.
    * Exceptions: None.
    */
-  isSeaportRes4?: (h3: string) => boolean;
+  isSeaportTactical?: (h3: string) => boolean;
   /**
    * Returns true when a land unit may treat the step `fromH3` → `toH3` as following a road/rail link (not rubble-suppressed).
    *
    * Contract: Optional; when absent, no transport shortcuts apply in march planning.
-   * When to use: `planTacticalRes4March` land enter-cost override for infantry/armor.
-   * Expected outcome: Adjacent pair with both cells carrying any road/rail overlay side (`tacticalRes4TransportMarchAdjacentPairAllowsStep`).
+   * When to use: `planTacticalMarch` land enter-cost override for infantry/armor.
+   * Expected outcome: Adjacent pair with both cells carrying any road/rail overlay side (`tacticalTransportMarchAdjacentPairAllowsStep`).
    * Exceptions: None.
    */
   transportFromTo?: (fromH3: string, toH3: string) => boolean;
   /**
    * Bundled road/rail masks and rubble flags for land transport **continuity** (interior corridor) checks in march planning.
    *
-   * Contract: Present when the snapshot contributes any normalized `res4RoadSidesByH3` / `res4RailSidesByH3` rows; absent when
+   * Contract: Present when the snapshot contributes any normalized `tacticalRoadSidesByH3` / `tacticalRailSidesByH3` rows; absent when
    * there is no transport overlay (planner falls back to `transportFromTo` only).
    * When to use: Land march pricing reads the destination cell's mask from this map. `transportFromTo` still reports the older both-cell pair, which spawn and diagnostics use.
    * Expected outcome: Same `Map` instance backing `transportFromTo` pair tests for that snapshot build.
    * Exceptions: None.
    */
   landTransportMarchContext?: {
-    roadRailByH3: ReadonlyMap<string, TacticalRes4TransportMasks>;
+    roadRailByH3: ReadonlyMap<string, TacticalTransportMasks>;
     rubbleByH3: Readonly<Record<string, boolean>>;
   };
   /**
-   * Returns raw terrain kind for a res4 index (may be empty when only parent kind applies).
+   * Returns raw terrain kind for a tactical index (may be empty when only parent kind applies).
    *
    * Contract: Caller combines with parent fallback; values are typically lowercase DB `terrain_kind`.
    * When to use: Tactical march planner before `normalizeDbTerrainKindToTacticalCategory`.
-   * Expected outcome: String per res4 child in the tactical footprint.
+   * Expected outcome: String per tactical child in the tactical footprint.
    * Exceptions: None.
    */
-  effectiveKindForRes4Hex(h3: string): string;
+  effectiveKindForTacticalHex(h3: string): string;
   /**
-   * Strategic `terrain` column for the enclosing res1 hex (`land` / `water` / …).
+   * Strategic `terrain` column for the enclosing strategic hex (`land` / `water` / …).
    *
    * Contract: Same meaning as strategic hex rows; influences water detection when kinds are ambiguous.
    * When to use: Water vs land disambiguation in `normalizeDbTerrainKindToTacticalCategory`.
@@ -104,10 +104,10 @@ export type TacticalTerrainKindResolver = {
    */
   parentTerrain: string;
   /**
-   * Strategic res1 `terrain_kind` for the enclosing hex (`plains`, `coastal`, …).
+   * Strategic strategic `terrain_kind` for the enclosing hex (`plains`, `coastal`, …).
    *
    * Contract: Matches `TacticalBattleSnapshot.strategicHexTerrainKind`; used for shoreline naval rules when `terrain` is `land`.
-   * When to use: `isNavalRes4TacticalCellNavigable` and resolver consumers that must mirror snapshot build.
+   * When to use: `isNavalTacticalCellNavigable` and resolver consumers that must mirror snapshot build.
    * Expected outcome: Lowercase-ish DB strings; defaults to `plains` when absent in legacy saves.
    * Exceptions: None.
    */
@@ -118,7 +118,7 @@ export type TacticalTerrainKindResolver = {
  * Maps database / snapshot terrain strings to a tactical movement category for cost rules.
  *
  * Contract: Lowercases inputs; treats parent `water` as water when kind is empty.
- * When to use: Before `tacticalEnterHexMovementCost` for each candidate res4 cell.
+ * When to use: Before `tacticalEnterHexMovementCost` for each candidate tactical cell.
  * Expected outcome: A `TacticalMovementCategory` suitable for the §12.4 cost table.
  * Exceptions: None.
  */
@@ -142,14 +142,14 @@ export function normalizeDbTerrainKindToTacticalCategory(
 }
 
 /**
- * Returns true when a per-res4 `terrain_kind` string should be treated as open water or surf for naval §12.4 routing.
+ * Returns true when a per-tactical `terrain_kind` string should be treated as open water or surf for naval §12.4 routing.
  *
  * Purpose: GIS / legacy rows sometimes label sea tiles `ocean` or `sea` while the combat pipeline standardizes on `water`.
- * When to use: Naval navigability fast path and seaport adjacency checks that must agree with `isNavalRes4TacticalCellNavigable`.
+ * When to use: Naval navigability fast path and seaport adjacency checks that must agree with `isNavalTacticalCellNavigable`.
  * Expected outcome: True for lowercase `water`, `coastal`, `ocean`, and `sea`.
  * Exceptions: None.
  */
-export function nativeRes4TerrainKindIsWaterOrCoastalForNavalRouting(kind: string): boolean {
+export function nativeTacticalTerrainKindIsWaterOrCoastalForNavalRouting(kind: string): boolean {
   const k = (kind || '').toLowerCase();
   return k === 'water' || k === 'coastal' || k === 'ocean' || k === 'sea';
 }
@@ -186,30 +186,30 @@ export function tacticalLandUnitMayOccupyCellWithoutTransport(
   terrain: TacticalTerrainKindResolver
 ): boolean {
   if (unitType !== 'infantry' && unitType !== 'armor') return false;
-  if (terrain.isUrbanRes4?.(cellH3) || terrain.isRubbleRes4?.(cellH3)) return true;
-  const raw = terrain.effectiveKindForRes4Hex(cellH3);
+  if (terrain.isUrbanTactical?.(cellH3) || terrain.isRubbleTactical?.(cellH3)) return true;
+  const raw = terrain.effectiveKindForTacticalHex(cellH3);
   const cat = normalizeDbTerrainKindToTacticalCategory(raw, terrain.parentTerrain);
   return Number.isFinite(tacticalEnterHexMovementCost(unitType, cat));
 }
 
 /**
- * Returns whether a tactical res4 cell may host or receive a naval march (water/coastal tile or seaport facility).
+ * Returns whether a tactical cell may host or receive a naval march (water/coastal tile or seaport facility).
  *
- * Contract: Aligns snapshot placement with `planTacticalRes4March` naval edges; does **not** encode seaport→seaport step blocking (handled in the planner with `fromH3`) or “has a legal first step” (handled by `tacticalNavalHasMovableNeighborInFootprint` at spawn).
+ * Contract: Aligns snapshot placement with `planTacticalMarch` naval edges; does **not** encode seaport→seaport step blocking (handled in the planner with `fromH3`) or “has a legal first step” (handled by `tacticalNavalHasMovableNeighborInFootprint` at spawn).
  * When to use: `computeTacticalBattleSnapshot` base navigability and naval `enterCostForHex` eligibility before the port-consecutive guard.
- * Expected outcome: True for seaport tiles, res4 kinds `water`/`coastal` (plus legacy `ocean`/`sea`), and cells that normalize to `water` when strategic `terrain` is open water and kind strings are blank; false for land-like categories (`plains`, `forests`, `desert`, etc.) unless the cell is explicitly marked as seaport.
+ * Expected outcome: True for seaport tiles, tactical kinds `water`/`coastal` (plus legacy `ocean`/`sea`), and cells that normalize to `water` when strategic `terrain` is open water and kind strings are blank; false for land-like categories (`plains`, `forests`, `desert`, etc.) unless the cell is explicitly marked as seaport.
  * Exceptions: None.
  */
-export function isNavalRes4TacticalCellNavigable(args: {
+export function isNavalTacticalCellNavigable(args: {
   resolvedKindForCell: string;
   parentTerrain: string;
-  /** Strategic res1 `terrain_kind` for the enclosing hex (e.g. `coastal` shoreline on `terrain === 'land'`). */
+  /** Strategic strategic `terrain_kind` for the enclosing hex (e.g. `coastal` shoreline on `terrain === 'land'`). */
   parentTerrainKind: string;
   isSeaportCell: boolean;
 }): boolean {
   const { resolvedKindForCell, parentTerrain, parentTerrainKind, isSeaportCell } = args;
   if (isSeaportCell) return true;
-  if (nativeRes4TerrainKindIsWaterOrCoastalForNavalRouting(resolvedKindForCell)) return true;
+  if (nativeTacticalTerrainKindIsWaterOrCoastalForNavalRouting(resolvedKindForCell)) return true;
   void parentTerrainKind;
   const cat = normalizeDbTerrainKindToTacticalCategory(resolvedKindForCell, parentTerrain);
   return cat === 'water' || cat === 'coastal';
@@ -224,18 +224,18 @@ export function isNavalRes4TacticalCellNavigable(args: {
  * Exceptions: None.
  */
 /**
- * Merges parallel `res4RoadSidesByH3` / `res4RailSidesByH3` snapshot records into a normalized `roadRailByH3` map.
+ * Merges parallel `tacticalRoadSidesByH3` / `tacticalRailSidesByH3` snapshot records into a normalized `roadRailByH3` map.
  *
  * Purpose: Single implementation for resolver construction and any caller that needs the same padding/length rules as gameplay.
  * When to use: `buildTacticalTerrainKindResolverFromSnapshot` before attaching transport resolver helpers.
  * Expected outcome: Empty map when no keys or only malformed rows; aligned `roadSides`/`railSides` arrays per cell.
  * Exceptions: Drops rows whose padded arrays still disagree in length.
  */
-export function buildRoadRailMapFromRes4RoadRailRecords(
+export function buildRoadRailMapFromTacticalRoadRailRecords(
   roadBy: Readonly<Record<string, readonly boolean[] | undefined>>,
   railBy: Readonly<Record<string, readonly boolean[] | undefined>>
-): Map<string, TacticalRes4TransportMasks> {
-  const roadRailByH3 = new Map<string, TacticalRes4TransportMasks>();
+): Map<string, TacticalTransportMasks> {
+  const roadRailByH3 = new Map<string, TacticalTransportMasks>();
   const transportKeys = new Set([...Object.keys(roadBy), ...Object.keys(railBy)]);
   for (const h3 of transportKeys) {
     const r = roadBy[h3];
@@ -255,12 +255,12 @@ export function buildRoadRailMapFromRes4RoadRailRecords(
  * Builds `transportFromTo` and `landTransportMarchContext` from an existing normalized road/rail map and rubble flags.
  *
  * Purpose: Keeps march-pair closure identical between snapshot `buildTacticalTerrainKindResolverFromSnapshot` and placement-time resolvers.
- * When to use: After `buildRoadRailMapFromRes4RoadRailRecords` or `tacticalRes4FootprintTransportOverlayRecords` yields `roadRailByH3`.
+ * When to use: After `buildRoadRailMapFromTacticalRoadRailRecords` or `tacticalFootprintTransportOverlayRecords` yields `roadRailByH3`.
  * Expected outcome: Both fields undefined when the map is empty; otherwise shared map reference on context and closure over rubble.
  * Exceptions: None.
  */
 export function tacticalTerrainTransportResolverFnsFromRoadRailMap(
-  roadRailByH3: ReadonlyMap<string, TacticalRes4TransportMasks>,
+  roadRailByH3: ReadonlyMap<string, TacticalTransportMasks>,
   rubbleByH3: Readonly<Record<string, boolean>>
 ): {
   transportFromTo: TacticalTerrainKindResolver['transportFromTo'];
@@ -270,7 +270,7 @@ export function tacticalTerrainTransportResolverFnsFromRoadRailMap(
     return { transportFromTo: undefined, landTransportMarchContext: undefined };
   }
   const transportFromTo = (fromH3: string, toH3: string): boolean =>
-    tacticalRes4TransportMarchAdjacentPairAllowsStep({
+    tacticalTransportMarchAdjacentPairAllowsStep({
       fromH3,
       toH3,
       roadRailByH3,
@@ -340,25 +340,25 @@ export function tacticalEnterHexMovementCost(unitType: string, category: Tactica
 export function buildTacticalTerrainKindResolverFromSnapshot(
   battle: Pick<
     TacticalBattleSnapshot,
-    | 'res4TerrainKindByH3'
+    | 'tacticalTerrainKindByH3'
     | 'strategicHexTerrain'
     | 'strategicHexTerrainKind'
-    | 'res4IsSeaportByH3'
-    | 'res4IsUrbanByH3'
-    | 'res4IsRubbleByH3'
-    | 'res4RoadSidesByH3'
-    | 'res4RailSidesByH3'
+    | 'tacticalIsSeaportByH3'
+    | 'tacticalIsUrbanByH3'
+    | 'tacticalIsRubbleByH3'
+    | 'tacticalRoadSidesByH3'
+    | 'tacticalRailSidesByH3'
   >
 ): TacticalTerrainKindResolver {
   const parentTerrain = battle.strategicHexTerrain ?? 'land';
   const parentKind = battle.strategicHexTerrainKind ?? 'plains';
-  const map = battle.res4TerrainKindByH3 ?? {};
-  const seaportMap = battle.res4IsSeaportByH3 ?? {};
-  const urbanMap = battle.res4IsUrbanByH3 ?? {};
-  const rubbleMap = battle.res4IsRubbleByH3 ?? {};
-  const roadBy = battle.res4RoadSidesByH3 ?? {};
-  const railBy = battle.res4RailSidesByH3 ?? {};
-  const roadRailByH3 = buildRoadRailMapFromRes4RoadRailRecords(roadBy, railBy);
+  const map = battle.tacticalTerrainKindByH3 ?? {};
+  const seaportMap = battle.tacticalIsSeaportByH3 ?? {};
+  const urbanMap = battle.tacticalIsUrbanByH3 ?? {};
+  const rubbleMap = battle.tacticalIsRubbleByH3 ?? {};
+  const roadBy = battle.tacticalRoadSidesByH3 ?? {};
+  const railBy = battle.tacticalRailSidesByH3 ?? {};
+  const roadRailByH3 = buildRoadRailMapFromTacticalRoadRailRecords(roadBy, railBy);
   const { transportFromTo: transportFromToFn, landTransportMarchContext } =
     tacticalTerrainTransportResolverFnsFromRoadRailMap(roadRailByH3, rubbleMap);
   return {
@@ -366,19 +366,19 @@ export function buildTacticalTerrainKindResolverFromSnapshot(
     parentTerrainKind: parentKind,
     transportFromTo: transportFromToFn,
     landTransportMarchContext,
-    effectiveKindForRes4Hex(h3: string): string {
+    effectiveKindForTacticalHex(h3: string): string {
       const raw = map[h3];
       if (raw == null) return parentKind;
       const trimmed = String(raw).trim();
       return trimmed.length > 0 ? trimmed : parentKind;
     },
-    isSeaportRes4(h3: string): boolean {
+    isSeaportTactical(h3: string): boolean {
       return !!seaportMap[h3];
     },
-    isUrbanRes4(h3: string): boolean {
+    isUrbanTactical(h3: string): boolean {
       return !!urbanMap[h3];
     },
-    isRubbleRes4(h3: string): boolean {
+    isRubbleTactical(h3: string): boolean {
       return !!rubbleMap[h3];
     },
   };
@@ -410,30 +410,30 @@ export function tacticalMovementUnitTypeForPathfinding(
 }
 
 /**
- * Stable string for tactical planning cache keys so res4 terrain edits invalidate even when override map size is unchanged.
+ * Stable string for tactical planning cache keys so tactical terrain edits invalidate even when override map size is unchanged.
  *
- * Purpose: `battleId` + turn + sub-unit positions are not enough when only `res4TerrainKindByH3` values change under the same key set.
- * When to use: `planTacticalRes4MarchWithSessionCache` environment keys and renderer hover memo keys alongside those fields.
- * Expected outcome: Deterministic for a fixed snapshot; changes when any override entry, parent terrain fields, or res4 road/rail mask content changes.
+ * Purpose: `battleId` + turn + sub-unit positions are not enough when only `tacticalTerrainKindByH3` values change under the same key set.
+ * When to use: `planTacticalMarchWithSessionCache` environment keys and renderer hover memo keys alongside those fields.
+ * Expected outcome: Deterministic for a fixed snapshot; changes when any override entry, parent terrain fields, or tactical road/rail mask content changes.
  * Exceptions: None.
  */
 export function tacticalTerrainLayerSignature(
   battle: Pick<
     TacticalBattleSnapshot,
-    | 'res4TerrainKindByH3'
+    | 'tacticalTerrainKindByH3'
     | 'strategicHexTerrain'
     | 'strategicHexTerrainKind'
-    | 'res4IsSeaportByH3'
-    | 'res4IsUrbanByH3'
-    | 'res4IsRubbleByH3'
-    | 'res4RoadSidesByH3'
-    | 'res4RailSidesByH3'
+    | 'tacticalIsSeaportByH3'
+    | 'tacticalIsUrbanByH3'
+    | 'tacticalIsRubbleByH3'
+    | 'tacticalRoadSidesByH3'
+    | 'tacticalRailSidesByH3'
   >
 ): string {
   const parentTerrain = battle.strategicHexTerrain ?? '';
   const parentKind = battle.strategicHexTerrainKind ?? '';
-  const map = battle.res4TerrainKindByH3;
-  const sp = battle.res4IsSeaportByH3;
+  const map = battle.tacticalTerrainKindByH3;
+  const sp = battle.tacticalIsSeaportByH3;
   const spBody = !sp
     ? ''
     : Object.entries(sp)
@@ -441,7 +441,7 @@ export function tacticalTerrainLayerSignature(
         .map(([h3]) => h3)
         .sort((a, b) => a.localeCompare(b))
         .join(';');
-  const urban = battle.res4IsUrbanByH3;
+  const urban = battle.tacticalIsUrbanByH3;
   const urbanBody = !urban
     ? ''
     : Object.entries(urban)
@@ -449,7 +449,7 @@ export function tacticalTerrainLayerSignature(
         .map(([h3]) => h3)
         .sort((a, b) => a.localeCompare(b))
         .join(';');
-  const rubble = battle.res4IsRubbleByH3;
+  const rubble = battle.tacticalIsRubbleByH3;
   const rubbleBody = !rubble
     ? ''
     : Object.entries(rubble)
@@ -457,8 +457,8 @@ export function tacticalTerrainLayerSignature(
         .map(([h3]) => h3)
         .sort((a, b) => a.localeCompare(b))
         .join(';');
-  const road = battle.res4RoadSidesByH3;
-  const rail = battle.res4RailSidesByH3;
+  const road = battle.tacticalRoadSidesByH3;
+  const rail = battle.tacticalRailSidesByH3;
   const trKeys = new Set<string>([...(road ? Object.keys(road) : []), ...(rail ? Object.keys(rail) : [])]);
   const trBody =
     trKeys.size === 0

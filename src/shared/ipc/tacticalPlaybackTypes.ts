@@ -5,7 +5,7 @@ import type { CombatDicePlaybackFields } from './combatDiceTypes';
 import type { InfrastructureDestroyedEvent, RemovedUnitSnapshot } from './readyTypes';
 
 /**
- * One tactical Ready playback march segment for resolution animation (res4 cells).
+ * One tactical Ready playback march segment for resolution animation (tactical cells).
  *
  * Purpose: Carries optional `pathH3Indexes` so the renderer can glide units along the planned §12.4 path instead of a straight chord.
  * When to use: `TacticalCommitResolutionPlayback.humanMoves` and `opponentMoves` entries from `commitHumanTacticalDraftOrders`.
@@ -26,7 +26,7 @@ export type TacticalPlaybackMarchMove = {
  * Purpose: Bridges tactical snapshot-only commits with `S.resolutionMoveAnimation` without duplicating combat simulation in the renderer.
  * When to use: Main-process `commitHumanTacticalDraftOrders` success path after movement and support projection complete.
  * Expected outcome: `humanMoves` lists sub-unit position deltas; ranged fields mirror strategic `ReadyResult` subsets when support orders remove units.
- *   Per-phase dice rolls come from `CombatDicePlaybackFields`, anchored on res4 cells.
+ *   Per-phase dice rolls come from `CombatDicePlaybackFields`, anchored on tactical cells.
  * Exceptions: None; empty `humanMoves` is valid when only non-move effects occur.
  */
 export type TacticalCommitResolutionPlayback = CombatDicePlaybackFields & {
@@ -36,7 +36,7 @@ export type TacticalCommitResolutionPlayback = CombatDicePlaybackFields & {
    *
    * Purpose: Lets `S.resolutionMoveAnimation.moves` include AI tactical marches without re-fetching the snapshot mid-playback.
    * When to use: Populated when `opponentTacticalDraft.movementOrders` committed non-noop opponent legs this beat.
-   * Expected outcome: Same shape as `humanMoves`, including optional `pathH3Indexes` for bent res4 paths.
+   * Expected outcome: Same shape as `humanMoves`, including optional `pathH3Indexes` for bent tactical paths.
    * Exceptions: Omitted when empty.
    */
   opponentMoves?: TacticalPlaybackMarchMove[];
@@ -89,11 +89,11 @@ export type TacticalCommitResolutionPlayback = CombatDicePlaybackFields & {
    */
   killsByAirStrike?: KillEdge[];
   /**
-   * Res1 infrastructure damage events from tactical human air strikes against urban/airport/seaport targets.
+   * Strategic infrastructure damage events from tactical human air strikes against urban/airport/seaport targets.
    *
    * Purpose: Surfaces “Air strikes: … destroyed N airports” in the same toast field as strategic Ready.
    * When to use: After `applyInfrastructureDestructionEffects` runs for non-`units` tactical strike orders.
-   * Expected outcome: Same contract as `ReadyResult.infrastructureDestroyedEvents` with `h3Index` on the parent res1 cell.
+   * Expected outcome: Same contract as `ReadyResult.infrastructureDestroyedEvents` with `h3Index` on the parent strategic cell.
    * Exceptions: Omitted when empty.
    */
   infrastructureDestroyedEvents?: InfrastructureDestroyedEvent[];
@@ -116,7 +116,7 @@ export type TacticalCommitResolutionPlayback = CombatDicePlaybackFields & {
    */
   airStrikeMoves?: AirStrikeAnimationMove[];
   /**
-   * Res4 hexes where tactical air combat lightning should flash (targets), mirroring `ReadyResult.airStrikeHexes`.
+   * Tactical hexes where tactical air combat lightning should flash (targets), mirroring `ReadyResult.airStrikeHexes`.
    *
    * Purpose: Feeds `resolutionMoveAnimation.airStrikeCombatHexes` for `phase.inAirStrikeLightning`; must not duplicate ranged-only combat hexes.
    * When to use: Set alongside `airStrikeMoves` from the same air pass.
@@ -125,7 +125,7 @@ export type TacticalCommitResolutionPlayback = CombatDicePlaybackFields & {
    */
   airStrikeHexes?: string[];
   /**
-   * Res4 hexes where air-strike casualties occurred this beat, mirroring `ReadyResult.airStrikeCasualtyHexes`.
+   * Tactical hexes where air-strike casualties occurred this beat, mirroring `ReadyResult.airStrikeCasualtyHexes`.
    *
    * Purpose: Feeds `resolutionMoveAnimation.airStrikeCasualtyHexes` for the air casualty pulse segment.
    * When to use: Populated from removals and outcomes during the tactical air phase (ground AA, destroyed aircraft, etc.).
@@ -138,21 +138,21 @@ export type TacticalCommitResolutionPlayback = CombatDicePlaybackFields & {
    *
    * Purpose: Lets `buildTacticalCommitReadyResultForToast` classify melee lines separately from ranged and air-strike summaries.
    * When to use: Populated by `commitHumanTacticalDraftOrders` after `applyTacticalMeleeAfterSupportOrders` removes co-located enemies.
-   * Expected outcome: Same `{ victimId, killerIds }` shape as strategic melee kill metadata; omitted when no res4 hex had opposing survivors after support.
+   * Expected outcome: Same `{ victimId, killerIds }` shape as strategic melee kill metadata; omitted when no tactical hex had opposing survivors after support.
    * Exceptions: None.
    */
   killsByMelee?: KillEdge[];
   /**
-   * Res4 hexes where tactical melee combat was adjudicated this commit.
+   * Tactical hexes where tactical melee combat was adjudicated this commit.
    *
    * Purpose: Drives resolution playback overlays for melee flashes on the tactical map.
    * When to use: After tactical melee phase runs on the post-support snapshot.
-   * Expected outcome: Subset of `res4ChildH3Indexes` where at least two players had sub-units before melee rolls.
+   * Expected outcome: Subset of `tacticalChildH3Indexes` where at least two players had sub-units before melee rolls.
    * Exceptions: None.
    */
   meleeCombatHexes?: string[];
   /**
-   * Res4 hexes that lost at least one sub-unit to tactical melee this commit.
+   * Tactical hexes that lost at least one sub-unit to tactical melee this commit.
    *
    * Purpose: Aligns tactical casualty highlighting with strategic `meleeCasualtyHexes` semantics.
    * When to use: Populated alongside `meleeRemovedUnits` from the same melee pass.

@@ -108,7 +108,7 @@ const TACTICAL_MARCH_PREVIEW_TYPE_PRIORITY: Readonly<Record<string, number>> = {
 /**
  * Picks one representative tactical sub-unit id per origin for march hover previews.
  *
- * Purpose: When infantry/armor share a res4 with a naval carrier, first-id-wins would often pick land units and
+ * Purpose: When infantry/armor share a tactical with a naval carrier, first-id-wins would often pick land units and
  * run §12.4 pathfinding as infantry/armor (land costs), producing long land previews and blocking water — the inverse of naval rules.
  * When to use: `groupedTacticalMarchPreviewUnitIds` for homogeneous tactical selections only; mixed land/naval uses all selected ids.
  * Expected outcome: Lowest numeric priority among `naval` → `armor` → `infantry` → `air` per `originH3`; ties keep the first seen id.
@@ -132,7 +132,7 @@ export function representativeTacticalMarchPreviewUnitIdsByOriginH3(
  * Resolves which sub-unit ids receive per-unit tactical march hover previews for a grouped selection.
  *
  * Purpose: Mixed land/naval stacks must preview every selected sub-unit so `validForAll` reflects the whole selection;
- * homogeneous stacks keep one representative preview per origin, preferring naval over land on the same res4 cell.
+ * homogeneous stacks keep one representative preview per origin, preferring naval over land on the same tactical cell.
  * When to use: `buildTacticalMarchHoverPreview` before building per-unit previews.
  * Expected outcome: All selected ids when `mixedLandAndNaval` is true; otherwise `representativeTacticalMarchPreviewUnitIdsByOriginH3`.
  * Exceptions: None.

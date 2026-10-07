@@ -17,25 +17,25 @@
  */
 export interface UnitOrigin {
   /**
-   * The res1 hex the unit was created in.
+   * The strategic hex the unit was created in.
    *
-   * Contract: Always a res1 H3 index.
+   * Contract: Always a strategic H3 index.
    * When to use: Identifying the birth hex.
    * Expected outcome: Equals the unit's hex at creation time.
    * Exceptions: None.
    */
   readonly birthH3Index: string;
   /**
-   * The res4 cell chosen inside the birth hex.
+   * The tactical cell chosen inside the birth hex.
    *
-   * Contract: A res4 child of `birthH3Index`, or `null` when the hex had no land child.
+   * Contract: A tactical child of `birthH3Index`, or `null` when the hex had no land child.
    * When to use: Looking up the birth country and terrain.
    * Expected outcome: Intact urban cells are preferred, then land cells.
    * Exceptions: None.
    */
-  readonly birthRes4H3Index: string | null;
+  readonly birthTacticalH3Index: string | null;
   /**
-   * Pipeline terrain kind of the birth cell, or of the res1 hex when there is no cell.
+   * Pipeline terrain kind of the birth cell, or of the strategic hex when there is no cell.
    *
    * Contract: A valid pipeline terrain kind, or `null` when unknown.
    * When to use: The origin tooltip's terrain line.
@@ -46,7 +46,7 @@ export interface UnitOrigin {
   /**
    * Whether the birth cell was intact urban.
    *
-   * Contract: `true` only when the chosen res4 cell was urban and not rubble. `false` when the cell is land, or when the hex had no birth cell.
+   * Contract: `true` only when the chosen tactical cell was urban and not rubble. `false` when the cell is land, or when the hex had no birth cell.
    * When to use: Telling two origins apart when they share a country and terrain kind. The origin tooltip does not show this flag, and origin bonuses ignore it.
    * Expected outcome: Independent of `birthTerrainKind`, which stays the cell's base kind.
    * Exceptions: None.
@@ -73,9 +73,9 @@ export interface UnitOrigin {
 }
 
 /**
- * The country that a res4 cell counts as for unit births.
+ * The country that a tactical cell counts as for unit births.
  *
- * Purpose: Precomputed per res4 cell so birth selection needs no naming data at spawn time.
+ * Purpose: Precomputed per tactical cell so birth selection needs no naming data at spawn time.
  * When to use: Values of the terrain cache's birth-country map.
  * Expected outcome: Shared, interned objects; equal countries are the same object.
  * Exceptions: None.

@@ -31,16 +31,16 @@ export const MOVEMENT_RANGE_BY_UNIT_TYPE: Readonly<Record<string, number>> = Obj
  * Exceptions: None.
  */
 /**
- * Tactical ranged attack ranges in res4 grid steps (combat rules §12.5).
+ * Tactical ranged attack ranges in tactical grid steps (combat rules §12.5).
  *
  * Contract: **Baseline** max range per unit type; `src/shared/tacticalTerrainCombatModifiers.ts` may cap range to 1
  * from forest/urban/rubble cells and block armor/naval shots whose implicit LOS crosses mountain. Air strikes and ferry are not blocked by mountains.
- * Air uses a large within-footprint cap because strikes are allowed anywhere inside the parent res1 cell.
+ * Air uses a large within-footprint cap because strikes are allowed anywhere inside the parent strategic cell.
  * When to use: Tactical ranged targeting validation and UI gating.
  * Expected outcome: Infantry 2, armor 5, naval 10, air 99 (effectively unlimited within the tactical map) before terrain modifiers.
  * Exceptions: None.
  *
- * **Strategic vs tactical:** For **res1 strategic** ranged distance (smaller standoff values), use `getRange` / `strategicRangedRangeHexesForUnitType`. Do not substitute this table into strategic `validateRangedAttack` without an explicit tactical-active branch.
+ * **Strategic vs tactical:** For **strategic** ranged distance (smaller standoff values), use `getRange` / `strategicRangedRangeHexesForUnitType`. Do not substitute this table into strategic `validateRangedAttack` without an explicit tactical-active branch.
  */
 export const RANGED_RANGE_BY_UNIT_TYPE: Readonly<Record<string, number>> = Object.freeze({
   infantry: 2,
@@ -64,9 +64,9 @@ export function unitHasTacticalRangedBaseline(unitType: string): boolean {
 /**
  * Documents the module-scope binding `AIR_STRIKE_RANGE_HEXES` (AIR_STRIKE_RANGE_HEXES).
 
- * Purpose: Strategic air strike distance from the unit’s home res1 hex; tactical human/opponent strikes ignore this cap and allow any target in the tactical res4 footprint.
+ * Purpose: Strategic air strike distance from the unit’s home strategic hex; tactical human/opponent strikes ignore this cap and allow any target in the tactical footprint.
  * When to use: Strategic `validateAirStrikeOrder`, AI strike envelopes, and briefing text — not tactical battle validation.
- * Expected outcome: Three res4 grid steps from base for strategic strikes.
+ * Expected outcome: Three tactical grid steps from base for strategic strikes.
  * Exceptions: None.
  */
 export const AIR_STRIKE_RANGE_HEXES = 3;

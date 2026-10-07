@@ -13,9 +13,9 @@ import {
 import { resetTacticalMovementPlanningCacheForTests } from './tacticalMovementPlanningCache';
 import {
   firstRingCellDistinctFrom,
-  tacticalRes1Cell,
-  tacticalRes4UnderRes1Corner,
-} from './testSupport/tacticalRes4HexFixtures';
+  tacticalParentCell,
+  tacticalUnderCorner,
+} from './testSupport/tacticalHexFixtures';
 
 beforeEach(() => {
   resetTacticalMovementPlanningCacheForTests();
@@ -25,34 +25,34 @@ beforeEach(() => {
  * Supplies §12.4 terrain so ring-based fixtures are passable for infantry and naval without SQLite.
  *
  * Purpose: Marks every footprint cell `coastal` so land and naval sub-units share a littoral test neighborhood.
- * When to use: Tactical movement projection tests that synthesize `res4ChildH3Indexes` from `gridDisk` alone.
- * Expected outcome: `strategicHexTerrain` / `res4TerrainKindByH3` populated for `planTacticalRes4March` consumers.
+ * When to use: Tactical movement projection tests that synthesize `tacticalChildH3Indexes` from `gridDisk` alone.
+ * Expected outcome: `strategicHexTerrain` / `tacticalTerrainKindByH3` populated for `planTacticalMarch` consumers.
  * Exceptions: None.
  */
 function coastalFootprintTerrain(ringCells: readonly string[]): Pick<
   TacticalBattleSnapshot,
-  'strategicHexTerrain' | 'strategicHexTerrainKind' | 'res4TerrainKindByH3'
+  'strategicHexTerrain' | 'strategicHexTerrainKind' | 'tacticalTerrainKindByH3'
 > {
-  const res4TerrainKindByH3: Record<string, string> = {};
+  const tacticalTerrainKindByH3: Record<string, string> = {};
   for (const h of ringCells) {
-    res4TerrainKindByH3[h] = 'coastal';
+    tacticalTerrainKindByH3[h] = 'coastal';
   }
   return {
     strategicHexTerrain: 'land',
     strategicHexTerrainKind: 'coastal',
-    res4TerrainKindByH3,
+    tacticalTerrainKindByH3,
   };
 }
 
 test('projectTacticalSnapshot moves opponent sub-unit within res4 range', () => {
-  const res1 = tacticalRes1Cell(10, 20);
-  const center = tacticalRes4UnderRes1Corner(10, 20);
+  const strategic = tacticalParentCell(10, 20);
+  const center = tacticalUnderCorner(10, 20);
   const ring = gridDisk(center, 1);
   const dest = firstRingCellDistinctFrom(center);
   const snap: TacticalBattleSnapshot = {
     battleId: 'tb-move',
-    enclosingRes1H3Index: res1,
-    res4ChildH3Indexes: [...ring],
+    enclosingStrategicH3Index: strategic,
+    tacticalChildH3Indexes: [...ring],
     ...coastalFootprintTerrain([...ring]),
     strategicTurnNumber: 1,
     tacticalTurnNumber: 1,
@@ -72,14 +72,14 @@ test('projectTacticalSnapshot moves opponent sub-unit within res4 range', () => 
 });
 
 test('projectTacticalSnapshot auto-debarks embarked opponent land on independent march', () => {
-  const res1 = tacticalRes1Cell(11, 12);
-  const navalCell = tacticalRes4UnderRes1Corner(11, 12);
+  const strategic = tacticalParentCell(11, 12);
+  const navalCell = tacticalUnderCorner(11, 12);
   const ring = gridDisk(navalCell, 1);
   const landDest = firstRingCellDistinctFrom(navalCell);
   const snap: TacticalBattleSnapshot = {
     battleId: 'tb-dis',
-    enclosingRes1H3Index: res1,
-    res4ChildH3Indexes: [...ring],
+    enclosingStrategicH3Index: strategic,
+    tacticalChildH3Indexes: [...ring],
     ...coastalFootprintTerrain([...ring]),
     strategicTurnNumber: 1,
     tacticalTurnNumber: 1,
@@ -110,14 +110,14 @@ test('projectTacticalSnapshot auto-debarks embarked opponent land on independent
 });
 
 test('projectTacticalSnapshot moves embarked opponent land with its naval carrier', () => {
-  const res1 = tacticalRes1Cell(3, 4);
-  const center = tacticalRes4UnderRes1Corner(3, 4);
+  const strategic = tacticalParentCell(3, 4);
+  const center = tacticalUnderCorner(3, 4);
   const ring = gridDisk(center, 1);
   const dest = firstRingCellDistinctFrom(center);
   const snap: TacticalBattleSnapshot = {
     battleId: 'tb-emb',
-    enclosingRes1H3Index: res1,
-    res4ChildH3Indexes: [...ring],
+    enclosingStrategicH3Index: strategic,
+    tacticalChildH3Indexes: [...ring],
     ...coastalFootprintTerrain([...ring]),
     strategicTurnNumber: 1,
     tacticalTurnNumber: 1,
@@ -147,14 +147,14 @@ test('projectTacticalSnapshot moves embarked opponent land with its naval carrie
 });
 
 test('projectTacticalSnapshot ignores human-controlled sub-units', () => {
-  const res1 = tacticalRes1Cell(5, 6);
-  const center = tacticalRes4UnderRes1Corner(5, 6, { latEpsilon: 0.01 });
+  const strategic = tacticalParentCell(5, 6);
+  const center = tacticalUnderCorner(5, 6, { latEpsilon: 0.01 });
   const ring = gridDisk(center, 1);
   const dest = firstRingCellDistinctFrom(center);
   const snap: TacticalBattleSnapshot = {
     battleId: 'tb-h',
-    enclosingRes1H3Index: res1,
-    res4ChildH3Indexes: [...ring],
+    enclosingStrategicH3Index: strategic,
+    tacticalChildH3Indexes: [...ring],
     ...coastalFootprintTerrain([...ring]),
     strategicTurnNumber: 1,
     tacticalTurnNumber: 1,
@@ -174,23 +174,23 @@ test('projectTacticalSnapshot ignores human-controlled sub-units', () => {
 });
 
 test('projectTacticalSnapshotAfterHumanMovementOrders moves human sub-unit along multi-step res4 path beyond one-turn range', () => {
-  const res1 = tacticalRes1Cell(20, 30);
-  const center = tacticalRes4UnderRes1Corner(20, 30);
+  const strategic = tacticalParentCell(20, 30);
+  const center = tacticalUnderCorner(20, 30);
   const disk = [...gridDisk(center, 3)];
   const ring1 = new Set(gridDisk(center, 1));
   const far = disk.find((h) => h !== center && !ring1.has(h));
   assert.ok(far);
-  const res4TerrainKindByH3: Record<string, string> = {};
+  const tacticalTerrainKindByH3: Record<string, string> = {};
   for (const h of disk) {
-    res4TerrainKindByH3[h] = 'plains';
+    tacticalTerrainKindByH3[h] = 'plains';
   }
   const snap: TacticalBattleSnapshot = {
     battleId: 'tb-hum-far',
-    enclosingRes1H3Index: res1,
-    res4ChildH3Indexes: disk,
+    enclosingStrategicH3Index: strategic,
+    tacticalChildH3Indexes: disk,
     strategicHexTerrain: 'land',
     strategicHexTerrainKind: 'plains',
-    res4TerrainKindByH3,
+    tacticalTerrainKindByH3,
     strategicTurnNumber: 1,
     tacticalTurnNumber: 1,
     subUnits: [
@@ -209,14 +209,14 @@ test('projectTacticalSnapshotAfterHumanMovementOrders moves human sub-unit along
 });
 
 test('projectTacticalSnapshotAfterHumanMovementOrders moves human sub-unit within res4 range', () => {
-  const res1 = tacticalRes1Cell(8, 9);
-  const center = tacticalRes4UnderRes1Corner(8, 9);
+  const strategic = tacticalParentCell(8, 9);
+  const center = tacticalUnderCorner(8, 9);
   const ring = gridDisk(center, 1);
   const dest = firstRingCellDistinctFrom(center);
   const snap: TacticalBattleSnapshot = {
     battleId: 'tb-hum-move',
-    enclosingRes1H3Index: res1,
-    res4ChildH3Indexes: [...ring],
+    enclosingStrategicH3Index: strategic,
+    tacticalChildH3Indexes: [...ring],
     ...coastalFootprintTerrain([...ring]),
     strategicTurnNumber: 1,
     tacticalTurnNumber: 1,
@@ -236,14 +236,14 @@ test('projectTacticalSnapshotAfterHumanMovementOrders moves human sub-unit withi
 });
 
 test('projectTacticalSnapshotAfterHumanMovementOrders does not independently move embarked cargo', () => {
-  const res1 = tacticalRes1Cell(14, 15);
-  const navalCell = tacticalRes4UnderRes1Corner(14, 15);
+  const strategic = tacticalParentCell(14, 15);
+  const navalCell = tacticalUnderCorner(14, 15);
   const ring = gridDisk(navalCell, 1);
   const landDest = firstRingCellDistinctFrom(navalCell);
   const snap: TacticalBattleSnapshot = {
     battleId: 'tb-hum-emb-cargo',
-    enclosingRes1H3Index: res1,
-    res4ChildH3Indexes: [...ring],
+    enclosingStrategicH3Index: strategic,
+    tacticalChildH3Indexes: [...ring],
     ...coastalFootprintTerrain([...ring]),
     strategicTurnNumber: 1,
     tacticalTurnNumber: 1,
@@ -276,14 +276,14 @@ test('projectTacticalSnapshotAfterHumanMovementOrders does not independently mov
 });
 
 test('projectTacticalSnapshotAfterHumanMovementOrders ignores opponent-controlled sub-units', () => {
-  const res1 = tacticalRes1Cell(16, 17);
-  const center = tacticalRes4UnderRes1Corner(16, 17);
+  const strategic = tacticalParentCell(16, 17);
+  const center = tacticalUnderCorner(16, 17);
   const ring = gridDisk(center, 1);
   const dest = firstRingCellDistinctFrom(center);
   const snap: TacticalBattleSnapshot = {
     battleId: 'tb-hum-ign-opp',
-    enclosingRes1H3Index: res1,
-    res4ChildH3Indexes: [...ring],
+    enclosingStrategicH3Index: strategic,
+    tacticalChildH3Indexes: [...ring],
     ...coastalFootprintTerrain([...ring]),
     strategicTurnNumber: 1,
     tacticalTurnNumber: 1,
@@ -324,16 +324,16 @@ function landInfantry(id: string, player: TacticalSubUnitSnapshot['player'], h3I
 }
 
 test('projectTacticalSnapshotAfterHumanMovementOrders lets two units stack on the same empty dest', () => {
-  const res1 = tacticalRes1Cell(18, 19);
-  const center = tacticalRes4UnderRes1Corner(18, 19);
+  const strategic = tacticalParentCell(18, 19);
+  const center = tacticalUnderCorner(18, 19);
   const ring = [...gridDisk(center, 1)];
   const dest = firstRingCellDistinctFrom(center);
   const originB = ring.find((h) => h !== center && h !== dest);
   assert.ok(originB);
   const snap: TacticalBattleSnapshot = {
     battleId: 'tb-hum-stack-empty',
-    enclosingRes1H3Index: res1,
-    res4ChildH3Indexes: ring,
+    enclosingStrategicH3Index: strategic,
+    tacticalChildH3Indexes: ring,
     ...coastalFootprintTerrain(ring),
     strategicTurnNumber: 1,
     tacticalTurnNumber: 1,
@@ -348,14 +348,14 @@ test('projectTacticalSnapshotAfterHumanMovementOrders lets two units stack on th
 });
 
 test('projectTacticalSnapshotAfterHumanMovementOrders lets a unit stack onto a hex another friendly already occupies', () => {
-  const res1 = tacticalRes1Cell(21, 22);
-  const occupied = tacticalRes4UnderRes1Corner(21, 22);
+  const strategic = tacticalParentCell(21, 22);
+  const occupied = tacticalUnderCorner(21, 22);
   const ring = [...gridDisk(occupied, 1)];
   const origin = firstRingCellDistinctFrom(occupied);
   const snap: TacticalBattleSnapshot = {
     battleId: 'tb-hum-stack-occupied',
-    enclosingRes1H3Index: res1,
-    res4ChildH3Indexes: ring,
+    enclosingStrategicH3Index: strategic,
+    tacticalChildH3Indexes: ring,
     ...coastalFootprintTerrain(ring),
     strategicTurnNumber: 1,
     tacticalTurnNumber: 1,
@@ -369,16 +369,16 @@ test('projectTacticalSnapshotAfterHumanMovementOrders lets a unit stack onto a h
 });
 
 test('projectTacticalSnapshotAfterOpponentMovementOrders lets two units stack on the same empty dest', () => {
-  const res1 = tacticalRes1Cell(23, 24);
-  const center = tacticalRes4UnderRes1Corner(23, 24);
+  const strategic = tacticalParentCell(23, 24);
+  const center = tacticalUnderCorner(23, 24);
   const ring = [...gridDisk(center, 1)];
   const dest = firstRingCellDistinctFrom(center);
   const originB = ring.find((h) => h !== center && h !== dest);
   assert.ok(originB);
   const snap: TacticalBattleSnapshot = {
     battleId: 'tb-opp-stack-empty',
-    enclosingRes1H3Index: res1,
-    res4ChildH3Indexes: ring,
+    enclosingStrategicH3Index: strategic,
+    tacticalChildH3Indexes: ring,
     ...coastalFootprintTerrain(ring),
     strategicTurnNumber: 1,
     tacticalTurnNumber: 1,

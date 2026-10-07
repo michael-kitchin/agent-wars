@@ -6,21 +6,21 @@ import * as assert from 'assert';
 import { getOrderedHexList } from './mapData';
 import {
   assertLandMassMatchesHexList,
-  buildRes1LandMassByH3,
+  buildStrategicLandMassByH3,
   EXPECTED_LANDMASS_SCHEMA_VERSION,
-  loadTerrainRes1LandMassBundled,
-  parseRes1LandMassEnvelope,
+  loadTerrainStrategicLandMassBundled,
+  parseStrategicLandMassEnvelope,
 } from './terrainLandMassLoad';
 
 /**
- * Documents the module-scope binding `EXPECTED_RES1_HEX_COUNT` (EXPECTED_RES1_HEX_COUNT).
+ * Documents the module-scope binding `EXPECTED_STRATEGIC_HEX_COUNT` (EXPECTED_STRATEGIC_HEX_COUNT).
 
- * Purpose: Supports maintainability by documenting why `EXPECTED_RES1_HEX_COUNT` exists.
+ * Purpose: Supports maintainability by documenting why `EXPECTED_STRATEGIC_HEX_COUNT` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-const EXPECTED_RES1_HEX_COUNT = 842;
+const EXPECTED_STRATEGIC_HEX_COUNT = 842;
 
 /**
  * Defines the `testBundledLandMassRecordCount` function shape (function testBundledLandMassRecordCount(): void).
@@ -31,12 +31,12 @@ const EXPECTED_RES1_HEX_COUNT = 842;
  * Exceptions: None.
  */
 function testBundledLandMassRecordCount(): void {
-  const envelope = loadTerrainRes1LandMassBundled();
+  const envelope = loadTerrainStrategicLandMassBundled();
   assert.strictEqual(envelope.schema_version, EXPECTED_LANDMASS_SCHEMA_VERSION);
   assert.strictEqual(envelope.resolution, 1);
-  assert.strictEqual(envelope.record_count, EXPECTED_RES1_HEX_COUNT);
-  assert.strictEqual(envelope.records.length, EXPECTED_RES1_HEX_COUNT);
-  const byH3 = buildRes1LandMassByH3(envelope);
+  assert.strictEqual(envelope.record_count, EXPECTED_STRATEGIC_HEX_COUNT);
+  assert.strictEqual(envelope.records.length, EXPECTED_STRATEGIC_HEX_COUNT);
+  const byH3 = buildStrategicLandMassByH3(envelope);
   assertLandMassMatchesHexList(byH3, getOrderedHexList());
 }
 
@@ -49,12 +49,12 @@ function testBundledLandMassRecordCount(): void {
  * Exceptions: None.
  */
 function testParseRejectsInvalidEnvelope(): void {
-  assert.throws(() => parseRes1LandMassEnvelope({ schema_version: '9.9.9', records: [] }));
-  assert.throws(() => parseRes1LandMassEnvelope({ schema_version: EXPECTED_LANDMASS_SCHEMA_VERSION, records: 'bad' }));
+  assert.throws(() => parseStrategicLandMassEnvelope({ schema_version: '9.9.9', records: [] }));
+  assert.throws(() => parseStrategicLandMassEnvelope({ schema_version: EXPECTED_LANDMASS_SCHEMA_VERSION, records: 'bad' }));
 }
 
 function testParseV2MinimalEnvelope(): void {
-  const envelope = parseRes1LandMassEnvelope({
+  const envelope = parseStrategicLandMassEnvelope({
     schema_version: EXPECTED_LANDMASS_SCHEMA_VERSION,
     resolution: 1,
     generated_at_utc: '2026-01-01T00:00:00+00:00',
@@ -67,7 +67,7 @@ function testParseV2MinimalEnvelope(): void {
       island_min_area_km2: 1000,
     },
     water_pct_source: {
-      method: 'res4_child_water_terrain_fraction',
+      method: 'tactical_child_water_terrain_fraction',
       requires: ['terrain_res4_metadata.json'],
     },
     records: [

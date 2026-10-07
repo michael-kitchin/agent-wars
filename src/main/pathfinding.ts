@@ -15,7 +15,7 @@ import {
   canLandUnitTraverseEdge,
   landUnitCanOccupyHex,
   type LandMassByH3,
-} from '../shared/landTraversalRes1';
+} from '../shared/landTraversalStrategic';
 
 /**
  * Documents the `PassableDomain` type alias (export type PassableDomain).

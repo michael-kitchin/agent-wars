@@ -1,12 +1,12 @@
 /**
- * Shared production overlay math for res1 canvas labels and build-entry gating (capacity, queues, deployment caps).
+ * Shared production overlay math for strategic canvas labels and build-entry gating (capacity, queues, deployment caps).
  */
 
 import type { BuildUnitType, GameStateSnapshot } from '../../shared/ipcTypes';
 import { estimateTurnsToNextSpawn } from '../../shared/productionConfig';
 import { getMaxUnitsPerType, parseGameSize } from '../../shared/gameSize';
 import { getPlayerUnitCountsByType } from '../../shared/unitCountsByType';
-import { getUrbanProductionCapacityForHex as getUrbanProductionCapacityForHexFromTooltipState } from '../map/terrainTooltipRes1State';
+import { getUrbanProductionCapacityForHex as getUrbanProductionCapacityForHexFromTooltipState } from '../map/terrainTooltipStrategicState';
 import { rendererSharedState as S } from '../core/state';
 
 /**
@@ -20,14 +20,14 @@ export type UnitCountsByType = Record<BuildUnitType, number>;
 export type UnitCountsByPlayer = Record<'human' | 'opponent', UnitCountsByType>;
 
 /**
- * Context computed once per frame for res1 production overlay drawing and build-entry sync.
+ * Context computed once per frame for strategic production overlay drawing and build-entry sync.
  */
 export interface ProductionOverlayContext {
     /**
    * Specifies the contract for the `mapInspectionHeld` member (mapInspectionHeld: boolean;).
 
    * Contract: True while terrain fill is hidden (T held) for stack/inspection tooling.
-   * When to use: Read by `drawRes1ProductionOverlays` and `syncBuildEntryButton` each frame.
+   * When to use: Read by `drawStrategicProductionOverlays` and `syncBuildEntryButton` each frame.
    * Expected outcome: Matches `S.hideTerrainFillWhileHeld` via `isMapInspectionModeHeld`.
    * Exceptions: None.
    */
@@ -46,7 +46,7 @@ revealAllControllerQueues: boolean;
 
    * Contract: Hexes that currently contain at least one unit for infrastructure glyph hints.
    * When to use: Pass-through from latest `GameStateSnapshot` during overlay build.
-   * Expected outcome: One entry per occupied strategic res1 hex.
+   * Expected outcome: One entry per occupied strategic hex.
    * Exceptions: None.
    */
 unitHexes: Set<string>;
@@ -62,15 +62,15 @@ unitCountsByPlayer?: UnitCountsByPlayer;
 }
 
 /**
- * Reads strategic control owner for a res1 hex from the snapshot control table.
+ * Reads strategic control owner for a strategic hex from the snapshot control table.
  */
 export function getControllerForHex(state: GameStateSnapshot, h3Index: string): string | null {
-  const row = state.res1Control?.find((entry) => entry.h3Index === h3Index);
+  const row = state.strategicControl?.find((entry) => entry.h3Index === h3Index);
   return row?.controllerPlayerId ?? null;
 }
 
 /**
- * Urban production capacity for overlay labels; delegates to the shared terrain tooltip res4 urban count cache.
+ * Urban production capacity for overlay labels; delegates to the shared terrain tooltip tactical urban count cache.
  */
 export function getUrbanProductionCapacityForHex(h3Index: string): number {
   return getUrbanProductionCapacityForHexFromTooltipState(h3Index);
@@ -86,7 +86,7 @@ export function isMapInspectionModeHeld(): boolean {
 /**
  * True when the human controls the hex and it has positive urban production capacity.
  */
-export function isRes1HexHumanUrbanProduction(
+export function isStrategicHexHumanUrbanProduction(
   state: GameStateSnapshot,
   hx: GameStateSnapshot['hexes'][number]
 ): boolean {
@@ -95,13 +95,13 @@ export function isRes1HexHumanUrbanProduction(
 }
 
 /**
- * Looks up aggregated queue row for a hex from `res1BuildQueueTotals`, if present.
+ * Looks up aggregated queue row for a hex from `strategicBuildQueueTotals`, if present.
  */
 export function getBuildQueueSummaryForHex(
   state: GameStateSnapshot,
   h3Index: string
-): NonNullable<GameStateSnapshot['res1BuildQueueTotals']>[number] | null {
-  return state.res1BuildQueueTotals?.find((entry) => entry.h3Index === h3Index) ?? null;
+): NonNullable<GameStateSnapshot['strategicBuildQueueTotals']>[number] | null {
+  return state.strategicBuildQueueTotals?.find((entry) => entry.h3Index === h3Index) ?? null;
 }
 
 /**

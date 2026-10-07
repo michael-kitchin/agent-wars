@@ -1,5 +1,5 @@
 /**
- * Planar polyline interpolation in latitude/longitude for short march segments (tactical res4 scale).
+ * Planar polyline interpolation in latitude/longitude for short march segments (tactical scale).
  *
  * Purpose: Shared math for resolution playback so unit markers follow multi-hex paths at uniform arc-length speed.
  * When to use: Renderer `drawMovingUnits` with `pathH3Indexes`; unit-tested without Leaflet.

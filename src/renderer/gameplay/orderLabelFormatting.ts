@@ -11,7 +11,7 @@ import type {
  *
  * Purpose: Tactical pending orders reference `TacticalSubUnitSnapshot.id` while `S.gameState.units` stays on the strategic roster.
  * When to use: Pass `tacticalBattleSnapshot.subUnits` from the renderer when formatting tactical draft order labels.
- * Expected outcome: Same `h3Index` resolution the map uses for sub-units (res4 during tactical play).
+ * Expected outcome: Same `h3Index` resolution the map uses for sub-units (tactical during tactical play).
  * Exceptions: None.
  */
 export type UnitH3PositionLookup = readonly { id: string; h3Index: string }[];
@@ -73,7 +73,7 @@ function computeGridDistanceForLabel(originH3: string, targetH3: string): number
 
  * Purpose: Supports maintainability by documenting why `formatDistanceLabelForPlannedAttack` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: `Nh` where `N` is H3 grid edge count at the snapshot resolution (res1 strategic or res4 tactical).
+ * Expected outcome: `Nh` where `N` is H3 grid edge count at the snapshot resolution (strategic or tactical).
  * Exceptions: None.
  */
 function formatDistanceLabelForPlannedAttack(

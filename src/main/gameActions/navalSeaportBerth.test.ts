@@ -7,11 +7,11 @@ import * as assert from 'assert';
 import { gridDistance } from 'h3-js';
 import { dbRun, getGameState } from '../gameDb';
 import { assignHumanMarchOrder, previewHumanMarchOrders } from '../gameActions';
-import { getRes1ProductionContext, getRes1LandMassByH3 } from '../terrainClassificationCache';
+import { getStrategicProductionContext, getStrategicLandMassByH3 } from '../terrainClassificationCache';
 import { hexHasSeaport, isLandSeaportSpawnHex } from '../movementTerrain';
 import { resetHumanMarchPreviewDiagnosticsForTests } from './humanMarchPreview';
 import { withTempGameDb } from '../testSupport/withTempGameDb';
-import { landUnitCanOccupyHex } from '../../shared/landTraversalRes1';
+import { landUnitCanOccupyHex } from '../../shared/landTraversalStrategic';
 import { isNativeNavalTransitTerrain } from '../../shared/navalStrategicEdges';
 
 /**
@@ -39,7 +39,7 @@ function withTempDb(runCase: () => void): void {
  */
 function findLandSeaportWithAdjacentWater(): { portH3: string; waterH3: string; dryInlandH3: string | null } | null {
   const state = getGameState();
-  const landMass = getRes1LandMassByH3();
+  const landMass = getStrategicLandMassByH3();
   let fallback: { portH3: string; waterH3: string; dryInlandH3: string | null } | null = null;
   for (const hex of state.hexes) {
     if (isNativeNavalTransitTerrain(hex.terrain, hex.terrainKind)) continue;
@@ -103,12 +103,12 @@ function findAdjacentInland(state: ReturnType<typeof getGameState>, centerH3: st
  *
  * Purpose: Builds an inland second port for canal/port-to-port failures.
  * When to use: After choosing an inland neighbor.
- * Expected outcome: `res1_infrastructure.seaport_count = 1`.
+ * Expected outcome: `res_s_infrastructure.seaport_count = 1`.
  * Exceptions: None.
  */
 function setSeaportCount(h3Index: string, seaportCount: number): void {
   dbRun(
-    `INSERT INTO res1_infrastructure (h3_index, urban_hex_count, airport_count, seaport_count)
+    `INSERT INTO res_s_infrastructure (h3_index, urban_hex_count, airport_count, seaport_count)
      VALUES (?, 0, 0, ?)
      ON CONFLICT(h3_index) DO UPDATE SET seaport_count = excluded.seaport_count`,
     [h3Index, seaportCount]
@@ -284,7 +284,7 @@ function testDestroyedLandSeaportIsNotASeaport(): void {
     const found = findLandSeaportWithAdjacentWater();
     assert.ok(found, 'expected a land seaport with adjacent water');
     const { portH3 } = found!;
-    assert.ok(getRes1ProductionContext({ h3Index: portH3 }).seaportCount > 0, 'fixture must still be a metadata seaport');
+    assert.ok(getStrategicProductionContext({ h3Index: portH3 }).seaportCount > 0, 'fixture must still be a metadata seaport');
     assert.strictEqual(hexHasSeaport(portH3), true);
     setSeaportCount(portH3, 0);
     assert.strictEqual(hexHasSeaport(portH3), false);

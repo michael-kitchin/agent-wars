@@ -14,7 +14,7 @@ import { terrainIsPassableForDomain } from '../../pathfinding';
 import {
   canLandUnitTraverseEdge,
   landUnitCanOccupyHex,
-} from '../../../shared/landTraversalRes1';
+} from '../../../shared/landTraversalStrategic';
 import { isLandUnitType } from '../landMovementConstraints';
 import type { PlanRouteError, PlanRouteOk } from '../../tools/pathfinding';
 import type { HumanMarchPreviewComputationContext } from '../humanMarchPreviewComputationContext';
@@ -260,7 +260,7 @@ export function resolveLandOrNavalMarchPreview(
       ? navalLookupForHexState(
           args.context.pathfindingSession,
           args.context.state.hexes,
-          args.context.state.res1Infrastructure
+          args.context.state.strategicInfrastructure
         )
       : undefined;
   const hoveredPassable =

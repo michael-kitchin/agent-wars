@@ -1,7 +1,7 @@
 /**
  * Shared formatting for human pending movement rows in sidebars (strategic standing orders + tactical drafts).
  *
- * Purpose: Keeps `Nh (status)` label contracts identical across modes; tactical uses res4 grid step counts for `N`.
+ * Purpose: Keeps `Nh (status)` label contracts identical across modes; tactical uses tactical grid step counts for `N`.
  * When to use: Pending orders list rendering for strategic `HumanStandingOrderSnapshot` rows and tactical draft rows.
  * Expected outcome: Stable, parse-friendly labels suitable for sidebar rows and tests.
  * Exceptions: None for `formatPendingMovementSidebarTargetLabel`; distance helpers catch H3 failures when noted.
@@ -33,11 +33,11 @@ export function formatPendingMovementSidebarTargetLabel(distanceHexSteps: number
 }
 
 /**
- * Builds the tactical draft march pending-order target label using res4 `gridDistance` and the shared status token.
+ * Builds the tactical draft march pending-order target label using tactical `gridDistance` and the shared status token.
  *
  * Purpose: Replaces ad-hoc tactical-only label builders with the same contract as strategic pending movement rows.
  * When to use: Tactical battle snapshot active and `S.tacticalPendingMarches` rows are rendered.
- * Expected outcome: `0h (en_route)` when the sub-unit row is missing; otherwise res4 step count to destination.
+ * Expected outcome: `0h (en_route)` when the sub-unit row is missing; otherwise tactical step count to destination.
  * Exceptions: Invalid H3 indexes fall back to `0h (en_route)` without throwing.
  */
 export function formatTacticalDraftMarchPendingOrderTargetLabel(

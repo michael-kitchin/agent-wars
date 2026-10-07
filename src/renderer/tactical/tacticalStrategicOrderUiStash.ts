@@ -14,7 +14,7 @@ import { rendererSharedState as S } from '../core/state';
 /**
  * Captures renderer-only strategic order lists before tactical mode replaces them with tactical-specific UI.
  *
- * Contract: Idempotent while a stash row exists; clears ranged/air targeting modes that do not apply on the res4 map.
+ * Contract: Idempotent while a stash row exists; clears ranged/air targeting modes that do not apply on the tactical map.
  * When to use: Tactical battle activation (IPC start and main snapshot restore) before mutating `S.tacticalBattleSnapshot`.
  * Expected outcome: `S.humanStandingOrders` and pending attack/ferry arrays become empty until restore or a full new-game reset.
  * Exceptions: None.

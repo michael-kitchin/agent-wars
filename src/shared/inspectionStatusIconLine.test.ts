@@ -7,8 +7,8 @@ import {
   inspectionStatusIconFontPx,
   inspectionStatusIconsForHex,
   inspectionStatusSlashIsBold,
-  res1OverlayBandOffsetPx,
-  res1ProductionLabelSurface,
+  strategicOverlayBandOffsetPx,
+  strategicProductionLabelSurface,
   techInspectionIconAssetPath,
   weatherInspectionIconAssetPath,
 } from './inspectionStatusIconLine';
@@ -18,25 +18,25 @@ import {
  *
  * Purpose: The icon row follows the same hexes as the production label, including the build button.
  * When to use: From this file's runner.
- * Expected outcome: Res4, hidden hexes, and opponent hexes outside inspection are `'none'`. The build button wins when it is shown. Inspection reveals a canvas label on the remaining hexes.
+ * Expected outcome: Tactical, hidden hexes, and opponent hexes outside inspection are `'none'`. The build button wins when it is shown. Inspection reveals a canvas label on the remaining hexes.
  * Exceptions: AssertionError when the surface drifts from the production overlay.
  */
 test('a production label is a button, a canvas line, or absent', () => {
   const base = {
-    res4Rendered: false,
+    tacticalRendered: false,
     explored: true,
     mapInspectionHeld: false,
     controlledByHuman: true,
     humanUrbanProduction: true,
     buildEntryZoom: true,
   };
-  assert.equal(res1ProductionLabelSurface({ ...base, res4Rendered: true }), 'none');
+  assert.equal(strategicProductionLabelSurface({ ...base, tacticalRendered: true }), 'none');
   assert.equal(
-    res1ProductionLabelSurface({ ...base, explored: false, humanUrbanProduction: false, buildEntryZoom: false }),
+    strategicProductionLabelSurface({ ...base, explored: false, humanUrbanProduction: false, buildEntryZoom: false }),
     'none'
   );
   assert.equal(
-    res1ProductionLabelSurface({
+    strategicProductionLabelSurface({
       ...base,
       controlledByHuman: false,
       humanUrbanProduction: false,
@@ -44,18 +44,18 @@ test('a production label is a button, a canvas line, or absent', () => {
     }),
     'none'
   );
-  assert.equal(res1ProductionLabelSurface(base), 'button');
-  assert.equal(res1ProductionLabelSurface({ ...base, mapInspectionHeld: true }), 'button');
+  assert.equal(strategicProductionLabelSurface(base), 'button');
+  assert.equal(strategicProductionLabelSurface({ ...base, mapInspectionHeld: true }), 'button');
   assert.equal(
-    res1ProductionLabelSurface({ ...base, explored: false, mapInspectionHeld: true }),
+    strategicProductionLabelSurface({ ...base, explored: false, mapInspectionHeld: true }),
     'canvas'
   );
   assert.equal(
-    res1ProductionLabelSurface({ ...base, humanUrbanProduction: false, buildEntryZoom: false }),
+    strategicProductionLabelSurface({ ...base, humanUrbanProduction: false, buildEntryZoom: false }),
     'canvas'
   );
   assert.equal(
-    res1ProductionLabelSurface({
+    strategicProductionLabelSurface({
       ...base,
       explored: false,
       controlledByHuman: false,
@@ -66,7 +66,7 @@ test('a production label is a button, a canvas line, or absent', () => {
     'canvas'
   );
   assert.equal(
-    res1ProductionLabelSurface({
+    strategicProductionLabelSurface({
       ...base,
       controlledByHuman: false,
       humanUrbanProduction: false,
@@ -75,7 +75,7 @@ test('a production label is a button, a canvas line, or absent', () => {
     }),
     'canvas'
   );
-  assert.equal(res1ProductionLabelSurface({ ...base, buildEntryZoom: false }), 'canvas');
+  assert.equal(strategicProductionLabelSurface({ ...base, buildEntryZoom: false }), 'canvas');
 });
 
 /**
@@ -211,7 +211,7 @@ test('the slash is bold on a human hex with capacity', () => {
  * Exceptions: AssertionError when the offset is rounded or the path changes.
  */
 test('the band offset, slash text, and icon paths stay fixed', () => {
-  assert.equal(res1OverlayBandOffsetPx(100), 24);
+  assert.equal(strategicOverlayBandOffsetPx(100), 24);
   assert.equal(INSPECTION_STATUS_ICON_SLASH_TEXT, ' / ');
   assert.equal(techInspectionIconAssetPath('advanced'), 'tech/tech_advanced.svg');
   assert.equal(techInspectionIconAssetPath('basic'), 'tech/tech_basic.svg');
@@ -251,7 +251,7 @@ test('both scene passes draw the icon row after the hex codes', () => {
   const rendererPath = path.resolve(process.cwd(), 'src', 'renderer', 'rendering', 'gameScene.ts');
   const source = fs.readFileSync(rendererPath, 'utf8');
   const scene = functionSource(source, 'drawGameScene');
-  const marks = [...scene.matchAll(/drawStrategicRes1InspectionHexCodes\(/g)];
+  const marks = [...scene.matchAll(/drawStrategicInspectionHexCodes\(/g)];
   assert.equal(marks.length, 2);
   for (const mark of marks) {
     const after = scene.slice(mark.index ?? 0, (mark.index ?? 0) + 400);

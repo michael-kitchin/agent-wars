@@ -148,7 +148,7 @@ test('tactical coaching includes every required item when its gate is on', () =>
   assert.doesNotMatch(text, /blocked terrain\. A unit may enter that cell/);
   assert.doesNotMatch(text, /Urban and rubble cells cost more/);
   assert.match(text, /urban or rubble/i);
-  assert.match(text, /Infantry and armor fire at res4 baselines/i);
+  assert.match(text, /Infantry and armor fire at tactical baselines/i);
   assert.match(text, /strike any cell in the footprint/i);
   assert.match(text, /ferryOrders/);
   assert.match(text, /intact airport/i);

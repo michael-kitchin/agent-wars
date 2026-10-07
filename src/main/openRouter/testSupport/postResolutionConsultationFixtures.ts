@@ -13,16 +13,16 @@ import type { TacticalBattleSnapshot } from '../../../shared/tacticalBattleTypes
 /**
  * Builds a minimal tactical battle snapshot for idle / kill-attribution tests (only `subUnits` matter to the helpers).
  *
- * Purpose: Single factory for gate-style tactical predicate cases with fixed res4 geometry.
+ * Purpose: Single factory for gate-style tactical predicate cases with fixed tactical geometry.
  * When to use: Tests that only need `subUnits` populated on an otherwise static grid.
- * Expected outcome: Cast-safe `TacticalBattleSnapshot` with placeholder ids and one res4 child cell.
+ * Expected outcome: Cast-safe `TacticalBattleSnapshot` with placeholder ids and one tactical child cell.
  * Exceptions: None.
  */
 export function minimalTacticalBattle(subUnits: TacticalBattleSnapshot['subUnits']): TacticalBattleSnapshot {
   return {
     battleId: 'gate-test',
-    enclosingRes1H3Index: '81193ffffffffff',
-    res4ChildH3Indexes: ['81283fffffffffff'],
+    enclosingStrategicH3Index: '81193ffffffffff',
+    tacticalChildH3Indexes: ['81283fffffffffff'],
     strategicTurnNumber: 1,
     tacticalTurnNumber: 1,
     subUnits,

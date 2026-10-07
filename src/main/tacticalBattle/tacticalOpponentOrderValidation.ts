@@ -1,39 +1,40 @@
 /**
- * Snapshot-based validation for opponent tactical orders (air, ferry, embark) using res4 geometry and res1 infrastructure DB rows.
+ * Snapshot-based validation for opponent tactical orders (air, ferry, embark) using tactical geometry and strategic infrastructure DB rows.
  */
 
-import { cellToParent } from 'h3-js';
+import { strategicParentOf } from '../../shared/h3Resolutions';
+
 import type { AirStrikeOrder, EmbarkOrder, FerryOrder, GameStateSnapshot } from '../../shared/ipcTypes';
 import type { TacticalBattleSnapshot, TacticalSubUnitSnapshot } from '../../shared/tacticalBattleTypes';
 import { tacticalFerryAirportRejectionReason } from './tacticalFerryAirportGuards';
 import { tacticalSubUnitLabelForUserMessage } from '../../shared/unitDisplayNames';
-import { dbGetOne, getRes1InfrastructureForHex, isDbReady } from '../gameDb';
+import { dbGetOne, getStrategicInfrastructureForHex, isDbReady } from '../gameDb';
 import { canEmbarkAtHex } from '../../shared/sealiftEmbarkEligibility';
 import { tacticalLogQuery } from './tacticalLogging';
 import { tacticalInvalidResult, tacticalValidResult, type TacticalValidationResult } from './tacticalValidationResult';
 
 /**
- * Resolves whether a player may embark sealift from a tactical res4 cell using the same port/coastal rules as strategic sealift.
+ * Resolves whether a player may embark sealift from a tactical cell using the same port/coastal rules as strategic sealift.
  *
- * Purpose: Reuses res1 infrastructure rows while keeping tactical validation free of `sealift` module import cycles.
+ * Purpose: Reuses strategic infrastructure rows while keeping tactical validation free of `sealift` module import cycles.
  * When to use: `validateTacticalOpponentEmbarkOrder` before recording tactical embark state.
  * Expected outcome: True only for coastal stacks or controlled seaport contexts mirroring strategic `canPlayerEmbarkFromHex` parity.
- * Exceptions: Returns false when the parent res1 hex is missing from `hexes` or context cannot be loaded.
+ * Exceptions: Returns false when the parent strategic hex is missing from `hexes` or context cannot be loaded.
  */
-export function canPlayerEmbarkFromTacticalRes4Hex(h3Index: string, playerId: string): boolean {
-  const res1 = cellToParent(h3Index, 1);
+export function canPlayerEmbarkFromTacticalHex(h3Index: string, playerId: string): boolean {
+  const strategic = strategicParentOf(h3Index);
   const terrainRow = dbGetOne<{ terrain: string; terrainKind: string | null }>(
     'SELECT terrain, terrain_kind AS terrainKind FROM hexes WHERE h3_index = ?',
-    [res1]
+    [strategic]
   );
   if (!terrainRow) return false;
   const infra = dbGetOne<{ seaportCount: number }>(
-    'SELECT seaport_count AS seaportCount FROM res1_infrastructure WHERE h3_index = ?',
-    [res1]
+    'SELECT seaport_count AS seaportCount FROM res_s_infrastructure WHERE h3_index = ?',
+    [strategic]
   );
   const control = dbGetOne<{ controllerPlayerId: string | null }>(
-    'SELECT controller_player_id AS controllerPlayerId FROM res1_control WHERE h3_index = ?',
-    [res1]
+    'SELECT controller_player_id AS controllerPlayerId FROM res_s_control WHERE h3_index = ?',
+    [strategic]
   );
   const seaportCount = infra?.seaportCount ?? 0;
   const controllerPlayerId = control?.controllerPlayerId ?? null;
@@ -46,7 +47,7 @@ export function canPlayerEmbarkFromTacticalRes4Hex(h3Index: string, playerId: st
 }
 
 /**
- * Validates an opponent air strike order against a post-move tactical plan state and res1 infrastructure.
+ * Validates an opponent air strike order against a post-move tactical plan state and strategic infrastructure.
  *
  * Contract: Mirrors `validateAirStrikeOrder` airport and enemy rules without reading `units` from SQLite; tactical strikes may target any hex on the projected tactical map (no strategic 3-step strike cap).
  * When to use: Tactical branch of `requestOrdersFlow` after movement orders are applied to the plan snapshot.
@@ -68,7 +69,7 @@ export function validateTacticalOpponentAirStrikeOrder(
   const hexIds = new Set(state.hexes.map((h) => h.h3Index));
   if (!hexIds.has(order.targetH3Index)) return tacticalInvalidResult('Target not on tactical map');
   if (!hexIds.has(unit.h3Index)) return tacticalInvalidResult('Air unit not on tactical map');
-  const baseInfra = getRes1InfrastructureForHex(cellToParent(unit.h3Index, 1));
+  const baseInfra = getStrategicInfrastructureForHex(strategicParentOf(unit.h3Index));
   if (baseInfra.airportCount <= 0) {
     return tacticalInvalidResult('Air unit must be based at an intact airport to strike');
   }
@@ -77,7 +78,7 @@ export function validateTacticalOpponentAirStrikeOrder(
     if (!enemiesAtTarget) return tacticalInvalidResult('Target hex has no enemy units');
     return tacticalValidResult();
   }
-  const targetInfra = getRes1InfrastructureForHex(cellToParent(order.targetH3Index, 1));
+  const targetInfra = getStrategicInfrastructureForHex(strategicParentOf(order.targetH3Index));
   if (order.targetType === 'urban' && targetInfra.urbanHexCount <= 0) {
     return tacticalInvalidResult('Target hex has no urban infrastructure');
   }
@@ -92,9 +93,9 @@ export function validateTacticalOpponentAirStrikeOrder(
 }
 
 /**
- * Validates an opponent ferry order for tactical air sub-units using res4 airport cells.
+ * Validates an opponent ferry order for tactical air sub-units using tactical airport cells.
  *
- * Contract: Origin and dest must be intact res4 airport cells on `battle` (not merely a child of a parent res1
+ * Contract: Origin and dest must be intact tactical airport cells on `battle` (not merely a child of a parent strategic
  * that has some airport). Dest must be on the tactical map; no 4-hex range cap and no dest-ownership check.
  * When to use: Tactical AI flow after movement projection.
  * Expected outcome: Valid when origin/destination airport cells exist and dest is in the tactical hex list.
@@ -123,7 +124,7 @@ export function validateTacticalOpponentFerryOrder(
 /**
  * Validates opponent embark orders against tactical sub-units after movement, mirroring sealift slot rules.
  *
- * Contract: Infantry/armor may board opponent naval in the same res4 cell when embark hex rules pass; capacity matches `applyEmbarkOrdersForPlayer`.
+ * Contract: Infantry/armor may board opponent naval in the same tactical cell when embark hex rules pass; capacity matches `applyEmbarkOrdersForPlayer`.
  * When to use: Tactical AI flow before mutating `embarkedOnSubUnitId` on the tactical snapshot.
  * Expected outcome: Valid when co-located, types match, port rule passes, and carrier slots allow the cargo type.
  * Exceptions: None; unknown ids yield invalid with a reason string.
@@ -151,7 +152,7 @@ export function validateTacticalOpponentEmbarkOrder(
   if (land.embarkedOnSubUnitId) {
     return tacticalInvalidResult('Land unit already embarked on a different carrier');
   }
-  if (!canPlayerEmbarkFromTacticalRes4Hex(land.h3Index, 'opponent')) {
+  if (!canPlayerEmbarkFromTacticalHex(land.h3Index, 'opponent')) {
     return tacticalInvalidResult('Embarkation requires a valid port or coastal stack');
   }
   let existingArmor = false;
@@ -202,7 +203,7 @@ export function validateTacticalHumanEmbarkOrder(
   if (land.embarkedOnSubUnitId) {
     return tacticalInvalidResult('Land unit already embarked on a different carrier');
   }
-  if (!canPlayerEmbarkFromTacticalRes4Hex(land.h3Index, 'human')) {
+  if (!canPlayerEmbarkFromTacticalHex(land.h3Index, 'human')) {
     return tacticalInvalidResult('Embarkation requires a valid port or coastal stack');
   }
   let existingArmor = false;

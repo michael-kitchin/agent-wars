@@ -1,7 +1,7 @@
 /**
  * End-of-turn region-vs-region win evaluation.
  *
- * Victory paths: (1) full enemy home-region res1 hex control, or (2) elimination of all res4 urban cells
+ * Victory paths: (1) full enemy home-region strategic hex control, or (2) elimination of all tactical urban cells
  * aggregated across the enemy home region (`urbanHexCount` sums to zero there) while your home region still has at least one urban cell.
  * Strategic unit elimination alone is not evaluated here (see `meleeInterceptReadyFinalize`).
  */

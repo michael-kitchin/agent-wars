@@ -3,23 +3,23 @@
  * Derives legal moves/melee reach, air ferry destinations, ranged attacks, and air strikes from order validation rules.
  *
  * Strategic vs tactical reachability (intentional parity of *pipeline*, not hex sets):
- * - Strategic ground: `getValidDestinations` → res1 `getLandMassReachableHexes` (hop BFS).
- * - Tactical ground: `collectTacticalLegalMoveDestinationRes4Hexes` → single-source MP reachability (Ready rules).
+ * - Strategic ground: `getValidDestinations` → strategic `getLandMassReachableHexes` (hop BFS).
+ * - Tactical ground: `collectTacticalLegalMoveDestinationTacticalHexes` → single-source MP reachability (Ready rules).
  * Best Options This Turn interest/approach live in `possibleUnitActionsBestOptionsInterest.ts`
  * (enemy ∪ uncontrolled unoccupied infra; empty interest falls back to approach; this-turn air strikes
  * list enemy-occupied or human-controlled infra only strategically, and human-occupied footprint cells
- * tactically when the parent res1 airport is intact; tactical Best Options lists airport-to-airport ferry dests).
+ * tactically when the parent strategic airport is intact; tactical Best Options lists airport-to-airport ferry dests).
  * The indexed snapshot maps and cell text live in `possibleUnitActionsIndexedState.ts`; strategic ferry and strike
  * destinations and the per-request destination caches live in `possibleUnitActionsDestinations.ts`.
  */
 
-import { type GameStateSnapshot, listRes4FeatureOverridesForGame } from '../gameDb';
+import { type GameStateSnapshot, listTacticalFeatureOverridesForGame } from '../gameDb';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
-import { collectTacticalLegalMoveDestinationRes4Hexes } from '../../shared/collectTacticalLegalMoveDestinationRes4Hexes';
+import { collectTacticalLegalMoveDestinationHexes } from '../../shared/collectTacticalLegalMoveDestinationHexes';
 import { collectTacticalLegalFerryDestinationHexes } from '../tacticalBattle/tacticalFerryAirportGuards';
 import { unitHasDirectRangedPlanning } from '../../shared/rangePerimeterModel';
 import { getValidDestinations } from '../oneStepMoveDestinations';
-import { collectTacticalLegalRangedTargetRes4Hexes } from '../../shared/tacticalTerrainCombatModifiers';
+import { collectTacticalLegalRangedTargetHexes } from '../../shared/tacticalTerrainCombatModifiers';
 import { computeGridDistancePure } from '../../shared/h3GridRangePure';
 import { compareUnitIdsNaturally } from '../../shared/unitIds';
 import { logDebug, logTrace } from '../logger';
@@ -116,7 +116,7 @@ function sortHexesByLatLng(hexes: string[], latLngByH3: Map<string, [number, num
 /**
  * Ranking distance used when H3 cannot measure a pair that is still a legal destination.
  *
- * Purpose: `gridDistance` throws across many res1 icosahedron-face crossings even when `gridDisk` includes the dest. Dropping those rows hid entire air bases from Best Options while Air Operations still counted ferry dests.
+ * Purpose: `gridDistance` throws across many strategic icosahedron-face crossings even when `gridDisk` includes the dest. Dropping those rows hid entire air bases from Best Options while Air Operations still counted ferry dests.
  * When to use: `tableRowDistance` fallback only; never as a range check.
  * Expected outcome: Unmeasurable legal dests sort after measurable ones, then by urban count / lat-lng.
  * Exceptions: None.
@@ -149,7 +149,7 @@ function tableRowDistance(from: string, to: string, unitId: string): number {
  * Purpose: Move, ferry, ranged, and strike collection share the same row shape, ranking distance, and cell text.
  * When to use: From `collectAggregatedPossibleActionRows` after the legal hexes for one unit and action are final.
  * Expected outcome: `args.rows` grows by one row per legal hex. Strike rows describe strike kinds; tactical rows use
- *   res4 feature flags for the features column and urban rank.
+ *   tactical feature flags for the features column and urban rank.
  * Exceptions: None.
  */
 function appendRowsForLegalHexes(args: {
@@ -165,7 +165,7 @@ function appendRowsForLegalHexes(args: {
   isAirStrike: boolean;
   /** When set, overrides per-hex enemy occupancy text (used for approach rows targeting empty approach cells). */
   enemySummaryOverride?: string;
-  /** Tactical interest context so Target Infrastructure / urban rank use res4 flags instead of strategic res1 maps. */
+  /** Tactical interest context so Target Infrastructure / urban rank use tactical flags instead of strategic maps. */
   tacticalInterest?: TacticalBestOptionsInterestContext;
 }): void {
   const parts = partitionHomelandNearestOther(args.legalHexes, args.homeland);
@@ -217,7 +217,7 @@ export function collectAggregatedPossibleActionRows(args: {
    *
    * Contract: When true, narrows move/ranged candidate hexes for the operational-map Best Options This Turn table; when false or omitted, preserves legacy full-table row generation.
    * When to use: Set only from `buildStrategicOperationalMapSectionMarkdown` / `buildTacticalOperationalMapSectionMarkdown`.
-   * Expected outcome: Ground move/melee filter for non-air units (strategic and tactical: human/enemy contact, else approach, else uncontrolled unoccupied infra); empty or infra-only interest falls back to approach in both modes; strategic ranged lists only enemy-occupied hexes in range (same as full markdown); tactical ranged Best Options lists only human-occupied cells (legal infra-only shots unchanged); this-turn air strikes list enemy-occupied or human-controlled infra only (strategic) or human-occupied footprint cells when the parent res1 airport is intact (tactical); air ferry dests stay listed and are labeled `ferry` (strategic: owned airports in range 4; tactical: intact airport cells in the footprint).
+   * Expected outcome: Ground move/melee filter for non-air units (strategic and tactical: human/enemy contact, else approach, else uncontrolled unoccupied infra); empty or infra-only interest falls back to approach in both modes; strategic ranged lists only enemy-occupied hexes in range (same as full markdown); tactical ranged Best Options lists only human-occupied cells (legal infra-only shots unchanged); this-turn air strikes list enemy-occupied or human-controlled infra only (strategic) or human-occupied footprint cells when the parent strategic airport is intact (tactical); air ferry dests stay listed and are labeled `ferry` (strategic: owned airports in range 4; tactical: intact airport cells in the footprint).
    * Exceptions: None.
    */
   forThisTurnOptionsTable?: boolean;
@@ -256,9 +256,9 @@ export function collectAggregatedPossibleActionRows(args: {
       tacticalBattle.subUnits.filter((s) => s.player === ENEMY_PLAYER).map((s) => s.h3Index)
     );
     try {
-      const foot = new Set(tacticalBattle.res4ChildH3Indexes);
-      tacticalRangedRowsForFootprint = listRes4FeatureOverridesForGame().filter(
-        (r) => r.parentH3Index === tacticalBattle.enclosingRes1H3Index && foot.has(r.h3Index)
+      const foot = new Set(tacticalBattle.tacticalChildH3Indexes);
+      tacticalRangedRowsForFootprint = listTacticalFeatureOverridesForGame().filter(
+        (r) => r.parentH3Index === tacticalBattle.enclosingStrategicH3Index && foot.has(r.h3Index)
       );
     } catch {
       tacticalRangedRowsForFootprint = [];
@@ -269,7 +269,7 @@ export function collectAggregatedPossibleActionRows(args: {
       friendlyOccupiedH3: new Set(
         tacticalBattle.subUnits.filter((s) => s.player === FRIENDLY_PLAYER).map((s) => s.h3Index)
       ),
-      enclosingController: indexed.controlByHex.get(tacticalBattle.enclosingRes1H3Index) ?? null,
+      enclosingController: indexed.controlByHex.get(tacticalBattle.enclosingStrategicH3Index) ?? null,
       rowByH3: new Map((tacticalRangedRowsForFootprint ?? []).map((r) => [r.h3Index, r])),
     };
     logDebug('possibleUnitActions collectAggregatedPossibleActionRows tactical interest', {
@@ -326,7 +326,7 @@ export function collectAggregatedPossibleActionRows(args: {
         return rememberComputedHexList(
           legalDestByKey,
           tacticalLegalMoveDestCacheKey(tacticalBattle, unit.id),
-          () => collectTacticalLegalMoveDestinationRes4Hexes(tacticalBattle, unit.id)
+          () => collectTacticalLegalMoveDestinationHexes(tacticalBattle, unit.id)
         );
       }
       strategicLandNavalOrigins.add(`${unit.h3Index}|${unit.unitType}`);
@@ -450,7 +450,7 @@ export function collectAggregatedPossibleActionRows(args: {
           ? rememberComputedHexList(
               rangedDestByKey,
               tacticalRangedDestCacheKey(tacticalBattle, unit.id),
-              () => collectTacticalLegalRangedTargetRes4Hexes(tacticalBattle, unit.id, tacticalRangedRows)
+              () => collectTacticalLegalRangedTargetHexes(tacticalBattle, unit.id, tacticalRangedRows)
             )
           : rememberComputedHexList(
               rangedDestByKey,
@@ -528,7 +528,7 @@ export function buildPossibleUnitActionsMarkdown(args: {
   latLngByH3: Map<string, [number, number]>;
   formatLatLng: (ll: [number, number]) => string;
   /**
-   * When set, ranged target discovery uses tactical res4 rules (terrain range cap, mountain LOS) for opponent units.
+   * When set, ranged target discovery uses tactical rules (terrain range cap, mountain LOS) for opponent units.
    *
    * Contract: `state.hexes` / `state.units` must already match this footprint (e.g. `buildTacticalAiPlanState` output).
    * When to use: Tactical AI `requestOrdersFlow` briefings.

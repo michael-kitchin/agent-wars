@@ -18,7 +18,7 @@ import type {
 } from './originBonusTypes';
 import { isPipelineTerrainKind, type PipelineTerrainKind } from './pipelineTerrain';
 import type { TacticalBattleSnapshot } from './tacticalBattleTypes';
-import { effectiveRes4TerrainKindString, type TacticalBattleTerrainPick } from './tacticalTerrainCombatModifiers';
+import { effectiveTacticalTerrainKindString, type TacticalBattleTerrainPick } from './tacticalTerrainCombatModifiers';
 import type { UnitOrigin } from './unitOriginTypes';
 
 /**
@@ -246,7 +246,7 @@ export function formatOriginBonusTableCell(sources: ReadonlyArray<OriginBonusSou
 }
 
 /**
- * Describes a res4 cell inside a battle as an origin bonus place.
+ * Describes a tactical cell inside a battle as an origin bonus place.
  *
  * Purpose: Battle cells carry their own country and terrain.
  * When to use: For any tactical roll or assessment, with the sub-unit's own `h3Index`.
@@ -254,12 +254,12 @@ export function formatOriginBonusTableCell(sources: ReadonlyArray<OriginBonusSou
  * Exceptions: None.
  */
 export function tacticalOriginBonusPlace(
-  battle: TacticalBattleTerrainPick & Pick<TacticalBattleSnapshot, 'res4CountryNameByH3'>,
-  res4H3Index: string
+  battle: TacticalBattleTerrainPick & Pick<TacticalBattleSnapshot, 'tacticalCountryNameByH3'>,
+  tacticalH3Index: string
 ): OriginBonusPlace {
   return {
-    countryName: battle.res4CountryNameByH3?.[res4H3Index] ?? null,
-    terrainKind: effectiveRes4TerrainKindString(battle, res4H3Index),
+    countryName: battle.tacticalCountryNameByH3?.[tacticalH3Index] ?? null,
+    terrainKind: effectiveTacticalTerrainKindString(battle, tacticalH3Index),
   };
 }
 
@@ -281,23 +281,23 @@ const countryNameByHexesArray = new WeakMap<GameStateSnapshot['hexes'], Readonly
  * Expected outcome: The name, or `null` when the hex is unknown, has no country, or the snapshot omits countries.
  * Exceptions: None.
  */
-export function strategicHexCountryNameAt(state: Pick<GameStateSnapshot, 'hexes'>, res1H3Index: string): string | null {
+export function strategicHexCountryNameAt(state: Pick<GameStateSnapshot, 'hexes'>, strategicH3Index: string): string | null {
   let byH3 = countryNameByHexesArray.get(state.hexes);
   if (!byH3) {
     byH3 = new Map(state.hexes.map((h) => [h.h3Index, h.countryName ?? null] as const));
     countryNameByHexesArray.set(state.hexes, byH3);
   }
-  return byH3.get(res1H3Index) ?? null;
+  return byH3.get(strategicH3Index) ?? null;
 }
 
 /**
- * Describes a strategic res1 hex as an origin bonus place.
+ * Describes a strategic hex as an origin bonus place.
  *
  * Purpose: The strategic map uses the country test only.
  * When to use: For any strategic roll or assessment, with the unit's hex at roll time.
  * Expected outcome: The hex's majority country and a `null` terrain kind.
  * Exceptions: None.
  */
-export function strategicOriginBonusPlace(state: Pick<GameStateSnapshot, 'hexes'>, res1H3Index: string): OriginBonusPlace {
-  return { countryName: strategicHexCountryNameAt(state, res1H3Index), terrainKind: null };
+export function strategicOriginBonusPlace(state: Pick<GameStateSnapshot, 'hexes'>, strategicH3Index: string): OriginBonusPlace {
+  return { countryName: strategicHexCountryNameAt(state, strategicH3Index), terrainKind: null };
 }

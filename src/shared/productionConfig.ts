@@ -1,4 +1,6 @@
 import type { BuildUnitType } from './ipcTypes';
+import { GLOBAL_GAME_MAP } from './activeGameMap';
+import { unitCostFor } from './gameRules';
 
 /**
  * Documents the module-scope binding `UNIT_COST_BY_TYPE` (UNIT_COST_BY_TYPE: Readonly<Record<BuildUnitType, number>>).
@@ -17,7 +19,7 @@ export const UNIT_COST_BY_TYPE: Readonly<Record<BuildUnitType, number>> = {
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-infantry: 20,
+infantry: GLOBAL_GAME_MAP.rules.infantryCost,
     /**
    * Documents the object literal property `armor` (armor: 40).
 
@@ -26,7 +28,7 @@ infantry: 20,
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-armor: 40,
+armor: GLOBAL_GAME_MAP.rules.armorCost,
     /**
    * Documents the object literal property `naval` (naval: 100).
 
@@ -35,7 +37,7 @@ armor: 40,
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-naval: 100,
+naval: GLOBAL_GAME_MAP.rules.navalCost,
     /**
    * Documents the object literal property `air` (air: 60).
 
@@ -44,7 +46,7 @@ naval: 100,
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-air: 60,
+air: GLOBAL_GAME_MAP.rules.airCost,
 };
 
 /**
@@ -108,7 +110,7 @@ export function estimateTurnsToNextSpawn(
   capacityPerTurn: number
 ): number | null {
   if (!nextUnitType) return null;
-  const unitCost = UNIT_COST_BY_TYPE[nextUnitType];
+  const unitCost = unitCostFor(nextUnitType);
   const safeCapacity = Math.max(0, Math.trunc(capacityPerTurn));
   if (safeCapacity <= 0) return null;
   const safeStoredPoints = Math.max(0, Math.trunc(storedPoints));
@@ -148,7 +150,7 @@ export interface BuildQueueProductionEntry {
 
    * Contract: The unit type being built for this queue row.
    * When to use: Must be a key present in `UNIT_COST_BY_TYPE`.
-   * Expected outcome: Costs are read from `UNIT_COST_BY_TYPE`.
+   * Expected outcome: Spend uses `unitCostFor` for this type. `UNIT_COST_BY_TYPE` is the global column only.
    * Exceptions: None.
    */
   unitType: BuildUnitType;
@@ -187,7 +189,7 @@ export function applyProduction(
   let idx = 0;
   while (idx < updated.length) {
     const entry = updated[idx]!;
-    const unitCost = UNIT_COST_BY_TYPE[entry.unitType];
+    const unitCost = unitCostFor(entry.unitType);
     if (points < unitCost) break;
     const maxBuildable = Math.floor(points / unitCost);
     const built = Math.min(maxBuildable, entry.remainingCount);
@@ -212,7 +214,7 @@ export function applyProduction(
 
  * Purpose: Totals IPC-style build costs for all queued units (cost × count per row), ignoring stored production points.
  * When to use: Build popup “queue cost” summaries where the UI needs a single currency total.
- * Expected outcome: Returns a non-negative integer sum of `UNIT_COST_BY_TYPE` contributions.
+ * Expected outcome: Returns a non-negative integer sum of `unitCostFor` contributions for the active map.
  * Exceptions: None.
  */
 export function sumQueuedProductionCost(
@@ -220,7 +222,7 @@ export function sumQueuedProductionCost(
 ): number {
   let sum = 0;
   for (const row of entries) {
-    const cost = UNIT_COST_BY_TYPE[row.unitType];
+    const cost = unitCostFor(row.unitType);
     sum += cost * Math.max(0, Math.trunc(row.count));
   }
   return sum;
@@ -281,7 +283,7 @@ export function estimateTurnsToCompleteQueuedProduction(
  */
 export function computeKeepBuildingRefillCount(unitType: BuildUnitType, availablePoints: number): number {
   const points = Math.max(0, Math.trunc(availablePoints));
-  const cost = UNIT_COST_BY_TYPE[unitType];
+  const cost = unitCostFor(unitType);
   const raw = Math.max(1, Math.floor(points / cost));
   return Math.min(99, Math.max(1, raw));
 }

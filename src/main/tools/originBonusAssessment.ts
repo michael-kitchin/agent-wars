@@ -135,9 +135,9 @@ export function tacticalOriginBonusUnitFields(
  */
 export function strategicOriginBonusHexFields(
   state: GameStateSnapshot,
-  res1H3Index: string
+  strategicH3Index: string
 ): { readonly country?: string | null } {
   const settings = originBonusSettingsFromSnapshot(state);
-  logTrace('originBonusAssessment strategicOriginBonusHexFields', { res1H3Index, ...settings });
-  return settings.countryBonusEnabled ? { country: strategicHexCountryNameAt(state, res1H3Index) } : {};
+  logTrace('originBonusAssessment strategicOriginBonusHexFields', { strategicH3Index, ...settings });
+  return settings.countryBonusEnabled ? { country: strategicHexCountryNameAt(state, strategicH3Index) } : {};
 }

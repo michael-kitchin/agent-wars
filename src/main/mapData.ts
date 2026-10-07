@@ -4,17 +4,18 @@
  */
 
 import { getRes0Cells, cellToChildren, cellToLatLng } from 'h3-js';
-import { STRATEGIC_H3_RESOLUTION } from '../shared/h3Resolutions';
+import { registerActiveGameMapReset } from '../shared/activeGameMap';
+import { GLOBAL_STRATEGIC_H3_RESOLUTION, strategicH3Resolution } from '../shared/h3Resolutions';
 
 /**
  * H3 resolution of the ordered world hex list.
  *
  * Purpose: Names the strategic resolution used to enumerate every world cell and to fill prompt text.
  * When to use: `getOrderedHexList` and any prompt that prints the world resolution.
- * Expected outcome: Always equals `STRATEGIC_H3_RESOLUTION` (1).
+ * Expected outcome: Always 1, the global strategic resolution. The ordered list itself uses `strategicH3Resolution`.
  * Exceptions: None.
  */
-export const H3_RESOLUTION = STRATEGIC_H3_RESOLUTION;
+export const H3_RESOLUTION = GLOBAL_STRATEGIC_H3_RESOLUTION;
 
 /**
  * Documents the module-scope binding `cachedWorldHexList` (cachedWorldHexList: string[] | null).
@@ -27,11 +28,25 @@ export const H3_RESOLUTION = STRATEGIC_H3_RESOLUTION;
 let cachedWorldHexList: string[] | null = null;
 
 /**
- * Defines the `getOrderedHexList` function shape (export function getOrderedHexList(): string[]).
+ * Drops the cached strategic hex list.
+ *
+ * Purpose: The list is every cell at the active strategic resolution. A profile change must not keep the previous grid.
+ * When to use: Registered when this module loads. Callers use `getOrderedHexList`.
+ * Expected outcome: The next `getOrderedHexList` rebuilds.
+ * Exceptions: None.
+ */
+function resetOrderedHexListCache(): void {
+  cachedWorldHexList = null;
+}
 
- * Purpose: Supports maintainability by documenting why `getOrderedHexList` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+registerActiveGameMapReset(resetOrderedHexListCache);
+
+/**
+ * Returns every strategic cell on the active map, in sorted order.
+ *
+ * Purpose: Snapshots, prompts, and seeding walk one stable list.
+ * When to use: After the active profile is the map being played. A profile change clears the cache.
+ * Expected outcome: On the global profile, 842 resolution-1 cells. A different strategic resolution rebuilds the list.
  * Exceptions: None.
  */
 export function getOrderedHexList(): string[] {
@@ -39,7 +54,7 @@ export function getOrderedHexList(): string[] {
   const res0 = getRes0Cells();
   const out: string[] = [];
   for (const c of res0) {
-    out.push(...cellToChildren(c, H3_RESOLUTION));
+    out.push(...cellToChildren(c, strategicH3Resolution()));
   }
   out.sort();
   cachedWorldHexList = out;

@@ -1,4 +1,5 @@
-import { cellToLatLng, cellToParent, gridDisk, latLngToCell } from 'h3-js';
+import { strategicCellAt, strategicParentOf, tacticalCellAt } from '../../shared/h3Resolutions';
+import { cellToLatLng, gridDisk } from 'h3-js';
 import { alignLngToReference, clampLatForWebMercatorDisplay } from './hexGrid';
 import {
   getMainLeafletMap,
@@ -6,7 +7,7 @@ import {
   hexCenterToOverlayPointWithReferenceLng,
   type GlobalLeafletFactory,
 } from './worldLeafletMap';
-import { DETAIL_H3_RESOLUTION, INITIAL_CAMERA_ZOOM_IN_LEVELS, WORLD_H3_RESOLUTION } from '../core/constants';
+import { INITIAL_CAMERA_ZOOM_IN_LEVELS } from '../core/constants';
 import { rendererSharedState as S } from '../core/state';
 import type { PanDirection } from '../core/types';
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
@@ -112,10 +113,9 @@ export function panMapByNetAxes(ns: -1 | 0 | 1, ew: -1 | 0 | 1): void {
   if (!map || !leafletRef) return;
   const center = map.getCenter();
   const tactical = S.tacticalBattleSnapshot != null;
-  const resolution = tactical ? DETAIL_H3_RESOLUTION : WORLD_H3_RESOLUTION;
   let centerH3: string;
   try {
-    centerH3 = latLngToCell(center.lat, center.lng, resolution);
+    centerH3 = tactical ? tacticalCellAt(center.lat, center.lng) : strategicCellAt(center.lat, center.lng);
   } catch {
     return;
   }
@@ -136,14 +136,14 @@ export function panMapByNetAxes(ns: -1 | 0 | 1, ew: -1 | 0 | 1): void {
 }
 
 /**
- * Defines the `panMapOneRes1Hex` function shape (export function panMapOneRes1Hex(direction: PanDirection): void).
+ * Defines the `panMapOneStrategicHex` function shape (export function panMapOneStrategicHex(direction: PanDirection): void).
 
  * Purpose: Single-axis wrapper over `panMapByNetAxes` for callers that still pass one cardinal.
  * When to use: Prefer `panMapByNetAxes` for hold-to-continue; keep this for one-shot cardinal pan.
  * Expected outcome: Same as `panMapByNetAxes` with the matching unit vector.
  * Exceptions: None.
  */
-export function panMapOneRes1Hex(direction: PanDirection): void {
+export function panMapOneStrategicHex(direction: PanDirection): void {
   const { ns, ew } = panAxisKeyToNetAxes(direction as PanAxisKey);
   panMapByNetAxes(ns, ew);
 }
@@ -246,14 +246,14 @@ export function hitTestHexAtContainerPixel(x: number, y: number, mapHexSet: Set<
   const latlng = map.containerPointToLatLng(L.point(x, y));
   let cell: string;
   try {
-    cell = latLngToCell(latlng.lat, latlng.lng, WORLD_H3_RESOLUTION);
+    cell = strategicCellAt(latlng.lat, latlng.lng);
   } catch {
     return null;
   }
   if (mapHexSet.has(cell)) return cell;
   try {
-    const detailCell = latLngToCell(latlng.lat, latlng.lng, DETAIL_H3_RESOLUTION);
-    const parent = cellToParent(detailCell, WORLD_H3_RESOLUTION);
+    const detailCell = tacticalCellAt(latlng.lat, latlng.lng);
+    const parent = strategicParentOf(detailCell);
     return mapHexSet.has(parent) ? parent : null;
   } catch {
     return null;
@@ -261,16 +261,16 @@ export function hitTestHexAtContainerPixel(x: number, y: number, mapHexSet: Set<
 }
 
 /**
- * Resolves a main-map container pixel to a res4 tactical cell in the active battle footprint (or its enclosing res1).
+ * Resolves a main-map container pixel to a tactical cell in the active battle footprint (or its enclosing strategic).
  *
- * Purpose: `hitTestHexAtContainerPixel` maps res4 clicks onto strategic res1 parents using `gameState.hexes`, but tactical
- * sub-units use res4 `h3Index` values; without this helper, `drawnAtHit` stays empty and human unit clicks no-op.
+ * Purpose: `hitTestHexAtContainerPixel` maps tactical clicks onto strategic parents using `gameState.hexes`, but tactical
+ * sub-units use tactical `h3Index` values; without this helper, `drawnAtHit` stays empty and human unit clicks no-op.
  * When to use: While `tacticalBattleSnapshot` is non-null for click hit-testing and hover cursor hints over tactical units.
- * Expected outcome: Returns a res4 id from `res4ChildH3Indexes` when the pointer snaps inside that cell; may return
- * `enclosingRes1H3Index` when the pointer resolves to that res1 cell; null when outside the tactical footprint.
+ * Expected outcome: Returns a tactical id from `tacticalChildH3Indexes` when the pointer snaps inside that cell; may return
+ * `enclosingStrategicH3Index` when the pointer resolves to that strategic cell; null when outside the tactical footprint.
  * Exceptions: `latLngToCell` failures return null.
  */
-export function hitTestTacticalRes4HexAtContainerPixel(
+export function hitTestTacticalHexAtContainerPixel(
   x: number,
   y: number,
   tactical: TacticalBattleSnapshot
@@ -282,16 +282,16 @@ export function hitTestTacticalRes4HexAtContainerPixel(
   const L = getLeafletGlobal();
   if (!L) return null;
   const latlng = map.containerPointToLatLng(L.point(x, y));
-  let res4: string;
+  let tacticalIndex: string;
   try {
-    res4 = latLngToCell(latlng.lat, latlng.lng, DETAIL_H3_RESOLUTION);
+    tacticalIndex = tacticalCellAt(latlng.lat, latlng.lng);
   } catch {
     return null;
   }
-  if (tactical.res4ChildH3Indexes.includes(res4)) return res4;
+  if (tactical.tacticalChildH3Indexes.includes(tacticalIndex)) return tacticalIndex;
   try {
-    const res1 = latLngToCell(latlng.lat, latlng.lng, WORLD_H3_RESOLUTION);
-    if (res1 === tactical.enclosingRes1H3Index) return tactical.enclosingRes1H3Index;
+    const strategic = strategicCellAt(latlng.lat, latlng.lng);
+    if (strategic === tactical.enclosingStrategicH3Index) return tactical.enclosingStrategicH3Index;
   } catch {
     return null;
   }

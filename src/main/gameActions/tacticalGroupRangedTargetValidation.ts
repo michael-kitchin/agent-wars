@@ -8,11 +8,11 @@ import {
   effectiveTacticalRangedMaxRangeForAttacker,
   tacticalMountainLosBlockedState,
   tacticalMovementTerrainAnchorH3,
-  tacticalRes4HasStrikeableInfrastructure,
+  tacticalHasStrikeableInfrastructure,
 } from '../../shared/tacticalTerrainCombatModifiers';
 import { isWithinGridRangePure } from '../../shared/h3GridRangePure';
 import { tacticalSubUnitLabelForUserMessage } from '../../shared/unitDisplayNames';
-import { listRes4FeatureOverridesForGame } from '../gameDb';
+import { listTacticalFeatureOverridesForGame } from '../gameDb';
 
 /**
  * Result shape for tactical grouped ranged validation (structurally matches `SubmitOrdersResult` from `submitOrders.ts`).
@@ -27,7 +27,7 @@ export type TacticalGroupRangedTargetResult = { success: boolean; reason?: strin
 /**
  * Validates that every selected sub-unit may order **tactical ranged** fire at `targetH3Index` (footprint, range cap, mountain LOS, enemy presence).
  *
- * Contract: Caller must pass a non-null `snap` with `res4ChildH3Indexes` and `subUnits` already aligned with the active tactical session.
+ * Contract: Caller must pass a non-null `snap` with `tacticalChildH3Indexes` and `subUnits` already aligned with the active tactical session.
  * When to use: `validateGroupRangedTarget` when `isTacticalBattleActive()` is true—keeps `gameActions.ts` as a thin coordinator.
  * Expected outcome: `{ success: true }` when every unit passes range + LOS and the target has an enemy **or** strikeable infrastructure (urban/airport/seaport, not rubble); otherwise `{ success: false, reason }` with per-unit labels in reasons.
  * Exceptions: Does not catch DB readiness; caller handles session missing and empty `uniqueUnitIds`.
@@ -45,7 +45,7 @@ export function validateTacticalGroupRangedTarget(params: {
     tacticalAttackerPlayer,
     battleId: snap.battleId,
   });
-  const footprint = new Set(snap.res4ChildH3Indexes);
+  const footprint = new Set(snap.tacticalChildH3Indexes);
   if (!footprint.has(targetH3Index)) return { success: false, reason: 'Target is outside the tactical battle.' };
   for (const unitId of uniqueUnitIds) {
     const label = tacticalSubUnitLabelForUserMessage(snap.subUnits, unitId);
@@ -75,16 +75,16 @@ export function validateTacticalGroupRangedTarget(params: {
     (u) => u.h3Index === targetH3Index && u.player !== tacticalAttackerPlayer
   );
   if (enemiesAtTarget.length > 0) return { success: true };
-  let res4Rows: ReturnType<typeof listRes4FeatureOverridesForGame> = [];
+  let tacticalRows: ReturnType<typeof listTacticalFeatureOverridesForGame> = [];
   try {
-    res4Rows = listRes4FeatureOverridesForGame();
+    tacticalRows = listTacticalFeatureOverridesForGame();
   } catch (err) {
     logError('validateTacticalGroupRangedTarget: listRes4FeatureOverridesForGame failed (snapshot-only infra check)', err);
   }
-  const rowsInBattle = res4Rows.filter(
-    (r) => r.parentH3Index === snap.enclosingRes1H3Index && footprint.has(r.h3Index)
+  const rowsInBattle = tacticalRows.filter(
+    (r) => r.parentH3Index === snap.enclosingStrategicH3Index && footprint.has(r.h3Index)
   );
-  if (tacticalRes4HasStrikeableInfrastructure(snap, targetH3Index, rowsInBattle)) {
+  if (tacticalHasStrikeableInfrastructure(snap, targetH3Index, rowsInBattle)) {
     return { success: true };
   }
   return { success: false, reason: 'Target hex has no enemy units or strikeable infrastructure' };

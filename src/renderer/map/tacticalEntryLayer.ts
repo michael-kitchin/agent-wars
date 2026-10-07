@@ -3,7 +3,7 @@ import { TACTICAL_ENTRY_HIT_PAD_PX } from '../core/constants';
 import { rendererSharedState as S } from '../core/state';
 import { isHoverOrderPlanningActive } from '../rendering/canvasPreviewPolicy';
 import { areResolutionDiceChipsShowing } from '../rendering/combatDiceChipDrawing';
-import { computeRes1OverlayTextY } from '../rendering/terrainRendering';
+import { computeStrategicOverlayTextY } from '../rendering/terrainRendering';
 import { getLeafletGlobal, hexCenterPx } from './mapHelpers';
 import { shouldShowBuildEntryZoom } from './terrainView';
 import { getMainLeafletMap } from './worldLeafletMap';
@@ -23,20 +23,20 @@ export function hideTacticalEntryLayer(layer: HTMLElement, clearHtml = true): vo
 }
 
 /**
- * Returns true when both human and opponent parent units share the same res1 hex.
+ * Returns true when both human and opponent parent units share the same strategic hex.
  *
  * Purpose: Detects tactical-entry eligibility independent of fog-of-war exploration filters.
  * When to use: While building tactical magnifier buttons for explored strategic hexes.
  * Expected outcome: True only when at least one human and one opponent unit occupy `h3Index`.
  * Exceptions: None.
  */
-function isContestedRes1Hex(state: GameStateSnapshot, h3Index: string): boolean {
+function isContestedStrategicHex(state: GameStateSnapshot, h3Index: string): boolean {
   const here = state.units.filter((u) => u.h3Index === h3Index);
   return here.some((u) => u.player === 'human') && here.some((u) => u.player === 'opponent');
 }
 
 /**
- * Synchronizes tactical-entry magnifying-glass buttons for contested res1 hexes during strategic planning.
+ * Synchronizes tactical-entry magnifying-glass buttons for contested strategic hexes during strategic planning.
  *
  * Vertical placement: same horizontal center as the hex; `top` is `center.y + (textY - center.y)` so the icon sits
  * **below** the hex midpoint by the same distance overlay text sits below it (previously `2 * center.y - textY` mirrored above).
@@ -46,7 +46,7 @@ function isContestedRes1Hex(state: GameStateSnapshot, h3Index: string): boolean 
  */
 export function syncTacticalEntryButton(deps: {
   isHexExploredByPlayer: (h3: string) => boolean;
-  hasRes1OverlayOffsetFeatures: (h3Index: string, visibleUnitHexes: Set<string>) => boolean;
+  hasStrategicOverlayOffsetFeatures: (h3Index: string, visibleUnitHexes: Set<string>) => boolean;
 }): void {
   const layer = document.getElementById('tactical-entry-layer');
   if (!layer || !S.gameState) {
@@ -79,10 +79,10 @@ export function syncTacticalEntryButton(deps: {
   const rows: Array<{ h3: string; left: number; top: number }> = [];
   for (const hx of S.gameState.hexes) {
     if (!deps.isHexExploredByPlayer(hx.h3Index)) continue;
-    if (!isContestedRes1Hex(S.gameState, hx.h3Index)) continue;
+    if (!isContestedStrategicHex(S.gameState, hx.h3Index)) continue;
     const center = hexCenterPx(hx.h3Index);
-    const hasOffset = deps.hasRes1OverlayOffsetFeatures(hx.h3Index, visibleUnitHexes) || visibleUnitHexes.has(hx.h3Index);
-    const textY = computeRes1OverlayTextY(hx.h3Index, map, L, hasOffset);
+    const hasOffset = deps.hasStrategicOverlayOffsetFeatures(hx.h3Index, visibleUnitHexes) || visibleUnitHexes.has(hx.h3Index);
+    const textY = computeStrategicOverlayTextY(hx.h3Index, map, L, hasOffset);
     const offsetFromCenterToOverlayText = textY - center.y;
     const magnifyTop = Math.round(center.y + offsetFromCenterToOverlayText);
     rows.push({ h3: hx.h3Index, left: Math.round(center.x), top: magnifyTop });

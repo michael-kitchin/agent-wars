@@ -27,8 +27,8 @@ function findNearestOpponentEmbarkHex(
   state: GameStateSnapshot,
   format: (h3: string) => string
 ): string {
-  const infraByHex = new Map((state.res1Infrastructure ?? []).map((row) => [row.h3Index, row]));
-  const controlByHex = new Map((state.res1Control ?? []).map((row) => [row.h3Index, row.controllerPlayerId]));
+  const infraByHex = new Map((state.strategicInfrastructure ?? []).map((row) => [row.h3Index, row]));
+  const controlByHex = new Map((state.strategicControl ?? []).map((row) => [row.h3Index, row.controllerPlayerId]));
   const legalH3: string[] = [];
   for (const hex of state.hexes) {
     const seaport = Number(infraByHex.get(hex.h3Index)?.seaportCount ?? 0);
@@ -101,8 +101,8 @@ export function buildSealiftBriefingBlock(
     return lines.join('\n');
   }
 
-  const infraByHex = new Map((state.res1Infrastructure ?? []).map((row) => [row.h3Index, row]));
-  const controlByHex = new Map((state.res1Control ?? []).map((row) => [row.h3Index, row.controllerPlayerId]));
+  const infraByHex = new Map((state.strategicInfrastructure ?? []).map((row) => [row.h3Index, row]));
+  const controlByHex = new Map((state.strategicControl ?? []).map((row) => [row.h3Index, row.controllerPlayerId]));
 
   lines.push(topLevelHeading(SECTION_TITLE_NAVAL_TRANSPORT_STATUS));
   lines.push('');

@@ -8,7 +8,7 @@ import * as os from 'os';
 import * as path from 'path';
 import {
   EXPECTED_HEX_NAMING_SCHEMA_VERSION,
-  loadTerrainRes1NamingFromPath,
+  loadTerrainStrategicNamingFromPath,
   namesForFirstOccurringScalerank,
   namesForFirstOccurringScalerankList,
 } from './terrainNamingLoad';
@@ -47,14 +47,14 @@ function testNamesForFirstOccurringScalerankListKeepsSourceOrder(): void {
 }
 
 /**
- * Writes a one-record res1 naming file whose single country row has the given code.
+ * Writes a one-record strategic naming file whose single country row has the given code.
  *
  * Purpose: Exercises the real loader path with a minimal envelope.
  * When to use: In country-code validation tests.
  * Expected outcome: Absolute path to a temp JSON file; the caller removes its directory.
  * Exceptions: Throws on file-system errors.
  */
-function writeRes1NamingWithCountryCode(dir: string, countryCode: unknown): string {
+function writeStrategicNamingWithCountryCode(dir: string, countryCode: unknown): string {
   const filePath = path.join(dir, 'terrain_res1_naming.json');
   const envelope = {
     schema_version: EXPECTED_HEX_NAMING_SCHEMA_VERSION,
@@ -86,13 +86,13 @@ function writeRes1NamingWithCountryCode(dir: string, countryCode: unknown): stri
 function testCountryCodeValidation(): void {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'terrain-naming-load-'));
   try {
-    const loaded = loadTerrainRes1NamingFromPath(writeRes1NamingWithCountryCode(dir, 'FR'));
+    const loaded = loadTerrainStrategicNamingFromPath(writeStrategicNamingWithCountryCode(dir, 'FR'));
     assert.strictEqual(loaded.records[0]?.countries[0]?.countryCode, 'FR');
-    const loadedNull = loadTerrainRes1NamingFromPath(writeRes1NamingWithCountryCode(dir, null));
+    const loadedNull = loadTerrainStrategicNamingFromPath(writeStrategicNamingWithCountryCode(dir, null));
     assert.strictEqual(loadedNull.records[0]?.countries[0]?.countryCode, null);
     for (const bad of ['fr', '-99']) {
       assert.throws(
-        () => loadTerrainRes1NamingFromPath(writeRes1NamingWithCountryCode(dir, bad)),
+        () => loadTerrainStrategicNamingFromPath(writeStrategicNamingWithCountryCode(dir, bad)),
         /country_code must be two uppercase letters or null/
       );
     }

@@ -7,7 +7,7 @@
  * Exceptions: Propagates unexpected errors to the caller for outer `try/catch` handling.
  */
 
-import { dbGetAll, dbGetOne, dbRun, getGameSeed, getHexController, getGameStateForPlayer, getRes1InfrastructureForHex, listUnitsForSnapshot } from '../gameDb';
+import { dbGetAll, dbGetOne, dbRun, getGameSeed, getHexController, getGameStateForPlayer, getStrategicInfrastructureForHex, listUnitsForSnapshot } from '../gameDb';
 import { buildLatLngCoordinateMap, getOrderedHexList } from '../mapData';
 import { createCombatRng, runMeleePhase, runRangedPhase, type CombatUnit } from '../combatResolution';
 import { logDebug } from '../logger';
@@ -344,7 +344,7 @@ export function executeReadyStrategicTurn(
     );
     const withinFerryRange = isWithinAirFerryGridRange(originH3Index, ferry.destinationH3Index, 'ready ferry', ferryRange);
     if (!withinFerryRange) continue;
-    const destinationInfra = getRes1InfrastructureForHex(ferry.destinationH3Index);
+    const destinationInfra = getStrategicInfrastructureForHex(ferry.destinationH3Index);
     const destinationController = getHexController(ferry.destinationH3Index);
     if (destinationInfra.airportCount > 0 && destinationController === unit.player) {
       rememberStrategicHexBeforeMove(ferry.unitId, originH3Index, ferry.destinationH3Index);
@@ -357,7 +357,7 @@ export function executeReadyStrategicTurn(
       });
       continue;
     }
-    const originInfra = getRes1InfrastructureForHex(originH3Index);
+    const originInfra = getStrategicInfrastructureForHex(originH3Index);
     const originController = getHexController(originH3Index);
     if (!(originInfra.airportCount > 0 && originController === unit.player)) {
       dbRun('DELETE FROM units WHERE id = ?', [ferry.unitId]);

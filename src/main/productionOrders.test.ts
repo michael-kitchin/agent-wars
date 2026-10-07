@@ -4,7 +4,7 @@
 
 import * as assert from 'assert';
 import type { CoordinateContext } from './briefing/map/coordinateContext';
-import { ensureStrategicCoordinateRegistryInitialized, listStrategicRes1H3Indexes } from './briefing/map/hexCoordinates';
+import { ensureStrategicCoordinateRegistryInitialized, listStrategicH3Indexes } from './briefing/map/hexCoordinates';
 import { h3ToCode } from './briefing/map/hexCodeTranslator';
 import { normalizeProductionOrders } from './productionOrders';
 
@@ -20,7 +20,7 @@ const strategicCtx: CoordinateContext = { mode: 'strategic' };
  */
 function twoSampleStrategicHexCodes(): [string, string] {
   ensureStrategicCoordinateRegistryInitialized();
-  const cells = listStrategicRes1H3Indexes();
+  const cells = listStrategicH3Indexes();
   if (cells.length < 2) throw new Error('productionOrders.test: expected at least two strategic res1 cells');
   const a = h3ToCode(cells[0]!, strategicCtx);
   const b = h3ToCode(cells[1]!, strategicCtx);

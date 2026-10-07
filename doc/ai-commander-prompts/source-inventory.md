@@ -46,8 +46,8 @@ Emit order as coded. All headings quoted exactly (`promptSpec/sectionHeadings.ts
 | `# Commander's Briefing` | `formatBriefing` | always when a briefing is supplied | n/a |
 | (narrative, no heading) | `buildStrategicNarrative` | always | never empty; capped at 5 sentences |
 | `## Unit Status and Threats` | `formatBriefing` | always | header plus `(No AI units)` |
-| (omniscient hop line) | `OMNISCIENT_GRID_PROXIMITY_BRIEFING_LINE` | fog off and res1 | omitted |
-| (fog intel-staleness + path-distance lines) | `buildIntelStalenessRule` then `FOG_PATH_DISTANCE_BRIEFING_LINE` | fog on at res1 | omitted when fog is off or in battle |
+| (omniscient hop line) | `OMNISCIENT_GRID_PROXIMITY_BRIEFING_LINE` | fog off and a strategic cell | omitted |
+| (fog intel-staleness + path-distance lines) | `buildIntelStalenessRule` then `FOG_PATH_DISTANCE_BRIEFING_LINE` | fog on, on the strategic map | omitted when fog is off or in battle |
 | (unit status table) | `buildUnitStatusTable` | always; a `Bonus` column follows `Hex` only when the assessments carry `originBonusHere` (country bonus on) | header plus `(No AI units)` |
 | `## Attention Flags` | `formatBriefing` | always | `None.` |
 | `# Operational Map` | `buildStrategicOperationalMapSectionMarkdown` | `operational.trim().length > 0` | heading plus `(No units — map not rendered.)` when neither side has units |

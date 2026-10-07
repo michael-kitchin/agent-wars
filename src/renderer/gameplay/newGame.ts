@@ -50,15 +50,15 @@ function registerRegionRandomizeButtons(): void {
  */
 type NewGameDeps = {
     /**
-   * Specifies the contract for the `refreshRes4TerrainOverridesForRenderer` member.
+   * Specifies the contract for the `refreshTacticalTerrainOverridesForRenderer` member.
    *
-   * Contract: Reloads res4 terrain override rows from main. Pass `{ reloadStaticOverlays: true }` to also
+   * Contract: Reloads tactical terrain override rows from main. Pass `{ reloadStaticOverlays: true }` to also
    * re-fetch static city/road/rail/vector overlay payloads (required after `newGame` resets all terrain).
    * When to use: After newGame (with reloadStaticOverlays), and on routine Ready refreshes (without it).
    * Expected outcome: Renderer maps aligned with main-process caches after the promise settles.
    * Exceptions: None; implementations log failures without throwing.
    */
-refreshRes4TerrainOverridesForRenderer: (options?: { reloadStaticOverlays?: boolean }) => Promise<void>;
+refreshTacticalTerrainOverridesForRenderer: (options?: { reloadStaticOverlays?: boolean }) => Promise<void>;
     /**
    * Specifies the contract for the `rebuildUnitDisplayNameLookup` member (rebuildUnitDisplayNameLookup: (state: GameStateSnapshot | null) => void;).
 
@@ -96,14 +96,14 @@ updateClientStaleEnemyIntel: (previousState: GameStateSnapshot | null, state: Ga
    */
 applyInitialCameraForState: (state: GameStateSnapshot) => void;
     /**
-   * Specifies the contract for the `clearRes1TooltipSummaryCaches` member (clearRes1TooltipSummaryCaches: () => void;).
+   * Specifies the contract for the `clearStrategicTooltipSummaryCaches` member (clearStrategicTooltipSummaryCaches: () => void;).
 
-   * Contract: Describes stable behavior for callers of `clearRes1TooltipSummaryCaches` in this codebase.
+   * Contract: Describes stable behavior for callers of `clearStrategicTooltipSummaryCaches` in this codebase.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-clearRes1TooltipSummaryCaches: () => void;
+clearStrategicTooltipSummaryCaches: () => void;
     /**
    * Specifies the contract for the `clearPendingTacticalOrders` member (clearPendingTacticalOrders: () => void;).
 
@@ -249,7 +249,7 @@ export function registerNewGameButton(deps: NewGameDeps): void {
         aiHomeRegion: selectedRegions.aiHomeRegion,
         gameSize: readSelectedGameSizeFromDocument(),
       })) as GameStateSnapshot;
-      await deps.refreshRes4TerrainOverridesForRenderer({ reloadStaticOverlays: true });
+      await deps.refreshTacticalTerrainOverridesForRenderer({ reloadStaticOverlays: true });
       S.gameState = state;
       S.strategicScenarioInitialLeafletView = null;
       tacticalReleaseRendererSessionForNewStrategicMatch(state);
@@ -264,7 +264,7 @@ export function registerNewGameButton(deps: NewGameDeps): void {
       if (state.hexes.length > 0) {
         deps.applyInitialCameraForState(state);
       }
-      deps.clearRes1TooltipSummaryCaches();
+      deps.clearStrategicTooltipSummaryCaches();
       S.humanStandingOrders = [];
       S.hoverRoutePreview = null;
       deps.clearPendingTacticalOrders();

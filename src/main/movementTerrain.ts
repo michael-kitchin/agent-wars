@@ -1,4 +1,4 @@
-import { getRes1InfrastructureForHex } from './gameDb';
+import { getStrategicInfrastructureForHex } from './gameDb';
 import { logTrace } from './logger';
 import { isNativeNavalTransitTerrain } from '../shared/navalStrategicEdges';
 
@@ -45,12 +45,12 @@ terrainKind?: string;
  *
  * Purpose: Spawn, mixed occupancy, and related checks must follow destroyed counts, not world metadata.
  * When to use: Single-hex seaport presence. Naval routing uses snapshot merge (`seaportCountByH3ForNavalLookup`).
- * Expected outcome: True only when `res1_infrastructure.seaport_count > 0`. A missing row counts as 0.
+ * Expected outcome: True only when `res_s_infrastructure.seaport_count > 0`. A missing row counts as 0.
  * Exceptions: None.
  */
 export function hexHasSeaport(h3Index: string): boolean {
   logTrace('movementTerrain hexHasSeaport', { h3Index });
-  return getRes1InfrastructureForHex(h3Index).seaportCount > 0;
+  return getStrategicInfrastructureForHex(h3Index).seaportCount > 0;
 }
 
 /**

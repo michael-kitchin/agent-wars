@@ -13,8 +13,8 @@ import {
 test('tactical context block includes battle metadata and sub-units', () => {
   const snap: TacticalBattleSnapshot = {
     battleId: 'tb-contract',
-    enclosingRes1H3Index: '811fbffffffffff',
-    res4ChildH3Indexes: ['811fafffffffff'],
+    enclosingStrategicH3Index: '811fbffffffffff',
+    tacticalChildH3Indexes: ['811fafffffffff'],
     strategicTurnNumber: 2,
     tacticalTurnNumber: 1,
     subUnits: [
@@ -38,8 +38,8 @@ test('tactical context block includes battle metadata and sub-units', () => {
 test('tactical context block omits strategic tool markers', () => {
   const snap: TacticalBattleSnapshot = {
     battleId: 'tb-clean',
-    enclosingRes1H3Index: '811fbffffffffff',
-    res4ChildH3Indexes: ['811fafffffffff'],
+    enclosingStrategicH3Index: '811fbffffffffff',
+    tacticalChildH3Indexes: ['811fafffffffff'],
     strategicTurnNumber: 1,
     tacticalTurnNumber: 1,
     subUnits: [

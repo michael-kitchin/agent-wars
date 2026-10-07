@@ -9,7 +9,7 @@ import {
   getForcedVisibleHomeRegionHexesForPlayer,
 } from '../../shared/homeRegionRules';
 import { logDebug, logTrace } from '../logger';
-import type { Res1InfrastructureRow } from './controlInfrastructure';
+import type { StrategicInfrastructureRow } from './controlInfrastructure';
 import type { GuardedDbOps } from './dbOps';
 import { getScenarioHomeRegionHexes } from '../regionScenario';
 import { loadScenarioState, REGION_VS_REGION_SCENARIO_ID } from './scenarioState';
@@ -18,7 +18,7 @@ import { readPersistedOriginBonusSettings } from './originBonusConfig';
 import { calendarMonthName, parseStartMonth } from '../../shared/weatherBonusRules';
 import { techLevelForBirthHex } from '../techBonus/techLevelForBirthHex';
 import { displayWeatherForHex, weatherTagsForBirthHex } from '../weather/weatherPackLoad';
-import { getRes1MajorityCountryNamesFromSnapshot } from '../unitOrigin/res4BirthCountryCache';
+import { getStrategicMajorityCountryNamesFromSnapshot } from '../unitOrigin/tacticalBirthCountryCache';
 
 /**
  * How many turns a last-known enemy position remains visible after contact is lost.
@@ -85,14 +85,14 @@ ops: FogDbOps;
    */
 listUnitsForSnapshot: () => GameStateSnapshot['units'];
     /**
-   * Specifies the contract for the `listRes1InfrastructureRows` member (listRes1InfrastructureRows: () => Res1InfrastructureRow[];).
+   * Specifies the contract for the `listStrategicInfrastructureRows` member (listStrategicInfrastructureRows: () => StrategicInfrastructureRow[];).
 
-   * Contract: Describes stable behavior for callers of `listRes1InfrastructureRows` in this codebase.
+   * Contract: Describes stable behavior for callers of `listStrategicInfrastructureRows` in this codebase.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-listRes1InfrastructureRows: () => Res1InfrastructureRow[];
+listStrategicInfrastructureRows: () => StrategicInfrastructureRow[];
 }
 
 /**
@@ -186,7 +186,7 @@ export function getGameStateSnapshot(deps: FogDeps): GameStateSnapshot {
   const hasHexes = !!hexCount && hexCount.c > 0;
   const ordered = hasHexes ? getOrderedHexList() : [];
   const originBonusSettings = readPersistedOriginBonusSettings(ops);
-  const countryNames = originBonusSettings.countryBonusEnabled ? getRes1MajorityCountryNamesFromSnapshot() : null;
+  const countryNames = originBonusSettings.countryBonusEnabled ? getStrategicMajorityCountryNamesFromSnapshot() : null;
   const hexRows: GameStateSnapshot['hexes'] = ordered.map((h3Index) => {
     const row = ops.getOne<{ terrain: string; terrain_kind: string }>('SELECT terrain, terrain_kind FROM hexes WHERE h3_index = ?', [h3Index]);
     return {
@@ -202,7 +202,7 @@ export function getGameStateSnapshot(deps: FogDeps): GameStateSnapshot {
   const gameOverRow = ops.getOne<{ value: string }>("SELECT value FROM game_config WHERE key = 'game_over'");
   const winnerRow = ops.getOne<{ value: string }>("SELECT value FROM game_config WHERE key = 'winner'");
   const controlRows = ops.getAll<{ h3Index: string; controllerPlayerId: string | null }>(
-    'SELECT h3_index AS h3Index, controller_player_id AS controllerPlayerId FROM res1_control'
+    'SELECT h3_index AS h3Index, controller_player_id AS controllerPlayerId FROM res_s_control'
   );
   const queueTotalRows = ops.getAll<{
     h3Index: string;
@@ -215,14 +215,14 @@ export function getGameStateSnapshot(deps: FogDeps): GameStateSnapshot {
             COALESCE(SUM(q.remaining_count), 0) AS queuedUnits,
             (
               SELECT qh.unit_type
-              FROM res1_build_queue qh
+              FROM res_s_build_queue qh
               WHERE qh.h3_index = q.h3_index
               ORDER BY qh.queue_index ASC, qh.id ASC
               LIMIT 1
             ) AS nextUnitType,
             (
               SELECT qh.remaining_count
-              FROM res1_build_queue qh
+              FROM res_s_build_queue qh
               WHERE qh.h3_index = q.h3_index
               ORDER BY qh.queue_index ASC, qh.id ASC
               LIMIT 1
@@ -230,15 +230,15 @@ export function getGameStateSnapshot(deps: FogDeps): GameStateSnapshot {
             COALESCE(
               (
                 SELECT p.stored_points
-                FROM res1_build_progress p
+                FROM res_s_build_progress p
                 WHERE p.h3_index = q.h3_index
               ),
               0
             ) AS storedPoints
-     FROM res1_build_queue q
+     FROM res_s_build_queue q
      GROUP BY q.h3_index`
   );
-  const infrastructureRows = deps.listRes1InfrastructureRows();
+  const infrastructureRows = deps.listStrategicInfrastructureRows();
   const gameOver = gameOverRow?.value === '1';
   const winner = winnerRow?.value ?? undefined;
   const weatherOn = originBonusSettings.weatherBonusEnabled === true;
@@ -264,9 +264,9 @@ export function getGameStateSnapshot(deps: FogDeps): GameStateSnapshot {
     phase: turnRow?.phase ?? 'planning',
     turnNumber,
     pendingOrders: orderRows,
-    res1Control: controlRows,
-    res1BuildQueueTotals: queueTotalRows,
-    res1Infrastructure: infrastructureRows,
+    strategicControl: controlRows,
+    strategicBuildQueueTotals: queueTotalRows,
+    strategicInfrastructure: infrastructureRows,
     gameOver: gameOver || undefined,
     winner,
     gameSize: readPersistedGameSize(ops),

@@ -6,15 +6,15 @@
 import assert from 'node:assert/strict';
 import { gridDisk } from 'h3-js';
 import { test } from 'node:test';
-import { firstRingCellDistinctFrom, tacticalRes1Cell, tacticalRes4UnderRes1Corner } from './testSupport/tacticalRes4HexFixtures';
+import { firstRingCellDistinctFrom, tacticalParentCell, tacticalUnderCorner } from './testSupport/tacticalHexFixtures';
 import { tacticalSequencedRandom, tacticalUniformForCombatDieFace } from './testSupport/tacticalDiceFixtures';
 import type { AirStrikeOrder } from '../../shared/ipcTypes';
 import type { TacticalBattleSnapshot, TacticalSubUnitSnapshot } from '../../shared/tacticalBattleTypes';
 import {
   dbGetOne,
   dbRun,
-  getRes1InfrastructureForHex,
-  reconcileRes1InfrastructureCountsFromRes4Overrides,
+  getStrategicInfrastructureForHex,
+  reconcileStrategicInfrastructureCountsFromTacticalOverrides,
 } from '../gameDb';
 import { withTempGameDb } from '../testSupport/withTempGameDb';
 import {
@@ -71,13 +71,13 @@ test('sortTacticalAirStrikesForStrategicPhaseOrder matches strategic-style attac
 });
 
 test('applyTacticalEmbarkPhaseOnBattle applies opponent embark before callers run merged combat', () => {
-  const res1 = '8f283082dcb519f';
+  const strategic = '8f283082dcb519f';
   const h0 = '8f283083dcb519f';
   const ring = [h0];
   const snap: TacticalBattleSnapshot = {
     battleId: 'tb-embark-order',
-    enclosingRes1H3Index: res1,
-    res4ChildH3Indexes: ring,
+    enclosingStrategicH3Index: strategic,
+    tacticalChildH3Indexes: ring,
     strategicTurnNumber: 1,
     tacticalTurnNumber: 1,
     subUnits: [
@@ -106,7 +106,7 @@ test('applyTacticalEmbarkPhaseOnBattle applies opponent embark before callers ru
 
 test('reconcileRes1InfrastructureCountsFromRes4Overrides is callable after tactical DB session (Phase 2.5 smoke)', () => {
   withTempGameDb('aw-tactical-infra-reconcile-', () => {
-    const { changedHexCount } = reconcileRes1InfrastructureCountsFromRes4Overrides();
+    const { changedHexCount } = reconcileStrategicInfrastructureCountsFromTacticalOverrides();
     assert.ok(typeof changedHexCount === 'number');
     assert.ok(changedHexCount >= 0);
   });
@@ -116,20 +116,20 @@ test('tactical urban air strike updates res1 urban_hex_count after reconcile (Ph
   withTempGameDb('aw-tactical-infra-urban-', () => {
     const urban = dbGetOne<{ h3Index: string; parentH3Index: string }>(
       `SELECT h3_index AS h3Index, parent_h3_index AS parentH3Index
-       FROM res4_feature_overrides
+       FROM res_t_feature_overrides
        WHERE is_urban = 1 AND is_rubble = 0
        LIMIT 1`
     );
     assert.ok(urban);
     const parent = urban!.parentH3Index;
-    const beforeUrban = getRes1InfrastructureForHex(parent).urbanHexCount;
+    const beforeUrban = getStrategicInfrastructureForHex(parent).urbanHexCount;
     assert.ok(beforeUrban > 0, 'fixture needs positive res1 urban rollup before strike');
     const ring = [...gridDisk(urban!.h3Index, 2)];
     assert.ok(ring.includes(urban!.h3Index));
     const snap: TacticalBattleSnapshot = {
       battleId: 'tb-infra-urban',
-      enclosingRes1H3Index: parent,
-      res4ChildH3Indexes: ring,
+      enclosingStrategicH3Index: parent,
+      tacticalChildH3Indexes: ring,
       strategicTurnNumber: 1,
       tacticalTurnNumber: 1,
       subUnits: [
@@ -158,8 +158,8 @@ test('tactical urban air strike updates res1 urban_hex_count after reconcile (Ph
       out.infrastructureDestroyedEvents.length > 0,
       'urban res4 strike should emit infrastructureDestroyedEvents'
     );
-    reconcileRes1InfrastructureCountsFromRes4Overrides();
-    const afterUrban = getRes1InfrastructureForHex(parent).urbanHexCount;
+    reconcileStrategicInfrastructureCountsFromTacticalOverrides();
+    const afterUrban = getStrategicInfrastructureForHex(parent).urbanHexCount;
     assert.strictEqual(afterUrban, beforeUrban - 1);
     assert.strictEqual(
       out.airStrikePlaybackMoves.length,
@@ -174,7 +174,7 @@ test('applyTacticalAirStrikeThenRangedPhaseOnBattle leaves air playback arrays e
   withTempGameDb('aw-tactical-no-air-playback-', () => {
     const urban = dbGetOne<{ h3Index: string; parentH3Index: string }>(
       `SELECT h3_index AS h3Index, parent_h3_index AS parentH3Index
-       FROM res4_feature_overrides
+       FROM res_t_feature_overrides
        WHERE is_urban = 1 AND is_rubble = 0
        LIMIT 1`
     );
@@ -186,13 +186,13 @@ test('applyTacticalAirStrikeThenRangedPhaseOnBattle leaves air playback arrays e
     for (const h of ring) terrain[h] = 'plains';
     const snap: TacticalBattleSnapshot = {
       battleId: 'tb-ranged-no-air-playback',
-      enclosingRes1H3Index: urban!.parentH3Index,
-      res4ChildH3Indexes: ring,
+      enclosingStrategicH3Index: urban!.parentH3Index,
+      tacticalChildH3Indexes: ring,
       strategicTurnNumber: 1,
       tacticalTurnNumber: 1,
       strategicHexTerrain: 'land',
       strategicHexTerrainKind: 'plains',
-      res4TerrainKindByH3: terrain,
+      tacticalTerrainKindByH3: terrain,
       subUnits: [
         {
           id: 'hi-no-air',
@@ -224,7 +224,7 @@ test('tactical infra-only ranged strike leaves urban DB row when strike roll mis
   withTempGameDb('aw-tactical-ranged-infra-miss-', () => {
     const urban = dbGetOne<{ h3Index: string; parentH3Index: string }>(
       `SELECT h3_index AS h3Index, parent_h3_index AS parentH3Index
-       FROM res4_feature_overrides
+       FROM res_t_feature_overrides
        WHERE is_urban = 1 AND is_rubble = 0
        LIMIT 1`
     );
@@ -236,13 +236,13 @@ test('tactical infra-only ranged strike leaves urban DB row when strike roll mis
     for (const h of ring) terrain[h] = 'plains';
     const snap: TacticalBattleSnapshot = {
       battleId: 'tb-ranged-infra-miss',
-      enclosingRes1H3Index: urban!.parentH3Index,
-      res4ChildH3Indexes: ring,
+      enclosingStrategicH3Index: urban!.parentH3Index,
+      tacticalChildH3Indexes: ring,
       strategicTurnNumber: 1,
       tacticalTurnNumber: 1,
       strategicHexTerrain: 'land',
       strategicHexTerrainKind: 'plains',
-      res4TerrainKindByH3: terrain,
+      tacticalTerrainKindByH3: terrain,
       subUnits: [
         {
           id: 'hi-infra-miss',
@@ -266,7 +266,7 @@ test('tactical infra-only ranged strike leaves urban DB row when strike roll mis
       'singlePlayer'
     );
     const row = dbGetOne<{ isRubble: number }>(
-      'SELECT is_rubble AS isRubble FROM res4_feature_overrides WHERE h3_index = ?',
+      'SELECT is_rubble AS isRubble FROM res_t_feature_overrides WHERE h3_index = ?',
       [urban!.h3Index]
     );
     assert.strictEqual(row?.isRubble, 0);
@@ -277,7 +277,7 @@ test('tactical infra-only ranged strike converts urban DB row to rubble on hit',
   withTempGameDb('aw-tactical-ranged-infra-hit-', () => {
     const urban = dbGetOne<{ h3Index: string; parentH3Index: string }>(
       `SELECT h3_index AS h3Index, parent_h3_index AS parentH3Index
-       FROM res4_feature_overrides
+       FROM res_t_feature_overrides
        WHERE is_urban = 1 AND is_rubble = 0
        LIMIT 1`
     );
@@ -289,13 +289,13 @@ test('tactical infra-only ranged strike converts urban DB row to rubble on hit',
     for (const h of ring) terrain[h] = 'plains';
     const snap: TacticalBattleSnapshot = {
       battleId: 'tb-ranged-infra-hit',
-      enclosingRes1H3Index: urban!.parentH3Index,
-      res4ChildH3Indexes: ring,
+      enclosingStrategicH3Index: urban!.parentH3Index,
+      tacticalChildH3Indexes: ring,
       strategicTurnNumber: 1,
       tacticalTurnNumber: 1,
       strategicHexTerrain: 'land',
       strategicHexTerrainKind: 'plains',
-      res4TerrainKindByH3: terrain,
+      tacticalTerrainKindByH3: terrain,
       subUnits: [
         {
           id: 'hi-infra-hit',
@@ -320,7 +320,7 @@ test('tactical infra-only ranged strike converts urban DB row to rubble on hit',
     );
     assert.ok(out.infrastructureDestroyedEvents.length > 0);
     const row = dbGetOne<{ isRubble: number; isUrban: number }>(
-      'SELECT is_rubble AS isRubble, is_urban AS isUrban FROM res4_feature_overrides WHERE h3_index = ?',
+      'SELECT is_rubble AS isRubble, is_urban AS isUrban FROM res_t_feature_overrides WHERE h3_index = ?',
       [urban!.h3Index]
     );
     assert.strictEqual(row?.isRubble, 1);
@@ -329,14 +329,14 @@ test('tactical infra-only ranged strike converts urban DB row to rubble on hit',
 });
 
 test('tactical air strike against units removes one sub-unit when sibling sub-units remain', () => {
-  const res1 = tacticalRes1Cell(11, 12);
-  const h0 = tacticalRes4UnderRes1Corner(11, 12);
+  const strategic = tacticalParentCell(11, 12);
+  const h0 = tacticalUnderCorner(11, 12);
   const h1 = firstRingCellDistinctFrom(h0);
   const ring = [...gridDisk(h0, 1)];
   const snap: TacticalBattleSnapshot = {
     battleId: 'tb-air-sibling-survives',
-    enclosingRes1H3Index: res1,
-    res4ChildH3Indexes: ring,
+    enclosingStrategicH3Index: strategic,
+    tacticalChildH3Indexes: ring,
     strategicTurnNumber: 1,
     tacticalTurnNumber: 1,
     subUnits: [
@@ -384,8 +384,8 @@ test('tactical air strike against units removes one sub-unit when sibling sub-un
 
 test('tactical air strike deletes strategic parent when the last sub-unit is eliminated', () => {
   withTempGameDb('aw-tactical-air-last-sub-', () => {
-    const res1 = tacticalRes1Cell(13, 14);
-    const h0 = tacticalRes4UnderRes1Corner(13, 14);
+    const strategic = tacticalParentCell(13, 14);
+    const h0 = tacticalUnderCorner(13, 14);
     const h1 = firstRingCellDistinctFrom(h0);
     const ring = [...gridDisk(h0, 1)];
     const parentId = 'opponent-armor-test-last-sub';
@@ -393,13 +393,13 @@ test('tactical air strike deletes strategic parent when the last sub-unit is eli
       parentId,
       'opponent',
       'armor',
-      res1,
+      strategic,
       0,
     ]);
     const snap: TacticalBattleSnapshot = {
       battleId: 'tb-air-last-sub',
-      enclosingRes1H3Index: res1,
-      res4ChildH3Indexes: ring,
+      enclosingStrategicH3Index: strategic,
+      tacticalChildH3Indexes: ring,
       strategicTurnNumber: 1,
       tacticalTurnNumber: 1,
       subUnits: [
@@ -440,7 +440,7 @@ test('tactical infrastructure counterattack removes attacker without killsByAirS
   withTempGameDb('aw-tactical-infra-counter-', () => {
     const urban = dbGetOne<{ h3Index: string; parentH3Index: string }>(
       `SELECT h3_index AS h3Index, parent_h3_index AS parentH3Index
-       FROM res4_feature_overrides
+       FROM res_t_feature_overrides
        WHERE is_urban = 1 AND is_rubble = 0
        LIMIT 1`
     );
@@ -449,8 +449,8 @@ test('tactical infrastructure counterattack removes attacker without killsByAirS
     const neighbor = firstRingCellDistinctFrom(urban!.h3Index);
     const snap: TacticalBattleSnapshot = {
       battleId: 'tb-infra-counter',
-      enclosingRes1H3Index: urban!.parentH3Index,
-      res4ChildH3Indexes: ring,
+      enclosingStrategicH3Index: urban!.parentH3Index,
+      tacticalChildH3Indexes: ring,
       strategicTurnNumber: 1,
       tacticalTurnNumber: 1,
       subUnits: [
@@ -484,28 +484,28 @@ test('tactical infrastructure counterattack removes attacker without killsByAirS
 });
 
 test('tactical infantry in the target hex can AA a striking air sub-unit', () => {
-  const res1 = tacticalRes1Cell(12, 34);
-  const res4Inf = tacticalRes4UnderRes1Corner(12, 34);
-  const res4Air = firstRingCellDistinctFrom(res4Inf);
-  const ring = [...new Set([res4Inf, res4Air, ...gridDisk(res4Inf, 2)])];
+  const strategic = tacticalParentCell(12, 34);
+  const tacticalInf = tacticalUnderCorner(12, 34);
+  const tacticalAir = firstRingCellDistinctFrom(tacticalInf);
+  const ring = [...new Set([tacticalInf, tacticalAir, ...gridDisk(tacticalInf, 2)])];
   const terrain: Record<string, string> = {};
   for (const h of ring) terrain[h] = 'plains';
   const snap: TacticalBattleSnapshot = {
     battleId: 'tb-inf-aa',
-    enclosingRes1H3Index: res1,
-    res4ChildH3Indexes: ring,
+    enclosingStrategicH3Index: strategic,
+    tacticalChildH3Indexes: ring,
     strategicTurnNumber: 1,
     tacticalTurnNumber: 1,
     strategicHexTerrain: 'land',
     strategicHexTerrainKind: 'plains',
-    res4TerrainKindByH3: terrain,
+    tacticalTerrainKindByH3: terrain,
     subUnits: [
       {
         id: 'hum-air-aa',
         parentUnitId: 'p-air',
         player: 'human',
         unitType: 'air',
-        h3Index: res4Air,
+        h3Index: tacticalAir,
         displayName: 'Air',
       },
       {
@@ -513,7 +513,7 @@ test('tactical infantry in the target hex can AA a striking air sub-unit', () =>
         parentUnitId: 'p-air',
         player: 'human',
         unitType: 'air',
-        h3Index: res4Air,
+        h3Index: tacticalAir,
         displayName: 'Air sibling',
       },
       {
@@ -521,14 +521,14 @@ test('tactical infantry in the target hex can AA a striking air sub-unit', () =>
         parentUnitId: 'p-inf',
         player: 'opponent',
         unitType: 'infantry',
-        h3Index: res4Inf,
+        h3Index: tacticalInf,
         displayName: 'Infantry',
       },
     ],
   };
   const out = applyTacticalAirStrikeThenRangedPhaseOnBattle(
     snap,
-    [{ unitId: 'hum-air-aa', targetH3Index: res4Inf, targetType: 'units' }],
+    [{ unitId: 'hum-air-aa', targetH3Index: tacticalInf, targetType: 'units' }],
     undefined,
     'human',
     tacticalSequencedRandom([
@@ -548,8 +548,8 @@ test('tactical infantry in the target hex can AA a striking air sub-unit', () =>
   assert.deepEqual(
     out.airStrikeDiceRolls.map((r) => [r.kind, r.face, r.anchorH3Index]),
     [
-      ['airStrike', 20, res4Inf],
-      ['antiAir', 1, res4Inf],
+      ['airStrike', 20, tacticalInf],
+      ['antiAir', 1, tacticalInf],
     ],
     'strike and AA rolls are recorded in order on the target cell'
   );
@@ -568,27 +568,27 @@ test('tactical infantry in the target hex can AA a striking air sub-unit', () =>
  * Exceptions: Throws when resolution draws more rolls than `faces` provides.
  */
 function strikeLoneInfantryOn(targetTerrainKind: string, faces: readonly number[]) {
-  const res1 = tacticalRes1Cell(12, 34);
-  const res4Inf = tacticalRes4UnderRes1Corner(12, 34);
-  const res4Air = firstRingCellDistinctFrom(res4Inf);
-  const ring = [...new Set([res4Inf, res4Air, ...gridDisk(res4Inf, 2)])];
+  const strategic = tacticalParentCell(12, 34);
+  const tacticalInf = tacticalUnderCorner(12, 34);
+  const tacticalAir = firstRingCellDistinctFrom(tacticalInf);
+  const ring = [...new Set([tacticalInf, tacticalAir, ...gridDisk(tacticalInf, 2)])];
   const terrain: Record<string, string> = Object.fromEntries(ring.map((h) => [h, 'plains']));
-  terrain[res4Inf] = targetTerrainKind;
+  terrain[tacticalInf] = targetTerrainKind;
   const snap: TacticalBattleSnapshot = {
     battleId: 'tb-air-cover',
-    enclosingRes1H3Index: res1,
-    res4ChildH3Indexes: ring,
+    enclosingStrategicH3Index: strategic,
+    tacticalChildH3Indexes: ring,
     strategicTurnNumber: 1,
     tacticalTurnNumber: 1,
     strategicHexTerrain: 'land',
     strategicHexTerrainKind: 'plains',
-    res4TerrainKindByH3: terrain,
+    tacticalTerrainKindByH3: terrain,
     subUnits: [
-      { id: 'hum-air-cover', parentUnitId: 'p-air', player: 'human', unitType: 'air', h3Index: res4Air, displayName: 'Air' },
-      { id: 'opp-inf-cover', parentUnitId: 'p-inf', player: 'opponent', unitType: 'infantry', h3Index: res4Inf, displayName: 'Infantry' },
+      { id: 'hum-air-cover', parentUnitId: 'p-air', player: 'human', unitType: 'air', h3Index: tacticalAir, displayName: 'Air' },
+      { id: 'opp-inf-cover', parentUnitId: 'p-inf', player: 'opponent', unitType: 'infantry', h3Index: tacticalInf, displayName: 'Infantry' },
     ],
   };
-  const strike: AirStrikeOrder = { unitId: 'hum-air-cover', targetH3Index: res4Inf, targetType: 'units' };
+  const strike: AirStrikeOrder = { unitId: 'hum-air-cover', targetH3Index: tacticalInf, targetType: 'units' };
   const next = tacticalSequencedRandom(faces.map(tacticalUniformForCombatDieFace));
   return applyTacticalAirStrikeThenRangedPhaseOnBattle(snap, [strike], undefined, 'human', next, 'singlePlayer');
 }

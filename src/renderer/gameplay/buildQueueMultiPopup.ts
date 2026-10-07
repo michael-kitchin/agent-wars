@@ -4,7 +4,7 @@ import { resolutionPlaybackBlocksMapOrders } from '../../shared/mapOrderGestureG
 import { estimateTurnsToCompleteQueuedProduction, sumQueuedProductionCost } from '../../shared/productionConfig';
 import { UNIT_SELECT_GLYPH } from '../core/constants';
 import { rendererSharedState as S } from '../core/state';
-import { baselineUrbanHexCountForRes1Hex } from '../rendererRes4Hydration';
+import { baselineUrbanHexCountForStrategicHex } from '../rendererTacticalHydration';
 import {
   appendKeepBuildingCheckbox,
   areAllKeepBuildingArmed,
@@ -281,7 +281,7 @@ export async function renderMultiBuildQueueIntoMount(deps: MultiBuildQueueRender
 
   const techLineHtml = formatSelectedHexTechLineHtml({
     techBonusEnabled: S.gameState?.techBonusEnabled === true,
-    baselineUrbanHexCounts: selectedH3Indexes.map((h3Index) => baselineUrbanHexCountForRes1Hex(h3Index)),
+    baselineUrbanHexCounts: selectedH3Indexes.map((h3Index) => baselineUrbanHexCountForStrategicHex(h3Index)),
   });
   if (techLineHtml) {
     const techLine = document.createElement('div');

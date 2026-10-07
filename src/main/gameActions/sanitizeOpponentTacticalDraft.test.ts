@@ -9,9 +9,9 @@ import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { resetTacticalMovementPlanningCacheForTests } from '../tacticalBattle/tacticalMovementPlanningCache';
 import {
   firstRingCellDistinctFrom,
-  tacticalRes1Cell,
-  tacticalRes4Cell,
-} from '../tacticalBattle/testSupport/tacticalRes4HexFixtures';
+  tacticalParentCell,
+  tacticalCell,
+} from '../tacticalBattle/testSupport/tacticalHexFixtures';
 import { sanitizeOpponentTacticalDraftForReadyCommit } from './gameActionsCore';
 
 beforeEach(() => {
@@ -35,8 +35,8 @@ function minimalOpponentMarchBattle(
   const lng = 49;
   return {
     battleId: 'sanitize-no-op',
-    enclosingRes1H3Index: tacticalRes1Cell(lat, lng),
-    res4ChildH3Indexes: footprint,
+    enclosingStrategicH3Index: tacticalParentCell(lat, lng),
+    tacticalChildH3Indexes: footprint,
     strategicTurnNumber: 1,
     tacticalTurnNumber: 1,
     strategicHexTerrain: 'land',
@@ -55,7 +55,7 @@ function minimalOpponentMarchBattle(
 }
 
 test('sanitize drops same-hex opponent march (stale no-op recycle guard)', () => {
-  const center = tacticalRes4Cell(39, 49);
+  const center = tacticalCell(39, 49);
   const battle = minimalOpponentMarchBattle(center, [center], 'naval');
   const draft = {
     movementOrders: [{ unitId: 'opp:01', toH3Index: center }],
@@ -69,7 +69,7 @@ test('sanitize drops same-hex opponent march (stale no-op recycle guard)', () =>
 });
 
 test('sanitize keeps opponent march to a different reachable hex', () => {
-  const center = tacticalRes4Cell(40, 50);
+  const center = tacticalCell(40, 50);
   const neighbor = firstRingCellDistinctFrom(center);
   const battle = minimalOpponentMarchBattle(center, [center, neighbor]);
   const draft = {

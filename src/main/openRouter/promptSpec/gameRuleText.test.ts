@@ -13,7 +13,7 @@ import { AIR_STRIKE_RANGE_HEXES, MOVEMENT_RANGE_BY_UNIT_TYPE, RANGED_RANGE_BY_UN
 import {
   TACTICAL_TRANSPORT_RAIL_BUDGET_MULTIPLIER,
   TACTICAL_TRANSPORT_ROAD_BUDGET_MULTIPLIER,
-} from '../../../shared/tacticalRes4TransportLink';
+} from '../../../shared/tacticalTransportLink';
 import { UNIT_COST_BY_TYPE } from '../../productionRules';
 import { ORIGIN_BONUS_OFF } from '../../../shared/originBonusRules';
 import {

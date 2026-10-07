@@ -5,25 +5,25 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { gridDisk } from 'h3-js';
-import { res4GridDiskNeighborsOrdered } from '../../shared/tacticalRes4TransportLink';
-import { tacticalMarchFirstStopAlongPath, tacticalMarchWithinRes4GridSteps } from './tacticalRulesAdapter';
+import { tacticalGridDiskNeighborsOrdered } from '../../shared/tacticalTransportLink';
+import { tacticalMarchFirstStopAlongPath, tacticalMarchWithinGridSteps } from './tacticalRulesAdapter';
 import { resetTacticalMovementPlanningCacheForTests } from './tacticalMovementPlanningCache';
-import { firstRingCellDistinctFrom, tacticalRes4Cell } from './testSupport/tacticalRes4HexFixtures';
+import { firstRingCellDistinctFrom, tacticalCell } from './testSupport/tacticalHexFixtures';
 
 test('tacticalMarchWithinRes4GridSteps allows same cell within limit zero', () => {
-  const cell = tacticalRes4Cell(10, 20);
-  assert.equal(tacticalMarchWithinRes4GridSteps(cell, cell, 0), true);
+  const cell = tacticalCell(10, 20);
+  assert.equal(tacticalMarchWithinGridSteps(cell, cell, 0), true);
 });
 
 test('tacticalMarchWithinRes4GridSteps matches grid distance for a res4 neighbor', () => {
-  const center = tacticalRes4Cell(10, 20);
+  const center = tacticalCell(10, 20);
   const neighbor = firstRingCellDistinctFrom(center);
-  assert.equal(tacticalMarchWithinRes4GridSteps(center, neighbor, 0), false);
-  assert.equal(tacticalMarchWithinRes4GridSteps(center, neighbor, 1), true);
+  assert.equal(tacticalMarchWithinGridSteps(center, neighbor, 0), false);
+  assert.equal(tacticalMarchWithinGridSteps(center, neighbor, 1), true);
 });
 
 test('tacticalMarchFirstStopAlongPath stops at maxEdges when the path is longer', () => {
-  const center = tacticalRes4Cell(5, 6);
+  const center = tacticalCell(5, 6);
   const ring1 = [...gridDisk(center, 1)];
   const ring2 = [...gridDisk(center, 2)];
   const footprint = new Set([...ring2]);
@@ -36,7 +36,7 @@ test('tacticalMarchFirstStopAlongPath stops at maxEdges when the path is longer'
 });
 
 test('tacticalMarchFirstStopAlongPath reaches destination when within maxEdges', () => {
-  const center = tacticalRes4Cell(7, 8);
+  const center = tacticalCell(7, 8);
   const neighbor = firstRingCellDistinctFrom(center);
   const footprint = new Set(gridDisk(center, 1));
   const { stopH3, consumedFullPath } = tacticalMarchFirstStopAlongPath(center, neighbor, 2, footprint);
@@ -46,12 +46,12 @@ test('tacticalMarchFirstStopAlongPath reaches destination when within maxEdges',
 
 test('tacticalMarchFirstStopAlongPath honors res4 road masks when battle snapshot includes them (armor through mountain)', () => {
   resetTacticalMovementPlanningCacheForTests();
-  const p = tacticalRes4Cell(58, 68);
+  const p = tacticalCell(58, 68);
   const m = firstRingCellDistinctFrom(p);
-  const ringM = res4GridDiskNeighborsOrdered(m);
+  const ringM = tacticalGridDiskNeighborsOrdered(m);
   const w = ringM.find((h) => h !== p);
   assert.ok(w);
-  const ringP = res4GridDiskNeighborsOrdered(p);
+  const ringP = tacticalGridDiskNeighborsOrdered(p);
   const iPm = ringP.indexOf(m);
   assert.ok(iPm >= 0);
   const nP = ringP.length;
@@ -77,7 +77,7 @@ test('tacticalMarchFirstStopAlongPath honors res4 road masks when battle snapsho
         displayName: 'Armor',
       },
     ],
-    res4TerrainKindByH3: { [p]: 'plains', [m]: 'mountain', [w]: 'plains' },
+    tacticalTerrainKindByH3: { [p]: 'plains', [m]: 'mountain', [w]: 'plains' },
     strategicHexTerrain: 'land',
     strategicHexTerrainKind: 'plains',
   };
@@ -87,8 +87,8 @@ test('tacticalMarchFirstStopAlongPath honors res4 road masks when battle snapsho
   resetTacticalMovementPlanningCacheForTests();
   const { stopH3, consumedFullPath } = tacticalMarchFirstStopAlongPath(p, m, 4, footprint, {
     ...battleBase,
-    res4RoadSidesByH3: { [p]: roadP, [m]: roadM },
-    res4RailSidesByH3: { [p]: railP, [m]: railM },
+    tacticalRoadSidesByH3: { [p]: roadP, [m]: roadM },
+    tacticalRailSidesByH3: { [p]: railP, [m]: railM },
   }, 'armor');
   assert.equal(stopH3, m);
   assert.equal(consumedFullPath, true);

@@ -14,17 +14,17 @@ import {
 export type RangePerimeterUnitInput = { readonly h3Index: string; readonly unitType: string };
 
 /**
- * Strategic res1 ranged distance in hex steps. Source of truth for `getRange` in `src/main/combatConstants.ts`.
+ * Strategic strategic ranged distance in hex steps. Source of truth for `getRange` in `src/main/combatConstants.ts`.
  *
  * Purpose: One table for renderer perimeters, strategic validation, return fire, DEFEND auto-ranged, and air-strike AA.
- * When to use: Strategic (res1) ranged distance only — not tactical `RANGED_RANGE_BY_UNIT_TYPE`.
+ * When to use: Strategic ranged distance only — not tactical `RANGED_RANGE_BY_UNIT_TYPE`.
  * Expected outcome: infantry 0 (melee only), armor 1, naval 2, air 3; `0` for unknown types.
  * Exceptions: None.
  */
 export function strategicRangedRangeHexesForUnitType(unitType: string): number {
   const table: Record<string, number> = {
     /**
-     * Strategic infantry is melee-only on the res1 map.
+     * Strategic infantry is melee-only on the strategic map.
      *
      * Purpose: Gates ranged orders, planning-parity return fire, DEFEND auto-ranged, and strategic air-strike AA.
      * When to use: Keep at `0`. Tactical infantry ranged and tactical AA use `RANGED_RANGE_BY_UNIT_TYPE`.
@@ -40,7 +40,7 @@ export function strategicRangedRangeHexesForUnitType(unitType: string): number {
 }
 
 /**
- * Returns whether a unit type can issue strategic (res1) direct ranged attacks.
+ * Returns whether a unit type can issue strategic direct ranged attacks.
  *
  * Purpose: Keeps the renderer Ranged-mode gate aligned with `getRange` without importing main-process combat constants.
  * When to use: Strategic map UI only — not tactical battles (use `unitHasTacticalRangedBaseline`).
@@ -54,7 +54,7 @@ export function unitHasStrategicRangedBaseline(unitType: string): boolean {
 /**
  * Returns whether a unit type may enter direct ranged planning for the current theater.
  *
- * Purpose: One predicate for the Ranged button so strategic infantry stay melee-only while tactical infantry keep res4 ranged.
+ * Purpose: One predicate for the Ranged button so strategic infantry stay melee-only while tactical infantry keep tactical ranged.
  * When to use: Renderer ranged-mode enable/show paths that already know whether a tactical battle snapshot is active.
  * Expected outcome: Strategic uses `unitHasStrategicRangedBaseline`; tactical uses `unitHasTacticalRangedBaseline`.
  * Exceptions: None.
@@ -66,7 +66,7 @@ export function unitHasDirectRangedPlanning(unitType: string, tacticalBattleActi
 }
 
 /**
- * Unions `gridDisk` around each unit using strategic ranged range (res1).
+ * Unions `gridDisk` around each unit using the strategic ranged range.
  *
  * Purpose: Range-only envelope for strategic ranged planning mode.
  * When to use: Strategic map with `rangedModeActive` and selected ground units.
@@ -88,7 +88,7 @@ export function buildStrategicRangedRangeSet(units: readonly RangePerimeterUnitI
 }
 
 /**
- * Unions `gridDisk` around each unit using strategic air-strike range (res1).
+ * Unions `gridDisk` around each unit using the strategic air-strike range.
  *
  * Purpose: Range-only envelope for strategic air-strike planning mode.
  * When to use: Strategic map with `airStrikeModeActive` and selected air units.
@@ -108,7 +108,7 @@ export function buildStrategicAirStrikeRangeSet(units: readonly RangePerimeterUn
 }
 
 /**
- * Unions effective tactical ranged disks clipped to the battle footprint (res4).
+ * Unions effective tactical ranged disks clipped to the battle footprint (tactical).
  *
  * Purpose: Range-only envelope for tactical ranged planning (terrain caps, no LOS).
  * When to use: Tactical battle with `rangedModeActive` and selected sub-units.
@@ -137,9 +137,9 @@ export function buildTacticalRangedRangeSet(
 }
 
 /**
- * Returns the full tactical res4 footprint for air-strike perimeter (no grid cap).
+ * Returns the full tactical footprint for air-strike perimeter (no grid cap).
  *
- * Purpose: Tactical air strikes may target any res4 cell in the parent res1 battle area.
+ * Purpose: Tactical air strikes may target any tactical cell in the parent strategic battle area.
  * When to use: Tactical battle with `airStrikeModeActive`.
  * Expected outcome: Same cells as `footprint`.
  * Exceptions: None.

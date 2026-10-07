@@ -3,7 +3,8 @@
  * air strike phase, ranged phase, then callers apply movement, ferry, cargo sync, and melee.
  */
 
-import { cellToParent } from 'h3-js';
+import { strategicParentOf } from '../../shared/h3Resolutions';
+
 import type {
   AirStrikeAnimationMove,
   AirStrikeOrder,
@@ -18,9 +19,9 @@ import { tacticalFerryApplyOutcome } from './tacticalFerryAirportGuards';
 import {
   tacticalMovementTerrainAnchorH3,
   tacticalRangedDirectFirePassesTerrainAndRange,
-  tacticalRes4HasStrikeableInfrastructure,
+  tacticalHasStrikeableInfrastructure,
 } from '../../shared/tacticalTerrainCombatModifiers';
-import { tacticalRes4CellHasActiveTransportCorridor } from '../../shared/tacticalRes4TransportLink';
+import { tacticalCellHasActiveTransportCorridor } from '../../shared/tacticalTransportLink';
 import { createCombatDieRoller, INFRASTRUCTURE_COUNTER_FIRE_THRESHOLD } from '../combatDice';
 import { attackHitThreshold } from '../combatHitThresholds';
 import { createCombatDiceLog, rollCombatDieAgainst } from '../combatDiceRecording';
@@ -43,11 +44,11 @@ import type { CombatUnit } from '../combatUnitTypes';
 import { deleteStrategicParentUnitAndApplyTransportOutcome } from '../gameActions/sealift';
 import { applyInfrastructureDestructionEffects } from '../gameActions/airStrikeResolution';
 import {
-  applyTacticalRangedRubbleToRes4Cell,
+  applyTacticalRangedRubbleToCell,
   type TacticalRangedRubbleApplyOptions,
 } from '../gameActions/tacticalRangedInfrastructureRubble';
-import { isDbReady, listRes4FeatureOverridesForGame } from '../gameDb';
-import { refreshTacticalBattleRes4TerrainFromGameDb } from './computeTacticalBattleSnapshot';
+import { isDbReady, listTacticalFeatureOverridesForGame } from '../gameDb';
+import { refreshTacticalBattleTerrainFromGameDb } from './computeTacticalBattleSnapshot';
 import { buildTacticalReturnFireContext, tacticalEmbarkedLandExcludedFromRangedInput } from './tacticalCombatInput';
 import { tacticalLogMutate, tacticalLogQuery } from './tacticalLogging';
 import {
@@ -59,41 +60,41 @@ import {
  * Picks an `InfrastructureDestroyedEvent.targetType` label from DB override flags before a ranged rubble write.
  *
  * Purpose: Keeps tactical ranged infrastructure toasts aligned with air-strike `targetType` vocabulary when a cell mixes features.
- * When to use: Immediately before `applyTacticalRangedRubbleToRes4Cell` when emitting synthetic infra events.
+ * When to use: Immediately before `applyTacticalRangedRubbleToTacticalCell` when emitting synthetic infra events.
  * Expected outcome: `airport` when the row had an airport; else `seaport` when a seaport flag; else `urban`.
  * Exceptions: None; missing rows default to `urban`.
  */
 function tacticalRangedRubbleApplyOptsForHex(
   battle: Pick<
     TacticalBattleSnapshot,
-    | 'res4TerrainKindByH3'
+    | 'tacticalTerrainKindByH3'
     | 'strategicHexTerrainKind'
-    | 'res4RoadSidesByH3'
-    | 'res4RailSidesByH3'
-    | 'res4IsRubbleByH3'
+    | 'tacticalRoadSidesByH3'
+    | 'tacticalRailSidesByH3'
+    | 'tacticalIsRubbleByH3'
   >,
   hex: string
 ): TacticalRangedRubbleApplyOptions {
   const merged =
-    (battle.res4TerrainKindByH3 && battle.res4TerrainKindByH3[hex]) ||
+    (battle.tacticalTerrainKindByH3 && battle.tacticalTerrainKindByH3[hex]) ||
     battle.strategicHexTerrainKind ||
     'plains';
   return {
     mergedTerrainKindForInsert: String(merged),
-    insertStrikeableTransportCorridor: tacticalRes4CellHasActiveTransportCorridor({
+    insertStrikeableTransportCorridor: tacticalCellHasActiveTransportCorridor({
       cellH3: hex,
-      roadSidesByH3: battle.res4RoadSidesByH3,
-      railSidesByH3: battle.res4RailSidesByH3,
-      rubbleByH3: battle.res4IsRubbleByH3,
+      roadSidesByH3: battle.tacticalRoadSidesByH3,
+      railSidesByH3: battle.tacticalRailSidesByH3,
+      rubbleByH3: battle.tacticalIsRubbleByH3,
     }),
   };
 }
 
 function tacticalRangedInfraEventTargetTypeBeforeRubble(
-  res4H3: string,
+  tacticalH3: string,
   rows: ReadonlyArray<{ h3Index: string; isAirport: boolean; isSeaport: boolean; isUrban: boolean; isRubble: boolean }>
 ): 'urban' | 'airport' | 'seaport' {
-  const row = rows.find((r) => r.h3Index === res4H3 && !r.isRubble);
+  const row = rows.find((r) => r.h3Index === tacticalH3 && !r.isRubble);
   if (row?.isAirport) return 'airport';
   if (row?.isSeaport) return 'seaport';
   return 'urban';
@@ -162,7 +163,7 @@ function tacticalSubUnitsToRangedCombatUnits(
 }
 
 /**
- * Sorts tactical air strike orders like `resolveAirStrikePhase`: attacker res4 cell, then attacker unit id.
+ * Sorts tactical air strike orders like `resolveAirStrikePhase`: attacker tactical cell, then attacker unit id.
  *
  * Purpose: Preserves strategic strike sequencing when multiple aircraft act on one tactical turn.
  * When to use: Before iterating air strike rows in `applyTacticalAirStrikeThenRangedPhaseOnBattle`.
@@ -247,7 +248,7 @@ export type TacticalAirRangedPhaseAccum = {
    *
    * Purpose: Maps to `TacticalCommitResolutionPlayback.airStrikeHexes` separate from ranged combat hexes.
    * When to use: Same assembly path as `airStrikePlaybackMoves`.
-   * Expected outcome: De-duplicated res4 target references for strikes that entered the animation pipeline.
+   * Expected outcome: De-duplicated tactical target references for strikes that entered the animation pipeline.
    * Exceptions: None.
    */
   airStrikePlaybackStrikeHexes: string[];
@@ -396,8 +397,8 @@ export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
     airStrikeAttemptCount += 1;
     strikeHexesSet.add(s.targetH3Index);
     const fromH3Index = attacker.h3Index;
-    const parent = cellToParent(s.targetH3Index, 1);
-    if (parent !== battle.enclosingRes1H3Index) {
+    const parent = strategicParentOf(s.targetH3Index);
+    if (parent !== battle.enclosingStrategicH3Index) {
       strikeMoves.push({
         unitId: attacker.id,
         player: attacker.player,
@@ -439,7 +440,7 @@ export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
       continue;
     }
     const destruction = applyInfrastructureDestructionEffects(parent, s.targetType, next, {
-      tacticalUrbanStrikeTargetRes4H3: s.targetType === 'urban' ? s.targetH3Index : undefined,
+      tacticalUrbanStrikeTargetH3: s.targetType === 'urban' ? s.targetH3Index : undefined,
     });
     if (destruction.changedRubbleCount > 0 || destruction.destroyedAirUnits.length > 0) {
       infrastructureDestroyedEvents.push({
@@ -480,7 +481,7 @@ export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
   }
   flushAirCasualties();
   let workBattle: TacticalBattleSnapshot = { ...battle, subUnits: sub };
-  const footprint = new Set(workBattle.res4ChildH3Indexes);
+  const footprint = new Set(workBattle.tacticalChildH3Indexes);
   const rangedPlayerFiltered = (rangedAttacks ?? []).filter((r) => {
     const a = workBattle.subUnits.find((u) => u.id === r.unitId);
     if (!a) return false;
@@ -506,7 +507,7 @@ export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
       rangedPlayer,
     });
   }
-  let res4RowsForBattle: Array<{
+  let tacticalRowsForBattle: Array<{
     h3Index: string;
     parentH3Index: string;
     isUrban: boolean;
@@ -515,11 +516,11 @@ export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
     isRubble: boolean;
   }>;
   try {
-    res4RowsForBattle = listRes4FeatureOverridesForGame().filter(
-      (r) => r.parentH3Index === workBattle.enclosingRes1H3Index && footprint.has(r.h3Index)
+    tacticalRowsForBattle = listTacticalFeatureOverridesForGame().filter(
+      (r) => r.parentH3Index === workBattle.enclosingStrategicH3Index && footprint.has(r.h3Index)
     );
   } catch {
-    res4RowsForBattle = [];
+    tacticalRowsForBattle = [];
   }
 
   const hexHasEnemyForPlayer = (attackerPlayer: string, hex: string): boolean =>
@@ -532,7 +533,7 @@ export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
     if (!atk) continue;
     if (hexHasEnemyForPlayer(atk.player, o.targetH3Index)) {
       rangedOrdersCombat.push(o);
-    } else if (tacticalRes4HasStrikeableInfrastructure(workBattle, o.targetH3Index, res4RowsForBattle)) {
+    } else if (tacticalHasStrikeableInfrastructure(workBattle, o.targetH3Index, tacticalRowsForBattle)) {
       rangedOrdersInfraOnly.push(o);
     }
   }
@@ -551,7 +552,7 @@ export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
     const rangedInput = tacticalSubUnitsToRangedCombatUnits(workBattle, workBattle.subUnits, originHitBonusAt, techHitBonusAt);
     const rangedResult = runRangedPhase(
       rangedInput,
-      workBattle.res4ChildH3Indexes,
+      workBattle.tacticalChildH3Indexes,
       rangedOrdersCombat,
       next,
       buildTacticalReturnFireContext(workBattle),
@@ -595,18 +596,18 @@ export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
     const rubbledFromCombat = new Set<string>();
     for (const hex of defenderHexesWithKill) {
       if (!footprint.has(hex) || rubbledFromCombat.has(hex)) continue;
-      if (!tacticalRes4HasStrikeableInfrastructure(workBattle, hex, res4RowsForBattle)) continue;
-      const targetType = tacticalRangedInfraEventTargetTypeBeforeRubble(hex, res4RowsForBattle);
-      const { changed, destroyedAirUnitsCount } = applyTacticalRangedRubbleToRes4Cell(
+      if (!tacticalHasStrikeableInfrastructure(workBattle, hex, tacticalRowsForBattle)) continue;
+      const targetType = tacticalRangedInfraEventTargetTypeBeforeRubble(hex, tacticalRowsForBattle);
+      const { changed, destroyedAirUnitsCount } = applyTacticalRangedRubbleToCell(
         hex,
-        workBattle.enclosingRes1H3Index,
+        workBattle.enclosingStrategicH3Index,
         tacticalRangedRubbleApplyOptsForHex(workBattle, hex)
       );
       if (changed) {
         rubbledFromCombat.add(hex);
         rangedTerrainMutated = true;
         infrastructureDestroyedEvents.push({
-          h3Index: workBattle.enclosingRes1H3Index,
+          h3Index: workBattle.enclosingStrategicH3Index,
           targetType,
           changedRubbleCount: 1,
           destroyedAirUnitsCount,
@@ -617,8 +618,8 @@ export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
 
   if (rangedOrdersInfraOnly.length > 0) {
     try {
-      res4RowsForBattle = listRes4FeatureOverridesForGame().filter(
-        (r) => r.parentH3Index === workBattle.enclosingRes1H3Index && footprint.has(r.h3Index)
+      tacticalRowsForBattle = listTacticalFeatureOverridesForGame().filter(
+        (r) => r.parentH3Index === workBattle.enclosingStrategicH3Index && footprint.has(r.h3Index)
       );
     } catch {
       /* keep previous rows */
@@ -648,18 +649,18 @@ export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
       if (!rollCombatDieAgainst(rollDie, infraShotThreshold, infraShotContext, rangedDiceLog.sink)) continue;
       const hex = o.targetH3Index;
       if (rubbledInfraHexes.has(hex)) continue;
-      if (!tacticalRes4HasStrikeableInfrastructure(workBattle, hex, res4RowsForBattle)) continue;
-      const targetType = tacticalRangedInfraEventTargetTypeBeforeRubble(hex, res4RowsForBattle);
-      const { changed, destroyedAirUnitsCount } = applyTacticalRangedRubbleToRes4Cell(
+      if (!tacticalHasStrikeableInfrastructure(workBattle, hex, tacticalRowsForBattle)) continue;
+      const targetType = tacticalRangedInfraEventTargetTypeBeforeRubble(hex, tacticalRowsForBattle);
+      const { changed, destroyedAirUnitsCount } = applyTacticalRangedRubbleToCell(
         hex,
-        workBattle.enclosingRes1H3Index,
+        workBattle.enclosingStrategicH3Index,
         tacticalRangedRubbleApplyOptsForHex(workBattle, hex)
       );
       if (changed) {
         rubbledInfraHexes.add(hex);
         rangedTerrainMutated = true;
         infrastructureDestroyedEvents.push({
-          h3Index: workBattle.enclosingRes1H3Index,
+          h3Index: workBattle.enclosingStrategicH3Index,
           targetType,
           changedRubbleCount: 1,
           destroyedAirUnitsCount,
@@ -669,7 +670,7 @@ export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
   }
 
   if (infrastructureDestroyedEvents.length > 0 || rangedTerrainMutated) {
-    workBattle = refreshTacticalBattleRes4TerrainFromGameDb(workBattle);
+    workBattle = refreshTacticalBattleTerrainFromGameDb(workBattle);
   }
   tacticalLogMutate('applyTacticalAirStrikeThenRangedPhaseOnBattle complete', {
     battleId: battle.battleId,

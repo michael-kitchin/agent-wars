@@ -4,8 +4,8 @@ import { createPathfindingSession, executePlanRouteWithSession } from './pathfin
 import type { LatLng } from './pathfinding';
 import { terrainIsPassableForDomain } from '../pathfinding';
 import type { PassableDomain } from '../pathfinding';
-import { landUnitCanOccupyHex } from '../../shared/landTraversalRes1';
-import { getRes1LandMassByH3 } from '../terrainClassificationCache';
+import { landUnitCanOccupyHex } from '../../shared/landTraversalStrategic';
+import { getStrategicLandMassByH3 } from '../terrainClassificationCache';
 import { logDebug, logError, logTrace } from '../logger';
 import {
   canAssignStandingOrderType,
@@ -86,7 +86,7 @@ function assignOrder(
       }
       const terrain = terrainByH3.get(h3) ?? 'land';
       if (domain === 'land') {
-        if (!landUnitCanOccupyHex(h3, getRes1LandMassByH3())) {
+        if (!landUnitCanOccupyHex(h3, getStrategicLandMassByH3())) {
           return {
             status: 'error',
             error: `Patrol waypoint ${i + 1} is impassable for ${unit.unitType} on the operational map.`,

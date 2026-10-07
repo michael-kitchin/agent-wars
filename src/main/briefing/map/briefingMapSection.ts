@@ -15,10 +15,10 @@ import type { CoordinateContext } from './coordinateContext';
 import {
   ensureStrategicCoordinateRegistryInitialized,
   initTacticalCoordinateRegistry,
-  listStrategicRes1H3Indexes,
+  listStrategicH3Indexes,
 } from './hexCoordinates';
 import { projectToGrid } from './hexGridProjection';
-import { projectTacticalRes4FootprintToAsciiGrid } from './tacticalAsciiGridProjection';
+import { projectTacticalFootprintToAsciiGrid } from './tacticalAsciiGridProjection';
 import type { HexMapCellState } from './hexMapRenderer';
 import { renderHexAsciiMap } from './hexMapRenderer';
 import {
@@ -44,14 +44,14 @@ function formatBestOptionsThisTurnSubsection(optionsMd: string): string {
 }
 
 /**
- * Builds the strategic operational map section (res1) for the AI Commander briefing.
+ * Builds the strategic operational map section for the AI Commander briefing.
  *
  * Purpose: Primary entry used by `formatBriefing` when precomputation is enabled.
  * When to use: Strategic consultations where the LLM needs geography without huge action tables.
  * Expected outcome: Markdown fragment including H1/H2 headings per existing briefing style.
  * Exceptions: None beyond missing registry initialization (handled via `ensureStrategicCoordinateRegistryInitialized`).
  *
- * Map extent: Uses every registered strategic res1 cell (full world) so the LLM sees pole-to-pole and dateline-safe
+ * Map extent: Uses every registered strategic cell (full world) so the LLM sees pole-to-pole and dateline-safe
  * geography; fog and enemy markers still follow `buildStrategicHexGameStateMap` visibility rules.
  */
 export function buildStrategicOperationalMapSectionMarkdown(args: {
@@ -77,9 +77,9 @@ export function buildStrategicOperationalMapSectionMarkdown(args: {
     return `${topLevelHeading(SECTION_TITLE_OPERATIONAL_MAP)}\n\n(No units — map not rendered.)\n`;
   }
 
-  const mapHexes = listStrategicRes1H3Indexes();
+  const mapHexes = listStrategicH3Indexes();
   logDebug('briefing-map-section buildStrategicOperationalMapSectionMarkdown: full-world res1 set', {
-    res1CellCount: mapHexes.length,
+    strategicCellCount: mapHexes.length,
   });
   const grid = projectToGrid(mapHexes, context);
   const gameByH3 = buildStrategicHexGameStateMap(args.state, mapHexes);
@@ -111,9 +111,9 @@ export function buildStrategicOperationalMapSectionMarkdown(args: {
 
 function buildStrategicHexGameStateMap(state: GameStateSnapshot, mapHexes: string[]): Map<string, HexMapCellState> {
   const terrainByH3 = new Map(state.hexes.map((h) => [h.h3Index, h.terrain]));
-  const controlByH3 = new Map((state.res1Control ?? []).map((r) => [r.h3Index, r.controllerPlayerId]));
+  const controlByH3 = new Map((state.strategicControl ?? []).map((r) => [r.h3Index, r.controllerPlayerId]));
   const infraByH3 = new Map(
-    (state.res1Infrastructure ?? []).map((r) => [
+    (state.strategicInfrastructure ?? []).map((r) => [
       r.h3Index,
       {
         urban: Number(r.urbanHexCount ?? 0),
@@ -161,11 +161,11 @@ function buildStrategicHexGameStateMap(state: GameStateSnapshot, mapHexes: strin
 }
 
 /**
- * Builds the tactical res4 operational map markdown fragment (no leading H1; caller supplies section title).
+ * Builds the tactical operational map markdown fragment (no leading H1; caller supplies section title).
  *
- * Purpose: Tactical AI consultations reuse the same ASCII format with a res4 registry scoped to one battle.
+ * Purpose: Tactical AI consultations reuse the same ASCII format with a tactical registry scoped to one battle.
  * When to use: `requestOrdersFlow` appends this under a tactical heading after the strategic briefing block.
- * Expected outcome: Compact tactical map plus Best Options This Turn when non-empty, all using res4 hex codes.
+ * Expected outcome: Compact tactical map plus Best Options This Turn when non-empty, all using tactical hex codes.
  * Exceptions: None beyond missing tactical registry initialization (handled via `initTacticalCoordinateRegistry`).
  */
 export function buildTacticalOperationalMapSectionMarkdown(args: {
@@ -176,14 +176,14 @@ export function buildTacticalOperationalMapSectionMarkdown(args: {
   logDebug('briefing-map-section buildTacticalOperationalMapSectionMarkdown', {
     battleId: args.tacticalBattle.battleId,
   });
-  initTacticalCoordinateRegistry(args.tacticalBattle.battleId, args.tacticalBattle.enclosingRes1H3Index);
+  initTacticalCoordinateRegistry(args.tacticalBattle.battleId, args.tacticalBattle.enclosingStrategicH3Index);
   const context: CoordinateContext = {
     mode: 'tactical',
     battleId: args.tacticalBattle.battleId,
     tacticalTurnNumber: args.tacticalBattle.tacticalTurnNumber,
   };
 
-  const mapHexes = [...args.tacticalBattle.res4ChildH3Indexes];
+  const mapHexes = [...args.tacticalBattle.tacticalChildH3Indexes];
   if (mapHexes.length === 0) {
     return '_No tactical cells — map not rendered._\n';
   }
@@ -195,7 +195,7 @@ export function buildTacticalOperationalMapSectionMarkdown(args: {
       stateHexRows: args.state.hexes.length,
     });
   }
-  const grid = projectTacticalRes4FootprintToAsciiGrid(mapHexes, context);
+  const grid = projectTacticalFootprintToAsciiGrid(mapHexes, context);
   const gameByH3 = buildTacticalHexGameStateMap(args.state, args.tacticalBattle, mapHexes);
   const { mapString, displacedFeatures } = renderHexAsciiMap(grid, gameByH3);
 
@@ -226,11 +226,11 @@ export function buildTacticalOperationalMapSectionMarkdown(args: {
 /**
  * Builds per-cell land/water, infrastructure, and occupancy state for the tactical ASCII map.
  *
- * Purpose: Each res4 child must paint its own kind and urban/seaport/airport letters; copying the enclosing res1
+ * Purpose: Each tactical child must paint its own kind and urban/seaport/airport letters; copying the enclosing strategic
  * ocean or hardcoding features off made urban armor look like it was at sea.
  * When to use: Only from `buildTacticalOperationalMapSectionMarkdown` after the grid is projected.
  * Expected outcome: Terrain matches `state.hexes` for that child; U/S/A/B follow battle flags unless the cell is rubble;
- * uppercase when the enclosing res1 is AI-controlled.
+ * uppercase when the enclosing strategic is AI-controlled.
  * Exceptions: Missing hex rows default to land; fog hides enemy counts the same way as the strategic map.
  */
 function buildTacticalHexGameStateMap(
@@ -248,7 +248,7 @@ function buildTacticalHexGameStateMap(
     if (u.player === 'opponent') aiUnitsByH3.set(u.h3Index, (aiUnitsByH3.get(u.h3Index) ?? 0) + 1);
   }
   const enclosingController =
-    (state.res1Control ?? []).find((r) => r.h3Index === battle.enclosingRes1H3Index)?.controllerPlayerId ?? null;
+    (state.strategicControl ?? []).find((r) => r.h3Index === battle.enclosingStrategicH3Index)?.controllerPlayerId ?? null;
   const controlledByAI = enclosingController === 'opponent';
   const out = new Map<string, HexMapCellState>();
   for (const h3 of mapHexes) {
@@ -257,10 +257,10 @@ function buildTacticalHexGameStateMap(
       rawTerrain === 'ocean' || rawTerrain === 'water' || rawTerrain === 'arctic_ocean' ? 'water' : 'land';
     const isDiscovered = !fog || discovered.has(h3);
     const visible = !fog || discovered.has(h3);
-    const rubble = !!battle.res4IsRubbleByH3?.[h3];
-    const urban = !rubble && !!battle.res4IsUrbanByH3?.[h3];
-    const seaport = !rubble && !!battle.res4IsSeaportByH3?.[h3];
-    const airport = !rubble && !!battle.res4IsAirportByH3?.[h3];
+    const rubble = !!battle.tacticalIsRubbleByH3?.[h3];
+    const urban = !rubble && !!battle.tacticalIsUrbanByH3?.[h3];
+    const seaport = !rubble && !!battle.tacticalIsSeaportByH3?.[h3];
+    const airport = !rubble && !!battle.tacticalIsAirportByH3?.[h3];
     out.set(h3, {
       terrain,
       isDiscovered,

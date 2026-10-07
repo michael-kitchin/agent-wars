@@ -8,7 +8,7 @@ import {
   type ReturnFireEligibilityContext,
 } from '../../shared/returnFireEligibility';
 import {
-  effectiveRes4TerrainKindString,
+  effectiveTacticalTerrainKindString,
   effectiveTacticalRangedMaxRangeForAttacker,
   tacticalMovementTerrainAnchorH3,
 } from '../../shared/tacticalTerrainCombatModifiers';
@@ -350,7 +350,7 @@ export function executeTacticalAssessUnit(args: TacticalAssessUnitArgs): {
       unitId: self.id,
       type: self.unitType,
       position: h3ToLatLng(selfH3, latLngByH3, 'cellCenter'),
-      terrain: effectiveRes4TerrainKindString(battle, selfH3),
+      terrain: effectiveTacticalTerrainKindString(battle, selfH3),
       movementPointsThisBeat: selfBudget,
       rangedRangeThisBeat: selfRange,
       embarkedOnSubUnitId: self.embarkedOnSubUnitId ?? null,

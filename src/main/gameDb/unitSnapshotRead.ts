@@ -48,7 +48,7 @@ interface DbUnitSnapshotRow extends Record<string, unknown> {
    */
   unit_type: string;
   /**
-   * Current res0/res1 H3 index for the unit.
+   * Current res0/strategic H3 index for the unit.
    *
    * Contract: Valid H3 index string for the active map resolution.
    * When to use: Maps to `GameStateSnapshot.units[].h3Index`.
@@ -75,7 +75,7 @@ interface DbUnitSnapshotRow extends Record<string, unknown> {
    */
   embarked_on_naval_unit_id: string | null;
   /**
-   * Birth res1 hex, or SQL null for rows inserted without origin data.
+   * Birth strategic hex, or SQL null for rows inserted without origin data.
    *
    * Contract: Non-empty when the row has an origin.
    * When to use: Decides whether the snapshot unit gets an `origin`.
@@ -84,14 +84,14 @@ interface DbUnitSnapshotRow extends Record<string, unknown> {
    */
   birth_h3_index: string | null;
   /**
-   * Birth res4 cell, or SQL null.
+   * Birth tactical cell, or SQL null.
    *
-   * Contract: A res4 child of `birth_h3_index` when set.
-   * When to use: Maps to `origin.birthRes4H3Index`.
+   * Contract: A tactical child of `birth_h3_index` when set.
+   * When to use: Maps to `origin.birthTacticalH3Index`.
    * Expected outcome: Preserved verbatim.
    * Exceptions: None.
    */
-  birth_res4_h3_index: string | null;
+  birth_res_t_h3_index: string | null;
   /**
    * Birth terrain kind, or SQL null.
    *
@@ -142,7 +142,7 @@ function unitOriginFromRow(row: DbUnitSnapshotRow): UnitOrigin | undefined {
   if (typeof row.birth_h3_index !== 'string' || row.birth_h3_index.length === 0) return undefined;
   return {
     birthH3Index: row.birth_h3_index,
-    birthRes4H3Index: row.birth_res4_h3_index ?? null,
+    birthTacticalH3Index: row.birth_res_t_h3_index ?? null,
     birthTerrainKind: row.birth_terrain_kind ?? null,
     birthIsUrban: row.birth_is_urban === 1,
     birthCountryName: row.birth_country_name ?? null,
@@ -192,7 +192,7 @@ export function listUnitsForSnapshotWithGetAll(
             u.h3_index,
             u.display_order,
             u.birth_h3_index,
-            u.birth_res4_h3_index,
+            u.birth_res_t_h3_index,
             u.birth_terrain_kind,
             u.birth_is_urban,
             u.birth_country_name,

@@ -180,7 +180,7 @@ segments: HumanOrderPreviewSegment[];
     /**
    * Optional title-case terrain word when this preview is **valid** but terrain throttles movement (e.g. `Forest`, `Urban`).
    *
-   * Contract: Omitted or `null` on strategic marches (no res1 slowdowns) and when not applicable; never required with `valid: false`.
+   * Contract: Omitted or `null` on strategic marches (no strategic slowdowns) and when not applicable; never required with `valid: false`.
    * When to use: Tactical `buildTacticalMarchHoverPreview` and merged grouped envelopes; strategic `previewHumanMarchOrders` leaves it null.
    * Expected outcome: Plain-text aggregate for logs/sidebar; comma-separated when multiple terrains apply; renderer prefers `orderPreviewTerrainImpact` for tooltips.
    * Exceptions: None.
@@ -198,7 +198,7 @@ orderPreviewTerrainImpact?: OrderPreviewTerrainImpact | null;
 }
 
 /**
- * Wrapper for tactical draft march previews that also exposes the committed res4 H3 path for stable overlay reuse.
+ * Wrapper for tactical draft march previews that also exposes the committed tactical H3 path for stable overlay reuse.
  *
  * Purpose: Keeps `HumanOrderPreviewResult` unchanged for IPC while letting the renderer cache `pathH3Indexes` alongside lat/lng segments.
  * When to use: `buildTacticalMarchDraftDestinationPreview` return value; tactical pending-march row construction in the renderer.
@@ -216,7 +216,7 @@ export interface TacticalDraftPreviewResult {
    */
   preview: HumanOrderPreviewResult;
   /**
-   * Ordered res4 H3 indexes (inclusive endpoints) used to build `preview.segments`; null when unreachable.
+   * Ordered tactical H3 indexes (inclusive endpoints) used to build `preview.segments`; null when unreachable.
    *
    * Contract: When non-null, indexes match the path used for segment generation; head is the planning origin cell.
    * When to use: Store on `TacticalPendingMarchRow.pathH3Indexes` at draft time or after continuation tail advance.
@@ -254,7 +254,7 @@ export interface TacticalPendingMarchRow {
    */
   destinationH3Index: string;
   /**
-   * Committed res4 H3 path from unit origin to destination for stable display across beats.
+   * Committed tactical H3 path from unit origin to destination for stable display across beats.
    *
    * Contract: Inclusive endpoints; head must match unit `h3Index` for cached segment reuse in the renderer.
    * When to use: Populated at draft commit and advanced via `buildTacticalPendingMarchRowsFromContinuations`.
@@ -267,7 +267,7 @@ export interface TacticalPendingMarchRow {
    *
    * Contract: Same turn-split segment shape as tactical hover previews; paired with `pathH3Indexes` when present.
    * When to use: Renderer draw path when `pathH3Indexes[0]` equals the sub-unit current cell.
-   * Expected outcome: Avoids repeated `planTacticalRes4March` calls during redraw and beat transitions.
+   * Expected outcome: Avoids repeated `planTacticalMarch` calls during redraw and beat transitions.
    * Exceptions: None.
    */
   cachedSegments?: HumanOrderPreviewSegment[];

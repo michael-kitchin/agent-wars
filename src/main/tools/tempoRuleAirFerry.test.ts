@@ -40,7 +40,7 @@ function stageIdleSquadron(): {
   if (!squadron) return null;
   const hexSet = new Set(seeded.hexes.map((h) => h.h3Index));
   const occupied = new Set(seeded.units.map((u) => u.h3Index));
-  const airports = (seeded.res1Infrastructure ?? []).filter((i) => i.airportCount > 0).map((i) => i.h3Index);
+  const airports = (seeded.strategicInfrastructure ?? []).filter((i) => i.airportCount > 0).map((i) => i.h3Index);
 
   for (const homeBase of airports) {
     for (const forwardBase of airports) {
@@ -57,7 +57,7 @@ function stageIdleSquadron(): {
       });
       if (!enemyH3) continue;
       for (const base of [homeBase, forwardBase]) {
-        dbRun('INSERT OR REPLACE INTO res1_control (h3_index, controller_player_id) VALUES (?, ?)', [base, 'opponent']);
+        dbRun('INSERT OR REPLACE INTO res_s_control (h3_index, controller_player_id) VALUES (?, ?)', [base, 'opponent']);
       }
       dbRun('UPDATE units SET h3_index = ? WHERE id = ?', [homeBase, squadron.id]);
       dbRun(

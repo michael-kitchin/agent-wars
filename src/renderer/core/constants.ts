@@ -1,5 +1,4 @@
 import { AI_CONSULTATION_WAIT_TIMEOUT_MS } from '../../shared/aiConsultationLimits';
-import { STRATEGIC_H3_RESOLUTION, TACTICAL_H3_RESOLUTION } from '../../shared/h3Resolutions';
 
 /**
  * Documents the module-scope binding `BACKGROUND_COLOR` (BACKGROUND_COLOR).
@@ -142,7 +141,7 @@ export const AI_ORDER_LINE_COLOR = PLAYER_COLORS.opponent;
  */
 export const TOOLTIP_OFFSET_PX = 12;
 /**
- * Millisecond hover dwell before the res1/res4 hex details popup appears on the main map.
+ * Millisecond hover dwell before the strategic/tactical hex details popup appears on the main map.
  *
  * Purpose: Deliberate disclosure delay for the hex tooltip, the order-effects tooltip, and the blocked-order tooltip.
  * When to use: The deferred hex-tooltip timer, the deferred effects-tooltip timer, and the deferred blocked-tooltip timer, after the pointer settles.
@@ -172,41 +171,23 @@ export const HEX_DETAILS_TOOLTIP_REST_PX = 6;
 export const ORDER_BLOCK_HEX_TOOLTIP_TTL_MS = 1500;
 
 /**
- * Strategic map H3 resolution exposed to the renderer.
- *
- * Purpose: Keeps renderer callers on the historical name while the value comes from the shared resolution pair.
- * When to use: Renderer map code that needs the res1 world grid.
- * Expected outcome: Always equals `STRATEGIC_H3_RESOLUTION` (1).
- * Exceptions: None.
- */
-export const WORLD_H3_RESOLUTION = STRATEGIC_H3_RESOLUTION;
-/**
- * Tactical detail H3 resolution exposed to the renderer.
- *
- * Purpose: Keeps renderer callers on the historical name while the value comes from the shared resolution pair.
- * When to use: Renderer map code that needs the res4 tactical grid.
- * Expected outcome: Always equals `TACTICAL_H3_RESOLUTION` (4).
- * Exceptions: None.
- */
-export const DETAIL_H3_RESOLUTION = TACTICAL_H3_RESOLUTION;
-/**
- * Documents the module-scope binding `RES4_SHOW_THRESHOLD_VIEW_FRACTION` (RES4_SHOW_THRESHOLD_VIEW_FRACTION).
+ * Documents the module-scope binding `TACTICAL_SHOW_THRESHOLD_VIEW_FRACTION` (TACTICAL_SHOW_THRESHOLD_VIEW_FRACTION).
 
- * Purpose: Supports maintainability by documenting why `RES4_SHOW_THRESHOLD_VIEW_FRACTION` exists.
+ * Purpose: Supports maintainability by documenting why `TACTICAL_SHOW_THRESHOLD_VIEW_FRACTION` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export const RES4_SHOW_THRESHOLD_VIEW_FRACTION = 0.8;
+export const TACTICAL_SHOW_THRESHOLD_VIEW_FRACTION = 0.8;
 /**
- * Documents the module-scope binding `RES4_HIDE_THRESHOLD_VIEW_FRACTION` (RES4_HIDE_THRESHOLD_VIEW_FRACTION).
+ * Documents the module-scope binding `TACTICAL_HIDE_THRESHOLD_VIEW_FRACTION` (TACTICAL_HIDE_THRESHOLD_VIEW_FRACTION).
 
- * Purpose: Supports maintainability by documenting why `RES4_HIDE_THRESHOLD_VIEW_FRACTION` exists.
+ * Purpose: Supports maintainability by documenting why `TACTICAL_HIDE_THRESHOLD_VIEW_FRACTION` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export const RES4_HIDE_THRESHOLD_VIEW_FRACTION = 0.7;
+export const TACTICAL_HIDE_THRESHOLD_VIEW_FRACTION = 0.7;
 /**
  * Documents the module-scope binding `BUILD_ENTRY_ZOOM_STEPS_FROM_DEFAULT` (BUILD_ENTRY_ZOOM_STEPS_FROM_DEFAULT).
 
@@ -397,7 +378,7 @@ export const MULTI_PLAYER_STROKE = '#222222';
 export const MULTI_PLAYER_GLYPH_FILTER = 'brightness(0.133)';
 
 /**
- * Opacity for res1 region-control and home-region ownership border strokes.
+ * Opacity for strategic region-control and home-region ownership border strokes.
  *
  * Purpose: Softens player-colored control rings so terrain fill remains readable beneath them.
  * When to use: `drawOutlinedHomeRegionOwnershipBorders` and normal single-line control borders in `drawTerrainHexes`.

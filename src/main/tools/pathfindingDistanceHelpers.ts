@@ -5,7 +5,7 @@ import {
 } from '../../shared/h3GridRangePure';
 import { findPath } from '../pathfinding';
 import type { PassableDomain } from '../pathfinding';
-import type { LandMassByH3 } from '../../shared/landTraversalRes1';
+import type { LandMassByH3 } from '../../shared/landTraversalStrategic';
 import { terrainIsPassableForDomain } from '../pathfinding';
 import { logDebug, logError, logTrace } from '../logger';
 

@@ -104,8 +104,8 @@ export function isOrderBlockHexTooltipVisible(): boolean {
 function terrainKindForHoveredHex(h3: string | null): string | null {
   if (!h3) return null;
   const tb = S.tacticalBattleSnapshot;
-  if (tb?.res4ChildH3Indexes?.includes(h3)) {
-    const kind = tb.res4TerrainKindByH3?.[h3] ?? tb.strategicHexTerrainKind ?? tb.strategicHexTerrain;
+  if (tb?.tacticalChildH3Indexes?.includes(h3)) {
+    const kind = tb.tacticalTerrainKindByH3?.[h3] ?? tb.strategicHexTerrainKind ?? tb.strategicHexTerrain;
     return kind ? String(kind).toLowerCase() : null;
   }
   const hx = S.gameState?.hexes.find((h) => h.h3Index === h3);

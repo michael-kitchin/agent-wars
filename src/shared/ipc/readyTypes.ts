@@ -756,21 +756,21 @@ meleeDecisionToken?: string;
     /**
    * Specifies the contract for the `meleeInterceptCandidates` member (meleeInterceptCandidates?: MeleeCandidateRow[];).
 
-   * Contract: One row per res1 hex where melee would occur if the player chooses Ignore.
+   * Contract: One row per strategic hex where melee would occur if the player chooses Ignore.
    * When to use: Renderer builds the intercept modal from this list.
    * Expected outcome: Summaries omit zero categories; hex popup column uses renderer-side formatting for the same h3.
    * Exceptions: None.
    */
 meleeInterceptCandidates?: MeleeCandidateRow[];
     /**
-   * Specifies the contract for the `tacticalAutoStartRes1H3Index` member (tacticalAutoStartRes1H3Index?: string;).
+   * Specifies the contract for the `tacticalAutoStartStrategicH3Index` member (tacticalAutoStartStrategicH3Index?: string;).
 
-   * Contract: Present after a successful Fight decision so the renderer can start tactical combat in that res1 hex.
+   * Contract: Present after a successful Fight decision so the renderer can start tactical combat in that strategic hex.
    * When to use: After `resolveMeleeIntercept` returns success with decision fight.
-   * Expected outcome: Renderer invokes `startTacticalBattle` with this res1 id when strategic playback completes.
+   * Expected outcome: Renderer invokes `startTacticalBattle` with this strategic id when strategic playback completes.
    * Exceptions: None.
    */
-tacticalAutoStartRes1H3Index?: string;
+tacticalAutoStartH3Index?: string;
     /**
    * True when main deferred event-driven post-resolution LLM work until `notifyResolutionPlaybackComplete`.
    *

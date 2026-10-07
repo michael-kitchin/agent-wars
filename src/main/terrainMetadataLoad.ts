@@ -4,7 +4,8 @@ import { getResolution } from 'h3-js';
 import { readJsonFileOrThrow } from './jsonFileHelpers';
 import { logDebug, logTrace } from './logger';
 import type { PipelineTerrainKind } from '../shared/pipelineTerrain';
-import { resolveTerrainRes1MetadataPath, resolveTerrainRes4MetadataPath } from './terrainMetadataPaths';
+import { resolveTerrainStrategicMetadataPath, resolveTerrainTacticalMetadataPath } from './terrainMetadataPaths';
+import { GLOBAL_GAME_MAP } from '../shared/activeGameMap';
 import { STRATEGIC_H3_RESOLUTION, TACTICAL_H3_RESOLUTION } from '../shared/h3Resolutions';
 
 /**
@@ -160,7 +161,7 @@ export const DEFAULT_NODATA_FALLBACK_TERRAIN: PipelineTerrainKind = 'water';
 /**
  * H3 resolution of parent cells in terrain metadata packs.
  *
- * Purpose: Names the strategic resolution used when validating res1 metadata rows.
+ * Purpose: Names the strategic resolution used when validating strategic metadata rows.
  * When to use: Terrain metadata load and validation.
  * Expected outcome: Always equals `STRATEGIC_H3_RESOLUTION` (1).
  * Exceptions: None.
@@ -169,7 +170,7 @@ export const METADATA_PARENT_RESOLUTION = STRATEGIC_H3_RESOLUTION;
 /**
  * H3 resolution of child cells in terrain metadata packs.
  *
- * Purpose: Names the tactical resolution used when validating res4 metadata rows.
+ * Purpose: Names the tactical resolution used when validating tactical metadata rows.
  * When to use: Terrain metadata load and validation.
  * Expected outcome: Always equals `TACTICAL_H3_RESOLUTION` (4).
  * Exceptions: None.
@@ -275,7 +276,7 @@ urban_edges: number;
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export const MAJOR_POINT_FEATURE_MAX_SCALERANK = 5;
+export const MAJOR_POINT_FEATURE_MAX_SCALERANK = GLOBAL_GAME_MAP.scaleranks.airport;
 
 /**
  * Documents the module-scope binding `URBAN_OVERLAY_MAX_SCALERANK` (URBAN_OVERLAY_MAX_SCALERANK).
@@ -285,17 +286,17 @@ export const MAJOR_POINT_FEATURE_MAX_SCALERANK = 5;
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export const URBAN_OVERLAY_MAX_SCALERANK = 5;
+export const URBAN_OVERLAY_MAX_SCALERANK = GLOBAL_GAME_MAP.scaleranks.urbanOverlay;
 
 /**
- * Documents the `HexMetadataRecordRes1` interface as a named contract surface (export interface HexMetadataRecordRes1).
+ * Documents the `HexMetadataRecordStrategic` interface as a named contract surface (export interface HexMetadataRecordStrategic).
 
- * Purpose: Supports maintainability by documenting why `HexMetadataRecordRes1` exists.
+ * Purpose: Supports maintainability by documenting why `HexMetadataRecordStrategic` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export interface HexMetadataRecordRes1 {
+export interface HexMetadataRecordStrategic {
     /**
    * Specifies the contract for the `h3_index` member (h3_index: string;).
 
@@ -434,14 +435,14 @@ seaport_count_by_scalerank: ScalerankCountRow[];
 }
 
 /**
- * Documents the `HexMetadataRecordRes4` interface as a named contract surface (export interface HexMetadataRecordRes4 extends HexMetadataRecordRes1).
+ * Documents the `HexMetadataRecordTactical` interface as a named contract surface (export interface HexMetadataRecordTactical extends HexMetadataRecordStrategic).
 
- * Purpose: Supports maintainability by documenting why `HexMetadataRecordRes4` exists.
+ * Purpose: Supports maintainability by documenting why `HexMetadataRecordTactical` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export interface HexMetadataRecordRes4 extends HexMetadataRecordRes1 {
+export interface HexMetadataRecordTactical extends HexMetadataRecordStrategic {
     /**
    * Specifies the contract for the `all_urban` member (all_urban: boolean;).
 
@@ -517,14 +518,14 @@ resolution: number;
    */
 record_count: number;
     /**
-   * Specifies the contract for the `records` member (records: HexMetadataRecordRes1[] | HexMetadataRecordRes4[];).
+   * Specifies the contract for the `records` member (records: HexMetadataRecordStrategic[] | HexMetadataRecordTactical[];).
 
    * Contract: Describes stable behavior for callers of `records` in this codebase.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-records: HexMetadataRecordRes1[] | HexMetadataRecordRes4[];
+records: HexMetadataRecordStrategic[] | HexMetadataRecordTactical[];
 }
 
 /**
@@ -668,7 +669,7 @@ function readUrbanByScalerankArray(r: Record<string, unknown>, key: string): Urb
 }
 
 /**
- * Defines the `recordHasMajorAirport` function shape (export function recordHasMajorAirport( r: Pick<HexMetadataRecordRes1, 'airport_count_by_scalerank'>, maxRank = MAJOR_POINT_FEATURE_MAX_SCALERANK ): boole).
+ * Defines the `recordHasMajorAirport` function shape (export function recordHasMajorAirport( r: Pick<HexMetadataRecordStrategic, 'airport_count_by_scalerank'>, maxRank = MAJOR_POINT_FEATURE_MAX_SCALERANK ): boole).
 
  * Purpose: Supports maintainability by documenting why `recordHasMajorAirport` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
@@ -676,7 +677,7 @@ function readUrbanByScalerankArray(r: Record<string, unknown>, key: string): Urb
  * Exceptions: None.
  */
 export function recordHasMajorAirport(
-  r: Pick<HexMetadataRecordRes1, 'airport_count_by_scalerank'>,
+  r: Pick<HexMetadataRecordStrategic, 'airport_count_by_scalerank'>,
   maxRank = MAJOR_POINT_FEATURE_MAX_SCALERANK
 ): boolean {
   for (const row of r.airport_count_by_scalerank) {
@@ -687,7 +688,7 @@ export function recordHasMajorAirport(
 }
 
 /**
- * Defines the `recordHasMajorSeaport` function shape (export function recordHasMajorSeaport( r: Pick<HexMetadataRecordRes1, 'seaport_count_by_scalerank'>, maxRank = MAJOR_POINT_FEATURE_MAX_SCALERANK ): boole).
+ * Defines the `recordHasMajorSeaport` function shape (export function recordHasMajorSeaport( r: Pick<HexMetadataRecordStrategic, 'seaport_count_by_scalerank'>, maxRank = MAJOR_POINT_FEATURE_MAX_SCALERANK ): boole).
 
  * Purpose: Supports maintainability by documenting why `recordHasMajorSeaport` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
@@ -695,8 +696,8 @@ export function recordHasMajorAirport(
  * Exceptions: None.
  */
 export function recordHasMajorSeaport(
-  r: Pick<HexMetadataRecordRes1, 'seaport_count_by_scalerank'>,
-  maxRank = MAJOR_POINT_FEATURE_MAX_SCALERANK
+  r: Pick<HexMetadataRecordStrategic, 'seaport_count_by_scalerank'>,
+  maxRank = GLOBAL_GAME_MAP.scaleranks.seaport
 ): boolean {
   for (const row of r.seaport_count_by_scalerank) {
     if (row.count <= 0) continue;
@@ -706,14 +707,14 @@ export function recordHasMajorSeaport(
 }
 
 /**
- * Defines the `parseRes1Row` function shape (function parseRes1Row(raw: unknown, resolution: number): HexMetadataRecordRes1).
+ * Defines the `parseStrategicRow` function shape (function parseStrategicRow(raw: unknown, resolution: number): HexMetadataRecordStrategic).
 
- * Purpose: Supports maintainability by documenting why `parseRes1Row` exists.
+ * Purpose: Supports maintainability by documenting why `parseStrategicRow` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-function parseRes1Row(raw: unknown, resolution: number): HexMetadataRecordRes1 {
+function parseStrategicRow(raw: unknown, resolution: number): HexMetadataRecordStrategic {
   if (!isRecord(raw)) throw new Error('terrain metadata: record must be an object');
   const h3Index = readStr(raw, 'h3_index');
   if (getResolution(h3Index) !== resolution) {
@@ -739,15 +740,15 @@ function parseRes1Row(raw: unknown, resolution: number): HexMetadataRecordRes1 {
 }
 
 /**
- * Defines the `parseRes4Row` function shape (function parseRes4Row(raw: unknown, resolution: number): HexMetadataRecordRes4).
+ * Defines the `parseTacticalRow` function shape (function parseTacticalRow(raw: unknown, resolution: number): HexMetadataRecordTactical).
 
- * Purpose: Supports maintainability by documenting why `parseRes4Row` exists.
+ * Purpose: Supports maintainability by documenting why `parseTacticalRow` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-function parseRes4Row(raw: unknown, resolution: number): HexMetadataRecordRes4 {
-  const base = parseRes1Row(raw, resolution);
+function parseTacticalRow(raw: unknown, resolution: number): HexMetadataRecordTactical {
+  const base = parseStrategicRow(raw, resolution);
   if (!isRecord(raw)) throw new Error('terrain metadata: record must be an object');
   return {
     ...base,
@@ -784,7 +785,7 @@ function parseMetadataEnvelope(raw: unknown, expectedResolution: number): HexMet
     throw new Error(`terrain metadata: record_count ${recordCount} != len(records) ${recs.length}`);
   }
   const parseRow =
-    expectedResolution === 4 ? (r: unknown) => parseRes4Row(r, 4) : (r: unknown) => parseRes1Row(r, 1);
+    expectedResolution === 4 ? (r: unknown) => parseTacticalRow(r, 4) : (r: unknown) => parseStrategicRow(r, 1);
   const records = recs.map((r, i) => {
     try {
       return parseRow(r);
@@ -792,7 +793,7 @@ function parseMetadataEnvelope(raw: unknown, expectedResolution: number): HexMet
       const msg = e instanceof Error ? e.message : String(e);
       throw new Error(`terrain metadata: records[${i}]: ${msg}`);
     }
-  }) as HexMetadataRecordRes1[] | HexMetadataRecordRes4[];
+  }) as HexMetadataRecordStrategic[] | HexMetadataRecordTactical[];
   const seen = new Set<string>();
   for (const row of records) {
     if (seen.has(row.h3_index)) throw new Error(`terrain metadata: duplicate h3_index ${row.h3_index}`);
@@ -807,57 +808,57 @@ function parseMetadataEnvelope(raw: unknown, expectedResolution: number): HexMet
 }
 
 /**
- * Loads and validates a res1 terrain metadata JSON file.
+ * Loads and validates a strategic terrain metadata JSON file.
  *
  * Purpose: Entry point for the strategic terrain pack on disk.
  * When to use: Bundled load and any caller that already has an absolute metadata path.
  * Expected outcome: Parsed envelope at resolution 1.
  * Exceptions: Rethrows read and parse failures. Throws when the envelope fails validation.
  */
-export function loadTerrainRes1MetadataFromPath(absPath: string): HexMetadataEnvelope {
+export function loadTerrainStrategicMetadataFromPath(absPath: string): HexMetadataEnvelope {
   logDebug('terrainMetadataLoad loadTerrainRes1MetadataFromPath', { absPath });
   const parsed = readJsonFileOrThrow(absPath, 'terrainMetadataLoad loadTerrainRes1MetadataFromPath');
   return parseMetadataEnvelope(parsed, 1);
 }
 
 /**
- * Loads and validates a res4 terrain metadata JSON file.
+ * Loads and validates a tactical terrain metadata JSON file.
  *
  * Purpose: Entry point for the tactical terrain pack on disk.
  * When to use: Bundled load and any caller that already has an absolute metadata path.
  * Expected outcome: Parsed envelope at resolution 4.
  * Exceptions: Rethrows read and parse failures. Throws when the envelope fails validation.
  */
-export function loadTerrainRes4MetadataFromPath(absPath: string): HexMetadataEnvelope {
+export function loadTerrainTacticalMetadataFromPath(absPath: string): HexMetadataEnvelope {
   logDebug('terrainMetadataLoad loadTerrainRes4MetadataFromPath', { absPath });
   const parsed = readJsonFileOrThrow(absPath, 'terrainMetadataLoad loadTerrainRes4MetadataFromPath');
   return parseMetadataEnvelope(parsed, 4);
 }
 
 /**
- * Defines the `loadTerrainRes1MetadataBundled` function shape (export function loadTerrainRes1MetadataBundled(): HexMetadataEnvelope).
+ * Defines the `loadTerrainStrategicMetadataBundled` function shape (export function loadTerrainStrategicMetadataBundled(): HexMetadataEnvelope).
 
- * Purpose: Supports maintainability by documenting why `loadTerrainRes1MetadataBundled` exists.
+ * Purpose: Supports maintainability by documenting why `loadTerrainStrategicMetadataBundled` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function loadTerrainRes1MetadataBundled(): HexMetadataEnvelope {
+export function loadTerrainStrategicMetadataBundled(): HexMetadataEnvelope {
   logTrace('terrainMetadataLoad loadTerrainRes1MetadataBundled');
-  return loadTerrainRes1MetadataFromPath(resolveTerrainRes1MetadataPath());
+  return loadTerrainStrategicMetadataFromPath(resolveTerrainStrategicMetadataPath());
 }
 
 /**
- * Defines the `loadTerrainRes4MetadataBundled` function shape (export function loadTerrainRes4MetadataBundled(): HexMetadataEnvelope).
+ * Defines the `loadTerrainTacticalMetadataBundled` function shape (export function loadTerrainTacticalMetadataBundled(): HexMetadataEnvelope).
 
- * Purpose: Supports maintainability by documenting why `loadTerrainRes4MetadataBundled` exists.
+ * Purpose: Supports maintainability by documenting why `loadTerrainTacticalMetadataBundled` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function loadTerrainRes4MetadataBundled(): HexMetadataEnvelope {
+export function loadTerrainTacticalMetadataBundled(): HexMetadataEnvelope {
   logTrace('terrainMetadataLoad loadTerrainRes4MetadataBundled');
-  return loadTerrainRes4MetadataFromPath(resolveTerrainRes4MetadataPath());
+  return loadTerrainTacticalMetadataFromPath(resolveTerrainTacticalMetadataPath());
 }
 
 /**

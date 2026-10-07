@@ -283,7 +283,7 @@ Each row is a pair of gates that would otherwise fight. The resolution column ma
 | Air unit given both a strike and a ferry | The strike wins and the ferry is discarded. The coaching states the exclusivity so the model does not spend a decision on a discarded order. |
 | Air unit whose base is not intact or not controlled | It cannot ferry. The air table's base columns carry this, and the coaching must not tell such a unit to reposition. |
 | Tactical destination beyond the beat budget | The order is clamped to the first reachable leg, not rejected. The coaching states the clamp so the model does not read partial movement as a failed order. |
-| Distances are hop counts **and** the mode is tactical | The caveat line is omitted, because its gate requires the strategic resolution. Res4 step counts inside one footprint do not carry the same distortion. |
+| Distances are hop counts **and** the mode is tactical | The caveat line is omitted, because its gate requires a strategic cell. Tactical step counts inside one footprint do not carry the same distortion. |
 | Terrain bonus on **and** country bonus off **and** strategic | No surface changes. Terrain matching is battle-only, so the strategic prompt must not mention an origin bonus. |
 
 ## 8. Origin bonuses

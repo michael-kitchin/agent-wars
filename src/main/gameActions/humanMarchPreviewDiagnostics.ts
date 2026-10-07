@@ -194,7 +194,7 @@ function buildInfrastructureSignature(): string {
             COALESCE(SUM(urban_hex_count), 0) AS urban,
             COALESCE(SUM(airport_count), 0) AS airports,
             COALESCE(SUM(seaport_count), 0) AS seaports
-     FROM res1_infrastructure`
+     FROM res_s_infrastructure`
   );
   return `i:${infrastructure?.c ?? 0}:${infrastructure?.urban ?? 0}:${infrastructure?.airports ?? 0}:${infrastructure?.seaports ?? 0}`;
 }

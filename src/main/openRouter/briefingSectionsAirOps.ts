@@ -26,7 +26,7 @@ import { SECTION_TITLE_AIR_OPERATIONS_STATUS, topLevelHeading } from './promptSp
  */
 function countStrikeableEnemyInfrastructure(args: {
   strikeEnvelope: Set<string>;
-  infraRows: NonNullable<GameStateSnapshot['res1Infrastructure']>;
+  infraRows: NonNullable<GameStateSnapshot['strategicInfrastructure']>;
   controllerByHex: Map<string, string | null | undefined>;
 }): { urban: number; airports: number; seaports: number } {
   let urban = 0;
@@ -80,9 +80,9 @@ export function buildAirOperationsBriefingBlock(
     return lines.join('\n');
   }
 
-  const infraRows = state.res1Infrastructure ?? [];
+  const infraRows = state.strategicInfrastructure ?? [];
   const hexUniverse = new Set(state.hexes.map((h) => h.h3Index));
-  const controllerByHex = new Map((state.res1Control ?? []).map((r) => [r.h3Index, r.controllerPlayerId]));
+  const controllerByHex = new Map((state.strategicControl ?? []).map((r) => [r.h3Index, r.controllerPlayerId]));
   const infraByHex = new Map(infraRows.map((r) => [r.h3Index, r]));
   const opponentAirports = infraRows.filter(
     (r) => Number(r.airportCount ?? 0) > 0 && controllerByHex.get(r.h3Index) === 'opponent'

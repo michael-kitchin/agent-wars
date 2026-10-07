@@ -2,6 +2,7 @@ import * as assert from 'assert';
 import {
   bannedSuffixIn,
   directoryViolations,
+  containsResolutionAbbreviation,
   isCamelCaseIdentifier,
   isKebabCaseSegment,
   isNumberedToolName,
@@ -22,6 +23,10 @@ assert.equal(bannedSuffixIn('submitOrdersImpl'), 'Impl');
 assert.equal(isNumberedToolName('tool2Assessment'), true);
 assert.equal(isNumberedToolName('TOOL2_NAMES'), true);
 assert.equal(isNumberedToolName('assessment'), false);
+
+assert.equal(containsResolutionAbbreviation('getRes1Naming'), true);
+assert.equal(containsResolutionAbbreviation('RES4_SYNC'), true);
+assert.equal(containsResolutionAbbreviation('strategicH3Resolution'), false);
 
 assert.equal(isKebabCaseSegment('game-actions'), true);
 assert.equal(isKebabCaseSegment('gameActions'), false);

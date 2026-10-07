@@ -1,18 +1,18 @@
 # Tactical prompt
 
-The tactical (res4) beat system prompt as the builders emit it. The captured tactical prompt dump in the repository root is stale and is not a source. If this file disagrees with the builders, the builders win.
+The tactical beat system prompt as the builders emit it. The preamble states H3 resolution 4 children inside the enclosing strategic hex. The captured tactical prompt dump in the repository root is stale and is not a source. If this file disagrees with the builders, the builders win.
 
 Shared rules come from `assembly-contract.md`. Differences from the strategic contract are stated as differences; everything not called out here follows `strategic-prompt.md` only where `assembly-contract.md` marks the section as shared.
 
 ## 1. Battle framing
 
 1. **Two clocks.** The prompt states the strategic turn number, the tactical beat number, and the phase. A beat is a period inside one strategic turn, and the beat number is what "this beat" refers to everywhere else in the prompt. Carries `TURN_CLOCK`, `BATTLE_FRAME`.
-2. **One footprint.** The battle occupies the res4 child cells of a single contested res1 cell. Every cell code in the prompt belongs to that footprint. Carries `BATTLE_FRAME`, `HEX_IDENTITY`.
+2. **One footprint.** The battle occupies the tactical child cells of a single contested strategic cell. Every cell code in the prompt belongs to that footprint. Carries `BATTLE_FRAME`, `HEX_IDENTITY`.
 3. **Local goal only.** The goal statement is to engage and defeat the enemy forces present in this battle. The regional win conditions, home regions, and territorial progress must not appear. A model told to win the region during a beat will disengage to chase territory it cannot reach from inside the footprint. Carries `BATTLE_FRAME`.
 4. **Sub-unit addressing.** Units in battle are sub-units, addressed as the parent unit id followed by a colon and a two-digit slot. Enemy sub-unit ids are legal target values. The parent strategic id is never a valid order target in a beat. Carries `SUBUNIT_IDENTITY`.
 5. **Full visibility.** Both sides see every sub-unit in the footprint, and the narrative states this. Fog affects the strategic snapshot, not the battle. The straight-hop distance caveat is not emitted in battle, because its gate requires the strategic resolution. Carries `BATTLE_FRAME`.
 6. **Movement is a point budget.** A sub-unit moves on a terrain-weighted movement-point budget. Clear of weather, that budget is two points for infantry, four for armor, three for naval, and air does not march. Infantry or armor whose **current** cell is urban or rubble has a one-point budget this beat, not the type baseline. Armor in forest is penalised to the infantry baseline. Entering an intact road cell costs half a point and an intact rail cell costs one third, for every terrain, for infantry and armor. That cell may be entered from a neighbor that is not on the line, including terrain the unit could not otherwise enter, and a blocked line cell may be left only onto terrain the unit can enter without a line or onto another intact line cell. Entering an urban cell with no road or rail costs 1. Rubble with no road or rail costs 2. Rubble on a road or rail costs 1 where the unit could already enter, and does not open blocked terrain. A non-air sub-unit always retains at least one point. Carries `TACTICAL_MP_RULES`.
-7. **Infantry has reach here.** At res4 every ground and naval type has a ranged reach: infantry two, armor five, naval ten, before terrain reduces it. Forest, urban, or rubble on the attacker's cell caps infantry and armor to range 1. Mountain along the line of sight blocks armor and naval (infantry is exempt). Air strikes and ferry are not blocked by mountains. This is the opposite of the strategic rule and the prompt must state it explicitly rather than leaving the strategic melee-only sentence in place. Carries `TACTICAL_RANGE_TABLE`.
+7. **Infantry has reach here.** On the tactical grid every ground and naval type has a ranged reach: infantry two, armor five, naval ten, before terrain reduces it. Forest, urban, or rubble on the attacker's cell caps infantry and armor to range 1. Mountain along the line of sight blocks armor and naval (infantry is exempt). Air strikes and ferry are not blocked by mountains. This is the opposite of the strategic rule and the prompt must state it explicitly rather than leaving the strategic melee-only sentence in place. Carries `TACTICAL_RANGE_TABLE`.
 8. **Air strikes anywhere in the battle.** An air sub-unit may strike any cell in the footprint; the strategic three-cell strike radius does not apply. Striking still costs the unit its one air action for the beat. Strike options are offered only while the enclosing cell's airport is intact, so an air sub-unit whose parent airport has been destroyed has no strike rows to copy. Carries `AIR_STRIKE_ENVELOPE`, `TACTICAL_RANGE_TABLE`, `AIR_ORDER_RESTRICTIONS`.
 9. **Standing orders are inert.** No standing order moves a sub-unit during a beat. A sub-unit the model does not order is a sub-unit that does not move. Carries `STANDING_ORDERS_INERT_IN_BATTLE`.
 
@@ -35,7 +35,7 @@ The battle-local goal from section 1.3, followed by a pointer to the rules below
 
 ### 2.4 Coordinate preamble
 
-Two paragraphs. First: the battle map is the res4 children of the enclosing res1 cell, positions are two-character tactical codes taken from the map and the unit table, copied exactly and never invented, distances are res4 steps. Second: in the response, cells are tactical codes and target-unit values are enemy sub-unit ids; raw H3 strings and coordinate pairs are never emitted. Carries `HEX_IDENTITY`, `SUBUNIT_IDENTITY`.
+Two paragraphs. First: the battle map is the resolution-4 children of the enclosing strategic hex, positions are two-character tactical codes taken from the map and the unit table, copied exactly and never invented, distances are tactical hex steps. Second: in the response, cells are tactical codes and target-unit values are enemy sub-unit ids; raw H3 strings and coordinate pairs are never emitted. Carries `HEX_IDENTITY`, `SUBUNIT_IDENTITY`.
 
 ### 2.5 Combat and attack rules
 
@@ -43,7 +43,7 @@ Same clause order as strategic section 1.5, with these substitutions:
 
 | Clause | Tactical value |
 | --- | --- |
-| Per-type reach | Res4 reaches from `RANGED_RANGE_BY_UNIT_TYPE`; air is stated as striking anywhere in the battle rather than as a numeric reach |
+| Per-type reach | Tactical reaches from `RANGED_RANGE_BY_UNIT_TYPE`; air is stated as striking anywhere in the battle rather than as a numeric reach |
 | Infantry clause | Infantry and armor fire at res4 baselines; forest, urban, or rubble on the attacker caps them to range 1; mountain LOS blocks armor and naval; air strikes and ferry are not blocked by mountains; close to melee when out of reach |
 | Movement budgets | The point budget from section 1.6: clear-of-weather type baselines, origin urban/rubble collapsing infantry and armor to one point, forest penalty for armor, intact line enter costs for infantry and armor, the roadless urban enter cost, and rubble enter costs; not the strategic per-turn cell counts. Weather changes to those budgets are the weather-bonus row |
 | Resolution order | Embark, air strikes, ranged fire, movement, ferry, cargo sync, melee, applied per beat with no production step (`buildResolutionOrderRule`) |

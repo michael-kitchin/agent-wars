@@ -11,7 +11,7 @@ import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { dbGetOne, isDbReady, listUnitsForSnapshot } from '../gameDb';
 import { readPersistedOriginBonusSettings } from '../gameDb/originBonusConfig';
 import { logDebug, logTrace } from '../logger';
-import { getRes1MajorityCountryNamesFromSnapshot } from '../unitOrigin/res4BirthCountryCache';
+import { getStrategicMajorityCountryNamesFromSnapshot } from '../unitOrigin/tacticalBirthCountryCache';
 import {
   noOriginHitBonus,
   createStrategicOriginHitBonusLookup,
@@ -44,11 +44,11 @@ export function buildStrategicOriginHitBonusLookupFromDb(): OriginHitBonusLookup
   const settings = readOriginBonusSettingsFromDb();
   logDebug('originHitBonusLookupDb buildStrategicOriginHitBonusLookupFromDb', { ...settings });
   if (!settings.countryBonusEnabled) return noOriginHitBonus;
-  const countryNames = getRes1MajorityCountryNamesFromSnapshot();
+  const countryNames = getStrategicMajorityCountryNamesFromSnapshot();
   return createStrategicOriginHitBonusLookup({
     settings,
     units: listUnitsForSnapshot(),
-    countryNameAt: (res1H3Index) => countryNames.get(res1H3Index) ?? null,
+    countryNameAt: (strategicH3Index) => countryNames.get(strategicH3Index) ?? null,
   });
 }
 

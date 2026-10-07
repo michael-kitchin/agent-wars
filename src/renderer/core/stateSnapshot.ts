@@ -41,14 +41,14 @@ reconcileSelectionToCurrentState: () => void;
    */
 updateClientStaleEnemyIntel: (previousState: GameStateSnapshot | null, state: GameStateSnapshot) => void;
     /**
-   * Specifies the contract for the `clearRes1TooltipSummaryCaches` member (clearRes1TooltipSummaryCaches: () => void;).
+   * Specifies the contract for the `clearStrategicTooltipSummaryCaches` member (clearStrategicTooltipSummaryCaches: () => void;).
 
-   * Contract: Describes stable behavior for callers of `clearRes1TooltipSummaryCaches` in this codebase.
+   * Contract: Describes stable behavior for callers of `clearStrategicTooltipSummaryCaches` in this codebase.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-clearRes1TooltipSummaryCaches: () => void;
+clearStrategicTooltipSummaryCaches: () => void;
     /**
    * Specifies the contract for the `refreshHumanStandingOrders` member (refreshHumanStandingOrders: () => Promise<void>;).
 
@@ -135,14 +135,14 @@ refreshBuildPopupIfOpen: () => void;
 
    * Contract: Drops renderer tactical overlay state when the main strategic snapshot no longer matches the active tactical session anchor turn/phase.
    * When to use: Immediately after every `S.gameState` replacement from the main process.
-   * Expected outcome: Prevents stale tactical res4 mode after new game, ready-advanced turns, or phase changes.
+   * Expected outcome: Prevents stale tactical mode after new game, ready-advanced turns, or phase changes.
    * Exceptions: None.
    */
   reconcileTacticalBattleAfterStrategicSnapshot: (nextState: GameStateSnapshot) => void;
     /**
    * Specifies the contract for the `applyRestoredTacticalBattleFromMain` member (applyRestoredTacticalBattleFromMain?: (battle: TacticalBattleSnapshot) => void;).
 
-   * Contract: Enters tactical res4 mode when the main process attached `tacticalBattleSession` to `getGameState` (restart restore).
+   * Contract: Enters tactical mode when the main process attached `tacticalBattleSession` to `getGameState` (restart restore).
    * When to use: Optional; omitted in tests that do not model tactical UI.
    * Expected outcome: Renderer tactical snapshot and map chrome match the restored main-process session.
    * Exceptions: None; implementation should be defensive and avoid duplicate activation for the same `battleId`.
@@ -323,7 +323,7 @@ export async function applyGameStateSnapshot(
       applyInitialCameraForState(nextState);
     }
   }
-  deps.clearRes1TooltipSummaryCaches();
+  deps.clearStrategicTooltipSummaryCaches();
   if (options.refreshStandingOrders) await deps.refreshHumanStandingOrders();
   if (options.updateGameStateSidebarUi) deps.updateGameStateSidebar(nextState);
   if (options.updateSelectionUi) {

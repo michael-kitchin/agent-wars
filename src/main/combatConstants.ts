@@ -69,8 +69,8 @@ export function getDefense(unitType: string): number {
 /**
  * Defines the `getRange` function shape (export function getRange(unitType: string): number).
 
- * Purpose: **Strategic (res1) combat** max ranged distance in H3 hex steps for dice resolution, pre-computation, and strategic order validation (`validateRangedAttack`, tool assessments, etc.).
- * When to use: Any **strategic** path that must stay aligned with `strategicRangedRangeHexesForUnitType`—not res4 tactical battles.
+ * Purpose: Strategic combat max ranged distance in H3 hex steps for dice resolution, pre-computation, and strategic order validation (`validateRangedAttack`, tool assessments, etc.).
+ * When to use: Any **strategic** path that must stay aligned with `strategicRangedRangeHexesForUnitType`—not tactical battles.
  * Expected outcome: Delegates to the shared strategic range table (infantry 0 / melee only). Tactical ranged legality uses `RANGED_RANGE_BY_UNIT_TYPE` and `effectiveTacticalRangedMaxRangeForAttacker`.
  * Exceptions: None.
  */

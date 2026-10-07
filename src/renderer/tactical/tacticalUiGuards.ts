@@ -2,7 +2,8 @@
  * Renderer-side tactical mode guards shared by map interactions, ready-button gating, and IPC orchestration.
  */
 
-import { cellToParent, getResolution } from 'h3-js';
+import { isTacticalCell, strategicParentOf } from '../../shared/h3Resolutions';
+
 import { tacticalHitIsInsideBattle } from '../../shared/mapOrderGestureGate';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 
@@ -19,7 +20,7 @@ export type TacticalRendererGateState = {
 };
 
 /**
- * Returns true when the renderer holds an active tactical battle snapshot (res4 session).
+ * Returns true when the renderer holds an active tactical battle snapshot (tactical session).
  *
  * Contract: Pure; identical to `!!state.tacticalBattleSnapshot`.
  * When to use: Ready button disabling, map interaction blocking, and sidebar suppression checks.
@@ -34,7 +35,7 @@ export function tacticalRendererIsBattleActive(state: TacticalRendererGateState)
  * Returns true when strategic human orders should be blocked because tactical mode owns the map.
  *
  * Contract: Currently identical to battle-active; kept as a named hook for future divergences (e.g. transitional states).
- * When to use: Any strategic-only gesture that must not fire while tactical res4 mode is active.
+ * When to use: Any strategic-only gesture that must not fire while tactical mode is active.
  * Expected outcome: True whenever tactical battle snapshot is non-null.
  * Exceptions: None.
  */
@@ -43,9 +44,9 @@ export function tacticalRendererShouldBlockStrategicMapOrders(state: TacticalRen
 }
 
 /**
- * Returns true when a hit-tested strategic or res4 hex lies inside the active tactical footprint.
+ * Returns true when a hit-tested strategic or tactical hex lies inside the active tactical footprint.
  *
- * Contract: Accepts enclosing res1, any listed res4 child, or any res4 cell whose parent res1 matches the enclosure.
+ * Contract: Accepts enclosing strategic, any listed tactical child, or any tactical cell whose parent strategic matches the enclosure.
  * The null-hit rule lives in `tacticalHitIsInsideBattle`.
  * When to use: Main-map click routing to reject out-of-footprint clicks during tactical sessions.
  * Expected outcome: True when no tactical session exists. During a battle, false for a null hit and for a hex outside the footprint.
@@ -54,12 +55,12 @@ export function tacticalRendererShouldBlockStrategicMapOrders(state: TacticalRen
 export function tacticalRendererHitInsideBattleFootprint(hit: string | null, tb: TacticalBattleSnapshot | null): boolean {
   let footprintSaysInside = false;
   if (typeof hit === 'string' && tb) {
-    if (hit === tb.enclosingRes1H3Index || tb.res4ChildH3Indexes.includes(hit)) {
+    if (hit === tb.enclosingStrategicH3Index || tb.tacticalChildH3Indexes.includes(hit)) {
       footprintSaysInside = true;
     } else {
       try {
-        if (getResolution(hit) === 4) {
-          footprintSaysInside = cellToParent(hit, 1) === tb.enclosingRes1H3Index;
+        if (isTacticalCell(hit)) {
+          footprintSaysInside = strategicParentOf(hit) === tb.enclosingStrategicH3Index;
         }
       } catch {
         footprintSaysInside = false;

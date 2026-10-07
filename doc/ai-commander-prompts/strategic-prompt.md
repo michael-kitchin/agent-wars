@@ -1,6 +1,6 @@
 # Strategic prompt
 
-The strategic (res1) system prompt as `buildSystemPromptForTools` emits it. Shared assembly comes from `assembly-contract.md`. Messages after the system prompt are in `consultation-flow.md`; gates are in `variants.md`. If this file disagrees with the builders, the builders win.
+The strategic system prompt as `buildSystemPromptForTools` emits it. On the global map the preamble states H3 resolution 1. Shared assembly comes from `assembly-contract.md`. Messages after the system prompt are in `consultation-flow.md`; gates are in `variants.md`. If this file disagrees with the builders, the builders win.
 
 Heading strings in backticks are exact and must match the generated prompt character for character.
 
@@ -31,7 +31,7 @@ Emit order. Each entry states purpose, the information items it carries, include
 
 ### 1.4 Coordinate preamble
 
-- **Shape:** two paragraphs. First: global map at res1, positions are two-character briefing codes taken from the operational map and unit table, copied exactly and never invented, distances are hex counts. Second: in the response, cells are briefing codes and a pursue target is an enemy unit id; raw H3 strings and latitude/longitude pairs are never emitted.
+- **Shape:** two paragraphs. First: global Earth map at the strategic H3 resolution passed in (1 on the global map), positions are two-character briefing codes taken from the operational map and unit table, copied exactly and never invented, distances are hex counts. Second: in the response, cells are briefing codes and a pursue target is an enemy unit id; raw H3 strings and latitude/longitude pairs are never emitted.
 - **Items:** `HEX_IDENTITY`, `UNIT_IDENTITY`.
 - **Include:** always. **Empty-state:** not possible.
 
@@ -78,7 +78,7 @@ Assessment-tool and combat-estimate hints must **not** appear when a precomputed
 #### `## Unit Status and Threats`
 
 - **Include:** always inside the briefing.
-- **Distance-basis caveat line:** immediately after the heading and before the table. Under fog off at res1, include one line stating that nearest-enemy distances and threat estimates are straight hop counts rather than march or sail paths, and that option-table targets are already this-turn legal destinations. Under fog on at res1, include the intel-staleness sentence and one line stating that nearest-enemy distances are march or sail path lengths when a path exists (otherwise a hop count), and that Best Options Target Hexes are already this-turn legal destinations — copy them even when the printed path is longer than one movement budget. Omit both caveat lines in battle. `variants.md` fixes the gates.
+- **Distance-basis caveat line:** immediately after the heading and before the table. With fog off on the strategic map, include one line stating that nearest-enemy distances and threat estimates are straight hop counts rather than march or sail paths, and that option-table targets are already this-turn legal destinations. With fog on, include the intel-staleness sentence and one line stating that nearest-enemy distances are march or sail path lengths when a path exists (otherwise a hop count), and that Best Options Target Hexes are already this-turn legal destinations. Copy them even when the printed path is longer than one movement budget. Omit both caveat lines in battle. `variants.md` fixes the gates.
 - **Rows:** one per own unit. **No cap.** The table lists every unit the snapshot includes, at every game size.
 - **Bonus column:** a `Bonus` column follows `Hex` when the country bonus is on or the tech bonus is on. Country reads `+2 country` (`+4 country` at High) for a unit that qualifies where it stands. Tech appends `tech +2 attack` at Low, or `tech +2 attack and defense` at High, for an Advanced unit. A row with neither reads `—`. With both flags off the table is unchanged. Carries `ORIGIN_BONUS` and `TECH_BONUS`.
 - **Items:** `OWN_UNIT_TABLE`, `UNIT_IDENTITY`, `NEAREST_ENEMY_DISTANCE`, `CONTACT_FLAGS`, `THREAT_SEVERITY`, `ACTION_NEEDED_FLAG`, `INTEL_FRESHNESS`, `INTEL_STALENESS_WINDOW`, `HOP_VS_PATH_CAVEAT`.

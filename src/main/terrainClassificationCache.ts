@@ -2,66 +2,67 @@
  * One-shot terrain classification from bundled metadata JSON: res-1 kinds for DB seeding and res-4 override rows for the renderer.
  */
 
-import { cellToParent } from 'h3-js';
+import { activeGameMap } from '../shared/activeGameMap';
+import { strategicParentOf } from '../shared/h3Resolutions';
 import { logDebug, logError, logTrace } from './logger';
 import type { PipelineTerrainKind } from '../shared/pipelineTerrain';
-import type { Res1ProductionContextSnapshot } from '../shared/ipcTypes';
+import type { StrategicProductionContextSnapshot } from '../shared/ipcTypes';
 import {
   classifyCellWithoutUrbanOverride,
-  classifyRes4TerrainKind,
-  isRes4UrbanOverlayHex,
+  classifyTacticalTerrainKind,
+  isTacticalUrbanOverlayHex,
 } from './terrainClassifierFromMetadata';
 import {
   DEFAULT_CLASSIFIER_THRESHOLDS,
   DEFAULT_NODATA_FALLBACK_TERRAIN,
   METADATA_CHILD_RESOLUTION,
   METADATA_PARENT_RESOLUTION,
-  loadTerrainRes1MetadataBundled,
-  loadTerrainRes4MetadataBundled,
+  loadTerrainStrategicMetadataBundled,
+  loadTerrainTacticalMetadataBundled,
   recordHasMajorAirport,
   recordHasMajorSeaport,
-  type HexMetadataRecordRes4,
+  type HexMetadataRecordTactical,
 } from './terrainMetadataLoad';
 import {
-  loadTerrainRes1NamingBundled,
-  loadTerrainRes4NamingBundled,
-  type TerrainNamingRecordRes1,
-  type TerrainNamingRecordRes4,
+  loadTerrainStrategicNamingBundled,
+  loadTerrainTacticalNamingBundled,
+  type TerrainNamingRecordStrategic,
+  type TerrainNamingRecordTactical,
 } from './terrainNamingLoad';
 import {
   buildNamingCaptionsByH3,
-  namingCaptionForRes1Record,
-  namingCaptionForRes4Record,
+  namingCaptionForStrategicRecord,
+  namingCaptionForTacticalRecord,
 } from './terrainNamingCaption';
 import type { HexNamingCaption } from '../shared/hexNamingCaption';
-import { clearRes4BirthCountryCache, storeRes4BirthCountryCache } from './unitOrigin/res4BirthCountryCache';
+import { clearTacticalBirthCountryCache, storeTacticalBirthCountryCache } from './unitOrigin/tacticalBirthCountryCache';
 import {
   assertLandMassMatchesHexList,
-  buildRes1LandMassByH3,
-  loadTerrainRes1LandMassBundled,
+  buildStrategicLandMassByH3,
+  loadTerrainStrategicLandMassBundled,
 } from './terrainLandMassLoad';
-import type { Res1LandMassRecord } from '../shared/landTraversalRes1';
+import type { StrategicLandMassRecord } from '../shared/landTraversalStrategic';
 import { ensureWeatherPackLoaded } from './weather/weatherPackLoad';
-import { reduceRes4CityOverlayLabelsByH3 } from './terrainRes4CityOverlayReduce';
-import { loadTerrainRes4RoadRailSidesBundled } from './terrainRoadRailSidesLoad';
-import { loadTerrainRes4RoadRailVectorsBundled } from './terrainRoadRailVectorsLoad';
+import { reduceTacticalCityOverlayLabelsByH3 } from './terrainTacticalCityOverlayReduce';
+import { loadTerrainTacticalRoadRailSidesBundled } from './terrainRoadRailSidesLoad';
+import { loadTerrainTacticalRoadRailVectorsBundled } from './terrainRoadRailVectorsLoad';
 import {
   hexContinentNamesFromSnapshot,
   hexNamingTooltipLineFromSnapshot,
-  res1BaselineUrbanHexCountRowsFromSnapshot,
-  res1ProductionContextFromSnapshot,
-  res4CityOverlayRowsFromSnapshot,
-  res4FeatureRowsForSeedingFromSnapshot,
-  res4RoadRailOverlayRowsFromSnapshot,
-  res4TerrainOverridesRowsForRenderer,
-  res4TransportVectorOverlayRowsFromSnapshot,
-  terrainRes1KindsFromSnapshot,
+  strategicBaselineUrbanHexCountRowsFromSnapshot,
+  strategicProductionContextFromSnapshot,
+  tacticalCityOverlayRowsFromSnapshot,
+  tacticalFeatureRowsForSeedingFromSnapshot,
+  tacticalRoadRailOverlayRowsFromSnapshot,
+  tacticalTerrainOverridesRowsForRenderer,
+  tacticalTransportVectorOverlayRowsFromSnapshot,
+  terrainStrategicKindsFromSnapshot,
 } from './terrainClassificationCacheSerialization';
 import type {
-  Res1BaselineUrbanHexCountRow,
-  Res4CityOverlayRow,
-  Res4RoadRailOverlayRow,
-  Res4TransportVectorOverlayRow,
+  StrategicBaselineUrbanHexCountRow,
+  TacticalCityOverlayRow,
+  TacticalRoadRailOverlayRow,
+  TacticalTransportVectorOverlayRow,
 } from '../shared/ipc/terrainHexTypes';
 
 /**
@@ -74,111 +75,111 @@ import type {
  */
 export interface TerrainClassificationSnapshot {
     /**
-   * Specifies the contract for the `res1KindByH3` member (res1KindByH3: ReadonlyMap<string, PipelineTerrainKind>;).
+   * Specifies the contract for the `strategicKindByH3` member (strategicKindByH3: ReadonlyMap<string, PipelineTerrainKind>;).
 
-   * Contract: Describes stable behavior for callers of `res1KindByH3` in this codebase.
+   * Contract: Describes stable behavior for callers of `strategicKindByH3` in this codebase.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-res1KindByH3: ReadonlyMap<string, PipelineTerrainKind>;
+strategicKindByH3: ReadonlyMap<string, PipelineTerrainKind>;
     /**
-   * Specifies the contract for the `res4OverrideRows` member (res4OverrideRows: ReadonlyArray<{ h3Index: string; terrainKind: PipelineTerrainKind; isUrban: boolean }>;).
+   * Specifies the contract for the `tacticalOverrideRows` member (tacticalOverrideRows: ReadonlyArray<{ h3Index: string; terrainKind: PipelineTerrainKind; isUrban: boolean }>;).
 
-   * Contract: Describes stable behavior for callers of `res4OverrideRows` in this codebase.
+   * Contract: Describes stable behavior for callers of `tacticalOverrideRows` in this codebase.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-res4OverrideRows: ReadonlyArray<{ h3Index: string; terrainKind: PipelineTerrainKind; isUrban: boolean }>;
+tacticalOverrideRows: ReadonlyArray<{ h3Index: string; terrainKind: PipelineTerrainKind; isUrban: boolean }>;
   /**
-   * Precomputed naming caption per res1 hex.
+   * Precomputed naming caption per strategic hex.
    * Contract: Hexes without naming rows are absent; identical captions share one object.
    * When to use: Hex naming IPC lookups at resolution 1.
    * Expected outcome: Caption text plus country spans for flags.
    * Exceptions: None.
    */
-  readonly namingCaptionsRes1ByH3: ReadonlyMap<string, HexNamingCaption>;
+  readonly namingCaptionsStrategicByH3: ReadonlyMap<string, HexNamingCaption>;
   /**
-   * Precomputed naming caption per res4 cell.
+   * Precomputed naming caption per tactical cell.
    * Contract: Cells without naming rows are absent; identical captions share one object.
    * When to use: Hex naming IPC lookups at resolution 4.
    * Expected outcome: Caption text plus country spans for flags.
    * Exceptions: None.
    */
-  readonly namingCaptionsRes4ByH3: ReadonlyMap<string, HexNamingCaption>;
+  readonly namingCaptionsTacticalByH3: ReadonlyMap<string, HexNamingCaption>;
     /**
-   * Specifies the contract for the `continentNamesRes1ByH3` member (continentNamesRes1ByH3: ReadonlyMap<string, string[]>;).
+   * Specifies the contract for the `continentNamesStrategicByH3` member (continentNamesStrategicByH3: ReadonlyMap<string, string[]>;).
 
-   * Contract: Describes stable behavior for callers of `continentNamesRes1ByH3` in this codebase.
+   * Contract: Describes stable behavior for callers of `continentNamesStrategicByH3` in this codebase.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-continentNamesRes1ByH3: ReadonlyMap<string, string[]>;
+continentNamesStrategicByH3: ReadonlyMap<string, string[]>;
     /**
-   * Specifies the contract for the `urbanHexCountByRes1H3` member (urbanHexCountByRes1H3: ReadonlyMap<string, number>;).
+   * Specifies the contract for the `urbanHexCountByStrategicH3` member (urbanHexCountByStrategicH3: ReadonlyMap<string, number>;).
 
-   * Contract: Describes stable behavior for callers of `urbanHexCountByRes1H3` in this codebase.
+   * Contract: Describes stable behavior for callers of `urbanHexCountByStrategicH3` in this codebase.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-urbanHexCountByRes1H3: ReadonlyMap<string, number>;
+urbanHexCountByStrategicH3: ReadonlyMap<string, number>;
     /**
-   * Specifies the contract for the `airportCountByRes1H3` member (airportCountByRes1H3: ReadonlyMap<string, number>;).
+   * Specifies the contract for the `airportCountByStrategicH3` member (airportCountByStrategicH3: ReadonlyMap<string, number>;).
 
-   * Contract: Describes stable behavior for callers of `airportCountByRes1H3` in this codebase.
+   * Contract: Describes stable behavior for callers of `airportCountByStrategicH3` in this codebase.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-airportCountByRes1H3: ReadonlyMap<string, number>;
+airportCountByStrategicH3: ReadonlyMap<string, number>;
     /**
-   * Specifies the contract for the `seaportCountByRes1H3` member (seaportCountByRes1H3: ReadonlyMap<string, number>;).
+   * Specifies the contract for the `seaportCountByStrategicH3` member (seaportCountByStrategicH3: ReadonlyMap<string, number>;).
 
-   * Contract: Describes stable behavior for callers of `seaportCountByRes1H3` in this codebase.
+   * Contract: Describes stable behavior for callers of `seaportCountByStrategicH3` in this codebase.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-seaportCountByRes1H3: ReadonlyMap<string, number>;
+seaportCountByStrategicH3: ReadonlyMap<string, number>;
     /**
-   * Specifies the contract for the `res4CityOverlayByH3` member (res4CityOverlayByH3: ReadonlyMap<string, string>;).
+   * Specifies the contract for the `tacticalCityOverlayByH3` member (tacticalCityOverlayByH3: ReadonlyMap<string, string>;).
 
-   * Contract: Reduced res4 city labels (scalerank 0..4) keyed by child `h3_index` for map inspection overlays.
+   * Contract: Reduced tactical city labels (scalerank 0..4) keyed by child `h3_index` for map inspection overlays.
    * When to use: Renderer IPC that must not re-parse the full naming JSON each frame.
    * Expected outcome: Values are non-empty display strings; missing keys mean no city overlay for that hex.
    * Exceptions: None.
    */
-res4CityOverlayByH3: ReadonlyMap<string, string>;
+tacticalCityOverlayByH3: ReadonlyMap<string, string>;
     /**
-   * Specifies the contract for the `res4RoadRailOverlayByH3` member (res4RoadRailOverlayByH3: ReadonlyMap<string, { roadSides: readonly boolean[]; railSides: readonly boolean[] }>;).
+   * Specifies the contract for the `tacticalRoadRailOverlayByH3` member (tacticalRoadRailOverlayByH3: ReadonlyMap<string, { roadSides: readonly boolean[]; railSides: readonly boolean[] }>;).
 
    * Contract: Boolean side masks for roads/rails aligned to the exported clockwise side ordering contract; the renderer infers edge-to-edge chord strokes (plus short inward spurs when the active count is odd) from these masks, not exported centerline polylines.
-   * When to use: Renderer IPC for res4 transport overlays when res4 is visible (`drawRes4CityOverlays` + `buildTransportChordSegments`).
+   * When to use: Renderer IPC for tactical transport overlays when tactical is visible (`drawTacticalCityOverlays` + `buildTransportChordSegments`).
    * Expected outcome: Both arrays share length 5 or 6 for a given cell; absent keys mean no transport overlay.
    * Exceptions: None.
    */
-res4RoadRailOverlayByH3: ReadonlyMap<string, { roadSides: readonly boolean[]; railSides: readonly boolean[] }>;
+tacticalRoadRailOverlayByH3: ReadonlyMap<string, { roadSides: readonly boolean[]; railSides: readonly boolean[] }>;
     /**
-   * Specifies the contract for the `res4TransportVectorOverlayRows` member (res4TransportVectorOverlayRows: ReadonlyArray<Res4TransportVectorOverlayRow>;).
+   * Specifies the contract for the `tacticalTransportVectorOverlayRows` member (tacticalTransportVectorOverlayRows: ReadonlyArray<TacticalTransportVectorOverlayRow>;).
 
    * Contract: Optional display-only road/rail polylines for Leaflet overlays; empty when vector artifact is absent.
    * When to use: Renderer IPC for vector transport drawing without touching boolean pathfinding masks.
    * Expected outcome: Rows contain validated `kind` and WGS84 `points`.
    * Exceptions: None.
    */
-res4TransportVectorOverlayRows: ReadonlyArray<Res4TransportVectorOverlayRow>;
+tacticalTransportVectorOverlayRows: ReadonlyArray<TacticalTransportVectorOverlayRow>;
     /**
-   * Specifies the contract for the `res4FeatureRows` member (res4FeatureRows: ReadonlyArray<{ h3Index: string; parentH3Index: string; terrainKind: PipelineTerrainKind; isUrban: boolean; isAirport:).
+   * Specifies the contract for the `tacticalFeatureRows` member (tacticalFeatureRows: ReadonlyArray<{ h3Index: string; parentH3Index: string; terrainKind: PipelineTerrainKind; isUrban: boolean; isAirport:).
 
-   * Contract: Describes stable behavior for callers of `res4FeatureRows` in this codebase.
+   * Contract: Describes stable behavior for callers of `tacticalFeatureRows` in this codebase.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-res4FeatureRows: ReadonlyArray<{
+tacticalFeatureRows: ReadonlyArray<{
     h3Index: string;
     parentH3Index: string;
     terrainKind: PipelineTerrainKind;
@@ -187,23 +188,23 @@ res4FeatureRows: ReadonlyArray<{
     isSeaport: boolean;
   }>;
     /**
-   * Specifies the contract for the `res1NamingRecords` member (res1NamingRecords: ReadonlyArray<TerrainNamingRecordRes1>;).
+   * Specifies the contract for the `strategicNamingRecords` member (strategicNamingRecords: ReadonlyArray<TerrainNamingRecordStrategic>;).
 
-   * Contract: Parsed res1 naming rows from `terrain_res1_naming.json` retained for region/scenario helpers without a second file read.
-   * When to use: `regionScenario.buildRegionHexCache` and other callers needing country `region` per res1 hex.
-   * Expected outcome: Same records as `loadTerrainRes1NamingBundled().records` at snapshot build time.
+   * Contract: Parsed strategic naming rows from `terrain_res1_naming.json` retained for region/scenario helpers without a second file read.
+   * When to use: `regionScenario.buildRegionHexCache` and other callers needing country `region` per strategic hex.
+   * Expected outcome: Same records as `loadTerrainStrategicNamingBundled().records` at snapshot build time.
    * Exceptions: None.
    */
-res1NamingRecords: ReadonlyArray<TerrainNamingRecordRes1>;
+strategicNamingRecords: ReadonlyArray<TerrainNamingRecordStrategic>;
     /**
-   * Specifies the contract for the `res1LandMassByH3` member (res1LandMassByH3: ReadonlyMap<string, Res1LandMassRecord>;).
+   * Specifies the contract for the `strategicLandMassByH3` member (strategicLandMassByH3: ReadonlyMap<string, StrategicLandMassRecord>;).
 
    * Contract: Precomputed continent/island membership and water fraction per res-1 hex for land-unit pathfinding.
    * When to use: Strategic land movement validation and routing after cache load.
-   * Expected outcome: One record per res-1 hex; keys match res1KindByH3.
+   * Expected outcome: One record per res-1 hex; keys match strategicKindByH3.
    * Exceptions: None.
    */
-res1LandMassByH3: ReadonlyMap<string, Res1LandMassRecord>;
+strategicLandMassByH3: ReadonlyMap<string, StrategicLandMassRecord>;
 }
 
 /**
@@ -226,36 +227,36 @@ let cached: TerrainClassificationSnapshot | null = null;
  */
 function buildSnapshot(): TerrainClassificationSnapshot {
   logDebug('terrainClassificationCache buildSnapshot: loading JSON');
-  const res1Env = loadTerrainRes1MetadataBundled();
-  const res4Env = loadTerrainRes4MetadataBundled();
-  const namingRes1Env = loadTerrainRes1NamingBundled();
-  const namingRes4Env = loadTerrainRes4NamingBundled();
-  if (res1Env.resolution !== METADATA_PARENT_RESOLUTION) {
+  const strategicEnv = loadTerrainStrategicMetadataBundled();
+  const tacticalEnv = loadTerrainTacticalMetadataBundled();
+  const namingStrategicEnv = loadTerrainStrategicNamingBundled();
+  const namingTacticalEnv = loadTerrainTacticalNamingBundled();
+  if (strategicEnv.resolution !== METADATA_PARENT_RESOLUTION) {
     throw new Error(
-      `terrain metadata: res1 resolution ${res1Env.resolution} != expected ${METADATA_PARENT_RESOLUTION}`
+      `terrain metadata: res1 resolution ${strategicEnv.resolution} != expected ${METADATA_PARENT_RESOLUTION}`
     );
   }
-  if (res4Env.resolution !== METADATA_CHILD_RESOLUTION) {
+  if (tacticalEnv.resolution !== METADATA_CHILD_RESOLUTION) {
     throw new Error(
-      `terrain metadata: res4 resolution ${res4Env.resolution} != expected ${METADATA_CHILD_RESOLUTION}`
+      `terrain metadata: res4 resolution ${tacticalEnv.resolution} != expected ${METADATA_CHILD_RESOLUTION}`
     );
   }
-  if (res4Env.record_count <= 0) {
+  if (tacticalEnv.record_count <= 0) {
     throw new Error(
       'terrain metadata: terrain_res4_metadata.json has no records; regenerate with npm run terrain:generate'
     );
   }
-  if (namingRes1Env.resolution !== METADATA_PARENT_RESOLUTION) {
+  if (namingStrategicEnv.resolution !== METADATA_PARENT_RESOLUTION) {
     throw new Error(
-      `terrain naming: res1 resolution ${namingRes1Env.resolution} != expected ${METADATA_PARENT_RESOLUTION}`
+      `terrain naming: res1 resolution ${namingStrategicEnv.resolution} != expected ${METADATA_PARENT_RESOLUTION}`
     );
   }
-  if (namingRes4Env.resolution !== METADATA_CHILD_RESOLUTION) {
+  if (namingTacticalEnv.resolution !== METADATA_CHILD_RESOLUTION) {
     throw new Error(
-      `terrain naming: res4 resolution ${namingRes4Env.resolution} != expected ${METADATA_CHILD_RESOLUTION}`
+      `terrain naming: res4 resolution ${namingTacticalEnv.resolution} != expected ${METADATA_CHILD_RESOLUTION}`
     );
   }
-  if (namingRes4Env.record_count <= 0) {
+  if (namingTacticalEnv.record_count <= 0) {
     throw new Error(
       'terrain naming: terrain_res4_naming.json has no records; regenerate with naming pipeline'
     );
@@ -263,24 +264,25 @@ function buildSnapshot(): TerrainClassificationSnapshot {
   const nodata = DEFAULT_NODATA_FALLBACK_TERRAIN;
   const t = DEFAULT_CLASSIFIER_THRESHOLDS;
 
-  const res1FallbackKindByH3 = new Map<string, PipelineTerrainKind>();
-  for (const row of res1Env.records) {
-    res1FallbackKindByH3.set(row.h3_index, classifyCellWithoutUrbanOverride(row, t, nodata));
+  const strategicFallbackKindByH3 = new Map<string, PipelineTerrainKind>();
+  for (const row of strategicEnv.records) {
+    strategicFallbackKindByH3.set(row.h3_index, classifyCellWithoutUrbanOverride(row, t, nodata));
   }
 
-  const res1MajorAirports: string[] = [];
-  const res1MajorSeaports: string[] = [];
-  const seaportCountByRes1H3 = new Map<string, number>();
-  const airportCountByRes1H3 = new Map<string, number>();
-  for (const row of res1Env.records) {
-    if (recordHasMajorAirport(row)) res1MajorAirports.push(row.h3_index);
-    if (recordHasMajorSeaport(row)) res1MajorSeaports.push(row.h3_index);
-    airportCountByRes1H3.set(row.h3_index, Math.max(0, row.airport_count_total));
-    seaportCountByRes1H3.set(row.h3_index, Math.max(0, row.seaport_count_total));
+  const scaleranks = activeGameMap().scaleranks;
+  const strategicMajorAirports: string[] = [];
+  const strategicMajorSeaports: string[] = [];
+  const seaportCountByStrategicH3 = new Map<string, number>();
+  const airportCountByStrategicH3 = new Map<string, number>();
+  for (const row of strategicEnv.records) {
+    if (recordHasMajorAirport(row, scaleranks.airport)) strategicMajorAirports.push(row.h3_index);
+    if (recordHasMajorSeaport(row, scaleranks.seaport)) strategicMajorSeaports.push(row.h3_index);
+    airportCountByStrategicH3.set(row.h3_index, Math.max(0, row.airport_count_total));
+    seaportCountByStrategicH3.set(row.h3_index, Math.max(0, row.seaport_count_total));
   }
-  const res4MajorAirports: string[] = [];
-  const res4MajorSeaports: string[] = [];
-  const res4FeatureRows: Array<{
+  const tacticalMajorAirports: string[] = [];
+  const tacticalMajorSeaports: string[] = [];
+  const tacticalFeatureRows: Array<{
     h3Index: string;
     parentH3Index: string;
     terrainKind: PipelineTerrainKind;
@@ -288,26 +290,26 @@ function buildSnapshot(): TerrainClassificationSnapshot {
     isAirport: boolean;
     isSeaport: boolean;
   }> = [];
-  const res4ClassifiedRows: Array<{ h3Index: string; parentH3: string; childKind: PipelineTerrainKind; isUrban: boolean }> = [];
-  const urbanHexCountByRes1H3 = new Map<string, number>();
+  const tacticalClassifiedRows: Array<{ h3Index: string; parentH3: string; childKind: PipelineTerrainKind; isUrban: boolean }> = [];
+  const urbanHexCountByStrategicH3 = new Map<string, number>();
   const childKindCountsByParent = new Map<string, Map<PipelineTerrainKind, number>>();
-  for (const row of res4Env.records as HexMetadataRecordRes4[]) {
-    const childKind = classifyRes4TerrainKind(row, t, nodata);
-    const isUrban = isRes4UrbanOverlayHex(row);
-    const parentH3 = cellToParent(row.h3_index, METADATA_PARENT_RESOLUTION);
+  for (const row of tacticalEnv.records as HexMetadataRecordTactical[]) {
+    const childKind = classifyTacticalTerrainKind(row, t, nodata);
+    const isUrban = isTacticalUrbanOverlayHex(row, scaleranks.urbanOverlay);
+    const parentH3 = strategicParentOf(row.h3_index);
     // Point infrastructure: use major-feature scalerank gates (not raw totals). Totals are noisy and
-    // mark many res4 children when a res1 hosts port/airport influence, which breaks tactical rules
-    // that must treat only true facility tiles as seaport/airport res4 cells.
-    const isAirport = recordHasMajorAirport(row);
-    const isSeaport = recordHasMajorSeaport(row);
+    // mark many tactical children when a strategic hosts port/airport influence, which breaks tactical rules
+    // that must treat only true facility tiles as seaport/airport tactical cells.
+    const isAirport = recordHasMajorAirport(row, scaleranks.airport);
+    const isSeaport = recordHasMajorSeaport(row, scaleranks.seaport);
     let parentCounts = childKindCountsByParent.get(parentH3);
     if (!parentCounts) {
       parentCounts = new Map<PipelineTerrainKind, number>();
       childKindCountsByParent.set(parentH3, parentCounts);
     }
     parentCounts.set(childKind, (parentCounts.get(childKind) ?? 0) + 1);
-    res4ClassifiedRows.push({ h3Index: row.h3_index, parentH3, childKind, isUrban });
-    res4FeatureRows.push({
+    tacticalClassifiedRows.push({ h3Index: row.h3_index, parentH3, childKind, isUrban });
+    tacticalFeatureRows.push({
       h3Index: row.h3_index,
       parentH3Index: parentH3,
       terrainKind: childKind,
@@ -316,17 +318,17 @@ function buildSnapshot(): TerrainClassificationSnapshot {
       isSeaport,
     });
     if (isUrban) {
-      urbanHexCountByRes1H3.set(parentH3, (urbanHexCountByRes1H3.get(parentH3) ?? 0) + 1);
+      urbanHexCountByStrategicH3.set(parentH3, (urbanHexCountByStrategicH3.get(parentH3) ?? 0) + 1);
     }
-    if (recordHasMajorAirport(row)) res4MajorAirports.push(row.h3_index);
-    if (recordHasMajorSeaport(row)) res4MajorSeaports.push(row.h3_index);
+    if (recordHasMajorAirport(row, scaleranks.airport)) tacticalMajorAirports.push(row.h3_index);
+    if (recordHasMajorSeaport(row, scaleranks.seaport)) tacticalMajorSeaports.push(row.h3_index);
   }
 
-  const res1KindByH3 = new Map<string, PipelineTerrainKind>();
-  for (const row of res1Env.records) {
+  const strategicKindByH3 = new Map<string, PipelineTerrainKind>();
+  for (const row of strategicEnv.records) {
     const counts = childKindCountsByParent.get(row.h3_index);
     if (!counts || counts.size === 0) {
-      res1KindByH3.set(row.h3_index, res1FallbackKindByH3.get(row.h3_index) ?? nodata);
+      strategicKindByH3.set(row.h3_index, strategicFallbackKindByH3.get(row.h3_index) ?? nodata);
       continue;
     }
     let dominantKind: PipelineTerrainKind | null = null;
@@ -337,78 +339,81 @@ function buildSnapshot(): TerrainClassificationSnapshot {
         dominantCount = count;
       }
     }
-    res1KindByH3.set(row.h3_index, dominantKind ?? (res1FallbackKindByH3.get(row.h3_index) ?? nodata));
+    strategicKindByH3.set(row.h3_index, dominantKind ?? (strategicFallbackKindByH3.get(row.h3_index) ?? nodata));
   }
 
-  const res4OverrideRows: { h3Index: string; terrainKind: PipelineTerrainKind; isUrban: boolean }[] = [];
-  for (const row of res4ClassifiedRows) {
+  const tacticalOverrideRows: { h3Index: string; terrainKind: PipelineTerrainKind; isUrban: boolean }[] = [];
+  for (const row of tacticalClassifiedRows) {
     const { h3Index, parentH3, childKind, isUrban } = row;
-    const parentKind = res1KindByH3.get(parentH3);
+    const parentKind = strategicKindByH3.get(parentH3);
     if (parentKind === undefined) {
       const msg = `terrain metadata: res4 child ${h3Index} parent ${parentH3} missing from res1 map`;
       logError('terrainClassificationCache buildSnapshot: orphan res4 row', new Error(msg));
       throw new Error(msg);
     }
     if (childKind !== parentKind || isUrban) {
-      res4OverrideRows.push({ h3Index, terrainKind: childKind, isUrban });
+      tacticalOverrideRows.push({ h3Index, terrainKind: childKind, isUrban });
     }
   }
-  const namingCaptionsRes1ByH3 = buildNamingCaptionsByH3(namingRes1Env.records, namingCaptionForRes1Record);
-  const namingCaptionsRes4ByH3 = buildNamingCaptionsByH3(
-    namingRes4Env.records as TerrainNamingRecordRes4[],
-    namingCaptionForRes4Record
+  const namingCaptionsStrategicByH3 = buildNamingCaptionsByH3(namingStrategicEnv.records, namingCaptionForStrategicRecord);
+  const namingCaptionsTacticalByH3 = buildNamingCaptionsByH3(
+    namingTacticalEnv.records as TerrainNamingRecordTactical[],
+    namingCaptionForTacticalRecord
   );
-  const res4CityOverlayByH3 = reduceRes4CityOverlayLabelsByH3(namingRes4Env.records as TerrainNamingRecordRes4[]);
-  const res4RoadRailOverlayByH3 = loadTerrainRes4RoadRailSidesBundled();
-  const res4TransportVectorOverlayRows = loadTerrainRes4RoadRailVectorsBundled();
-  const continentNamesRes1ByH3 = new Map<string, string[]>();
-  for (const row of namingRes1Env.records as TerrainNamingRecordRes1[]) {
+  const tacticalCityOverlayByH3 = reduceTacticalCityOverlayLabelsByH3(
+    namingTacticalEnv.records as TerrainNamingRecordTactical[],
+    scaleranks.cityLabel,
+  );
+  const tacticalRoadRailOverlayByH3 = loadTerrainTacticalRoadRailSidesBundled();
+  const tacticalTransportVectorOverlayRows = loadTerrainTacticalRoadRailVectorsBundled();
+  const continentNamesStrategicByH3 = new Map<string, string[]>();
+  for (const row of namingStrategicEnv.records as TerrainNamingRecordStrategic[]) {
     const names: string[] = [];
     for (const countryRow of row.countries) {
       const candidate = (countryRow.continent ?? '').trim() || countryRow.name.trim();
       if (!candidate) continue;
       if (!names.includes(candidate)) names.push(candidate);
     }
-    continentNamesRes1ByH3.set(row.h3_index, names);
+    continentNamesStrategicByH3.set(row.h3_index, names);
   }
 
-  const landMassEnv = loadTerrainRes1LandMassBundled();
+  const landMassEnv = loadTerrainStrategicLandMassBundled();
   ensureWeatherPackLoaded();
-  const res1LandMassByH3 = buildRes1LandMassByH3(landMassEnv);
-  const expectedRes1Hexes = res1Env.records.map((row) => row.h3_index);
-  assertLandMassMatchesHexList(res1LandMassByH3, expectedRes1Hexes);
+  const strategicLandMassByH3 = buildStrategicLandMassByH3(landMassEnv);
+  const expectedStrategicHexes = strategicEnv.records.map((row) => row.h3_index);
+  assertLandMassMatchesHexList(strategicLandMassByH3, expectedStrategicHexes);
 
   logDebug('terrainClassificationCache buildSnapshot: done', {
-    res1Count: res1KindByH3.size,
-    res4Records: res4Env.records.length,
-    res4OverrideCount: res4OverrideRows.length,
-    res1MajorAirportHexes: res1MajorAirports.length,
-    res1MajorSeaportHexes: res1MajorSeaports.length,
-    res4MajorAirportHexes: res4MajorAirports.length,
-    res4MajorSeaportHexes: res4MajorSeaports.length,
-    res1NamingHexes: namingCaptionsRes1ByH3.size,
-    res4NamingHexes: namingCaptionsRes4ByH3.size,
-    res4CityOverlayHexes: res4CityOverlayByH3.size,
-    res4RoadRailOverlayHexes: res4RoadRailOverlayByH3.size,
-    res4TransportVectorRows: res4TransportVectorOverlayRows.length,
-    res1LandMassHexes: res1LandMassByH3.size,
+    strategicCount: strategicKindByH3.size,
+    tacticalRecords: tacticalEnv.records.length,
+    tacticalOverrideCount: tacticalOverrideRows.length,
+    strategicMajorAirportHexes: strategicMajorAirports.length,
+    strategicMajorSeaportHexes: strategicMajorSeaports.length,
+    tacticalMajorAirportHexes: tacticalMajorAirports.length,
+    tacticalMajorSeaportHexes: tacticalMajorSeaports.length,
+    strategicNamingHexes: namingCaptionsStrategicByH3.size,
+    tacticalNamingHexes: namingCaptionsTacticalByH3.size,
+    tacticalCityOverlayHexes: tacticalCityOverlayByH3.size,
+    tacticalRoadRailOverlayHexes: tacticalRoadRailOverlayByH3.size,
+    tacticalTransportVectorRows: tacticalTransportVectorOverlayRows.length,
+    strategicLandMassHexes: strategicLandMassByH3.size,
   });
-  storeRes4BirthCountryCache(namingRes1Env.records as TerrainNamingRecordRes1[], namingRes4Env.records as TerrainNamingRecordRes4[]);
+  storeTacticalBirthCountryCache(namingStrategicEnv.records as TerrainNamingRecordStrategic[], namingTacticalEnv.records as TerrainNamingRecordTactical[]);
   return {
-    res1KindByH3,
-    res4OverrideRows,
-    namingCaptionsRes1ByH3,
-    namingCaptionsRes4ByH3,
-    continentNamesRes1ByH3,
-    urbanHexCountByRes1H3,
-    airportCountByRes1H3,
-    seaportCountByRes1H3,
-    res4CityOverlayByH3,
-    res4RoadRailOverlayByH3,
-    res4TransportVectorOverlayRows,
-    res4FeatureRows,
-    res1NamingRecords: namingRes1Env.records as TerrainNamingRecordRes1[],
-    res1LandMassByH3,
+    strategicKindByH3,
+    tacticalOverrideRows,
+    namingCaptionsStrategicByH3,
+    namingCaptionsTacticalByH3,
+    continentNamesStrategicByH3,
+    urbanHexCountByStrategicH3,
+    airportCountByStrategicH3,
+    seaportCountByStrategicH3,
+    tacticalCityOverlayByH3,
+    tacticalRoadRailOverlayByH3,
+    tacticalTransportVectorOverlayRows,
+    tacticalFeatureRows,
+    strategicNamingRecords: namingStrategicEnv.records as TerrainNamingRecordStrategic[],
+    strategicLandMassByH3,
   };
 }
 
@@ -432,64 +437,64 @@ export function ensureTerrainClassificationCacheLoaded(): void {
 }
 
 /**
- * Returns parsed res1 naming records from the loaded terrain snapshot.
+ * Returns parsed strategic naming records from the loaded terrain snapshot.
  *
  * Purpose: Supplies `regionScenario` and similar helpers without re-reading `terrain_res1_naming.json`.
  * When to use: After `ensureTerrainClassificationCacheLoaded()` at startup or before region hex aggregation.
  * Expected outcome: Read-only array identical to the bundled naming envelope records used when the snapshot was built.
  * Exceptions: Throws if the classification cache has not been loaded yet.
  */
-export function getTerrainRes1NamingRecordsFromSnapshot(): ReadonlyArray<TerrainNamingRecordRes1> {
+export function getTerrainStrategicNamingRecordsFromSnapshot(): ReadonlyArray<TerrainNamingRecordStrategic> {
   logTrace('terrainClassificationCache getTerrainRes1NamingRecordsFromSnapshot');
   if (!cached) {
     const err = new Error('terrainClassificationCache: load ensureTerrainClassificationCacheLoaded() first');
     logError('terrainClassificationCache getTerrainRes1NamingRecordsFromSnapshot: cache empty', err);
     throw err;
   }
-  return cached.res1NamingRecords;
+  return cached.strategicNamingRecords;
 }
 
 /**
- * Defines the `getRes1LandMassByH3` function shape (export function getRes1LandMassByH3(): ReadonlyMap<string, Res1LandMassRecord>).
+ * Defines the `getStrategicLandMassByH3` function shape (export function getStrategicLandMassByH3(): ReadonlyMap<string, StrategicLandMassRecord>).
 
- * Purpose: Supports maintainability by documenting why `getRes1LandMassByH3` exists.
+ * Purpose: Supports maintainability by documenting why `getStrategicLandMassByH3` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function getRes1LandMassByH3(): ReadonlyMap<string, Res1LandMassRecord> {
+export function getStrategicLandMassByH3(): ReadonlyMap<string, StrategicLandMassRecord> {
   logTrace('terrainClassificationCache getRes1LandMassByH3');
   ensureTerrainClassificationCacheLoaded();
-  return cached!.res1LandMassByH3;
+  return cached!.strategicLandMassByH3;
 }
 
 /**
- * Defines the `getTerrainRes1KindsFromCache` function shape (export function getTerrainRes1KindsFromCache(): ReadonlyMap<string, PipelineTerrainKind> { logTrace('terrainClassificationCache getTerrainRes1KindsFromCache').
+ * Defines the `getTerrainStrategicKindsFromCache` function shape (export function getTerrainStrategicKindsFromCache(): ReadonlyMap<string, PipelineTerrainKind> { logTrace('terrainClassificationCache getTerrainStrategicKindsFromCache').
 
- * Purpose: Supports maintainability by documenting why `getTerrainRes1KindsFromCache` exists.
+ * Purpose: Supports maintainability by documenting why `getTerrainStrategicKindsFromCache` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function getTerrainRes1KindsFromCache(): ReadonlyMap<string, PipelineTerrainKind> {
+export function getTerrainStrategicKindsFromCache(): ReadonlyMap<string, PipelineTerrainKind> {
   logTrace('terrainClassificationCache getTerrainRes1KindsFromCache');
   if (!cached) {
     const err = new Error('terrainClassificationCache: load ensureTerrainClassificationCacheLoaded() first');
     logError('terrainClassificationCache getTerrainRes1KindsFromCache: cache empty', err);
     throw err;
   }
-  return terrainRes1KindsFromSnapshot(cached);
+  return terrainStrategicKindsFromSnapshot(cached);
 }
 
 /**
- * Defines the `getRes4TerrainOverridesForRenderer` function shape (export function getRes4TerrainOverridesForRenderer(): Array<).
+ * Defines the `getTacticalTerrainOverridesForRenderer` function shape (export function getTacticalTerrainOverridesForRenderer(): Array<).
 
- * Purpose: Supports maintainability by documenting why `getRes4TerrainOverridesForRenderer` exists.
+ * Purpose: Supports maintainability by documenting why `getTacticalTerrainOverridesForRenderer` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function getRes4TerrainOverridesForRenderer(): Array<{
+export function getTacticalTerrainOverridesForRenderer(): Array<{
   h3Index: string;
   terrainKind: PipelineTerrainKind;
   isUrban: boolean;
@@ -501,11 +506,11 @@ export function getRes4TerrainOverridesForRenderer(): Array<{
     logError('terrainClassificationCache getRes4TerrainOverridesForRenderer: cache empty', err);
     throw err;
   }
-  return res4TerrainOverridesRowsForRenderer(cached);
+  return tacticalTerrainOverridesRowsForRenderer(cached);
 }
 
 /**
- * Looks up the precomputed naming caption for a res1 or res4 hex.
+ * Looks up the precomputed naming caption for a strategic or tactical hex.
  *
  * Purpose: Backs the `game:getHexNamingTooltipLine` IPC handler.
  * When to use: After `ensureTerrainClassificationCacheLoaded()`.
@@ -543,100 +548,100 @@ export function getHexContinentNamesForRenderer(payload: { h3Index: string }): s
 }
 
 /**
- * Defines the `getRes4CityOverlaysForRenderer` function shape (export function getRes4CityOverlaysForRenderer(): Res4CityOverlayRow[]).
+ * Defines the `getTacticalCityOverlaysForRenderer` function shape (export function getTacticalCityOverlaysForRenderer(): TacticalCityOverlayRow[]).
 
- * Purpose: Serializes reduced res4 city labels for renderer map inspection overlays.
- * When to use: `game:getRes4CityOverlays` IPC handler after the classification cache is loaded.
+ * Purpose: Serializes reduced tactical city labels for renderer map inspection overlays.
+ * When to use: `game:getTacticalCityOverlays` IPC handler after the classification cache is loaded.
  * Expected outcome: Stable array of `{ h3Index, label }` rows; empty when the cache has not been built yet.
  * Exceptions: None.
  */
-export function getRes4CityOverlaysForRenderer(): Res4CityOverlayRow[] {
+export function getTacticalCityOverlaysForRenderer(): TacticalCityOverlayRow[] {
   logTrace('terrainClassificationCache getRes4CityOverlaysForRenderer');
   if (!cached) {
     logDebug('terrainClassificationCache getRes4CityOverlaysForRenderer: cache empty, returning []');
     return [];
   }
-  return res4CityOverlayRowsFromSnapshot(cached);
+  return tacticalCityOverlayRowsFromSnapshot(cached);
 }
 
 /**
- * Returns the generated urban-cell count for each res1 hex that can produce units.
+ * Returns the generated urban-cell count for each strategic hex that can produce units.
  *
  * Purpose: Tooltips and the build popup classify tech from this baseline, which air strikes do not change.
- * When to use: `game:getRes1BaselineUrbanHexCounts` after the classification cache is loaded.
+ * When to use: `game:getStrategicBaselineUrbanHexCounts` after the classification cache is loaded.
  * Expected outcome: Rows with a positive count. Empty when the cache has not been built yet.
  * Exceptions: None.
  */
-export function getRes1BaselineUrbanHexCountsForRenderer(): Res1BaselineUrbanHexCountRow[] {
+export function getStrategicBaselineUrbanHexCountsForRenderer(): StrategicBaselineUrbanHexCountRow[] {
   logTrace('terrainClassificationCache getRes1BaselineUrbanHexCountsForRenderer');
   if (!cached) {
     logDebug('terrainClassificationCache getRes1BaselineUrbanHexCountsForRenderer: cache empty, returning []');
     return [];
   }
-  return res1BaselineUrbanHexCountRowsFromSnapshot(cached);
+  return strategicBaselineUrbanHexCountRowsFromSnapshot(cached);
 }
 
 /**
- * Defines the `getRes4RoadRailOverlaysForRenderer` function shape (export function getRes4RoadRailOverlaysForRenderer(): Res4RoadRailOverlayRow[]).
+ * Defines the `getTacticalRoadRailOverlaysForRenderer` function shape (export function getTacticalRoadRailOverlaysForRenderer(): TacticalRoadRailOverlayRow[]).
 
  * Purpose: Serializes bundled road/rail side masks for renderer transport glyphs.
- * When to use: `game:getRes4RoadRailOverlays` IPC handler after the classification cache is loaded.
+ * When to use: `game:getTacticalRoadRailOverlays` IPC handler after the classification cache is loaded.
  * Expected outcome: Each row includes cloned boolean arrays suitable for immediate renderer caching.
  * Exceptions: None.
  */
-export function getRes4RoadRailOverlaysForRenderer(): Res4RoadRailOverlayRow[] {
+export function getTacticalRoadRailOverlaysForRenderer(): TacticalRoadRailOverlayRow[] {
   logTrace('terrainClassificationCache getRes4RoadRailOverlaysForRenderer');
   if (!cached) {
     logDebug('terrainClassificationCache getRes4RoadRailOverlaysForRenderer: cache empty, returning []');
     return [];
   }
-  return res4RoadRailOverlayRowsFromSnapshot(cached);
+  return tacticalRoadRailOverlayRowsFromSnapshot(cached);
 }
 
 /**
- * Defines the `getRes4TransportVectorOverlaysForRenderer` function shape (export function getRes4TransportVectorOverlaysForRenderer(): Res4TransportVectorOverlayRow[]).
+ * Defines the `getTacticalTransportVectorOverlaysForRenderer` function shape (export function getTacticalTransportVectorOverlaysForRenderer(): TacticalTransportVectorOverlayRow[]).
 
  * Purpose: Serializes optional display-only road/rail vector rows for the Leaflet overlay layer.
- * When to use: `game:getRes4TransportVectorOverlays` IPC handler after cache load.
+ * When to use: `game:getTacticalTransportVectorOverlays` IPC handler after cache load.
  * Expected outcome: Returns cloned point tuples for renderer safety; empty when optional artifact is unavailable.
  * Exceptions: None.
  */
-export function getRes4TransportVectorOverlaysForRenderer(): Res4TransportVectorOverlayRow[] {
+export function getTacticalTransportVectorOverlaysForRenderer(): TacticalTransportVectorOverlayRow[] {
   logTrace('terrainClassificationCache getRes4TransportVectorOverlaysForRenderer');
   if (!cached) {
     logDebug('terrainClassificationCache getRes4TransportVectorOverlaysForRenderer: cache empty, returning []');
     return [];
   }
-  return res4TransportVectorOverlayRowsFromSnapshot(cached);
+  return tacticalTransportVectorOverlayRowsFromSnapshot(cached);
 }
 
 /**
- * Defines the `getRes1ProductionContext` function shape (export function getRes1ProductionContext(payload:).
+ * Defines the `getStrategicProductionContext` function shape (export function getStrategicProductionContext(payload:).
 
- * Purpose: Supports maintainability by documenting why `getRes1ProductionContext` exists.
+ * Purpose: Supports maintainability by documenting why `getStrategicProductionContext` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function getRes1ProductionContext(payload: { h3Index: string }): Res1ProductionContextSnapshot {
+export function getStrategicProductionContext(payload: { h3Index: string }): StrategicProductionContextSnapshot {
   logTrace('terrainClassificationCache getRes1ProductionContext', payload);
   if (!cached) {
     const err = new Error('terrainClassificationCache: load ensureTerrainClassificationCacheLoaded() first');
     logError('terrainClassificationCache getRes1ProductionContext: cache empty', err);
     throw err;
   }
-  return res1ProductionContextFromSnapshot(cached, payload.h3Index);
+  return strategicProductionContextFromSnapshot(cached, payload.h3Index);
 }
 
 /**
- * Defines the `getRes4FeatureRowsForSeeding` function shape (export function getRes4FeatureRowsForSeeding(): ReadonlyArray<).
+ * Defines the `getTacticalFeatureRowsForSeeding` function shape (export function getTacticalFeatureRowsForSeeding(): ReadonlyArray<).
 
- * Purpose: Supports maintainability by documenting why `getRes4FeatureRowsForSeeding` exists.
+ * Purpose: Supports maintainability by documenting why `getTacticalFeatureRowsForSeeding` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function getRes4FeatureRowsForSeeding(): ReadonlyArray<{
+export function getTacticalFeatureRowsForSeeding(): ReadonlyArray<{
   h3Index: string;
   parentH3Index: string;
   terrainKind: PipelineTerrainKind;
@@ -650,7 +655,7 @@ export function getRes4FeatureRowsForSeeding(): ReadonlyArray<{
     logError('terrainClassificationCache getRes4FeatureRowsForSeeding: cache empty', err);
     throw err;
   }
-  return res4FeatureRowsForSeedingFromSnapshot(cached);
+  return tacticalFeatureRowsForSeedingFromSnapshot(cached);
 }
 
 /**
@@ -674,9 +679,9 @@ export function isTerrainClassificationCacheLoaded(): boolean {
  * Expected outcome: The cache map (including zeros) when loaded; null before `ensureTerrainClassificationCacheLoaded`.
  * Exceptions: None.
  */
-export function getCachedSeaportCountByRes1H3(): ReadonlyMap<string, number> | null {
+export function getCachedSeaportCountByStrategicH3(): ReadonlyMap<string, number> | null {
   logTrace('terrainClassificationCache getCachedSeaportCountByRes1H3');
-  return cached?.seaportCountByRes1H3 ?? null;
+  return cached?.seaportCountByStrategicH3 ?? null;
 }
 
 /**
@@ -690,5 +695,5 @@ export function getCachedSeaportCountByRes1H3(): ReadonlyMap<string, number> | n
 export function clearTerrainClassificationCacheForTests(): void {
   logDebug('terrainClassificationCache clearTerrainClassificationCacheForTests');
   cached = null;
-  clearRes4BirthCountryCache();
+  clearTacticalBirthCountryCache();
 }

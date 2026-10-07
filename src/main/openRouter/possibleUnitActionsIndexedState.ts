@@ -2,7 +2,8 @@
  * Indexed snapshot maps for possible-action collection, and the read-only lookups and cell text built from them.
  */
 
-import { cellToParent } from 'h3-js';
+import { strategicParentOf } from '../../shared/h3Resolutions';
+
 import type { GameStateSnapshot } from '../gameDb';
 import { logDebug, logInfo, logTrace } from '../logger';
 import { ENEMY_PLAYER, FRIENDLY_PLAYER } from './possibleUnitActionsTableAssembly';
@@ -10,7 +11,7 @@ import { ENEMY_PLAYER, FRIENDLY_PLAYER } from './possibleUnitActionsTableAssembl
 /**
  * Infrastructure counts on one world hex.
  *
- * Purpose: Answers "what can be struck or captured here" without rescanning `res1Infrastructure`.
+ * Purpose: Answers "what can be struck or captured here" without rescanning `strategicInfrastructure`.
  * When to use: Values of `PossibleActionsIndexedState.infraByHex`, read through `getInfra`.
  * Expected outcome: Non-negative counts; a hex with no row reads as all zeros.
  * Exceptions: None.
@@ -57,7 +58,7 @@ export interface InfraCounts {
  */
 export interface PossibleActionsIndexedState {
   /**
-   * Infrastructure counts per hex that has a `res1Infrastructure` row.
+   * Infrastructure counts per hex that has a `strategicInfrastructure` row.
    *
    * Contract: Hexes without a row are absent; read through `getInfra` for zero defaults.
    * When to use: Any infrastructure lookup.
@@ -68,7 +69,7 @@ export interface PossibleActionsIndexedState {
   /**
    * Controlling player per hex, or `null` for uncontrolled.
    *
-   * Contract: Hexes without a `res1Control` row are absent, which callers treat as uncontrolled.
+   * Contract: Hexes without a `strategicControl` row are absent, which callers treat as uncontrolled.
    * When to use: Ferry destination ownership and Best Options interest.
    * Expected outcome: One entry per control row.
    * Exceptions: None.
@@ -115,7 +116,7 @@ export interface PossibleActionsIndexedState {
  */
 export function buildPossibleActionsIndexedState(state: GameStateSnapshot): PossibleActionsIndexedState {
   const infraByHex = new Map<string, InfraCounts>();
-  for (const row of state.res1Infrastructure ?? []) {
+  for (const row of state.strategicInfrastructure ?? []) {
     infraByHex.set(row.h3Index, {
       urban: Number(row.urbanHexCount ?? 0),
       seaport: Number(row.seaportCount ?? 0),
@@ -123,7 +124,7 @@ export function buildPossibleActionsIndexedState(state: GameStateSnapshot): Poss
     });
   }
   const controlByHex = new Map<string, string | null>();
-  for (const row of state.res1Control ?? []) {
+  for (const row of state.strategicControl ?? []) {
     controlByHex.set(row.h3Index, row.controllerPlayerId ?? null);
   }
   const enemyUnitsByHex = new Map<string, Array<{ id: string; unitType: string }>>();
@@ -283,20 +284,20 @@ export function airBaseHasIntactAirport(indexed: PossibleActionsIndexedState, ai
 }
 
 /**
- * True when the air unit's parent res1 hex still has an airport in the plan-state snapshot.
+ * True when the air unit's parent strategic hex still has an airport in the plan-state snapshot.
  *
- * Purpose: Tactical strike validation keys airport presence on `cellToParent(unit.h3Index, 1)`, not the res4 cell the
+ * Purpose: Tactical strike validation keys airport presence on `strategicParentOf(unit.h3Index)`, not the tactical cell the
  *   aircraft occupies. Best Options must use the same gate so the tempo rule does not list a strike the engine will
  *   reject.
  * When to use: Tactical branch of air-strike row collection in `collectAggregatedPossibleActionRows`.
- * Expected outcome: `true` when snapshot infra for the parent res1 has `airport > 0`; `false` when parent lookup fails
+ * Expected outcome: `true` when snapshot infra for the parent strategic has `airport > 0`; `false` when parent lookup fails
  *   or the airport is gone.
  * Exceptions: Returns false and logs at info level if `cellToParent` throws.
  */
 export function tacticalParentAirportIntact(indexed: PossibleActionsIndexedState, airH3: string): boolean {
   logTrace('possibleUnitActions tacticalParentAirportIntact', airH3);
   try {
-    return getInfra(indexed, cellToParent(airH3, 1)).airport > 0;
+    return getInfra(indexed, strategicParentOf(airH3)).airport > 0;
   } catch (err) {
     logInfo('possibleUnitActions tacticalParentAirportIntact: cellToParent failed, treating airport as gone', { airH3, err });
     return false;

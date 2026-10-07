@@ -36,11 +36,11 @@ export const GAME_DB_REQUIRED_TABLES = [
   'ai_loss_events_since_consultation',
   'player_hex_intel',
   'player_unit_intel',
-  'res1_control',
-  'res1_build_queue',
-  'res1_build_progress',
-  'res1_infrastructure',
-  'res4_feature_overrides',
+  'res_s_control',
+  'res_s_build_queue',
+  'res_s_build_progress',
+  'res_s_infrastructure',
+  'res_t_feature_overrides',
   'turn_notes_history',
 ] as const;
 

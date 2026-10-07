@@ -1,61 +1,61 @@
 /**
- * Tactical rules adapter seed: res4 spatial checks that future tactical combat/movement will share with strategic parity layers.
+ * Tactical rules adapter seed: tactical spatial checks that future tactical combat/movement will share with strategic parity layers.
  */
 
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
-import { planTacticalRes4March } from '../../shared/tacticalRes4MovementPlanner';
+import { planTacticalMarch } from '../../shared/tacticalMovementPlanner';
 import { buildTacticalTerrainKindResolverFromSnapshot } from '../../shared/tacticalTerrainMovement';
-import { planTacticalRes4MarchWithSessionCache } from './tacticalMovementPlanningCache';
+import { planTacticalMarchWithSessionCache } from './tacticalMovementPlanningCache';
 import { tacticalLogQuery } from './tacticalLogging';
-import { tacticalRes4GridDistance } from './tacticalSpatialAdapter';
+import { tacticalGridDistance } from './tacticalSpatialAdapter';
 
 /**
- * Returns whether two res4 cells are within a maximum inclusive grid-step distance for tactical march-style checks.
+ * Returns whether two tactical cells are within a maximum inclusive grid-step distance for tactical march-style checks.
  *
- * Contract: Uses `tacticalRes4GridDistance`; both cells must be valid resolution-4 indexes or the distance helper throws.
- * When to use: Tactical order validation before delegating into shared strategic march rules with res4 geometry.
+ * Contract: Uses `tacticalGridDistance`; both cells must be valid resolution-4 indexes or the distance helper throws.
+ * When to use: Tactical order validation before delegating into shared strategic march rules with tactical geometry.
  * Expected outcome: True when distance is less than or equal to `maxSteps` (including same-cell distance zero).
- * Exceptions: Propagates errors from `tacticalRes4GridDistance` for invalid indexes.
+ * Exceptions: Propagates errors from `tacticalGridDistance` for invalid indexes.
  */
-export function tacticalMarchWithinRes4GridSteps(
-  fromRes4H3Index: string,
-  toRes4H3Index: string,
+export function tacticalMarchWithinGridSteps(
+  fromTacticalH3Index: string,
+  toTacticalH3Index: string,
   maxSteps: number
 ): boolean {
-  tacticalLogQuery('tacticalMarchWithinRes4GridSteps', { fromRes4H3Index, toRes4H3Index, maxSteps });
-  const d = tacticalRes4GridDistance(fromRes4H3Index, toRes4H3Index);
+  tacticalLogQuery('tacticalMarchWithinGridSteps', { fromTacticalH3Index, toTacticalH3Index, maxSteps });
+  const d = tacticalGridDistance(fromTacticalH3Index, toTacticalH3Index);
   const ok = d <= maxSteps;
   tacticalLogQuery('tacticalMarchWithinRes4GridSteps result', { d, ok });
   return ok;
 }
 
 /**
- * Returns the res4 cell reached after spending at most `movementPointBudget` movement points toward `toRes4H3Index` along the cheapest valid tactical path.
+ * Returns the tactical cell reached after spending at most `movementPointBudget` movement points toward `toTacticalH3Index` along the cheapest valid tactical path.
  *
  * Purpose: Lets tactical Ready apply only the first leg of a multi-turn march using §12.4 terrain costs (milestone 2.2).
  * When to use: `commitHumanTacticalDraftOrders` before `applyHumanTacticalDraftBeatInStrategicOrder`, using the same footprint and terrain snapshot as march validation.
  * Expected outcome: `stopH3` lies on the minimum movement-point path; `consumedFullPath` is true when the ordered destination is reached within budget.
- * When the budget cannot pay for the first step but the path exists and the budget is positive, `planTacticalRes4March` still advances one hex along that path.
+ * When the budget cannot pay for the first step but the path exists and the budget is positive, `planTacticalMarch` still advances one hex along that path.
  * Exceptions: When no finite-cost path exists, returns `{ stopH3: from, consumedFullPath: false }` so callers do not advance illegally.
  */
 export function tacticalMarchFirstStopAlongPath(
-  fromRes4H3Index: string,
-  toRes4H3Index: string,
+  fromTacticalH3Index: string,
+  toTacticalH3Index: string,
   movementPointBudget: number,
-  res4Set: ReadonlySet<string>,
+  tacticalSet: ReadonlySet<string>,
   battle?: Pick<
     TacticalBattleSnapshot,
     | 'battleId'
     | 'tacticalTurnNumber'
     | 'subUnits'
-    | 'res4TerrainKindByH3'
+    | 'tacticalTerrainKindByH3'
     | 'strategicHexTerrain'
     | 'strategicHexTerrainKind'
-    | 'res4IsSeaportByH3'
-    | 'res4IsUrbanByH3'
-    | 'res4IsRubbleByH3'
-    | 'res4RoadSidesByH3'
-    | 'res4RailSidesByH3'
+    | 'tacticalIsSeaportByH3'
+    | 'tacticalIsUrbanByH3'
+    | 'tacticalIsRubbleByH3'
+    | 'tacticalRoadSidesByH3'
+    | 'tacticalRailSidesByH3'
     | 'weather'
     | 'weatherBonusEnabled'
   >,
@@ -63,18 +63,18 @@ export function tacticalMarchFirstStopAlongPath(
   weatherTags?: readonly import('../../shared/weatherBonusTypes').WeatherState[] | null
 ): { stopH3: string; consumedFullPath: boolean; pathH3Prefix?: string[] } {
   tacticalLogQuery('tacticalMarchFirstStopAlongPath', {
-    fromRes4H3Index,
-    toRes4H3Index,
+    fromTacticalH3Index,
+    toTacticalH3Index,
     movementPointBudget,
     unitTypeForMovement,
   });
   if (movementPointBudget <= 0) {
-    return { stopH3: fromRes4H3Index, consumedFullPath: false, pathH3Prefix: undefined };
+    return { stopH3: fromTacticalH3Index, consumedFullPath: false, pathH3Prefix: undefined };
   }
   const planArgs = {
-    fromH3: fromRes4H3Index,
-    toH3: toRes4H3Index,
-    res4Set,
+    fromH3: fromTacticalH3Index,
+    toH3: toTacticalH3Index,
+    tacticalSet,
     unitTypeForMovement,
     movementPointBudget,
     weatherEnabled: battle?.weatherBonusEnabled === true,
@@ -83,14 +83,14 @@ export function tacticalMarchFirstStopAlongPath(
   };
   const plan =
     battle && battle.battleId && battle.subUnits
-      ? planTacticalRes4MarchWithSessionCache(battle, planArgs)
-      : planTacticalRes4March({
+      ? planTacticalMarchWithSessionCache(battle, planArgs)
+      : planTacticalMarch({
           ...planArgs,
           terrain: buildTacticalTerrainKindResolverFromSnapshot(battle ?? {}),
         });
   if (!plan.reachable) {
     tacticalLogQuery('tacticalMarchFirstStopAlongPath unreachable', { failureReason: plan.failureReason });
-    return { stopH3: fromRes4H3Index, consumedFullPath: false, pathH3Prefix: undefined };
+    return { stopH3: fromTacticalH3Index, consumedFullPath: false, pathH3Prefix: undefined };
   }
   const { stopH3, consumedFullPath } = plan.firstStopWithinBudget;
   let pathH3Prefix: string[] | undefined;

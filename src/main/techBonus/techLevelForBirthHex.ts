@@ -1,14 +1,14 @@
 /**
  * Tech tier of a unit's birth hex.
  *
- * Purpose: The tier follows the generated urban count of the origin res1 hex, including after urban cells are destroyed.
+ * Purpose: The tier follows the generated urban count of the origin strategic hex, including after urban cells are destroyed.
  * When to use: Snapshot stamping and the hit-bonus lookup. Dice must not trust a stamp alone.
  * Expected outcome: `advanced` at 21 or more urban cells. A count of 20, a missing birth hex, or an unloaded terrain cache is `basic` and does not throw.
  * Exceptions: None.
  */
 
 import { logDebug, logTrace } from '../logger';
-import { getRes1ProductionContext, isTerrainClassificationCacheLoaded } from '../terrainClassificationCache';
+import { getStrategicProductionContext, isTerrainClassificationCacheLoaded } from '../terrainClassificationCache';
 import { techLevelFromUrbanHexCount } from '../../shared/techBonusRules';
 import type { TechLevel } from '../../shared/techBonusTypes';
 
@@ -23,11 +23,11 @@ import type { TechLevel } from '../../shared/techBonusTypes';
 export function urbanHexCountForTech(h3Index: string): number | null {
   logTrace('techBonus urbanHexCountForTech', { h3Index });
   if (!isTerrainClassificationCacheLoaded()) return null;
-  return getRes1ProductionContext({ h3Index }).urbanHexCount;
+  return getStrategicProductionContext({ h3Index }).urbanHexCount;
 }
 
 /**
- * Classifies the res1 hex a unit was born in.
+ * Classifies the strategic hex a unit was born in.
  *
  * Purpose: Production, tooltips, and dice agree on one tier for that hex.
  * When to use: When stamping `techLevel`, and from tests that pass `urbanHexCountAt`.

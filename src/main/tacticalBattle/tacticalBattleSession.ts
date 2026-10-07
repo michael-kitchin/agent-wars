@@ -63,11 +63,11 @@ function opponentTacticalMarchValidationFailure(
   orders: readonly { unitId: string; toH3Index: string }[]
 ): string | null {
   if (orders.length === 0) return null;
-  const res4Set = new Set(cur.res4ChildH3Indexes);
+  const tacticalSet = new Set(cur.tacticalChildH3Indexes);
   const sub = [...cur.subUnits];
   const byId = new Map(sub.map((u, i) => [u.id, i] as const));
   for (const o of orders) {
-    const outcome = tacticalComputeMovementOrderOutcome({ byId, sub, order: o, res4Set, battle: cur });
+    const outcome = tacticalComputeMovementOrderOutcome({ byId, sub, order: o, tacticalSet, battle: cur });
     if (!outcome.ok) {
       tacticalLogQuery('opponentTacticalMarchValidationFailure', {
         reason: outcome.reason,
@@ -213,7 +213,7 @@ function endTacticalBattleSessionCore(applyHumanVoluntaryBailoutResolution: bool
 /**
  * Returns whether a tactical battle session is currently active in the main process.
  *
- * Contract: True iff `startTacticalBattleForEnclosingRes1Hex` succeeded and `endTacticalBattleSession` has not cleared state.
+ * Contract: True iff `startTacticalBattleForEnclosingStrategicHex` succeeded and `endTacticalBattleSession` has not cleared state.
  * When to use: IPC guards, strategic `ready()` gating, and any code that must not mutate strategic turn flow while tactical is open.
  * Expected outcome: Inexpensive boolean; does not allocate.
  * Exceptions: None.
@@ -238,23 +238,23 @@ export function getActiveTacticalBattleSnapshot(): TacticalBattleSnapshot | null
 }
 
 /**
- * Starts a tactical battle for the given contested res1 hex; fails if another battle is already active.
+ * Starts a tactical battle for the given contested strategic hex; fails if another battle is already active.
  *
  * Contract: On success, installs `activeTacticalBattle` from `computeTacticalBattleSnapshot`; on failure, leaves prior session unchanged (usually none).
- * When to use: Renderer `startTacticalBattle` IPC after entry button click with validated res1 id.
+ * When to use: Renderer `startTacticalBattle` IPC after entry button click with validated strategic id.
  * Expected outcome: `success: true` with `battle` and optional `skippedParentDisplayNames`; or `success: false` with human-readable `reason`.
  * Exceptions: Unexpected errors are caught, logged at error, and returned as `success: false` (no throw).
  */
-export function startTacticalBattleForEnclosingRes1Hex(enclosingRes1H3Index: string): StartTacticalBattleIpcResult {
-  tacticalLogMutate('startTacticalBattleForEnclosingRes1Hex', { enclosingRes1H3Index });
+export function startTacticalBattleForEnclosingHex(enclosingStrategicH3Index: string): StartTacticalBattleIpcResult {
+  tacticalLogMutate('startTacticalBattleForEnclosingHex', { enclosingStrategicH3Index });
   try {
     const concurrent = tacticalBoundaryConcurrentSessionAllowed(getActiveTacticalBattleSnapshotRef() !== null);
     if (!concurrent.ok) {
       return { success: false, reason: 'A tactical battle is already in progress.' };
     }
-    const battleId = `tb-${enclosingRes1H3Index}-${Date.now()}`;
+    const battleId = `tb-${enclosingStrategicH3Index}-${Date.now()}`;
     const { snapshot, skippedParentDisplayNames, failureReason } = computeTacticalBattleSnapshot(
-      enclosingRes1H3Index,
+      enclosingStrategicH3Index,
       battleId
     );
     if (!snapshot) {
@@ -273,7 +273,7 @@ export function startTacticalBattleForEnclosingRes1Hex(enclosingRes1H3Index: str
       skippedParentDisplayNames: skippedParentDisplayNames.length > 0 ? skippedParentDisplayNames : undefined,
     };
   } catch (err) {
-    tacticalLogError('startTacticalBattleForEnclosingRes1Hex failed', { enclosingRes1H3Index, err });
+    tacticalLogError('startTacticalBattleForEnclosingRes1Hex failed', { enclosingStrategicH3Index, err });
     return { success: false, reason: 'Could not start tactical battle.' };
   }
 }
@@ -346,11 +346,11 @@ function humanTacticalMarchValidationFailure(
   orders: readonly { unitId: string; toH3Index: string }[]
 ): string | null {
   if (orders.length === 0) return null;
-  const res4Set = new Set(cur.res4ChildH3Indexes);
+  const tacticalSet = new Set(cur.tacticalChildH3Indexes);
   const sub = [...cur.subUnits];
   const byId = new Map(sub.map((u, i) => [u.id, i] as const));
   for (const o of orders) {
-    const outcome = tacticalComputeHumanMovementOrderOutcome({ byId, sub, order: o, res4Set, battle: cur });
+    const outcome = tacticalComputeHumanMovementOrderOutcome({ byId, sub, order: o, tacticalSet, battle: cur });
     if (!outcome.ok) {
       tacticalLogMutate('humanTacticalMarchValidationFailure', {
         reason: outcome.reason,

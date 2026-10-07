@@ -8,10 +8,10 @@ Mode-specific detail lives in `strategic-prompt.md` and `tactical-prompt.md`. Me
 
 ## 1. Identity and coordinates
 
-1. **Cells are briefing hex codes.** Every cell the model reads or writes is a two-character code from the alphabet `A–Z` and `0–9`, produced by `h3ToCode` under the active `CoordinateContext`. Strategic prompts use the res1 registry; tactical prompts use the res4 registry for the battle footprint.
+1. **Cells are briefing hex codes.** Every cell the model reads or writes is a two-character code from the alphabet `A–Z` and `0–9`, produced by `h3ToCode` under the active `CoordinateContext`. Strategic prompts use the strategic registry; tactical prompts use the tactical registry for the battle footprint.
 2. **Codes are drawn, never invented.** A code the model emits must have appeared in the operational map or in a table of the same prompt. The prompt must say so.
 3. **Raw geometry is never an order value.** H3 index strings and latitude/longitude pairs must not appear in any order field. The prompt must say so in both modes.
-4. **Registries do not mix.** A tactical prompt must not contain res1 codes and a strategic prompt must not contain res4 codes. Home-region hex lists are res1 by definition (`HOME_REGION_HEX_COORD_CTX`) and therefore appear only in strategic prompts.
+4. **Registries do not mix.** A tactical prompt must not contain strategic codes and a strategic prompt must not contain tactical codes. Home-region hex lists use `HOME_REGION_HEX_COORD_CTX` (`mode: 'strategic'`) and therefore appear only in strategic prompts.
 5. **Units are addressed by snapshot id.** Strategic ids come from `GameStateSnapshot.units[].id`. Tactical ids are `parent:slot` from `TacticalSubUnitSnapshot.id`. A prompt must never present `displayName` as an addressable handle.
 6. **Enemy units are legal target values.** `targetUnitId` takes an enemy unit id at strategic level and an enemy sub-unit id in battle.
 7. **Tool results obey the same rules.** Every geographic value returned to the model is rewritten to briefing codes before the model sees it (`openRouterToolResultHex.ts`). A tool result that leaks a raw tuple is a defect, not an exception the model must tolerate.
@@ -54,12 +54,12 @@ Every cell is binary. `always` means unconditional in that mode; `never` means t
 | Goal statement | always (win conditions) | always (battle-local goal) | strategic with no scenario set falls back to the generic objective in `strategic-prompt.md` 1.2; never reuse scenario wording |
 | Scouting directive | when no enemy unit is observed | never | omit |
 | Tool-budget warning | when the previous consultation exhausted its tool budget and planning or orders tools are enabled | when the same condition holds | omit |
-| Coordinate preamble | always (res1 wording) | always (res4 wording) | n/a |
+| Coordinate preamble | always (strategic wording) | always (tactical wording) | n/a |
 | Combat and attack rules | always | always | n/a |
 | `# Commander's Briefing` | when a briefing body is supplied | when a briefing body is supplied | omit the heading and emit the standalone sections instead |
 | Narrative paragraph | always inside the briefing | always inside the briefing | never empty |
 | `## Unit Status and Threats` | always inside the briefing | always inside the briefing | header row plus `(No AI units)` |
-| Distance-basis caveat line | fog-off res1: hop-count honesty line; fog-on res1: path-vs-Best-Options line (after the staleness sentence) | never | omit |
+| Distance-basis caveat line | fog off on the strategic map: hop-count honesty line; fog on: path-vs-Best-Options line (after the staleness sentence) | never | omit |
 | `## Attention Flags` | always inside the briefing | always inside the briefing | `None.` |
 | `# Operational Map` | always inside the briefing | always inside the briefing | `(No units — map not rendered.)` strategic; `_No tactical cells — map not rendered._` tactical |
 | `### Best Options This Turn` | when at least one option row exists | when at least one option row exists | omit heading and table |
@@ -83,7 +83,7 @@ Every cell is binary. `always` means unconditional in that mode; `never` means t
 Live assembler notes that match the matrix above:
 
 - Air and naval status sections are **omitted** when the opponent has none of that arm (`buildAirOperationsBriefingBlock` / `buildSealiftBriefingBlock` return `''`). A dash table is not emitted.
-- The distance-basis caveat follows **what the numbers mean**, not the fog flag alone. Fog-off at res1 prints hop counts, so the hop-versus-path line is emitted. Fog-on at res1 prints march or sail path lengths (falling back to hops when no path exists), so the path-versus-Best-Options line is emitted. Neither line appears in a battle prompt.
+- The distance-basis caveat follows **what the numbers mean**, not the fog flag alone. Fog off on the strategic map prints hop counts, so the hop-versus-path line is emitted. Fog on prints march or sail path lengths (falling back to hops when no path exists), so the path-versus-Best-Options line is emitted. Neither line appears in a battle prompt.
 
 ## 4. Tools versus envelope writes
 
@@ -144,7 +144,7 @@ Envelope-wide rules the prompt must state:
 | Action | Strategic | Tactical |
 | --- | --- | --- |
 | `explicit_move` | legal | legal |
-| `ranged_attack` | legal for units with a strategic ranged reach of at least one | legal for every type with a res4 reach, infantry included |
+| `ranged_attack` | legal for units with a strategic ranged reach of at least one | legal for every type with a tactical reach, infantry included |
 | `assign_order` | legal when standing-order tools are enabled | **forbidden** |
 | `cancel_order` | legal when standing-order tools are enabled | **forbidden** |
 | `embark`, `transport_move`, `disembark` | legal when the opponent has naval units | legal when the opponent has naval sub-units |

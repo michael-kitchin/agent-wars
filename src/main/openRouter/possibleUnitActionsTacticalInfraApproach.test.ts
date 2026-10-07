@@ -1,5 +1,5 @@
 /**
- * Tactical Best Options contracts for empty-city vs approach when the enclosing res1 is uncontrolled,
+ * Tactical Best Options contracts for empty-city vs approach when the enclosing strategic is uncontrolled,
  * and for this-turn air strikes / ferry (footprint-wide human targets, no ferry rows).
  *
  * Purpose: Empty urban tiles in an uncontrolled battle must not crowd out closing with observed humans, and must not appear as blank ranged shots. Tactical air Best Options must match Air Operations (strike anywhere in the battle at human-occupied cells) and list airport ferry dests when the air unit has no this-turn strike.
@@ -14,7 +14,7 @@ import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { AIR_STRIKE_RANGE_HEXES } from '../../shared/tacticalRanges';
 import { LATLNG_DECIMAL_PLACES } from '../mapData';
 import { buildTacticalAiPlanState } from '../tacticalBattle/buildTacticalAiPlanState';
-import { tacticalRes1Cell, tacticalRes4UnderRes1Corner } from '../tacticalBattle/testSupport/tacticalRes4HexFixtures';
+import { tacticalParentCell, tacticalUnderCorner } from '../tacticalBattle/testSupport/tacticalHexFixtures';
 import { formatLatLng } from './promptText';
 import { collectAggregatedPossibleActionRows } from './possibleUnitActions';
 import type { GameStateSnapshot } from '../gameDb';
@@ -25,27 +25,27 @@ import type { GameStateSnapshot } from '../gameDb';
  * Purpose: Shared fixture so far-enemy vs no-enemy cases differ only in whether a human is present.
  * When to use: The two contract tests in this file.
  * Expected outcome: Armor at the corner cell; urban neighbor at grid distance 1; optional human at grid distance 6.
- * Exceptions: Throws when those neighbors cannot be placed under the same res1 parent.
+ * Exceptions: Throws when those neighbors cannot be placed under the same strategic parent.
  */
 function uncontrolledEmptyUrbanBattle(args: { includeFarHuman: boolean }): {
   tactical: TacticalBattleSnapshot;
   plan: GameStateSnapshot;
-  res4Opp: string;
-  res4Urban: string;
-  res4Human: string | null;
+  tacticalOpp: string;
+  tacticalUrban: string;
+  tacticalHuman: string | null;
 } {
-  const res1 = tacticalRes1Cell(12, 34);
-  const res4Opp = tacticalRes4UnderRes1Corner(12, 34);
-  const sameParent = [...gridDisk(res4Opp, 8)].filter((h) => cellToParent(h, 1) === res1);
-  const res4Urban = sameParent.find((h) => h !== res4Opp && gridDistance(res4Opp, h) === 1);
-  const res4Human = sameParent.find((h) => h !== res4Opp && h !== res4Urban && gridDistance(res4Opp, h) === 6);
-  if (!res4Urban || (args.includeFarHuman && !res4Human)) {
+  const parentCell = tacticalParentCell(12, 34);
+  const tacticalOpp = tacticalUnderCorner(12, 34);
+  const sameParent = [...gridDisk(tacticalOpp, 8)].filter((h) => cellToParent(h, 1) === parentCell);
+  const tacticalUrban = sameParent.find((h) => h !== tacticalOpp && gridDistance(tacticalOpp, h) === 1);
+  const tacticalHuman = sameParent.find((h) => h !== tacticalOpp && h !== tacticalUrban && gridDistance(tacticalOpp, h) === 6);
+  if (!tacticalUrban || (args.includeFarHuman && !tacticalHuman)) {
     throw new Error('expected an adjacent urban neighbor and a human six steps away under the same res1 parent');
   }
-  const far = args.includeFarHuman ? res4Human! : res4Opp;
+  const far = args.includeFarHuman ? tacticalHuman! : tacticalOpp;
   const footprint = sameParent.filter((h) => {
     try {
-      return gridDistance(res4Opp, h) <= 6 || gridDistance(far, h) <= 6;
+      return gridDistance(tacticalOpp, h) <= 6 || gridDistance(far, h) <= 6;
     } catch {
       return false;
     }
@@ -58,7 +58,7 @@ function uncontrolledEmptyUrbanBattle(args: { includeFarHuman: boolean }): {
       parentUnitId: 'parent-arm-a',
       player: 'opponent',
       unitType: 'armor',
-      h3Index: res4Opp,
+      h3Index: tacticalOpp,
       displayName: 'Armor A',
     },
   ];
@@ -68,36 +68,36 @@ function uncontrolledEmptyUrbanBattle(args: { includeFarHuman: boolean }): {
       parentUnitId: 'parent-inf',
       player: 'human',
       unitType: 'infantry',
-      h3Index: res4Human!,
+      h3Index: tacticalHuman!,
       displayName: 'Infantry',
     });
   }
   const tactical: TacticalBattleSnapshot = {
     battleId: 't-best-options-uncontrolled-urban',
-    enclosingRes1H3Index: res1,
-    res4ChildH3Indexes: footprint,
+    enclosingStrategicH3Index: parentCell,
+    tacticalChildH3Indexes: footprint,
     strategicTurnNumber: 1,
     tacticalTurnNumber: 1,
     strategicHexTerrain: 'land',
     strategicHexTerrainKind: 'plains',
-    res4TerrainKindByH3: terrain,
-    res4IsUrbanByH3: { [res4Urban]: true },
+    tacticalTerrainKindByH3: terrain,
+    tacticalIsUrbanByH3: { [tacticalUrban]: true },
     subUnits,
   };
   const strategic: GameStateSnapshot = {
     turnNumber: 1,
     phase: 'planning',
-    hexes: [{ h3Index: res1, terrain: 'land', terrainKind: 'plains' }],
+    hexes: [{ h3Index: parentCell, terrain: 'land', terrainKind: 'plains' }],
     units: [],
     pendingOrders: [],
-    res1Control: [],
+    strategicControl: [],
   };
   return {
     tactical,
     plan: buildTacticalAiPlanState(strategic, tactical),
-    res4Opp,
-    res4Urban,
-    res4Human: args.includeFarHuman ? res4Human! : null,
+    tacticalOpp,
+    tacticalUrban,
+    tacticalHuman: args.includeFarHuman ? tacticalHuman! : null,
   };
 }
 
@@ -132,20 +132,20 @@ function collectTacticalThisTurnRows(plan: GameStateSnapshot, tactical: Tactical
  * Exceptions: Throws if the geodesic neighbors cannot be placed.
  */
 function testTacticalBestOptionsPrefersApproachOverEmptyUncontrolledUrban(): void {
-  const { tactical, plan, res4Urban, res4Human } = uncontrolledEmptyUrbanBattle({ includeFarHuman: true });
+  const { tactical, plan, tacticalUrban, tacticalHuman } = uncontrolledEmptyUrbanBattle({ includeFarHuman: true });
   const rows = collectTacticalThisTurnRows(plan, tactical).filter((r) => r.unitId === 'opp-arm-shooter');
   assert.ok(
-    !rows.some((r) => r.targetH3 === res4Urban && r.actionTypes.includes('move/melee')),
+    !rows.some((r) => r.targetH3 === tacticalUrban && r.actionTypes.includes('move/melee')),
     'empty uncontrolled urban must not suppress approach as move/melee'
   );
   assert.ok(
-    !rows.some((r) => r.targetH3 === res4Urban && r.actionTypes.includes('ranged')),
+    !rows.some((r) => r.targetH3 === tacticalUrban && r.actionTypes.includes('ranged')),
     'empty uncontrolled urban must not appear as a ranged Best Option when humans are out of range'
   );
   const approaches = rows.filter((r) => r.actionTypes.includes('approach'));
   assert.ok(approaches.length >= 1, 'expected approach rows toward the distant human');
   assert.ok(
-    approaches.every((r) => gridDistance(r.targetH3, res4Human!) < 6),
+    approaches.every((r) => gridDistance(r.targetH3, tacticalHuman!) < 6),
     'approach targets must reduce distance to the distant human'
   );
   assert.ok(
@@ -163,9 +163,9 @@ function testTacticalBestOptionsPrefersApproachOverEmptyUncontrolledUrban(): voi
  * Exceptions: Throws if the adjacent urban neighbor cannot be placed.
  */
 function testTacticalBestOptionsKeepsEmptyUncontrolledUrbanWhenNoEnemy(): void {
-  const { tactical, plan, res4Urban } = uncontrolledEmptyUrbanBattle({ includeFarHuman: false });
+  const { tactical, plan, tacticalUrban } = uncontrolledEmptyUrbanBattle({ includeFarHuman: false });
   const rows = collectTacticalThisTurnRows(plan, tactical).filter((r) => r.unitId === 'opp-arm-shooter');
-  const urbanMoves = rows.filter((r) => r.targetH3 === res4Urban && r.actionTypes.includes('move/melee'));
+  const urbanMoves = rows.filter((r) => r.targetH3 === tacticalUrban && r.actionTypes.includes('move/melee'));
   assert.ok(urbanMoves.length >= 1, 'empty uncontrolled urban must remain move/melee when no enemy is observed');
   assert.ok(
     urbanMoves.every((r) => typeof r.featuresSummary === 'string' && r.featuresSummary.includes('urban')),
@@ -174,11 +174,11 @@ function testTacticalBestOptionsKeepsEmptyUncontrolledUrbanWhenNoEnemy(): void {
 }
 
 /**
- * Builds a tactical air Best Options fixture on a real enclosing-res1 airport snapshot (plan-state shape).
+ * Builds a tactical air Best Options fixture on a real enclosing-strategic airport snapshot (plan-state shape).
  *
- * Purpose: Production plan state keeps `res1Infrastructure` keyed by the enclosing res1 hex, not the air unit's res4 cell. Airport eligibility follows the parent of the air unit's cell (same as strike validation).
+ * Purpose: Production plan state keeps `strategicInfrastructure` keyed by the enclosing strategic hex, not the air unit's tactical cell. Airport eligibility follows the parent of the air unit's cell (same as strike validation).
  * When to use: This-turn air-strike range, airport-gate, empty-urban omit, and ferry-omit contracts in this file.
- * Expected outcome: Opponent air at the corner cell; optional far human beyond strategic strike range; optional empty urban neighbor; parent-res1 airport intact unless `airportCount` is 0.
+ * Expected outcome: Opponent air at the corner cell; optional far human beyond strategic strike range; optional empty urban neighbor; parent-strategic airport intact unless `airportCount` is 0.
  * Exceptions: Throws when the requested neighbors cannot be placed under the same parent.
  */
 function tacticalAirBestOptionsBattle(args: {
@@ -188,28 +188,28 @@ function tacticalAirBestOptionsBattle(args: {
 }): {
   tactical: TacticalBattleSnapshot;
   plan: GameStateSnapshot;
-  res4Air: string;
-  res4FarHuman: string | null;
-  res4EmptyUrban: string | null;
+  tacticalAir: string;
+  tacticalFarHuman: string | null;
+  tacticalEmptyUrban: string | null;
 } {
-  const res1 = tacticalRes1Cell(12, 34);
-  const res4Air = tacticalRes4UnderRes1Corner(12, 34);
-  const sameParent = [...gridDisk(res4Air, 8)].filter((h) => cellToParent(h, 1) === res1);
-  const res4EmptyUrban = sameParent.find((h) => h !== res4Air && gridDistance(res4Air, h) === 1);
+  const parentCell = tacticalParentCell(12, 34);
+  const tacticalAir = tacticalUnderCorner(12, 34);
+  const sameParent = [...gridDisk(tacticalAir, 8)].filter((h) => cellToParent(h, 1) === parentCell);
+  const tacticalEmptyUrban = sameParent.find((h) => h !== tacticalAir && gridDistance(tacticalAir, h) === 1);
   const farDist = AIR_STRIKE_RANGE_HEXES + 3;
-  const res4FarHuman = sameParent.find(
-    (h) => h !== res4Air && h !== res4EmptyUrban && gridDistance(res4Air, h) === farDist
+  const tacticalFarHuman = sameParent.find(
+    (h) => h !== tacticalAir && h !== tacticalEmptyUrban && gridDistance(tacticalAir, h) === farDist
   );
-  if (args.includeEmptyUrban && !res4EmptyUrban) {
+  if (args.includeEmptyUrban && !tacticalEmptyUrban) {
     throw new Error('expected an adjacent urban neighbor under the same res1 parent');
   }
-  if (args.includeFarHuman && !res4FarHuman) {
+  if (args.includeFarHuman && !tacticalFarHuman) {
     throw new Error(`expected a human ${farDist} steps away under the same res1 parent`);
   }
-  const far = args.includeFarHuman ? res4FarHuman! : res4Air;
+  const far = args.includeFarHuman ? tacticalFarHuman! : tacticalAir;
   const footprint = sameParent.filter((h) => {
     try {
-      return gridDistance(res4Air, h) <= farDist || gridDistance(far, h) <= farDist;
+      return gridDistance(tacticalAir, h) <= farDist || gridDistance(far, h) <= farDist;
     } catch {
       return false;
     }
@@ -222,7 +222,7 @@ function tacticalAirBestOptionsBattle(args: {
       parentUnitId: 'parent-air',
       player: 'opponent',
       unitType: 'air',
-      h3Index: res4Air,
+      h3Index: tacticalAir,
       displayName: 'Air',
     },
   ];
@@ -232,56 +232,56 @@ function tacticalAirBestOptionsBattle(args: {
       parentUnitId: 'parent-inf',
       player: 'human',
       unitType: 'infantry',
-      h3Index: res4FarHuman!,
+      h3Index: tacticalFarHuman!,
       displayName: 'Infantry',
     });
   }
   const tactical: TacticalBattleSnapshot = {
     battleId: 't-best-options-air-footprint',
-    enclosingRes1H3Index: res1,
-    res4ChildH3Indexes: footprint,
+    enclosingStrategicH3Index: parentCell,
+    tacticalChildH3Indexes: footprint,
     strategicTurnNumber: 1,
     tacticalTurnNumber: 1,
     strategicHexTerrain: 'land',
     strategicHexTerrainKind: 'plains',
-    res4TerrainKindByH3: terrain,
-    res4IsUrbanByH3: args.includeEmptyUrban && res4EmptyUrban ? { [res4EmptyUrban]: true } : {},
-    res4IsAirportByH3: {
-      [res4Air]: true,
-      ...(args.includeEmptyUrban && res4EmptyUrban ? { [res4EmptyUrban]: true } : {}),
+    tacticalTerrainKindByH3: terrain,
+    tacticalIsUrbanByH3: args.includeEmptyUrban && tacticalEmptyUrban ? { [tacticalEmptyUrban]: true } : {},
+    tacticalIsAirportByH3: {
+      [tacticalAir]: true,
+      ...(args.includeEmptyUrban && tacticalEmptyUrban ? { [tacticalEmptyUrban]: true } : {}),
     },
     subUnits,
   };
   const strategic: GameStateSnapshot = {
     turnNumber: 1,
     phase: 'planning',
-    hexes: [{ h3Index: res1, terrain: 'land', terrainKind: 'plains' }],
+    hexes: [{ h3Index: parentCell, terrain: 'land', terrainKind: 'plains' }],
     units: [],
     pendingOrders: [],
-    res1Infrastructure: [
-      { h3Index: res1, urbanHexCount: 1, airportCount: args.airportCount, seaportCount: 0 },
+    strategicInfrastructure: [
+      { h3Index: parentCell, urbanHexCount: 1, airportCount: args.airportCount, seaportCount: 0 },
     ],
-    res1Control: [{ h3Index: res1, controllerPlayerId: 'opponent' }],
+    strategicControl: [{ h3Index: parentCell, controllerPlayerId: 'opponent' }],
   };
   return {
     tactical,
     plan: buildTacticalAiPlanState(strategic, tactical),
-    res4Air,
-    res4FarHuman: args.includeFarHuman ? res4FarHuman! : null,
-    res4EmptyUrban: args.includeEmptyUrban ? res4EmptyUrban! : null,
+    tacticalAir,
+    tacticalFarHuman: args.includeFarHuman ? tacticalFarHuman! : null,
+    tacticalEmptyUrban: args.includeEmptyUrban ? tacticalEmptyUrban! : null,
   };
 }
 
 /**
- * Ensures tactical Best Options air strikes use the battle footprint and enclosing-res1 airport, not the strategic 3-hex disk.
+ * Ensures tactical Best Options air strikes use the battle footprint and enclosing-strategic airport, not the strategic 3-hex disk.
  *
- * Purpose: Air Operations says strike anywhere in the battle; the this-turn table used a 3-hex collector and an airport check on the air unit's res4 cell, so far humans and real plan-state airports were dropped.
+ * Purpose: Air Operations says strike anywhere in the battle; the this-turn table used a 3-hex collector and an airport check on the air unit's tactical cell, so far humans and real plan-state airports were dropped.
  * When to use: After edits to tactical this-turn air-strike collection in `collectAggregatedPossibleActionRows`.
  * Expected outcome: Strike on a human beyond strategic strike range; no strike on empty urban; no ferry rows because this-turn strike-or-ferry exclusivity drops ferry when a strike is listed.
  * Exceptions: Throws when the fixture cannot place those neighbors.
  */
 function testTacticalBestOptionsAirStrikesUseFootprintAndOmitFerry(): void {
-  const { tactical, plan, res4FarHuman, res4EmptyUrban } = tacticalAirBestOptionsBattle({
+  const { tactical, plan, tacticalFarHuman, tacticalEmptyUrban } = tacticalAirBestOptionsBattle({
     includeFarHuman: true,
     includeEmptyUrban: true,
     airportCount: 1,
@@ -289,11 +289,11 @@ function testTacticalBestOptionsAirStrikesUseFootprintAndOmitFerry(): void {
   const rows = collectTacticalThisTurnRows(plan, tactical).filter((r) => r.unitId === 'opp-air-strike');
   const strikes = rows.filter((r) => r.actionTypes.includes('air strike'));
   assert.ok(
-    strikes.some((r) => r.targetH3 === res4FarHuman),
+    strikes.some((r) => r.targetH3 === tacticalFarHuman),
     'tactical Best Options must list an air strike on a human beyond strategic strike range'
   );
   assert.ok(
-    !strikes.some((r) => r.targetH3 === res4EmptyUrban),
+    !strikes.some((r) => r.targetH3 === tacticalEmptyUrban),
     'tactical Best Options must not list an air strike on empty urban'
   );
   assert.ok(
@@ -311,15 +311,15 @@ function testTacticalBestOptionsAirStrikesUseFootprintAndOmitFerry(): void {
  * Exceptions: Throws when the fixture cannot place an adjacent dest airport.
  */
 function testTacticalBestOptionsListsAirportFerryDests(): void {
-  const { tactical, plan, res4EmptyUrban } = tacticalAirBestOptionsBattle({
+  const { tactical, plan, tacticalEmptyUrban } = tacticalAirBestOptionsBattle({
     includeFarHuman: false,
     includeEmptyUrban: true,
     airportCount: 1,
   });
-  assert.ok(res4EmptyUrban, 'expected a dest airport cell');
+  assert.ok(tacticalEmptyUrban, 'expected a dest airport cell');
   const rows = collectTacticalThisTurnRows(plan, tactical).filter((r) => r.unitId === 'opp-air-strike');
   assert.ok(
-    rows.some((r) => r.targetH3 === res4EmptyUrban && r.actionTypes.includes('ferry')),
+    rows.some((r) => r.targetH3 === tacticalEmptyUrban && r.actionTypes.includes('ferry')),
     'tactical Best Options must list a ferry dest at the other intact airport'
   );
   assert.ok(
@@ -329,9 +329,9 @@ function testTacticalBestOptionsListsAirportFerryDests(): void {
 }
 
 /**
- * Ensures tactical Best Options omit air strikes when the air unit's parent res1 has no airport.
+ * Ensures tactical Best Options omit air strikes when the air unit's parent strategic has no airport.
  *
- * Purpose: Order validation requires an intact parent-res1 airport; the table must not tempo-rule a strike the engine will reject.
+ * Purpose: Order validation requires an intact parent-strategic airport; the table must not tempo-rule a strike the engine will reject.
  * When to use: Together with `testTacticalBestOptionsAirStrikesUseFootprintAndOmitFerry`.
  * Expected outcome: No air-strike rows when `airportCount` is 0 even if humans are in the footprint.
  * Exceptions: None.

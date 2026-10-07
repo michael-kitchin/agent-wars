@@ -57,7 +57,7 @@ export function tacticalBattleExitTeardownTransientRendererState(): void {
  *
  * Purpose: `newGame` IPC clears the active battle in main but does not run tactical exit UI; this mirrors that teardown on the renderer.
  * When to use: After a fresh `GameStateSnapshot` with no `tacticalBattleSession`, including `newGame` and any `getGameState` apply where main dropped the session.
- * Expected outcome: Tactical HUD hidden, res4 map bounds released, resolution animation cancelled, `S.tacticalBattleSnapshot` null; sidebar turn uses `nextState`.
+ * Expected outcome: Tactical HUD hidden, tactical map bounds released, resolution animation cancelled, `S.tacticalBattleSnapshot` null; sidebar turn uses `nextState`.
  * Exceptions: None; safe when already strategic (no-op aside from `exitTacticalMapView` if pre-tactical zoom was captured).
  */
 export function tacticalReleaseRendererSessionForNewStrategicMatch(nextState: GameStateSnapshot): void {
@@ -82,7 +82,7 @@ export function tacticalReleaseRendererSessionForNewStrategicMatch(nextState: Ga
 /**
  * Keeps the strategic sidebar visible during tactical play; legacy hook remains for callers that toggled suppression.
  *
- * Contract: Always removes `tactical-strategic-suppress` so Ready, pending orders, and LLM panels stay usable in res4 mode.
+ * Contract: Always removes `tactical-strategic-suppress` so Ready, pending orders, and LLM panels stay usable in tactical mode.
  * When to use: Tactical entry success and tactical exit / reconciliation teardown (parameter ignored for compatibility).
  * Expected outcome: Full `#sidebar` visibility regardless of tactical flag.
  * Exceptions: None when `#sidebar` is missing (no-op).
@@ -109,7 +109,7 @@ export function tacticalUpdateExitButtonVisibility(): void {
  *
  * Contract: Clears `S.tacticalBattleSnapshot` when strategic phase/turn diverges from the tactical snapshot anchor.
  * When to use: `applyGameStateSnapshot` dependency hook after strategic state replacement.
- * Expected outcome: Tactical res4 view tears down and entry layer hides when reconciliation triggers.
+ * Expected outcome: Tactical tactical view tears down and entry layer hides when reconciliation triggers.
  * Exceptions: None.
  */
 export function tacticalReconcileBattleAfterStrategicSnapshot(nextState: GameStateSnapshot): void {
@@ -134,16 +134,16 @@ export function tacticalReconcileBattleAfterStrategicSnapshot(nextState: GameSta
 }
 
 /**
- * Resynchronizes tactical-entry magnifier controls for contested res1 hexes during strategic planning.
+ * Resynchronizes tactical-entry magnifier controls for contested strategic hexes during strategic planning.
  *
  * Contract: Delegates to `syncTacticalEntryButton` with the same dependency injection shape as the strategic renderer.
  * When to use: Canvas redraw paths that already refresh build-entry controls.
- * Expected outcome: Tactical magnifiers match contested explored res1 cells at eligible zoom levels.
+ * Expected outcome: Tactical magnifiers match contested explored strategic cells at eligible zoom levels.
  * Exceptions: None.
  */
 export function tacticalSyncTacticalEntryButtonOverlay(deps: {
   isHexExploredByPlayer: (h3: string) => boolean;
-  hasRes1OverlayOffsetFeatures: (h3Index: string, visibleUnitHexes: Set<string>) => boolean;
+  hasStrategicOverlayOffsetFeatures: (h3Index: string, visibleUnitHexes: Set<string>) => boolean;
 }): void {
   syncTacticalEntryButton(deps);
 }

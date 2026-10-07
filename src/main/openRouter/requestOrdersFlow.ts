@@ -169,7 +169,7 @@ export async function requestOrdersFlow(
     : { mode: 'strategic' };
   ensureStrategicCoordinateRegistryInitialized();
   if (tacticalBattle) {
-    initTacticalCoordinateRegistry(tacticalBattle.battleId, tacticalBattle.enclosingRes1H3Index);
+    initTacticalCoordinateRegistry(tacticalBattle.battleId, tacticalBattle.enclosingStrategicH3Index);
   }
   const coordMap = {
     latLngByH3,

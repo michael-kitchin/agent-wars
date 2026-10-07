@@ -30,7 +30,7 @@ function testSelectionHasMixedLandAndNaval(): void {
 /**
  * Regression guard for coastal-only mixed-stack destination eligibility.
  *
- * Purpose: Ensures `hexSupportsMixedLandAndNaval` accepts coastal/littoral res1 hexes and rejects pure land or water.
+ * Purpose: Ensures `hexSupportsMixedLandAndNaval` accepts coastal/littoral strategic hexes and rejects pure land or water.
  * When to use: Run via `npm test` after changes to mixed land/naval destination validation.
  * Expected outcome: Coastal terrain kinds return true; plains, wetlands, and water return false.
  * Exceptions: None.

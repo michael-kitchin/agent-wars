@@ -13,7 +13,7 @@ import { rendererSharedState as S } from '../core/state';
 import type { HoverRoutePreviewState } from '../core/types';
 import { resolveOrderBlockHexTooltipMessage, showOrderBlockHexTooltip } from '../map/orderBlockHexTooltip';
 import { hideOrderSlowerHexTooltip, scheduleOrderEffectsTooltip } from '../map/orderSlowerHexTooltip';
-import { clearTerrainTooltipTimer, hideTerrainTooltipVisual } from '../map/terrainTooltipRes1State';
+import { clearTerrainTooltipTimer, hideTerrainTooltipVisual } from '../map/terrainTooltipStrategicState';
 import { buildOrderPreviewEffectsTooltipInput } from './orderPreviewEffectsContext';
 import { getPreviewHumanMarchOrders, getValidateGroupAirStrikeTarget, getValidateGroupRangedTarget } from './gameApiHumanOrderPreview';
 import { buildGroupedSupportTargetingLinePreview } from './hoverRoutePreviewGroupedTargeting';

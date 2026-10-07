@@ -21,8 +21,8 @@ import {
   showTerrainTooltip,
   scheduleTerrainTooltipRestoreAfterPopoverClose,
   getPrimarySelectedUnitId,
-  applyRes4TerrainOverrides,
-  refreshRes4TerrainOverridesForRenderer,
+  applyTacticalTerrainOverrides,
+  refreshTacticalTerrainOverridesForRenderer,
   formatUnitDisplayName,
   refreshStrategicOrderSidebars,
   startTacticalBattleFromEntryHex,
@@ -38,8 +38,8 @@ import {
   isStackCalloutTargetInsideDialog,
   refreshGameStateAfterSealiftChange,
   detailHitAtClientPixel,
-  drawRes4TerrainHexes,
-  drawRes4CityOverlayPass,
+  drawTacticalTerrainHexes,
+  drawTacticalCityOverlayPass,
   drawLoadingScene,
   getUnitsForDrawWithMovingIds,
   tryHandleBuildEntryAtClientXY,
@@ -85,7 +85,7 @@ import {
 } from './map/mapHelpers';
 import {
   hideBuildEntryLayer,
-  shouldRenderRes4Hexes,
+  shouldRenderTacticalHexes,
   shouldShowBuildEntryZoom,
 } from './map/terrainView';
 
@@ -158,18 +158,18 @@ import {
   getControllerForHex,
   getUrbanProductionCapacityForHex,
   isMapInspectionModeHeld,
-  isRes1HexHumanUrbanProduction,
+  isStrategicHexHumanUrbanProduction,
 } from './gameplay/productionOverlayHelpers';
 
 import {
   clearTerrainTooltipTimer,
-  getRes1DominantTerrainKind,
+  getStrategicDominantTerrainKind,
   hideTerrainTooltipVisual,
-  infraGlyphsAllowedForRes1Hex,
-  infraGlyphsAllowedForRes4Child,
+  infraGlyphsAllowedForStrategicHex,
+  infraGlyphsAllowedForTacticalChild,
   namingLookupTargetForPointer,
   terrainStateForPointer,
-} from './map/terrainTooltipRes1State';
+} from './map/terrainTooltipStrategicState';
 
 import {
   wireMainMapInteractions as wireMainMapInteractionsFromModule,
@@ -179,9 +179,9 @@ import {
   wireInitCore as wireInitCoreFromModule,
 } from './map/initCore';
 import {
-  computeRes1OverlayTextY,
+  computeStrategicOverlayTextY,
   drawTerrainInfrastructureOverlays as drawTerrainInfrastructureOverlaysFromModule,
-  hasVisibleRes1InfrastructureGlyphs as hasVisibleRes1InfrastructureGlyphsFromModule,
+  hasVisibleStrategicInfrastructureGlyphs as hasVisibleStrategicInfrastructureGlyphsFromModule,
 } from './rendering/terrainRendering';
 
 import {
@@ -248,24 +248,24 @@ function formatTargetingValidationReason(reason: string | undefined, fallbackMes
 }
 
 /**
- * Defines the `hasVisibleRes1InfrastructureGlyphs` function shape (function hasVisibleRes1InfrastructureGlyphs().
+ * Defines the `hasVisibleStrategicInfrastructureGlyphs` function shape (function hasVisibleStrategicInfrastructureGlyphs().
 
- * Purpose: Supports maintainability by documenting why `hasVisibleRes1InfrastructureGlyphs` exists.
+ * Purpose: Supports maintainability by documenting why `hasVisibleStrategicInfrastructureGlyphs` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-function hasVisibleRes1InfrastructureGlyphs(
+function hasVisibleStrategicInfrastructureGlyphs(
   h3Index: string,
-  res4On: boolean,
+  tacticalOn: boolean,
   unitHexes: Set<string>
 ): boolean {
-  return hasVisibleRes1InfrastructureGlyphsFromModule(h3Index, res4On, unitHexes, {
+  return hasVisibleStrategicInfrastructureGlyphsFromModule(h3Index, tacticalOn, unitHexes, {
     getExploredHexSet,
-    getRes1DominantTerrainKind,
+    getStrategicDominantTerrainKind,
     isMapInspectionModeHeld,
-    infraGlyphsAllowedForRes1Hex,
-    infraGlyphsAllowedForRes4Child,
+    infraGlyphsAllowedForStrategicHex,
+    infraGlyphsAllowedForTacticalChild,
   });
 }
 
@@ -308,8 +308,8 @@ function syncBuildEntryButton(): void {
     hideBuildEntryLayer(layer);
     return;
   }
-  const res4On = shouldRenderRes4Hexes();
-  if (res4On) {
+  const tacticalOn = shouldRenderTacticalHexes();
+  if (tacticalOn) {
     hideBuildEntryLayer(layer);
     hideBuildPopup();
     return;
@@ -327,13 +327,13 @@ function syncBuildEntryButton(): void {
   for (const hx of S.gameState.hexes) {
     const explored = isHexExploredByPlayer(hx.h3Index);
     if (!explored) continue;
-    if (!isRes1HexHumanUrbanProduction(S.gameState, hx)) continue;
+    if (!isStrategicHexHumanUrbanProduction(S.gameState, hx)) continue;
     const capacityPerTurn = getUrbanProductionCapacityForHex(hx.h3Index);
-    const hasInfraSymbols = hasVisibleRes1InfrastructureGlyphs(hx.h3Index, res4On, visibleUnitHexes);
+    const hasInfraSymbols = hasVisibleStrategicInfrastructureGlyphs(hx.h3Index, tacticalOn, visibleUnitHexes);
     const hasVisibleUnits = visibleUnitHexes.has(hx.h3Index);
     const center = hexCenterPx(hx.h3Index);
     // While T is held, align build-entry buttons with the downward offset used for airport/seaport hexes so labels stay clear of centered hex codes.
-    const textY = computeRes1OverlayTextY(
+    const textY = computeStrategicOverlayTextY(
       hx.h3Index,
       map,
       L,
@@ -381,24 +381,24 @@ function syncBuildEntryButton(): void {
 function drawTerrainInfrastructureOverlays(ctx: CanvasRenderingContext2D): void {
   return drawTerrainInfrastructureOverlaysFromModule(ctx, {
     getExploredHexSet,
-    getRes1DominantTerrainKind,
+    getStrategicDominantTerrainKind,
     isMapInspectionModeHeld,
-    infraGlyphsAllowedForRes1Hex,
-    infraGlyphsAllowedForRes4Child,
+    infraGlyphsAllowedForStrategicHex,
+    infraGlyphsAllowedForTacticalChild,
   });
 }
 
 /**
- * Defines the `drawRes1ProductionOverlays` function shape (function drawRes1ProductionOverlays(ctx: CanvasRenderingContext2D): void).
+ * Defines the `drawStrategicProductionOverlays` function shape (function drawStrategicProductionOverlays(ctx: CanvasRenderingContext2D): void).
 
- * Purpose: Supports maintainability by documenting why `drawRes1ProductionOverlays` exists.
+ * Purpose: Supports maintainability by documenting why `drawStrategicProductionOverlays` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-function drawRes1ProductionOverlays(ctx: CanvasRenderingContext2D): void {
+function drawStrategicProductionOverlays(ctx: CanvasRenderingContext2D): void {
   if (!S.gameState) return;
-  if (shouldRenderRes4Hexes()) return;
+  if (shouldRenderTacticalHexes()) return;
   const map = getMainLeafletMap() as
     | { latLngToContainerPoint: (ll: unknown) => { x: number; y: number } }
     | null;
@@ -413,15 +413,15 @@ function drawRes1ProductionOverlays(ctx: CanvasRenderingContext2D): void {
     const controlledByHuman = controller === 'human';
     const capacityPerTurn = getUrbanProductionCapacityForHex(hx.h3Index);
     if (!overlayContext.mapInspectionHeld) {
-      const canShowLabelWithoutInspection = isRes1HexHumanUrbanProduction(S.gameState, hx) || controlledByHuman;
+      const canShowLabelWithoutInspection = isStrategicHexHumanUrbanProduction(S.gameState, hx) || controlledByHuman;
       if (!canShowLabelWithoutInspection) continue;
     }
     const hasUrbanCapacity = capacityPerTurn > 0;
-    const hasInfraSymbols = hasVisibleRes1InfrastructureGlyphs(hx.h3Index, false, overlayContext.unitHexes);
+    const hasInfraSymbols = hasVisibleStrategicInfrastructureGlyphs(hx.h3Index, false, overlayContext.unitHexes);
     const hasVisibleUnits = overlayContext.unitHexes.has(hx.h3Index);
     const center = hexCenterPx(hx.h3Index);
-    // Inspection mode shows centered hex codes on res1; push production text to the same lower band as infra-heavy hexes.
-    const textY = computeRes1OverlayTextY(
+    // Inspection mode shows centered hex codes on strategic; push production text to the same lower band as infra-heavy hexes.
+    const textY = computeStrategicOverlayTextY(
       hx.h3Index,
       map,
       L,
@@ -439,7 +439,7 @@ function drawRes1ProductionOverlays(ctx: CanvasRenderingContext2D): void {
         : formatProductionLabelForHumanControllerOnly(S.gameState, hx.h3Index, capacityPerTurn, controller)
       : `$${Math.max(0, capacityPerTurn).toLocaleString()}`;
     const hasClickableBuildEntryForHex =
-      explored && isRes1HexHumanUrbanProduction(S.gameState, hx) && shouldShowBuildEntryZoom();
+      explored && isStrategicHexHumanUrbanProduction(S.gameState, hx) && shouldShowBuildEntryZoom();
     if (hasClickableBuildEntryForHex) {
       continue;
     }
@@ -606,15 +606,15 @@ function init(): void {
     maybeScheduleTacticalAnnihilationExit,
     updatePendingOrdersSidebar,
     updateRangedSidebar,
-    hasVisibleRes1InfrastructureGlyphs,
+    hasVisibleStrategicInfrastructureGlyphs,
     buildKillToastFormatterBundle,
   });
   bindGameSceneHost({
     maybeScheduleTacticalAnnihilationExit,
-    drawRes4TerrainHexes,
-    drawRes1ProductionOverlays,
-    drawRes4CityOverlayPass,
-    hasVisibleRes1InfrastructureGlyphs,
+    drawTacticalTerrainHexes,
+    drawStrategicProductionOverlays,
+    drawTacticalCityOverlayPass,
+    hasVisibleStrategicInfrastructureGlyphs,
     drawTerrainInfrastructureOverlays,
     drawHoverRoutePreview,
     getUnitsForDrawWithMovingIds,
@@ -639,8 +639,8 @@ function init(): void {
     updateReadyButtonState,
     refreshHoverRoutePreview,
     applyGameStateSnapshot,
-    applyRes4TerrainOverrides,
-    refreshRes4TerrainOverridesForRenderer,
+    applyTacticalTerrainOverrides,
+    refreshTacticalTerrainOverridesForRenderer,
     hideBuildPopup,
     hideStackCallout,
     applyModifierDrivenPopoverCloseRules,

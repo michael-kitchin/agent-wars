@@ -2,7 +2,7 @@ import { getReachableHexes, terrainIsPassableForDomain } from '../pathfinding';
 import { strategicRangeOnState } from '../weather/weatherMatch';
 import type { WeatherState } from '../../shared/weatherBonusTypes';
 import type { PassableDomain } from '../pathfinding';
-import { landUnitCanOccupyHex, type LandMassByH3 } from '../../shared/landTraversalRes1';
+import { landUnitCanOccupyHex, type LandMassByH3 } from '../../shared/landTraversalStrategic';
 import { logDebug } from '../logger';
 import {
   PLAN_ROUTE_ERR_NAVAL_START,
@@ -211,7 +211,7 @@ function resolveNavalStrategicRoutePath(payload: {
   const lookup = navalLookupForHexState(
     payload.session,
     payload.session.state.hexes,
-    payload.session.state.res1Infrastructure
+    payload.session.state.strategicInfrastructure
   );
   const originAttrs = lookup(payload.originH3);
   if (!originAttrs || !navalMayOccupyHex(originAttrs)) {

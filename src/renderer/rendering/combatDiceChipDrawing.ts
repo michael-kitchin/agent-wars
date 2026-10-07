@@ -16,7 +16,7 @@ import type { CombatDiceInfrastructureType, CombatDiceRoll } from '../../shared/
 import { PLAYER_COLORS, UNIT_RADIUS, UNIT_TYPE_LABELS } from '../core/constants';
 import type { ResolutionMoveAnimationState } from '../core/state';
 import { hexCenterPx } from '../map/mapHelpers';
-import { shouldHideStrategicMapUnitsForRes4Zoom } from '../map/terrainView';
+import { shouldHideStrategicMapUnitsForZoom } from '../map/terrainView';
 import { buildResolutionPlaybackState, resolutionAnimationElapsedMs } from './resolutionPlayback';
 import { drawUnitTypeGlyph } from './unitDrawing';
 
@@ -411,7 +411,7 @@ function visibleDicePhases(
  * Exceptions: None.
  */
 export function areResolutionDiceChipsShowing(anim: ResolutionMoveAnimationState): boolean {
-  if (!anim || shouldHideStrategicMapUnitsForRes4Zoom()) return false;
+  if (!anim || shouldHideStrategicMapUnitsForZoom()) return false;
   return visibleDicePhases(anim, resolutionAnimationElapsedMs(anim)).length > 0;
 }
 
@@ -421,7 +421,7 @@ export function areResolutionDiceChipsShowing(anim: ResolutionMoveAnimationState
  * Purpose: Shows every die rolled in the air strike, ranged, or melee phase for twice that phase's lightning-through-casualty
  *   beat, hung just below the stack that rolled them. The chips can still be up after later stages have finished.
  * When to use: As the last playback draw of a frame, so chips sit above every other playback layer. The caller skips
- *   it when strategic units are hidden at the res4 zoom.
+ *   it when strategic units are hidden at the tactical zoom.
  * Expected outcome: Nothing outside a phase window or when the phase has no recorded rolls. Otherwise one chip per
  *   anchor, faded in and out at the window edges, drawn top to bottom by anchor screen position so lower chips
  *   cover the ones above them, and clamped inside the canvas. Chips are paint only and never take input. Build and

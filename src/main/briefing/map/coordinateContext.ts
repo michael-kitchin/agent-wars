@@ -1,7 +1,7 @@
 /**
  * Describes which coordinate namespace applies when translating 2-character briefing codes.
  *
- * Purpose: Keeps strategic res1 codes and tactical res4 codes disjoint while reusing the same wire format.
+ * Purpose: Keeps strategic codes and tactical codes disjoint while reusing the same wire format.
  * When to use: Pass into hex registry lookups, translators, parsers, and tool arg normalization for the active OpenRouter session.
  * Expected outcome: Callers never mix registries across strategic vs tactical modes.
  * Exceptions: Tactical mode requires `battleId`; omitting it should be rejected by validators.
@@ -27,7 +27,7 @@ export type CoordinateContextMode = 'strategic' | 'tactical';
  */
 export interface CoordinateContext {
   /**
-   * Selects strategic res1 vs tactical res4 registry semantics.
+   * Selects strategic vs tactical registry semantics.
    *
    * Contract: Must match the active game mode for the snapshot being briefed or ordered against.
    * When to use: Always pass explicitly; do not infer from H3 string shape.
@@ -36,7 +36,7 @@ export interface CoordinateContext {
    */
   mode: CoordinateContextMode;
   /**
-   * Tactical battle identifier used to key the res4 registry (strategic mode ignores this field).
+   * Tactical battle identifier used to key the tactical registry (strategic mode ignores this field).
    *
    * Contract: Present and non-empty when `mode === 'tactical'`.
    * When to use: Populate from `TacticalBattleSnapshot.battleId` for tactical AI consultations.

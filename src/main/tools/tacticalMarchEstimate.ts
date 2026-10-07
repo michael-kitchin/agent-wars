@@ -4,7 +4,7 @@
 
 import type { TacticalBattleSnapshot, TacticalSubUnitSnapshot } from '../../shared/tacticalBattleTypes';
 import { effectiveTacticalMovementPointBudgetForMarchLeg } from '../../shared/tacticalTerrainCombatModifiers';
-import { planTacticalRes4MarchWithSessionCache } from '../tacticalBattle/tacticalMovementPlanningCache';
+import { planTacticalMarchWithSessionCache } from '../tacticalBattle/tacticalMovementPlanningCache';
 import { logTrace } from '../logger';
 
 /**
@@ -67,7 +67,7 @@ export interface TacticalMarchEstimate {
  * Estimates battle beats to a destination from total movement cost and per-beat budget.
  *
  * Purpose: Shared beats arithmetic for battle routes, distances, and assessments.
- * When to use: After a reachable `planTacticalRes4MarchWithSessionCache` result.
+ * When to use: After a reachable `planTacticalMarchWithSessionCache` result.
  * Expected outcome: Zero when the path has one cell; otherwise at least one. Falls back to step count when the budget
  * or cost is not usable.
  * Exceptions: None.
@@ -84,7 +84,7 @@ export function estimateTacticalTurnsRequired(totalCost: number, budget: number,
  *
  * Purpose: Single entry point for "can this mover get there, and how soon" inside a battle footprint. It uses the
  * same planner, budget rule, and memo as Ready movement, so tools never disagree with what a move order would do.
- * When to use: Battle tools that report distance or beats to reach; pass `res4Set` only to restrict the cells the
+ * When to use: Battle tools that report distance or beats to reach; pass `tacticalSet` only to restrict the cells the
  * march may use, such as an enemy-avoiding route.
  * Expected outcome: A `TacticalMarchEstimate`; air movers are always unreachable because air does not march.
  * Exceptions: None; planner failures surface as unreachable.
@@ -93,7 +93,7 @@ export function estimateTacticalMarch(
   battle: TacticalBattleSnapshot,
   mover: Pick<TacticalSubUnitSnapshot, 'unitType' | 'h3Index' | 'embarkedOnSubUnitId' | 'weatherTags'>,
   toH3: string,
-  res4Set?: ReadonlySet<string>
+  tacticalSet?: ReadonlySet<string>
 ): TacticalMarchEstimate {
   logTrace('tacticalMarchEstimate estimateTacticalMarch', {
     battleId: battle.battleId,
@@ -116,10 +116,10 @@ export function estimateTacticalMarch(
   if (mover.h3Index === toH3) {
     return { reachable: true, reachableThisBeat: true, pathStepCount: 0, estimatedBeats: 0, movementPointBudget: budget };
   }
-  const plan = planTacticalRes4MarchWithSessionCache(battle, {
+  const plan = planTacticalMarchWithSessionCache(battle, {
     fromH3: mover.h3Index,
     toH3,
-    res4Set: res4Set ?? new Set(battle.res4ChildH3Indexes),
+    tacticalSet: tacticalSet ?? new Set(battle.tacticalChildH3Indexes),
     unitTypeForMovement: mover.unitType,
     movementPointBudget: budget,
     weatherEnabled: battle.weatherBonusEnabled === true,

@@ -39,7 +39,7 @@ export interface HomeRegionOwnerIdentityInput {
   /**
    * Strategic hex whose home-region membership is being resolved.
    *
-   * Contract: res1 H3 index present in snapshot hex lists or border styling inputs.
+   * Contract: strategic H3 index present in snapshot hex lists or border styling inputs.
    * When to use: Passed to `resolveHomeRegionOwnerIdentity` for inner dashed border coloring.
    * Expected outcome: Drives which player(s) are treated as home-region owners for the hex.
    * Exceptions: None.
@@ -48,7 +48,7 @@ export interface HomeRegionOwnerIdentityInput {
   /**
    * Human home-region hex list from snapshot metadata, when present.
    *
-   * Contract: Read-only list of res1 H3 indexes declared as human home region.
+   * Contract: Read-only list of strategic H3 indexes declared as human home region.
    * When to use: Together with opponent home lists to classify intersection and sole ownership.
    * Expected outcome: Hexes in this list contribute to human home-region identity when matched.
    * Exceptions: None.
@@ -57,7 +57,7 @@ export interface HomeRegionOwnerIdentityInput {
   /**
    * Opponent home-region hex list from snapshot metadata, when present.
    *
-   * Contract: Read-only list of res1 H3 indexes declared as opponent home region.
+   * Contract: Read-only list of strategic H3 indexes declared as opponent home region.
    * When to use: Together with human home lists to classify intersection and sole ownership.
    * Expected outcome: Hexes in this list contribute to opponent home-region identity when matched.
    * Exceptions: None.
@@ -97,7 +97,7 @@ export function resolveHomeRegionOwnerIdentity(input: HomeRegionOwnerIdentityInp
 }
 
 /**
- * Formats the parenthetical home-region assignment suffix for res1 tooltip control lines.
+ * Formats the parenthetical home-region assignment suffix for strategic tooltip control lines.
  *
  * Purpose: Distinguishes declared home-region ownership from current hex control in tooltip copy.
  * When to use: After `resolveHomeRegionOwnerIdentity` returns a non-null identity for a strategic hex.
@@ -245,7 +245,7 @@ export interface OwnershipBorderStyleDecisionInput {
   /**
    * Reports who currently controls the hex, if known in state.
    *
-   * Contract: Uses current authoritative control owner from `res1Control`.
+   * Contract: Uses current authoritative control owner from `strategicControl`.
    * When to use: Pass through control-map lookup result for this hex.
    * Expected outcome: Owner-colored styles reflect current control state when visible.
    * Exceptions: None.

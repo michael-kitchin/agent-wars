@@ -827,35 +827,35 @@ function testRecedingMarchIsActionNeeded(): void {
 }
 
 /**
- * Verifies the grid-hops honesty line appears only for fog-off strategic (res1) snapshots.
+ * Verifies the grid-hops honesty line appears only for fog-off strategic snapshots.
  *
  * Purpose: Fog-off Unit Status distances are grid hops; the model must be told they are not march paths.
  * When to use: After changing formatBriefing omniscient copy.
- * Expected outcome: Line present for fog false + res1; absent for fog true + res1, and for the shared res3 fixture even with fog false.
+ * Expected outcome: Line present for fog false + strategic; absent for fog true + strategic, and for the shared res3 fixture even with fog false.
  * Exceptions: None.
  */
 function testFormatBriefingGridProximityHonestyLine(): void {
-  const res1 = getOrderedHexList()[0]!;
-  const res1State: GameStateSnapshot = {
+  const strategic = getOrderedHexList()[0]!;
+  const strategicState: GameStateSnapshot = {
     ...fixtureState,
     fogOfWarEnabled: false,
-    hexes: [{ h3Index: res1, terrain: 'land', terrainKind: 'plains' }],
-    units: fixtureState.units.map((u) => ({ ...u, h3Index: res1 })),
+    hexes: [{ h3Index: strategic, terrain: 'land', terrainKind: 'plains' }],
+    units: fixtureState.units.map((u) => ({ ...u, h3Index: strategic })),
   };
-  const fogOffRes1 = formatBriefing(res1State, precomputed, '', '');
+  const fogOffStrategic = formatBriefing(strategicState, precomputed, '', '');
   assert.ok(
-    fogOffRes1.includes(
+    fogOffStrategic.includes(
       `## Unit Status and Threats\n\n${OMNISCIENT_GRID_PROXIMITY_BRIEFING_LINE}\n\n| Unit ID | Type | Hex |`
     ),
     'fog-off res1 briefing places grid-hops sentence immediately after Unit Status heading, then the table'
   );
   assert.ok(
-    !fogOffRes1.includes(buildIntelStalenessRule()),
+    !fogOffStrategic.includes(buildIntelStalenessRule()),
     'fog-off res1 briefing omits the intel staleness sentence'
   );
 
-  const fogOnRes1: GameStateSnapshot = { ...res1State, fogOfWarEnabled: true };
-  const fogOnOut = formatBriefing(fogOnRes1, precomputed, '', '');
+  const fogOnStrategic: GameStateSnapshot = { ...strategicState, fogOfWarEnabled: true };
+  const fogOnOut = formatBriefing(fogOnStrategic, precomputed, '', '');
   assert.ok(
     !fogOnOut.includes(OMNISCIENT_GRID_PROXIMITY_BRIEFING_LINE),
     'fog-on res1 briefing omits grid-hops sentence'

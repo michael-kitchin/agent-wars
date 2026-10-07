@@ -2,7 +2,7 @@ import { cellToLatLng } from 'h3-js';
 import {
   getGameStateForPlayer,
   getHexController,
-  getRes1InfrastructureForHex,
+  getStrategicInfrastructureForHex,
   isDbReady,
 } from '../../gameDb';
 import { executePlanRouteWithSession } from '../../tools/pathfinding';
@@ -23,7 +23,7 @@ import {
 import {
   landUnitCanOccupyHex,
   LAND_UNIT_DESTINATION_NOT_LANDMASS_REASON,
-} from '../../../shared/landTraversalRes1';
+} from '../../../shared/landTraversalStrategic';
 import {
   EMBARKED_LAND_UNIT_MOVEMENT_BLOCK_REASON,
   getLandMovementBlockReason,
@@ -341,7 +341,7 @@ segments: HumanOrderPreviewSegment[];
     /**
    * Optional title-case terrain word when a tactical preview is valid but terrain throttles movement.
    *
-   * Contract: Strategic march previews omit this (no §12.4 slowdowns at res1).
+   * Contract: Strategic march previews omit this (no §12.4 slowdowns at strategic).
    * When to use: Tactical hover rows; strategic `PlanRouteOk` paths leave it null.
    * Expected outcome: Null on strategic previews; matches shared IPC typing when set.
    * Exceptions: None.
@@ -351,7 +351,7 @@ slowerTerrainDisplayTitle?: string | null;
    * Terrain throttle hints for HTML order-preview tooltips (parity with `humanOrderPreviewTypes`).
    *
    * Contract: Strategic march previews omit this; tactical rows may set `slower` / `roadRail`.
-   * When to use: Tactical hover after a successful res4 plan; not used for strategic `PlanRouteOk`.
+   * When to use: Tactical hover after a successful tactical plan; not used for strategic `PlanRouteOk`.
    * Expected outcome: Null on strategic previews.
    * Exceptions: None.
    */
@@ -640,7 +640,7 @@ function computeHumanMarchPreviewForUnit(
         segments: [],
       };
     }
-    const destinationInfra = getRes1InfrastructureForHex(hoveredH3Index);
+    const destinationInfra = getStrategicInfrastructureForHex(hoveredH3Index);
     if (destinationInfra.airportCount <= 0) {
       return {
         valid: false,

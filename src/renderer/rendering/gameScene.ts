@@ -6,13 +6,13 @@ import { inferUnitTypeLabelFromId } from '../core/unitTypeLabel';
 import { updateGameStateSidebar } from '../core/uiState';
 import { isMapInspectionModeHeld } from '../gameplay/productionOverlayHelpers';
 import { hideStackCallout } from '../map/stackCallout';
-import { syncRes4TransportVectorLeafletLayer } from '../map/res4TransportVectorLayer';
+import { syncTacticalTransportVectorLeafletLayer } from '../map/tacticalTransportVectorLayer';
 import {
-  getRes1DominantTerrainKind,
-  infraGlyphsAllowedForRes1Hex,
-  infraGlyphsAllowedForRes4Child,
-} from '../map/terrainTooltipRes1State';
-import { shouldHideStrategicMapUnitsForRes4Zoom } from '../map/terrainView';
+  getStrategicDominantTerrainKind,
+  infraGlyphsAllowedForStrategicHex,
+  infraGlyphsAllowedForTacticalChild,
+} from '../map/terrainTooltipStrategicState';
+import { shouldHideStrategicMapUnitsForZoom } from '../map/terrainView';
 import { invalidateLeafletMapSizes } from '../map/worldLeafletMap';
 import { flushResolutionPlaybackCompleteNotifyCallbacks } from '../openRouter/resolutionPlaybackDeferral';
 import { updateReadyButtonState } from '../openRouter/openRouterUiHelpers';
@@ -35,7 +35,7 @@ import {
   drawTacticalPendingMarchPlanLines,
 } from './pathDrawing';
 import { drawRangePerimeterOverlay, ensureRangePerimeterAnimation } from './rangePerimeterOverlay';
-import { drawStrategicRes1InspectionHexCodes } from './res4CityOverlays';
+import { drawStrategicInspectionHexCodes } from './tacticalCityOverlays';
 import { drawResolutionCombatAndCasualtyOverlays } from './resolutionCombatOverlays';
 import {
   buildResolutionPlaybackState,
@@ -67,41 +67,41 @@ export interface GameSceneHost {
    */
   maybeScheduleTacticalAnnihilationExit: () => void;
   /**
-   * Draws res4 terrain hexes with the entry terrain deps.
+   * Draws tactical terrain hexes with the entry terrain deps.
    *
    * Contract: Runs the entry wrapper, including its deps object.
-   * When to use: Both scene branches after res1 terrain.
-   * Expected outcome: Res4 hexes follow the entry exploration and glyph rules.
+   * When to use: Both scene branches after strategic terrain.
+   * Expected outcome: Tactical hexes follow the entry exploration and glyph rules.
    * Exceptions: None.
    */
-  drawRes4TerrainHexes: (ctx: CanvasRenderingContext2D) => void;
+  drawTacticalTerrainHexes: (ctx: CanvasRenderingContext2D) => void;
   /**
-   * Draws res1 production labels.
+   * Draws strategic production labels.
    *
    * Contract: Runs the entry overlay body.
    * When to use: Both scene branches.
    * Expected outcome: Production labels match the entry rules.
    * Exceptions: None.
    */
-  drawRes1ProductionOverlays: (ctx: CanvasRenderingContext2D) => void;
+  drawStrategicProductionOverlays: (ctx: CanvasRenderingContext2D) => void;
   /**
-   * Draws the res4 city overlay pass.
+   * Draws the tactical city overlay pass.
    *
    * Contract: Runs the entry pass that supplies getExploredHexSet.
    * When to use: After production overlays in both scene branches.
    * Expected outcome: City marks follow the entry gate.
    * Exceptions: None.
    */
-  drawRes4CityOverlayPass: (ctx: CanvasRenderingContext2D) => void;
+  drawTacticalCityOverlayPass: (ctx: CanvasRenderingContext2D) => void;
   /**
-   * Reports whether a res1 hex should show infrastructure glyphs.
+   * Reports whether a strategic hex should show infrastructure glyphs.
    *
    * Contract: Runs the entry wrapper and its terrain deps.
    * When to use: Inspection status icons in both scene branches.
    * Expected outcome: Glyph visibility matches the entry helper.
    * Exceptions: None.
    */
-  hasVisibleRes1InfrastructureGlyphs: (h3Index: string, res4On: boolean, unitHexes: Set<string>) => boolean;
+  hasVisibleStrategicInfrastructureGlyphs: (h3Index: string, tacticalOn: boolean, unitHexes: Set<string>) => boolean;
   /**
    * Draws infrastructure overlays with the entry terrain deps.
    *
@@ -174,38 +174,38 @@ let maybeScheduleTacticalAnnihilationExit: GameSceneHost['maybeScheduleTacticalA
 };
 
 /**
- * Draws res4 terrain through the renderer entry wrapper.
+ * Draws tactical terrain through the renderer entry wrapper.
  *
  * Purpose: drawGameScene calls this name directly.
  * When to use: Assigned by bindGameSceneHost before the first draw.
  * Expected outcome: The entry wrapper runs.
  * Exceptions: Throws if the host is not bound.
  */
-let drawRes4TerrainHexes: GameSceneHost['drawRes4TerrainHexes'] = () => {
+let drawTacticalTerrainHexes: GameSceneHost['drawTacticalTerrainHexes'] = () => {
   throw new Error('game scene host is not bound');
 };
 
 /**
- * Draws res1 production labels through the renderer entry.
+ * Draws strategic production labels through the renderer entry.
  *
  * Purpose: drawGameScene calls this name directly.
  * When to use: Assigned by bindGameSceneHost before the first draw.
  * Expected outcome: The entry overlay runs.
  * Exceptions: Throws if the host is not bound.
  */
-let drawRes1ProductionOverlays: GameSceneHost['drawRes1ProductionOverlays'] = () => {
+let drawStrategicProductionOverlays: GameSceneHost['drawStrategicProductionOverlays'] = () => {
   throw new Error('game scene host is not bound');
 };
 
 /**
- * Draws the res4 city pass through the renderer entry.
+ * Draws the tactical city pass through the renderer entry.
  *
  * Purpose: drawGameScene calls this name directly.
  * When to use: Assigned by bindGameSceneHost before the first draw.
  * Expected outcome: The entry pass runs.
  * Exceptions: Throws if the host is not bound.
  */
-let drawRes4CityOverlayPass: GameSceneHost['drawRes4CityOverlayPass'] = () => {
+let drawTacticalCityOverlayPass: GameSceneHost['drawTacticalCityOverlayPass'] = () => {
   throw new Error('game scene host is not bound');
 };
 
@@ -217,7 +217,7 @@ let drawRes4CityOverlayPass: GameSceneHost['drawRes4CityOverlayPass'] = () => {
  * Expected outcome: The entry helper runs.
  * Exceptions: Throws if the host is not bound.
  */
-let hasVisibleRes1InfrastructureGlyphs: GameSceneHost['hasVisibleRes1InfrastructureGlyphs'] = () => {
+let hasVisibleStrategicInfrastructureGlyphs: GameSceneHost['hasVisibleStrategicInfrastructureGlyphs'] = () => {
   throw new Error('game scene host is not bound');
 };
 
@@ -303,10 +303,10 @@ let syncTacticalEntryButtonOverlay: GameSceneHost['syncTacticalEntryButtonOverla
  */
 export function bindGameSceneHost(host: GameSceneHost): void {
   maybeScheduleTacticalAnnihilationExit = host.maybeScheduleTacticalAnnihilationExit;
-  drawRes4TerrainHexes = host.drawRes4TerrainHexes;
-  drawRes1ProductionOverlays = host.drawRes1ProductionOverlays;
-  drawRes4CityOverlayPass = host.drawRes4CityOverlayPass;
-  hasVisibleRes1InfrastructureGlyphs = host.hasVisibleRes1InfrastructureGlyphs;
+  drawTacticalTerrainHexes = host.drawTacticalTerrainHexes;
+  drawStrategicProductionOverlays = host.drawStrategicProductionOverlays;
+  drawTacticalCityOverlayPass = host.drawTacticalCityOverlayPass;
+  hasVisibleStrategicInfrastructureGlyphs = host.hasVisibleStrategicInfrastructureGlyphs;
   drawTerrainInfrastructureOverlays = host.drawTerrainInfrastructureOverlays;
   drawHoverRoutePreview = host.drawHoverRoutePreview;
   getUnitsForDrawWithMovingIds = host.getUnitsForDrawWithMovingIds;
@@ -325,13 +325,13 @@ export function bindGameSceneHost(host: GameSceneHost): void {
  */
 function drawTerrainHexes(ctx: CanvasRenderingContext2D): void {
   // Contract anchor retained after extraction:
-  // if (res4Active) return;
+  // if (tacticalActive) return;
   return drawTerrainHexesFromModule(ctx, {
     getExploredHexSet,
-    getRes1DominantTerrainKind,
+    getStrategicDominantTerrainKind,
     isMapInspectionModeHeld,
-    infraGlyphsAllowedForRes1Hex,
-    infraGlyphsAllowedForRes4Child,
+    infraGlyphsAllowedForStrategicHex,
+    infraGlyphsAllowedForTacticalChild,
   });
 }
 
@@ -389,18 +389,18 @@ function drawGameScene(
   height: number,
   state: GameStateSnapshot
 ): void {
-  syncRes4TransportVectorLeafletLayer();
+  syncTacticalTransportVectorLeafletLayer();
   ctx.clearRect(0, 0, width, height);
   if (S.tacticalBattleSnapshot) {
     maybeScheduleTacticalAnnihilationExit();
     drawTerrainHexes(ctx);
-    drawRes4TerrainHexes(ctx);
-    drawRes1ProductionOverlays(ctx);
-    drawRes4CityOverlayPass(ctx);
-    drawStrategicRes1InspectionHexCodes(ctx, { getExploredHexSet });
+    drawTacticalTerrainHexes(ctx);
+    drawStrategicProductionOverlays(ctx);
+    drawTacticalCityOverlayPass(ctx);
+    drawStrategicInspectionHexCodes(ctx, { getExploredHexSet });
     drawInspectionStatusIcons(ctx, {
       isHexExploredByPlayer,
-      hasInfraSymbols: (h3Index, unitHexes) => hasVisibleRes1InfrastructureGlyphs(h3Index, false, unitHexes),
+      hasInfraSymbols: (h3Index, unitHexes) => hasVisibleStrategicInfrastructureGlyphs(h3Index, false, unitHexes),
       requestRedraw,
     });
     drawTerrainInfrastructureOverlays(ctx);
@@ -497,7 +497,7 @@ function drawGameScene(
     return;
   }
   drawTerrainHexes(ctx);
-  drawRes4TerrainHexes(ctx);
+  drawTacticalTerrainHexes(ctx);
   drawScenarioHomeRegionOutlines(ctx);
   const hexList = state.hexes.map((h) => h.h3Index);
   let moveProgress = 1;
@@ -553,18 +553,18 @@ function drawGameScene(
     resolutionAnimationBlocksMarchHoverPreview: !!anim,
     drawMarchHoverPreview: drawHoverRoutePreview,
   });
-  drawRes1ProductionOverlays(ctx);
-  drawRes4CityOverlayPass(ctx);
-  drawStrategicRes1InspectionHexCodes(ctx, { getExploredHexSet });
+  drawStrategicProductionOverlays(ctx);
+  drawTacticalCityOverlayPass(ctx);
+  drawStrategicInspectionHexCodes(ctx, { getExploredHexSet });
   drawInspectionStatusIcons(ctx, {
     isHexExploredByPlayer,
-    hasInfraSymbols: (h3Index, unitHexes) => hasVisibleRes1InfrastructureGlyphs(h3Index, false, unitHexes),
+    hasInfraSymbols: (h3Index, unitHexes) => hasVisibleStrategicInfrastructureGlyphs(h3Index, false, unitHexes),
     requestRedraw,
   });
   drawTerrainInfrastructureOverlays(ctx);
   drawRangePerimeterOverlay(ctx);
   drawStaleEnemyIntel(ctx, state, inferUnitTypeLabelFromId);
-  const hideStrategicUnits = shouldHideStrategicMapUnitsForRes4Zoom();
+  const hideStrategicUnits = shouldHideStrategicMapUnitsForZoom();
   if (anim && hexList && playbackPhase?.inRangedLightning && (anim.rangedResolutionShotLines?.length ?? 0) > 0) {
     drawRangedResolutionShotLines(
       ctx,
@@ -638,7 +638,7 @@ function resizeAndRedraw(): void {
   syncTacticalEntryButtonOverlay();
   tacticalUpdateExitButtonVisibility();
   updateReadyButtonState();
-  if (shouldHideStrategicMapUnitsForRes4Zoom()) {
+  if (shouldHideStrategicMapUnitsForZoom()) {
     hideStackCallout();
   }
 }
@@ -678,7 +678,7 @@ function redraw(): void {
   syncTacticalEntryButtonOverlay();
   tacticalUpdateExitButtonVisibility();
   updateReadyButtonState();
-  if (shouldHideStrategicMapUnitsForRes4Zoom()) {
+  if (shouldHideStrategicMapUnitsForZoom()) {
     hideStackCallout();
   }
 }

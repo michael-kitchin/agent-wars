@@ -37,14 +37,14 @@ function testRedrawAndResizeDelegateToSharedScene(): void {
 }
 
 /**
- * Static regression tests for res4 strategic zoom hiding unit markers while preserving stale-intel tracking.
+ * Static regression tests for tactical strategic zoom hiding unit markers while preserving stale-intel tracking.
  *
- * Purpose: Guards res4 detail zoom from drawing or hit-testing strategic units, stacks, and stale intel markers on the strategic map.
+ * Purpose: Guards tactical detail zoom from drawing or hit-testing strategic units, stacks, and stale intel markers on the strategic map.
  * When to use: CI guard when refactoring `drawGameScene`, `drawStaleEnemyIntel`, stack callout, or map interactions.
- * Expected outcome: Stale intel tracking always runs; marker draw and unit icons are gated behind `shouldHideStrategicMapUnitsForRes4Zoom`.
+ * Expected outcome: Stale intel tracking always runs; marker draw and unit icons are gated behind `shouldHideStrategicMapUnitsForTacticalZoom`.
  * Exceptions: None.
  */
-function testRes4ZoomHidesStrategicMapUnits(): void {
+function testZoomHidesStrategicMapUnits(): void {
   const gameScenePath = path.resolve(process.cwd(), 'src', 'renderer', 'rendering', 'gameScene.ts');
   const terrainViewPath = path.resolve(process.cwd(), 'src', 'renderer', 'map', 'terrainView.ts');
   const mainMapInteractionsPath = path.resolve(process.cwd(), 'src', 'renderer', 'map', 'mainMapInteractions.ts');
@@ -75,52 +75,52 @@ function testRes4ZoomHidesStrategicMapUnits(): void {
   const strategicSlice = drawSceneFn.slice(tacticalReturnIdx);
 
   assert.ok(
-    terrainViewSource.includes('export function shouldHideStrategicMapUnitsForRes4Zoom(): boolean') &&
-      terrainViewSource.includes('return shouldRenderRes4Hexes() && !S.tacticalBattleSnapshot;'),
-    'terrainView should expose shouldHideStrategicMapUnitsForRes4Zoom combining res4 and non-tactical checks'
+    terrainViewSource.includes('export function shouldHideStrategicMapUnitsForZoom(): boolean') &&
+      terrainViewSource.includes('return shouldRenderTacticalHexes() && !S.tacticalBattleSnapshot;'),
+    'terrainView should expose shouldHideStrategicMapUnitsForZoom combining res4 and non-tactical checks'
   );
   assert.ok(
     strategicSlice.includes('drawStaleEnemyIntel(ctx, state, inferUnitTypeLabelFromId);'),
     'strategic drawGameScene should always invoke drawStaleEnemyIntel for tracking'
   );
   assert.ok(
-    strategicSlice.includes('const hideStrategicUnits = shouldHideStrategicMapUnitsForRes4Zoom();') &&
+    strategicSlice.includes('const hideStrategicUnits = shouldHideStrategicMapUnitsForZoom();') &&
       strategicSlice.includes('if (!hideStrategicUnits) {') &&
       strategicSlice.includes('drawUnits(ctx, unitsToDraw, effectiveMovingIdsStrategic);') &&
       strategicSlice.includes('if (anim && hexList && !hideStrategicUnits)'),
     'strategic drawGameScene should gate drawUnits and drawMovingUnits on res4 strategic zoom hide helper'
   );
   assert.ok(
-    drawStaleIntelFn.includes('if (shouldHideStrategicMapUnitsForRes4Zoom()) return;'),
+    drawStaleIntelFn.includes('if (shouldHideStrategicMapUnitsForZoom()) return;'),
     'drawStaleEnemyIntel should suppress marker draw but keep tracking when res4 strategic zoom hides units'
   );
   assert.ok(
-    showStackCalloutFn.includes('if (shouldHideStrategicMapUnitsForRes4Zoom()) {') &&
+    showStackCalloutFn.includes('if (shouldHideStrategicMapUnitsForZoom()) {') &&
       showStackCalloutFn.includes('hideStackCallout();'),
     'showStackCallout should dismiss and not open during res4 strategic zoom'
   );
   assert.ok(
-    refreshStackCalloutFn.includes('if (shouldHideStrategicMapUnitsForRes4Zoom()) {') &&
+    refreshStackCalloutFn.includes('if (shouldHideStrategicMapUnitsForZoom()) {') &&
       refreshStackCalloutFn.includes('hideStackCallout();'),
     'refreshStackCalloutIfOpen should dismiss callout during res4 strategic zoom'
   );
   assert.ok(
-    redrawFn.includes('if (shouldHideStrategicMapUnitsForRes4Zoom()) {') &&
+    redrawFn.includes('if (shouldHideStrategicMapUnitsForZoom()) {') &&
       redrawFn.includes('hideStackCallout();'),
     'redraw should dismiss open stack callout when res4 strategic zoom hides units'
   );
   assert.ok(
-    resizeAndRedrawFn.includes('if (shouldHideStrategicMapUnitsForRes4Zoom()) {') &&
+    resizeAndRedrawFn.includes('if (shouldHideStrategicMapUnitsForZoom()) {') &&
       resizeAndRedrawFn.includes('hideStackCallout();'),
     'resizeAndRedraw should dismiss open stack callout when res4 strategic zoom hides units'
   );
   assert.ok(
     mainMapInteractionsSource.includes('function pointerHitsDrawnUnitIcon(') &&
-      mainMapInteractionsSource.includes('if (shouldHideStrategicMapUnitsForRes4Zoom()) return false;'),
+      mainMapInteractionsSource.includes('if (shouldHideStrategicMapUnitsForZoom()) return false;'),
     'mainMapInteractions should zero out unit/stack icon hit-testing when res4 strategic zoom hides units'
   );
   assert.ok(
-    drawInteractionSource.includes('!shouldHideStrategicMapUnitsForRes4Zoom()') &&
+    drawInteractionSource.includes('!shouldHideStrategicMapUnitsForZoom()') &&
       drawInteractionSource.includes('containerPixelHitsDrawnUnitIcon(px, py, hit, drawnAtHit.length)'),
     'updateMapInteractionCursor should skip unit-icon pointer cursor when res4 strategic zoom hides units'
   );
@@ -219,72 +219,72 @@ function testCommittedPathsRemainVisibleDuringResolutionAnimation(): void {
 function testProductionLabelContractsForExploredVsUnexploredHexes(): void {
   const rendererPath = path.resolve(process.cwd(), 'src', 'renderer', 'renderer.ts');
   const productionOverlayHelpersPath = path.resolve(process.cwd(), 'src', 'renderer', 'gameplay', 'productionOverlayHelpers.ts');
-  const terrainTooltipStatePath = path.resolve(process.cwd(), 'src', 'renderer', 'map', 'terrainTooltipRes1State.ts');
+  const terrainTooltipStatePath = path.resolve(process.cwd(), 'src', 'renderer', 'map', 'terrainTooltipStrategicState.ts');
   const policyPath = path.resolve(process.cwd(), 'src', 'renderer', 'rendering', 'canvasPreviewPolicy.ts');
   const source = fs.readFileSync(rendererPath, 'utf8');
   const productionOverlayHelpersSource = fs.readFileSync(productionOverlayHelpersPath, 'utf8');
   const policySource = fs.readFileSync(policyPath, 'utf8');
   const terrainTooltipSource = fs.readFileSync(terrainTooltipStatePath, 'utf8');
-  const drawProductionFn = getFunctionSource(source, 'drawRes1ProductionOverlays');
+  const drawProductionFn = getFunctionSource(source, 'drawStrategicProductionOverlays');
   const syncBuildEntryFn = getFunctionSource(source, 'syncBuildEntryButton');
   const getUrbanProductionCapacityForHexFn = getFunctionSource(productionOverlayHelpersSource, 'getUrbanProductionCapacityForHex');
   const canonicalUrbanCapacityFn = getFunctionSource(terrainTooltipSource, 'getUrbanProductionCapacityForHex');
-  const isRes1HexHumanUrbanProductionFn = getFunctionSource(productionOverlayHelpersSource, 'isRes1HexHumanUrbanProduction');
+  const isStrategicHexHumanUrbanProductionFn = getFunctionSource(productionOverlayHelpersSource, 'isStrategicHexHumanUrbanProduction');
   const drawHoverPreviewFn = getFunctionSource(source, 'drawHoverRoutePreview');
   const shouldDrawHoveredPathPreviewFn = getFunctionSource(policySource, 'shouldDrawHoveredPathPreview');
 
   assert.ok(
-    drawProductionFn.includes('if (shouldRenderRes4Hexes()) return'),
-    'drawRes1ProductionOverlays should draw no production labels when res4 hexes are shown'
+    drawProductionFn.includes('if (shouldRenderTacticalHexes()) return'),
+    'drawStrategicProductionOverlays should draw no production labels when res4 hexes are shown'
   );
   assert.ok(
     drawProductionFn.includes('const overlayContext = buildProductionOverlayContext(S.gameState);'),
-    'drawRes1ProductionOverlays should build a shared overlay context once per draw'
+    'drawStrategicProductionOverlays should build a shared overlay context once per draw'
   );
   assertMatches(
     drawProductionFn,
     /if\s*\(!explored\s*&&\s*!overlayContext\.mapInspectionHeld\)\s*continue;/,
-    'drawRes1ProductionOverlays should only show unexplored production labels while T is held'
+    'drawStrategicProductionOverlays should only show unexplored production labels while T is held'
   );
   assert.ok(
     drawProductionFn.includes('!overlayContext.mapInspectionHeld') &&
-      drawProductionFn.includes('isRes1HexHumanUrbanProduction(S.gameState, hx)'),
-    'drawRes1ProductionOverlays should include shared human-urban production eligibility checks'
+      drawProductionFn.includes('isStrategicHexHumanUrbanProduction(S.gameState, hx)'),
+    'drawStrategicProductionOverlays should include shared human-urban production eligibility checks'
   );
   assert.ok(
     drawProductionFn.includes(
-      'const canShowLabelWithoutInspection = isRes1HexHumanUrbanProduction(S.gameState, hx) || controlledByHuman;'
+      'const canShowLabelWithoutInspection = isStrategicHexHumanUrbanProduction(S.gameState, hx) || controlledByHuman;'
     ),
-    'drawRes1ProductionOverlays should keep $0 labels visible on explored human-controlled non-urban hexes'
+    'drawStrategicProductionOverlays should keep $0 labels visible on explored human-controlled non-urban hexes'
   );
   assert.ok(
     drawProductionFn.includes('const hasClickableBuildEntryForHex =') &&
-      drawProductionFn.includes('isRes1HexHumanUrbanProduction(S.gameState, hx)'),
-    'drawRes1ProductionOverlays should keep build-entry clickability restricted to human urban-production hexes'
+      drawProductionFn.includes('isStrategicHexHumanUrbanProduction(S.gameState, hx)'),
+    'drawStrategicProductionOverlays should keep build-entry clickability restricted to human urban-production hexes'
   );
   assertMatches(
     drawProductionFn,
     /:\s*`\$\$\{Math\.max\(0,\s*capacityPerTurn\)\.toLocaleString\(\)\}`;/,
-    'drawRes1ProductionOverlays should show unexplored labels in $N format'
+    'drawStrategicProductionOverlays should show unexplored labels in $N format'
   );
   assert.ok(
     drawProductionFn.includes('const hasClickableBuildEntryForHex =') &&
       drawProductionFn.includes('explored &&') &&
-      drawProductionFn.includes('isRes1HexHumanUrbanProduction(S.gameState, hx)') &&
+      drawProductionFn.includes('isStrategicHexHumanUrbanProduction(S.gameState, hx)') &&
       drawProductionFn.includes('if (hasClickableBuildEntryForHex) {'),
-    'drawRes1ProductionOverlays should hide non-clickable label when clickable build entry exists'
+    'drawStrategicProductionOverlays should hide non-clickable label when clickable build entry exists'
   );
   assert.ok(
     drawProductionFn.includes('const capacityPerTurn = getUrbanProductionCapacityForHex(hx.h3Index);'),
-    'drawRes1ProductionOverlays should derive production capacity from shared canonical urban-res4 count helper'
+    'drawStrategicProductionOverlays should derive production capacity from shared canonical urban-res4 count helper'
   );
   assert.ok(
     drawProductionFn.includes('overlayContext.revealAllControllerQueues'),
-    'drawRes1ProductionOverlays should branch queue visibility by overlay context'
+    'drawStrategicProductionOverlays should branch queue visibility by overlay context'
   );
 
   assert.ok(
-    syncBuildEntryFn.includes('if (res4On) {') && syncBuildEntryFn.includes('hideBuildPopup()'),
+    syncBuildEntryFn.includes('if (tacticalOn) {') && syncBuildEntryFn.includes('hideBuildPopup()'),
     'syncBuildEntryButton should suppress build UI and close build popup on res4 zoom'
   );
   assert.ok(
@@ -296,7 +296,7 @@ function testProductionLabelContractsForExploredVsUnexploredHexes(): void {
     'syncBuildEntryButton should only render clickable buttons for explored hexes'
   );
   assert.ok(
-    syncBuildEntryFn.includes('isRes1HexHumanUrbanProduction(S.gameState, hx)'),
+    syncBuildEntryFn.includes('isStrategicHexHumanUrbanProduction(S.gameState, hx)'),
     'syncBuildEntryButton should use shared human-urban production eligibility'
   );
   assert.ok(
@@ -305,15 +305,15 @@ function testProductionLabelContractsForExploredVsUnexploredHexes(): void {
     'renderer production labels and build-entry buttons should not hard-exclude controlled water hexes'
   );
   assert.ok(
-    isRes1HexHumanUrbanProductionFn.includes('getUrbanProductionCapacityForHex(hx.h3Index) > 0'),
-    'isRes1HexHumanUrbanProduction should use canonical urban-res4 count for build eligibility'
+    isStrategicHexHumanUrbanProductionFn.includes('getUrbanProductionCapacityForHex(hx.h3Index) > 0'),
+    'isStrategicHexHumanUrbanProduction should use canonical urban-res4 count for build eligibility'
   );
   assert.ok(
     getUrbanProductionCapacityForHexFn.includes('getUrbanProductionCapacityForHexFromTooltipState'),
     'productionOverlayHelpers should delegate urban capacity to the shared terrain tooltip / res1 cache module'
   );
   assert.ok(
-    canonicalUrbanCapacityFn.includes('countUrbanRes4HexesInRes1Hex(h3Index)'),
+    canonicalUrbanCapacityFn.includes('countUrbanTacticalHexesInStrategicHex(h3Index)'),
     'shared getUrbanProductionCapacityForHex should compute from live urban res4-child count'
   );
   assert.ok(
@@ -324,14 +324,14 @@ function testProductionLabelContractsForExploredVsUnexploredHexes(): void {
 }
 
 /**
- * Defines the `testInfrastructureGlyphSetsComeFromRes4Overrides` function shape (function testInfrastructureGlyphSetsComeFromRes4Overrides(): void).
+ * Defines the `testInfrastructureGlyphSetsComeFromTacticalOverrides` function shape (function testInfrastructureGlyphSetsComeFromTacticalOverrides(): void).
 
- * Purpose: Supports maintainability by documenting why `testInfrastructureGlyphSetsComeFromRes4Overrides` exists.
+ * Purpose: Supports maintainability by documenting why `testInfrastructureGlyphSetsComeFromTacticalOverrides` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-function testInfrastructureGlyphSetsComeFromRes4Overrides(): void {
+function testInfrastructureGlyphSetsComeFromTacticalOverrides(): void {
   const rendererPath = path.resolve(process.cwd(), 'src', 'renderer', 'renderer.ts');
   const source = fs.readFileSync(rendererPath, 'utf8');
   const entrySource = fs.readFileSync(
@@ -339,18 +339,18 @@ function testInfrastructureGlyphSetsComeFromRes4Overrides(): void {
     'utf8'
   );
   const drawInfraFn = getFunctionSource(source, 'drawTerrainInfrastructureOverlays');
-  const hasVisibleRes1InfraFn = getFunctionSource(source, 'hasVisibleRes1InfrastructureGlyphs');
+  const hasVisibleStrategicInfraFn = getFunctionSource(source, 'hasVisibleStrategicInfrastructureGlyphs');
 
   assert.ok(
     entrySource.includes('const nextState = deriveInfrastructureOverlayState(rows);') &&
-      entrySource.includes('terrainInfraRes4Airport = nextState.terrainInfraRes4Airport;') &&
-      entrySource.includes('terrainInfraRes4Seaport = nextState.terrainInfraRes4Seaport;'),
-    'applyRes4TerrainOverrides should use centralized derivation for res4 airport/seaport glyph sets'
+      entrySource.includes('terrainInfraTacticalAirport = nextState.terrainInfraTacticalAirport;') &&
+      entrySource.includes('terrainInfraTacticalSeaport = nextState.terrainInfraTacticalSeaport;'),
+    'applyTacticalTerrainOverrides should use centralized derivation for res4 airport/seaport glyph sets'
   );
   assert.ok(
-    entrySource.includes('terrainInfraRes1Airport = nextState.terrainInfraRes1Airport;') &&
-      entrySource.includes('terrainInfraRes1Seaport = nextState.terrainInfraRes1Seaport;'),
-    'applyRes4TerrainOverrides should use centralized derivation for res1 airport/seaport glyph sets'
+    entrySource.includes('terrainInfraStrategicAirport = nextState.terrainInfraStrategicAirport;') &&
+      entrySource.includes('terrainInfraStrategicSeaport = nextState.terrainInfraStrategicSeaport;'),
+    'applyTacticalTerrainOverrides should use centralized derivation for res1 airport/seaport glyph sets'
   );
   assert.ok(
     !source.includes('.getTerrainInfrastructureHints()') &&
@@ -363,8 +363,8 @@ function testInfrastructureGlyphSetsComeFromRes4Overrides(): void {
     'drawTerrainInfrastructureOverlays should not suppress airport/seaport glyphs on hexes that contain units'
   );
   assert.ok(
-    !hasVisibleRes1InfraFn.includes('!unitHexes.has(h3Index)'),
-    'hasVisibleRes1InfrastructureGlyphs should remain true for explored infra hexes even when units are present'
+    !hasVisibleStrategicInfraFn.includes('!unitHexes.has(h3Index)'),
+    'hasVisibleStrategicInfrastructureGlyphs should remain true for explored infra hexes even when units are present'
   );
 }
 
@@ -569,53 +569,53 @@ function testKillUpdateTextOmitsPlayerSuffixes(): void {
 }
 
 /**
- * Defines the `testRes4RubbleTooltipAndTerrainVariantContracts` function shape (function testRes4RubbleTooltipAndTerrainVariantContracts(): void).
+ * Defines the `testTacticalRubbleTooltipAndTerrainVariantContracts` function shape (function testTacticalRubbleTooltipAndTerrainVariantContracts(): void).
 
- * Purpose: Supports maintainability by documenting why `testRes4RubbleTooltipAndTerrainVariantContracts` exists.
+ * Purpose: Supports maintainability by documenting why `testTacticalRubbleTooltipAndTerrainVariantContracts` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-function testRes4RubbleTooltipAndTerrainVariantContracts(): void {
+function testTacticalRubbleTooltipAndTerrainVariantContracts(): void {
   const gameScenePath = path.resolve(process.cwd(), 'src', 'renderer', 'rendering', 'gameScene.ts');
   const rendererSource = fs.readFileSync(gameScenePath, 'utf8');
-  const terrainTooltipStatePath = path.resolve(process.cwd(), 'src', 'renderer', 'map', 'terrainTooltipRes1State.ts');
+  const terrainTooltipStatePath = path.resolve(process.cwd(), 'src', 'renderer', 'map', 'terrainTooltipStrategicState.ts');
   const terrainTooltipStateSource = fs.readFileSync(terrainTooltipStatePath, 'utf8');
   const terrainTooltipHtmlPath = path.resolve(process.cwd(), 'src', 'renderer', 'map', 'terrainTooltipHtml.ts');
   const terrainTooltipHtmlSource = fs.readFileSync(terrainTooltipHtmlPath, 'utf8');
   const terrainStylesPath = path.resolve(process.cwd(), 'src', 'renderer', 'rendering', 'terrainVisualStyles.ts');
   const terrainStylesSource = fs.readFileSync(terrainStylesPath, 'utf8');
   const drawTerrainHexesFn = getFunctionSource(rendererSource, 'drawTerrainHexes');
-  const featureLabelsForRes4ChildFn = getFunctionSource(terrainTooltipStateSource, 'featureLabelsForRes4Child');
+  const featureLabelsForTacticalChildFn = getFunctionSource(terrainTooltipStateSource, 'featureLabelsForTacticalChild');
   const terrainStateForPointerFn = getFunctionSource(terrainTooltipStateSource, 'terrainStateForPointer');
   const formatTerrainTooltipHtmlFn = getFunctionSource(terrainTooltipHtmlSource, 'formatTerrainTooltipHtml');
 
   assert.ok(
-    drawTerrainHexesFn.includes('if (res4Active) return;'),
+    drawTerrainHexesFn.includes('if (tacticalActive) return;'),
     'res1 terrain fills/styles should be suppressed while res4 child hex rendering is active'
   );
   assert.ok(
-    !featureLabelsForRes4ChildFn.includes("labels.push('Rubble')") &&
-      !getFunctionSource(terrainTooltipStateSource, 'featureLabelsForRes1Hex').includes('Rubble') &&
-      !getFunctionSource(terrainTooltipStateSource, 'getRes1FeaturesSummary').includes('Rubble'),
+    !featureLabelsForTacticalChildFn.includes("labels.push('Rubble')") &&
+      !getFunctionSource(terrainTooltipStateSource, 'featureLabelsForStrategicHex').includes('Rubble') &&
+      !getFunctionSource(terrainTooltipStateSource, 'getStrategicFeaturesSummary').includes('Rubble'),
     'feature lines omit Rubble'
   );
   assert.ok(
-    !getFunctionSource(terrainTooltipStateSource, 'getRes1TerrainSummary').includes('Urban') &&
-      !getFunctionSource(terrainTooltipStateSource, 'getRes1TerrainSummary').includes('Rubble'),
+    !getFunctionSource(terrainTooltipStateSource, 'getStrategicTerrainSummary').includes('Urban') &&
+      !getFunctionSource(terrainTooltipStateSource, 'getStrategicTerrainSummary').includes('Rubble'),
     'a world hex terrain summary stays the kind mix'
   );
   assert.ok(
-    featureLabelsForRes4ChildFn.includes('res4RoadRailSideMasksForChild') &&
-      featureLabelsForRes4ChildFn.includes("labels.push('Road')") &&
-      featureLabelsForRes4ChildFn.includes("labels.push('Rail')") &&
-      !featureLabelsForRes4ChildFn.includes('tacticalBattleSnapshot'),
-    'res4 feature labels should list Road/Rail from global res4RoadRailSidesByH3 for explored hexes in strategic and tactical modes'
+    featureLabelsForTacticalChildFn.includes('tacticalRoadRailSideMasksForChild') &&
+      featureLabelsForTacticalChildFn.includes("labels.push('Road')") &&
+      featureLabelsForTacticalChildFn.includes("labels.push('Rail')") &&
+      !featureLabelsForTacticalChildFn.includes('tacticalBattleSnapshot'),
+    'res4 feature labels should list Road/Rail from global tacticalRoadRailSidesByH3 for explored hexes in strategic and tactical modes'
   );
   assert.ok(
-    terrainTooltipStateSource.includes('function res4RoadRailSideMasksForChild') &&
-      terrainTooltipStateSource.includes('S.res4RoadRailSidesByH3.get(detailH3)'),
-    'res4 tooltip Features and Effects should share res4RoadRailSideMasksForChild lookup'
+    terrainTooltipStateSource.includes('function tacticalRoadRailSideMasksForChild') &&
+      terrainTooltipStateSource.includes('S.tacticalRoadRailSidesByH3.get(detailH3)'),
+    'res4 tooltip Features and Effects should share tacticalRoadRailSideMasksForChild lookup'
   );
   assert.ok(
     terrainStateForPointerFn.includes('isRubble: detail?.isRubble ?? false'),
@@ -662,27 +662,27 @@ function testTacticalDrawBranchSkipsStrategicStaleIntel(): void {
 }
 
 /**
- * Defines the `testTacticalRes4DrawingSkipsExploredGateWhenTactical` function shape (function testTacticalRes4DrawingSkipsExploredGateWhenTactical(): void).
+ * Defines the `testTacticalDrawingSkipsExploredGateWhenTactical` function shape (function testTacticalDrawingSkipsExploredGateWhenTactical(): void).
 
- * Purpose: Confirms res4 terrain drawing does not hide the enclosing tactical parent behind strategic exploration fog (milestone 2.1 Phase K).
- * When to use: Regression guard when refactoring `drawRes4TerrainHexes` parent filtering.
+ * Purpose: Confirms tactical terrain drawing does not hide the enclosing tactical parent behind strategic exploration fog (milestone 2.1 Phase K).
+ * When to use: Regression guard when refactoring `drawTacticalTerrainHexes` parent filtering.
  * Expected outcome: Tactical branch uses `!tactical && !exploredHexes.has(parent.h3Index)` so explored is ignored when tactical is active.
  * Exceptions: None.
  */
-function testTacticalRes4DrawingSkipsExploredGateWhenTactical(): void {
+function testTacticalDrawingSkipsExploredGateWhenTactical(): void {
   const terrainPath = path.resolve(process.cwd(), 'src', 'renderer', 'rendering', 'terrainRendering.ts');
   const source = fs.readFileSync(terrainPath, 'utf8');
-  const fn = getFunctionSource(source, 'drawRes4TerrainHexes');
+  const fn = getFunctionSource(source, 'drawTacticalTerrainHexes');
   assert.ok(
     fn.includes('if (!tactical && !exploredHexes.has(parent.h3Index)) continue;'),
-    'drawRes4TerrainHexes should skip exploredHexes gating for the tactical enclosing res1 parent'
+    'drawTacticalTerrainHexes should skip exploredHexes gating for the tactical enclosing res1 parent'
   );
 }
 
 /**
  * Defines the `testTacticalEntryLayerPlanningAndContestedContracts` function shape (function testTacticalEntryLayerPlanningAndContestedContracts(): void).
 
- * Purpose: Static regression tests for milestone-2.1 Phase B tactical magnifier visibility rules (planning-only, contested res1, mirrored vertical offset).
+ * Purpose: Static regression tests for milestone-2.1 Phase B tactical magnifier visibility rules (planning-only, contested strategic, mirrored vertical offset).
  * When to use: CI guard when refactoring `syncTacticalEntryButton` or overlay layout.
  * Expected outcome: Source encodes planning+tactical-active gate, co-presence contest check, and magnifyTop symmetric offset below the hex midpoint (same distance as overlay text is below center).
  * Exceptions: None.
@@ -703,7 +703,7 @@ function testTacticalEntryLayerPlanningAndContestedContracts(): void {
     'syncTacticalEntryButton should hide magnifiers while resolution dice chips are showing'
   );
   assert.ok(
-    source.includes('if (!isContestedRes1Hex(S.gameState, hx.h3Index)) continue;'),
+    source.includes('if (!isContestedStrategicHex(S.gameState, hx.h3Index)) continue;'),
     'syncTacticalEntryButton should only place buttons on contested res1 hexes'
   );
   assert.ok(
@@ -973,17 +973,17 @@ function testMaintainabilityConsolidationSeams(): void {
  */
 function run(): void {
   testRedrawAndResizeDelegateToSharedScene();
-  testRes4ZoomHidesStrategicMapUnits();
+  testZoomHidesStrategicMapUnits();
   testCommittedPathsRemainVisibleDuringResolutionAnimation();
   testProductionLabelContractsForExploredVsUnexploredHexes();
-  testInfrastructureGlyphSetsComeFromRes4Overrides();
+  testInfrastructureGlyphSetsComeFromTacticalOverrides();
   testAirFerryDoubleClickContracts();
   testAirStrikeAndAirGlyphContracts();
   testKillUpdateTextOmitsPlayerSuffixes();
-  testRes4RubbleTooltipAndTerrainVariantContracts();
+  testTacticalRubbleTooltipAndTerrainVariantContracts();
   testResolutionMovingStackGroupsMixedEmbarkedAndNavalMoves();
   testTacticalDrawBranchSkipsStrategicStaleIntel();
-  testTacticalRes4DrawingSkipsExploredGateWhenTactical();
+  testTacticalDrawingSkipsExploredGateWhenTactical();
   testTacticalEntryLayerPlanningAndContestedContracts();
   testStrategicAndTacticalBranchesShareOrderOverlayPipeline();
   testMainMapInteractionsDelegatesHumanUnitIconSelectionToPolicyModule();

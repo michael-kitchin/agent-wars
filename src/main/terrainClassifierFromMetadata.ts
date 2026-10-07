@@ -5,8 +5,8 @@
 import {
   URBAN_OVERLAY_MAX_SCALERANK,
   type ClassifierThresholds,
-  type HexMetadataRecordRes1,
-  type HexMetadataRecordRes4,
+  type HexMetadataRecordStrategic,
+  type HexMetadataRecordTactical,
 } from './terrainMetadataLoad';
 import type { PipelineTerrainKind } from '../shared/pipelineTerrain';
 
@@ -29,7 +29,7 @@ export type WaterRelationKind = 'in_water' | 'coastal_band' | 'wetlands_band' | 
  * Exceptions: None.
  */
 export function waterRelationFromMaskMetrics(
-  r: Pick<HexMetadataRecordRes1, 'all_water' | 'intersects_water' | 'water_edges'>
+  r: Pick<HexMetadataRecordStrategic, 'all_water' | 'intersects_water' | 'water_edges'>
 ): WaterRelationKind {
   if (r.all_water) return 'in_water';
   if (!r.intersects_water) return 'no_water';
@@ -37,19 +37,19 @@ export function waterRelationFromMaskMetrics(
 }
 
 /**
- * Defines the `landcoverDictNonEmpty` function shape (function landcoverDictNonEmpty(r: HexMetadataRecordRes1): boolean).
+ * Defines the `landcoverDictNonEmpty` function shape (function landcoverDictNonEmpty(r: HexMetadataRecordStrategic): boolean).
 
  * Purpose: Supports maintainability by documenting why `landcoverDictNonEmpty` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-function landcoverDictNonEmpty(r: HexMetadataRecordRes1): boolean {
+function landcoverDictNonEmpty(r: HexMetadataRecordStrategic): boolean {
   return r.arctic_mean != null || r.forest_mean != null || r.desert_mean != null;
 }
 
 /**
- * Defines the `classifyInteriorBiome` function shape (function classifyInteriorBiome( r: HexMetadataRecordRes1, t: ClassifierThresholds ): Exclude<PipelineTerrainKind, 'water' | 'coastal' | 'wetlands'> {).
+ * Defines the `classifyInteriorBiome` function shape (function classifyInteriorBiome( r: HexMetadataRecordStrategic, t: ClassifierThresholds ): Exclude<PipelineTerrainKind, 'water' | 'coastal' | 'wetlands'> {).
 
  * Purpose: Supports maintainability by documenting why `classifyInteriorBiome` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
@@ -57,7 +57,7 @@ function landcoverDictNonEmpty(r: HexMetadataRecordRes1): boolean {
  * Exceptions: None.
  */
 function classifyInteriorBiome(
-  r: HexMetadataRecordRes1,
+  r: HexMetadataRecordStrategic,
   t: ClassifierThresholds
 ): Exclude<PipelineTerrainKind, 'water' | 'coastal' | 'wetlands'> {
   const c10 = r.arctic_mean ?? 0;
@@ -74,7 +74,7 @@ function classifyInteriorBiome(
 }
 
 /**
- * Defines the `classifyCellWithoutUrbanOverride` function shape (export function classifyCellWithoutUrbanOverride( r: HexMetadataRecordRes1, t: ClassifierThresholds, nodataFallback: PipelineTerrainKind ): PipelineTe).
+ * Defines the `classifyCellWithoutUrbanOverride` function shape (export function classifyCellWithoutUrbanOverride( r: HexMetadataRecordStrategic, t: ClassifierThresholds, nodataFallback: PipelineTerrainKind ): PipelineTe).
 
  * Purpose: Supports maintainability by documenting why `classifyCellWithoutUrbanOverride` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
@@ -82,7 +82,7 @@ function classifyInteriorBiome(
  * Exceptions: None.
  */
 export function classifyCellWithoutUrbanOverride(
-  r: HexMetadataRecordRes1,
+  r: HexMetadataRecordStrategic,
   t: ClassifierThresholds,
   nodataFallback: PipelineTerrainKind
 ): PipelineTerrainKind {
@@ -95,15 +95,15 @@ export function classifyCellWithoutUrbanOverride(
 }
 
 /**
- * Defines the `classifyRes4TerrainKind` function shape (export function classifyRes4TerrainKind( r: HexMetadataRecordRes4, t: ClassifierThresholds, nodataFallback: PipelineTerrainKind ): PipelineTerrainKind).
+ * Defines the `classifyTacticalTerrainKind` function shape (export function classifyTacticalTerrainKind( r: HexMetadataRecordTactical, t: ClassifierThresholds, nodataFallback: PipelineTerrainKind ): PipelineTerrainKind).
 
- * Purpose: Supports maintainability by documenting why `classifyRes4TerrainKind` exists.
+ * Purpose: Supports maintainability by documenting why `classifyTacticalTerrainKind` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function classifyRes4TerrainKind(
-  r: HexMetadataRecordRes4,
+export function classifyTacticalTerrainKind(
+  r: HexMetadataRecordTactical,
   t: ClassifierThresholds,
   nodataFallback: PipelineTerrainKind
 ): PipelineTerrainKind {
@@ -111,15 +111,15 @@ export function classifyRes4TerrainKind(
 }
 
 /**
- * Defines the `isRes4UrbanOverlayHex` function shape (export function isRes4UrbanOverlayHex().
+ * Defines the `isTacticalUrbanOverlayHex` function shape (export function isTacticalUrbanOverlayHex().
 
- * Purpose: Supports maintainability by documenting why `isRes4UrbanOverlayHex` exists.
+ * Purpose: Supports maintainability by documenting why `isTacticalUrbanOverlayHex` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function isRes4UrbanOverlayHex(
-  r: Pick<HexMetadataRecordRes4, 'urban_by_scalerank'>,
+export function isTacticalUrbanOverlayHex(
+  r: Pick<HexMetadataRecordTactical, 'urban_by_scalerank'>,
   maxScalerank = URBAN_OVERLAY_MAX_SCALERANK
 ): boolean {
   for (const row of r.urban_by_scalerank) {

@@ -85,7 +85,7 @@ function cloneSubscriptions(rows: readonly CallbackSubscription[]): CallbackSubs
  * Snapshots opponent callback subscriptions at tactical battle start into memory and `game_config`.
  *
  * Purpose: Preserves strategic (or prior) subscriptions so sub-unit tactical callbacks can be discarded on battle end.
- * When to use: Immediately after a successful `startTacticalBattleForEnclosingRes1Hex` installs the session.
+ * When to use: Immediately after a successful `startTacticalBattleForEnclosingStrategicHex` installs the session.
  * Expected outcome: In-memory stash overwritten with a deep copy; durable key written (including empty list).
  * Exceptions: None.
  */

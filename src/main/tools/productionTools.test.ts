@@ -4,7 +4,7 @@
 
 import * as assert from 'assert';
 import { cellToLatLng } from 'h3-js';
-import { getGameState, setHexController, setRes1InfrastructureForHex } from '../gameDb';
+import { getGameState, setHexController, setStrategicInfrastructureForHex } from '../gameDb';
 import { addHexBuildQueueEntry, getHexBuildQueue } from '../gameActions';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { setActiveTacticalBattleSnapshotRef } from '../tacticalBattle/activeTacticalBattleRef';
@@ -27,7 +27,7 @@ function findOrProvisionOpponentBuildableHex(urbanHexCount: number): string {
   const h3Index = existing?.h3Index ?? state.hexes[0]?.h3Index;
   if (!h3Index) throw new Error('expected at least one map hex');
   if (!existing) setHexController(h3Index, 'opponent');
-  setRes1InfrastructureForHex(h3Index, { urbanHexCount, airportCount: 0, seaportCount: 0 });
+  setStrategicInfrastructureForHex(h3Index, { urbanHexCount, airportCount: 0, seaportCount: 0 });
   const queue = getHexBuildQueue(h3Index, 'opponent');
   if (!queue.controlledByRequester || !queue.buildSectionVisible) {
     throw new Error('expected opponent-controlled buildable hex');

@@ -11,7 +11,7 @@ import {
   getGameState,
   getGameStateForPlayer,
   resetGameForNewMatch,
-  getRes4TerrainOverridesForRendererFromGame,
+  getTacticalTerrainOverridesForRendererFromGame,
   listScenarioHomeRegions,
 } from './gameDb';
 import {
@@ -33,7 +33,7 @@ import { clearStrategicPreviousHexMemory } from './strategicUnitPreviousHex';
 import {
   endTacticalBattleSession,
   endTacticalBattleSessionForHumanVoluntaryExitBailout,
-  startTacticalBattleForEnclosingRes1Hex,
+  startTacticalBattleForEnclosingHex,
 } from './tacticalBattle/tacticalBattleSession';
 import { restorePersistedTacticalBattleSession } from './tacticalBattle/tacticalBattleSession';
 import { normalizeSubmitOrdersPayload } from './submitOrdersPayload';
@@ -61,10 +61,10 @@ import { parseGameSize } from '../shared/gameSize';
 import {
   getHexNamingTooltipLineForRenderer,
   getHexContinentNamesForRenderer,
-  getRes1BaselineUrbanHexCountsForRenderer,
-  getRes4CityOverlaysForRenderer,
-  getRes4RoadRailOverlaysForRenderer,
-  getRes4TransportVectorOverlaysForRenderer,
+  getStrategicBaselineUrbanHexCountsForRenderer,
+  getTacticalCityOverlaysForRenderer,
+  getTacticalRoadRailOverlaysForRenderer,
+  getTacticalTransportVectorOverlaysForRenderer,
 } from './terrainClassificationCache';
 import {
   handleRequestAiOrders,
@@ -261,33 +261,33 @@ function buildSharedHumanReadyConsultationDeps(
  */
 function registerIpcHandlers(): void {
   ipcMain.handle(IPC_GAME.getState, () => getGameStateForPlayer('human', { maskUnexploredTerrain: false }));
-  ipcMain.handle(IPC_GAME.getRes4TerrainOverrides, () => getRes4TerrainOverridesForRendererFromGame());
+  ipcMain.handle(IPC_GAME.getTacticalTerrainOverrides, () => getTacticalTerrainOverridesForRendererFromGame());
   registerLoggedIpcHandler(
     ipcMain,
-    IPC_GAME.getRes4CityOverlays,
+    IPC_GAME.getTacticalCityOverlays,
     'main IPC_GAME.getRes4CityOverlays',
-    () => getRes4CityOverlaysForRenderer(),
+    () => getTacticalCityOverlaysForRenderer(),
     []
   );
   registerLoggedIpcHandler(
     ipcMain,
-    IPC_GAME.getRes4RoadRailOverlays,
+    IPC_GAME.getTacticalRoadRailOverlays,
     'main IPC_GAME.getRes4RoadRailOverlays',
-    () => getRes4RoadRailOverlaysForRenderer(),
+    () => getTacticalRoadRailOverlaysForRenderer(),
     []
   );
   registerLoggedIpcHandler(
     ipcMain,
-    IPC_GAME.getRes4TransportVectorOverlays,
+    IPC_GAME.getTacticalTransportVectorOverlays,
     'main IPC_GAME.getRes4TransportVectorOverlays',
-    () => getRes4TransportVectorOverlaysForRenderer(),
+    () => getTacticalTransportVectorOverlaysForRenderer(),
     []
   );
   registerLoggedIpcHandler(
     ipcMain,
-    IPC_GAME.getRes1BaselineUrbanHexCounts,
+    IPC_GAME.getStrategicBaselineUrbanHexCounts,
     'main IPC_GAME.getRes1BaselineUrbanHexCounts',
-    () => getRes1BaselineUrbanHexCountsForRenderer(),
+    () => getStrategicBaselineUrbanHexCountsForRenderer(),
     []
   );
   ipcMain.handle(
@@ -471,11 +471,11 @@ function registerIpcHandlers(): void {
     return cancelHumanOrder(payload.unitId);
   });
   registerBuildQueueSealiftIpcHandler(ipcMain);
-  ipcMain.handle(IPC_GAME.startTacticalBattle, (_event, payload: { enclosingRes1H3Index?: string }) => {
-    if (typeof payload?.enclosingRes1H3Index !== 'string') {
+  ipcMain.handle(IPC_GAME.startTacticalBattle, (_event, payload: { enclosingStrategicH3Index?: string }) => {
+    if (typeof payload?.enclosingStrategicH3Index !== 'string') {
       return { success: false, reason: 'Invalid tactical start payload.' };
     }
-    return startTacticalBattleForEnclosingRes1Hex(payload.enclosingRes1H3Index);
+    return startTacticalBattleForEnclosingHex(payload.enclosingStrategicH3Index);
   });
   ipcMain.handle(IPC_GAME.endTacticalBattle, () => {
     clearDeferredPlaybackConsultPending();

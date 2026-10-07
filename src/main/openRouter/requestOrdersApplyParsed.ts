@@ -276,14 +276,14 @@ export function applyParsedRequestOrders(args: ApplyParsedRequestOrdersArgs): Re
       continue;
     }
     if (tacticalBattle) {
-      const res4Set = new Set(tacticalBattle.res4ChildH3Indexes);
+      const tacticalSet = new Set(tacticalBattle.tacticalChildH3Indexes);
       const sub = [...tacticalBattle.subUnits];
       const byId = new Map(sub.map((u, i) => [u.id, i] as const));
       const tacticalOutcome = tacticalComputeMovementOrderOutcome({
         byId,
         sub,
         order,
-        res4Set,
+        tacticalSet,
         battle: tacticalBattle,
       });
       if (!tacticalOutcome.ok) {

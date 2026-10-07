@@ -11,7 +11,7 @@ import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { emitParityDiagnosticsBreadcrumb } from '../core/parityDiagnostics';
 
 /**
- * Returns the committed res4 cell for a tactical sub-unit from the authoritative battle snapshot.
+ * Returns the committed tactical cell for a tactical sub-unit from the authoritative battle snapshot.
  *
  * Purpose: Single source of truth for “where the unit is” before Ready applies drafts to the main snapshot.
  * When to use: Selection chrome, march planning origins, and hit-testing that must not jump to draft destinations.
@@ -27,7 +27,7 @@ export function tacticalCommittedH3ForSubUnit(battle: TacticalBattleSnapshot, su
  *
  * Purpose: Separates draft destination lookup from committed snapshot reads.
  * When to use: Pending-order labels, draft route overlays, and any UI that should show planned destination.
- * Expected outcome: Destination res4 index when a draft row exists; otherwise null.
+ * Expected outcome: Destination tactical index when a draft row exists; otherwise null.
  * Exceptions: None.
  */
 export function tacticalDraftMarchDestinationH3Index(
@@ -39,7 +39,7 @@ export function tacticalDraftMarchDestinationH3Index(
 }
 
 /**
- * Returns the displayed res4 cell for a sub-unit, preferring a draft destination when present.
+ * Returns the displayed tactical cell for a sub-unit, preferring a draft destination when present.
  *
  * Purpose: Optional helper for features that intentionally show units at their planned destination (ghost previews).
  * When to use: Only when UX explicitly requires draft placement; not for default selection/planning origins.

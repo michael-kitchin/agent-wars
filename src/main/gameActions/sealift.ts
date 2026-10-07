@@ -218,11 +218,11 @@ function getHexEmbarkContext(h3Index: string): HexEmbarkContext | null {
   );
   if (!terrainRow) return null;
   const infra = dbGetOne<{ seaportCount: number }>(
-    'SELECT seaport_count AS seaportCount FROM res1_infrastructure WHERE h3_index = ?',
+    'SELECT seaport_count AS seaportCount FROM res_s_infrastructure WHERE h3_index = ?',
     [h3Index]
   );
   const control = dbGetOne<{ controllerPlayerId: string | null }>(
-    'SELECT controller_player_id AS controllerPlayerId FROM res1_control WHERE h3_index = ?',
+    'SELECT controller_player_id AS controllerPlayerId FROM res_s_control WHERE h3_index = ?',
     [h3Index]
   );
   const normalizedMovementTerrain = normalizeMovementTerrain({
@@ -674,9 +674,9 @@ export function syncEmbarkedLandUnitPositionsWithNaval(): void {
  * Exceptions: None.
  */
 /**
- * Writes human sealift rows for tactical sub-unit embark orders using strategic parent ids (no res4 hex co-location check).
+ * Writes human sealift rows for tactical sub-unit embark orders using strategic parent ids (no tactical hex co-location check).
  *
- * Purpose: Mirrors strategic slot assignment during tactical Ready commits while parent `units.h3_index` may still anchor at res1; tactical validation already ensured legality on the snapshot.
+ * Purpose: Mirrors strategic slot assignment during tactical Ready commits while parent `units.h3_index` may still anchor at strategic; tactical validation already ensured legality on the snapshot.
  * When to use: After a successful human tactical commit or support-only apply that includes `embarkOrders` with tactical sub-unit ids.
  * Expected outcome: `unit_transport_assignments` rows updated for the involved land parents; other carriers lose exclusive claim on that land row via `DELETE` before insert.
  * Exceptions: None; skips silently when parent rows or types are missing or not human infantry/armor + naval.
@@ -711,7 +711,7 @@ export function applyTacticalEmbarkCommittedOrdersToStrategicDb(
 }
 
 /**
- * Clears strategic sealift rows for all human land parents with infantry/armor sub-units at a tactical res4 hex, then applies sub-unit embark pairs.
+ * Clears strategic sealift rows for all human land parents with infantry/armor sub-units at a tactical hex, then applies sub-unit embark pairs.
  *
  * Purpose: Keeps `unit_transport_assignments` aligned with immediate tactical sealift UI edits, mirroring strategic `writeAssignmentsForHex` for that cohort.
  * When to use: Only after `projectTacticalSealiftSlotChange` succeeds in `applyTacticalSealiftSlotChangeInSession`.

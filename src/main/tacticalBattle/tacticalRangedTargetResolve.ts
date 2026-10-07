@@ -1,23 +1,23 @@
 /**
- * Resolves tactical res4 ranged targets for sub-units (closest in-range enemy cell with LOS) and generates per-beat DEFEND engagement orders.
+ * Resolves tactical ranged targets for sub-units (closest in-range enemy cell with LOS) and generates per-beat DEFEND engagement orders.
  */
 
 import type { TacticalOpponentPlanPayload } from '../../shared/ipc/consultationPushTypes';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import {
-  collectTacticalLegalRangedTargetRes4Hexes,
+  collectTacticalLegalRangedTargetHexes,
   tacticalMovementTerrainAnchorH3,
 } from '../../shared/tacticalTerrainCombatModifiers';
 import { gridHopDistanceBetween } from '../tools/assessUnitProximity';
 import { logDebug, logTrace } from '../logger';
 
 /**
- * Picks the closest enemy-occupied res4 cell the attacker may legally ranged-fire this beat.
+ * Picks the closest enemy-occupied tactical cell the attacker may legally ranged-fire this beat.
  *
- * Purpose: Draft sanitization must not map strategic res1 targets onto the footprint anchor when enemies occupy other res4 cells (e.g. naval vs land on a coastal hex).
+ * Purpose: Draft sanitization must not map strategic targets onto the footprint anchor when enemies occupy other tactical cells (e.g. naval vs land on a coastal hex).
  * When to use: `sanitizeOpponentTacticalDraftForReadyCommit` when a proposed ranged target is missing or invalid.
  * Expected outcome: An enemy sub-unit `h3Index` in the battle footprint that passes tactical range and mountain LOS, or `undefined` when none exist.
- * Exceptions: None. Legality is already settled by `collectTacticalLegalRangedTargetRes4Hexes`, so a cell whose distance
+ * Exceptions: None. Legality is already settled by `collectTacticalLegalRangedTargetTacticalHexes`, so a cell whose distance
  * stays unmeasurable ranks last instead of being dropped; that keeps a legal shot rather than skipping the beat's fire.
  */
 export function pickClosestEnemyTacticalRangedTargetForSubUnit(
@@ -31,7 +31,7 @@ export function pickClosestEnemyTacticalRangedTargetForSubUnit(
   const attacker = battle.subUnits.find((s) => s.id === attackerSubUnitId);
   if (!attacker) return undefined;
   const anchor = tacticalMovementTerrainAnchorH3(attacker, battle.subUnits);
-  const legalHexes = collectTacticalLegalRangedTargetRes4Hexes(battle, attackerSubUnitId);
+  const legalHexes = collectTacticalLegalRangedTargetHexes(battle, attackerSubUnitId);
   const enemyHexes = legalHexes.filter((h3) =>
     battle.subUnits.some((s) => s.h3Index === h3 && s.player !== attacker.player)
   );
@@ -56,7 +56,7 @@ export function pickClosestEnemyTacticalRangedTargetForSubUnit(
 /**
  * Returns a valid tactical ranged target, preferring a proposed cell when it already hosts an enemy.
  *
- * Purpose: Defense-in-depth when upstream orders still carry a res1-projected anchor or stale hex code.
+ * Purpose: Defense-in-depth when upstream orders still carry a strategic-projected anchor or stale hex code.
  * When to use: Opponent tactical draft sanitization before dropping a ranged row.
  * Expected outcome: `proposedTargetH3Index` when an enemy sub-unit occupies it and the shot is legal; otherwise the closest legal enemy cell from `pickClosestEnemyTacticalRangedTargetForSubUnit`.
  * Exceptions: None.
@@ -75,7 +75,7 @@ export function resolveTacticalRangedTargetForSubUnit(
   if (!attacker) return undefined;
 
   if (proposedTargetH3Index) {
-    const legal = collectTacticalLegalRangedTargetRes4Hexes(battle, attackerSubUnitId);
+    const legal = collectTacticalLegalRangedTargetHexes(battle, attackerSubUnitId);
     const enemyAtProposed = battle.subUnits.some(
       (s) => s.h3Index === proposedTargetH3Index && s.player !== attacker.player
     );
@@ -111,7 +111,7 @@ export type TacticalTempoAttackArgs = {
  *
  * Purpose: The tactical counterpart of the strategic tempo sweep. Tactical beats carry no standing orders, so before
  * this existed the model's reply was the only source of opponent attacks and a model that returned nothing simply did
- * not shoot. Targets come from `pickClosestEnemyTacticalRangedTargetForSubUnit`, which applies res4 range, terrain,
+ * not shoot. Targets come from `pickClosestEnemyTacticalRangedTargetForSubUnit`, which applies tactical range, terrain,
  * and mountain line of sight, so emitted rows are already legal.
  * When to use: Opponent tactical order assembly, after the model's own attacks are known.
  * Expected outcome: At most one row per sub-unit; air goes to `airStrikes` so the AA-defense phase applies, everything

@@ -16,11 +16,11 @@ import { weatherIconAssetPath } from './weatherIcons';
  * Fraction of a hex's projected span between the code and the production line.
  *
  * Purpose: The icon row uses the same distance above the code that production uses below its anchor.
- * When to use: `res1OverlayBandOffsetPx` and the res1 overlay text position.
+ * When to use: `strategicOverlayBandOffsetPx` and the strategic overlay text position.
  * Expected outcome: `0.24`, with no rounding inside the helper.
  * Exceptions: None.
  */
-export const RES1_OVERLAY_BAND_OFFSET_SPAN_FRAC = 0.24;
+export const STRATEGIC_OVERLAY_BAND_OFFSET_SPAN_FRAC = 0.24;
 
 /**
  * Text drawn between the tech icon and the weather icon.
@@ -36,30 +36,30 @@ export const INSPECTION_STATUS_ICON_SLASH_TEXT = ' / ';
  * Where a world hex's production label is drawn.
  *
  * Purpose: The icon row appears only on a hex that already shows that label.
- * When to use: `res1ProductionLabelSurface`.
+ * When to use: `strategicProductionLabelSurface`.
  * Expected outcome: `'button'` for the build-entry control, `'canvas'` for the painted line, `'none'` when the label is hidden.
  * Exceptions: None.
  */
-export type Res1ProductionLabelSurface = 'none' | 'canvas' | 'button';
+export type StrategicProductionLabelSurface = 'none' | 'canvas' | 'button';
 
 /**
  * Facts that choose the production-label surface.
  *
  * Purpose: Keeps the surface decision free of renderer state so tests can lock it.
- * When to use: `res1ProductionLabelSurface`.
+ * When to use: `strategicProductionLabelSurface`.
  * Expected outcome: One object per hex per decision.
  * Exceptions: None.
  */
-export interface Res1ProductionLabelInput {
+export interface StrategicProductionLabelInput {
   /**
-   * Whether res4 cells are the visible hexes.
+   * Whether tactical cells are the visible hexes.
    *
    * Contract: True hides every world-hex production label.
-   * When to use: Pass the current `shouldRenderRes4Hexes` result.
+   * When to use: Pass the current `shouldRenderTacticalHexes` result.
    * Expected outcome: A true value yields `'none'`.
    * Exceptions: None.
    */
-  readonly res4Rendered: boolean;
+  readonly tacticalRendered: boolean;
   /**
    * Whether the player has explored this world hex.
    *
@@ -90,7 +90,7 @@ export interface Res1ProductionLabelInput {
   /**
    * Whether this is a human hex with urban production.
    *
-   * Contract: Matches `isRes1HexHumanUrbanProduction`. The build button requires it.
+   * Contract: Matches `isStrategicHexHumanUrbanProduction`. The build button requires it.
    * When to use: Pass that helper's result.
    * Expected outcome: With exploration and build-entry zoom, the surface is `'button'`.
    * Exceptions: None.
@@ -120,11 +120,11 @@ export interface InspectionStatusIconInput {
    * Production surface for this hex.
    *
    * Contract: `'none'` suppresses the whole icon row.
-   * When to use: Pass `res1ProductionLabelSurface`.
+   * When to use: Pass `strategicProductionLabelSurface`.
    * Expected outcome: Any other surface can still return null when both icons are absent.
    * Exceptions: None.
    */
-  readonly productionSurface: Res1ProductionLabelSurface;
+  readonly productionSurface: StrategicProductionLabelSurface;
   /**
    * Whether the match awards a tech tier.
    *
@@ -138,7 +138,7 @@ export interface InspectionStatusIconInput {
    * Generated urban-cell count for this hex.
    *
    * Contract: The tier cut is 21. Zero and non-finite counts omit the tech icon.
-   * When to use: Pass `baselineUrbanHexCountForRes1Hex`.
+   * When to use: Pass `baselineUrbanHexCountForStrategicHex`.
    * Expected outcome: 20 is Basic. 21 is Advanced.
    * Exceptions: None.
    */
@@ -252,20 +252,20 @@ function knownWeather(weather: string | null | undefined): WeatherState | null {
  * Expected outcome: `spanPx * 0.24`, with no rounding.
  * Exceptions: None.
  */
-export function res1OverlayBandOffsetPx(spanPx: number): number {
-  return spanPx * RES1_OVERLAY_BAND_OFFSET_SPAN_FRAC;
+export function strategicOverlayBandOffsetPx(spanPx: number): number {
+  return spanPx * STRATEGIC_OVERLAY_BAND_OFFSET_SPAN_FRAC;
 }
 
 /**
  * Returns which production label a world hex shows.
  *
  * Purpose: The icon row is limited to hexes that already show a production label, either as a button or as canvas text.
- * When to use: Once per hex while deciding whether to draw icons. Keep this aligned with `drawRes1ProductionOverlays` and `syncBuildEntryButton`.
+ * When to use: Once per hex while deciding whether to draw icons. Keep this aligned with `drawStrategicProductionOverlays` and `syncBuildEntryButton`.
  * Expected outcome: `'none'`, `'button'`, or `'canvas'` from the rules above.
  * Exceptions: None.
  */
-export function res1ProductionLabelSurface(input: Res1ProductionLabelInput): Res1ProductionLabelSurface {
-  if (input.res4Rendered) return 'none';
+export function strategicProductionLabelSurface(input: StrategicProductionLabelInput): StrategicProductionLabelSurface {
+  if (input.tacticalRendered) return 'none';
   if (input.explored && input.humanUrbanProduction && input.buildEntryZoom) return 'button';
   if (!input.explored && !input.mapInspectionHeld) return 'none';
   if (!input.mapInspectionHeld && !input.humanUrbanProduction && !input.controlledByHuman) return 'none';
@@ -276,7 +276,7 @@ export function res1ProductionLabelSurface(input: Res1ProductionLabelInput): Res
  * Returns the tech and weather icons for one hex, or null when the row is empty.
  *
  * Purpose: Applies the hex tooltip's Tech and Weather omissions to the map icon row.
- * When to use: After `res1ProductionLabelSurface`.
+ * When to use: After `strategicProductionLabelSurface`.
  * Expected outcome: Null when the surface is `'none'` or both icons are omitted. Otherwise at least one icon is set.
  * Exceptions: None.
  */

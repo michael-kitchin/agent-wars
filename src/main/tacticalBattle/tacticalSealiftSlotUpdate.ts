@@ -9,7 +9,7 @@ import { normalizeSealiftSlots, type SealiftSlotPair } from '../gameActions/seal
 import { isDbReady } from '../gameDb';
 import { getActiveTacticalBattleSnapshotRef, setActiveTacticalBattleSnapshotRef } from './activeTacticalBattleRef';
 import { writeTacticalBattleSnapshotToGameConfig } from './tacticalBattlePersistence';
-import { validateTacticalHumanEmbarkOrder, canPlayerEmbarkFromTacticalRes4Hex } from './tacticalOpponentOrderValidation';
+import { validateTacticalHumanEmbarkOrder, canPlayerEmbarkFromTacticalHex } from './tacticalOpponentOrderValidation';
 import {
   applyTacticalEmbarkPhaseOnBattle,
   tacticalBattleWithSyncedEmbarkCargo,
@@ -22,7 +22,7 @@ import { tacticalLogMutate, tacticalLogQuery } from './tacticalLogging';
 type SealiftSlots = SealiftSlotPair;
 
 /**
- * Clears human infantry/armor embark links for sub-units co-located at one tactical res4 hex (draft for reassignment).
+ * Clears human infantry/armor embark links for sub-units co-located at one tactical hex (draft for reassignment).
  *
  * Purpose: Matches strategic slot editor behavior that removes a land unit from all carriers before assigning it to the target row.
  * When to use: First step of `projectTacticalSealiftSlotChange` before sequential embark validation.
@@ -80,7 +80,7 @@ export function projectTacticalSealiftSlotChange(
     slotIndex: args.slotIndex,
     hasLand: args.landUnitId != null && args.landUnitId.length > 0,
   });
-  const footprint = new Set(snap.res4ChildH3Indexes);
+  const footprint = new Set(snap.tacticalChildH3Indexes);
   if (!footprint.has(args.h3Index)) {
     return { success: false, reason: 'That stack is outside the tactical battle footprint.' };
   }
@@ -94,7 +94,7 @@ export function projectTacticalSealiftSlotChange(
     if (!canManualDebarkFromHex(args.h3Index, 'human')) {
       return { success: false, reason: 'Debark is not available at this location.' };
     }
-  } else if (!canPlayerEmbarkFromTacticalRes4Hex(args.h3Index, 'human')) {
+  } else if (!canPlayerEmbarkFromTacticalHex(args.h3Index, 'human')) {
     const atSea = baseState.contextMode === 'water';
     return {
       success: false,

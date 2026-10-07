@@ -1,15 +1,15 @@
 /**
- * Pure res4 terrain-effect strings for the map hex tooltip "Effects:" line.
+ * Pure tactical terrain-effect strings for the map hex tooltip "Effects:" line.
  *
  * Purpose: Centralizes movement and range symbol rules so tooltip copy matches tactical movement and range.
- * When to use: From `formatTerrainTooltipHtml` for the movement and range clauses of the Effects line. Cover clauses are separate. Terrain symbols are for res4 cells. Weather stays on the Weather line.
+ * When to use: From `formatTerrainTooltipHtml` for the movement and range clauses of the Effects line. Cover clauses are separate. Terrain symbols are for tactical cells. Weather stays on the Weather line.
  * Expected outcome: A comma-delimited plain list, or the same clauses as HTML with status icons. `null` when the cell has no movement or range effect.
  * Exceptions: None; invalid/unknown kinds fall back through `normalizeDbTerrainKindToTacticalCategory`.
  */
 
 import {
   isInfantryOrArmorTacticalSpawnCell,
-  isNavalRes4TacticalCellNavigable,
+  isNavalTacticalCellNavigable,
   normalizeDbTerrainKindToTacticalCategory,
   tacticalEnterHexMovementCost,
 } from './tacticalTerrainMovement';
@@ -40,25 +40,25 @@ const MOVEMENT_UNIT_LABEL: Readonly<Record<MovementUnitType, UnitLabel>> = {
 };
 
 /**
- * Snapshot of res4 terrain fields needed to derive tooltip effects without renderer or battle state.
+ * Snapshot of tactical terrain fields needed to derive tooltip effects without renderer or battle state.
  *
  * Purpose: Keeps `computeTerrainEffectsLine` pure and testable from main-process unit tests.
  * When to use: Built in `terrainStateForPointer` and passed into tooltip HTML formatting.
- * Expected outcome: All boolean flags reflect the hovered res4 cell; `parentTerrain` is res1 passability.
+ * Expected outcome: All boolean flags reflect the hovered tactical cell; `parentTerrain` is strategic passability.
  * Exceptions: None.
  */
 export interface TerrainEffectsInput {
   /**
-   * Effective res4 terrain kind string for the hovered cell.
+   * Effective tactical terrain kind string for the hovered cell.
    *
-   * Contract: Child override or inherited res1 kind; fed to `normalizeDbTerrainKindToTacticalCategory`.
-   * When to use: Always set from `terrainStateForPointer` res4 branch.
+   * Contract: Child override or inherited strategic kind; fed to `normalizeDbTerrainKindToTacticalCategory`.
+   * When to use: Always set from `terrainStateForPointer` tactical branch.
    * Expected outcome: Drives base movement/range classification for the tooltip line.
    * Exceptions: Empty string falls back via parent passability in normalization.
    */
   terrainKind: string;
   /**
-   * Res1 passability bucket for the parent strategic hex.
+   * Strategic passability bucket for the parent strategic hex.
    *
    * Contract: One of `land`, `water`, `coastal`, or `wetlands` from `gameState.hexes[].terrain`.
    * When to use: Second argument to `normalizeDbTerrainKindToTacticalCategory`.
@@ -67,54 +67,54 @@ export interface TerrainEffectsInput {
    */
   parentTerrain: string;
   /**
-   * Res1 `terrain_kind` for the parent strategic hex.
+   * Strategic `terrain_kind` for the parent strategic hex.
    *
    * Contract: Parent kind string used by naval navigability helpers when the child kind is blank.
-   * When to use: Passed to `isNavalRes4TacticalCellNavigable` for occupiable-unit checks.
+   * When to use: Passed to `isNavalTacticalCellNavigable` for occupiable-unit checks.
    * Expected outcome: Enables seaport/coastal edge cases on land passability parents.
    * Exceptions: May match `terrainKind` when no child override exists.
    */
   parentTerrainKind: string;
   /**
-   * Whether the res4 cell carries the urban overlay flag.
+   * Whether the tactical cell carries the urban overlay flag.
    *
    * Contract: Mutually exclusive with rubble at snapshot build; forces land-unit movement/range caps.
-   * When to use: From `res4TerrainOverridesByH3` or tactical snapshot urban map.
+   * When to use: From `tacticalTerrainOverridesByH3` or tactical snapshot urban map.
    * Expected outcome: Infantry and Armored receive `-` movement and `-` range symbols.
    * Exceptions: None.
    */
   isUrban: boolean;
   /**
-   * Whether the res4 cell carries the rubble overlay flag.
+   * Whether the tactical cell carries the rubble overlay flag.
    *
    * Contract: Suppresses road/rail movement bonuses; applies urban-like range cap and movement slowdown.
-   * When to use: From `res4TerrainOverridesByH3` or tactical snapshot rubble map.
+   * When to use: From `tacticalTerrainOverridesByH3` or tactical snapshot rubble map.
    * Expected outcome: `-` movement/range for land units; no `+` from transport masks.
    * Exceptions: None.
    */
   isRubble: boolean;
   /**
-   * Whether the res4 cell is marked as a seaport facility.
+   * Whether the tactical cell is marked as a seaport facility.
    *
    * Contract: Allows naval occupiability on otherwise land-like tiles.
-   * When to use: From `terrainInfraRes4Seaport` membership for the hovered child hex.
+   * When to use: From `terrainInfraTacticalSeaport` membership for the hovered child hex.
    * Expected outcome: Naval included in occupiable set without spurious movement symbols on open plains.
    * Exceptions: None.
    */
   isSeaport: boolean;
   /**
-   * Whether any road side mask is active on the hovered res4 cell.
+   * Whether any road side mask is active on the hovered tactical cell.
    *
-   * Contract: True when explored and `res4RoadRailSidesByH3` has any `true` road side.
+   * Contract: True when explored and `tacticalRoadRailSidesByH3` has any `true` road side.
    * When to use: Together with `hasRail` for exception C transport movement bonus.
    * Expected outcome: Contributes to `(+) All Movement` for Infantry/Armored when not rubble.
    * Exceptions: Ignored when `isRubble` is true.
    */
   hasRoad: boolean;
   /**
-   * Whether any rail side mask is active on the hovered res4 cell.
+   * Whether any rail side mask is active on the hovered tactical cell.
    *
-   * Contract: True when explored and `res4RoadRailSidesByH3` has any `true` rail side.
+   * Contract: True when explored and `tacticalRoadRailSidesByH3` has any `true` rail side.
    * When to use: Together with `hasRoad` for exception C transport movement bonus.
    * Expected outcome: Contributes to `(+) All Movement` for Infantry/Armored when not rubble.
    * Exceptions: Ignored when `isRubble` is true.
@@ -164,7 +164,7 @@ function formatTerrainEffectLabel(category: EffectCategory, unit: UnitLabel | 'A
  * Returns the status-icon prefix for one movement or range symbol set.
  *
  * Purpose: Tooltip HTML uses the same symbol order as the plain prefix, drawn as icons.
- * When to use: While assembling res4 Effects tooltip entries from known symbol strings.
+ * When to use: While assembling tactical Effects tooltip entries from known symbol strings.
  * Expected outcome: One icon for a single symbol. A pipe between icons when more than one symbol applies. An empty string returns `''`.
  * Exceptions: None.
  */
@@ -191,7 +191,7 @@ function formatTerrainEffectEntryPlain(
 /**
  * Formats one HTML effect entry from grouped parts without regex parsing.
  *
- * Purpose: Keeps res4 Effects tooltip entries in the same clause order as the plain line.
+ * Purpose: Keeps tactical Effects tooltip entries in the same clause order as the plain line.
  * When to use: From `formatTerrainEffectEntryHtml` after a plain entry has been parsed.
  * Expected outcome: Status icons, then the unit scope and category, with no space between them.
  * Exceptions: None.
@@ -272,15 +272,15 @@ export function formatTerrainEffectsLineHtml(line: string): string {
 }
 
 /**
- * Returns the comma-delimited terrain effects list for a res4 hex, or null when empty.
+ * Returns the comma-delimited terrain effects list for a tactical hex, or null when empty.
  *
- * Purpose: Single entry for res4 tooltip `Effects:` line assembly.
+ * Purpose: Single entry for tactical tooltip `Effects:` line assembly.
  * When to use: `formatTerrainTooltipHtml` when `namingTarget.resolution === 4`.
  * Expected outcome: Matches `.spec/terrain-effects-tooltip.md` matrix; `null` for plains/desert/water with no overlays.
  * Exceptions: None.
  */
 /**
- * Builds the grouped movement/range symbol map for one res4 tooltip input snapshot.
+ * Builds the grouped movement/range symbol map for one tactical tooltip input snapshot.
  *
  * Purpose: Shared intermediate for plain and HTML effect line formatters.
  * When to use: Inside `computeTerrainEffectsLine` and `computeTerrainEffectsLineHtml`.
@@ -320,9 +320,9 @@ export function computeTerrainEffectsLine(input: TerrainEffectsInput): string | 
 }
 
 /**
- * Returns the comma-delimited terrain effects tooltip HTML for a res4 hex, or null when empty.
+ * Returns the comma-delimited terrain effects tooltip HTML for a tactical hex, or null when empty.
  *
- * Purpose: Res4 tooltip `Effects:` body. Icons replace the plain prefixes after the plain line has been sorted.
+ * Purpose: Tactical tooltip `Effects:` body. Icons replace the plain prefixes after the plain line has been sorted.
  * When to use: `formatTerrainTooltipHtml` when `namingTarget.resolution === 4`.
  * Expected outcome: The same clauses as `computeTerrainEffectsLine`, in that order, with status icons in place of `(+)`, `(-)`, and `(x)`. Null when the plain line is null.
  * Exceptions: None.
@@ -464,7 +464,7 @@ function occupiableMovementUnits(cat: TacticalMovementCategory, input: TerrainEf
     units.push('Infantry', 'Armored');
   }
   if (
-    isNavalRes4TacticalCellNavigable({
+    isNavalTacticalCellNavigable({
       resolvedKindForCell: input.terrainKind,
       parentTerrain: input.parentTerrain,
       parentTerrainKind: input.parentTerrainKind,

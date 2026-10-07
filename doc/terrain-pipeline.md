@@ -23,7 +23,7 @@ The naming files list the countries, states, cities, and water bodies that overl
 
 Regenerate with `python -m scripts.naming_pipeline.generate_hex_naming run`, then `npm run generated:zip`. Only the `.json.zip` files are tracked.
 
-The main process uses the codes for the flags in hex tooltips and for each new unit's country of origin. The flag images are vendored in `static/flags/`; see [`static/flags/README.md`](../static/flags/README.md).
+The main process uses the codes for the flags in hex tooltips and for each new unit's country of origin. National flag images are vendored in `static/flags/`. Subdivision SVGs, one file per ISO 3166-2 code, are in `static/flags/subdivisions/` with `ATTRIBUTION.md`. The match still shows the national flag. See [`static/flags/README.md`](../static/flags/README.md).
 
 A birth cell's country is its largest city (population, then lower scalerank, then name). With no city that names a country, it is the country row with the most states in the cell, then lower scalerank, then name. With no country row, it is the country of the most prominent state. The stored name is the canonical country name for that ISO code. A cell with none of those rows has no country.
 
@@ -39,12 +39,12 @@ How to regenerate the pack stays in `scripts/weather_pipeline/`. Only the `.json
 
 ## Resolutions
 
-- **Strategic map:** H3 resolution **1** (`STRATEGIC_H3_RESOLUTION`).
-- **Tactical battles:** H3 resolution **4** (`TACTICAL_H3_RESOLUTION`) children of one contested res-1 cell.
+- **Strategic map:** H3 resolution **1** on the global map (`strategicH3Resolution()`).
+- **Tactical battles:** H3 resolution **4** on the global map (`tacticalH3Resolution()`), the children of one contested strategic cell.
 
-Both constants live in `src/shared/h3Resolutions.ts`.
+Both functions live in `src/shared/h3Resolutions.ts`. `GLOBAL_STRATEGIC_H3_RESOLUTION` and `GLOBAL_TACTICAL_H3_RESOLUTION` are the global values. The tracked global JSON files keep the names `terrain_res1_*` and `terrain_res4_*`.
 
-Parent-child mapping is H3's native hierarchy (res 1 → res 4 spans three steps). Terrain kinds at res 4 can differ from the parent (coastal, forest, mountain, urban flags, rubble).
+Parent-child mapping is H3's native hierarchy (three steps, 343 tactical cells under one strategic hex). Terrain kinds on a tactical cell can differ from the parent (coastal, forest, mountain, urban flags, rubble).
 
 ## What this is not
 
@@ -53,7 +53,7 @@ Parent-child mapping is H3's native hierarchy (res 1 → res 4 spans three steps
 
 ## Regional Packs
 
-Regional maps live under `data/generated/regions/<region_id>/`. Each folder holds a manifest plus strategic (`res_s`) and tactical (`res_t`) JSON. The app does not load these packs yet. The runbook is [scripts/regional_pipeline/README.md](../scripts/regional_pipeline/README.md).
+Regional maps live under `data/generated/regions/<region_id>/`. Each folder holds a manifest plus strategic (`res_s`) and tactical (`res_t`) JSON. Manifest schema 1.1.0 records side groups and origin areas. The economy numbers for those maps are in `src/shared/regionalRulesCatalog.ts`. The app does not load these packs yet. The runbook is [scripts/regional_pipeline/README.md](../scripts/regional_pipeline/README.md).
 
 ## Related
 

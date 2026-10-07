@@ -50,7 +50,7 @@ export type TempoRuleAttackArgs = {
  * whether the model happened to mention it and on which standing order it carries.
  * When to use: Strategic opponent turns, after merging model and standing-order attacks. Not for the human, whose
  * attacks are theirs to choose, and not inside tactical battles — those use `collectTacticalTempoAttacks`, which
- * works on the res4 grid.
+ * works on the tactical grid.
  * Expected outcome: At most one attack per swept unit, targeting its nearest legal enemy. Units already attacking,
  * units under a `hold_fire` standing order, and units with no strategic range (infantry) produce nothing.
  * Exceptions: None; an empty result is normal when every unit is already engaged or out of range.
@@ -99,7 +99,7 @@ export function collectTempoRuleAttacks(args: TempoRuleAttackArgs): {
  * conflicts *between* sources, not within one. Ids must all be in the same namespace: strategic unit ids on a
  * strategic turn, tactical sub-unit ids when `tacticalBattle` is set.
  * When to use: Assembling the opponent's attacks on a consulted turn or beat.
- * Expected outcome: Passing `tacticalBattle` selects the res4 sweep; omitting it selects the strategic sweep.
+ * Expected outcome: Passing `tacticalBattle` selects the tactical sweep; omitting it selects the strategic sweep.
  * Exceptions: None.
  */
 export type MergeOpponentAttackOrdersArgs = {

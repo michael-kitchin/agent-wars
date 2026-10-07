@@ -42,7 +42,7 @@ export interface StrategicWeatherUnit {
   /**
    * Hex the unit occupies now.
    *
-   * Contract: Res1 index. Weather is read here, not at the destination.
+   * Contract: Strategic index. Weather is read here, not at the destination.
    * When to use: Always.
    * Expected outcome: Snow or rain on this hex can shorten armor or naval movement.
    * Exceptions: None.

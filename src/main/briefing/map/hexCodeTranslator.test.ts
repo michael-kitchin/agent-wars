@@ -15,7 +15,7 @@ import {
   isValidHexCode,
   latLngToCode,
 } from './hexCodeTranslator';
-import { ensureStrategicCoordinateRegistryInitialized, listStrategicRes1H3Indexes } from './hexCoordinates';
+import { ensureStrategicCoordinateRegistryInitialized, listStrategicH3Indexes } from './hexCoordinates';
 
 /**
  * Defines the `testIsValidHexCodeMatchesRegistry` function shape (function testIsValidHexCodeMatchesRegistry(): void).
@@ -28,7 +28,7 @@ import { ensureStrategicCoordinateRegistryInitialized, listStrategicRes1H3Indexe
 function testIsValidHexCodeMatchesRegistry(): void {
   ensureStrategicCoordinateRegistryInitialized();
   const ctx = { mode: 'strategic' as const };
-  const sample = listStrategicRes1H3Indexes()[0]!;
+  const sample = listStrategicH3Indexes()[0]!;
   const code = h3ToCode(sample, ctx);
   assert.strictEqual(isValidHexCode(code, ctx), true);
   assert.strictEqual(isValidHexCode('!!', ctx), false);
@@ -38,15 +38,15 @@ function testIsValidHexCodeMatchesRegistry(): void {
 /**
  * Defines the `testLatLngToCodeMatchesCellCenterStrategic` function shape (function testLatLngToCodeMatchesCellCenterStrategic(): void).
 
- * Purpose: Confirms `latLngToCode` snaps WGS84 to the same strategic code as `h3ToCode` for a res1 center.
+ * Purpose: Confirms `latLngToCode` snaps WGS84 to the same strategic code as `h3ToCode` for a strategic center.
  * When to use: Validates “snap then lookup” semantics for migration helpers.
- * Expected outcome: `latLngToCode(cellToLatLng(h3))` equals `h3ToCode(h3)` for res1 registry cells.
+ * Expected outcome: `latLngToCode(cellToLatLng(h3))` equals `h3ToCode(h3)` for strategic registry cells.
  * Exceptions: None.
  */
 function testLatLngToCodeMatchesCellCenterStrategic(): void {
   ensureStrategicCoordinateRegistryInitialized();
   const ctx = { mode: 'strategic' as const };
-  const h3 = listStrategicRes1H3Indexes()[0]!;
+  const h3 = listStrategicH3Indexes()[0]!;
   const [lat, lng] = cellToLatLng(h3);
   assert.strictEqual(latLngToCode(lat, lng, ctx), h3ToCode(h3, ctx));
 }
@@ -62,7 +62,7 @@ function testLatLngToCodeMatchesCellCenterStrategic(): void {
 function testCodeToH3RoundTripSample(): void {
   ensureStrategicCoordinateRegistryInitialized();
   const ctx = { mode: 'strategic' as const };
-  const h3 = listStrategicRes1H3Indexes()[1]!;
+  const h3 = listStrategicH3Indexes()[1]!;
   const code = h3ToCode(h3, ctx);
   assert.strictEqual(codeToH3(code, ctx), h3);
 }

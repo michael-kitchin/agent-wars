@@ -11,12 +11,12 @@ import {
   resolveOrderSlowerTooltipHtml,
   pickTacticalMarchSlowTerrainDisplayTitle,
 } from '../shared/orderPreviewSlowTerrainTooltip';
-import { res4GridDiskNeighborsOrdered } from '../shared/tacticalRes4TransportLink';
+import { tacticalGridDiskNeighborsOrdered } from '../shared/tacticalTransportLink';
 import {
   firstRingCellDistinctFrom,
   pairedTransportSidesForAdjacentHexes,
-  tacticalRes4Cell,
-} from './tacticalBattle/testSupport/tacticalRes4HexFixtures';
+  tacticalCell,
+} from './tacticalBattle/testSupport/tacticalHexFixtures';
 import type { TacticalBattleSnapshot } from '../shared/tacticalBattleTypes';
 
 const roadMark = '<img class="feature-icon" src="transport/road.svg" alt="" aria-hidden="true" />Road';
@@ -172,18 +172,18 @@ test('mergeOrderPreviewTerrainImpactsFromPreviews unions slower labels and ORs r
 });
 
 test('collectTacticalMarchTerrainImpact lists coastal for armor when path enters a coastal res4', () => {
-  const a = tacticalRes4Cell(59, 69);
+  const a = tacticalCell(59, 69);
   const b = firstRingCellDistinctFrom(a);
   const impact = collectTacticalMarchTerrainImpact({
     battle: {
       battleId: 'tb-coastal-armor',
-      enclosingRes1H3Index: '8f283082dcb519f',
-      res4ChildH3Indexes: [a, b],
+      enclosingStrategicH3Index: '8f283082dcb519f',
+      tacticalChildH3Indexes: [a, b],
       strategicTurnNumber: 1,
       tacticalTurnNumber: 1,
       strategicHexTerrain: 'land',
       strategicHexTerrainKind: 'plains',
-      res4TerrainKindByH3: { [a]: 'plains', [b]: 'coastal' },
+      tacticalTerrainKindByH3: { [a]: 'plains', [b]: 'coastal' },
       subUnits: [
         {
           id: 'u1',
@@ -211,21 +211,21 @@ test('collectTacticalMarchTerrainImpact lists coastal for armor when path enters
 });
 
 test('pickTacticalMarchSlowTerrainDisplayTitle returns Road/Rail when a step uses transport over blocked terrain', () => {
-  const a = tacticalRes4Cell(57, 67);
+  const a = tacticalCell(57, 67);
   const b = firstRingCellDistinctFrom(a);
   const paired = pairedTransportSidesForAdjacentHexes(a, b, 'road');
   const title = pickTacticalMarchSlowTerrainDisplayTitle({
     battle: {
       battleId: 'tb-slow',
-      enclosingRes1H3Index: '8f283082dcb519f',
-      res4ChildH3Indexes: [a, b],
+      enclosingStrategicH3Index: '8f283082dcb519f',
+      tacticalChildH3Indexes: [a, b],
       strategicTurnNumber: 1,
       tacticalTurnNumber: 1,
       strategicHexTerrain: 'land',
       strategicHexTerrainKind: 'plains',
-      res4TerrainKindByH3: { [a]: 'plains', [b]: 'mountain' },
-      res4RoadSidesByH3: paired.res4RoadSidesByH3,
-      res4RailSidesByH3: paired.res4RailSidesByH3,
+      tacticalTerrainKindByH3: { [a]: 'plains', [b]: 'mountain' },
+      tacticalRoadSidesByH3: paired.tacticalRoadSidesByH3,
+      tacticalRailSidesByH3: paired.tacticalRailSidesByH3,
       subUnits: [
         {
           id: 'u1',
@@ -252,21 +252,21 @@ test('pickTacticalMarchSlowTerrainDisplayTitle returns Road/Rail when a step use
 });
 
 test('collectTacticalMarchTerrainImpact keeps roadRail when anchor MP throttle already added slower (forest armor)', () => {
-  const a = tacticalRes4Cell(58, 68);
+  const a = tacticalCell(58, 68);
   const b = firstRingCellDistinctFrom(a);
   const paired = pairedTransportSidesForAdjacentHexes(a, b, 'road');
   const impact = collectTacticalMarchTerrainImpact({
     battle: {
       battleId: 'tb-anchor-road',
-      enclosingRes1H3Index: '8f283082dcb519f',
-      res4ChildH3Indexes: [a, b],
+      enclosingStrategicH3Index: '8f283082dcb519f',
+      tacticalChildH3Indexes: [a, b],
       strategicTurnNumber: 1,
       tacticalTurnNumber: 1,
       strategicHexTerrain: 'land',
       strategicHexTerrainKind: 'plains',
-      res4TerrainKindByH3: { [a]: 'forest', [b]: 'mountain' },
-      res4RoadSidesByH3: paired.res4RoadSidesByH3,
-      res4RailSidesByH3: paired.res4RailSidesByH3,
+      tacticalTerrainKindByH3: { [a]: 'forest', [b]: 'mountain' },
+      tacticalRoadSidesByH3: paired.tacticalRoadSidesByH3,
+      tacticalRailSidesByH3: paired.tacticalRailSidesByH3,
       subUnits: [
         {
           id: 'u1',
@@ -297,20 +297,20 @@ test('collectTacticalMarchTerrainImpact keeps roadRail when anchor MP throttle a
 });
 
 test('collectTacticalMarchTerrainImpact names snow for forest armor only when the weather cap is below the forest budget', () => {
-  const a = tacticalRes4Cell(58, 68);
+  const a = tacticalCell(58, 68);
   const b = firstRingCellDistinctFrom(a);
   const armor = { id: 'u1', parentUnitId: 'p1', player: 'human', unitType: 'armor', h3Index: a, displayName: 'A' } as const;
   const slowerAt = (weatherBonusLevel: 'low' | 'high'): readonly string[] =>
     collectTacticalMarchTerrainImpact({
       battle: {
         battleId: `tb-forest-snow-${weatherBonusLevel}`,
-        enclosingRes1H3Index: '8f283082dcb519f',
-        res4ChildH3Indexes: [a, b],
+        enclosingStrategicH3Index: '8f283082dcb519f',
+        tacticalChildH3Indexes: [a, b],
         strategicTurnNumber: 1,
         tacticalTurnNumber: 1,
         strategicHexTerrain: 'land',
         strategicHexTerrainKind: 'plains',
-        res4TerrainKindByH3: { [a]: 'forest', [b]: 'plains' },
+        tacticalTerrainKindByH3: { [a]: 'forest', [b]: 'plains' },
         weather: 'snow',
         weatherBonusEnabled: true,
         weatherBonusLevel,
@@ -325,21 +325,21 @@ test('collectTacticalMarchTerrainImpact names snow for forest armor only when th
 });
 
 test('collectTacticalMarchTerrainImpact sets roadRail without duplicating Road/Rail in slower list', () => {
-  const a = tacticalRes4Cell(57, 67);
+  const a = tacticalCell(57, 67);
   const b = firstRingCellDistinctFrom(a);
   const paired = pairedTransportSidesForAdjacentHexes(a, b, 'road');
   const impact = collectTacticalMarchTerrainImpact({
     battle: {
       battleId: 'tb-slow2',
-      enclosingRes1H3Index: '8f283082dcb519f',
-      res4ChildH3Indexes: [a, b],
+      enclosingStrategicH3Index: '8f283082dcb519f',
+      tacticalChildH3Indexes: [a, b],
       strategicTurnNumber: 1,
       tacticalTurnNumber: 1,
       strategicHexTerrain: 'land',
       strategicHexTerrainKind: 'plains',
-      res4TerrainKindByH3: { [a]: 'plains', [b]: 'mountain' },
-      res4RoadSidesByH3: paired.res4RoadSidesByH3,
-      res4RailSidesByH3: paired.res4RailSidesByH3,
+      tacticalTerrainKindByH3: { [a]: 'plains', [b]: 'mountain' },
+      tacticalRoadSidesByH3: paired.tacticalRoadSidesByH3,
+      tacticalRailSidesByH3: paired.tacticalRailSidesByH3,
       subUnits: [
         {
           id: 'u1',
@@ -369,21 +369,21 @@ test('collectTacticalMarchTerrainImpact sets roadRail without duplicating Road/R
 });
 
 test('collectTacticalMarchTerrainImpact names a plains road on the Using line', () => {
-  const a = tacticalRes4Cell(61, 71);
+  const a = tacticalCell(61, 71);
   const b = firstRingCellDistinctFrom(a);
   const paired = pairedTransportSidesForAdjacentHexes(a, b, 'road');
   const impact = collectTacticalMarchTerrainImpact({
     battle: {
       battleId: 'tb-plains-road',
-      enclosingRes1H3Index: '8f283082dcb519f',
-      res4ChildH3Indexes: [a, b],
+      enclosingStrategicH3Index: '8f283082dcb519f',
+      tacticalChildH3Indexes: [a, b],
       strategicTurnNumber: 1,
       tacticalTurnNumber: 1,
       strategicHexTerrain: 'land',
       strategicHexTerrainKind: 'plains',
-      res4TerrainKindByH3: { [a]: 'plains', [b]: 'plains' },
-      res4RoadSidesByH3: paired.res4RoadSidesByH3,
-      res4RailSidesByH3: paired.res4RailSidesByH3,
+      tacticalTerrainKindByH3: { [a]: 'plains', [b]: 'plains' },
+      tacticalRoadSidesByH3: paired.tacticalRoadSidesByH3,
+      tacticalRailSidesByH3: paired.tacticalRailSidesByH3,
       subUnits: [
         {
           id: 'u1',
@@ -413,22 +413,22 @@ test('collectTacticalMarchTerrainImpact names a plains road on the Using line', 
 });
 
 test('collectTacticalMarchTerrainImpact omits Urban when the road prices that cell and keeps it off the road', () => {
-  const a = tacticalRes4Cell(62, 72);
+  const a = tacticalCell(62, 72);
   const b = firstRingCellDistinctFrom(a);
   const paired = pairedTransportSidesForAdjacentHexes(a, b, 'road');
   const withRoad = collectTacticalMarchTerrainImpact({
     battle: {
       battleId: 'tb-urban-road',
-      enclosingRes1H3Index: '8f283082dcb519f',
-      res4ChildH3Indexes: [a, b],
+      enclosingStrategicH3Index: '8f283082dcb519f',
+      tacticalChildH3Indexes: [a, b],
       strategicTurnNumber: 1,
       tacticalTurnNumber: 1,
       strategicHexTerrain: 'land',
       strategicHexTerrainKind: 'plains',
-      res4TerrainKindByH3: { [a]: 'plains', [b]: 'plains' },
-      res4IsUrbanByH3: { [b]: true },
-      res4RoadSidesByH3: paired.res4RoadSidesByH3,
-      res4RailSidesByH3: paired.res4RailSidesByH3,
+      tacticalTerrainKindByH3: { [a]: 'plains', [b]: 'plains' },
+      tacticalIsUrbanByH3: { [b]: true },
+      tacticalRoadSidesByH3: paired.tacticalRoadSidesByH3,
+      tacticalRailSidesByH3: paired.tacticalRailSidesByH3,
       subUnits: [
         {
           id: 'u1',
@@ -457,14 +457,14 @@ test('collectTacticalMarchTerrainImpact omits Urban when the road prices that ce
   const withoutRoad = collectTacticalMarchTerrainImpact({
     battle: {
       battleId: 'tb-urban-plain',
-      enclosingRes1H3Index: '8f283082dcb519f',
-      res4ChildH3Indexes: [a, b],
+      enclosingStrategicH3Index: '8f283082dcb519f',
+      tacticalChildH3Indexes: [a, b],
       strategicTurnNumber: 1,
       tacticalTurnNumber: 1,
       strategicHexTerrain: 'land',
       strategicHexTerrainKind: 'plains',
-      res4TerrainKindByH3: { [a]: 'plains', [b]: 'plains' },
-      res4IsUrbanByH3: { [b]: true },
+      tacticalTerrainKindByH3: { [a]: 'plains', [b]: 'plains' },
+      tacticalIsUrbanByH3: { [b]: true },
       subUnits: [
         {
           id: 'u1',
@@ -493,9 +493,9 @@ test('collectTacticalMarchTerrainImpact omits Urban when the road prices that ce
 });
 
 test('collectTacticalMarchTerrainImpact names Forest only on steps the line does not price', () => {
-  const origin = tacticalRes4Cell(63, 73);
+  const origin = tacticalCell(63, 73);
   const onRoad = firstRingCellDistinctFrom(origin);
-  const offRoad = res4GridDiskNeighborsOrdered(onRoad).find((cell) => cell !== origin);
+  const offRoad = tacticalGridDiskNeighborsOrdered(onRoad).find((cell) => cell !== origin);
   assert.ok(offRoad);
   const paired = pairedTransportSidesForAdjacentHexes(origin, onRoad, 'road');
   const armor = {
@@ -518,16 +518,16 @@ test('collectTacticalMarchTerrainImpact names Forest only on steps the line does
     collectTacticalMarchTerrainImpact({
       battle: {
         battleId: 'tb-forest-line',
-        enclosingRes1H3Index: '8f283082dcb519f',
-        res4ChildH3Indexes: [origin, onRoad, offRoad],
+        enclosingStrategicH3Index: '8f283082dcb519f',
+        tacticalChildH3Indexes: [origin, onRoad, offRoad],
         strategicTurnNumber: 1,
         tacticalTurnNumber: 1,
         strategicHexTerrain: 'land',
         strategicHexTerrainKind: 'plains',
-        res4TerrainKindByH3: kinds,
-        res4IsUrbanByH3: urban,
-        res4RoadSidesByH3: paired.res4RoadSidesByH3,
-        res4RailSidesByH3: paired.res4RailSidesByH3,
+        tacticalTerrainKindByH3: kinds,
+        tacticalIsUrbanByH3: urban,
+        tacticalRoadSidesByH3: paired.tacticalRoadSidesByH3,
+        tacticalRailSidesByH3: paired.tacticalRailSidesByH3,
         subUnits: [armor],
       },
       subUnit: armor,
@@ -550,23 +550,23 @@ test('collectTacticalMarchTerrainImpact names Forest only on steps the line does
 });
 
 test('collectTacticalMarchTerrainImpact marks a mountain road when only the mountain has the road', () => {
-  const a = tacticalRes4Cell(90, 100);
+  const a = tacticalCell(90, 100);
   const b = firstRingCellDistinctFrom(a);
   const paired = pairedTransportSidesForAdjacentHexes(a, b, 'road');
-  delete paired.res4RoadSidesByH3[a];
-  delete paired.res4RailSidesByH3[a];
+  delete paired.tacticalRoadSidesByH3[a];
+  delete paired.tacticalRailSidesByH3[a];
   const impact = collectTacticalMarchTerrainImpact({
     battle: {
       battleId: 'tb-dest-road',
-      enclosingRes1H3Index: '8f283082dcb519f',
-      res4ChildH3Indexes: [a, b],
+      enclosingStrategicH3Index: '8f283082dcb519f',
+      tacticalChildH3Indexes: [a, b],
       strategicTurnNumber: 1,
       tacticalTurnNumber: 1,
       strategicHexTerrain: 'land',
       strategicHexTerrainKind: 'plains',
-      res4TerrainKindByH3: { [a]: 'plains', [b]: 'mountain' },
-      res4RoadSidesByH3: paired.res4RoadSidesByH3,
-      res4RailSidesByH3: paired.res4RailSidesByH3,
+      tacticalTerrainKindByH3: { [a]: 'plains', [b]: 'mountain' },
+      tacticalRoadSidesByH3: paired.tacticalRoadSidesByH3,
+      tacticalRailSidesByH3: paired.tacticalRailSidesByH3,
       subUnits: [
         {
           id: 'u1',
@@ -596,20 +596,20 @@ test('collectTacticalMarchTerrainImpact marks a mountain road when only the moun
 });
 
 test('collectTacticalRangedSlowTerrainLabels preserves first-seen order across units', () => {
-  const anchorA = tacticalRes4Cell(40, 50);
-  const anchorB = tacticalRes4Cell(41, 51);
+  const anchorA = tacticalCell(40, 50);
+  const anchorB = tacticalCell(41, 51);
   const cells = [anchorA, anchorB];
   const battle = {
     battleId: 'r1',
-    enclosingRes1H3Index: '8f283082dcb519f',
-    res4ChildH3Indexes: cells,
+    enclosingStrategicH3Index: '8f283082dcb519f',
+    tacticalChildH3Indexes: cells,
     strategicTurnNumber: 1,
     tacticalTurnNumber: 1,
     strategicHexTerrain: 'land',
     strategicHexTerrainKind: 'plains',
-    res4TerrainKindByH3: { [anchorA]: 'plains', [anchorB]: 'plains' },
-    res4IsUrbanByH3: { [anchorA]: true, [anchorB]: false },
-    res4IsRubbleByH3: { [anchorA]: false, [anchorB]: true },
+    tacticalTerrainKindByH3: { [anchorA]: 'plains', [anchorB]: 'plains' },
+    tacticalIsUrbanByH3: { [anchorA]: true, [anchorB]: false },
+    tacticalIsRubbleByH3: { [anchorA]: false, [anchorB]: true },
     subUnits: [
       {
         id: 'u1',

@@ -31,7 +31,7 @@ reason?: string;
   /**
    * Specifies the contract for the `tacticalBattle` member (tacticalBattle?: TacticalBattleSnapshot;).
 
-   * Contract: Present only after a successful tactical human march mutation so the renderer can refresh res4 state without an extra round-trip.
+   * Contract: Present only after a successful tactical human march mutation so the renderer can refresh tactical state without an extra round-trip.
    * When to use: Consumers of `commitHumanTacticalDraftOrders` after tactical Ready; not used for draft validation IPC.
    * Expected outcome: Deep snapshot suitable for JSON IPC when set.
    * Exceptions: None.

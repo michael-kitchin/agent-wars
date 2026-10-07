@@ -19,39 +19,39 @@ import {
 } from './assessUnitProximity';
 
 /**
- * Documents the module-scope binding `res1Cell` (res1Cell).
+ * Documents the module-scope binding `strategicCell` (strategicCell).
  *
  * Purpose: Stable H3 resolution-1 cell for gate and distance tests.
  * When to use: Any case that must be strategic-map geometry.
  * Expected outcome: `getResolution` is 1.
  * Exceptions: None.
  */
-const res1Cell = latLngToCell(0, 0, 1);
+const strategicCell = latLngToCell(0, 0, 1);
 /**
- * Documents the module-scope binding `res4Cell` (res4Cell).
+ * Documents the module-scope binding `tacticalCell` (tacticalCell).
  *
  * Purpose: Stable H3 resolution-4 cell so the gate rejects tactical geometry.
  * When to use: Fog-off + non-strategic resolution cases.
  * Expected outcome: `getResolution` is 4.
  * Exceptions: None.
  */
-const res4Cell = latLngToCell(0, 0, 4);
+const tacticalSampleCell = latLngToCell(0, 0, 4);
 
 /**
  * Verifies the omniscient gate requires fog off and a resolution-1 cell.
  *
- * Purpose: Prevents tactical snapshots (fog forced false, res4) from using the unbounded grid scan.
+ * Purpose: Prevents tactical snapshots (fog forced false, tactical) from using the unbounded grid scan.
  * When to use: After changing `usesOmniscientGridProximity`.
- * Expected outcome: True only for fogOfWarEnabled === false with a res1 index.
+ * Expected outcome: True only for fogOfWarEnabled === false with a strategic index.
  * Exceptions: None.
  */
-function testOmniscientGateRequiresFogOffAndRes1(): void {
-  assert.strictEqual(getResolution(res1Cell), 1);
-  assert.strictEqual(getResolution(res4Cell), 4);
-  assert.strictEqual(usesOmniscientGridProximity({ fogOfWarEnabled: false, h3Index: res1Cell }), true);
-  assert.strictEqual(usesOmniscientGridProximity({ fogOfWarEnabled: true, h3Index: res1Cell }), false);
-  assert.strictEqual(usesOmniscientGridProximity({ h3Index: res1Cell }), false);
-  assert.strictEqual(usesOmniscientGridProximity({ fogOfWarEnabled: false, h3Index: res4Cell }), false);
+function testOmniscientGateRequiresFogOffAndStrategic(): void {
+  assert.strictEqual(getResolution(strategicCell), 1);
+  assert.strictEqual(getResolution(tacticalSampleCell), 4);
+  assert.strictEqual(usesOmniscientGridProximity({ fogOfWarEnabled: false, h3Index: strategicCell }), true);
+  assert.strictEqual(usesOmniscientGridProximity({ fogOfWarEnabled: true, h3Index: strategicCell }), false);
+  assert.strictEqual(usesOmniscientGridProximity({ h3Index: strategicCell }), false);
+  assert.strictEqual(usesOmniscientGridProximity({ fogOfWarEnabled: false, h3Index: tacticalSampleCell }), false);
   assert.strictEqual(usesOmniscientGridProximity({ fogOfWarEnabled: false, h3Index: 'not-a-cell' }), false);
 }
 
@@ -60,14 +60,14 @@ function testOmniscientGateRequiresFogOffAndRes1(): void {
  *
  * Purpose: The path-versus-Best-Options line must not leak into fog-off or non-strategic geometry.
  * When to use: After changing `usesFogPathDistanceBriefing`.
- * Expected outcome: True only for fogOfWarEnabled === true with a res1 index.
+ * Expected outcome: True only for fogOfWarEnabled === true with a strategic index.
  * Exceptions: None.
  */
-function testFogPathGateRequiresFogOnAndRes1(): void {
-  assert.strictEqual(usesFogPathDistanceBriefing({ fogOfWarEnabled: true, h3Index: res1Cell }), true);
-  assert.strictEqual(usesFogPathDistanceBriefing({ fogOfWarEnabled: false, h3Index: res1Cell }), false);
-  assert.strictEqual(usesFogPathDistanceBriefing({ h3Index: res1Cell }), false);
-  assert.strictEqual(usesFogPathDistanceBriefing({ fogOfWarEnabled: true, h3Index: res4Cell }), false);
+function testFogPathGateRequiresFogOnAndStrategic(): void {
+  assert.strictEqual(usesFogPathDistanceBriefing({ fogOfWarEnabled: true, h3Index: strategicCell }), true);
+  assert.strictEqual(usesFogPathDistanceBriefing({ fogOfWarEnabled: false, h3Index: strategicCell }), false);
+  assert.strictEqual(usesFogPathDistanceBriefing({ h3Index: strategicCell }), false);
+  assert.strictEqual(usesFogPathDistanceBriefing({ fogOfWarEnabled: true, h3Index: tacticalSampleCell }), false);
   assert.strictEqual(usesFogPathDistanceBriefing({ fogOfWarEnabled: true, h3Index: 'not-a-cell' }), false);
 }
 
@@ -80,10 +80,10 @@ function testFogPathGateRequiresFogOnAndRes1(): void {
  * Exceptions: None.
  */
 function testSafeGridHexDistanceSameAndAdjacent(): void {
-  assert.strictEqual(safeGridHexDistance(res1Cell, res1Cell), 0);
-  const neighbor = gridDisk(res1Cell, 1).find((h3) => h3 !== res1Cell);
+  assert.strictEqual(safeGridHexDistance(strategicCell, strategicCell), 0);
+  const neighbor = gridDisk(strategicCell, 1).find((h3) => h3 !== strategicCell);
   assert.ok(neighbor, 'expected a ring-1 neighbor');
-  assert.strictEqual(safeGridHexDistance(res1Cell, neighbor!), 1);
+  assert.strictEqual(safeGridHexDistance(strategicCell, neighbor!), 1);
 }
 
 /**
@@ -95,11 +95,11 @@ function testSafeGridHexDistanceSameAndAdjacent(): void {
  * Exceptions: None.
  */
 function testGridHopDistancesMatchGridDistanceWhenAvailable(): void {
-  assert.strictEqual(gridHopDistancesFrom(res1Cell, [res1Cell]).get(res1Cell), 0);
-  const neighbor = gridDisk(res1Cell, 1).find((h3) => h3 !== res1Cell);
+  assert.strictEqual(gridHopDistancesFrom(strategicCell, [strategicCell]).get(strategicCell), 0);
+  const neighbor = gridDisk(strategicCell, 1).find((h3) => h3 !== strategicCell);
   assert.ok(neighbor, 'expected a ring-1 neighbor');
-  assert.strictEqual(safeGridHexDistance(res1Cell, neighbor!), 1);
-  assert.strictEqual(gridHopDistancesFrom(res1Cell, [neighbor!]).get(neighbor!), 1);
+  assert.strictEqual(safeGridHexDistance(strategicCell, neighbor!), 1);
+  assert.strictEqual(gridHopDistancesFrom(strategicCell, [neighbor!]).get(neighbor!), 1);
 }
 
 /**
@@ -112,7 +112,7 @@ function testGridHopDistancesMatchGridDistanceWhenAvailable(): void {
  */
 function testSafeGridHexDistanceInvalidIndexesReturnNull(): void {
   assert.strictEqual(safeGridHexDistance('not-a-cell', 'also-bad'), null);
-  assert.strictEqual(safeGridHexDistance(res1Cell, 'not-a-cell'), null);
+  assert.strictEqual(safeGridHexDistance(strategicCell, 'not-a-cell'), null);
 }
 
 /**
@@ -124,9 +124,9 @@ function testSafeGridHexDistanceInvalidIndexesReturnNull(): void {
  * Exceptions: None.
  */
 function testCollectOmniscientNearbyUnitsSkipsInvalidOtherIndex(): void {
-  const neighbor = gridDisk(res1Cell, 1).find((h3) => h3 !== res1Cell);
+  const neighbor = gridDisk(strategicCell, 1).find((h3) => h3 !== strategicCell);
   assert.ok(neighbor, 'expected a ring-1 neighbor');
-  const assessed = { id: 'opponent-armor-1', player: 'opponent', unitType: 'armor', h3Index: res1Cell };
+  const assessed = { id: 'opponent-armor-1', player: 'opponent', unitType: 'armor', h3Index: strategicCell };
   const collected = collectOmniscientNearbyUnits({
     assessedUnit: assessed,
     units: [
@@ -160,10 +160,10 @@ function testEstimatedTurnsFromGridDistance(): void {
  *
  * Purpose: Reproduces the global-map gap where nearest-enemy stayed empty despite living humans.
  * When to use: Omniscient collector cases that must not skip those pairs.
- * Expected outcome: A res1 pair with `safeGridHexDistance` null.
+ * Expected outcome: A strategic pair with `safeGridHexDistance` null.
  * Exceptions: Throws when no such pair exists on the ordered hex list.
  */
-function res1PairWhereGridDistanceThrows(): [string, string] {
+function strategicPairWhereGridDistanceThrows(): [string, string] {
   const hexes = getOrderedHexList();
   for (const origin of hexes) {
     for (const other of hexes) {
@@ -181,13 +181,13 @@ function res1PairWhereGridDistanceThrows(): [string, string] {
 /**
  * Verifies omniscient collection still scores a pentagon-crossing enemy.
  *
- * Purpose: `gridDistance` cannot span some global res1 pairs; nearest-enemy must still fill.
+ * Purpose: `gridDistance` cannot span some global strategic pairs; nearest-enemy must still fill.
  * When to use: After changing omniscient hop scoring.
  * Expected outcome: nearbyEnemies includes the human with a positive hop count.
  * Exceptions: None.
  */
 function testCollectOmniscientNearbyUnitsIncludesPentagonCrossingEnemy(): void {
-  const [origin, far] = res1PairWhereGridDistanceThrows();
+  const [origin, far] = strategicPairWhereGridDistanceThrows();
   assert.strictEqual(safeGridHexDistance(origin, far), null);
   const assessed = { id: 'opponent-armor-1', player: 'opponent', unitType: 'armor', h3Index: origin };
   const collected = collectOmniscientNearbyUnits({
@@ -213,12 +213,12 @@ function testCollectOmniscientNearbyUnitsIncludesPentagonCrossingEnemy(): void {
  * Exceptions: None.
  */
 function testGridHopDistanceBetweenCoversPentagonCrossingPair(): void {
-  const neighbor = gridDisk(res1Cell, 1).find((h) => h !== res1Cell);
+  const neighbor = gridDisk(strategicCell, 1).find((h) => h !== strategicCell);
   assert.ok(neighbor, 'expected a ring-1 neighbor');
-  assert.strictEqual(gridHopDistanceBetween(res1Cell, res1Cell), 0);
-  assert.strictEqual(gridHopDistanceBetween(res1Cell, neighbor!), gridDistance(res1Cell, neighbor!));
+  assert.strictEqual(gridHopDistanceBetween(strategicCell, strategicCell), 0);
+  assert.strictEqual(gridHopDistanceBetween(strategicCell, neighbor!), gridDistance(strategicCell, neighbor!));
 
-  const [origin, far] = res1PairWhereGridDistanceThrows();
+  const [origin, far] = strategicPairWhereGridDistanceThrows();
   assert.strictEqual(safeGridHexDistance(origin, far), null);
   const hops = gridHopDistanceBetween(origin, far);
   assert.ok(hops !== null && hops >= 1, 'pentagon-crossing pair must still report hops');
@@ -267,8 +267,8 @@ function testFogPathHonestyLineUsesBestOptionsDestCopy(): void {
  * Exceptions: Propagates assertion errors.
  */
 function run(): void {
-  testOmniscientGateRequiresFogOffAndRes1();
-  testFogPathGateRequiresFogOnAndRes1();
+  testOmniscientGateRequiresFogOffAndStrategic();
+  testFogPathGateRequiresFogOnAndStrategic();
   testSafeGridHexDistanceSameAndAdjacent();
   testGridHopDistancesMatchGridDistanceWhenAvailable();
   testSafeGridHexDistanceInvalidIndexesReturnNull();

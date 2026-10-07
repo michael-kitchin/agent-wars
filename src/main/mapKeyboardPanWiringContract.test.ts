@@ -27,7 +27,7 @@ function readSrc(...segments: string[]): string {
 test('initCore uses hold pan controller instead of one-shot panMapOneRes1Hex for WASD', () => {
   const initCore = readSrc('renderer', 'map', 'initCore.ts');
   assert.equal(
-    initCore.includes('panMapOneRes1Hex'),
+    initCore.includes('panMapOneStrategicHex'),
     false,
     'initCore must not call panMapOneRes1Hex directly'
   );
@@ -62,8 +62,8 @@ test('panMapByNetAxes pans in screen pixels via panBy, not hex-north setView', (
   const fn = getFunctionSource(helpers, 'panMapByNetAxes');
   assert.match(fn, /netAxesToScreenPanDelta/);
   assert.match(fn, /keyboardPanModeSpeed/);
-  assert.match(fn, /DETAIL_H3_RESOLUTION/);
-  assert.match(fn, /WORLD_H3_RESOLUTION/);
+  assert.match(fn, /tacticalCellAt/);
+  assert.match(fn, /strategicCellAt/);
   assert.match(fn, /panBy/);
   assert.match(fn, /animate:\s*false/);
   assert.equal(

@@ -39,7 +39,7 @@ import { originBonusSettingsFromSnapshot } from '../../shared/originBonusRules';
 import { buildContextCoaching, type CoachingGates } from './promptSpec/coachingText';
 import { buildToolBudgetExceededWarning } from './requestOrdersFlowSupport';
 
-/** Home regions are defined at strategic res1; always encode with the strategic registry, not tactical res4. */
+/** Home regions are defined at strategic; always encode with the strategic registry, not tactical. */
 const HOME_REGION_HEX_COORD_CTX = { mode: 'strategic' as const };
 
 /**
@@ -47,7 +47,7 @@ const HOME_REGION_HEX_COORD_CTX = { mode: 'strategic' as const };
 
  * Purpose: Maps home-region H3 indexes to strategic briefing hex codes for LLM-visible comma-separated lists.
  * When to use: Strategic `region_vs_region` home-region hex bullets in `buildSystemPromptForTools` only.
- * Expected outcome: Comma-separated res1 codes via `h3ToCode` strategic context; falls back to raw `h3` on lookup failure.
+ * Expected outcome: Comma-separated strategic codes via `h3ToCode` strategic context; falls back to raw `h3` on lookup failure.
  * Exceptions: None; empty input returns an empty string.
  */
 function formatHomeRegionHexCodesForPrompt(h3Indexes: readonly string[]): string {
@@ -204,11 +204,11 @@ ${toolPromptLines.map((line, i) => `${i + 1}. ${line}`).join('\n')}${toolGuidanc
     ? state.exploredHexes
     : state.hexes.map((hex) => hex.h3Index);
   const exploredLandHexes = exploredHexesRaw.filter((h3Index) => landHexSet.has(h3Index)).length;
-  const controlledLandHexes = (state.res1Control ?? []).filter(
+  const controlledLandHexes = (state.strategicControl ?? []).filter(
     (row) => row.controllerPlayerId === 'opponent' && landHexSet.has(row.h3Index)
   ).length;
-  const ownHomeRegionControl = countControlledHexesInRegion(state.res1Control ?? [], state.aiHomeRegionHexes, 'opponent');
-  const opponentHomeRegionControl = countControlledHexesInRegion(state.res1Control ?? [], state.humanHomeRegionHexes, 'opponent');
+  const ownHomeRegionControl = countControlledHexesInRegion(state.strategicControl ?? [], state.aiHomeRegionHexes, 'opponent');
+  const opponentHomeRegionControl = countControlledHexesInRegion(state.strategicControl ?? [], state.humanHomeRegionHexes, 'opponent');
   let regionHomeProgressAndHexBullets = '';
   if (homePartitions) {
     const lineOwn = formatControlProgressLine('Your home region control', ownHomeRegionControl.controlled, ownHomeRegionControl.total);

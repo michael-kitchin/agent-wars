@@ -16,13 +16,13 @@ test('the strategic lookup reads each hex terrain kind and gives 0 for an unlist
 test('the battle lookup reads cell terrain and the urban flag, and a cell without a kind takes the hex kind', () => {
   const lookup = createTacticalTerrainCoverLookup({
     strategicHexTerrainKind: 'plains',
-    res4TerrainKindByH3: { 'cell-forest': 'forest' },
-    res4IsUrbanByH3: { 'cell-urban': true },
+    tacticalTerrainKindByH3: { 'cell-forest': 'forest' },
+    tacticalIsUrbanByH3: { 'cell-urban': true },
   });
   assert.equal(lookup('cell-forest', 'surface'), 2);
   assert.equal(lookup('cell-urban', 'air'), 1);
   assert.equal(lookup('cell-open', 'surface'), 0);
-  const forestHex = createTacticalTerrainCoverLookup({ strategicHexTerrainKind: 'forest', res4TerrainKindByH3: {} });
+  const forestHex = createTacticalTerrainCoverLookup({ strategicHexTerrainKind: 'forest', tacticalTerrainKindByH3: {} });
   assert.equal(forestHex('cell-open', 'surface'), 2);
 });
 

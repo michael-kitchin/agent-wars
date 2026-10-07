@@ -113,7 +113,7 @@ function buildFixtureState(hexes: string[]): {
   hexes: { h3Index: string; terrain: string; terrainKind: string }[];
   units: { id: string; player: string; unitType: string; h3Index: string }[];
   exploredHexes: string[];
-  res1Control: { h3Index: string; controllerPlayerId: string | null }[];
+  strategicControl: { h3Index: string; controllerPlayerId: string | null }[];
   scenarioId: 'region_vs_region';
   humanHomeRegion: string;
   aiHomeRegion: string;
@@ -132,7 +132,7 @@ function buildFixtureState(hexes: string[]): {
       { id: 'human-infantry-1', player: 'human', unitType: 'infantry', h3Index: hexes[1]! },
     ],
     exploredHexes: [hexes[0]!, hexes[1]!, hexes[2]!],
-    res1Control: [
+    strategicControl: [
       { h3Index: hexes[0]!, controllerPlayerId: 'opponent' },
       { h3Index: hexes[1]!, controllerPlayerId: 'opponent' },
       { h3Index: hexes[2]!, controllerPlayerId: 'human' },

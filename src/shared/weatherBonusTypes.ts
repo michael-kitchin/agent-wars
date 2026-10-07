@@ -1,5 +1,5 @@
 /**
- * Shapes for the optional weather bonus: a fixed month on each res1 hex, and acclimation tags from a unit's birth hex.
+ * Shapes for the optional weather bonus: a fixed month on each strategic hex, and acclimation tags from a unit's birth hex.
  *
  * Purpose: Shared by dice, movement, AI tools, and the renderer so every surface uses the same four states.
  * When to use: Import with `import type`; the runtime rules live in `weatherBonusRules.ts`.
@@ -8,7 +8,7 @@
  */
 
 /**
- * One month's weather on a res1 hex.
+ * One month's weather on a strategic hex.
  *
  * Purpose: The only labels the calendar, tooltips, and penalties accept.
  * When to use: Display state and the weather a unit is standing in.

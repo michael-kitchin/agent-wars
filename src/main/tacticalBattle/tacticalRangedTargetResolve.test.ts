@@ -14,34 +14,34 @@ import {
   withTacticalTempoAttacks,
 } from './tacticalRangedTargetResolve';
 import {
-  tacticalRes1Cell,
-  tacticalRes4PentagonCrossingPair,
-  tacticalRes4UnderRes1Corner,
-} from './testSupport/tacticalRes4HexFixtures';
+  tacticalParentCell,
+  tacticalPentagonCrossingPair,
+  tacticalUnderCorner,
+} from './testSupport/tacticalHexFixtures';
 
 test('pickClosestEnemyTacticalRangedTargetForSubUnit prefers nearer human over farther', () => {
-  const res1 = tacticalRes1Cell(12, 34);
-  const res4Naval = tacticalRes4UnderRes1Corner(12, 34, { latEpsilon: 0.01, lngEpsilon: 0.01 });
-  const sameParent = [...gridDisk(res4Naval, 8)].filter((h) => cellToParent(h, 1) === res1);
-  const res4NearHuman = sameParent.find((h) => h !== res4Naval && gridDistance(res4Naval, h) === 1);
-  const res4FarHuman = sameParent.find((h) => h !== res4Naval && gridDistance(res4Naval, h) === 2);
-  assert.ok(res4NearHuman && res4FarHuman, 'expected near and far human cells under res1 parent');
+  const strategic = tacticalParentCell(12, 34);
+  const tacticalNaval = tacticalUnderCorner(12, 34, { latEpsilon: 0.01, lngEpsilon: 0.01 });
+  const sameParent = [...gridDisk(tacticalNaval, 8)].filter((h) => cellToParent(h, 1) === strategic);
+  const tacticalNearHuman = sameParent.find((h) => h !== tacticalNaval && gridDistance(tacticalNaval, h) === 1);
+  const tacticalFarHuman = sameParent.find((h) => h !== tacticalNaval && gridDistance(tacticalNaval, h) === 2);
+  assert.ok(tacticalNearHuman && tacticalFarHuman, 'expected near and far human cells under res1 parent');
   const battle: TacticalBattleSnapshot = {
     battleId: 'tb-ranged-pick',
-    enclosingRes1H3Index: res1,
-    res4ChildH3Indexes: sameParent.slice(0, 40),
+    enclosingStrategicH3Index: strategic,
+    tacticalChildH3Indexes: sameParent.slice(0, 40),
     strategicTurnNumber: 1,
     tacticalTurnNumber: 1,
     strategicHexTerrain: 'coastal',
     strategicHexTerrainKind: 'water',
-    res4TerrainKindByH3: Object.fromEntries(sameParent.slice(0, 40).map((h, i) => [h, i === 0 ? 'water' : 'plains'])),
+    tacticalTerrainKindByH3: Object.fromEntries(sameParent.slice(0, 40).map((h, i) => [h, i === 0 ? 'water' : 'plains'])),
     subUnits: [
       {
         id: 'opp-naval:01',
         parentUnitId: 'opp-naval',
         player: 'opponent',
         unitType: 'naval',
-        h3Index: res4Naval,
+        h3Index: tacticalNaval,
         displayName: 'Naval',
       },
       {
@@ -49,7 +49,7 @@ test('pickClosestEnemyTacticalRangedTargetForSubUnit prefers nearer human over f
         parentUnitId: 'hum-near',
         player: 'human',
         unitType: 'infantry',
-        h3Index: res4NearHuman,
+        h3Index: tacticalNearHuman,
         displayName: 'Near',
       },
       {
@@ -57,38 +57,38 @@ test('pickClosestEnemyTacticalRangedTargetForSubUnit prefers nearer human over f
         parentUnitId: 'hum-far',
         player: 'human',
         unitType: 'infantry',
-        h3Index: res4FarHuman,
+        h3Index: tacticalFarHuman,
         displayName: 'Far',
       },
     ],
   };
   const picked = pickClosestEnemyTacticalRangedTargetForSubUnit(battle, 'opp-naval:01');
-  assert.strictEqual(picked, res4NearHuman);
+  assert.strictEqual(picked, tacticalNearHuman);
 });
 
 test('resolveTacticalRangedTargetForSubUnit retargets away from anchor without enemies', () => {
-  const res1 = tacticalRes1Cell(12, 34);
-  const res4Naval = tacticalRes4UnderRes1Corner(12, 34, { latEpsilon: 0.01, lngEpsilon: 0.01 });
-  const anchor = battleFootprintOrigin(res1, res4Naval);
-  const sameParent = [...gridDisk(res4Naval, 8)].filter((h) => cellToParent(h, 1) === res1);
-  const res4Human = sameParent.find((h) => h !== res4Naval && gridDistance(res4Naval, h) === 1);
-  assert.ok(res4Human, 'expected adjacent human cell');
+  const strategic = tacticalParentCell(12, 34);
+  const tacticalNaval = tacticalUnderCorner(12, 34, { latEpsilon: 0.01, lngEpsilon: 0.01 });
+  const anchor = battleFootprintOrigin(strategic, tacticalNaval);
+  const sameParent = [...gridDisk(tacticalNaval, 8)].filter((h) => cellToParent(h, 1) === strategic);
+  const tacticalHuman = sameParent.find((h) => h !== tacticalNaval && gridDistance(tacticalNaval, h) === 1);
+  assert.ok(tacticalHuman, 'expected adjacent human cell');
   const battle: TacticalBattleSnapshot = {
     battleId: 'tb-ranged-retarget',
-    enclosingRes1H3Index: res1,
-    res4ChildH3Indexes: sameParent.slice(0, 40),
+    enclosingStrategicH3Index: strategic,
+    tacticalChildH3Indexes: sameParent.slice(0, 40),
     strategicTurnNumber: 1,
     tacticalTurnNumber: 1,
     strategicHexTerrain: 'coastal',
     strategicHexTerrainKind: 'water',
-    res4TerrainKindByH3: Object.fromEntries(sameParent.slice(0, 40).map((h) => [h, h === res4Naval ? 'water' : 'plains'])),
+    tacticalTerrainKindByH3: Object.fromEntries(sameParent.slice(0, 40).map((h) => [h, h === tacticalNaval ? 'water' : 'plains'])),
     subUnits: [
       {
         id: 'opp-naval:01',
         parentUnitId: 'opp-naval',
         player: 'opponent',
         unitType: 'naval',
-        h3Index: res4Naval,
+        h3Index: tacticalNaval,
         displayName: 'Naval',
       },
       {
@@ -96,7 +96,7 @@ test('resolveTacticalRangedTargetForSubUnit retargets away from anchor without e
         parentUnitId: 'hum',
         player: 'human',
         unitType: 'infantry',
-        h3Index: res4Human,
+        h3Index: tacticalHuman,
         displayName: 'Human',
       },
     ],
@@ -104,32 +104,32 @@ test('resolveTacticalRangedTargetForSubUnit retargets away from anchor without e
   const anchorHasEnemy = battle.subUnits.some((s) => s.h3Index === anchor && s.player === 'human');
   assert.ok(!anchorHasEnemy, 'anchor should not host enemy for this fixture');
   const resolved = resolveTacticalRangedTargetForSubUnit(battle, 'opp-naval:01', anchor);
-  assert.strictEqual(resolved, res4Human);
+  assert.strictEqual(resolved, tacticalHuman);
 });
 
 test('collectTacticalTempoAttacks emits ranged for non-air and air strike for air', () => {
-  const res1 = tacticalRes1Cell(12, 34);
-  const res4Armor = tacticalRes4UnderRes1Corner(12, 34, { latEpsilon: 0.01, lngEpsilon: 0.01 });
-  const sameParent = [...gridDisk(res4Armor, 8)].filter((h) => cellToParent(h, 1) === res1);
-  const res4AirUnit = sameParent.find((h) => h !== res4Armor && gridDistance(res4Armor, h) === 1);
-  const res4HumanEnemy = sameParent.find((h) => h !== res4Armor && h !== res4AirUnit && gridDistance(res4Armor, h) === 1);
-  assert.ok(res4AirUnit && res4HumanEnemy, 'expected air and enemy cells adjacent to armor');
+  const strategic = tacticalParentCell(12, 34);
+  const tacticalArmor = tacticalUnderCorner(12, 34, { latEpsilon: 0.01, lngEpsilon: 0.01 });
+  const sameParent = [...gridDisk(tacticalArmor, 8)].filter((h) => cellToParent(h, 1) === strategic);
+  const tacticalAirUnit = sameParent.find((h) => h !== tacticalArmor && gridDistance(tacticalArmor, h) === 1);
+  const tacticalHumanEnemy = sameParent.find((h) => h !== tacticalArmor && h !== tacticalAirUnit && gridDistance(tacticalArmor, h) === 1);
+  assert.ok(tacticalAirUnit && tacticalHumanEnemy, 'expected air and enemy cells adjacent to armor');
   const battle: TacticalBattleSnapshot = {
     battleId: 'tb-defend-engage',
-    enclosingRes1H3Index: res1,
-    res4ChildH3Indexes: sameParent.slice(0, 40),
+    enclosingStrategicH3Index: strategic,
+    tacticalChildH3Indexes: sameParent.slice(0, 40),
     strategicTurnNumber: 1,
     tacticalTurnNumber: 1,
     strategicHexTerrain: 'coastal',
     strategicHexTerrainKind: 'land',
-    res4TerrainKindByH3: Object.fromEntries(sameParent.slice(0, 40).map((h) => [h, 'plains'])),
+    tacticalTerrainKindByH3: Object.fromEntries(sameParent.slice(0, 40).map((h) => [h, 'plains'])),
     subUnits: [
       {
         id: 'opp-armor:01',
         parentUnitId: 'opp-armor',
         player: 'opponent',
         unitType: 'armor',
-        h3Index: res4Armor,
+        h3Index: tacticalArmor,
         displayName: 'Armor',
       },
       {
@@ -137,7 +137,7 @@ test('collectTacticalTempoAttacks emits ranged for non-air and air strike for ai
         parentUnitId: 'opp-air',
         player: 'opponent',
         unitType: 'air',
-        h3Index: res4AirUnit,
+        h3Index: tacticalAirUnit,
         displayName: 'Air',
       },
       {
@@ -145,7 +145,7 @@ test('collectTacticalTempoAttacks emits ranged for non-air and air strike for ai
         parentUnitId: 'hum',
         player: 'human',
         unitType: 'infantry',
-        h3Index: res4HumanEnemy,
+        h3Index: tacticalHumanEnemy,
         displayName: 'Enemy',
       },
     ],
@@ -158,7 +158,7 @@ test('collectTacticalTempoAttacks emits ranged for non-air and air strike for ai
   });
   assert.strictEqual(rangedAttacks.length, 1, 'armor should generate ranged');
   assert.strictEqual(rangedAttacks[0]!.unitId, 'opp-armor:01');
-  assert.strictEqual(rangedAttacks[0]!.targetH3Index, res4HumanEnemy);
+  assert.strictEqual(rangedAttacks[0]!.targetH3Index, tacticalHumanEnemy);
   assert.strictEqual(airStrikes.length, 1, 'air should generate air strike');
   assert.strictEqual(airStrikes[0]!.unitId, 'opp-air:01');
   assert.strictEqual(airStrikes[0]!.targetType, 'units');
@@ -182,7 +182,7 @@ test('collectTacticalTempoAttacks emits ranged for non-air and air strike for ai
 
   // The model keeps its agency in tactical too: a target it chose survives the backfill untouched, and the
   // sub-unit it named gains no second attack.
-  const modelTarget = res4Armor;
+  const modelTarget = tacticalArmor;
   const backfilled = withTacticalTempoAttacks(
     battle,
     {
@@ -211,16 +211,16 @@ test('collectTacticalTempoAttacks emits ranged for non-air and air strike for ai
 });
 
 test('pickClosestEnemyTacticalRangedTargetForSubUnit keeps a legal shot gridDistance cannot measure', () => {
-  const pair = tacticalRes4PentagonCrossingPair();
+  const pair = tacticalPentagonCrossingPair();
   const battle: TacticalBattleSnapshot = {
     battleId: 'tb-ranged-crossing',
-    enclosingRes1H3Index: pair.res1H3Index,
-    res4ChildH3Indexes: pair.res4ChildH3Indexes,
+    enclosingStrategicH3Index: pair.strategicH3Index,
+    tacticalChildH3Indexes: pair.tacticalChildH3Indexes,
     strategicTurnNumber: 1,
     tacticalTurnNumber: 1,
     strategicHexTerrain: 'land',
     strategicHexTerrainKind: 'plains',
-    res4TerrainKindByH3: Object.fromEntries(pair.res4ChildH3Indexes.map((h) => [h, 'plains'])),
+    tacticalTerrainKindByH3: Object.fromEntries(pair.tacticalChildH3Indexes.map((h) => [h, 'plains'])),
     subUnits: [
       {
         id: 'opp-infantry:01',
@@ -247,14 +247,14 @@ test('pickClosestEnemyTacticalRangedTargetForSubUnit keeps a legal shot gridDist
 });
 
 /**
- * Returns the sorted-first res4 cell under a res1 parent for fixtures that mimic tactical footprint origin projection.
+ * Returns the sorted-first tactical cell under a strategic parent for fixtures that mimic tactical footprint origin projection.
  *
- * Purpose: Test-only helper to assert retargeting avoids the ASCII-map origin when enemies live on other res4 cells.
+ * Purpose: Test-only helper to assert retargeting avoids the ASCII-map origin when enemies live on other tactical cells.
  * When to use: `resolveTacticalRangedTargetForSubUnit` regression only.
- * Expected outcome: A res4 index under `res1`, preferring ring cells near `preferredChild`.
+ * Expected outcome: A tactical index under `strategic`, preferring ring cells near `preferredChild`.
  * Exceptions: None.
  */
-function battleFootprintOrigin(res1: string, preferredChild: string): string {
-  const ring = [...gridDisk(preferredChild, 6)].filter((h) => cellToParent(h, 1) === res1);
+function battleFootprintOrigin(strategic: string, preferredChild: string): string {
+  const ring = [...gridDisk(preferredChild, 6)].filter((h) => cellToParent(h, 1) === strategic);
   return ring.sort()[0] ?? preferredChild;
 }

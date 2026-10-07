@@ -2,7 +2,7 @@
   "src/renderer/gameplay/readyResolutionAnnouncements.ts|TS2353|Object literal may only specify known properties, and 'killsByAirStrike' does not exist in type 'ReadyResult'.",
   "src/renderer/map/hexGrid.ts|TS2488|Type 'CoordIJ' must have a '[Symbol.iterator]()' method that returns an iterator.",
   "src/renderer/map/mapHelpers.ts|TS18048|'L' is possibly 'undefined'.",
-  "src/renderer/map/res4TransportVectorLayer.ts|TS2352|Conversion of type 'GlobalLeafletFactory | undefined' to type '{ layerGroup: (...args: unknown[]) => unknown; polyline: (...args: unknown[]) => unknown; } | null' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.",
+  "src/renderer/map/tacticalTransportVectorLayer.ts|TS2352|Conversion of type 'GlobalLeafletFactory | undefined' to type '{ layerGroup: (...args: unknown[]) => unknown; polyline: (...args: unknown[]) => unknown; } | null' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.",
   "src/renderer/map/tacticalMapView.ts|TS2345|Argument of type 'unknown' is not assignable to parameter of type '{ lat: number; lng: number; }'.",
   "src/renderer/map/tacticalMapView.ts|TS2345|Argument of type 'unknown' is not assignable to parameter of type '{ lat: number; lng: number; }'.",
   "src/renderer/map/terrainView.ts|TS18048|'L' is possibly 'undefined'.",

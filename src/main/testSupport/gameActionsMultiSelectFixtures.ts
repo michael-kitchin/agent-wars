@@ -9,11 +9,11 @@
 
 import { gridDistance } from 'h3-js';
 import { dbGetOne, dbRun, getGameState } from '../gameDb';
-import { getRes1LandMassByH3 } from '../terrainClassificationCache';
+import { getStrategicLandMassByH3 } from '../terrainClassificationCache';
 import { hexHasSeaport } from '../movementTerrain';
 import { resetHumanMarchPreviewDiagnosticsForTests } from '../gameActions/humanMarchPreview';
 import { withTempGameDb } from './withTempGameDb';
-import { canLandUnitTraverseEdge, landUnitCanOccupyHex } from '../../shared/landTraversalRes1';
+import { canLandUnitTraverseEdge, landUnitCanOccupyHex } from '../../shared/landTraversalStrategic';
 import { hexSupportsMixedLandAndNaval } from '../gameActions/humanMarchPreviewMixedSelection';
 
 /**
@@ -40,7 +40,7 @@ export function withTempDb(runCase: () => void): void {
  * Exceptions: None.
  */
 export function findNearestLandSeaportHex(state: ReturnType<typeof getGameState>, originH3: string): string | null {
-  const landMass = getRes1LandMassByH3();
+  const landMass = getStrategicLandMassByH3();
   const landSeaportHexes = state.hexes
     .filter(
       (hex) =>
@@ -89,7 +89,7 @@ export function findAdjacentNavalPassableHex(state: ReturnType<typeof getGameSta
  * Exceptions: None.
  */
 export function isOpenOceanLandMass(h3Index: string): boolean {
-  const record = getRes1LandMassByH3().get(h3Index);
+  const record = getStrategicLandMassByH3().get(h3Index);
   return !!record && record.continentIds.length === 0 && record.islandIds.length === 0;
 }
 
@@ -136,7 +136,7 @@ export function findAdjacentMixedTransitHex(state: ReturnType<typeof getGameStat
 /**
  * Locates adjacent open-ocean hexes for land-unit movement rejection integration tests.
  *
- * Purpose: Finds a neighboring open-ocean res1 pair for land movement rejection scenarios.
+ * Purpose: Finds a neighboring open-ocean strategic pair for land movement rejection scenarios.
  * When to use: From integration tests that require land units blocked from open-ocean hops.
  * Expected outcome: Returns adjacent hex ids with empty continent and island membership, or throws if none found.
  * Exceptions: None; callers assert when no pair exists in the seeded state.
@@ -167,15 +167,15 @@ export function findOpenOceanHexPair(state: ReturnType<typeof getGameState>): { 
  * Exceptions: None.
  */
 export function setHumanControlledPort(h3Index: string): void {
-  const childRes4 = dbGetOne<{ h3Index: string }>(
-    'SELECT h3_index AS h3Index FROM res4_feature_overrides WHERE parent_h3_index = ? LIMIT 1',
+  const childTactical = dbGetOne<{ h3Index: string }>(
+    'SELECT h3_index AS h3Index FROM res_t_feature_overrides WHERE parent_h3_index = ? LIMIT 1',
     [h3Index]
   );
-  if (childRes4) {
-    dbRun('UPDATE res4_feature_overrides SET is_seaport = 1 WHERE h3_index = ?', [childRes4.h3Index]);
+  if (childTactical) {
+    dbRun('UPDATE res_t_feature_overrides SET is_seaport = 1 WHERE h3_index = ?', [childTactical.h3Index]);
   }
-  dbRun('UPDATE res1_infrastructure SET seaport_count = 1 WHERE h3_index = ?', [h3Index]);
-  dbRun('INSERT OR REPLACE INTO res1_control (h3_index, controller_player_id) VALUES (?, ?)', [h3Index, 'human']);
+  dbRun('UPDATE res_s_infrastructure SET seaport_count = 1 WHERE h3_index = ?', [h3Index]);
+  dbRun('INSERT OR REPLACE INTO res_s_control (h3_index, controller_player_id) VALUES (?, ?)', [h3Index, 'human']);
 }
 
 /**
@@ -194,7 +194,7 @@ export function findAirportPairByDistance(
     .map((hex) => {
       const airportCount =
         dbGetOne<{ airportCount: number }>(
-          'SELECT airport_count AS airportCount FROM res1_infrastructure WHERE h3_index = ?',
+          'SELECT airport_count AS airportCount FROM res_s_infrastructure WHERE h3_index = ?',
           [hex.h3Index]
         )?.airportCount ?? 0;
       return airportCount > 0 ? hex.h3Index : null;
@@ -274,7 +274,7 @@ export function findAdjacentHex(state: ReturnType<typeof getGameState>, originH3
  * Exceptions: None.
  */
 export function findAdjacentNonArcticLandHex(state: ReturnType<typeof getGameState>, originH3: string): string | null {
-  const landMass = getRes1LandMassByH3();
+  const landMass = getStrategicLandMassByH3();
   const originHex = state.hexes.find((hex) => hex.h3Index === originH3);
   const originIsWater = originHex?.terrain === 'water';
   for (const hex of state.hexes) {
@@ -301,12 +301,12 @@ export function findAdjacentNonArcticLandHex(state: ReturnType<typeof getGameSta
 export function findWaterHexWithAdjacentLand(state: ReturnType<typeof getGameState>): { waterHex: string; adjacentLandHex: string } | null {
   for (const hex of state.hexes) {
     if (hex.terrain !== 'water') continue;
-    const hasRes4Child =
+    const hasTacticalChild =
       (dbGetOne<{ count: number }>(
-        'SELECT COUNT(*) AS count FROM res4_feature_overrides WHERE parent_h3_index = ?',
+        'SELECT COUNT(*) AS count FROM res_t_feature_overrides WHERE parent_h3_index = ?',
         [hex.h3Index]
       )?.count ?? 0) > 0;
-    if (!hasRes4Child) continue;
+    if (!hasTacticalChild) continue;
     const adjacentLandHex = findAdjacentNonArcticLandHex(state, hex.h3Index);
     if (!adjacentLandHex) continue;
     return { waterHex: hex.h3Index, adjacentLandHex };

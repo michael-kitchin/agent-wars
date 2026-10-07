@@ -1,5 +1,5 @@
 /**
- * Pure construction of air ferry hover preview payloads for tactical (res4) battles.
+ * Pure construction of air ferry hover preview payloads for tactical battles.
  *
  * Purpose: Mirrors strategic air ferry preview geometry without calling strategic IPC march preview.
  * When to use: Renderer `refreshHoverRoutePreview` when all selected human sub-units are air and ranged/strike modes are off.
@@ -41,7 +41,7 @@ function invalidPreview(reason: string, showMarker = true): HumanOrderPreviewRes
 }
 
 /**
- * Builds a valid straight-segment ferry preview between two res4 cell origins and destinations.
+ * Builds a valid straight-segment ferry preview between two tactical cell origins and destinations.
  *
  * Purpose: Mirrors strategic air ferry preview geometry for tactical hover line drawing.
  * When to use: After successful tactical ferry validation when origin and destination differ.
@@ -88,7 +88,7 @@ export function buildTacticalMixedAirNonAirHoverEnvelope(unitIds: readonly strin
 }
 
 /**
- * Builds a grouped air ferry hover preview for selected tactical air sub-units toward a hovered res4 cell.
+ * Builds a grouped air ferry hover preview for selected tactical air sub-units toward a hovered tactical cell.
  *
  * Purpose: Supplies march-branch hover drawing with straight origin→destination segments after main-process ferry validation.
  * When to use: Tactical `refreshHoverRoutePreview` when every selected human sub-unit is air and ferry validation has completed.

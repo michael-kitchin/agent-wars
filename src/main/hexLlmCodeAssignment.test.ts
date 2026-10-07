@@ -3,15 +3,15 @@
  *
  * Purpose: Ensures the shared module used by renderer tooltip badges stays aligned with briefing/tool code paths.
  * When to use: `npm test` after edits to either module.
- * Expected outcome: Strategic maps match; per-parent res4 codes match tactical registry rows.
+ * Expected outcome: Strategic maps match; per-parent tactical codes match tactical registry rows.
  * Exceptions: None.
  */
 
 import * as assert from 'assert';
 import { cellToChildren } from 'h3-js';
 import {
-  buildStrategicRes1H3ToCodeMap,
-  getRes4ChildCodeWithinParent,
+  buildStrategicH3ToCodeMap,
+  getTacticalChildCodeWithinParent,
   sortCellsForStableLlmCodes,
 } from '../shared/hexLlmCodeAssignment';
 import {
@@ -27,35 +27,35 @@ const STRATEGIC_CTX = { mode: 'strategic' as const };
  *
  * Purpose: Guards against drift after refactors that touch one path but not the other.
  * When to use: Default suite entry below.
- * Expected outcome: Pairwise equality for all res1 cells.
+ * Expected outcome: Pairwise equality for all strategic cells.
  * Exceptions: None.
  */
 function testSharedStrategicMapMatchesHexCoordinates(): void {
   ensureStrategicCoordinateRegistryInitialized();
-  const fromShared = buildStrategicRes1H3ToCodeMap();
+  const fromShared = buildStrategicH3ToCodeMap();
   for (const [h3, code] of fromShared.entries()) {
     assert.strictEqual(getHexCodeForContext(h3, STRATEGIC_CTX), code);
   }
 }
 
 /**
- * Asserts res4 child codes equal those assigned by `initTacticalCoordinateRegistry` for the same parent.
+ * Asserts tactical child codes equal those assigned by `initTacticalCoordinateRegistry` for the same parent.
  *
  * Purpose: Confirms `(XX.YY)` tooltip suffixes use the same `YY` as tactical LLM maps.
  * When to use: Default suite entry below.
- * Expected outcome: Equality for every res4 child under an arbitrary sample parent.
+ * Expected outcome: Equality for every tactical child under an arbitrary sample parent.
  * Exceptions: None.
  */
-function testRes4ChildCodesMatchTacticalRegistry(): void {
+function testChildCodesMatchTacticalRegistry(): void {
   ensureStrategicCoordinateRegistryInitialized();
-  const sample = [...buildStrategicRes1H3ToCodeMap().keys()][0]!;
+  const sample = [...buildStrategicH3ToCodeMap().keys()][0]!;
   const battleId = 'hexLlmCodeAssignment-alignment-test';
   initTacticalCoordinateRegistry(battleId, sample);
   const children = sortCellsForStableLlmCodes(cellToChildren(sample, 4));
   const tacticalCtx = { mode: 'tactical' as const, battleId };
   for (const child of children) {
     assert.strictEqual(
-      getRes4ChildCodeWithinParent(sample, child),
+      getTacticalChildCodeWithinParent(sample, child),
       getHexCodeForContext(child, tacticalCtx),
       `child ${child}`
     );
@@ -64,7 +64,7 @@ function testRes4ChildCodesMatchTacticalRegistry(): void {
 
 function run(): void {
   testSharedStrategicMapMatchesHexCoordinates();
-  testRes4ChildCodesMatchTacticalRegistry();
+  testChildCodesMatchTacticalRegistry();
   console.log('hexLlmCodeAssignment.test.ts passed');
 }
 

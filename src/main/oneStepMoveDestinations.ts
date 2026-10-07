@@ -9,9 +9,9 @@ import { logDebug, logTrace } from './logger';
 import { passabilityAllowsNavalUnit } from '../shared/pipelineTerrain';
 import {
   getLandMassReachableHexes,
-} from '../shared/landTraversalRes1';
+} from '../shared/landTraversalStrategic';
 import { strategicRangeOnState } from './weather/weatherMatch';
-import { getRes1LandMassByH3 } from './terrainClassificationCache';
+import { getStrategicLandMassByH3 } from './terrainClassificationCache';
 import { isEmbarkedLandUnit } from './gameActions/sealift';
 import {
   getNavalStrategicReachableHexes,
@@ -153,7 +153,7 @@ function destCacheBucketForState(
  * Expected outcome: Land units: hexes reachable via land-mass edges within range. Naval: berth/egress BFS within range. Cache hit and miss both log at TRACE.
  * Exceptions: Never throws; pentagon edges fall through to a legacy scan for non-naval water-like types only.
  *
- * Tactical Best Options uses `collectTacticalLegalMoveDestinationRes4Hexes` instead (res4 MP reachability with the same
+ * Tactical Best Options uses `collectTacticalLegalMoveDestinationTacticalHexes` instead (tactical MP reachability with the same
  * “one origin search → list destinations” shape as `getLandMassReachableHexes` here).
  */
 export function getValidDestinations(
@@ -211,13 +211,13 @@ function computeValidDestinations(
     return [...getLandMassReachableHexes({
       originH3: unit.h3Index,
       hexSet,
-      data: getRes1LandMassByH3(),
+      data: getStrategicLandMassByH3(),
       maxDepth: range,
     })];
   }
 
   if (unit.unitType === 'naval') {
-    const lookup = navalLookupForHexState(state, state.hexes, state.res1Infrastructure);
+    const lookup = navalLookupForHexState(state, state.hexes, state.strategicInfrastructure);
     return [...getNavalStrategicReachableHexes({
       originH3: unit.h3Index,
       maxSteps: range,

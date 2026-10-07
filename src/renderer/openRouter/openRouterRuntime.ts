@@ -71,7 +71,7 @@ export function cancelInFlightBackgroundAiRequestForRendererTeardown(logLine: st
 }
 
 /**
- * Cancels an in-flight tactical `requestAiOrders` prefetch when the res4 tactical session is torn down on the renderer.
+ * Cancels an in-flight tactical `requestAiOrders` prefetch when the tactical session is torn down on the renderer.
  *
  * Purpose: Exiting tactical play or reconciling the battle away must cancel main-process work so a late success cannot call `applySuccessfulPrecomputedAiResult` against a null snapshot.
  * When to use: Start of `tacticalReleaseRendererSessionForNewStrategicMatch` and `tacticalReconcileBattleAfterStrategicSnapshot` before clearing `S.tacticalBattleSnapshot`.
@@ -167,7 +167,7 @@ export function syncEventDrivenFromTools(): void {
  * opponent fetches while the enclosing turn stayed in `resolution` (melee intercept → tactical). Event-driven mode
  * must not block tactical-only consultations: opponent draft requests use tactical state, not strategic pending orders.
  * When to use: First gate inside `startBackgroundRequestIfAllowed` after `isWaitingForPrecomputedAiOrders`.
- * Expected outcome: Tactical planning with an active res4 snapshot always permits the fetch; strategic play still
+ * Expected outcome: Tactical planning with an active tactical snapshot always permits the fetch; strategic play still
  * requires `planning` when not in tactical UI.
  * Exceptions: None.
  */

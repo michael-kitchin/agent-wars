@@ -36,9 +36,9 @@ export function tacticalDbFixtureSetStrategicPlanningPhase(): void {
 }
 
 /**
- * Co-locates the given human and opponent parent units on one res1 hex to create a contested cell.
+ * Co-locates the given human and opponent parent units on one strategic hex to create a contested cell.
  *
- * Contract: Updates `units.h3_index` for both ids; does not validate that `targetH3` is res1.
+ * Contract: Updates `units.h3_index` for both ids; does not validate that `targetH3` is strategic.
  * When to use: Tactical placement tests that need both players present in the enclosing hex.
  * Expected outcome: Both units report `h3_index = targetH3` for subsequent snapshot queries.
  * Exceptions: None.
@@ -48,7 +48,7 @@ export function tacticalDbFixtureColocateHumanOpponentUnits(targetH3: string, hu
 }
 
 /**
- * Loads the first human unit (id + res1 hex) and first opponent unit id from the temp strategic DB.
+ * Loads the first human unit (id + strategic hex) and first opponent unit id from the temp strategic DB.
  *
  * Contract: Throws if either seed row is missing; callers must run inside `withTempGameDb`.
  * When to use: Fixture blocks that need stable human/opponent ids without hard-coding fixture rows.
@@ -58,7 +58,7 @@ export function tacticalDbFixtureColocateHumanOpponentUnits(targetH3: string, hu
 export function tacticalDbFixtureLoadDefaultHumanOpponentPlacement(): {
   humanId: string;
   opponentId: string;
-  humanRes1H3: string;
+  humanStrategicH3: string;
 } {
   const human = dbGetOne<{ id: string; h3Index: string }>(
     `SELECT id, h3_index AS h3Index FROM units WHERE player = 'human' LIMIT 1`
@@ -67,25 +67,25 @@ export function tacticalDbFixtureLoadDefaultHumanOpponentPlacement(): {
   if (!human || !opponent) {
     throw new Error('tacticalDbFixtureLoadDefaultHumanOpponentPlacement: missing seed human or opponent unit');
   }
-  return { humanId: human.id, opponentId: opponent.id, humanRes1H3: human.h3Index };
+  return { humanId: human.id, opponentId: opponent.id, humanStrategicH3: human.h3Index };
 }
 
 /**
- * Runs `fn` inside a disposable game DB after planning phase + contested co-location on the human res1 hex.
+ * Runs `fn` inside a disposable game DB after planning phase + contested co-location on the human strategic hex.
  *
  * Contract: Wraps `withTempGameDb`; mutates units/turn_state for the duration of `fn` only.
- * When to use: Tactical integration tests that share the common “both sides on one res1 during planning” prelude.
- * Expected outcome: `fn` receives the res1 target hex and both unit ids used for placement.
+ * When to use: Tactical integration tests that share the common “both sides on one strategic during planning” prelude.
+ * Expected outcome: `fn` receives the strategic target hex and both unit ids used for placement.
  * Exceptions: Propagates errors from `withTempGameDb` or missing seed rows.
  */
 export function tacticalDbFixtureWithTempDbContestedPlanning(
   labelPrefix: string,
-  fn: (ctx: { targetRes1H3: string; humanId: string; opponentId: string }) => void
+  fn: (ctx: { targetStrategicH3: string; humanId: string; opponentId: string }) => void
 ): void {
   withTempGameDb(labelPrefix, () => {
     tacticalDbFixtureSetStrategicPlanningPhase();
-    const { humanId, opponentId, humanRes1H3 } = tacticalDbFixtureLoadDefaultHumanOpponentPlacement();
-    tacticalDbFixtureColocateHumanOpponentUnits(humanRes1H3, humanId, opponentId);
-    fn({ targetRes1H3: humanRes1H3, humanId, opponentId });
+    const { humanId, opponentId, humanStrategicH3 } = tacticalDbFixtureLoadDefaultHumanOpponentPlacement();
+    tacticalDbFixtureColocateHumanOpponentUnits(humanStrategicH3, humanId, opponentId);
+    fn({ targetStrategicH3: humanStrategicH3, humanId, opponentId });
   });
 }

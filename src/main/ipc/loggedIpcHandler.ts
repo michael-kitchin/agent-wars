@@ -15,7 +15,7 @@ export type LoggedIpcMainLike = {
 /**
  * Registers an IPC handler that logs entry, catches failures, and returns a fallback.
  *
- * Purpose: Collapses identical try/catch+logError wrappers for read-only loaders (e.g. res4 overlay IPC).
+ * Purpose: Collapses identical try/catch+logError wrappers for read-only loaders (e.g. tactical overlay IPC).
  * When to use: When a handler’s failure mode is “log and return fallback” with a stable debug label.
  * Expected outcome: Successful invokes return `handler()`; thrown errors log `${logLabel}: failed` and return `fallback`.
  * Exceptions: Does not rethrow; always returns `T`.

@@ -11,7 +11,7 @@ import {
   setGameOver,
 } from '../gameDb';
 import { captureTurnLossNoteFromResolution } from './captureTurnLossNote';
-import { processProductionAfterControlResolution, resolveRes1ControlAfterCombatAndMovement } from './controlAndProduction';
+import { processProductionAfterControlResolution, resolveStrategicControlAfterCombatAndMovement } from './controlAndProduction';
 import { applyTransportOutcomeForRemovedStrategicUnits } from './sealift';
 import type { CombatResolutionResult } from '../combatResolution';
 import { combatDicePlaybackFields } from '../combatDiceRecording';
@@ -209,7 +209,7 @@ export function finalizeReadyTurnAfterMelee(args: FinalizeReadyAfterMeleeArgs): 
     meleeResult.removedUnits
   );
 
-  const controlTransitions = resolveRes1ControlAfterCombatAndMovement(traversedHexesByPlayer);
+  const controlTransitions = resolveStrategicControlAfterCombatAndMovement(traversedHexesByPlayer);
   const baseLossRemovedAir = destroyAirUnitsWithInvalidBase();
   const airStrikeDestroyedFeatures = { urban: 0, airport: 0, seaport: 0 };
   let airStrikeDestroyedBasedAirUnits = 0;

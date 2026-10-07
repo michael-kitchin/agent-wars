@@ -7,7 +7,7 @@ import {
   dbGetOne,
   dbRun,
   isDbReady,
-  getRes1InfrastructureForHex,
+  getStrategicInfrastructureForHex,
 } from '../gameDb';
 import { buildLatLngCoordinateMap } from '../mapData';
 import { logDebug, logError, logTrace } from '../logger';
@@ -322,7 +322,7 @@ export function assignHumanMarchOrder(unitId: string, destinationH3Index: string
     const destinationHex = state.hexes.find((hex) => hex.h3Index === destinationH3Index);
     if (!destinationHex) return { success: false, reason: 'Destination not on map' };
     const destinationTerrain = effectiveHexPassabilityTerrain(destinationHex);
-    const destinationSeaportCount = getRes1InfrastructureForHex(destinationH3Index).seaportCount;
+    const destinationSeaportCount = getStrategicInfrastructureForHex(destinationH3Index).seaportCount;
     logDebug('gameActions assignHumanMarchOrder: destination terrain classification', {
       unitId,
       destinationH3Index,
@@ -383,7 +383,7 @@ export function assignHumanMarchOrders(unitIds: string[], destinationH3Index: st
       return { success: false, reason: 'At least one selected unit is invalid or not human-controlled.' };
     }
     const destinationTerrain = effectiveHexPassabilityTerrain(destinationHex);
-    const destinationSeaportCount = getRes1InfrastructureForHex(destinationH3Index).seaportCount;
+    const destinationSeaportCount = getStrategicInfrastructureForHex(destinationH3Index).seaportCount;
     const sharedMixedTerrain = hexSupportsMixedLandAndNaval({
       ...destinationHex,
       hasSeaport: destinationSeaportCount > 0,
@@ -585,9 +585,9 @@ export function getSealiftStackState(h3Index: string): SealiftStackState {
 }
 
 /**
- * Returns sealift stack UI state for a tactical res4 hex using sub-unit ids from the active tactical snapshot.
+ * Returns sealift stack UI state for a tactical hex using sub-unit ids from the active tactical snapshot.
  *
- * Purpose: Supports stack-callout sealift controls during tactical battles when strategic `getSealiftStackState` does not describe res4 sub-units.
+ * Purpose: Supports stack-callout sealift controls during tactical battles when strategic `getSealiftStackState` does not describe tactical sub-units.
  * When to use: Renderer invokes `game:getTacticalSealiftStackState` while `isTacticalBattleActive()` is true.
  * Expected outcome: Same `SealiftStackState` shape as strategic sealift with tactical sub-unit ids, or an empty section when inactive or outside the footprint.
  * Exceptions: None; delegates to `getTacticalSealiftStackStateForHex` without throwing.

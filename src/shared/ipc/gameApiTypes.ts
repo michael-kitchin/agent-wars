@@ -24,11 +24,11 @@ import type {
 import type {
   HexContinentNamesRequest,
   HexNamingTooltipLineRequest,
-  Res1BaselineUrbanHexCountRow,
-  Res4CityOverlayRow,
-  Res4RoadRailOverlayRow,
-  Res4TransportVectorOverlayRow,
-  Res4TerrainOverrideRow,
+  StrategicBaselineUrbanHexCountRow,
+  TacticalCityOverlayRow,
+  TacticalRoadRailOverlayRow,
+  TacticalTransportVectorOverlayRow,
+  TacticalTerrainOverrideRow,
 } from './terrainHexTypes';
 import type { HumanOrderGroupPreviewResult, HumanOrderPreviewResult, HumanStandingOrderSnapshot } from './humanOrderPreviewTypes';
 import type { OpenRouterModel, RequestAiOrdersResult } from './openRouterTypes';
@@ -120,52 +120,52 @@ export interface GameApi {
    */
 getGameState: () => Promise<GameStateSnapshot>;
     /**
-   * Specifies the contract for the `getRes4TerrainOverrides` member (getRes4TerrainOverrides: () => Promise<Res4TerrainOverrideRow[]>;).
+   * Specifies the contract for the `getTacticalTerrainOverrides` member (getTacticalTerrainOverrides: () => Promise<TacticalTerrainOverrideRow[]>;).
 
-   * Contract: Describes stable behavior for callers of `getRes4TerrainOverrides` in this codebase.
+   * Contract: Describes stable behavior for callers of `getTacticalTerrainOverrides` in this codebase.
    * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-getRes4TerrainOverrides: () => Promise<Res4TerrainOverrideRow[]>;
+getTacticalTerrainOverrides: () => Promise<TacticalTerrainOverrideRow[]>;
     /**
-   * Specifies the contract for the `getRes4CityOverlays` member (getRes4CityOverlays: () => Promise<Res4CityOverlayRow[]>;).
+   * Specifies the contract for the `getTacticalCityOverlays` member (getTacticalCityOverlays: () => Promise<TacticalCityOverlayRow[]>;).
 
-   * Contract: Returns reduced res4 city labels for res4 map overlays; empty when classification cache is unavailable.
+   * Contract: Returns reduced tactical city labels for tactical map overlays; empty when classification cache is unavailable.
    * When to use: Renderer startup hydration alongside terrain overrides.
-   * Expected outcome: Stable rows keyed by res4 `h3Index` with display-ready `label` strings.
+   * Expected outcome: Stable rows keyed by tactical `h3Index` with display-ready `label` strings.
    * Exceptions: None beyond IPC transport failures.
    */
-getRes4CityOverlays: () => Promise<Res4CityOverlayRow[]>;
+getTacticalCityOverlays: () => Promise<TacticalCityOverlayRow[]>;
     /**
-   * Specifies the contract for the `getRes4RoadRailOverlays` member (getRes4RoadRailOverlays: () => Promise<Res4RoadRailOverlayRow[]>;).
+   * Specifies the contract for the `getTacticalRoadRailOverlays` member (getTacticalRoadRailOverlays: () => Promise<TacticalRoadRailOverlayRow[]>;).
 
-   * Contract: Returns parsed road/rail side masks from bundled generated JSON for res4 tactical glyphs.
-   * When to use: Renderer startup hydration when res4 transport/city overlays are needed.
+   * Contract: Returns parsed road/rail side masks from bundled generated JSON for tactical glyphs.
+   * When to use: Renderer startup hydration when tactical transport/city overlays are needed.
    * Expected outcome: Each row carries equal-length boolean masks sized to the parent cell edge count.
    * Exceptions: None beyond IPC transport failures.
    */
-getRes4RoadRailOverlays: () => Promise<Res4RoadRailOverlayRow[]>;
+getTacticalRoadRailOverlays: () => Promise<TacticalRoadRailOverlayRow[]>;
     /**
-   * Specifies the contract for the `getRes4TransportVectorOverlays` member (getRes4TransportVectorOverlays: () => Promise<Res4TransportVectorOverlayRow[]>;).
+   * Specifies the contract for the `getTacticalTransportVectorOverlays` member (getTacticalTransportVectorOverlays: () => Promise<TacticalTransportVectorOverlayRow[]>;).
 
    * Contract: Returns optional display-only WGS84 polylines for Leaflet road/rail overlays (not gameplay transport truth).
    * When to use: Renderer startup hydration to enable vector-based transport drawing when generated data exists.
    * Expected outcome: Empty array when the vector artifact is absent or invalid; otherwise style-tagged route rows.
    * Exceptions: None beyond IPC transport failures.
    */
-getRes4TransportVectorOverlays: () => Promise<Res4TransportVectorOverlayRow[]>;
+getTacticalTransportVectorOverlays: () => Promise<TacticalTransportVectorOverlayRow[]>;
   /**
-   * Returns the generated urban-cell count for each res1 hex that can produce units.
+   * Returns the generated urban-cell count for each strategic hex that can produce units.
    *
    * Contract: Counts come from the terrain classification cache. They do not change when air strikes destroy cities.
-   * When to use: Once per renderer session, beside the static res4 overlay load.
+   * When to use: Once per renderer session, beside the static tactical overlay load.
    * Expected outcome: One row per hex with a positive count. Empty when the cache is not loaded. Hexes that produce nothing are absent.
    * Exceptions: None beyond IPC transport failures. A handler failure returns an empty array.
    */
-  getRes1BaselineUrbanHexCounts: () => Promise<Res1BaselineUrbanHexCountRow[]>;
+  getStrategicBaselineUrbanHexCounts: () => Promise<StrategicBaselineUrbanHexCountRow[]>;
   /**
-   * Returns the structured naming caption (text plus country spans) for a res1 or res4 hex.
+   * Returns the structured naming caption (text plus country spans) for a strategic or tactical hex.
    *
    * Contract: `text` is the plain caption; spans mark headings and country names for flags. `null` when the hex has no naming data.
    * When to use: Hover tooltips, the build popup, and the melee-intercept hex cell, via the renderer's caption cache.
@@ -223,7 +223,7 @@ ready: (payload?: GameReadyIpcPayload) => Promise<ReadyResult>;
 
    * Contract: Completes a turn paused at pre-melee after the human submits Fight or Ignore from the intercept modal.
    * When to use: Only after a successful ready returned `awaitingMeleeDecision`.
-   * Expected outcome: Same completion fields as a normal ready result; Fight may set `tacticalAutoStartRes1H3Index`.
+   * Expected outcome: Same completion fields as a normal ready result; Fight may set `tacticalAutoStartStrategicH3Index`.
    * Exceptions: None.
    */
 resolveMeleeIntercept: (payload: ResolveMeleeInterceptIpcPayload) => Promise<ReadyResult>;
@@ -487,14 +487,14 @@ updateSealiftSlot: (payload: {
    */
 requestAiOrders: (payload?: { enabledToolGroups?: string[] }) => Promise<RequestAiOrdersResult>;
     /**
-   * Specifies the contract for the `startTacticalBattle` member (startTacticalBattle: (payload: { enclosingRes1H3Index: string }) => Promise<StartTacticalBattleIpcResult>;).
+   * Specifies the contract for the `startTacticalBattle` member (startTacticalBattle: (payload: { enclosingStrategicH3Index: string }) => Promise<StartTacticalBattleIpcResult>;).
 
-   * Contract: Starts a milestone-2.1 tactical battle for a contested res1 hex during strategic planning; fails if prerequisites are not met.
+   * Contract: Starts a milestone-2.1 tactical battle for a contested strategic hex during strategic planning; fails if prerequisites are not met.
    * When to use: Renderer invokes this after the player confirms tactical entry from the map overlay.
-   * Expected outcome: On success, returns a tactical snapshot the renderer stores for res4-focused drawing and interaction.
+   * Expected outcome: On success, returns a tactical snapshot the renderer stores for tactical-focused drawing and interaction.
    * Exceptions: None.
    */
-startTacticalBattle: (payload: { enclosingRes1H3Index: string }) => Promise<StartTacticalBattleIpcResult>;
+startTacticalBattle: (payload: { enclosingStrategicH3Index: string }) => Promise<StartTacticalBattleIpcResult>;
     /**
    * Specifies the contract for the `endTacticalBattle` member (endTacticalBattle: () => Promise<EndTacticalBattleIpcResult>;).
 

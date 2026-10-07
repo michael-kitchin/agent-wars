@@ -180,7 +180,7 @@ When this guide and the running app disagree, the app wins until this file is up
 
 ### 3.5 Multi-Resolution and Attention
 
-- **Zoom levels (live):** Strategic res1 and tactical res4. Tactical mode clamps pan/zoom to the footprint. Entry is a map magnifier on contested hexes and/or a Fight/Ignore melee-intercept dialog. Exit restores world bounds.
+- **Zoom levels (live):** Strategic H3 resolution 1 and tactical resolution 4 on the global map. Tactical mode clamps pan/zoom to the footprint. Entry is a map magnifier on contested hexes and/or a Fight/Ignore melee-intercept dialog. Exit restores world bounds.
 - **Attention/focus:** If the game later shows where the player or AI focused attention, use a restrained overlay that doesn’t obscure terrain or units.
 
 ### 3.6 Scenarios, Save/Load, and Onboarding

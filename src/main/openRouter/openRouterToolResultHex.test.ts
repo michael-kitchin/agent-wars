@@ -4,7 +4,7 @@
 
 import * as assert from 'assert';
 import type { CoordinateContext } from '../briefing/map/coordinateContext';
-import { ensureStrategicCoordinateRegistryInitialized, listStrategicRes1H3Indexes } from '../briefing/map/hexCoordinates';
+import { ensureStrategicCoordinateRegistryInitialized, listStrategicH3Indexes } from '../briefing/map/hexCoordinates';
 import { cellToLatLng } from 'h3-js';
 import { encodeOpenRouterToolResultForLlm } from './openRouterToolResultHex';
 
@@ -49,7 +49,7 @@ function makeResolveToH3(hexList: string[]): (lat: number, lng: number) => strin
  */
 function testEncodeAssessUnitReplacesPositionTuples(): void {
   ensureStrategicCoordinateRegistryInitialized();
-  const cells = listStrategicRes1H3Indexes().slice(0, 3);
+  const cells = listStrategicH3Indexes().slice(0, 3);
   assert.ok(cells.length >= 2, 'need strategic cells');
   const resolveToH3 = makeResolveToH3(cells);
   const ll0 = cellToLatLng(cells[0]!);
@@ -82,7 +82,7 @@ function testEncodeAssessUnitReplacesPositionTuples(): void {
  */
 function testEncodeEstimateCombatTargetHexString(): void {
   ensureStrategicCoordinateRegistryInitialized();
-  const cells = listStrategicRes1H3Indexes().slice(0, 2);
+  const cells = listStrategicH3Indexes().slice(0, 2);
   const resolveToH3 = makeResolveToH3(cells);
   const ll = cellToLatLng(cells[0]!);
   const raw = {

@@ -4,21 +4,21 @@
  */
 
 import type { PipelineTerrainKind } from '../shared/pipelineTerrain';
-import type { Res1ProductionContextSnapshot } from '../shared/ipcTypes';
+import type { StrategicProductionContextSnapshot } from '../shared/ipcTypes';
 import type {
-  Res1BaselineUrbanHexCountRow,
-  Res4CityOverlayRow,
-  Res4RoadRailOverlayRow,
-  Res4TransportVectorOverlayRow,
+  StrategicBaselineUrbanHexCountRow,
+  TacticalCityOverlayRow,
+  TacticalRoadRailOverlayRow,
+  TacticalTransportVectorOverlayRow,
 } from '../shared/ipc/terrainHexTypes';
 import type { TerrainClassificationSnapshot } from './terrainClassificationCache';
 import type { HexNamingCaption } from '../shared/hexNamingCaption';
 
 /**
- * Maps res4 override rows into renderer payload rows with `isRubble` defaulted.
- * When to use: `getRes4TerrainOverridesForRenderer` after the cache snapshot is non-null.
+ * Maps tactical override rows into renderer payload rows with `isRubble` defaulted.
+ * When to use: `getTacticalTerrainOverridesForRenderer` after the cache snapshot is non-null.
  */
-export function res4TerrainOverridesRowsForRenderer(
+export function tacticalTerrainOverridesRowsForRenderer(
   snapshot: TerrainClassificationSnapshot
 ): Array<{
   h3Index: string;
@@ -26,7 +26,7 @@ export function res4TerrainOverridesRowsForRenderer(
   isUrban: boolean;
   isRubble?: boolean;
 }> {
-  return snapshot.res4OverrideRows.map((row) => ({ ...row, isRubble: false }));
+  return snapshot.tacticalOverrideRows.map((row) => ({ ...row, isRubble: false }));
 }
 
 /**
@@ -37,35 +37,35 @@ export function hexNamingTooltipLineFromSnapshot(
   snapshot: TerrainClassificationSnapshot,
   payload: { h3Index: string; resolution: 1 | 4 }
 ): HexNamingCaption | null {
-  const captions = payload.resolution === 1 ? snapshot.namingCaptionsRes1ByH3 : snapshot.namingCaptionsRes4ByH3;
+  const captions = payload.resolution === 1 ? snapshot.namingCaptionsStrategicByH3 : snapshot.namingCaptionsTacticalByH3;
   return captions.get(payload.h3Index) ?? null;
 }
 
 /**
- * Copies continent name lists for a res1 hex from the snapshot.
+ * Copies continent name lists for a strategic hex from the snapshot.
  * When to use: `getHexContinentNamesForRenderer` when the cache is loaded.
  */
 export function hexContinentNamesFromSnapshot(
   snapshot: TerrainClassificationSnapshot,
   h3Index: string
 ): string[] {
-  return [...(snapshot.continentNamesRes1ByH3.get(h3Index) ?? [])];
+  return [...(snapshot.continentNamesStrategicByH3.get(h3Index) ?? [])];
 }
 
 /**
- * Lists res1 hexes whose generated urban count can produce units.
+ * Lists strategic hexes whose generated urban count can produce units.
  *
  * Purpose: The renderer classifies tech from this baseline, not from the live count after air strikes.
- * When to use: `getRes1BaselineUrbanHexCountsForRenderer`. Pass null before the cache is loaded.
+ * When to use: `getStrategicBaselineUrbanHexCountsForRenderer`. Pass null before the cache is loaded.
  * Expected outcome: One row per hex with a positive integer count. An empty cache, a blank hex id, or a hex that produces nothing yields no row.
  * Exceptions: None.
  */
-export function res1BaselineUrbanHexCountRowsFromSnapshot(
+export function strategicBaselineUrbanHexCountRowsFromSnapshot(
   snapshot: TerrainClassificationSnapshot | null
-): Res1BaselineUrbanHexCountRow[] {
+): StrategicBaselineUrbanHexCountRow[] {
   if (!snapshot) return [];
-  const rows: Res1BaselineUrbanHexCountRow[] = [];
-  for (const [h3Index, urbanHexCount] of snapshot.urbanHexCountByRes1H3.entries()) {
+  const rows: StrategicBaselineUrbanHexCountRow[] = [];
+  for (const [h3Index, urbanHexCount] of snapshot.urbanHexCountByStrategicH3.entries()) {
     if (!h3Index || !Number.isFinite(urbanHexCount)) continue;
     const count = Math.trunc(urbanHexCount);
     if (count <= 0) continue;
@@ -75,15 +75,15 @@ export function res1BaselineUrbanHexCountRowsFromSnapshot(
 }
 
 /**
- * Builds city overlay rows from reduced res4 labels in the snapshot.
- * When to use: `getRes4CityOverlaysForRenderer`; pass null before load to get an empty list.
+ * Builds city overlay rows from reduced tactical labels in the snapshot.
+ * When to use: `getTacticalCityOverlaysForRenderer`; pass null before load to get an empty list.
  */
-export function res4CityOverlayRowsFromSnapshot(
+export function tacticalCityOverlayRowsFromSnapshot(
   snapshot: TerrainClassificationSnapshot | null
-): Res4CityOverlayRow[] {
+): TacticalCityOverlayRow[] {
   if (!snapshot) return [];
-  const rows: Res4CityOverlayRow[] = [];
-  for (const [h3Index, label] of snapshot.res4CityOverlayByH3.entries()) {
+  const rows: TacticalCityOverlayRow[] = [];
+  for (const [h3Index, label] of snapshot.tacticalCityOverlayByH3.entries()) {
     if (!label) continue;
     rows.push({ h3Index, label });
   }
@@ -92,14 +92,14 @@ export function res4CityOverlayRowsFromSnapshot(
 
 /**
  * Builds road/rail side-mask rows for renderer transport overlays.
- * When to use: `getRes4RoadRailOverlaysForRenderer`; pass null before load to get an empty list.
+ * When to use: `getTacticalRoadRailOverlaysForRenderer`; pass null before load to get an empty list.
  */
-export function res4RoadRailOverlayRowsFromSnapshot(
+export function tacticalRoadRailOverlayRowsFromSnapshot(
   snapshot: TerrainClassificationSnapshot | null
-): Res4RoadRailOverlayRow[] {
+): TacticalRoadRailOverlayRow[] {
   if (!snapshot) return [];
-  const rows: Res4RoadRailOverlayRow[] = [];
-  for (const [h3Index, masks] of snapshot.res4RoadRailOverlayByH3.entries()) {
+  const rows: TacticalRoadRailOverlayRow[] = [];
+  for (const [h3Index, masks] of snapshot.tacticalRoadRailOverlayByH3.entries()) {
     rows.push({
       h3Index,
       roadSides: [...masks.roadSides],
@@ -111,48 +111,48 @@ export function res4RoadRailOverlayRowsFromSnapshot(
 
 /**
  * Clones transport vector overlay rows for renderer consumption.
- * When to use: `getRes4TransportVectorOverlaysForRenderer`; pass null before load to get an empty list.
+ * When to use: `getTacticalTransportVectorOverlaysForRenderer`; pass null before load to get an empty list.
  */
-export function res4TransportVectorOverlayRowsFromSnapshot(
+export function tacticalTransportVectorOverlayRowsFromSnapshot(
   snapshot: TerrainClassificationSnapshot | null
-): Res4TransportVectorOverlayRow[] {
+): TacticalTransportVectorOverlayRow[] {
   if (!snapshot) return [];
-  return snapshot.res4TransportVectorOverlayRows.map((row) => ({
+  return snapshot.tacticalTransportVectorOverlayRows.map((row) => ({
     kind: row.kind,
     points: row.points.map((p) => [p[0], p[1]] as [number, number]),
   }));
 }
 
 /**
- * Builds the res1 production context struct for a parent hex from snapshot counters.
- * When to use: `getRes1ProductionContext` when the cache is loaded.
+ * Builds the strategic production context struct for a parent hex from snapshot counters.
+ * When to use: `getStrategicProductionContext` when the cache is loaded.
  */
-export function res1ProductionContextFromSnapshot(
+export function strategicProductionContextFromSnapshot(
   snapshot: TerrainClassificationSnapshot,
   h3Index: string
-): Res1ProductionContextSnapshot {
+): StrategicProductionContextSnapshot {
   return {
-    urbanHexCount: Math.max(0, snapshot.urbanHexCountByRes1H3.get(h3Index) ?? 0),
-    airportCount: Math.max(0, snapshot.airportCountByRes1H3.get(h3Index) ?? 0),
-    seaportCount: Math.max(0, snapshot.seaportCountByRes1H3.get(h3Index) ?? 0),
+    urbanHexCount: Math.max(0, snapshot.urbanHexCountByStrategicH3.get(h3Index) ?? 0),
+    airportCount: Math.max(0, snapshot.airportCountByStrategicH3.get(h3Index) ?? 0),
+    seaportCount: Math.max(0, snapshot.seaportCountByStrategicH3.get(h3Index) ?? 0),
   };
 }
 
 /**
- * Returns the immutable res1 terrain kind map from a loaded snapshot.
- * When to use: `getTerrainRes1KindsFromCache` after load validation succeeds.
+ * Returns the immutable strategic terrain kind map from a loaded snapshot.
+ * When to use: `getTerrainStrategicKindsFromCache` after load validation succeeds.
  */
-export function terrainRes1KindsFromSnapshot(
+export function terrainStrategicKindsFromSnapshot(
   snapshot: TerrainClassificationSnapshot
 ): ReadonlyMap<string, PipelineTerrainKind> {
-  return snapshot.res1KindByH3;
+  return snapshot.strategicKindByH3;
 }
 
 /**
- * Returns res4 DB seeding feature rows from a loaded snapshot.
- * When to use: `getRes4FeatureRowsForSeeding` after load validation succeeds.
+ * Returns tactical DB seeding feature rows from a loaded snapshot.
+ * When to use: `getTacticalFeatureRowsForSeeding` after load validation succeeds.
  */
-export function res4FeatureRowsForSeedingFromSnapshot(
+export function tacticalFeatureRowsForSeedingFromSnapshot(
   snapshot: TerrainClassificationSnapshot
 ): ReadonlyArray<{
   h3Index: string;
@@ -162,5 +162,5 @@ export function res4FeatureRowsForSeedingFromSnapshot(
   isAirport: boolean;
   isSeaport: boolean;
 }> {
-  return snapshot.res4FeatureRows;
+  return snapshot.tacticalFeatureRows;
 }

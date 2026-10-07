@@ -9,8 +9,8 @@ import type { GameStateSnapshot } from '../gameDb';
 import { getDistanceAndTurns, terrainIsPassableForDomain } from '../pathfinding';
 import type { PassableDomain } from '../pathfinding';
 import { passabilityAllowsNavalUnit } from '../../shared/pipelineTerrain';
-import { landUnitCanOccupyHex } from '../../shared/landTraversalRes1';
-import { getRes1LandMassByH3 } from '../terrainClassificationCache';
+import { landUnitCanOccupyHex } from '../../shared/landTraversalStrategic';
+import { getStrategicLandMassByH3 } from '../terrainClassificationCache';
 import {
   getNavalStrategicDistanceAndTurns,
   navalLookupForHexState,
@@ -147,7 +147,7 @@ function getPathDistanceAndTurns(
     state
   );
   if (unitType === 'naval') {
-    const lookup = navalLookupForHexState(state, state.hexes, state.res1Infrastructure);
+    const lookup = navalLookupForHexState(state, state.hexes, state.strategicInfrastructure);
     return getNavalStrategicDistanceAndTurns({
       originH3,
       destinationH3: destH3,
@@ -158,7 +158,7 @@ function getPathDistanceAndTurns(
     });
   }
   const passableFor: PassableDomain = 'land';
-  const landMass = getRes1LandMassByH3();
+  const landMass = getStrategicLandMassByH3();
   return getDistanceAndTurns(
     originH3,
     destH3,
@@ -557,7 +557,7 @@ function executeAssessHex(
   }
   const terrain = terrainByH3.get(hexH3) ?? 'land';
   const passableBy: string[] = [];
-  if (landUnitCanOccupyHex(hexH3, getRes1LandMassByH3())) passableBy.push('infantry', 'armor');
+  if (landUnitCanOccupyHex(hexH3, getStrategicLandMassByH3())) passableBy.push('infantry', 'armor');
   if (passabilityAllowsNavalUnit(terrain)) passableBy.push('naval');
   if (passableBy.length === 0) passableBy.push('none');
   const unitsAtHex = state.units

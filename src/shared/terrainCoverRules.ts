@@ -8,7 +8,7 @@
  */
 import { escapeHtmlText } from './htmlTextFormatting';
 import { formatStatusIconHtml } from './statusIconHtml';
-import { effectiveRes4TerrainKindString, type TacticalBattleTerrainPick } from './tacticalTerrainCombatModifiers';
+import { effectiveTacticalTerrainKindString, type TacticalBattleTerrainPick } from './tacticalTerrainCombatModifiers';
 import { normalizeDbTerrainKindToTacticalCategory, type TacticalMovementCategory } from './tacticalTerrainMovement';
 
 /**
@@ -133,11 +133,11 @@ export function terrainCoverFor(place: TerrainCoverPlace, shooter: TerrainCoverS
  * Expected outcome: The cell's terrain kind (falling back to the enclosing hex's kind) and its two flags.
  * Exceptions: None.
  */
-export function tacticalCellCoverPlace(battle: TacticalBattleTerrainPick, res4H3: string): TerrainCoverPlace {
+export function tacticalCellCoverPlace(battle: TacticalBattleTerrainPick, tacticalH3: string): TerrainCoverPlace {
   return {
-    terrainKind: effectiveRes4TerrainKindString(battle, res4H3),
-    isUrban: battle.res4IsUrbanByH3?.[res4H3] === true,
-    isRubble: battle.res4IsRubbleByH3?.[res4H3] === true,
+    terrainKind: effectiveTacticalTerrainKindString(battle, tacticalH3),
+    isUrban: battle.tacticalIsUrbanByH3?.[tacticalH3] === true,
+    isRubble: battle.tacticalIsRubbleByH3?.[tacticalH3] === true,
   };
 }
 
@@ -146,15 +146,15 @@ export function tacticalCellCoverPlace(battle: TacticalBattleTerrainPick, res4H3
  *
  * Purpose: Shortcut for battle roll sites that already know the target cell.
  * When to use: Battle air strikes on units and the battle cover lookup.
- * Expected outcome: `terrainCoverFor(tacticalCellCoverPlace(battle, res4H3), shooter)`.
+ * Expected outcome: `terrainCoverFor(tacticalCellCoverPlace(battle, tacticalH3), shooter)`.
  * Exceptions: None.
  */
 export function tacticalCellTerrainCover(
   battle: TacticalBattleTerrainPick,
-  res4H3: string,
+  tacticalH3: string,
   shooter: TerrainCoverShooter
 ): TerrainCover {
-  return terrainCoverFor(tacticalCellCoverPlace(battle, res4H3), shooter);
+  return terrainCoverFor(tacticalCellCoverPlace(battle, tacticalH3), shooter);
 }
 
 /**

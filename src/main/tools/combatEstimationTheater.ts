@@ -323,7 +323,7 @@ export function buildStrategicCombatEstimationTheater(state: GameStateSnapshot):
     originHitBonusAt: createStrategicOriginHitBonusLookup({
       settings: originBonusSettingsFromSnapshot(state),
       units: state.units,
-      countryNameAt: (res1H3Index) => strategicHexCountryNameAt(state, res1H3Index),
+      countryNameAt: (strategicH3Index) => strategicHexCountryNameAt(state, strategicH3Index),
     }),
     techHitBonusAt: createTechHitBonusLookup({
       settings: originBonusSettingsFromSnapshot(state),
@@ -351,7 +351,7 @@ export function buildTacticalCombatEstimationTheater(
     battleId: battle.battleId,
     subUnitCount: battle.subUnits.length,
   });
-  const footprint = new Set(battle.res4ChildH3Indexes);
+  const footprint = new Set(battle.tacticalChildH3Indexes);
   const isExcluded = (u: TacticalSubUnitSnapshot, engagementType: CombatEstimationEngagementType): boolean =>
     engagementType === 'ranged' && tacticalEmbarkedLandExcludedFromRangedInput(battle, battle.subUnits, u);
   const toCombatUnit = (u: TacticalSubUnitSnapshot): CombatUnit => ({

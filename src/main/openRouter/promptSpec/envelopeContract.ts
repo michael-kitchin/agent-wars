@@ -225,7 +225,7 @@ export function buildInvalidOutputRulesClause(gates: EnvelopeGates): string {
       ...shared,
       TACTICAL_STANDING_ORDER_PROHIBITION,
       'memoryUpdates and productionOrders are not accepted this beat.',
-      'Strategic res1 codes are never valid field values this beat.',
+      'Strategic hex codes are never valid field values this beat.',
     ].join(' ');
   }
   return [

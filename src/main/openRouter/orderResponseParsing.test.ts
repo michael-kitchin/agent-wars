@@ -5,7 +5,7 @@
 
 import * as assert from 'assert';
 import { cellToLatLng } from 'h3-js';
-import { ensureStrategicCoordinateRegistryInitialized, listStrategicRes1H3Indexes } from '../briefing/map/hexCoordinates';
+import { ensureStrategicCoordinateRegistryInitialized, listStrategicH3Indexes } from '../briefing/map/hexCoordinates';
 import { buildLatLngCoordinateMap } from '../mapData';
 import type { GameStateSnapshot } from '../gameDb';
 import { dbRun, getGameState } from '../gameDb';
@@ -365,7 +365,7 @@ function testExplicitMoveWhileEmbarkedAutoDebarks(): void {
  */
 function testInfrastructureDestroyedCallbackStoresH3NotBriefingCode(): void {
   ensureStrategicCoordinateRegistryInitialized();
-  const h3 = listStrategicRes1H3Indexes()[0];
+  const h3 = listStrategicH3Indexes()[0];
   assert.ok(h3, 'expected at least one strategic cell');
   const code = h3ToCode(h3, { mode: 'strategic' });
   const compact = parseFixture(

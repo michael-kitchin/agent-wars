@@ -1,12 +1,12 @@
 /**
- * Intact-airport checks for tactical air ferry (res4 cells), matching strategic airport-to-airport ferry.
+ * Intact-airport checks for tactical air ferry (tactical cells), matching strategic airport-to-airport ferry.
  *
  * Purpose: Human hover/assign, apply-phase mutation, and opponent AI validation previously treated every footprint
- * cell as a legal ferry dest when the enclosing res1 had any airport. Strategic ferry requires an intact airport at
- * origin and dest; tactical ferry uses the same airport rule on res4 cells while remaining footprint-bounded.
+ * cell as a legal ferry dest when the enclosing strategic had any airport. Strategic ferry requires an intact airport at
+ * origin and dest; tactical ferry uses the same airport rule on tactical cells while remaining footprint-bounded.
  * When to use: Tactical ferry validation and apply after footprint and air-type checks.
  * Expected outcome: Origin and dest must each be a non-rubble airport cell on the battle snapshot.
- * Exceptions: Does not apply dest-hex ownership (tactical battles are often contested at the enclosing res1).
+ * Exceptions: Does not apply dest-hex ownership (tactical battles are often contested at the enclosing strategic).
  */
 
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
@@ -14,27 +14,27 @@ import { tacticalSubUnitLabelForUserMessage } from '../../shared/unitDisplayName
 import { tacticalLogQuery } from './tacticalLogging';
 
 /**
- * Battle fields needed to decide whether a res4 cell is an intact airport.
+ * Battle fields needed to decide whether a tactical cell is an intact airport.
  *
- * Contract: `res4IsAirportByH3` true means a live airport tile; rubble wins even if the airport flag is still set.
+ * Contract: `tacticalIsAirportByH3` true means a live airport tile; rubble wins even if the airport flag is still set.
  * When to use: Airport helpers that should not require a full snapshot.
  * Expected outcome: Omitted keys mean the cell is not an airport.
  * Exceptions: None.
  */
-export type TacticalFerryAirportBattle = Pick<TacticalBattleSnapshot, 'res4IsAirportByH3' | 'res4IsRubbleByH3'>;
+export type TacticalFerryAirportBattle = Pick<TacticalBattleSnapshot, 'tacticalIsAirportByH3' | 'tacticalIsRubbleByH3'>;
 
 /**
  * True when the cell is an intact (non-rubble) airport tile on the tactical snapshot.
  *
  * Purpose: Shared origin/dest airport test so hover validation, apply, and opponent AI cannot drift.
  * When to use: Before accepting a tactical ferry hop.
- * Expected outcome: True only when `res4IsAirportByH3[h3]` is true and the cell is not rubble.
+ * Expected outcome: True only when `tacticalIsAirportByH3[h3]` is true and the cell is not rubble.
  * Exceptions: Missing maps or omitted keys are not airports.
  */
-export function tacticalRes4CellHasIntactAirport(battle: TacticalFerryAirportBattle, h3: string): boolean {
-  tacticalLogQuery('tacticalRes4CellHasIntactAirport', { h3 });
-  if (battle.res4IsRubbleByH3?.[h3] === true) return false;
-  return battle.res4IsAirportByH3?.[h3] === true;
+export function tacticalCellHasIntactAirport(battle: TacticalFerryAirportBattle, h3: string): boolean {
+  tacticalLogQuery('tacticalCellHasIntactAirport', { h3 });
+  if (battle.tacticalIsRubbleByH3?.[h3] === true) return false;
+  return battle.tacticalIsAirportByH3?.[h3] === true;
 }
 
 /**
@@ -51,10 +51,10 @@ export function tacticalFerryAirportRejectionReason(
   destH3: string
 ): string | null {
   tacticalLogQuery('tacticalFerryAirportRejectionReason', { originH3, destH3 });
-  if (!tacticalRes4CellHasIntactAirport(battle, originH3)) {
+  if (!tacticalCellHasIntactAirport(battle, originH3)) {
     return 'Origin airport is not intact';
   }
-  if (!tacticalRes4CellHasIntactAirport(battle, destH3)) {
+  if (!tacticalCellHasIntactAirport(battle, destH3)) {
     return 'Destination airport is not intact';
   }
   return null;
@@ -71,15 +71,15 @@ export function tacticalFerryAirportRejectionReason(
  * Exceptions: None.
  */
 export function tacticalFerryApplyOutcome(
-  battle: Pick<TacticalBattleSnapshot, 'res4ChildH3Indexes' | 'res4IsAirportByH3' | 'res4IsRubbleByH3'>,
+  battle: Pick<TacticalBattleSnapshot, 'tacticalChildH3Indexes' | 'tacticalIsAirportByH3' | 'tacticalIsRubbleByH3'>,
   originH3: string,
   destH3: string
 ): 'move' | 'stay' | 'destroy' {
   tacticalLogQuery('tacticalFerryApplyOutcome', { originH3, destH3 });
   const destLegal =
-    battle.res4ChildH3Indexes.includes(destH3) && tacticalRes4CellHasIntactAirport(battle, destH3);
+    battle.tacticalChildH3Indexes.includes(destH3) && tacticalCellHasIntactAirport(battle, destH3);
   if (destLegal) return 'move';
-  if (!tacticalRes4CellHasIntactAirport(battle, originH3)) return 'destroy';
+  if (!tacticalCellHasIntactAirport(battle, originH3)) return 'destroy';
   return 'stay';
 }
 
@@ -88,7 +88,7 @@ export function tacticalFerryApplyOutcome(
  *
  * Purpose: Tactical Best Options ferry dests, matching order-time `validateTacticalGroupFerryTarget` dest legality.
  * When to use: After confirming the origin cell is an intact airport; empty when the unit cannot legally ferry.
- * Expected outcome: Every returned cell is a non-rubble airport in `res4ChildH3Indexes`, never the origin.
+ * Expected outcome: Every returned cell is a non-rubble airport in `tacticalChildH3Indexes`, never the origin.
  * Exceptions: None.
  */
 export function collectTacticalLegalFerryDestinationHexes(
@@ -96,16 +96,16 @@ export function collectTacticalLegalFerryDestinationHexes(
   originH3: string
 ): string[] {
   tacticalLogQuery('collectTacticalLegalFerryDestinationHexes', { originH3 });
-  if (!tacticalRes4CellHasIntactAirport(battle, originH3)) return [];
-  return battle.res4ChildH3Indexes.filter(
-    (h3) => h3 !== originH3 && tacticalRes4CellHasIntactAirport(battle, h3)
+  if (!tacticalCellHasIntactAirport(battle, originH3)) return [];
+  return battle.tacticalChildH3Indexes.filter(
+    (h3) => h3 !== originH3 && tacticalCellHasIntactAirport(battle, h3)
   );
 }
 
 /**
  * Validates a grouped tactical ferry target against footprint, air type, owner, and intact airports.
  *
- * Contract: Dest must be in `res4ChildH3Indexes`; each listed sub-unit must be air owned by `attackerPlayer`; origin
+ * Contract: Dest must be in `tacticalChildH3Indexes`; each listed sub-unit must be air owned by `attackerPlayer`; origin
  * and dest must be intact airport cells.
  * When to use: `validateGroupFerryTarget` while a battle is active, and unit tests without a live session.
  * Expected outcome: `{ success: true }` or a labeled `reason` suitable for toasts and hover.
@@ -122,7 +122,7 @@ export function validateTacticalGroupFerryTarget(
     destinationH3Index,
     attackerPlayer,
   });
-  const footprint = new Set(battle.res4ChildH3Indexes);
+  const footprint = new Set(battle.tacticalChildH3Indexes);
   if (!footprint.has(destinationH3Index)) {
     return { success: false, reason: 'Destination is outside the tactical battle.' };
   }

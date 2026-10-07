@@ -1,5 +1,5 @@
 /**
- * Stable res1 H3 fixtures for melee-intercept candidate contract tests.
+ * Stable strategic H3 fixtures for melee-intercept candidate contract tests.
  *
  * Purpose: Avoid repeating magic strings across `meleeInterceptCandidates` tests while keeping coordinates stable.
  * When to use: Import `hexA` / `hexB` from unit tests that assert melee candidate grouping.

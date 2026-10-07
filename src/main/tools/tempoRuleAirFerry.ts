@@ -83,12 +83,12 @@ function createNearestEnemyDistance(
 function collectFriendlyAirBases(state: GameStateSnapshot, playerId: string): string[] {
   logTrace('tempoRuleAirFerry collectFriendlyAirBases', {
     playerId,
-    infrastructureCount: state.res1Infrastructure?.length ?? 0,
+    infrastructureCount: state.strategicInfrastructure?.length ?? 0,
   });
   const controlledByPlayer = new Set(
-    (state.res1Control ?? []).filter((c) => c.controllerPlayerId === playerId).map((c) => c.h3Index)
+    (state.strategicControl ?? []).filter((c) => c.controllerPlayerId === playerId).map((c) => c.h3Index)
   );
-  return (state.res1Infrastructure ?? [])
+  return (state.strategicInfrastructure ?? [])
     .filter((infra) => infra.airportCount > 0 && controlledByPlayer.has(infra.h3Index))
     .map((infra) => infra.h3Index)
     .sort();

@@ -1,4 +1,4 @@
-import { getStrategicRes1HexCode } from '../../shared/hexLlmCodeAssignment';
+import { getStrategicHexCode } from '../../shared/hexLlmCodeAssignment';
 import {
   ALL_BUILD_UNIT_TYPES,
   type BuildQueueTemplateEntry,
@@ -77,7 +77,7 @@ export function toBuildQueueTemplateEntries(
  */
 export function formatSelectedBuildHexCodesHtml(h3Indexes: string[]): string {
   const labels = h3Indexes.map(
-    (h3Index) => `<strong>${escapeBuildPopupHtml(`(${getStrategicRes1HexCode(h3Index) ?? h3Index})`)}</strong>`
+    (h3Index) => `<strong>${escapeBuildPopupHtml(`(${getStrategicHexCode(h3Index) ?? h3Index})`)}</strong>`
   );
   const suffix = ` (${h3Indexes.length} ${h3Indexes.length === 1 ? 'hex' : 'hexes'})`;
   if (labels.length <= 1) return `${labels[0] ?? ''}${suffix}`;

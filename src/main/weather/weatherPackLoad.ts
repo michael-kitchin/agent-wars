@@ -1,5 +1,5 @@
 /**
- * Loads the generated res1 weather pack and answers month questions from it.
+ * Loads the generated strategic weather pack and answers month questions from it.
  *
  * Purpose: Movement, dice, and snapshots share one table of twelve months per hex.
  * When to use: After terrain startup, and whenever a hex's current weather or a birth hex's tags are needed.
@@ -9,7 +9,7 @@
 
 import * as fs from 'fs';
 import { logDebug, logError, logTrace } from '../logger';
-import { resolveTerrainRes1WeatherPath } from '../terrainMetadataPaths';
+import { resolveTerrainStrategicWeatherPath } from '../terrainMetadataPaths';
 import type { WeatherMonthRecord, WeatherState } from '../../shared/weatherBonusTypes';
 import { acclimationTags, calendarMonthIndex } from '../../shared/weatherBonusRules';
 
@@ -26,7 +26,7 @@ const MILD_YEAR: readonly WeatherMonthRecord[] = Object.freeze(
 );
 
 /**
- * Parsed years keyed by res1 index.
+ * Parsed years keyed by strategic index.
  *
  * Purpose: Avoids rereading the pack on every order check.
  * When to use: Set by `ensureWeatherPackLoaded`.
@@ -76,7 +76,7 @@ export function ensureWeatherPackLoaded(): ReadonlyMap<string, readonly WeatherM
 function readWeatherPack(): ReadonlyMap<string, readonly WeatherMonthRecord[]> {
   if (yearsByHex) return yearsByHex;
   try {
-    const filePath = resolveTerrainRes1WeatherPath();
+    const filePath = resolveTerrainStrategicWeatherPath();
     const parsed = JSON.parse(fs.readFileSync(filePath, 'utf8')) as { records?: unknown };
     if (!Array.isArray(parsed.records)) {
       throw new Error('terrain_res1_weather.json has no records array');
@@ -113,7 +113,7 @@ export function resetWeatherPackCacheForTests(): void {
 }
 
 /**
- * Returns the twelve classified months for one res1 hex.
+ * Returns the twelve classified months for one strategic hex.
  *
  * Purpose: Acclimation and the current month both start from this year.
  * When to use: When the hex may be missing from the pack.

@@ -24,13 +24,13 @@ type LeafletMapLike = {
 /**
  * Tightens Leaflet pan/zoom limits to the tactical footprint and animates a zoomed-in view.
  *
- * Purpose: Frames the res4 battle area when entering tactical mode from strategic.
- * When to use: After a tactical battle session starts and child res4 indexes are known.
+ * Purpose: Frames the tactical battle area when entering tactical mode from strategic.
+ * When to use: After a tactical battle session starts and child tactical indexes are known.
  * Expected outcome: Map flies/fits to the tactical bounds, min/max zoom are adjusted,
  * and planning chrome toasts are dismissed once at entry (hide only; later shows still work).
  * Exceptions: No-ops when the Leaflet map, global, fitBounds, or bounds are unavailable.
  */
-export function enterTacticalMapView(childRes4H3Indexes: string[]): void {
+export function enterTacticalMapView(childTacticalH3Indexes: string[]): void {
   const map = getMainLeafletMap() as LeafletMapLike | null;
   const L = getLeafletGlobal() as
     | {
@@ -44,7 +44,7 @@ export function enterTacticalMapView(childRes4H3Indexes: string[]): void {
   let maxLat = -90;
   let minLng = 180;
   let maxLng = -180;
-  for (const h3 of childRes4H3Indexes) {
+  for (const h3 of childTacticalH3Indexes) {
     const boundary = getHexBoundaryLatLngForLeafletOverlay(h3);
     for (const [lat, lng] of boundary) {
       if (lat < minLat) minLat = lat;

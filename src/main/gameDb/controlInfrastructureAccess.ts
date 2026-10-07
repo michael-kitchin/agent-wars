@@ -6,25 +6,25 @@ import {
   getBuildProgressPointsForHex as getBuildProgressPointsForHexFromModule,
   getKeepBuildingForHex as getKeepBuildingForHexFromModule,
   getHexController as getHexControllerFromModule,
-  getRes1InfrastructureForHex as getRes1InfrastructureForHexFromModule,
-  getRes4TerrainOverridesForRendererFromGame as getRes4TerrainOverridesForRendererFromGameFromModule,
-  ensureRes1InfrastructureSyncTriggers as ensureRes1InfrastructureSyncTriggersFromModule,
+  getStrategicInfrastructureForHex as getStrategicInfrastructureForHexFromModule,
+  getTacticalTerrainOverridesForRendererFromGame as getTacticalTerrainOverridesForRendererFromGameFromModule,
+  ensureStrategicInfrastructureSyncTriggers as ensureStrategicInfrastructureSyncTriggersFromModule,
   listAllHexControls as listAllHexControlsFromModule,
   listBuildQueueRowsForHex as listBuildQueueRowsForHexFromModule,
-  listRes1InfrastructureRows as listRes1InfrastructureRowsFromModule,
-  listRes4FeatureOverridesForGame as listRes4FeatureOverridesForGameFromModule,
-  reconcileRes1InfrastructureCountsFromRes4Overrides as reconcileRes1InfrastructureCountsFromRes4OverridesFromModule,
+  listStrategicInfrastructureRows as listStrategicInfrastructureRowsFromModule,
+  listTacticalFeatureOverridesForGame as listTacticalFeatureOverridesForGameFromModule,
+  reconcileStrategicInfrastructureCountsFromTacticalOverrides as reconcileStrategicInfrastructureCountsFromTacticalOverridesFromModule,
   replaceBuildQueueForHex as replaceBuildQueueForHexFromModule,
   setBuildProgressPointsForHex as setBuildProgressPointsForHexFromModule,
   setKeepBuildingForHex as setKeepBuildingForHexFromModule,
   setHexController as setHexControllerFromModule,
-  setRes1InfrastructureForHex as setRes1InfrastructureForHexFromModule,
-  insertRes4FeatureOverrideRubbleRow as insertRes4FeatureOverrideRubbleRowFromModule,
-  updateRes4FeatureOverrideRow as updateRes4FeatureOverrideRowFromModule,
+  setStrategicInfrastructureForHex as setStrategicInfrastructureForHexFromModule,
+  insertTacticalFeatureOverrideRubbleRow as insertTacticalFeatureOverrideRubbleRowFromModule,
+  updateTacticalFeatureOverrideRow as updateTacticalFeatureOverrideRowFromModule,
   type BuildQueueRow,
   type HexControlRow,
-  type Res1InfrastructureRow,
-  type Res4FeatureOverrideRow,
+  type StrategicInfrastructureRow,
+  type TacticalFeatureOverrideRow,
 } from './controlInfrastructure';
 
 /**
@@ -64,10 +64,10 @@ export function listAllHexControls(): HexControlRow[] {
 }
 
 /**
- * Returns every strategic res1 hex’s current controller as a map keyed by H3 index.
+ * Returns every strategic hex’s current controller as a map keyed by H3 index.
  *
  * Purpose: Avoid repeating `new Map(listAllHexControls().map(...))` at call sites that need bulk control lookups.
- * When to use: Whenever resolution reads many hex controllers from `res1_control` in one pass (win checks, control resolution snapshots).
+ * When to use: Whenever resolution reads many hex controllers from `res_s_control` in one pass (win checks, control resolution snapshots).
  * Expected outcome: A new map per call; values mirror `controller_player_id` (including null when unset).
  * Exceptions: None.
  */
@@ -168,84 +168,84 @@ export function replaceBuildQueueForHex(h3Index: string, entries: Array<{ unitTy
 }
 
 /**
- * Defines the `getRes1InfrastructureForHex` function shape (export function getRes1InfrastructureForHex(h3Index: string): Res1InfrastructureRow).
+ * Defines the `getStrategicInfrastructureForHex` function shape (export function getStrategicInfrastructureForHex(h3Index: string): StrategicInfrastructureRow).
 
- * Purpose: Supports maintainability by documenting why `getRes1InfrastructureForHex` exists.
+ * Purpose: Supports maintainability by documenting why `getStrategicInfrastructureForHex` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function getRes1InfrastructureForHex(h3Index: string): Res1InfrastructureRow {
-  return getRes1InfrastructureForHexFromModule(gameDbOps, h3Index);
+export function getStrategicInfrastructureForHex(h3Index: string): StrategicInfrastructureRow {
+  return getStrategicInfrastructureForHexFromModule(gameDbOps, h3Index);
 }
 
 /**
- * Sums persisted res4 urban cell counts (aggregated per res1 hex) over a list of strategic hex ids.
+ * Sums persisted tactical urban cell counts (aggregated per strategic hex) over a list of strategic hex ids.
  *
  * Purpose: Single place for region-scale urban totals used by victory rules and any future analytics.
- * When to use: Pass the full res1 hex list for a home region or other bounded set.
- * Expected outcome: Non-negative integer equal to the sum of each hex’s `urbanHexCount` from `res1_infrastructure`.
+ * When to use: Pass the full strategic hex list for a home region or other bounded set.
+ * Expected outcome: Non-negative integer equal to the sum of each hex’s `urbanHexCount` from `res_s_infrastructure`.
  * Exceptions: None.
  */
 export function sumUrbanHexCountForHexes(hexIds: readonly string[]): number {
   logTrace('gameDb sumUrbanHexCountForHexes', { hexCount: hexIds.length });
   let sum = 0;
   for (const h3Index of hexIds) {
-    sum += getRes1InfrastructureForHex(h3Index).urbanHexCount;
+    sum += getStrategicInfrastructureForHex(h3Index).urbanHexCount;
   }
   return sum;
 }
 
 /**
- * Defines the `listRes1InfrastructureRows` function shape (export function listRes1InfrastructureRows(): Res1InfrastructureRow[]).
+ * Defines the `listStrategicInfrastructureRows` function shape (export function listStrategicInfrastructureRows(): StrategicInfrastructureRow[]).
 
- * Purpose: Supports maintainability by documenting why `listRes1InfrastructureRows` exists.
+ * Purpose: Supports maintainability by documenting why `listStrategicInfrastructureRows` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function listRes1InfrastructureRows(): Res1InfrastructureRow[] {
-  return listRes1InfrastructureRowsFromModule(gameDbOps);
+export function listStrategicInfrastructureRows(): StrategicInfrastructureRow[] {
+  return listStrategicInfrastructureRowsFromModule(gameDbOps);
 }
 
 /**
- * Defines the `setRes1InfrastructureForHex` function shape (export function setRes1InfrastructureForHex().
+ * Defines the `setStrategicInfrastructureForHex` function shape (export function setStrategicInfrastructureForHex().
 
- * Purpose: Supports maintainability by documenting why `setRes1InfrastructureForHex` exists.
+ * Purpose: Supports maintainability by documenting why `setStrategicInfrastructureForHex` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function setRes1InfrastructureForHex(
+export function setStrategicInfrastructureForHex(
   h3Index: string,
   counts: { urbanHexCount: number; airportCount: number; seaportCount: number }
 ): void {
-  setRes1InfrastructureForHexFromModule(gameDbOps, h3Index, counts);
+  setStrategicInfrastructureForHexFromModule(gameDbOps, h3Index, counts);
 }
 
 /**
- * Defines the `listRes4FeatureOverridesForGame` function shape (export function listRes4FeatureOverridesForGame(): Res4FeatureOverrideRow[]).
+ * Defines the `listTacticalFeatureOverridesForGame` function shape (export function listTacticalFeatureOverridesForGame(): TacticalFeatureOverrideRow[]).
 
- * Purpose: Supports maintainability by documenting why `listRes4FeatureOverridesForGame` exists.
+ * Purpose: Supports maintainability by documenting why `listTacticalFeatureOverridesForGame` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function listRes4FeatureOverridesForGame(): Res4FeatureOverrideRow[] {
-  return listRes4FeatureOverridesForGameFromModule(gameDbOps);
+export function listTacticalFeatureOverridesForGame(): TacticalFeatureOverrideRow[] {
+  return listTacticalFeatureOverridesForGameFromModule(gameDbOps);
 }
 
 /**
- * Defines the `reconcileRes1InfrastructureCountsFromRes4Overrides` function shape (export function reconcileRes1InfrastructureCountsFromRes4Overrides(): { changedHexCount: number } { logDebug('gameDb reconcileRes1InfrastructureCountsFromRes).
+ * Defines the `reconcileStrategicInfrastructureCountsFromTacticalOverrides` function shape (export function reconcileStrategicInfrastructureCountsFromTacticalOverrides(): { changedHexCount: number } { logDebug('gameDb reconcileStrategicInfrastructureCountsFromRes).
 
- * Purpose: Supports maintainability by documenting why `reconcileRes1InfrastructureCountsFromRes4Overrides` exists.
+ * Purpose: Supports maintainability by documenting why `reconcileStrategicInfrastructureCountsFromTacticalOverrides` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function reconcileRes1InfrastructureCountsFromRes4Overrides(): { changedHexCount: number } {
+export function reconcileStrategicInfrastructureCountsFromTacticalOverrides(): { changedHexCount: number } {
   logDebug('gameDb reconcileRes1InfrastructureCountsFromRes4Overrides');
-  return reconcileRes1InfrastructureCountsFromRes4OverridesFromModule(gameDbOps);
+  return reconcileStrategicInfrastructureCountsFromTacticalOverridesFromModule(gameDbOps);
 }
 
 /**
@@ -257,63 +257,63 @@ export function reconcileRes1InfrastructureCountsFromRes4Overrides(): { changedH
  * Exceptions: None.
  */
 export function runInfrastructureStartupConsistencyPass(options?: { includeReconciliation?: boolean }): void {
-  ensureRes1InfrastructureSyncTriggers();
+  ensureStrategicInfrastructureSyncTriggers();
   if (options?.includeReconciliation === false) return;
-  reconcileRes1InfrastructureCountsFromRes4Overrides();
+  reconcileStrategicInfrastructureCountsFromTacticalOverrides();
 }
 
 /**
- * Defines the `ensureRes1InfrastructureSyncTriggers` function shape (export function ensureRes1InfrastructureSyncTriggers(): void).
+ * Defines the `ensureStrategicInfrastructureSyncTriggers` function shape (export function ensureStrategicInfrastructureSyncTriggers(): void).
 
- * Purpose: Supports maintainability by documenting why `ensureRes1InfrastructureSyncTriggers` exists.
+ * Purpose: Supports maintainability by documenting why `ensureStrategicInfrastructureSyncTriggers` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function ensureRes1InfrastructureSyncTriggers(): void {
-  ensureRes1InfrastructureSyncTriggersFromModule(gameDbOps);
+export function ensureStrategicInfrastructureSyncTriggers(): void {
+  ensureStrategicInfrastructureSyncTriggersFromModule(gameDbOps);
 }
 
 /**
- * Defines the `insertRes4FeatureOverrideRubbleRow` function shape (export function insertRes4FeatureOverrideRubbleRow(args: { h3Index: string; parentH3Index: string; terrainKind: string }): void).
+ * Defines the `insertTacticalFeatureOverrideRubbleRow` function shape (export function insertTacticalFeatureOverrideRubbleRow(args: { h3Index: string; parentH3Index: string; terrainKind: string }): void).
  *
  * Purpose: Exposes transport-only tactical rubble persistence at the game DB facade.
- * When to use: `applyTacticalRangedRubbleToRes4Cell` when no override row exists yet for the res4 cell.
- * Expected outcome: Delegates to `controlInfrastructure.insertRes4FeatureOverrideRubbleRow` with the live connection bundle (which emits debug logs).
+ * When to use: `applyTacticalRangedRubbleToTacticalCell` when no override row exists yet for the tactical cell.
+ * Expected outcome: Delegates to `controlInfrastructure.insertTacticalFeatureOverrideRubbleRow` with the live connection bundle (which emits debug logs).
  * Exceptions: None; SQLite errors surface to callers that wrap in try/catch.
  */
-export function insertRes4FeatureOverrideRubbleRow(args: {
+export function insertTacticalFeatureOverrideRubbleRow(args: {
   h3Index: string;
   parentH3Index: string;
   terrainKind: string;
 }): void {
-  insertRes4FeatureOverrideRubbleRowFromModule(gameDbOps, args);
+  insertTacticalFeatureOverrideRubbleRowFromModule(gameDbOps, args);
 }
 
 /**
- * Defines the `updateRes4FeatureOverrideRow` function shape (export function updateRes4FeatureOverrideRow( h3Index: string, patch: Partial<Pick<Res4FeatureOverrideRow, 'isUrban' | 'isAirport' | 'isSeaport' | 'isRubb).
+ * Defines the `updateTacticalFeatureOverrideRow` function shape (export function updateTacticalFeatureOverrideRow( h3Index: string, patch: Partial<Pick<TacticalFeatureOverrideRow, 'isUrban' | 'isAirport' | 'isSeaport' | 'isRubb).
 
- * Purpose: Supports maintainability by documenting why `updateRes4FeatureOverrideRow` exists.
+ * Purpose: Supports maintainability by documenting why `updateTacticalFeatureOverrideRow` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function updateRes4FeatureOverrideRow(
+export function updateTacticalFeatureOverrideRow(
   h3Index: string,
-  patch: Partial<Pick<Res4FeatureOverrideRow, 'isUrban' | 'isAirport' | 'isSeaport' | 'isRubble'>>
+  patch: Partial<Pick<TacticalFeatureOverrideRow, 'isUrban' | 'isAirport' | 'isSeaport' | 'isRubble'>>
 ): void {
-  updateRes4FeatureOverrideRowFromModule(gameDbOps, h3Index, patch);
+  updateTacticalFeatureOverrideRowFromModule(gameDbOps, h3Index, patch);
 }
 
 /**
- * Defines the `getRes4TerrainOverridesForRendererFromGame` function shape (export function getRes4TerrainOverridesForRendererFromGame(): Array<).
+ * Defines the `getTacticalTerrainOverridesForRendererFromGame` function shape (export function getTacticalTerrainOverridesForRendererFromGame(): Array<).
 
- * Purpose: Supports maintainability by documenting why `getRes4TerrainOverridesForRendererFromGame` exists.
+ * Purpose: Supports maintainability by documenting why `getTacticalTerrainOverridesForRendererFromGame` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-export function getRes4TerrainOverridesForRendererFromGame(): Array<{
+export function getTacticalTerrainOverridesForRendererFromGame(): Array<{
   h3Index: string;
   terrainKind: string;
   isUrban: boolean;
@@ -321,5 +321,5 @@ export function getRes4TerrainOverridesForRendererFromGame(): Array<{
   isSeaport?: boolean;
   isRubble?: boolean;
 }> {
-  return getRes4TerrainOverridesForRendererFromGameFromModule(gameDbOps);
+  return getTacticalTerrainOverridesForRendererFromGameFromModule(gameDbOps);
 }

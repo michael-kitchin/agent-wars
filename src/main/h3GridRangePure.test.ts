@@ -53,7 +53,7 @@ function testComputeGridDistancePureMatchesDirectH3(): void {
  * Expected outcome: A pair where `gridPathCells` throws.
  * Exceptions: Fails the assertion when no such pair exists.
  */
-function res4PairWhereGridPathCellsThrows(): [string, string] {
+function tacticalPairWhereGridPathCellsThrows(): [string, string] {
   for (const pentagon of getPentagons(4)) {
     const children = cellToChildren(cellToParent(pentagon, 1), 4);
     for (let i = 0; i < children.length; i++) {
@@ -84,7 +84,7 @@ function testComputeGridPathCellsPureCoversFaceCrossings(): void {
   assert.deepStrictEqual(computeGridPathCellsPure(origin, origin), [origin]);
   assert.strictEqual(computeGridDistanceWithPathFallbackPure(origin, origin), 0);
 
-  const [crossFrom, crossTo] = res4PairWhereGridPathCellsThrows();
+  const [crossFrom, crossTo] = tacticalPairWhereGridPathCellsThrows();
   assert.strictEqual(computeGridDistancePure(crossFrom, crossTo), null, 'fixture must be an unmeasurable pair');
   const path = computeGridPathCellsPure(crossFrom, crossTo);
   assert.ok(path !== null, 'face-crossing pair must still yield a path');

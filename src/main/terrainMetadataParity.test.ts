@@ -9,17 +9,17 @@ import type { PipelineTerrainKind } from '../shared/pipelineTerrain';
 import {
   clearTerrainClassificationCacheForTests,
   ensureTerrainClassificationCacheLoaded,
-  getRes4TerrainOverridesForRenderer,
+  getTacticalTerrainOverridesForRenderer,
 } from './terrainClassificationCache';
 import {
   DEFAULT_CLASSIFIER_THRESHOLDS,
   DEFAULT_NODATA_FALLBACK_TERRAIN,
-  loadTerrainRes1MetadataBundled,
-  loadTerrainRes4MetadataBundled,
+  loadTerrainStrategicMetadataBundled,
+  loadTerrainTacticalMetadataBundled,
 } from './terrainMetadataLoad';
 import { classifyCellWithoutUrbanOverride } from './terrainClassifierFromMetadata';
-import { parseTerrainRes1CsvText } from './terrainRes1Csv';
-import { parseTerrainRes4ExceptionsCsvText, resolveTerrainRes4ExceptionsCsvPath } from './terrainRes4Csv';
+import { parseTerrainStrategicCsvText } from './terrainStrategicCsv';
+import { parseTerrainTacticalExceptionsCsvText, resolveTerrainTacticalExceptionsCsvPath } from './terrainTacticalCsv';
 
 /**
  * Documents the module-scope binding `PARITY_MIN` (PARITY_MIN).
@@ -32,14 +32,14 @@ import { parseTerrainRes4ExceptionsCsvText, resolveTerrainRes4ExceptionsCsvPath 
 const PARITY_MIN = 0.99;
 
 /**
- * Defines the `res1CsvPath` function shape (function res1CsvPath(): string).
+ * Defines the `strategicCsvPath` function shape (function strategicCsvPath(): string).
 
- * Purpose: Supports maintainability by documenting why `res1CsvPath` exists.
+ * Purpose: Supports maintainability by documenting why `strategicCsvPath` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-function res1CsvPath(): string {
+function strategicCsvPath(): string {
   return path.join(process.cwd(), 'data', 'generated', 'terrain_res1_base.csv');
 }
 
@@ -56,27 +56,27 @@ function parityRatio(matches: number, total: number): number {
 }
 
 /**
- * Defines the `testRes1MetadataVsCsvParity` function shape (function testRes1MetadataVsCsvParity(): void).
+ * Defines the `testStrategicMetadataVsCsvParity` function shape (function testStrategicMetadataVsCsvParity(): void).
 
- * Purpose: Supports maintainability by documenting why `testRes1MetadataVsCsvParity` exists.
+ * Purpose: Supports maintainability by documenting why `testStrategicMetadataVsCsvParity` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-function testRes1MetadataVsCsvParity(): void {
-  if (!fs.existsSync(res1CsvPath())) {
+function testStrategicMetadataVsCsvParity(): void {
+  if (!fs.existsSync(strategicCsvPath())) {
     console.log('terrainMetadataParity.test: skipped res1 parity (terrain_res1_base.csv missing)');
     return;
   }
-  const env = loadTerrainRes1MetadataBundled();
+  const env = loadTerrainStrategicMetadataBundled();
   const nodata = DEFAULT_NODATA_FALLBACK_TERRAIN;
   const t = DEFAULT_CLASSIFIER_THRESHOLDS;
   const tsMap = new Map<string, PipelineTerrainKind>();
   for (const row of env.records) {
     tsMap.set(row.h3_index, classifyCellWithoutUrbanOverride(row, t, nodata));
   }
-  const csvText = fs.readFileSync(res1CsvPath(), 'utf8');
-  const csvMap = parseTerrainRes1CsvText(csvText);
+  const csvText = fs.readFileSync(strategicCsvPath(), 'utf8');
+  const csvMap = parseTerrainStrategicCsvText(csvText);
   let matches = 0;
   let total = 0;
   for (const [h3, csvKind] of csvMap) {
@@ -92,27 +92,27 @@ function testRes1MetadataVsCsvParity(): void {
 }
 
 /**
- * Defines the `testRes4OverridesVsCsvParity` function shape (function testRes4OverridesVsCsvParity(): void).
+ * Defines the `testTacticalOverridesVsCsvParity` function shape (function testTacticalOverridesVsCsvParity(): void).
 
- * Purpose: Supports maintainability by documenting why `testRes4OverridesVsCsvParity` exists.
+ * Purpose: Supports maintainability by documenting why `testTacticalOverridesVsCsvParity` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
  * Exceptions: None.
  */
-function testRes4OverridesVsCsvParity(): void {
+function testTacticalOverridesVsCsvParity(): void {
   let csvPath = '';
   try {
-    csvPath = resolveTerrainRes4ExceptionsCsvPath();
+    csvPath = resolveTerrainTacticalExceptionsCsvPath();
   } catch {
     console.log('terrainMetadataParity.test: skipped res4 parity (terrain_res4_exceptions.csv missing)');
     return;
   }
-  const env = loadTerrainRes4MetadataBundled();
+  const env = loadTerrainTacticalMetadataBundled();
   assert.ok(env.record_count > 0, 'terrainMetadataParity: terrain_res4_metadata.json has no records');
   clearTerrainClassificationCacheForTests();
   ensureTerrainClassificationCacheLoaded();
-  const csvMap = parseTerrainRes4ExceptionsCsvText(fs.readFileSync(csvPath, 'utf8'));
-  const tsRows = getRes4TerrainOverridesForRenderer();
+  const csvMap = parseTerrainTacticalExceptionsCsvText(fs.readFileSync(csvPath, 'utf8'));
+  const tsRows = getTacticalTerrainOverridesForRenderer();
   const tsMap = new Map(tsRows.map((r) => [r.h3Index, (r.isUrban ? 'urban' : r.terrainKind)] as const));
   let matches = 0;
   let total = 0;
@@ -136,8 +136,8 @@ function testRes4OverridesVsCsvParity(): void {
  * Exceptions: None.
  */
 function main(): void {
-  testRes1MetadataVsCsvParity();
-  testRes4OverridesVsCsvParity();
+  testStrategicMetadataVsCsvParity();
+  testTacticalOverridesVsCsvParity();
   console.log('terrainMetadataParity.test: ok');
 }
 

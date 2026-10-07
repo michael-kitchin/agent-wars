@@ -125,7 +125,7 @@ function testMissingLevelRowsReadAsLow(): void {
  * Locks that hex country names appear on the snapshot only with the country bonus on.
  *
  * Purpose: With both flags off the snapshot must stay unchanged; with the country bonus on, hexes need a country to judge units by.
- * When to use: After changing snapshot hex assembly or the res1 majority-country cache.
+ * When to use: After changing snapshot hex assembly or the strategic majority-country cache.
  * Expected outcome: On, at least one hex has a non-null `countryName`; off, no hex has the property.
  * Exceptions: None.
  */

@@ -3,7 +3,7 @@
  *
  * Purpose: Locks prompt map scope without coupling to OpenRouter; run via `npm test` after `build:main`.
  * When to use: After changes to `briefingMapSection`, grid projection, or registry selection.
- * Expected outcome: Strategic map includes every res1 code; tactical map includes every res4 code in the battle; fog hides enemy markers when hexes are not visible.
+ * Expected outcome: Strategic map includes every strategic code; tactical map includes every tactical code in the battle; fog hides enemy markers when hexes are not visible.
  * Exceptions: None; failures indicate regressions in briefing map assembly.
  */
 
@@ -13,16 +13,16 @@ import type { GameStateSnapshot } from '../../gameDb';
 import { buildLatLngCoordinateMap } from '../../mapData';
 import type { TacticalBattleSnapshot } from '../../../shared/tacticalBattleTypes';
 import { buildTacticalAiPlanState } from '../../tacticalBattle/buildTacticalAiPlanState';
-import { tacticalRes1Cell, tacticalRes4UnderRes1Corner } from '../../tacticalBattle/testSupport/tacticalRes4HexFixtures';
+import { tacticalParentCell, tacticalUnderCorner } from '../../tacticalBattle/testSupport/tacticalHexFixtures';
 import { buildStrategicOperationalMapSectionMarkdown, buildTacticalOperationalMapSectionMarkdown } from './briefingMapSection';
-import { ensureStrategicCoordinateRegistryInitialized, getHexCodeForContext, initTacticalCoordinateRegistry, listStrategicRes1H3Indexes } from './hexCoordinates';
-import { projectTacticalRes4FootprintToAsciiGrid } from './tacticalAsciiGridProjection';
+import { ensureStrategicCoordinateRegistryInitialized, getHexCodeForContext, initTacticalCoordinateRegistry, listStrategicH3Indexes } from './hexCoordinates';
+import { projectTacticalFootprintToAsciiGrid } from './tacticalAsciiGridProjection';
 
 /**
  * Documents the module-scope binding `STRATEGIC_CTX` (STRATEGIC_CTX).
  *
  * Purpose: Single frozen `CoordinateContext` for strategic registry lookups in this suite.
- * When to use: Calls to `getHexCodeForContext` for res1 cells in assertions.
+ * When to use: Calls to `getHexCodeForContext` for strategic cells in assertions.
  * Expected outcome: Valid strategic coordinate context object.
  * Exceptions: None.
  */
@@ -61,32 +61,32 @@ function collectCodeTokensFromMapAscii(mapString: string): Set<string> {
 }
 
 /**
- * Defines the `testStrategicOperationalMapIncludesAllRes1Codes` function shape.
+ * Defines the `testStrategicOperationalMapIncludesAllStrategicCodes` function shape.
  *
- * Purpose: Regression guard that strategic AI prompts use the full-world res1 set, not a unit viewport.
+ * Purpose: Regression guard that strategic AI prompts use the full-world strategic set, not a unit viewport.
  * When to use: Whenever `buildStrategicOperationalMapSectionMarkdown` extent or registry wiring changes.
- * Expected outcome: Fence map body contains exactly one occurrence worth of every strategic res1 code token.
+ * Expected outcome: Fence map body contains exactly one occurrence worth of every strategic code token.
  * Exceptions: None.
  */
-function testStrategicOperationalMapIncludesAllRes1Codes(): void {
+function testStrategicOperationalMapIncludesAllCodes(): void {
   ensureStrategicCoordinateRegistryInitialized();
-  const res1Unit = latLngToCell(12, 34, 1);
-  const [lat, lng] = cellToLatLng(res1Unit);
+  const strategicUnit = latLngToCell(12, 34, 1);
+  const [lat, lng] = cellToLatLng(strategicUnit);
   const state: GameStateSnapshot = {
-    hexes: [{ h3Index: res1Unit, terrain: 'land', terrainKind: 'plains' }],
-    units: [{ id: 'opp-1', player: 'opponent', unitType: 'infantry', h3Index: res1Unit }],
+    hexes: [{ h3Index: strategicUnit, terrain: 'land', terrainKind: 'plains' }],
+    units: [{ id: 'opp-1', player: 'opponent', unitType: 'infantry', h3Index: strategicUnit }],
     phase: 'planning',
     turnNumber: 1,
     pendingOrders: [],
   };
-  const latLngByH3 = new Map<string, [number, number]>([[res1Unit, [lat, lng]]]);
+  const latLngByH3 = new Map<string, [number, number]>([[strategicUnit, [lat, lng]]]);
   const md = buildStrategicOperationalMapSectionMarkdown({
     state,
     latLngByH3,
   });
   const body = firstFenceBody(md);
   const tokens = collectCodeTokensFromMapAscii(body);
-  const universe = listStrategicRes1H3Indexes();
+  const universe = listStrategicH3Indexes();
   const expectedCodes = new Set(universe.map((h3) => getHexCodeForContext(h3, STRATEGIC_CTX)).filter(Boolean) as string[]);
   assert.strictEqual(tokens.size, expectedCodes.size, 'map should list each strategic code once');
   for (const code of expectedCodes) {
@@ -128,18 +128,18 @@ function testStrategicOperationalMapNoUnitsFallback(): void {
  */
 function testStrategicOperationalMapOmitsBestOptionsHeadingWhenEmpty(): void {
   ensureStrategicCoordinateRegistryInitialized();
-  const res1Human = latLngToCell(-15, 120, 1);
-  const [lat, lng] = cellToLatLng(res1Human);
+  const strategicHuman = latLngToCell(-15, 120, 1);
+  const [lat, lng] = cellToLatLng(strategicHuman);
   const state: GameStateSnapshot = {
-    hexes: [{ h3Index: res1Human, terrain: 'land', terrainKind: 'plains' }],
-    units: [{ id: 'hum-1', player: 'human', unitType: 'infantry', h3Index: res1Human }],
+    hexes: [{ h3Index: strategicHuman, terrain: 'land', terrainKind: 'plains' }],
+    units: [{ id: 'hum-1', player: 'human', unitType: 'infantry', h3Index: strategicHuman }],
     phase: 'planning',
     turnNumber: 1,
     pendingOrders: [],
   };
   const md = buildStrategicOperationalMapSectionMarkdown({
     state,
-    latLngByH3: new Map([[res1Human, [lat, lng]]]),
+    latLngByH3: new Map([[strategicHuman, [lat, lng]]]),
   });
   assert.ok(md.includes('```'), 'expected ASCII map fence when units exist');
   assert.ok(!md.includes('### Unit Roster'), 'strategic omits Unit Roster; Unit Status covers threats');
@@ -156,28 +156,28 @@ function testStrategicOperationalMapOmitsBestOptionsHeadingWhenEmpty(): void {
  */
 function testStrategicFogHidesEnemyMarkersOnMap(): void {
   ensureStrategicCoordinateRegistryInitialized();
-  const res1Ai = latLngToCell(5, 10, 1);
-  const res1Human = latLngToCell(-15, 120, 1);
+  const strategicAi = latLngToCell(5, 10, 1);
+  const strategicHuman = latLngToCell(-15, 120, 1);
   const latLngByH3 = new Map<string, [number, number]>();
-  for (const h3 of [res1Ai, res1Human]) {
+  for (const h3 of [strategicAi, strategicHuman]) {
     const ll = cellToLatLng(h3);
     latLngByH3.set(h3, ll);
   }
   const baseHexes = [
-    { h3Index: res1Ai, terrain: 'land', terrainKind: 'plains' },
-    { h3Index: res1Human, terrain: 'land', terrainKind: 'plains' },
+    { h3Index: strategicAi, terrain: 'land', terrainKind: 'plains' },
+    { h3Index: strategicHuman, terrain: 'land', terrainKind: 'plains' },
   ];
   const hiddenState: GameStateSnapshot = {
     hexes: baseHexes,
     units: [
-      { id: 'ai-1', player: 'opponent', unitType: 'infantry', h3Index: res1Ai },
-      { id: 'hum-1', player: 'human', unitType: 'infantry', h3Index: res1Human },
+      { id: 'ai-1', player: 'opponent', unitType: 'infantry', h3Index: strategicAi },
+      { id: 'hum-1', player: 'human', unitType: 'infantry', h3Index: strategicHuman },
     ],
     phase: 'planning',
     turnNumber: 2,
     pendingOrders: [],
     fogOfWarEnabled: true,
-    visibleHexes: [res1Ai],
+    visibleHexes: [strategicAi],
     exploredHexes: [],
   };
   const hiddenMd = buildStrategicOperationalMapSectionMarkdown({
@@ -188,7 +188,7 @@ function testStrategicFogHidesEnemyMarkersOnMap(): void {
 
   const visibleState: GameStateSnapshot = {
     ...hiddenState,
-    visibleHexes: [res1Ai, res1Human],
+    visibleHexes: [strategicAi, strategicHuman],
   };
   const visibleMd = buildStrategicOperationalMapSectionMarkdown({
     state: visibleState,
@@ -198,29 +198,29 @@ function testStrategicFogHidesEnemyMarkersOnMap(): void {
 }
 
 /**
- * Defines the `testTacticalOperationalMapIncludesAllRes4Codes` function shape.
+ * Defines the `testTacticalOperationalMapIncludesAllTacticalCodes` function shape.
  *
- * Purpose: Locks tactical prompt map to the full battle res4 footprint (all children in snapshot).
+ * Purpose: Locks tactical prompt map to the full battle tactical footprint (all children in snapshot).
  * When to use: When tactical briefing or `buildTacticalAiPlanState` selection changes.
- * Expected outcome: Fence map tokens match tactical registry size for every res4 child listed on the battle.
+ * Expected outcome: Fence map tokens match tactical registry size for every tactical child listed on the battle.
  * Exceptions: None.
  */
-function testTacticalOperationalMapIncludesAllRes4Codes(): void {
-  const res1 = tacticalRes1Cell(12, 34);
-  const res4Children = [...cellToChildren(res1, 4)];
-  assert.ok(res4Children.length > 1, 'fixture should include multiple res4 cells');
-  const res4a = tacticalRes4UnderRes1Corner(12, 34, { latEpsilon: 0.01 });
+function testTacticalOperationalMapIncludesAllCodes(): void {
+  const parentCell = tacticalParentCell(12, 34);
+  const tacticalChildren = [...cellToChildren(parentCell, 4)];
+  assert.ok(tacticalChildren.length > 1, 'fixture should include multiple res4 cells');
+  const tacticala = tacticalUnderCorner(12, 34, { latEpsilon: 0.01 });
   const strategic: GameStateSnapshot = {
     turnNumber: 1,
     phase: 'planning',
-    hexes: [{ h3Index: res1, terrain: 'land', terrainKind: 'plains' }],
+    hexes: [{ h3Index: parentCell, terrain: 'land', terrainKind: 'plains' }],
     units: [],
     pendingOrders: [],
   };
   const tactical: TacticalBattleSnapshot = {
     battleId: 't-footprint-test',
-    enclosingRes1H3Index: res1,
-    res4ChildH3Indexes: res4Children,
+    enclosingStrategicH3Index: parentCell,
+    tacticalChildH3Indexes: tacticalChildren,
     strategicTurnNumber: 1,
     tacticalTurnNumber: 1,
     subUnits: [
@@ -229,7 +229,7 @@ function testTacticalOperationalMapIncludesAllRes4Codes(): void {
         parentUnitId: 'parent-1',
         player: 'opponent',
         unitType: 'infantry',
-        h3Index: res4a,
+        h3Index: tacticala,
         displayName: 'Opp Infantry',
       },
     ],
@@ -246,7 +246,7 @@ function testTacticalOperationalMapIncludesAllRes4Codes(): void {
   const tokens = collectCodeTokensFromMapAscii(body);
   const tacticalCtx = { mode: 'tactical' as const, battleId: tactical.battleId };
   const expectedCodes = new Set(
-    res4Children.map((h3) => getHexCodeForContext(h3, tacticalCtx)).filter(Boolean) as string[]
+    tacticalChildren.map((h3) => getHexCodeForContext(h3, tacticalCtx)).filter(Boolean) as string[]
   );
   assert.strictEqual(tokens.size, expectedCodes.size, 'tactical map should list each battle res4 code once');
   for (const code of expectedCodes) {
@@ -255,17 +255,17 @@ function testTacticalOperationalMapIncludesAllRes4Codes(): void {
 }
 
 /**
- * Locks that a water parent does not paint every res4 child as ocean, and that urban/port tiles show feature letters.
+ * Locks that a water parent does not paint every tactical child as ocean, and that urban/port tiles show feature letters.
  *
- * Purpose: Beat-1 reviews showed the whole footprint as "." because plan-state terrain copied the enclosing res1 ocean.
+ * Purpose: Beat-1 reviews showed the whole footprint as "." because plan-state terrain copied the enclosing strategic ocean.
  * When to use: After `buildTacticalAiPlanState` or tactical HexMapCellState assembly changes.
  * Expected outcome: Wetlands child renders land (`x`); water child renders `.`; unoccupied urban shows `U`; unoccupied
  * airport+seaport shows `B`/`b`.
  * Exceptions: None.
  */
 function testTacticalMapShowsChildTerrainAndUrban(): void {
-  const res1 = tacticalRes1Cell(12, 34);
-  const landChild = tacticalRes4UnderRes1Corner(12, 34, { latEpsilon: 0.01 });
+  const parentCell = tacticalParentCell(12, 34);
+  const landChild = tacticalUnderCorner(12, 34, { latEpsilon: 0.01 });
   const ring = [...gridDisk(landChild, 1)].filter((h) => h !== landChild);
   const waterChild = ring[0]!;
   const urbanChild = ring[1]!;
@@ -279,27 +279,27 @@ function testTacticalMapShowsChildTerrainAndUrban(): void {
   const strategic: GameStateSnapshot = {
     turnNumber: 1,
     phase: 'planning',
-    hexes: [{ h3Index: res1, terrain: 'water', terrainKind: 'ocean' }],
+    hexes: [{ h3Index: parentCell, terrain: 'water', terrainKind: 'ocean' }],
     units: [],
     pendingOrders: [],
   };
   const tactical: TacticalBattleSnapshot = {
     battleId: 't-terrain-glyphs',
-    enclosingRes1H3Index: res1,
-    res4ChildH3Indexes: [landChild, waterChild, urbanChild, portChild],
+    enclosingStrategicH3Index: parentCell,
+    tacticalChildH3Indexes: [landChild, waterChild, urbanChild, portChild],
     strategicTurnNumber: 1,
     tacticalTurnNumber: 1,
     strategicHexTerrain: 'water',
     strategicHexTerrainKind: 'ocean',
-    res4TerrainKindByH3: {
+    tacticalTerrainKindByH3: {
       [landChild]: 'wetlands',
       [waterChild]: 'water',
       [urbanChild]: 'plains',
       [portChild]: 'plains',
     },
-    res4IsUrbanByH3: { [urbanChild]: true },
-    res4IsAirportByH3: { [portChild]: true },
-    res4IsSeaportByH3: { [portChild]: true },
+    tacticalIsUrbanByH3: { [urbanChild]: true },
+    tacticalIsAirportByH3: { [portChild]: true },
+    tacticalIsSeaportByH3: { [portChild]: true },
     subUnits: [
       {
         id: 'su-opp-1',
@@ -344,21 +344,21 @@ function testTacticalMapShowsChildTerrainAndUrban(): void {
 /**
  * Defines the `testTacticalAsciiGridUsesManyRowsNotLatitudeRibbon` function shape.
  *
- * Purpose: Ensures tactical maps use H3-local projection so ~343 res4 cells spread across many ASCII rows instead of 1–3 latitude bands.
- * When to use: Regression guard for `projectTacticalRes4FootprintToAsciiGrid` wiring.
+ * Purpose: Ensures tactical maps use H3-local projection so ~343 tactical cells spread across many ASCII rows instead of 1–3 latitude bands.
+ * When to use: Regression guard for `projectTacticalFootprintToAsciiGrid` wiring.
  * Expected outcome: Row count comfortably above 3, one cell per footprint index, unique grid slots.
  * Exceptions: None.
  */
 function testTacticalAsciiGridUsesManyRowsNotLatitudeRibbon(): void {
-  const res1 = tacticalRes1Cell(12, 34);
-  const res4Children = [...cellToChildren(res1, 4)];
-  assert.strictEqual(res4Children.length, 343, 'fixture expects full res1→res4 child count');
+  const strategic = tacticalParentCell(12, 34);
+  const tacticalChildren = [...cellToChildren(strategic, 4)];
+  assert.strictEqual(tacticalChildren.length, 343, 'fixture expects full res1→res4 child count');
   const battleId = 't-ascii-rows-test';
-  initTacticalCoordinateRegistry(battleId, res1);
+  initTacticalCoordinateRegistry(battleId, strategic);
   const tacticalCtx = { mode: 'tactical' as const, battleId };
-  const grid = projectTacticalRes4FootprintToAsciiGrid(res4Children, tacticalCtx);
+  const grid = projectTacticalFootprintToAsciiGrid(tacticalChildren, tacticalCtx);
   assert.ok(grid.numRows >= 15, `expected many ASCII rows, got numRows=${grid.numRows}`);
-  assert.strictEqual(grid.cells.length, res4Children.length, 'every res4 cell should appear in the grid');
+  assert.strictEqual(grid.cells.length, tacticalChildren.length, 'every res4 cell should appear in the grid');
   const slotKeys = new Set(grid.cells.map((c) => `${c.row},${c.col}`));
   assert.strictEqual(slotKeys.size, grid.cells.length, 'no two cells may share the same row,col slot');
 }
@@ -372,14 +372,14 @@ function testTacticalAsciiGridUsesManyRowsNotLatitudeRibbon(): void {
  * Exceptions: None.
  */
 const tests = [
-  { name: 'strategic operational map includes all res1 codes', fn: testStrategicOperationalMapIncludesAllRes1Codes },
+  { name: 'strategic operational map includes all res1 codes', fn: testStrategicOperationalMapIncludesAllCodes },
   { name: 'strategic operational map no-units fallback', fn: testStrategicOperationalMapNoUnitsFallback },
   {
     name: 'strategic operational map omits Best Options heading when table empty',
     fn: testStrategicOperationalMapOmitsBestOptionsHeadingWhenEmpty,
   },
   { name: 'strategic fog hides enemy markers in fenced map', fn: testStrategicFogHidesEnemyMarkersOnMap },
-  { name: 'tactical operational map includes all res4 codes', fn: testTacticalOperationalMapIncludesAllRes4Codes },
+  { name: 'tactical operational map includes all res4 codes', fn: testTacticalOperationalMapIncludesAllCodes },
   { name: 'tactical map uses child land/water and urban overlay', fn: testTacticalMapShowsChildTerrainAndUrban },
   {
     name: 'tactical ascii grid uses many rows (IJ projection not latitude ribbon)',

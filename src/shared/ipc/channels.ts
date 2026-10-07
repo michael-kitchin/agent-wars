@@ -9,11 +9,11 @@
 /** Main ↔ renderer game API (`ipcMain.handle` / `ipcRenderer.invoke`). */
 export const IPC_GAME = {
   getState: 'game:getState',
-  getRes4TerrainOverrides: 'game:getRes4TerrainOverrides',
-  getRes4CityOverlays: 'game:getRes4CityOverlays',
-  getRes4RoadRailOverlays: 'game:getRes4RoadRailOverlays',
-  getRes4TransportVectorOverlays: 'game:getRes4TransportVectorOverlays',
-  getRes1BaselineUrbanHexCounts: 'game:getRes1BaselineUrbanHexCounts',
+  getTacticalTerrainOverrides: 'game:getRes4TerrainOverrides',
+  getTacticalCityOverlays: 'game:getRes4CityOverlays',
+  getTacticalRoadRailOverlays: 'game:getRes4RoadRailOverlays',
+  getTacticalTransportVectorOverlays: 'game:getRes4TransportVectorOverlays',
+  getStrategicBaselineUrbanHexCounts: 'game:getRes1BaselineUrbanHexCounts',
   getHexNamingTooltipLine: 'game:getHexNamingTooltipLine',
   getHexContinentNames: 'game:getHexContinentNames',
   listScenarioHomeRegions: 'game:listScenarioHomeRegions',

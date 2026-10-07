@@ -13,7 +13,7 @@ import { getAssessmentCategory, executeEstimateCombat, poissonBinomialPMF } from
 import type { GameStateSnapshot } from '../gameDb';
 import type { UnitOrigin } from '../../shared/unitOriginTypes';
 import { TECH_ADVANCED_MIN_URBAN_HEX_COUNT } from '../../shared/techBonusRules';
-import { ensureTerrainClassificationCacheLoaded, getRes4FeatureRowsForSeeding } from '../terrainClassificationCache';
+import { ensureTerrainClassificationCacheLoaded, getTacticalFeatureRowsForSeeding } from '../terrainClassificationCache';
 
 /**
  * Defines the `makeUnit` function shape (function makeUnit(id: string, player: string, unitType: string, h3Index: string): CombatUnit).
@@ -368,7 +368,7 @@ function testExecuteEstimateCombatMalformedSideArgs(): void {
 function frenchOrigin(birthH3Index: string): UnitOrigin {
   return {
     birthH3Index,
-    birthRes4H3Index: null,
+    birthTacticalH3Index: null,
     birthTerrainKind: 'plains',
     birthIsUrban: false,
     birthCountryName: 'France',
@@ -462,7 +462,7 @@ function testMeleeEstimateJudgesAttackerAtTarget(): void {
  * Exceptions: None.
  */
 /**
- * Finds one res1 hex whose generated urban count is high enough to be Advanced.
+ * Finds one strategic hex whose generated urban count is high enough to be Advanced.
  *
  * Purpose: Estimates classify tech from the terrain cache, so the fixture has to be a real birth hex.
  * When to use: The tech-bonus estimate case.
@@ -472,7 +472,7 @@ function testMeleeEstimateJudgesAttackerAtTarget(): void {
 function advancedBirthHex(): string {
   ensureTerrainClassificationCacheLoaded();
   const counts = new Map<string, number>();
-  for (const row of getRes4FeatureRowsForSeeding()) {
+  for (const row of getTacticalFeatureRowsForSeeding()) {
     if (!row.isUrban) continue;
     const next = (counts.get(row.parentH3Index) ?? 0) + 1;
     if (next >= TECH_ADVANCED_MIN_URBAN_HEX_COUNT) return row.parentH3Index;

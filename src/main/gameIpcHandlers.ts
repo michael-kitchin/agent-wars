@@ -652,7 +652,7 @@ export async function handleGameReady(
     wallClockMs: turnWallClockMs,
     inputTokens: turnInputTokens,
     outputTokens: turnOutputTokens,
-    tacticalAutoStartRes1H3Index: readyResult.tacticalAutoStartRes1H3Index,
+    tacticalAutoStartH3Index: readyResult.tacticalAutoStartH3Index,
     ...(shouldDeferPostResolutionConsult
       ? {
           postResolutionConsultDeferred: true,
@@ -667,7 +667,7 @@ export async function handleGameReady(
  *
  * Purpose: Keeps consultation and cost accounting aligned with `handleGameReady` without re-running movement.
  * When to use: IPC `game:resolveMeleeIntercept` from the renderer modal.
- * Expected outcome: Full `ReadyResult` fields for a completed turn plus `tacticalAutoStartRes1H3Index` when applicable.
+ * Expected outcome: Full `ReadyResult` fields for a completed turn plus `tacticalAutoStartStrategicH3Index` when applicable.
  * Exceptions: Delegates failure reasons to `resolveMeleeIntercept` in the main process.
  */
 export async function handleResolveMeleeIntercept(
@@ -758,7 +758,7 @@ export async function handleResolveMeleeIntercept(
     humanMoves: resolveResult.humanMoves,
     opponentCombatParticipantUnitIds: resolveResult.opponentCombatParticipantUnitIds,
     removedOpponentUnitIds: resolveResult.removedOpponentUnitIds,
-    tacticalAutoStartRes1H3Index: resolveResult.tacticalAutoStartRes1H3Index,
+    tacticalAutoStartH3Index: resolveResult.tacticalAutoStartH3Index,
     aiStrategy,
     aiMessage,
     toolInvocationCounts,
