@@ -359,10 +359,10 @@ export function excludeUnitCurrentHex(unitH3: string, hexes: string[]): string[]
 }
 
 /**
- * Derives the Action column label for the Commander **Best Options This Turn** table (matches briefing markdown semantics).
+ * Derives one Action label from an aggregated Best Options row, preferring a shot over a move.
  *
- * Purpose: Single source for rendered action text in the **Best Options This Turn** markdown table.
- * When to use: `renderThisTurnOptionsTableMarkdown` (via import).
+ * Purpose: Picks one Action label when a caller needs a single priority, with shots ahead of moves.
+ * When to use: Callers that cannot list every action. The Best Options table uses `bestOptionsActionLabels` instead, so a shared hex keeps both the shot and the move.
  * Expected outcome: One of `air strike`, `ranged`, `approach`, `ferry`, `move/melee`, or the raw `actionTypes` string as fallback.
  * Exceptions: None.
  */
@@ -373,6 +373,54 @@ export function deriveThisTurnOptionsActionColumn(r: PossibleActionTableRow): st
   if (r.actionTypes.includes('ferry')) return 'ferry';
   if (r.actionTypes.includes('move') || r.actionTypes.includes('melee')) return 'move/melee';
   return r.actionTypes;
+}
+
+const BEST_OPTIONS_ACTION_DISPLAY_ORDER = ['air strike', 'ranged', 'approach', 'ferry', 'move/melee'] as const;
+
+/**
+ * Maps one aggregated action token onto the Best Options Action column label.
+ *
+ * Purpose: `aggregateRows` stores vendor labels such as `ranged attack`, while the Commander table uses the shorter
+ * labels the prompt tells the model to copy.
+ * When to use: Only from `bestOptionsActionLabels`.
+ * Expected outcome: One stable Action column label. Unknown tokens pass through unchanged.
+ * Exceptions: None.
+ */
+function canonicalBestOptionsAction(token: string): string {
+  if (token === ACTION_AIR_STRIKES || token === 'air_strike') return 'air strike';
+  if (token === ACTION_RANGED || token === 'ranged') return 'ranged';
+  if (token === ACTION_APPROACH) return 'approach';
+  if (token === ACTION_FERRY) return 'ferry';
+  if (token === ACTION_MOVES_MELEE || token === 'move' || token === 'melee') return 'move/melee';
+  return token;
+}
+
+/**
+ * Lists every Best Options action stored on one aggregated row.
+ *
+ * Purpose: A move onto an enemy hex and a shot at that same hex share one aggregated row. The Action column used to
+ * keep only the shot, so the model never received a move/melee hex for that unit.
+ * When to use: `renderThisTurnOptionsTableMarkdown`, after the per-unit cap, before rows are grouped by target.
+ * Expected outcome: One label per distinct action, in shot-then-move display order. An empty action string yields a
+ * one-element list containing that string.
+ * Exceptions: None.
+ */
+export function bestOptionsActionLabels(actionTypes: string): string[] {
+  const found = new Set<string>();
+  for (const token of actionTypes.split(',')) {
+    const trimmed = token.trim();
+    if (trimmed.length > 0) found.add(canonicalBestOptionsAction(trimmed));
+  }
+  const ordered: string[] = BEST_OPTIONS_ACTION_DISPLAY_ORDER.filter((label) => found.has(label));
+  for (const label of found) {
+    if (!ordered.includes(label)) ordered.push(label);
+  }
+  const labels = ordered.length > 0 ? ordered : [actionTypes];
+  logDebug('possibleUnitActionsTableAssembly bestOptionsActionLabels', {
+    actionTypes,
+    labelCount: labels.length,
+  });
+  return labels;
 }
 
 /**
@@ -392,7 +440,8 @@ function preferredSummary(a: string, b: string): string {
 /**
  * Merges raw per-action rows into deduplicated table rows with combined `actionTypes` strings.
  *
- * Purpose: Collapses multiple action types targeting the same hex into one markdown row per unit/target.
+ * Purpose: Collapses multiple action types targeting the same hex into one aggregated row per unit and target.
+ * The Best Options table lists each of those actions as its own row afterward.
  * When to use: After all `appendRowsForLegalHexes` calls populated `rawRows`.
  * Expected outcome: Sorted `actionTypes` label ordering via `ACTION_TYPE_ORDER`.
  * Exceptions: None.

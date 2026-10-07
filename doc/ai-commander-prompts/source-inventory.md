@@ -66,14 +66,14 @@ Emit order as coded. All headings quoted exactly (`promptSpec/sectionHeadings.ts
 Table columns as coded:
 
 - Unit status: `Unit ID` | `Type` | `Hex` | `Nearest enemy + distance` | `Threat severity` | `Action needed`. **No row cap.**
-- Best Options: `Unit IDs` | `Action` | `Target Hexes` | `Target Units` | `Target Infrastructure`. At most 5 rows per unit before merge; identical action/hex/target rows merge.
+- Best Options: `Unit IDs` | `Action` | `Target Hexes` | `Target Units` | `Target Infrastructure`. At most 5 target hexes per unit; each distinct action on a hex is then its own row, in the order air strike, ranged, approach, ferry, move/melee. Identical action, hex, and target rows merge.
 - Controlled Hex Queues: `Hex` | `Urban Hexes` | `Airports` | `Seaports` | `Available Unit Types` | `Current Queue`. Top 10 plus any further hex with queued entries.
 - Memory persistent: `Key` | `Updated Turn` | `Content`. Reminders: `Key` | `Tier` | `Recurring` | `Content`.
-- Standing Order Status: `Unit ID` | `Unit Type` | `Order Type` | `Destination / Target` | `Status` | `Next Move` | `Turns Remaining` | `Attention`.
+- Standing Order Status: `Unit ID` | `Unit Type` | `Order Type` | `Destination / Target` | `Status` | `Next Move` | `Turns Remaining` | `Attention`. `Next Move` is the step about to be taken. Before the briefing is built, a step the unit has already entered is replaced by the following stored step when turns remain. A step not yet entered is left as stored. March, pursue, defend, and patrol store that route when they queue a step.
 - Units Without Standing Orders: `Unit ID` | `Unit Type` | `Suggested Destination`.
 - Active Callbacks: `Event` | `Details` (parameters, not just the event name).
 
-Attention Flags is a bullet list: rank-sorted, capped at 5. The armed-units bullet names at most `ATTENTION_ARMED_UNITS_LISTED` (12) ids plus overflow. On the strategic map it includes every non-infantry unit with an in-range attack, including same-hex contact, and leaves infantry off. Same-hex armor and naval are told to copy a move/melee Target Hex and not to order a ranged_attack. In a battle it includes only a ranged attack or an air strike.
+Attention Flags is a bullet list: rank-sorted, capped at 5. The armed-units bullet names at most `ATTENTION_ARMED_UNITS_LISTED` (12) ids plus overflow. On the strategic map it includes every non-infantry unit with an in-range attack, including same-hex contact, and leaves infantry off. Same-hex armor and naval are told not to order a ranged_attack, that they are already in contact, and that melee resolves if they stay. In a battle it includes only a ranged attack or an air strike.
 
 Production status interpolates `buildProductionIncomeRule` and `buildProductionCostRulesLine` (costs and prerequisites from engine tables).
 

@@ -1,5 +1,5 @@
-import type { PlanRouteOk } from './pathfinding';
 import type { HumanOrderPreviewSegment } from '../../shared/ipc/humanOrderPreviewTypes';
+import type { PlanRouteOk } from './pathfinding';
 
 /**
  * Every standing-order type `assignOrder` accepts.
@@ -338,7 +338,8 @@ export function parseStandingOrderComputedRoute(
 /**
  * Builds the JSON payload persisted in `standing_orders.computed_route` after a successful route plan.
  *
- * Purpose: Stores turn progress plus display cache keyed by the unit's planning origin H3.
+ * Purpose: Stores turn progress plus display cache keyed by the unit's planning origin H3. `nextMoveHex` is the step
+ * about to be taken. Once the unit has entered that cell, `expireAndUpdateStatus` advances it from `cachedRouteSegments`.
  * When to use: After `executePlanRouteWithSession` in assign and turn-generation paths.
  * Expected outcome: Includes `cachedOriginH3` and `cachedRouteSegments` for stable overlay reuse while the unit remains at the origin cell.
  * Exceptions: None.

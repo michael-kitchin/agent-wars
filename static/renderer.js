@@ -28194,8 +28194,8 @@ ${body}`;
   // src/renderer/rendering/resolutionSymbolDrawing.ts
   var COMBAT_LIGHTNING_SRC = "resolution/lightning_bolt.svg";
   var DESTRUCTION_MARK_SRC = "resolution/x_destroyed.svg";
-  var COMBAT_LIGHTNING_PX = 44;
-  var DESTRUCTION_MARK_PX = 52;
+  var COMBAT_LIGHTNING_PX = 35.2;
+  var DESTRUCTION_MARK_PX = 41.6;
   function startResolutionSymbolLoad(src) {
     const img = new Image();
     img.decoding = "async";

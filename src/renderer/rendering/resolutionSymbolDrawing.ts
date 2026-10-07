@@ -32,22 +32,22 @@ const DESTRUCTION_MARK_SRC = 'resolution/x_destroyed.svg';
 /**
  * On-screen side of the combat bolt, in CSS pixels.
  *
- * Purpose: The bolt spans 20 of the 24 viewBox units, so 44px keeps it about as tall as a unit token.
+ * Purpose: The bolt spans 20 of the 24 viewBox units. 35.2 CSS pixels is 80% of a unit-token side so the bolt reads smaller than the token.
  * When to use: `drawCombatLightning`.
  * Expected outcome: A square centered on the hex.
  * Exceptions: None.
  */
-const COMBAT_LIGHTNING_PX = 44;
+const COMBAT_LIGHTNING_PX = 35.2;
 
 /**
  * On-screen side of the destruction mark, in CSS pixels.
  *
- * Purpose: The mark spans about 19 of the 24 viewBox units, so 52px keeps it a little larger than the bolt.
+ * Purpose: The mark spans about 19 of the 24 viewBox units. 41.6 CSS pixels keeps it a little larger than the bolt.
  * When to use: `drawCasualtyOverlay`.
  * Expected outcome: A square centered on the hex.
  * Exceptions: None.
  */
-const DESTRUCTION_MARK_PX = 52;
+const DESTRUCTION_MARK_PX = 41.6;
 
 /**
  * Starts a load of one resolution symbol.

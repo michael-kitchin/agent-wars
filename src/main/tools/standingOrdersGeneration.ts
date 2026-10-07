@@ -1,5 +1,6 @@
 import { cellToLatLng } from 'h3-js';
 import { computeGridDistanceWithPathFallbackPure } from '../../shared/h3GridRangePure';
+import { strategicCellAt } from '../../shared/h3Resolutions';
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import type { AirStrikeTargetType } from '../../shared/ipcTypes';
 import { dbRun, dbGetAll, saveDatabase } from '../gameDb';
@@ -8,11 +9,12 @@ import { validateAirStrikeOrder } from '../gameActions/airValidation';
 import { isWithinAirStrikeGridRange } from '../gameActions/gridRange';
 import { createPathfindingSession, executePlanRouteWithSession, type PathfindingSession } from './pathfinding';
 import type { LatLng } from './pathfinding';
-import { logDebug, logTrace } from '../logger';
+import { logDebug, logError, logTrace } from '../logger';
 import {
   AIR_INELIGIBLE_ORDER_TYPES,
   parseComputedRoute,
   parseOrderParams,
+  parseStandingOrderComputedRoute,
   toComputedRoutePayload,
   type StandingOrderRow,
 } from './standingOrdersShared';
@@ -150,12 +152,71 @@ export function holdFireUnitIdsForPlayer(playerId: string): Set<string> {
 }
 
 /**
- * Defines the `expireAndUpdateStatus` function shape (export function expireAndUpdateStatus(playerId: string, state: GameStateSnapshot): void).
+ * Snaps a stored lat/lng to its strategic cell.
+ *
+ * Purpose: Standing-order routes persist centers, and the briefing has to compare those centers to the unit's H3.
+ * When to use: Only from `advanceNextMovePastOccupiedCell`.
+ * Expected outcome: Strategic H3, or undefined when the point cannot be resolved.
+ * Exceptions: Swallows H3 failures and returns undefined.
+ */
+function latLngToStrategicH3(lat: number, lng: number): string | undefined {
+  logTrace('standingOrders latLngToStrategicH3', { lat, lng });
+  try {
+    return strategicCellAt(lat, lng);
+  } catch (err) {
+    logError('standingOrders latLngToStrategicH3: unresolved', { lat, lng, err });
+    return undefined;
+  }
+}
 
- * Purpose: Supports maintainability by documenting why `expireAndUpdateStatus` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
+/**
+ * Replaces a next-move center that the unit has already entered with the following cached step.
+ *
+ * Purpose: A march step is stored as Next Move and then the unit enters that hex, so the next briefing shows the
+ * current cell. The cached route still holds the step after that one.
+ * When to use: `expireAndUpdateStatus`, before the briefing reads `computed_route`.
+ * Expected outcome: Rewrites `nextMoveHex` when it is the unit's current cell, turns remain, and a later segment
+ * exists. The first cached turn-end on that cell is the step just entered, because each turn of a planned route
+ * ends on a new cell. Leaves every other row unchanged, including a step the unit has not entered yet.
+ * Exceptions: None. Unresolvable coordinates are left as stored.
+ */
+function advanceNextMovePastOccupiedCell(playerId: string, row: StandingOrderRow, unitH3: string): void {
+  const computed = parseStandingOrderComputedRoute(row);
+  const raw = parseComputedRoute(row);
+  if (!computed || !raw || computed.turnsRemaining <= 0) return;
+  const stepH3 = latLngToStrategicH3(computed.nextMoveHex[0], computed.nextMoveHex[1]);
+  if (stepH3 !== unitH3) return;
+  const segments = computed.cachedRouteSegments;
+  if (!segments || segments.length < 2) return;
+  const occupiedIndex = segments.findIndex((seg) => {
+    const end = seg.hexes[seg.hexes.length - 1];
+    if (!end || end.length < 2) return false;
+    return latLngToStrategicH3(end[0], end[1]) === unitH3;
+  });
+  if (occupiedIndex < 0 || occupiedIndex + 1 >= segments.length) return;
+  const nextHexes = segments[occupiedIndex + 1]!.hexes;
+  const nextEnd = nextHexes[nextHexes.length - 1];
+  if (!nextEnd || nextEnd.length < 2) return;
+  const nextH3 = latLngToStrategicH3(nextEnd[0], nextEnd[1]);
+  if (!nextH3 || nextH3 === unitH3) return;
+  raw.nextMoveHex = [nextEnd[0], nextEnd[1]];
+  logDebug('standingOrders expireAndUpdateStatus: advanced next move past current cell', {
+    playerId,
+    unitId: row.unit_id,
+    fromSegment: occupiedIndex,
+  });
+  updateStandingOrderComputedRoute(playerId, row.unit_id, raw);
+}
+
+/**
+ * Drops finished marches and pursuits, and advances a next step the unit has already entered.
+ *
+ * Purpose: Planning briefings and stay-put occupancy read `computed_route` before this turn's route is rebuilt.
+ * A step stored when it was queued is the unit's current cell after that step lands.
+ * When to use: Before building a strategic briefing, and at the start of standing-order generation.
+ * Expected outcome: Arrived marches and pursuits with a missing target are deleted. A next step equal to the
+ * unit's cell becomes the following cached segment when turns remain. Other rows are unchanged.
+ * Exceptions: None. Unresolvable coordinates are left as stored.
  */
 export function expireAndUpdateStatus(playerId: string, state: GameStateSnapshot): void {
   logDebug('standingOrders expireAndUpdateStatus', { playerId, turnNumber: state.turnNumber });
@@ -183,6 +244,7 @@ export function expireAndUpdateStatus(playerId: string, state: GameStateSnapshot
         continue;
       }
     }
+    let removed = false;
     if (row.order_type === 'march') {
       const params = parseOrderParams(row);
       const dest = params.destination as [number, number] | undefined;
@@ -204,6 +266,7 @@ export function expireAndUpdateStatus(playerId: string, state: GameStateSnapshot
         }
         if (destH3 && unit.h3Index === destH3) {
           deleteStandingOrder(playerId, row.unit_id);
+          removed = true;
           logDebug('standingOrders expireAndUpdateStatus: removed arrived march order', {
             playerId,
             unitId: row.unit_id,
@@ -217,8 +280,11 @@ export function expireAndUpdateStatus(playerId: string, state: GameStateSnapshot
       const targetExists = targetId && state.units.some((u) => u.id === targetId && u.player !== playerId);
       if (!targetExists) {
         deleteStandingOrder(playerId, row.unit_id);
+        removed = true;
       }
     }
+    const orderedUnit = state.units.find((u) => u.id === row.unit_id);
+    if (!removed && orderedUnit) advanceNextMovePastOccupiedCell(playerId, row, orderedUnit.h3Index);
   }
   saveDatabase();
 }
@@ -287,12 +353,18 @@ export function generateOrdersForStandingOrders(
           pathfindingSession
         );
         if (routeResult.status === 'ok' && routeResult.path.length > 0) {
-          const endHex = routeResult.path[0]!.endHex;
+          const routePayload = toComputedRoutePayload(routeResult, unit.h3Index);
           const toH3 = routeResult.orderToH3;
           if (toH3) movementOrders.push({ unitId: row.unit_id, toH3Index: toH3 });
           const turnsRemaining = Math.max(0, routeResult.turnsRequired - 1);
           if (mutateProgress) {
-            updateStandingOrderComputedRoute(playerId, row.unit_id, { nextMoveHex: endHex, turnsRemaining });
+            updateStandingOrderComputedRoute(playerId, row.unit_id, {
+              nextMoveHex: routePayload.nextMoveHex,
+              turnsRemaining,
+              totalPath: routePayload.totalPath,
+              cachedOriginH3: routePayload.cachedOriginH3,
+              cachedRouteSegments: routePayload.cachedRouteSegments,
+            });
           }
         }
       } else if (defendH3 && mutateProgress) {
@@ -444,7 +516,7 @@ export function generateOrdersForStandingOrders(
       );
       if (routeResult.status === 'error') continue;
       if (routeResult.path.length > 0) {
-        const endHex = routeResult.path[0]!.endHex;
+        const routePayload = toComputedRoutePayload(routeResult, unit.h3Index);
         const toH3 = routeResult.orderToH3;
         if (toH3) {
           movementOrders.push({ unitId: row.unit_id, toH3Index: toH3 });
@@ -455,7 +527,14 @@ export function generateOrdersForStandingOrders(
             updateStandingOrderComputedRoute(
               playerId,
               row.unit_id,
-              { waypointIndex: nextIndex, nextMoveHex: endHex, turnsRemaining },
+              {
+                waypointIndex: nextIndex,
+                nextMoveHex: routePayload.nextMoveHex,
+                turnsRemaining,
+                totalPath: routePayload.totalPath,
+                cachedOriginH3: routePayload.cachedOriginH3,
+                cachedRouteSegments: routePayload.cachedRouteSegments,
+              },
               'patrolling'
             );
           }

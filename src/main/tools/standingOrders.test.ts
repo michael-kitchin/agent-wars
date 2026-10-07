@@ -11,6 +11,7 @@ import * as path from 'path';
 import { cellToLatLng, gridDisk, gridDistance, latLngToCell } from 'h3-js';
 import { AIR_STRIKE_RANGE_HEXES } from '../../shared/tacticalRanges';
 import { getOrderedHexList } from '../mapData';
+import { h3ToCode } from '../briefing/map/hexCodeTranslator';
 import { safeGridHexDistance } from './assessUnitProximity';
 import { executeStandingOrders, getInjectionText } from './standingOrders';
 import {
@@ -819,6 +820,76 @@ function testAirDefendDoesNotProduceMovementOrder(): void {
 }
 
 /**
+ * After a queued march step is applied, the next briefing must name the following step.
+ *
+ * Purpose: Persisting the step just queued makes Next Move equal the hex the unit already occupies
+ * on the following planning briefing, so the model treats a live march as stalled.
+ * When to use: After edits to the computed route stored once a standing-order step is queued.
+ * Expected outcome: Next Move is a different hex from the unit's post-move cell, with turns still remaining.
+ * Exceptions: None.
+ */
+function testBriefingNextMoveIsNotTheHexJustEntered(): void {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aw-tool5-next-'));
+  const dbPath = path.join(tempDir, 't.sqlite');
+  try {
+    openGameDatabaseAtPathForTests(dbPath);
+    resetGameForNewMatch();
+    const state = getGameState();
+    const unit = state.units.find((u) => u.player === 'opponent' && u.unitType === 'infantry');
+    assert.ok(unit, 'expected an opponent infantry unit');
+    const hexByH3 = new Map(state.hexes.map((h) => [h.h3Index, h]));
+    const withinTwo = new Set(gridDisk(unit.h3Index, 2));
+    const destinationH3 = gridDisk(unit.h3Index, 4).find((h3) => {
+      if (withinTwo.has(h3)) return false;
+      const hex = hexByH3.get(h3);
+      return !!hex && hex.terrain !== 'water';
+    });
+    assert.ok(destinationH3, 'expected a land hex beyond two steps');
+    const [destLat, destLng] = cellToLatLng(destinationH3);
+    const latLngByH3 = new Map(state.hexes.map((h) => [h.h3Index, cellToLatLng(h.h3Index) as [number, number]]));
+    const resolveToH3 = (lat: number, lng: number): string | undefined => {
+      try {
+        return latLngToCell(lat, lng, 1);
+      } catch {
+        return undefined;
+      }
+    };
+    dbRun(
+      `INSERT OR REPLACE INTO standing_orders (player_id, unit_id, order_type, params, computed_route, status, created_turn, origin_hex)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        'opponent',
+        unit.id,
+        'march',
+        JSON.stringify({ type: 'march', destination: [destLat, destLng], avoidEnemies: false, engageEnRoute: false }),
+        null,
+        'en_route',
+        state.turnNumber,
+        JSON.stringify(cellToLatLng(unit.h3Index)),
+      ]
+    );
+    const generated = generateOrdersForStandingOrders('opponent', getGameState(), latLngByH3, resolveToH3);
+    const move = generated.movementOrders.find((order) => order.unitId === unit.id);
+    assert.ok(move, 'multi-hop march must queue a step');
+    assert.notStrictEqual(move.toH3Index, destinationH3, 'the queued step must not already be the destination');
+    dbRun('UPDATE units SET h3_index = ? WHERE id = ?', [move.toH3Index, unit.id]);
+    const text = getInjectionText('opponent', getGameState());
+    const row = text.split('\n').find((line) => line.includes(`| ${unit.id} |`));
+    assert.ok(row, `expected a standing-order row for ${unit.id}`);
+    const cells = row.split('|').slice(1, -1).map((cell) => cell.trim());
+    const nextMove = cells[5];
+    const turnsRemaining = cells[6];
+    const arrivedCode = h3ToCode(move.toH3Index, { mode: 'strategic' });
+    assert.notStrictEqual(turnsRemaining, '—', row);
+    assert.notStrictEqual(turnsRemaining, '0', row);
+    assert.notStrictEqual(nextMove, '—', row);
+    assert.notStrictEqual(nextMove, arrivedCode, `Next Move must not be the hex just entered: ${row}`);
+  } finally {
+    closeGameDatabaseForTests();
+  }
+}
+
+/**
  * Flags a healthy march whose destination recedes from the nearest observed enemy.
  *
  * Purpose: Turn 18 left in-range units on receding MARCH orders because Attention was no.
@@ -891,6 +962,7 @@ function run(): void {
   testDefendAutoEngagementAirStrikeSurvivesUnmeasurablePair();
   testMarchEngageEnRouteUsesWeaponRange();
   testAirDefendDoesNotProduceMovementOrder();
+  testBriefingNextMoveIsNotTheHexJustEntered();
   testGetInjectionTextAttentionYesForRecedingMarch();
   testHumanMarchDefaultsAvoidEnemiesFalse();
   console.log('standingOrders tests passed');

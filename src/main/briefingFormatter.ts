@@ -372,7 +372,8 @@ function isSameHexContactOnly(
  * Purpose: Same-hex armor and naval stay on the list, and the sentence must not tell them to order a ranged_attack.
  * When to use: After the armed-unit ids are sliced to `ATTENTION_ARMED_UNITS_LISTED`.
  * Expected outcome: One sentence. The shot clause names ranged, air-strike, and air ids. The contact clause names
- * strategic armor and naval whose only in-range row is melee. The overflow suffix counts the combined remainder.
+ * strategic armor and naval whose only in-range row is melee and tells the model to stay for that melee. The overflow
+ * suffix counts the combined remainder.
  * Exceptions: None.
  */
 function armedUnitsBulletText(args: {
@@ -401,7 +402,7 @@ function armedUnitsBulletText(args: {
   }
   if (contactIds.length > 0) {
     clauses.push(
-      `copy a move/melee Target Hex for ${contactIds.join(', ')} and do not order a ranged_attack for them`
+      `do not order a ranged_attack for ${contactIds.join(', ')}, they are already in contact, and melee resolves if they stay`
     );
   }
   return `${count} unit(s) have a legal attack this ${args.period} — ${clauses.join('; ')}${overflowText}.`;

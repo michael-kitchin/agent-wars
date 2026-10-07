@@ -3,11 +3,13 @@
  *
  * Purpose: Locks action-column labels and documents that Best Options This Turn tables no longer merge multiple target hexes into one row.
  * When to use: `npm test` after `build:main`.
- * Expected outcome: `deriveThisTurnOptionsActionColumn` returns stable labels; merged multi-hex rows are not produced by this module.
+ * Expected outcome: `deriveThisTurnOptionsActionColumn` returns stable labels; a hex that is both a move and a shot stays two table rows; a ranged-only row does not gain a move row.
  * Exceptions: Assertion failures indicate regression in action column derivation.
  */
 
 import assert from 'node:assert/strict';
+import { renderThisTurnOptionsTableMarkdown } from '../briefing/map/briefingTables';
+import { ensureStrategicCoordinateRegistryInitialized, listStrategicH3Indexes } from '../briefing/map/hexCoordinates';
 import {
   ACTION_AIR_STRIKES,
   ACTION_FERRY,
@@ -207,6 +209,42 @@ function rawFixture(overrides: Partial<RawPossibleActionRow>): RawPossibleAction
 }
 
 /**
+ * A hex that is both a shot and a move must stay two Best Options rows.
+ *
+ * Purpose: Aggregation merges those actions onto one row, and the Action column used to keep only ranged,
+ * so a sub-unit with a legal close never saw a move/melee hex.
+ * When to use: After edits to Best Options action labeling.
+ * Expected outcome: The markdown lists both `move/melee` and `ranged` for that unit and hex.
+ * Exceptions: None.
+ */
+function testBestOptionsTableKeepsMoveRowWhenRangedSharesTheHex(): void {
+  ensureStrategicCoordinateRegistryInitialized();
+  const targetH3 = listStrategicH3Indexes()[0]!;
+  const markdown = renderThisTurnOptionsTableMarkdown(
+    [
+      fixtureRow({
+        unitId: 'a1-t1-s1',
+        actionTypes: 'move/melee, ranged attack',
+        targetH3,
+        enemySummary: '2 infantry',
+        enemyUnitCount: 2,
+      }),
+    ],
+    new Map(),
+    { mode: 'strategic' }
+  );
+  assert.match(markdown, /\| a1-t1-s1 \| move\/melee \|/);
+  assert.match(markdown, /\| a1-t1-s1 \| ranged \|/);
+  const rangedOnly = renderThisTurnOptionsTableMarkdown(
+    [fixtureRow({ unitId: 'a1-t1-s3', actionTypes: 'ranged attack', targetH3 })],
+    new Map(),
+    { mode: 'strategic' }
+  );
+  assert.match(rangedOnly, /\| a1-t1-s3 \| ranged \|/);
+  assert.equal(rangedOnly.includes('move/melee'), false, rangedOnly);
+}
+
+/**
  * Drops this-turn ferry dests for air units that already have an air-strike row.
  *
  * Purpose: Turn 18 listed the same strike-capable air units on both strike and ferry Best Options rows.
@@ -249,6 +287,7 @@ function main(): void {
   testSelectTopRowsPerUnitApproachIgnoresUrbanCount();
   testSelectTopRowsPerUnitMoveMeleeStillPrefersUrban();
   testSelectTopRowsPerUnitKeepsAirStrikeAheadOfFerry();
+  testBestOptionsTableKeepsMoveRowWhenRangedSharesTheHex();
   testOmitThisTurnFerryRowsForStrikingAir();
   console.log('possibleUnitActionsTableAssembly tests passed');
 }

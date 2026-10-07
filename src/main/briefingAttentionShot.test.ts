@@ -67,7 +67,7 @@ test('the strategic shot list omits infantry and keeps units that can fire', () 
   assert.ok(flags.includes('a1-i1'), 'infantry in contact stays on a threat bullet');
 });
 
-test('same-hex armor and naval are told to copy move/melee', () => {
+test('same-hex armor and naval are told to stay for melee', () => {
   const flags = buildAttentionFlags(
     [contacted('a1-t1', 'armor', 'melee'), contacted('a1-n1', 'naval', 'melee')],
     'strategic',
@@ -76,7 +76,8 @@ test('same-hex armor and naval are told to copy move/melee', () => {
   const shot = flags.split('\n').find((line) => line.includes('legal attack')) ?? '';
   assert.ok(shot.includes('a1-t1'), shot);
   assert.ok(shot.includes('a1-n1'), shot);
-  assert.ok(shot.includes('copy a move/melee Target Hex'), shot);
+  assert.ok(shot.includes('already in contact'), shot);
+  assert.ok(shot.includes('melee resolves if they stay'), shot);
   assert.ok(shot.includes('do not order a ranged_attack'), shot);
   assert.equal(shot.includes('choose the targets yourself'), false, shot);
 });

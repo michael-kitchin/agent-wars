@@ -10,22 +10,20 @@
 import { buildPromptTableLines } from '../../promptTableHelpers';
 import { logDebug, logTrace } from '../../logger';
 import type { PossibleActionTableRow } from '../../openRouter/possibleUnitActionsTableAssembly';
-import { deriveThisTurnOptionsActionColumn, selectTopRowsPerUnit } from '../../openRouter/possibleUnitActionsTableAssembly';
+import { bestOptionsActionLabels, selectTopRowsPerUnit } from '../../openRouter/possibleUnitActionsTableAssembly';
 import type { CoordinateContext } from './coordinateContext';
 import { h3ToCode } from './hexCodeTranslator';
 import { SECTION_TITLE_BEST_OPTIONS_THIS_TURN } from '../../openRouter/promptSpec/sectionHeadings';
 
 /**
- * Defines the `infrastructureCellForThisTurnOptionsRow` function shape (function infrastructureCellForThisTurnOptionsRow(r: PossibleActionTableRow): string).
-
- * Purpose: Builds the **Target Infrastructure** column for the **Best Options This Turn** table from `featuresSummary`, stripping air-strike-only `; strike: …` suffixes so strike kinds stay out of that column.
- * When to use: Only from `renderThisTurnOptionsTableMarkdown` per body row.
+ * Purpose: Builds the **Target Infrastructure** column for one Best Options action from `featuresSummary`, stripping air-strike-only `; strike: …` suffixes so strike kinds stay out of that column.
+ * When to use: Only from `renderThisTurnOptionsTableMarkdown`, once per expanded action label. `action` is that label.
  * Expected outcome: Pipe-safe text, or `—` when nothing remains after trim/strip.
  * Exceptions: None.
  */
-function infrastructureCellForThisTurnOptionsRow(r: PossibleActionTableRow): string {
+function infrastructureCellForThisTurnOptionsRow(r: PossibleActionTableRow, action: string): string {
   let s = r.featuresSummary.replace(/\|/g, ' ');
-  if (deriveThisTurnOptionsActionColumn(r) === 'air strike') {
+  if (action === 'air strike') {
     const cut = s.indexOf('; strike:');
     if (cut >= 0) s = s.slice(0, cut);
   }
@@ -74,7 +72,7 @@ function groupThisTurnOptionRowsByTarget(
  *
  * Purpose: Single high-signal table replacing multi-bucket possible-actions markdown.
  * When to use: After `collectAggregatedPossibleActionRows`.
- * Expected outcome: Columns `Unit IDs`, `Action`, `Target Hexes`, `Target Units` (enemy summary only), `Target Infrastructure` (hex features; air-strike rows omit `; strike: …`); at most five options per unit; one target hex per row, with units sharing an identical option listed together in `Unit IDs`.
+ * Expected outcome: Columns `Unit IDs`, `Action`, `Target Hexes`, `Target Units` (enemy summary only), `Target Infrastructure` (hex features; air-strike rows omit `; strike: …`); at most five target hexes per unit, with each distinct action on a hex kept as its own row; units sharing an identical option are listed together in `Unit IDs`.
  * Exceptions: Propagates `h3ToCode` failures for unknown tactical/strategic cells.
  */
 export function renderThisTurnOptionsTableMarkdown(
@@ -89,15 +87,18 @@ export function renderThisTurnOptionsTableMarkdown(
   });
   if (rows.length === 0) return '';
   const capped = selectTopRowsPerUnit(rows, latLngByH3);
-  const grouped = groupThisTurnOptionRowsByTarget(
-    capped.map((r) => ({
+  const labeled = capped.flatMap((r) => {
+    const hex = h3ToCode(r.targetH3, context);
+    const targetUnits = r.enemySummary.replace(/\|/g, ' ');
+    return bestOptionsActionLabels(r.actionTypes).map((action) => ({
       unitId: r.unitId,
-      action: deriveThisTurnOptionsActionColumn(r),
-      hex: h3ToCode(r.targetH3, context),
-      targetUnits: r.enemySummary.replace(/\|/g, ' '),
-      infrastructure: infrastructureCellForThisTurnOptionsRow(r),
-    }))
-  );
+      action,
+      hex,
+      targetUnits,
+      infrastructure: infrastructureCellForThisTurnOptionsRow(r, action),
+    }));
+  });
+  const grouped = groupThisTurnOptionRowsByTarget(labeled);
   logDebug('briefing-tables renderThisTurnOptionsTableMarkdown: grouped', {
     cappedRowCount: capped.length,
     groupedRowCount: grouped.length,
