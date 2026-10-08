@@ -109,10 +109,11 @@ Cells are `Shown`, `Hidden`, `Disabled` (visible, but pointer input is off), `Ch
 
 | Element | New game | Strategic planning | Tactical battles list | Resolution playback | Tactical planning | Tactical annihilation | Game over |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Map surface | Disabled | Shown | Disabled | Changed | Changed | Disabled | Disabled |
-| Map overlays | Disabled | Shown | Disabled | Shown | Changed | Disabled | Disabled |
+| Map surface | Changed | Shown | Disabled | Changed | Changed | Disabled | Changed |
+| Map overlays | Hidden | Shown | Disabled | Shown | Changed | Disabled | Hidden |
 | Minimap | Hidden | Shown | Disabled | Shown | Shown | Disabled | Hidden |
 | Terrain legend | Hidden | Shown | Disabled | Shown | Shown | Disabled | Hidden |
+| Map zoom control | Hidden | Shown | Disabled | Shown | Shown | Disabled | Hidden |
 | Hex tooltips | Hidden | Shown | Hidden | Shown | Shown | Hidden | Hidden |
 | Stack callout | Hidden | Shown | Hidden | Hidden | Shown | Hidden | Hidden |
 | Build popup | Hidden | Shown | Disabled | Disabled | Hidden | Hidden | Hidden |

@@ -21,6 +21,7 @@ import {
 import { newGameButtonTooltipText } from '../chrome/controlTooltipText';
 import { installRendererGameMap } from '../core/installRendererGameMap';
 import { blurMapChromeIfFocused } from '../core/uiState';
+import { expandNewGameDialog, toggleNewGameDialogCollapsed } from './newGameDialogCollapse';
 import { syncMapExtentToSnapshot } from '../map/mapExtent';
 import { prepareNewGameMapPanel, readNewGameMapChoice, regionalStartBlocked, registerNewGameMapControls } from './newGameMapUi';
 import {
@@ -265,6 +266,9 @@ setMainUIControlsEnabled: (enabled: boolean) => void;
  * Exceptions: None; click handler errors are caught.
  */
 export function registerNewGameButton(deps: NewGameDeps): void {
+  document.getElementById('new-game-dialog-collapse')?.addEventListener('click', () => {
+    toggleNewGameDialogCollapsed();
+  });
   registerRegionRandomizeButtons();
   registerNewGameMapControls();
   registerGameSizeSelect();
@@ -345,7 +349,7 @@ export function registerNewGameButton(deps: NewGameDeps): void {
  * When to use: The Model tab's New game button.
  * Expected outcome: During a battle or resolution playback the click returns without cancelling planning, showing
  *   the overlay, or disabling the map. Otherwise AI requests are cancelled, Fog of war and the bonus dropdowns
- *   return to their defaults, the home regions, starting month, and map preview are drawn again, and the new-game overlay opens.
+ *   return to their defaults, the home regions, starting month, and map preview are drawn again, the form starts showing, and the new-game overlay opens.
  * Exceptions: None.
  */
 export function openNewGameOverlayFromModelTab(setMainUIControlsEnabled: (enabled: boolean) => void, updateReadyButtonState: () => void): void {
@@ -375,6 +379,7 @@ export function openNewGameOverlayFromModelTab(setMainUIControlsEnabled: (enable
   })();
   syncGameSizeCapPreview();
   overlay?.classList.remove('hidden');
+  expandNewGameDialog();
   blurMapChromeIfFocused();
   resetNewGameMapPreviewFrame();
   repaintNewGameMapPreview();

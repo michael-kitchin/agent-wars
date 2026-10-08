@@ -41,6 +41,8 @@ The tip can appear whenever the control can receive the pointer or keyboard focu
 - Fog of war: Leave this checked to hide places and enemy units you have not seen. Uncheck it to show the whole map for the next match.
 - Starting month: Pick the month the match starts in. Each world-map turn advances one month, and a battle stays in the month that is current.
 - Randomize starting month: Pick a month at random, including the month already shown.
+- Hide the new game choices: Hide the new game choices. The map stays up.
+- Show the new game choices: Show the new game choices.
 - Start game: Start the match with the choices on this screen. If the start fails, the screen stays open.
 - New game: Start a new match with the choices on this screen. This clears your selection and the orders you had queued.
 - Ready: End this planning step and play out the orders you have queued, on the world map or in a battle. It stays unavailable while the match is over, while the opponent is still planning, or while playback is already running. The sentence stays the same when the label reads "AI:".

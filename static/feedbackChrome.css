@@ -53,6 +53,30 @@
 }
 #game-over-overlay > .game-over-box {
   flex-shrink: 0;
+  padding-top: max(1.5rem, calc(var(--new-game-collapse-size, 1.75rem) + 0.45rem));
+  padding-left: max(2rem, calc(var(--new-game-collapse-size, 1.75rem) + 0.45rem));
+  padding-right: 2rem;
+  padding-bottom: 1.5rem;
+}
+/* The square matches a randomize button. It stays clickable when the overlay stops taking the pointer. */
+#new-game-dialog-collapse {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 1;
+  width: var(--new-game-collapse-size, 1.75rem);
+  height: var(--new-game-collapse-size, 1.75rem);
+  min-width: 0;
+  margin-left: 0;
+  padding: 0;
+  box-sizing: border-box;
+  pointer-events: auto;
+}
+#game-over-overlay.game-over-dialog-collapsed {
+  pointer-events: none;
+}
+#game-over-overlay.game-over-dialog-collapsed > .game-over-box {
+  display: none;
 }
 /* Stacks above tactical HUD (6600) and matches game-over overlay chrome for annihilation results. */
 .tactical-annihilation-overlay.game-over-overlay {

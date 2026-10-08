@@ -24465,6 +24465,66 @@ ${body}`;
     syncGameSizeCapPreview();
   }
 
+  // src/renderer/gameplay/newGameDialogCollapse.ts
+  var COLLAPSED_CLASS = "game-over-dialog-collapsed";
+  var EXPANDED_LABEL = "Hide the new game choices";
+  var EXPANDED_TOOLTIP = "Hide the new game choices. The map stays up.";
+  var COLLAPSED_LABEL = "Show the new game choices";
+  var COLLAPSED_TOOLTIP = "Show the new game choices.";
+  function newGameOverlayIsOpen() {
+    const overlay = document.getElementById("game-over-overlay");
+    return overlay != null && !overlay.classList.contains("hidden");
+  }
+  function measureCollapseSquare(overlay) {
+    if (overlay.classList.contains(COLLAPSED_CLASS)) return;
+    const globalButton = document.getElementById("new-game-human-region-randomize");
+    const regionalButton = document.getElementById("new-game-region-randomize");
+    const source = globalButton != null && globalButton.offsetHeight > 0 ? globalButton : regionalButton;
+    if (source == null || source.offsetHeight <= 0) return;
+    overlay.style.setProperty("--new-game-collapse-size", `${source.offsetHeight}px`);
+  }
+  function applyExpandedChrome(overlay, button) {
+    overlay.classList.remove(COLLAPSED_CLASS);
+    button.textContent = UNIT_DESELECT_GLYPH;
+    button.setAttribute("aria-expanded", "true");
+    button.setAttribute("aria-label", EXPANDED_LABEL);
+    button.setAttribute("data-control-tooltip", EXPANDED_TOOLTIP);
+    measureCollapseSquare(overlay);
+  }
+  function applyCollapsedChrome(overlay, button) {
+    const active2 = document.activeElement;
+    const dialog = document.getElementById("game-over-dialog");
+    if (active2 instanceof HTMLElement && dialog?.contains(active2)) active2.blur();
+    overlay.classList.add(COLLAPSED_CLASS);
+    button.textContent = UNIT_SELECT_GLYPH;
+    button.setAttribute("aria-expanded", "false");
+    button.setAttribute("aria-label", COLLAPSED_LABEL);
+    button.setAttribute("data-control-tooltip", COLLAPSED_TOOLTIP);
+    overlay.scrollTop = 0;
+    overlay.scrollLeft = 0;
+  }
+  function expandNewGameDialog() {
+    const overlay = document.getElementById("game-over-overlay");
+    const button = document.getElementById("new-game-dialog-collapse");
+    if (!(overlay instanceof HTMLElement) || !(button instanceof HTMLButtonElement)) return;
+    applyExpandedChrome(overlay, button);
+  }
+  function toggleNewGameDialogCollapsed() {
+    const overlay = document.getElementById("game-over-overlay");
+    const button = document.getElementById("new-game-dialog-collapse");
+    if (!(overlay instanceof HTMLElement) || !(button instanceof HTMLButtonElement)) return;
+    if (overlay.classList.contains(COLLAPSED_CLASS)) applyExpandedChrome(overlay, button);
+    else applyCollapsedChrome(overlay, button);
+    syncNewGameDialogMapPointer();
+  }
+  function syncNewGameDialogMapPointer() {
+    const overlay = document.getElementById("game-over-overlay");
+    const map = document.getElementById("main-map");
+    if (!(overlay instanceof HTMLElement) || !(map instanceof HTMLElement)) return;
+    if (overlay.classList.contains("hidden")) return;
+    map.style.pointerEvents = overlay.classList.contains(COLLAPSED_CLASS) ? "auto" : "none";
+  }
+
   // src/renderer/core/uiState.ts
   function formatStrategicPhaseLabelForSidebar(phase) {
     if (!phase) return phase;
@@ -24527,6 +24587,7 @@ ${body}`;
       sidebar.style.pointerEvents = enabled ? "" : "none";
       sidebar.classList.toggle("main-ui-disabled", !enabled);
     }
+    syncNewGameDialogMapPointer();
   }
   function updateGameOverUI(state, updateReadyButtonState2) {
     const overlay = document.getElementById("game-over-overlay");
@@ -24547,6 +24608,7 @@ ${body}`;
     overlay?.classList.remove("hidden");
     resetNewGameOptionControls();
     if (wasHidden) {
+      expandNewGameDialog();
       blurMapChromeIfFocused();
       resetNewGameMapPreviewFrame();
       repaintNewGameMapPreview();
@@ -29303,6 +29365,9 @@ ${body}`;
     });
   }
   function registerNewGameButton(deps) {
+    document.getElementById("new-game-dialog-collapse")?.addEventListener("click", () => {
+      toggleNewGameDialogCollapsed();
+    });
     registerRegionRandomizeButtons();
     registerNewGameMapControls();
     registerGameSizeSelect();
@@ -29402,6 +29467,7 @@ ${body}`;
     })();
     syncGameSizeCapPreview();
     overlay?.classList.remove("hidden");
+    expandNewGameDialog();
     blurMapChromeIfFocused();
     resetNewGameMapPreviewFrame();
     repaintNewGameMapPreview();
@@ -32790,6 +32856,13 @@ ${body}`;
     const map = getMainLeafletMap();
     if (!map) return;
     const container = map.getContainer();
+    if (newGameOverlayIsOpen()) {
+      if (rendererSharedState.lastAppliedMapInteractionCursor !== "") {
+        rendererSharedState.lastAppliedMapInteractionCursor = "";
+        container.style.removeProperty("cursor");
+      }
+      return;
+    }
     if (container.classList.contains("leaflet-dragging")) {
       if (rendererSharedState.lastAppliedMapInteractionCursor !== "") {
         rendererSharedState.lastAppliedMapInteractionCursor = "";
@@ -34020,6 +34093,7 @@ ${body}`;
       scheduleHexDetailsTooltip(hit, rendererSharedState.hoveredDetailHexH3, rendererSharedState.lastPointerClientX, rendererSharedState.lastPointerClientY);
     };
     mainMapEl.addEventListener("pointermove", (e) => {
+      if (newGameOverlayIsOpen()) return;
       rendererSharedState.lastPointerClientX = e.clientX;
       rendererSharedState.lastPointerClientY = e.clientY;
       repositionOrderBlockHexTooltipIfVisible();
@@ -34128,6 +34202,7 @@ ${body}`;
       }
     });
     mainMapEl.addEventListener("pointerdown", (e) => {
+      if (newGameOverlayIsOpen()) return;
       if (e.button !== 0) return;
       const pressAtMs = Date.now();
       const press = resolveMapGesturePress({
@@ -34162,6 +34237,7 @@ ${body}`;
       hideOrderBlockHexTooltip();
     });
     mainMapEl.addEventListener("click", async (e) => {
+      if (newGameOverlayIsOpen()) return;
       if (resolutionPlaybackBlocksMapOrders(rendererSharedState.resolutionMoveAnimation)) {
         if (await deps.tryHandleTacticalEntryAtClientXY(e.clientX, e.clientY)) {
           deps.updateSidebar();
@@ -34296,6 +34372,7 @@ ${body}`;
       deps.redraw();
     });
     mainMapEl.addEventListener("dblclick", (e) => {
+      if (newGameOverlayIsOpen()) return;
       void handleMainMapDoubleClick(e, {
         clientXYToHit,
         pointerHitsDrawnUnitIcon,
@@ -34317,6 +34394,7 @@ ${body}`;
     });
     mainMapEl.addEventListener("contextmenu", (e) => {
       e.preventDefault();
+      if (newGameOverlayIsOpen()) return;
       clearDeferredHumanUnitSingleSelectTimer();
       clearDeferredStackCalloutTimer();
       if (rendererSharedState.selectedUnitIds.length === 0 && !rendererSharedState.hoverRoutePreview) {

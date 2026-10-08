@@ -10,7 +10,7 @@ Name the modes a player can be in, what starts and ends each one, and what plann
 
 ### New game
 
-The player sees the new-game overlay. The message is "Start the world map game when ready." when no match is loaded, and "Start a new world map game when ready." when the player opened the overlay from the Model tab during a match. The button reads "Start game". Global and Regional tabs sit under the message. Global chooses a home region for each side. Regional chooses one region and a different side group for each side. Game size, fog of war, a level (Off, Low, or High) for each of the origin bonus, tech bonus, terrain bonus, and weather bonus, and a starting month sit outside the tabs. The map and the right panel do not accept pointer input. Ready is disabled. The map behind the overlay shows the selected tab's strategic hexes and home areas, as in [new-game-dialog.md](new-game-dialog.md). The dialog sits at the minimap's usual corner, with no dark veil. The minimap and the terrain legend are hidden. This mode ends when Start game succeeds and a match is loaded.
+The player sees the new-game overlay. The message is "Start the world map game when ready." when no match is loaded, and "Start a new world map game when ready." when the player opened the overlay from the Model tab during a match. The button reads "Start game". Global and Regional tabs sit under the message. Global chooses a home region for each side. Regional chooses one region and a different side group for each side. Game size, fog of war, a level (Off, Low, or High) for each of the origin bonus, tech bonus, terrain bonus, and weather bonus, and a starting month sit outside the tabs. The right panel does not accept pointer input. While the form is showing, the map does not accept pointer input either. While the form is hidden, drag and the wheel pan and zoom the preview, and a click, double-click, or right-click does not select, order, or change the selection. Ready is disabled. The map behind the overlay shows the selected tab's strategic hexes and home areas, as in [new-game-dialog.md](new-game-dialog.md). The dialog sits at the minimap's usual corner, with no dark veil. The minimap, the terrain legend, and the map's + and − zoom control are hidden. This mode ends when Start game succeeds and a match is loaded.
 
 ### Strategic planning
 
@@ -52,7 +52,7 @@ The player sees an overlay with "You win!", "You lose.", or "All units destroyed
 
 ### Game over
 
-The player sees the same overlay as New game. The message is "You win!" or "You lose." The button reads "New game". The map and the right panel do not accept pointer input, and Ready is disabled. The map behind the overlay shows the same preview as New game. The dialog, the missing veil, and the hidden minimap and legend match New game. Starting a new match leaves this mode for strategic planning.
+The player sees the same overlay as New game. The message is "You win!" or "You lose." The button reads "New game". The right panel does not accept pointer input. The map follows the same show and hide rules as New game, and Ready is disabled. The map behind the overlay shows the same preview as New game. The dialog, the missing veil, and the hidden minimap, legend, and + and − zoom control match New game. Starting a new match leaves this mode for strategic planning.
 
 ## Transitions
 

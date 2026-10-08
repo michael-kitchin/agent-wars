@@ -8,7 +8,7 @@ Show the consequence of the current selection, drafts, and resolution without ma
 
 ## Availability
 
-Drawn on the map surface whenever their condition is true, in Strategic planning, Tactical planning, and Resolution playback. They are not interactive. New game, Game over, and the tactical battles list disable pointer input on the map; overlays are not a separate mode. While the new-game overlay is open, these match overlays are not drawn. The map shows that dialog's preview instead. See [new-game-dialog.md](new-game-dialog.md). While the tactical battles list is open, the map is not refreshed, so overlays stay as they were when Ready paused.
+Drawn on the map surface whenever their condition is true, in Strategic planning, Tactical planning, and Resolution playback. They are not interactive. New game, Game over, and the tactical battles list are not overlay modes. While the new-game overlay is open, these match overlays are not drawn. The map shows that dialog's preview instead. See [new-game-dialog.md](new-game-dialog.md). While the tactical battles list is open, the map is not refreshed, so overlays stay as they were when Ready paused.
 
 ## Information Displayed
 

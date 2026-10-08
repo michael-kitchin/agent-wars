@@ -10,6 +10,7 @@ import { repaintNewGameMapPreview } from '../map/newGameMapPreviewRendering';
 import { syncGameSizeCapPreview } from '../gameplay/newGameSizeUi';
 import { resetNewGameOptionControls } from '../gameplay/newGameOptionsUi';
 import { newGameButtonTooltipText } from '../chrome/controlTooltipText';
+import { expandNewGameDialog, syncNewGameDialogMapPointer } from '../gameplay/newGameDialogCollapse';
 
 /**
  * Title-cases the strategic phase id from main (`planning` / `resolution`) for the sidebar line.
@@ -105,7 +106,7 @@ export function blurMapChromeIfFocused(): void {
  *
  * Purpose: The new-game overlay and the annihilation dialog stay clickable while the match controls do not.
  * When to use: When those overlays open or close, and when the tactical battles list opens or closes.
- * Expected outcome: Children of the map pane other than those two overlays ignore the pointer while `enabled` is false. The right panel matches.
+ * Expected outcome: Children of the map pane other than those two overlays ignore the pointer while `enabled` is false. The right panel matches. While the new-game form is hidden, the main map takes the pointer again so drag and the wheel still move the preview.
  * Exceptions: None.
  */
 export function setMainUIControlsEnabled(enabled: boolean): void {
@@ -122,6 +123,7 @@ export function setMainUIControlsEnabled(enabled: boolean): void {
     (sidebar as HTMLElement).style.pointerEvents = enabled ? '' : 'none';
     sidebar.classList.toggle('main-ui-disabled', !enabled);
   }
+  syncNewGameDialogMapPointer();
 }
 
 /**
@@ -132,6 +134,7 @@ export function setMainUIControlsEnabled(enabled: boolean): void {
  * Expected outcome: With a live game the overlay hides and controls are enabled. Otherwise the overlay shows a
  *   win, loss, or start message. Fog of war and the bonus dropdowns return to their defaults on every call while
  *   it shows. The home regions, the starting month, and the map preview are drawn only when the overlay opens.
+ *   The form starts showing only on that open. A later refresh leaves a hidden form hidden.
  * Exceptions: None.
  */
 export function updateGameOverUI(
@@ -159,6 +162,7 @@ export function updateGameOverUI(
   overlay?.classList.remove('hidden');
   resetNewGameOptionControls();
   if (wasHidden) {
+    expandNewGameDialog();
     blurMapChromeIfFocused();
     resetNewGameMapPreviewFrame();
     repaintNewGameMapPreview();

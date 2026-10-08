@@ -101,6 +101,10 @@ body {
 #canvas-container:has(#game-over-overlay:not(.hidden)) #terrain-legend {
   visibility: hidden;
 }
+/* Hidden for the whole time the start dialog is open, including while its form is collapsed. Not removed, so it shows again when that dialog closes. The battle-result dialog does not use this overlay. */
+#canvas-container:has(#game-over-overlay:not(.hidden)) #main-map .leaflet-control-zoom {
+  visibility: hidden;
+}
 #terrain-legend select {
   display: block;
   width: auto;

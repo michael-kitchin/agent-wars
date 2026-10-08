@@ -35,6 +35,7 @@ Keys other than these do not pan, toggle terrain, or close popups.
 ## Precedence and Focus
 
 - When the key target is a text field, a text area, a dropdown, or other editable content, T and the pan keys do nothing, and pressing Shift does not refresh an open stack callout. Escape is handled before that check, so it still closes the build popup or the stack callout, and it still chooses Ignore on the tactical battles list. That includes Escape pressed inside the build popup's count field.
+- While the new-game overlay is open and its form is showing, drag, wheel, click, double-click, and right-click do not reach the map. While that form is hidden, drag and the wheel pan and zoom the preview. Click, double-click, and right-click do not select, order, or change the selection, and hover does not open a hex tooltip. See [new-game-dialog.md](new-game-dialog.md).
 - Focusing an editable field stops keyboard pan immediately. Releasing a pan key still stops that key even if focus moved into a field after the key went down.
 - Window blur stops keyboard pan, clears the held-Shift flag, and, if T was held, restores terrain fill, removes the hex codes, and restores the weather icon.
 - Hiding the window stops keyboard pan.

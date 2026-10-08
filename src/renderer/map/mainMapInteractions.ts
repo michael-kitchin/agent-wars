@@ -6,6 +6,7 @@ import { hitTestHexAtContainerPixel, hitTestTacticalHexAtContainerPixel } from '
 import { rendererSharedState as S } from '../core/state';
 import { clearMapSelectionChrome, isEmbarkedLandUnitBlockedForSelection } from '../core/selection';
 import { getMainLeafletMap } from './worldLeafletMap';
+import { newGameOverlayIsOpen } from '../gameplay/newGameDialogCollapse';
 import { tacticalRendererHitInsideBattleFootprint } from '../tactical/tacticalUiGuards';
 import { buildTacticalPendingMarchRowFromDraft } from '../tactical/tacticalPendingMarchPath';
 import {
@@ -575,6 +576,7 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
   };
 
   mainMapEl.addEventListener('pointermove', (e) => {
+    if (newGameOverlayIsOpen()) return;
     S.lastPointerClientX = e.clientX;
     S.lastPointerClientY = e.clientY;
     repositionOrderBlockHexTooltipIfVisible();
@@ -713,6 +715,7 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
   });
 
   mainMapEl.addEventListener('pointerdown', (e) => {
+    if (newGameOverlayIsOpen()) return;
     if (e.button !== 0) return;
     const pressAtMs = Date.now();
     const press = resolveMapGesturePress({
@@ -752,6 +755,7 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
   });
 
   mainMapEl.addEventListener('click', async (e) => {
+    if (newGameOverlayIsOpen()) return;
     if (resolutionPlaybackBlocksMapOrders(S.resolutionMoveAnimation)) {
       if (await deps.tryHandleTacticalEntryAtClientXY(e.clientX, e.clientY)) {
         deps.updateSidebar();
@@ -908,6 +912,7 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
   });
 
   mainMapEl.addEventListener('dblclick', (e) => {
+    if (newGameOverlayIsOpen()) return;
     void handleMainMapDoubleClick(e, {
       clientXYToHit,
       pointerHitsDrawnUnitIcon,
@@ -930,6 +935,7 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
 
   mainMapEl.addEventListener('contextmenu', (e) => {
     e.preventDefault();
+    if (newGameOverlayIsOpen()) return;
     clearDeferredHumanUnitSingleSelectTimer();
     clearDeferredStackCalloutTimer();
     if (S.selectedUnitIds.length === 0 && !S.hoverRoutePreview) {

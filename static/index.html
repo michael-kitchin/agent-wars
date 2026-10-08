@@ -27,7 +27,8 @@
       <ul id="stack-callout-list"></ul>
     </div>
     <div id="game-over-overlay" class="game-over-overlay hidden" aria-live="polite">
-      <div class="game-over-box">
+      <button type="button" id="new-game-dialog-collapse" class="compact-blue-btn compact-square-btn" aria-expanded="true" aria-controls="game-over-dialog" aria-label="Hide the new game choices" data-control-tooltip="Hide the new game choices. The map stays up.">-</button>
+      <div class="game-over-box" id="game-over-dialog">
         <p id="game-over-message"></p>
         <div class="openrouter-tab-bar game-over-tab-bar" role="tablist">
           <button type="button" id="new-game-tab-global" role="tab" aria-selected="true" aria-controls="new-game-panel-global" data-control-tooltip="Start on the world map and pick a home region for each side.">Global</button>
