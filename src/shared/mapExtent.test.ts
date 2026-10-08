@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { longitudeIntervalFromCenters } from './mapExtent';
+import { loadedMapExtentKey, longitudeIntervalFromCenters, shouldApplyLoadedMapExtent } from './mapExtent';
 
 describe('longitudeIntervalFromCenters', () => {
   it('spans the short way across the antimeridian', () => {
@@ -24,5 +24,26 @@ describe('longitudeIntervalFromCenters', () => {
     assert.ok(Math.abs(interval.west - 30) < 0.001);
     assert.ok(interval.east > 180);
     assert.ok(Math.abs(interval.east - 185) < 0.001);
+  });
+});
+
+describe('loadedMapExtentKey', () => {
+  it('marks an empty hex list', () => {
+    assert.equal(loadedMapExtentKey('western_europe', []), 'western_europe:empty');
+  });
+
+  it('uses map id, length, and the first and last index', () => {
+    assert.equal(loadedMapExtentKey('western_europe', ['a', 'b', 'c']), 'western_europe:3:a:c');
+  });
+});
+
+describe('shouldApplyLoadedMapExtent', () => {
+  it('skips a matching footprint unless a new match asks to fit again', () => {
+    assert.equal(shouldApplyLoadedMapExtent('western_europe:3:a:c', 'western_europe:3:a:c', false), false);
+    assert.equal(shouldApplyLoadedMapExtent('western_europe:3:a:c', 'western_europe:3:a:c', true), true);
+  });
+
+  it('applies a different footprint without a forced refit', () => {
+    assert.equal(shouldApplyLoadedMapExtent('global:empty', 'western_europe:3:a:c', false), true);
   });
 });

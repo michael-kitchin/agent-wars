@@ -39,13 +39,14 @@ When no match is loaded, the basemap can still be visible under the new-game ove
 
 ### Other
 
+- When a match starts, the view frames that match's bounds, then zooms one level toward the player's infantry and armor. If the player has neither, that zoom uses any of the player's units. If the player has no units, the view stays on the framed bounds. A global match frames the Mercator world. A regional match frames that region's hexes. Starting a match on the same region as the previous match frames it again. A later turn does not move the view back to that frame while the match's hex footprint is unchanged.
 - When a tactical battle starts, the view moves to the battle area and pan limits follow that area until the battle ends.
-- When the battle ends, the view returns to the world bounds.
+- When the battle ends, pan limits return to the match's bounds. The view returns to the frame saved when that match opened. When no frame was saved, the view fits those bounds.
 - When some basemap tiles fail to load, a map toast says the game remains playable. That toast is shown once per session and hides like other map toasts. See [notifications-and-feedback.md](notifications-and-feedback.md).
 
 ## States
 
-- Strategic view: world bounds, strategic units, entry markers when the zoom allows them.
+- Strategic view: the loaded match's bounds, strategic units, entry markers when the zoom allows them.
 - Tactical view: battle bounds, battle units, Exit Battle available according to [tactical-battle-controls.md](tactical-battle-controls.md).
 - Input disabled: New game, Game over, Tactical annihilation, or while the tactical battles list is open. Pointer input is off. While the tactical battles list is open, and in Tactical annihilation, pan keys and T still follow [input-map.md](input-map.md).
 - Orders blocked: Resolution playback. The map pans, zooms, and shows tooltips, but does not select, target, or order.
@@ -56,6 +57,7 @@ When no match is loaded, the basemap can still be visible under the new-game ove
 - A click outside the battle area never issues a strategic order.
 - A map gesture during Resolution playback never queues or changes an order.
 - Double-click never zooms the map.
+- Starting a match frames that match's bounds before the player can act. A later turn does not return the view to that frame while the match's hex footprint is unchanged.
 - Keyboard pan is the app pan, not the map library's own keyboard pan.
 - The tech and weather line above a hex code appears only while T is held, only on the strategic map, only outside battle-detail zoom, and only on a hex that is showing a production label.
 
@@ -91,6 +93,8 @@ None.
 
 - `static/index.html` (`#canvas-container`, `#main-map`, `#map-overlay`)
 - `src/renderer/map/worldLeafletMap.ts`
+- `src/renderer/map/mapExtent.ts`
+- `src/shared/mapExtent.ts`
 - `src/renderer/map/mainMapInteractions.ts`
 - `src/renderer/map/mapDoubleClickHandler.ts`
 - `src/renderer/map/mapClickSelectionPolicy.ts`

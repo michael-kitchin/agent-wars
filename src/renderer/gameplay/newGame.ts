@@ -20,6 +20,7 @@ import {
 } from './newGameOptionsUi';
 import { newGameButtonTooltipText } from '../chrome/controlTooltipText';
 import { installRendererGameMap } from '../core/installRendererGameMap';
+import { syncMapExtentToSnapshot } from '../map/mapExtent';
 import { prepareNewGameMapPanel, readNewGameMapChoice, regionalStartBlocked, registerNewGameMapControls } from './newGameMapUi';
 import { showMapToast } from '../openRouter/openRouterUiHelpers';
 
@@ -233,7 +234,8 @@ setMainUIControlsEnabled: (enabled: boolean) => void;
  * When to use: Once at renderer startup.
  * Expected outcome: The randomize buttons, game-size preview, and bonus-line separators are live. Clicking Start sends
  *   fog, the four bonus levels, the starting month, home regions, and game size to `newGame`, then reloads the map,
- *   sidebars, and overlay from the returned state. Failures are logged to the console.
+ *   sidebars, and overlay from the returned state. Start fits the loaded extent, then zooms one level toward human infantry and armor, or any human units when those are absent.
+ *   Failures are logged to the console.
  * Exceptions: None; click handler errors are caught.
  */
 export function registerNewGameButton(deps: NewGameDeps): void {
@@ -270,6 +272,7 @@ export function registerNewGameButton(deps: NewGameDeps): void {
       S.lastRenderedVisibleEnemyByUnitId.clear();
       deps.updateClientStaleEnemyIntel(null, state);
       S.initialCameraApplied = false;
+      syncMapExtentToSnapshot(state, { refit: true });
       if (state.hexes.length > 0) {
         deps.applyInitialCameraForState(state);
       }

@@ -96,7 +96,7 @@ stateDiagram-v2
 
 ## State Carried Across Transitions
 
-- New game and Game over into Strategic planning: selection, hex selection, draft orders, the strategic-order stash, hover preview, the running AI cost, and the AI activity log are cleared. The map view is whatever the new match opens.
+- New game and Game over into Strategic planning: selection, hex selection, draft orders, the strategic-order stash, hover preview, the running AI cost, and the AI activity log are cleared. The map view frames the new match, as in [map-surface.md](map-surface.md).
 - Strategic planning into Tactical planning: strategic draft orders are stashed and the order lists empty. Ranged and Strike targeting turn off. The build popup closes. Selection is reconciled to units that exist in the battle, which is usually empty. The map view changes to the battle area.
 - Tactical planning or Tactical annihilation into Strategic planning: tactical draft orders are cleared. Stashed strategic drafts return, minus drafts whose units are gone. The map view leaves the battle area. A failed exit does not clear the battle. A successful exit then runs Ready, using the same rules as pressing Ready in Strategic planning. That can submit the restored drafts, open the tactical battles list, or start resolution playback. It does nothing while a deferred consultation is outstanding, and it shows the AI-wait toast while opponent orders are not ready.
 - Ready, in either theater: a successful commit clears the drafts that were just submitted. Grouped march and ferry commits also clear the selection. Hover preview is cleared after strategic Ready. Tactical march continuations can reappear as pending movement after a tactical commit.

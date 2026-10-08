@@ -141,6 +141,31 @@ export function mapExtentReferenceLng(): number | null {
 }
 
 /**
+ * Builds the identity of one loaded footprint.
+ *
+ * Purpose: Later snapshots of the same match must not fit the camera again.
+ * When to use: When extent sync decides whether a snapshot should fit. Pass `gameMap.id`, or `'global'` when that id is missing.
+ * Expected outcome: An empty hex list returns `${mapId}:empty`. Any other list returns map id, length, first index, and last index, in that order.
+ * Exceptions: None.
+ */
+export function loadedMapExtentKey(mapId: string, h3Indexes: readonly string[]): string {
+  if (h3Indexes.length === 0) return `${mapId}:empty`;
+  return `${mapId}:${h3Indexes.length}:${h3Indexes[0]}:${h3Indexes[h3Indexes.length - 1]}`;
+}
+
+/**
+ * Reports whether this footprint should move the map.
+ *
+ * Purpose: A new match frames its map even when the hex list matches the previous match. A later snapshot of that match does not.
+ * When to use: From extent sync, after the map is known to exist. This function only compares keys.
+ * Expected outcome: True when `refit` is true or the keys differ. False when the keys match and `refit` is false.
+ * Exceptions: None.
+ */
+export function shouldApplyLoadedMapExtent(appliedKey: string, nextKey: string, refit: boolean): boolean {
+  return refit || appliedKey !== nextKey;
+}
+
+/**
  * Picks the occupied longitude span as the complement of the largest gap.
  *
  * Purpose: A map that crosses 180° must span the short way around, not the long empty ocean.

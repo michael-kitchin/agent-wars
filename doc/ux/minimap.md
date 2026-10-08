@@ -30,6 +30,7 @@ The rectangle tracks pan and zoom of the main map.
 ### Other
 
 - When the main map moves or zooms, the overview rectangle updates or hides.
+- When a match starts, the overview shows that match's extent, including a new match on the same region.
 
 ## States
 
@@ -62,3 +63,4 @@ None.
 
 - `static/index.html` (`#minimap`)
 - `src/renderer/map/worldLeafletMap.ts`
+- `src/renderer/map/mapExtent.ts`

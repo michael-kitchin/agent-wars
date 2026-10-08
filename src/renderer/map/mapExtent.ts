@@ -1,9 +1,11 @@
 import { cellToLatLng } from 'h3-js';
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import {
+  loadedMapExtentKey,
   longitudeIntervalFromCenters,
   mapExtentBoxForHexes,
   setMapExtentReferenceLng,
+  shouldApplyLoadedMapExtent,
   type MapExtentBox,
 } from '../../shared/mapExtent';
 import { WEB_MERCATOR_MAX_ABS_LAT } from './hexGrid';
@@ -96,7 +98,7 @@ let active: 'world' | MapExtentBox = 'world';
 /**
  * Skips repeat fits when the same footprint is applied again.
  *
- * Purpose: A later snapshot of the same map must not yank the camera back to the fit.
+ * Purpose: A later snapshot of the same map must not yank the camera back to the fit. A new match passes `refit` so the same footprint can frame again.
  * When to use: Compared inside `syncMapExtentToSnapshot`.
  * Expected outcome: Changes when the map id or the first and last hex change.
  * Exceptions: None.
@@ -185,20 +187,41 @@ export function restoreLoadedMapExtent(fit = false): void {
 }
 
 /**
+ * Chooses whether a snapshot fit may repeat the last footprint.
+ *
+ * Purpose: Start must frame a new match. Ordinary snapshot applies must not.
+ * When to use: The optional second argument of `syncMapExtentToSnapshot`.
+ * Expected outcome: Omitted means do not repeat a matching footprint.
+ * Exceptions: None.
+ */
+interface MapExtentSyncOptions {
+  /**
+   * Forces a fit even when the footprint key matches the last apply.
+   *
+   * Contract: True fits again even when this match's hex list matches the previous match. A different region already has a different key.
+   * When to use: Pass true from the Start button only.
+   * Expected outcome: True fits again. False or omitted skips an unchanged footprint.
+   * Exceptions: None.
+   */
+  readonly refit?: boolean;
+}
+
+/**
  * Fits a newly loaded footprint, or restores the world when the snapshot is empty.
  *
- * Purpose: Extent changes with the game map, not on every redraw.
- * When to use: At the start of applying a strategic snapshot, after the renderer profile is installed.
- * Expected outcome: Global and empty snapshots use world limits. Regional snapshots use the hex footprint.
- * Exceptions: None when the map is not created yet; the next snapshot retries because the key is not stored.
+ * Purpose: Extent changes with the match, not on every redraw.
+ * When to use: At the start of applying a strategic snapshot. Pass `{ refit: true }` only when a new match is starting.
+ * Expected outcome: Global and empty snapshots use world limits. Regional snapshots use the hex footprint. A matching footprint is skipped unless `refit` is true. When the map is not created yet, nothing is stored and the next snapshot retries.
+ * Exceptions: None.
  */
-export function syncMapExtentToSnapshot(state: GameStateSnapshot): void {
+export function syncMapExtentToSnapshot(state: GameStateSnapshot, options?: MapExtentSyncOptions): void {
   const mapId = state.gameMap?.id ?? 'global';
-  const first = state.hexes[0]?.h3Index ?? '';
-  const last = state.hexes[state.hexes.length - 1]?.h3Index ?? '';
-  const key = state.hexes.length === 0 ? `${mapId}:empty` : `${mapId}:${state.hexes.length}:${first}:${last}`;
+  const key = loadedMapExtentKey(
+    mapId,
+    state.hexes.map((hex) => hex.h3Index)
+  );
   if (!extentMaps()) return;
-  if (key === appliedKey) return;
+  if (!shouldApplyLoadedMapExtent(appliedKey, key, options?.refit === true)) return;
   if (mapId === 'global' || state.hexes.length === 0) {
     applyLoadedMapExtent('world', true);
     appliedKey = key;

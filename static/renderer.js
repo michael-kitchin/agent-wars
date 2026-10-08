@@ -18788,6 +18788,13 @@ ${body}`;
   function mapExtentReferenceLng() {
     return extentReferenceLng;
   }
+  function loadedMapExtentKey(mapId, h3Indexes) {
+    if (h3Indexes.length === 0) return `${mapId}:empty`;
+    return `${mapId}:${h3Indexes.length}:${h3Indexes[0]}:${h3Indexes[h3Indexes.length - 1]}`;
+  }
+  function shouldApplyLoadedMapExtent(appliedKey2, nextKey, refit) {
+    return refit || appliedKey2 !== nextKey;
+  }
   function longitudeIntervalFromCenters(longitudes) {
     const sorted = longitudes.filter((lng) => Number.isFinite(lng)).sort((a, b) => a - b);
     if (sorted.length === 0) return null;
@@ -23906,13 +23913,14 @@ ${body}`;
   function restoreLoadedMapExtent(fit = false) {
     applyLoadedMapExtent(active, fit);
   }
-  function syncMapExtentToSnapshot(state) {
+  function syncMapExtentToSnapshot(state, options) {
     const mapId = state.gameMap?.id ?? "global";
-    const first = state.hexes[0]?.h3Index ?? "";
-    const last = state.hexes[state.hexes.length - 1]?.h3Index ?? "";
-    const key = state.hexes.length === 0 ? `${mapId}:empty` : `${mapId}:${state.hexes.length}:${first}:${last}`;
+    const key = loadedMapExtentKey(
+      mapId,
+      state.hexes.map((hex) => hex.h3Index)
+    );
     if (!extentMaps()) return;
-    if (key === appliedKey) return;
+    if (!shouldApplyLoadedMapExtent(appliedKey, key, options?.refit === true)) return;
     if (mapId === "global" || state.hexes.length === 0) {
       applyLoadedMapExtent("world", true);
       appliedKey = key;
@@ -28903,6 +28911,7 @@ ${body}`;
         rendererSharedState.lastRenderedVisibleEnemyByUnitId.clear();
         deps.updateClientStaleEnemyIntel(null, state);
         rendererSharedState.initialCameraApplied = false;
+        syncMapExtentToSnapshot(state, { refit: true });
         if (state.hexes.length > 0) {
           deps.applyInitialCameraForState(state);
         }

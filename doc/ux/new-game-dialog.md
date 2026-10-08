@@ -36,7 +36,7 @@ Opens in New game and in Game over. See [modes-and-transitions.md](modes-and-tra
 - When the player clicks the starting-month randomize control, the month becomes a random month from the list, including the month already shown. Opening the overlay draws a month the same way.
 - When the player changes game size, the cap badges update to that size.
 - When the player changes Fog of war, Origin bonus, Tech bonus, Terrain bonus, Weather bonus, or the starting month, the next match uses that setting. Opening the overlay checks Fog of war again, sets every bonus dropdown back to Low, and draws a new starting month. A refresh while the overlay stays open keeps the month the player is looking at.
-- When the player clicks Start game or New game, the match starts, drafts and the selection clear, the AI cost readout and the AI activity log clear, and the overlay closes on success. A failure leaves the overlay open.
+- When the player clicks Start game or New game, the match starts, drafts and the selection clear, the AI cost readout and the AI activity log clear, and the overlay closes on success. The view then frames the new match, as in [map-surface.md](map-surface.md). A failure leaves the overlay open.
 
 ### Keyboard
 
