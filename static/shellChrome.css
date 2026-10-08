@@ -96,6 +96,11 @@ body {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.28);
   pointer-events: auto;
 }
+/* Hidden, not removed, so the minimap keeps its 200px box while the start dialog is open. */
+#canvas-container:has(#game-over-overlay:not(.hidden)) #minimap,
+#canvas-container:has(#game-over-overlay:not(.hidden)) #terrain-legend {
+  visibility: hidden;
+}
 #terrain-legend select {
   display: block;
   width: auto;

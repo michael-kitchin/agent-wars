@@ -1,10 +1,10 @@
 # Game Vision Document
 
-*Version 3.1 — August 2026 (intent plus live 2.4.0 implementation)*
+*Version 3.1 — August 2026 (intent plus live 2.5.0 implementation)*
 
 This is the product intent document. **Where a roster, fog radius, cost, cap, or phase claim disagrees with the engine, the engine and [combat-rules-v3.md](combat-rules-v3.md) win.** Unbuilt surfaces (player-facing save/load, diplomacy, async multiplayer, Steam/Discord shipping) remain intent.
 
-**Implementation status (2.4.0):** The global strategic game, hybrid OpenRouter AI, fog of war, production, air, sealift, and optional res4 tactical battles are playable. Milestone 2.5 (save/load) is not shipped. Tactical battles are not deferred.
+**Implementation status (2.5.0):** The global strategic game, hybrid OpenRouter AI, fog of war, production, air, sealift, and optional res4 tactical battles are playable. Milestone 2.5 (save/load) is not shipped. Tactical battles are not deferred.
 
 ---
 
@@ -136,6 +136,6 @@ A shipped game that people want to play more than once against AI opponents that
 
 ## Development Approach
 
-The original roadmap treated Phase 0 as a throwaway prototype, Phase 1 as the global game, Phase 2 as polish, Phase 3 as tactical, and Phase 4 as ship. **That numbering is historical.** The live plan in [devleopment-plan-v3.3.md](devleopment-plan-v3.3.md) moved tactical battles into Phase 2 (milestones 2.1–2.5). As of 2.4.0, hybrid AI validation, the global strategic game, and tactical battles through 2.4 are complete. Save/load (2.5) and Phase 3 polish are not shipped.
+The original roadmap treated Phase 0 as a throwaway prototype, Phase 1 as the global game, Phase 2 as polish, Phase 3 as tactical, and Phase 4 as ship. **That numbering is historical.** The live plan in [devleopment-plan-v3.3.md](devleopment-plan-v3.3.md) moved tactical battles into Phase 2 (milestones 2.1–2.5). As of 2.5.0, hybrid AI validation, the global strategic game, and tactical battles through 2.4 are complete. Save/load (2.5) and Phase 3 polish are not shipped.
 
 Every milestone still aims at something playable. The tactical layer is no longer deferrable in the sense of "not built" — it is in the current build and remains skippable in play.

@@ -28,6 +28,8 @@ import type {
   AirStrikeTargetType,
   HexBuildQueueSnapshot,
   NewGameIpcPayload,
+  NewGameMapPreview,
+  NewGameMapPreviewRequest,
   GameMapListEntry,
   ResolveMeleeInterceptIpcPayload,
   NotifyResolutionPlaybackCompletePayload,
@@ -65,6 +67,7 @@ const IPC_GAME = {
   getHexContinentNames: 'game:getHexContinentNames',
   listScenarioHomeRegions: 'game:listScenarioHomeRegions',
   listGameMaps: 'game:listGameMaps',
+  newGameMapPreview: 'game:newGameMapPreview',
   newGame: 'game:newGame',
   submitOrders: 'game:submitOrders',
   listHumanStandingOrders: 'game:listHumanStandingOrders',
@@ -264,6 +267,16 @@ listScenarioHomeRegions: (): Promise<string[]> =>
    */
 listGameMaps: (): Promise<GameMapListEntry[]> =>
     ipcRenderer.invoke(IPC_GAME.listGameMaps),
+  /**
+   * Asks the main process for the new-game map preview.
+   *
+   * Purpose: The overlay paints that map's terrain, weather, and homes without loading the match.
+   * When to use: When the dialog opens and when its map or home choices change.
+   * Expected outcome: The payload from `buildNewGameMapPreview`.
+   * Exceptions: Rejects when the map or a side group is unknown, or when the IPC channel fails.
+   */
+  newGameMapPreview: (request: NewGameMapPreviewRequest): Promise<NewGameMapPreview> =>
+    ipcRenderer.invoke(IPC_GAME.newGameMapPreview, request),
     /**
    * Documents the object literal property `newGame` (newGame: (payload?: NewGameIpcPayload): Promise<GameStateSnapshot> => ipcRenderer.invoke('game:newGame', payload)).
 

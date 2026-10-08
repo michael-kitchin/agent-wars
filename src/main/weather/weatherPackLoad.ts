@@ -71,20 +71,19 @@ export function ensureWeatherPackLoaded(): ReadonlyMap<string, readonly WeatherM
 }
 
 /**
- * Returns the cached pack, reading the file on the first call.
+ * Reads one weather pack file without touching the loaded match's cache.
  *
- * Purpose: Hex scans ask for weather thousands of times. Those reads must not each emit a debug line.
- * When to use: From `ensureWeatherPackLoaded` and from the weather getters.
- * Expected outcome: The same map after the first successful read. A missing or empty pack throws.
- * Exceptions: Throws when the file is missing, unreadable, or has no valid twelve-month rows.
+ * Purpose: A new-game preview can ask for a map that is not the active pack. The match cache stays on the loaded map.
+ * When to use: Preview builds, and the first load of the active pack.
+ * Expected outcome: A map of twelve-month rows. Invalid rows are skipped. An empty file throws.
+ * Exceptions: Throws when the file is missing, unreadable, or has no valid twelve-month hexes.
  */
-function readWeatherPack(): ReadonlyMap<string, readonly WeatherMonthRecord[]> {
-  if (yearsByHex) return yearsByHex;
+export function loadWeatherPackFromPath(absPath: string): ReadonlyMap<string, readonly WeatherMonthRecord[]> {
+  logDebug('weatherPackLoad loadWeatherPackFromPath', { absPath });
   try {
-    const filePath = resolveTerrainStrategicWeatherPath();
-    const parsed = JSON.parse(fs.readFileSync(filePath, 'utf8')) as { records?: unknown };
+    const parsed = JSON.parse(fs.readFileSync(absPath, 'utf8')) as { records?: unknown };
     if (!Array.isArray(parsed.records)) {
-      throw new Error('terrain_res1_weather.json has no records array');
+      throw new Error('terrain weather pack has no records array');
     }
     const next = new Map<string, readonly WeatherMonthRecord[]>();
     for (const row of parsed.records) {
@@ -94,14 +93,28 @@ function readWeatherPack(): ReadonlyMap<string, readonly WeatherMonthRecord[]> {
       if (!record.months.every(isMonthRecord)) continue;
       next.set(record.h3Index, record.months);
     }
-    if (next.size === 0) throw new Error('terrain_res1_weather.json contained no twelve-month hexes');
-    yearsByHex = next;
-    logDebug('weatherPackLoad readWeatherPack: loaded', { hexes: next.size });
+    if (next.size === 0) throw new Error('terrain weather pack contained no twelve-month hexes');
     return next;
   } catch (err) {
-    logError('weatherPackLoad readWeatherPack: failed', err);
+    logError('weatherPackLoad loadWeatherPackFromPath: failed', err);
     throw err;
   }
+}
+
+/**
+ * Returns the cached pack, reading the file on the first call.
+ *
+ * Purpose: Hex scans ask for weather thousands of times. Those reads must not each emit a debug line.
+ * When to use: From `ensureWeatherPackLoaded` and from the weather getters.
+ * Expected outcome: The same map after the first successful read. A missing or empty pack throws.
+ * Exceptions: Throws when the file is missing, unreadable, or has no valid twelve-month rows.
+ */
+function readWeatherPack(): ReadonlyMap<string, readonly WeatherMonthRecord[]> {
+  if (yearsByHex) return yearsByHex;
+  const next = loadWeatherPackFromPath(resolveTerrainStrategicWeatherPath());
+  yearsByHex = next;
+  logDebug('weatherPackLoad readWeatherPack: loaded', { hexes: next.size });
+  return next;
 }
 
 /**

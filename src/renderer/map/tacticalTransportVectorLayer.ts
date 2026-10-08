@@ -39,6 +39,28 @@ let vectorLayer: unknown | null = null;
 let vectorLayerAttached = false;
 
 /**
+ * Hides road and rail lines while the new-game overlay is open.
+ *
+ * Purpose: Those lines belong to the loaded match. The preview must not leave them on top of another map.
+ * When to use: Set true before a preview frame and false before a match frame.
+ * Expected outcome: `syncTacticalTransportVectorLeafletLayer` removes the layer while this is true.
+ * Exceptions: None.
+ */
+let vectorsSuppressed = false;
+
+/**
+ * Tells the road and rail layer whether the new-game preview is covering the map.
+ *
+ * Purpose: The preview frame does not draw the match, so the match's lines have to be removed explicitly.
+ * When to use: Once per frame, before `syncTacticalTransportVectorLeafletLayer`.
+ * Expected outcome: The next sync hides the lines while `suppressed` is true, and may show them again when it is false.
+ * Exceptions: None.
+ */
+export function setTacticalTransportVectorsSuppressed(suppressed: boolean): void {
+  vectorsSuppressed = suppressed;
+}
+
+/**
  * Documents the module-scope binding `lastRowCount` (lastRowCount: number).
 
  * Purpose: Allows cheap rebuild checks when renderer receives refreshed vector rows.
@@ -249,7 +271,8 @@ export function syncTacticalTransportVectorLeafletLayer(): void {
       }
     | null;
   if (!map || !L) return;
-  const shouldShow = shouldRenderTacticalHexes() && S.tacticalTransportVectorOverlayRows.length > 0;
+  const shouldShow =
+    !vectorsSuppressed && shouldRenderTacticalHexes() && S.tacticalTransportVectorOverlayRows.length > 0;
   if (!shouldShow) {
     if (vectorLayer && vectorLayerAttached) {
       map.removeLayer(vectorLayer);

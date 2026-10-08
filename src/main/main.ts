@@ -15,6 +15,7 @@ import {
   listScenarioHomeRegions,
 } from './gameDb';
 import { listGameMaps } from './gameMap/listGameMaps';
+import { buildNewGameMapPreview } from './gameMap/newGameMapPreview';
 import {
   submitOrders,
   ready,
@@ -87,6 +88,7 @@ import type {
   GameReadyIpcPayload,
   RequestAiOrdersResult,
   NewGameIpcPayload,
+  NewGameMapPreviewRequest,
   ResolveMeleeInterceptIpcPayload,
 } from '../shared/ipcTypes';
 
@@ -308,6 +310,9 @@ function registerIpcHandlers(): void {
   });
   ipcMain.handle(IPC_GAME.listScenarioHomeRegions, () => listScenarioHomeRegions());
   ipcMain.handle(IPC_GAME.listGameMaps, () => listGameMaps());
+  ipcMain.handle(IPC_GAME.newGameMapPreview, (_event, request: NewGameMapPreviewRequest) =>
+    buildNewGameMapPreview(request)
+  );
   ipcMain.handle(IPC_GAME.newGame, (_event, payload: NewGameIpcPayload | undefined) => {
     const fogOfWarEnabled = payload?.fogOfWarEnabled !== false;
     const gameSize = parseGameSize(payload?.gameSize);

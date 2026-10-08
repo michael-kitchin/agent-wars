@@ -760,14 +760,14 @@ function parseTacticalRow(raw: unknown, resolution: number): HexMetadataRecordTa
 }
 
 /**
- * Defines the `parseMetadataEnvelope` function shape (function parseMetadataEnvelope(raw: unknown, expectedResolution: number): HexMetadataEnvelope).
-
- * Purpose: Supports maintainability by documenting why `parseMetadataEnvelope` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
+ * Validates one terrain metadata envelope.
+ *
+ * Purpose: Strategic and tactical files share the envelope checks. The caller says which row shape to expect.
+ * When to use: After a metadata file has been parsed as JSON.
+ * Expected outcome: Records match `expectedResolution`. `tacticalRows` keeps urban fields. Otherwise rows stay strategic.
+ * Exceptions: Throws when the schema, resolution, or a row is invalid.
  */
-function parseMetadataEnvelope(raw: unknown, expectedResolution: number): HexMetadataEnvelope {
+function parseMetadataEnvelope(raw: unknown, expectedResolution: number, tacticalRows: boolean): HexMetadataEnvelope {
   if (!isRecord(raw)) throw new Error('terrain metadata: root must be an object');
   if (raw.schema_version !== EXPECTED_HEX_METADATA_SCHEMA_VERSION) {
     throw new Error(
@@ -784,10 +784,9 @@ function parseMetadataEnvelope(raw: unknown, expectedResolution: number): HexMet
   if (recs.length !== recordCount) {
     throw new Error(`terrain metadata: record_count ${recordCount} != len(records) ${recs.length}`);
   }
-  const parseRow =
-    expectedResolution === tacticalH3Resolution()
-      ? (r: unknown) => parseTacticalRow(r, expectedResolution)
-      : (r: unknown) => parseStrategicRow(r, expectedResolution);
+  const parseRow = tacticalRows
+    ? (r: unknown) => parseTacticalRow(r, expectedResolution)
+    : (r: unknown) => parseStrategicRow(r, expectedResolution);
   const records = recs.map((r, i) => {
     try {
       return parseRow(r);
@@ -820,7 +819,21 @@ function parseMetadataEnvelope(raw: unknown, expectedResolution: number): HexMet
 export function loadTerrainStrategicMetadataFromPath(absPath: string): HexMetadataEnvelope {
   logDebug('terrainMetadataLoad loadTerrainRes1MetadataFromPath', { absPath });
   const parsed = readJsonFileOrThrow(absPath, 'terrainMetadataLoad loadTerrainRes1MetadataFromPath');
-  return parseMetadataEnvelope(parsed, strategicH3Resolution());
+  return parseMetadataEnvelope(parsed, strategicH3Resolution(), false);
+}
+
+/**
+ * Loads one terrain metadata file at a caller-chosen resolution.
+ *
+ * Purpose: A new-game preview must read a map that is not the active match. The bundled loaders validate against the active resolution.
+ * When to use: Preview grid builds. Match seeding keeps the bundled loaders.
+ * Expected outcome: The envelope's resolution is `resolution`. Tactical files pass `tacticalRows` true so urban fields are kept.
+ * Exceptions: Rethrows read and parse failures. Throws when the envelope fails validation.
+ */
+export function loadTerrainMetadataFromPath(absPath: string, resolution: number, tacticalRows: boolean): HexMetadataEnvelope {
+  logDebug('terrainMetadataLoad loadTerrainMetadataFromPath', { absPath, resolution, tacticalRows });
+  const parsed = readJsonFileOrThrow(absPath, 'terrainMetadataLoad loadTerrainMetadataFromPath');
+  return parseMetadataEnvelope(parsed, resolution, tacticalRows);
 }
 
 /**
@@ -834,7 +847,7 @@ export function loadTerrainStrategicMetadataFromPath(absPath: string): HexMetada
 export function loadTerrainTacticalMetadataFromPath(absPath: string): HexMetadataEnvelope {
   logDebug('terrainMetadataLoad loadTerrainRes4MetadataFromPath', { absPath });
   const parsed = readJsonFileOrThrow(absPath, 'terrainMetadataLoad loadTerrainRes4MetadataFromPath');
-  return parseMetadataEnvelope(parsed, tacticalH3Resolution());
+  return parseMetadataEnvelope(parsed, tacticalH3Resolution(), true);
 }
 
 /**

@@ -28,6 +28,7 @@ The tip can appear whenever the control can receive the pointer or keyboard focu
 - Global tab: Start on the world map and pick a home region for each side.
 - Regional tab: Start on one region and pick a different side group for each player.
 - Region: Pick the region both sides fight over. Changing it draws two different sides again.
+- Randomize region: Pick one of the listed regions at random, including the region already shown.
 - Human side: Pick your side. It stays different from the opponent's side.
 - Randomize human side: Pick one of the other sides at random for your side.
 - Opponent side: Pick the opponent's side. It stays different from yours.

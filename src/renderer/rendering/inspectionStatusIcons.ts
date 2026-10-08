@@ -151,7 +151,7 @@ function drawFittedIcon(
  * Expected outcome: One object per hex that will be painted.
  * Exceptions: None.
  */
-interface StatusIconPlacement {
+export interface StatusIconPlacement {
   /**
    * Horizontal center of the icon, in container pixels.
    *
@@ -188,6 +188,30 @@ interface StatusIconPlacement {
    * Exceptions: None.
    */
   readonly assetPath: string;
+}
+
+/**
+ * Draws one weather or tech icon for the new-game map preview.
+ *
+ * Purpose: The preview has no match, so it cannot use the status-icon pass that returns without game state.
+ * When to use: One preview hex that is showing a weather icon, or a tech icon while T is held.
+ * Expected outcome: The image is centered on the placement. A blank square is left while it loads, then a redraw paints it.
+ * Exceptions: None.
+ */
+export function drawPlacedStatusIcon(
+  ctx: CanvasRenderingContext2D,
+  placement: StatusIconPlacement,
+  requestRedraw: () => void
+): void {
+  drawStatusIcon(
+    ctx,
+    {
+      isHexExploredByPlayer: () => false,
+      hasInfraSymbols: () => false,
+      requestRedraw,
+    },
+    placement
+  );
 }
 
 /**

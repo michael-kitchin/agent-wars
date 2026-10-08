@@ -10,7 +10,10 @@ import { inferUnitTypeLabelFromId } from '../core/unitTypeLabel';
 import { updateGameStateSidebar } from '../core/uiState';
 import { isMapInspectionModeHeld } from '../gameplay/productionOverlayHelpers';
 import { hideStackCallout } from '../map/stackCallout';
-import { syncTacticalTransportVectorLeafletLayer } from '../map/tacticalTransportVectorLayer';
+import { hideTacticalEntryLayer } from '../map/tacticalEntryLayer';
+import { setTacticalTransportVectorsSuppressed, syncTacticalTransportVectorLeafletLayer } from '../map/tacticalTransportVectorLayer';
+import { hideBuildEntryLayer } from '../map/terrainView';
+import { drawNewGameMapPreview, setNewGameMapPreviewRepaint } from '../map/newGameMapPreviewRendering';
 import {
   getStrategicDominantTerrainKind,
   infraGlyphsAllowedForStrategicHex,
@@ -677,23 +680,7 @@ function resizeAndRedraw(): void {
 
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.scale(dpr, dpr);
-
-  if (!S.gameState) {
-    drawLoadingScene(ctx, w, h);
-    syncBuildEntryButton();
-    syncTacticalEntryButtonOverlay();
-    tacticalUpdateExitButtonVisibility();
-    updateReadyButtonState();
-    return;
-  }
-  drawGameScene(ctx, w, h, S.gameState);
-  syncBuildEntryButton();
-  syncTacticalEntryButtonOverlay();
-  tacticalUpdateExitButtonVisibility();
-  updateReadyButtonState();
-  if (shouldHideStrategicMapUnitsForZoom()) {
-    hideStackCallout();
-  }
+  paintMapFrame(ctx, w, h);
 }
 
 /**
@@ -717,23 +704,43 @@ function redraw(): void {
   const { w, h, dpr } = metrics;
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.scale(dpr, dpr);
+  paintMapFrame(ctx, w, h);
+}
 
-  if (!S.gameState) {
+/**
+ * Paints one canvas frame and then syncs the buttons that sit on it.
+ *
+ * Purpose: The new-game overlay replaces the match scene. Both resize and redraw must take that path.
+ * When to use: After the canvas transform is set.
+ * Expected outcome: An open overlay clears the canvas, draws only the preview, and hides match markers. Otherwise the loading scene or the match is drawn. Buttons sync either way.
+ * Exceptions: None.
+ */
+function paintMapFrame(ctx: CanvasRenderingContext2D, w: number, h: number): void {
+  const overlay = document.getElementById('game-over-overlay');
+  const overlayOpen = overlay != null && !overlay.classList.contains('hidden');
+  setTacticalTransportVectorsSuppressed(overlayOpen);
+  if (overlayOpen) {
+    ctx.clearRect(0, 0, w, h);
+    drawNewGameMapPreview(ctx, requestRedraw);
+    hideStackCallout();
+    syncTacticalTransportVectorLeafletLayer();
+  } else if (!S.gameState) {
     drawLoadingScene(ctx, w, h);
-    syncBuildEntryButton();
-    syncTacticalEntryButtonOverlay();
-    tacticalUpdateExitButtonVisibility();
-    updateReadyButtonState();
-    return;
+  } else {
+    drawGameScene(ctx, w, h, S.gameState);
+    if (shouldHideStrategicMapUnitsForZoom()) {
+      hideStackCallout();
+    }
   }
-  drawGameScene(ctx, w, h, S.gameState);
   syncBuildEntryButton();
   syncTacticalEntryButtonOverlay();
   tacticalUpdateExitButtonVisibility();
   updateReadyButtonState();
-  if (shouldHideStrategicMapUnitsForZoom()) {
-    hideStackCallout();
-  }
+  if (!overlayOpen) return;
+  const buildEntry = document.getElementById('build-entry-layer');
+  if (buildEntry) hideBuildEntryLayer(buildEntry);
+  const tacticalEntry = document.getElementById('tactical-entry-layer');
+  if (tacticalEntry) hideTacticalEntryLayer(tacticalEntry);
 }
 
 /**
@@ -763,6 +770,8 @@ function tickResolutionMoveAnimation(): void {
     redraw();
   }
 }
+
+setNewGameMapPreviewRepaint(redraw);
 
 /**
  * Re-exports the scene functions declared above.

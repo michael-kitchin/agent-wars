@@ -1,6 +1,6 @@
 # Hybrid AI (what ships)
 
-Short description of how the LLM opponent is wired in **2.4.0**. Combat, movement, and production rules live in [combat-rules-v3.md](combat-rules-v3.md). **What the model is told today** is catalogued in [ai-commander-prompts/](ai-commander-prompts/README.md) — this page does not restate prompt copy.
+Short description of how the LLM opponent is wired in **2.5.0**. Combat, movement, and production rules live in [combat-rules-v3.md](combat-rules-v3.md). **What the model is told today** is catalogued in [ai-commander-prompts/](ai-commander-prompts/README.md) — this page does not restate prompt copy.
 
 The engine under `src/` wins if this file drifts.
 

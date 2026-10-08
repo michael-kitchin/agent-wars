@@ -18,6 +18,7 @@ export const IPC_GAME = {
   getHexContinentNames: 'game:getHexContinentNames',
   listScenarioHomeRegions: 'game:listScenarioHomeRegions',
   listGameMaps: 'game:listGameMaps',
+  newGameMapPreview: 'game:newGameMapPreview',
   newGame: 'game:newGame',
   submitOrders: 'game:submitOrders',
   listHumanStandingOrders: 'game:listHumanStandingOrders',

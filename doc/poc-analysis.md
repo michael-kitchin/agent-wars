@@ -2,7 +2,7 @@
 
 *Historical research (Phase 0, early 2026). Not live mechanics.*
 
-The hybrid architecture this paper recommended — pre-computed briefings, standing orders, and event-driven LLM consultation — is the live 2.4.0 design. Cost and latency numbers below are period research, not current measurements. For what the game actually does, start at [README.md](README.md) and [combat-rules-v3.md](combat-rules-v3.md).
+The hybrid architecture this paper recommended — pre-computed briefings, standing orders, and event-driven LLM consultation — is the live 2.5.0 design. Cost and latency numbers below are period research, not current measurements. For what the game actually does, start at [README.md](README.md) and [combat-rules-v3.md](combat-rules-v3.md).
 
 ---
 

@@ -20,8 +20,16 @@ import {
 } from './newGameOptionsUi';
 import { newGameButtonTooltipText } from '../chrome/controlTooltipText';
 import { installRendererGameMap } from '../core/installRendererGameMap';
+import { blurMapChromeIfFocused } from '../core/uiState';
 import { syncMapExtentToSnapshot } from '../map/mapExtent';
 import { prepareNewGameMapPanel, readNewGameMapChoice, regionalStartBlocked, registerNewGameMapControls } from './newGameMapUi';
+import {
+  holdNewGameMapPreviewCamera,
+  refreshNewGameMapPreview,
+  releaseNewGameMapPreviewCamera,
+  resetNewGameMapPreviewFrame,
+} from './newGameMapPreviewUi';
+import { repaintNewGameMapPreview } from '../map/newGameMapPreviewRendering';
 import { showMapToast } from '../openRouter/openRouterUiHelpers';
 
 /**
@@ -29,18 +37,36 @@ import { showMapToast } from '../openRouter/openRouterUiHelpers';
  *
  * Purpose: Each button redraws only the control beside it.
  * When to use: Once, while the renderer is starting.
- * Expected outcome: Human and AI region buttons redraw those dropdowns. The starting-month button redraws the month list. A missing button is skipped.
+ * Expected outcome: Human and AI region buttons redraw those dropdowns and refresh the map preview. The starting-month button redraws the month list and the weather icons. The weather and tech bonus dropdowns redraw the icons. A missing button is skipped.
  * Exceptions: None.
  */
 function registerRegionRandomizeButtons(): void {
   document.getElementById('new-game-human-region-randomize')?.addEventListener('click', () => {
     randomizeScenarioRegionSelect('new-game-human-region-select');
+    void refreshNewGameMapPreview();
   });
   document.getElementById('new-game-ai-region-randomize')?.addEventListener('click', () => {
     randomizeScenarioRegionSelect('new-game-ai-region-select');
+    void refreshNewGameMapPreview();
+  });
+  document.getElementById('new-game-human-region-select')?.addEventListener('change', () => {
+    void refreshNewGameMapPreview();
+  });
+  document.getElementById('new-game-ai-region-select')?.addEventListener('change', () => {
+    void refreshNewGameMapPreview();
   });
   document.getElementById('new-game-start-month-randomize')?.addEventListener('click', () => {
     randomizeNewGameStartMonth();
+    repaintNewGameMapPreview();
+  });
+  document.getElementById('new-game-start-month')?.addEventListener('change', () => {
+    repaintNewGameMapPreview();
+  });
+  document.getElementById('new-game-weather-bonus-select')?.addEventListener('change', () => {
+    repaintNewGameMapPreview();
+  });
+  document.getElementById('new-game-tech-bonus-select')?.addEventListener('change', () => {
+    repaintNewGameMapPreview();
   });
 }
 
@@ -235,7 +261,7 @@ setMainUIControlsEnabled: (enabled: boolean) => void;
  * Expected outcome: The randomize buttons, game-size preview, and bonus-line separators are live. Clicking Start sends
  *   fog, the four bonus levels, the starting month, home regions, and game size to `newGame`, then reloads the map,
  *   sidebars, and overlay from the returned state. Start fits the loaded extent, then zooms one level toward human infantry and armor, or any human units when those are absent.
- *   Failures are logged to the console.
+ *   While that attempt runs, a preview reply cannot move the camera. Failures are logged to the console and the dialog's map is framed again.
  * Exceptions: None; click handler errors are caught.
  */
 export function registerNewGameButton(deps: NewGameDeps): void {
@@ -249,6 +275,7 @@ export function registerNewGameButton(deps: NewGameDeps): void {
       showMapToast('This map has no two sides.');
       return;
     }
+    const cameraHold = holdNewGameMapPreviewCamera();
     try {
       const selectedRegions = getSelectedScenarioRegions();
       const state = (await window.gameApi.newGame({
@@ -306,6 +333,7 @@ export function registerNewGameButton(deps: NewGameDeps): void {
     } catch (err) {
       console.error('newGame failed:', err);
       showMapToast('The new game did not start. This screen stays open.');
+      if (releaseNewGameMapPreviewCamera(cameraHold)) void refreshNewGameMapPreview();
     }
   });
 }
@@ -317,7 +345,7 @@ export function registerNewGameButton(deps: NewGameDeps): void {
  * When to use: The Model tab's New game button.
  * Expected outcome: During a battle or resolution playback the click returns without cancelling planning, showing
  *   the overlay, or disabling the map. Otherwise AI requests are cancelled, Fog of war and the bonus dropdowns
- *   return to their defaults, the home regions and starting month are drawn again, and the new-game overlay opens.
+ *   return to their defaults, the home regions, starting month, and map preview are drawn again, and the new-game overlay opens.
  * Exceptions: None.
  */
 export function openNewGameOverlayFromModelTab(setMainUIControlsEnabled: (enabled: boolean) => void, updateReadyButtonState: () => void): void {
@@ -341,10 +369,15 @@ export function openNewGameOverlayFromModelTab(setMainUIControlsEnabled: (enable
     newGameBtn.setAttribute('data-control-tooltip', newGameButtonTooltipText(true));
   }
   resetNewGameOptionControls();
-  void initializeScenarioRegionSelectorsOnOverlayOpen();
-  void prepareNewGameMapPanel();
+  void (async () => {
+    await Promise.all([initializeScenarioRegionSelectorsOnOverlayOpen(), prepareNewGameMapPanel()]);
+    await refreshNewGameMapPreview();
+  })();
   syncGameSizeCapPreview();
   overlay?.classList.remove('hidden');
+  blurMapChromeIfFocused();
+  resetNewGameMapPreviewFrame();
+  repaintNewGameMapPreview();
   setMainUIControlsEnabled(false);
   updateReadyButtonState();
 }

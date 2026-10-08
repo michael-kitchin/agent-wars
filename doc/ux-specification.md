@@ -84,7 +84,7 @@ Element documents share a fixed heading set:
 - [right-panel-tools-tab.md](ux/right-panel-tools-tab.md): the Tools tab and its tool list.
 - [right-panel-model-tab.md](ux/right-panel-model-tab.md): API key, model, reasoning effort, Run, New, the Tactical battles checkbox, and the model description tooltip.
 - [ai-activity-log.md](ux/ai-activity-log.md): the log of AI interactions and errors.
-- [new-game-dialog.md](ux/new-game-dialog.md): the overlay used to start a game and to show game over.
+- [new-game-dialog.md](ux/new-game-dialog.md): the overlay used to start a game and to show game over, and the map preview behind it.
 - [resolution-playback.md](ux/resolution-playback.md): the animated replay of turn resolution and the inputs it blocks.
 - [tactical-entry-markers.md](ux/tactical-entry-markers.md): markers on contested hexes that lead into a tactical battle.
 - [tactical-battles-list.md](ux/tactical-battles-list.md): the list of melee hexes where the player chooses to fight or ignore.
@@ -111,8 +111,8 @@ Cells are `Shown`, `Hidden`, `Disabled` (visible, but pointer input is off), `Ch
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | Map surface | Disabled | Shown | Disabled | Changed | Changed | Disabled | Disabled |
 | Map overlays | Disabled | Shown | Disabled | Shown | Changed | Disabled | Disabled |
-| Minimap | Disabled | Shown | Disabled | Shown | Shown | Disabled | Disabled |
-| Terrain legend | Disabled | Shown | Disabled | Shown | Shown | Disabled | Disabled |
+| Minimap | Hidden | Shown | Disabled | Shown | Shown | Disabled | Hidden |
+| Terrain legend | Hidden | Shown | Disabled | Shown | Shown | Disabled | Hidden |
 | Hex tooltips | Hidden | Shown | Hidden | Shown | Shown | Hidden | Hidden |
 | Stack callout | Hidden | Shown | Hidden | Hidden | Shown | Hidden | Hidden |
 | Build popup | Hidden | Shown | Disabled | Disabled | Hidden | Hidden | Hidden |

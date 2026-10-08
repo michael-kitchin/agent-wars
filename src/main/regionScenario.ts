@@ -157,12 +157,27 @@ function getRegionHexCache(): Map<string, string[]> {
 }
 
 /**
- * Defines the `listScenarioHomeRegions` function shape (export function listScenarioHomeRegions(): string[]).
+ * Returns the global strategic hexes for one UN subregion name.
+ *
+ * Purpose: The new-game preview must not use side groups installed for a regional match.
+ * When to use: A Global-tab home combo. Match seeding keeps `getScenarioHomeRegionHexes`.
+ * Expected outcome: Sorted hexes from the world naming file. An unknown or blank name returns an empty list.
+ * Exceptions: Throws when the world naming file cannot be read.
+ */
+export function globalScenarioHomeRegionHexes(regionName: string): string[] {
+  logTrace('regionScenario globalScenarioHomeRegionHexes', { regionName });
+  const key = regionName.trim();
+  if (!key) return [];
+  return [...(getRegionHexCache().get(key) ?? [])];
+}
 
- * Purpose: Supports maintainability by documenting why `listScenarioHomeRegions` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
+/**
+ * Lists UN subregion names from the world naming file.
+ *
+ * Purpose: The Global tab fills its home combos from this list even while a regional pack is loaded.
+ * When to use: When the new-game overlay opens.
+ * Expected outcome: Sorted region names. Throws when the naming file cannot be read.
+ * Exceptions: Rethrows a naming-file failure from the cache builder.
  */
 export function listScenarioHomeRegions(): string[] {
   logTrace('regionScenario listScenarioHomeRegions');

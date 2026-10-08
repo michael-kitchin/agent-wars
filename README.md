@@ -1,12 +1,12 @@
 # Agent Wars
 
-Grand strategy wargame with LLM opponents on a real-Earth H3 map. Early milestones **0.5–0.7** validated tools, hybrid AI, and event-driven callbacks; **1.1** established the production baseline (see [.spec/completed/milestone-1.1-execution-plan.md](.spec/completed/milestone-1.1-execution-plan.md)). The current shipping version is **2.4.0** (`package.json`).
+Grand strategy wargame with LLM opponents on a real-Earth H3 map. Early milestones **0.5–0.7** validated tools, hybrid AI, and event-driven callbacks; **1.1** established the production baseline (see [.spec/completed/milestone-1.1-execution-plan.md](.spec/completed/milestone-1.1-execution-plan.md)). The current shipping version is **2.5.0** (`package.json`).
 
 Development roadmap: [.spec/devleopment-plan-v3.3.md](.spec/devleopment-plan-v3.3.md).
 
 ## Repository status
 
-- **Release version:** **2.4.0** (developer / side-load distribution only; no store or notarization requirements yet)
+- **Release version:** **2.5.0** (developer / side-load distribution only; no store or notarization requirements yet)
 - **Progress:** Phase 0 (hybrid AI validation) and Phase 1 (global strategic game) are complete. Phase 2 tactical battles are complete through **milestone 2.4** (integration and balance). Next planned milestone is **2.5** (save/load and session management). Post-2.4 work on this branch is playtest hardening and UX polish (pathfinding, build queue, return-fire visuals, keyboard pan, and related fixes).
 - CI: GitHub Actions matrix build and test on Windows/Linux/macOS
 

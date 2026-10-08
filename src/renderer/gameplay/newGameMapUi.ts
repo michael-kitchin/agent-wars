@@ -3,6 +3,7 @@ import { formatAdvancedTechLine, formatUnitCostLabel, pickDistinctIndexes, pickI
 import { selectTabPanel, type TabPanelBinding } from '../chrome/selectTabPanel';
 import { showMapToast } from '../openRouter/openRouterUiHelpers';
 import { rendererSharedState as S } from '../core/state';
+import { refreshNewGameMapPreview } from './newGameMapPreviewUi';
 
 /**
  * Tab buttons and panels on the new-game dialog.
@@ -42,17 +43,31 @@ let controlsRegistered = false;
  *
  * Purpose: Those controls stay live for the whole session. The map list loads when the overlay opens.
  * When to use: Once, from `registerNewGameButton`.
- * Expected outcome: Tab clicks switch panels and costs. Side randomize buttons redraw one side.
+ * Expected outcome: Tab clicks switch panels, costs, and the map preview. The region randomize button, side changes, and side randomize buttons refresh that preview.
  * Exceptions: None. A missing element is skipped.
  */
 export function registerNewGameMapControls(): void {
   if (controlsRegistered) return;
   controlsRegistered = true;
-  document.getElementById('new-game-tab-global')?.addEventListener('click', () => selectNewGameTab('global'));
-  document.getElementById('new-game-tab-regional')?.addEventListener('click', () => selectNewGameTab('regional'));
+  document.getElementById('new-game-tab-global')?.addEventListener('click', () => {
+    selectNewGameTab('global');
+    void refreshNewGameMapPreview();
+  });
+  document.getElementById('new-game-tab-regional')?.addEventListener('click', () => {
+    selectNewGameTab('regional');
+    void refreshNewGameMapPreview();
+  });
   document.getElementById('new-game-region-select')?.addEventListener('change', () => {
-    applySelectedRegionSides(true);
-    if (regionalTabSelected()) applyVisibleCosts();
+    onRegionalRegionChanged();
+  });
+  document.getElementById('new-game-region-randomize')?.addEventListener('click', () => {
+    randomizeSelectedRegion();
+  });
+  document.getElementById('new-game-human-side-select')?.addEventListener('change', () => {
+    void refreshNewGameMapPreview();
+  });
+  document.getElementById('new-game-ai-side-select')?.addEventListener('change', () => {
+    void refreshNewGameMapPreview();
   });
   document.getElementById('new-game-human-side-randomize')?.addEventListener('click', () => randomizeOneRegionalSide('human'));
   document.getElementById('new-game-ai-side-randomize')?.addEventListener('click', () => randomizeOneRegionalSide('ai'));
@@ -153,11 +168,51 @@ function fillRegionSelect(regions: readonly GameMapListEntry[]): void {
  * Exceptions: None.
  */
 function randomizeRegionalMap(): void {
-  const select = document.getElementById('new-game-region-select') as HTMLSelectElement | null;
-  if (select && select.options.length > 0) {
-    select.selectedIndex = Math.floor(Math.random() * select.options.length);
-  }
+  pickRandomRegionIndex();
   applySelectedRegionSides(true);
+}
+
+/**
+ * Draws another listed region, including the one already shown, then two different sides.
+ *
+ * Purpose: The region randomize button matches the home-region buttons. Setting the index does not fire `change`.
+ * When to use: The region randomize button.
+ * Expected outcome: Sides, prices, the Advanced line, Start, and the map preview follow the drawn region.
+ * Exceptions: None. An empty list leaves the selectors as they are.
+ */
+function randomizeSelectedRegion(): void {
+  if (!pickRandomRegionIndex()) return;
+  onRegionalRegionChanged();
+}
+
+/**
+ * Chooses one option of the region selector.
+ *
+ * Purpose: Opening the overlay and the region randomize button share one draw.
+ * When to use: `randomizeRegionalMap` and `randomizeSelectedRegion`.
+ * Expected outcome: True when an option was selected. False when the selector is missing or empty.
+ * Exceptions: None.
+ */
+function pickRandomRegionIndex(): boolean {
+  const select = document.getElementById('new-game-region-select') as HTMLSelectElement | null;
+  if (!select || select.options.length <= 0) return false;
+  select.selectedIndex = Math.floor(Math.random() * select.options.length);
+  return true;
+}
+
+/**
+ * Applies the region now shown in the selector.
+ *
+ * Purpose: The dropdown and the randomize button must leave sides, prices, Start, and the preview on that region.
+ * When to use: The region selector's `change` event and `randomizeSelectedRegion`.
+ * Expected outcome: Two different sides when the region has two groups. Start disables when it has fewer. The preview refits.
+ * Exceptions: None.
+ */
+function onRegionalRegionChanged(): void {
+  applySelectedRegionSides(true);
+  if (regionalTabSelected()) applyVisibleCosts();
+  syncStartEnabled();
+  void refreshNewGameMapPreview();
 }
 
 /**
@@ -199,6 +254,7 @@ function randomizeOneRegionalSide(which: 'human' | 'ai'): void {
   const next = pickIndexExcept(groups.length, otherIndex);
   if (next === null) return;
   target.selectedIndex = next;
+  void refreshNewGameMapPreview();
 }
 
 /**
@@ -252,7 +308,7 @@ function setCost(id: string, cost: number): void {
  * Disables Start when the regional map cannot field two sides.
  *
  * Purpose: The player sees why Start will not run.
- * When to use: After a tab change.
+ * When to use: After a tab change, and after the regional region changes.
  * Expected outcome: Start is enabled on Global and on a regional map with two groups. Otherwise it is disabled and a toast names the problem.
  * Exceptions: None.
  */

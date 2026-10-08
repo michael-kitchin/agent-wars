@@ -43,6 +43,17 @@
   z-index: 7002;
 }
 .game-over-overlay.hidden { display: none; }
+/* The id keeps the annihilation dialog on the shared class: centered, on its veil. */
+#game-over-overlay {
+  align-items: flex-start;
+  justify-content: flex-start;
+  padding: 12px;
+  background: transparent;
+  overflow: auto;
+}
+#game-over-overlay > .game-over-box {
+  flex-shrink: 0;
+}
 /* Stacks above tactical HUD (6600) and matches game-over overlay chrome for annihilation results. */
 .tactical-annihilation-overlay.game-over-overlay {
   z-index: 7010;

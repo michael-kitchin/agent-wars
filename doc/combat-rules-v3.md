@@ -1,8 +1,8 @@
 # Combat Execution and Resolution Rules
 
-*Version 3.2 — October 2026 (aligned to engine 2.4.0)*
+*Version 3.2 — October 2026 (aligned to engine 2.5.0)*
 
-This document describes combat, movement, production, fog, sealift, and optional tactical battles. **Live engine symbols under `src/` are first authority.** Constants cited here are the values in those symbols as of 2.4.0.
+This document describes combat, movement, production, fog, sealift, and optional tactical battles. **Live engine symbols under `src/` are first authority.** Constants cited here are the values in those symbols as of 2.5.0.
 
 Rules are divided into two layers: **strategic** (the primary game) and **tactical** (optional zoom-in battles). On the global map those layers are H3 resolution 1 and resolution 4. The active map supplies both through `strategicH3Resolution` and `tacticalH3Resolution` in `src/shared/h3Resolutions.ts`. `GLOBAL_STRATEGIC_H3_RESOLUTION` and `GLOBAL_TACTICAL_H3_RESOLUTION` are the global values. Both layers use **WEGO** simultaneous resolution. A tactical battle pauses the rest of the strategic map until it ends.
 

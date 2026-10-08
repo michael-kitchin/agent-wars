@@ -4,7 +4,7 @@
 
 ---
 
-## Current progress (August 2026, engine 2.4.0)
+## Current progress (August 2026, engine 2.5.0)
 
 This file is the original phased plan. **It is not live rules.** Combat, caps, vision, costs, and phase order live in [combat-rules-v3.md](combat-rules-v3.md) and `src/`. Prompt text lives in [ai-commander-prompts/](ai-commander-prompts/README.md).
 

@@ -20,7 +20,7 @@ Shown in Strategic planning, Resolution playback, and Tactical planning. While t
 - On the strategic map, outside a battle and outside battle-detail zoom, one icon sits on the band above the hex center, whether or not that hex is showing a production label. While T is not held, the icon is that hex's weather, when the weather bonus is on and the hex has weather. Fog of war leaves an unexplored hex without that icon. While T is held, the weather icon is hidden, and the icon is that hex's tech tier when the tech bonus is on and the hex's original urban count can produce units. Fog of war does not hide the tech icon. A hex that does not qualify shows no icon during the hold. The two icons are the same size, one and a half times the height of that hex's production text. That height is the shorter production text when the hex shows a build button, an airport or seaport glyph, or a unit, and the plain height otherwise, including a hex that is not showing the text. The icon is centered. The glyphs match the Tech and Weather icons in the [hex tooltip](hex-tooltips.md). These icons have no tooltip of their own. The hex tooltip still appears on hover.
 - Overlays from [map-overlays.md](map-overlays.md).
 
-When no match is loaded, the basemap can still be visible under the new-game overlay.
+When no match is loaded, the basemap can still be visible under the new-game overlay. While that overlay is open, the canvas draws the dialog's map preview instead of the loaded match: the selected tab's terrain-filled strategic hexes, home-region rings, and weather icons, as in [new-game-dialog.md](new-game-dialog.md). Units, hex codes, production labels, build markers, battle-entry markers, road and rail lines, and other match chrome stay hidden. The minimap and the terrain legend are hidden. Opening the overlay frames the main view. Changing a home does not move it. Changing the tab or the regional region does. Fog of war does not hide the preview icons. Holding T hides those fills and weather icons and does not show hex codes or production labels. While Tech bonus is Low or High, that hold shows the previewed map's tech icons on hexes that can produce units. Basic and Advanced use that map's Advanced threshold. Off hides them. Battle-detail zoom of that map's strategic hexes hides both icons.
 
 ## Inputs and Responses
 
@@ -36,7 +36,7 @@ When no match is loaded, the basemap can still be visible under the new-game ove
 ### Keyboard
 
 - When the player holds W, A, S, D, or an arrow key, under the rules in [input-map.md](input-map.md), the map pans. Opposite directions cancel.
-- When the player holds T, terrain fill hides until release or blur. On the strategic map, outside battle-detail zoom, the hex codes stay up for that same hold, and the weather icon is hidden. The tech icon is shown where the information list says it applies. Release or blur restores the fill, removes the codes, and restores the weather icon.
+- When the player holds T, terrain fill hides until release or blur. On the strategic map, outside battle-detail zoom, the hex codes stay up for that same hold, and the weather icon is hidden. The tech icon is shown where the information list says it applies. Release or blur restores the fill, removes the codes, and restores the weather icon. While the new-game overlay is open, the same hold follows that dialog: no hex codes and no production labels.
 
 ### Other
 
@@ -49,9 +49,9 @@ When no match is loaded, the basemap can still be visible under the new-game ove
 
 - Strategic view: the loaded match's bounds, strategic units, entry markers when the zoom allows them.
 - Tactical view: battle bounds, battle units, Exit Battle available according to [tactical-battle-controls.md](tactical-battle-controls.md).
-- Input disabled: New game, Game over, Tactical annihilation, or while the tactical battles list is open. Pointer input is off. While the tactical battles list is open, and in Tactical annihilation, pan keys and T still follow [input-map.md](input-map.md).
+- Input disabled: New game, Game over, Tactical annihilation, or while the tactical battles list is open. Pointer input is off. While the new-game overlay is open, the canvas shows that dialog's map preview. While the tactical battles list is open, and in Tactical annihilation, pan keys and T still follow [input-map.md](input-map.md).
 - Orders blocked: Resolution playback. The map pans, zooms, and shows tooltips, but does not select, target, or order.
-- Terrain fill hidden: T is held. On the strategic map, outside battle-detail zoom, hex codes are shown, the weather icon is hidden, and the tech icon is shown where it applies.
+- Terrain fill hidden: T is held. On the strategic map, outside battle-detail zoom, hex codes are shown, the weather icon is hidden, and the tech icon is shown where it applies. While the new-game overlay is open, hex codes stay hidden.
 
 ## Invariants
 
@@ -60,7 +60,7 @@ When no match is loaded, the basemap can still be visible under the new-game ove
 - Double-click never zooms the map.
 - Starting a match frames that match's bounds before the player can act. A later turn does not return the view to that frame while the match's hex footprint is unchanged.
 - Keyboard pan is the app pan, not the map library's own keyboard pan.
-- The weather icon appears on the strategic map outside a battle and outside battle-detail zoom, while T is not held, on each world hex that has weather while the weather bonus is on, including a hex with no production label. An unexplored hex has none. While T is held, the weather icon is hidden. The tech icon is shown on that same band on each world hex whose original urban count can produce units, while the tech bonus is on, including an unexplored hex. A hex with no tech icon shows no status icon during the hold. Neither icon appears in a battle or at battle-detail zoom.
+- The weather icon appears on the strategic map outside a battle and outside battle-detail zoom, while T is not held, on each world hex that has weather while the weather bonus is on, including a hex with no production label. An unexplored hex has none. While T is held, the weather icon is hidden. The tech icon is shown on that same band on each world hex whose original urban count can produce units, while the tech bonus is on, including an unexplored hex. A hex with no tech icon shows no status icon during the hold. Neither icon appears in a battle or at battle-detail zoom. While the new-game overlay is open, weather and tech follow that dialog, including on hexes the loaded match has not explored.
 
 ## Strategic and Tactical Differences
 
@@ -102,6 +102,7 @@ None.
 - `src/renderer/map/mapKeyboardPan.ts`
 - `src/renderer/map/drawInteraction.ts`
 - `src/renderer/rendering/gameScene.ts`
+- `src/renderer/map/newGameMapPreviewRendering.ts`
 - `src/renderer/map/hexGrid.ts`
 - `src/renderer/map/terrainView.ts`
 - `src/renderer/map/tacticalMapView.ts`

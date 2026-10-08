@@ -140,13 +140,13 @@ let lockedMinZoom: number | null = null;
  *
  * Purpose: The player can pan and zoom inside the loaded map and no farther.
  * When to use: From snapshot sync, and with `fit: false` when restoring after tactical mode.
- * Expected outcome: Global uses minZoom 1.5, Mercator bounds, and worldCopyJump. Regional fits, then locks minZoom to that zoom.
- * Exceptions: Returns without throwing when Leaflet is not ready.
+ * Expected outcome: Global uses minZoom 1.5, Mercator bounds, and worldCopyJump. Regional fits, then locks minZoom to that zoom. Returns true when the maps were updated.
+ * Exceptions: Returns false without throwing when Leaflet is not ready.
  */
-export function applyLoadedMapExtent(target: 'world' | MapExtentBox, fit = true): void {
-  active = target;
+export function applyLoadedMapExtent(target: 'world' | MapExtentBox, fit = true): boolean {
   const maps = extentMaps();
-  if (!maps) return;
+  if (!maps) return false;
+  active = target;
   if (target === 'world') {
     activeBounds = null;
     lockedMinZoom = null;
@@ -154,7 +154,7 @@ export function applyLoadedMapExtent(target: 'world' | MapExtentBox, fit = true)
     const bounds = worldBounds(maps.leaflet);
     applyToMap(maps.main, bounds, true, 1.5, fit);
     applyToMap(maps.mini, bounds, true, 0, fit);
-    return;
+    return true;
   }
   setMapExtentReferenceLng(target.referenceLng);
   const bounds = maps.leaflet.latLngBounds(
@@ -172,6 +172,7 @@ export function applyLoadedMapExtent(target: 'world' | MapExtentBox, fit = true)
     maps.main.setMinZoom?.(lockedMinZoom);
   }
   attachResize(maps.main);
+  return true;
 }
 
 /**

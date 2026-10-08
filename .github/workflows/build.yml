@@ -1,4 +1,4 @@
-# Build and test Agent Wars 2.4 on Windows, Linux, and macOS.
+# Build and test Agent Wars 2.5 on Windows, Linux, and macOS.
 # On-demand only (workflow_dispatch). Uploads release artifacts per OS.
 # Artifact names embed the app version from package.json ("version"), via the "Read app version" step.
 name: Build

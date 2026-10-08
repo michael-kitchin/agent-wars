@@ -8,7 +8,7 @@ Name the terrain kinds the map uses, and let the player switch the terrain style
 
 ## Availability
 
-Shown with the map. It stays available in Strategic planning and Tactical planning. In New game, Game over, Tactical annihilation, and while the tactical battles list is open, pointer input on the map container is off, so the style dropdown cannot be used.
+Shown with the map. It stays available in Strategic planning and Tactical planning. It is hidden in New game and Game over, and shown again when that overlay closes. In Tactical annihilation, and while the tactical battles list is open, it stays visible and pointer input on the map container is off, so the style dropdown cannot be used.
 
 ## Information Displayed
 
@@ -33,7 +33,8 @@ Shown with the map. It stays available in Strategic planning and Tactical planni
 ## States
 
 - Interactive: the map container accepts pointer input, and the dropdown can change style.
-- Not interactive: New game, Game over, Tactical annihilation, or the tactical battles list has disabled pointer input on the map container.
+- Hidden: New game or Game over.
+- Not interactive: Tactical annihilation, or the tactical battles list, has disabled pointer input on the map container. The legend stays visible.
 
 ## Invariants
 

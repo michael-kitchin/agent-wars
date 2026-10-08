@@ -238,6 +238,45 @@ export function resolveBundledGlobalStrategicNamingPath(): string {
 }
 
 /**
+ * Locates the world strategic terrain file, ignoring any regional pack directory.
+ *
+ * Purpose: A new-game preview of the world must not read the active regional pack.
+ * When to use: The global preview grid.
+ * Expected outcome: Absolute path to `terrain_res1_metadata.json`.
+ * Exceptions: Throws when that file is not in any candidate root.
+ */
+export function resolveBundledGlobalStrategicMetadataPath(): string {
+  logDebug('terrainMetadataPaths resolveBundledGlobalStrategicMetadataPath');
+  return resolveFirstExisting('terrain_res1_metadata.json', [...STRATEGIC_SEGMENTS]);
+}
+
+/**
+ * Locates the world tactical terrain file, ignoring any regional pack directory.
+ *
+ * Purpose: Dominant strategic fills roll up resolution-4 children from the world pack.
+ * When to use: The global preview grid.
+ * Expected outcome: Absolute path to `terrain_res4_metadata.json`.
+ * Exceptions: Throws when that file is not in any candidate root.
+ */
+export function resolveBundledGlobalTacticalMetadataPath(): string {
+  logDebug('terrainMetadataPaths resolveBundledGlobalTacticalMetadataPath');
+  return resolveFirstExisting('terrain_res4_metadata.json', [...TACTICAL_SEGMENTS]);
+}
+
+/**
+ * Locates the world weather pack, ignoring any regional pack directory.
+ *
+ * Purpose: Preview months must stay on the world file while a regional match is loaded.
+ * When to use: The global preview grid.
+ * Expected outcome: Absolute path to `terrain_res1_weather.json`.
+ * Exceptions: Throws when that file is not in any candidate root.
+ */
+export function resolveBundledGlobalWeatherPath(): string {
+  logDebug('terrainMetadataPaths resolveBundledGlobalWeatherPath');
+  return resolveFirstExisting('terrain_res1_weather.json', [...STRATEGIC_WEATHER_SEGMENTS]);
+}
+
+/**
  * Defines the `resolveTerrainStrategicNamingPath` function shape (export function resolveTerrainStrategicNamingPath(): string).
 
  * Purpose: Supports maintainability by documenting why `resolveTerrainStrategicNamingPath` exists.

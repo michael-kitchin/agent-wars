@@ -15,3 +15,4 @@ export * from './humanOrderPreviewTypes';
 export * from './sealiftTypes';
 export * from './gameApiTypes';
 export type { GameMapListEntry } from '../gameMapList';
+export type { NewGameMapPreview, NewGameMapPreviewRequest } from '../newGameMapPreviewTypes';

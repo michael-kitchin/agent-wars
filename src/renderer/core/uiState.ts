@@ -5,6 +5,8 @@ import { rendererSharedState as S } from './state';
 import { setUnitNameContent } from './unitOriginFlags';
 import { initializeScenarioRegionSelectorsOnOverlayOpen } from '../gameplay/newGameRegionUi';
 import { prepareNewGameMapPanel } from '../gameplay/newGameMapUi';
+import { refreshNewGameMapPreview, resetNewGameMapPreviewFrame } from '../gameplay/newGameMapPreviewUi';
+import { repaintNewGameMapPreview } from '../map/newGameMapPreviewRendering';
 import { syncGameSizeCapPreview } from '../gameplay/newGameSizeUi';
 import { resetNewGameOptionControls } from '../gameplay/newGameOptionsUi';
 import { newGameButtonTooltipText } from '../chrome/controlTooltipText';
@@ -85,11 +87,25 @@ export function updateGameStateSidebar(state: GameStateSnapshot | null): void {
 }
 
 /**
- * Defines the `setMainUIControlsEnabled` function shape (export function setMainUIControlsEnabled(enabled: boolean): void).
+ * Drops focus when it is inside the minimap or the terrain legend.
+ *
+ * Purpose: Those elements are hidden while the new-game overlay is open. A focused style dropdown would still take keys.
+ * When to use: When that overlay goes from hidden to shown.
+ * Expected outcome: Focus leaves the minimap or the legend. A dialog control that already has focus is left alone.
+ * Exceptions: None.
+ */
+export function blurMapChromeIfFocused(): void {
+  const active = document.activeElement;
+  if (!(active instanceof HTMLElement)) return;
+  if (active.closest('#minimap') != null || active.closest('#terrain-legend') != null) active.blur();
+}
 
- * Purpose: Supports maintainability by documenting why `setMainUIControlsEnabled` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+/**
+ * Turns pointer input on or off for the map and the right panel.
+ *
+ * Purpose: The new-game overlay and the annihilation dialog stay clickable while the match controls do not.
+ * When to use: When those overlays open or close, and when the tactical battles list opens or closes.
+ * Expected outcome: Children of the map pane other than those two overlays ignore the pointer while `enabled` is false. The right panel matches.
  * Exceptions: None.
  */
 export function setMainUIControlsEnabled(enabled: boolean): void {
@@ -115,7 +131,7 @@ export function setMainUIControlsEnabled(enabled: boolean): void {
  * When to use: After every state refresh.
  * Expected outcome: With a live game the overlay hides and controls are enabled. Otherwise the overlay shows a
  *   win, loss, or start message. Fog of war and the bonus dropdowns return to their defaults on every call while
- *   it shows. The home regions and the starting month are drawn only when the overlay opens.
+ *   it shows. The home regions, the starting month, and the map preview are drawn only when the overlay opens.
  * Exceptions: None.
  */
 export function updateGameOverUI(
@@ -143,8 +159,13 @@ export function updateGameOverUI(
   overlay?.classList.remove('hidden');
   resetNewGameOptionControls();
   if (wasHidden) {
-    void initializeScenarioRegionSelectorsOnOverlayOpen();
-    void prepareNewGameMapPanel();
+    blurMapChromeIfFocused();
+    resetNewGameMapPreviewFrame();
+    repaintNewGameMapPreview();
+    void (async () => {
+      await Promise.all([initializeScenarioRegionSelectorsOnOverlayOpen(), prepareNewGameMapPanel()]);
+      await refreshNewGameMapPreview();
+    })();
   }
   syncGameSizeCapPreview();
   setMainUIControlsEnabled(false);

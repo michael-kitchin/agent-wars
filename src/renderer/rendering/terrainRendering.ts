@@ -154,7 +154,7 @@ function resolveHomeRegionOwnerBorderColor(identity: HomeRegionOwnerIdentity): s
  * Expected outcome: Outer ring uses controller color; inset dashed ring uses home-region owner color.
  * Exceptions: None.
  */
-function drawOutlinedHomeRegionOwnershipBorders(
+export function drawOutlinedHomeRegionOwnershipBorders(
   ctx: CanvasRenderingContext2D,
   pts: readonly { x: number; y: number }[],
   args: {

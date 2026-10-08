@@ -53,9 +53,13 @@
         </div>
         <div id="new-game-panel-regional" class="openrouter-tab-panel" role="tabpanel" aria-labelledby="new-game-tab-regional" hidden>
           <div class="game-over-regional-region">
-            <label for="new-game-region-select">Region:
-              <select id="new-game-region-select" data-control-tooltip="Pick the region both sides fight over. Changing it draws two different sides again."></select>
-            </label>
+            <div class="game-over-region-cell">
+              <label for="new-game-region-select">Region:</label>
+              <div class="game-over-region-controls">
+                <select id="new-game-region-select" data-control-tooltip="Pick the region both sides fight over. Changing it draws two different sides again."></select>
+                <button type="button" id="new-game-region-randomize" class="compact-blue-btn compact-square-btn game-over-region-randomize" aria-label="Randomize region" data-control-tooltip="Pick one of the listed regions at random, including the region already shown.">↻</button>
+              </div>
+            </div>
           </div>
           <div class="game-over-region-row">
             <div class="game-over-region-cell">

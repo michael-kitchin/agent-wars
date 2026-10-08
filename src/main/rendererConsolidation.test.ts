@@ -23,13 +23,12 @@ function testRedrawAndResizeDelegateToSharedScene(): void {
   const resizeFn = getFunctionSource(source, 'resizeAndRedraw');
   const redrawFn = getFunctionSource(source, 'redraw');
 
+  const frameFn = getFunctionSource(source, 'paintMapFrame');
+  assert.ok(resizeFn.includes('paintMapFrame(ctx, w, h);'), 'resizeAndRedraw should delegate to paintMapFrame');
+  assert.ok(redrawFn.includes('paintMapFrame(ctx, w, h);'), 'redraw should delegate to paintMapFrame');
   assert.ok(
-    resizeFn.includes('drawGameScene(ctx, w, h, S.gameState);'),
-    'resizeAndRedraw should delegate to drawGameScene'
-  );
-  assert.ok(
-    redrawFn.includes('drawGameScene(ctx, w, h, S.gameState);'),
-    'redraw should delegate to drawGameScene'
+    frameFn.includes('drawGameScene(ctx, w, h, S.gameState);'),
+    'paintMapFrame should delegate to drawGameScene'
   );
 
   assert.ok(!resizeFn.includes('drawTerrainHexes('), 'resizeAndRedraw should not duplicate scene rendering steps');
@@ -104,15 +103,15 @@ function testZoomHidesStrategicMapUnits(): void {
       refreshStackCalloutFn.includes('hideStackCallout();'),
     'refreshStackCalloutIfOpen should dismiss callout during res4 strategic zoom'
   );
+  const frameFn = getFunctionSource(rendererSource, 'paintMapFrame');
   assert.ok(
-    redrawFn.includes('if (shouldHideStrategicMapUnitsForZoom()) {') &&
-      redrawFn.includes('hideStackCallout();'),
-    'redraw should dismiss open stack callout when res4 strategic zoom hides units'
+    frameFn.includes('if (shouldHideStrategicMapUnitsForZoom()) {') &&
+      frameFn.includes('hideStackCallout();'),
+    'paintMapFrame should dismiss open stack callout when res4 strategic zoom hides units'
   );
   assert.ok(
-    resizeAndRedrawFn.includes('if (shouldHideStrategicMapUnitsForZoom()) {') &&
-      resizeAndRedrawFn.includes('hideStackCallout();'),
-    'resizeAndRedraw should dismiss open stack callout when res4 strategic zoom hides units'
+    redrawFn.includes('paintMapFrame(ctx, w, h);') && resizeAndRedrawFn.includes('paintMapFrame(ctx, w, h);'),
+    'redraw and resizeAndRedraw should share the frame that dismisses the stack callout'
   );
   assert.ok(
     mainMapInteractionsSource.includes('function pointerHitsDrawnUnitIcon(') &&

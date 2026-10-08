@@ -1,6 +1,6 @@
 # Region vs region
 
-The only persisted scenario id in 2.4.0 is `region_vs_region` (`REGION_VS_REGION_SCENARIO_ID` in `src/main/gameDb/scenarioState.ts`). A new match writes the two homes to `scenario_region_human` and `scenario_region_ai`. Combat resolution is unchanged; this page is win evaluation, visibility, and UI.
+The only persisted scenario id in 2.5.0 is `region_vs_region` (`REGION_VS_REGION_SCENARIO_ID` in `src/main/gameDb/scenarioState.ts`). A new match writes the two homes to `scenario_region_human` and `scenario_region_ai`. Combat resolution is unchanged; this page is win evaluation, visibility, and UI.
 
 The engine under `src/` wins if this file drifts.
 
@@ -19,6 +19,8 @@ On the Global tab the player picks:
 A global match stores the two home-region names in `scenario_region_human` and `scenario_region_ai`. Those two regions may be the same.
 
 A regional match stores the two side groups' display names in those same keys. The groups must differ. Win evaluation, forced visibility, and the home outlines use those side-group hexes. The strategic hexes are the loaded map's resolution: 1 on the global map, and 2 or 3 on a regional map.
+
+While the new-game dialog is open, the map behind it draws the selected tab's strategic grid and the two chosen homes. See [new-game-dialog.md](ux/new-game-dialog.md).
 
 `scenarioId` on the snapshot is always `region_vs_region` for a new match (`fogState` / seeding). There is no second scenario picker in the live overlay.
 

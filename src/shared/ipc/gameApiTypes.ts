@@ -17,6 +17,7 @@ import type {
 } from './productionTypes';
 import type { GameStateSnapshot } from './gameStateTypes';
 import type { GameMapListEntry } from '../gameMapList';
+import type { NewGameMapPreview, NewGameMapPreviewRequest } from '../newGameMapPreviewTypes';
 import type {
   EndTacticalBattleIpcResult,
   StartTacticalBattleIpcResult,
@@ -201,6 +202,15 @@ listScenarioHomeRegions: () => Promise<string[]>;
    * Exceptions: Rejects on IPC transport failures.
    */
 listGameMaps: () => Promise<GameMapListEntry[]>;
+  /**
+   * Builds a read-only map preview for the open new-game dialog.
+   *
+   * Contract: Does not change the loaded match, its map profile, or its weather pack.
+   * When to use: When the dialog opens and when its map or home choices change.
+   * Expected outcome: Terrain, twelve-month weather, home hexes, and the extent for that tab.
+   * Exceptions: Rejects when the map or a side group is unknown, or when IPC transport fails.
+   */
+  newGameMapPreview: (request: NewGameMapPreviewRequest) => Promise<NewGameMapPreview>;
     /**
    * Specifies the contract for the `newGame` member (newGame: (payload?: NewGameIpcPayload) => Promise<GameStateSnapshot>;).
 
