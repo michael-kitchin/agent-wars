@@ -13,6 +13,7 @@ import type { GameStateSnapshot } from '../gameDb';
 import { dbGetOne, dbRun } from '../gameDb';
 import { LATLNG_DECIMAL_PLACES } from '../mapData';
 import { landUnitCanOccupyHex, LAND_UNIT_ROUTE_STEP_BLOCKED_REASON } from '../../shared/landTraversalStrategic';
+import { ARMOR_MOVE_ENDS_ON_ENTER_REASON } from '../../shared/strategicTerrainFlags';
 import { getStrategicLandMassByH3 } from '../terrainClassificationCache';
 import {
   getValidDestinations,
@@ -22,6 +23,7 @@ import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { buildStrategicUnitDisplayLabelResolver } from '../../shared/unitDisplayNames';
 import { validateTacticalGroupRangedTarget } from '../gameActions/tacticalGroupRangedTargetValidation';
 import { isEmbarkedLandUnit } from '../gameActions/sealift';
+import { landUnitGridRouteBlockReason } from '../gameActions/strategicOrderValidation';
 import { formatLatLng as formatLatLngWithPrecision } from './promptText';
 import { requestOrdersFlow } from './requestOrdersFlow';
 import { NAVAL_DESTINATION_MUST_BE_WATER_COASTAL } from '../navalMovementMessages';
@@ -416,7 +418,15 @@ function validateAiOrder(
   if ((unit.unitType === 'infantry' || unit.unitType === 'armor') && !landUnitCanOccupyHex(order.toH3Index, getStrategicLandMassByH3())) {
     return { valid: false, reason: 'Land units must move to a hex that overlaps a continent or large island.' };
   }
-  if (unit.unitType === 'infantry' || unit.unitType === 'armor') {
+  if (unit.unitType === 'armor') {
+    if (!getValidDestinations(unit, state, destinationOptions).includes(order.toH3Index)) {
+      if (dist !== null) {
+        const landMassBlock = landUnitGridRouteBlockReason(unit.h3Index, order.toH3Index, dist, order.unitId);
+        if (landMassBlock) return { valid: false, reason: landMassBlock };
+      }
+      return { valid: false, reason: ARMOR_MOVE_ENDS_ON_ENTER_REASON };
+    }
+  } else if (unit.unitType === 'infantry') {
     if (!getValidDestinations(unit, state, destinationOptions).includes(order.toH3Index)) {
       return { valid: false, reason: LAND_UNIT_ROUTE_STEP_BLOCKED_REASON };
     }

@@ -60,6 +60,17 @@ export function setStrategicTerrainFlags(
 }
 
 /**
+ * Sentence for an armor order that would pass a hex where the move must end.
+ *
+ * Purpose: The human order gate and the AI movement check share one explanation.
+ * When to use: After range, occupancy, and the straight land-mass route have been allowed, when armor's destination is still outside the one-turn reachable set.
+ * Expected outcome: The caller shows this sentence and does not store the order.
+ * Exceptions: None.
+ */
+export const ARMOR_MOVE_ENDS_ON_ENTER_REASON =
+  'Armor must end its move on entering a rugged, arctic, or city hex.';
+
+/**
  * True when armor may enter this hex and may not leave it during the same move.
  *
  * Purpose: One predicate for path search, destination lists, and route tools.

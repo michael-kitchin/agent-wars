@@ -417,7 +417,6 @@ export function buildPlanRouteSuccessResult(payload: {
     firstTurnMovementBudget: payload.firstTurnMovementBudget ?? null,
     maxTurns: payload.maxTurns ?? null,
   });
-  const firstTurnBudget = payload.firstTurnMovementBudget ?? payload.movementBudget;
   let turnsRequired = 0;
   const segments = payload.partitionPathByTurn(
     payload.path,
@@ -428,16 +427,10 @@ export function buildPlanRouteSuccessResult(payload: {
   const maxTurns = payload.maxTurns;
   if (maxTurns != null && turnsRequired > maxTurns) {
     payload.warnings.push(`Route truncated at maxTurns limit - destination not reached in ${maxTurns} turns`);
-    const stepsAllowed =
-      maxTurns <= 0 ? 0 : firstTurnBudget + Math.max(0, maxTurns - 1) * payload.movementBudget;
-    const truncatedPath = payload.path.slice(0, Math.min(payload.path.length, stepsAllowed + 1));
-    const truncatedSegments = payload.partitionPathByTurn(
-      truncatedPath,
-      payload.movementBudget,
-      payload.firstTurnMovementBudget
-    );
+    const kept = maxTurns <= 0 ? [] : segments.slice(0, maxTurns);
+    const hops = kept.reduce((sum, seg) => sum + seg.movementSpent, 0);
     turnsRequired = maxTurns;
-    const pathForResponse = truncatedSegments.map((seg) => ({
+    const pathForResponse = kept.map((seg) => ({
       turn: seg.turn,
       hexes: seg.hexes.map((h) => payload.h3ToLatLng(h)),
       movementSpent: seg.movementSpent,
@@ -454,8 +447,8 @@ export function buildPlanRouteSuccessResult(payload: {
       origin: originLl,
       destination: destLl,
       orderToXY,
-      orderToH3: truncatedSegments.length > 0 ? truncatedSegments[0]!.endHex : payload.originH3,
-      hexDistance: truncatedPath.length - 1,
+      orderToH3: kept.length > 0 ? kept[0]!.endHex : payload.originH3,
+      hexDistance: hops,
       turnsRequired,
       path: pathForResponse,
       warnings: payload.warnings,

@@ -4,6 +4,7 @@ import { gridDisk, latLngToCell } from 'h3-js';
 import { getLandMassReachableHexes, type LandMassByH3 } from '../shared/landTraversalStrategic';
 import { setLoadedStrategicFootprint } from '../shared/loadedStrategicFootprint';
 import { isNeutralBorderHex } from '../shared/h3Resolutions';
+import { getDistanceAndTurns } from './pathfinding';
 import { armorMoveEndsOnHex, setStrategicTerrainFlags } from '../shared/strategicTerrainFlags';
 
 /**
@@ -68,6 +69,30 @@ describe('armor stop', () => {
         maxDepth: 2,
       });
       assert.equal(infantry.has(far), true);
+    } finally {
+      setStrategicTerrainFlags(null);
+    }
+  });
+
+  it('counts two turns through a rugged hex and one turn when armor starts there', () => {
+    const { origin, mid, far, land, hexSet } = sampleChain();
+    setStrategicTerrainFlags({ rugged: [mid], arctic: [], city: [] });
+    try {
+      const through = getDistanceAndTurns(origin, far, hexSet, new Map(), 'land', 2, undefined, land, armorMoveEndsOnHex);
+      assert.equal(through?.hexDistance, 2);
+      assert.equal(through?.estimatedTurns, 2);
+      const reached = getLandMassReachableHexes({
+        originH3: origin,
+        hexSet,
+        data: land,
+        maxDepth: 2,
+        endMoveOnEnter: armorMoveEndsOnHex,
+      });
+      assert.equal(reached.has(mid), true);
+      assert.equal(reached.has(far), false);
+      const leaving = getDistanceAndTurns(mid, far, hexSet, new Map(), 'land', 2, undefined, land, armorMoveEndsOnHex);
+      assert.equal(leaving?.hexDistance, 1);
+      assert.equal(leaving?.estimatedTurns, 1);
     } finally {
       setStrategicTerrainFlags(null);
     }

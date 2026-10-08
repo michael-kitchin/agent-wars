@@ -6,6 +6,7 @@ import {
   landUnitCanOccupyHex,
 } from '../../shared/landTraversalStrategic';
 import { formatTargetOutOfRangeReason } from '../../shared/tacticalRanges';
+import { ARMOR_MOVE_ENDS_ON_ENTER_REASON } from '../../shared/strategicTerrainFlags';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { buildStrategicUnitDisplayLabelResolver, fallbackDisplayNameFromUnitId } from '../../shared/unitDisplayNames';
 import { getRange } from '../combatConstants';
@@ -98,11 +99,47 @@ export function humanPerspectiveStateSnapshot(): GameStateSnapshot {
 }
 
 /**
+ * Land-mass failure for the straight grid route between two hexes.
+ *
+ * Purpose: The armor stop sentence must not replace a water or different-continent failure.
+ * When to use: From the human order gate for every land unit, and from the AI armor check before the stop sentence.
+ * Expected outcome: Null when every grid step stays on one land mass. Otherwise the land-mass reason, or the invalid-path reason when no grid path exists.
+ * Exceptions: Logs at error and returns the invalid-path reason when the grid path cannot be derived.
+ */
+export function landUnitGridRouteBlockReason(
+  fromH3: string,
+  toH3: string,
+  gridDistance: number,
+  unitId: string
+): string | null {
+  logDebug('gameActions landUnitGridRouteBlockReason', { unitId, fromH3, toH3, gridDistance });
+  const routeH3: string[] = [fromH3];
+  const traversedH3: string[] = [];
+  if (gridDistance > 1) {
+    const path = computeGridPathCellsPure(fromH3, toH3);
+    if (path === null) {
+      logError('gameActions landUnitGridRouteBlockReason: no derivable route between hexes', {
+        unitId,
+        fromH3,
+        toH3,
+      });
+      return 'Invalid hex or path; try starting a new game.';
+    }
+    traversedH3.push(...path);
+  }
+  for (const h3 of traversedH3) {
+    if (routeH3[routeH3.length - 1] !== h3) routeH3.push(h3);
+  }
+  if (routeH3[routeH3.length - 1] !== toH3) routeH3.push(toH3);
+  return getLandMassRouteBlockReason(routeH3, getStrategicLandMassByH3());
+}
+
+/**
  * Checks whether a human unit may be ordered to a strategic hex.
  *
  * Purpose: Movement-order gate used by submit-orders before a standing march is stored.
  * When to use: From `submitOrders` with a display-label callback for missing-unit text.
- * Expected outcome: `{ valid: true }` or `{ valid: false, reason }` with the same reason strings as the previous inline ownership checks.
+ * Expected outcome: `{ valid: true }` or `{ valid: false, reason }`. A blocked straight route keeps the land-mass reason. After that check, armor outside its one-turn reachable set gets `ARMOR_MOVE_ENDS_ON_ENTER_REASON`.
  * Exceptions: Logs at error and returns a reason when hex distance or a route cannot be derived; does not throw.
  */
 export function validateOrder(
@@ -110,6 +147,7 @@ export function validateOrder(
   toH3Index: string,
   displayLabelForUnit: (id: string) => string
 ): { valid: true } | { valid: false; reason: string } {
+  logDebug('gameActions validateOrder', { unitId, toH3Index });
   const owned = loadOwnedStrategicUnit(unitId, {
     allowedPlayer: 'human',
     displayLabelForUnit,
@@ -173,26 +211,17 @@ export function validateOrder(
       });
       if (blockReason) return { valid: false, reason: blockReason };
     }
-    const routeH3: string[] = [unit.h3_index];
-    const traversedH3: string[] = [];
-    if (dist > 1) {
-      const path = computeGridPathCellsPure(unit.h3_index, toH3Index);
-      if (path === null) {
-        logError('gameActionsCore validateMoveOrder: no derivable route between hexes', {
-          unitId,
-          fromH3Index: unit.h3_index,
-          toH3Index,
-        });
-        return { valid: false, reason: 'Invalid hex or path; try starting a new game.' };
-      }
-      traversedH3.push(...path);
-    }
-    for (const h3 of traversedH3) {
-      if (routeH3[routeH3.length - 1] !== h3) routeH3.push(h3);
-    }
-    if (routeH3[routeH3.length - 1] !== toH3Index) routeH3.push(toH3Index);
-    const landMassBlock = getLandMassRouteBlockReason(routeH3, getStrategicLandMassByH3());
+    const landMassBlock = landUnitGridRouteBlockReason(unit.h3_index, toH3Index, dist, unitId);
     if (landMassBlock) return { valid: false, reason: landMassBlock };
+    if (unit.unit_type === 'armor') {
+      const armorDests = getValidDestinations(
+        { id: unitId, h3Index: unit.h3_index, unitType: 'armor' },
+        perspective
+      );
+      if (!armorDests.includes(toH3Index)) {
+        return { valid: false, reason: ARMOR_MOVE_ENDS_ON_ENTER_REASON };
+      }
+    }
   }
 
   return { valid: true };

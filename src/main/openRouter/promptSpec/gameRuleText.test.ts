@@ -237,6 +237,7 @@ test('buildMovementBudgetRule quotes engine budgets and states that air never ma
   assert.ok(strategic.includes(String(getMovementBudget('armor'))));
   assert.match(strategic, /air (never marches|does not march)/i);
   assert.match(strategic, /Armor that enters a rugged, arctic, or city hex ends its move there/);
+  assert.match(strategic, /A longer route continues on the next turn, and the turn count includes that halt/);
   assert.doesNotMatch(strategic, /urban or rubble/i);
   const tactical = buildMovementBudgetRule('tactical');
   assert.ok(tactical.includes(String(MOVEMENT_RANGE_BY_UNIT_TYPE.armor)));

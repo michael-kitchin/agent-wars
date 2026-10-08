@@ -420,7 +420,8 @@ export function buildMovementBudgetRule(mode: PromptCoordinateMode): string {
   return (
     `Movement budgets: ${getMovementBudget('infantry')} cell for infantry, ` +
     `${getMovementBudget('armor')} for armor and naval, and air never marches. ` +
-    'Armor that enters a rugged, arctic, or city hex ends its move there. Armor already on that hex may leave.'
+    'Armor that enters a rugged, arctic, or city hex ends its move there. Armor already on that hex may leave. ' +
+    'A longer route continues on the next turn, and the turn count includes that halt.'
   );
 }
 

@@ -1,5 +1,4 @@
 import { getReachableHexes, terrainIsPassableForDomain } from '../pathfinding';
-import { armorMoveEndsOnHex } from '../../shared/strategicTerrainFlags';
 import { strategicRangeOnState } from '../weather/weatherMatch';
 import type { WeatherState } from '../../shared/weatherBonusTypes';
 import type { PassableDomain } from '../pathfinding';
@@ -166,7 +165,6 @@ export function resolveRoutePathForUnit(payload: {
     blocked: payload.blocked,
     warnings,
     blockedRetryWarning: 'Route passes through enemy-occupied hexes - avoidance was not possible.',
-    endMoveOnEnter: payload.unitType === 'armor' ? armorMoveEndsOnHex : undefined,
   });
   return {
     passableFor: 'land',

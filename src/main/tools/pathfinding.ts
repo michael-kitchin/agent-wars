@@ -654,7 +654,13 @@ export function executePlanRouteWithSession(
     warnings,
     maxTurns: options?.maxTurns,
     h3ToLatLng: (h3) => h3ToLatLng(h3, session.latLngByH3, 'cellCenter'),
-    partitionPathByTurn,
+    partitionPathByTurn: (pathH3, budget, firstTurnBudget) =>
+      partitionPathByTurn(
+        pathH3,
+        budget,
+        firstTurnBudget,
+        unit.unitType === 'armor' ? armorMoveEndsOnHex : undefined
+      ),
   });
   } catch (err) {
     logError('pathfinding executePlanRoute: exception', {

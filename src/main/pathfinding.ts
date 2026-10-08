@@ -238,10 +238,12 @@ export function getReachableHexes(
  *
  * Purpose: `plan_route` and standing-order overlays need one segment per turn, with land-seaport
  * egress using a smaller first-turn budget than later sailing turns.
- * When to use: After a full path is known; pass `firstTurnMovementBudget` only when turn 1 differs.
+ * When to use: After a full path is known; pass `firstTurnMovementBudget` only when turn 1 differs,
+ * and pass `endMoveOnEnter` when entering a hex must close the turn.
  * Expected outcome: Empty when the path has fewer than two hexes or a budget is not positive; otherwise
  * turn 1 uses `firstTurnMovementBudget` (or `movementBudget` if omitted) and later turns use `movementBudget`.
- * Exceptions: None.
+ * Entering a marked hex includes that hex and ends the turn, leaving unused hops. The next segment starts there.
+ * Exceptions: The hex a segment starts on is not tested, so a unit already on a marked hex may leave.
  */
 export function partitionPathByTurn(
   pathH3: string[],
@@ -254,9 +256,23 @@ export function partitionPathByTurn(
    * Expected outcome: Turn 1 spends at most this many edges; later turns use `movementBudget`.
    * Exceptions: Values below 1 yield no segments.
    */
-  firstTurnMovementBudget?: number
+  firstTurnMovementBudget?: number,
+  /**
+   * Hexes that end the current turn when the path enters them.
+   *
+   * Contract: Omit to split only on the hop budget.
+   * When to use: Pass `armorMoveEndsOnHex` for an armor route.
+   * Expected outcome: The entered hex closes the segment; the next segment may leave it.
+   * Exceptions: The segment's starting hex is not tested.
+   */
+  endMoveOnEnter?: (h3: string) => boolean
 ): { turn: number; hexes: string[]; movementSpent: number; movementBudget: number; endHex: string }[] {
-  logTrace('pathfinding partitionPathByTurn', { pathLength: pathH3.length, movementBudget, firstTurnMovementBudget });
+  logTrace('pathfinding partitionPathByTurn', {
+    pathLength: pathH3.length,
+    movementBudget,
+    firstTurnMovementBudget,
+    endsMoveOnEnter: endMoveOnEnter != null,
+  });
   if (pathH3.length <= 1) return [];
   if (movementBudget <= 0) return [];
   const firstBudget = firstTurnMovementBudget ?? movementBudget;
@@ -272,6 +288,7 @@ export function partitionPathByTurn(
       i++;
       hexes.push(pathH3[i]!);
       spent++;
+      if (endMoveOnEnter?.(pathH3[i]!)) break;
     }
     segments.push({
       turn,
@@ -286,11 +303,13 @@ export function partitionPathByTurn(
 }
 
 /**
- * Defines the `getDistanceAndTurns` function shape (export function getDistanceAndTurns( originH3: string, destinationH3: string, hexSet: Set<string>, terrainByH3: Map<string, string>, passableFor:).
-
- * Purpose: Supports maintainability by documenting why `getDistanceAndTurns` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Hop count and turn count for one passable route.
+ *
+ * Purpose: `check_distance` and unit assessment need both numbers from the same path.
+ * When to use: After the caller has a domain, a budget, and an optional set of hexes that end a turn on entry.
+ * Expected outcome: Null when no path exists. Otherwise the hop count, and the turn count from `partitionPathByTurn`
+ * when the budget is positive. A budget that is not positive keeps `Math.ceil(hops / budget)`, so a zero budget
+ * stays infinite rather than a successful zero-turn trip. The search may pass through hexes that end a turn.
  * Exceptions: None.
  */
 export function getDistanceAndTurns(
@@ -302,14 +321,25 @@ export function getDistanceAndTurns(
   movementBudget: number,
   blocked?: Set<string>,
   landMass?: LandMassByH3,
+  /**
+   * Hexes that end the current turn when the path enters them.
+   *
+   * Contract: The search still walks through these hexes.
+   * When to use: Pass `armorMoveEndsOnHex` for armor. Omit it for infantry.
+   * Expected outcome: A positive budget counts one turn per segment, including a turn that stopped early.
+   * Exceptions: A budget that is not positive ignores the predicate and uses `Math.ceil`.
+   */
   endMoveOnEnter?: (h3: string) => boolean
 ): { hexDistance: number; estimatedTurns: number } | null {
-  logTrace('pathfinding getDistanceAndTurns', { passableFor });
-  const path = findPath(originH3, destinationH3, hexSet, terrainByH3, passableFor, blocked, landMass, endMoveOnEnter);
+  logTrace('pathfinding getDistanceAndTurns', { passableFor, movementBudget, endsMoveOnEnter: endMoveOnEnter != null });
+  const path = findPath(originH3, destinationH3, hexSet, terrainByH3, passableFor, blocked, landMass);
   if (!path || path.length === 0) return null;
   const hexDistance = path.length - 1; // steps between hexes
   if (hexDistance <= 0) return { hexDistance: 0, estimatedTurns: 0 };
-  const estimatedTurns = Math.ceil(hexDistance / movementBudget);
+  const estimatedTurns =
+    movementBudget > 0
+      ? partitionPathByTurn(path, movementBudget, undefined, endMoveOnEnter).length
+      : Math.ceil(hexDistance / movementBudget);
   return { hexDistance, estimatedTurns };
 }
 

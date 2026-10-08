@@ -115,7 +115,7 @@ Hits are air-strike hits on urban cells. The average side is the map's land hexe
 - Hits on infrastructure in battles stay at one cell.
 
 **Strategic movement**
-- Armor that enters a rugged, arctic or city hex ends its move there. Infantry and naval movement are unchanged.
+- Armor that enters a rugged, arctic or city hex ends its move there. A longer route continues on the next turn, and the turn count includes that halt. Infantry and naval movement are unchanged.
 - **Rugged:** at least half the hex's land cells pass the existing mountain test (TRI ≥ 24, or slope ≥ 5 with elevation_max ≥ 700), regardless of land cover.
 - **Arctic:** at least half its land cells are arctic.
 - **City:** at least 86 of 343 tactical cells are urban in the generated data, so bombing doesn't remove the status.

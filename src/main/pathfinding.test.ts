@@ -66,6 +66,43 @@ function testMultiTurnArmor(): void {
 }
 
 /**
+ * Entering a marked hex ends the turn before the budget is spent.
+ *
+ * Purpose: A two-hop route at budget 2 is one turn until the middle hex ends the move.
+ * When to use: After changing how `partitionPathByTurn` treats `endMoveOnEnter`.
+ * Expected outcome: With no mark, A-B-C is one turn. With B marked, turn 1 is A-B and turn 2 is B-C.
+ * Exceptions: None.
+ */
+function testStopOnMiddleHexUsesTwoTurns(): void {
+  const path = ['A', 'B', 'C'];
+  const open = partitionPathByTurn(path, 2);
+  assert.strictEqual(open.length, 1);
+  assert.deepStrictEqual(open[0]!.hexes, ['A', 'B', 'C']);
+  const stopped = partitionPathByTurn(path, 2, undefined, (hex) => hex === 'B');
+  assert.strictEqual(stopped.length, 2);
+  assert.deepStrictEqual(stopped[0]!.hexes, ['A', 'B']);
+  assert.strictEqual(stopped[0]!.movementSpent, 1);
+  assert.deepStrictEqual(stopped[1]!.hexes, ['B', 'C']);
+  assert.strictEqual(stopped[1]!.movementSpent, 1);
+}
+
+/**
+ * A mark on the origin does not end the turn before the unit leaves.
+ *
+ * Purpose: A unit already standing on a hex that would end a move may still spend its budget.
+ * When to use: After changing how `partitionPathByTurn` treats `endMoveOnEnter`.
+ * Expected outcome: Path A-B-C at budget 2 stays one turn when only A is marked.
+ * Exceptions: None.
+ */
+function testStopOnOriginStillSpendsBudget(): void {
+  const path = ['A', 'B', 'C'];
+  const segments = partitionPathByTurn(path, 2, undefined, (hex) => hex === 'A');
+  assert.strictEqual(segments.length, 1);
+  assert.deepStrictEqual(segments[0]!.hexes, ['A', 'B', 'C']);
+  assert.strictEqual(segments[0]!.movementSpent, 2);
+}
+
+/**
  * Defines the `testHexContinuity` function shape (function testHexContinuity(): void).
 
  * Purpose: Supports maintainability by documenting why `testHexContinuity` exists.
@@ -349,6 +386,8 @@ function run(): void {
   testSingleStepInfantry();
   testMultiTurnInfantry();
   testMultiTurnArmor();
+  testStopOnMiddleHexUsesTwoTurns();
+  testStopOnOriginStillSpendsBudget();
   testHexContinuity();
   testSingleHexReturnsEmpty();
   testEmptyPathReturnsEmpty();
