@@ -8,7 +8,7 @@ Mode-specific detail lives in `strategic-prompt.md` and `tactical-prompt.md`. Me
 
 ## 1. Identity and coordinates
 
-1. **Cells are briefing hex codes.** Every cell the model reads or writes is a two-character code from the alphabet `A–Z` and `0–9`, produced by `h3ToCode` under the active `CoordinateContext`. Strategic prompts use the strategic registry; tactical prompts use the tactical registry for the battle footprint.
+1. **Cells are briefing hex codes.** Every cell the model reads or writes is a two-character code from the alphabet `A–Z` and `0–9`, produced by `h3ToCode` under the active `CoordinateContext`. Strategic prompts use the strategic registry for the match that is loaded: the world grid on Global, that region's footprint on Regional. Loading another map replaces that registry before the next briefing. Tactical prompts use the tactical registry for that battle's footprint. Loading another map drops those battle tables.
 2. **Codes are drawn, never invented.** A code the model emits must have appeared in the operational map or in a table of the same prompt. The prompt must say so.
 3. **Raw geometry is never an order value.** H3 index strings and latitude/longitude pairs must not appear in any order field. The prompt must say so in both modes.
 4. **Registries do not mix.** A tactical prompt must not contain strategic codes and a strategic prompt must not contain tactical codes. Home-region hex lists use `HOME_REGION_HEX_COORD_CTX` (`mode: 'strategic'`) and therefore appear only in strategic prompts.

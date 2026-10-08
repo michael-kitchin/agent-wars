@@ -103,7 +103,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  margin: 0 0 0.7rem 0;
+  margin: 0 0 0.2rem 0;
 }
 .game-over-region-cell {
   display: flex;
@@ -212,8 +212,12 @@
 }
 .game-over-box p.game-over-advanced-tech {
   text-align: center;
-  margin: 0.15rem 0 0.35rem 0;
+  margin: 0 0 0.55rem 0;
   font-size: 0.78rem;
+}
+.game-over-box p.game-over-advanced-tech:empty {
+  display: none;
+  margin: 0;
 }
 .map-toast p { margin: 0; flex: 1; white-space: pre-line; }
 #map-toast-dismiss {

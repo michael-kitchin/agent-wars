@@ -61,7 +61,7 @@ Tactical envelopes omit `assign_order`, memory writes, and production. Sub-units
 
 ## Coordinates
 
-The model never sees raw H3 indexes. Briefing hex codes (and lat/lng internally) are the contract. Tool results are rewritten to hex codes by `encodeOpenRouterToolResultForLlm`.
+The model never sees raw H3 indexes. Briefing hex codes (and lat/lng internally) are the contract. Strategic codes name the loaded match's strategic cells and are replaced when another map loads. Tactical codes name one battle's footprint. Tool results are rewritten to hex codes by `encodeOpenRouterToolResultForLlm`.
 
 ## Related
 

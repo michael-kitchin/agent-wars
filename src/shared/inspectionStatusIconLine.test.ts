@@ -3,10 +3,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
 import {
-  INSPECTION_STATUS_ICON_SLASH_TEXT,
+  inspectionStatusIconDrawPx,
   inspectionStatusIconFontPx,
   inspectionStatusIconsForHex,
-  inspectionStatusSlashIsBold,
   strategicOverlayBandOffsetPx,
   strategicProductionLabelSurface,
   techInspectionIconAssetPath,
@@ -16,7 +15,7 @@ import {
 /**
  * Checks which production surface a world hex uses.
  *
- * Purpose: The icon row follows the same hexes as the production label, including the build button.
+ * Purpose: Production labels stay on their current hexes. The status icon does not use this surface as a yes-or-no gate.
  * When to use: From this file's runner.
  * Expected outcome: Tactical, hidden hexes, and opponent hexes outside inspection are `'none'`. The build button wins when it is shown. Inspection reveals a canvas label on the remaining hexes.
  * Exceptions: AssertionError when the surface drifts from the production overlay.
@@ -79,95 +78,123 @@ test('a production label is a button, a canvas line, or absent', () => {
 });
 
 /**
- * Checks which tech and weather icons a labeled hex receives.
+ * Checks which single status icon a world hex receives.
  *
- * Purpose: The icon row uses the same omissions as the hex tooltip Tech and Weather lines.
+ * Purpose: T held shows tech. T released shows weather. A missing bonus or a missing hex fact shows nothing.
  * When to use: From this file's runner.
- * Expected outcome: No row when the production surface is absent or both icons are absent. One icon when only one applies. Basic at 20 urban cells and Advanced at 21.
- * Exceptions: AssertionError when a missing count becomes Basic or an unknown weather becomes Mild.
+ * Expected outcome: Tech while held when the bonus is on and the urban count is a positive finite number. Weather while released when that bonus is on and the word is known. Null otherwise.
+ * Exceptions: AssertionError when a missing count becomes Basic, an unknown weather becomes Mild, or the other icon leaks into the hold state.
  */
-test('tech and weather icons follow the hex tooltip omissions', () => {
+test('one status icon follows the hold and the bonus', () => {
+  assert.deepEqual(
+    inspectionStatusIconsForHex({
+      mapInspectionHeld: true,
+      techBonusEnabled: true,
+      weatherBonusEnabled: true,
+      baselineUrbanHexCount: 21,
+      weather: 'heat',
+    }),
+    { kind: 'tech', level: 'advanced' }
+  );
+  assert.deepEqual(
+    inspectionStatusIconsForHex({
+      mapInspectionHeld: true,
+      techBonusEnabled: true,
+      weatherBonusEnabled: false,
+      baselineUrbanHexCount: 20,
+      weather: null,
+    }),
+    { kind: 'tech', level: 'basic' }
+  );
   assert.equal(
     inspectionStatusIconsForHex({
-      productionSurface: 'none',
-      techBonusEnabled: true,
+      mapInspectionHeld: true,
+      techBonusEnabled: false,
+      weatherBonusEnabled: true,
       baselineUrbanHexCount: 21,
       weather: 'heat',
     }),
     null
   );
-  assert.deepEqual(
+  assert.equal(
     inspectionStatusIconsForHex({
-      productionSurface: 'canvas',
-      techBonusEnabled: false,
-      baselineUrbanHexCount: 21,
-      weather: 'heat',
-    }),
-    { tech: null, weather: 'heat' }
-  );
-  assert.deepEqual(
-    inspectionStatusIconsForHex({
-      productionSurface: 'canvas',
+      mapInspectionHeld: true,
       techBonusEnabled: true,
-      baselineUrbanHexCount: 21,
-      weather: null,
-    }),
-    { tech: 'advanced', weather: null }
-  );
-  assert.deepEqual(
-    inspectionStatusIconsForHex({
-      productionSurface: 'button',
-      techBonusEnabled: true,
-      baselineUrbanHexCount: 20,
-      weather: 'rain',
-    }),
-    { tech: 'basic', weather: 'rain' }
-  );
-  assert.deepEqual(
-    inspectionStatusIconsForHex({
-      productionSurface: 'canvas',
-      techBonusEnabled: true,
+      weatherBonusEnabled: true,
       baselineUrbanHexCount: 0,
       weather: 'mild',
     }),
-    { tech: null, weather: 'mild' }
+    null
   );
   assert.equal(
     inspectionStatusIconsForHex({
-      productionSurface: 'canvas',
+      mapInspectionHeld: true,
       techBonusEnabled: true,
-      baselineUrbanHexCount: 0,
+      weatherBonusEnabled: false,
+      baselineUrbanHexCount: Number.NaN,
+      weather: null,
+    }),
+    null
+  );
+  assert.equal(
+    inspectionStatusIconsForHex({
+      mapInspectionHeld: true,
+      techBonusEnabled: true,
+      weatherBonusEnabled: true,
+      baselineUrbanHexCount: -1,
+      weather: 'snow',
+    }),
+    null
+  );
+  assert.deepEqual(
+    inspectionStatusIconsForHex({
+      mapInspectionHeld: false,
+      techBonusEnabled: true,
+      weatherBonusEnabled: true,
+      baselineUrbanHexCount: 21,
+      weather: 'heat',
+    }),
+    { kind: 'weather', state: 'heat' }
+  );
+  assert.equal(
+    inspectionStatusIconsForHex({
+      mapInspectionHeld: false,
+      techBonusEnabled: true,
+      weatherBonusEnabled: false,
+      baselineUrbanHexCount: 21,
+      weather: 'heat',
+    }),
+    null
+  );
+  assert.equal(
+    inspectionStatusIconsForHex({
+      mapInspectionHeld: false,
+      techBonusEnabled: true,
+      weatherBonusEnabled: true,
+      baselineUrbanHexCount: 21,
       weather: 'fog',
     }),
     null
   );
   assert.equal(
     inspectionStatusIconsForHex({
-      productionSurface: 'canvas',
+      mapInspectionHeld: false,
       techBonusEnabled: true,
-      baselineUrbanHexCount: Number.NaN,
+      weatherBonusEnabled: true,
+      baselineUrbanHexCount: 21,
       weather: null,
     }),
     null
   );
-  assert.deepEqual(
-    inspectionStatusIconsForHex({
-      productionSurface: 'canvas',
-      techBonusEnabled: true,
-      baselineUrbanHexCount: -1,
-      weather: 'snow',
-    }),
-    { tech: null, weather: 'snow' }
-  );
 });
 
 /**
- * Checks the pixel size of the icon row.
+ * Checks the production-text height that the status icon is scaled from.
  *
- * Purpose: The icons match the production text on that hex.
+ * Purpose: The painted icon is this height times 1.5, from `inspectionStatusIconDrawPx`.
  * When to use: From this file's runner.
  * Expected outcome: A build button is 10. A canvas label with infrastructure or units is 10. A plain canvas label is 11.
- * Exceptions: AssertionError when the size drifts from the production label.
+ * Exceptions: AssertionError when the base drifts from the production label.
  */
 test('icon height matches the production label on that hex', () => {
   assert.equal(
@@ -189,30 +216,42 @@ test('icon height matches the production label on that hex', () => {
 });
 
 /**
- * Checks when the slash between the icons is bold.
+ * Checks the enlarged status-icon size.
  *
- * Purpose: The slash uses the same weight as the production numbers on that hex.
+ * Purpose: Weather and tech are one and a half times the production-text height on that hex.
  * When to use: From this file's runner.
- * Expected outcome: Bold only for a human hex with capacity above zero.
- * Exceptions: AssertionError when an opponent or empty hex is bold.
+ * Expected outcome: A build button, infrastructure, or a unit yields 15. A plain canvas label yields 16.5.
+ * Exceptions: AssertionError when the size is rounded or drifts from 1.5 times the base.
  */
-test('the slash is bold on a human hex with capacity', () => {
-  assert.equal(inspectionStatusSlashIsBold(true, 1), true);
-  assert.equal(inspectionStatusSlashIsBold(true, 0), false);
-  assert.equal(inspectionStatusSlashIsBold(false, 5), false);
+test('the status icon is one and a half times the production text', () => {
+  assert.equal(
+    inspectionStatusIconDrawPx({ productionSurface: 'button', hasInfraSymbols: false, hasVisibleUnits: false }),
+    15
+  );
+  assert.equal(
+    inspectionStatusIconDrawPx({ productionSurface: 'canvas', hasInfraSymbols: false, hasVisibleUnits: true }),
+    15
+  );
+  assert.equal(
+    inspectionStatusIconDrawPx({ productionSurface: 'canvas', hasInfraSymbols: true, hasVisibleUnits: false }),
+    15
+  );
+  assert.equal(
+    inspectionStatusIconDrawPx({ productionSurface: 'canvas', hasInfraSymbols: false, hasVisibleUnits: false }),
+    16.5
+  );
 });
 
 /**
- * Checks the shared band offset, the slash text, and the asset paths.
+ * Checks the shared band offset and the asset paths.
  *
- * Purpose: The icon row sits one production-band above the code, and the assets match the tooltip icons.
+ * Purpose: The icon sits one production-band above the hex center, and the assets match the tooltip icons.
  * When to use: From this file's runner.
- * Expected outcome: Span 100 offsets by 24. The slash is space, slash, space. Advanced and Heat use their existing files.
+ * Expected outcome: Span 100 offsets by 24. Advanced and Heat use their existing files.
  * Exceptions: AssertionError when the offset is rounded or the path changes.
  */
-test('the band offset, slash text, and icon paths stay fixed', () => {
+test('the band offset and icon paths stay fixed', () => {
   assert.equal(strategicOverlayBandOffsetPx(100), 24);
-  assert.equal(INSPECTION_STATUS_ICON_SLASH_TEXT, ' / ');
   assert.equal(techInspectionIconAssetPath('advanced'), 'tech/tech_advanced.svg');
   assert.equal(techInspectionIconAssetPath('basic'), 'tech/tech_basic.svg');
   assert.equal(weatherInspectionIconAssetPath('heat'), 'weather/heat.svg');

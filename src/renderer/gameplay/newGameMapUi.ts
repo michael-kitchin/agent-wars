@@ -63,10 +63,11 @@ export function registerNewGameMapControls(): void {
  *
  * Purpose: The overlay should not keep a stale region or two copies of the same side.
  * When to use: When the new-game overlay goes from hidden to shown.
- * Expected outcome: Costs follow the selected tab. A map with fewer than two sides disables Start.
- * Exceptions: A failed list load leaves the controls as they are.
+ * Expected outcome: Costs and the Advanced line follow the selected tab. A map with fewer than two sides disables Start.
+ * Exceptions: A failed list load leaves the controls as they are and clears the Advanced line.
  */
 export async function prepareNewGameMapPanel(): Promise<void> {
+  setAdvancedTechLine('');
   const maps = await window.gameApi?.listGameMaps?.();
   if (!Array.isArray(maps) || maps.length === 0) return;
   loadedMaps = maps;
@@ -114,7 +115,7 @@ export function regionalStartBlocked(): boolean {
  *
  * Purpose: Prices belong to the tab, and Start is available only when the regional map has two sides.
  * When to use: A tab click and the overlay open.
- * Expected outcome: The other panel is hidden. Costs match the visible tab.
+ * Expected outcome: The other panel is hidden. Costs and the Advanced line match the visible tab.
  * Exceptions: None.
  */
 function selectNewGameTab(which: 'global' | 'regional'): void {
@@ -171,9 +172,6 @@ function applySelectedRegionSides(randomize: boolean): void {
   const groups = selectedSideGroups();
   fillSideSelect('new-game-human-side-select', groups);
   fillSideSelect('new-game-ai-side-select', groups);
-  const advanced = document.getElementById('new-game-advanced-tech');
-  const entry = selectedRegionalEntry();
-  if (advanced && entry) advanced.textContent = formatAdvancedTechLine(entry.advancedMinUrbanCells);
   if (!randomize) return;
   const picked = pickDistinctIndexes(groups.length);
   const human = document.getElementById('new-game-human-side-select') as HTMLSelectElement | null;
@@ -204,20 +202,37 @@ function randomizeOneRegionalSide(which: 'human' | 'ai'): void {
 }
 
 /**
- * Writes the four prices for the tab that is showing.
+ * Writes the four prices and the Advanced line for the tab that is showing.
  *
- * Purpose: The unit row sits outside the tabs, so it has to follow the selection.
+ * Purpose: The unit row and the Advanced line sit outside the tabs, so both follow the selection.
  * When to use: A tab change and a regional region change while Regional is selected.
- * Expected outcome: Each unit type reads like `Infantry ($20)` on Global and the catalog price the same way on Regional.
+ * Expected outcome: Each unit type reads like `Infantry ($20)` on Global and the catalog price the same way on Regional. The Advanced line under the game size selector uses that same map's threshold, or is cleared when that map is missing.
  * Exceptions: None.
  */
 function applyVisibleCosts(): void {
   const entry = regionalTabSelected() ? selectedRegionalEntry() : loadedMaps.find((map) => map.id === 'global');
-  if (!entry) return;
+  if (!entry) {
+    setAdvancedTechLine('');
+    return;
+  }
   setCost('new-game-cost-infantry', entry.costs.infantry);
   setCost('new-game-cost-armor', entry.costs.armor);
   setCost('new-game-cost-naval', entry.costs.naval);
   setCost('new-game-cost-air', entry.costs.air);
+  setAdvancedTechLine(formatAdvancedTechLine(entry.advancedMinUrbanCells));
+}
+
+/**
+ * Writes the Advanced threshold under the game size selector.
+ *
+ * Purpose: One line serves both tabs, and an empty line must not keep the previous map's threshold.
+ * When to use: `applyVisibleCosts`, and at the start of `prepareNewGameMapPanel` before the map list returns.
+ * Expected outcome: The paragraph shows the given text. An empty string removes the previous threshold.
+ * Exceptions: None.
+ */
+function setAdvancedTechLine(text: string): void {
+  const advanced = document.getElementById('new-game-advanced-tech');
+  if (advanced) advanced.textContent = text;
 }
 
 /**

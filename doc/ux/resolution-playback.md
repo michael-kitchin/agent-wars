@@ -66,6 +66,7 @@ A map toast can summarize losses the player can see. Combat outside vision is an
 - Dice chips never take input. They do not change when the other stages play, and playback continues after those stages until the chips fade.
 - Build markers and tactical entry markers never cover dice chips.
 - Dice chips are not drawn on the strategic map while it is zoomed in far enough to hide strategic units.
+- A unit removed during the air-strike stage, including by anti-air or infrastructure counter-fire, stays on the map through that stage's destruction mark and is not drawn again, including on the flight home. A unit removed by ranged fire, including return fire, stays through the ranged destruction mark and is not drawn from movement onward. A failed ferry does not glide. A melee victim stays through the melee destruction mark and is drawn moving only when the removal hex is the march destination. A removed icon is not drawn on an unknown casualty hex. A survivor on that hex stays. Dice chips can continue after the icon is gone.
 
 ## Strategic and Tactical Differences
 
@@ -93,6 +94,8 @@ None.
 ## Code Entry Points
 
 - `src/renderer/rendering/resolutionPlayback.ts`
+- `src/shared/resolutionCasualtyDraw.ts`
+- `src/renderer/map/drawInteraction.ts`
 - `src/renderer/rendering/gameScene.ts` (`drawGameScene`, `tickResolutionMoveAnimation`)
 - `src/renderer/rendering/resolutionCombatOverlays.ts`
 - `src/renderer/rendering/combatDiceChipDrawing.ts`

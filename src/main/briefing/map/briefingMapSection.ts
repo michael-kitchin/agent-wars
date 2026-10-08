@@ -78,7 +78,7 @@ export function buildStrategicOperationalMapSectionMarkdown(args: {
   }
 
   const mapHexes = listStrategicH3Indexes();
-  logDebug('briefing-map-section buildStrategicOperationalMapSectionMarkdown: full-world res1 set', {
+  logDebug('briefing-map-section buildStrategicOperationalMapSectionMarkdown: full-world strategic set', {
     strategicCellCount: mapHexes.length,
   });
   const grid = projectToGrid(mapHexes, context);

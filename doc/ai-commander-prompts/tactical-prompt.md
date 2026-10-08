@@ -238,7 +238,7 @@ Claims the builders **omit** from tactical coaching:
 | Surface | Strategic | Tactical |
 | --- | --- | --- |
 | Goal | Win conditions and home regions | Defeat the forces in this battle |
-| Coordinate registry | res1 codes | res4 codes in one footprint |
+| Coordinate registry | Loaded match's strategic cells; a new match replaces them | That battle's tactical children; a new match drops them |
 | Unit addressing | unit id | `parent:slot` sub-unit id |
 | Infantry ranged | none | res4 baseline of two |
 | Air ranged | strike radius of three from base | anywhere in the footprint |

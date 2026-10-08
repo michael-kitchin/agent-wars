@@ -623,17 +623,19 @@ During the resolution phase, the client animates so that combat and death overla
 2. **Air strike casualties** — Red X at casualty hexes; infrastructure destruction indicators.
 3. **Ranged lightning** — Yellow lightning at ranged combat hexes; units at **pre-move** positions. Shot lines may be drawn from attacker to target.
 4. **Ranged casualties** — Red X at ranged removal hexes.
-5. **Movement** — Ground and naval units interpolate from source to destination. Air ferries appear at the new airport (or show destruction if ferry failed and origin was lost). Embarked follow-moves travel with the carrier.
-6. **Melee lightning** — Yellow lightning at melee hexes; units at **post-move** positions.
+5. **Movement** — Ground and naval units that are still alive interpolate from source to destination. A unit removed before movement does not move. Air ferries appear at the new airport (or show destruction, without gliding, if the ferry failed and the origin was lost). Embarked follow-moves travel with the carrier.
+6. **Melee lightning** — Yellow lightning at melee hexes. A unit that reached its destination is drawn there. A unit removed on its origin is still on that hex.
 7. **Melee casualties** — Red X at melee removal hexes. Air units destroyed by base capture show destruction at their airport hex.
 
 Air strike overlays complete before ranged overlays begin. Ranged overlays never "chase" moved units; melee overlays appear only after movement is complete.
+
+A unit removed during the air-strike stage, including by anti-air or infrastructure counter-fire, stays through that stage's red X and is not drawn again, including on the flight home. A unit removed by ranged fire, including return fire, stays through the ranged red X and is not drawn from movement onward. A melee victim stays through the melee red X. It is drawn moving only when it dies on the march destination, and a death on the origin does not glide. An unknown casualty hex shows the unknown-battle marker and does not gain the removed unit's icon. A survivor on that hex stays.
 
 Dice chips listing every die rolled in the air strike, ranged, and melee phases sit on top of every other playback layer. Each phase's chips appear with its lightning and stay up for twice the time from that lightning through its casualties, which can run past the other stages. They are not drawn on hexes that were outside the player's vision both before and after the turn. See [resolution-playback.md](ux/resolution-playback.md).
 
 ### 13.2 Tactical battle animation
 
-Tactical battle animation follows the same principles at the res4 hex grid scale. Movement uses interpolation between res4 hexes. Ranged fire shows directional indicators. Casualties use the same red X overlay. The same dice chips sit on top of every other playback layer, for twice the time from lightning through casualties, on the res4 cells.
+Tactical battle animation follows the same removal rule as §13.1. A battle has no unknown casualty hexes. Movement uses interpolation between that battle's tactical hexes. Ranged fire shows directional indicators. Casualties use the same red X overlay. The same dice chips sit on top of every other playback layer, for twice the time from lightning through casualties, on the battle's tactical cells.
 
 The tactical battle UI displays the res4 hex grid for the parent res1 hex with terrain coloring, road/rail overlays, sub-unit markers by type, and an exit control that triggers voluntary-exit mapping (§12.8).
 

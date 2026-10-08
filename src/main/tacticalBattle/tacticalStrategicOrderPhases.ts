@@ -262,6 +262,15 @@ export type TacticalAirRangedPhaseAccum = {
    */
   airStrikePlaybackCasualtyHexes: string[];
   /**
+   * Units removed during the air phase, including anti-air and infrastructure counter-fire.
+   *
+   * Contract: The `removedUnits` rows present after the air flush and before ranged removals. Anti-air is on `killsByReturnFire`, and infrastructure counter-fire can remove the striker with an empty killer list, so this list is the air-phase removals themselves.
+   * When to use: Read when assembling tactical resolution playback. Loss notes keep their own filter.
+   * Expected outcome: Strike victims, based aircraft, anti-air, and infrastructure counter-fire. Empty when the air phase removed nobody. Later ranged and ferry removals are absent.
+   * Exceptions: None.
+   */
+  airStrikePlaybackRemovedUnits: RemovedUnitSnapshot[];
+  /**
    * Hex-to-hex ranged connectors for resolution lightning (direct fire + return-fire attempts).
    *
    * Purpose: Feeds `TacticalCommitResolutionPlayback.rangedResolutionShotLines` with the same contract as strategic Ready.
@@ -480,6 +489,7 @@ export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
     });
   }
   flushAirCasualties();
+  const airStrikePlaybackRemovedUnits = [...removedUnits];
   let workBattle: TacticalBattleSnapshot = { ...battle, subUnits: sub };
   const footprint = new Set(workBattle.tacticalChildH3Indexes);
   const rangedPlayerFiltered = (rangedAttacks ?? []).filter((r) => {
@@ -678,6 +688,7 @@ export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
     playbackStrikeMoveCount: strikeMoves.length,
     strikeHexPlaybackCount: strikeHexesSet.size,
     airCasualtyHexPlaybackCount: airStrikeCasualtyHexSet.size,
+    airPhaseRemovedCount: airStrikePlaybackRemovedUnits.length,
     rangedOrderCount: rangedOrders.length,
     removedCount: removedUnits.length,
     shotLineCount: rangedResolutionShotLines.length,
@@ -696,6 +707,7 @@ export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
     airStrikePlaybackMoves: strikeMoves,
     airStrikePlaybackStrikeHexes: [...strikeHexesSet],
     airStrikePlaybackCasualtyHexes: [...airStrikeCasualtyHexSet],
+    airStrikePlaybackRemovedUnits,
     rangedResolutionShotLines,
     airStrikeDiceRolls: airDiceLog.rolls,
     rangedDiceRolls: rangedDiceLog.rolls,

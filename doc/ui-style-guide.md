@@ -102,6 +102,7 @@ When this guide and the running app disagree, the app wins until this file is up
 ### 2.2 Units and Symbols
 
 - **NATO APP-6–inspired symbols:** Live unit markers use white SVG glyphs under `static/units/` (infantry, armor, naval, air, mixed) drawn on the player-colored circle. A mixed-side stack and the new-game cap tokens use the gray circle and draw that glyph dark. Differentiate unit types by symbol; use player color for ownership.
+- **Strategic status icons (live):** Outside a battle and outside battle-detail zoom, one icon sits above each world hex. Weather shows while T is not held. Tech replaces it while T is held. The files are the same tech and weather SVGs as the hex tooltip. Behavior is in [ux/map-surface.md](ux/map-surface.md).
 - **Unit state:** Selection, movement-in-progress, and pending orders should be obvious (e.g., outline, halo, or icon badge). Strength or health (e.g., bars or numeric) should be readable at default zoom without cluttering the map.
 - **Stacking:** When multiple units occupy one hex, show stack count and/or a compact summary (e.g., icon + number). Detail on click or in the unit panel.
 
@@ -185,7 +186,7 @@ When this guide and the running app disagree, the app wins until this file is up
 
 ### 3.6 Scenarios, Save/Load, and Onboarding
 
-- **New game (live):** Overlay with Global and Regional tabs. Global has human/AI home-region selectors. Regional has one centered region selector and human/AI side-group selectors, each with a randomize button, plus an Advanced tech line. After each unit type, its price in parentheses, such as Infantry ($20), follows the selected tab and region. Game size dropdown and cap badges draw the map glyphs dark on gray disks. Two option lines (Origin bonus / Tech bonus, then Terrain bonus / Weather bonus) of dropdowns (Off, Low, High, default Low) whose labels end in colons sit outside the tabs, then a row with Fog of war, a slash separator, and a "Starting month:" dropdown and a square randomize button matching the human home-region button, and New game. The live scenario id is `region_vs_region`.
+- **New game (live):** Overlay with Global and Regional tabs. Global has human/AI home-region selectors. Regional has one centered region selector and human/AI side-group selectors, each with a randomize button. After each unit type, its price in parentheses, such as Infantry ($20), follows the selected tab and region. The game size dropdown sits above an Advanced tech line for the map that is showing, and the cap badges draw the map glyphs dark on gray disks. Two option lines (Origin bonus / Tech bonus, then Terrain bonus / Weather bonus) of dropdowns (Off, Low, High, default Low) whose labels end in colons sit outside the tabs, then a row with Fog of war, a slash separator, and a "Starting month:" dropdown and a square randomize button matching the human home-region button, and New game. The live scenario id is `region_vs_region`.
 - **Save/Load:** **Not shipped.** Target: named saves, overwrite confirmation, auto-save visibility.
 - **End-game summary:** Live overlay reports winner and offers New game; territory-over-time charts are still target.
 - **Tutorial/onboarding:** Not shipped.

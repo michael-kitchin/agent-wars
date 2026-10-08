@@ -428,6 +428,7 @@ export function commitHumanTacticalDraftOrders(args: {
       }
     }
     const rangedRemovedUnits = support.removedUnits;
+    const airStrikePlaybackRemovedUnits = support.airStrikePlaybackRemovedUnits;
     const rangedCombatHexSet = new Set<string>();
     for (const r of explicitRanged) {
       rangedCombatHexSet.add(r.targetH3Index);
@@ -463,6 +464,9 @@ export function commitHumanTacticalDraftOrders(args: {
       ...(support.airStrikePlaybackCasualtyHexes.length > 0
         ? { airStrikeCasualtyHexes: support.airStrikePlaybackCasualtyHexes }
         : {}),
+      ...(airStrikePlaybackRemovedUnits.length > 0
+        ? { airStrikeRemovedUnits: airStrikePlaybackRemovedUnits }
+        : {}),
       killsByMelee: meleePack.killsByMelee.length > 0 ? meleePack.killsByMelee : undefined,
       meleeCombatHexes: meleePack.meleeCombatHexes.length > 0 ? meleePack.meleeCombatHexes : undefined,
       meleeCasualtyHexes: meleePack.meleeCasualtyHexes.length > 0 ? meleePack.meleeCasualtyHexes : undefined,
@@ -490,6 +494,7 @@ export function commitHumanTacticalDraftOrders(args: {
       airStrikePlaybackMoveCount: support.airStrikePlaybackMoves.length,
       airStrikePlaybackStrikeHexCount: support.airStrikePlaybackStrikeHexes.length,
       airStrikePlaybackCasualtyHexCount: support.airStrikePlaybackCasualtyHexes.length,
+      airStrikePlaybackRemovedCount: airStrikePlaybackRemovedUnits.length,
       rangedRemovedCount: rangedRemovedUnits.length,
       rangedKillEdgeCount: support.killsByDirectFire.length,
       returnFireKillEdgeCount: support.killsByReturnFire.length,

@@ -70,6 +70,15 @@ export type ResolutionMoveAnimationState = (CombatDicePlaybackFields & {
    */
   airStrikeCasualtyHexes?: string[];
   /**
+   * Units removed during the air-strike stage, as they were before removal.
+   *
+   * Contract: The icon layer reads this during the air stages. An id here follows the air-strike window even when the ranged list repeats it.
+   * When to use: Set from the tactical playback field or from the strategic air-phase removal list. Omit when this playback removed nobody in the air phase.
+   * Expected outcome: Those icons stay through the air casualty mark and are not drawn again.
+   * Exceptions: None.
+   */
+  airStrikeRemovedUnits?: RemovedUnitSnapshot[];
+  /**
    * `Date.now()` value when the playback started.
    *
    * Purpose: Origin of the playback clock.
@@ -92,11 +101,10 @@ export type ResolutionMoveAnimationState = (CombatDicePlaybackFields & {
   /**
    * Sub-units copied at tactical Ready commit time (pre-commit snapshot) for resolution march playback lookup only.
    *
-   * Purpose: `buildResolutionPlaybackMoves` needs `player`/`unitType` per `unitId`; the live `tacticalBattleSnapshot` is
-   *   swapped to the post-beat row set before animation runs, so units removed by ranged/melee in the same beat would
-   *   otherwise vanish from the map and drop their march segments from playback.
+   * Purpose: `buildResolutionPlaybackMoves` needs `player`/`unitType` per `unitId`. The live tactical snapshot omits
+   *   casualties, so a melee arrival would otherwise lose its march. Air and ranged removals do not glide.
    * When to use: Tactical `commitHumanTacticalDraftOrders` path when arming `resolutionMoveAnimation` with march moves.
-   * Expected outcome: Merged with current snapshot rows so movers still resolve for lines and glides until the anim ends.
+   * Expected outcome: Merged with current snapshot rows so a melee arrival can still resolve for lines and glides.
    * Exceptions: None.
    */
   tacticalMarchPlaybackUnits?: GameStateSnapshot['units'];

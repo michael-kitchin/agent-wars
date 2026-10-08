@@ -217,6 +217,7 @@ test('applyTacticalAirStrikeThenRangedPhaseOnBattle leaves air playback arrays e
     assert.strictEqual(out.airStrikeAttemptCount, 0);
     assert.deepStrictEqual(out.airStrikePlaybackMoves, []);
     assert.deepStrictEqual(out.airStrikePlaybackStrikeHexes, []);
+    assert.deepStrictEqual(out.airStrikePlaybackRemovedUnits, []);
   });
 });
 
@@ -319,6 +320,7 @@ test('tactical infra-only ranged strike converts urban DB row to rubble on hit',
       'singlePlayer'
     );
     assert.ok(out.infrastructureDestroyedEvents.length > 0);
+    assert.deepStrictEqual(out.airStrikePlaybackRemovedUnits, []);
     const row = dbGetOne<{ isRubble: number; isUrban: number }>(
       'SELECT is_rubble AS isRubble, is_urban AS isUrban FROM res_t_feature_overrides WHERE h3_index = ?',
       [urban!.h3Index]
@@ -480,6 +482,11 @@ test('tactical infrastructure counterattack removes attacker without killsByAirS
       out.removedUnits.some((u) => u.id === 'hum-air-infra-counter'),
       'counterattack should remove the attacking air sub-unit from the snapshot'
     );
+    assert.deepStrictEqual(
+      out.airStrikePlaybackRemovedUnits.map((unit) => unit.id),
+      ['hum-air-infra-counter'],
+      'infrastructure counter-fire has no air-strike kill edge and still belongs on the air playback list'
+    );
   });
 });
 
@@ -544,6 +551,11 @@ test('tactical infantry in the target hex can AA a striking air sub-unit', () =>
   assert.ok(
     out.removedUnits.some((u) => u.id === 'hum-air-aa'),
     'infantry AA hit should remove the striking air sub-unit'
+  );
+  assert.deepStrictEqual(
+    out.airStrikePlaybackRemovedUnits.map((unit) => unit.id),
+    ['hum-air-aa'],
+    'anti-air writes return-fire kills and still belongs on the air playback list'
   );
   assert.deepEqual(
     out.airStrikeDiceRolls.map((r) => [r.kind, r.face, r.anchorH3Index]),

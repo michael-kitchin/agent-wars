@@ -129,10 +129,19 @@ export type TacticalCommitResolutionPlayback = CombatDicePlaybackFields & {
    *
    * Purpose: Feeds `resolutionMoveAnimation.airStrikeCasualtyHexes` for the air casualty pulse segment.
    * When to use: Populated from removals and outcomes during the tactical air phase (ground AA, destroyed aircraft, etc.).
-   * Expected outcome: Subset of cells tied to `killsByAirStrike` / air-phase `removedUnits`.
+   * Expected outcome: Cells of units removed during the air phase, including anti-air and infrastructure counter-fire.
    * Exceptions: Omitted when empty.
    */
   airStrikeCasualtyHexes?: string[];
+  /**
+   * Sub-units removed during the air-strike stage.
+   *
+   * Contract: The icon layer reads this during the air stages. An id here follows the air-strike window even when `rangedRemovedUnits` repeats it.
+   * When to use: Set from the air-phase removal rows, including anti-air and infrastructure counter-fire. Omit when this playback removed nobody in the air phase.
+   * Expected outcome: Those icons stay through the air casualty mark and are not drawn again. Rows may also remain in `rangedRemovedUnits`.
+   * Exceptions: None.
+   */
+  airStrikeRemovedUnits?: RemovedUnitSnapshot[];
   /**
    * Kill edges from tactical **melee** resolution after movement and support on the same commit (mirrors melee slice of `ReadyResult.kills`).
    *

@@ -245,6 +245,7 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
           ...(airStrikeReturnMoves.length > 0 ? { airStrikeReturnMoves } : {}),
           ...(playback.airStrikeHexes?.length ? { airStrikeCombatHexes: playback.airStrikeHexes } : {}),
           ...(playback.airStrikeCasualtyHexes?.length ? { airStrikeCasualtyHexes: playback.airStrikeCasualtyHexes } : {}),
+          ...(playback.airStrikeRemovedUnits?.length ? { airStrikeRemovedUnits: playback.airStrikeRemovedUnits } : {}),
           rangedCombatHexes: playback.rangedCombatHexes,
           rangedCasualtyHexes: playback.rangedCasualtyHexes,
           rangedRemovedUnits: playback.rangedRemovedUnits,
@@ -535,6 +536,9 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
         airStrikeReturnMoves: airStrikeReturnMoves.length > 0 ? airStrikeReturnMoves : undefined,
         airStrikeCombatHexes: readyResult.airStrikeHexes?.length ? readyResult.airStrikeHexes : undefined,
         airStrikeCasualtyHexes: readyResult.airStrikeCasualtyHexes?.length ? readyResult.airStrikeCasualtyHexes : undefined,
+        ...(readyResult.airStrikeRemovedUnits?.length
+          ? { airStrikeRemovedUnits: readyResult.airStrikeRemovedUnits }
+          : {}),
         startTime: Date.now(),
         combatHexes: readyResult.combatHexes?.length ? readyResult.combatHexes : undefined,
         casualtyHexes: readyResult.casualtyHexes?.length ? readyResult.casualtyHexes : undefined,

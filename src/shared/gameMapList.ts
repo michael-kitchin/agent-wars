@@ -125,7 +125,7 @@ export interface GameMapListEntry {
    * Urban cells that make a birth hex Advanced.
    *
    * Contract: 21 on the global map. The catalog threshold on a regional map.
-   * When to use: The Regional tab's Advanced line.
+   * When to use: The Advanced line under the game size selector, for the tab that is showing.
    * Expected outcome: A positive integer.
    * Exceptions: None.
    */
@@ -147,8 +147,8 @@ export function formatUnitCostLabel(cost: number): string {
 /**
  * Formats the Advanced threshold line.
  *
- * Purpose: The Regional tab states how many urban cells Advanced requires.
- * When to use: Under the side selectors for the selected region.
+ * Purpose: The start dialog states how many urban cells Advanced requires on the map that is showing.
+ * When to use: Under the game size selector, for the Global map or the selected region.
  * Expected outcome: `Advanced tech: $60+ hexes` when the threshold is 60.
  * Exceptions: None.
  */

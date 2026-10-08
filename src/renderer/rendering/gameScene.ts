@@ -1,4 +1,8 @@
 import { combatDicePlaybackHoldEndMs } from '../../shared/combatDiceChips';
+import {
+  marchPlayedForUnit,
+  type ResolutionCasualtyDrawInput,
+} from '../../shared/resolutionCasualtyDraw';
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import { rendererSharedState as S } from '../core/state';
 import { getExploredHexSet, getVisibleHexSet, isHexExploredByPlayer } from '../core/selection';
@@ -354,12 +358,11 @@ function requestRedraw(): void {
 }
 
 /**
- * Merges current tactical sub-unit rows with a pre-commit copy so resolution playback can still resolve movers removed
- * later in the same beat (ranged/melee) from `buildResolutionPlaybackMoves`.
+ * Merges current tactical sub-unit rows with a pre-commit copy so a melee arrival can still resolve `player` and `unitType`.
  *
- * Purpose: Post-commit `tacticalBattleSnapshot.subUnits` omits casualties; march `ResolutionMove` entries would
- * otherwise lose `player`/`unitType` lookup and be dropped from lines and glides.
- * When to use: Tactical `drawGameScene` and `getUnitsForDrawWithMovingIds` while `resolutionMoveAnimation` is active.
+ * Purpose: Post-commit `tacticalBattleSnapshot.subUnits` omits casualties, so `buildResolutionPlaybackMoves` would
+ *   otherwise drop a melee arrival. Air and ranged removals do not glide; the march filter removes them after lookup.
+ * When to use: Tactical `drawGameScene` while `resolutionMoveAnimation` is active.
  * Expected outcome: Prefer live rows when an id exists; add missing ids from `pre` only.
  * Exceptions: None.
  */
@@ -373,6 +376,40 @@ function mergeTacticalSubUnitsForMarchPlayback(
     if (!byId.has(u.id)) byId.set(u.id, u);
   }
   return [...byId.values()];
+}
+
+/**
+ * Reads the three removal lists the casualty draw uses.
+ *
+ * Purpose: Both scene branches must hand the same lists to the march filter.
+ * When to use: Once per frame in each `drawGameScene` branch.
+ * Expected outcome: Missing lists are empty. A null animation yields three empty lists.
+ * Exceptions: None.
+ */
+function casualtyDrawInputFromAnimation(
+  anim: NonNullable<typeof S.resolutionMoveAnimation> | null
+): ResolutionCasualtyDrawInput {
+  return {
+    airRemovedUnits: anim?.airStrikeRemovedUnits ?? [],
+    rangedRemovedUnits: anim?.rangedRemovedUnits ?? [],
+    meleeRemovedUnits: anim?.meleeRemovedUnits ?? [],
+  };
+}
+
+/**
+ * Builds playback marches and drops any march a removal says should not glide.
+ *
+ * Purpose: Air and ranged victims stay put. A melee victim walks only when the removal hex is the march destination.
+ * When to use: Before march lines, moving icons, and the movement id set in both scene branches.
+ * Expected outcome: The returned marches are the ones `marchPlayedForUnit` accepts.
+ * Exceptions: None.
+ */
+function playbackMarchesAfterRemovals(
+  moves: NonNullable<typeof S.resolutionMoveAnimation>['moves'],
+  units: GameStateSnapshot['units'],
+  input: ResolutionCasualtyDrawInput
+) {
+  return buildResolutionPlaybackMoves(moves, units).filter((move) => marchPlayedForUnit(move, input));
 }
 
 /**
@@ -432,7 +469,12 @@ function drawGameScene(
     let airStrikeOutboundProgress = 1;
     let airStrikeReturnProgress = 1;
     let playbackPhase: ResolutionPlaybackPhase | null = null;
-    const regularPlaybackMoves = buildResolutionPlaybackMoves(anim?.moves ?? [], tacticalUnitsForMarchPlayback);
+    const tacticalCasualtyInput = casualtyDrawInputFromAnimation(anim);
+    const regularPlaybackMoves = playbackMarchesAfterRemovals(
+      anim?.moves ?? [],
+      tacticalUnitsForMarchPlayback,
+      tacticalCasualtyInput
+    );
     const airStrikeOutboundPlaybackMoves = anim?.airStrikeOutboundMoves ?? [];
     const airStrikeReturnPlaybackMoves = anim?.airStrikeReturnMoves ?? [];
     const stateForTacticalAnim =
@@ -505,7 +547,18 @@ function drawGameScene(
   let airStrikeReturnProgress = 1;
   let playbackPhase: ResolutionPlaybackPhase | null = null;
   const anim = S.resolutionMoveAnimation;
-  const regularPlaybackMoves = buildResolutionPlaybackMoves(anim?.moves ?? [], state.units);
+  const strategicCasualtyInput = casualtyDrawInputFromAnimation(anim);
+  const meleeMarchUnits = (anim?.meleeRemovedUnits ?? []).map((unit) => ({
+    id: unit.id,
+    player: unit.player,
+    unitType: unit.unitType,
+    h3Index: unit.h3Index,
+  }));
+  const regularPlaybackMoves = playbackMarchesAfterRemovals(
+    anim?.moves ?? [],
+    [...state.units, ...meleeMarchUnits],
+    strategicCasualtyInput
+  );
   const airStrikeOutboundPlaybackMoves = anim?.airStrikeOutboundMoves ?? [];
   const airStrikeReturnPlaybackMoves = anim?.airStrikeReturnMoves ?? [];
   let elapsedStrategic = 0;

@@ -22708,6 +22708,86 @@ ${body}`;
     };
   }
 
+  // src/shared/resolutionCasualtyDraw.ts
+  function firstRemoval(units, unitId) {
+    return units.find((unit) => unit.id === unitId);
+  }
+  function resolutionCasualtyTiming(phase) {
+    if (phase.inAirStrikeOutbound || phase.inAirStrikeLightning || phase.inAirStrikeCasualty) {
+      return "throughAirCasualties";
+    }
+    if (phase.inAirStrikeReturn) return "airReturn";
+    if (phase.inRangedLightning || phase.inRangedCasualty) return "throughRangedCasualties";
+    if (phase.inMovement) return "movement";
+    if (phase.inMeleeLightning || phase.inMeleeCasualty) return "throughMeleeCasualties";
+    return "afterCasualties";
+  }
+  function unitIconVisibleAtCasualtyTiming(unitId, timing, input) {
+    if (firstRemoval(input.airRemovedUnits, unitId)) return timing === "throughAirCasualties";
+    if (firstRemoval(input.rangedRemovedUnits, unitId)) {
+      return timing === "throughAirCasualties" || timing === "airReturn" || timing === "throughRangedCasualties";
+    }
+    if (firstRemoval(input.meleeRemovedUnits, unitId)) return timing !== "afterCasualties";
+    return true;
+  }
+  function marchPlayedForUnit(move, input) {
+    if (firstRemoval(input.airRemovedUnits, move.unitId) || firstRemoval(input.rangedRemovedUnits, move.unitId)) {
+      return false;
+    }
+    const melee = firstRemoval(input.meleeRemovedUnits, move.unitId);
+    if (!melee) return true;
+    if (melee.h3Index === move.fromH3Index) return false;
+    return melee.h3Index === move.toH3Index;
+  }
+  function placedRemoval(unitId, timing, input, moves, hiddenHexes) {
+    if (!unitIconVisibleAtCasualtyTiming(unitId, timing, input)) return void 0;
+    const air = firstRemoval(input.airRemovedUnits, unitId);
+    const ranged = firstRemoval(input.rangedRemovedUnits, unitId);
+    const melee = firstRemoval(input.meleeRemovedUnits, unitId);
+    const source = air ?? ranged ?? melee;
+    if (!source) return void 0;
+    let h3Index = source.h3Index;
+    if (!air && !ranged && melee) {
+      const move = moves.find((candidate) => candidate.unitId === unitId);
+      const beforeMelee = timing === "throughAirCasualties" || timing === "airReturn" || timing === "throughRangedCasualties" || timing === "movement";
+      if (beforeMelee && move && move.fromH3Index !== melee.h3Index) h3Index = move.fromH3Index;
+    }
+    if (hiddenHexes.has(h3Index)) return void 0;
+    return { id: source.id, player: source.player, unitType: source.unitType, h3Index };
+  }
+  function unitsDrawnAtCasualtyTiming(args) {
+    const hiddenHexes = new Set(args.hiddenHexes);
+    const removedIds = /* @__PURE__ */ new Set([
+      ...args.input.airRemovedUnits.map((unit) => unit.id),
+      ...args.input.rangedRemovedUnits.map((unit) => unit.id),
+      ...args.input.meleeRemovedUnits.map((unit) => unit.id)
+    ]);
+    const seen = /* @__PURE__ */ new Set();
+    const drawn = [];
+    for (const unit of args.units) {
+      if (seen.has(unit.id)) continue;
+      seen.add(unit.id);
+      if (!removedIds.has(unit.id)) {
+        drawn.push(unit);
+        continue;
+      }
+      const placed = placedRemoval(unit.id, args.timing, args.input, args.moves, hiddenHexes);
+      if (placed) drawn.push(placed);
+    }
+    const removedInOrder = [
+      ...args.input.airRemovedUnits,
+      ...args.input.rangedRemovedUnits,
+      ...args.input.meleeRemovedUnits
+    ];
+    for (const unit of removedInOrder) {
+      if (seen.has(unit.id)) continue;
+      seen.add(unit.id);
+      const placed = placedRemoval(unit.id, args.timing, args.input, args.moves, hiddenHexes);
+      if (placed) drawn.push(placed);
+    }
+    return drawn;
+  }
+
   // src/renderer/core/unitTypeLabel.ts
   function inferUnitTypeLabelFromId(unitId) {
     const unitType = unitTypeFromUnitId(unitId);
@@ -22889,6 +22969,7 @@ ${body}`;
     document.getElementById("new-game-ai-side-randomize")?.addEventListener("click", () => randomizeOneRegionalSide("ai"));
   }
   async function prepareNewGameMapPanel() {
+    setAdvancedTechLine("");
     const maps = await window.gameApi?.listGameMaps?.();
     if (!Array.isArray(maps) || maps.length === 0) return;
     loadedMaps = maps;
@@ -22935,9 +23016,6 @@ ${body}`;
     const groups = selectedSideGroups();
     fillSideSelect("new-game-human-side-select", groups);
     fillSideSelect("new-game-ai-side-select", groups);
-    const advanced = document.getElementById("new-game-advanced-tech");
-    const entry = selectedRegionalEntry();
-    if (advanced && entry) advanced.textContent = formatAdvancedTechLine(entry.advancedMinUrbanCells);
     if (!randomize) return;
     const picked = pickDistinctIndexes(groups.length);
     const human = document.getElementById("new-game-human-side-select");
@@ -22959,11 +23037,19 @@ ${body}`;
   }
   function applyVisibleCosts() {
     const entry = regionalTabSelected() ? selectedRegionalEntry() : loadedMaps.find((map) => map.id === "global");
-    if (!entry) return;
+    if (!entry) {
+      setAdvancedTechLine("");
+      return;
+    }
     setCost("new-game-cost-infantry", entry.costs.infantry);
     setCost("new-game-cost-armor", entry.costs.armor);
     setCost("new-game-cost-naval", entry.costs.naval);
     setCost("new-game-cost-air", entry.costs.air);
+    setAdvancedTechLine(formatAdvancedTechLine(entry.advancedMinUrbanCells));
+  }
+  function setAdvancedTechLine(text) {
+    const advanced = document.getElementById("new-game-advanced-tech");
+    if (advanced) advanced.textContent = text;
   }
   function setCost(id, cost) {
     const el = document.getElementById(id);
@@ -24542,7 +24628,6 @@ ${body}`;
 
   // src/shared/inspectionStatusIconLine.ts
   var STRATEGIC_OVERLAY_BAND_OFFSET_SPAN_FRAC = 0.24;
-  var INSPECTION_STATUS_ICON_SLASH_TEXT = " / ";
   var KNOWN_WEATHER = /* @__PURE__ */ new Set(["mild", "rain", "snow", "heat"]);
   function knownWeather(weather) {
     if (weather == null || !KNOWN_WEATHER.has(weather)) return null;
@@ -24559,18 +24644,23 @@ ${body}`;
     return "canvas";
   }
   function inspectionStatusIconsForHex(input) {
-    if (input.productionSurface === "none") return null;
-    const tech = input.techBonusEnabled === true && Number.isFinite(input.baselineUrbanHexCount) && input.baselineUrbanHexCount > 0 ? techLevelFromUrbanHexCount(input.baselineUrbanHexCount) : null;
+    if (input.mapInspectionHeld) {
+      if (input.techBonusEnabled !== true) return null;
+      if (!Number.isFinite(input.baselineUrbanHexCount) || input.baselineUrbanHexCount <= 0) return null;
+      return { kind: "tech", level: techLevelFromUrbanHexCount(input.baselineUrbanHexCount) };
+    }
+    if (input.weatherBonusEnabled !== true) return null;
     const weather = knownWeather(input.weather);
-    if (tech == null && weather == null) return null;
-    return { tech, weather };
+    if (weather == null) return null;
+    return { kind: "weather", state: weather };
   }
   function inspectionStatusIconFontPx(input) {
     if (input.productionSurface === "button" || input.hasInfraSymbols || input.hasVisibleUnits) return 10;
     return 11;
   }
-  function inspectionStatusSlashIsBold(controlledByHuman, capacityPerTurn) {
-    return controlledByHuman && capacityPerTurn > 0;
+  var STATUS_ICON_LINEAR_SCALE = 1.5;
+  function inspectionStatusIconDrawPx(input) {
+    return inspectionStatusIconFontPx(input) * STATUS_ICON_LINEAR_SCALE;
   }
   function techInspectionIconAssetPath(level) {
     return level === "advanced" ? "tech/tech_advanced.svg" : "tech/tech_basic.svg";
@@ -27143,53 +27233,24 @@ ${body}`;
     const height = img.naturalHeight * scale;
     ctx.drawImage(img, centerX - width / 2, centerY - height / 2, width, height);
   }
-  function drawSlash(ctx, centerX, centerY) {
-    ctx.strokeStyle = "#fff";
-    ctx.lineWidth = 1.25;
-    ctx.strokeText(INSPECTION_STATUS_ICON_SLASH_TEXT, centerX, centerY);
-    ctx.fillStyle = "#000";
-    ctx.fillText(INSPECTION_STATUS_ICON_SLASH_TEXT, centerX, centerY);
-  }
-  function drawIconGroup(ctx, deps, placement) {
-    const { centerX, centerY, fontPx, bold, tech, weather } = placement;
-    ctx.font = `${bold ? "bold " : ""}${fontPx}px system-ui, sans-serif`;
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    const slashWidth = tech && weather ? ctx.measureText(INSPECTION_STATUS_ICON_SLASH_TEXT).width : 0;
-    const totalWidth = (tech ? fontPx : 0) + slashWidth + (weather ? fontPx : 0);
-    let left = centerX - totalWidth / 2;
-    if (tech) {
-      drawFittedIcon(
-        ctx,
-        iconImage(techInspectionIconAssetPath(tech), deps.requestRedraw),
-        left + fontPx / 2,
-        centerY,
-        fontPx
-      );
-      left += fontPx;
-    }
-    if (tech && weather) {
-      drawSlash(ctx, left + slashWidth / 2, centerY);
-      left += slashWidth;
-    }
-    if (weather) {
-      drawFittedIcon(
-        ctx,
-        iconImage(weatherInspectionIconAssetPath(weather), deps.requestRedraw),
-        left + fontPx / 2,
-        centerY,
-        fontPx
-      );
-    }
+  function drawStatusIcon(ctx, deps, placement) {
+    drawFittedIcon(
+      ctx,
+      iconImage(placement.assetPath, deps.requestRedraw),
+      placement.centerX,
+      placement.centerY,
+      placement.iconPx
+    );
   }
   function drawInspectionStatusIcons(ctx, deps) {
-    if (!rendererSharedState.gameState || rendererSharedState.tacticalBattleSnapshot || !isMapInspectionModeHeld() || shouldRenderTacticalHexes()) return;
+    if (!rendererSharedState.gameState || rendererSharedState.tacticalBattleSnapshot || shouldRenderTacticalHexes()) return;
     const map = getMainLeafletMapForProjection();
     const leaflet = getLeafletGlobal();
     if (!map || !leaflet) return;
     const state = rendererSharedState.gameState;
     const unitHexes = new Set(state.units.map((unit) => unit.h3Index));
     const buildEntryZoom = shouldShowBuildEntryZoom();
+    const mapInspectionHeld = isMapInspectionModeHeld();
     ctx.save();
     try {
       for (const hx of state.hexes) {
@@ -27199,33 +27260,32 @@ ${body}`;
         const surface = strategicProductionLabelSurface({
           tacticalRendered: false,
           explored,
-          mapInspectionHeld: true,
+          mapInspectionHeld,
           controlledByHuman,
           humanUrbanProduction,
           buildEntryZoom
         });
-        const icons = inspectionStatusIconsForHex({
-          productionSurface: surface,
+        const icon = inspectionStatusIconsForHex({
+          mapInspectionHeld,
           techBonusEnabled: state.techBonusEnabled === true,
+          weatherBonusEnabled: state.weatherBonusEnabled === true,
           baselineUrbanHexCount: baselineUrbanHexCountForStrategicHex(hx.h3Index),
-          weather: hx.weather
+          weather: explored ? hx.weather : null
         });
-        if (surface === "none" || !icons) continue;
+        if (!icon) continue;
         const pts = projectHexBoundaryToContainerPoints(hx.h3Index, map, leaflet);
         if (pts.length === 0) continue;
         const centroid = projectedCentroid(pts);
-        const fontPx = inspectionStatusIconFontPx({
-          productionSurface: surface,
-          hasInfraSymbols: deps.hasInfraSymbols(hx.h3Index, unitHexes),
-          hasVisibleUnits: unitHexes.has(hx.h3Index)
-        });
-        drawIconGroup(ctx, deps, {
+        const assetPath = icon.kind === "tech" ? techInspectionIconAssetPath(icon.level) : weatherInspectionIconAssetPath(icon.state);
+        drawStatusIcon(ctx, deps, {
           centerX: centroid.x,
           centerY: centroid.y - strategicOverlayBandOffsetPx(spanForProjectedHex(pts)),
-          fontPx,
-          bold: inspectionStatusSlashIsBold(controlledByHuman, getUrbanProductionCapacityForHex2(hx.h3Index)),
-          tech: icons.tech,
-          weather: icons.weather
+          iconPx: inspectionStatusIconDrawPx({
+            productionSurface: surface === "button" ? "button" : "canvas",
+            hasInfraSymbols: deps.hasInfraSymbols(hx.h3Index, unitHexes),
+            hasVisibleUnits: unitHexes.has(hx.h3Index)
+          }),
+          assetPath
         });
       }
     } finally {
@@ -28338,6 +28398,16 @@ ${body}`;
     }
     return [...byId.values()];
   }
+  function casualtyDrawInputFromAnimation(anim) {
+    return {
+      airRemovedUnits: anim?.airStrikeRemovedUnits ?? [],
+      rangedRemovedUnits: anim?.rangedRemovedUnits ?? [],
+      meleeRemovedUnits: anim?.meleeRemovedUnits ?? []
+    };
+  }
+  function playbackMarchesAfterRemovals(moves, units, input) {
+    return buildResolutionPlaybackMoves(moves, units).filter((move) => marchPlayedForUnit(move, input));
+  }
   function drawGameScene(ctx, width, height, state) {
     syncTacticalTransportVectorLeafletLayer();
     ctx.clearRect(0, 0, width, height);
@@ -28380,7 +28450,12 @@ ${body}`;
       let airStrikeOutboundProgress2 = 1;
       let airStrikeReturnProgress2 = 1;
       let playbackPhase2 = null;
-      const regularPlaybackMoves2 = buildResolutionPlaybackMoves(anim2?.moves ?? [], tacticalUnitsForMarchPlayback);
+      const tacticalCasualtyInput = casualtyDrawInputFromAnimation(anim2);
+      const regularPlaybackMoves2 = playbackMarchesAfterRemovals(
+        anim2?.moves ?? [],
+        tacticalUnitsForMarchPlayback,
+        tacticalCasualtyInput
+      );
       const airStrikeOutboundPlaybackMoves2 = anim2?.airStrikeOutboundMoves ?? [];
       const airStrikeReturnPlaybackMoves2 = anim2?.airStrikeReturnMoves ?? [];
       const stateForTacticalAnim = anim2 && tacticalUnitsForMarchPlayback.length > 0 ? { ...state, units: tacticalUnitsForMarchPlayback } : state;
@@ -28448,7 +28523,18 @@ ${body}`;
     let airStrikeReturnProgress = 1;
     let playbackPhase = null;
     const anim = rendererSharedState.resolutionMoveAnimation;
-    const regularPlaybackMoves = buildResolutionPlaybackMoves(anim?.moves ?? [], state.units);
+    const strategicCasualtyInput = casualtyDrawInputFromAnimation(anim);
+    const meleeMarchUnits = (anim?.meleeRemovedUnits ?? []).map((unit) => ({
+      id: unit.id,
+      player: unit.player,
+      unitType: unit.unitType,
+      h3Index: unit.h3Index
+    }));
+    const regularPlaybackMoves = playbackMarchesAfterRemovals(
+      anim?.moves ?? [],
+      [...state.units, ...meleeMarchUnits],
+      strategicCasualtyInput
+    );
     const airStrikeOutboundPlaybackMoves = anim?.airStrikeOutboundMoves ?? [];
     const airStrikeReturnPlaybackMoves = anim?.airStrikeReturnMoves ?? [];
     let elapsedStrategic = 0;
@@ -30808,6 +30894,7 @@ ${body}`;
             ...airStrikeReturnMoves2.length > 0 ? { airStrikeReturnMoves: airStrikeReturnMoves2 } : {},
             ...playback.airStrikeHexes?.length ? { airStrikeCombatHexes: playback.airStrikeHexes } : {},
             ...playback.airStrikeCasualtyHexes?.length ? { airStrikeCasualtyHexes: playback.airStrikeCasualtyHexes } : {},
+            ...playback.airStrikeRemovedUnits?.length ? { airStrikeRemovedUnits: playback.airStrikeRemovedUnits } : {},
             rangedCombatHexes: playback.rangedCombatHexes,
             rangedCasualtyHexes: playback.rangedCasualtyHexes,
             rangedRemovedUnits: playback.rangedRemovedUnits,
@@ -31066,6 +31153,7 @@ ${body}`;
           airStrikeReturnMoves: airStrikeReturnMoves.length > 0 ? airStrikeReturnMoves : void 0,
           airStrikeCombatHexes: readyResult.airStrikeHexes?.length ? readyResult.airStrikeHexes : void 0,
           airStrikeCasualtyHexes: readyResult.airStrikeCasualtyHexes?.length ? readyResult.airStrikeCasualtyHexes : void 0,
+          ...readyResult.airStrikeRemovedUnits?.length ? { airStrikeRemovedUnits: readyResult.airStrikeRemovedUnits } : {},
           startTime: Date.now(),
           combatHexes: readyResult.combatHexes?.length ? readyResult.combatHexes : void 0,
           casualtyHexes: readyResult.casualtyHexes?.length ? readyResult.casualtyHexes : void 0,
@@ -32261,6 +32349,11 @@ ${body}`;
       const { phase } = deps.buildResolutionPlaybackState(anim, elapsed);
       const moveProgress = phase.moveProgress;
       const rangedRemovedIds = new Set((anim.rangedRemovedUnits ?? []).map((u) => u.id));
+      const casualtyInput = {
+        airRemovedUnits: anim.airStrikeRemovedUnits ?? [],
+        rangedRemovedUnits: anim.rangedRemovedUnits ?? [],
+        meleeRemovedUnits: anim.meleeRemovedUnits ?? []
+      };
       if (phase.inAirStrikeOutbound) {
         unitsToDraw = state.units;
         movingIds = new Set((anim.airStrikeOutboundMoves ?? []).map((move) => move.unitId));
@@ -32294,7 +32387,7 @@ ${body}`;
         movingIds = void 0;
       } else if (phase.inMovement) {
         unitsToDraw = state.units;
-        movingIds = moveProgress < 1 ? new Set(anim.moves.map((m) => m.unitId)) : void 0;
+        movingIds = moveProgress < 1 ? new Set(anim.moves.filter((move) => marchPlayedForUnit(move, casualtyInput)).map((move) => move.unitId)) : void 0;
       } else if (anim.moves.length > 0 && moveProgress < 1) {
         const moveById = new Map(anim.moves.map((m) => [m.unitId, m]));
         unitsToDraw = state.units.map((u) => {
@@ -32306,6 +32399,13 @@ ${body}`;
         unitsToDraw = [...state.units, ...anim.meleeRemovedUnits ?? []];
         movingIds = void 0;
       }
+      unitsToDraw = unitsDrawnAtCasualtyTiming({
+        units: unitsToDraw,
+        timing: resolutionCasualtyTiming(phase),
+        input: casualtyInput,
+        moves: anim.moves,
+        hiddenHexes: anim.unknownCasualtyHexes ?? []
+      });
     } else {
       movingIds = void 0;
     }

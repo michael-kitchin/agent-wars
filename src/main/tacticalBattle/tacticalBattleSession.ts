@@ -433,6 +433,7 @@ export function applyHumanTacticalDraftBeatInStrategicOrder(args: {
       airStrikePlaybackMoves: AirStrikeAnimationMove[];
       airStrikePlaybackStrikeHexes: string[];
       airStrikePlaybackCasualtyHexes: string[];
+      airStrikePlaybackRemovedUnits: RemovedUnitSnapshot[];
       rangedResolutionShotLines: RangedResolutionShotLine[];
       airStrikeDiceRolls: CombatDiceRoll[];
       rangedDiceRolls: CombatDiceRoll[];
@@ -531,6 +532,7 @@ export function applyHumanTacticalDraftBeatInStrategicOrder(args: {
       airStrikePlaybackMoves: acc.airStrikePlaybackMoves,
       airStrikePlaybackStrikeHexes: acc.airStrikePlaybackStrikeHexes,
       airStrikePlaybackCasualtyHexes: acc.airStrikePlaybackCasualtyHexes,
+      airStrikePlaybackRemovedUnits: acc.airStrikePlaybackRemovedUnits,
       rangedResolutionShotLines: acc.rangedResolutionShotLines,
       airStrikeDiceRolls: acc.airStrikeDiceRolls,
       rangedDiceRolls: acc.rangedDiceRolls,

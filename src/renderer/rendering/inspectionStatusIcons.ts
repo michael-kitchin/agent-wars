@@ -1,27 +1,22 @@
 /**
- * Draws the tech and weather icons above strategic hex codes while map inspection is held.
+ * Draws one status icon above a strategic world hex.
  *
- * Purpose: The held-T world map shows those icons on hexes that already show a production label.
+ * Purpose: Weather shows while T is not held. Tech replaces it, at the same enlarged size, while T is held.
  * When to use: Immediately after the strategic hex-code pass.
- * Expected outcome: While T is held on the strategic world map, a centered icon row one production-band above each code. Nothing in a tactical battle, at tactical zoom, or when T is released.
+ * Expected outcome: One centered icon on each qualifying world hex. Nothing in a tactical battle or at battle-detail zoom.
  * Exceptions: A missing map or a failed image load leaves that icon blank. The function does not throw.
  */
 
 import {
-  INSPECTION_STATUS_ICON_SLASH_TEXT,
-  inspectionStatusIconFontPx,
+  inspectionStatusIconDrawPx,
   inspectionStatusIconsForHex,
-  inspectionStatusSlashIsBold,
   strategicOverlayBandOffsetPx,
   strategicProductionLabelSurface,
   techInspectionIconAssetPath,
   weatherInspectionIconAssetPath,
 } from '../../shared/inspectionStatusIconLine';
-import type { TechLevel } from '../../shared/techBonusTypes';
-import type { WeatherState } from '../../shared/weatherBonusTypes';
 import { rendererSharedState as S } from '../core/state';
 import {
-  getUrbanProductionCapacityForHex,
   getControllerForHex,
   isMapInspectionModeHeld,
   isStrategicHexHumanUrbanProduction,
@@ -58,7 +53,7 @@ export interface InspectionStatusIconDrawDeps {
    * Whether the hex would show an airport or seaport glyph.
    *
    * Contract: The set is the hexes that currently hold a unit. The boolean matches the production label's infrastructure check.
-   * When to use: Once per hex that will draw an icon row.
+   * When to use: Once per hex that may draw a status icon.
    * Expected outcome: True when that check would shrink the production text to 10px.
    * Exceptions: None.
    */
@@ -129,8 +124,8 @@ function iconImage(src: string, requestRedraw: () => void): HTMLImageElement | n
 /**
  * Paints one icon inside a square, preserving its aspect.
  *
- * Purpose: Tech and weather marks match the production text height.
- * When to use: For each present icon after the font size is known.
+ * Purpose: The square is the enlarged status-icon size for this hex.
+ * When to use: For the one icon after its pixel size is known.
  * Expected outcome: The image is drawn when it has loaded. A blank square is left while it is loading or after an error.
  * Exceptions: None.
  */
@@ -149,147 +144,91 @@ function drawFittedIcon(
 }
 
 /**
- * Paints the slash with the production label's white edge and black fill.
+ * Placement for the one status icon on a hex.
  *
- * Purpose: The character between the icons matches the slash between production numbers.
- * When to use: Only when both icons are present.
- * Expected outcome: ` / ` centered at the given point.
- * Exceptions: None.
- */
-function drawSlash(ctx: CanvasRenderingContext2D, centerX: number, centerY: number): void {
-  ctx.strokeStyle = '#fff';
-  ctx.lineWidth = 1.25;
-  ctx.strokeText(INSPECTION_STATUS_ICON_SLASH_TEXT, centerX, centerY);
-  ctx.fillStyle = '#000';
-  ctx.fillText(INSPECTION_STATUS_ICON_SLASH_TEXT, centerX, centerY);
-}
-
-/**
- * Placement for one icon row.
- *
- * Purpose: Keeps the draw call within the argument limit while the row still knows its center, size, and icons.
- * When to use: `drawIconGroup`.
+ * Purpose: Keeps the draw call within the argument limit while the icon still knows its center, size, and asset.
+ * When to use: `drawStatusIcon`.
  * Expected outcome: One object per hex that will be painted.
  * Exceptions: None.
  */
-interface IconGroupPlacement {
+interface StatusIconPlacement {
   /**
-   * Horizontal center of the group, in container pixels.
+   * Horizontal center of the icon, in container pixels.
    *
-   * Contract: The hex-code centroid x.
-   * When to use: Centering the icons and the slash.
-   * Expected outcome: The group is centered on this x.
+   * Contract: The hex centroid x.
+   * When to use: Centering the icon.
+   * Expected outcome: The icon is centered on this x.
    * Exceptions: None.
    */
   readonly centerX: number;
   /**
-   * Vertical center of the icons, in container pixels.
+   * Vertical center of the icon, in container pixels.
    *
    * Contract: The centroid y minus the production-band offset.
-   * When to use: The shared baseline for the icons and the slash.
-   * Expected outcome: The row sits above the hex code.
+   * When to use: The icon's vertical center.
+   * Expected outcome: The icon sits on the band above the hex center.
    * Exceptions: None.
    */
   readonly centerY: number;
   /**
-   * Icon square and slash font size, in pixels.
+   * Icon square size, in pixels.
    *
-   * Contract: 10 or 11, matching the production label.
-   * When to use: Font string and icon fit.
-   * Expected outcome: Icons and the slash share this size.
+   * Contract: 15 or 16.5. One and a half times the 10px or 11px production-text base.
+   * When to use: `drawFittedIcon`.
+   * Expected outcome: Weather and tech use the same size on a given hex.
    * Exceptions: None.
    */
-  readonly fontPx: number;
+  readonly iconPx: number;
   /**
-   * Whether the slash uses the bold production weight.
+   * SVG path for the one icon.
    *
-   * Contract: True for a human hex with capacity above zero.
-   * When to use: The canvas font string.
-   * Expected outcome: Bold or regular `system-ui`.
+   * Contract: A tech or weather asset path from the status-icon choice.
+   * When to use: `iconImage`.
+   * Expected outcome: That file is drawn, or a blank square while it loads.
    * Exceptions: None.
    */
-  readonly bold: boolean;
-  /**
-   * Tech tier to paint, or null when that icon is omitted.
-   *
-   * Contract: Set only when the icon line includes tech.
-   * When to use: The left side of the group.
-   * Expected outcome: Null skips that square.
-   * Exceptions: None.
-   */
-  readonly tech: TechLevel | null;
-  /**
-   * Weather state to paint, or null when that icon is omitted.
-   *
-   * Contract: Set only when the icon line includes weather.
-   * When to use: The right side of the group.
-   * Expected outcome: Null skips that square.
-   * Exceptions: None.
-   */
-  readonly weather: WeatherState | null;
+  readonly assetPath: string;
 }
 
 /**
- * Draws the icon row for one hex.
+ * Draws one status icon centered on a hex band.
  *
- * Purpose: Keeps the group centered, with a reserved square for an icon that has not loaded yet.
- * When to use: After the hex has a non-empty icon line.
- * Expected outcome: Tech, then the slash, then weather. A single icon is centered with no slash.
+ * Purpose: Paints the one chosen image at the band center.
+ * When to use: After the selector returns a tech or weather icon.
+ * Expected outcome: The image is centered on the placement point at `iconPx`. A blank square is left while it loads.
  * Exceptions: None.
  */
-function drawIconGroup(
+function drawStatusIcon(
   ctx: CanvasRenderingContext2D,
   deps: InspectionStatusIconDrawDeps,
-  placement: IconGroupPlacement
+  placement: StatusIconPlacement
 ): void {
-  const { centerX, centerY, fontPx, bold, tech, weather } = placement;
-  ctx.font = `${bold ? 'bold ' : ''}${fontPx}px system-ui, sans-serif`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  const slashWidth = tech && weather ? ctx.measureText(INSPECTION_STATUS_ICON_SLASH_TEXT).width : 0;
-  const totalWidth = (tech ? fontPx : 0) + slashWidth + (weather ? fontPx : 0);
-  let left = centerX - totalWidth / 2;
-  if (tech) {
-    drawFittedIcon(
-      ctx,
-      iconImage(techInspectionIconAssetPath(tech), deps.requestRedraw),
-      left + fontPx / 2,
-      centerY,
-      fontPx
-    );
-    left += fontPx;
-  }
-  if (tech && weather) {
-    drawSlash(ctx, left + slashWidth / 2, centerY);
-    left += slashWidth;
-  }
-  if (weather) {
-    drawFittedIcon(
-      ctx,
-      iconImage(weatherInspectionIconAssetPath(weather), deps.requestRedraw),
-      left + fontPx / 2,
-      centerY,
-      fontPx
-    );
-  }
+  drawFittedIcon(
+    ctx,
+    iconImage(placement.assetPath, deps.requestRedraw),
+    placement.centerX,
+    placement.centerY,
+    placement.iconPx
+  );
 }
 
 /**
- * Draws tech and weather icons above world-hex codes while inspection is held.
+ * Draws the status icon above each qualifying world hex.
  *
- * Purpose: Shows the same tech tier and weather the hex tooltip names, on hexes that already show a production label.
+ * Purpose: Weather shows while T is not held. Tech replaces it while T is held. Neither requires a production label.
  * When to use: On the next line after each `drawStrategicInspectionHexCodes` call.
- * Expected outcome: No-op in a tactical battle, at tactical zoom, or when T is not held. Otherwise one row per labeled hex.
+ * Expected outcome: No-op in a tactical battle or at battle-detail zoom. Otherwise one icon per qualifying hex. An unexplored hex is not passed a weather word, because the renderer snapshot still stores weather there.
  * Exceptions: A missing map returns without drawing. Image errors leave a blank square.
  */
 export function drawInspectionStatusIcons(ctx: CanvasRenderingContext2D, deps: InspectionStatusIconDrawDeps): void {
-  if (!S.gameState || S.tacticalBattleSnapshot || !isMapInspectionModeHeld() || shouldRenderTacticalHexes()) return;
+  if (!S.gameState || S.tacticalBattleSnapshot || shouldRenderTacticalHexes()) return;
   const map = getMainLeafletMapForProjection();
   const leaflet = getLeafletGlobal();
   if (!map || !leaflet) return;
   const state = S.gameState;
   const unitHexes = new Set(state.units.map((unit) => unit.h3Index));
   const buildEntryZoom = shouldShowBuildEntryZoom();
+  const mapInspectionHeld = isMapInspectionModeHeld();
   ctx.save();
   try {
     for (const hx of state.hexes) {
@@ -299,33 +238,34 @@ export function drawInspectionStatusIcons(ctx: CanvasRenderingContext2D, deps: I
       const surface = strategicProductionLabelSurface({
         tacticalRendered: false,
         explored,
-        mapInspectionHeld: true,
+        mapInspectionHeld,
         controlledByHuman,
         humanUrbanProduction,
         buildEntryZoom,
       });
-      const icons = inspectionStatusIconsForHex({
-        productionSurface: surface,
+      const icon = inspectionStatusIconsForHex({
+        mapInspectionHeld,
         techBonusEnabled: state.techBonusEnabled === true,
+        weatherBonusEnabled: state.weatherBonusEnabled === true,
         baselineUrbanHexCount: baselineUrbanHexCountForStrategicHex(hx.h3Index),
-        weather: hx.weather,
+        weather: explored ? hx.weather : null,
       });
-      if (surface === 'none' || !icons) continue;
+      if (!icon) continue;
       const pts = projectHexBoundaryToContainerPoints(hx.h3Index, map, leaflet);
       if (pts.length === 0) continue;
       const centroid = projectedCentroid(pts);
-      const fontPx = inspectionStatusIconFontPx({
-        productionSurface: surface,
-        hasInfraSymbols: deps.hasInfraSymbols(hx.h3Index, unitHexes),
-        hasVisibleUnits: unitHexes.has(hx.h3Index),
-      });
-      drawIconGroup(ctx, deps, {
+      const assetPath = icon.kind === 'tech'
+        ? techInspectionIconAssetPath(icon.level)
+        : weatherInspectionIconAssetPath(icon.state);
+      drawStatusIcon(ctx, deps, {
         centerX: centroid.x,
         centerY: centroid.y - strategicOverlayBandOffsetPx(spanForProjectedHex(pts)),
-        fontPx,
-        bold: inspectionStatusSlashIsBold(controlledByHuman, getUrbanProductionCapacityForHex(hx.h3Index)),
-        tech: icons.tech,
-        weather: icons.weather,
+        iconPx: inspectionStatusIconDrawPx({
+          productionSurface: surface === 'button' ? 'button' : 'canvas',
+          hasInfraSymbols: deps.hasInfraSymbols(hx.h3Index, unitHexes),
+          hasVisibleUnits: unitHexes.has(hx.h3Index),
+        }),
+        assetPath,
       });
     }
   } finally {

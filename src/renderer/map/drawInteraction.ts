@@ -1,5 +1,10 @@
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import {
+  marchPlayedForUnit,
+  resolutionCasualtyTiming,
+  unitsDrawnAtCasualtyTiming,
+} from '../../shared/resolutionCasualtyDraw';
+import {
   UNIT_ICON_HIT_PAD_PX,
   UNIT_RADIUS,
   STACK_OFFSET_X,
@@ -77,11 +82,11 @@ export function drawLoadingScene(ctx: CanvasRenderingContext2D, width: number, h
 }
 
 /**
- * Defines the `getUnitsForDrawWithMovingIds` function shape (export function getUnitsForDrawWithMovingIds( state: GameStateSnapshot, deps: DrawInteractionDeps ): { unitsToDraw: GameStateSnapshot['units']; movingIds).
-
- * Purpose: Supports maintainability by documenting why `getUnitsForDrawWithMovingIds` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Chooses the unit icons for this frame and which of them are mid-playback.
+ *
+ * Purpose: Resolution playback has to keep a removed icon through its destruction mark and glide a march only when that unit reached the destination.
+ * When to use: Each map frame that draws unit icons, including while no playback is running.
+ * Expected outcome: Without playback, the snapshot units and no moving ids. During playback, icons follow `unitsDrawnAtCasualtyTiming`, and `movingIds` is set only for an outbound strike, a return flight, or a march that `marchPlayedForUnit` still allows.
  * Exceptions: None.
  */
 export function getUnitsForDrawWithMovingIds(
@@ -96,6 +101,11 @@ export function getUnitsForDrawWithMovingIds(
     const { phase } = deps.buildResolutionPlaybackState(anim, elapsed);
     const moveProgress = phase.moveProgress;
     const rangedRemovedIds = new Set((anim.rangedRemovedUnits ?? []).map((u) => u.id));
+    const casualtyInput = {
+      airRemovedUnits: anim.airStrikeRemovedUnits ?? [],
+      rangedRemovedUnits: anim.rangedRemovedUnits ?? [],
+      meleeRemovedUnits: anim.meleeRemovedUnits ?? [],
+    };
     if (phase.inAirStrikeOutbound) {
       unitsToDraw = state.units;
       movingIds = new Set((anim.airStrikeOutboundMoves ?? []).map((move) => move.unitId));
@@ -131,7 +141,10 @@ export function getUnitsForDrawWithMovingIds(
       movingIds = undefined;
     } else if (phase.inMovement) {
       unitsToDraw = state.units;
-      movingIds = moveProgress < 1 ? new Set(anim.moves.map((m) => m.unitId)) : undefined;
+      movingIds =
+        moveProgress < 1
+          ? new Set(anim.moves.filter((move) => marchPlayedForUnit(move, casualtyInput)).map((move) => move.unitId))
+          : undefined;
     } else if (anim.moves.length > 0 && moveProgress < 1) {
       // Snapshot already lists march destinations during pre-move phases; draw movers at playback origins until movement anim hides them.
       const moveById = new Map(anim.moves.map((m) => [m.unitId, m] as const));
@@ -144,6 +157,13 @@ export function getUnitsForDrawWithMovingIds(
       unitsToDraw = [...state.units, ...(anim.meleeRemovedUnits ?? [])];
       movingIds = undefined;
     }
+    unitsToDraw = unitsDrawnAtCasualtyTiming({
+      units: unitsToDraw,
+      timing: resolutionCasualtyTiming(phase),
+      input: casualtyInput,
+      moves: anim.moves,
+      hiddenHexes: anim.unknownCasualtyHexes ?? [],
+    });
   } else {
     movingIds = undefined;
   }

@@ -1,8 +1,8 @@
 /**
- * Decides the tech and weather icons drawn above a strategic hex code.
+ * Decides which single status icon a strategic world hex shows, and how large it is.
  *
- * Purpose: The held-T icon row and the hex tooltip share one rule for which icons exist, how tall they are, and how far they sit from the code.
- * When to use: From the inspection icon drawer, and from tests that lock those rules.
+ * Purpose: Weather shows while T is not held. Tech replaces it while T is held. Size and band offset stay pure so tests can lock them.
+ * When to use: From the status-icon drawer, and from tests that lock those rules.
  * Expected outcome: Pure results with no map, canvas, or game snapshot.
  * Exceptions: None.
  */
@@ -23,19 +23,9 @@ import { weatherIconAssetPath } from './weatherIcons';
 export const STRATEGIC_OVERLAY_BAND_OFFSET_SPAN_FRAC = 0.24;
 
 /**
- * Text drawn between the tech icon and the weather icon.
- *
- * Purpose: Matches the spaces around the slash in a production label such as `$1,000 / 3t`.
- * When to use: The canvas slash when both icons are present.
- * Expected outcome: A space, a slash, and a space.
- * Exceptions: None.
- */
-export const INSPECTION_STATUS_ICON_SLASH_TEXT = ' / ';
-
-/**
  * Where a world hex's production label is drawn.
  *
- * Purpose: The icon row appears only on a hex that already shows that label.
+ * Purpose: Callers use `'button'` for the build-entry control, `'canvas'` for the painted line, and `'none'` when the label is hidden.
  * When to use: `strategicProductionLabelSurface`.
  * Expected outcome: `'button'` for the build-entry control, `'canvas'` for the painted line, `'none'` when the label is hidden.
  * Exceptions: None.
@@ -108,45 +98,54 @@ export interface StrategicProductionLabelInput {
 }
 
 /**
- * Facts that choose the tech and weather icons.
+ * Facts that choose the one status icon for a world hex.
  *
- * Purpose: The drawer gathers snapshot fields and the surface, then asks this object what to paint.
+ * Purpose: The drawer gathers the hold state and the snapshot fields, then asks this object what to paint.
  * When to use: `inspectionStatusIconsForHex`.
- * Expected outcome: One object per hex that has already chosen a production surface.
+ * Expected outcome: One object per hex. A production label is not required.
  * Exceptions: None.
  */
 export interface InspectionStatusIconInput {
   /**
-   * Production surface for this hex.
+   * Whether T is held.
    *
-   * Contract: `'none'` suppresses the whole icon row.
-   * When to use: Pass `strategicProductionLabelSurface`.
-   * Expected outcome: Any other surface can still return null when both icons are absent.
+   * Contract: True selects a tech icon. False selects a weather icon.
+   * When to use: Pass `isMapInspectionModeHeld`.
+   * Expected outcome: The other icon is never returned for this hold state.
    * Exceptions: None.
    */
-  readonly productionSurface: StrategicProductionLabelSurface;
+  readonly mapInspectionHeld: boolean;
   /**
    * Whether the match awards a tech tier.
    *
-   * Contract: Only `true` can show a tech icon. Low and High use the same icon.
+   * Contract: Only `true` can show a tech icon, and only while T is held. Low and High use the same icon.
    * When to use: Pass `techBonusEnabled === true`.
    * Expected outcome: A false or missing flag omits the tech icon.
    * Exceptions: None.
    */
   readonly techBonusEnabled: boolean;
   /**
+   * Whether the match applies weather.
+   *
+   * Contract: Only `true` can show a weather icon, and only while T is not held. Low and High use the same icon.
+   * When to use: Pass `weatherBonusEnabled === true`.
+   * Expected outcome: A false or missing flag omits the weather icon even when the hex has a weather word.
+   * Exceptions: None.
+   */
+  readonly weatherBonusEnabled: boolean;
+  /**
    * Generated urban-cell count for this hex.
    *
-   * Contract: The tier cut is 21. Zero and non-finite counts omit the tech icon.
+   * Contract: A finite count above zero can show tech. The tier comes from `techLevelFromUrbanHexCount`, which follows the loaded map.
    * When to use: Pass `baselineUrbanHexCountForStrategicHex`.
-   * Expected outcome: 20 is Basic. 21 is Advanced.
+   * Expected outcome: Zero, negative, and non-finite counts omit the tech icon. On the global map, 20 is Basic and 21 is Advanced.
    * Exceptions: None.
    */
   readonly baselineUrbanHexCount: number;
   /**
    * Weather word stored on the hex, if any.
    *
-   * Contract: Only `mild`, `rain`, `snow`, and `heat` count. Other strings omit the weather icon.
+   * Contract: Only `mild`, `rain`, `snow`, and `heat` count, and only while T is not held and the weather bonus is on.
    * When to use: Pass the snapshot weather field, including null or undefined.
    * Expected outcome: An unknown word does not become Mild.
    * Exceptions: None.
@@ -155,33 +154,54 @@ export interface InspectionStatusIconInput {
 }
 
 /**
- * Icons to paint for one hex.
+ * The one status icon to paint for a hex.
  *
- * Purpose: The drawer reads which side is present. A null side is omitted, and the slash appears only when both are set.
+ * Purpose: Tech and weather cannot both be set. The drawer centers whichever side is present.
  * When to use: The return value of `inspectionStatusIconsForHex`.
- * Expected outcome: At least one of `tech` and `weather` is set.
+ * Expected outcome: A tech tier while T is held, or a weather state while T is not held.
  * Exceptions: None.
  */
-export interface InspectionStatusIconLine {
-  /**
-   * Tech tier icon, or null when that icon is omitted.
-   *
-   * Contract: `basic` or `advanced` when the tech line would appear on the hex tooltip.
-   * When to use: Choose `techInspectionIconAssetPath`.
-   * Expected outcome: Null leaves the weather icon centered alone.
-   * Exceptions: None.
-   */
-  readonly tech: TechLevel | null;
-  /**
-   * Weather icon, or null when that icon is omitted.
-   *
-   * Contract: One of the four weather states when the snapshot has that weather.
-   * When to use: Choose `weatherInspectionIconAssetPath`.
-   * Expected outcome: Null leaves the tech icon centered alone.
-   * Exceptions: None.
-   */
-  readonly weather: WeatherState | null;
-}
+export type InspectionStatusIcon =
+  | {
+      /**
+       * Discriminator for the tech glyph.
+       *
+       * Contract: Always `'tech'`.
+       * When to use: Choose `techInspectionIconAssetPath` with `level`.
+       * Expected outcome: The drawer paints one tech icon.
+       * Exceptions: None.
+       */
+      readonly kind: 'tech';
+      /**
+       * Tech tier for this hex.
+       *
+       * Contract: `basic` or `advanced` from the loaded map's urban-count cut.
+       * When to use: `techInspectionIconAssetPath`.
+       * Expected outcome: The matching tech SVG.
+       * Exceptions: None.
+       */
+      readonly level: TechLevel;
+    }
+  | {
+      /**
+       * Discriminator for the weather glyph.
+       *
+       * Contract: Always `'weather'`.
+       * When to use: Choose `weatherInspectionIconAssetPath` with `state`.
+       * Expected outcome: The drawer paints one weather icon.
+       * Exceptions: None.
+       */
+      readonly kind: 'weather';
+      /**
+       * Weather state for this hex.
+       *
+       * Contract: One of `mild`, `rain`, `snow`, or `heat`.
+       * When to use: `weatherInspectionIconAssetPath`.
+       * Expected outcome: The matching weather SVG.
+       * Exceptions: None.
+       */
+      readonly state: WeatherState;
+    };
 
 /**
  * Facts that choose the icon pixel size.
@@ -259,8 +279,8 @@ export function strategicOverlayBandOffsetPx(spanPx: number): number {
 /**
  * Returns which production label a world hex shows.
  *
- * Purpose: The icon row is limited to hexes that already show a production label, either as a button or as canvas text.
- * When to use: Once per hex while deciding whether to draw icons. Keep this aligned with `drawStrategicProductionOverlays` and `syncBuildEntryButton`.
+ * Purpose: Labels and build buttons use this surface. The status icon uses it only to choose the 10px or 11px base.
+ * When to use: Once per hex while placing a production label or sizing a status icon. Keep this aligned with `drawStrategicProductionOverlays` and `syncBuildEntryButton`.
  * Expected outcome: `'none'`, `'button'`, or `'canvas'` from the rules above.
  * Exceptions: None.
  */
@@ -273,31 +293,30 @@ export function strategicProductionLabelSurface(input: StrategicProductionLabelI
 }
 
 /**
- * Returns the tech and weather icons for one hex, or null when the row is empty.
+ * Returns the one status icon for a world hex, or null when that hex shows none.
  *
- * Purpose: Applies the hex tooltip's Tech and Weather omissions to the map icon row.
- * When to use: After `strategicProductionLabelSurface`.
- * Expected outcome: Null when the surface is `'none'` or both icons are omitted. Otherwise at least one icon is set.
+ * Purpose: T held selects tech. T released selects weather. A missing bonus or a missing hex fact omits the icon.
+ * When to use: Once per world hex while the strategic map is outside a battle and outside battle-detail zoom.
+ * Expected outcome: A tech icon, a weather icon, or null. Never both.
  * Exceptions: None.
  */
-export function inspectionStatusIconsForHex(input: InspectionStatusIconInput): InspectionStatusIconLine | null {
-  if (input.productionSurface === 'none') return null;
-  const tech =
-    input.techBonusEnabled === true &&
-    Number.isFinite(input.baselineUrbanHexCount) &&
-    input.baselineUrbanHexCount > 0
-      ? techLevelFromUrbanHexCount(input.baselineUrbanHexCount)
-      : null;
+export function inspectionStatusIconsForHex(input: InspectionStatusIconInput): InspectionStatusIcon | null {
+  if (input.mapInspectionHeld) {
+    if (input.techBonusEnabled !== true) return null;
+    if (!Number.isFinite(input.baselineUrbanHexCount) || input.baselineUrbanHexCount <= 0) return null;
+    return { kind: 'tech', level: techLevelFromUrbanHexCount(input.baselineUrbanHexCount) };
+  }
+  if (input.weatherBonusEnabled !== true) return null;
   const weather = knownWeather(input.weather);
-  if (tech == null && weather == null) return null;
-  return { tech, weather };
+  if (weather == null) return null;
+  return { kind: 'weather', state: weather };
 }
 
 /**
- * Returns the icon and slash size in pixels.
+ * Returns the production-text height used as the status-icon base, in pixels.
  *
- * Purpose: The row matches the production text height on that same hex.
- * When to use: For a hex whose surface is `'canvas'` or `'button'`.
+ * Purpose: The painted icon is this height times 1.5. Call `inspectionStatusIconDrawPx` to draw.
+ * When to use: From `inspectionStatusIconDrawPx`, and from tests that lock the 10px and 11px base.
  * Expected outcome: 10 for a button or a crowded canvas label. 11 for a plain canvas label.
  * Exceptions: None.
  */
@@ -307,22 +326,32 @@ export function inspectionStatusIconFontPx(input: InspectionStatusIconFontInput)
 }
 
 /**
- * Returns whether the slash uses the bold production weight.
+ * Scale from the production-text height to the status icon.
  *
- * Purpose: A human hex with capacity paints its production numbers in bold, and the icon slash follows.
- * When to use: When both icons are present.
- * Expected outcome: True only when the controller is human and capacity is above zero.
+ * Purpose: Weather and tech share one size, half again the 10px or 11px base on that hex.
+ * When to use: `inspectionStatusIconDrawPx`.
+ * Expected outcome: `1.5`, with no rounding inside the helper.
  * Exceptions: None.
  */
-export function inspectionStatusSlashIsBold(controlledByHuman: boolean, capacityPerTurn: number): boolean {
-  return controlledByHuman && capacityPerTurn > 0;
+const STATUS_ICON_LINEAR_SCALE = 1.5;
+
+/**
+ * Returns the status-icon square size in pixels.
+ *
+ * Purpose: The drawn icon is one and a half times the production-text height on that hex.
+ * When to use: For a hex that will paint a tech or weather icon. Pass `'canvas'` when the production surface is `'none'`.
+ * Expected outcome: 15 for a button or a crowded canvas label. 16.5 for a plain canvas label. No rounding.
+ * Exceptions: None.
+ */
+export function inspectionStatusIconDrawPx(input: InspectionStatusIconFontInput): number {
+  return inspectionStatusIconFontPx(input) * STATUS_ICON_LINEAR_SCALE;
 }
 
 /**
  * Returns the SVG path for a tech tier icon.
  *
  * Purpose: The map row uses the same files as the Tech line in a tooltip.
- * When to use: When `InspectionStatusIconLine.tech` is set.
+ * When to use: When `InspectionStatusIcon` has `kind: 'tech'`.
  * Expected outcome: `tech/tech_basic.svg` or `tech/tech_advanced.svg`.
  * Exceptions: None.
  */
@@ -334,7 +363,7 @@ export function techInspectionIconAssetPath(level: TechLevel): string {
  * Returns the SVG path for a weather icon.
  *
  * Purpose: The map row uses the same files as the Weather line in a tooltip.
- * When to use: When `InspectionStatusIconLine.weather` is set.
+ * When to use: When `InspectionStatusIcon` has `kind: 'weather'`.
  * Expected outcome: `weather/<state>.svg` for that state.
  * Exceptions: None.
  */

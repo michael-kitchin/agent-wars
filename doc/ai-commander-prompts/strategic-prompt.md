@@ -97,6 +97,7 @@ Assessment-tool and combat-estimate hints must **not** appear when a precomputed
 #### `# Operational Map`
 
 - **Shape:** a legend, then a fenced ASCII grid, then a displaced-features footnote when needed, then the options subsection.
+- **Extent:** every strategic cell of the match that is loaded. Global is the world grid. Regional is that region's footprint. A new match replaces the codes, including when the new map uses the same resolution. A code from the previous match is not a cell on this map.
 - **Legend contract:** each cell shows its code on the top line and terrain plus overlay on the bottom line; `x` is land and `.` is water; `*` marks own units, `!` enemy units, `#` contested, `?` undiscovered intel; feature letters mark airport, seaport, both, and urban, with uppercase meaning own control; odd rows are indented one space; only codes from this map or the tables may be used.
 - **Displaced-features footnote:** include when a unit overlay hides a feature marker, listing each affected cell and its feature. Omit when empty.
 - **Items:** `MAP_GRID`, `TERRAIN_CLASS`, `INFRA_PRESENCE`, `CONTROL_STATE`, `DISPLACED_FEATURES`.
