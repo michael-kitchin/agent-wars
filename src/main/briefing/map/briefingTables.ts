@@ -16,9 +16,11 @@ import { h3ToCode } from './hexCodeTranslator';
 import { SECTION_TITLE_BEST_OPTIONS_THIS_TURN } from '../../openRouter/promptSpec/sectionHeadings';
 
 /**
- * Purpose: Builds the **Target Infrastructure** column for one Best Options action from `featuresSummary`, stripping air-strike-only `; strike: …` suffixes so strike kinds stay out of that column.
- * When to use: Only from `renderThisTurnOptionsTableMarkdown`, once per expanded action label. `action` is that label.
- * Expected outcome: Pipe-safe text, or `—` when nothing remains after trim/strip.
+ * Builds the Target Infrastructure cell for one Best Options action.
+ *
+ * Purpose: Keeps a combined air-strike cell down to its infrastructure text, and keeps pipe characters from splitting the markdown table on every row.
+ * When to use: From `renderThisTurnOptionsTableMarkdown`, once per expanded action label. `action` is that label.
+ * Expected outcome: `featuresSummary` with `|` replaced by spaces. When `action` is `air strike` and the text contains `; strike:`, that suffix is removed. A cell with no `; strike:` suffix is otherwise unchanged. `—` when nothing remains.
  * Exceptions: None.
  */
 function infrastructureCellForThisTurnOptionsRow(r: PossibleActionTableRow, action: string): string {
@@ -72,7 +74,7 @@ function groupThisTurnOptionRowsByTarget(
  *
  * Purpose: Single high-signal table replacing multi-bucket possible-actions markdown.
  * When to use: After `collectAggregatedPossibleActionRows`.
- * Expected outcome: Columns `Unit IDs`, `Action`, `Target Hexes`, `Target Units` (enemy summary only), `Target Infrastructure` (hex features; air-strike rows omit `; strike: …`); at most five target hexes per unit, with each distinct action on a hex kept as its own row; units sharing an identical option are listed together in `Unit IDs`.
+ * Expected outcome: Columns `Unit IDs`, `Action`, `Target Hexes`, `Target Units` (enemy summary only), `Target Infrastructure` (hex features; an air-strike row drops text from `; strike:` onward when that suffix is present); at most five target hexes per unit, with each distinct action on a hex kept as its own row; units sharing an identical option are listed together in `Unit IDs`.
  * Exceptions: Propagates `h3ToCode` failures for unknown tactical/strategic cells.
  */
 export function renderThisTurnOptionsTableMarkdown(

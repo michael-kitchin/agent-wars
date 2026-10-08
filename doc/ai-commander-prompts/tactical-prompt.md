@@ -87,7 +87,7 @@ Bullet list, ranked, capped at five, empty form `None.` Tactical emits threat bu
 #### `### Best Options This Turn`
 
 - **Include:** when at least one option row exists; omit heading and table otherwise.
-- **Columns:** identical to strategic.
+- **Columns:** identical to strategic, including the `Target Infrastructure` cell contract (`|` is written as a space; an `air strike` row then omits text from `; strike:` onward; a cell with no `; strike:` suffix is otherwise unchanged; an empty cell is an em dash).
 - **Action values in battle:** `air strike`, `ranged`, `approach`, `ferry`, `move/melee`. A unit listed on an `air strike` row is not also listed on a `ferry` row this beat.
 - **"This beat" legality:** move and approach targets are cells reachable this beat under the terrain-weighted budget, computed with the same planner the engine uses when it applies the order. Approach targets omit stay-put friendlies; a cell a friendly is leaving this period is listed. move/melee targets may be enemy-occupied. Ranged targets are enemy-occupied cells within reach. Air strike targets are enemy-occupied footprint cells, and are produced only when the parent cell's airport is intact. Ferry targets are other intact airport cells in the footprint.
 - **Per-unit cap:** five target hexes per sub-unit. Each distinct action on a hex is its own row, in the order air strike, ranged, approach, ferry, then move/melee. Identical rows are merged and their sub-unit ids listed together. A sub-unit must not use the same hex as both its move destination and its ranged target.

@@ -66,7 +66,7 @@ Emit order as coded. All headings quoted exactly (`promptSpec/sectionHeadings.ts
 Table columns as coded:
 
 - Unit status: `Unit ID` | `Type` | `Hex` | `Nearest enemy + distance` | `Threat severity` | `Action needed`. **No row cap.**
-- Best Options: `Unit IDs` | `Action` | `Target Hexes` | `Target Units` | `Target Infrastructure`. At most 5 target hexes per unit; each distinct action on a hex is then its own row, in the order air strike, ranged, approach, ferry, move/melee. Identical action, hex, and target rows merge.
+- Best Options: `Unit IDs` | `Action` | `Target Hexes` | `Target Units` | `Target Infrastructure`. At most 5 target hexes per unit; each distinct action on a hex is then its own row, in the order air strike, ranged, approach, ferry, move/melee. Identical action, hex, and target rows merge. `Target Infrastructure` is the hex feature text. `|` is written as a space. On an `air strike` row, text from `; strike:` onward is then omitted; a cell with no `; strike:` suffix is otherwise unchanged. An empty cell is `—`.
 - Controlled Hex Queues: `Hex` | `Urban Hexes` | `Airports` | `Seaports` | `Available Unit Types` | `Current Queue`. Top 10 plus any further hex with queued entries.
 - Memory persistent: `Key` | `Updated Turn` | `Content`. Reminders: `Key` | `Tier` | `Recurring` | `Content`.
 - Standing Order Status: `Unit ID` | `Unit Type` | `Order Type` | `Destination / Target` | `Status` | `Next Move` | `Turns Remaining` | `Attention`. `Next Move` is the step about to be taken. Before the briefing is built, a step the unit has already entered is replaced by the following stored step when turns remain. A step not yet entered is left as stored. March, pursue, defend, and patrol store that route when they queue a step.
