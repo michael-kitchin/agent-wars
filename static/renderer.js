@@ -34077,6 +34077,7 @@ ${body}`;
       dwellAnchorY = clientY;
       rendererSharedState.terrainTooltipDelayTimer = setTimeout(() => {
         rendererSharedState.terrainTooltipDelayTimer = null;
+        if (newGameOverlayIsOpen()) return;
         if (rendererSharedState.hoveredHexH3 !== targetHex || rendererSharedState.hoveredDetailHexH3 !== targetDetail || !rendererSharedState.gameState) return;
         if (deps.shouldSuppressTerrainTooltip()) return;
         const state = deps.terrainStateForPointer(rendererSharedState.lastPointerClientX, rendererSharedState.lastPointerClientY, targetHex);
@@ -34093,7 +34094,14 @@ ${body}`;
       scheduleHexDetailsTooltip(hit, rendererSharedState.hoveredDetailHexH3, rendererSharedState.lastPointerClientX, rendererSharedState.lastPointerClientY);
     };
     mainMapEl.addEventListener("pointermove", (e) => {
-      if (newGameOverlayIsOpen()) return;
+      if (newGameOverlayIsOpen()) {
+        deps.clearTerrainTooltipTimer();
+        deps.hideTerrainTooltipVisual();
+        hideOrderBlockHexTooltip();
+        clearOrderEffectsTooltipDwell();
+        forgetSingleUnitHoverCallout();
+        return;
+      }
       rendererSharedState.lastPointerClientX = e.clientX;
       rendererSharedState.lastPointerClientY = e.clientY;
       repositionOrderBlockHexTooltipIfVisible();

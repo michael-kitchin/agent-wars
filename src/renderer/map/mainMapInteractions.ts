@@ -548,7 +548,7 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
    *
    * Purpose: A new cell, travel inside that cell, and leaving a single-unit token all share one rest.
    * When to use: Before the tooltip is open. An open tooltip follows the pointer instead.
-   * Expected outcome: The tooltip shows one second later if the pointer is still on this cell. A newer wait cancels this one.
+   * Expected outcome: The tooltip shows one second later if the pointer is still on this cell and the new-game overlay is not open. A newer wait cancels this one.
    * Exceptions: None.
    */
   const scheduleHexDetailsTooltip = (targetHex: string, targetDetail: string | null, clientX: number, clientY: number): void => {
@@ -558,6 +558,7 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
     dwellAnchorY = clientY;
     S.terrainTooltipDelayTimer = setTimeout(() => {
       S.terrainTooltipDelayTimer = null;
+      if (newGameOverlayIsOpen()) return;
       if (S.hoveredHexH3 !== targetHex || S.hoveredDetailHexH3 !== targetDetail || !S.gameState) return;
       if (deps.shouldSuppressTerrainTooltip()) return;
       const state = deps.terrainStateForPointer(S.lastPointerClientX, S.lastPointerClientY, targetHex);
@@ -576,7 +577,14 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
   };
 
   mainMapEl.addEventListener('pointermove', (e) => {
-    if (newGameOverlayIsOpen()) return;
+    if (newGameOverlayIsOpen()) {
+      deps.clearTerrainTooltipTimer();
+      deps.hideTerrainTooltipVisual();
+      hideOrderBlockHexTooltip();
+      clearOrderEffectsTooltipDwell();
+      forgetSingleUnitHoverCallout();
+      return;
+    }
     S.lastPointerClientX = e.clientX;
     S.lastPointerClientY = e.clientY;
     repositionOrderBlockHexTooltipIfVisible();
