@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { previewHomeBorder, previewTechIcon, previewWeatherIcon } from './newGameMapPreviewCore';
+import { previewHexIsDrawn, previewHomeBorder, previewTechIcon, previewWeatherIcon } from './newGameMapPreviewCore';
 import type { WeatherState } from './weatherBonusTypes';
 
 /**
@@ -46,6 +46,15 @@ test('preview home borders mark exclusive, shared, and identical homes', () => {
     controllerPlayerId: null,
     homeOwnerIdentity: 'both',
   });
+});
+
+test('global preview paints a hex body only when it is a home, and a regional preview paints every hex body', () => {
+  assert.equal(previewHexIsDrawn('global', null), false);
+  assert.equal(previewHexIsDrawn('global', 'human'), true);
+  assert.equal(previewHexIsDrawn('global', 'opponent'), true);
+  assert.equal(previewHexIsDrawn('global', 'both'), true);
+  assert.equal(previewHexIsDrawn('eastern_europe', null), true);
+  assert.equal(previewHexIsDrawn('eastern_europe', 'human'), true);
 });
 
 test('preview weather icon follows the start month unless the bonus, inspection, or zoom hides it', () => {

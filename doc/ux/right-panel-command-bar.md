@@ -8,7 +8,7 @@ Show whose turn it is and give the player the buttons that end the turn or start
 
 ## Availability
 
-Shown with the right panel. Ready, Ranged, and the air-strike controls follow the rules below in Strategic planning and Tactical planning. While the tactical battles list is open, the bar stays visible and does not receive pointer input. They are disabled or hidden in New game, Game over, and Tactical annihilation as stated in [modes-and-transitions.md](modes-and-transitions.md).
+Shown with the right panel. Ready, Ranged, and the air-strike controls follow the rules below in Strategic planning and Tactical planning. While the tactical battles list is open, the bar stays visible and does not receive pointer input. In New game and Game over the panel is absent, so these controls are absent with it. In Tactical annihilation they are disabled or hidden as stated in [modes-and-transitions.md](modes-and-transitions.md).
 
 ## Information Displayed
 

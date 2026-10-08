@@ -35,6 +35,22 @@ export function previewHomeBorder(
 }
 
 /**
+ * Reports whether one preview hex's terrain and grid are painted.
+ *
+ * Purpose: The global preview paints home-region terrain and rings, and leaves the rest of the world grid undrawn. A regional preview paints its whole strategic grid.
+ * When to use: Once per hex, after `previewHomeBorder`, to decide whether that hex's terrain and grid are painted. Weather and tech icons are chosen separately.
+ * Expected outcome: False for a global hex in neither home. True for a global home hex, including a shared home, and for every hex of any other map.
+ * Exceptions: None.
+ */
+export function previewHexIsDrawn(
+  gameMapId: string,
+  homeOwnerIdentity: PreviewHomeBorder['homeOwnerIdentity']
+): boolean {
+  if (gameMapId !== 'global') return true;
+  return homeOwnerIdentity != null;
+}
+
+/**
  * Chooses the weather icon for one preview hex, or null when that hex shows none.
  *
  * Purpose: The preview follows the dialog's month and weather bonus, and it does not draw a tech icon while T is held.

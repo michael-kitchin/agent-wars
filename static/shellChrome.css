@@ -129,6 +129,10 @@ body {
   border-left: 1px solid var(--chrome-border);
   overflow: hidden;
 }
+/* Out of the row for the whole time #game-over-overlay is open, including while its form is collapsed. The map pane takes that width. The battle-result dialog is a different element. */
+body:has(#game-over-overlay:not(.hidden)) #sidebar {
+  display: none;
+}
 #sidebar.main-ui-disabled {
   opacity: 0.65;
   transition: opacity 0.15s ease;

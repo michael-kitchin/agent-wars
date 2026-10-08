@@ -8,7 +8,7 @@ Show which units are selected and which drafts are queued, and let the player se
 
 ## Availability
 
-Shown with the right panel. The player can use the lists in Strategic planning and Tactical planning, and they follow the active theater. While the tactical battles list is open, the lists stay visible and do not receive pointer input. See [modes-and-transitions.md](modes-and-transitions.md).
+Shown with the right panel. The player can use the lists in Strategic planning and Tactical planning, and they follow the active theater. While the tactical battles list is open, the lists stay visible and do not receive pointer input. See [modes-and-transitions.md](modes-and-transitions.md). In New game and Game over the panel is absent, so these lists are absent with it.
 
 ## Information Displayed
 

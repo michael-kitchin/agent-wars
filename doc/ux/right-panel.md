@@ -8,7 +8,7 @@ Keep turn status, orders, and the opponent's model controls in one place that st
 
 ## Availability
 
-Shown in every mode. It accepts pointer input in Strategic planning, Tactical planning, and Resolution playback. While the tactical battles list is open, the panel stays visible and does not receive pointer input. In New game and Game over, pointer input on the panel is off. In Tactical annihilation, pointer input on the panel is off except the annihilation dialog, which is not part of this panel.
+Shown in Strategic planning, Tactical planning, Resolution playback, the tactical battles list, and Tactical annihilation. It is not on screen in New game or Game over, including while the new-game form is hidden, and the map fills the window. It accepts pointer input in Strategic planning, Tactical planning, and Resolution playback. While the tactical battles list is open, the panel stays visible and does not receive pointer input. In Tactical annihilation, pointer input on the panel is off except the annihilation dialog, which is not part of this panel.
 
 ## Information Displayed
 
@@ -37,11 +37,13 @@ Shown in every mode. It accepts pointer input in Strategic planning, Tactical pl
 
 - Model tab selected: the Model tab is shown. This is the start state.
 - Tools tab selected: the Tools tab is shown.
-- Pointer input off: New game, Game over, or Tactical annihilation.
+- Absent: New game and Game over, including while the new-game form is hidden. The map fills the window.
+- Pointer input off: the tactical battles list, and Tactical annihilation.
 
 ## Invariants
 
 - The panel is never hidden just because a tactical battle is active.
+- The panel is absent for the whole New game and Game over overlay, and present again as soon as that overlay closes.
 - Only one of the Tools tab and the Model tab is shown at a time.
 
 ## Strategic and Tactical Differences

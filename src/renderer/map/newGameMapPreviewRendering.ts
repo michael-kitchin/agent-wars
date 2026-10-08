@@ -5,7 +5,7 @@ import {
   techInspectionIconAssetPath,
   weatherInspectionIconAssetPath,
 } from '../../shared/inspectionStatusIconLine';
-import { previewHomeBorder, previewTechIcon, previewWeatherIcon } from '../../shared/newGameMapPreviewCore';
+import { previewHexIsDrawn, previewHomeBorder, previewTechIcon, previewWeatherIcon } from '../../shared/newGameMapPreviewCore';
 import type { NewGameMapPreview } from '../../shared/newGameMapPreviewTypes';
 import { TACTICAL_HIDE_THRESHOLD_VIEW_FRACTION, TACTICAL_SHOW_THRESHOLD_VIEW_FRACTION } from '../core/constants';
 import { isMapInspectionModeHeld } from '../gameplay/productionOverlayHelpers';
@@ -129,11 +129,11 @@ export function storeNewGameMapPreview(next: NewGameMapPreview): boolean {
 }
 
 /**
- * Paints the new-game map: terrain, home borders, and weather icons.
+ * Paints the new-game map: terrain, home borders, and weather and tech icons.
  *
  * Purpose: While the overlay is open the canvas shows this instead of the loaded match.
  * When to use: From the scene frame when the overlay is visible.
- * Expected outcome: Nothing when there is no payload for the map on screen or Leaflet is missing. Otherwise every strategic hex is filled unless T is held, home hexes use the ownership rings, weather icons follow the month, and tech icons follow the tech bonus while T is held.
+ * Expected outcome: Nothing when there is no payload for the map on screen or Leaflet is missing. A regional preview fills every strategic hex unless T is held, and strokes the hexes that are not homes. A global preview draws only the selected home regions. Home hexes use the same fills and ownership rings either way. Weather icons follow the month on every strategic hex, and tech icons follow the tech bonus on every strategic hex while T is held. Icons are painted after the hex bodies, so a fill does not cover one.
  * Exceptions: None. A missing map returns without drawing.
  */
 export function drawNewGameMapPreview(ctx: CanvasRenderingContext2D, requestRedraw: () => void): void {
@@ -153,35 +153,38 @@ export function drawNewGameMapPreview(ctx: CanvasRenderingContext2D, requestRedr
   const startMonth = readNewGameStartMonth();
   const humanHomes = new Set(payload.humanHomeRegionHexes);
   const aiHomes = new Set(payload.aiHomeRegionHexes);
+  const icons: StatusIconPlacement[] = [];
   for (const hex of payload.hexes) {
+    const border = previewHomeBorder(hex.h3Index, humanHomes, aiHomes);
     const pts = projectHexBoundaryToContainerPoints(hex.h3Index, map, leaflet);
     if (pts.length === 0) continue;
-    const drawClosedPath = (): void => {
-      ctx.beginPath();
-      for (let i = 0; i < pts.length; i++) {
-        const point = pts[i]!;
-        if (i === 0) ctx.moveTo(point.x, point.y);
-        else ctx.lineTo(point.x, point.y);
+    if (previewHexIsDrawn(payload.gameMapId, border.homeOwnerIdentity)) {
+      const drawClosedPath = (): void => {
+        ctx.beginPath();
+        for (let i = 0; i < pts.length; i++) {
+          const point = pts[i]!;
+          if (i === 0) ctx.moveTo(point.x, point.y);
+          else ctx.lineTo(point.x, point.y);
+        }
+        ctx.closePath();
+      };
+      if (!inspectionHeld) fillHexTerrain(ctx, hex.terrainKind, drawClosedPath);
+      if (border.homeOwnerIdentity == null) {
+        ctx.strokeStyle = stroke.color;
+        ctx.lineWidth = stroke.width * zoomStrokeScale;
+        drawClosedPath();
+        ctx.stroke();
+      } else {
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0)';
+        ctx.lineWidth = stroke.width * zoomStrokeScale;
+        drawClosedPath();
+        ctx.stroke();
+        drawOutlinedHomeRegionOwnershipBorders(ctx, pts, {
+          controllerPlayerId: border.controllerPlayerId,
+          homeOwnerIdentity: border.homeOwnerIdentity,
+          ownershipLineWidth,
+        });
       }
-      ctx.closePath();
-    };
-    if (!inspectionHeld) fillHexTerrain(ctx, hex.terrainKind, drawClosedPath);
-    const border = previewHomeBorder(hex.h3Index, humanHomes, aiHomes);
-    if (border.homeOwnerIdentity == null) {
-      ctx.strokeStyle = stroke.color;
-      ctx.lineWidth = stroke.width * zoomStrokeScale;
-      drawClosedPath();
-      ctx.stroke();
-    } else {
-      ctx.strokeStyle = 'rgba(0, 0, 0, 0)';
-      ctx.lineWidth = stroke.width * zoomStrokeScale;
-      drawClosedPath();
-      ctx.stroke();
-      drawOutlinedHomeRegionOwnershipBorders(ctx, pts, {
-        controllerPlayerId: border.controllerPlayerId,
-        homeOwnerIdentity: border.homeOwnerIdentity,
-        ownershipLineWidth,
-      });
     }
     const weather = previewWeatherIcon({
       weatherBonusLevel,
@@ -202,9 +205,9 @@ export function drawNewGameMapPreview(ctx: CanvasRenderingContext2D, requestRedr
       : weather
         ? weatherInspectionIconAssetPath(weather)
         : null;
-    if (!assetPath) continue;
-    drawPlacedStatusIcon(ctx, statusIconPlacement(pts, assetPath), requestRedraw);
+    if (assetPath) icons.push(statusIconPlacement(pts, assetPath));
   }
+  for (const icon of icons) drawPlacedStatusIcon(ctx, icon, requestRedraw);
 }
 
 /**

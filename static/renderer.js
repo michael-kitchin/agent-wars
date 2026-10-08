@@ -23111,6 +23111,10 @@ ${body}`;
     if (inAi) return { controllerPlayerId: "opponent", homeOwnerIdentity: "opponent" };
     return { controllerPlayerId: null, homeOwnerIdentity: null };
   }
+  function previewHexIsDrawn(gameMapId, homeOwnerIdentity) {
+    if (gameMapId !== "global") return true;
+    return homeOwnerIdentity != null;
+  }
   function previewWeatherIcon(input) {
     if (input.tacticalZoom || input.mapInspectionHeld || input.weatherBonusLevel === "off") return null;
     if (input.weatherByMonth.length !== 12) return null;
@@ -24083,35 +24087,38 @@ ${body}`;
     const startMonth = readNewGameStartMonth();
     const humanHomes = new Set(payload.humanHomeRegionHexes);
     const aiHomes = new Set(payload.aiHomeRegionHexes);
+    const icons = [];
     for (const hex of payload.hexes) {
+      const border = previewHomeBorder(hex.h3Index, humanHomes, aiHomes);
       const pts = projectHexBoundaryToContainerPoints(hex.h3Index, map, leaflet);
       if (pts.length === 0) continue;
-      const drawClosedPath = () => {
-        ctx.beginPath();
-        for (let i = 0; i < pts.length; i++) {
-          const point = pts[i];
-          if (i === 0) ctx.moveTo(point.x, point.y);
-          else ctx.lineTo(point.x, point.y);
+      if (previewHexIsDrawn(payload.gameMapId, border.homeOwnerIdentity)) {
+        const drawClosedPath = () => {
+          ctx.beginPath();
+          for (let i = 0; i < pts.length; i++) {
+            const point = pts[i];
+            if (i === 0) ctx.moveTo(point.x, point.y);
+            else ctx.lineTo(point.x, point.y);
+          }
+          ctx.closePath();
+        };
+        if (!inspectionHeld) fillHexTerrain(ctx, hex.terrainKind, drawClosedPath);
+        if (border.homeOwnerIdentity == null) {
+          ctx.strokeStyle = stroke.color;
+          ctx.lineWidth = stroke.width * zoomStrokeScale;
+          drawClosedPath();
+          ctx.stroke();
+        } else {
+          ctx.strokeStyle = "rgba(0, 0, 0, 0)";
+          ctx.lineWidth = stroke.width * zoomStrokeScale;
+          drawClosedPath();
+          ctx.stroke();
+          drawOutlinedHomeRegionOwnershipBorders(ctx, pts, {
+            controllerPlayerId: border.controllerPlayerId,
+            homeOwnerIdentity: border.homeOwnerIdentity,
+            ownershipLineWidth
+          });
         }
-        ctx.closePath();
-      };
-      if (!inspectionHeld) fillHexTerrain(ctx, hex.terrainKind, drawClosedPath);
-      const border = previewHomeBorder(hex.h3Index, humanHomes, aiHomes);
-      if (border.homeOwnerIdentity == null) {
-        ctx.strokeStyle = stroke.color;
-        ctx.lineWidth = stroke.width * zoomStrokeScale;
-        drawClosedPath();
-        ctx.stroke();
-      } else {
-        ctx.strokeStyle = "rgba(0, 0, 0, 0)";
-        ctx.lineWidth = stroke.width * zoomStrokeScale;
-        drawClosedPath();
-        ctx.stroke();
-        drawOutlinedHomeRegionOwnershipBorders(ctx, pts, {
-          controllerPlayerId: border.controllerPlayerId,
-          homeOwnerIdentity: border.homeOwnerIdentity,
-          ownershipLineWidth
-        });
       }
       const weather = previewWeatherIcon({
         weatherBonusLevel,
@@ -24128,9 +24135,9 @@ ${body}`;
         tacticalZoom
       });
       const assetPath = tech ? techInspectionIconAssetPath(tech) : weather ? weatherInspectionIconAssetPath(weather) : null;
-      if (!assetPath) continue;
-      drawPlacedStatusIcon(ctx, statusIconPlacement(pts, assetPath), requestRedraw3);
+      if (assetPath) icons.push(statusIconPlacement(pts, assetPath));
     }
+    for (const icon of icons) drawPlacedStatusIcon(ctx, icon, requestRedraw3);
   }
   function previewAtBattleDetailZoom(map, leaflet, preview) {
     const fraction = previewStrategicFillFraction(map, leaflet, preview);
@@ -24236,7 +24243,10 @@ ${body}`;
       if (serial !== requestSerial || !newGameOverlayOpen() || mapCameraHeldForStart) return;
       if (!storeNewGameMapPreview(preview)) return;
       const key = extentKey(preview.extent);
-      if (key !== framedExtentKey && applyLoadedMapExtent(preview.extent, true)) framedExtentKey = key;
+      if (key !== framedExtentKey && applyLoadedMapExtent(preview.extent, true)) {
+        framedExtentKey = key;
+        if (preview.gameMapId === "global") zoomGlobalPreviewInOneLevel();
+      }
       repaintNewGameMapPreview();
     } catch (err) {
       if (serial !== requestSerial) return;
@@ -24268,6 +24278,11 @@ ${body}`;
   function selectValue(id) {
     const select = document.getElementById(id);
     return select?.value ?? "";
+  }
+  function zoomGlobalPreviewInOneLevel() {
+    const map = getMainLeafletMap();
+    if (!map) return;
+    map.setZoom(map.getZoom() + 1);
   }
   function newGameOverlayOpen() {
     const overlay = document.getElementById("game-over-overlay");
@@ -24465,6 +24480,273 @@ ${body}`;
     syncGameSizeCapPreview();
   }
 
+  // src/renderer/chrome/controlTooltip.ts
+  var controlTooltipAttr = "data-control-tooltip";
+  var controlTooltipElementId = "control-tooltip";
+  var installed = false;
+  var delayTimer = null;
+  var currentHost = null;
+  var pointerInside = false;
+  var placeFromPointer = false;
+  var suppressedHost = null;
+  var lastClientX = 0;
+  var lastClientY = 0;
+  function tipElement() {
+    return document.getElementById(controlTooltipElementId);
+  }
+  function clearDelayTimer() {
+    if (delayTimer !== null) {
+      clearTimeout(delayTimer);
+      delayTimer = null;
+    }
+  }
+  function hideTip() {
+    clearDelayTimer();
+    const el = tipElement();
+    if (!el) return;
+    el.classList.add("hidden");
+    el.setAttribute("aria-hidden", "true");
+    el.textContent = "";
+  }
+  function orderTipVisible() {
+    for (const id of ["order-block-tooltip", "order-slower-tooltip"]) {
+      const el = document.getElementById(id);
+      if (el && !el.classList.contains("hidden")) return true;
+    }
+    return false;
+  }
+  function hostFromTarget(target) {
+    if (!(target instanceof Element)) return null;
+    const closest = target.closest(`[${controlTooltipAttr}]`);
+    if (closest instanceof HTMLElement) return closest;
+    if (target instanceof HTMLLabelElement && target.htmlFor) {
+      const linked = document.getElementById(target.htmlFor);
+      if (linked instanceof HTMLElement && linked.hasAttribute(controlTooltipAttr)) return linked;
+    }
+    const label = target.closest("label");
+    const descendant = label?.querySelector(`[${controlTooltipAttr}]`);
+    return descendant instanceof HTMLElement ? descendant : null;
+  }
+  function hostText(host) {
+    return (host.getAttribute(controlTooltipAttr) ?? "").trim();
+  }
+  function keyOpensNativeList(ev) {
+    if (ev.key === " " || ev.key === "Spacebar" || ev.key === "Enter") return true;
+    if (ev.key === "ArrowDown" && ev.altKey) return true;
+    if (ev.key === "ArrowDown" || ev.key === "ArrowUp") return true;
+    return false;
+  }
+  function selectForTip(target) {
+    if (!(target instanceof Element)) return null;
+    const select = target instanceof HTMLSelectElement ? target : target.closest("select");
+    if (!(select instanceof HTMLSelectElement)) return null;
+    return hostFromTarget(select) ? select : null;
+  }
+  function showTip(host, text) {
+    const el = tipElement();
+    if (!el) return;
+    clearTerrainTooltipTimer();
+    hideTerrainTooltipVisual();
+    let x = lastClientX;
+    let y = lastClientY;
+    if (!placeFromPointer) {
+      const rect = host.getBoundingClientRect();
+      x = rect.left;
+      y = rect.top;
+    }
+    el.textContent = text;
+    el.style.left = `${x + TOOLTIP_OFFSET_PX}px`;
+    el.style.top = `${y + TOOLTIP_OFFSET_PX}px`;
+    el.classList.remove("hidden");
+    el.setAttribute("aria-hidden", "false");
+    el.setAttribute("role", "tooltip");
+  }
+  function scheduleShow(host) {
+    clearDelayTimer();
+    if (suppressedHost === host) return;
+    const text = hostText(host);
+    if (!text) {
+      hideTip();
+      return;
+    }
+    delayTimer = setTimeout(() => {
+      delayTimer = null;
+      if (currentHost !== host || suppressedHost === host || !hostIsAvailable(host)) return;
+      if (orderTipVisible()) return;
+      const next = hostText(host);
+      if (!next) {
+        hideTip();
+        return;
+      }
+      showTip(host, next);
+    }, HEX_DETAILS_TOOLTIP_DELAY_MS);
+  }
+  function suppressHost(host) {
+    suppressedHost = host;
+    hideTip();
+  }
+  function adoptHost(host, fromPointer, clientX, clientY) {
+    if (fromPointer && host === currentHost) {
+      pointerInside = true;
+      placeFromPointer = true;
+      lastClientX = clientX;
+      lastClientY = clientY;
+      moveVisibleTip(lastClientX, lastClientY);
+      return;
+    }
+    if (!fromPointer && host === currentHost) return;
+    if (currentHost !== host) {
+      hideTip();
+      suppressedHost = null;
+    }
+    currentHost = host;
+    if (fromPointer) {
+      pointerInside = true;
+      placeFromPointer = true;
+      lastClientX = clientX;
+      lastClientY = clientY;
+    } else {
+      pointerInside = pointerIsOn(host);
+      placeFromPointer = pointerInside;
+    }
+    if (suppressedHost === host) return;
+    scheduleShow(host);
+  }
+  function releaseHost(host) {
+    if (suppressedHost === host) suppressedHost = null;
+    if (currentHost !== host) return;
+    pointerInside = false;
+    currentHost = null;
+    hideTip();
+  }
+  function relatedStaysInside(host, related) {
+    if (!(related instanceof Element)) return false;
+    const next = hostFromTarget(related);
+    if (next === host) return true;
+    if (next) return false;
+    return related === host || host.contains(related);
+  }
+  function pointerIsOn(host) {
+    return host.matches(":hover");
+  }
+  function focusIsOn(host) {
+    const active2 = document.activeElement;
+    if (!(active2 instanceof Element) || active2.closest(".hidden")) return false;
+    return active2 === host || host.contains(active2) || hostFromTarget(active2) === host;
+  }
+  function hostIsAvailable(host) {
+    if (!host.isConnected || host.getClientRects().length === 0) return false;
+    const controls = host.matches("button, input, select, textarea") ? [host] : Array.from(host.querySelectorAll("button, input, select, textarea"));
+    if (controls.length === 0) return true;
+    return controls.some((control) => control.getClientRects().length > 0);
+  }
+  function dismissStaleControlTooltip() {
+    if (currentHost && !hostIsAvailable(currentHost)) releaseHost(currentHost);
+  }
+  function moveVisibleTip(clientX, clientY) {
+    const el = tipElement();
+    if (!el || el.classList.contains("hidden")) return;
+    el.style.left = `${clientX + TOOLTIP_OFFSET_PX}px`;
+    el.style.top = `${clientY + TOOLTIP_OFFSET_PX}px`;
+  }
+  function installControlTooltip() {
+    if (installed) return;
+    installed = true;
+    document.addEventListener(
+      "pointerover",
+      (ev) => {
+        const host = hostFromTarget(ev.target);
+        if (!host) return;
+        adoptHost(host, true, ev.clientX, ev.clientY);
+      },
+      true
+    );
+    document.addEventListener(
+      "pointerout",
+      (ev) => {
+        const host = hostFromTarget(ev.target);
+        if (!host || relatedStaysInside(host, ev.relatedTarget)) return;
+        releaseHost(host);
+      },
+      true
+    );
+    document.addEventListener(
+      "pointermove",
+      (ev) => {
+        const host = hostFromTarget(ev.target);
+        if (orderTipVisible()) {
+          if (currentHost) releaseHost(currentHost);
+          return;
+        }
+        if (currentHost && !hostIsAvailable(currentHost)) releaseHost(currentHost);
+        if (host && host !== currentHost) {
+          adoptHost(host, true, ev.clientX, ev.clientY);
+          return;
+        }
+        if (currentHost && host !== currentHost && !pointerIsOn(currentHost) && !focusIsOn(currentHost)) {
+          releaseHost(currentHost);
+        }
+        if (!host || host !== currentHost) return;
+        lastClientX = ev.clientX;
+        lastClientY = ev.clientY;
+        placeFromPointer = true;
+        pointerInside = true;
+        moveVisibleTip(lastClientX, lastClientY);
+      },
+      true
+    );
+    document.addEventListener(
+      "pointerdown",
+      (ev) => {
+        const select = selectForTip(ev.target);
+        if (!select) return;
+        const host = hostFromTarget(select);
+        if (host) suppressHost(host);
+      },
+      true
+    );
+    document.addEventListener(
+      "keydown",
+      (ev) => {
+        if (!keyOpensNativeList(ev)) return;
+        const select = selectForTip(ev.target);
+        if (!select) return;
+        const host = hostFromTarget(select);
+        if (host) suppressHost(host);
+      },
+      true
+    );
+    document.addEventListener(
+      "change",
+      (ev) => {
+        const select = selectForTip(ev.target);
+        if (!select) return;
+        const host = hostFromTarget(select);
+        if (host) suppressHost(host);
+      },
+      true
+    );
+    document.addEventListener(
+      "focusin",
+      (ev) => {
+        const host = hostFromTarget(ev.target);
+        if (!host) return;
+        adoptHost(host, false, lastClientX, lastClientY);
+      },
+      true
+    );
+    document.addEventListener(
+      "focusout",
+      (ev) => {
+        const host = hostFromTarget(ev.target);
+        if (!host || relatedStaysInside(host, ev.relatedTarget)) return;
+        if (pointerInside && currentHost === host) return;
+        releaseHost(host);
+      },
+      true
+    );
+  }
+
   // src/renderer/gameplay/newGameDialogCollapse.ts
   var COLLAPSED_CLASS = "game-over-dialog-collapsed";
   var EXPANDED_LABEL = "Hide the new game choices";
@@ -24570,8 +24852,11 @@ ${body}`;
   }
   function blurMapChromeIfFocused() {
     const active2 = document.activeElement;
-    if (!(active2 instanceof HTMLElement)) return;
-    if (active2.closest("#minimap") != null || active2.closest("#terrain-legend") != null) active2.blur();
+    if (active2 instanceof HTMLElement) {
+      const insideHiddenChrome = active2.closest("#minimap") != null || active2.closest("#terrain-legend") != null || active2.closest("#sidebar") != null;
+      if (insideHiddenChrome) active2.blur();
+    }
+    dismissStaleControlTooltip();
   }
   function setMainUIControlsEnabled(enabled) {
     const container = document.getElementById("canvas-container");
@@ -24603,7 +24888,7 @@ ${body}`;
       setMainUIControlsEnabled(true);
       if (rangedBtn) rangedBtn.disabled = false;
       updateReadyButtonState2();
-      return;
+      return overlay != null && wasHidden === false;
     }
     overlay?.classList.remove("hidden");
     resetNewGameOptionControls();
@@ -24634,6 +24919,7 @@ ${body}`;
     }
     if (rangedBtn) rangedBtn.disabled = true;
     updateReadyButtonState2();
+    return overlay != null && wasHidden === true;
   }
 
   // src/shared/resolutionPlaybackPhase.ts
@@ -25375,273 +25661,6 @@ ${body}`;
         console.error("resolutionPlaybackDeferral: notify callback failed", err);
       }
     }
-  }
-
-  // src/renderer/chrome/controlTooltip.ts
-  var controlTooltipAttr = "data-control-tooltip";
-  var controlTooltipElementId = "control-tooltip";
-  var installed = false;
-  var delayTimer = null;
-  var currentHost = null;
-  var pointerInside = false;
-  var placeFromPointer = false;
-  var suppressedHost = null;
-  var lastClientX = 0;
-  var lastClientY = 0;
-  function tipElement() {
-    return document.getElementById(controlTooltipElementId);
-  }
-  function clearDelayTimer() {
-    if (delayTimer !== null) {
-      clearTimeout(delayTimer);
-      delayTimer = null;
-    }
-  }
-  function hideTip() {
-    clearDelayTimer();
-    const el = tipElement();
-    if (!el) return;
-    el.classList.add("hidden");
-    el.setAttribute("aria-hidden", "true");
-    el.textContent = "";
-  }
-  function orderTipVisible() {
-    for (const id of ["order-block-tooltip", "order-slower-tooltip"]) {
-      const el = document.getElementById(id);
-      if (el && !el.classList.contains("hidden")) return true;
-    }
-    return false;
-  }
-  function hostFromTarget(target) {
-    if (!(target instanceof Element)) return null;
-    const closest = target.closest(`[${controlTooltipAttr}]`);
-    if (closest instanceof HTMLElement) return closest;
-    if (target instanceof HTMLLabelElement && target.htmlFor) {
-      const linked = document.getElementById(target.htmlFor);
-      if (linked instanceof HTMLElement && linked.hasAttribute(controlTooltipAttr)) return linked;
-    }
-    const label = target.closest("label");
-    const descendant = label?.querySelector(`[${controlTooltipAttr}]`);
-    return descendant instanceof HTMLElement ? descendant : null;
-  }
-  function hostText(host) {
-    return (host.getAttribute(controlTooltipAttr) ?? "").trim();
-  }
-  function keyOpensNativeList(ev) {
-    if (ev.key === " " || ev.key === "Spacebar" || ev.key === "Enter") return true;
-    if (ev.key === "ArrowDown" && ev.altKey) return true;
-    if (ev.key === "ArrowDown" || ev.key === "ArrowUp") return true;
-    return false;
-  }
-  function selectForTip(target) {
-    if (!(target instanceof Element)) return null;
-    const select = target instanceof HTMLSelectElement ? target : target.closest("select");
-    if (!(select instanceof HTMLSelectElement)) return null;
-    return hostFromTarget(select) ? select : null;
-  }
-  function showTip(host, text) {
-    const el = tipElement();
-    if (!el) return;
-    clearTerrainTooltipTimer();
-    hideTerrainTooltipVisual();
-    let x = lastClientX;
-    let y = lastClientY;
-    if (!placeFromPointer) {
-      const rect = host.getBoundingClientRect();
-      x = rect.left;
-      y = rect.top;
-    }
-    el.textContent = text;
-    el.style.left = `${x + TOOLTIP_OFFSET_PX}px`;
-    el.style.top = `${y + TOOLTIP_OFFSET_PX}px`;
-    el.classList.remove("hidden");
-    el.setAttribute("aria-hidden", "false");
-    el.setAttribute("role", "tooltip");
-  }
-  function scheduleShow(host) {
-    clearDelayTimer();
-    if (suppressedHost === host) return;
-    const text = hostText(host);
-    if (!text) {
-      hideTip();
-      return;
-    }
-    delayTimer = setTimeout(() => {
-      delayTimer = null;
-      if (currentHost !== host || suppressedHost === host || !hostIsAvailable(host)) return;
-      if (orderTipVisible()) return;
-      const next = hostText(host);
-      if (!next) {
-        hideTip();
-        return;
-      }
-      showTip(host, next);
-    }, HEX_DETAILS_TOOLTIP_DELAY_MS);
-  }
-  function suppressHost(host) {
-    suppressedHost = host;
-    hideTip();
-  }
-  function adoptHost(host, fromPointer, clientX, clientY) {
-    if (fromPointer && host === currentHost) {
-      pointerInside = true;
-      placeFromPointer = true;
-      lastClientX = clientX;
-      lastClientY = clientY;
-      moveVisibleTip(lastClientX, lastClientY);
-      return;
-    }
-    if (!fromPointer && host === currentHost) return;
-    if (currentHost !== host) {
-      hideTip();
-      suppressedHost = null;
-    }
-    currentHost = host;
-    if (fromPointer) {
-      pointerInside = true;
-      placeFromPointer = true;
-      lastClientX = clientX;
-      lastClientY = clientY;
-    } else {
-      pointerInside = pointerIsOn(host);
-      placeFromPointer = pointerInside;
-    }
-    if (suppressedHost === host) return;
-    scheduleShow(host);
-  }
-  function releaseHost(host) {
-    if (suppressedHost === host) suppressedHost = null;
-    if (currentHost !== host) return;
-    pointerInside = false;
-    currentHost = null;
-    hideTip();
-  }
-  function relatedStaysInside(host, related) {
-    if (!(related instanceof Element)) return false;
-    const next = hostFromTarget(related);
-    if (next === host) return true;
-    if (next) return false;
-    return related === host || host.contains(related);
-  }
-  function pointerIsOn(host) {
-    return host.matches(":hover");
-  }
-  function focusIsOn(host) {
-    const active2 = document.activeElement;
-    if (!(active2 instanceof Element) || active2.closest(".hidden")) return false;
-    return active2 === host || host.contains(active2) || hostFromTarget(active2) === host;
-  }
-  function hostIsAvailable(host) {
-    if (!host.isConnected || host.getClientRects().length === 0) return false;
-    const controls = host.matches("button, input, select, textarea") ? [host] : Array.from(host.querySelectorAll("button, input, select, textarea"));
-    if (controls.length === 0) return true;
-    return controls.some((control) => control.getClientRects().length > 0);
-  }
-  function dismissStaleControlTooltip() {
-    if (currentHost && !hostIsAvailable(currentHost)) releaseHost(currentHost);
-  }
-  function moveVisibleTip(clientX, clientY) {
-    const el = tipElement();
-    if (!el || el.classList.contains("hidden")) return;
-    el.style.left = `${clientX + TOOLTIP_OFFSET_PX}px`;
-    el.style.top = `${clientY + TOOLTIP_OFFSET_PX}px`;
-  }
-  function installControlTooltip() {
-    if (installed) return;
-    installed = true;
-    document.addEventListener(
-      "pointerover",
-      (ev) => {
-        const host = hostFromTarget(ev.target);
-        if (!host) return;
-        adoptHost(host, true, ev.clientX, ev.clientY);
-      },
-      true
-    );
-    document.addEventListener(
-      "pointerout",
-      (ev) => {
-        const host = hostFromTarget(ev.target);
-        if (!host || relatedStaysInside(host, ev.relatedTarget)) return;
-        releaseHost(host);
-      },
-      true
-    );
-    document.addEventListener(
-      "pointermove",
-      (ev) => {
-        const host = hostFromTarget(ev.target);
-        if (orderTipVisible()) {
-          if (currentHost) releaseHost(currentHost);
-          return;
-        }
-        if (currentHost && !hostIsAvailable(currentHost)) releaseHost(currentHost);
-        if (host && host !== currentHost) {
-          adoptHost(host, true, ev.clientX, ev.clientY);
-          return;
-        }
-        if (currentHost && host !== currentHost && !pointerIsOn(currentHost) && !focusIsOn(currentHost)) {
-          releaseHost(currentHost);
-        }
-        if (!host || host !== currentHost) return;
-        lastClientX = ev.clientX;
-        lastClientY = ev.clientY;
-        placeFromPointer = true;
-        pointerInside = true;
-        moveVisibleTip(lastClientX, lastClientY);
-      },
-      true
-    );
-    document.addEventListener(
-      "pointerdown",
-      (ev) => {
-        const select = selectForTip(ev.target);
-        if (!select) return;
-        const host = hostFromTarget(select);
-        if (host) suppressHost(host);
-      },
-      true
-    );
-    document.addEventListener(
-      "keydown",
-      (ev) => {
-        if (!keyOpensNativeList(ev)) return;
-        const select = selectForTip(ev.target);
-        if (!select) return;
-        const host = hostFromTarget(select);
-        if (host) suppressHost(host);
-      },
-      true
-    );
-    document.addEventListener(
-      "change",
-      (ev) => {
-        const select = selectForTip(ev.target);
-        if (!select) return;
-        const host = hostFromTarget(select);
-        if (host) suppressHost(host);
-      },
-      true
-    );
-    document.addEventListener(
-      "focusin",
-      (ev) => {
-        const host = hostFromTarget(ev.target);
-        if (!host) return;
-        adoptHost(host, false, lastClientX, lastClientY);
-      },
-      true
-    );
-    document.addEventListener(
-      "focusout",
-      (ev) => {
-        const host = hostFromTarget(ev.target);
-        if (!host || relatedStaysInside(host, ev.relatedTarget)) return;
-        if (pointerInside && currentHost === host) return;
-        releaseHost(host);
-      },
-      true
-    );
   }
 
   // src/renderer/tactical/tacticalExitButtonDom.ts
@@ -29402,6 +29421,7 @@ ${body}`;
         rendererSharedState.lastRenderedVisibleEnemyByUnitId.clear();
         deps.updateClientStaleEnemyIntel(null, state);
         rendererSharedState.initialCameraApplied = false;
+        deps.updateGameOverUI(state);
         syncMapExtentToSnapshot(state, { refit: true });
         if (state.hexes.length > 0) {
           deps.applyInitialCameraForState(state);
@@ -29429,7 +29449,6 @@ ${body}`;
         deps.updatePendingOrdersSidebar();
         deps.updateRangedSidebar();
         deps.updateSidebar();
-        deps.updateGameOverUI(state);
         deps.updateReadyButtonState();
         if (rendererSharedState.runButtonOn) deps.startBackgroundRequestIfAllowed();
         deps.resizeAndRedraw();
@@ -29441,7 +29460,7 @@ ${body}`;
     });
   }
   function openNewGameOverlayFromModelTab(setMainUIControlsEnabled2, updateReadyButtonState2) {
-    if (rendererSharedState.tacticalBattleSnapshot != null || rendererSharedState.resolutionMoveAnimation != null) return;
+    if (rendererSharedState.tacticalBattleSnapshot != null || rendererSharedState.resolutionMoveAnimation != null) return false;
     window.gameApi?.cancelRequestAiOrders?.();
     resetPrecomputedAiState("null");
     rendererSharedState.pendingDeferredStrategicPostResolutionConsult = false;
@@ -29466,6 +29485,7 @@ ${body}`;
       await refreshNewGameMapPreview();
     })();
     syncGameSizeCapPreview();
+    const opened = overlay?.classList.contains("hidden") === true;
     overlay?.classList.remove("hidden");
     expandNewGameDialog();
     blurMapChromeIfFocused();
@@ -29473,6 +29493,7 @@ ${body}`;
     repaintNewGameMapPreview();
     setMainUIControlsEnabled2(false);
     updateReadyButtonState2();
+    return opened;
   }
   async function refreshHumanStandingOrders2() {
     if (!window.gameApi?.listHumanStandingOrders) {
@@ -32096,10 +32117,12 @@ ${body}`;
     return updateSidebar(getPrimarySelectedUnitId, formatUnitDisplayName2);
   }
   function updateGameOverUI2(state) {
-    return updateGameOverUI(state, updateReadyButtonState);
+    const visibilityChanged = updateGameOverUI(state, updateReadyButtonState);
+    if (visibilityChanged) resizeAndRedraw();
   }
   function openNewGameOverlayFromModelTab2() {
-    return openNewGameOverlayFromModelTab(setMainUIControlsEnabled, updateReadyButtonState);
+    const visibilityChanged = openNewGameOverlayFromModelTab(setMainUIControlsEnabled, updateReadyButtonState);
+    if (visibilityChanged) resizeAndRedraw();
   }
   function applySelectionFromSidebarUnitButton2(unitId, event) {
     return applySelectionFromSidebarUnitButton(unitId, event, {

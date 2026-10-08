@@ -1,6 +1,7 @@
 import type { MapExtentBox } from '../../shared/mapExtent';
 import type { NewGameMapPreviewRequest } from '../../shared/newGameMapPreviewTypes';
 import { applyLoadedMapExtent } from '../map/mapExtent';
+import { getMainLeafletMap } from '../map/worldLeafletMap';
 import {
   noteNewGameMapPreviewRequest,
   repaintNewGameMapPreview,
@@ -126,7 +127,7 @@ export function releaseNewGameMapPreviewCamera(holdSerial: number): boolean {
  *
  * Purpose: Opening the dialog, changing a tab, or changing a home area must frame that map and paint its grid.
  * When to use: After those controls settle. Month and weather-bonus changes call `repaintNewGameMapPreview` instead.
- * Expected outcome: The camera fits when the extent changes or the dialog has just opened. A home change on the same extent only repaints. A regional choice with a missing id paints nothing and does not call IPC. A failure logs and leaves a same-map payload in place. A response that arrives after the dialog closes, or while Start holds the camera, does not move the match.
+ * Expected outcome: The camera fits when the extent changes or the dialog has just opened. A global fit then zooms in one level, still centered on that fit. A home change on the same extent only repaints. A regional choice with a missing id paints nothing and does not call IPC. A failure logs and leaves a same-map payload in place. A response that arrives after the dialog closes, or while Start holds the camera, does not move the match.
  * Exceptions: None. IPC failures are logged.
  */
 export async function refreshNewGameMapPreview(): Promise<void> {
@@ -148,7 +149,10 @@ export async function refreshNewGameMapPreview(): Promise<void> {
     if (serial !== requestSerial || !newGameOverlayOpen() || mapCameraHeldForStart) return;
     if (!storeNewGameMapPreview(preview)) return;
     const key = extentKey(preview.extent);
-    if (key !== framedExtentKey && applyLoadedMapExtent(preview.extent, true)) framedExtentKey = key;
+    if (key !== framedExtentKey && applyLoadedMapExtent(preview.extent, true)) {
+      framedExtentKey = key;
+      if (preview.gameMapId === 'global') zoomGlobalPreviewInOneLevel();
+    }
     repaintNewGameMapPreview();
   } catch (err) {
     if (serial !== requestSerial) return;
@@ -198,6 +202,20 @@ function readPreviewDialogRequest(): PreviewDialogRequest | null {
 function selectValue(id: string): string {
   const select = document.getElementById(id) as HTMLSelectElement | null;
   return select?.value ?? '';
+}
+
+/**
+ * Moves the global preview one zoom level closer than the world fit.
+ *
+ * Purpose: The world fit shows the whole Mercator map. The global preview starts one level closer and stays centered on that fit.
+ * When to use: Immediately after a global preview extent is applied with fit. Not after a home change, and not for a regional preview.
+ * Expected outcome: Nothing when the main map is missing. Otherwise its zoom increases by one. Leaflet keeps the center and stops at the map's maximum.
+ * Exceptions: None.
+ */
+function zoomGlobalPreviewInOneLevel(): void {
+  const map = getMainLeafletMap();
+  if (!map) return;
+  map.setZoom(map.getZoom() + 1);
 }
 
 /**

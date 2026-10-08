@@ -8,7 +8,7 @@ Let the player connect a model, start or stop opponent planning, and open a new 
 
 ## Availability
 
-Shown when the Model tab is selected. This is the tab the panel starts on. The model description tooltip can appear while this tab's model dropdown is in use. While the tactical battles list is open, the tab stays visible and does not receive pointer input.
+Shown when the Model tab is selected. This is the tab the panel starts on. The model description tooltip can appear while this tab's model dropdown is in use. While the tactical battles list is open, the tab stays visible and does not receive pointer input. In New game and Game over the panel is absent, so this tab is absent with it.
 
 ## Information Displayed
 

@@ -261,8 +261,10 @@ setMainUIControlsEnabled: (enabled: boolean) => void;
  * When to use: Once at renderer startup.
  * Expected outcome: The randomize buttons, game-size preview, and bonus-line separators are live. Clicking Start sends
  *   fog, the four bonus levels, the starting month, home regions, and game size to `newGame`, then reloads the map,
- *   sidebars, and overlay from the returned state. Start fits the loaded extent, then zooms one level toward human infantry and armor, or any human units when those are absent.
- *   While that attempt runs, a preview reply cannot move the camera. Failures are logged to the console and the dialog's map is framed again.
+ *   sidebars, and overlay from the returned state. The overlay closes, and the map is resized beside the right panel,
+ *   before the loaded extent is fit. Start then zooms one level toward human infantry and armor, or any human units
+ *   when those are absent. While that attempt runs, a preview reply cannot move the camera. Failures are logged to
+ *   the console and the dialog's map is framed again.
  * Exceptions: None; click handler errors are caught.
  */
 export function registerNewGameButton(deps: NewGameDeps): void {
@@ -303,6 +305,7 @@ export function registerNewGameButton(deps: NewGameDeps): void {
       S.lastRenderedVisibleEnemyByUnitId.clear();
       deps.updateClientStaleEnemyIntel(null, state);
       S.initialCameraApplied = false;
+      deps.updateGameOverUI(state);
       syncMapExtentToSnapshot(state, { refit: true });
       if (state.hexes.length > 0) {
         deps.applyInitialCameraForState(state);
@@ -330,7 +333,6 @@ export function registerNewGameButton(deps: NewGameDeps): void {
       deps.updatePendingOrdersSidebar();
       deps.updateRangedSidebar();
       deps.updateSidebar();
-      deps.updateGameOverUI(state);
       deps.updateReadyButtonState();
       if (S.runButtonOn) deps.startBackgroundRequestIfAllowed();
       deps.resizeAndRedraw();
@@ -347,13 +349,15 @@ export function registerNewGameButton(deps: NewGameDeps): void {
  *
  * Purpose: Lets the player abandon the current match; stops pending AI work first so it cannot land on the new one.
  * When to use: The Model tab's New game button.
- * Expected outcome: During a battle or resolution playback the click returns without cancelling planning, showing
- *   the overlay, or disabling the map. Otherwise AI requests are cancelled, Fog of war and the bonus dropdowns
- *   return to their defaults, the home regions, starting month, and map preview are drawn again, the form starts showing, and the new-game overlay opens.
+ * Expected outcome: Returns false when a battle or playback is active, or when the overlay was already open or
+ *   missing, and in the battle and playback case does nothing else. Otherwise AI requests are cancelled, Fog of war
+ *   and the bonus dropdowns return to their defaults, the home regions, starting month, and map preview are drawn
+ *   again, the form starts showing, and the overlay opens. Returns true only when this call removes `hidden` from
+ *   `#game-over-overlay`.
  * Exceptions: None.
  */
-export function openNewGameOverlayFromModelTab(setMainUIControlsEnabled: (enabled: boolean) => void, updateReadyButtonState: () => void): void {
-  if (S.tacticalBattleSnapshot != null || S.resolutionMoveAnimation != null) return;
+export function openNewGameOverlayFromModelTab(setMainUIControlsEnabled: (enabled: boolean) => void, updateReadyButtonState: () => void): boolean {
+  if (S.tacticalBattleSnapshot != null || S.resolutionMoveAnimation != null) return false;
   window.gameApi?.cancelRequestAiOrders?.();
   resetPrecomputedAiState('null');
   S.pendingDeferredStrategicPostResolutionConsult = false;
@@ -378,6 +382,7 @@ export function openNewGameOverlayFromModelTab(setMainUIControlsEnabled: (enable
     await refreshNewGameMapPreview();
   })();
   syncGameSizeCapPreview();
+  const opened = overlay?.classList.contains('hidden') === true;
   overlay?.classList.remove('hidden');
   expandNewGameDialog();
   blurMapChromeIfFocused();
@@ -385,6 +390,7 @@ export function openNewGameOverlayFromModelTab(setMainUIControlsEnabled: (enable
   repaintNewGameMapPreview();
   setMainUIControlsEnabled(false);
   updateReadyButtonState();
+  return opened;
 }
 
 /**

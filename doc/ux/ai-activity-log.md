@@ -8,7 +8,7 @@ Give the player a running record of opponent consultations, model-list failures,
 
 ## Availability
 
-Shown with the right panel in every mode where the panel is visible, whichever tab is selected. While the tactical battles list is open, the log stays visible and does not receive pointer input. The log itself has no mode of its own.
+Shown with the right panel in every mode where the panel is visible, whichever tab is selected. While the tactical battles list is open, the log stays visible and does not receive pointer input. The log itself has no mode of its own. The log is absent in New game and Game over because the panel is absent.
 
 ## Information Displayed
 

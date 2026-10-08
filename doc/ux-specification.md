@@ -118,12 +118,12 @@ Cells are `Shown`, `Hidden`, `Disabled` (visible, but pointer input is off), `Ch
 | Stack callout | Hidden | Shown | Hidden | Hidden | Shown | Hidden | Hidden |
 | Build popup | Hidden | Shown | Disabled | Disabled | Hidden | Hidden | Hidden |
 | Multi-hex build popup | Hidden | Shown | Disabled | Disabled | Hidden | Hidden | Hidden |
-| Right panel | Disabled | Shown | Disabled | Shown | Shown | Disabled | Disabled |
-| Command bar | Disabled | Shown | Disabled | Shown | Changed | Disabled | Disabled |
-| Selection and orders | Disabled | Shown | Disabled | Shown | Changed | Disabled | Disabled |
-| Tools tab | Disabled | Shown | Disabled | Shown | Shown | Disabled | Disabled |
-| Model tab | Disabled | Shown | Disabled | Shown | Changed | Disabled | Disabled |
-| AI activity log | Disabled | Shown | Disabled | Shown | Shown | Disabled | Disabled |
+| Right panel | Hidden | Shown | Disabled | Shown | Shown | Disabled | Hidden |
+| Command bar | Hidden | Shown | Disabled | Shown | Changed | Disabled | Hidden |
+| Selection and orders | Hidden | Shown | Disabled | Shown | Changed | Disabled | Hidden |
+| Tools tab | Hidden | Shown | Disabled | Shown | Shown | Disabled | Hidden |
+| Model tab | Hidden | Shown | Disabled | Shown | Changed | Disabled | Hidden |
+| AI activity log | Hidden | Shown | Disabled | Shown | Shown | Disabled | Hidden |
 | New game dialog | Shown | Hidden | Hidden | Hidden | Hidden | Hidden | Shown |
 | Resolution playback | Hidden | Hidden | Hidden | Shown | Hidden | Hidden | Hidden |
 | Tactical entry markers | Hidden | Shown | Disabled | Shown | Hidden | Hidden | Hidden |

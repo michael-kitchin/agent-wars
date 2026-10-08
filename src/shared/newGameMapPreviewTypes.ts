@@ -206,7 +206,7 @@ export interface NewGameMapPreview {
  *
  * Purpose: Exclusive homes look controlled by that side. Shared homes use the gray overlap rings.
  * When to use: The result of `previewHomeBorder`, passed to the ownership-border drawer.
- * Expected outcome: A null identity means the hex is not a home and keeps the plain grid stroke.
+ * Expected outcome: A null identity means the hex is not a home. A regional preview then keeps the plain grid stroke. A global preview does not draw that hex's terrain or grid. Weather and tech icons still follow the preview rules.
  * Exceptions: None.
  */
 export interface PreviewHomeBorder {

@@ -3,7 +3,7 @@
  */
 
 import { dismissMapDetailPopoversIfHoverPlanningActive, hideStackCallout, isClientPointInsideMainMapLeafletContainer, refreshStackCalloutIfOpen, shouldSuppressTerrainTooltip } from './map/stackCallout';
-import { redraw, requestRedraw } from './rendering/gameScene';
+import { redraw, requestRedraw, resizeAndRedraw } from './rendering/gameScene';
 import { getMainLeafletMap } from './map/worldLeafletMap';
 import { deriveInfrastructureOverlayState } from './rendering/infrastructureOverlayState';
 import type { GameStateSnapshot, TacticalCityOverlayRow, TacticalRoadRailOverlayRow, TacticalTransportVectorOverlayRow } from '../shared/ipcTypes';
@@ -771,27 +771,29 @@ export function updateSidebar(): void {
 }
 
 /**
- * Defines the `updateGameOverUI` function shape (function updateGameOverUI(state: GameStateSnapshot | null): void).
-
- * Purpose: Supports maintainability by documenting why `updateGameOverUI` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Shows or hides the new-game overlay, and resizes the map when that visibility changes.
+ *
+ * Purpose: The overlay and the right panel share the window width. Leaflet keeps the previous container size until a resize.
+ * When to use: After a snapshot, and when a match ends.
+ * Expected outcome: The overlay matches the snapshot. The map is resized only when the overlay opens or closes.
  * Exceptions: None.
  */
 export function updateGameOverUI(state: GameStateSnapshot | null): void {
-  return updateGameOverUIFromModule(state, updateReadyButtonState);
+  const visibilityChanged = updateGameOverUIFromModule(state, updateReadyButtonState);
+  if (visibilityChanged) resizeAndRedraw();
 }
 
 /**
- * Defines the `openNewGameOverlayFromModelTab` function shape (function openNewGameOverlayFromModelTab(): void).
-
- * Purpose: Supports maintainability by documenting why `openNewGameOverlayFromModelTab` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Opens the new-game dialog from the Model tab, and resizes the map when it actually opens.
+ *
+ * Purpose: The right panel leaves the layout when that dialog opens. The map has to take the freed width before the preview fits.
+ * When to use: The Model tab's New button.
+ * Expected outcome: A battle or playback ignores the click. Otherwise the dialog opens, and the map resizes only when the overlay was hidden.
  * Exceptions: None.
  */
 export function openNewGameOverlayFromModelTab(): void {
-  return openNewGameOverlayFromModelTabFromModule(setMainUIControlsEnabled, updateReadyButtonState);
+  const visibilityChanged = openNewGameOverlayFromModelTabFromModule(setMainUIControlsEnabled, updateReadyButtonState);
+  if (visibilityChanged) resizeAndRedraw();
 }
 
 /**

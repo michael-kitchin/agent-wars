@@ -9,6 +9,7 @@ import { refreshNewGameMapPreview, resetNewGameMapPreviewFrame } from '../gamepl
 import { repaintNewGameMapPreview } from '../map/newGameMapPreviewRendering';
 import { syncGameSizeCapPreview } from '../gameplay/newGameSizeUi';
 import { resetNewGameOptionControls } from '../gameplay/newGameOptionsUi';
+import { dismissStaleControlTooltip } from '../chrome/controlTooltip';
 import { newGameButtonTooltipText } from '../chrome/controlTooltipText';
 import { expandNewGameDialog, syncNewGameDialogMapPointer } from '../gameplay/newGameDialogCollapse';
 
@@ -88,17 +89,22 @@ export function updateGameStateSidebar(state: GameStateSnapshot | null): void {
 }
 
 /**
- * Drops focus when it is inside the minimap or the terrain legend.
+ * Drops focus and a control tip from chrome the new-game overlay is about to cover.
  *
- * Purpose: Those elements are hidden while the new-game overlay is open. A focused style dropdown would still take keys.
- * When to use: When that overlay goes from hidden to shown.
- * Expected outcome: Focus leaves the minimap or the legend. A dialog control that already has focus is left alone.
+ * Purpose: The minimap, the legend, and the right panel are not on screen while that overlay is open. A focused control would still take keys, and a tip for the New button would stay up over the map.
+ * When to use: When that overlay goes from hidden to shown, after its `hidden` class is removed.
+ * Expected outcome: Focus leaves the minimap, the legend, or the right panel. A dialog control that already has focus is left alone. A tip whose control has no box is dismissed.
  * Exceptions: None.
  */
 export function blurMapChromeIfFocused(): void {
   const active = document.activeElement;
-  if (!(active instanceof HTMLElement)) return;
-  if (active.closest('#minimap') != null || active.closest('#terrain-legend') != null) active.blur();
+  if (active instanceof HTMLElement) {
+    const insideHiddenChrome = active.closest('#minimap') != null
+      || active.closest('#terrain-legend') != null
+      || active.closest('#sidebar') != null;
+    if (insideHiddenChrome) active.blur();
+  }
+  dismissStaleControlTooltip();
 }
 
 /**
@@ -131,16 +137,18 @@ export function setMainUIControlsEnabled(enabled: boolean): void {
  *
  * Purpose: Keeps the overlay up while there is no game or the game is over, and the main controls disabled with it.
  * When to use: After every state refresh.
- * Expected outcome: With a live game the overlay hides and controls are enabled. Otherwise the overlay shows a
- *   win, loss, or start message. Fog of war and the bonus dropdowns return to their defaults on every call while
- *   it shows. The home regions, the starting month, and the map preview are drawn only when the overlay opens.
- *   The form starts showing only on that open. A later refresh leaves a hidden form hidden.
+ * Expected outcome: Returns true only when `#game-over-overlay` gains or loses `hidden`. Returns false when it
+ *   stays open, stays closed, or the element is missing. With a live game the overlay hides and controls are
+ *   enabled. Otherwise the overlay shows a win, loss, or start message. Fog of war and the bonus dropdowns return
+ *   to their defaults on every call while it shows. The home regions, the starting month, and the map preview are
+ *   drawn only when the overlay opens. The form starts showing only on that open. A later refresh leaves a hidden
+ *   form hidden.
  * Exceptions: None.
  */
 export function updateGameOverUI(
   state: GameStateSnapshot | null,
   updateReadyButtonState: () => void
-): void {
+): boolean {
   const overlay = document.getElementById('game-over-overlay');
   const messageEl = document.getElementById('game-over-message');
   const newGameBtn = document.getElementById('new-game-btn');
@@ -156,7 +164,7 @@ export function updateGameOverUI(
     setMainUIControlsEnabled(true);
     if (rangedBtn) rangedBtn.disabled = false;
     updateReadyButtonState();
-    return;
+    return overlay != null && wasHidden === false;
   }
 
   overlay?.classList.remove('hidden');
@@ -188,4 +196,5 @@ export function updateGameOverUI(
   }
   if (rangedBtn) rangedBtn.disabled = true;
   updateReadyButtonState();
+  return overlay != null && wasHidden === true;
 }
