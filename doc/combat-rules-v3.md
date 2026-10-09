@@ -468,7 +468,7 @@ If a naval unit carrying cargo is destroyed, all embarked units are destroyed wi
 - **Unit hit points:** Instead of one hit = one unit lost.
 - **Infrastructure rebuilding:** If permanent destruction proves too punishing.
 - **Additional unit types.**
-- **Player-facing save/load and turn replay** (milestone 2.5).
+- **Player-facing save/load and turn replay** (milestone 2.6).
 - **AI-initiated tactical bail-out** as a distinct order (not implemented; only the human can voluntarily exit).
 
 ---

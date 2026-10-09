@@ -1,26 +1,30 @@
 # Strategic Development Plan: Grand Strategy Wargame with LLM Opponents
 
-*Version 3.3 — April 2026 (historical roadmap)*
+*Version 3.4 — October 2026 (historical roadmap, renumbered for the regional game)*
 
 ---
 
-## Current progress (August 2026, engine 2.5.0)
+## Current progress (October 2026, engine 2.5.0)
 
-This file is the original phased plan. **It is not live rules.** Combat, caps, vision, costs, and phase order live in [combat-rules-v3.md](combat-rules-v3.md) and `src/`. Prompt text lives in [ai-commander-prompts/](ai-commander-prompts/README.md).
+This file is the original phased plan. **It is not live rules.** Combat, caps, vision, costs, and phase order live in [combat-rules-v3.md](combat-rules-v3.md) and `src/`. Regional map data and economy numbers live in [region-summary-1.md](region-summary-1.md) and `src/shared/regionalRulesCatalog.ts`. Prompt text lives in [ai-commander-prompts/](ai-commander-prompts/README.md).
 
 | Planned milestone | Status in the live build |
 | --- | --- |
 | 0.6 Pre-computation and briefing | Complete |
 | 0.7 Callback / event-driven consultation | Complete |
-| 1.1–1.7 Global strategic game (map, fog, economy, air, sealift, region-vs-region) | Complete. Live caps, costs, and vision radii differ from the numbers written inside those milestone sections. |
+| 1.1–1.7 Global strategic game (map, fog, economy, air, sealift, region-vs-region) | Complete. Live caps, costs, and vision radii differ from the numbers written inside those milestone sections. 1.7 shipped as the single `region_vs_region` scenario with player-chosen homes, not as preset scenarios. |
 | 2.1–2.4 Tactical rendering, movement, combat, LLM play, integration | Complete. Tactical ranged baselines are infantry 2 / armor 5 / naval 10, not the 5/10/20 in the 2.2 writeup. Mountain LOS and terrain MP modifiers are live. |
-| 2.5 Save/load and session management | **Not shipped.** SQLite persists the in-progress match in Electron user data; there is no player-facing save slot, load list, or turn replay UI. |
-| 3.1–3.5 Polish, personalities, diplomacy, sound, async multiplayer | Not started as named milestones. Some 3.1 UI (minimap, map-first chrome, OpenRouter panel, keyboard pan) exists in partial form. |
+| 2.45 Playtester UI fixes | Complete (September 2026). |
+| 2.5 Regional game and rules enhancements | Complete (October 2026). Ships as engine 2.5.0. |
+| 2.6 Save/load and session management | **Not shipped.** SQLite persists the in-progress match in Electron user data; there is no player-facing save slot, load list, or turn replay UI. Numbered 2.5 before version 3.4. |
+| 3.1–3.5 Polish, personalities, diplomacy, sound, async multiplayer | Not started as named milestones. Some 3.1 UI (minimap, map-first chrome, OpenRouter panel, keyboard pan, the October UI facelift) and some 3.4 resolution feedback (dice chips, destroyed-unit playback) exist in partial form. |
 | 4.1–4.4 Onboarding, store packaging, community beta, launch | Not started. Desktop packaging via electron-builder exists for developer / side-load builds. |
 
 **Do not copy unit costs, caps, fog radii, tactical ranges, or bail-out formulas from the milestone writeups below.** Those paragraphs were design-time targets.
 
-**Filename:** `devleopment-plan-v3.3.md` keeps the historical spelling so existing links keep working.
+**Renumbering in version 3.4.** Two milestones were built after 2.4 without a number in this plan: 2.45 (playtester UI fixes) and 2.5 (the regional game, plus the rules and UI enhancements built alongside it). Save/load and session management, formerly 2.5, is now 2.6. Phase 3 and Phase 4 numbers are unchanged. Commits, execution plans under `.spec/completed/`, and blog drafts written before October 2026 that say "milestone 2.5" mean save/load.
+
+**Filename:** `devleopment-plan-v3.4.md` keeps the historical spelling. Version 3.3 is in git history.
 
 ---
 
@@ -39,6 +43,8 @@ These observations align with every other LLM game AI project's findings. The so
 This plan begins after milestone 0.5 and incorporates the hybrid AI architecture as a foundational design decision rather than a future optimization.
 
 **Map resolution decision (settled).** The game uses two H3 zoom levels: global (H3 resolution 1, ~842 hexes at ~610,000 km² each) and tactical (H3 resolution 4, ~343 hexes per global hex at ~1,770 km² each, ~42 km edge-to-edge). This was determined by a rendering performance budget of ~400 hexes on screen. Phase 1 builds the complete game at the global level. Phase 2 adds optional tactical battles at res 4 when opposing units share a res1 hex, plus session persistence. The earlier goal of 1 km² hex resolution has been set aside — res 4's ~42 km hexes provide division-scale tactical play, which is the right grain for the Axis & Allies-inspired unit interactions in the game vision.
+
+*Version 3.4 note:* milestone 2.5 adds a second family of maps. A regional map uses strategic H3 resolution 2 or 3, with battles three levels down at resolution 5 or 6. The global map stays at resolutions 1 and 4. The active map supplies both resolutions (`strategicH3Resolution` and `tacticalH3Resolution` in `src/shared/h3Resolutions.ts`).
 
 **Tactical vs strategic turn resolution.** Ordering, playback parity, reconciliation, and human march merge (standing orders previewed without DB mutation, then merged at tactical Ready) are documented in [.spec/completed/tactical-strategic-turn-resolution-alignment-plan.md](../.spec/completed/tactical-strategic-turn-resolution-alignment-plan.md), with a focused audit of res1/res4 infrastructure reconciliation in [.spec/completed/tactical-infra-reconciliation-audit.md](../.spec/completed/tactical-infra-reconciliation-audit.md). Live phase order is embark → air → ranged → movement → cargo sync → ferry → melee (tactical beats put cargo sync after ferry). See combat rules §4.
 
@@ -380,6 +386,8 @@ INFRASTRUCTURE STATUS:
 
 ### Milestone 1.7 — Game Scenarios and Win Conditions
 
+*Version 3.4 note: the live build has one scenario, `region_vs_region`, where each player picks a home instead of choosing a preset scenario ([region-vs-region.md](region-vs-region.md)). The contained regional conflict proposed below arrived in milestone 2.5 as the regional game, on its own higher-resolution maps rather than as a fenced-off area of the global map.*
+
 **Build:** Create 2–3 preset scenarios on the real-Earth map: a contained regional conflict (e.g., European theatre — limit the playable area to ~50–80 global hexes), a two-front global scenario, and a free-play sandbox. Each scenario defines starting territories, forces, production centers, airport and seaport locations, and victory conditions. Add a scenario selection screen and a basic end-game summary showing territory control over the course of the game.
 
 Scenarios should vary in how much infrastructure is available at start — a scenario with few airports makes air power scarce and valuable; a scenario with many airports makes air superiority a central strategic concern. This lets you test air balance across different setups without changing the rules. Include at least one scenario with significant water separating the two sides to exercise sealift mechanics.
@@ -395,13 +403,15 @@ Scenarios should vary in how much infrastructure is available at start — a sce
 
 ---
 
-## Phase 2: Tactical Battles (Milestones 2.1–2.5)
+## Phase 2: Tactical Battles (Milestones 2.1–2.6)
 
 **Goal:** Add the optional tactical battle layer and session persistence. The tactical battle layer at H3 res 4 lets players zoom into contested res1 hexes and fight division-scale battles on ~343 child hexes, or skip them and resolve via standard strategic dice rolls. The strategic game pauses while a tactical battle is in progress. This is the Total War model: optional zoom-in battles that enhance the strategic game without being required. Save/load comes last in this phase so it can handle both strategic and tactical game state from the start.
 
+*Version 3.4 note: Phase 2 now also holds two milestones built after 2.4: 2.45 (playtester UI fixes) and 2.5 (regional game and rules enhancements). Save/load moves to 2.6 and still comes last, so it covers strategic, tactical, and regional state from the start.*
+
 **Why Phase 2 and not later:** UI, sound, and art design are more effective when applied to the complete gameplay experience rather than an incomplete slice. Polishing the strategic game first and then retrofitting polish onto the tactical layer means doing presentation work twice. Building all gameplay systems first — then polishing everything in one pass — is more efficient and produces a more cohesive result.
 
-**What you'll have at the end of Phase 2:** The complete game at both strategic and tactical levels, with session persistence, but pre-polish. All gameplay mechanics are in place and playable. The game looks and sounds like a developer build — functional but not presentable.
+**What you'll have at the end of Phase 2:** The complete game at both strategic and tactical levels, on the global map and on regional maps, with session persistence, but pre-polish. All gameplay mechanics are in place and playable. The game looks and sounds like a developer build — functional but not presentable.
 
 **Critical prerequisite:** Phase 2 begins only when the global-level game from Phase 1 is stable, fun, and has at least one external tester's confirmation. The tactical layer adds significant complexity; the base game must be solid. If Phase 1 playtesting reveals that players never express a desire to "zoom in" — if the global level is satisfying on its own — consider skipping directly to Phase 3 (polish) and deferring tactical battles to post-launch.
 
@@ -469,13 +479,68 @@ Ensure scenarios from milestone 1.7 work correctly with tactical battles availab
 
 **Playtest hypothesis:** A complete game using both strategic and tactical layers should feel richer than the strategic-only experience, not more tedious. The tactical battle should be something you want to use when you have a positional advantage or want finer control, not something you feel obligated to engage with every time. If players consistently skip tactical battles, the tactical layer needs more compelling differentiation from strategic resolution — but that's a balance problem, not an architectural one.
 
-### Milestone 2.5 — Save/Load and Session Management
+### Milestone 2.45 — Playtester UI Fixes
+
+*Added in version 3.4. Built in September 2026, after 2.4. Status: complete.*
+
+**Build:** Work through a round of external playtester feedback on the 2.4 build. The fixes covered map clicks and selection (double-click planning and deselect, clicks during resolution playback), Shift as the multi-select modifier, opening unit placement, ranged-attack button visibility, build-queue seeding and failed queue edits, toasts and tooltips during playback, the Model tab across match start and end, Escape in the tactical battles list, the tactical ferry movement list, and the tactical phase label and exit control during playback. The same pass wrote the UX specification suite under `doc/ux/`, one page per surface, so later UI work has a written contract to check against.
+
+Two feedback items were deferred to the design backlog rather than fixed: port-to-port land travel rules and automatic build planning.
+
+**Playtest hypothesis:** A returning playtester can plan and resolve turns without the selection and dialog traps that caused most of the frustration in earlier sessions.
+
+### Milestone 2.5 — Regional Game and Rules Enhancements
+
+*Added in version 3.4. Built in October 2026 and shipped as engine 2.5.0. Status: complete. Save/load, previously numbered 2.5, is now 2.6.*
+
+**Build (regional game):** A second way to play. A regional match is the global game on one regional map, with that map's resolutions and economy numbers. Everything else is the same rulebook.
+
+- **Maps.** 23 maps drawn from UN subregions. Some subregions are split into two maps (Northern, Middle, and Eastern Africa, and Southern Asia) or trimmed (Western Asia, Northern Europe, Northern America). Melanesia, Micronesia, Polynesia, Antarctica, and the Sahel are excluded. Each map has about 240 to 470 strategic hexes, of which about 120 to 310 are land; the rest is sea rings and, on three maps, neutral border. Strategic hexes are H3 res2 or res3. Battles are three levels down, at res5 or res6. Maps are tiered Strong, Passable, or Weak by expected fun. Eastern Asia is the recommended pilot ([region-summary-1.md](region-summary-1.md)).
+- **Sides.** The human and the AI each pick a side group, a named group of provinces, on a new Regional tab in the new-game dialog. The two groups must differ. Side groups are the homes for the existing `region_vs_region` win check, so victory, forced visibility, and home outlines work unchanged. Land outside the two groups is neutral, as in the global game.
+- **Per-map economy.** `src/shared/regionalRulesCatalog.ts` holds each map's costs (one scale per map, keeping the global 1:2:5:3 price ratio), build minimums, Advanced tech threshold, and urban cells destroyed per strategic air-strike hit (`max(1, round(9 × scale))`). The numbers are copied from the summary tables, not computed at runtime.
+- **Origin areas and flags.** On a regional map, units take their name, flag, and origin bonus from admin-1 provinces, Natural Earth regions, or whole small countries instead of countries alone. Sub-national flags are SVGs from Wikimedia Commons with recorded attribution, falling back to the national flag.
+- **Neutral-border hexes** (Western Europe, Western Asia north, South-Eastern Asia). They can be entered and held, produce nothing, accept no build queue, and cannot base air.
+- **Data and loading.** A regional pipeline (`scripts/regional_pipeline/`) generates one pack per map. The installer ships zipped packs. The first play of a region extracts only that region, and a clean launch reads no terrain files until a match loads. SQLite grid objects are renamed `res_s_` and `res_t_`, and code reads resolutions from the active map. The match records its map in `game_config` as `game_map_id`.
+- **Map extent.** Pan and zoom stop at the loaded map's bounds, on the main map and the minimap.
+- **Calendar.** A regional turn is one week, starting on the 1st of the chosen month. A global turn stays one month.
+
+**Build (enhancements built alongside, both modes):**
+
+- **d20 combat.** Combat moved from d6 to d20. Hit numbers have a floor of 2 and a cap of 17 (combat rules §1, §4.9).
+- **Four optional bonuses,** each Off, Low, or High, all defaulting to Low:
+  - Origin bonus (formerly "country bonus"). Units carry a birth area and a flag, and fight better at home.
+  - Terrain bonus. Tactical only. Units fight better on their birth terrain kind.
+  - Weather bonus. Each hex gets monthly climate weather (mild, rain, snow, heat) from a chosen starting month. Units are tagged by their birth climate, and untagged units are slowed or lose attack.
+  - Tech bonus. Units are Basic or Advanced by the urban count of their birth hex.
+- **Strategic terrain rules.** Armor that enters a rugged, arctic, or city hex ends its move there. City and rugged hexes add strategic cover.
+- **Battle size.** Battles add three rings of neighboring tactical cells around the core 343. Sub-unit counts are infantry 8, armor 4, air 3, naval 4.
+- **AI.** OpenRouter structured output with a reasoning-effort selector, model labels that list reasoning levels, a fixed consultation round shape that adapts to each model's tool support, `estimate_combat` and `assess_unit` in battles, and no restart of the AI's background planning on every draft edit.
+- **UI and feedback.** A UI facelift, dice chips and destroyed-unit playback during resolution, weather and tech icons on the strategic map, control tooltips, a reworked new-game dialog with a live map preview and a collapse button, and the game date on the turn line.
+- **Code health.** Codebase consolidation and source-file decomposition to the 1,000-line hard limit.
+
+**Out of scope (open issues in [region-summary-1.md](region-summary-1.md), not scheduled):** a production-weighted win condition for unequal side groups, the shoreline-wetlands classifier, the forest-before-mountain classifier order, urban data quality (the scalerank filter), per-unit price scales, port and airport counts at regional resolutions, and EarthEnv 1 km topography for res6 maps. The side-group imbalance and the slow hex-control win on maps with large sides matter most for regional play.
+
+**AI architecture impact:** The prompts take resolutions, costs, thresholds, and strike damage from the active map. The turn line and briefing name the date. Bonuses appear in tool output, the briefing Bonus cell, and the combat rules paragraph only while their option is on. Regional maps carry no more land hexes than the global map's playable land, so pre-computation and briefing size stay inside what was already measured.
+
+**Playtest hypothesis:** A match on a Strong-tier map, starting with Eastern Asia, plays to a decision in fewer turns than a global match, with terrain that channels movement and cities worth fighting over. The bonuses make where a unit was born and when it fights matter, without the AI losing track of them. If regional matches stall on maps with lopsided side groups, take the production-weighted win from the open issues before tuning individual maps.
+
+### Milestone 2.6 — Save/Load and Session Management
+
+*Numbered 2.5 before version 3.4. Status: not started.*
 
 **Build:** Full save and load. Since game state is in SQLite, this is largely about serializing the complete database state — including per-player subjective views, pending orders, AI memory, standing orders, active callback subscriptions, infrastructure state (which urban hexes/airports/seaports have been destroyed), embarked cargo assignments, tactical battle state (sub-unit positions, tactical turn count, which res1 hex is in tactical mode), and turn counter — to a save file and restoring it cleanly. Auto-save at the start of each strategic turn and at the start of each tactical turn. Add turn replay: step through any previous turn's resolution, including the AI's briefing and response for turns where it was consulted.
 
-**AI architecture impact:** The callback subscription state must be persisted and restored. On load, the engine must re-evaluate whether any callback conditions are already satisfied in the loaded game state (e.g., if the game was saved mid-crisis, the loaded state might immediately trigger a consultation). AI strategic memory (Tool 4) is already in SQLite and persists naturally. If the game is saved mid-tactical-battle, restoring it must resume the tactical battle at the correct sub-unit positions and turn state.
+*Added in version 3.4:* milestone 2.5 widened the state a save must carry.
 
-**Playtest hypothesis:** You should be able to close the game mid-session — whether during strategic play or mid-tactical-battle — reopen it days later, and resume with full context. The turn replay with AI briefing review should help you remember your strategic situation.
+- **Map identity.** `game_map_id` and the map's resolutions. Loading a regional save must load that region's pack, extracting it if needed, and apply its map extent before the snapshot draws.
+- **Match settings.** Game size, fog, the four bonus levels, and the starting month. The calendar, weather, and tech tiers derive from these.
+- **Per-unit identity.** Origin area, birth hex, birth terrain, weather tags, tech tier, and formation date.
+- **Battle footprint.** A saved battle includes the three margin rings and the sub-units placed at entry, so voluntary exit keeps using the counts placed at the start.
+- **Save format version.** Today a schema change discards the in-progress match without migration. Saves need a version number and a stated policy for older saves, or every schema change will silently break a player's save list.
+
+**AI architecture impact:** The callback subscription state must be persisted and restored. On load, the engine must re-evaluate whether any callback conditions are already satisfied in the loaded game state (e.g., if the game was saved mid-crisis, the loaded state might immediately trigger a consultation). AI strategic memory (Tool 4) is already in SQLite and persists naturally. If the game is saved mid-tactical-battle, restoring it must resume the tactical battle at the correct sub-unit positions and turn state. Decide before writing the serializer whether a save must hold more than one AI opponent (milestone 3.3). Settling that scope now avoids a save-format change later.
+
+**Playtest hypothesis:** You should be able to close the game mid-session — whether during strategic play or mid-tactical-battle, on the global map or a regional one — reopen it days later, and resume with full context. The turn replay with AI briefing review should help you remember your strategic situation.
 
 ---
 
@@ -600,13 +665,15 @@ Assuming 2-week milestones at 10–15 hours per week:
 |-------|-----------|---------------|
 | Phase 0 (continued): Hybrid Validation | 0.6–0.7 | 3–5 weeks |
 | Phase 1: The Real Game | 1.1–1.7 | 12–16 weeks |
-| Phase 2: Tactical Battles | 2.1–2.5 | 8–12 weeks |
+| Phase 2: Tactical Battles | 2.1–2.6 | 8–12 weeks |
 | Phase 3: Polish and Depth | 3.1–3.5 | 8–12 weeks |
 | Phase 4: Ship It | 4.1–4.4 | 6–10 weeks |
 
 **Total estimated range from current position: 9–14 months to launch.**
 
-Phase 2 (tactical battles) remains deferrable to post-launch if the global-level game is strong enough on its own. If deferred, Phase 3 (polish) follows Phase 1 directly and the range compresses to 7–11 months. That's a legitimate shipping strategy — launch the game that works, expand it once it has an audience. If Phase 2 is deferred, save/load (milestone 2.5) should still be pulled into Phase 1 or early Phase 3, since session persistence is essential for any serious playtesting.
+*Version 3.4 note: these estimates date from April 2026 and have not been re-baselined. Phase 2 has run from April 11 to October 9, 2026 (about 26 weeks) through milestone 2.5, against an 8–12 week estimate that did not include 2.45 or 2.5.*
+
+Phase 2 (tactical battles) remains deferrable to post-launch if the global-level game is strong enough on its own. If deferred, Phase 3 (polish) follows Phase 1 directly and the range compresses to 7–11 months. That's a legitimate shipping strategy — launch the game that works, expand it once it has an audience. If Phase 2 is deferred, save/load (milestone 2.6) should still be pulled into Phase 1 or early Phase 3, since session persistence is essential for any serious playtesting.
 
 Phase 2 carries significantly less risk than earlier estimates because the key design decisions (unit relationship, visibility model, bail-out mechanic) are already resolved. The highest-risk element is AI tactical reasoning quality — if the LLM can't play tactically at an acceptable level, the fallback is human-only tactical battles with AI auto-resolve, which is still a valuable feature.
 

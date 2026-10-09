@@ -177,6 +177,12 @@
   min-width: var(--new-game-region-select-width, max-content);
   max-width: var(--new-game-region-select-width, none);
 }
+/* Size to the longest month. Overrides the shared region width so a long region name does not widen this control and a short region list does not clip a month name. */
+.game-over-start-month .game-over-region-controls select {
+  width: max-content;
+  min-width: max-content;
+  max-width: none;
+}
 /* Matches the dropdown beside it. The fixed square size on `.compact-square-btn` is for other buttons. */
 .game-over-box .compact-square-btn.game-over-region-randomize {
   align-self: stretch;

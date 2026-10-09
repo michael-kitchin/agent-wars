@@ -19,7 +19,7 @@ It records two things:
 2. **Prompt-generating code is first authority for wording.** The system prompt is assembled by `buildSystemPromptForTools` (`openRouterBuildSystemPrompt.ts`). Combat sentences live in `promptSpec/gameRuleText.ts`. Coaching lives in `promptSpec/coachingTextStrategic.ts` and `coachingTextTactical.ts`. Envelope shape lives in `promptSpec/envelopeContract.ts`; the structured-output schema built from the same gates lives in `promptSpec/envelopeJsonSchema.ts`. Opening and repair user messages live in `promptSpec/consultationText.ts`. Briefing tables live in `briefingFormatter.ts`, `formatTacticalBriefing.ts`, and the section builders they call.
 3. **This package describes that emission.** A sentence here is evidence of what we tell the model only insofar as it matches those builders.
 4. Captured dumps (`debug-last-strategic-prompt.txt`, `debug-last-user-prompt.txt`) are examples of emitted shape for one consultation. The tactical dump on disk may be stale; tactical catalogs below are derived from code.
-5. `devleopment-plan-v3.3.md` is historical architecture and is not prompt authority.
+5. `devleopment-plan-v3.4.md` is historical architecture and is not prompt authority.
 
 ## 3. How to use this package
 
@@ -59,7 +59,7 @@ These documents keep their mechanics content. They do not override emitted promp
 
 - `../combat-rules-v3.md` — mechanics reference, aligned to the engine as of 2.5.0.
 - `../hybrid-ai.md`, `../ai-tools.md` — consult loop and tool names, not prompt copy.
-- `../devleopment-plan-v3.3.md` — historical architecture.
+- `../devleopment-plan-v3.4.md` — historical architecture.
 - `../../.spec/prompt-debug-log-split.md` — which debug file each consultation writes, not what the prompt says.
 
 Completed execution plans under `../../.spec/completed/` that specified prompt wording are historical. Their decisions are either reflected in the builders or were superseded.
