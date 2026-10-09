@@ -201,5 +201,4 @@ async function assertRuntimeDestinationIsFree(runtimePath) {
 module.exports = {
   installLinuxSandboxLauncher,
   buildLinuxSandboxLauncherScript,
-  restoreLinuxExecutable,
 };

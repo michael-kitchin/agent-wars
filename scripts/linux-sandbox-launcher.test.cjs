@@ -4,13 +4,13 @@
 const assert = require('assert');
 const { spawnSync } = require('child_process');
 const fs = require('fs');
+const fsPromises = require('fs/promises');
 const os = require('os');
 const path = require('path');
 
 const {
   buildLinuxSandboxLauncherScript,
   installLinuxSandboxLauncher,
-  restoreLinuxExecutable,
 } = require('./linux-sandbox-launcher.cjs');
 
 function testLauncherScriptKeepsSandboxWhenPossible() {
@@ -369,20 +369,33 @@ function symlinkErrorIsPermission(error) {
 }
 
 /**
- * A failed write must put the Electron binary back at the original name.
- * The runtime file holds the binary, and the entry-point path holds a partial script.
+ * A launcher write that fails after the rename must put the Electron binary back.
+ * The write leaves a partial script at the entry point before failing, so the
+ * restore must replace that partial file rather than leave the pack half-wrapped.
  */
 async function testFailedInstallRestoresTheElectronBinary() {
   const appOutDir = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-wars-launcher-restore-'));
   const binaryPath = path.join(appOutDir, 'agent-wars');
   const runtimePath = path.join(appOutDir, 'agent-wars.bin');
-  fs.writeFileSync(runtimePath, 'elf-binary');
-  fs.writeFileSync(binaryPath, 'partial-script');
+  fs.writeFileSync(binaryPath, 'elf-binary');
+  const realWriteFile = fsPromises.writeFile;
+  fsPromises.writeFile = async (filePath) => {
+    fs.writeFileSync(filePath, 'partial-script');
+    throw Object.assign(new Error('simulated write failure'), { code: 'EIO' });
+  };
   try {
-    await restoreLinuxExecutable(binaryPath, runtimePath);
+    await assert.rejects(
+      () => installLinuxSandboxLauncher({
+        electronPlatformName: 'linux',
+        appOutDir,
+        packager: { executableName: 'agent-wars' },
+      }),
+      /launcher could not be installed .*\(EIO\)/
+    );
     assert.strictEqual(fs.readFileSync(binaryPath, 'utf8'), 'elf-binary');
-    assert.ok(!fs.existsSync(runtimePath));
+    assert.ok(!fs.existsSync(runtimePath), 'the renamed runtime must not be left behind');
   } finally {
+    fsPromises.writeFile = realWriteFile;
     fs.rmSync(appOutDir, { recursive: true, force: true });
   }
 }
