@@ -38,7 +38,7 @@ The workflow in **`.github/workflows/build.yml`** runs when someone starts it fr
   - **Linux:** unpacked `release/linux-unpacked/`. The entry point `agent-wars` is the sandbox launcher; the Electron binary is `agent-wars.bin`. See [packaging.md](packaging.md).
   - **macOS:** unpacked `.app` under `release/`.
 
-Artifacts are uploaded per run, named `agent-wars-<version>-Windows`, `agent-wars-<version>-Linux`, and `agent-wars-<version>-macOS`. To download them:
+Artifacts are uploaded per run. Windows is `agent-wars-<version>-windows-<arch>`, one zip of the unpacked app. Linux and macOS are `agent-wars-<version>-Linux` and `agent-wars-<version>-macOS`, and each contains the archive made on that runner. To download them:
 
 1. Open the run in the **Actions** tab.
 2. Scroll to the **Artifacts** section.

@@ -1,6 +1,8 @@
 # Build and test Agent Wars on Windows, Linux, and macOS.
-# On-demand only (workflow_dispatch). Each OS uploads one release archive, named
-# from the app version in package.json ("version") and the runner's architecture.
+# On-demand only (workflow_dispatch). Windows uploads the unpacked app as
+# agent-wars-<version>-windows-<arch>; that artifact is the zip. Linux and macOS
+# upload an archive made on the runner, because the artifact upload drops Unix
+# permissions and follows symlinks.
 # With "Create a draft release" checked, a last job attaches the archives and
 # SHA256SUMS.txt to a draft GitHub release v<version>, with notes from
 # doc/release-notes/v<version>.md. Publishing the draft stays a manual step.
@@ -114,14 +116,17 @@ jobs:
           fi
           codesign --verify --deep --strict --verbose=2 "$app"
 
-      # Archive on the runner. upload-artifact drops Unix permissions and follows
-      # symlinks, which would break the Linux launcher and the macOS app bundle.
-      # Windows and macOS get a .zip, Linux a .tar.gz.
+      # Linux and macOS are archived on the runner. upload-artifact always stores a
+      # zip, drops Unix permissions, and follows symlinks, which would break the
+      # Linux launcher and the macOS app bundle. Windows is left unpacked: zipping
+      # it here would put that zip inside the artifact zip.
       - name: Archive the build
+        id: archive
         shell: bash
         env:
           APP_VERSION: ${{ steps.app_version.outputs.value }}
         run: |
+          set -eu
           shopt -s nullglob
           arch="$(echo "$RUNNER_ARCH" | tr '[:upper:]' '[:lower:]')"
           mkdir -p release-archive
@@ -129,7 +134,8 @@ jobs:
             Windows)
               name="agent-wars-${APP_VERSION}-windows-${arch}"
               mv release/win-unpacked "release/${name}"
-              (cd release && 7z a -tzip -bd "../release-archive/${name}.zip" "${name}")
+              echo "archive_name=${name}" >> "$GITHUB_OUTPUT"
+              echo "archive_path=release/${name}" >> "$GITHUB_OUTPUT"
               ;;
             Linux)
               name="agent-wars-${APP_VERSION}-linux-${arch}"
@@ -149,10 +155,24 @@ jobs:
           ls -l release-archive
 
       - name: Upload release archive
+        if: runner.os != 'Windows'
         uses: actions/upload-artifact@v4
         with:
           name: agent-wars-${{ steps.app_version.outputs.value }}-${{ runner.os }}
           path: release-archive/*
+          if-no-files-found: error
+
+      # The artifact name is the zip name. upload-artifact creates that zip from
+      # the unpacked app, so the Actions download is one zip and not a zip of a zip.
+      # Hidden files stay in: the draft-release zip includes them, and the unpacked
+      # app can contain dotfiles that are part of the build.
+      - name: Upload Windows build
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.archive.outputs.archive_name }}
+          path: ${{ steps.archive.outputs.archive_path }}
+          include-hidden-files: true
           if-no-files-found: error
 
   release:
@@ -176,10 +196,47 @@ jobs:
         with:
           pattern: agent-wars-${{ steps.app_version.outputs.value }}-*
           path: release-assets
-          merge-multiple: true
+
+      # Linux and macOS artifacts each hold one archive. The Windows artifact is
+      # the unpacked app, so this step zips it once, with files at the zip root,
+      # under the artifact's name. found must be 3, one file for each matrix OS.
+      - name: Collect release files
+        shell: bash
+        run: |
+          set -eu
+          shopt -s nullglob
+          mkdir -p publish
+          found=0
+          for dir in release-assets/*; do
+            [ -d "$dir" ] || continue
+            base="$(basename "$dir")"
+            archives=( "$dir"/*.zip "$dir"/*.tar.gz )
+            entries=( "$dir"/* )
+            if [ "${#archives[@]}" -eq 1 ] && [ "${#entries[@]}" -eq 1 ]; then
+              mv "${archives[0]}" publish/
+              found=$((found + 1))
+              continue
+            fi
+            if [ "${#archives[@]}" -ne 0 ]; then
+              echo "Artifact ${base} mixes an archive with other files." >&2
+              exit 1
+            fi
+            if [ "${#entries[@]}" -eq 0 ]; then
+              echo "Artifact ${base} is empty." >&2
+              exit 1
+            fi
+            publish_dir="$PWD/publish"
+            (cd "$dir" && zip -r -q "${publish_dir}/${base}.zip" .)
+            found=$((found + 1))
+          done
+          if [ "$found" -ne 3 ]; then
+            echo "Expected 3 release files, found ${found}." >&2
+            exit 1
+          fi
+          ls -l publish
 
       - name: Write checksums
-        working-directory: release-assets
+        working-directory: publish
         run: |
           sha256sum agent-wars-* > SHA256SUMS.txt
           cat SHA256SUMS.txt
@@ -195,7 +252,7 @@ jobs:
             echo "Release notes not found: $notes" >&2
             exit 1
           fi
-          gh release create "v${APP_VERSION}" release-assets/* \
+          gh release create "v${APP_VERSION}" publish/* \
             --draft \
             --target "$GITHUB_SHA" \
             --title "Agent Wars ${APP_VERSION}" \
