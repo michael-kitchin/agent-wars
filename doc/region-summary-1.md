@@ -5,7 +5,7 @@
 ## Context
 
 - **Regional mode** restricts play to one UN subregion from the global game. Some subregions are split into two maps, and some are excluded. The human and the AI each pick a side group (a home region made of provinces). Everything else on the map is neutral territory, as in the global game.
-- **Resolutions:** strategic hexes are H3 res2 or res3. Battles are always three levels down (res5 or res6), so every battle keeps the current 343-cell footprint (286 on an H3 pentagon, all of which are in open ocean). Each strategic hex has 343 tactical children, as now.
+- **Resolutions:** strategic hexes are H3 res2 or res3. Battles are always three levels down (res5 or res6). Each strategic hex has 343 tactical children (286 on an H3 pentagon). A battle also includes three rings of neighboring tactical cells. Counts in the tables below are children of a strategic hex, not the battle footprint.
 - **Rules:** the same as the global game, except for the per-map economy numbers (Table 2) and the strategic terrain and combat rules below (Table 3).
 - **Build priority:** Strong tier first. **Eastern Asia is the recommended pilot**: res2/res5 is the smaller step from today, it needs only a ×1.43 economy scale, it has the most terrain that slows armor, and naval, sealift and air all matter there.
 - **Tiers** are a design judgment about how fun each map is likely to be. Strong maps have cities to fight over, terrain that channels movement, a land and sea mix, and sides small enough to win. Weak maps lack two or more of those.

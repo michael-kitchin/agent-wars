@@ -20,7 +20,7 @@ A global match stores the two home-region names in `scenario_region_human` and `
 
 A regional match stores the two side groups' display names in those same keys. The groups must differ. Win evaluation, forced visibility, and the home outlines use those side-group hexes. The strategic hexes are the loaded map's resolution: 1 on the global map, and 2 or 3 on a regional map.
 
-While the new-game dialog is open, a Global preview frames the world one zoom level closer than the world fit, draws the two chosen home regions, does not draw the rest of the world hex grid, and shows weather and tech icons on every strategic hex. A Regional preview draws that pack's strategic grid and the two chosen homes. See [new-game-dialog.md](ux/new-game-dialog.md).
+While the new-game dialog is open, a Global preview frames the world one zoom level closer than the world fit, and a Regional preview frames that region. Both draw the two chosen homes and leave the strategic hex grid hidden until the player holds T, which draws that grid on either map. Weather icons sit on every strategic hex until that hold, and tech icons replace them while it lasts. See [new-game-dialog.md](ux/new-game-dialog.md).
 
 `scenarioId` on the snapshot is always `region_vs_region` for a new match (`fogState` / seeding). There is no second scenario picker in the live overlay.
 

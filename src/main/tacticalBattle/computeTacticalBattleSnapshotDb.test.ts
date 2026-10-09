@@ -10,6 +10,8 @@ import { filterMeleeCandidateHexesWithTacticalEntry, listMeleeCandidateHexes } f
 import { dbGetOne, dbRun, listUnitsForSnapshot } from '../gameDb';
 import { getOrderedHexList } from '../mapData';
 import { withTempGameDb } from '../testSupport/withTempGameDb';
+import { tacticalChildrenOf } from '../../shared/h3Resolutions';
+import { tacticalBattleFootprint } from '../../shared/tacticalBattleFootprint';
 import { parseTacticalSubUnitId } from '../../shared/unitIds';
 import { updateTacticalSealiftSlot } from '../gameActions';
 import { computeTacticalBattleSnapshot } from './computeTacticalBattleSnapshot';
@@ -76,6 +78,11 @@ test('computeTacticalBattleSnapshot is deterministic for identical battle id and
     const pa = a.snapshot.subUnits.map((u) => ({ id: u.id, h3Index: u.h3Index }));
     const pb = b.snapshot.subUnits.map((u) => ({ id: u.id, h3Index: u.h3Index }));
     assert.deepEqual(pa, pb);
+    const core = new Set(tacticalBattleFootprint(targetStrategicH3).coreChildH3Indexes);
+    assert.ok(a.snapshot.tacticalChildH3Indexes.length > tacticalChildrenOf(targetStrategicH3).length);
+    for (const sub of a.snapshot.subUnits) {
+      assert.equal(core.has(sub.h3Index), true);
+    }
     for (const sub of a.snapshot.subUnits) {
       const parsed = parseTacticalSubUnitId(sub.id);
       assert.ok(parsed, `expected compact sub-unit id, got ${sub.id}`);

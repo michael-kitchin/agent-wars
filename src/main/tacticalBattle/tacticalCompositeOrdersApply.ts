@@ -122,7 +122,7 @@ export function projectTacticalSnapshotAfterValidatedHumanSupportOrders(
     next
   );
   for (const e of opts.embarkOrders ?? []) {
-    const v = validateTacticalHumanEmbarkOrder(e, acc.battle.subUnits);
+    const v = validateTacticalHumanEmbarkOrder(e, acc.battle.subUnits, acc.battle.enclosingStrategicH3Index);
     if (!v.valid) {
       throw new TacticalEmbarkValidationRejected(v.reason);
     }

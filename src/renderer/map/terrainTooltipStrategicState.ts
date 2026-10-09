@@ -8,6 +8,8 @@
  */
 
 import { strategicParentOf, tacticalCellAt, tacticalChildrenOf } from '../../shared/h3Resolutions';
+import { tacticalBattleTerrainKindByCell } from '../../shared/tacticalBattleFootprint';
+import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 
 import { isHexExploredByPlayer } from '../core/selection';
 import { rendererSharedState as S } from '../core/state';
@@ -208,6 +210,55 @@ function featureLabelsForStrategicHex(h3: string): string[] {
 function transportSideMaskHasAnyTrue(mask: readonly boolean[] | undefined): boolean {
   if (!mask || mask.length === 0) return false;
   return mask.some((v) => v === true);
+}
+
+/**
+ * Tooltip state for one cell inside the active battle.
+ *
+ * Purpose: A margin cell keeps its own terrain kind. Airport and seaport words come from the snapshot, which only flags the enclosing hex's children.
+ * When to use: `terrainStateForPointer` when the sampled cell is in `tacticalChildH3Indexes`.
+ * Expected outcome: Terrain kind follows the tactical row, then a loaded geometric parent, then the enclosing hex. Control and weather stay on that enclosing hex in the HTML formatter.
+ * Exceptions: None.
+ */
+function battleTerrainTooltipState(detailH3: string, battle: TacticalBattleSnapshot): TerrainTooltipState {
+  const override = S.tacticalTerrainOverridesByH3.get(detailH3);
+  const tacticalKindByH3 = new Map<string, string>();
+  if (override?.terrainKind && override.terrainKind.trim().length > 0) {
+    tacticalKindByH3.set(detailH3, override.terrainKind);
+  }
+  const loadedStrategicKindByH3 = new Map<string, string>();
+  for (const hex of S.gameState?.hexes ?? []) {
+    if (hex.terrainKind && hex.terrainKind.trim().length > 0) loadedStrategicKindByH3.set(hex.h3Index, hex.terrainKind);
+  }
+  const enclosingKind =
+    loadedStrategicKindByH3.get(battle.enclosingStrategicH3Index) || battle.strategicHexTerrainKind || 'plains';
+  const terrainKind =
+    tacticalBattleTerrainKindByCell({
+      cells: [detailH3],
+      tacticalKindByH3,
+      enclosingKind,
+      loadedStrategicKindByH3,
+    })[detailH3] ?? enclosingKind;
+  const features: string[] = [];
+  if (battle.tacticalIsAirportByH3?.[detailH3] === true) features.push('Airport');
+  if (battle.tacticalIsSeaportByH3?.[detailH3] === true) features.push('Seaport');
+  const { roadSides, railSides } = tacticalRoadRailSideMasksForChild(detailH3);
+  if (transportSideMaskHasAnyTrue(roadSides)) features.push('Road');
+  if (transportSideMaskHasAnyTrue(railSides)) features.push('Rail');
+  return {
+    terrainKind,
+    isUrban: battle.tacticalIsUrbanByH3?.[detailH3] === true,
+    isRubble: battle.tacticalIsRubbleByH3?.[detailH3] === true,
+    features,
+    urbanHexCount: null,
+    strategicTerrainSummary: null,
+    strategicFeaturesSummary: null,
+    parentTerrain: parentPassabilityForStrategicHex(battle.enclosingStrategicH3Index),
+    parentTerrainKind: enclosingKind,
+    isSeaport: battle.tacticalIsSeaportByH3?.[detailH3] === true,
+    hasRoad: transportSideMaskHasAnyTrue(roadSides),
+    hasRail: transportSideMaskHasAnyTrue(railSides),
+  };
 }
 
 /**
@@ -528,6 +579,8 @@ export function terrainStateForPointer(
   const latlng = map.containerPointToLatLng(L.point(clientX - rect.left, clientY - rect.top));
   try {
     const detailH3 = tacticalCellAt(latlng.lat, latlng.lng);
+    const battle = S.tacticalBattleSnapshot;
+    if (battle?.tacticalChildH3Indexes.includes(detailH3)) return battleTerrainTooltipState(detailH3, battle);
     const parentH3 = strategicParentOf(detailH3);
     const parentKind = terrainKindForStrategicHex(parentH3);
     const detail = S.tacticalTerrainOverridesByH3.get(detailH3);

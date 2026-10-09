@@ -665,7 +665,7 @@ function testTacticalDrawBranchSkipsStrategicStaleIntel(): void {
 
  * Purpose: Confirms tactical terrain drawing does not hide the enclosing tactical parent behind strategic exploration fog (milestone 2.1 Phase K).
  * When to use: Regression guard when refactoring `drawTacticalTerrainHexes` parent filtering.
- * Expected outcome: Tactical branch uses `!tactical && !exploredHexes.has(parent.h3Index)` so explored is ignored when tactical is active.
+ * Expected outcome: With a battle snapshot, terrain drawing iterates `tacticalChildH3Indexes`. Without one, explored parents still gate the geometric children.
  * Exceptions: None.
  */
 function testTacticalDrawingSkipsExploredGateWhenTactical(): void {
@@ -673,8 +673,12 @@ function testTacticalDrawingSkipsExploredGateWhenTactical(): void {
   const source = fs.readFileSync(terrainPath, 'utf8');
   const fn = getFunctionSource(source, 'drawTacticalTerrainHexes');
   assert.ok(
-    fn.includes('if (!tactical && !exploredHexes.has(parent.h3Index)) continue;'),
-    'drawTacticalTerrainHexes should skip exploredHexes gating for the tactical enclosing res1 parent'
+    fn.includes('paintBattleFootprintTerrain'),
+    'drawTacticalTerrainHexes should paint tacticalChildH3Indexes while a battle snapshot is set'
+  );
+  assert.ok(
+    fn.includes('if (!exploredHexes.has(parent.h3Index)) continue;'),
+    'drawTacticalTerrainHexes should keep the explored-parent path when no battle snapshot is set'
   );
 }
 

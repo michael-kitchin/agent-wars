@@ -177,7 +177,7 @@ export function sanitizeOpponentTacticalDraftForReadyCommit(
       : preBattle;
   const embarkOrders: TacticalOpponentPlanPayload['embarkOrders'] = [];
   for (const e of draft.embarkOrders) {
-    const er = validateTacticalOpponentEmbarkOrder(e, projected.subUnits);
+    const er = validateTacticalOpponentEmbarkOrder(e, projected.subUnits, preBattle.enclosingStrategicH3Index);
     if (!er.valid) {
       dropped += 1;
       logOrderPlanSanitizeDrop(sanitizeCtx, 'embark', {

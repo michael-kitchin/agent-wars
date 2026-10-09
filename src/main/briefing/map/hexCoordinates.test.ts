@@ -12,6 +12,7 @@ import { cellToLatLng, latLngToCell } from 'h3-js';
 import { GLOBAL_GAME_MAP, resetActiveGameMap, withGameMap } from '../../../shared/activeGameMap';
 import { setLoadedStrategicFootprint } from '../../../shared/loadedStrategicFootprint';
 import { tacticalCellAt, tacticalChildrenOf } from '../../../shared/h3Resolutions';
+import { tacticalBattleFootprint } from '../../../shared/tacticalBattleFootprint';
 import { projectToGrid } from './hexGridProjection';
 import {
   ensureStrategicCoordinateRegistryInitialized,
@@ -186,12 +187,37 @@ function testStrategicRegistryFollowsActiveMap(): void {
  * Expected outcome: All tests pass and a single success line is printed.
  * Exceptions: None.
  */
+/**
+ * Checks that a battle registry includes the margin and round-trips one margin cell.
+ *
+ * Purpose: Briefing codes and map labels share the footprint, not only the enclosing hex's children.
+ * When to use: After the strategic registry tests.
+ * Expected outcome: 607 codes for `81263ffffffffff`, and a margin cell maps both ways.
+ * Exceptions: Assertion failure when the margin is missing.
+ */
+function testTacticalRegistryIncludesMargin(): void {
+  const enclosing = '81263ffffffffff';
+  const battleId = 'margin-registry';
+  const context = { mode: 'tactical' as const, battleId };
+  withGameMap(GLOBAL_GAME_MAP, () => {
+    const footprint = tacticalBattleFootprint(enclosing);
+    const margin = footprint.h3Indexes.find((cell) => !footprint.coreChildH3Indexes.includes(cell));
+    if (!margin) throw new Error('fixture has no margin cell');
+    initTacticalCoordinateRegistry(battleId, enclosing);
+    const code = getHexCodeForContext(margin, context);
+    assert.strictEqual(footprint.h3Indexes.length, 607);
+    assert.ok(code && code.length === 2);
+    assert.strictEqual(getH3IndexForCode(code, context), margin);
+  });
+}
+
 function run(): void {
   testStrategicCodesAreUniqueAcrossAllCells();
   testStrategicFullRoundTripForEveryCell();
   testStrategicRegistryStableAcrossExplicitReInit();
   testStrategicFastPathMatchesRoundTrip();
   testStrategicRegistryFollowsActiveMap();
+  testTacticalRegistryIncludesMargin();
   console.log('hexCoordinates.test.ts passed');
 }
 

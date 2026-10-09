@@ -498,7 +498,7 @@ export function applyHumanTacticalDraftBeatInStrategicOrder(args: {
         ? projectTacticalSnapshotAfterOpponentMovementOrders(bAfterHumanMove, oppMarch)
         : bAfterHumanMove;
     for (const e of args.embarkOrders ?? []) {
-      const emb = validateTacticalHumanEmbarkOrder(e, bAfterBothMoves.subUnits);
+      const emb = validateTacticalHumanEmbarkOrder(e, bAfterBothMoves.subUnits, bAfterBothMoves.enclosingStrategicH3Index);
       if (!emb.valid) {
         tacticalLogQuery('applyHumanTacticalDraftBeatInStrategicOrder rejected', { reason: 'embark_validation', detail: emb.reason });
         return { success: false, reason: emb.reason };

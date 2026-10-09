@@ -11,6 +11,7 @@ import {
 import { getHexBoundaryLatLngForLeafletOverlay } from '../map/hexGrid';
 import { getActiveHexStrokeStyle, fillHexTerrain } from './terrainVisualStyles';
 import { drawTerrainInfrastructureGlyphs, TACTICAL_TERRAIN_INFRA_GLYPH_AREA_SCALE } from './terrainInfrastructureOverlay';
+import { drawBattleFootprintInfrastructureGlyphs, paintBattleFootprintTerrain } from './tacticalBattleTerrainPaint';
 import { MULTI_PLAYER_FILL, OWNERSHIP_BORDER_ALPHA, PLAYER_COLORS } from '../core/constants';
 import { getLeafletGlobal, hexCenterPx } from '../map/mapHelpers';
 import {
@@ -345,11 +346,11 @@ export function drawTerrainHexes(ctx: CanvasRenderingContext2D, deps: TerrainRen
 }
 
 /**
- * Defines the `drawTacticalTerrainHexes` function shape (export function drawTacticalTerrainHexes(ctx: CanvasRenderingContext2D, deps: TerrainRenderingDeps): void).
-
- * Purpose: Supports maintainability by documenting why `drawTacticalTerrainHexes` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Draws tactical terrain hexes for the strategic map, or the battle footprint when a battle is open.
+ *
+ * Purpose: Battle cells include three rings beyond the enclosing hex, so that path paints `tacticalChildH3Indexes` directly.
+ * When to use: Each map frame while tactical hexes should render.
+ * Expected outcome: With a snapshot, every on-screen footprint cell is painted and the strategic parent loop is skipped. Without one, explored parents still gate geometric children.
  * Exceptions: None.
  */
 export function drawTacticalTerrainHexes(ctx: CanvasRenderingContext2D, deps: TerrainRenderingDeps): void {
@@ -363,14 +364,19 @@ export function drawTacticalTerrainHexes(ctx: CanvasRenderingContext2D, deps: Te
     | null;
   if (!map) return;
   const L = getLeafletGlobal();
+  if (!L) return;
   const container = map.getContainer();
   const viewportWidth = Math.max(1, container.clientWidth);
   const viewportHeight = Math.max(1, container.clientHeight);
   const stroke = getActiveHexStrokeStyle();
   const tactical = S.tacticalBattleSnapshot;
+  if (tactical) {
+    const leaflet = L as { latLng: (lat: number, lng: number) => unknown };
+    paintBattleFootprintTerrain(ctx, deps, tactical, map, leaflet, viewportWidth, viewportHeight, stroke);
+    return;
+  }
   for (const parent of S.gameState.hexes) {
-    if (tactical && parent.h3Index !== tactical.enclosingStrategicH3Index) continue;
-    if (!tactical && !exploredHexes.has(parent.h3Index)) continue;
+    if (!exploredHexes.has(parent.h3Index)) continue;
     if (!shouldConsiderTacticalChildrenForViewport(parent.h3Index, map, L, viewportWidth, viewportHeight)) continue;
     const parentKind =
       parent.terrainKind ??
@@ -560,8 +566,13 @@ export function drawTerrainInfrastructureOverlays(ctx: CanvasRenderingContext2D,
   const viewportWidth = Math.max(1, container.clientWidth);
   const viewportHeight = Math.max(1, container.clientHeight);
   const tactical = S.tacticalBattleSnapshot;
+  if (tactical) {
+    if (!L) return;
+    const leaflet = L as { latLng: (lat: number, lng: number) => unknown };
+    drawBattleFootprintInfrastructureGlyphs(ctx, tactical, map, leaflet, viewportWidth, viewportHeight, outlineScreenPx);
+    return;
+  }
   for (const parent of S.gameState.hexes) {
-    if (tactical && parent.h3Index !== tactical.enclosingStrategicH3Index) continue;
     let children = S.tacticalChildrenByParent.get(parent.h3Index);
     if (!children) {
       children = tacticalChildrenOf(parent.h3Index);
@@ -569,7 +580,7 @@ export function drawTerrainInfrastructureOverlays(ctx: CanvasRenderingContext2D,
     }
     if (!shouldConsiderTacticalChildrenForViewport(parent.h3Index, map, L, viewportWidth, viewportHeight)) continue;
     for (const child of children) {
-      if (!tactical && !deps.infraGlyphsAllowedForTacticalChild(parent.h3Index, child)) continue;
+      if (!deps.infraGlyphsAllowedForTacticalChild(parent.h3Index, child)) continue;
       const ap = S.terrainInfraTacticalAirport.has(child);
       const pt = S.terrainInfraTacticalSeaport.has(child);
       if (!ap && !pt) continue;

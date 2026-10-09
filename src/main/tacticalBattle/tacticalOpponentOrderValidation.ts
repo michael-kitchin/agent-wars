@@ -3,6 +3,7 @@
  */
 
 import { strategicParentOf } from '../../shared/h3Resolutions';
+import { logDebug } from '../logger';
 
 import type { AirStrikeOrder, EmbarkOrder, FerryOrder, GameStateSnapshot } from '../../shared/ipcTypes';
 import type { TacticalBattleSnapshot, TacticalSubUnitSnapshot } from '../../shared/tacticalBattleTypes';
@@ -11,6 +12,7 @@ import { tacticalSubUnitLabelForUserMessage } from '../../shared/unitDisplayName
 import { dbGetOne, getStrategicInfrastructureForHex, isDbReady } from '../gameDb';
 import { canEmbarkAtHex } from '../../shared/sealiftEmbarkEligibility';
 import { tacticalLogQuery } from './tacticalLogging';
+import { tacticalInfrastructureStrikeStaysOnEnclosingHex } from './tacticalSnapshotGuards';
 import { tacticalInvalidResult, tacticalValidResult, type TacticalValidationResult } from './tacticalValidationResult';
 
 /**
@@ -18,11 +20,16 @@ import { tacticalInvalidResult, tacticalValidResult, type TacticalValidationResu
  *
  * Purpose: Reuses strategic infrastructure rows while keeping tactical validation free of `sealift` module import cycles.
  * When to use: `validateTacticalOpponentEmbarkOrder` before recording tactical embark state.
- * Expected outcome: True only for coastal stacks or controlled seaport contexts mirroring strategic `canPlayerEmbarkFromHex` parity.
- * Exceptions: Returns false when the parent strategic hex is missing from `hexes` or context cannot be loaded.
+ * Expected outcome: True only for coastal stacks or controlled seaport contexts mirroring strategic `canPlayerEmbarkFromHex` parity. The enclosing hex is the one the caller already holds, including when the sub-unit stands in the margin.
+ * Exceptions: Returns false when that strategic hex is missing from `hexes` or context cannot be loaded.
  */
-export function canPlayerEmbarkFromTacticalHex(h3Index: string, playerId: string): boolean {
-  const strategic = strategicParentOf(h3Index);
+export function canPlayerEmbarkFromTacticalHex(
+  h3Index: string,
+  playerId: string,
+  enclosingStrategicH3Index: string
+): boolean {
+  logDebug('canPlayerEmbarkFromTacticalHex', { h3Index, playerId, enclosingStrategicH3Index });
+  const strategic = enclosingStrategicH3Index;
   const terrainRow = dbGetOne<{ terrain: string; terrainKind: string | null }>(
     'SELECT terrain, terrain_kind AS terrainKind FROM hexes WHERE h3_index = ?',
     [strategic]
@@ -58,7 +65,8 @@ export function canPlayerEmbarkFromTacticalHex(h3Index: string, playerId: string
 export function validateTacticalOpponentAirStrikeOrder(
   order: AirStrikeOrder,
   state: GameStateSnapshot,
-  displayLabelForUnit: (unitId: string) => string
+  displayLabelForUnit: (unitId: string) => string,
+  battle: Pick<TacticalBattleSnapshot, 'enclosingStrategicH3Index' | 'coreChildH3Indexes'>
 ): TacticalValidationResult {
   tacticalLogQuery('validateTacticalOpponentAirStrikeOrder', { unitId: order.unitId, targetType: order.targetType });
   if (!isDbReady()) return tacticalInvalidResult('Database not initialized');
@@ -78,7 +86,10 @@ export function validateTacticalOpponentAirStrikeOrder(
     if (!enemiesAtTarget) return tacticalInvalidResult('Target hex has no enemy units');
     return tacticalValidResult();
   }
-  const targetInfra = getStrategicInfrastructureForHex(strategicParentOf(order.targetH3Index));
+  if (!tacticalInfrastructureStrikeStaysOnEnclosingHex(battle, order.targetH3Index)) {
+    return tacticalInvalidResult('Air strikes may only target the contested strategic hex.');
+  }
+  const targetInfra = getStrategicInfrastructureForHex(battle.enclosingStrategicH3Index);
   if (order.targetType === 'urban' && targetInfra.urbanHexCount <= 0) {
     return tacticalInvalidResult('Target hex has no urban infrastructure');
   }
@@ -131,7 +142,8 @@ export function validateTacticalOpponentFerryOrder(
  */
 export function validateTacticalOpponentEmbarkOrder(
   order: EmbarkOrder,
-  subUnits: readonly TacticalSubUnitSnapshot[]
+  subUnits: readonly TacticalSubUnitSnapshot[],
+  enclosingStrategicH3Index: string
 ): TacticalValidationResult {
   tacticalLogQuery('validateTacticalOpponentEmbarkOrder', { unitId: order.unitId, navalUnitId: order.navalUnitId });
   const land = subUnits.find((u) => u.id === order.unitId);
@@ -152,7 +164,7 @@ export function validateTacticalOpponentEmbarkOrder(
   if (land.embarkedOnSubUnitId) {
     return tacticalInvalidResult('Land unit already embarked on a different carrier');
   }
-  if (!canPlayerEmbarkFromTacticalHex(land.h3Index, 'opponent')) {
+  if (!canPlayerEmbarkFromTacticalHex(land.h3Index, 'opponent', enclosingStrategicH3Index)) {
     return tacticalInvalidResult('Embarkation requires a valid port or coastal stack');
   }
   let existingArmor = false;
@@ -182,7 +194,8 @@ export function validateTacticalOpponentEmbarkOrder(
  */
 export function validateTacticalHumanEmbarkOrder(
   order: EmbarkOrder,
-  subUnits: readonly TacticalSubUnitSnapshot[]
+  subUnits: readonly TacticalSubUnitSnapshot[],
+  enclosingStrategicH3Index: string
 ): TacticalValidationResult {
   tacticalLogQuery('validateTacticalHumanEmbarkOrder', { unitId: order.unitId, navalUnitId: order.navalUnitId });
   const land = subUnits.find((u) => u.id === order.unitId);
@@ -203,7 +216,7 @@ export function validateTacticalHumanEmbarkOrder(
   if (land.embarkedOnSubUnitId) {
     return tacticalInvalidResult('Land unit already embarked on a different carrier');
   }
-  if (!canPlayerEmbarkFromTacticalHex(land.h3Index, 'human')) {
+  if (!canPlayerEmbarkFromTacticalHex(land.h3Index, 'human', enclosingStrategicH3Index)) {
     return tacticalInvalidResult('Embarkation requires a valid port or coastal stack');
   }
   let existingArmor = false;

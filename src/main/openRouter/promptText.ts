@@ -129,16 +129,16 @@ Final JSON: use briefing hex codes for cells; standing-order pursue uses enemy u
 }
 
 /**
- * Opening geography clause for tactical AI prompts inside one strategic footprint.
+ * Opening geography clause for tactical AI prompts.
  *
- * Purpose: Avoids claiming a global strategic context when the operational map is the local tactical child grid.
+ * Purpose: Avoids claiming a global strategic context when the operational map is the battle footprint.
  * When to use: `buildSystemPromptForTools` when `coordinateContext.mode === 'tactical'`.
  * Expected outcome: Two-character tactical codes and adjacency semantics aligned with the tactical operational map section.
  * Exceptions: None.
  */
 export function buildTacticalLatLngPreamble(decimalPlaces: number): string {
   void decimalPlaces;
-  return `Tactical battle map: H3 resolution 4 children inside the enclosing strategic hex. Positions are two-character tactical briefing hex codes (A–Z and 0–9) from the operational map and Unit Status table — copy exactly; never invent codes. Distances are tactical hex steps where shown.
+  return `Tactical battle map: the enclosing strategic hex's tactical cells plus three neighboring rings. Positions are two-character tactical briefing hex codes (A–Z and 0–9) from the operational map and Unit Status table — copy exactly; never invent codes. Distances are tactical hex steps where shown.
 
 Final JSON: use tactical briefing hex codes for cells and enemy sub-unit ids for targetUnitId. Never emit raw H3 strings or latitude/longitude pairs.`;
 }

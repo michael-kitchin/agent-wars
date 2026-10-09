@@ -151,13 +151,18 @@ export function tacticalCellIsUrbanOrRubble(battle: TacticalBattleTerrainPick, t
  *
  * Purpose: Lets tactical ranged validation and AI legal-target lists allow infra-only shots alongside enemy-occupied hexes.
  * When to use: After loading `listTacticalFeatureOverridesForGame` rows filtered to the battle footprint and parent strategic.
- * Expected outcome: True when snapshot maps or a matching non-rubble override row still carries urban, airport, or seaport.
- * Exceptions: None; empty `tacticalFeatureRows` still allows hits from `tacticalIsUrbanByH3` / `tacticalIsSeaportByH3` alone.
+ * Expected outcome: True when snapshot maps or a matching non-rubble override row still carries urban, airport, or seaport. False for a cell outside `coreChildH3Indexes` when that list is present.
+ * Exceptions: None. Does not call H3. Empty `tacticalFeatureRows` still allows hits from `tacticalIsUrbanByH3` / `tacticalIsSeaportByH3` alone when the cell is in the core, or when the core list is absent.
  */
 export function tacticalHasStrikeableInfrastructure(
   battle: Pick<
     TacticalBattleSnapshot,
-    'tacticalIsUrbanByH3' | 'tacticalIsRubbleByH3' | 'tacticalIsSeaportByH3' | 'tacticalRoadSidesByH3' | 'tacticalRailSidesByH3'
+    | 'coreChildH3Indexes'
+    | 'tacticalIsUrbanByH3'
+    | 'tacticalIsRubbleByH3'
+    | 'tacticalIsSeaportByH3'
+    | 'tacticalRoadSidesByH3'
+    | 'tacticalRailSidesByH3'
   >,
   tacticalH3: string,
   tacticalFeatureRows: ReadonlyArray<{
@@ -168,6 +173,7 @@ export function tacticalHasStrikeableInfrastructure(
     isRubble: boolean;
   }>
 ): boolean {
+  if (battle.coreChildH3Indexes && !battle.coreChildH3Indexes.includes(tacticalH3)) return false;
   if (battle.tacticalIsRubbleByH3?.[tacticalH3]) return false;
   if (battle.tacticalIsUrbanByH3?.[tacticalH3]) return true;
   if (battle.tacticalIsSeaportByH3?.[tacticalH3]) return true;

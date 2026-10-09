@@ -21129,28 +21129,6 @@ ${bonuses}`;
     return `<strong>Blocked:</strong> ${formatTerrainNameListHtml(m[1].trim())}`;
   }
 
-  // src/shared/hexNamingCaption.ts
-  var EMPTY_HEX_NAMING_CAPTION_SPANS = Object.freeze([]);
-  function formatHexNamingCaptionHtml(caption) {
-    const { text } = caption;
-    let html = "";
-    let cursor = 0;
-    for (const span of caption.spans) {
-      html += escapeHtmlText(text.slice(cursor, span.start));
-      const flag = span.isCountry ? countryFlagImgHtml(span.countryCode) : "";
-      const name = escapeHtmlText(text.slice(span.start, span.end));
-      if (span.role === "heading") {
-        const hasColon = text[span.end] === ":";
-        html += `<strong>${flag}${name}${hasColon ? ":" : ""}</strong>`;
-        cursor = hasColon ? span.end + 1 : span.end;
-      } else {
-        html += `${flag}${name}`;
-        cursor = span.end;
-      }
-    }
-    return html + escapeHtmlText(text.slice(cursor));
-  }
-
   // src/shared/hexLlmCodeAssignment.ts
   var CODE_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
   var strategicH3ToCodeSingleton = null;
@@ -21220,6 +21198,87 @@ ${bonuses}`;
     const parentCode = getStrategicHexCode(parent);
     const childCode = getTacticalChildCodeWithinParent(parent, target.h3Index);
     return parentCode && childCode ? `(${parentCode}.${childCode})` : null;
+  }
+
+  // src/shared/tacticalBattleFootprint.ts
+  var TACTICAL_BATTLE_MARGIN_RINGS = 3;
+  var footprintByKey = /* @__PURE__ */ new Map();
+  function resetTacticalBattleFootprintCache() {
+    footprintByKey.clear();
+  }
+  registerActiveGameMapReset(resetTacticalBattleFootprintCache);
+  function frozenCodeMap(entries) {
+    const map = new Map(entries);
+    const reject = () => {
+      throw new TypeError("tactical battle footprint code map is frozen");
+    };
+    map.set = reject;
+    map.delete = reject;
+    map.clear = reject;
+    return map;
+  }
+  function buildTacticalBattleFootprint(enclosingStrategicH3Index) {
+    const coreChildH3Indexes = Object.freeze([...tacticalChildrenOf(enclosingStrategicH3Index)]);
+    const cells = /* @__PURE__ */ new Set();
+    for (const cell of coreChildH3Indexes) {
+      for (const near of gridDisk(cell, TACTICAL_BATTLE_MARGIN_RINGS)) {
+        cells.add(near);
+      }
+    }
+    const h3Indexes = Object.freeze(sortCellsForStableLlmCodes([...cells]));
+    const codeByH3 = frozenCodeMap(h3Indexes.map((h3, index) => [h3, indexToCode(index)]));
+    return { coreChildH3Indexes, h3Indexes, codeByH3 };
+  }
+  function tacticalBattleFootprint(enclosingStrategicH3Index) {
+    const key = `${strategicH3Resolution()}:${tacticalH3Resolution()}:${enclosingStrategicH3Index}`;
+    const cached = footprintByKey.get(key);
+    if (cached) return cached;
+    const built = buildTacticalBattleFootprint(enclosingStrategicH3Index);
+    footprintByKey.set(key, built);
+    return built;
+  }
+  function tacticalBattleHexCode(enclosingStrategicH3Index, tacticalH3Index) {
+    return tacticalBattleFootprint(enclosingStrategicH3Index).codeByH3.get(tacticalH3Index);
+  }
+  function tacticalBattleTerrainKindByCell(args) {
+    const kinds = {};
+    for (const cell of args.cells) {
+      const tacticalKind = args.tacticalKindByH3.get(cell);
+      if (tacticalKind !== void 0 && tacticalKind.trim().length > 0) {
+        kinds[cell] = tacticalKind;
+        continue;
+      }
+      let parentKind;
+      try {
+        parentKind = args.loadedStrategicKindByH3.get(strategicParentOf(cell));
+      } catch {
+        parentKind = void 0;
+      }
+      kinds[cell] = parentKind !== void 0 && parentKind.trim().length > 0 ? parentKind : args.enclosingKind;
+    }
+    return kinds;
+  }
+
+  // src/shared/hexNamingCaption.ts
+  var EMPTY_HEX_NAMING_CAPTION_SPANS = Object.freeze([]);
+  function formatHexNamingCaptionHtml(caption) {
+    const { text } = caption;
+    let html = "";
+    let cursor = 0;
+    for (const span of caption.spans) {
+      html += escapeHtmlText(text.slice(cursor, span.start));
+      const flag = span.isCountry ? countryFlagImgHtml(span.countryCode) : "";
+      const name = escapeHtmlText(text.slice(span.start, span.end));
+      if (span.role === "heading") {
+        const hasColon = text[span.end] === ":";
+        html += `<strong>${flag}${name}${hasColon ? ":" : ""}</strong>`;
+        cursor = hasColon ? span.end + 1 : span.end;
+      } else {
+        html += `${flag}${name}`;
+        cursor = span.end;
+      }
+    }
+    return html + escapeHtmlText(text.slice(cursor));
   }
 
   // src/shared/homeRegionRules.ts
@@ -21598,6 +21657,13 @@ ${bonuses}`;
   // src/renderer/map/terrainTooltipHtml.ts
   function formatLlmLocationBoldPrefixHtml(namingTarget) {
     if (!namingTarget) return "";
+    const battle = rendererSharedState.tacticalBattleSnapshot;
+    if (battle) {
+      const strategicCode = getStrategicHexCode(battle.enclosingStrategicH3Index);
+      const tacticalCode = tacticalBattleHexCode(battle.enclosingStrategicH3Index, namingTarget.h3Index);
+      if (!strategicCode || !tacticalCode) return "";
+      return `<strong>${escapeHtmlText(`(${strategicCode}.${tacticalCode})`)}</strong> `;
+    }
     const label = getLlmHexLocationParenLabelForNamingTarget(namingTarget);
     if (!label) return "";
     return `<strong>${escapeHtmlText(label)}</strong> `;
@@ -21609,6 +21675,7 @@ ${bonuses}`;
     return variants.length > 0 ? `, ${variants.join(", ")}` : "";
   }
   function resolveStrategicHexForControlLine(namingTarget) {
+    if (rendererSharedState.tacticalBattleSnapshot) return rendererSharedState.tacticalBattleSnapshot.enclosingStrategicH3Index;
     if (!namingTarget) return null;
     if (namingTarget.resolution === 1) return namingTarget.h3Index;
     try {
@@ -21646,8 +21713,8 @@ ${bonuses}`;
     return ownerLabel;
   }
   function tooltipWeather(namingTarget) {
+    if (rendererSharedState.tacticalBattleSnapshot) return rendererSharedState.tacticalBattleSnapshot.weather ?? null;
     if (!namingTarget) return null;
-    if (namingTarget.resolution === 4 && rendererSharedState.tacticalBattleSnapshot) return rendererSharedState.tacticalBattleSnapshot.weather ?? null;
     if (!rendererSharedState.gameState) return null;
     const strategicHex = namingTarget.resolution === 1 ? namingTarget.h3Index : parentStrategicHex(namingTarget.h3Index);
     if (!strategicHex) return null;
@@ -21830,6 +21897,44 @@ ${bonuses}`;
   function transportSideMaskHasAnyTrue(mask) {
     if (!mask || mask.length === 0) return false;
     return mask.some((v) => v === true);
+  }
+  function battleTerrainTooltipState(detailH3, battle) {
+    const override = rendererSharedState.tacticalTerrainOverridesByH3.get(detailH3);
+    const tacticalKindByH3 = /* @__PURE__ */ new Map();
+    if (override?.terrainKind && override.terrainKind.trim().length > 0) {
+      tacticalKindByH3.set(detailH3, override.terrainKind);
+    }
+    const loadedStrategicKindByH3 = /* @__PURE__ */ new Map();
+    for (const hex of rendererSharedState.gameState?.hexes ?? []) {
+      if (hex.terrainKind && hex.terrainKind.trim().length > 0) loadedStrategicKindByH3.set(hex.h3Index, hex.terrainKind);
+    }
+    const enclosingKind = loadedStrategicKindByH3.get(battle.enclosingStrategicH3Index) || battle.strategicHexTerrainKind || "plains";
+    const terrainKind = tacticalBattleTerrainKindByCell({
+      cells: [detailH3],
+      tacticalKindByH3,
+      enclosingKind,
+      loadedStrategicKindByH3
+    })[detailH3] ?? enclosingKind;
+    const features = [];
+    if (battle.tacticalIsAirportByH3?.[detailH3] === true) features.push("Airport");
+    if (battle.tacticalIsSeaportByH3?.[detailH3] === true) features.push("Seaport");
+    const { roadSides, railSides } = tacticalRoadRailSideMasksForChild(detailH3);
+    if (transportSideMaskHasAnyTrue(roadSides)) features.push("Road");
+    if (transportSideMaskHasAnyTrue(railSides)) features.push("Rail");
+    return {
+      terrainKind,
+      isUrban: battle.tacticalIsUrbanByH3?.[detailH3] === true,
+      isRubble: battle.tacticalIsRubbleByH3?.[detailH3] === true,
+      features,
+      urbanHexCount: null,
+      strategicTerrainSummary: null,
+      strategicFeaturesSummary: null,
+      parentTerrain: parentPassabilityForStrategicHex(battle.enclosingStrategicH3Index),
+      parentTerrainKind: enclosingKind,
+      isSeaport: battle.tacticalIsSeaportByH3?.[detailH3] === true,
+      hasRoad: transportSideMaskHasAnyTrue(roadSides),
+      hasRail: transportSideMaskHasAnyTrue(railSides)
+    };
   }
   function featureLabelsForTacticalChild(parentH3, childH3) {
     if (!infraGlyphsAllowedForTacticalChild(parentH3, childH3)) return [];
@@ -22049,6 +22154,8 @@ ${bonuses}`;
     const latlng = map.containerPointToLatLng(L.point(clientX - rect.left, clientY - rect.top));
     try {
       const detailH3 = tacticalCellAt(latlng.lat, latlng.lng);
+      const battle = rendererSharedState.tacticalBattleSnapshot;
+      if (battle?.tacticalChildH3Indexes.includes(detailH3)) return battleTerrainTooltipState(detailH3, battle);
       const parentH3 = strategicParentOf(detailH3);
       const parentKind = terrainKindForStrategicHex(parentH3);
       const detail = rendererSharedState.tacticalTerrainOverridesByH3.get(detailH3);
@@ -23396,8 +23503,8 @@ ${bonuses}`;
     if (inAi) return { controllerPlayerId: "opponent", homeOwnerIdentity: "opponent" };
     return { controllerPlayerId: null, homeOwnerIdentity: null };
   }
-  function previewHexIsDrawn(gameMapId, homeOwnerIdentity) {
-    if (gameMapId !== "global") return true;
+  function previewHexIsDrawn(homeOwnerIdentity, mapInspectionHeld) {
+    if (mapInspectionHeld) return true;
     return homeOwnerIdentity != null;
   }
   function previewWeatherIcon(input) {
@@ -23983,6 +24090,69 @@ ${bonuses}`;
     }
   }
 
+  // src/renderer/rendering/tacticalBattleTerrainPaint.ts
+  function paintBattleFootprintTerrain(ctx, deps, tactical, map, leaflet, viewportWidth, viewportHeight, stroke) {
+    const tacticalKindByH3 = /* @__PURE__ */ new Map();
+    for (const cell of tactical.tacticalChildH3Indexes) {
+      const kind = rendererSharedState.tacticalTerrainOverridesByH3.get(cell)?.terrainKind;
+      if (kind && kind.trim().length > 0) tacticalKindByH3.set(cell, kind);
+    }
+    const loadedStrategicKindByH3 = /* @__PURE__ */ new Map();
+    for (const hex of rendererSharedState.gameState?.hexes ?? []) {
+      if (hex.terrainKind && hex.terrainKind.trim().length > 0) loadedStrategicKindByH3.set(hex.h3Index, hex.terrainKind);
+    }
+    const enclosing = rendererSharedState.gameState?.hexes.find((hex) => hex.h3Index === tactical.enclosingStrategicH3Index);
+    const enclosingKind = enclosing?.terrainKind?.trim() || tactical.strategicHexTerrainKind || "plains";
+    const kinds = tacticalBattleTerrainKindByCell({
+      cells: tactical.tacticalChildH3Indexes,
+      tacticalKindByH3,
+      enclosingKind,
+      loadedStrategicKindByH3
+    });
+    for (const child of tactical.tacticalChildH3Indexes) {
+      const override = rendererSharedState.tacticalTerrainOverridesByH3.get(child);
+      const terrainKind = kinds[child] ?? enclosingKind;
+      const pts = projectHexBoundaryToContainerPoints(child, map, leaflet);
+      if (!shouldDrawTacticalChildHexInViewport(pts, viewportWidth, viewportHeight)) continue;
+      const drawClosedPath = () => {
+        ctx.beginPath();
+        for (let i = 0; i < pts.length; i++) {
+          const p = pts[i];
+          if (i === 0) ctx.moveTo(p.x, p.y);
+          else ctx.lineTo(p.x, p.y);
+        }
+        ctx.closePath();
+      };
+      if (!deps.isMapInspectionModeHeld()) {
+        fillHexTerrain(ctx, terrainKind, drawClosedPath, {
+          fillAndHatchAlphaScale: rendererSharedState.hoveredDetailHexH3 === child ? 2 : 1,
+          landHoverFill: rendererSharedState.hoveredDetailHexH3 === child && terrainKind === "plains",
+          isUrban: override?.isUrban ?? false,
+          isRubble: override?.isRubble ?? false
+        });
+      }
+      ctx.strokeStyle = stroke.color;
+      ctx.lineWidth = Math.max(0.28, stroke.width * 0.62);
+      drawClosedPath();
+      ctx.stroke();
+    }
+  }
+  function drawBattleFootprintInfrastructureGlyphs(ctx, tactical, map, leaflet, viewportWidth, viewportHeight, outlineScreenPx) {
+    for (const child of tactical.tacticalChildH3Indexes) {
+      const ap = tactical.tacticalIsAirportByH3?.[child] === true;
+      const pt = tactical.tacticalIsSeaportByH3?.[child] === true;
+      if (!ap && !pt) continue;
+      const pts = projectHexBoundaryToContainerPoints(child, map, leaflet);
+      if (!shouldDrawTacticalChildHexInViewport(pts, viewportWidth, viewportHeight)) continue;
+      drawTerrainInfrastructureGlyphs(ctx, pts, {
+        showAirport: ap,
+        showSeaport: pt,
+        outlineScreenPx,
+        glyphAreaScale: TACTICAL_TERRAIN_INFRA_GLYPH_AREA_SCALE
+      });
+    }
+  }
+
   // src/renderer/rendering/terrainRendering.ts
   function getMapZoomStrokeScale(zoom) {
     return Math.max(0.88, Math.min(1.22, 1.22 - (zoom - 2) * (0.32 / 8)));
@@ -24162,14 +24332,19 @@ ${bonuses}`;
     const map = getMainLeafletMap();
     if (!map) return;
     const L = getLeafletGlobal();
+    if (!L) return;
     const container = map.getContainer();
     const viewportWidth = Math.max(1, container.clientWidth);
     const viewportHeight = Math.max(1, container.clientHeight);
     const stroke = getActiveHexStrokeStyle();
     const tactical = rendererSharedState.tacticalBattleSnapshot;
+    if (tactical) {
+      const leaflet = L;
+      paintBattleFootprintTerrain(ctx, deps, tactical, map, leaflet, viewportWidth, viewportHeight, stroke);
+      return;
+    }
     for (const parent of rendererSharedState.gameState.hexes) {
-      if (tactical && parent.h3Index !== tactical.enclosingStrategicH3Index) continue;
-      if (!tactical && !exploredHexes.has(parent.h3Index)) continue;
+      if (!exploredHexes.has(parent.h3Index)) continue;
       if (!shouldConsiderTacticalChildrenForViewport(parent.h3Index, map, L, viewportWidth, viewportHeight)) continue;
       const parentKind = parent.terrainKind ?? (parent.terrain === "water" ? "water" : parent.terrain === "coastal" ? "coastal" : parent.terrain === "wetlands" ? "wetlands" : "plains");
       let children = rendererSharedState.tacticalChildrenByParent.get(parent.h3Index);
@@ -24302,8 +24477,13 @@ ${bonuses}`;
     const viewportWidth = Math.max(1, container.clientWidth);
     const viewportHeight = Math.max(1, container.clientHeight);
     const tactical = rendererSharedState.tacticalBattleSnapshot;
+    if (tactical) {
+      if (!L) return;
+      const leaflet = L;
+      drawBattleFootprintInfrastructureGlyphs(ctx, tactical, map, leaflet, viewportWidth, viewportHeight, outlineScreenPx);
+      return;
+    }
     for (const parent of rendererSharedState.gameState.hexes) {
-      if (tactical && parent.h3Index !== tactical.enclosingStrategicH3Index) continue;
       let children = rendererSharedState.tacticalChildrenByParent.get(parent.h3Index);
       if (!children) {
         children = tacticalChildrenOf(parent.h3Index);
@@ -24311,7 +24491,7 @@ ${bonuses}`;
       }
       if (!shouldConsiderTacticalChildrenForViewport(parent.h3Index, map, L, viewportWidth, viewportHeight)) continue;
       for (const child of children) {
-        if (!tactical && !deps.infraGlyphsAllowedForTacticalChild(parent.h3Index, child)) continue;
+        if (!deps.infraGlyphsAllowedForTacticalChild(parent.h3Index, child)) continue;
         const ap = rendererSharedState.terrainInfraTacticalAirport.has(child);
         const pt = rendererSharedState.terrainInfraTacticalSeaport.has(child);
         if (!ap && !pt) continue;
@@ -24377,7 +24557,7 @@ ${bonuses}`;
       const border = previewHomeBorder(hex.h3Index, humanHomes, aiHomes);
       const pts = projectHexBoundaryToContainerPoints(hex.h3Index, map, leaflet);
       if (pts.length === 0) continue;
-      if (previewHexIsDrawn(payload.gameMapId, border.homeOwnerIdentity)) {
+      if (previewHexIsDrawn(border.homeOwnerIdentity, inspectionHeld)) {
         const drawClosedPath = () => {
           ctx.beginPath();
           for (let i = 0; i < pts.length; i++) {
@@ -24387,7 +24567,7 @@ ${bonuses}`;
           }
           ctx.closePath();
         };
-        if (!inspectionHeld) fillHexTerrain(ctx, hex.terrainKind, drawClosedPath);
+        fillHexTerrain(ctx, hex.terrainKind, drawClosedPath);
         if (border.homeOwnerIdentity == null) {
           ctx.strokeStyle = stroke.color;
           ctx.lineWidth = stroke.width * zoomStrokeScale;
@@ -28871,9 +29051,38 @@ ${bonuses}`;
       const tactical = rendererSharedState.tacticalBattleSnapshot;
       const inspection = isMapInspectionModeHeld();
       const labelJobs = [];
+      if (tactical) {
+        for (const child of tactical.tacticalChildH3Indexes) {
+          const pts = projectHexBoundaryToContainerPoints(child, map, L);
+          if (!shouldDrawTacticalChildHexInViewport(pts, viewportWidth, viewportHeight)) continue;
+          const span = spanForProjectedHex(pts);
+          const centerPx = projectedCentroid2(pts);
+          const cityLabel = rendererSharedState.tacticalCityOverlayLabelByH3.get(child);
+          const hasAirportOrSeaport = tactical.tacticalIsAirportByH3?.[child] === true || tactical.tacticalIsSeaportByH3?.[child] === true;
+          if (cityLabel && !hasAirportOrSeaport) {
+            const referenceOuterR = TACTICAL_MAP_OVERLAY_CITY_DOT_RADIUS_PX * 2 * zoomStrokeScale;
+            const circleRadiusPx = referenceOuterR * TACTICAL_MAP_OVERLAY_CITY_CIRCLE_RADIUS_FRAC;
+            drawTacticalCityCircleMarker(
+              ctx,
+              centerPx.x,
+              centerPx.y,
+              circleRadiusPx,
+              TACTICAL_MAP_OVERLAY_CITY_DOT_HALO_WIDTH_PX,
+              zoomStrokeScale
+            );
+          }
+          if (inspection) {
+            const code = tacticalBattleHexCode(tactical.enclosingStrategicH3Index, child);
+            if (code) scheduleCenteredInspectionCodeLabelJob(labelJobs, centerPx, span, code);
+          } else if (cityLabel) {
+            scheduleCityStyleLabelJob(labelJobs, centerPx, span, cityLabel, zoomStrokeScale);
+          }
+        }
+        flushCityStyleLabelJobs(ctx, labelJobs, zoomStrokeScale);
+        return;
+      }
       for (const parent of rendererSharedState.gameState.hexes) {
-        if (tactical && parent.h3Index !== tactical.enclosingStrategicH3Index) continue;
-        if (!tactical && !inspection && !exploredHexes.has(parent.h3Index)) continue;
+        if (!inspection && !exploredHexes.has(parent.h3Index)) continue;
         if (!shouldConsiderTacticalChildrenForViewport(parent.h3Index, map, L, viewportWidth, viewportHeight)) continue;
         let children = rendererSharedState.tacticalChildrenByParent.get(parent.h3Index);
         if (!children) {
@@ -28902,8 +29111,7 @@ ${bonuses}`;
             }
           }
           if (inspection) {
-            const parentForCode = tactical ? tactical.enclosingStrategicH3Index : parent.h3Index;
-            const code = getTacticalChildCodeWithinParent(parentForCode, child);
+            const code = getTacticalChildCodeWithinParent(parent.h3Index, child);
             if (code) {
               scheduleCenteredInspectionCodeLabelJob(labelJobs, centerPx, span, code);
             }
@@ -33238,6 +33446,7 @@ ${bonuses}`;
   }
   function detailHitAtClientPixel(clientX, clientY, mapHexSet) {
     if (!rendererSharedState.gameState || !shouldRenderTacticalHexes()) return null;
+    const battle = rendererSharedState.tacticalBattleSnapshot;
     const exploredHexes = getExploredHexSet(rendererSharedState.gameState);
     const map = getMainLeafletMap();
     if (!map) return null;
@@ -33247,6 +33456,7 @@ ${bonuses}`;
     const latlng = map.containerPointToLatLng(L.point(clientX - rect.left, clientY - rect.top));
     try {
       const detailH3 = tacticalCellAt(latlng.lat, latlng.lng);
+      if (battle) return battle.tacticalChildH3Indexes.includes(detailH3) ? detailH3 : null;
       const parentH3 = strategicParentOf(detailH3);
       if (!exploredHexes.has(parentH3)) return null;
       return mapHexSet.has(parentH3) ? detailH3 : null;
@@ -33739,17 +33949,7 @@ ${bonuses}`;
   function tacticalRendererHitInsideBattleFootprint(hit, tb) {
     let footprintSaysInside = false;
     if (typeof hit === "string" && tb) {
-      if (hit === tb.enclosingStrategicH3Index || tb.tacticalChildH3Indexes.includes(hit)) {
-        footprintSaysInside = true;
-      } else {
-        try {
-          if (isTacticalCell(hit)) {
-            footprintSaysInside = strategicParentOf(hit) === tb.enclosingStrategicH3Index;
-          }
-        } catch {
-          footprintSaysInside = false;
-        }
-      }
+      footprintSaysInside = hit === tb.enclosingStrategicH3Index || tb.tacticalChildH3Indexes.includes(hit);
     }
     return tacticalHitIsInsideBattle(tb != null, hit, footprintSaysInside);
   }

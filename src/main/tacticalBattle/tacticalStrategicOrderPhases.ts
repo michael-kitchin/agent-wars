@@ -3,8 +3,6 @@
  * air strike phase, ranged phase, then callers apply movement, ferry, cargo sync, and melee.
  */
 
-import { strategicParentOf } from '../../shared/h3Resolutions';
-
 import type {
   AirStrikeAnimationMove,
   AirStrikeOrder,
@@ -54,6 +52,7 @@ import { tacticalLogMutate, tacticalLogQuery } from './tacticalLogging';
 import {
   tacticalFindSubUnitIndexById,
   tacticalGuardOpponentAirSubUnitForFerry,
+  tacticalInfrastructureStrikeStaysOnEnclosingHex,
 } from './tacticalSnapshotGuards';
 
 /**
@@ -406,8 +405,7 @@ export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
     airStrikeAttemptCount += 1;
     strikeHexesSet.add(s.targetH3Index);
     const fromH3Index = attacker.h3Index;
-    const parent = strategicParentOf(s.targetH3Index);
-    if (parent !== battle.enclosingStrategicH3Index) {
+    if (!tacticalInfrastructureStrikeStaysOnEnclosingHex(battle, s.targetH3Index)) {
       strikeMoves.push({
         unitId: attacker.id,
         player: attacker.player,
@@ -448,12 +446,12 @@ export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
       });
       continue;
     }
-    const destruction = applyInfrastructureDestructionEffects(parent, s.targetType, next, {
+    const destruction = applyInfrastructureDestructionEffects(battle.enclosingStrategicH3Index, s.targetType, next, {
       tacticalUrbanStrikeTargetH3: s.targetType === 'urban' ? s.targetH3Index : undefined,
     });
     if (destruction.changedRubbleCount > 0 || destruction.destroyedAirUnits.length > 0) {
       infrastructureDestroyedEvents.push({
-        h3Index: parent,
+        h3Index: battle.enclosingStrategicH3Index,
         targetType: s.targetType,
         changedRubbleCount: destruction.changedRubbleCount,
         destroyedAirUnitsCount: destruction.destroyedAirUnits.length,
@@ -606,6 +604,7 @@ export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
     const rubbledFromCombat = new Set<string>();
     for (const hex of defenderHexesWithKill) {
       if (!footprint.has(hex) || rubbledFromCombat.has(hex)) continue;
+      if (!tacticalInfrastructureStrikeStaysOnEnclosingHex(workBattle, hex)) continue;
       if (!tacticalHasStrikeableInfrastructure(workBattle, hex, tacticalRowsForBattle)) continue;
       const targetType = tacticalRangedInfraEventTargetTypeBeforeRubble(hex, tacticalRowsForBattle);
       const { changed, destroyedAirUnitsCount } = applyTacticalRangedRubbleToCell(
@@ -659,6 +658,7 @@ export function applyTacticalAirStrikeThenRangedPhaseOnBattle(
       if (!rollCombatDieAgainst(rollDie, infraShotThreshold, infraShotContext, rangedDiceLog.sink)) continue;
       const hex = o.targetH3Index;
       if (rubbledInfraHexes.has(hex)) continue;
+      if (!tacticalInfrastructureStrikeStaysOnEnclosingHex(workBattle, hex)) continue;
       if (!tacticalHasStrikeableInfrastructure(workBattle, hex, tacticalRowsForBattle)) continue;
       const targetType = tacticalRangedInfraEventTargetTypeBeforeRubble(hex, tacticalRowsForBattle);
       const { changed, destroyedAirUnitsCount } = applyTacticalRangedRubbleToCell(

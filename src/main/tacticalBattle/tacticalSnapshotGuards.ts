@@ -3,6 +3,7 @@
  */
 
 import { gridDisk } from 'h3-js';
+import { strategicParentOf } from '../../shared/h3Resolutions';
 import { computeGridDistanceWithPathFallbackPure } from '../../shared/h3GridRangePure';
 import type { TacticalMarchPlanResult } from '../../shared/tacticalMovementPlanner';
 import type { TacticalBattleSnapshot, TacticalSubUnitSnapshot } from '../../shared/tacticalBattleTypes';
@@ -16,7 +17,7 @@ import {
   tacticalMovementUnitTypeForPathfinding,
 } from '../../shared/tacticalTerrainMovement';
 import { effectiveTacticalMovementPointBudgetForMarchLeg } from '../../shared/tacticalTerrainCombatModifiers';
-import { tacticalLogMutate } from './tacticalLogging';
+import { tacticalLogError, tacticalLogMutate } from './tacticalLogging';
 import { logDebug } from '../logger';
 
 /**
@@ -518,6 +519,27 @@ export function tacticalFindSubUnitIndexById(subUnits: readonly { id: string }[]
  */
 export function tacticalFootprintContains(tacticalSet: ReadonlySet<string>, h3Index: string): boolean {
   return tacticalSet.has(h3Index);
+}
+
+/**
+ * Returns whether an infrastructure strike may use this tactical cell.
+ *
+ * Purpose: A margin cell can hold a unit. Rubble, airports, and seaports stay on the enclosing hex's own children.
+ * When to use: Air-strike validation after the target is already inside the playable footprint.
+ * Expected outcome: True when the cell is in `coreChildH3Indexes`. When that list is absent, true only when the cell's geometric parent is the enclosing hex.
+ * Exceptions: A malformed cell id returns false.
+ */
+export function tacticalInfrastructureStrikeStaysOnEnclosingHex(
+  battle: Pick<TacticalBattleSnapshot, 'enclosingStrategicH3Index' | 'coreChildH3Indexes'>,
+  targetH3Index: string
+): boolean {
+  if (battle.coreChildH3Indexes) return battle.coreChildH3Indexes.includes(targetH3Index);
+  try {
+    return strategicParentOf(targetH3Index) === battle.enclosingStrategicH3Index;
+  } catch (err) {
+    tacticalLogError('tacticalInfrastructureStrikeStaysOnEnclosingHex rejected a cell id', { targetH3Index, err });
+    return false;
+  }
 }
 
 /**

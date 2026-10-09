@@ -147,14 +147,23 @@ export interface TacticalBattleSnapshot {
    */
   enclosingStrategicH3Index: string;
   /**
-   * All tactical descendants of the enclosing hex that participate in tactical rendering.
+   * Playable tactical cells for this battle, in stable briefing-code order.
    *
-   * Contract: Subset of `cellToChildren(enclosingStrategicH3Index, 4)` order is not significant.
-   * When to use: Leaflet `fitBounds` and tactical terrain drawing filters.
+   * Contract: The enclosing hex's geometric tactical children plus three neighboring rings. A superset of those children.
+   * When to use: Movement, range, drawing, clicks, and the AI map.
    * Expected outcome: Non-empty for a successfully started battle.
    * Exceptions: None.
    */
   tacticalChildH3Indexes: string[];
+  /**
+   * Geometric tactical children of the enclosing hex.
+   *
+   * Contract: Optional so older snapshot literals still typecheck. Production sets it from the footprint helper. Deployment and infrastructure destruction use it. When it is absent, infrastructure checks keep the parent test.
+   * When to use: Placement and strikeable-facility gates.
+   * Expected outcome: The children of `enclosingStrategicH3Index`. A margin cell is not in this list.
+   * Exceptions: None.
+   */
+  coreChildH3Indexes?: readonly string[];
   /**
    * Strategic turn number captured when tactical mode began.
    *

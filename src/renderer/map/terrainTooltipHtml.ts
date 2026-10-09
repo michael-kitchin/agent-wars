@@ -10,7 +10,8 @@
 import { strategicParentOf } from '../../shared/h3Resolutions';
 
 import { formatHexNamingCaptionHtml, type HexNamingCaption } from '../../shared/hexNamingCaption';
-import { getLlmHexLocationParenLabelForNamingTarget } from '../../shared/hexLlmCodeAssignment';
+import { getLlmHexLocationParenLabelForNamingTarget, getStrategicHexCode } from '../../shared/hexLlmCodeAssignment';
+import { tacticalBattleHexCode } from '../../shared/tacticalBattleFootprint';
 import { escapeHtmlText } from '../../shared/htmlTextFormatting';
 import {
   formatHomeRegionAssignmentControlSuffix,
@@ -42,6 +43,13 @@ import type { NamingLookupTarget, TerrainTooltipState } from './terrainTooltipTy
  */
 function formatLlmLocationBoldPrefixHtml(namingTarget: NamingLookupTarget | null): string {
   if (!namingTarget) return '';
+  const battle = S.tacticalBattleSnapshot;
+  if (battle) {
+    const strategicCode = getStrategicHexCode(battle.enclosingStrategicH3Index);
+    const tacticalCode = tacticalBattleHexCode(battle.enclosingStrategicH3Index, namingTarget.h3Index);
+    if (!strategicCode || !tacticalCode) return '';
+    return `<strong>${escapeHtmlText(`(${strategicCode}.${tacticalCode})`)}</strong> `;
+  }
   const label = getLlmHexLocationParenLabelForNamingTarget(namingTarget);
   if (!label) return '';
   return `<strong>${escapeHtmlText(label)}</strong> `;
@@ -71,6 +79,7 @@ function formatTerrainVariantSuffix(state: Pick<TerrainTooltipState, 'isUrban' |
  * Exceptions: Invalid h3 conversion returns null.
  */
 function resolveStrategicHexForControlLine(namingTarget: NamingLookupTarget | null): string | null {
+  if (S.tacticalBattleSnapshot) return S.tacticalBattleSnapshot.enclosingStrategicH3Index;
   if (!namingTarget) return null;
   if (namingTarget.resolution === 1) return namingTarget.h3Index;
   try {
@@ -128,8 +137,8 @@ function getTooltipControlLabel(namingTarget: NamingLookupTarget | null): string
  * Exceptions: None.
  */
 function tooltipWeather(namingTarget: NamingLookupTarget | null): import('../../shared/weatherBonusTypes').WeatherState | null {
+  if (S.tacticalBattleSnapshot) return S.tacticalBattleSnapshot.weather ?? null;
   if (!namingTarget) return null;
-  if (namingTarget.resolution === 4 && S.tacticalBattleSnapshot) return S.tacticalBattleSnapshot.weather ?? null;
   if (!S.gameState) return null;
   const strategicHex = namingTarget.resolution === 1
     ? namingTarget.h3Index

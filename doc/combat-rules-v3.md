@@ -490,7 +490,7 @@ If a naval unit carrying cargo is destroyed, all embarked units are destroyed wi
 
 ## 12. Tactical game (optional battles at res4)
 
-The tactical game is a separate combat layer on the res4 hex grid within one res1 hex. While a tactical battle is in progress, the rest of the strategic map does not resolve. Tactical beats use the same WEGO model as the strategic game.
+The tactical game is a separate combat layer. The battlefield is the enclosing strategic hex's own tactical cells plus three rings of neighboring tactical cells. Units deploy on the original entry edge of the enclosing hex. They may move into the margin and end there. After the battle, strategic units still occupy the enclosing hex. Infrastructure damage applies only to the enclosing hex's own tactical cells. A shot in the margin does not change any strategic hex's urban, airport, or seaport counts. Origin bonus uses each cell's country, or its regional origin area, including a margin cell. Weather is the enclosing hex's weather for the whole battle. While a tactical battle is in progress, the rest of the strategic map does not resolve. Tactical beats use the same WEGO model as the strategic game.
 
 ### 12.1 Triggering a tactical battle
 
@@ -518,7 +518,7 @@ Sub-units inherit their parent's unit type for combat resolution. Each sub-unit 
 
 ### 12.3 Entry-side injection
 
-Sub-units are placed on the res4 hex grid at the edge corresponding to the direction from which the parent strategic unit entered the res1 hex (`getPreviousStrategicH3IndexForUnit`). If a unit was already in the hex, placement uses a default edge. Road/rail corridors can allow infantry/armor to spawn on otherwise blocked cells. Urban and rubble cells are occupiable. Armor is blocked by mountains, wetlands, arctic, and water unless a transport override applies.
+Sub-units are placed on the enclosing hex's own tactical cells, at the edge corresponding to the direction from which the parent strategic unit entered that hex (`getPreviousStrategicH3IndexForUnit`). The three neighboring rings are extra ground, including behind that line, and units are not deployed there. If a unit was already in the hex, placement uses a default edge. Road/rail corridors can allow infantry/armor to spawn on otherwise blocked cells. Urban and rubble cells are occupiable. Armor is blocked by mountains, wetlands, arctic, and water unless a transport override applies.
 
 ### 12.4 Movement
 
@@ -563,7 +563,7 @@ At the tactical level, all unit types have a positive ranged baseline (`RANGED_R
 - Mountain along the implicit H3 grid path blocks **armor and naval** shots. **Infantry is exempt.** Air strikes and ferry are not blocked by mountains. If no path can be derived, the shot is blocked (fail closed), except icosahedron face-crossing pairs which use a BFS fallback.
 - Return fire uses the same range + LOS rules (planning parity).
 - **Air-strike AA:** tactical infantry may counter-fire when an air strike targets their hex, because infantry has a positive tactical ranged baseline.
-- Legal targets include enemy-occupied cells **and** strikeable infrastructure (urban, airport, seaport, or active non-rubble road/rail).
+- Legal targets include enemy-occupied cells anywhere in the footprint, including a margin cell, **and** strikeable infrastructure (urban, airport, seaport, or active non-rubble road/rail) on the enclosing hex's own tactical cells. A margin city or road still slows movement and still gives cover. It is not a legal infrastructure target, and a shot there does not change a strategic hex.
 
 Ranged attacks use the same A&A-style dice as strategic combat. Casualty assignment follows the standard fixed priority. With the origin bonus or the terrain bonus on, a unit on a cell in the area where it was built, or on a cell whose terrain kind matches its birth terrain, adds 2 (Low) or 4 (High) to its rolls there (§4.9, "Origin bonus and terrain bonus"). That area is its birth country on the global map and its origin area on a regional map. An Advanced unit adds its tech bonus on top (§4.9, "Tech bonus").
 
@@ -580,7 +580,7 @@ The tactical game uses **WEGO** simultaneous resolution — the same model as th
 3. **Air strike phase.**
 4. **Ranged phase.**
 5. **Movement phase** (first-leg truncation as in §12.4).
-6. **Ferry** (tactical air ferry is footprint-bounded and only between intact airport cells; not the strategic 4-hex airport hop). If the destination is illegal and the origin airport is gone, the air unit is destroyed; if the origin is still intact, it stays.
+6. **Ferry** (tactical air ferry is only between intact airport cells of the enclosing hex, not a neighbor airport in the margin, and not the strategic 4-hex airport hop). If the destination is illegal and the origin airport is gone, the air unit is destroyed; if the origin is still intact, it stays.
 7. **Cargo sync.**
 8. **Melee phase.**
 9. Casualties removed. Next beat, or battle end.
@@ -637,7 +637,7 @@ Dice chips listing every die rolled in the air strike, ranged, and melee phases 
 
 Tactical battle animation follows the same removal rule as §13.1. A battle has no unknown casualty hexes. Movement uses interpolation between that battle's tactical hexes. Ranged fire shows directional indicators. Casualties use the same red X overlay. The same dice chips sit on top of every other playback layer, for twice the time from lightning through casualties, on the battle's tactical cells.
 
-The tactical battle UI displays the res4 hex grid for the parent res1 hex with terrain coloring, road/rail overlays, sub-unit markers by type, and an exit control that triggers voluntary-exit mapping (§12.8).
+The tactical battle UI displays the battlefield from the opening of §12, with each cell's own terrain, road and rail overlays, and sub-unit markers. Airport and seaport marks are the enclosing hex's own cells. An exit control triggers voluntary-exit mapping (§12.8).
 
 ---
 

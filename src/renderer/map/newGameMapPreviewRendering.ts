@@ -133,7 +133,7 @@ export function storeNewGameMapPreview(next: NewGameMapPreview): boolean {
  *
  * Purpose: While the overlay is open the canvas shows this instead of the loaded match.
  * When to use: From the scene frame when the overlay is visible.
- * Expected outcome: Nothing when there is no payload for the map on screen or Leaflet is missing. A regional preview fills every strategic hex unless T is held, and strokes the hexes that are not homes. A global preview draws only the selected home regions. Home hexes use the same fills and ownership rings either way. Weather icons follow the month on every strategic hex, and tech icons follow the tech bonus on every strategic hex while T is held. Icons are painted after the hex bodies, so a fill does not cover one.
+ * Expected outcome: Nothing when there is no payload for the map on screen or Leaflet is missing. Home hexes use the match's terrain fills and ownership rings. Other strategic hexes stay off the basemap until T is held, and then both global and regional previews fill and stroke that grid. Weather icons follow the month on every strategic hex, and tech icons follow the tech bonus on every strategic hex while T is held. Icons are painted after the hex bodies, so a fill does not cover one.
  * Exceptions: None. A missing map returns without drawing.
  */
 export function drawNewGameMapPreview(ctx: CanvasRenderingContext2D, requestRedraw: () => void): void {
@@ -158,7 +158,7 @@ export function drawNewGameMapPreview(ctx: CanvasRenderingContext2D, requestRedr
     const border = previewHomeBorder(hex.h3Index, humanHomes, aiHomes);
     const pts = projectHexBoundaryToContainerPoints(hex.h3Index, map, leaflet);
     if (pts.length === 0) continue;
-    if (previewHexIsDrawn(payload.gameMapId, border.homeOwnerIdentity)) {
+    if (previewHexIsDrawn(border.homeOwnerIdentity, inspectionHeld)) {
       const drawClosedPath = (): void => {
         ctx.beginPath();
         for (let i = 0; i < pts.length; i++) {
@@ -168,7 +168,7 @@ export function drawNewGameMapPreview(ctx: CanvasRenderingContext2D, requestRedr
         }
         ctx.closePath();
       };
-      if (!inspectionHeld) fillHexTerrain(ctx, hex.terrainKind, drawClosedPath);
+      fillHexTerrain(ctx, hex.terrainKind, drawClosedPath);
       if (border.homeOwnerIdentity == null) {
         ctx.strokeStyle = stroke.color;
         ctx.lineWidth = stroke.width * zoomStrokeScale;

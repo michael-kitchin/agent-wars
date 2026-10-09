@@ -32,6 +32,7 @@ import {
   TACTICAL_MAP_OVERLAY_VECTOR_TRANSPORT_HALO_OPACITY,
 } from '../../shared/tacticalMapOverlayConstants';
 import { getTacticalChildCodeWithinParent, getStrategicHexCode } from '../../shared/hexLlmCodeAssignment';
+import { tacticalBattleHexCode } from '../../shared/tacticalBattleFootprint';
 import { isMapInspectionModeHeld } from '../gameplay/productionOverlayHelpers';
 import { withOpacityHex } from './canvasColor';
 
@@ -228,9 +229,40 @@ export function drawTacticalCityOverlays(ctx: CanvasRenderingContext2D, deps: Ta
 
     const labelJobs: LabelJob[] = [];
 
+    if (tactical) {
+      for (const child of tactical.tacticalChildH3Indexes) {
+        const pts = projectHexBoundaryToContainerPoints(child, map, L);
+        if (!shouldDrawTacticalChildHexInViewport(pts, viewportWidth, viewportHeight)) continue;
+        const span = spanForProjectedHex(pts);
+        const centerPx = projectedCentroid(pts);
+        const cityLabel = S.tacticalCityOverlayLabelByH3.get(child);
+        const hasAirportOrSeaport =
+          tactical.tacticalIsAirportByH3?.[child] === true || tactical.tacticalIsSeaportByH3?.[child] === true;
+        if (cityLabel && !hasAirportOrSeaport) {
+          const referenceOuterR = TACTICAL_MAP_OVERLAY_CITY_DOT_RADIUS_PX * 2 * zoomStrokeScale;
+          const circleRadiusPx = referenceOuterR * TACTICAL_MAP_OVERLAY_CITY_CIRCLE_RADIUS_FRAC;
+          drawTacticalCityCircleMarker(
+            ctx,
+            centerPx.x,
+            centerPx.y,
+            circleRadiusPx,
+            TACTICAL_MAP_OVERLAY_CITY_DOT_HALO_WIDTH_PX,
+            zoomStrokeScale
+          );
+        }
+        if (inspection) {
+          const code = tacticalBattleHexCode(tactical.enclosingStrategicH3Index, child);
+          if (code) scheduleCenteredInspectionCodeLabelJob(labelJobs, centerPx, span, code);
+        } else if (cityLabel) {
+          scheduleCityStyleLabelJob(labelJobs, centerPx, span, cityLabel, zoomStrokeScale);
+        }
+      }
+      flushCityStyleLabelJobs(ctx, labelJobs, zoomStrokeScale);
+      return;
+    }
+
     for (const parent of S.gameState.hexes) {
-      if (tactical && parent.h3Index !== tactical.enclosingStrategicH3Index) continue;
-      if (!tactical && !inspection && !exploredHexes.has(parent.h3Index)) continue;
+      if (!inspection && !exploredHexes.has(parent.h3Index)) continue;
       if (!shouldConsiderTacticalChildrenForViewport(parent.h3Index, map, L, viewportWidth, viewportHeight)) continue;
       let children = S.tacticalChildrenByParent.get(parent.h3Index);
       if (!children) {
@@ -262,8 +294,7 @@ export function drawTacticalCityOverlays(ctx: CanvasRenderingContext2D, deps: Ta
         }
 
         if (inspection) {
-          const parentForCode = tactical ? tactical.enclosingStrategicH3Index : parent.h3Index;
-          const code = getTacticalChildCodeWithinParent(parentForCode, child);
+          const code = getTacticalChildCodeWithinParent(parent.h3Index, child);
           if (code) {
             scheduleCenteredInspectionCodeLabelJob(labelJobs, centerPx, span, code);
           }

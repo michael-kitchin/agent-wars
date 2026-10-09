@@ -9,17 +9,13 @@
 
 import { cellToLatLng } from 'h3-js';
 import { registerActiveGameMapReset } from '../../../shared/activeGameMap';
-import {
-  buildStrategicH3ToCodeMap,
-  indexToCode,
-  sortCellsForStableLlmCodes,
-} from '../../../shared/hexLlmCodeAssignment';
+import { buildStrategicH3ToCodeMap } from '../../../shared/hexLlmCodeAssignment';
+import { tacticalBattleFootprint } from '../../../shared/tacticalBattleFootprint';
 import {
   isStrategicCell,
   strategicCellAt,
   strategicH3Resolution,
   tacticalCellAt,
-  tacticalChildrenOf,
 } from '../../../shared/h3Resolutions';
 import { logDebug, logError, logTrace } from '../../logger';
 import type { CoordinateContext } from './coordinateContext';
@@ -82,24 +78,19 @@ export function initStrategicCoordinateRegistry(): void {
  *
  * Purpose: Tactical codes are stable for the battle only; they reuse the 2-character space independently of strategic codes.
  * When to use: At tactical AI consultation start, keyed by `battleId`.
- * Expected outcome: Codes cover all tactical children returned by H3 for the parent cell.
- * Exceptions: Throws if children cannot be enumerated.
+ * Expected outcome: Codes cover the playable battle cells, including the three-ring margin, in the footprint's stable order.
+ * Exceptions: Throws if the enclosing index is not a cell.
  */
 export function initTacticalCoordinateRegistry(battleId: string, enclosingStrategicH3Index: string): void {
-  logDebug('hex-coordinates initTacticalCoordinateRegistry: building tactical res4 registry', {
+  logDebug('hex-coordinates initTacticalCoordinateRegistry: building tactical registry', {
     battleId,
     enclosingStrategicH3Index,
   });
   try {
-    const children = sortCellsForStableLlmCodes(tacticalChildrenOf(enclosingStrategicH3Index));
-    const h3ToCode = new Map<string, string>();
+    const footprint = tacticalBattleFootprint(enclosingStrategicH3Index);
+    const h3ToCode = new Map(footprint.codeByH3);
     const codeToH3 = new Map<string, string>();
-    for (let i = 0; i < children.length; i++) {
-      const h3 = children[i]!;
-      const code = indexToCode(i);
-      h3ToCode.set(h3, code);
-      codeToH3.set(code, h3);
-    }
+    for (const [h3, code] of footprint.codeByH3) codeToH3.set(code, h3);
     tacticalRegistries.set(battleId, { h3ToCode, codeToH3, parentStrategic: enclosingStrategicH3Index });
     logDebug('hex-coordinates initTacticalCoordinateRegistry: complete', {
       battleId,

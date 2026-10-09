@@ -94,7 +94,7 @@ export function projectTacticalSealiftSlotChange(
     if (!canManualDebarkFromHex(args.h3Index, 'human')) {
       return { success: false, reason: 'Debark is not available at this location.' };
     }
-  } else if (!canPlayerEmbarkFromTacticalHex(args.h3Index, 'human')) {
+  } else if (!canPlayerEmbarkFromTacticalHex(args.h3Index, 'human', snap.enclosingStrategicH3Index)) {
     const atSea = baseState.contextMode === 'water';
     return {
       success: false,
@@ -139,7 +139,7 @@ export function projectTacticalSealiftSlotChange(
   let acc = clearHumanLandEmbarksAtHex(snap, args.h3Index);
   const embarkOrders = embarkOrdersFromTacticalSlots(slotsByNavalId);
   for (const e of embarkOrders) {
-    const checked = validateTacticalHumanEmbarkOrder(e, acc.subUnits);
+    const checked = validateTacticalHumanEmbarkOrder(e, acc.subUnits, snap.enclosingStrategicH3Index);
     if (!checked.valid) {
       return { success: false, reason: checked.reason };
     }

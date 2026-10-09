@@ -71,8 +71,8 @@ export function strategicParentOf(h3Index: string): string {
 /**
  * Returns the tactical children of one strategic cell on the active map.
  *
- * Purpose: A battle footprint is those children. The count stays 343 because the gap is always three resolutions.
- * When to use: When expanding one strategic hex into its battle grid.
+ * Purpose: Birth hexes, terrain rollups, and the strategic map use these geometric children. The count stays 343 because the gap is always three resolutions.
+ * When to use: When expanding one strategic hex into its own tactical children. A battle's playable cells are wider.
  * Expected outcome: The children at `tacticalH3Resolution()`.
  * Exceptions: Throws the H3 library's error when `h3Index` is not a cell.
  */

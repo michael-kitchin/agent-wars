@@ -220,6 +220,7 @@ export function detailHitAtClientPixel(
   mapHexSet: Set<string>
 ): string | null {
   if (!S.gameState || !shouldRenderTacticalHexes()) return null;
+  const battle = S.tacticalBattleSnapshot;
   const exploredHexes = getExploredHexSet(S.gameState);
   const map = getMainLeafletMap() as
     | {
@@ -234,6 +235,7 @@ export function detailHitAtClientPixel(
   const latlng = map.containerPointToLatLng(L.point(clientX - rect.left, clientY - rect.top));
   try {
     const detailH3 = tacticalCellAt(latlng.lat, latlng.lng);
+    if (battle) return battle.tacticalChildH3Indexes.includes(detailH3) ? detailH3 : null;
     const parentH3 = strategicParentOf(detailH3);
     if (!exploredHexes.has(parentH3)) return null;
     return mapHexSet.has(parentH3) ? detailH3 : null;

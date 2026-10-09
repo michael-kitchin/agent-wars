@@ -3,19 +3,20 @@
  *
  * Purpose: Ensures the shared module used by renderer tooltip badges stays aligned with briefing/tool code paths.
  * When to use: `npm test` after edits to either module.
- * Expected outcome: Strategic maps match; per-parent tactical codes match tactical registry rows.
+ * Expected outcome: Strategic maps match. Battle registry codes follow the footprint. Geometric child codes stay on the parent's own children.
  * Exceptions: None.
  */
 
 import * as assert from 'assert';
-import { cellToChildren } from 'h3-js';
+import { GLOBAL_GAME_MAP, withGameMap } from '../shared/activeGameMap';
+import { tacticalBattleFootprint, tacticalBattleHexCode } from '../shared/tacticalBattleFootprint';
 import {
   buildStrategicH3ToCodeMap,
   getTacticalChildCodeWithinParent,
-  sortCellsForStableLlmCodes,
 } from '../shared/hexLlmCodeAssignment';
 import {
   ensureStrategicCoordinateRegistryInitialized,
+  getH3IndexForCode,
   getHexCodeForContext,
   initTacticalCoordinateRegistry,
 } from './briefing/map/hexCoordinates';
@@ -39,32 +40,40 @@ function testSharedStrategicMapMatchesHexCoordinates(): void {
 }
 
 /**
- * Asserts tactical child codes equal those assigned by `initTacticalCoordinateRegistry` for the same parent.
+ * Asserts battle codes follow the footprint, and geometric child codes do not cover the margin.
  *
- * Purpose: Confirms `(XX.YY)` tooltip suffixes use the same `YY` as tactical LLM maps.
+ * Purpose: A margin cell shares the briefing code. The strategic map still codes only a parent's own children, in a different order.
  * When to use: Default suite entry below.
- * Expected outcome: Equality for every tactical child under an arbitrary sample parent.
+ * Expected outcome: Every footprint cell round-trips through the battle registry. A margin cell has no geometric child code.
  * Exceptions: None.
  */
-function testChildCodesMatchTacticalRegistry(): void {
-  ensureStrategicCoordinateRegistryInitialized();
-  const sample = [...buildStrategicH3ToCodeMap().keys()][0]!;
+function testBattleRegistryUsesFootprintCodes(): void {
+  const sample = '81263ffffffffff';
   const battleId = 'hexLlmCodeAssignment-alignment-test';
-  initTacticalCoordinateRegistry(battleId, sample);
-  const children = sortCellsForStableLlmCodes(cellToChildren(sample, 4));
   const tacticalCtx = { mode: 'tactical' as const, battleId };
-  for (const child of children) {
-    assert.strictEqual(
-      getTacticalChildCodeWithinParent(sample, child),
-      getHexCodeForContext(child, tacticalCtx),
-      `child ${child}`
-    );
-  }
+  withGameMap(GLOBAL_GAME_MAP, () => {
+    initTacticalCoordinateRegistry(battleId, sample);
+    const footprint = tacticalBattleFootprint(sample);
+    const core = new Set(footprint.coreChildH3Indexes);
+    assert.ok(footprint.h3Indexes.length > core.size);
+    for (const cell of footprint.h3Indexes) {
+      const code = getHexCodeForContext(cell, tacticalCtx);
+      assert.strictEqual(code, tacticalBattleHexCode(sample, cell), cell);
+      assert.ok(code);
+      assert.strictEqual(getH3IndexForCode(code, tacticalCtx), cell);
+    }
+    for (const child of footprint.coreChildH3Indexes) {
+      assert.ok(getTacticalChildCodeWithinParent(sample, child));
+    }
+    const margin = footprint.h3Indexes.find((cell) => !core.has(cell));
+    assert.ok(margin);
+    assert.strictEqual(getTacticalChildCodeWithinParent(sample, margin), undefined);
+  });
 }
 
 function run(): void {
   testSharedStrategicMapMatchesHexCoordinates();
-  testChildCodesMatchTacticalRegistry();
+  testBattleRegistryUsesFootprintCodes();
   console.log('hexLlmCodeAssignment.test.ts passed');
 }
 

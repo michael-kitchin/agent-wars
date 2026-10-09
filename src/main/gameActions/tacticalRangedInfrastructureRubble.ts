@@ -8,6 +8,7 @@
  * Exceptions: No-op when no eligible facility row exists and the optional transport insert path does not apply; logs at error level on unexpected failures.
  */
 
+import { strategicParentOf } from '../../shared/h3Resolutions';
 import { logDebug, logError } from '../logger';
 import {
   insertTacticalFeatureOverrideRubbleRow,
@@ -48,6 +49,13 @@ export function applyTacticalRangedRubbleToCell(
     insertTransport: !!opts?.insertStrikeableTransportCorridor,
   });
   try {
+    if (strategicParentOf(tacticalH3Index) !== strategicParentH3Index) {
+      logDebug('tacticalRangedInfrastructureRubble applyTacticalRangedRubbleToRes4Cell: cell is outside the enclosing hex', {
+        tacticalH3Index,
+        strategicParentH3Index,
+      });
+      return { changed: false, destroyedAirUnitsCount: 0 };
+    }
     const rows = listTacticalFeatureOverridesForGame();
     const rowForCell = rows.find((r) => r.h3Index === tacticalH3Index && r.parentH3Index === strategicParentH3Index);
     if (

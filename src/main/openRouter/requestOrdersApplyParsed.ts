@@ -383,7 +383,7 @@ export function applyParsedRequestOrders(args: ApplyParsedRequestOrdersArgs): Re
         dropReasons.push(`Duplicate air strike for ${aiOrderUnitLabel(s.unitId)}`);
         continue;
       }
-      const vr = validateTacticalOpponentAirStrikeOrder(s, planAfterMove, aiOrderUnitLabel);
+      const vr = validateTacticalOpponentAirStrikeOrder(s, planAfterMove, aiOrderUnitLabel, tacticalBattle);
       if (vr.valid) {
         validatedAir.push(s);
         seenStrike.add(s.unitId);
@@ -418,7 +418,11 @@ export function applyParsedRequestOrders(args: ApplyParsedRequestOrdersArgs): Re
         dropReasons.push(`Duplicate embark for ${aiOrderUnitLabel(e.unitId)}`);
         continue;
       }
-      const er = validateTacticalOpponentEmbarkOrder(e, movementProjected.subUnits);
+      const er = validateTacticalOpponentEmbarkOrder(
+        e,
+        movementProjected.subUnits,
+        movementProjected.enclosingStrategicH3Index
+      );
       if (er.valid) {
         validatedEmb.push(e);
         seenEmbarkLand.add(e.unitId);

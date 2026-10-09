@@ -35,25 +35,25 @@ export function previewHomeBorder(
 }
 
 /**
- * Reports whether one preview hex's terrain and grid are painted.
+ * Reports whether one preview hex's fill and outline are painted.
  *
- * Purpose: The global preview paints home-region terrain and rings, and leaves the rest of the world grid undrawn. A regional preview paints its whole strategic grid.
- * When to use: Once per hex, after `previewHomeBorder`, to decide whether that hex's terrain and grid are painted. Weather and tech icons are chosen separately.
- * Expected outcome: False for a global hex in neither home. True for a global home hex, including a shared home, and for every hex of any other map.
+ * Purpose: Home regions stay visible on the basemap. The other strategic hexes, on a global or regional map, are painted only while T is held.
+ * When to use: Once per hex, after `previewHomeBorder`, as the single gate for that hex's fill, grid stroke, and home rings. Weather and tech icons are chosen separately.
+ * Expected outcome: True for a home hex, including a shared home, on every map. True for any other hex only while T is held.
  * Exceptions: None.
  */
 export function previewHexIsDrawn(
-  gameMapId: string,
-  homeOwnerIdentity: PreviewHomeBorder['homeOwnerIdentity']
+  homeOwnerIdentity: PreviewHomeBorder['homeOwnerIdentity'],
+  mapInspectionHeld: boolean
 ): boolean {
-  if (gameMapId !== 'global') return true;
+  if (mapInspectionHeld) return true;
   return homeOwnerIdentity != null;
 }
 
 /**
  * Chooses the weather icon for one preview hex, or null when that hex shows none.
  *
- * Purpose: The preview follows the dialog's month and weather bonus, and it does not draw a tech icon while T is held.
+ * Purpose: The preview follows the dialog's month and weather bonus. Holding T hides this icon. Tech icons are chosen separately and appear while T is held.
  * When to use: Once per hex per frame, with values read from the dialog and the view, not from a cached copy.
  * Expected outcome: A display state, including `mild`. Null when the bonus is off, T is held, the view is at battle-detail zoom, or the year is not twelve known states.
  * Exceptions: None.

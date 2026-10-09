@@ -1,13 +1,13 @@
 # Tactical prompt
 
-The tactical beat system prompt as the builders emit it. The preamble states H3 resolution 4 children inside the enclosing strategic hex. The captured tactical prompt dump in the repository root is stale and is not a source. If this file disagrees with the builders, the builders win.
+The tactical beat system prompt as the builders emit it. The preamble states that the battle map is the enclosing strategic hex's tactical cells plus three neighboring rings. The captured tactical prompt dump in the repository root is stale and is not a source. If this file disagrees with the builders, the builders win.
 
 Shared rules come from `assembly-contract.md`. Differences from the strategic contract are stated as differences; everything not called out here follows `strategic-prompt.md` only where `assembly-contract.md` marks the section as shared.
 
 ## 1. Battle framing
 
 1. **Two clocks.** The prompt states the strategic turn number, the tactical beat number, and the phase. A beat is a period inside one strategic turn, and the beat number is what "this beat" refers to everywhere else in the prompt. Carries `TURN_CLOCK`, `BATTLE_FRAME`.
-2. **One footprint.** The battle occupies the tactical child cells of a single contested strategic cell. Every cell code in the prompt belongs to that footprint. Carries `BATTLE_FRAME`, `HEX_IDENTITY`.
+2. **One footprint.** The battle occupies the enclosing strategic hex's tactical cells plus three neighboring rings. Every cell code in the prompt belongs to that footprint. Carries `BATTLE_FRAME`, `HEX_IDENTITY`.
 3. **Local goal only.** The goal statement is to engage and defeat the enemy forces present in this battle. The regional win conditions, home regions, and territorial progress must not appear. A model told to win the region during a beat will disengage to chase territory it cannot reach from inside the footprint. Carries `BATTLE_FRAME`.
 4. **Sub-unit addressing.** Units in battle are sub-units, addressed as the parent unit id followed by a colon and a two-digit slot. Enemy sub-unit ids are legal target values. The parent strategic id is never a valid order target in a beat. Carries `SUBUNIT_IDENTITY`.
 5. **Full visibility.** Both sides see every sub-unit in the footprint, and the narrative states this. Fog affects the strategic snapshot, not the battle. The straight-hop distance caveat is not emitted in battle, because its gate requires the strategic resolution. Carries `BATTLE_FRAME`.
@@ -35,7 +35,7 @@ The battle-local goal from section 1.3, followed by a pointer to the rules below
 
 ### 2.4 Coordinate preamble
 
-Two paragraphs. First: the battle map is the resolution-4 children of the enclosing strategic hex, positions are two-character tactical codes taken from the map and the unit table, copied exactly and never invented, distances are tactical hex steps. Second: in the response, cells are tactical codes and target-unit values are enemy sub-unit ids; raw H3 strings and coordinate pairs are never emitted. Carries `HEX_IDENTITY`, `SUBUNIT_IDENTITY`.
+Two paragraphs. First: the battle map is the enclosing strategic hex's tactical cells plus three neighboring rings, positions are two-character tactical codes taken from the map and the unit table, copied exactly and never invented, distances are tactical hex steps. Second: in the response, cells are tactical codes and target-unit values are enemy sub-unit ids; raw H3 strings and coordinate pairs are never emitted. Carries `HEX_IDENTITY`, `SUBUNIT_IDENTITY`.
 
 ### 2.5 Combat and attack rules
 
@@ -79,7 +79,7 @@ Bullet list, ranked, capped at five, empty form `None.` Tactical emits threat bu
 
 #### `# Operational Map`
 
-- **Legend contract:** each cell shows its tactical code on the top line and terrain plus overlay on the bottom; `x` is land and `.` is water, taken from that res4 child's kind (not the enclosing res1 ocean); `*` marks own sub-units, `!` enemy sub-units, `#` contested; `A/a` airport, `S/s` seaport, `B/b` both, `U/u` urban; uppercase means the enclosing cell is AI-controlled; odd rows are indented one space; only codes from this map or the tables may be used. The undiscovered-intel marker is not part of the tactical legend.
+- **Legend contract:** each cell shows its tactical code on the top line and terrain plus overlay on the bottom; `x` is land and `.` is water, taken from that cell's own kind, including a margin cell (not the enclosing hex's ocean); `*` marks own sub-units, `!` enemy sub-units, `#` contested; `A/a` airport, `S/s` seaport, `B/b` both, `U/u` urban; uppercase means the enclosing cell is AI-controlled; odd rows are indented one space; only codes from this map or the tables may be used. The undiscovered-intel marker is not part of the tactical legend.
 - **Displaced-features footnote:** included when a unit overlay hides a feature marker; omitted when empty.
 - **Empty footprint:** the map body states that there are no tactical cells to render.
 - **Must not contain:** a unit-roster subsection.

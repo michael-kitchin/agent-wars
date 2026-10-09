@@ -4,7 +4,7 @@
  * Purpose: Mirrors `initStrategicCoordinateRegistry` / `initTacticalCoordinateRegistry` ordering so UI tooltips
  * can show the same labels as briefings and tools without an IPC round-trip.
  * When to use: Renderer tooltip prefixes and main-process `hex-coordinates` registry construction.
- * Expected outcome: Stable `A0`…-style codes; tactical codes match per-parent sorted child order used tactically.
+ * Expected outcome: Stable `A0`…-style codes. A battle's codes follow the footprint order. `getTacticalChildCodeWithinParent` stays the geometric children of one strategic hex.
  * Exceptions: `indexToCode` throws if the child index exceeds the 36×36 code space (logic bug, not user input).
  */
 
@@ -135,9 +135,9 @@ export function getStrategicHexCode(h3Index: string): string | undefined {
 /**
  * Returns the tactical-style two-character code for one tactical child under a given strategic parent.
  *
- * Purpose: `YY` in `(XX.YY)` matches `initTacticalCoordinateRegistry` for that parent.
- * When to use: Tactical zoom tooltips where the naming target resolution is 4.
- * Expected outcome: Code for the child's position in the sorted child list, or `undefined` if not a child.
+ * Purpose: Strategic-map labels for a parent's own tactical cells. A battle label uses `tacticalBattleHexCode`, because the footprint sort is a different order.
+ * When to use: Tactical zoom outside a battle, where the naming target resolution is 4.
+ * Expected outcome: Code for the child's place among that parent's geometric children, or `undefined` when the cell is not one of them. A margin cell is undefined here.
  * Exceptions: None.
  */
 export function getTacticalChildCodeWithinParent(

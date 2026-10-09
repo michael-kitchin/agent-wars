@@ -8,7 +8,10 @@ import type { AirStrikeTargetType } from '../../shared/ipcTypes';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { tacticalSubUnitLabelForUserMessage } from '../../shared/unitDisplayNames';
 import { getStrategicInfrastructureForHex, isDbReady } from '../gameDb';
-import { tacticalFootprintContains } from '../tacticalBattle/tacticalSnapshotGuards';
+import {
+  tacticalFootprintContains,
+  tacticalInfrastructureStrikeStaysOnEnclosingHex,
+} from '../tacticalBattle/tacticalSnapshotGuards';
 import { logDebug } from '../logger';
 
 /**
@@ -40,8 +43,7 @@ export function validateTacticalHumanAirStrikeGroup(
   if (!tacticalFootprintContains(footprint, targetH3Index)) {
     return { success: false, reason: 'Target is outside the tactical battle.' };
   }
-  const targetParent = strategicParentOf(targetH3Index);
-  if (targetParent !== snap.enclosingStrategicH3Index) {
+  if (targetType !== 'units' && !tacticalInfrastructureStrikeStaysOnEnclosingHex(snap, targetH3Index)) {
     return { success: false, reason: 'Air strikes may only target the contested strategic hex.' };
   }
 
@@ -64,7 +66,7 @@ export function validateTacticalHumanAirStrikeGroup(
       if (!enemiesAtTarget) return { success: false, reason: `${label}: Target hex has no enemy units` };
       continue;
     }
-    const targetInfra = getStrategicInfrastructureForHex(targetParent);
+    const targetInfra = getStrategicInfrastructureForHex(snap.enclosingStrategicH3Index);
     if (targetType === 'urban' && targetInfra.urbanHexCount <= 0) {
       return { success: false, reason: `${label}: Target hex has no urban infrastructure` };
     }
