@@ -6,8 +6,9 @@
  * Weaker models skipped that join and marched units to their own hex, which is dropped as already-arrived — leaving the
  * unit orderless again next turn, permanently idle. Putting a legal destination beside the question breaks that loop.
  * When to use: Strategic `getInjectionText` only, for the ids it is about to list as having no standing order.
- * Expected outcome: A suggestion per unit that closes on the nearest enemy and is never the unit's current hex; units
- * with nowhere useful to go are simply absent from the map so the caller can render an em dash.
+ * Expected outcome: A suggestion per unit that strictly closes on the nearest enemy and is never the unit's current hex.
+ * An enemy-occupied legal dest is chosen when one closes, including a contested hex; otherwise an unoccupied closing
+ * dest is used. Units with nowhere useful to go are absent from the map so the caller can render an em dash.
  * Exceptions: None; this is advisory briefing content and never constrains what the model may actually order.
  */
 
@@ -41,10 +42,10 @@ function enemyOccupiedHexes(state: GameStateSnapshot, playerId: string): Readonl
 /**
  * Chooses the single closing destination to show for one unit.
  *
- * Purpose: Best Options lists every closing hex, but a suggestion column has room for one, so it must be the same
- * first approach dest Best Options would keep after ranking (unit-to-dest hop, then hex id).
- * When to use: Per orderless unit, with that unit's already-legal dests that are not stay-put occupied.
- * Expected outcome: The closest legal closing dest to the unit; null when no candidate closes the distance.
+ * Purpose: Best Options lists every closing hex, but a suggestion column has room for one, so this ranks one pool
+ * (unit-to-dest hop, then hex id). Callers try enemy-occupied dests before unoccupied approach dests.
+ * When to use: Per orderless unit, once for the contact pool and again for the approach pool when contact does not close.
+ * Expected outcome: The closest closing dest in that pool; null when no candidate in the pool strictly closes.
  * Exceptions: None.
  */
 function bestClosingDestination(
@@ -68,14 +69,15 @@ function bestClosingDestination(
 }
 
 /**
- * Maps each orderless unit to a legal one-step destination that closes on the nearest enemy.
+ * Maps each orderless unit to one legal destination inside this turn's movement budget that closes on the nearest enemy.
  *
  * Purpose: Gives the Standing Order Status table something concrete to offer for every unit it asks the model to order.
  * When to use: Strategic briefing assembly, passing only the ids being listed as orderless — this runs a destination
  * search per distinct unit hex and type, so do not call it for the whole roster.
- * Expected outcome: `unitId -> destination h3`, omitting units that are missing from the snapshot, cannot take a march
- * order at all, have no legal stay-put-empty closing dest, or cannot close on any enemy. Suggestions never equal
- * the unit's own hex. A cell a friendly is leaving this period is eligible; a stay-put stack is not.
+ * Expected outcome: `unitId -> destination h3`. A closing enemy-occupied dest wins, including a contested hex; otherwise
+ * a closing dest that is not a stay-put friendly hex. Omitted when the unit is missing, cannot march, is already on the
+ * enemy, or has no dest that strictly closes. Suggestions never equal the unit's own hex. A cell a friendly is leaving
+ * this period stays eligible for the approach pool.
  * Exceptions: Never throws; a unit that cannot be scored is omitted rather than given a fabricated destination.
  */
 export function suggestApproachDestinationsForOrderlessUnits(
@@ -85,7 +87,15 @@ export function suggestApproachDestinationsForOrderlessUnits(
   thisPeriodMoveByUnitId?: ReadonlyMap<string, string>
 ): ReadonlyMap<string, string> {
   const suggestions = new Map<string, string>();
-  if (unitIds.length === 0) return suggestions;
+  if (unitIds.length === 0) {
+    logDebug('orderlessUnitSuggestions suggestApproachDestinationsForOrderlessUnits', {
+      playerId,
+      turnNumber: state.turnNumber,
+      requestedCount: 0,
+      suggestedCount: 0,
+    });
+    return suggestions;
+  }
   const enemyOccupiedH3 = enemyOccupiedHexes(state, playerId);
   const stayPut = stayPutFriendlyOccupiedHexes(
     state.units.filter((u) => u.player === playerId).map((u) => ({ id: u.id, h3Index: u.h3Index })),
@@ -97,16 +107,19 @@ export function suggestApproachDestinationsForOrderlessUnits(
     if (!unit) continue;
     // Air units reposition by ferry, so offering them a march destination would invite an order assignOrder rejects.
     if (!canAssignStandingOrderType(unit.unitType, 'march')) continue;
-    const candidates = getValidDestinations(unit, state).filter(
-      (h3) => h3 !== unit.h3Index && !stayPut.has(h3) && !enemyOccupiedH3.has(h3)
-    );
-    const destination = bestClosingDestination(unit.h3Index, candidates, enemyOccupiedH3);
+    const legal = getValidDestinations(unit, state).filter((h3) => h3 !== unit.h3Index);
+    const contact = legal.filter((h3) => enemyOccupiedH3.has(h3));
+    const approach = legal.filter((h3) => !enemyOccupiedH3.has(h3) && !stayPut.has(h3));
+    const destination =
+      bestClosingDestination(unit.h3Index, contact, enemyOccupiedH3) ??
+      bestClosingDestination(unit.h3Index, approach, enemyOccupiedH3);
     if (destination !== null) suggestions.set(unitId, destination);
     logTrace('orderlessUnitSuggestions suggestApproachDestinationsForOrderlessUnits: unit', {
       unitId,
       unitType: unit.unitType,
       originH3: unit.h3Index,
-      candidateCount: candidates.length,
+      contactCount: contact.length,
+      approachCount: approach.length,
       destination,
     });
   }

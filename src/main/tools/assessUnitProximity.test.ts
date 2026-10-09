@@ -249,13 +249,17 @@ function testOmniscientHonestyLineUsesBestOptionsDestCopy(): void {
  *
  * Purpose: Fog-on printed distances can exceed one movement budget while Best Options still lists a legal hop.
  * When to use: After edits to `FOG_PATH_DISTANCE_BRIEFING_LINE`.
- * Expected outcome: Mentions path lengths and Best Options dest copy; does not reuse the omniscient hop sentence.
+ * Expected outcome: Mentions path lengths, a Target Hex inside this turn's budget, and forbids copying a farther path hex into explicit_move. Does not reuse the omniscient hop sentence.
  * Exceptions: None.
  */
 function testFogPathHonestyLineUsesBestOptionsDestCopy(): void {
   assert.ok(FOG_PATH_DISTANCE_BRIEFING_LINE.includes('path lengths'));
   assert.ok(FOG_PATH_DISTANCE_BRIEFING_LINE.includes('Best Options This Turn'));
   assert.ok(!FOG_PATH_DISTANCE_BRIEFING_LINE.includes(OMNISCIENT_GRID_PROXIMITY_BRIEFING_LINE));
+  assert.ok(FOG_PATH_DISTANCE_BRIEFING_LINE.includes("inside this turn's budget, including weather"));
+  assert.ok(FOG_PATH_DISTANCE_BRIEFING_LINE.includes('Do not copy a farther hex from the printed path'));
+  assert.ok(FOG_PATH_DISTANCE_BRIEFING_LINE.includes('explicit_move past the budget is dropped'));
+  assert.ok(!FOG_PATH_DISTANCE_BRIEFING_LINE.includes('copy them even when'));
 }
 
 /**

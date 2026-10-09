@@ -297,17 +297,18 @@ export function updateRangedSidebar(deps: TacticalOrderDeps): void {
       S.rangedModeActive = false;
       btnEl.textContent = 'Strike';
       btnEl.setAttribute('data-control-tooltip', rangedButtonTooltipText('Strike'));
-      btnEl.style.display = S.airStrikeModeActive ? 'none' : 'inline-block';
+      // An empty display lets the command-row rule center the label in the shared height.
+      btnEl.style.display = S.airStrikeModeActive ? 'none' : '';
       if (strikeTypeEl) {
-        strikeTypeEl.style.display = S.airStrikeModeActive ? 'inline-block' : 'none';
+        strikeTypeEl.style.display = S.airStrikeModeActive ? '' : 'none';
         strikeTypeEl.value = S.airStrikeTargetType;
       }
       if (strikeCancelEl) {
-        strikeCancelEl.style.display = S.airStrikeModeActive ? 'inline-block' : 'none';
+        strikeCancelEl.style.display = S.airStrikeModeActive ? '' : 'none';
       }
     } else if (mode === 'ranged') {
       S.airStrikeModeActive = false;
-      btnEl.style.display = 'inline-block';
+      btnEl.style.display = '';
       btnEl.textContent = S.rangedModeActive ? 'Cancel' : 'Ranged';
       btnEl.setAttribute(
         'data-control-tooltip',

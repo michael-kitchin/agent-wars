@@ -153,7 +153,7 @@ Gates: presence of each arm among the opponent's own units, presence of observed
 
 | Surface | Contract |
 | --- | --- |
-| system | The orderless table is emitted whenever the standing-order block is present, listing every march-capable unit without an order. A suggested destination is required for every such unit that has a closing cell; a unit with no closing cell shows an em dash. |
+| system | The orderless table is emitted whenever the standing-order block is present, listing every march-capable unit without an order. A suggested destination is required when a closing cell exists. An em dash means none does, including when the unit is already on the enemy. |
 | user | unchanged |
 | tools | unchanged |
 | envelope | unchanged |
@@ -279,7 +279,7 @@ Each row is a pair of gates that would otherwise fight. The resolution column ma
 | Briefing absent **and** planning tools off | The fallback adjacent-cell listing is the only destination source, and the own-unit listing is still emitted. |
 | Fire withheld **and** a legal shot exists | The withholding order wins: the unit does not fire and the engine's fallback does not fire for it. The prompt must not imply that a withheld unit will shoot anyway, and must not imply that omitting an attack is equivalent to withholding. |
 | Overlapping home regions | The shared cells appear once, in the shared-cell line, and the exclusive lists exclude them. When the regions are identical as sets, only the shared line and the progress lines appear. The shared cells count toward both win conditions and the coaching says so. |
-| Option target already occupied | Cannot occur: move and approach targets are filtered to unoccupied cells. If it does occur, the filter has regressed. The occupancy rule stays in the coaching regardless, because the model can also propose destinations from the routing tool. |
+| Option target already occupied | An enemy-occupied cell is a legal move/melee target. Approach targets omit stay-put friendlies and enemy-occupied cells. A suggested destination may name that enemy cell when moving there strictly closes. The occupancy rule stays in the coaching, because the model can also propose destinations from the routing tool. |
 | Air unit given both a strike and a ferry | The strike wins and the ferry is discarded. The coaching states the exclusivity so the model does not spend a decision on a discarded order. |
 | Air unit whose base is not intact or not controlled | It cannot ferry. The air table's base columns carry this, and the coaching must not tell such a unit to reposition. |
 | Tactical destination beyond the beat budget | The order is clamped to the first reachable leg, not rejected. The coaching states the clamp so the model does not read partial movement as a failed order. |

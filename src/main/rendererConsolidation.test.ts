@@ -487,7 +487,8 @@ function testAirStrikeAndAirGlyphContracts(): void {
     'ready update toast should use consolidated turn update summary helpers'
   );
   assert.ok(
-    source.includes("btnEl.style.display = S.airStrikeModeActive ? 'none' : 'inline-block';"),
+    source.includes("btnEl.style.display = S.airStrikeModeActive ? 'none' : '';") &&
+      tacticalOrdersSource.includes("btnEl.style.display = S.airStrikeModeActive ? 'none' : '';"),
     'Strike button should hide while strike planning mode is active'
   );
   assert.ok(

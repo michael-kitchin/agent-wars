@@ -63,9 +63,13 @@ function testStackSealiftEmbarkedSelectionAndDebarkControls(): void {
   assert.ok(
     setNonSelectableFn.includes('applyStackCalloutSelectionButtonVisibility(calloutEl, nonSelectable);') &&
       applyVisibilityFn.includes(
+        'btn.textContent = S.selectedUnitIds.includes(unitId) ? UNIT_DESELECT_GLYPH : UNIT_SELECT_GLYPH;'
+      ) &&
+      applyVisibilityFn.includes(
         'btn.style.visibility = nonSelectableUnitIds.has(unitId) ? \'hidden\' : \'visible\';'
-      ),
-    'non-selectable stack-popup units should reserve space for per-unit select/unselect buttons while hiding them'
+      ) &&
+      showStackCalloutFn.includes('onStackSingleUnitToggleClick(u.id, S.selectedUnitIds.includes(u.id), units, clientX, clientY);'),
+    'non-selectable stack-popup units should reserve space for per-unit select/unselect buttons while hiding them, and a shown toggle should match the current selection'
   );
   assert.ok(
     showStackCalloutFn.includes('getSelectableHumanIdsForStackCallout(units)') &&
@@ -81,8 +85,14 @@ function testStackSealiftEmbarkedSelectionAndDebarkControls(): void {
   );
   assert.ok(
     removeSealiftSectionFn.includes("querySelectorAll('.stack-sealift-section')") &&
-      renderSealiftSectionFn.includes('generation !== sealiftSectionRenderGeneration'),
-    'sealift section must drop stale overlapping renders and remove every existing section before append'
+      renderSealiftSectionFn.includes('generation !== sealiftSectionRenderGeneration') &&
+      renderSealiftSectionFn.replace(/\r\n/g, '\n').includes('removeSealiftSection(calloutEl);\n    calloutEl.appendChild(section);') &&
+      renderSealiftSectionFn.includes(
+        "if (calloutEl.classList.contains('hidden') || calloutEl.getAttribute('data-h3-index') !== h3Index) return;"
+      ) &&
+      renderSealiftSectionFn.includes('refreshSameHexSealiftSection();') &&
+      !renderSealiftSectionFn.includes('refreshStackCalloutIfOpen()'),
+    'sealift section must drop stale overlapping renders, swap the fleet lists in place, and leave the unit list mounted'
   );
   assert.ok(
     stackSingleUnitHandlerFn.includes('refreshStackCallout: false') &&

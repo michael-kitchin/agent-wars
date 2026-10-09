@@ -151,13 +151,13 @@ function tempoBullet(hasAirUnits: boolean): string {
 /**
  * Orderless units need a mission this turn.
  *
- * Purpose: The orderless table is the worklist; marching to the unit's own cell is discarded.
+ * Purpose: The orderless table is the worklist. A named cell is the march dest. A blank cell is not a march, and defend applies only when an enemy is already observed.
  * When to use: When standing-order tools are enabled.
- * Expected outcome: Points at Units Without Standing Orders and forbids a march to the current cell.
+ * Expected outcome: A named cell may be enemy contact and is marched to. A blank cell is not a march. Defend is only for an already observed enemy the unit is on, or cannot close on. Pursue is only with an enemy unit id.
  * Exceptions: None.
  */
 const ORDERLESS_BULLET =
-  '- For every unit listed under ## Units Without Standing Orders, add an orders[] entry with action assign_order (march/pursue for closing; defend to hold). That table\'s Suggested Destination column already holds a legal hex that closes on the nearest enemy — march there unless you have a better destination in mind, and use defend only when you actually want the unit to hold. Never march to the unit\'s current Hex; that order is dropped as already arrived and the unit stays idle. When you need a one-step explicit_move this turn, copy a Best Options approach or move/melee Target Hex that is not the current cell, or assign defend to hold.';
+  '- For every unit listed under ## Units Without Standing Orders, add an orders[] entry with action assign_order. When Suggested Destination names a hex, march there; that hex is a legal destination that closes on the nearest enemy, and it may be the enemy-occupied hex. Use pursue only when you supply an enemy unit id, not in place of that hex. When the cell is —, do not invent a march. Assign defend on its current hex only when an enemy is already observed and the unit is on that enemy or has no closing step. Never march to the unit\'s current Hex; that order is dropped as already arrived and the unit stays idle. When you need a one-step explicit_move this turn, copy a Best Options approach or move/melee Target Hex for that unit. That hex is already inside this turn\'s movement budget, including weather. Do not copy a farther hex from the printed nearest-enemy path.';
 
 /**
  * Working standing orders should be left alone.

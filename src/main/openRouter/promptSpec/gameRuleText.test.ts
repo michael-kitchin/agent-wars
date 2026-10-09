@@ -238,6 +238,9 @@ test('buildMovementBudgetRule quotes engine budgets and states that air never ma
   assert.match(strategic, /air (never marches|does not march)/i);
   assert.match(strategic, /Armor that enters a rugged, arctic, or city hex ends its move there/);
   assert.match(strategic, /A longer route continues on the next turn, and the turn count includes that halt/);
+  assert.match(strategic, /Movement budgets in clear weather/);
+  assert.match(strategic, /When the weather sentence states a lower budget for a unit that lacks that weather, that lower number is this turn's budget/);
+  assert.match(strategic, /dropped, not shortened to the first step/);
   assert.doesNotMatch(strategic, /urban or rubble/i);
   const tactical = buildMovementBudgetRule('tactical');
   assert.ok(tactical.includes(String(MOVEMENT_RANGE_BY_UNIT_TYPE.armor)));
@@ -259,6 +262,8 @@ test('buildMovementBudgetRule quotes engine budgets and states that air never ma
   assert.ok(tactical.includes(String(TACTICAL_TRANSPORT_RAIL_BUDGET_MULTIPLIER)));
   assert.doesNotMatch(tactical, /unless that cell holds a friendly/i);
   assert.doesNotMatch(tactical, /Urban and rubble cells cost more/);
+  assert.match(tactical, /clamped to the first reachable leg/);
+  assert.doesNotMatch(tactical, /\bdropped\b/);
 });
 
 test('buildRangedReachRule distinguishes infantry melee from tactical infantry reach', () => {

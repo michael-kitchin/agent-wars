@@ -227,12 +227,30 @@ body:has(#game-over-overlay:not(.hidden)) #sidebar {
 .openrouter-tool-toggle:disabled {
   opacity: 0.55;
 }
+/* Ready sits in a tip host. A shown control clears its inline display so this rule can center its label. The host and Ranged share one top edge and one height, including Strike's list and Cancel. */
+#sidebar-top p:has(#ready-btn) {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  column-gap: 0.35rem;
+  row-gap: 0.35rem;
+}
+#sidebar-top p:has(#ready-btn) > .control-tooltip-host {
+  height: 1.75rem;
+  align-items: stretch;
+}
 .ready-btn,
 .ranged-btn {
+  box-sizing: border-box;
+  height: 1.75rem;
   min-width: 2rem;
-  padding: 0.25rem 0.4rem;
+  padding: 0 0.4rem;
   font-size: 12px;
   font-weight: 500;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 .openrouter-status-row {
   margin-top: 0.5rem;

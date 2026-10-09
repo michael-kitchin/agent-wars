@@ -82,6 +82,15 @@ test('strategic coaching includes every required item when its gate is on', () =
   assert.match(text, /leaving this period/i);
   assert.match(text, /move\/melee/i);
   assert.match(text, /Units Without Standing Orders/i);
+  assert.doesNotMatch(text, /already holds a legal hex/i);
+  assert.match(text, /When the cell is —/);
+  assert.match(text, /assign defend on its current hex/i);
+  assert.match(text, /only when an enemy is already observed/);
+  assert.match(text, /enemy-occupied hex/);
+  assert.match(text, /Use pursue only when you supply an enemy unit id/);
+  assert.match(text, /inside this turn's movement budget, including weather/);
+  assert.match(text, /Do not copy a farther hex from the printed nearest-enemy path/);
+  assert.match(text, /Never march to the unit's current Hex/);
   assert.match(text, /healthy standing order/i);
   assert.match(text, /recedes from the nearest enemy/i);
   assert.match(text, /move\/melee Target Hex is such an override/i);

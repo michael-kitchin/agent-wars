@@ -507,11 +507,11 @@ export function onStackAllActionClick(
 }
 
 /**
- * Defines the `applyStackCalloutSelectionButtonVisibility` function shape (function applyStackCalloutSelectionButtonVisibility(calloutEl: HTMLElement, nonSelectableUnitIds: ReadonlySet<string>): void).
-
- * Purpose: Supports maintainability by documenting why `applyStackCalloutSelectionButtonVisibility` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Hides selection toggles for embarked units and keeps each visible toggle matched to the current selection.
+ *
+ * Purpose: Embark hides a toggle without removing its row. Debark shows that same button, so its mark has to follow selection rather than the mark from when the list opened.
+ * When to use: After the stack list is built and whenever sealift state changes which units are selectable.
+ * Expected outcome: A non-selectable unit's toggle stays in the layout and is hidden. Every other toggle is visible and shows select or unselect for the current selection.
  * Exceptions: None.
  */
 export function applyStackCalloutSelectionButtonVisibility(calloutEl: HTMLElement, nonSelectableUnitIds: ReadonlySet<string>): void {
@@ -523,6 +523,7 @@ export function applyStackCalloutSelectionButtonVisibility(calloutEl: HTMLElemen
     if (!unitId) continue;
     const btn = row.querySelector('button.stack-unit-toggle') as HTMLButtonElement | null;
     if (!btn) continue;
+    btn.textContent = S.selectedUnitIds.includes(unitId) ? UNIT_DESELECT_GLYPH : UNIT_SELECT_GLYPH;
     btn.style.visibility = nonSelectableUnitIds.has(unitId) ? 'hidden' : 'visible';
   }
 }
@@ -563,7 +564,7 @@ export function getSelectableHumanIdsForStackCallout(units: GameStateSnapshot['u
  * Removes every sealift assignment block from the stack popup.
  *
  * Purpose: Overlapping async renders can leave more than one `.stack-sealift-section`; a single `querySelector` would keep extras.
- * When to use: Before fetching new sealift state and whenever the popup must not show stale cargo rows.
+ * When to use: When a finished replacement is ready to append, when this hex has no sealift UI, or when the loaded state says the section should hide.
  * Expected outcome: No `.stack-sealift-section` remains under `calloutEl`.
  * Exceptions: None.
  */
@@ -588,23 +589,40 @@ export function buildSealiftUnitLabel(unitId: string, unitType: string): string 
  * Fills the stack popup sealift controls for the current hex after loading stack state.
  *
  * Purpose: Cargo slot UI is async; a generation token drops stale awaits so each fleet is listed once.
- * When to use: End of `showStackCallout` and after sealift slot IPC refreshes the open popup.
- * Expected outcome: At most one sealift section for the latest stack hex; hidden or superseded renders do not append.
+ * When to use: End of `showStackCallout` and after a fleet list or debark button changes an assignment.
+ * Expected outcome: At most one sealift section for the latest stack hex. The previous section stays until the replacement is appended, so the unit list does not blank while embarked selection toggles hide. Hidden or superseded renders do not append.
  * Exceptions: Logs to the console if sealift IPC throws.
  */
 export async function renderSealiftSection(units: GameStateSnapshot['units'], calloutEl: HTMLElement): Promise<void> {
   const generation = ++sealiftSectionRenderGeneration;
-  removeSealiftSection(calloutEl);
   const h3Index = units[0]?.h3Index;
-  if (!h3Index) return;
+  if (!h3Index) {
+    removeSealiftSection(calloutEl);
+    return;
+  }
   const tacticalSealiftMode = !!(
     S.tacticalBattleSnapshot?.tacticalChildH3Indexes.includes(h3Index) &&
     window.gameApi?.getTacticalSealiftStackState &&
     window.gameApi?.updateTacticalSealiftSlot
   );
-  if (!tacticalSealiftMode && (!window.gameApi?.getSealiftStackState || !window.gameApi?.updateSealiftSlot)) return;
-  if (tacticalSealiftMode && (!window.gameApi?.getTacticalSealiftStackState || !window.gameApi?.updateTacticalSealiftSlot))
+  if (!tacticalSealiftMode && (!window.gameApi?.getSealiftStackState || !window.gameApi?.updateSealiftSlot)) {
+    removeSealiftSection(calloutEl);
     return;
+  }
+  if (tacticalSealiftMode && (!window.gameApi?.getTacticalSealiftStackState || !window.gameApi?.updateTacticalSealiftSlot)) {
+    removeSealiftSection(calloutEl);
+    return;
+  }
+  /**
+   * Purpose: A slot change must leave the unit list mounted and must not cancel a sealift render for a different hex.
+   * When to use: After a fleet-list or debark IPC settles.
+   * Expected outcome: The open popup's fleet section refreshes when its hex still matches.
+   * Exceptions: None.
+   */
+  const refreshSameHexSealiftSection = (): void => {
+    if (calloutEl.classList.contains('hidden') || calloutEl.getAttribute('data-h3-index') !== h3Index) return;
+    void renderSealiftSection(units, calloutEl);
+  };
   try {
     let state: SealiftStackState;
     if (tacticalSealiftMode) {
@@ -616,7 +634,10 @@ export async function renderSealiftSection(units: GameStateSnapshot['units'], ca
     if (generation !== sealiftSectionRenderGeneration) return;
     if (calloutEl.classList.contains('hidden')) return;
     if (calloutEl.getAttribute('data-h3-index') !== h3Index) return;
-    if (!state.showSealiftSection) return;
+    if (!state.showSealiftSection) {
+      removeSealiftSection(calloutEl);
+      return;
+    }
     const nonSelectableEmbarkedIds = state.navalRows
       .flatMap((row) => [row.slot1UnitId, row.slot2UnitId])
       .filter((unitId): unitId is string => typeof unitId === 'string' && unitId.length > 0);
@@ -668,12 +689,6 @@ export async function renderSealiftSection(units: GameStateSnapshot['units'], ca
           const selected = select.value.trim();
           if (tacticalSealiftMode) {
             const prev = select.dataset.prevLand ?? '';
-            if (prev) {
-              S.tacticalPendingMarches = S.tacticalPendingMarches.filter((m) => m.subUnitId !== prev);
-            }
-            if (selected.length > 0) {
-              S.tacticalPendingMarches = S.tacticalPendingMarches.filter((m) => m.subUnitId !== selected);
-            }
             const result = await window.gameApi.updateTacticalSealiftSlot!({
               h3Index,
               navalUnitId: row.navalUnitId,
@@ -681,8 +696,15 @@ export async function renderSealiftSection(units: GameStateSnapshot['units'], ca
               landUnitId: selected.length > 0 ? selected : null,
             });
             if (!result.success) {
+              select.value = select.dataset.prevLand ?? '';
               showMapToast(formatTargetingValidationReason(result.reason, 'Failed to update sealift assignment.'));
             } else {
+              if (prev) {
+                S.tacticalPendingMarches = S.tacticalPendingMarches.filter((m) => m.subUnitId !== prev);
+              }
+              if (selected.length > 0) {
+                S.tacticalPendingMarches = S.tacticalPendingMarches.filter((m) => m.subUnitId !== selected);
+              }
               if (result.tacticalBattle) {
                 S.tacticalBattleSnapshot = result.tacticalBattle;
               }
@@ -694,7 +716,7 @@ export async function renderSealiftSection(units: GameStateSnapshot['units'], ca
               }
               updatePendingOrdersSidebar();
             }
-            refreshStackCalloutIfOpen();
+            refreshSameHexSealiftSection();
             requestRedraw();
             return;
           }
@@ -705,6 +727,7 @@ export async function renderSealiftSection(units: GameStateSnapshot['units'], ca
             landUnitId: selected.length > 0 ? selected : null,
           });
           if (!result.success) {
+            select.value = select.dataset.prevLand ?? '';
             showMapToast(formatTargetingValidationReason(result.reason, 'Failed to update sealift assignment.'));
           } else {
             // Embark/debark changes `embarkedOnNavalUnitId` in main; refresh so selection/march use current flags.
@@ -713,7 +736,7 @@ export async function renderSealiftSection(units: GameStateSnapshot['units'], ca
               await refreshHoverRoutePreview();
             }
           }
-          refreshStackCalloutIfOpen();
+          refreshSameHexSealiftSection();
           requestRedraw();
         });
         slotRow.appendChild(selectHost);
@@ -747,7 +770,7 @@ export async function renderSealiftSection(units: GameStateSnapshot['units'], ca
                   updatePendingOrdersSidebar();
                 }
               }
-              refreshStackCalloutIfOpen();
+              refreshSameHexSealiftSection();
               requestRedraw();
               return;
             }
@@ -762,7 +785,7 @@ export async function renderSealiftSection(units: GameStateSnapshot['units'], ca
             } else {
               await refreshGameStateAfterSealiftChange();
             }
-            refreshStackCalloutIfOpen();
+            refreshSameHexSealiftSection();
             requestRedraw();
         });
         slotRow.appendChild(debarkBtn);
@@ -775,6 +798,7 @@ export async function renderSealiftSection(units: GameStateSnapshot['units'], ca
       section.appendChild(rowEl);
     }
     if (generation !== sealiftSectionRenderGeneration) return;
+    removeSealiftSection(calloutEl);
     calloutEl.appendChild(section);
   } catch (err) {
     console.error('sealift stack section failed:', err);
@@ -881,10 +905,9 @@ export function showStackCallout(
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'unit-select stack-unit-toggle';
-      const inSelection = S.selectedUnitIds.includes(u.id);
-      btn.textContent = inSelection ? UNIT_DESELECT_GLYPH : UNIT_SELECT_GLYPH;
+      btn.textContent = S.selectedUnitIds.includes(u.id) ? UNIT_DESELECT_GLYPH : UNIT_SELECT_GLYPH;
       btn.addEventListener('click', () => {
-        onStackSingleUnitToggleClick(u.id, inSelection, units, clientX, clientY);
+        onStackSingleUnitToggleClick(u.id, S.selectedUnitIds.includes(u.id), units, clientX, clientY);
       });
       li.appendChild(btn);
     }

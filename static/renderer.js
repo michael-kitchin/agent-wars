@@ -22659,6 +22659,7 @@ ${bonuses}`;
       if (!unitId) continue;
       const btn = row.querySelector("button.stack-unit-toggle");
       if (!btn) continue;
+      btn.textContent = rendererSharedState.selectedUnitIds.includes(unitId) ? UNIT_DESELECT_GLYPH : UNIT_SELECT_GLYPH;
       btn.style.visibility = nonSelectableUnitIds.has(unitId) ? "hidden" : "visible";
     }
   }
@@ -22685,13 +22686,24 @@ ${bonuses}`;
   }
   async function renderSealiftSection(units, calloutEl) {
     const generation = ++sealiftSectionRenderGeneration;
-    removeSealiftSection(calloutEl);
     const h3Index = units[0]?.h3Index;
-    if (!h3Index) return;
-    const tacticalSealiftMode = !!(rendererSharedState.tacticalBattleSnapshot?.tacticalChildH3Indexes.includes(h3Index) && window.gameApi?.getTacticalSealiftStackState && window.gameApi?.updateTacticalSealiftSlot);
-    if (!tacticalSealiftMode && (!window.gameApi?.getSealiftStackState || !window.gameApi?.updateSealiftSlot)) return;
-    if (tacticalSealiftMode && (!window.gameApi?.getTacticalSealiftStackState || !window.gameApi?.updateTacticalSealiftSlot))
+    if (!h3Index) {
+      removeSealiftSection(calloutEl);
       return;
+    }
+    const tacticalSealiftMode = !!(rendererSharedState.tacticalBattleSnapshot?.tacticalChildH3Indexes.includes(h3Index) && window.gameApi?.getTacticalSealiftStackState && window.gameApi?.updateTacticalSealiftSlot);
+    if (!tacticalSealiftMode && (!window.gameApi?.getSealiftStackState || !window.gameApi?.updateSealiftSlot)) {
+      removeSealiftSection(calloutEl);
+      return;
+    }
+    if (tacticalSealiftMode && (!window.gameApi?.getTacticalSealiftStackState || !window.gameApi?.updateTacticalSealiftSlot)) {
+      removeSealiftSection(calloutEl);
+      return;
+    }
+    const refreshSameHexSealiftSection = () => {
+      if (calloutEl.classList.contains("hidden") || calloutEl.getAttribute("data-h3-index") !== h3Index) return;
+      void renderSealiftSection(units, calloutEl);
+    };
     try {
       let state;
       if (tacticalSealiftMode) {
@@ -22703,7 +22715,10 @@ ${bonuses}`;
       if (generation !== sealiftSectionRenderGeneration) return;
       if (calloutEl.classList.contains("hidden")) return;
       if (calloutEl.getAttribute("data-h3-index") !== h3Index) return;
-      if (!state.showSealiftSection) return;
+      if (!state.showSealiftSection) {
+        removeSealiftSection(calloutEl);
+        return;
+      }
       const nonSelectableEmbarkedIds = state.navalRows.flatMap((row) => [row.slot1UnitId, row.slot2UnitId]).filter((unitId) => typeof unitId === "string" && unitId.length > 0);
       setStackPopupNonSelectableUnitIds(calloutEl, nonSelectableEmbarkedIds);
       if (generation !== sealiftSectionRenderGeneration) return;
@@ -22744,12 +22759,6 @@ ${bonuses}`;
             const selected = select.value.trim();
             if (tacticalSealiftMode) {
               const prev = select.dataset.prevLand ?? "";
-              if (prev) {
-                rendererSharedState.tacticalPendingMarches = rendererSharedState.tacticalPendingMarches.filter((m) => m.subUnitId !== prev);
-              }
-              if (selected.length > 0) {
-                rendererSharedState.tacticalPendingMarches = rendererSharedState.tacticalPendingMarches.filter((m) => m.subUnitId !== selected);
-              }
               const result2 = await window.gameApi.updateTacticalSealiftSlot({
                 h3Index,
                 navalUnitId: row.navalUnitId,
@@ -22757,8 +22766,15 @@ ${bonuses}`;
                 landUnitId: selected.length > 0 ? selected : null
               });
               if (!result2.success) {
+                select.value = select.dataset.prevLand ?? "";
                 showMapToast(formatTargetingValidationReason(result2.reason, "Failed to update sealift assignment."));
               } else {
+                if (prev) {
+                  rendererSharedState.tacticalPendingMarches = rendererSharedState.tacticalPendingMarches.filter((m) => m.subUnitId !== prev);
+                }
+                if (selected.length > 0) {
+                  rendererSharedState.tacticalPendingMarches = rendererSharedState.tacticalPendingMarches.filter((m) => m.subUnitId !== selected);
+                }
                 if (result2.tacticalBattle) {
                   rendererSharedState.tacticalBattleSnapshot = result2.tacticalBattle;
                 }
@@ -22770,7 +22786,7 @@ ${bonuses}`;
                 }
                 updatePendingOrdersSidebar();
               }
-              refreshStackCalloutIfOpen();
+              refreshSameHexSealiftSection();
               requestRedraw();
               return;
             }
@@ -22781,6 +22797,7 @@ ${bonuses}`;
               landUnitId: selected.length > 0 ? selected : null
             });
             if (!result.success) {
+              select.value = select.dataset.prevLand ?? "";
               showMapToast(formatTargetingValidationReason(result.reason, "Failed to update sealift assignment."));
             } else {
               await refreshGameStateAfterSealiftChange({ refreshStandingOrders: selected.length > 0 });
@@ -22788,7 +22805,7 @@ ${bonuses}`;
                 await refreshHoverRoutePreview();
               }
             }
-            refreshStackCalloutIfOpen();
+            refreshSameHexSealiftSection();
             requestRedraw();
           });
           slotRow.appendChild(selectHost);
@@ -22821,7 +22838,7 @@ ${bonuses}`;
                   updatePendingOrdersSidebar();
                 }
               }
-              refreshStackCalloutIfOpen();
+              refreshSameHexSealiftSection();
               requestRedraw();
               return;
             }
@@ -22836,7 +22853,7 @@ ${bonuses}`;
             } else {
               await refreshGameStateAfterSealiftChange();
             }
-            refreshStackCalloutIfOpen();
+            refreshSameHexSealiftSection();
             requestRedraw();
           });
           slotRow.appendChild(debarkBtn);
@@ -22848,6 +22865,7 @@ ${bonuses}`;
         section.appendChild(rowEl);
       }
       if (generation !== sealiftSectionRenderGeneration) return;
+      removeSealiftSection(calloutEl);
       calloutEl.appendChild(section);
     } catch (err) {
       console.error("sealift stack section failed:", err);
@@ -22936,10 +22954,9 @@ ${bonuses}`;
         const btn = document.createElement("button");
         btn.type = "button";
         btn.className = "unit-select stack-unit-toggle";
-        const inSelection = rendererSharedState.selectedUnitIds.includes(u.id);
-        btn.textContent = inSelection ? UNIT_DESELECT_GLYPH : UNIT_SELECT_GLYPH;
+        btn.textContent = rendererSharedState.selectedUnitIds.includes(u.id) ? UNIT_DESELECT_GLYPH : UNIT_SELECT_GLYPH;
         btn.addEventListener("click", () => {
-          onStackSingleUnitToggleClick(u.id, inSelection, units, clientX, clientY);
+          onStackSingleUnitToggleClick(u.id, rendererSharedState.selectedUnitIds.includes(u.id), units, clientX, clientY);
         });
         li.appendChild(btn);
       }
@@ -28062,17 +28079,17 @@ ${bonuses}`;
         rendererSharedState.rangedModeActive = false;
         btnEl.textContent = "Strike";
         btnEl.setAttribute("data-control-tooltip", rangedButtonTooltipText("Strike"));
-        btnEl.style.display = rendererSharedState.airStrikeModeActive ? "none" : "inline-block";
+        btnEl.style.display = rendererSharedState.airStrikeModeActive ? "none" : "";
         if (strikeTypeEl) {
-          strikeTypeEl.style.display = rendererSharedState.airStrikeModeActive ? "inline-block" : "none";
+          strikeTypeEl.style.display = rendererSharedState.airStrikeModeActive ? "" : "none";
           strikeTypeEl.value = rendererSharedState.airStrikeTargetType;
         }
         if (strikeCancelEl) {
-          strikeCancelEl.style.display = rendererSharedState.airStrikeModeActive ? "inline-block" : "none";
+          strikeCancelEl.style.display = rendererSharedState.airStrikeModeActive ? "" : "none";
         }
       } else if (mode === "ranged") {
         rendererSharedState.airStrikeModeActive = false;
-        btnEl.style.display = "inline-block";
+        btnEl.style.display = "";
         btnEl.textContent = rendererSharedState.rangedModeActive ? "Cancel" : "Ranged";
         btnEl.setAttribute(
           "data-control-tooltip",

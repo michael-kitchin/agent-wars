@@ -401,7 +401,7 @@ export function tacticalLandEnterCostRule(): string {
  *
  * Purpose: Multi-turn and intra-beat reach cannot be judged from the options table alone.
  * When to use: Combat paragraph after the infantry reach clause.
- * Expected outcome: Strategic cell counts from `getMovementBudget`. Tactical type numbers are the clear-weather point baselines from `MOVEMENT_RANGE_BY_UNIT_TYPE`; the weather sentence, when the bonus is on, states any lower budget. Origin urban/rubble collapse and enter costs for an intact line, a roadless urban cell, and rubble follow. The line-entry sentence refers to the road or rail cell.
+ * Expected outcome: Strategic cell counts from `getMovementBudget` are clear-weather counts. A lower number applies only when the weather sentence states one for a unit that lacks that weather. An over-budget strategic explicit move is dropped. Tactical type numbers are the clear-weather point baselines from `MOVEMENT_RANGE_BY_UNIT_TYPE`; the weather sentence, when the bonus is on, states any lower budget. Origin urban/rubble collapse and enter costs for an intact line, a roadless urban cell, and rubble follow. The line-entry sentence refers to the road or rail cell. A tactical destination past the beat budget is clamped to the first reachable leg.
  * Exceptions: None.
  */
 export function buildMovementBudgetRule(mode: PromptCoordinateMode): string {
@@ -418,10 +418,12 @@ export function buildMovementBudgetRule(mode: PromptCoordinateMode): string {
     );
   }
   return (
-    `Movement budgets: ${getMovementBudget('infantry')} cell for infantry, ` +
+    `Movement budgets in clear weather: ${getMovementBudget('infantry')} cell for infantry, ` +
     `${getMovementBudget('armor')} for armor and naval, and air never marches. ` +
+    "When the weather sentence states a lower budget for a unit that lacks that weather, that lower number is this turn's budget. " +
     'Armor that enters a rugged, arctic, or city hex ends its move there. Armor already on that hex may leave. ' +
-    'A longer route continues on the next turn, and the turn count includes that halt.'
+    'A longer route continues on the next turn, and the turn count includes that halt. ' +
+    "An explicit_move farther than this turn's budget is dropped, not shortened to the first step."
   );
 }
 

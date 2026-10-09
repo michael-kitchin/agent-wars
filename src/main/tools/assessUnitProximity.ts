@@ -291,14 +291,13 @@ export const OMNISCIENT_GRID_PROXIMITY_BRIEFING_LINE =
 /**
  * Honesty sentence when Unit Status distances use march/sail paths under fog.
  *
- * Purpose: Fog-on assessments print path length while Best Options dests use this-turn legal hops, so a unit can
- * close this turn even when the printed path is longer than one movement budget.
+ * Purpose: Fog-on assessments print path length while Best Options dests are one-step hops inside this turn's budget, so the printed path is remaining distance and not the hex to order.
  * When to use: Strategic formatBriefing immediately after the intel staleness sentence when fog is on at strategic.
- * Expected outcome: Tells the model to copy Best Options Target Hexes rather than treating printed path length as the move budget.
+ * Expected outcome: Tells the model to copy a Best Options Target Hex into explicit_move and not a farther hex from the printed path.
  * Exceptions: None.
  */
 export const FOG_PATH_DISTANCE_BRIEFING_LINE =
-  'Nearest-enemy distances are march or sail path lengths when a path exists (otherwise a hop count). Best Options This Turn Target Hexes are already this-turn legal destinations — copy them even when the printed path is longer than one movement budget.';
+  'Nearest-enemy distances are march or sail path lengths when a path exists (otherwise a hop count). That length can be longer than one movement budget. Best Options This Turn Target Hexes are the one-step destinations already inside this turn\'s budget, including weather. Copy a Target Hex into explicit_move. Do not copy a farther hex from the printed path; an explicit_move past the budget is dropped.';
 
 /**
  * Minimal unit fields required to pair grid distances without a full snapshot type.

@@ -5,7 +5,7 @@
  * as already-arrived, so those units stayed orderless and idle every turn. The suggestion column exists to break that
  * loop, and it only works if the hex it offers is legal, closes on the enemy, and is never the unit's current hex.
  * When to use: After edits to `orderlessUnitSuggestions.ts` or the shared approach helpers in `assessUnitProximity.ts`.
- * Expected outcome: A closing suggestion when an enemy is reachable, and no suggestion at all when none is observed.
+ * Expected outcome: A closing suggestion when an enemy is reachable, including an enemy-occupied hex inside this turn's budget, and no suggestion when none is observed or the unit is already on the enemy.
  * Exceptions: Throws when the world map has no geodesic land-mass chain of the required length.
  */
 
@@ -15,6 +15,7 @@ import {
   buildLandChainState,
   findGeodesicLandMassChain,
 } from '../testSupport/strategicLandChainFixtures';
+import { getValidDestinations } from '../oneStepMoveDestinations';
 import { suggestApproachDestinationsForOrderlessUnits } from './orderlessUnitSuggestions';
 
 /**
@@ -113,6 +114,130 @@ function testAirUnitsAreNeverOfferedAMarchDestination(): void {
   );
 }
 
+/**
+ * Ensures an adjacent enemy hex is the suggested march when it is a legal step.
+ *
+ * Purpose: Best Options labels that hex move/melee. A suggestion on a different hex would send the standing order
+ * somewhere other than the contact the table already lists.
+ * When to use: After changing which occupied hexes are eligible suggestions.
+ * Expected outcome: The suggestion is exactly the enemy hex.
+ * Exceptions: Throws if no geodesic 4-hop land chain exists.
+ */
+function testAdjacentEnemyHexIsTheSuggestion(): void {
+  const chain = findGeodesicLandMassChain(4);
+  const state = buildLandChainState({
+    chain,
+    units: [
+      { id: 'opponent-inf-idle', player: 'opponent', unitType: 'infantry', h3Index: chain[0]! },
+      { id: 'human-inf-adj', player: 'human', unitType: 'infantry', h3Index: chain[1]! },
+    ],
+  });
+
+  const suggestions = suggestApproachDestinationsForOrderlessUnits('opponent', state, [
+    'opponent-inf-idle',
+  ]);
+
+  assert.strictEqual(
+    suggestions.get('opponent-inf-idle'),
+    chain[1],
+    'an adjacent legal enemy hex is the suggested destination'
+  );
+}
+
+/**
+ * Ensures an enemy inside this turn's budget beats the empty step in front of it.
+ *
+ * Purpose: Choosing the hex closest to the unit would name the empty step and miss the move/melee contact.
+ * When to use: After changing contact-versus-approach preference.
+ * Expected outcome: The suggestion is the enemy hex, and both that hex and the empty step are legal dests.
+ * Exceptions: Throws if no geodesic 4-hop land chain exists, or if armor cannot legally reach both hexes.
+ */
+function testEnemyInsideBudgetBeatsTheEmptyStepInFront(): void {
+  const chain = findGeodesicLandMassChain(4);
+  const state = buildLandChainState({
+    chain,
+    units: [
+      { id: 'opponent-arm-idle', player: 'opponent', unitType: 'armor', h3Index: chain[0]! },
+      { id: 'human-inf-two', player: 'human', unitType: 'infantry', h3Index: chain[2]! },
+    ],
+  });
+  const legal = getValidDestinations(
+    { id: 'opponent-arm-idle', h3Index: chain[0]!, unitType: 'armor' },
+    state
+  );
+  assert.ok(legal.includes(chain[1]!), 'fixture requires the empty step to be a legal dest');
+  assert.ok(legal.includes(chain[2]!), 'fixture requires the enemy hex to be a legal dest');
+
+  const suggestions = suggestApproachDestinationsForOrderlessUnits('opponent', state, [
+    'opponent-arm-idle',
+  ]);
+
+  assert.strictEqual(
+    suggestions.get('opponent-arm-idle'),
+    chain[2],
+    'an enemy hex inside this turn\'s budget is suggested ahead of the empty step in front of it'
+  );
+}
+
+/**
+ * Ensures a contested hex is still suggested when a friendly is standing on the enemy.
+ *
+ * Purpose: Stay-put friendlies are skipped only when the hex holds no enemy. Contact remains a legal march dest.
+ * When to use: After changing the stay-put exclusion.
+ * Expected outcome: The suggestion is the contested hex.
+ * Exceptions: Throws if no geodesic 4-hop land chain exists.
+ */
+function testContestedHexIsStillSuggested(): void {
+  const chain = findGeodesicLandMassChain(4);
+  const state = buildLandChainState({
+    chain,
+    units: [
+      { id: 'opponent-inf-idle', player: 'opponent', unitType: 'infantry', h3Index: chain[0]! },
+      { id: 'opponent-inf-stay', player: 'opponent', unitType: 'infantry', h3Index: chain[1]! },
+      { id: 'human-inf-adj', player: 'human', unitType: 'infantry', h3Index: chain[1]! },
+    ],
+  });
+
+  const suggestions = suggestApproachDestinationsForOrderlessUnits('opponent', state, [
+    'opponent-inf-idle',
+  ]);
+
+  assert.strictEqual(
+    suggestions.get('opponent-inf-idle'),
+    chain[1],
+    'a contested hex is the suggested destination'
+  );
+}
+
+/**
+ * Ensures a unit already standing on the enemy is not given a march.
+ *
+ * Purpose: Nothing is strictly closer than distance 0, and a march to the current hex is dropped as already arrived.
+ * When to use: After changing the closing filter or the own-hex exclusion.
+ * Expected outcome: The unit is absent from the returned map.
+ * Exceptions: Throws if no geodesic 4-hop land chain exists.
+ */
+function testUnitAlreadyOnTheEnemyIsOmitted(): void {
+  const chain = findGeodesicLandMassChain(4);
+  const state = buildLandChainState({
+    chain,
+    units: [
+      { id: 'opponent-inf-idle', player: 'opponent', unitType: 'infantry', h3Index: chain[0]! },
+      { id: 'human-inf-here', player: 'human', unitType: 'infantry', h3Index: chain[0]! },
+    ],
+  });
+
+  const suggestions = suggestApproachDestinationsForOrderlessUnits('opponent', state, [
+    'opponent-inf-idle',
+  ]);
+
+  assert.strictEqual(
+    suggestions.has('opponent-inf-idle'),
+    false,
+    'a unit already on the enemy has no strictly closer dest'
+  );
+}
+
 const tests: ReadonlyArray<{ name: string; fn: () => void }> = [
   {
     name: 'suggestApproachDestinationsForOrderlessUnits offers a closing hex that is not the unit\'s own',
@@ -125,6 +250,22 @@ const tests: ReadonlyArray<{ name: string; fn: () => void }> = [
   {
     name: 'suggestApproachDestinationsForOrderlessUnits omits air units, which cannot march',
     fn: testAirUnitsAreNeverOfferedAMarchDestination,
+  },
+  {
+    name: 'suggestApproachDestinationsForOrderlessUnits names an adjacent enemy hex',
+    fn: testAdjacentEnemyHexIsTheSuggestion,
+  },
+  {
+    name: 'suggestApproachDestinationsForOrderlessUnits prefers an in-budget enemy hex over the empty step',
+    fn: testEnemyInsideBudgetBeatsTheEmptyStepInFront,
+  },
+  {
+    name: 'suggestApproachDestinationsForOrderlessUnits names a contested hex',
+    fn: testContestedHexIsStillSuggested,
+  },
+  {
+    name: 'suggestApproachDestinationsForOrderlessUnits omits a unit already on the enemy',
+    fn: testUnitAlreadyOnTheEnemyIsOmitted,
   },
 ];
 
