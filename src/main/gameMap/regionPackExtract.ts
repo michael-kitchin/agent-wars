@@ -147,18 +147,30 @@ function extractedJsonMatchesZips(directory: string, zipDirectory: string): bool
  * Purpose: Extracts must land in the per-user folder, not in the install directory.
  * When to use: Before reading or writing `generated-regions`.
  * Expected outcome: The test override, otherwise Electron's user-data path, otherwise null when Electron is absent.
- * Exceptions: None. A missing Electron install returns null.
+ * Exceptions: None. A missing Electron install returns null. A thrown `app.getPath` is logged and also returns null. `getPath` stays on `app` because Electron rejects a detached call.
  */
 function userDataRoot(): string | null {
-  if (userDataRootOverride) return userDataRootOverride;
+  if (userDataRootOverride) {
+    logTrace('regionPackExtract userDataRoot', { source: 'override' });
+    return userDataRootOverride;
+  }
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const electron = require('electron') as { app?: { getPath?: (name: string) => string } } | undefined;
-    const getPath = electron?.app?.getPath;
-    if (typeof getPath !== 'function') return null;
-    return getPath('userData');
+    const electron = require('electron') as Record<string, unknown> | string | undefined;
+    if (!electron || typeof electron !== 'object') {
+      logTrace('regionPackExtract userDataRoot', { source: 'none' });
+      return null;
+    }
+    const app = electron.app as { getPath?: (name: string) => string } | undefined;
+    if (!app || typeof app.getPath !== 'function') {
+      logTrace('regionPackExtract userDataRoot', { source: 'none' });
+      return null;
+    }
+    const root = app.getPath('userData');
+    logTrace('regionPackExtract userDataRoot', { source: 'electron' });
+    return root;
   } catch (err) {
-    logTrace('regionPackExtract userDataRoot: Electron is unavailable', { err });
+    logError('regionPackExtract userDataRoot: failed', err);
     return null;
   }
 }

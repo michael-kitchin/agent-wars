@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import * as fs from 'fs';
+import Module from 'node:module';
 import * as os from 'os';
 import * as path from 'path';
 import { test } from 'node:test';
@@ -37,6 +38,43 @@ test('the packed JSON names match the packaging manifest', () => {
   assert.deepEqual([...regionalPackJsonFiles()], [...REGIONAL_JSON_FILES]);
 });
 
+/**
+ * Call shape of Node's module loader.
+ *
+ * Purpose: The extract test replaces this loader so `require('electron')` returns a stand-in app.
+ * When to use: `installBoundElectronUserData` saves and restores the real loader.
+ * Expected outcome: Node's request, parent, and main flag, and whatever the loader returns.
+ * Exceptions: None.
+ */
+type ModuleLoad = (this: unknown, request: string, parent: unknown, isMain: boolean) => unknown;
+
+/**
+ * Serves Electron `app.getPath` only when it is called on the app object.
+ *
+ * Purpose: Packaged extraction asks Electron for user data. A detached `getPath` throws, which the extractor used to treat as "no user data".
+ * When to use: Around one zip-only extract that must not use the test user-data override.
+ * Expected outcome: `require('electron')` returns this app until the restore function runs.
+ * Exceptions: None.
+ */
+function installBoundElectronUserData(userDataDir: string): () => void {
+  const moduleWithLoad = Module as unknown as { _load: ModuleLoad };
+  const originalLoad = moduleWithLoad._load;
+  const app = {
+    getPath(this: unknown, name: string): string {
+      if (this !== app) throw new TypeError('getPath called without app');
+      if (name !== 'userData') throw new Error(`unexpected path ${name}`);
+      return userDataDir;
+    },
+  };
+  moduleWithLoad._load = function patchedLoad(request, parent, isMain) {
+    if (request === 'electron') return { app };
+    return originalLoad.call(this, request, parent, isMain);
+  };
+  return () => {
+    moduleWithLoad._load = originalLoad;
+  };
+}
+
 test('a zip-only region is extracted once into user data', () => {
   const regionId = 'sample_pack';
   const { root, regionDirectory, userData } = makeRegionRoot(regionId);
@@ -53,6 +91,28 @@ test('a zip-only region is extracted once into user data', () => {
     assert.equal(regionPackDirectory(regionId), expected);
     assert.equal(fs.existsSync(path.join(userData, 'generated-regions', `.${regionId}.extracting`)), false);
   } finally {
+    setTerrainMetadataPathOverrideForTests(null);
+    setRegionPackUserDataRootForTests(null);
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('a zip-only region extracts into Electron user data when getPath must stay bound', () => {
+  const regionId = 'sample_pack';
+  const { root, regionDirectory, userData } = makeRegionRoot(regionId);
+  const zip = zipSync({ 'region_manifest.json': strToU8('{"schema_version":"1.1.0"}') });
+  fs.writeFileSync(path.join(regionDirectory, 'region_manifest.json.zip'), zip);
+  setTerrainMetadataPathOverrideForTests(root);
+  setRegionPackUserDataRootForTests(null);
+  const restoreElectron = installBoundElectronUserData(userData);
+  try {
+    const extracted = regionPackDirectory(regionId);
+    const expected = path.join(userData, 'generated-regions', regionId);
+    assert.equal(extracted, expected);
+    assert.equal(fs.readFileSync(path.join(expected, 'region_manifest.json'), 'utf8'), '{"schema_version":"1.1.0"}');
+    assert.ok(fs.existsSync(path.join(expected, 'pack.ready')));
+  } finally {
+    restoreElectron();
     setTerrainMetadataPathOverrideForTests(null);
     setRegionPackUserDataRootForTests(null);
     fs.rmSync(root, { recursive: true, force: true });
