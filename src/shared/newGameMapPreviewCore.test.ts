@@ -48,13 +48,15 @@ test('preview home borders mark exclusive, shared, and identical homes', () => {
   });
 });
 
-test('preview paints home terrain always, and the rest of the grid only while T is held', () => {
-  assert.equal(previewHexIsDrawn(null, false), false);
-  assert.equal(previewHexIsDrawn('human', false), true);
-  assert.equal(previewHexIsDrawn('opponent', false), true);
-  assert.equal(previewHexIsDrawn('both', false), true);
-  assert.equal(previewHexIsDrawn(null, true), true);
-  assert.equal(previewHexIsDrawn('human', true), true);
+test('global preview paints homes always and the rest of the grid only while T is held, and a regional preview paints every hex', () => {
+  assert.equal(previewHexIsDrawn('global', null, false), false);
+  assert.equal(previewHexIsDrawn('global', 'human', false), true);
+  assert.equal(previewHexIsDrawn('global', 'opponent', false), true);
+  assert.equal(previewHexIsDrawn('global', 'both', false), true);
+  assert.equal(previewHexIsDrawn('global', null, true), true);
+  assert.equal(previewHexIsDrawn('global', 'human', true), true);
+  assert.equal(previewHexIsDrawn('northern_america', null, false), true);
+  assert.equal(previewHexIsDrawn('northern_america', null, true), true);
 });
 
 test('preview weather icon follows the start month unless the bonus, inspection, or zoom hides it', () => {

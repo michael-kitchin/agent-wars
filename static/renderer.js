@@ -18448,14 +18448,14 @@
     const displayName = identity.displayName.trim();
     if (displayName.length > 0) {
       lines.push(
-        `<strong>Name:</strong> ${originFlagImgHtml({
+        `<strong>Unit:</strong> ${originFlagImgHtml({
           subdivisionCode: origin.birthSubdivisionCode ?? null,
           countryCode: origin.birthCountryCode
         })}${escapeHtmlText(displayName)}`
       );
     }
     const formedLabel = identity.formedLabel?.trim() ?? "";
-    if (formedLabel.length > 0) lines.push(`<strong>Formed:</strong> ${escapeHtmlText(formedLabel)}`);
+    if (formedLabel.length > 0) lines.push(`<strong>DOB:</strong> ${escapeHtmlText(formedLabel)}`);
     return lines;
   }
   function formatUnitOriginTooltipHtml(input) {
@@ -23503,7 +23503,8 @@ ${bonuses}`;
     if (inAi) return { controllerPlayerId: "opponent", homeOwnerIdentity: "opponent" };
     return { controllerPlayerId: null, homeOwnerIdentity: null };
   }
-  function previewHexIsDrawn(homeOwnerIdentity, mapInspectionHeld) {
+  function previewHexIsDrawn(gameMapId, homeOwnerIdentity, mapInspectionHeld) {
+    if (gameMapId !== "global") return true;
     if (mapInspectionHeld) return true;
     return homeOwnerIdentity != null;
   }
@@ -24557,7 +24558,7 @@ ${bonuses}`;
       const border = previewHomeBorder(hex.h3Index, humanHomes, aiHomes);
       const pts = projectHexBoundaryToContainerPoints(hex.h3Index, map, leaflet);
       if (pts.length === 0) continue;
-      if (previewHexIsDrawn(border.homeOwnerIdentity, inspectionHeld)) {
+      if (previewHexIsDrawn(payload.gameMapId, border.homeOwnerIdentity, inspectionHeld)) {
         const drawClosedPath = () => {
           ctx.beginPath();
           for (let i = 0; i < pts.length; i++) {

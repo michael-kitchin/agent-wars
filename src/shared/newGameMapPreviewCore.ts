@@ -37,15 +37,17 @@ export function previewHomeBorder(
 /**
  * Reports whether one preview hex's fill and outline are painted.
  *
- * Purpose: Home regions stay visible on the basemap. The other strategic hexes, on a global or regional map, are painted only while T is held.
+ * Purpose: A global preview paints home regions always, and the rest of the world grid only while T is held. A regional preview paints its whole strategic grid.
  * When to use: Once per hex, after `previewHomeBorder`, as the single gate for that hex's fill, grid stroke, and home rings. Weather and tech icons are chosen separately.
- * Expected outcome: True for a home hex, including a shared home, on every map. True for any other hex only while T is held.
+ * Expected outcome: True for every hex of a regional map. On the global map, true for a home hex, including a shared home, and true for any other hex only while T is held.
  * Exceptions: None.
  */
 export function previewHexIsDrawn(
+  gameMapId: string,
   homeOwnerIdentity: PreviewHomeBorder['homeOwnerIdentity'],
   mapInspectionHeld: boolean
 ): boolean {
+  if (gameMapId !== 'global') return true;
   if (mapInspectionHeld) return true;
   return homeOwnerIdentity != null;
 }

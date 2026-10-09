@@ -26,7 +26,7 @@ const unitOriginById = new Map<string, UnitOrigin>();
 /**
  * Formation turn last seen for a strategic unit id.
  *
- * Purpose: The Formed line survives after the unit leaves the snapshot, including a loss toast.
+ * Purpose: The DOB line survives after the unit leaves the snapshot, including a loss toast.
  * When to use: Written by `rememberUnitOrigins` and read by `formedLabelFor`.
  * Expected outcome: Cleared with the origin cache on a new game. A tactical id is not stored; the parent id is.
  * Exceptions: None.
@@ -107,7 +107,7 @@ export function resolveUnitOrigin(unitId: string): UnitOrigin | null {
 /**
  * Formats the formation date for a unit that may be a tactical sub-unit.
  *
- * Purpose: The Formed line uses the strategic calendar of the loaded map.
+ * Purpose: The DOB line uses the strategic calendar of the loaded map.
  * When to use: Live flags and loss-toast flags.
  * Expected outcome: Null when no formation turn was remembered or no game state is loaded.
  * Exceptions: None.
@@ -120,9 +120,9 @@ function formedLabelFor(unitId: string): string | null {
 }
 
 /**
- * Builds the Name and Formed lines for a unit that is still identified by id.
+ * Builds the Unit and DOB lines for a unit that is still identified by id.
  *
- * Purpose: The Name line must be the display name, not a label that also carries a selection count.
+ * Purpose: The Unit line must be the display name, not a label that also carries a selection count.
  * When to use: Live flags and the one-unit map token.
  * Expected outcome: The lookup name, which may be empty, and the formation label, which may be null.
  * Exceptions: None.
@@ -271,7 +271,7 @@ export interface LossFlagIdentity {
    * Formation date of the victim, or of its parent strategic unit.
    *
    * Contract: Null when the formation turn was not remembered.
-   * When to use: The Formed line.
+   * When to use: The DOB line.
    * Expected outcome: A formatted date, or null.
    * Exceptions: None.
    */

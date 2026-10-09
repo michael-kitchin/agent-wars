@@ -62,7 +62,7 @@ test('an identity adds the name and formation date above a blank line', () => {
     bonuses: NONE,
     identity: { displayName: '22nd Armored', formedLabel: 'November, Year 3' },
   });
-  assert.match(html, /^<strong>Name:<\/strong> .*22nd Armored\n<strong>Formed:<\/strong> November, Year 3\n\n<strong>Bonuses:<\/strong>/);
+  assert.match(html, /^<strong>Unit:<\/strong> .*22nd Armored\n<strong>DOB:<\/strong> November, Year 3\n\n<strong>Bonuses:<\/strong>/);
   assert.ok(html.includes('flags/fr.svg'));
 });
 

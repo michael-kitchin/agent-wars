@@ -14,7 +14,7 @@ import type { TechLevel } from './techBonusTypes';
  *
  * Purpose: The flag tooltip identifies the unit before it lists bonuses.
  * When to use: `formatUnitOriginTooltipHtml` when the caller knows the display name or the formation date.
- * Expected outcome: An empty name omits the Name line. A null or blank formation label omits the Formed line.
+ * Expected outcome: An empty name omits the Unit line. A null or blank formation label omits the DOB line.
  * Exceptions: None.
  */
 export interface UnitOriginTooltipIdentity {
@@ -143,7 +143,7 @@ function bonusRow(label: string, value: string): string {
  * Looks up the strategic turn on which a unit was formed.
  *
  * Purpose: A tactical sub-unit has no formation turn of its own. It reports its parent's.
- * When to use: Before formatting the Formed line.
+ * When to use: Before formatting the DOB line.
  * Expected outcome: The turn stored for the id, else the parent's turn, else null.
  * Exceptions: None.
  */
@@ -156,7 +156,7 @@ export function formationTurnForUnit(unitId: string, formedTurnById: ReadonlyMap
 }
 
 /**
- * Builds the Name and Formed lines.
+ * Builds the Unit and DOB lines.
  *
  * Purpose: Those lines sit above the Bonuses block and are omitted when the caller has nothing to say.
  * When to use: `formatUnitOriginTooltipHtml` when an identity was passed.
@@ -169,14 +169,14 @@ function identityLines(origin: UnitOrigin, identity: UnitOriginTooltipIdentity |
   const displayName = identity.displayName.trim();
   if (displayName.length > 0) {
     lines.push(
-      `<strong>Name:</strong> ${originFlagImgHtml({
+      `<strong>Unit:</strong> ${originFlagImgHtml({
         subdivisionCode: origin.birthSubdivisionCode ?? null,
         countryCode: origin.birthCountryCode,
       })}${escapeHtmlText(displayName)}`
     );
   }
   const formedLabel = identity.formedLabel?.trim() ?? '';
-  if (formedLabel.length > 0) lines.push(`<strong>Formed:</strong> ${escapeHtmlText(formedLabel)}`);
+  if (formedLabel.length > 0) lines.push(`<strong>DOB:</strong> ${escapeHtmlText(formedLabel)}`);
   return lines;
 }
 
@@ -185,7 +185,7 @@ function identityLines(origin: UnitOrigin, identity: UnitOriginTooltipIdentity |
  *
  * Purpose: Every flag hover, including loss toasts, lists the bonuses this unit carries. An identity adds the name and formation date above that block.
  * When to use: When creating a unit flag. The result is stored on the flag and assigned to the tooltip's `innerHTML`.
- * Expected outcome: Bold `Bonuses:`, then one row per bonus the unit was born with. When an identity is present, `Name:` and `Formed:` come first, then a blank line. A missing identity leaves the Bonuses block alone. Where the unit stands does not change the text.
+ * Expected outcome: Bold `Bonuses:`, then one row per bonus the unit was born with. When an identity is present, `Unit:` and `DOB:` come first, then a blank line. A missing identity leaves the Bonuses block alone. Where the unit stands does not change the text.
  * Exceptions: None.
  */
 export function formatUnitOriginTooltipHtml(input: {
