@@ -19,7 +19,7 @@ import { strategicTerrainFlagsFor } from '../../shared/strategicTerrainFlags';
 import { loadScenarioState, REGION_VS_REGION_SCENARIO_ID } from './scenarioState';
 import { readPersistedGameSize } from './gameSizeConfig';
 import { readPersistedOriginBonusSettings } from './originBonusConfig';
-import { calendarMonthName, parseStartMonth } from '../../shared/weatherBonusRules';
+import { formatGameDateForTurn, gameCalendarKindForMap, parseStartMonth } from '../../shared/gameCalendar';
 import { techLevelForBirthHex } from '../techBonus/techLevelForBirthHex';
 import { displayWeatherForHex, weatherTagsForBirthHex } from '../weather/weatherPackLoad';
 import { getStrategicMajorityCountryNamesFromSnapshot } from '../unitOrigin/tacticalBirthCountryCache';
@@ -284,6 +284,9 @@ export function getGameStateSnapshot(deps: FogDeps): GameStateSnapshot {
   const techOn = originBonusSettings.techBonusEnabled === true;
   const startMonth = parseStartMonth(originBonusSettings.startMonth);
   const turnNumber = turnRow?.turnNumber ?? 1;
+  const calendarKind = gameCalendarKindForMap(activeGameMap().id);
+  const currentDateLabel = formatGameDateForTurn(turnNumber, startMonth, calendarKind);
+  logDebug('fogState getGameStateSnapshot date', { turnNumber, calendarKind, currentDateLabel });
   const originFlags = {
     originBonusEnabled: originBonusSettings.originBonusEnabled,
     terrainBonusEnabled: originBonusSettings.terrainBonusEnabled,
@@ -310,12 +313,12 @@ export function getGameStateSnapshot(deps: FogDeps): GameStateSnapshot {
     winner,
     gameSize: readPersistedGameSize(ops),
     ...originFlags,
+    startMonth,
+    currentDateLabel,
     ...(weatherOn
       ? {
           weatherBonusEnabled: true as const,
           weatherBonusLevel: originBonusSettings.weatherBonusLevel ?? 'low',
-          startMonth,
-          monthName: calendarMonthName(turnNumber, startMonth),
         }
       : {}),
   };

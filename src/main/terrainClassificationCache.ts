@@ -147,7 +147,7 @@ seaportCountByStrategicH3: ReadonlyMap<string, number>;
     /**
    * Specifies the contract for the `tacticalCityOverlayByH3` member (tacticalCityOverlayByH3: ReadonlyMap<string, string>;).
 
-   * Contract: Reduced tactical city labels (scalerank 0..4) keyed by child `h3_index` for map inspection overlays.
+   * Contract: Reduced tactical city labels, at or below the active map's city label ceiling, keyed by child `h3_index` for map inspection overlays.
    * When to use: Renderer IPC that must not re-parse the full naming JSON each frame.
    * Expected outcome: Values are non-empty display strings; missing keys mean no city overlay for that hex.
    * Exceptions: None.

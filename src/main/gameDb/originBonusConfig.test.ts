@@ -69,13 +69,15 @@ function testFlagsPersistOnResetAndReachSnapshots(): void {
     for (const key of LEVEL_KEYS) assert.strictEqual(configValue(key), 'low');
     const allOff = getGameStateForPlayer('human');
     assert.ok(!('originBonusLevel' in allOff) && !('terrainBonusLevel' in allOff) && !('weatherBonusLevel' in allOff));
+    assert.strictEqual(allOff.currentDateLabel, 'January, Year 1');
 
     resetGameForNewMatch({ weatherBonusLevel: 'low', startMonth: 6 });
     assert.strictEqual(configValue(WEATHER_BONUS_CONFIG_KEY), '1');
     assert.strictEqual(configValue(START_MONTH_CONFIG_KEY), '6');
     const weatherOn = getGameStateForPlayer('human');
     assert.strictEqual(weatherOn.weatherBonusEnabled, true);
-    assert.strictEqual(weatherOn.monthName, 'June');
+    assert.strictEqual(weatherOn.startMonth, 6);
+    assert.strictEqual(weatherOn.currentDateLabel, 'June, Year 1');
     assert.ok(weatherOn.units.every((unit) => Array.isArray(unit.weatherTags)));
   });
 }

@@ -27,6 +27,8 @@ The main process uses the codes for the flags in hex tooltips and for each new u
 
 A birth cell's country is its largest city (population, then lower scalerank, then name). With no city that names a country, it is the country row with the most states in the cell, then lower scalerank, then name. With no country row, it is the country of the most prominent state. The stored name is the canonical country name for that ISO code. A cell with none of those rows has no country.
 
+Tactical city dots use the city rows in the tactical naming file. A place is drawn when its Natural Earth scalerank is at or below the loaded map's ceiling: 6 on the global map, 7 on a region whose tactical resolution is 5, and 8 when that resolution is 6. Several places in one cell keep the lowest scalerank, and places that share it are joined with " / ". Hex tooltip names come from the naming caption, which does not use that ceiling.
+
 Main-process classification (`terrainClassificationCache.ts` and related) turns that cache into hex kinds, infrastructure counts, and overlay records. SQLite is seeded from the cache; res-4 feature overrides (rubble after strikes, destroyed ports) live in the match DB and overlay the pack.
 
 ## Weather
@@ -35,7 +37,7 @@ Main-process classification (`terrainClassificationCache.ts` and related) turns 
 
 The file is fixed climatology from WorldClim 2.1 10-arc-minute temperature and precipitation, sampled at each land hex's centroid. Classification uses the thresholds in `weatherBonusRules.ts`: snow at or below 0°C, otherwise rain at or above 120 mm, otherwise heat at or above 23°C, otherwise mild. A water hex copies the nearest land hex within two res1 steps. Open ocean beyond that, and a land centroid with no sample, is mild all year. Startup fails if the pack is missing or empty, the same way it fails for the other terrain files. An unknown hex reads as twelve mild months.
 
-How to regenerate the pack stays in `scripts/weather_pipeline/`. Only the `.json.zip` is tracked. The rules that turn those months into tags and penalties are in [combat rules §4.9](combat-rules-v3.md). The renderer never reads the pack. Main stamps the current month's weather and each unit's tags onto the snapshot.
+How to regenerate the pack stays in `scripts/weather_pipeline/`. Only the `.json.zip` is tracked. The rules that turn those months into tags and penalties are in [combat rules §4.9](combat-rules-v3.md). The renderer never reads the pack. Main stamps the weather of the match date's month, and each unit's tags, onto the snapshot. A global turn is one month. A regional turn is one week, so that month stays until the date enters the next one. A battle keeps the enclosing hex's weather for every beat.
 
 ## Resolutions
 
@@ -53,7 +55,7 @@ Parent-child mapping is H3's native hierarchy (three steps, 343 tactical cells u
 
 ## Regional Packs
 
-Regional maps live under `data/generated/regions/<region_id>/`. Each folder holds a manifest plus strategic (`res_s`) and tactical (`res_t`) JSON. Manifest schema 1.1.0 records side groups and origin areas. The economy numbers for those maps are in `src/shared/regionalRulesCatalog.ts`. The app loads one pack when a regional match starts. A packaged app ships the zip archives and extracts that one region into the user-data folder the first time it is played. The runbook is [scripts/regional_pipeline/README.md](../scripts/regional_pipeline/README.md).
+Regional maps live under `data/generated/regions/<region_id>/`. Each folder holds a manifest plus strategic (`res_s`) and tactical (`res_t`) JSON. Manifest schema 1.1.0 records side groups and origin areas. Every region keeps at least two rings of sea around member land, including water that the centroid window would otherwise clip, and a non-member island smaller than one strategic hex can sit in that halo. The economy numbers for those maps are in `src/shared/regionalRulesCatalog.ts`. The app loads one pack when a regional match starts. A packaged app ships the zip archives and extracts that one region into the user-data folder the first time it is played. The runbook is [scripts/regional_pipeline/README.md](../scripts/regional_pipeline/README.md).
 
 ## Related
 

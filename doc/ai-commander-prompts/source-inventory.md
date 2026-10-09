@@ -22,7 +22,7 @@ Emitted before `mainBlock`, in this order.
 
 | Content | Builder | Include condition | Empty-state |
 | --- | --- | --- | --- |
-| `You are the enemy commander in a WEGO (simultaneous movement) hex wargame. Current turn: {turnNumber}, phase: {phase}.` | `turnPhaseHeader` | always | n/a |
+| `You are the enemy commander in a WEGO (simultaneous movement) hex wargame. Current turn: {turnNumber}, date: {currentDateLabel}, phase: {phase}.` | `turnPhaseHeader` | always | `, date: …` omitted when `currentDateLabel` is absent |
 | Win-condition reminder | `buildWinConditionReminderClause` (`scenarioGoals.ts`) | `coordinateContext.mode !== 'tactical'` | generic sentence when `scenarioId` is not `region_vs_region` |
 | Scouting directive | `scoutingDirective` | `humanRoster.length === 0` (strategic only) | omitted |
 | Tool-limit warning | `buildToolBudgetExceededWarning` | `getAndClearAiToolLimitExceededLastTurn()` **and** (`planningEnabled` or `ordersEnabled`) | omitted |
@@ -127,7 +127,7 @@ Tactical unit status uses the same six columns and has **no** standing-order col
 
 | Surface | Tactical value |
 | --- | --- |
-| Turn header | `Strategic turn: {turnNumber}, tactical beat: {tacticalTurnNumber}, phase: {phase}.` |
+| Turn header | `Strategic turn: {turnNumber}, date: {currentDateLabel}, tactical beat: {tacticalTurnNumber}, phase: {phase}.` The date clause is omitted when `currentDateLabel` is absent. |
 | Goal clause | `buildTacticalBattleGoalClause` |
 | Coordinate preamble | `buildTacticalLatLngPreamble` |
 | Combat paragraph | same composer; tactical reach, MP, first-leg truncation, resolution order **embark, air strikes, ranged fire, movement, ferry, cargo sync, melee, no production**; no hold-fire (standing orders are not issuable) |

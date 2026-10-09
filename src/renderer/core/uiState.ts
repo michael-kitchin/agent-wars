@@ -57,7 +57,7 @@ export function updateSidebar(
 
  * Purpose: Refreshes phase and turn lines in the right sidebar from the latest snapshot.
  * When to use: After `applyGameStateSnapshot`, tactical entry/exit, tactical Ready commit, and when beat playback ends.
- * Expected outcome: The phase line is tactical planning or tactical resolution while a battle snapshot is set, otherwise the strategic label, or an em dash when `state` is null. `Turn:` shows `S.tacticalBattleSnapshot.tacticalTurnNumber` while a tactical session is active, otherwise `state.turnNumber`.
+ * Expected outcome: The phase line is tactical planning or tactical resolution while a battle snapshot is set, otherwise the strategic label, or an em dash when `state` is null. `Turn:` shows the beat number while a tactical session is active, otherwise `state.turnNumber`, then the strategic date when the snapshot has one.
  * Exceptions: None.
  */
 export function updateGameStateSidebar(state: GameStateSnapshot | null): void {
@@ -75,15 +75,14 @@ export function updateGameStateSidebar(state: GameStateSnapshot | null): void {
     if (!state) {
       turnEl.textContent = '—';
     } else if (S.tacticalBattleSnapshot) {
-      const month = state.monthName ? ` · ${state.monthName}` : '';
+      const date = state.currentDateLabel ? ` · ${state.currentDateLabel}` : '';
       const weather = S.tacticalBattleSnapshot.weather
         ? ` · ${formatWeatherIconHtml(S.tacticalBattleSnapshot.weather)}`
         : '';
-      turnEl.innerHTML = `Turn: ${S.tacticalBattleSnapshot.tacticalTurnNumber}${month}${weather}`;
-    } else if (state.monthName) {
-      turnEl.textContent = `Turn: ${state.turnNumber} · ${state.monthName}`;
+      turnEl.innerHTML = `Turn: ${S.tacticalBattleSnapshot.tacticalTurnNumber}${date}${weather}`;
     } else {
-      turnEl.textContent = `Turn: ${state.turnNumber}`;
+      const date = state.currentDateLabel ? ` · ${state.currentDateLabel}` : '';
+      turnEl.textContent = `Turn: ${state.turnNumber}${date}`;
     }
   }
 }

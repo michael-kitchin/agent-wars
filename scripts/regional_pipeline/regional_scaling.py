@@ -44,6 +44,20 @@ def island_min_area_km2_for(strategic_resolution: int, global_min_km2: float = 2
     return global_min_km2 * area / area_at_one
 
 
+def minor_island_max_km2_for(strategic_resolution: int) -> float:
+    """
+    Why this exists:
+        A non-member island smaller than one strategic hex can sit inside the sea halo.
+    When to use:
+        While measuring which land polygons count as a major landmass.
+    What to expect:
+        The average hex area at ``strategic_resolution``, in square kilometres.
+    """
+
+    LOGGER.debug("minor_island_max_km2_for strategic_resolution=%s.", strategic_resolution)
+    return h3.average_hexagon_area(strategic_resolution, unit="km^2")
+
+
 def weather_water_land_steps_for(strategic_resolution: int, global_steps: int = 2) -> int:
     """
     Why this exists:

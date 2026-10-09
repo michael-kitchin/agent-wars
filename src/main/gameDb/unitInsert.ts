@@ -72,6 +72,15 @@ export interface NewUnitRow {
    * Exceptions: None.
    */
   readonly origin: UnitOrigin | null;
+  /**
+   * Strategic turn on which the unit was formed.
+   *
+   * Contract: 1 for a unit placed at match start. One more than the planning turn for a unit built during resolution, because the turn counter increments after production.
+   * When to use: The `formed_turn` column.
+   * Expected outcome: A positive integer stored as given.
+   * Exceptions: None.
+   */
+  readonly formedTurn: number;
 }
 
 /**
@@ -88,13 +97,14 @@ export function insertUnitRow(run: (sql: string, params?: unknown[]) => unknown,
     h3Index: row.h3Index,
     birthTacticalH3Index: row.origin?.birthTacticalH3Index ?? null,
     birthCountryCode: row.origin?.birthCountryCode ?? null,
+    formedTurn: row.formedTurn,
   });
   run(
     `INSERT INTO units (
        id, player, unit_type, display_order, h3_index,
        birth_h3_index, birth_res_t_h3_index, birth_terrain_kind, birth_is_urban, birth_country_name, birth_country_code,
-       birth_area_id, birth_area_name
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       birth_area_id, birth_area_name, formed_turn
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       row.id,
       row.player,
@@ -109,6 +119,7 @@ export function insertUnitRow(run: (sql: string, params?: unknown[]) => unknown,
       row.origin?.birthCountryCode ?? null,
       row.origin?.birthAreaId ?? row.origin?.birthCountryName ?? null,
       row.origin?.birthAreaName ?? row.origin?.birthCountryName ?? null,
+      row.formedTurn,
     ]
   );
 }

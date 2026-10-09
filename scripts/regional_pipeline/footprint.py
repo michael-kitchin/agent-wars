@@ -20,6 +20,8 @@ MIN_LAND_KM2: Final = 1.0
 MEMBER_SHARE_MIN: Final = 0.5
 # A member cell with less than this share of its area in land counts as settled coast or river.
 SETTLED_LAND_SHARE_MAX: Final = 0.95
+# Water and minor-island cells this many grid steps from member land are sea even when the kilometre reach is shorter.
+MIN_SEA_RINGS: Final = 2
 
 
 @dataclass(frozen=True)
@@ -49,6 +51,8 @@ class CandidateCell:
     cell_area_km2: float
     # True when the cell contains a populated place, overlaps urban land, or is not almost entirely land.
     settled: bool
+    # Square kilometres of this cell covered by a landmass at least one hex in size. Zero when the only land is smaller.
+    major_land_km2: float
 
 
 def _nearest_km(origin: CandidateCell, others: Sequence[CandidateCell]) -> float:
@@ -77,7 +81,7 @@ def classify_footprint(definition: RegionDefinition, candidates: Sequence[Candid
     When to use:
         After candidates have been measured, including during reach sweeps.
     What to expect:
-        Only in-box cells receive a role. Sea and neutral roles require a positive reach.
+        Land and neutral roles are in-box only. Sea from the kilometre reach is in-box. The two-ring halo also includes out-of-box water and minor islands.
     Exceptions:
         ``ValueError`` when no member land remains.
     """
@@ -125,6 +129,12 @@ def classify_footprint(definition: RegionDefinition, candidates: Sequence[Candid
                 if _nearest_km(cell, member) <= definition.neutral_reach_km
             }
         )
+    sea_ring = _sea_ring_ids(member)
+    for cell in candidates:
+        if cell.h3_index in roles or cell.h3_index not in sea_ring:
+            continue
+        if _covered_by_sea_ring(cell):
+            roles[cell.h3_index] = HexRole.SEA
     return RegionFootprint(
         region_id=definition.region_id,
         strategic_resolution=definition.strategic_resolution,
@@ -166,3 +176,34 @@ def sweep_footprint_counts(
         updated = replace(definition, **{field_name: reach})
         results.append((float(reach), classify_footprint(updated, candidates).counts()))
     return results
+
+
+def _sea_ring_ids(member: Sequence[CandidateCell]) -> set[str]:
+    """
+    Why this exists:
+        The sea halo is a hex disk, not a kilometre radius.
+    When to use:
+        After member land is known.
+    What to expect:
+        Every cell id within ``MIN_SEA_RINGS`` of a member cell, including the member cells.
+    """
+
+    near: set[str] = set()
+    for cell in member:
+        near.update(h3.grid_disk(cell.h3_index, MIN_SEA_RINGS))
+    return near
+
+
+def _covered_by_sea_ring(cell: CandidateCell) -> bool:
+    """
+    Why this exists:
+        The halo fills water and non-member land that is only a minor island.
+    When to use:
+        For a candidate that has no role yet and sits in the sea disk.
+    What to expect:
+        True for water, and for land whose ``major_land_km2`` is below ``MIN_LAND_KM2``.
+    """
+
+    if cell.land_km2 < MIN_LAND_KM2:
+        return True
+    return cell.major_land_km2 < MIN_LAND_KM2

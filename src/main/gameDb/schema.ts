@@ -29,6 +29,7 @@ export function getFullDdl(): string {
       birth_country_code TEXT,
       birth_area_id TEXT,
       birth_area_name TEXT,
+      formed_turn INTEGER NOT NULL DEFAULT 1,
       FOREIGN KEY (h3_index) REFERENCES hexes(h3_index)
     );
 

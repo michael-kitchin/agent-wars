@@ -5,7 +5,7 @@ import type { GameMapProfile } from './gameMapTypes';
  *
  * Purpose: The default profile, and the numbers existing matches already use.
  * When to use: `resetActiveGameMap` and any caller that needs the global column without swapping the process profile.
- * Expected outcome: Costs 20/40/100/60, armor/air/naval minimums 2/5/10, Advanced 21, and 9 urban cells per strategic air strike.
+ * Expected outcome: Costs 20/40/100/60, armor/air/naval minimums 2/5/10, Advanced 21, 9 urban cells per strategic air strike, and city labels through scalerank 6.
  * Exceptions: None.
  */
 export const GLOBAL_GAME_MAP: GameMapProfile = {
@@ -28,7 +28,7 @@ export const GLOBAL_GAME_MAP: GameMapProfile = {
     urbanOverlay: 5,
     airport: 5,
     seaport: 5,
-    cityLabel: 4,
+    cityLabel: 6,
   },
 };
 

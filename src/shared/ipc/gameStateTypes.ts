@@ -98,6 +98,15 @@ units: {
     h3Index: string;
     displayOrder?: number;
     /**
+     * Strategic turn on which this unit was formed.
+     *
+     * Contract: 1 for a unit placed at match start. Absent only on a fixture that did not load the column.
+     * When to use: The Bonuses tooltip. A tactical unit uses its parent's value.
+     * Expected outcome: A positive integer when the row was read from `units`.
+     * Exceptions: None.
+     */
+    formedTurn?: number;
+    /**
      * Strategic sealift: naval carrier id when cargo is still assigned (`unit_transport_assignments`).
      *
      * Contract: Present on strategic snapshots from `listUnitsForSnapshot`; tactical battles may use `embarkedOnSubUnitId` instead.
@@ -270,21 +279,21 @@ weatherBonusLevel?: ActiveBonusLevel;
     /**
    * Calendar month of turn 1, 1 for January through 12 for December.
    *
-   * Contract: Present with `weatherBonusEnabled`.
-   * When to use: With `turnNumber` when a later turn needs the month.
-   * Expected outcome: A parsed start month.
+   * Contract: Always present. Weather rules still read it only when the weather bonus is on.
+   * When to use: With `turnNumber` when a later turn needs its date.
+   * Expected outcome: A parsed start month. January when the stored value was missing.
    * Exceptions: None.
    */
 startMonth?: number;
     /**
-   * Full English name of the current month.
+   * Date of the current strategic turn.
    *
-   * Contract: Present with `weatherBonusEnabled`. January on turn 1 of a January match.
-   * When to use: The turn line and prompts.
-   * Expected outcome: One of the twelve month names.
+   * Contract: Always present. A global match reads `November, Year 3`. A regional match reads `November 22nd, Year 1`.
+   * When to use: The turn line and prompts. A battle shows this date beside the beat number.
+   * Expected outcome: The label from `formatGameDateForTurn` for `turnNumber` and `startMonth`.
    * Exceptions: None.
    */
-monthName?: string;
+currentDateLabel?: string;
     /**
    * Whether this match has the tech bonus on.
    *

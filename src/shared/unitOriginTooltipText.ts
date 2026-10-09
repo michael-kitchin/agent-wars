@@ -1,5 +1,6 @@
 import { originFlagImgHtml, originPlaceLabelFor } from './originArea';
 import { escapeHtmlText } from './htmlTextFormatting';
+import { parseTacticalSubUnitId } from './unitIds';
 import { formatTerrainKindHtml } from './terrainSwatchHtml';
 import type { UnitOrigin } from './unitOriginTypes';
 import type { WeatherState } from './weatherBonusTypes';
@@ -7,6 +8,35 @@ import { weatherTagsInDisplayOrder } from './weatherBonusRules';
 import { formatWeatherIconHtml } from './weatherIcons';
 import { formatTechTierHtml } from './featureIconHtml';
 import type { TechLevel } from './techBonusTypes';
+
+/**
+ * Name and formation date shown above the Bonuses block.
+ *
+ * Purpose: The flag tooltip identifies the unit before it lists bonuses.
+ * When to use: `formatUnitOriginTooltipHtml` when the caller knows the display name or the formation date.
+ * Expected outcome: An empty name omits the Name line. A null or blank formation label omits the Formed line.
+ * Exceptions: None.
+ */
+export interface UnitOriginTooltipIdentity {
+  /**
+   * Display name already used beside the flag, without a selection count or an order target.
+   *
+   * Contract: Plain text. The formatter escapes it.
+   * When to use: The unit display-name lookup.
+   * Expected outcome: `22nd Armored` or `3rd Fleet (02)`.
+   * Exceptions: None.
+   */
+  readonly displayName: string;
+  /**
+   * Formation date of this unit, or of its parent when this is a tactical unit.
+   *
+   * Contract: Already formatted. Null when the formation turn was not recorded.
+   * When to use: `formatGameDateForTurn`.
+   * Expected outcome: `November, Year 3` or `November 22nd, Year 1`, or null.
+   * Exceptions: None.
+   */
+  readonly formedLabel: string | null;
+}
 
 /**
  * Which optional bonuses the tooltip may list for one unit.
@@ -110,16 +140,58 @@ function bonusRow(label: string, value: string): string {
 }
 
 /**
+ * Looks up the strategic turn on which a unit was formed.
+ *
+ * Purpose: A tactical sub-unit has no formation turn of its own. It reports its parent's.
+ * When to use: Before formatting the Formed line.
+ * Expected outcome: The turn stored for the id, else the parent's turn, else null.
+ * Exceptions: None.
+ */
+export function formationTurnForUnit(unitId: string, formedTurnById: ReadonlyMap<string, number>): number | null {
+  const direct = formedTurnById.get(unitId);
+  if (direct != null) return direct;
+  const parentUnitId = parseTacticalSubUnitId(unitId)?.parentUnitId;
+  if (!parentUnitId) return null;
+  return formedTurnById.get(parentUnitId) ?? null;
+}
+
+/**
+ * Builds the Name and Formed lines.
+ *
+ * Purpose: Those lines sit above the Bonuses block and are omitted when the caller has nothing to say.
+ * When to use: `formatUnitOriginTooltipHtml` when an identity was passed.
+ * Expected outcome: Zero, one, or two HTML lines. The name is preceded by the birth flag.
+ * Exceptions: None.
+ */
+function identityLines(origin: UnitOrigin, identity: UnitOriginTooltipIdentity | undefined): string[] {
+  if (!identity) return [];
+  const lines: string[] = [];
+  const displayName = identity.displayName.trim();
+  if (displayName.length > 0) {
+    lines.push(
+      `<strong>Name:</strong> ${originFlagImgHtml({
+        subdivisionCode: origin.birthSubdivisionCode ?? null,
+        countryCode: origin.birthCountryCode,
+      })}${escapeHtmlText(displayName)}`
+    );
+  }
+  const formedLabel = identity.formedLabel?.trim() ?? '';
+  if (formedLabel.length > 0) lines.push(`<strong>Formed:</strong> ${escapeHtmlText(formedLabel)}`);
+  return lines;
+}
+
+/**
  * Builds the unit-flag tooltip.
  *
- * Purpose: Every flag hover, including loss toasts, lists the bonuses this unit carries. The unit name stays on the label beside the flag.
+ * Purpose: Every flag hover, including loss toasts, lists the bonuses this unit carries. An identity adds the name and formation date above that block.
  * When to use: When creating a unit flag. The result is stored on the flag and assigned to the tooltip's `innerHTML`.
- * Expected outcome: Bold `Bonuses:`, then one row per bonus the unit was born with. Origin is the birth place label (the country once, or the brief area name and its country for a subdivision), terrain is the birth terrain, and weather is the birth-hex tags. Tech follows when the match tech bonus is on and the unit has a known tier. A line is omitted when that option is off or the unit has none. No selected bonus is `Bonuses:` and then `None`. Where the unit stands does not change the text.
+ * Expected outcome: Bold `Bonuses:`, then one row per bonus the unit was born with. When an identity is present, `Name:` and `Formed:` come first, then a blank line. A missing identity leaves the Bonuses block alone. Where the unit stands does not change the text.
  * Exceptions: None.
  */
 export function formatUnitOriginTooltipHtml(input: {
   readonly origin: UnitOrigin;
   readonly bonuses: UnitOriginTooltipBonuses;
+  readonly identity?: UnitOriginTooltipIdentity;
 }): string {
   const rows: string[] = [];
   const placeLabel = originPlaceLabelFor(input.origin);
@@ -146,5 +218,8 @@ export function formatUnitOriginTooltipHtml(input: {
     rows.push(bonusRow('Tech', formatTechTierHtml(input.bonuses.techLevel)));
   }
   const body = rows.length > 0 ? rows.join('\n') : 'None';
-  return `<strong>Bonuses:</strong>\n${body}`;
+  const bonuses = `<strong>Bonuses:</strong>\n${body}`;
+  const head = identityLines(input.origin, input.identity);
+  if (head.length === 0) return bonuses;
+  return `${head.join('\n')}\n\n${bonuses}`;
 }

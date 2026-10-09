@@ -22,9 +22,8 @@ class ScalerankPolicy:
         resolution step from the global tactical resolution. Roads and rail use the wide end of that
         range because a tactical battle covers a much smaller strategic hex. Urban polygons stay near
         the narrow end because large polygons already cover a similar share of cells. Airports and
-        seaports use the wider range because the count per battle falls with area. City labels skip
-        rank 5, which contains only two places, so the label ceiling jumps with the next rank that
-        actually adds cities.
+        seaports use the wider range because the count per battle falls with area. City labels
+        include rank 5, which contains only two places, because the global ceiling is 6.
 
         Minimum rank is always ``SCALERANK_MIN``.
     """
@@ -47,13 +46,13 @@ class ScalerankPolicy:
 SCALERANK_MIN: Final = 0
 
 # Policy for the global tactical resolution.
-GLOBAL_TACTICAL_POLICY: Final = ScalerankPolicy(4, 4, 5, 5, 5, 4)
+GLOBAL_TACTICAL_POLICY: Final = ScalerankPolicy(4, 4, 5, 5, 5, 6)
 
 # One policy per tactical resolution used by the global game and the regional maps.
 POLICY_BY_TACTICAL_RESOLUTION: Final = MappingProxyType({
     4: GLOBAL_TACTICAL_POLICY,
-    5: ScalerankPolicy(6, 6, 6, 6, 6, 6),
-    6: ScalerankPolicy(8, 8, 7, 8, 8, 7),
+    5: ScalerankPolicy(6, 6, 6, 6, 6, 7),
+    6: ScalerankPolicy(8, 8, 7, 8, 8, 8),
 })
 
 

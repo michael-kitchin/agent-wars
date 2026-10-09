@@ -117,7 +117,7 @@ isRubble?: boolean;
 
  * Purpose: Bundles a tactical hex key with the reduced city label shown only during map inspection while tactical is active.
  * When to use: IPC payloads from `game:getTacticalCityOverlays` and renderer cache hydration.
- * Expected outcome: `label` is already filtered to scalerank 0..4 ties per the naming reduction contract.
+ * Expected outcome: `label` is already filtered to cities at or below the active map's city label ceiling.
  * Exceptions: None.
  */
 export interface TacticalCityOverlayRow {

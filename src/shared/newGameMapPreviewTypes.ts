@@ -262,7 +262,7 @@ export interface PreviewWeatherIconInput {
    *
    * Contract: January at index 0. A length other than 12 draws no icon.
    * When to use: `NewGameMapPreviewHex.weatherByMonth`.
-   * Expected outcome: The month index from `calendarMonthIndex(1, startMonth)`.
+   * Expected outcome: The month index from `gameDateForTurn(1, startMonth, 'monthly')`.
    * Exceptions: None.
    */
   readonly weatherByMonth: readonly WeatherState[];

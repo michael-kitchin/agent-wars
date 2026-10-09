@@ -17,7 +17,7 @@ import { parseTerrainTacticalRoadRailSidesJson } from './terrainRoadRailSidesLoa
 /**
  * Defines the `testCityReductionPicksLowestScalerank` function shape (function testCityReductionPicksLowestScalerank(): void).
 
- * Purpose: Guards the scalerank 0..4 filter and lowest-rank winner selection for map labels.
+ * Purpose: Guards the city-label ceiling and lowest-rank winner selection for map labels.
  * When to use: `npm test` main-process suite.
  * Expected outcome: The smallest scalerank among eligible cities becomes the sole label when unique.
  * Exceptions: None.
@@ -69,16 +69,16 @@ function testCityTieJoinsAndSorts(): void {
 /**
  * Defines the `testCityReductionIgnoresOutOfRangeScalerank` function shape (function testCityReductionIgnoresOutOfRangeScalerank(): void).
 
- * Purpose: Confirms scalerank outside 0..4 never contributes to overlays.
+ * Purpose: Confirms a city above the active map's city label ceiling never contributes to overlays.
  * When to use: `npm test` main-process suite.
- * Expected outcome: No map entry is produced when no eligible cities exist.
+ * Expected outcome: No map entry is produced when no eligible cities exist. Scalerank 6 is labeled.
  * Exceptions: None.
  */
 function testCityReductionIgnoresOutOfRangeScalerank(): void {
   const records: TerrainNamingRecordTactical[] = [
     {
       h3_index: '840134bffffffff',
-      cities: [{ name: 'OnlyFive', state: null, country: null, population: 1, scalerank: 5, countryCode: null }],
+      cities: [{ name: 'OnlySeven', state: null, country: null, population: 1, scalerank: 7, countryCode: null }],
       states: [],
       countries: [],
       water: [],
@@ -86,6 +86,16 @@ function testCityReductionIgnoresOutOfRangeScalerank(): void {
   ];
   const m = reduceTacticalCityOverlayLabelsByH3(records);
   assert.ok(!m.has('840134bffffffff'));
+  const labeled = reduceTacticalCityOverlayLabelsByH3([
+    {
+      h3_index: '840134cffffffff',
+      cities: [{ name: 'RankSix', state: null, country: null, population: 1, scalerank: 6, countryCode: null }],
+      states: [],
+      countries: [],
+      water: [],
+    },
+  ]);
+  assert.strictEqual(labeled.get('840134cffffffff'), 'RankSix');
 }
 
 /**

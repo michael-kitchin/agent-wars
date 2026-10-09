@@ -266,7 +266,7 @@ export function buildWeatherRule(gates: GameRuleTextGates): string | null {
   const budget = TACTICAL_WEATHER_BUDGET_CAP[level];
   const penalty = WEATHER_ATTACK_PENALTY_BY_LEVEL[level];
   return (
-    'Weather bonus is on: the month is on the turn line and every beat of a battle shares the enclosing hex\'s weather. ' +
+    'Weather bonus is on: the date is on the turn line, weather changes when that date enters a new month, and every beat of a battle shares the enclosing hex\'s weather. ' +
     `Armor strategic movement is 1 in ${armor}, and naval strategic movement is 1 in ${naval}. ` +
     `In battle, armor's point budget is ${budget} in ${armor} and naval's is ${budget} in ${naval}; infantry pays 2 to enter open ground in snow or rain. ` +
     `Armor ranged attack is ${penalty} lower in snow or heat, including return fire and air-strike counter-fire. ` +

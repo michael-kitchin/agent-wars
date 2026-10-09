@@ -28,6 +28,7 @@ import {
   resolveStrategicControlAfterCombatAndMovement,
 } from './gameActions/controlAndProduction';
 import { getMaxUnitsPerType } from './productionCaps';
+import { insertUnitRow } from './gameDb/unitInsert';
 import { persistGameSize } from './gameDb/gameSizeConfig';
 import { withTempGameDb } from './testSupport/withTempGameDb';
 import { parseStrategicUnitId } from '../shared/unitIds';
@@ -802,6 +803,34 @@ function testKeepBuildingMutationContracts(): void {
  * finite queues without Keep building still stop empty with leftover points banked.
  * Exceptions: None.
  */
+/**
+ * Locks the formation turn written by `insertUnitRow`.
+ *
+ * Purpose: The Bonuses tooltip reads this column, so a caller-supplied turn must round-trip.
+ * When to use: After the `formed_turn` column is added.
+ * Expected outcome: The stored value is the value passed in, not the default.
+ * Exceptions: None.
+ */
+function testInsertUnitRowStoresFormedTurn(): void {
+  withTempDb(() => {
+    const h3 = findBuildableHumanControlledHex();
+    insertUnitRow(dbRun, {
+      id: 'h1-i99',
+      player: 'human',
+      unitType: 'infantry',
+      displayOrder: 99,
+      h3Index: h3,
+      origin: null,
+      formedTurn: 4,
+    });
+    assert.strictEqual(
+      dbGetOne<{ formedTurn: number }>('SELECT formed_turn AS formedTurn FROM units WHERE id = ?', ['h1-i99'])
+        ?.formedTurn,
+      4
+    );
+  });
+}
+
 function testKeepBuildingSameTurnRefill(): void {
   withTempDb(() => {
     const h3 = findBuildableHumanControlledHex();
@@ -823,6 +852,13 @@ function testKeepBuildingSameTurnRefill(): void {
         "SELECT COUNT(*) AS c FROM units WHERE player = 'human' AND unit_type = 'infantry'"
       )?.c ?? 0;
     assert.strictEqual(infantryAfter - infantryBefore, 2);
+    const planningTurn =
+      dbGetOne<{ turnNumber: number }>('SELECT turn_number AS turnNumber FROM turn_state WHERE id = 1')?.turnNumber ?? 1;
+    const formedTurns = dbGetAll<{ formedTurn: number }>(
+      "SELECT formed_turn AS formedTurn FROM units WHERE player = 'human' AND unit_type = 'infantry'"
+    );
+    assert.ok(formedTurns.length > 0);
+    assert.ok(formedTurns.every((row) => row.formedTurn === planningTurn + 1));
     const producedInfantry = dbGetAll<{ id: string }>(
       "SELECT id FROM units WHERE player = 'human' AND unit_type = 'infantry'"
     );
@@ -871,6 +907,12 @@ function testKeepBuildingSameTurnRefill(): void {
         [`human-armor-cap-kb-${i}`, h3]
       );
     }
+    assert.strictEqual(
+      dbGetOne<{ formedTurn: number }>('SELECT formed_turn AS formedTurn FROM units WHERE id = ?', [
+        'human-armor-cap-kb-0',
+      ])?.formedTurn,
+      1
+    );
     processProductionAfterControlResolution();
     const armorPulse = getHexBuildQueue(h3, 'human');
     assert.strictEqual(armorPulse.entries.length, 1);
@@ -967,6 +1009,7 @@ function run(): void {
   testAirBuildRequiresAirportInfrastructure();
   testNavalBuildRequiresSeaportAndUrbanInfrastructure();
   testKeepBuildingMutationContracts();
+  testInsertUnitRowStoresFormedTurn();
   testKeepBuildingSameTurnRefill();
   testKeepBuildingPruneStandingOrderSync();
   console.log('gameActionsProduction.test.ts passed');

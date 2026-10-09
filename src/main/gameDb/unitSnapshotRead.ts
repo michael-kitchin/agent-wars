@@ -148,6 +148,15 @@ interface DbUnitSnapshotRow extends Record<string, unknown> {
    * Exceptions: None.
    */
   birth_area_name: string | null;
+  /**
+   * Strategic turn on which the unit was formed.
+   *
+   * Contract: At least 1. Rows that omit the column on insert receive the default of 1.
+   * When to use: Maps to optional `formedTurn` on snapshot units.
+   * Expected outcome: A positive integer.
+   * Exceptions: None.
+   */
+  formed_turn: number;
 }
 
 /**
@@ -189,6 +198,7 @@ function mapDbUnitSnapshotRow(row: DbUnitSnapshotRow): GameStateSnapshot['units'
     unitType: row.unit_type,
     h3Index: row.h3_index,
     displayOrder: typeof row.display_order === 'number' ? row.display_order : undefined,
+    ...(typeof row.formed_turn === 'number' ? { formedTurn: row.formed_turn } : {}),
   };
   if (typeof row.embarked_on_naval_unit_id === 'string' && row.embarked_on_naval_unit_id.length > 0) {
     unit.embarkedOnNavalUnitId = row.embarked_on_naval_unit_id;
@@ -223,6 +233,7 @@ export function listUnitsForSnapshotWithGetAll(
             u.birth_country_code,
             u.birth_area_id,
             u.birth_area_name,
+            u.formed_turn,
             uta.naval_unit_id AS embarked_on_naval_unit_id
      FROM units u
      LEFT JOIN unit_transport_assignments uta ON uta.land_unit_id = u.id`

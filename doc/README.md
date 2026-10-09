@@ -40,7 +40,8 @@ When you change one of these, update `combat-rules-v3.md` (and any table that qu
 | Origin bonus size and matching | `ORIGIN_HIT_BONUS_BY_LEVEL` and `originBonusSources` in `src/shared/originBonusRules.ts` |
 | Weather bonus amounts by level | `WEATHER_SLOWING_STATES`, `TACTICAL_WEATHER_BUDGET_CAP`, and `WEATHER_ATTACK_PENALTY_BY_LEVEL` in `src/shared/weatherBonusRules.ts` |
 | Tech bonus cutoff and amounts | `advancedTechMinUrbanCells` in `src/shared/gameRules.ts` (21 on the global map). `TECH_ADVANCED_MIN_URBAN_HEX_COUNT` and `TECH_HIT_BONUS` in `src/shared/techBonusRules.ts` keep the global cutoff and the bonus amounts. |
-| Weather month, tags, movement, and attack penalties | `src/shared/weatherBonusRules.ts` |
+| Match date (global month and year, or regional week) | `gameDateForTurn` and `formatGameDateForTurn` in `src/shared/gameCalendar.ts` |
+| Weather tags, movement, and attack penalties | `src/shared/weatherBonusRules.ts` |
 | Tactical ranged and movement budgets | `src/shared/tacticalRanges.ts` |
 | Tactical terrain enter costs | `tacticalEnterHexMovementCost` in `src/shared/tacticalTerrainMovement.ts` |
 | Tactical combat modifiers (LOS, range caps, MP) | `src/shared/tacticalTerrainCombatModifiers.ts` |

@@ -17,7 +17,7 @@ Drawn on the map surface whenever their condition is true, in Strategic planning
 - Lines for queued ranged attacks, air strikes, and ferries.
 - Shot lines during resolution playback for ranged combat that is being replayed.
 - A draft march path during Tactical planning.
-- City, transport, and infrastructure marks on hexes that have them, when that overlay is enabled for the current zoom.
+- City, transport, and infrastructure marks on hexes that have them, when that overlay is enabled for the current zoom. A city mark is a place at or below the map's city-label ceiling: scalerank 6 on the global map, 7 when the tactical resolution is 5, and 8 when it is 6. The lowest scalerank in the cell is labeled, and places that share that rank are joined with " / ".
 - Combat marks during Resolution playback: the hexes where combat and casualties are being shown.
 - Dice chips during Resolution playback: the dice each stack rolled in the phase being shown, drawn above every other playback overlay. See [resolution-playback.md](resolution-playback.md).
 

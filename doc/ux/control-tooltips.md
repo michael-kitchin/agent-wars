@@ -39,7 +39,7 @@ The tip can appear whenever the control can receive the pointer or keyboard focu
 - Terrain bonus: In a battle, Low adds 2 and High adds 4 when a unit fights on the terrain where it was built. Off adds nothing, and a unit that also gets the origin bonus receives only the larger of the two.
 - Weather bonus: Choose Off to ignore weather. Low and High slow movement and cut some attacks for units that lack that weather, and High is the harsher penalty.
 - Fog of war: Leave this checked to hide places and enemy units you have not seen. Uncheck it to show the whole map for the next match.
-- Starting month: Pick the month the match starts in. Each world-map turn advances one month, and a battle stays in the month that is current.
+- Starting month: Pick the month the match starts in. A global turn is one month. A regional turn is one week, starting on the 1st. Weather changes when the date enters a new month, and a battle stays on the date that is current.
 - Randomize starting month: Pick a month at random, including the month already shown.
 - Hide the new game choices: Hide the new game choices. The map stays up.
 - Show the new game choices: Show the new game choices.

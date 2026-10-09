@@ -4,7 +4,7 @@ import * as path from 'path';
 import { test } from 'node:test';
 import { getResolution } from 'h3-js';
 import { activeGameMap } from '../../shared/activeGameMap';
-import { calendarMonthIndex } from '../../shared/weatherBonusRules';
+import { gameDateForTurn } from '../../shared/gameCalendar';
 import { buildNewGameMapPreview } from './newGameMapPreview';
 import { listScenarioHomeRegions } from '../regionScenario';
 import { ensureTerrainClassificationCacheLoaded, getStrategicBaselineUrbanHexCountsForRenderer, getTerrainStrategicKindsFromCache } from '../terrainClassificationCache';
@@ -59,7 +59,7 @@ test('global preview matches the world grid and leaves the active map alone', ()
   }
   const sample = preview.hexes[0]!;
   assert.equal(
-    sample.weatherByMonth[calendarMonthIndex(1, 6)],
+    sample.weatherByMonth[gameDateForTurn(1, 6, 'monthly').monthIndex],
     displayWeatherForHex(sample.h3Index, 1, 6)
   );
 });

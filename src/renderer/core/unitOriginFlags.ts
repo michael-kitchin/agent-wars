@@ -3,8 +3,9 @@ import { originFlagAssetPath } from '../../shared/originArea';
 import type { GameStateSnapshot } from '../../shared/ipc/gameStateTypes';
 import { LOSS_CAUSE_KEYS, type TurnLossSummary } from '../../shared/lossSummary';
 import { parseTacticalSubUnitId } from '../../shared/unitIds';
-import { formatUnitOriginTooltipHtml, unitOriginsPresentTheSame } from '../../shared/unitOriginTooltipText';
-import type { UnitOriginTooltipBonuses } from '../../shared/unitOriginTooltipText';
+import { formatGameDateForTurn, gameCalendarKindForMap } from '../../shared/gameCalendar';
+import { formationTurnForUnit, formatUnitOriginTooltipHtml, unitOriginsPresentTheSame } from '../../shared/unitOriginTooltipText';
+import type { UnitOriginTooltipBonuses, UnitOriginTooltipIdentity } from '../../shared/unitOriginTooltipText';
 import type { UnitOrigin } from '../../shared/unitOriginTypes';
 import type { TechLevel } from '../../shared/techBonusTypes';
 import type { WeatherState } from '../../shared/weatherBonusTypes';
@@ -21,6 +22,16 @@ import { rendererSharedState as S } from './state';
  * Exceptions: None.
  */
 const unitOriginById = new Map<string, UnitOrigin>();
+
+/**
+ * Formation turn last seen for a strategic unit id.
+ *
+ * Purpose: The Formed line survives after the unit leaves the snapshot, including a loss toast.
+ * When to use: Written by `rememberUnitOrigins` and read by `formedLabelFor`.
+ * Expected outcome: Cleared with the origin cache on a new game. A tactical id is not stored; the parent id is.
+ * Exceptions: None.
+ */
+const formedTurnById = new Map<string, number>();
 
 /**
  * Weather tags last seen for a birth hex.
@@ -47,12 +58,13 @@ const techLevelByBirthHex = new Map<string, TechLevel>();
  *
  * Purpose: Fills the accumulating origin cache so unit labels can show flags, even after a unit is destroyed.
  * When to use: For every applied game-state snapshot, before unit labels are rendered.
- * Expected outcome: Each unit with `origin` has an entry. Weather tags are remembered by birth hex when the snapshot carries them. Existing entries are overwritten, never deleted.
+ * Expected outcome: Each unit with `origin` has an entry. A numeric `formedTurn` is remembered by unit id. Weather tags and tech tier are remembered by birth hex when the snapshot carries them. Existing entries are overwritten, never deleted.
  * Exceptions: None.
  */
 export function rememberUnitOrigins(units: GameStateSnapshot['units']): void {
   for (const unit of units) {
     if (unit.origin) unitOriginById.set(unit.id, unit.origin);
+    if (typeof unit.formedTurn === 'number') formedTurnById.set(unit.id, unit.formedTurn);
     if (unit.origin?.birthH3Index && unit.weatherTags) {
       weatherTagsByBirthHex.set(unit.origin.birthH3Index, unit.weatherTags);
     }
@@ -67,11 +79,12 @@ export function rememberUnitOrigins(units: GameStateSnapshot['units']): void {
  *
  * Purpose: Prevents a previous game's origins from attaching to reused unit ids in a new game.
  * When to use: When a new game starts, right before its first snapshot is remembered.
- * Expected outcome: The origin cache and the birth-hex weather-tag cache are empty.
+ * Expected outcome: The origin cache, the formation-turn cache, the birth-hex weather-tag cache, and the birth-hex tech cache are empty.
  * Exceptions: None.
  */
 export function clearRememberedUnitOrigins(): void {
   unitOriginById.clear();
+  formedTurnById.clear();
   weatherTagsByBirthHex.clear();
   techLevelByBirthHex.clear();
 }
@@ -89,6 +102,36 @@ export function resolveUnitOrigin(unitId: string): UnitOrigin | null {
   if (direct) return direct;
   const parentUnitId = parseTacticalSubUnitId(unitId)?.parentUnitId;
   return parentUnitId ? (unitOriginById.get(parentUnitId) ?? null) : null;
+}
+
+/**
+ * Formats the formation date for a unit that may be a tactical sub-unit.
+ *
+ * Purpose: The Formed line uses the strategic calendar of the loaded map.
+ * When to use: Live flags and loss-toast flags.
+ * Expected outcome: Null when no formation turn was remembered or no game state is loaded.
+ * Exceptions: None.
+ */
+function formedLabelFor(unitId: string): string | null {
+  const formedTurn = formationTurnForUnit(unitId, formedTurnById);
+  const state = S.gameState;
+  if (formedTurn == null || !state) return null;
+  return formatGameDateForTurn(formedTurn, state.startMonth, gameCalendarKindForMap(state.gameMap?.id ?? 'global'));
+}
+
+/**
+ * Builds the Name and Formed lines for a unit that is still identified by id.
+ *
+ * Purpose: The Name line must be the display name, not a label that also carries a selection count.
+ * When to use: Live flags and the one-unit map token.
+ * Expected outcome: The lookup name, which may be empty, and the formation label, which may be null.
+ * Exceptions: None.
+ */
+function tooltipIdentityFor(unitId: string): UnitOriginTooltipIdentity {
+  return {
+    displayName: S.unitDisplayNameById.get(unitId) ?? '',
+    formedLabel: formedLabelFor(unitId),
+  };
 }
 
 /**
@@ -187,6 +230,7 @@ function weatherTagsFor(unitId: string, origin: UnitOrigin): readonly WeatherSta
 export function createUnitOriginFlagImage(input: {
   readonly origin: UnitOrigin;
   readonly bonuses: UnitOriginTooltipBonuses;
+  readonly identity?: UnitOriginTooltipIdentity;
 }): HTMLImageElement {
   const img = document.createElement('img');
   img.className = COUNTRY_FLAG_CLASS_NAME;
@@ -197,20 +241,57 @@ export function createUnitOriginFlagImage(input: {
   img.alt = '';
   img.setAttribute('aria-hidden', 'true');
   img.draggable = false;
-  img.dataset.unitOriginTooltip = formatUnitOriginTooltipHtml(input);
+  img.dataset.unitOriginTooltip = formatUnitOriginTooltipHtml({
+    origin: input.origin,
+    bonuses: input.bonuses,
+    ...(input.identity ? { identity: input.identity } : {}),
+  });
   return img;
+}
+
+/**
+ * Birth origin and formation date for one loss-toast victim.
+ *
+ * Purpose: The toast matches victims by display name, and the flag tooltip needs both facts.
+ * When to use: The value type of `buildUnitOriginByLossDisplayName`.
+ * Expected outcome: One origin and a formation label that may be null.
+ * Exceptions: None.
+ */
+export interface LossFlagIdentity {
+  /**
+   * Birth record used for the flag image and the Bonuses block.
+   *
+   * Contract: The same origin the live flag would show.
+   * When to use: `createAbsentUnitOriginFlagImage`.
+   * Expected outcome: A remembered `UnitOrigin`.
+   * Exceptions: None.
+   */
+  readonly origin: UnitOrigin;
+  /**
+   * Formation date of the victim, or of its parent strategic unit.
+   *
+   * Contract: Null when the formation turn was not remembered.
+   * When to use: The Formed line.
+   * Expected outcome: A formatted date, or null.
+   * Exceptions: None.
+   */
+  readonly formedLabel: string | null;
 }
 
 /**
  * Builds a flag for a unit that is no longer on the map.
  *
- * Purpose: Loss toasts share the live tooltip, without an origin or terrain bonus for a unit that has nowhere to stand.
+ * Purpose: Loss toasts share the live tooltip, including the victim's name and formation date.
  * When to use: When a loss line names a victim whose origin is known.
- * Expected outcome: The victim's birth-country flag, with a tooltip of any remembered weather tags.
+ * Expected outcome: The victim's birth-country flag. The tooltip names the victim and the formation date when one was remembered.
  * Exceptions: None.
  */
-export function createAbsentUnitOriginFlagImage(origin: UnitOrigin): HTMLImageElement {
-  return createUnitOriginFlagImage({ origin, bonuses: bonusesForAbsentUnit(origin) });
+export function createAbsentUnitOriginFlagImage(flag: LossFlagIdentity, displayName: string): HTMLImageElement {
+  return createUnitOriginFlagImage({
+    origin: flag.origin,
+    bonuses: bonusesForAbsentUnit(flag.origin),
+    identity: { displayName, formedLabel: flag.formedLabel },
+  });
 }
 
 /**
@@ -224,7 +305,11 @@ export function createAbsentUnitOriginFlagImage(origin: UnitOrigin): HTMLImageEl
 export function formatLiveUnitOriginTooltipHtml(unitId: string): string | null {
   const origin = resolveUnitOrigin(unitId);
   if (!origin) return null;
-  return formatUnitOriginTooltipHtml({ origin, bonuses: bonusesForLiveUnit(unitId, origin) });
+  return formatUnitOriginTooltipHtml({
+    origin,
+    bonuses: bonusesForLiveUnit(unitId, origin),
+    identity: tooltipIdentityFor(unitId),
+  });
 }
 
 /**
@@ -243,6 +328,7 @@ export function setUnitNameContent(target: HTMLElement, unitId: string, text: st
     target.appendChild(createUnitOriginFlagImage({
       origin,
       bonuses: bonusesForLiveUnit(unitId, origin),
+      identity: tooltipIdentityFor(unitId),
     }));
   }
   target.appendChild(document.createTextNode(text));
@@ -257,17 +343,21 @@ export function setUnitNameContent(target: HTMLElement, unitId: string, text: st
  *   victims whose origins would not show the same flag and tooltip is left out, so no flag is shown rather than a wrong one.
  * Exceptions: None.
  */
-export function buildUnitOriginByLossDisplayName(summary: TurnLossSummary): ReadonlyMap<string, UnitOrigin> {
-  const originByName = new Map<string, UnitOrigin>();
+export function buildUnitOriginByLossDisplayName(summary: TurnLossSummary): ReadonlyMap<string, LossFlagIdentity> {
+  const flagByName = new Map<string, LossFlagIdentity>();
   const ambiguousNames = new Set<string>();
   const victims = [summary.human, summary.ai].flatMap((player) => LOSS_CAUSE_KEYS.flatMap((key) => player[key]));
   for (const victim of victims) {
     const origin = victim.unitId ? resolveUnitOrigin(victim.unitId) : null;
-    if (!origin) continue;
-    const existing = originByName.get(victim.displayName);
-    if (existing && !unitOriginsPresentTheSame(existing, origin)) ambiguousNames.add(victim.displayName);
-    else originByName.set(victim.displayName, origin);
+    if (!origin || !victim.unitId) continue;
+    const flag: LossFlagIdentity = { origin, formedLabel: formedLabelFor(victim.unitId) };
+    const existing = flagByName.get(victim.displayName);
+    const sameFlag = existing != null
+      && unitOriginsPresentTheSame(existing.origin, flag.origin)
+      && existing.formedLabel === flag.formedLabel;
+    if (existing && !sameFlag) ambiguousNames.add(victim.displayName);
+    else flagByName.set(victim.displayName, flag);
   }
-  for (const name of ambiguousNames) originByName.delete(name);
-  return originByName;
+  for (const name of ambiguousNames) flagByName.delete(name);
+  return flagByName;
 }

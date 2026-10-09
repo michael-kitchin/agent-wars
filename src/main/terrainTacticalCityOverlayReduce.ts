@@ -1,5 +1,5 @@
 /**
- * Reduces tactical naming city rows into single-line map labels for inspection overlays (scalerank 0..4 contract).
+ * Reduces tactical naming city rows into single-line map labels for inspection overlays.
  */
 
 import { GLOBAL_GAME_MAP } from '../shared/activeGameMap';
@@ -25,7 +25,7 @@ function compareCitiesForMapOverlayTieBreak(a: TerrainNamingCityRow, b: TerrainN
 /**
  * Defines the `reduceTacticalCityOverlayLabelsByH3` function shape (export function reduceTacticalCityOverlayLabelsByH3(records: ReadonlyArray<TerrainNamingRecordTactical>): Map<string, string>).
 
- * Purpose: Builds per-tactical-hex display labels from naming cities using scalerank 0..4, lowest rank wins, `" / "` joins ties.
+ * Purpose: Builds per-tactical-hex display labels from naming cities at or below the active map's city label ceiling. The lowest rank wins, and `" / "` joins ties.
  * When to use: During terrain classification snapshot construction alongside naming tooltip maps.
  * Expected outcome: Map keys are tactical `h3_index` strings; values omit country/state grouping because overlays only need names.
  * Exceptions: None.

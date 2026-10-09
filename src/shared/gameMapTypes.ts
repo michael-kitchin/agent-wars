@@ -129,7 +129,7 @@ export interface GameRules {
  *
  * Purpose: A regional map can show smaller cities than the global map without changing the global files.
  * When to use: Terrain classification and city-label filters.
- * Expected outcome: A feature at or below the maximum is eligible. The global urban, airport, and seaport maxima are 5. The global city-label maximum is 4.
+ * Expected outcome: A feature at or below the maximum is eligible. The global urban, airport, and seaport maxima are 5. The global city-label maximum is 6.
  * Exceptions: None.
  */
 export interface GameMapScaleranks {
@@ -163,7 +163,7 @@ export interface GameMapScaleranks {
   /**
    * Highest scalerank that still receives a city label.
    *
-   * Contract: The global maximum is 4, which is stricter than the urban overlay.
+   * Contract: The global maximum is 6. A regional map can include smaller places.
    * When to use: City-label drawing.
    * Expected outcome: A place at or below this rank can be labeled.
    * Exceptions: None.

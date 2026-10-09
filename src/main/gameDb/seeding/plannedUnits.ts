@@ -98,6 +98,7 @@ export function insertPlannedUnitsForPlayer(
       displayOrder: deps.allocateNextUnitDisplayOrder(plan.unitType, player),
       h3Index: plan.h3Index,
       origin: deps.resolveBirthOrigin(id, plan.h3Index),
+      formedTurn: 1,
     });
   }
 }

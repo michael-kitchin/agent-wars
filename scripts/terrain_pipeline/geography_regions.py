@@ -36,7 +36,7 @@ def _mollweide_transformer() -> Transformer:
     return Transformer.from_crs(CRS.from_epsg(4326), moll, always_xy=True)
 
 
-def _area_km2_wgs84(geom_wgs84: Any) -> float:
+def area_km2_wgs84(geom_wgs84: Any) -> float:
     """Return polygon area in km² using Mollweide equal-area projection."""
     if geom_wgs84.is_empty:
         return 0.0
@@ -92,7 +92,7 @@ def load_geography_region_features(
             if featurecla in CONTINENT_TIER_FEATURECLA:
                 continents.append(RegionFeature(region_id=region_id, geometry_wgs84=geom))
             elif featurecla == ISLAND_FEATURECLA:
-                area_km2 = _area_km2_wgs84(geom)
+                area_km2 = area_km2_wgs84(geom)
                 if area_km2 < island_min_area_km2:
                     continue
                 islands.append(RegionFeature(region_id=region_id, geometry_wgs84=geom))

@@ -3313,6 +3313,262 @@
     return null;
   }
 
+  // src/shared/unitDisplayNames.ts
+  var UNIT_TYPE_NOUN_BY_TYPE = {
+    /**
+       * Documents the object literal property `infantry` (infantry: 'Infantry').
+    
+       * Purpose: Supports maintainability by documenting why `infantry` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    infantry: "Infantry",
+    /**
+       * Documents the object literal property `armor` (armor: 'Armored').
+    
+       * Purpose: Supports maintainability by documenting why `armor` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    armor: "Armored",
+    /**
+       * Documents the object literal property `naval` (naval: 'Fleet').
+    
+       * Purpose: Supports maintainability by documenting why `naval` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    naval: "Fleet",
+    /**
+       * Documents the object literal property `air` (air: 'Squadron').
+    
+       * Purpose: Supports maintainability by documenting why `air` exists.
+       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
+       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+       * Exceptions: None.
+       */
+    air: "Squadron"
+  };
+  var NATURAL_ID_COLLATOR = new Intl.Collator(void 0, { numeric: true, sensitivity: "base" });
+  function capitalizeWord(s) {
+    if (!s) return s;
+    return s.charAt(0).toUpperCase() + s.slice(1);
+  }
+  function ordinalSuffix(value) {
+    const abs = Math.abs(Math.trunc(value));
+    const mod100 = abs % 100;
+    if (mod100 >= 11 && mod100 <= 13) return "th";
+    const mod10 = abs % 10;
+    if (mod10 === 1) return "st";
+    if (mod10 === 2) return "nd";
+    if (mod10 === 3) return "rd";
+    return "th";
+  }
+  function toRomanNumeral(value) {
+    let remaining = Math.max(1, Math.trunc(value));
+    const numerals = [
+      [1e3, "M"],
+      [900, "CM"],
+      [500, "D"],
+      [400, "CD"],
+      [100, "C"],
+      [90, "XC"],
+      [50, "L"],
+      [40, "XL"],
+      [10, "X"],
+      [9, "IX"],
+      [5, "V"],
+      [4, "IV"],
+      [1, "I"]
+    ];
+    let out = "";
+    for (const [unit, symbol] of numerals) {
+      while (remaining >= unit) {
+        out += symbol;
+        remaining -= unit;
+      }
+    }
+    return out;
+  }
+  function unitDisplayOwner(unit) {
+    if (unit.player === "human" || unit.player === "opponent") return unit.player;
+    return unitIdOwnerFromId(unit.id) ?? "other";
+  }
+  function formatUnitNumberLabel(unit, value, locale) {
+    return unitDisplayOwner(unit) === "opponent" ? toRomanNumeral(value) : formatOrdinalLabel(value, locale);
+  }
+  function parseSeedUnitIdParts(unitId) {
+    const match = unitId.match(/^(human|opponent)-(infantry|armor|naval|air)-(\d+)$/);
+    if (!match) return null;
+    const ordinal = Number.parseInt(match[3], 10);
+    if (!Number.isFinite(ordinal) || ordinal <= 0) return null;
+    return { unitType: match[2], ordinal };
+  }
+  function productionSpawnSequenceFromUnitId(unitId) {
+    const match = unitId.match(/^(human|opponent)-(infantry|armor|naval|air)-prod-\d+-(\d+)$/);
+    if (!match) return null;
+    const sequence = Number.parseInt(match[3], 10);
+    return Number.isFinite(sequence) && sequence > 0 ? sequence : null;
+  }
+  function resolvePersistedDisplayOrderForUnitLabel(unit) {
+    if (typeof unit.displayOrder !== "number" || unit.displayOrder <= 0) return void 0;
+    const spawnSequence = productionSpawnSequenceFromUnitId(unit.id);
+    if (spawnSequence !== null && unit.displayOrder === spawnSequence) return void 0;
+    return unit.displayOrder;
+  }
+  function unitDisplaySequenceGroupKey(unit) {
+    return `${unitDisplayOwner(unit)}:${unit.unitType}`;
+  }
+  function uniqueUnitsPreferringPersistedOrder(units) {
+    const byId = /* @__PURE__ */ new Map();
+    for (const unit of units) {
+      const existing = byId.get(unit.id);
+      if (!existing) {
+        byId.set(unit.id, unit);
+        continue;
+      }
+      const existingOrder = resolvePersistedDisplayOrderForUnitLabel(existing);
+      const nextOrder = resolvePersistedDisplayOrderForUnitLabel(unit);
+      if (existingOrder === void 0 && nextOrder !== void 0) byId.set(unit.id, unit);
+    }
+    return [...byId.values()];
+  }
+  function formatOrdinalLabel(value, locale) {
+    const normalized = Math.max(1, Math.trunc(value));
+    const numberText = new Intl.NumberFormat(locale).format(normalized);
+    return `${numberText}${ordinalSuffix(normalized)}`;
+  }
+  function getUnitDisplayNoun(unitType) {
+    return UNIT_TYPE_NOUN_BY_TYPE[unitType] ?? capitalizeWord(unitType || "Unit");
+  }
+  function buildUnitDisplayNameLookup(units, locale) {
+    const byGroup = /* @__PURE__ */ new Map();
+    for (const unit of uniqueUnitsPreferringPersistedOrder(units)) {
+      const key = unitDisplaySequenceGroupKey(unit);
+      const existing = byGroup.get(key);
+      if (existing) existing.push(unit);
+      else byGroup.set(key, [unit]);
+    }
+    const result = /* @__PURE__ */ new Map();
+    for (const group of byGroup.values()) {
+      const unitType = group[0]?.unitType ?? "";
+      const withPersisted = group.filter((u) => resolvePersistedDisplayOrderForUnitLabel(u) !== void 0).sort(
+        (a, b) => resolvePersistedDisplayOrderForUnitLabel(a) - resolvePersistedDisplayOrderForUnitLabel(b) || NATURAL_ID_COLLATOR.compare(a.id, b.id)
+      );
+      const withoutPersisted = group.filter((u) => resolvePersistedDisplayOrderForUnitLabel(u) === void 0).sort((a, b) => NATURAL_ID_COLLATOR.compare(a.id, b.id));
+      const noun = getUnitDisplayNoun(unitType);
+      for (const unit of withPersisted) {
+        const ordinal = resolvePersistedDisplayOrderForUnitLabel(unit);
+        const numberLabel = formatUnitNumberLabel(unit, ordinal, locale);
+        result.set(unit.id, `${numberLabel} ${noun}`);
+      }
+      let fallbackOrdinal = withPersisted.reduce(
+        (max, u) => Math.max(max, resolvePersistedDisplayOrderForUnitLabel(u)),
+        0
+      );
+      for (const unit of withoutPersisted) {
+        fallbackOrdinal += 1;
+        const numberLabel = formatUnitNumberLabel(unit, fallbackOrdinal, locale);
+        result.set(unit.id, `${numberLabel} ${noun}`);
+      }
+    }
+    return result;
+  }
+  function fallbackDisplayNameFromUnitId(unitId, locale) {
+    const compact = parseStrategicUnitId(unitId);
+    if (compact) {
+      const numberLabel = formatUnitNumberLabel({ id: unitId, player: compact.player }, compact.ordinal, locale);
+      return `${numberLabel} ${getUnitDisplayNoun(compact.unitType)}`;
+    }
+    const seed = parseSeedUnitIdParts(unitId);
+    if (seed) {
+      const numberLabel = formatUnitNumberLabel({ id: unitId }, seed.ordinal, locale);
+      return `${numberLabel} ${getUnitDisplayNoun(seed.unitType)}`;
+    }
+    if (productionSpawnSequenceFromUnitId(unitId) !== null) return unitId;
+    return unitId;
+  }
+
+  // src/shared/gameCalendar.ts
+  var GAME_MONTH_NAMES = Object.freeze([
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December"
+  ]);
+  var DAYS_IN_COMMON_YEAR = Object.freeze([31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]);
+  function parseStartMonth(raw) {
+    if (typeof raw === "number" && Number.isInteger(raw) && raw >= 1 && raw <= 12) return raw;
+    const text = String(raw ?? "").trim();
+    if (/^\d+$/.test(text)) {
+      const numeric = Number(text);
+      return numeric >= 1 && numeric <= 12 ? numeric : 1;
+    }
+    const index = GAME_MONTH_NAMES.findIndex((name) => name.toLowerCase() === text.toLowerCase());
+    return index >= 0 ? index + 1 : 1;
+  }
+  function gameCalendarKindForMap(gameMapId) {
+    return gameMapId === "global" ? "monthly" : "weekly";
+  }
+  function isLeapGameYear(year) {
+    const normalized = Number.isFinite(year) ? Math.floor(year) : 1;
+    return (normalized - 1) % 4 === 0;
+  }
+  function daysInGameMonth(year, monthIndex) {
+    const index = monthIndex === 1 ? 1 : Math.min(11, Math.max(0, monthIndex));
+    if (index === 1 && isLeapGameYear(year)) return 29;
+    return DAYS_IN_COMMON_YEAR[index] ?? 31;
+  }
+  function normalizedTurn(turnNumber) {
+    return Number.isFinite(turnNumber) && turnNumber >= 1 ? Math.floor(turnNumber) : 1;
+  }
+  function weeklyDate(turn, startMonth) {
+    let year = 1;
+    let monthIndex = startMonth - 1;
+    let day = 1;
+    let monthsElapsed = 0;
+    for (let step = 1; step < turn; step += 1) {
+      day += 7;
+      while (day > daysInGameMonth(year, monthIndex)) {
+        day -= daysInGameMonth(year, monthIndex);
+        monthsElapsed += 1;
+        year = Math.floor(monthsElapsed / 12) + 1;
+        monthIndex = (startMonth - 1 + monthsElapsed) % 12;
+      }
+    }
+    return { year, monthIndex, day };
+  }
+  function gameDateForTurn(turnNumber, startMonth, kind) {
+    const turn = normalizedTurn(turnNumber);
+    const start = parseStartMonth(startMonth);
+    if (kind === "weekly") return weeklyDate(turn, start);
+    return {
+      year: Math.floor((turn - 1) / 12) + 1,
+      monthIndex: (turn - 1 + start - 1) % 12,
+      day: null
+    };
+  }
+  function formatGameDate(date) {
+    const monthName = GAME_MONTH_NAMES[date.monthIndex] ?? "January";
+    const yearLabel = `Year ${date.year}`;
+    if (date.day == null) return `${monthName}, ${yearLabel}`;
+    return `${monthName} ${formatOrdinalLabel(date.day, "en-US")}, ${yearLabel}`;
+  }
+  function formatGameDateForTurn(turnNumber, startMonth, kind) {
+    return formatGameDate(gameDateForTurn(turnNumber, startMonth, kind));
+  }
+
   // src/shared/pipelineTerrain.ts
   var PIPELINE_TERRAIN_KINDS = [
     "water",
@@ -3403,20 +3659,6 @@
   }
 
   // src/shared/weatherBonusRules.ts
-  var WEATHER_MONTH_NAMES = Object.freeze([
-    "January",
-    "February",
-    "March",
-    "April",
-    "May",
-    "June",
-    "July",
-    "August",
-    "September",
-    "October",
-    "November",
-    "December"
-  ]);
   var STRATEGIC_MOVEMENT_HEXES = Object.freeze({
     infantry: 1,
     armor: 2,
@@ -3442,21 +3684,6 @@
   });
   var TAG_TIE_ORDER = Object.freeze(["snow", "heat", "rain"]);
   var TAG_DISPLAY_ORDER = Object.freeze(["snow", "rain", "heat"]);
-  function parseStartMonth(raw) {
-    if (typeof raw === "number" && Number.isInteger(raw) && raw >= 1 && raw <= 12) return raw;
-    const text = String(raw ?? "").trim();
-    if (/^\d+$/.test(text)) {
-      const numeric = Number(text);
-      return numeric >= 1 && numeric <= 12 ? numeric : 1;
-    }
-    const index = WEATHER_MONTH_NAMES.findIndex((name) => name.toLowerCase() === text.toLowerCase());
-    return index >= 0 ? index + 1 : 1;
-  }
-  function calendarMonthIndex(turnNumber, startMonth) {
-    const turn = Number.isFinite(turnNumber) && turnNumber >= 1 ? Math.floor(turnNumber) : 1;
-    const start = parseStartMonth(startMonth);
-    return (turn - 1 + start - 1) % 12;
-  }
   function weatherTagsInDisplayOrder(tags) {
     const present = new Set(tags ?? []);
     return TAG_DISPLAY_ORDER.filter((state) => present.has(state)).slice();
@@ -3560,7 +3787,7 @@
       urbanOverlay: 5,
       airport: 5,
       seaport: 5,
-      cityLabel: 4
+      cityLabel: 6
     }
   };
   var activeProfile = GLOBAL_GAME_MAP;
@@ -18208,6 +18435,29 @@
   function bonusRow(label, value) {
     return `<strong>${label}:</strong> ${value}`;
   }
+  function formationTurnForUnit(unitId, formedTurnById2) {
+    const direct = formedTurnById2.get(unitId);
+    if (direct != null) return direct;
+    const parentUnitId = parseTacticalSubUnitId(unitId)?.parentUnitId;
+    if (!parentUnitId) return null;
+    return formedTurnById2.get(parentUnitId) ?? null;
+  }
+  function identityLines(origin, identity) {
+    if (!identity) return [];
+    const lines = [];
+    const displayName = identity.displayName.trim();
+    if (displayName.length > 0) {
+      lines.push(
+        `<strong>Name:</strong> ${originFlagImgHtml({
+          subdivisionCode: origin.birthSubdivisionCode ?? null,
+          countryCode: origin.birthCountryCode
+        })}${escapeHtmlText(displayName)}`
+      );
+    }
+    const formedLabel = identity.formedLabel?.trim() ?? "";
+    if (formedLabel.length > 0) lines.push(`<strong>Formed:</strong> ${escapeHtmlText(formedLabel)}`);
+    return lines;
+  }
   function formatUnitOriginTooltipHtml(input) {
     const rows = [];
     const placeLabel = originPlaceLabelFor(input.origin);
@@ -18234,17 +18484,24 @@
       rows.push(bonusRow("Tech", formatTechTierHtml(input.bonuses.techLevel)));
     }
     const body = rows.length > 0 ? rows.join("\n") : "None";
-    return `<strong>Bonuses:</strong>
+    const bonuses = `<strong>Bonuses:</strong>
 ${body}`;
+    const head = identityLines(input.origin, input.identity);
+    if (head.length === 0) return bonuses;
+    return `${head.join("\n")}
+
+${bonuses}`;
   }
 
   // src/renderer/core/unitOriginFlags.ts
   var unitOriginById = /* @__PURE__ */ new Map();
+  var formedTurnById = /* @__PURE__ */ new Map();
   var weatherTagsByBirthHex = /* @__PURE__ */ new Map();
   var techLevelByBirthHex = /* @__PURE__ */ new Map();
   function rememberUnitOrigins(units) {
     for (const unit of units) {
       if (unit.origin) unitOriginById.set(unit.id, unit.origin);
+      if (typeof unit.formedTurn === "number") formedTurnById.set(unit.id, unit.formedTurn);
       if (unit.origin?.birthH3Index && unit.weatherTags) {
         weatherTagsByBirthHex.set(unit.origin.birthH3Index, unit.weatherTags);
       }
@@ -18255,6 +18512,7 @@ ${body}`;
   }
   function clearRememberedUnitOrigins() {
     unitOriginById.clear();
+    formedTurnById.clear();
     weatherTagsByBirthHex.clear();
     techLevelByBirthHex.clear();
   }
@@ -18263,6 +18521,18 @@ ${body}`;
     if (direct) return direct;
     const parentUnitId = parseTacticalSubUnitId(unitId)?.parentUnitId;
     return parentUnitId ? unitOriginById.get(parentUnitId) ?? null : null;
+  }
+  function formedLabelFor(unitId) {
+    const formedTurn = formationTurnForUnit(unitId, formedTurnById);
+    const state = rendererSharedState.gameState;
+    if (formedTurn == null || !state) return null;
+    return formatGameDateForTurn(formedTurn, state.startMonth, gameCalendarKindForMap(state.gameMap?.id ?? "global"));
+  }
+  function tooltipIdentityFor(unitId) {
+    return {
+      displayName: rendererSharedState.unitDisplayNameById.get(unitId) ?? "",
+      formedLabel: formedLabelFor(unitId)
+    };
   }
   function selectedBonusOptions() {
     const state = rendererSharedState.gameState;
@@ -18313,16 +18583,28 @@ ${body}`;
     img.alt = "";
     img.setAttribute("aria-hidden", "true");
     img.draggable = false;
-    img.dataset.unitOriginTooltip = formatUnitOriginTooltipHtml(input);
+    img.dataset.unitOriginTooltip = formatUnitOriginTooltipHtml({
+      origin: input.origin,
+      bonuses: input.bonuses,
+      ...input.identity ? { identity: input.identity } : {}
+    });
     return img;
   }
-  function createAbsentUnitOriginFlagImage(origin) {
-    return createUnitOriginFlagImage({ origin, bonuses: bonusesForAbsentUnit(origin) });
+  function createAbsentUnitOriginFlagImage(flag, displayName) {
+    return createUnitOriginFlagImage({
+      origin: flag.origin,
+      bonuses: bonusesForAbsentUnit(flag.origin),
+      identity: { displayName, formedLabel: flag.formedLabel }
+    });
   }
   function formatLiveUnitOriginTooltipHtml(unitId) {
     const origin = resolveUnitOrigin(unitId);
     if (!origin) return null;
-    return formatUnitOriginTooltipHtml({ origin, bonuses: bonusesForLiveUnit(unitId, origin) });
+    return formatUnitOriginTooltipHtml({
+      origin,
+      bonuses: bonusesForLiveUnit(unitId, origin),
+      identity: tooltipIdentityFor(unitId)
+    });
   }
   function setUnitNameContent(target, unitId, text) {
     target.replaceChildren();
@@ -18330,24 +18612,27 @@ ${body}`;
     if (origin) {
       target.appendChild(createUnitOriginFlagImage({
         origin,
-        bonuses: bonusesForLiveUnit(unitId, origin)
+        bonuses: bonusesForLiveUnit(unitId, origin),
+        identity: tooltipIdentityFor(unitId)
       }));
     }
     target.appendChild(document.createTextNode(text));
   }
   function buildUnitOriginByLossDisplayName(summary) {
-    const originByName = /* @__PURE__ */ new Map();
+    const flagByName = /* @__PURE__ */ new Map();
     const ambiguousNames = /* @__PURE__ */ new Set();
     const victims = [summary.human, summary.ai].flatMap((player) => LOSS_CAUSE_KEYS.flatMap((key) => player[key]));
     for (const victim of victims) {
       const origin = victim.unitId ? resolveUnitOrigin(victim.unitId) : null;
-      if (!origin) continue;
-      const existing = originByName.get(victim.displayName);
-      if (existing && !unitOriginsPresentTheSame(existing, origin)) ambiguousNames.add(victim.displayName);
-      else originByName.set(victim.displayName, origin);
+      if (!origin || !victim.unitId) continue;
+      const flag = { origin, formedLabel: formedLabelFor(victim.unitId) };
+      const existing = flagByName.get(victim.displayName);
+      const sameFlag = existing != null && unitOriginsPresentTheSame(existing.origin, flag.origin) && existing.formedLabel === flag.formedLabel;
+      if (existing && !sameFlag) ambiguousNames.add(victim.displayName);
+      else flagByName.set(victim.displayName, flag);
     }
-    for (const name of ambiguousNames) originByName.delete(name);
-    return originByName;
+    for (const name of ambiguousNames) flagByName.delete(name);
+    return flagByName;
   }
 
   // src/shared/lossToastUnitSegments.ts
@@ -18488,8 +18773,8 @@ ${body}`;
     }
     if (unitOriginByDisplayName && unitOriginByDisplayName.size > 0) {
       for (const segment of splitLossCauseLineForUnitFlags(text, new Set(unitOriginByDisplayName.keys()))) {
-        const origin = segment.unitDisplayName ? unitOriginByDisplayName.get(segment.unitDisplayName) : void 0;
-        if (origin && segment.unitDisplayName) span.appendChild(createAbsentUnitOriginFlagImage(origin));
+        const flag = segment.unitDisplayName ? unitOriginByDisplayName.get(segment.unitDisplayName) : void 0;
+        if (flag && segment.unitDisplayName) span.appendChild(createAbsentUnitOriginFlagImage(flag, segment.unitDisplayName));
         span.appendChild(document.createTextNode(segment.text));
       }
     } else {
@@ -23118,7 +23403,7 @@ ${body}`;
   function previewWeatherIcon(input) {
     if (input.tacticalZoom || input.mapInspectionHeld || input.weatherBonusLevel === "off") return null;
     if (input.weatherByMonth.length !== 12) return null;
-    const weather = input.weatherByMonth[calendarMonthIndex(1, input.startMonth)];
+    const weather = input.weatherByMonth[gameDateForTurn(1, input.startMonth, "monthly").monthIndex];
     if (weather == null || !WEATHER_STATES.has(weather)) return null;
     return weather;
   }
@@ -24840,13 +25125,12 @@ ${body}`;
       if (!state) {
         turnEl.textContent = "\u2014";
       } else if (rendererSharedState.tacticalBattleSnapshot) {
-        const month = state.monthName ? ` \xB7 ${state.monthName}` : "";
+        const date = state.currentDateLabel ? ` \xB7 ${state.currentDateLabel}` : "";
         const weather = rendererSharedState.tacticalBattleSnapshot.weather ? ` \xB7 ${formatWeatherIconHtml(rendererSharedState.tacticalBattleSnapshot.weather)}` : "";
-        turnEl.innerHTML = `Turn: ${rendererSharedState.tacticalBattleSnapshot.tacticalTurnNumber}${month}${weather}`;
-      } else if (state.monthName) {
-        turnEl.textContent = `Turn: ${state.turnNumber} \xB7 ${state.monthName}`;
+        turnEl.innerHTML = `Turn: ${rendererSharedState.tacticalBattleSnapshot.tacticalTurnNumber}${date}${weather}`;
       } else {
-        turnEl.textContent = `Turn: ${state.turnNumber}`;
+        const date = state.currentDateLabel ? ` \xB7 ${state.currentDateLabel}` : "";
+        turnEl.textContent = `Turn: ${state.turnNumber}${date}`;
       }
     }
   }
@@ -29136,185 +29420,6 @@ ${body}`;
       terrainInfraTacticalAirport,
       terrainInfraTacticalSeaport
     };
-  }
-
-  // src/shared/unitDisplayNames.ts
-  var UNIT_TYPE_NOUN_BY_TYPE = {
-    /**
-       * Documents the object literal property `infantry` (infantry: 'Infantry').
-    
-       * Purpose: Supports maintainability by documenting why `infantry` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    infantry: "Infantry",
-    /**
-       * Documents the object literal property `armor` (armor: 'Armored').
-    
-       * Purpose: Supports maintainability by documenting why `armor` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    armor: "Armored",
-    /**
-       * Documents the object literal property `naval` (naval: 'Fleet').
-    
-       * Purpose: Supports maintainability by documenting why `naval` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    naval: "Fleet",
-    /**
-       * Documents the object literal property `air` (air: 'Squadron').
-    
-       * Purpose: Supports maintainability by documenting why `air` exists.
-       * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-       * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
-       * Exceptions: None.
-       */
-    air: "Squadron"
-  };
-  var NATURAL_ID_COLLATOR = new Intl.Collator(void 0, { numeric: true, sensitivity: "base" });
-  function capitalizeWord(s) {
-    if (!s) return s;
-    return s.charAt(0).toUpperCase() + s.slice(1);
-  }
-  function ordinalSuffix(value) {
-    const abs = Math.abs(Math.trunc(value));
-    const mod100 = abs % 100;
-    if (mod100 >= 11 && mod100 <= 13) return "th";
-    const mod10 = abs % 10;
-    if (mod10 === 1) return "st";
-    if (mod10 === 2) return "nd";
-    if (mod10 === 3) return "rd";
-    return "th";
-  }
-  function toRomanNumeral(value) {
-    let remaining = Math.max(1, Math.trunc(value));
-    const numerals = [
-      [1e3, "M"],
-      [900, "CM"],
-      [500, "D"],
-      [400, "CD"],
-      [100, "C"],
-      [90, "XC"],
-      [50, "L"],
-      [40, "XL"],
-      [10, "X"],
-      [9, "IX"],
-      [5, "V"],
-      [4, "IV"],
-      [1, "I"]
-    ];
-    let out = "";
-    for (const [unit, symbol] of numerals) {
-      while (remaining >= unit) {
-        out += symbol;
-        remaining -= unit;
-      }
-    }
-    return out;
-  }
-  function unitDisplayOwner(unit) {
-    if (unit.player === "human" || unit.player === "opponent") return unit.player;
-    return unitIdOwnerFromId(unit.id) ?? "other";
-  }
-  function formatUnitNumberLabel(unit, value, locale) {
-    return unitDisplayOwner(unit) === "opponent" ? toRomanNumeral(value) : formatOrdinalLabel(value, locale);
-  }
-  function parseSeedUnitIdParts(unitId) {
-    const match = unitId.match(/^(human|opponent)-(infantry|armor|naval|air)-(\d+)$/);
-    if (!match) return null;
-    const ordinal = Number.parseInt(match[3], 10);
-    if (!Number.isFinite(ordinal) || ordinal <= 0) return null;
-    return { unitType: match[2], ordinal };
-  }
-  function productionSpawnSequenceFromUnitId(unitId) {
-    const match = unitId.match(/^(human|opponent)-(infantry|armor|naval|air)-prod-\d+-(\d+)$/);
-    if (!match) return null;
-    const sequence = Number.parseInt(match[3], 10);
-    return Number.isFinite(sequence) && sequence > 0 ? sequence : null;
-  }
-  function resolvePersistedDisplayOrderForUnitLabel(unit) {
-    if (typeof unit.displayOrder !== "number" || unit.displayOrder <= 0) return void 0;
-    const spawnSequence = productionSpawnSequenceFromUnitId(unit.id);
-    if (spawnSequence !== null && unit.displayOrder === spawnSequence) return void 0;
-    return unit.displayOrder;
-  }
-  function unitDisplaySequenceGroupKey(unit) {
-    return `${unitDisplayOwner(unit)}:${unit.unitType}`;
-  }
-  function uniqueUnitsPreferringPersistedOrder(units) {
-    const byId = /* @__PURE__ */ new Map();
-    for (const unit of units) {
-      const existing = byId.get(unit.id);
-      if (!existing) {
-        byId.set(unit.id, unit);
-        continue;
-      }
-      const existingOrder = resolvePersistedDisplayOrderForUnitLabel(existing);
-      const nextOrder = resolvePersistedDisplayOrderForUnitLabel(unit);
-      if (existingOrder === void 0 && nextOrder !== void 0) byId.set(unit.id, unit);
-    }
-    return [...byId.values()];
-  }
-  function formatOrdinalLabel(value, locale) {
-    const normalized = Math.max(1, Math.trunc(value));
-    const numberText = new Intl.NumberFormat(locale).format(normalized);
-    return `${numberText}${ordinalSuffix(normalized)}`;
-  }
-  function getUnitDisplayNoun(unitType) {
-    return UNIT_TYPE_NOUN_BY_TYPE[unitType] ?? capitalizeWord(unitType || "Unit");
-  }
-  function buildUnitDisplayNameLookup(units, locale) {
-    const byGroup = /* @__PURE__ */ new Map();
-    for (const unit of uniqueUnitsPreferringPersistedOrder(units)) {
-      const key = unitDisplaySequenceGroupKey(unit);
-      const existing = byGroup.get(key);
-      if (existing) existing.push(unit);
-      else byGroup.set(key, [unit]);
-    }
-    const result = /* @__PURE__ */ new Map();
-    for (const group of byGroup.values()) {
-      const unitType = group[0]?.unitType ?? "";
-      const withPersisted = group.filter((u) => resolvePersistedDisplayOrderForUnitLabel(u) !== void 0).sort(
-        (a, b) => resolvePersistedDisplayOrderForUnitLabel(a) - resolvePersistedDisplayOrderForUnitLabel(b) || NATURAL_ID_COLLATOR.compare(a.id, b.id)
-      );
-      const withoutPersisted = group.filter((u) => resolvePersistedDisplayOrderForUnitLabel(u) === void 0).sort((a, b) => NATURAL_ID_COLLATOR.compare(a.id, b.id));
-      const noun = getUnitDisplayNoun(unitType);
-      for (const unit of withPersisted) {
-        const ordinal = resolvePersistedDisplayOrderForUnitLabel(unit);
-        const numberLabel = formatUnitNumberLabel(unit, ordinal, locale);
-        result.set(unit.id, `${numberLabel} ${noun}`);
-      }
-      let fallbackOrdinal = withPersisted.reduce(
-        (max, u) => Math.max(max, resolvePersistedDisplayOrderForUnitLabel(u)),
-        0
-      );
-      for (const unit of withoutPersisted) {
-        fallbackOrdinal += 1;
-        const numberLabel = formatUnitNumberLabel(unit, fallbackOrdinal, locale);
-        result.set(unit.id, `${numberLabel} ${noun}`);
-      }
-    }
-    return result;
-  }
-  function fallbackDisplayNameFromUnitId(unitId, locale) {
-    const compact = parseStrategicUnitId(unitId);
-    if (compact) {
-      const numberLabel = formatUnitNumberLabel({ id: unitId, player: compact.player }, compact.ordinal, locale);
-      return `${numberLabel} ${getUnitDisplayNoun(compact.unitType)}`;
-    }
-    const seed = parseSeedUnitIdParts(unitId);
-    if (seed) {
-      const numberLabel = formatUnitNumberLabel({ id: unitId }, seed.ordinal, locale);
-      return `${numberLabel} ${getUnitDisplayNoun(seed.unitType)}`;
-    }
-    if (productionSpawnSequenceFromUnitId(unitId) !== null) return unitId;
-    return unitId;
   }
 
   // src/shared/strategicTerrainFlags.ts

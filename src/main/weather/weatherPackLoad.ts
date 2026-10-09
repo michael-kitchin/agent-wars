@@ -11,7 +11,9 @@ import * as fs from 'fs';
 import { logDebug, logError, logTrace } from '../logger';
 import { resolveTerrainStrategicWeatherPath } from '../terrainMetadataPaths';
 import type { WeatherMonthRecord, WeatherState } from '../../shared/weatherBonusTypes';
-import { acclimationTags, calendarMonthIndex } from '../../shared/weatherBonusRules';
+import { activeGameMap } from '../../shared/activeGameMap';
+import { gameCalendarKindForMap, gameDateForTurn } from '../../shared/gameCalendar';
+import { acclimationTags } from '../../shared/weatherBonusRules';
 
 /**
  * Twelve mild months for a hex the pack does not list.
@@ -146,15 +148,16 @@ export function weatherYearForHex(h3Index: string): readonly WeatherMonthRecord[
 /**
  * Returns the display weather for a hex on a strategic turn.
  *
- * Purpose: One month covers the whole turn, including every beat of a battle in that hex.
+ * Purpose: The date of the strategic turn selects the climate month. A global turn is one month. A regional turn is one week, so the climate month changes only when that week enters a new month.
  * When to use: Snapshots, movement, and dice.
- * Expected outcome: The month's display state. An unknown hex is mild.
+ * Expected outcome: The climate month's display state. An unknown hex is mild.
  * Exceptions: Throws when the pack cannot be loaded.
  */
 export function displayWeatherForHex(h3Index: string, turnNumber: number, startMonth: number): WeatherState {
   logTrace('weatherPackLoad displayWeatherForHex', { h3Index, turnNumber, startMonth });
   const year = weatherYearForHex(h3Index);
-  return year[calendarMonthIndex(turnNumber, startMonth)]?.display ?? 'mild';
+  const monthIndex = gameDateForTurn(turnNumber, startMonth, gameCalendarKindForMap(activeGameMap().id)).monthIndex;
+  return year[monthIndex]?.display ?? 'mild';
 }
 
 /**

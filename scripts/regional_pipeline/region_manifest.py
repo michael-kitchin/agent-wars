@@ -15,7 +15,7 @@ from scripts.terrain_pipeline.config import build_default_config
 from scripts.terrain_pipeline.metadata_io import write_json_document
 from scripts.terrain_pipeline.resolution_profile import topo_keys_for_resolution
 
-from .footprint import MIN_LAND_KM2, MEMBER_SHARE_MIN
+from .footprint import MEMBER_SHARE_MIN, MIN_LAND_KM2, MIN_SEA_RINGS
 from .region_catalog import region_by_id
 from .region_models import HexRole, RegionDefinition, RegionFootprint
 from .region_paths import (
@@ -29,7 +29,7 @@ from .region_paths import (
     RegionPaths,
     WEATHER_S_FILENAME,
 )
-from .regional_scaling import island_min_area_km2_for, weather_water_land_steps_for
+from .regional_scaling import island_min_area_km2_for, minor_island_max_km2_for, weather_water_land_steps_for
 from .scalerank_policy import ScalerankPolicy, policy_to_json
 
 LOGGER = logging.getLogger(__name__)
@@ -105,6 +105,8 @@ def build_manifest_document(
                 "sea_reach_km": definition.sea_reach_km,
                 "neutral_reach_km": definition.neutral_reach_km,
                 "desert_trim_reach_km": definition.desert_trim_reach_km,
+                "min_sea_rings": MIN_SEA_RINGS,
+                "minor_island_max_km2": minor_island_max_km2_for(definition.strategic_resolution),
             },
             "targets": {
                 "land": definition.targets.land,

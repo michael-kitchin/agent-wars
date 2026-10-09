@@ -96,13 +96,13 @@ export const fogCheckboxTooltipText =
   'Leave this checked to hide places and enemy units you have not seen. Uncheck it to show the whole map for the next match.';
 
 /**
- * Purpose: Says the month advances with world-map turns and stays put in a battle.
+ * Purpose: Says a global turn is a month, a regional turn is a week, and a battle stays on the current date.
  * When to use: `#new-game-start-month`.
  * Expected outcome: The control tip shows this sentence.
  * Exceptions: None.
  */
 export const startMonthSelectTooltipText =
-  'Pick the month the match starts in. Each world-map turn advances one month, and a battle stays in the month that is current.';
+  'Pick the month the match starts in. A global turn is one month. A regional turn is one week, starting on the 1st. Weather changes when the date enters a new month, and a battle stays on the date that is current.';
 
 /**
  * Purpose: Says the draw can repeat the month already shown.

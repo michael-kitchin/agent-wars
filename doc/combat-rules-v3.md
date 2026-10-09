@@ -204,13 +204,13 @@ The highest printed attack is 10, so origin alone reaches 14, under the cap of 1
 
 #### Weather bonus (optional)
 
-**Weather bonus** is a new-game dropdown offering Off, Low, and High, defaulting to Low, with a starting month under the options. The dialog opens on a random month, and the player can pick another month or draw again. Each strategic turn is one month. Every beat of a battle stays in that month and uses the weather of the enclosing hex.
+**Weather bonus** is a new-game dropdown offering Off, Low, and High, defaulting to Low, with a starting month under the options. The dialog opens on a random month, and the player can pick another month or draw again. A global turn is one month, shown as `November, Year 3`. A regional turn is one week, shown as `November 22nd, Year 1`, and the match starts on the 1st of the selected month in a leap year. The year advances when that start month comes around again. February has 29 days in Years 1, 5, 9, and so on, and 28 days otherwise. Weather changes when the date enters a new month. Every beat of a battle stays on that date and uses the weather of the enclosing hex. The date is shown whether or not this bonus is on.
 
 Weather is Mild, Rain, Snow, or Heat, from a fixed monthly climate, not a roll. A month is snow when its mean temperature is at or below 0°C; otherwise rain when precipitation is at least 120 mm; otherwise heat when the mean is at least 23°C; otherwise mild. A hot wet month displays as rain and still counts as heat. Land hexes are sampled at the centroid. A water hex copies the nearest land hex within two res1 steps, and is mild all year when no land is that close ([terrain pipeline](terrain-pipeline.md)).
 
 A unit is tagged for rain, snow, or heat when its birth hex has that condition in at least 3 of 12 months. Mild is never a tag. At most two tags. When three qualify, the two with more months are kept; equal counts keep snow, then heat, then rain. Tags are shown in the order snow, rain, heat. No birth hex means no tags. Sub-units inherit the parent.
 
-Penalties apply only to units that lack the tag. They never raise a printed stat. A match with no saved weather setting plays with the bonus off. A match saved before levels existed plays at Low. An unreadable start month is January. Turn 1 of a January match is January.
+Penalties apply only to units that lack the tag. They never raise a printed stat. A match with no saved weather setting plays with the bonus off. A match saved before levels existed plays at Low. An unreadable start month is January. Turn 1 of a January match is January, Year 1. On a regional map that is January 1st.
 
 | Rule | Low | High |
 |---|---|---|
@@ -228,7 +228,7 @@ Penalties apply only to units that lack the tag. They never raise a printed stat
 - **Attack:** armor ranged attack, including return fire and air-strike counter-fire, is lower in snow or heat by the level's penalty (3 at Low, 5 at High). An air strike is lower by the same amount once when the base or the target is snow, rain, or heat the unit lacks. The attack is at least 2 after the penalty and any cover, and before the origin and tech bonuses. High origin and High weather do not cancel exactly: home armor firing in snow ends at `max(2, 10 − 5) + 4 = 9`, one below its printed 10. Rain does not cut armor attack. Infantry attack is unchanged.
 - **Unchanged:** defense, melee dice, casualty order, and tactical ferry. A strategic ferry into snow is 2 hexes instead of 4 when the unit lacks the snow tag, at either level.
 
-`estimate_combat` uses the same attack thresholds. With the weather bonus off, prompts stay as they were. With it on, the turn line names the month and the combat paragraph states the penalties for the chosen level.
+`estimate_combat` uses the same attack thresholds. The turn line names the date whether or not this bonus is on. With the bonus on, the combat paragraph states the penalties for the chosen level.
 
 #### Tech bonus (optional)
 

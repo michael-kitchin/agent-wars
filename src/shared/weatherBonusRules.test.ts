@@ -3,7 +3,6 @@ import { test } from 'node:test';
 import { BONUS_LEVELS } from './bonusLevel';
 import {
   acclimationTags,
-  calendarMonthName,
   classifyWeatherMonth,
   formatBriefingWeatherCell,
   formatWeatherLabel,
@@ -38,8 +37,6 @@ test('start month names and unknown values resolve to January through December',
   assert.equal(parseStartMonth('13'), 1);
   assert.equal(parseStartMonth('Foo'), 1);
   assert.equal(parseStartMonth(0), 1);
-  assert.equal(calendarMonthName(1, 1), 'January');
-  assert.equal(calendarMonthName(2, 'December'), 'January');
 });
 
 test('classification matches the reference climates and a hot wet month stays rain', () => {

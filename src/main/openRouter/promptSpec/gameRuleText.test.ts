@@ -196,7 +196,7 @@ test('the weather sentence keeps its exact wording', () => {
     buildWeatherRule(
       gates({ originBonusSettings: { originBonusEnabled: false, terrainBonusEnabled: false, weatherBonusEnabled: true } })
     ),
-    "Weather bonus is on: the month is on the turn line and every beat of a battle shares the enclosing hex's weather. " +
+    "Weather bonus is on: the date is on the turn line, weather changes when that date enters a new month, and every beat of a battle shares the enclosing hex's weather. " +
       'Armor strategic movement is 1 in snow or rain, and naval strategic movement is 1 in snow. ' +
       "In battle, armor's point budget is 2 in snow or rain and naval's is 2 in snow; infantry pays 2 to enter open ground in snow or rain. " +
       'Armor ranged attack is 3 lower in snow or heat, including return fire and air-strike counter-fire. ' +
@@ -220,7 +220,7 @@ test('the High weather sentence widens the slowing weather and deepens the penal
         },
       })
     ),
-    "Weather bonus is on: the month is on the turn line and every beat of a battle shares the enclosing hex's weather. " +
+    "Weather bonus is on: the date is on the turn line, weather changes when that date enters a new month, and every beat of a battle shares the enclosing hex's weather. " +
       'Armor strategic movement is 1 in snow, rain, or heat, and naval strategic movement is 1 in snow or rain. ' +
       "In battle, armor's point budget is 1 in snow, rain, or heat and naval's is 1 in snow or rain; infantry pays 2 to enter open ground in snow or rain. " +
       'Armor ranged attack is 5 lower in snow or heat, including return fire and air-strike counter-fire. ' +

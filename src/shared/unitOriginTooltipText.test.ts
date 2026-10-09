@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { latLngToCell } from 'h3-js';
-import { formatUnitOriginTooltipHtml, unitOriginsPresentTheSame } from './unitOriginTooltipText';
+import { formatStrategicUnitId, formatTacticalSubUnitId } from './unitIds';
+import { formationTurnForUnit, formatUnitOriginTooltipHtml, unitOriginsPresentTheSame } from './unitOriginTooltipText';
 import type { UnitOriginTooltipBonuses } from './unitOriginTooltipText';
 import type { UnitOrigin } from './unitOriginTypes';
 
@@ -53,6 +54,25 @@ test('the tooltip lists the bonuses the unit was born with', () => {
   assert.ok(html.includes('Rain'));
   assert.ok(!html.includes('<strong>Weather:</strong> None'));
   assert.ok(!html.includes('Bonus: +1'));
+});
+
+test('an identity adds the name and formation date above a blank line', () => {
+  const html = formatUnitOriginTooltipHtml({
+    origin,
+    bonuses: NONE,
+    identity: { displayName: '22nd Armored', formedLabel: 'November, Year 3' },
+  });
+  assert.match(html, /^<strong>Name:<\/strong> .*22nd Armored\n<strong>Formed:<\/strong> November, Year 3\n\n<strong>Bonuses:<\/strong>/);
+  assert.ok(html.includes('flags/fr.svg'));
+});
+
+test('a tactical unit reports the formation turn stored for its parent', () => {
+  const parentUnitId = formatStrategicUnitId({ player: 'human', unitType: 'armor', ordinal: 22 });
+  const subUnitId = formatTacticalSubUnitId(parentUnitId, 2);
+  const formedTurnById = new Map<string, number>([[parentUnitId, 4]]);
+  assert.equal(formationTurnForUnit(subUnitId, formedTurnById), 4);
+  assert.equal(formationTurnForUnit(parentUnitId, formedTurnById), 4);
+  assert.equal(formationTurnForUnit('missing', formedTurnById), null);
 });
 
 test('a turned-off option is omitted, and weather tags render snow, then rain, then heat', () => {

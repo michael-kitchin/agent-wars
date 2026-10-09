@@ -1,6 +1,6 @@
 import type { PreviewHomeBorder, PreviewTechIconInput, PreviewWeatherIconInput } from './newGameMapPreviewTypes';
 import type { TechLevel } from './techBonusTypes';
-import { calendarMonthIndex } from './weatherBonusRules';
+import { gameDateForTurn } from './gameCalendar';
 import type { WeatherState } from './weatherBonusTypes';
 
 /**
@@ -61,7 +61,7 @@ export function previewHexIsDrawn(
 export function previewWeatherIcon(input: PreviewWeatherIconInput): WeatherState | null {
   if (input.tacticalZoom || input.mapInspectionHeld || input.weatherBonusLevel === 'off') return null;
   if (input.weatherByMonth.length !== 12) return null;
-  const weather: string | undefined = input.weatherByMonth[calendarMonthIndex(1, input.startMonth)];
+  const weather: string | undefined = input.weatherByMonth[gameDateForTurn(1, input.startMonth, 'monthly').monthIndex];
   if (weather == null || !WEATHER_STATES.has(weather)) return null;
   return weather as WeatherState;
 }

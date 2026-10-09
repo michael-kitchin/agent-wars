@@ -1,7 +1,7 @@
 /**
  * Pure rules for the optional weather bonus, shared by movement, dice, AI tools, and the renderer.
  *
- * Purpose: One place decides the month, the tags, and the penalties, so live play and estimates never disagree.
+ * Purpose: One place decides the tags and the penalties, so live play and estimates never disagree. The date lives in `gameCalendar`.
  * When to use: Any code that needs a weather label, a movement budget, a ferry range, or an attack penalty.
  * Expected outcome: Deterministic results with no logging and no I/O.
  * Exceptions: None.
@@ -10,28 +10,7 @@
 import { bonusLevelOf, type ActiveBonusLevel, type BonusLevel } from './bonusLevel';
 import type { WeatherAttackKind, WeatherAttackPenalty, WeatherMonthRecord, WeatherState } from './weatherBonusTypes';
 
-/**
- * Full month names, January first.
- *
- * Purpose: The new-game control, the turn line, and `parseStartMonth` share one list.
- * When to use: Building the start-month options and formatting the current month.
- * Expected outcome: Twelve English names. Index 0 is January, which is start month 1.
- * Exceptions: None.
- */
-export const WEATHER_MONTH_NAMES: readonly string[] = Object.freeze([
-  'January',
-  'February',
-  'March',
-  'April',
-  'May',
-  'June',
-  'July',
-  'August',
-  'September',
-  'October',
-  'November',
-  'December',
-]);
+export { parseStartMonth } from './gameCalendar';
 
 /**
  * Monthly mean at or below this, in °C, is a snow month.
@@ -182,51 +161,6 @@ const TAG_TIE_ORDER = Object.freeze(['snow', 'heat', 'rain'] as const);
  * Exceptions: None.
  */
 const TAG_DISPLAY_ORDER = Object.freeze(['snow', 'rain', 'heat'] as const);
-
-/**
- * Parses a start month from the new-game control or a persisted config value.
- *
- * Purpose: Unknown or out-of-range input must not throw and must not shift the calendar.
- * When to use: When reading `start_month` or the start-month select.
- * Expected outcome: 1 for January through 12 for December. Names are matched case-insensitively. Digit strings from the month select and the saved config row are accepted. Anything else, including null, is 1.
- * Exceptions: None.
- */
-export function parseStartMonth(raw: string | number | null | undefined): number {
-  if (typeof raw === 'number' && Number.isInteger(raw) && raw >= 1 && raw <= 12) return raw;
-  const text = String(raw ?? '').trim();
-  if (/^\d+$/.test(text)) {
-    const numeric = Number(text);
-    return numeric >= 1 && numeric <= 12 ? numeric : 1;
-  }
-  const index = WEATHER_MONTH_NAMES.findIndex((name) => name.toLowerCase() === text.toLowerCase());
-  return index >= 0 ? index + 1 : 1;
-}
-
-/**
- * Returns the calendar index for a strategic turn.
- *
- * Purpose: Turn 1 of a January match is January, and later turns advance one month each.
- * When to use: Before formatting the month or looking up a hex's weather.
- * Expected outcome: 0 through 11. A turn below 1 is treated as turn 1. `startMonth` is parsed by `parseStartMonth`.
- * Exceptions: None.
- */
-export function calendarMonthIndex(turnNumber: number, startMonth: string | number | null | undefined): number {
-  const turn = Number.isFinite(turnNumber) && turnNumber >= 1 ? Math.floor(turnNumber) : 1;
-  const start = parseStartMonth(startMonth);
-  return (turn - 1 + start - 1) % 12;
-}
-
-/**
- * Returns the full month name for a strategic turn.
- *
- * Purpose: The turn line and prompts share this wording.
- * When to use: Whenever the player or the model is told the current month.
- * Expected outcome: One entry of `WEATHER_MONTH_NAMES`.
- * Exceptions: None.
- */
-export function calendarMonthName(turnNumber: number, startMonth: string | number | null | undefined): string {
-  return WEATHER_MONTH_NAMES[calendarMonthIndex(turnNumber, startMonth)] ?? 'January';
-}
 
 /**
  * Classifies one month from its mean temperature and precipitation.

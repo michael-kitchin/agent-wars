@@ -16,7 +16,7 @@ Each region is a directory under `data/generated/regions/<region_id>/`:
 
 ## Footprints
 
-A strategic cell is member land when it has at least 1 km² of land and at least half of that land belongs to a member country. Water within the sea reach of member land is sea. Other land within the neutral reach is a neutral border. Libya, Egypt, and Sudan also drop unsettled member land farther than the desert-trim reach from settled member land.
+A strategic cell is member land when it has at least 1 km² of land and at least half of that land belongs to a member country. Water within the sea reach of member land is sea. Every region also keeps water, and non-member land that is only a minor island, within two hexes of member land. A minor island is a land polygon smaller than one average strategic hex. A larger landmass is not given a sea role. Cells that already have a role, including a neutral border, are left alone. The two-ring halo is not clipped by the centroid window. Other land within the neutral reach is a neutral border. Libya, Egypt, and Sudan also drop unsettled member land farther than the desert-trim reach from settled member land.
 
 Reaches were chosen as the 25 km step from 0 to 800 closest to the map's target counts, with ties toward the smaller reach. The table, the Burkina Faso addition, the Libya trim, and the land counts that remain more than 10% off are in `.spec/regional-footprint-tuning-results.md`.
 
@@ -28,13 +28,13 @@ Strategic cells use 25 area samples and no lakes or urban mask. Tactical cells u
 
 The island floor and the weather search scale with hex size. At strategic resolution 1 the island floor is 2,000 km² and the weather search is 2 rings. At resolution 2 those are about 285 km² and 5 rings. At resolution 3 they are about 41 km² and 14 rings. A cell is water for landmass when its water percent is at least 85.
 
-Roads and rail are filtered when the file is written. Urban areas, airports, seaports, and city labels keep every rank in the JSON. The manifest records the ceiling a later loader should use. The ceiling rises by about 1.4 scalerank steps per H3 resolution step. Roads and rail use the wide end of that range, because a tactical battle covers a much smaller strategic hex. Urban polygons stay near the narrow end, because large polygons already cover a similar share of cells. Airports and seaports use the wider range, because fewer of them fall inside a smaller battle. City labels skip rank 5, which has only two places.
+Roads and rail are filtered when the file is written. Urban areas, airports, seaports, and city labels keep every rank in the JSON. The manifest records the ceiling a later loader should use. The ceiling rises by about 1.4 scalerank steps per H3 resolution step. Roads and rail use the wide end of that range, because a tactical battle covers a much smaller strategic hex. Urban polygons stay near the narrow end, because large polygons already cover a similar share of cells. Airports and seaports use the wider range, because fewer of them fall inside a smaller battle. City labels used to skip rank 5, which has only two places. The global ceiling is now 6, so those two places are included.
 
 | Tactical resolution | Roads | Rail | Urban | Airports | Seaports | City labels |
 | --- | --- | --- | --- | --- | --- | --- |
-| 4 (global) | 4 | 4 | 5 | 5 | 5 | 4 |
-| 5 | 6 | 6 | 6 | 6 | 6 | 6 |
-| 6 | 8 | 8 | 7 | 8 | 8 | 7 |
+| 4 (global) | 4 | 4 | 5 | 5 | 5 | 6 |
+| 5 | 6 | 6 | 6 | 6 | 6 | 7 |
+| 6 | 8 | 8 | 7 | 8 | 8 | 8 |
 
 The minimum rank is 0 for every layer.
 

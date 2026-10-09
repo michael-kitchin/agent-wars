@@ -95,7 +95,7 @@ def _sanity(manifest: RegionManifest, strategic: dict[str, Any] | None) -> list[
     When to use:
         After the strategic metadata file has been loaded.
     What to expect:
-        WARN when fewer than 80 percent of sea hexes are all water, or fewer than 95 percent of land hexes are not.
+        WARN when fewer than 80 percent of sea hexes touch water, or fewer than 95 percent of land hexes are not all water.
         SKIP when strategic metadata is missing.
     """
 
@@ -104,7 +104,11 @@ def _sanity(manifest: RegionManifest, strategic: dict[str, Any] | None) -> list[
     by_cell = {str(row["h3_index"]): row for row in strategic.get("records", [])}
     sea = [cell for cell, role in manifest.footprint.roles.items() if role.value == "sea"]
     land = [cell for cell, role in manifest.footprint.roles.items() if role.value == "land"]
-    sea_ok = sum(1 for cell in sea if by_cell.get(cell, {}).get("all_water") is True)
+    sea_ok = sum(
+        1
+        for cell in sea
+        if by_cell.get(cell, {}).get("all_water") is True or by_cell.get(cell, {}).get("intersects_water") is True
+    )
     land_ok = sum(1 for cell in land if by_cell.get(cell, {}).get("all_water") is False)
     sea_ratio = 1.0 if not sea else sea_ok / len(sea)
     land_ratio = 1.0 if not land else land_ok / len(land)
@@ -112,9 +116,9 @@ def _sanity(manifest: RegionManifest, strategic: dict[str, Any] | None) -> list[
         return [CheckResult(
             "metadata-sanity",
             "WARN",
-            f"sea all_water {sea_ratio:.0%}, land not all_water {land_ratio:.0%}",
+            f"sea touches water {sea_ratio:.0%}, land not all_water {land_ratio:.0%}",
         )]
-    return [CheckResult("metadata-sanity", "PASS", f"sea {sea_ratio:.0%}, land {land_ratio:.0%}")]
+    return [CheckResult("metadata-sanity", "PASS", f"sea touches water {sea_ratio:.0%}, land {land_ratio:.0%}")]
 
 
 def check_region_pack(region_id: str, root: Path = REGIONS_ROOT) -> list[CheckResult]:

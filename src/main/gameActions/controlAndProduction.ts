@@ -216,6 +216,7 @@ function spawnProducedUnitsForHex(
       displayOrder,
       h3Index,
       origin: resolveUnitBirthOrigin(GAME_DB_OPS, { unitId, birthH3Index: h3Index }),
+      formedTurn: turnNumber + 1,
     });
     unitCountsByPlayerType.set(key, currentCount + 1);
     deployed.push(unitType);

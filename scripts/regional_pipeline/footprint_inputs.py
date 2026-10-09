@@ -18,9 +18,10 @@ from scripts.terrain_pipeline.geometry_bounds import bounds_intersect
 
 from .cell_land_overlap import CountryLandIndex, overlap_km2
 from .footprint import SETTLED_LAND_SHARE_MAX, CandidateCell
+from .landmass_index import LandmassIndex
 from .member_geometry import AdminLayers, build_member_geometry, load_admin_layers
 from .region_models import RegionDefinition
-from .regional_scaling import center_spacing_km
+from .regional_scaling import center_spacing_km, minor_island_max_km2_for
 
 LOGGER = logging.getLogger(__name__)
 
@@ -44,6 +45,8 @@ class FootprintInputs:
     populated_points: tuple[tuple[float, float], ...]
     # Union of every urban polygon.
     urban_wgs84: BaseGeometry
+    # Exploded land polygons, used to tell a minor island from a major landmass.
+    landmass_index: LandmassIndex
 
 
 def _polygonal_parts(geom: BaseGeometry) -> list[BaseGeometry]:
@@ -133,6 +136,7 @@ def load_footprint_inputs(data_root: Path) -> FootprintInputs:
         layers = load_admin_layers(data_root)
         points = _load_points(data_root / "ne_10m_populated_places.shp")
         urban = _load_urban_union(data_root / "ne_10m_urban_areas.shp")
+        landmass_index = LandmassIndex.from_shapefile(data_root / "ne_10m_land.shp")
     except Exception:
         LOGGER.error("Failed to load footprint inputs from %s.", data_root, exc_info=True)
         raise
@@ -142,6 +146,7 @@ def load_footprint_inputs(data_root: Path) -> FootprintInputs:
         land_index=CountryLandIndex.from_layers(layers),
         populated_points=points,
         urban_wgs84=urban,
+        landmass_index=landmass_index,
     )
 
 
@@ -202,6 +207,7 @@ def build_footprint_candidates(
         max_reach_km,
     )
     resolution = definition.strategic_resolution
+    minor_island_max_km2 = minor_island_max_km2_for(resolution)
     member = build_member_geometry(definition, inputs.layers)
     touching = _cells_touching(member, resolution)
     spacing = center_spacing_km(resolution)
@@ -234,6 +240,7 @@ def build_footprint_candidates(
                 member_km2=overlap_km2(cell, member),
                 cell_area_km2=area_km2,
                 settled=settled,
+                major_land_km2=inputs.landmass_index.major_land_km2(cell, minor_island_max_km2),
             )
         )
     LOGGER.info(
