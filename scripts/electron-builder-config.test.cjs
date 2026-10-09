@@ -140,6 +140,17 @@ function testIconPackagingContract() {
   assert.ok(!files.includes('symbols'), 'electron-builder files must not include a symbols directory');
   assert.ok(!ciFiles.includes('symbols'), 'CI electron-builder files must not include a symbols directory');
   assert.ok(files.includes('static'), 'electron-builder files must include static, which holds the unit glyphs');
+  assert.ok(files.includes('LICENSE'), 'electron-builder files must include the project license');
+  assert.ok(ciFiles.includes('LICENSE'), 'CI electron-builder files must include the project license');
+  assert.ok(files.includes('THIRD-PARTY-NOTICES.md'), 'electron-builder files must include third-party notices');
+  assert.ok(ciFiles.includes('THIRD-PARTY-NOTICES.md'), 'CI electron-builder files must include third-party notices');
+  const chromiumNotice = Array.isArray(buildConfig.extraResources)
+    && buildConfig.extraResources.find((item) => item && item.to === 'LICENSES.chromium.html');
+  const chromiumOnDisk = require('node:fs').existsSync('node_modules/electron/dist/LICENSES.chromium.html');
+  assert.strictEqual(Boolean(chromiumNotice), chromiumOnDisk, 'Chromium notices ship when the Electron binary is installed');
+  const ciChromiumNotice = Array.isArray(ciBuildConfig.extraResources)
+    && ciBuildConfig.extraResources.find((item) => item && item.to === 'LICENSES.chromium.html');
+  assert.strictEqual(Boolean(ciChromiumNotice), chromiumOnDisk, 'CI config ships Chromium notices when the Electron binary is installed');
 }
 
 function main() {

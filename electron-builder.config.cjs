@@ -1,4 +1,4 @@
-const { buildElectronBuilderConfig } = require('./scripts/electronBuilderBaseConfig.cjs');
+const { buildElectronBuilderConfig, chromiumLicenseExtraResource } = require('./scripts/electronBuilderBaseConfig.cjs');
 const {
   buildElectronBuilderGeneratedFileEntries,
   buildElectronBuilderGeneratedResourceFilter,
@@ -10,6 +10,7 @@ const generatedTerrainFiles = buildElectronBuilderGeneratedFileEntries();
 const generatedTerrainResourceFilter = buildElectronBuilderGeneratedResourceFilter();
 const regionalZipFiles = buildElectronBuilderRegionalZipFileEntries();
 const regionalZipResource = buildElectronBuilderRegionalZipResource();
+const chromiumResource = chromiumLicenseExtraResource();
 
 module.exports = buildElectronBuilderConfig({
   publish: [],
@@ -18,6 +19,8 @@ module.exports = buildElectronBuilderConfig({
     'dist',
     'static',
     'package.json',
+    'LICENSE',
+    'THIRD-PARTY-NOTICES.md',
     'node_modules',
     ...generatedTerrainFiles,
     ...regionalZipFiles,
@@ -29,6 +32,7 @@ module.exports = buildElectronBuilderConfig({
       filter: generatedTerrainResourceFilter,
     },
     regionalZipResource,
+    ...chromiumResource,
   ],
   winTarget: ['zip'],
   linuxTarget: ['dir'],

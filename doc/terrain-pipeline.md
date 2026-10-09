@@ -1,6 +1,6 @@
 # Terrain pipeline (runtime)
 
-How generated Earth hex data reaches the Electron app. **How to regenerate the files** (Python, PostGIS, EarthEnv, Natural Earth shapefiles, credentials) is documented in [`scripts/terrain_pipeline/README.md`](../scripts/terrain_pipeline/README.md). Do not copy that runbook here.
+How generated Earth hex data reaches the Electron app. **How to regenerate the files** (Python, PostGIS, EarthEnv, Natural Earth shapefiles, credentials) is documented in [`scripts/terrain_pipeline/README.md`](../scripts/terrain_pipeline/README.md). Do not copy that runbook here. Credits and license terms for Natural Earth, EarthEnv, and WorldClim, including the non-commercial term on the consensus land cover and WorldClim's ban on redistribution without permission, are in `THIRD-PARTY-NOTICES.md` at the repository root.
 
 The engine under `src/` wins if this file drifts.
 
@@ -23,7 +23,7 @@ The naming files list the countries, states, cities, and water bodies that overl
 
 Regenerate with `python -m scripts.naming_pipeline.generate_hex_naming run`, then `npm run generated:zip`. Only the `.json.zip` files are tracked.
 
-The main process uses the codes for the flags in hex tooltips and for each new unit's country of origin. National flag images are vendored in `static/flags/`. A global unit shows that national flag. A regional unit shows the subdivision SVG when the origin area's `iso_3166_2` has a file under `static/flags/subdivisions/`, and otherwise the national flag for the area's country code. Attribution for those files is in `subdivisions/ATTRIBUTION.md`. See [`static/flags/README.md`](../static/flags/README.md).
+The main process uses the codes for the flags in hex tooltips and for each new unit's country of origin. National flag images are vendored in `static/flags/`. A global unit shows that national flag. A regional unit shows the subdivision SVG when the origin area's `iso_3166_2` has a file under `static/flags/subdivisions/`, and otherwise the national flag for the area's country code. The per-file list is `static/flags/subdivisions/ATTRIBUTION.md`. The MIT license for those SVGs is `static/flags/subdivisions/LICENSE`. National flags are described in [`static/flags/README.md`](../static/flags/README.md). Leaflet, the flag licenses, and the data credits are collected in `THIRD-PARTY-NOTICES.md` at the repository root.
 
 A birth cell's country is its largest city (population, then lower scalerank, then name). With no city that names a country, it is the country row with the most states in the cell, then lower scalerank, then name. With no country row, it is the country of the most prominent state. The stored name is the canonical country name for that ISO code. A cell with none of those rows has no country.
 
@@ -41,10 +41,10 @@ How to regenerate the pack stays in `scripts/weather_pipeline/`. Only the `.json
 
 ## Resolutions
 
-- **Strategic map:** H3 resolution **1** on the global map (`strategicH3Resolution()`).
-- **Tactical battles:** H3 resolution **4** on the global map (`tacticalH3Resolution()`), the children of one contested strategic cell.
+- **Strategic map:** H3 resolution **1** on the global map. A regional map uses resolution **2** or **3**.
+- **Tactical battles:** H3 resolution **4** on the global map, the children of one contested strategic cell. A regional battle uses resolution **5** or **6**.
 
-Both functions live in `src/shared/h3Resolutions.ts`. `GLOBAL_STRATEGIC_H3_RESOLUTION` and `GLOBAL_TACTICAL_H3_RESOLUTION` are the global values. The tracked global JSON files keep the names `terrain_res1_*` and `terrain_res4_*`.
+`strategicH3Resolution()` and `tacticalH3Resolution()` in `src/shared/h3Resolutions.ts` return the active map's values. `GLOBAL_STRATEGIC_H3_RESOLUTION` and `GLOBAL_TACTICAL_H3_RESOLUTION` stay 1 and 4. The tracked global JSON files keep the names `terrain_res1_*` and `terrain_res4_*`.
 
 Parent-child mapping is H3's native hierarchy (three steps, 343 tactical cells under one strategic hex). Terrain kinds on a tactical cell can differ from the parent (coastal, forest, mountain, urban flags, rubble).
 

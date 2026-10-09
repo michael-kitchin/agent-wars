@@ -23,7 +23,7 @@ From the project root:
 ## Cross-platform from one machine
 
 - **On Windows:** `npm run dist:win` and `npm run dist:linux` both work. Linux output is `release/linux-unpacked/`. Recipients run `./agent-wars`. That file is a launcher; the Electron binary beside it is `agent-wars.bin`. AppImage/.deb require building on Linux. Use a Mac or CI for macOS.
-- **On Linux:** `npm run dist:linux`, `npm run dist:win`, and (on some setups) `npm run dist:mac` may work.
+- **On Linux:** `npm run dist:linux` works. `npm run dist:win` may work. macOS builds run on a Mac.
 - **On macOS:** You can build for all three; use `npm run dist` to build for the current platform only.
 
 ## Output layout (Windows example)

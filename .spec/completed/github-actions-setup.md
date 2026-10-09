@@ -30,19 +30,19 @@
 
 ## 2. GitHub Actions (already configured)
 
-The workflow in **`.github/workflows/build.yml`** runs on every push and pull request to `main`. It:
+The workflow in **`.github/workflows/build.yml`** runs when someone starts it from the Actions tab (`workflow_dispatch`). It:
 
-- Runs **tests** (`npm run test`) on Windows, Linux, and macOS.
-- Builds the app on each OS:
-  - **Windows:** `npm run dist:win` → NSIS installer and portable exe in `release/`.
-  - **Linux:** unpacked `linux-unpacked/`. The entry point `agent-wars` is the sandbox launcher; the Electron binary is `agent-wars.bin`. See [packaging.md](packaging.md).
-  - **macOS:** `npm run dist:mac` → unpacked `.app` in `release/`.
+- Runs **tests** (`npm run test`) on Windows, Linux, and macOS, then installs the Electron binary.
+- Builds with `electron-builder.config.cjs` and a `dir` target:
+  - **Windows:** unpacked app in `release/win-unpacked/`.
+  - **Linux:** unpacked `release/linux-unpacked/`. The entry point `agent-wars` is the sandbox launcher; the Electron binary is `agent-wars.bin`. See [packaging.md](packaging.md).
+  - **macOS:** unpacked `.app` under `release/`.
 
-Artifacts are uploaded per run. To download them:
+Artifacts are uploaded per run, named `agent-wars-<version>-Windows`, `agent-wars-<version>-Linux`, and `agent-wars-<version>-macOS`. To download them:
 
 1. Open the run in the **Actions** tab.
 2. Scroll to the **Artifacts** section.
-3. Download `release-windows`, `release-linux`, or `release-mac`.
+3. Download the artifact for that operating system.
 
 ## 3. Optional: publishing releases
 

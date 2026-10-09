@@ -118,15 +118,15 @@ The game supports any mix of human and AI players. The primary experience is sin
 
 ## How I'm Building It
 
-Electron desktop application, TypeScript, SQLite (better-sqlite3) for game state. H3 for spatial indexing at two resolutions (res 1 for global, res 4 for tactical). Leaflet plus canvas overlay for map rendering. OpenRouter for LLM integration (BYOK). Six tool groups (pathfinding, assessment, combat estimation, memory, standing orders, production) — [ai-tools.md](ai-tools.md). Hybrid loop: [hybrid-ai.md](hybrid-ai.md). AI-assisted development with Cursor, spec-driven.
+Electron desktop application, TypeScript, SQLite (better-sqlite3) for game state. H3 for spatial indexing. The global map uses resolution 1, with battles at resolution 4. A regional map uses resolution 2 or 3, with battles at 5 or 6. Leaflet plus canvas overlay for map rendering. OpenRouter for LLM integration (BYOK). Six tool groups (pathfinding, assessment, combat estimation, memory, standing orders, production) — [ai-tools.md](ai-tools.md). Hybrid loop: [hybrid-ai.md](hybrid-ai.md). AI-assisted development with Cursor, spec-driven.
 
-The map data comes from Natural Earth shapefiles preprocessed into H3 cells at both resolutions, with per-hex terrain metadata, urban/airport/seaport features, and road/rail side masks. Runtime loads generated JSON under `data/generated/`.
+The map data comes from Natural Earth shapefiles preprocessed into H3 cells at the strategic and tactical resolutions, with per-hex terrain metadata, urban/airport/seaport features, and road/rail side masks. Terrain classes also use EarthEnv land cover and topography. Monthly weather is classified from WorldClim 2.1. Runtime loads generated JSON under `data/generated/`. Credits and the license terms, including the non-commercial term on the consensus land cover and WorldClim's ban on redistribution without permission, are in [THIRD-PARTY-NOTICES.md](../THIRD-PARTY-NOTICES.md). What the app loads is [terrain-pipeline.md](terrain-pipeline.md).
 
 ## How I'm Shipping It
 
 *Intent, not current distribution.* Live builds are developer / side-load Electron packages (electron-builder). There is no Steam listing or public GitHub-releases pipeline in this tree yet.
 
-Free builds on GitHub under my name. Paid convenience builds on Steam. The code is not open source — the GitHub repository hosts compiled builds and release notes, not the source. The Steam listing makes it clear that the free version always exists and the paid version is a way to get managed installation and support the project. This follows the model proven by Dwarf Fortress and others. The goal is to build a player base and a reputation as a developer in this space, not to maximize short-term revenue.
+Free builds on GitHub under my name, source included, under the MIT license (keep the copyright notice and the license text). Terrain and weather derived from EarthEnv consensus land cover and WorldClim ship with the application, under terms that prevent commercial use of the application as distributed, so a paid Steam build waits on permission from those data authors or on replacement earth data. The Steam listing, once that is possible, should make it clear that the free version always exists and the paid version is a way to get managed installation and support the project. This follows the model proven by Dwarf Fortress and others. The goal is to build a player base and a reputation as a developer in this space, not to maximize short-term revenue.
 
 Community building starts early — Discord server and devlog from the first real-map milestone, engagement with wargaming communities and content creators, Early Access on Steam once the core loop is solid.
 

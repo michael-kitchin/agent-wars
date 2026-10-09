@@ -21,7 +21,8 @@ const EXECUTABLE_NAME_PATTERN = /^[A-Za-z0-9._+-]+$/;
  * moves to `agent-wars.bin` beside `resources/` and `chrome-sandbox`. The sandbox stays
  * on when user namespaces work or the helper really is root mode 4755.
  * Exceptions: Throws if the executable name is unsafe to embed, the packaged binary is
- * missing, or `agent-wars.bin` already exists.
+ * missing, or `agent-wars.bin` already exists. If writing the launcher fails after the
+ * rename, the Electron binary is moved back to its original name and the error is rethrown.
  * Relaunch note: Electron `app.relaunch()` uses the real binary (`process.execPath`),
  * which skips this launcher. This app does not relaunch that way; a future call must
  * pass the launcher path.
@@ -38,6 +39,7 @@ async function installLinuxSandboxLauncher(context) {
   const runtimeName = `${executableName}.bin`;
   const runtimePath = path.join(context.appOutDir, runtimeName);
   await assertRuntimeDestinationIsFree(runtimePath);
+  const launcherScript = buildLinuxSandboxLauncherScript(executableName);
   try {
     await fs.rename(binaryPath, runtimePath);
   } catch (error) {
@@ -46,10 +48,43 @@ async function installLinuxSandboxLauncher(context) {
     console.error(message);
     throw new Error(message);
   }
-  await fs.chmod(runtimePath, 0o755);
-  await fs.writeFile(binaryPath, buildLinuxSandboxLauncherScript(executableName), { encoding: 'utf8' });
-  await fs.chmod(binaryPath, 0o755);
+  try {
+    await fs.chmod(runtimePath, 0o755);
+    await fs.writeFile(binaryPath, launcherScript, { encoding: 'utf8' });
+    await fs.chmod(binaryPath, 0o755);
+  } catch (error) {
+    const detail = error && error.code ? error.code : error;
+    console.error(`Linux sandbox launcher could not be installed at "${binaryPath}" (${detail}). Restoring the Electron binary.`);
+    await restoreLinuxExecutable(binaryPath, runtimePath);
+    throw new Error(`Linux sandbox launcher could not be installed at "${binaryPath}" (${detail}).`);
+  }
   console.log(`Installed Linux sandbox launcher at ${binaryPath} (runtime ${runtimeName})`);
+}
+
+/**
+ * Puts the Electron binary back when launcher installation fails after the rename.
+ *
+ * Purpose: A failed pack must not leave the entry point missing and the binary only at `*.bin`.
+ * When to use: From the installer's write/chmod failure path.
+ * Expected outcome: The original executable name holds the binary again.
+ * Exceptions: Logs and continues when the partial script or the restore rename cannot be completed.
+ * The caller still throws the installation error.
+ *
+ * @param {string} binaryPath Original executable path
+ * @param {string} runtimePath Renamed Electron binary
+ * @returns {Promise<void>}
+ */
+async function restoreLinuxExecutable(binaryPath, runtimePath) {
+  try {
+    await fs.rm(binaryPath, { force: true });
+  } catch (error) {
+    console.error(`Linux sandbox launcher could not remove a partial script at "${binaryPath}": ${error && error.code ? error.code : error}`);
+  }
+  try {
+    await fs.rename(runtimePath, binaryPath);
+  } catch (error) {
+    console.error(`Linux sandbox launcher could not restore "${binaryPath}": ${error && error.code ? error.code : error}`);
+  }
 }
 
 /**
@@ -166,4 +201,5 @@ async function assertRuntimeDestinationIsFree(runtimePath) {
 module.exports = {
   installLinuxSandboxLauncher,
   buildLinuxSandboxLauncherScript,
+  restoreLinuxExecutable,
 };

@@ -10,6 +10,7 @@ const path = require('path');
 const {
   buildLinuxSandboxLauncherScript,
   installLinuxSandboxLauncher,
+  restoreLinuxExecutable,
 } = require('./linux-sandbox-launcher.cjs');
 
 function testLauncherScriptKeepsSandboxWhenPossible() {
@@ -367,6 +368,25 @@ function symlinkErrorIsPermission(error) {
   return Boolean(error) && (error.code === 'EPERM' || error.code === 'EACCES');
 }
 
+/**
+ * A failed write must put the Electron binary back at the original name.
+ * The runtime file holds the binary, and the entry-point path holds a partial script.
+ */
+async function testFailedInstallRestoresTheElectronBinary() {
+  const appOutDir = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-wars-launcher-restore-'));
+  const binaryPath = path.join(appOutDir, 'agent-wars');
+  const runtimePath = path.join(appOutDir, 'agent-wars.bin');
+  fs.writeFileSync(runtimePath, 'elf-binary');
+  fs.writeFileSync(binaryPath, 'partial-script');
+  try {
+    await restoreLinuxExecutable(binaryPath, runtimePath);
+    assert.strictEqual(fs.readFileSync(binaryPath, 'utf8'), 'elf-binary');
+    assert.ok(!fs.existsSync(runtimePath));
+  } finally {
+    fs.rmSync(appOutDir, { recursive: true, force: true });
+  }
+}
+
 async function main() {
   testLauncherScriptKeepsSandboxWhenPossible();
   await testLinuxPackReplacesExecutableWithLauncher();
@@ -375,6 +395,7 @@ async function main() {
   await testDotDotExecutableNameIsRejected();
   await testExistingRuntimeIsRejected();
   await testMissingBinaryIsRejected();
+  await testFailedInstallRestoresTheElectronBinary();
 
   const bash = findBash();
   if (!bash) {
