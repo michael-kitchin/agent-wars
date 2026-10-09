@@ -152,7 +152,7 @@
   color: var(--chrome-text);
   font-weight: 600;
 }
-/* Select column is the longest option. The randomize button sits in the next column at the same height. */
+/* Select column shares one closed width. The randomize button sits in the next column at the same height. */
 .game-over-region-controls {
   display: grid;
   width: max-content;
@@ -170,10 +170,12 @@
   flex-shrink: 0;
   font-weight: 400;
 }
-/* Longest option, not the selected one. min-width stops the grid from squeezing the closed control below that option. */
+/* One closed width for home-region, region, and side selectors. The variable is the widest region option, so a short selection does not shrink a control and a long side name does not widen one. */
 .game-over-region-controls select {
-  width: max-content;
-  min-width: max-content;
+  box-sizing: border-box;
+  width: var(--new-game-region-select-width, max-content);
+  min-width: var(--new-game-region-select-width, max-content);
+  max-width: var(--new-game-region-select-width, none);
 }
 /* Matches the dropdown beside it. The fixed square size on `.compact-square-btn` is for other buttons. */
 .game-over-box .compact-square-btn.game-over-region-randomize {

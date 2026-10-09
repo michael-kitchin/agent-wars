@@ -1,4 +1,5 @@
 import { randomizeNewGameStartMonth } from './newGameOptionsUi';
+import { syncNewGameRegionSelectWidths } from './newGameRegionSelectWidth';
 
 /**
  * Documents the module-scope binding `HUMAN_REGION_SELECT_ID` (HUMAN_REGION_SELECT_ID).
@@ -60,18 +61,21 @@ export function randomizeScenarioRegionSelects(): void {
 }
 
 /**
- * Defines the `ensureScenarioRegionOptionsLoaded` function shape (export async function ensureScenarioRegionOptionsLoaded(): Promise<void>).
-
- * Purpose: Supports maintainability by documenting why `ensureScenarioRegionOptionsLoaded` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
+ * Fills both global home-region dropdowns from the scenario list.
+ *
+ * Purpose: The two home lists stay the same, and their closed width stays aligned with the regional region dropdown.
+ * When to use: When the new-game overlay opens.
+ * Expected outcome: The first successful load writes the options. A later call leaves those options in place and measures the shared width again. A missing control or an empty list leaves the options unchanged.
+ * Exceptions: A rejected list load propagates to the caller.
  */
 export async function ensureScenarioRegionOptionsLoaded(): Promise<void> {
   const humanSelect = getRegionSelect(HUMAN_REGION_SELECT_ID);
   const aiSelect = getRegionSelect(AI_REGION_SELECT_ID);
   if (!humanSelect || !aiSelect) return;
-  if (humanSelect.options.length > 0 && aiSelect.options.length > 0) return;
+  if (humanSelect.options.length > 0 && aiSelect.options.length > 0) {
+    syncNewGameRegionSelectWidths();
+    return;
+  }
   const regions = await window.gameApi?.listScenarioHomeRegions?.();
   if (!Array.isArray(regions) || regions.length <= 0) return;
   const renderOptions = (select: HTMLSelectElement): void => {
@@ -85,6 +89,7 @@ export async function ensureScenarioRegionOptionsLoaded(): Promise<void> {
   };
   renderOptions(humanSelect);
   renderOptions(aiSelect);
+  syncNewGameRegionSelectWidths();
 }
 
 /**

@@ -4,6 +4,7 @@ import { selectTabPanel, type TabPanelBinding } from '../chrome/selectTabPanel';
 import { showMapToast } from '../openRouter/openRouterUiHelpers';
 import { rendererSharedState as S } from '../core/state';
 import { refreshNewGameMapPreview } from './newGameMapPreviewUi';
+import { syncNewGameRegionSelectWidths } from './newGameRegionSelectWidth';
 
 /**
  * Tab buttons and panels on the new-game dialog.
@@ -144,7 +145,7 @@ function selectNewGameTab(which: 'global' | 'regional'): void {
  *
  * Purpose: The player picks one extracted region.
  * When to use: After the map list loads.
- * Expected outcome: One option per regional row, in the list's order.
+ * Expected outcome: One option per regional row, in the list's order. The place dropdowns then share the width of the widest region name currently listed.
  * Exceptions: None.
  */
 function fillRegionSelect(regions: readonly GameMapListEntry[]): void {
@@ -157,6 +158,7 @@ function fillRegionSelect(regions: readonly GameMapListEntry[]): void {
     option.textContent = region.displayName;
     select.appendChild(option);
   }
+  syncNewGameRegionSelectWidths();
 }
 
 /**
