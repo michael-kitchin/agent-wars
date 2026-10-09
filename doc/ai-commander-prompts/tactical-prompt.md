@@ -1,13 +1,13 @@
 # Tactical prompt
 
-The tactical beat system prompt as the builders emit it. The preamble states that the battle map is the enclosing strategic hex's tactical cells plus three neighboring rings. The captured tactical prompt dump in the repository root is stale and is not a source. If this file disagrees with the builders, the builders win.
+The tactical beat system prompt as the builders emit it. The preamble states that the battle map is the enclosing strategic hex's tactical cells plus up to three neighboring rings, and that cells beyond a regional map's edge are not part of the battle. The captured tactical prompt dump in the repository root is stale and is not a source. If this file disagrees with the builders, the builders win.
 
 Shared rules come from `assembly-contract.md`. Differences from the strategic contract are stated as differences; everything not called out here follows `strategic-prompt.md` only where `assembly-contract.md` marks the section as shared.
 
 ## 1. Battle framing
 
 1. **Two clocks.** The prompt states the strategic turn number, the tactical beat number, and the phase. A beat is a period inside one strategic turn, and the beat number is what "this beat" refers to everywhere else in the prompt. Carries `TURN_CLOCK`, `BATTLE_FRAME`.
-2. **One footprint.** The battle occupies the enclosing strategic hex's tactical cells plus three neighboring rings. Every cell code in the prompt belongs to that footprint. Carries `BATTLE_FRAME`, `HEX_IDENTITY`.
+2. **One footprint.** The battle occupies the enclosing strategic hex's tactical cells plus up to three neighboring rings. Cells beyond a regional map's edge are not part of the battle. Every cell code in the prompt belongs to that footprint. Carries `BATTLE_FRAME`, `HEX_IDENTITY`.
 3. **Local goal only.** The goal statement is to engage and defeat the enemy forces present in this battle. The regional win conditions, home regions, and territorial progress must not appear. A model told to win the region during a beat will disengage to chase territory it cannot reach from inside the footprint. Carries `BATTLE_FRAME`.
 4. **Sub-unit addressing.** Units in battle are sub-units, addressed as the parent unit id followed by a colon and a two-digit slot. Enemy sub-unit ids are legal target values. The parent strategic id is never a valid order target in a beat. Carries `SUBUNIT_IDENTITY`.
 5. **Full visibility.** Both sides see every sub-unit in the footprint, and the narrative states this. Fog affects the strategic snapshot, not the battle. The straight-hop distance caveat is not emitted in battle, because its gate requires the strategic resolution. Carries `BATTLE_FRAME`.
@@ -35,7 +35,7 @@ The battle-local goal from section 1.3, followed by a pointer to the rules below
 
 ### 2.4 Coordinate preamble
 
-Two paragraphs. First: the battle map is the enclosing strategic hex's tactical cells plus three neighboring rings, positions are two-character tactical codes taken from the map and the unit table, copied exactly and never invented, distances are tactical hex steps. Second: in the response, cells are tactical codes and target-unit values are enemy sub-unit ids; raw H3 strings and coordinate pairs are never emitted. Carries `HEX_IDENTITY`, `SUBUNIT_IDENTITY`.
+Two paragraphs. First: the battle map is the enclosing strategic hex's tactical cells plus up to three neighboring rings, cells beyond a regional map's edge are not part of the battle, positions are two-character tactical codes taken from the map and the unit table, copied exactly and never invented, distances are tactical hex steps. Second: in the response, cells are tactical codes and target-unit values are enemy sub-unit ids; raw H3 strings and coordinate pairs are never emitted. Carries `HEX_IDENTITY`, `SUBUNIT_IDENTITY`.
 
 ### 2.5 Combat and attack rules
 

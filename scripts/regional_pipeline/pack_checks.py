@@ -11,7 +11,14 @@ from typing import Any
 from scripts.naming_pipeline.naming_json_writers import SCHEMA_VERSION as NAMING_SCHEMA_VERSION
 from scripts.terrain_pipeline.metadata_models import TERRAIN_HEX_METADATA_SCHEMA_VERSION
 
-from .region_manifest import SIDE_GROUP_MANIFEST_SCHEMA_VERSION, RegionManifest, read_manifest
+from .economy_assignment import measure_region_economy
+from .region_manifest import (
+    ECONOMY_MANIFEST_SCHEMA_VERSION,
+    SIDE_GROUP_MANIFEST_SCHEMA_VERSION,
+    RegionManifest,
+    read_manifest,
+)
+from .regional_economy import balance_to_json, economy_to_json
 from .region_paths import REGIONS_ROOT, RegionPaths
 
 LOGGER = logging.getLogger(__name__)
@@ -174,6 +181,7 @@ def check_region_pack(region_id: str, root: Path = REGIONS_ROOT) -> list[CheckRe
     results.extend(_sides_results(paths.road_rail_sides_t, manifest, tactical_cells))
     results.extend(_vector_results(paths.road_rail_vectors_t))
     results.extend(_side_group_results(paths))
+    results.extend(_economy_results(paths, region_id, root))
     return results
 
 
@@ -334,14 +342,15 @@ def _side_group_results(paths: RegionPaths) -> list[CheckResult]:
     When to use:
         From ``check_region_pack``.
     What to expect:
-        FAIL when the manifest is not schema 1.1.0, a group has no land hex, or the origin file is missing.
+        FAIL when the manifest is not schema 1.1.0 or 1.2.0, a group has no land hex, or the origin file is missing.
         Does not read tactical metadata.
     """
 
     LOGGER.debug("_side_group_results path=%s.", paths.manifest)
     document = json.loads(paths.manifest.read_text(encoding="utf-8"))
-    if document.get("schema_version") != SIDE_GROUP_MANIFEST_SCHEMA_VERSION:
-        return [CheckResult(paths.manifest.name, "FAIL", "schema_version is not 1.1.0")]
+    accepted = {SIDE_GROUP_MANIFEST_SCHEMA_VERSION, ECONOMY_MANIFEST_SCHEMA_VERSION}
+    if document.get("schema_version") not in accepted:
+        return [CheckResult(paths.manifest.name, "FAIL", "schema_version is not 1.1.0 or 1.2.0")]
     groups = document.get("side_groups") or []
     if not groups:
         return [CheckResult(paths.manifest.name, "FAIL", "side_groups missing")]
@@ -368,3 +377,40 @@ def _side_group_results(paths: RegionPaths) -> list[CheckResult]:
     if origin.get("region_id") != document.get("region_id") or not origin.get("records"):
         return [CheckResult(paths.origin_units_t.name, "FAIL", "origin records missing")]
     return [CheckResult("side-groups", "PASS", f"{len(groups)} groups, {land} land hexes")]
+
+
+def _economy_results(paths: RegionPaths, region_id: str, root: Path) -> list[CheckResult]:
+    """
+    Why this exists:
+        Require the stored economy and side-group balance to match a fresh measurement.
+    When to use:
+        From ``check_region_pack``, after the side-group check.
+    What to expect:
+        One result. The first failure stops the rest of these checks.
+    Exceptions:
+        ``ValueError`` from the measurement becomes one FAIL. Other exceptions propagate.
+    """
+
+    LOGGER.debug("_economy_results region=%s root=%s.", region_id, root)
+    document = json.loads(paths.manifest.read_text(encoding="utf-8"))
+    if document.get("schema_version") != ECONOMY_MANIFEST_SCHEMA_VERSION or "economy" not in document:
+        return [CheckResult("economy", "FAIL", "economy missing; run npm run regional:economy")]
+    try:
+        economy, balance, _measured = measure_region_economy(region_id, root)
+    except ValueError as exc:
+        LOGGER.error("Economy check failed for %s.", region_id, exc_info=True)
+        return [CheckResult("economy", "FAIL", str(exc))]
+    policy = document.get("scalerank_policy")
+    overlay_max = int(policy["urban_overlay_max"]) if isinstance(policy, dict) else 0
+    if document.get("economy") != economy_to_json(economy, overlay_max):
+        return [CheckResult("economy", "FAIL", "economy is stale; run npm run regional:economy")]
+    if document.get("side_group_balance") != balance_to_json(balance, 0.25):
+        return [CheckResult("economy", "FAIL", "side_group_balance is stale; run npm run regional:economy")]
+    if not balance.within_tolerance:
+        failing = ", ".join(
+            f"{group.group_id} {group.share * 100:.1f}% ({group.ratio_to_fair_share:.2f}x)"
+            for group in balance.groups
+            if not group.within_tolerance
+        )
+        return [CheckResult("economy", "FAIL", f"side groups out of balance: {failing}")]
+    return [CheckResult("economy", "PASS", "economy and side-group balance current")]

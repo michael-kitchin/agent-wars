@@ -37,9 +37,11 @@ LOGGER = logging.getLogger(__name__)
 # Schema written by footprint classification, before side groups are attached.
 MANIFEST_SCHEMA_VERSION: Final = "1.0.0"
 # Schemas a reader accepts. Side-group output uses 1.1.0.
-ACCEPTED_MANIFEST_SCHEMA_VERSIONS: Final = frozenset({"1.0.0", "1.1.0"})
+ACCEPTED_MANIFEST_SCHEMA_VERSIONS: Final = frozenset({"1.0.0", "1.1.0", "1.2.0"})
 # Schema required once side groups have been written.
 SIDE_GROUP_MANIFEST_SCHEMA_VERSION: Final = "1.1.0"
+# Schema written once economy and side-group balance are stored.
+ECONOMY_MANIFEST_SCHEMA_VERSION: Final = "1.2.0"
 
 
 @dataclass(frozen=True)
@@ -168,7 +170,7 @@ def read_manifest(path: Path) -> RegionManifest:
     try:
         document = json.loads(path.read_text(encoding="utf-8"))
         if document.get("schema_version") not in ACCEPTED_MANIFEST_SCHEMA_VERSIONS:
-            raise ValueError(f"{path}: schema_version must be 1.0.0 or 1.1.0.")
+            raise ValueError(f"{path}: schema_version must be 1.0.0, 1.1.0, or 1.2.0.")
         definition = region_by_id(str(document["region_id"]))
         if int(document["res_s"]) != definition.strategic_resolution or int(document["res_t"]) != definition.tactical_resolution:
             raise ValueError(f"{path}: resolutions do not match the catalog.")

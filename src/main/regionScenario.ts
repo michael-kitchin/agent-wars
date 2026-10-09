@@ -42,6 +42,20 @@ let cachedRegionHexesByName: Map<string, string[]> | null = null;
 let sideGroupHomes: { id: string; displayName: string; hexes: readonly string[] }[] | null = null;
 
 /**
+ * Lists the side groups installed for the current map.
+ *
+ * Purpose: A saved home name can be checked against the loaded groups without resolving hexes.
+ * When to use: While opening a saved regional match. Null means the global map.
+ * Expected outcome: A copy of each group's id and display name, or null when none are installed.
+ * Exceptions: None.
+ */
+export function installedSideGroups(): readonly { id: string; displayName: string }[] | null {
+  logTrace('regionScenario installedSideGroups', { groupCount: sideGroupHomes?.length ?? 0 });
+  if (!sideGroupHomes) return null;
+  return sideGroupHomes.map((group) => ({ id: group.id, displayName: group.displayName }));
+}
+
+/**
  * Installs regional side groups as the home areas for the current match.
  *
  * Purpose: Seeding and victory look up hexes by the group's id or display name.

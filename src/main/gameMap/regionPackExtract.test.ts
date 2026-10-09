@@ -143,6 +143,54 @@ test('a missing extracted JSON file is restored from the zip', () => {
   }
 });
 
+test('a cached pack whose manifest differs from the zip is extracted again', () => {
+  const regionId = 'sample_pack';
+  const { root, regionDirectory, userData } = makeRegionRoot(regionId);
+  const next = '{"schema_version":"1.2.0"}';
+  const zip = zipSync({ 'region_manifest.json': strToU8(next) });
+  fs.writeFileSync(path.join(regionDirectory, 'region_manifest.json.zip'), zip);
+  const cached = path.join(userData, 'generated-regions', regionId);
+  fs.mkdirSync(cached, { recursive: true });
+  fs.writeFileSync(path.join(cached, 'region_manifest.json'), '{"schema_version":"1.1.0"}');
+  fs.writeFileSync(path.join(cached, 'pack.ready'), '');
+  fs.writeFileSync(path.join(cached, 'keep.txt'), 'old');
+  setTerrainMetadataPathOverrideForTests(root);
+  setRegionPackUserDataRootForTests(userData);
+  try {
+    const extracted = regionPackDirectory(regionId);
+    assert.equal(extracted, cached);
+    assert.equal(fs.readFileSync(path.join(cached, 'region_manifest.json'), 'utf8'), next);
+    assert.equal(fs.existsSync(path.join(cached, 'keep.txt')), false);
+  } finally {
+    setTerrainMetadataPathOverrideForTests(null);
+    setRegionPackUserDataRootForTests(null);
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('a cached pack whose manifest matches the zip is reused', () => {
+  const regionId = 'sample_pack';
+  const { root, regionDirectory, userData } = makeRegionRoot(regionId);
+  const text = '{"schema_version":"1.2.0"}';
+  const zip = zipSync({ 'region_manifest.json': strToU8(text) });
+  fs.writeFileSync(path.join(regionDirectory, 'region_manifest.json.zip'), zip);
+  const cached = path.join(userData, 'generated-regions', regionId);
+  fs.mkdirSync(cached, { recursive: true });
+  fs.writeFileSync(path.join(cached, 'region_manifest.json'), text);
+  fs.writeFileSync(path.join(cached, 'pack.ready'), '');
+  fs.writeFileSync(path.join(cached, 'keep.txt'), 'stay');
+  setTerrainMetadataPathOverrideForTests(root);
+  setRegionPackUserDataRootForTests(userData);
+  try {
+    assert.equal(regionPackDirectory(regionId), cached);
+    assert.equal(fs.readFileSync(path.join(cached, 'keep.txt'), 'utf8'), 'stay');
+  } finally {
+    setTerrainMetadataPathOverrideForTests(null);
+    setRegionPackUserDataRootForTests(null);
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test('extracted repo JSON is used and a broken zip leaves no temp directory', () => {
   const regionId = 'sample_pack';
   const { root, regionDirectory, userData } = makeRegionRoot(regionId);

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import logging
 import sys
 from pathlib import Path
@@ -11,6 +12,15 @@ from scripts.terrain_pipeline.config import InputRasterSet
 from scripts.terrain_pipeline.logging_utils import configure_logging
 
 from .density_report import build_density_report, write_density_report
+from .economy_assignment import (
+    assign_region_economy,
+    format_balance_markdown,
+    format_economy_line,
+    format_economy_markdown,
+    format_failure_lines,
+)
+from .region_paths import REGIONAL_QA_DIR, REGIONS_ROOT, RegionPaths
+from .regional_economy import RegionalEconomy
 from .pack_checks import check_region_pack
 from .regional_steps import STEP_ORDER, RunOptions, run_region_steps
 from .footprint import classify_footprint, sweep_footprint_counts
@@ -19,7 +29,6 @@ from .member_geometry import load_admin_layers, validate_member_codes
 from .region_catalog import REGION_DEFINITIONS, all_region_ids, region_by_id
 from .origin_assignment import assign_region_origins
 from .region_manifest import build_manifest_document, write_manifest
-from .region_paths import REGIONAL_QA_DIR, REGIONS_ROOT, RegionPaths
 from .scalerank_policy import policy_for_tactical_resolution
 
 LOGGER = logging.getLogger(__name__)
@@ -79,6 +88,11 @@ def build_parser() -> argparse.ArgumentParser:
     origins_choice.add_argument("--region", type=str)
     origins_choice.add_argument("--all", action="store_true")
     origins.add_argument("--force", action="store_true", help="Rewrite a region that already has side groups.")
+    economy = sub.add_parser("economy", parents=[common], help="Write each map's economy and side-group balance.")
+    economy_choice = economy.add_mutually_exclusive_group(required=True)
+    economy_choice.add_argument("--region", type=str)
+    economy_choice.add_argument("--all", action="store_true")
+    economy.add_argument("--markdown", action="store_true", help="Also print economy and balance tables.")
     check = sub.add_parser("check", parents=[common], help="Check regional packs against their manifests.")
     check_choice = check.add_mutually_exclusive_group(required=True)
     check_choice.add_argument("--region", type=str)
@@ -245,6 +259,42 @@ def run_footprint(region_id: str | None, data_root: Path, sweep: str | None, wri
     return 0
 
 
+def run_economy(region_id: str | None, markdown: bool) -> int:
+    """
+    Why this exists:
+        Write economies and print the line the operator compares to the expected table.
+    When to use:
+        The economy subcommand.
+    What to expect:
+        One line per region. Balance failures still return 0. A raised region returns 1 after the rest run.
+    Exceptions:
+        None. ``ValueError`` from one region is logged and printed, then the loop continues.
+    """
+
+    LOGGER.debug("run_economy region=%s markdown=%s.", region_id, markdown)
+    region_ids = [region_id] if region_id else all_region_ids()
+    failed = False
+    written: list[tuple[str, RegionalEconomy]] = []
+    documents: list[tuple[str, dict[str, object]]] = []
+    for current_id in region_ids:
+        try:
+            economy_result, balance = assign_region_economy(current_id)
+            print(format_economy_line(current_id, economy_result, balance))
+            for line in format_failure_lines(balance):
+                print(line)
+            written.append((current_id, economy_result))
+            document = json.loads(RegionPaths.for_region(current_id).manifest.read_text(encoding="utf-8"))
+            documents.append((current_id, document))
+        except ValueError as exc:
+            failed = True
+            LOGGER.error("Economy failed for %s.", current_id, exc_info=True)
+            print(f"{current_id} ERROR {exc}")
+    if markdown and written:
+        print(format_economy_markdown(written))
+        print(format_balance_markdown(documents))
+    return 1 if failed else 0
+
+
 def main(argv: list[str] | None = None) -> int:
     """
     Why this exists:
@@ -312,6 +362,8 @@ def main(argv: list[str] | None = None) -> int:
                     print(f"{region_id} ERROR")
                     print(exc)
             return 1 if failed else 0
+        if args.command == "economy":
+            return run_economy(args.region, args.markdown)
         if args.command == "check":
             region_ids = [args.region] if args.region else all_region_ids()
             failed = False

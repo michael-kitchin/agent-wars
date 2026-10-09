@@ -81,7 +81,7 @@ export interface GameMapListCosts {
  *
  * Purpose: The dialog can show names, sides, and prices without loading tactical terrain.
  * When to use: The result of `game:listGameMaps`.
- * Expected outcome: Global has no side groups. Each regional row has its catalog costs.
+   * Expected outcome: Global has no side groups. Each regional row has the costs from that map's manifest.
  * Exceptions: None.
  */
 export interface GameMapListEntry {
@@ -117,7 +117,7 @@ export interface GameMapListEntry {
    *
    * Contract: Copied from the active rules column, not recomputed in the dialog.
    * When to use: The four cost labels.
-   * Expected outcome: The global or catalog prices.
+   * Expected outcome: The global prices, or the prices stored in that map's manifest.
    * Exceptions: None.
    */
   readonly costs: GameMapListCosts;

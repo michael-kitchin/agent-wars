@@ -149,7 +149,7 @@ export interface TacticalBattleSnapshot {
   /**
    * Playable tactical cells for this battle, in stable briefing-code order.
    *
-   * Contract: The enclosing hex's geometric tactical children plus three neighboring rings. A superset of those children.
+   * Contract: The enclosing hex's geometric tactical children plus three neighboring rings. A superset of those children. On a regional map's edge, margin cells whose strategic hex is not on the map are left out.
    * When to use: Movement, range, drawing, clicks, and the AI map.
    * Expected outcome: Non-empty for a successfully started battle.
    * Exceptions: None.

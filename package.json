@@ -49,6 +49,7 @@
     "regional:footprint": "python -m scripts.regional_pipeline.regional_cli footprint --all --write",
     "regional:generate": "python -m scripts.regional_pipeline.regional_cli run --all --skip-existing --verbose",
     "regional:check": "python -m scripts.regional_pipeline.regional_cli check --all",
+    "regional:economy": "python -m scripts.regional_pipeline.regional_cli economy --all",
     "regional:report": "python -m scripts.regional_pipeline.regional_cli report",
     "regional:zip": "node scripts/zip-regional-data.cjs",
     "regional:extract": "node scripts/extract-regional-data.cjs",

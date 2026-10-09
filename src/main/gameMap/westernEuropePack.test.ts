@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { test } from 'node:test';
 import { withGameMap } from '../../shared/activeGameMap';
+import { advancedTechMinUrbanCells, strategicUrbanCellsDestroyedPerHit, unitCostFor } from '../../shared/gameRules';
 import { isNeutralBorderHex } from '../../shared/h3Resolutions';
 import { setLoadedStrategicFootprint } from '../../shared/loadedStrategicFootprint';
 import { REGIONAL_RULES_BY_ID } from '../../shared/regionalRulesCatalog';
@@ -65,7 +66,8 @@ test('western europe pack matches its manifest', (t) => {
         displayName: manifest.displayName,
         strategicResolution: catalog.strategicResolution,
         tacticalResolution: catalog.tacticalResolution,
-        rules: catalog.rules,
+        controlWinMinUrbanShare: null,
+        rules: manifest.rules,
         scaleranks: manifest.scaleranks,
       },
       () => {
@@ -77,6 +79,9 @@ test('western europe pack matches its manifest', (t) => {
         assert.ok(metadata.records.length > 0);
         assert.ok(naming.records.length > 0);
         assert.ok(landmass.records.length > 0);
+        assert.equal(unitCostFor('infantry'), 60);
+        assert.equal(advancedTechMinUrbanCells(), 59);
+        assert.equal(strategicUrbanCellsDestroyedPerHit(), 26);
       }
     );
     const tacticalPath = path.join(directory, 'terrain_res_t_metadata.json');

@@ -108,7 +108,7 @@ export function regionalPackJsonFiles(): readonly string[] {
  *
  * Purpose: A previous play of this region should not unpack the zips again.
  * When to use: After the repo JSON was not found.
- * Expected outcome: The directory when the marker, the manifest, and every JSON file that has a zip are present. Null when the extract is missing or a shipped JSON file was removed.
+ * Expected outcome: The directory when the marker, the manifest, and every JSON file that has a zip are present, and the cached manifest text matches the zip. Null when the extract is missing, a shipped JSON file was removed, or the manifest text differs.
  * Exceptions: None.
  */
 function readyUserDataDirectory(regionId: string, zipDirectory: string | null): string | null {
@@ -121,6 +121,14 @@ function readyUserDataDirectory(regionId: string, zipDirectory: string | null): 
   if (zipDirectory && !extractedJsonMatchesZips(directory, zipDirectory)) {
     logDebug('regionPackExtract readyUserDataDirectory: incomplete extract', { regionId });
     return null;
+  }
+  const manifestZip = zipDirectory ? path.join(zipDirectory, 'region_manifest.json.zip') : null;
+  if (manifestZip && fs.existsSync(manifestZip)) {
+    const cachedText = fs.readFileSync(path.join(directory, 'region_manifest.json'), 'utf8');
+    if (cachedText !== regionManifestTextFromZip(manifestZip)) {
+      logDebug('regionPackExtract readyUserDataDirectory: manifest changed', { regionId });
+      return null;
+    }
   }
   return directory;
 }

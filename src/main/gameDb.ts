@@ -8,8 +8,11 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import Database from 'better-sqlite3';
+import { activeGameMap } from '../shared/activeGameMap';
 import { ensureGameMapLoaded, setGameMapLoadError } from './gameMap/loadGameMap';
 import { REGIONAL_RULES_BY_ID, type RegionalGameMapId } from '../shared/regionalRulesCatalog';
+import { installedSideGroups } from './regionScenario';
+import { loadScenarioState, REGION_VS_REGION_SCENARIO_ID, type ScenarioStateSnapshot } from './gameDb/scenarioState';
 import type { GameMapId } from '../shared/gameMapTypes';
 import { logDebug, logError, logTrace } from './logger';
 import { closeDbHandle, gameDbOps, getAll, getOne, hasDbHandle, run, setDbHandle } from './gameDb/dbConnection';
@@ -321,8 +324,36 @@ function loadStoredGameMap(): boolean {
     return false;
   }
   ensureGameMapLoaded(id);
+  if (id !== 'global') assertStoredSideGroupsExist();
   setGameMapLoadError(null);
   return true;
+}
+
+/**
+ * Rejects a saved regional match whose home groups are no longer on the map.
+ *
+ * Purpose: An old save must fail with a clear message instead of resolving a dead name through the global naming cache.
+ * When to use: After a regional pack has been installed. The default reader loads the scenario from the open database. Tests pass a stub.
+ * Expected outcome: Returns when side groups are not installed, the scenario is not region-versus-region, or each stored home matches an installed id or display name.
+ * Exceptions: Throws when a stored home matches neither an installed id nor a display name.
+ */
+export function assertStoredSideGroupsExist(
+  readScenario: () => Pick<ScenarioStateSnapshot, 'scenarioId' | 'humanHomeRegion' | 'aiHomeRegion'> = () =>
+    loadScenarioState({ getOne: dbGetOne })
+): void {
+  logDebug('gameDb assertStoredSideGroupsExist');
+  const groups = installedSideGroups();
+  if (!groups) return;
+  const scenario = readScenario();
+  if (scenario.scenarioId !== REGION_VS_REGION_SCENARIO_ID) return;
+  const stored = [scenario.humanHomeRegion, scenario.aiHomeRegion];
+  const missing = stored.filter((name) => !groups.some((group) => group.id === name || group.displayName === name));
+  if (missing.length === 0) return;
+  const err = new Error(
+    `This saved ${activeGameMap().displayName} game uses side groups that no longer exist. Start a new game.`
+  );
+  logError('gameDb assertStoredSideGroupsExist', { missing, err });
+  throw err;
 }
 
 /**

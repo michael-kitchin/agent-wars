@@ -2,7 +2,7 @@ import { logDebug, logError, logTrace } from '../logger';
 import { resetActiveGameMap, setActiveGameMap } from '../../shared/activeGameMap';
 import type { GameMapId, GameMapProfile } from '../../shared/gameMapTypes';
 import { setLoadedStrategicFootprint } from '../../shared/loadedStrategicFootprint';
-import { REGIONAL_RULES_BY_ID, type RegionalGameMapId } from '../../shared/regionalRulesCatalog';
+import { REGIONAL_CONTROL_WIN_MIN_URBAN_SHARE, REGIONAL_RULES_BY_ID, type RegionalGameMapId } from '../../shared/regionalRulesCatalog';
 import { clearTerrainClassificationCache, ensureTerrainClassificationCacheLoaded, isTerrainClassificationCacheLoaded } from '../terrainClassificationCache';
 import { setActiveTerrainPackDirectory } from '../terrainMetadataPaths';
 import { clearWeatherPackCache } from '../weather/weatherPackLoad';
@@ -177,7 +177,8 @@ function installRegionalPack(id: RegionalGameMapId): void {
     displayName: manifest.displayName,
     strategicResolution: catalog.strategicResolution,
     tacticalResolution: catalog.tacticalResolution,
-    rules: catalog.rules,
+    controlWinMinUrbanShare: REGIONAL_CONTROL_WIN_MIN_URBAN_SHARE,
+    rules: manifest.rules,
     scaleranks: manifest.scaleranks,
   };
   setActiveTerrainPackDirectory(directory);

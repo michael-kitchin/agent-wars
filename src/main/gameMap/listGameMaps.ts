@@ -38,7 +38,7 @@ export function listGameMaps(): GameMapListEntry[] {
     try {
       const manifest = readListedRegionManifest(path.join(root, name.name));
       if (!manifest) continue;
-      const rules = REGIONAL_RULES_BY_ID[regionId].rules;
+      const rules = manifest.rules;
       const sideGroups = [...manifest.sideGroups].sort((a, b) => a.displayName.localeCompare(b.displayName));
       rows.push({
         id: regionId,

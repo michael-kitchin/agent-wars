@@ -1,7 +1,7 @@
 import * as fs from 'fs';
-import { logDebug, logError } from '../logger';
+import { logDebug, logError, logTrace } from '../logger';
 import { pathCandidates } from '../terrainMetadataPaths';
-import type { GameMapScaleranks } from '../../shared/gameMapTypes';
+import type { GameMapScaleranks, GameRules } from '../../shared/gameMapTypes';
 
 /**
  * One strategic hex recorded on a region manifest.
@@ -75,7 +75,7 @@ export interface RegionManifestSideGroup {
  *
  * Purpose: List and load share one parse and do not read tactical JSON.
  * When to use: `listGameMaps` and `ensureGameMapLoaded`.
- * Expected outcome: Schema 1.1.0 or newer, with resolutions, hexes, and side groups.
+ * Expected outcome: Schema 1.2.0 or newer, with resolutions, economy, hexes, and side groups.
  * Exceptions: None.
  */
 export interface RegionManifest {
@@ -142,6 +142,15 @@ export interface RegionManifest {
    * Exceptions: None.
    */
   readonly sideGroups: readonly RegionManifestSideGroup[];
+  /**
+   * Costs, build gates, and strike size from the manifest economy.
+   *
+   * Contract: Armor is twice infantry, naval is five times, and air is three times.
+   * When to use: The profile's `rules`.
+   * Expected outcome: Positive integers parsed from `economy`.
+   * Exceptions: None.
+   */
+  readonly rules: GameRules;
 }
 
 /**
@@ -165,8 +174,8 @@ export function resolveGeneratedRegionsDirectory(): string | null {
  *
  * Purpose: The dialog and the loader need the same hex and side lists.
  * When to use: With the absolute path of `region_manifest.json`.
- * Expected outcome: A parsed manifest. Schema older than 1.1.0 throws.
- * Exceptions: Throws when the file is missing, unreadable, or not a 1.1.0 manifest.
+ * Expected outcome: A parsed manifest. Schema older than 1.2.0 throws.
+ * Exceptions: Throws when the file is missing, unreadable, or older than schema 1.2.0.
  */
 export function readRegionManifest(manifestPath: string): RegionManifest {
   logDebug('regionManifestRead readRegionManifest', { manifestPath });
@@ -185,8 +194,8 @@ export function readRegionManifest(manifestPath: string): RegionManifest {
  *
  * Purpose: The start screen can read a zipped manifest without writing the whole pack.
  * When to use: After reading `region_manifest.json` or inflating that member from its zip.
- * Expected outcome: A parsed manifest. Schema older than 1.1.0 throws.
- * Exceptions: Throws when the text is not JSON or is not a 1.1.0 manifest.
+ * Expected outcome: A parsed manifest. Schema older than 1.2.0 throws.
+ * Exceptions: Throws when the text is not JSON, older than schema 1.2.0, or has an invalid economy.
  */
 export function readRegionManifestText(text: string, label: string): RegionManifest {
   logDebug('regionManifestRead readRegionManifestText', { label });
@@ -202,8 +211,10 @@ export function readRegionManifestText(text: string, label: string): RegionManif
   }
   const document = parsed as Record<string, unknown>;
   const schema = document.schema_version;
-  if (typeof schema !== 'string' || schema < '1.1.0') {
-    throw new Error(`${label}: schema_version must be 1.1.0 or newer`);
+  if (typeof schema !== 'string' || compareManifestSchemaVersion(schema, '1.2.0') < 0) {
+    const err = new Error(`${label}: regional pack is out of date (schema ${String(schema)}); run npm run regional:economy`);
+    logError('regionManifestRead readRegionManifestText: out of date', { label, schema, err });
+    throw err;
   }
   const regionId = requiredString(document.region_id, label, 'region_id');
   const displayName = requiredString(document.display_name, label, 'display_name');
@@ -229,7 +240,115 @@ export function readRegionManifestText(text: string, label: string): RegionManif
     },
     hexes,
     sideGroups,
+    rules: parseEconomy(document.economy, label),
   };
+}
+
+/**
+ * Orders two manifest schema versions as dot-separated integers.
+ *
+ * Purpose: `"1.10.0"` is newer than `"1.2.0"`, which a string compare gets wrong.
+ * When to use: Before accepting a manifest. The floor for a playable pack is `1.2.0`.
+ * Expected outcome: A negative number when `a` is older, zero when equal, and a positive number when `a` is newer.
+ * Exceptions: Throws when a component is not an integer.
+ */
+export function compareManifestSchemaVersion(a: string, b: string): number {
+  logTrace('regionManifestRead compareManifestSchemaVersion', { a, b });
+  let left: number[];
+  let right: number[];
+  try {
+    left = schemaComponents(a);
+    right = schemaComponents(b);
+  } catch (err) {
+    logError('regionManifestRead compareManifestSchemaVersion', { a, b, err });
+    throw err;
+  }
+  const length = Math.max(left.length, right.length);
+  for (let index = 0; index < length; index += 1) {
+    const difference = (left[index] ?? 0) - (right[index] ?? 0);
+    if (difference !== 0) return difference < 0 ? -1 : 1;
+  }
+  return 0;
+}
+
+/**
+ * Splits a schema version into integers.
+ *
+ * Purpose: Numeric comparison needs one integer per dot.
+ * When to use: From `compareManifestSchemaVersion`.
+ * Expected outcome: One non-negative integer per component.
+ * Exceptions: Throws when a component is empty or not an integer.
+ */
+function schemaComponents(version: string): number[] {
+  return version.split('.').map((part) => {
+    if (!/^[0-9]+$/.test(part)) {
+      throw new Error(`schema component is not an integer: ${part}`);
+    }
+    return Number(part);
+  });
+}
+
+/**
+ * Reads the economy block into game rules.
+ *
+ * Purpose: Regional prices come from the manifest, not a copied table.
+ * When to use: From `readRegionManifestText`.
+ * Expected outcome: A `GameRules` object. The balance block is ignored.
+ * Exceptions: Throws when a field is not a positive integer or a cost ratio is wrong.
+ */
+function parseEconomy(value: unknown, label: string): GameRules {
+  logTrace('regionManifestRead parseEconomy', { label });
+  if (!value || typeof value !== 'object') {
+    failEconomy(label, `${label}: economy must be an object`);
+  }
+  const economy = value as Record<string, unknown>;
+  const infantryCost = positiveInteger(economy.infantry_cost, label, 'infantry_cost');
+  const armorCost = positiveInteger(economy.armor_cost, label, 'armor_cost');
+  const navalCost = positiveInteger(economy.naval_cost, label, 'naval_cost');
+  const airCost = positiveInteger(economy.air_cost, label, 'air_cost');
+  if (armorCost !== infantryCost * 2) failEconomy(label, `${label}: economy.armor_cost must be 2 × infantry_cost`);
+  if (navalCost !== infantryCost * 5) failEconomy(label, `${label}: economy.naval_cost must be 5 × infantry_cost`);
+  if (airCost !== infantryCost * 3) failEconomy(label, `${label}: economy.air_cost must be 3 × infantry_cost`);
+  return {
+    infantryCost,
+    armorCost,
+    navalCost,
+    airCost,
+    armorMinUrbanCells: positiveInteger(economy.armor_min_urban_cells, label, 'armor_min_urban_cells'),
+    airMinUrbanCells: positiveInteger(economy.air_min_urban_cells, label, 'air_min_urban_cells'),
+    navalMinUrbanCells: positiveInteger(economy.naval_min_urban_cells, label, 'naval_min_urban_cells'),
+    advancedMinUrbanCells: positiveInteger(economy.advanced_min_urban_cells, label, 'advanced_min_urban_cells'),
+    strategicStrikeUrbanCells: positiveInteger(economy.strategic_strike_urban_cells, label, 'strategic_strike_urban_cells'),
+  };
+}
+
+/**
+ * Reads one positive integer from the economy block.
+ *
+ * Purpose: Costs and gates are stored as integers.
+ * When to use: From `parseEconomy`.
+ * Expected outcome: An integer greater than zero.
+ * Exceptions: Throws when the value is missing, fractional, or not positive.
+ */
+function positiveInteger(value: unknown, label: string, field: string): number {
+  if (typeof value !== 'number' || !Number.isInteger(value) || value <= 0) {
+    failEconomy(label, `${label}: economy.${field} must be a positive integer`);
+  }
+  return value;
+}
+
+/**
+ * Logs an economy mistake and throws it.
+ *
+ * Purpose: A bad manifest must be visible in the log before the caller sees the throw.
+ * When to use: From `parseEconomy` and `positiveInteger`.
+ * Expected outcome: Does not return.
+ * Exceptions: Always throws `message`.
+ */
+function failEconomy(label: string, message: string): never {
+  const err = new Error(message);
+  logError('regionManifestRead parseEconomy', { label, err });
+  throw err;
 }
 
 /**

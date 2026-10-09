@@ -26,6 +26,7 @@ from scripts.terrain_pipeline.sampling import cell_polygon
 
 from .member_geometry import _resolve_field_names, _to_wgs84, _xy_transform
 from .region_catalog import region_by_id
+from .region_manifest import ECONOMY_MANIFEST_SCHEMA_VERSION
 from .region_models import HexRole, RegionDefinition
 from .region_paths import REGIONAL_QA_DIR, RegionPaths
 from .side_group_catalog import (
@@ -38,8 +39,8 @@ from .side_group_catalog import (
 
 LOGGER = logging.getLogger(__name__)
 
-# Manifest versions this step can read. The step writes 1.1.0.
-_READABLE_SCHEMAS = frozenset({"1.0.0", "1.1.0"})
+# Manifest versions this step can read. The step writes 1.1.0 and drops a stored economy.
+_READABLE_SCHEMAS = frozenset({"1.0.0", "1.1.0", ECONOMY_MANIFEST_SCHEMA_VERSION})
 _WRITTEN_SCHEMA = "1.1.0"
 _ORIGIN_SCHEMA = "1.0.0"
 
@@ -304,7 +305,8 @@ def assign_region_origins(region_id: str, data_root: Path, *, force: bool = Fals
     When to use:
         After the footprint manifest exists. Safe to repeat.
     What to expect:
-        Skips a region whose manifest is already schema 1.1.0 unless ``force`` is set.
+        Skips a region whose manifest is already schema 1.1.0 or 1.2.0 unless ``force`` is set.
+        Rewriting side groups clears the economy and balance.
         Land hex counts per group are returned. A group with no land hex, or a land hex with no group, raises.
     Exceptions:
         ``ValueError`` when the manifest is missing, the schema is unknown, or the groups do not partition land hexes.
@@ -317,8 +319,12 @@ def assign_region_origins(region_id: str, data_root: Path, *, force: bool = Fals
         raise ValueError(f"{paths.manifest} is missing.")
     document = json.loads(paths.manifest.read_text(encoding="utf-8"))
     if document.get("schema_version") not in _READABLE_SCHEMAS:
-        raise ValueError(f"{paths.manifest}: schema_version must be 1.0.0 or 1.1.0.")
-    if document.get("schema_version") == _WRITTEN_SCHEMA and paths.origin_units_t.is_file() and not force:
+        raise ValueError(f"{paths.manifest}: schema_version must be 1.0.0, 1.1.0, or 1.2.0.")
+    if (
+        document.get("schema_version") in {_WRITTEN_SCHEMA, ECONOMY_MANIFEST_SCHEMA_VERSION}
+        and paths.origin_units_t.is_file()
+        and not force
+    ):
         LOGGER.info("Skipping %s; side groups are already written.", region_id)
         return _group_counts(document)
 
@@ -424,6 +430,8 @@ def assign_region_origins(region_id: str, data_root: Path, *, force: bool = Fals
         group_id = hex_groups.get(str(entry["h3_index"]))
         if group_id is not None:
             entry["side_group_id"] = group_id
+    document.pop("economy", None)
+    document.pop("side_group_balance", None)
     document["schema_version"] = _WRITTEN_SCHEMA
     document["side_groups"] = [
         {"id": rule.group_id, "display_name": rule.display_name, "land_hex_count": group_counts[rule.group_id]}

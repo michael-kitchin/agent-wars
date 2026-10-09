@@ -167,7 +167,7 @@ Assessment-tool and combat-estimate hints must **not** appear when a precomputed
 ### 1.7 `# Scenario Objective (Required)`
 
 - **Include:** when the scenario is the region-versus-region scenario. **Omit** for a missing or unrecognised scenario, and do not substitute region wording.
-- **Content:** the scenario id; own home region name when present; enemy home region name when present; the two win paths, control of every enemy home cell or elimination of all enemy home urban production; and the statement that both home outlines are always visible.
+- **Content:** the scenario id; own home region name when present; enemy home region name when present; the two win paths; and the statement that both home outlines are always visible. On a regional map the control path is enemy-home hexes that together hold at least 75% of that home's original urban cells, and two progress lines follow the win block: enemy-home urban cells in hexes you control, and your-home urban cells in hexes the enemy controls. On the global map the control path is every enemy home hex. The other path is elimination of all enemy home urban production.
 - **Items:** `SCENARIO_ID`, `HOME_REGION_NAMES`, `WIN_CONDITIONS`, `HOME_REGION_VISIBILITY`.
 - **Model use:** identifies which cells are worth taking and which must be held.
 
@@ -180,7 +180,7 @@ Bullets in this order.
 3. **Message guidance**: one in-character line at the human player, psychological warfare only, revealing no orders, cells, ids, or intent.
 4. **Explored** progress: own explored land cells against total land cells.
 5. **Controlled** progress: own controlled land cells against total land cells.
-6. **Home-region bullets**, when the scenario supplies home regions: own home control, own home cells when the two regions are not the same set, control of the enemy home region, enemy home cells when the sets differ, and the shared-cell line when the regions intersect.
+6. **Home-region bullets**, when the scenario supplies home regions: own home control, own home cells when the two regions are not the same set, control of the enemy home region, enemy home cells when the sets differ, and the shared-cell line when the regions intersect. Those hex counts are territory. On a regional map the control-win test is the urban-cell share in the scenario objective.
 
 - **Items:** `EXPLORED_CONTROLLED_PROGRESS`, `HOME_CONTROL_PROGRESS`, `HOME_REGION_HEXES`, `HOME_REGION_OVERLAP`, `MESSAGE_DISCIPLINE`.
 - **Include:** always; bullets 4 through 6 are gated as stated.

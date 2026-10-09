@@ -176,7 +176,7 @@ function buildRegionalPreview(gameMapId: string, humanSideGroupId: string, aiSid
   return {
     gameMapId,
     strategicResolution: grid.strategicResolution,
-    advancedMinUrbanCells: catalog.rules.advancedMinUrbanCells,
+    advancedMinUrbanCells: manifest.rules.advancedMinUrbanCells,
     extent: regionalExtent(grid.hexes.map((hex) => hex.h3Index)),
     hexes: grid.hexes,
     humanHomeRegionHexes: sideGroupLand(manifest, humanSideGroupId),

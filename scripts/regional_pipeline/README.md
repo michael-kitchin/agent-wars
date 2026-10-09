@@ -1,10 +1,10 @@
 # Regional Packs
 
-The game loads one of these packs when a regional match starts. They are the 23 maps in `data/region-summary-1.md`. The manifest carries side groups and origin units. A packaged app ships `*.json.zip` and extracts one region the first time it is played.
+The game loads one of these packs when a regional match starts. They are the 23 maps in `doc/region-summary-1.md`. The manifest carries side groups, origin units, and the economy. A packaged app ships `*.json.zip` and extracts one region the first time it is played. Only the zips are tracked; never run `regional:extract` with unzipped manifest edits.
 
 Each region is a directory under `data/generated/regions/<region_id>/`:
 
-- `region_manifest.json` lists the strategic cells and the role of each cell (`land`, `sea`, or `neutral_border`). It also lists `side_groups` and `origin_units`.
+- `region_manifest.json` lists the strategic cells and the role of each cell (`land`, `sea`, or `neutral_border`). Schema 1.2.0 also lists `side_groups`, `origin_units`, `economy`, and `side_group_balance`. The economy block is the map's prices, gates, and strike size, measured against a frozen global baseline. Each side group's urban share must sit within ±25% of an equal share. Rewriting side groups with the origins step clears both blocks.
 - `terrain_res_t_origin_units.json` maps each tactical land cell to an origin unit id.
 - `terrain_res_s_metadata.json` and `terrain_res_t_metadata.json` are strategic and tactical terrain.
 - `terrain_res_s_naming.json` and `terrain_res_t_naming.json` are the matching names. City rows are only in the tactical file.
@@ -45,9 +45,11 @@ From the repository root, with Natural Earth and the rasters in `F:/Data`:
 1. `npm run regional:validate`
 2. `npm run regional:footprint`
 3. `npm run regional:generate`
-4. `npm run regional:check`
-5. `npm run regional:report`
-6. `npm run regional:zip`
+4. `python -m scripts.regional_pipeline.regional_cli origins --all`
+5. `npm run regional:economy`
+6. `npm run regional:check`
+7. `npm run regional:report`
+8. `npm run regional:zip`
 
 `regional:generate` skips a step whose output is already complete, so it can be run again after an interruption. A tactical metadata file is complete only when its record count matches the full child set. `regional:extract` restores JSON from the regional archives. These commands are not part of `build`, `start`, or the global `generated:*` scripts.
 

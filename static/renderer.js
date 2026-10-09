@@ -3772,6 +3772,7 @@
     displayName: "Global",
     strategicResolution: 1,
     tacticalResolution: 4,
+    controlWinMinUrbanShare: null,
     rules: {
       infantryCost: 20,
       armorCost: 40,
@@ -19397,10 +19398,15 @@ ${bonuses}`;
   var footprint = null;
   var footprintSet = null;
   var hexRoles = null;
+  var footprintVersion = 0;
   function setLoadedStrategicFootprint(hexes, roles) {
     footprint = hexes ? [...hexes] : null;
     footprintSet = hexes ? new Set(hexes) : null;
     hexRoles = hexes && roles ? new Map(roles) : null;
+    footprintVersion += 1;
+  }
+  function loadedStrategicFootprintVersion() {
+    return footprintVersion;
   }
   function loadedStrategicFootprint() {
     return footprint ? [...footprint] : null;
@@ -21219,10 +21225,11 @@ ${bonuses}`;
   }
   function buildTacticalBattleFootprint(enclosingStrategicH3Index) {
     const coreChildH3Indexes = Object.freeze([...tacticalChildrenOf(enclosingStrategicH3Index)]);
-    const cells = /* @__PURE__ */ new Set();
+    const coreSet = new Set(coreChildH3Indexes);
+    const cells = new Set(coreChildH3Indexes);
     for (const cell of coreChildH3Indexes) {
       for (const near of gridDisk(cell, TACTICAL_BATTLE_MARGIN_RINGS)) {
-        cells.add(near);
+        if (coreSet.has(near) || isOnMap(strategicParentOf(near))) cells.add(near);
       }
     }
     const h3Indexes = Object.freeze(sortCellsForStableLlmCodes([...cells]));
@@ -21230,7 +21237,7 @@ ${bonuses}`;
     return { coreChildH3Indexes, h3Indexes, codeByH3 };
   }
   function tacticalBattleFootprint(enclosingStrategicH3Index) {
-    const key = `${strategicH3Resolution()}:${tacticalH3Resolution()}:${enclosingStrategicH3Index}`;
+    const key = `${activeGameMap().id}:${strategicH3Resolution()}:${tacticalH3Resolution()}:${loadedStrategicFootprintVersion()}:${enclosingStrategicH3Index}`;
     const cached = footprintByKey.get(key);
     if (cached) return cached;
     const built = buildTacticalBattleFootprint(enclosingStrategicH3Index);

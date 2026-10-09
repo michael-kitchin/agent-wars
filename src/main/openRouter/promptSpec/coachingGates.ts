@@ -117,4 +117,13 @@ export interface CoachingGates {
    * Exceptions: None.
    */
   readonly includeScenarioWinPaths: boolean;
+  /**
+   * Urban share the control win is using, when this consultation is regional.
+   *
+   * Contract: A number selects the urban-share coaching bullet. Null or absent keeps the every-hex bullet.
+   * When to use: Set from the same effective share the winner used. Do not read the active map here.
+   * Expected outcome: Absent on the global map and in tactical mode.
+   * Exceptions: None.
+   */
+  readonly controlWinMinUrbanShare?: number | null;
 }

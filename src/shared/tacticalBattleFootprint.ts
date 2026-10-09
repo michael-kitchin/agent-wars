@@ -3,14 +3,15 @@
  *
  * Purpose: Movement, drawing, and briefing codes share one frozen list, while placement and destruction stay on the children.
  * When to use: Snapshot build, city labels, and tooltip codes. Callers already hold the enclosing strategic hex.
- * Expected outcome: The same frozen record for one hex until the active map profile changes.
+ * Expected outcome: The same frozen record for one hex until the active map profile or the loaded footprint changes. A normal hexagon has 607 entries when all six neighboring strategic hexes are on the map. On a regional map's edge, margin cells whose strategic hex is not on the map are left out.
  * Exceptions: Throws the H3 library's error when the enclosing index is not a cell. This module does not log; label painting calls it per cell.
  */
 
 import { gridDisk } from 'h3-js';
-import { registerActiveGameMapReset } from './activeGameMap';
+import { activeGameMap, registerActiveGameMapReset } from './activeGameMap';
 import { indexToCode, sortCellsForStableLlmCodes } from './hexLlmCodeAssignment';
 import { strategicH3Resolution, strategicParentOf, tacticalChildrenOf, tacticalH3Resolution } from './h3Resolutions';
+import { isOnMap, loadedStrategicFootprintVersion } from './loadedStrategicFootprint';
 
 /**
  * Extra tactical rings around the enclosing hex's own children.
@@ -45,7 +46,7 @@ export type TacticalBattleFootprint = {
    *
    * Purpose: Briefing codes, pathfinding, and the map share one sequence.
    * When to use: The battle's playable list.
-   * Expected outcome: A frozen array. A normal hexagon has 607 entries.
+   * Expected outcome: A frozen array. A normal hexagon has 607 entries when all six neighboring strategic hexes are on the map. On a regional map's edge, margin cells whose strategic hex is not on the map are left out.
    * Exceptions: None.
    */
   readonly h3Indexes: readonly string[];
@@ -100,15 +101,16 @@ function frozenCodeMap(entries: Iterable<readonly [string, string]>): ReadonlyMa
  *
  * Purpose: The cache stores this record. Callers must not rebuild the rings themselves.
  * When to use: The first lookup for a cache key.
- * Expected outcome: Frozen arrays. Every core cell is in the footprint because `gridDisk` includes its center.
+ * Expected outcome: Frozen arrays. Every core cell is kept. A margin cell is kept only when its strategic parent is on the loaded map. Codes are assigned after that filter, so they stay contiguous.
  * Exceptions: Throws the H3 library's error when `enclosingStrategicH3Index` is not a cell.
  */
 function buildTacticalBattleFootprint(enclosingStrategicH3Index: string): TacticalBattleFootprint {
   const coreChildH3Indexes = Object.freeze([...tacticalChildrenOf(enclosingStrategicH3Index)]);
-  const cells = new Set<string>();
+  const coreSet = new Set<string>(coreChildH3Indexes);
+  const cells = new Set<string>(coreChildH3Indexes);
   for (const cell of coreChildH3Indexes) {
     for (const near of gridDisk(cell, TACTICAL_BATTLE_MARGIN_RINGS)) {
-      cells.add(near);
+      if (coreSet.has(near) || isOnMap(strategicParentOf(near))) cells.add(near);
     }
   }
   const h3Indexes = Object.freeze(sortCellsForStableLlmCodes([...cells]));
@@ -125,7 +127,7 @@ function buildTacticalBattleFootprint(enclosingStrategicH3Index: string): Tactic
  * Exceptions: Throws the H3 library's error when `enclosingStrategicH3Index` is not a cell.
  */
 export function tacticalBattleFootprint(enclosingStrategicH3Index: string): TacticalBattleFootprint {
-  const key = `${strategicH3Resolution()}:${tacticalH3Resolution()}:${enclosingStrategicH3Index}`;
+  const key = `${activeGameMap().id}:${strategicH3Resolution()}:${tacticalH3Resolution()}:${loadedStrategicFootprintVersion()}:${enclosingStrategicH3Index}`;
   const cached = footprintByKey.get(key);
   if (cached) return cached;
   const built = buildTacticalBattleFootprint(enclosingStrategicH3Index);
@@ -153,7 +155,7 @@ export function tacticalBattleHexCode(
  *
  * Purpose: A margin cell keeps its own tactical kind. A missing row uses the geometric parent's kind when that hex is loaded, then the enclosing hex's kind.
  * When to use: Snapshot build, terrain refresh, battle painting, and the battle tooltip. Pass kinds already loaded. This function does not read the database.
- * Expected outcome: One kind per cell. The parent lookup runs only for a cell with no tactical kind.
+ * Expected outcome: One kind per cell. The parent-then-enclosing fallback covers an on-map cell with no tactical row. Off-map cells are left out of the footprint before this function runs.
  * Exceptions: An invalid cell id skips the parent lookup and uses the enclosing kind. Does not log.
  */
 export function tacticalBattleTerrainKindByCell(args: {

@@ -173,7 +173,7 @@ Scope is `strategic`, `tactical`, `both`, or `consult-only`. Status is `required
 | Id | Meaning | Engine source | Visibility | Jobs | Scope | Status |
 | --- | --- | --- | --- | --- | --- | --- |
 | `SCENARIO_ID` | Which scenario is running | `state.scenarioId` | n/a | 1 | strategic | conditional — `scenarioId` present |
-| `WIN_CONDITIONS` | Control every enemy home hex, or eliminate all enemy home urban production | `evaluateRegionControlWinnerAtEndOfTurn` | n/a | 1 | strategic | conditional — `scenarioId === 'region_vs_region'` |
+| `WIN_CONDITIONS` | On a regional map, control enemy-home hexes holding at least 75% of that home's original urban cells, or eliminate all enemy home urban production. On the global map, control every enemy home hex | `evaluateRegionControlWinnerAtEndOfTurn` | n/a | 1 | strategic | conditional — `scenarioId === 'region_vs_region'` |
 | `HOME_REGION_NAMES` | Own and enemy home region names | `aiHomeRegion`, `humanHomeRegion` | n/a | 1 | strategic | conditional — names present |
 | `HOME_REGION_HEXES` | The cells that make up each home region | `aiHomeRegionHexes`, `humanHomeRegionHexes` | force-visible | 1 | strategic | conditional — `scenarioId === 'region_vs_region'` |
 | `HOME_REGION_OVERLAP` | Cells belonging to both home regions | `computeHomeRegionHexPartitionsForPrompting.intersection` | force-visible | 14 | strategic | conditional — `intersection.length > 0` |

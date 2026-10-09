@@ -9,6 +9,7 @@
 
 import { PRODUCTION_CAP_QUEUE_GUIDANCE } from '../../productionCaps';
 import { logTrace } from '../../logger';
+import { regionalWinPathsBullet } from '../scenarioGoals';
 import {
   buildCasualtySortRule,
   buildDestinationOccupancyRule,
@@ -43,7 +44,13 @@ ${MESSAGE_BLOCK}`;
 export function buildStrategicCoachingBullets(gates: CoachingGates): readonly string[] {
   logTrace('promptSpec buildStrategicCoachingBullets', { ...gates });
   const bullets: string[] = [];
-  if (gates.includeScenarioWinPaths) bullets.push(WIN_PATHS_BULLET);
+  if (gates.includeScenarioWinPaths) {
+    bullets.push(
+      typeof gates.controlWinMinUrbanShare === 'number'
+        ? regionalWinPathsBullet(gates.controlWinMinUrbanShare)
+        : WIN_PATHS_BULLET
+    );
+  }
   bullets.push(RESOLUTION_ORDER_BULLET, tempoBullet(gates.hasAirUnits));
   if (gates.ordersEnabled) bullets.push(`- ${buildHoldFireRule()}`);
   bullets.push(`- ${buildCasualtySortRule()}`);

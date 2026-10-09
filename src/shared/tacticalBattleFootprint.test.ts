@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import { getPentagons, gridDisk, gridDistance } from 'h3-js';
 import { GLOBAL_GAME_MAP, withGameMap } from './activeGameMap';
 import { strategicCellAt, strategicParentOf, tacticalChildrenOf } from './h3Resolutions';
+import { setLoadedStrategicFootprint } from './loadedStrategicFootprint';
 import { tacticalBattleFootprint, tacticalBattleHexCode } from './tacticalBattleFootprint';
 
 const GLOBAL_FIXTURE = '81263ffffffffff';
@@ -88,6 +89,42 @@ test('a resolution 3 hexagon has the same 343 and 607 footprint', () => {
     const footprint = tacticalBattleFootprint(strategic);
     assert.equal(footprint.coreChildH3Indexes.length, 343);
     assert.equal(footprint.h3Indexes.length, 607);
+  });
+});
+
+test('a regional edge keeps only margin cells whose strategic hex is on the map', () => {
+  const profile = {
+    ...GLOBAL_GAME_MAP,
+    strategicResolution: 3,
+    tacticalResolution: 6,
+  };
+  withGameMap(profile, () => {
+    const enclosing = strategicCellAt(12, 34);
+    const neighbors = gridDisk(enclosing, 1).filter((cell) => cell !== enclosing);
+    const oneNeighbor = neighbors[0];
+    if (!oneNeighbor) throw new Error('enclosing hex has no neighbor');
+    try {
+      setLoadedStrategicFootprint([enclosing]);
+      const coreOnly = tacticalBattleFootprint(enclosing);
+      assert.equal(coreOnly.h3Indexes.length, 343);
+      assert.deepEqual(new Set(coreOnly.h3Indexes), new Set(coreOnly.coreChildH3Indexes));
+
+      setLoadedStrategicFootprint(gridDisk(enclosing, 1));
+      const full = tacticalBattleFootprint(enclosing);
+      assert.equal(full.h3Indexes.length, 607);
+
+      setLoadedStrategicFootprint([enclosing, oneNeighbor]);
+      const partial = tacticalBattleFootprint(enclosing);
+      assert.ok(partial.h3Indexes.length > 343);
+      assert.ok(partial.h3Indexes.length < 607);
+      for (const cell of partial.h3Indexes) {
+        const parent = strategicParentOf(cell);
+        assert.ok(parent === enclosing || parent === oneNeighbor);
+      }
+      assert.notEqual(partial, full);
+    } finally {
+      setLoadedStrategicFootprint(null);
+    }
   });
 });
 

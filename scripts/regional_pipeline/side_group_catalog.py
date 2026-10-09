@@ -1,9 +1,8 @@
 """Side groups and origin levels for the 23 regional maps.
 
-Membership follows the origin column and side-group names in the region summary.
-Coordinate splits use province centroids. Named splits use Natural Earth region,
-region_sub, or iso_3166_2. The catalog does not adjust membership to match the
-summary's estimated hex counts.
+Membership is balanced on the packs' urban counts to within ±25% of an equal share,
+and regional:check enforces this. Coordinate splits use province centroids. Named
+splits use Natural Earth region, region_sub, or iso_3166_2.
 """
 
 from __future__ import annotations
@@ -153,10 +152,9 @@ def _rule(group_id: str, display_name: str, **kwargs: object) -> SideGroupRule:
     return SideGroupRule(group_id=group_id, display_name=display_name, **kwargs)  # type: ignore[arg-type]
 
 
-_EAST_CHINA = "east_china_taiwan"
+_SOUTH_EAST_CHINA = "south_east_china_taiwan"
 _NORTH_CHINA = "north_northwest_china_mongolia"
 _KOREA = "korea_manchuria"
-_SOUTH_CHINA = "south_southwest_china"
 _SOUTH_GERMANY = "southern_eastern_germany_austria_switzerland"
 _NORTH_GERMANY = "netherlands_northern_germany"
 _SOUTH_FRANCE = "southern_france"
@@ -166,15 +164,17 @@ _NORTH_FRANCE = "northern_france_belgium"
 SIDE_GROUP_RULES: Final[dict[str, tuple[SideGroupRule, ...]]] = {
     "eastern_asia": (
         _rule("japan", "Japan", countries=frozenset({"JPN"})),
-        _rule(_KOREA, "Korea & Manchuria", countries=frozenset({"PRK", "KOR"})),
-        _rule(_KOREA, "Korea & Manchuria", regions=_regions("CHN", "Northeast China")),
-        _rule(_NORTH_CHINA, "North & northwest China, Mongolia", countries=frozenset({"MNG"})),
-        _rule(_NORTH_CHINA, "North & northwest China, Mongolia", regions=_regions("CHN", "North China", "Northwest China")),
-        _rule(_EAST_CHINA, "East China & Taiwan", countries=frozenset({"TWN", "HKG", "MAC"})),
-        _rule(_EAST_CHINA, "East China & Taiwan", regions=_regions("CHN", "East China")),
-        _rule(_EAST_CHINA, "East China & Taiwan", countries=frozenset({"CHN"}), missing_region=True, lat_min=23.500001),
-        _rule(_SOUTH_CHINA, "South & southwest China", regions=_regions("CHN", "South Central China", "Southwest China")),
-        _rule(_SOUTH_CHINA, "South & southwest China", countries=frozenset({"CHN"}), missing_region=True),
+        _rule(_KOREA, "Korea, Manchuria & Inner Mongolia", countries=frozenset({"PRK", "KOR"})),
+        _rule(_KOREA, "Korea, Manchuria & Inner Mongolia", iso_codes=frozenset({"CN-NM"})),
+        _rule(_KOREA, "Korea, Manchuria & Inner Mongolia", regions=_regions("CHN", "Northeast China")),
+        _rule(_NORTH_CHINA, "North China, the northwest & Mongolia", iso_codes=frozenset({"CN-SD", "CN-HA"})),
+        _rule(_NORTH_CHINA, "North China, the northwest & Mongolia", countries=frozenset({"MNG"})),
+        _rule(_NORTH_CHINA, "North China, the northwest & Mongolia", regions=_regions("CHN", "North China", "Northwest China")),
+        _rule(_SOUTH_EAST_CHINA, "South & east China, Taiwan", countries=frozenset({"TWN", "HKG", "MAC"})),
+        _rule(_SOUTH_EAST_CHINA, "South & east China, Taiwan", regions=_regions(
+            "CHN", "East China", "South Central China", "Southwest China",
+        )),
+        _rule(_SOUTH_EAST_CHINA, "South & east China, Taiwan", countries=frozenset({"CHN"}), missing_region=True),
     ),
     "western_europe": (
         _rule(_SOUTH_GERMANY, "Southern & eastern Germany, Austria, Switzerland", iso_codes=frozenset({
@@ -196,13 +196,26 @@ SIDE_GROUP_RULES: Final[dict[str, tuple[SideGroupRule, ...]]] = {
         _rule(_NORTH_FRANCE, "Northern France & Belgium", countries=frozenset({"BEL", "LUX"})),
     ),
     "southern_europe": (
-        _rule("iberia", "Iberia", countries=frozenset({"ESP", "PRT", "AND", "GIB"})),
-        _rule("northern_italy", "Northern Italy", regions=_regions(
-            "ITA", "Piemonte", "Valle d'Aosta", "Lombardia", "Liguria", "Trentino-Alto Adige",
-            "Veneto", "Friuli-Venezia Giulia", "Emilia-Romagna",
+        _rule("portugal_western_spain", "Portugal & western Spain", countries=frozenset({"PRT", "GIB"})),
+        _rule("portugal_western_spain", "Portugal & western Spain", regions=_regions(
+            "ESP", "Galicia", "Asturias", "Cantabria", "Castilla y León", "Extremadura", "Andalucía", "Madrid",
         )),
-        _rule("central_southern_italy", "Central & southern Italy", countries=frozenset({"ITA", "SMR", "VAT", "MLT"})),
-        _rule("balkans_greece", "Balkans & Greece", countries=frozenset({
+        _rule("eastern_spain", "Eastern Spain", countries=frozenset({"ESP", "AND"})),
+        _rule("northwestern_italy", "Northwestern Italy", regions=_regions(
+            "ITA", "Piemonte", "Valle d'Aosta", "Lombardia", "Liguria", "Emilia-Romagna",
+        )),
+        _rule("venetia_balkans_greece", "Venetia, the Balkans & Greece", regions=_regions(
+            "ITA", "Veneto", "Friuli-Venezia Giulia", "Trentino-Alto Adige",
+        )),
+        _rule("southern_italy", "Southern Italy", regions=_regions(
+            "ITA", "Apulia", "Campania", "Sicily", "Calabria", "Basilicata", "Abruzzo", "Molise",
+        )),
+        _rule("southern_italy", "Southern Italy", countries=frozenset({"MLT"})),
+        _rule("central_italy", "Central Italy", regions=_regions(
+            "ITA", "Toscana", "Lazio", "Umbria", "Marche", "Sardegna",
+        )),
+        _rule("central_italy", "Central Italy", countries=frozenset({"SMR", "VAT"})),
+        _rule("venetia_balkans_greece", "Venetia, the Balkans & Greece", countries=frozenset({
             "ALB", "BIH", "HRV", "GRC", "KOS", "MKD", "MNE", "SRB", "SVN",
         })),
     ),
@@ -218,10 +231,13 @@ SIDE_GROUP_RULES: Final[dict[str, tuple[SideGroupRule, ...]]] = {
         _rule("pakistan_afghanistan", "Pakistan & Afghanistan", countries=frozenset({"PAK", "AFG"})),
     ),
     "northern_america": (
+        _rule("northeast_quebec_maritimes", "Northeast, Mid-Atlantic, Quebec & Maritimes", iso_codes=frozenset({
+            "US-MD", "US-DE", "US-WV", "US-DC",
+        })),
         _rule("south_atlantic", "South Atlantic", region_subs=_subs("USA", "South Atlantic")),
         _rule("south_central", "South Central", region_subs=_subs("USA", "West South Central", "East South Central")),
         _rule("great_lakes_ontario", "Great Lakes & Ontario", region_subs=_subs("USA", "East North Central") | _subs("CAN", "Ontario")),
-        _rule("northeast_quebec_maritimes", "Northeast, Quebec & Maritimes", region_subs=_subs(
+        _rule("northeast_quebec_maritimes", "Northeast, Mid-Atlantic, Quebec & Maritimes", region_subs=_subs(
             "USA", "New England", "Middle Atlantic",
         ) | _subs("CAN", "Quebec", "Atlantic Canada")),
         _rule("mountain_plains_prairies", "Mountain, Plains & Prairies", region_subs=_subs(
@@ -230,28 +246,35 @@ SIDE_GROUP_RULES: Final[dict[str, tuple[SideGroupRule, ...]]] = {
         _rule("pacific_british_columbia", "Pacific & British Columbia", region_subs=_subs("USA", "Pacific") | _subs("CAN", "British Columbia")),
     ),
     "southern_asia_east": (
+        _rule("south_india_sri_lanka", "South India, Chhattisgarh & Sri Lanka", iso_codes=frozenset({"IN-CT"})),
+        _rule("north_east_india", "North & East India, Bangladesh, Nepal, Bhutan", iso_codes=frozenset({"IN-UT"})),
         _rule("west_india", "West India", regions=_regions("IND", "West")),
         _rule("central_india", "Central India", regions=_regions("IND", "Central")),
-        _rule("south_india_sri_lanka", "South India & Sri Lanka", regions=_regions("IND", "South")),
-        _rule("south_india_sri_lanka", "South India & Sri Lanka", countries=frozenset({"LKA"})),
+        _rule("south_india_sri_lanka", "South India, Chhattisgarh & Sri Lanka", regions=_regions("IND", "South")),
+        _rule("south_india_sri_lanka", "South India, Chhattisgarh & Sri Lanka", countries=frozenset({"LKA"})),
         _rule("north_east_india", "North & East India, Bangladesh, Nepal, Bhutan", regions=_regions(
             "IND", "North", "Northeast", "East",
         )),
         _rule("north_east_india", "North & East India, Bangladesh, Nepal, Bhutan", countries=frozenset({"BGD", "NPL", "BTN", "IND", "KAS"})),
     ),
     "central_asia": (
-        _rule("eastern_uzbekistan", "Eastern Uzbekistan", countries=frozenset({"UZB"}), lon_min=67.500001),
+        _rule("kazakhstan_northern_kyrgyzstan", "Kazakhstan & northern Kyrgyzstan", iso_codes=frozenset({
+            "KG-C", "KG-Y", "KG-T", "KG-GB",
+        })),
+        _rule("kazakhstan_northern_kyrgyzstan", "Kazakhstan & northern Kyrgyzstan", countries=frozenset({"KAZ", "KAB"})),
+        _rule("tashkent_ferghana_tajikistan", "Tashkent, Ferghana & Tajikistan", countries=frozenset({"UZB"}), lon_min=67.500001),
         _rule("western_uzbekistan_turkmenistan", "Western Uzbekistan & Turkmenistan", countries=frozenset({"UZB", "TKM"})),
-        _rule("kazakhstan", "Kazakhstan", countries=frozenset({"KAZ"})),
-        _rule("kyrgyzstan_tajikistan", "Kyrgyzstan & Tajikistan", countries=frozenset({"KGZ", "TJK", "KAB"})),
+        _rule("tashkent_ferghana_tajikistan", "Tashkent, Ferghana & Tajikistan", countries=frozenset({"KGZ", "TJK"})),
     ),
     "central_america": (
         _rule("nw_mexico", "NW Mexico", iso_codes=frozenset({
-            "MX-SON", "MX-BCN", "MX-BCS", "MX-CHH", "MX-SIN", "MX-COA", "MX-DUR", "MX-ZAC", "MX-NAY",
+            "MX-SON", "MX-BCN", "MX-BCS", "MX-CHH", "MX-SIN", "MX-COA", "MX-DUR", "MX-NAY",
         })),
-        _rule("ne_mexico", "NE Mexico", iso_codes=frozenset({"MX-TAM", "MX-NLE", "MX-SLP"})),
-        _rule("central_mexico_bajio", "Central Mexico & Bajio", iso_codes=frozenset({
-            "MX-AGU", "MX-GUA", "MX-QUE", "MX-HID", "MX-MEX", "MX-DIF", "MX-MOR", "MX-PUE", "MX-TLA", "MX-JAL", "MX-MIC", "MX-COL",
+        _rule("ne_mexico_bajio", "NE Mexico & the Bajio", iso_codes=frozenset({
+            "MX-TAM", "MX-NLE", "MX-SLP", "MX-HID", "MX-QUE", "MX-GUA", "MX-ZAC", "MX-AGU",
+        })),
+        _rule("central_western_mexico", "Central & western Mexico", iso_codes=frozenset({
+            "MX-MEX", "MX-DIF", "MX-MOR", "MX-PUE", "MX-TLA", "MX-JAL", "MX-MIC", "MX-COL",
         })),
         _rule("southern_mexico_isthmus", "Southern Mexico & the isthmus", countries=frozenset({
             "MEX", "BLZ", "CRI", "GTM", "HND", "NIC", "PAN", "SLV",
@@ -268,8 +291,8 @@ SIDE_GROUP_RULES: Final[dict[str, tuple[SideGroupRule, ...]]] = {
         })),
     ),
     "southern_africa": (
-        _rule("gauteng", "Gauteng", iso_codes=frozenset({"ZA-GT"})),
-        _rule("highveld", "Highveld", iso_codes=frozenset({"ZA-FS", "ZA-NW", "ZA-MP", "ZA-LP"})),
+        _rule("gauteng_limpopo", "Gauteng & Limpopo", iso_codes=frozenset({"ZA-GT", "ZA-LP"})),
+        _rule("highveld", "Highveld", iso_codes=frozenset({"ZA-FS", "ZA-NW", "ZA-MP"})),
         _rule("east", "East", iso_codes=frozenset({"ZA-NL", "ZA-EC"})),
         _rule("cape_neighbours", "Cape & neighbours", countries=frozenset({"ZAF", "NAM", "BWA", "LSO", "SWZ"})),
     ),
@@ -277,74 +300,95 @@ SIDE_GROUP_RULES: Final[dict[str, tuple[SideGroupRule, ...]]] = {
         _rule("libya", "Libya", countries=frozenset({"LBY"})),
         _rule("lower_egypt", "Lower Egypt", iso_codes=frozenset({
             "EG-DK", "EG-SHR", "EG-IS", "EG-DT", "EG-KFS", "EG-BH", "EG-ALX", "EG-C", "EG-MNF", "EG-KB",
-            "EG-GH", "EG-PTS", "EG-GZ", "EG-FYM", "EG-SUZ", "EG-SIN", "EG-JS",
+            "EG-GH", "EG-PTS", "EG-GZ", "EG-FYM", "EG-SUZ", "EG-SIN", "EG-JS", "EG-MT",
         })),
         _rule("upper_egypt_sudan", "Upper Egypt & Sudan", countries=frozenset({"EGY", "SDN", "BRT"})),
     ),
     "maghreb": (
         _rule("morocco", "Morocco", countries=frozenset({"MAR", "SAH"})),
-        _rule("algeria", "Algeria", countries=frozenset({"DZA"})),
-        _rule("tunisia", "Tunisia", countries=frozenset({"TUN"})),
+        _rule("tunisia_eastern_algeria", "Tunisia & eastern Algeria", iso_codes=frozenset({
+            "DZ-04", "DZ-05", "DZ-07", "DZ-12", "DZ-18", "DZ-19", "DZ-21",
+            "DZ-23", "DZ-24", "DZ-25", "DZ-36", "DZ-40", "DZ-41", "DZ-43",
+        })),
+        _rule("western_central_algeria", "Western & central Algeria", countries=frozenset({"DZA"})),
+        _rule("tunisia_eastern_algeria", "Tunisia & eastern Algeria", countries=frozenset({"TUN"})),
     ),
     "west_africa_coast": (
-        _rule("southwest_nigeria", "Southwest Nigeria", iso_codes=frozenset({
-            "NG-LA", "NG-OG", "NG-OY", "NG-OS", "NG-ON", "NG-EK",
+        _rule("western_nigeria", "Western Nigeria", iso_codes=frozenset({
+            "NG-LA", "NG-OG", "NG-OY", "NG-OS", "NG-ON", "NG-EK", "NG-ED", "NG-KW",
         })),
-        _rule("rest_of_nigeria", "Rest of Nigeria", countries=frozenset({"NGA"})),
+        _rule("northern_eastern_nigeria", "Northern & eastern Nigeria", countries=frozenset({"NGA"})),
+        _rule("western_ghana_to_senegal", "Western Ghana to Senegal", iso_codes=frozenset({"GH-WP"})),
         _rule("ghana_togo_benin", "Ghana, Togo & Benin", countries=frozenset({"GHA", "TGO", "BEN"})),
-        _rule("cote_divoire_to_senegal", "Cote d'Ivoire to Senegal", countries=frozenset({
+        _rule("western_ghana_to_senegal", "Western Ghana to Senegal", countries=frozenset({
             "CIV", "SEN", "SLE", "BFA", "GIN", "GNB", "GMB", "LBR",
         })),
     ),
     "eastern_europe": (
+        _rule("central_northwestern_russia", "Central & northwestern Russia", iso_codes=frozenset({
+            "RU-VOR", "RU-NIZ", "RU-KIR", "RU-PNZ", "RU-MO", "RU-CU", "RU-ME",
+        })),
+        _rule("ukraine_belarus_lower_danube", "Ukraine, Belarus, Moldova, Romania & Bulgaria", iso_codes=frozenset({"UA-43", "UA-40"})),
         _rule("volga_russia", "Volga Russia", regions=_regions("RUS", "Volga")),
         _rule("urals_siberia_far_east", "Urals, Siberia & Far East", regions=_regions("RUS", "Urals", "Siberian", "Far Eastern")),
         _rule("central_northwestern_russia", "Central & northwestern Russia", regions=_regions("RUS", "Central", "Northwestern")),
-        _rule("ukraine_belarus_moldova", "Ukraine, Belarus & Moldova", countries=frozenset({"UKR", "BLR", "MDA"})),
-        _rule("central_europe_danube", "Central Europe & the Danube", countries=frozenset({
-            "POL", "CZE", "SVK", "HUN", "ROU", "BGR",
+        _rule("ukraine_belarus_lower_danube", "Ukraine, Belarus, Moldova, Romania & Bulgaria", countries=frozenset({
+            "UKR", "BLR", "MDA", "ROU", "BGR",
         })),
+        _rule("central_europe", "Poland, Czechia, Slovakia & Hungary", countries=frozenset({"POL", "CZE", "SVK", "HUN"})),
     ),
     "south_america": (
         _rule("southeast_brazil", "Southeast Brazil", iso_codes=frozenset({
-            "BR-SP", "BR-RJ", "BR-MG", "BR-ES", "BR-PR", "BR-SC", "BR-RS",
+            "BR-SP", "BR-RJ", "BR-ES", "BR-PR", "BR-SC", "BR-RS",
         })),
-        _rule("rest_of_brazil", "Rest of Brazil", countries=frozenset({"BRA"})),
-        _rule("river_plate", "River Plate", countries=frozenset({"ARG", "URY", "PRY", "SPI"})),
-        _rule("andes", "Andes", countries=frozenset({"CHL", "BOL", "PER", "ECU"})),
-        _rule("venezuela_colombia_guianas", "Venezuela, Colombia & Guianas", countries=frozenset({
-            "VEN", "COL", "GUY", "SUR", "FRA", "BRI",
+        _rule("venezuela_colombia_ecuador_guianas", "Venezuela, Colombia, Ecuador & the Guianas", iso_codes=frozenset({"BR-RR", "BR-AP"})),
+        _rule("central_northern_brazil_paraguay", "Central & northern Brazil, Paraguay", countries=frozenset({"BRA", "PRY"})),
+        _rule("argentina_uruguay", "Argentina & Uruguay", countries=frozenset({"ARG", "URY", "SPI"})),
+        _rule("andes", "Chile, Bolivia & Peru", countries=frozenset({"CHL", "BOL", "PER"})),
+        _rule("venezuela_colombia_ecuador_guianas", "Venezuela, Colombia, Ecuador & the Guianas", countries=frozenset({
+            "VEN", "COL", "ECU", "GUY", "SUR", "FRA", "BRI",
         })),
     ),
     "south_eastern_asia": (
-        _rule("thailand_myanmar", "Thailand & Myanmar", countries=frozenset({"THA", "MMR"})),
+        _rule("central_thailand", "Central Thailand", regions=_regions("THA", "Central", "Western", "Eastern")),
+        _rule("myanmar_northern_thailand_indochina", "Myanmar, northern Thailand & Indochina", regions=_regions(
+            "THA", "Northern", "Northeastern",
+        )),
+        _rule("malaysia_southern_thailand_philippines", "Malaysia, southern Thailand, Brunei & the Philippines", regions=_regions(
+            "THA", "Southern",
+        )),
         _rule("indonesia_timor", "Indonesia & Timor-Leste", countries=frozenset({"IDN", "TLS"})),
-        _rule("malaysia_singapore_brunei", "Malaysia, Singapore & Brunei", countries=frozenset({"MYS", "SGP", "BRN"})),
-        _rule("philippines", "Philippines", countries=frozenset({"PHL"})),
-        _rule("indochina", "Indochina", countries=frozenset({"KHM", "LAO", "VNM"})),
+        _rule("malaysia_southern_thailand_philippines", "Malaysia, southern Thailand, Brunei & the Philippines", countries=frozenset({
+            "MYS", "SGP", "BRN", "PHL",
+        })),
+        _rule("myanmar_northern_thailand_indochina", "Myanmar, northern Thailand & Indochina", countries=frozenset({
+            "MMR", "KHM", "LAO", "VNM",
+        })),
     ),
     "caribbean": (
-        _rule("puerto_rico_virgin_islands", "Puerto Rico & Virgin Is.", countries=frozenset({"PRI", "VIR", "VGB"})),
+        _rule("puerto_rico_leeward_islands", "Puerto Rico & the Leeward Islands", countries=frozenset({
+            "PRI", "VIR", "VGB", "AIA", "KNA", "ATG", "MSR", "BLM", "MAF", "SXM",
+        })),
         _rule("hispaniola", "Hispaniola", countries=frozenset({"DOM", "HTI"})),
-        _rule("jamaica_bahamas", "Jamaica & Bahamas", countries=frozenset({"JAM", "BHS"})),
-        _rule("cuba", "Cuba", countries=frozenset({"CUB"})),
-        _rule("lesser_antilles_trinidad", "Lesser Antilles & Trinidad", countries=frozenset({
-            "AIA", "ATG", "BRB", "CYM", "DMA", "GRD", "KNA", "LCA", "MSR", "TTO", "TCA", "VCT",
-            "ABW", "CUW", "SXM", "MAF", "BLM", "FRA", "NLD", "USG", "SER", "BJN",
+        _rule("cuba_jamaica_bahamas", "Cuba, Jamaica & the Bahamas", countries=frozenset({
+            "CUB", "JAM", "BHS", "CYM", "TCA", "USG", "SER", "BJN",
+        })),
+        _rule("southern_antilles_trinidad", "Southern Antilles & Trinidad", countries=frozenset({
+            "BRB", "DMA", "GRD", "LCA", "TTO", "VCT", "ABW", "CUW", "FRA", "NLD",
         })),
     ),
     "australia_new_zealand": (
         _rule("tasman", "Tasman (Victoria, Tasmania, NZ)", iso_codes=frozenset({"AU-VIC", "AU-TAS"})),
         _rule("tasman", "Tasman (Victoria, Tasmania, NZ)", countries=frozenset({"NZL"})),
-        _rule("west_south", "West & South (WA, SA, NT)", iso_codes=frozenset({"AU-WA", "AU-SA", "AU-NT"})),
         _rule("new_south_wales_act", "New South Wales & ACT", iso_codes=frozenset({"AU-NSW", "AU-ACT", "AU-X02~"})),
-        _rule("queensland", "Queensland", iso_codes=frozenset({"AU-QLD"})),
+        _rule("north_west_australia", "Queensland, NT, WA & SA", iso_codes=frozenset({"AU-QLD", "AU-WA", "AU-SA", "AU-NT"})),
     ),
     "middle_africa_north": (
         _rule("northern_cameroon_chad", "Northern Cameroon & Chad", iso_codes=frozenset({"CM-EN", "CM-NO", "CM-AD"})),
         _rule("northern_cameroon_chad", "Northern Cameroon & Chad", countries=frozenset({"TCD"})),
-        _rule("southern_cameroon", "Southern Cameroon", countries=frozenset({"CMR"})),
-        _rule("gabon_equatorial_guinea", "Gabon & Equatorial Guinea", countries=frozenset({"GAB", "GNQ"})),
+        _rule("gulf_of_guinea_coast", "Gabon, Equatorial Guinea & coastal Cameroon", iso_codes=frozenset({"CM-LT", "CM-SU"})),
+        _rule("central_western_cameroon", "Central & western Cameroon", countries=frozenset({"CMR"})),
+        _rule("gulf_of_guinea_coast", "Gabon, Equatorial Guinea & coastal Cameroon", countries=frozenset({"GAB", "GNQ"})),
         _rule("central_african_republic", "Central African Republic", countries=frozenset({"CAF"})),
     ),
     "middle_africa_south": (
@@ -359,10 +403,13 @@ SIDE_GROUP_RULES: Final[dict[str, tuple[SideGroupRule, ...]]] = {
         _rule("zimbabwe", "Zimbabwe", countries=frozenset({"ZWE"})),
     ),
     "horn_and_great_lakes": (
+        _rule("red_sea_somali_coast", "Eritrea, Tigray, Djibouti & the Somali lands", iso_codes=frozenset({
+            "ET-SO", "ET-AF", "ET-DD", "ET-TI",
+        })),
         _rule("ethiopia", "Ethiopia", countries=frozenset({"ETH"})),
         _rule("kenya", "Kenya", countries=frozenset({"KEN"})),
         _rule("great_lakes_south_sudan", "Great Lakes & South Sudan", countries=frozenset({"UGA", "BDI", "RWA", "SDS"})),
-        _rule("red_sea_somali_coast", "Red Sea & Somali coast", countries=frozenset({"ERI", "DJI", "SOM", "SOL"})),
+        _rule("red_sea_somali_coast", "Eritrea, Tigray, Djibouti & the Somali lands", countries=frozenset({"ERI", "DJI", "SOM", "SOL"})),
     ),
 }
 

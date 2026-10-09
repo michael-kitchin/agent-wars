@@ -30,6 +30,16 @@ let footprintSet: ReadonlySet<string> | null = null;
 let hexRoles: ReadonlyMap<string, string> | null = null;
 
 /**
+ * Generation of the loaded footprint.
+ *
+ * Purpose: Battle-footprint cache keys include it, so a cache built for one footprint is never reused for another.
+ * When to use: `setLoadedStrategicFootprint` increments it. Readers use `loadedStrategicFootprintVersion`.
+ * Expected outcome: Starts at 0 and increases by one on every install, including a null footprint.
+ * Exceptions: None.
+ */
+let footprintVersion = 0;
+
+/**
  * Remembers the loaded map's strategic hexes and their roles.
  *
  * Purpose: Seeding, snapshots, and hex codes walk this list instead of the whole Earth.
@@ -44,6 +54,19 @@ export function setLoadedStrategicFootprint(
   footprint = hexes ? [...hexes] : null;
   footprintSet = hexes ? new Set(hexes) : null;
   hexRoles = hexes && roles ? new Map(roles) : null;
+  footprintVersion += 1;
+}
+
+/**
+ * Returns the generation of the loaded footprint.
+ *
+ * Purpose: Cache keys include it, so a cache built for one footprint is never reused for another.
+ * When to use: When a cache key must change after `setLoadedStrategicFootprint`, including a call with null.
+ * Expected outcome: A number that increases by one on every install. This module does not log.
+ * Exceptions: None.
+ */
+export function loadedStrategicFootprintVersion(): number {
+  return footprintVersion;
 }
 
 /**

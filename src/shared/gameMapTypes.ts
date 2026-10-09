@@ -44,7 +44,7 @@ export interface GameRules {
   /**
    * Purchase cost of one infantry unit.
    *
-   * Contract: The regional catalog scales this from the global cost of 20.
+   * Contract: The global cost is 20. A regional map uses the number in its manifest economy.
    * When to use: Production spending and prompt cost sentences.
    * Expected outcome: A positive integer.
    * Exceptions: None.
@@ -80,7 +80,7 @@ export interface GameRules {
   /**
    * Urban cells required before armor can be built.
    *
-   * Contract: The global gate is 2. Regional maps use the catalog minimum.
+   * Contract: The global gate is 2. A regional map uses the minimum in its manifest economy.
    * When to use: `getAvailableBuildUnitTypes` and the build prompt.
    * Expected outcome: A positive integer. Infantry stays gated at 1 and is not stored here.
    * Exceptions: None.
@@ -107,7 +107,7 @@ export interface GameRules {
   /**
    * Urban cells required before a side is Advanced.
    *
-   * Contract: The global threshold is 21. Regional maps use the catalog value.
+   * Contract: The global threshold is 21. A regional map uses the value in its manifest economy.
    * When to use: Tech bonus checks and the Advanced prompt sentence.
    * Expected outcome: A positive integer.
    * Exceptions: None.
@@ -116,7 +116,7 @@ export interface GameRules {
   /**
    * Urban cells removed by one strategic air strike.
    *
-   * Contract: The global cap is 9. A regional map uses max(1, round(9 times its scale)).
+   * Contract: The global cap is 9. A regional map uses the strike size in its manifest economy.
    * When to use: The strategic branch of infrastructure destruction.
    * Expected outcome: A positive integer. A tactical strike still removes one named cell.
    * Exceptions: None.
@@ -217,11 +217,20 @@ export interface GameMapProfile {
    */
   readonly tacticalResolution: number;
   /**
+   * Urban share required for a regional control win.
+   *
+   * Contract: `null` means a control win needs every enemy home hex. A number means the controlled enemy home hexes must hold at least that share of the enemy home's generated urban cells.
+   * When to use: End-of-turn victory and the regional win sentence.
+   * Expected outcome: `null` on the global map. `0.75` on a regional map.
+   * Exceptions: None.
+   */
+  readonly controlWinMinUrbanShare: number | null;
+  /**
    * Economy and strike numbers for this map.
    *
    * Contract: Costs and gates change with the map. Battle ranges do not.
    * When to use: Production, tech, and strategic air-strike damage.
-   * Expected outcome: The global column, or one regional catalog row.
+   * Expected outcome: The global column, or the economy block of the loaded regional manifest.
    * Exceptions: None.
    */
   readonly rules: GameRules;
@@ -230,7 +239,7 @@ export interface GameMapProfile {
    *
    * Contract: Regional maps can show smaller cities from the same metadata fields.
    * When to use: Classification and city labels.
-   * Expected outcome: The global maxima, or the regional maxima from the catalog.
+   * Expected outcome: The global maxima, or the scalerank maxima from the loaded regional manifest.
    * Exceptions: None.
    */
   readonly scaleranks: GameMapScaleranks;

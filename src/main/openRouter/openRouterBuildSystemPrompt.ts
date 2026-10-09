@@ -30,7 +30,8 @@ import {
 } from '../navalMovementMessages';
 import { getFilteredToolMetadata } from './openRouterToolCatalog';
 import { getToolFlags } from './openRouterToolGroups';
-import { logDebug } from '../logger';
+import { getRegionHomeControlProgressForPrompt } from '../gameActions/regionControlWinner';
+import { logDebug, logError } from '../logger';
 import type { CoordinateContext } from '../briefing/map/coordinateContext';
 import { h3ToCode } from '../briefing/map/hexCodeTranslator';
 import { SECTION_TITLE_AVAILABLE_TOOLS, SECTION_TITLE_BEST_OPTIONS_THIS_TURN, topLevelHeading } from './promptSpec/sectionHeadings';
@@ -111,6 +112,16 @@ export function buildSystemPromptForTools(
     state.scenarioId === 'region_vs_region' && coordinateContext.mode !== 'tactical'
       ? computeHomeRegionHexPartitionsForPrompting(state.aiHomeRegionHexes, state.humanHomeRegionHexes)
       : null;
+  let homeControl: ReturnType<typeof getRegionHomeControlProgressForPrompt> = null;
+  if (coordinateContext.mode !== 'tactical') {
+    try {
+      homeControl = getRegionHomeControlProgressForPrompt();
+    } catch (err) {
+      logError('openRouterBuildSystemPrompt: home control progress failed', err);
+      homeControl = null;
+    }
+  }
+  const controlWinMinUrbanShare = homeControl?.controlWinMinUrbanShare;
   const coachingGates: CoachingGates = {
     coordinateMode: coordinateContext.mode,
     planningEnabled: flags.planningEnabled,
@@ -123,6 +134,7 @@ export function buildSystemPromptForTools(
     homeRegionsOverlap: (homePartitions?.intersection.length ?? 0) > 0,
     hasObservedEnemy: humanRoster.length > 0,
     includeScenarioWinPaths: state.scenarioId === 'region_vs_region' && coordinateContext.mode !== 'tactical',
+    controlWinMinUrbanShare: controlWinMinUrbanShare ?? null,
   };
   const toolPromptLines = filtered.map((m) => {
     let line = m.promptLine;
@@ -230,7 +242,11 @@ ${toolPromptLines.map((line, i) => `${i + 1}. ${line}`).join('\n')}${toolGuidanc
       p.intersection.length > 0
         ? `\n- These hexes are in both home regions: ${formatHomeRegionHexCodesForPrompt(p.intersection)}`
         : '';
-    regionHomeProgressAndHexBullets = `\n${lineOwn}${aiHexLine}\n${lineEnemyHome}${humanHexLine}${overlapLine}`;
+    const territorySentence =
+      typeof controlWinMinUrbanShare === 'number'
+        ? '\n- Those hex counts are territory, and the control win is the urban-cell share in the scenario objective.'
+        : '';
+    regionHomeProgressAndHexBullets = `\n${lineOwn}${aiHexLine}\n${lineEnemyHome}${humanHexLine}${overlapLine}${territorySentence}`;
   }
 
   const contextCoaching = buildContextCoaching(coachingGates);
@@ -246,7 +262,14 @@ ${contextCoaching}
     coordinateContext.mode === 'tactical' ? tacticalContextBlock : strategicContextBlock;
 
   const scenarioObjectiveBlock =
-    coordinateContext.mode === 'tactical' ? '' : buildRegionVsRegionScenarioObjectiveBlock(state);
+    coordinateContext.mode === 'tactical'
+      ? ''
+      : typeof controlWinMinUrbanShare === 'number' && homeControl
+        ? buildRegionVsRegionScenarioObjectiveBlock(state, {
+            controlWinMinUrbanShare,
+            progress: { ai: homeControl.ai, human: homeControl.human },
+          })
+        : buildRegionVsRegionScenarioObjectiveBlock(state);
   const mainBlock = briefingOverride != null && briefingOverride.length > 0
     ? `${briefingOverride}\n\n${scenarioObjectiveBlock ? `${scenarioObjectiveBlock}\n\n` : ''}${coachingContextBlock}\n\n${airOpsBlock}${sealiftBlock}${toolsSection}\n\n${humanUnitsLine}`
     : `${memoryBlock}${standingOrderBlock}${productionBlock}${scenarioObjectiveBlock ? `${scenarioObjectiveBlock}\n\n` : ''}${coachingContextBlock}\n\n${airOpsBlock}${sealiftBlock}${toolsSection}\n\n${ownUnitsLine}${humanUnitsLine}${adjacentCellsBlock}`;
@@ -279,7 +302,11 @@ ${contextCoaching}
   const winConditionReminder =
     coordinateContext.mode === 'tactical'
       ? buildTacticalBattleGoalClause()
-      : buildWinConditionReminderClause({ scenarioId: state.scenarioId });
+      : buildWinConditionReminderClause(
+          typeof controlWinMinUrbanShare === 'number'
+            ? { scenarioId: state.scenarioId, controlWinMinUrbanShare }
+            : { scenarioId: state.scenarioId }
+        );
   const latLngBlock =
     coordinateContext.mode === 'tactical'
       ? buildTacticalLatLngPreamble(LATLNG_DECIMAL_PLACES)

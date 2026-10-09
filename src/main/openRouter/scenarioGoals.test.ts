@@ -5,9 +5,12 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import type { GameStateSnapshot } from '../gameDb';
 import {
   GENERIC_OBJECTIVE_SENTENCE,
+  REGION_VS_REGION_SCENARIO_WIN_CONTROL_SNIPPET,
   WIN_CONDITION_REMINDER_FIRST_SENTENCE,
+  buildRegionVsRegionScenarioObjectiveBlock,
   buildWinConditionReminderClause,
 } from './scenarioGoals';
 
@@ -15,6 +18,31 @@ test('region_vs_region reminder uses home-region wording', () => {
   const text = buildWinConditionReminderClause({ scenarioId: 'region_vs_region' });
   assert.ok(text.includes(WIN_CONDITION_REMINDER_FIRST_SENTENCE));
   assert.match(text, /air strikes/i);
+});
+
+test('a 75 percent share replaces the every-hex reminder', () => {
+  const text = buildWinConditionReminderClause({ scenarioId: 'region_vs_region', controlWinMinUrbanShare: 0.75 });
+  assert.match(text, /at least 75%/);
+  assert.equal(text.includes(WIN_CONDITION_REMINDER_FIRST_SENTENCE), false);
+});
+
+test('the objective block can name both progress lines', () => {
+  const state = {
+    scenarioId: 'region_vs_region',
+    aiHomeRegion: 'North',
+    humanHomeRegion: 'South',
+  } as GameStateSnapshot;
+  const progress = {
+    ai: { heldUrbanCells: 90, totalUrbanCells: 100, neededUrbanCells: 75, controlWinMet: true },
+    human: { heldUrbanCells: 10, totalUrbanCells: 80, neededUrbanCells: 60, controlWinMet: false },
+  };
+  const withProgress = buildRegionVsRegionScenarioObjectiveBlock(state, { controlWinMinUrbanShare: 0.75, progress });
+  assert.match(withProgress, /Enemy home urban cells in hexes you control: 90 of 100 \(you need 75\)/);
+  assert.match(withProgress, /Your home urban cells in hexes the enemy controls: 10 of 80 \(they need 60\)/);
+  const plain = buildRegionVsRegionScenarioObjectiveBlock(state);
+  assert.equal(plain, buildRegionVsRegionScenarioObjectiveBlock(state, {}));
+  assert.ok(plain.includes(REGION_VS_REGION_SCENARIO_WIN_CONTROL_SNIPPET));
+  assert.equal(plain.includes('you need'), false);
 });
 
 test('absent or unrecognised scenario id uses only the generic objective', () => {

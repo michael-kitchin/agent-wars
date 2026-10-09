@@ -12,7 +12,7 @@ Shown in Strategic planning, Resolution playback, and Tactical planning. While t
 
 ## Information Displayed
 
-- The strategic world, or the battle area while Tactical planning or a tactical Resolution playback is active. The battle area is the enclosing hex's tactical cells plus three neighboring rings.
+- The strategic world, or the battle area while Tactical planning or a tactical Resolution playback is active. The battle area is the enclosing hex's tactical cells plus three neighboring rings. Cells beyond a regional map's edge are not part of a new battle. A battle already underway keeps the cells it started with.
 - Unit glyphs on their hexes: a white type glyph on the player-colored circle. A hex that holds both sides uses the gray circle and draws that glyph dark. Units that are moving during playback are drawn along the playback, not only at the destination. The glyphs are in the [UI style guide](../ui-style-guide.md).
 - A scale in metric and imperial units.
 - Terrain fill, unless the player is holding T. While the new-game overlay is open, that fill follows [new-game-dialog.md](new-game-dialog.md). See [input-map.md](input-map.md).
@@ -66,7 +66,7 @@ When no match is loaded, the basemap can still be visible under the new-game ove
 
 | Aspect | Strategic | Tactical |
 | --- | --- | --- |
-| Area | World map | The enclosing hex's tactical cells plus three neighboring rings, with pan limited to that area |
+| Area | World map | The enclosing hex's tactical cells plus three neighboring rings. A new battle leaves out cells beyond a regional map's edge. A battle already underway keeps the cells it started with. Pan stays inside that area |
 | Units | Strategic units | Battle sub-units |
 | Clicks outside the area | Not applicable | Error toast, no order |
 | Turn shown on the panel | Strategic turn | Tactical turn |

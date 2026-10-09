@@ -13,6 +13,7 @@ export const GLOBAL_GAME_MAP: GameMapProfile = {
   displayName: 'Global',
   strategicResolution: 1,
   tacticalResolution: 4,
+  controlWinMinUrbanShare: null,
   rules: {
     infantryCost: 20,
     armorCost: 40,

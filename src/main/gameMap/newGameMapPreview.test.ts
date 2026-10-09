@@ -102,7 +102,7 @@ test('regional preview uses that pack and does not replace global weather', (t) 
   assert.equal(displayWeatherForHex(globalHex, 1, 6), beforeWeather);
   assert.equal(preview.gameMapId, extracted.id);
   assert.equal(preview.strategicResolution, manifest.strategicResolution);
-  assert.equal(preview.advancedMinUrbanCells, REGIONAL_RULES_BY_ID[extracted.id as keyof typeof REGIONAL_RULES_BY_ID].rules.advancedMinUrbanCells);
+  assert.equal(preview.advancedMinUrbanCells, manifest.rules.advancedMinUrbanCells);
   assert.notEqual(preview.extent, 'world');
   assert.equal(preview.hexes.length, manifest.hexes.length);
   for (const hex of preview.hexes) {
