@@ -107,6 +107,7 @@ function main() {
     files.sort((a, b) => a.localeCompare(b));
     for (const extraName of [
       'electron-builder-config.test.cjs',
+      'linux-sandbox-launcher.test.cjs',
       'generated-data-packaging.test.cjs',
       'generated-data-pack-assert.test.cjs',
       'renderer-typecheck-report.test.cjs',

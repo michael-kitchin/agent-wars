@@ -35,7 +35,7 @@ The workflow in **`.github/workflows/build.yml`** runs on every push and pull re
 - Runs **tests** (`npm run test`) on Windows, Linux, and macOS.
 - Builds the app on each OS:
   - **Windows:** `npm run dist:win` → NSIS installer and portable exe in `release/`.
-  - **Linux:** `npm run dist:linux` → `linux-unpacked/` and `agent-wars-<version>-linux-x64.tar.gz` in `release/`.
+  - **Linux:** unpacked `linux-unpacked/`. The entry point `agent-wars` is the sandbox launcher; the Electron binary is `agent-wars.bin`. See [packaging.md](packaging.md).
   - **macOS:** `npm run dist:mac` → unpacked `.app` in `release/`.
 
 Artifacts are uploaded per run. To download them:

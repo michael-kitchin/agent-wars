@@ -4,6 +4,7 @@ const assert = require('assert');
 const packageJson = require('../package.json');
 const buildConfig = require('../electron-builder.config.cjs');
 const ciBuildConfig = require('../electron-builder.ci.cjs');
+const { installLinuxSandboxLauncher } = require('./linux-sandbox-launcher.cjs');
 const { getBuildIdentity } = require('./buildIdentity.cjs');
 const { GENERATED_TERRAIN_JSON_FILES } = require('./generated-data-manifest.cjs');
 const {
@@ -120,6 +121,19 @@ function testLinuxAndMacIconContract() {
   );
 }
 
+function testLinuxSandboxLauncherContract() {
+  assert.strictEqual(
+    buildConfig.afterPack,
+    installLinuxSandboxLauncher,
+    'electron-builder afterPack must install the Linux sandbox launcher'
+  );
+  assert.strictEqual(
+    ciBuildConfig.afterPack,
+    installLinuxSandboxLauncher,
+    'CI electron-builder config must use the same Linux sandbox launcher'
+  );
+}
+
 function testIconPackagingContract() {
   const files = Array.isArray(buildConfig.files) ? buildConfig.files : [];
   const ciFiles = Array.isArray(ciBuildConfig.files) ? ciBuildConfig.files : [];
@@ -135,6 +149,7 @@ function main() {
   testArtifactNameContract();
   testWindowsIconContract();
   testLinuxAndMacIconContract();
+  testLinuxSandboxLauncherContract();
   testIconPackagingContract();
   console.log('electron-builder-config.test.cjs passed');
 }
