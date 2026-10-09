@@ -56,6 +56,22 @@ Every line of production code was written by coding agents, mostly in Cursor. Th
 
 **A trail to follow:** the [unit origin and country flags plan](.spec/completed/unit-origin-and-country-flags-execution-plan.md) opens with ground rules for the executing agent, locked decisions, and verified facts. The code it produced is in [`src/main/unitOrigin/`](src/main/unitOrigin/), with tests beside it (`unitBirthOrigin.test.ts`, `unitBirthCellSelection.test.ts`, and others).
 
+### Time and tokens
+
+The developer logged hours in Toggl from 1 Jan to 14 Sep 2026. The charts' 169 hours leave out 2.9 hours of planning and 6.5 hours of promotion. Cursor tokens are usage attributed to Agent Wars sessions by the window between milestone tags. Both records stop in September, before the October work on milestone 2.5.
+
+![Bar chart of logged time and Cursor tokens by project stage: proof of concept 14% of time and 7% of tokens, feature building 69% and 59%, fixes 16% and 33%](doc/media/hours-and-tokens-by-stage.png)
+
+*Logged time and Cursor tokens by project stage, each as a share of its own total (169 hours and 5.9 billion tokens). Fixes, the work after the milestone 2.4 tag, took about a sixth of the time and a third of the tokens. The Fixes hours include some feature work.*
+
+![Bar chart of logged time and Cursor tokens by problem domain: foundation, LLM systems, platform, geospatial, game systems, and fixes](doc/media/hours-and-tokens-by-domain.png)
+
+*The same totals by problem domain. Each milestone counts toward one domain, the subject of its execution plan. Game systems took the largest share of both, at 42% of the time and 40% of the tokens. Milestones 1.3 and 1.4 share one token window, split between geospatial and game systems by logged hours.*
+
+![Paired bar chart of logged time and Cursor tokens for each milestone from 0.1 through 2.4, then fixes](doc/media/hours-and-tokens-by-milestone.png)
+
+*The same totals by milestone, from the core prototype (0.1 to 0.4) through tactical integration (2.4) and the fixes after it. Milestone 1.3 has no tag, so it shares a row with 1.4.*
+
 ## Architecture
 
 ```mermaid
@@ -88,6 +104,12 @@ flowchart LR
   Client -->|"orders and callbacks"| Orders
   Orders --> Rules
 ```
+
+![Flow diagram of the hybrid AI turn loop: planning, standing orders, resolution, and a callback check, then pre-computation, one model consultation, and persisted orders when a callback fires](doc/media/hybrid-ai-turn-loop.png)
+
+*Event-driven consultation, as drawn for 2.4.0. In the drawing, the orange step is the one that calls the model, and it runs when a mandatory override or a callback the model subscribed to fires. The eight overrides along the bottom are still the ones the engine returns in 2.5.0, including the deadman consult after five turns. Every-turn mode consults during planning, and pre-computation no longer injects combat estimates.*
+
+The override list is the return of `evaluateMandatoryOverrides`, and the five-turn deadman is `DEADMAN_TURNS`, both in `callbackEvaluation.ts`. What ships now is in [doc/hybrid-ai.md](doc/hybrid-ai.md).
 
 ## Build from source
 
