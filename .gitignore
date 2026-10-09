@@ -20,8 +20,6 @@ coverage/
 .env
 .env.*
 !.env.example
-.social/companion-staging/
-.social/michael-kitchin-resume-1.md
 __pycache__/
 *.pyc
 data/generated/**/*.json
