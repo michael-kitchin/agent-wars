@@ -34,7 +34,7 @@ Starting a match, the controls, and where messages appear are covered in [doc/ho
 
 ![Spain's 1st Fleet heading west across the Atlantic on the global map](doc/media/global-spain-new-world.png)
 
-*Re-invading the New World, at the beginning of a glabal game. What could go wrong?*
+*Re-invading the New World, at the start of a glabal game. What could go wrong?*
 
 ## What's inside
 
@@ -43,6 +43,8 @@ Starting a match, the controls, and where messages appear are covered in [doc/ho
 - **A real-Earth hex grid at two scales.** Strategic play uses H3 resolution 1 on the global map, or 2 or 3 on one of the regional maps. Tactical battles sit three resolutions finer. Terrain, roads, place names, and climate come from public datasets through an offline Python pipeline (`scripts/terrain_pipeline/`).
 - **Simultaneous turns.** Both sides plan, then the engine resolves air strikes, ranged fire, movement, ferry, and melee in a fixed phase order, with optional zoomed-in tactical battles. The rules are in [doc/combat-rules-v3.md](doc/combat-rules-v3.md).
 - **Guardrails.** `npm test` builds the main process, then runs ESLint (with custom rules in `[eslint-rules/](eslint-rules/)`), a naming-convention check, a renderer type check, the main-process and tool tests (785 tests at 2.5.0), and a third-party-notices check. The renderer runs with context isolation, without Node integration, and under a Content-Security-Policy.
+
+
 
 ## How it was built
 
@@ -95,6 +97,8 @@ npm start
 - **Lint and test:** `npm run lint` runs ESLint on `src/`. `npm run test` runs the full check described under [What's inside](#whats-inside).
 - **Package:** `npm run dist`, `dist:win`, `dist:linux`, or `dist:mac` builds with electron-builder (see [.spec/completed/packaging.md](.spec/completed/packaging.md)). Releases are made as described in [doc/releasing.md](doc/releasing.md).
 
+
+
 ### Terrain data
 
 The generated terrain and region packs under `data/generated/` are tracked, so building and playing need no GIS tools. To regenerate them:
@@ -110,6 +114,8 @@ Setup, the Python CLIs, and troubleshooting are in [scripts/terrain_pipeline/REA
 - **Progress:** Phase 0 (hybrid AI validation) and Phase 1 (global strategic game) are complete. Phase 2 is complete through milestone 2.5 (regional game and rules enhancements), including tactical battles (2.1 to 2.4) and playtester UI fixes (2.45). Milestone 2.6 (player-facing save/load and session management) is not shipped. See the [development plan (v3.4)](doc/devleopment-plan-v3.4.md); milestones 0.2 to 0.5 were a throwaway prototype that validated combat, tools, and the AI loop before the production baseline.
 - **CI:** lint and tests run on every push that changes code (Linux). The three-platform packaging build runs on demand and drafts each release.
 - **Contributions:** this is a personal R&D project, so it doesn't take issues or pull requests. To report a security problem, see [SECURITY.md](SECURITY.md).
+
+
 
 ## License
 
