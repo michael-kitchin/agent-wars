@@ -8,6 +8,7 @@ Shipping version as of this writing: **2.5.0** (`package.json`). Phase 0 (hybrid
 
 | Document | Role | Status |
 | --- | --- | --- |
+| [how-to-play.md](how-to-play.md) | Player guide: starting a match, a turn's controls, unit bonuses, and where messages appear | **Current UI.** Downloads and the OpenRouter key are under Play it in the root `README.md`. Per-surface detail is in [ux/](ux/). |
 | [combat-rules-v3.md](combat-rules-v3.md) | Combat, movement, production, fog, sealift, and tactical battles | **Current mechanics.** Numbers are taken from engine constants. |
 | [game-size-unit-caps.md](game-size-unit-caps.md) | Small / Medium / Large per-side caps | **Current.** Matches `getMaxUnitsPerType`. |
 | [region-vs-region.md](region-vs-region.md) | Shipped scenario, home regions, win evaluation | **Current.** Matches `evaluateRegionControlWinnerAtEndOfTurn`. |
@@ -19,6 +20,8 @@ Shipping version as of this writing: **2.5.0** (`package.json`). Phase 0 (hybrid
 | [naming-conventions.md](naming-conventions.md) | How files, directories, and exported symbols are named | **Living index.** Points at the contract and the signed rename ledger. |
 | [naming-conventions-contract-v1.md](naming-conventions-contract-v1.md) | Casing, role suffixes, frozen string values, and the reviewer checklist | **Current rules.** When this file and an identifier disagree, fix the identifier. |
 | [ai-commander-prompts/](ai-commander-prompts/README.md) | What the AI opponent's model is told today | **Current emission.** Builders under `src/main/openRouter/` win if this package drifts. Prompt copy is not game-rule authority; the engine is. |
+| [releasing.md](releasing.md) | How a version becomes a GitHub release: version bump, notes, Build workflow, smoke test, publish | **Current procedure.** Matches `.github/workflows/build.yml`. |
+| [release-notes/](release-notes/) | One notes file per release, used as the release body | **Per release.** The draft-release job reads `release-notes/v<version>.md`. |
 | [devleopment-plan-v3.4.md](devleopment-plan-v3.4.md) | Original phased roadmap (filename keeps the historical spelling) | **Historical plan** with a current-progress header. Milestone writeups inside it are not live rules. |
 | [poc-analysis.md](poc-analysis.md) | Phase 0 latency/cost research that justified the hybrid AI | **Historical research.** The hybrid pattern it recommended is now the live architecture. |
 | [market-research.md](market-research.md) | 2025–2026 market landscape | **Dated research.** Not a mechanics or shipping-status document. |

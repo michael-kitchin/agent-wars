@@ -1,7 +1,13 @@
 {
   "name": "agent-wars",
   "version": "2.5.0",
-  "description": "Grand strategy wargame with LLM opponents — Release 2.5.0",
+  "description": "Grand strategy wargame with LLM opponents on a real-Earth H3 hex map, built entirely by coding agents",
+  "private": true,
+  "homepage": "https://github.com/michael-kitchin/agent-wars#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/michael-kitchin/agent-wars.git"
+  },
   "main": "dist/main/main.js",
   "scripts": {
     "build": "npm run generated:extract && npm run build:main && npm run build:renderer",
@@ -60,8 +66,27 @@
     "dist:linux": "npm run clean:release && npm run build && npm run generated:assert-pack-ready && npm run rebuild:native:electron && node node_modules/electron-builder/cli.js --config electron-builder.config.cjs --linux",
     "dist:mac": "node -e \"if (process.platform !== 'darwin') { console.error('Build for macOS is supported only on macOS. Run npm run dist:mac on a Mac. See .spec/packaging.md'); process.exit(1); }\" && npm run clean:release && npm run build && npm run generated:assert-pack-ready && npm run rebuild:native:electron && node node_modules/electron-builder/cli.js --config electron-builder.config.cjs --mac"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": [
+    "llm",
+    "ai-agents",
+    "agentic-ai",
+    "coding-agents",
+    "game-ai",
+    "strategy-game",
+    "wargame",
+    "h3",
+    "geospatial",
+    "gis",
+    "electron",
+    "typescript",
+    "sqlite",
+    "leaflet",
+    "openrouter"
+  ],
+  "author": {
+    "name": "Michael J. Kitchin",
+    "url": "https://github.com/michael-kitchin"
+  },
   "license": "MIT",
   "devDependencies": {
     "@electron/rebuild": "^4.0.3",

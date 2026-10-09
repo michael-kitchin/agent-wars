@@ -60,5 +60,5 @@ Regional maps live under `data/generated/regions/<region_id>/`. Each folder hold
 ## Related
 
 - Movement, combat, and weather: [combat-rules-v3.md](combat-rules-v3.md) §4.9 and §12
-- Root README “Terrain generation pipeline” section
+- Regeneration commands: the “Terrain data” section of the root [README.md](../README.md#terrain-data)
 - Python tests: `npm run terrain:test`

@@ -1,40 +1,97 @@
 # Agent Wars
 
-Grand strategy wargame with LLM opponents on a real-Earth H3 map. Early milestones **0.5–0.7** validated tools, hybrid AI, and event-driven callbacks; **1.1** established the production baseline (see [.spec/completed/milestone-1.1-execution-plan.md](.spec/completed/milestone-1.1-execution-plan.md)). The current shipping version is **2.5.0** (`package.json`).
+[![CI](https://github.com/michael-kitchin/agent-wars/actions/workflows/ci.yml/badge.svg)](https://github.com/michael-kitchin/agent-wars/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/michael-kitchin/agent-wars?include_prereleases)](https://github.com/michael-kitchin/agent-wars/releases)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
+A turn-based grand strategy game on a real-Earth hex map, where your opponent is a large language model you choose. Coding agents wrote the code and most of the documentation. One developer set the direction, wrote the specs, prompts, and rules, and reviewed the results. The story of building it is told in the Agent Wars series in [*Standing Orders*](https://standingorders.substack.com).
 
 ![Tactical planning over central Mexico](doc/media/tactical-battle-mexico.jpg)
 
-*A tactical battle in central Mexico on turn 2, a rainy August. Teal human units face the rose opponent, and their movement orders are queued in the right panel. The hex readout for Guerrero, Morelos, and México lists the road, the forest and urban terrain, the rain, and what those do to range, movement, and cover. At the upper right, the opponent's message reads "Your lines will shatter before you even realize the battle has begun."*
+*A tactical battle in central Mexico on turn 2, a rainy August. Teal human units face the rose opponent (in this case, Gemini Flash Lite), and their movement orders are queued in the right panel. The hex readout for Guerrero, Morelos, and México lists the road, the forest and urban terrain, the rain, and what those do to range, movement, and cover. At the upper right, the LLM's message reads "Your lines will shatter before you even realize the battle has begun."*
 
-Third-party software and data are credited in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
+[Play it](#play-it) · [What's inside](#whats-inside) · [How it was built](#how-it-was-built) · [Architecture](#architecture) · [Build from source](#build-from-source) · [Status](#status) · [License](#license)
 
-Development roadmap: [doc/devleopment-plan-v3.4.md](doc/devleopment-plan-v3.4.md).
+## Play it
 
-## Repository status
+Download a build for Windows (x64), macOS (Apple silicon), or Linux (x64) from [Releases](https://github.com/michael-kitchin/agent-wars/releases). The builds are unsigned side-load builds, so Windows and macOS warn before the first launch. Each release lists SHA-256 checksums in `SHA256SUMS.txt`.
 
-- **Release version:** **2.5.0** (developer / side-load distribution only; no store or notarization requirements yet)
-- **Progress:** Phase 0 (hybrid AI validation) and Phase 1 (global strategic game) are complete. Phase 2 is complete through **milestone 2.5** (regional game and rules enhancements), including tactical battles (2.1 to 2.4) and playtester UI fixes (2.45). Milestone **2.6** (player-facing save/load and session management) is not shipped.
-- CI: GitHub Actions matrix build and test on Windows/Linux/macOS
+- **Windows:** unzip, then run `Agent Wars v2.5.0.exe`. If SmartScreen stops it, choose **More info**, then **Run anyway**.
+- **macOS:** unzip, then open `Agent Wars v2.5.0.app`. If macOS blocks it, open **System Settings > Privacy & Security** and choose **Open Anyway**.
+- **Linux:** extract the archive, then run `./agent-wars`. That launcher handles Chromium's sandbox when the archive can't keep `chrome-sandbox` owned by root.
 
-## Current capabilities (2.5)
+The opponent needs an [OpenRouter](https://openrouter.ai) API key of your own:
 
-- **Strategic map:** Real-Earth H3 hexes with terrain, fog of war, economy/production, standing orders, and WEGO resolution (ranged → movement → melee, plus air/ferry phases where applicable). The global map uses H3 resolution 1.
-- **Regional maps:** A Regional tab on the new-game dialog starts a match on one region, with side groups instead of home regions, weekly turns, and region-specific economies. Regional strategic hexes are H3 resolution 2 or 3 (`strategicH3Resolution`).
-- **Tactical battles:** Optional zoom-in fights when forces contest a strategic hex — sub-unit maneuver, terrain-aware movement, ranged/return fire, melee, bail-out back to strategic resolution, and LLM tactical play. Battle cells sit three H3 resolutions below the strategic grid: 4 on the global map, 5 or 6 on a regional map (`tacticalH3Resolution`).
-- **Hybrid AI:** Pre-computed briefings, ad-hoc planning tools, standing orders, and callback-driven consultations via OpenRouter (BYOK). A model without tool calls still plays, without the planning tools.
-- **Units:** Infantry, armor, naval, and air — with sealift, production, and infrastructure interactions at the strategic layer.
-- **Packaging:** `npm run dist` / `dist:win` / `dist:linux` / `dist:mac` via electron-builder (see [.spec/completed/packaging.md](.spec/completed/packaging.md)).
+1. In the right-side panel, open the **Model** tab (the panel starts on it).
+2. Paste your OpenRouter API key into the API key field (placeholder `Set key and blur to save`).
+3. Click outside the field, or press Enter, to save. A saved key loads the model list.
+4. Choose a model. **Refresh model list** reloads the list.
+5. Click **Run** to start opponent planning.
+
+The key is handled only in the Electron main process and stored locally in the Electron user-data directory, not in repository files. Without a key or a model the app still runs, **Run** stays disabled, and the opponent makes no model calls.
+
+Starting a match, the controls, and where messages appear are covered in [doc/how-to-play.md](doc/how-to-play.md).
 
 ![Spain's 1st Fleet heading west across the Atlantic on the global map](doc/media/global-spain-new-world.png)
 
-*Re-invading the New World. What's waiting for us?*
+*Re-invading the New World. What could go wrong?*
 
-## Prerequisites
+## What's inside
 
-- Node.js 24+ (`.nvmrc` pins 24)
-- npm 10+
+- **A hybrid AI opponent.** The engine pre-computes a briefing (an ASCII hex map, Markdown tables of units and threats, and attention flags) before it consults the model. Standing orders carry the plan forward on turns the model isn't consulted, and event callbacks decide when it is. Any OpenRouter model can play; one without tool calls plays without the planning tools. See [doc/hybrid-ai.md](doc/hybrid-ai.md) and [doc/ai-tools.md](doc/ai-tools.md).
+- **Prompts as code.** The prompts are assembled by builders in [`src/main/openRouter/promptSpec/`](src/main/openRouter/promptSpec/), documented in [doc/ai-commander-prompts/](doc/ai-commander-prompts/README.md), and held to that contract by tests such as `consultationContract.test.ts`, `envelopeJsonSchema.test.ts`, and `variantConformance.test.ts`.
+- **A real-Earth hex grid at two scales.** Strategic play uses H3 resolution 1 on the global map, or 2 or 3 on one of the regional maps. Tactical battles sit three resolutions finer. Terrain, roads, place names, and climate come from public datasets through an offline Python pipeline (`scripts/terrain_pipeline/`).
+- **Simultaneous turns.** Both sides plan, then the engine resolves air strikes, ranged fire, movement, ferry, and melee in a fixed phase order, with optional zoomed-in tactical battles. The rules are in [doc/combat-rules-v3.md](doc/combat-rules-v3.md).
+- **Guardrails.** `npm test` builds the main process, then runs ESLint (with custom rules in [`eslint-rules/`](eslint-rules/)), a naming-convention check, a renderer type check, the main-process and tool tests (785 tests at 2.5.0), and a third-party-notices check. The renderer runs with context isolation, without Node integration, and under a Content-Security-Policy.
 
-## Quick start
+## How it was built
+
+Every line of production code was written by coding agents, mostly in Cursor. The developer's hand-written work is the specs, the prompts that drove the agents, and the rules they follow. Those artifacts are in the repository:
+
+- [AGENTS.md](AGENTS.md): what every agent reads first, including which document wins a disagreement and what to update in the same change.
+- [`.cursor/rules/`](.cursor/rules/): fourteen always-on coding rules, from reliable code and testing standards to file-size limits and naming.
+- [`.spec/completed/`](.spec/completed/): the execution plans, audits, and verification records behind each change.
+- [doc/coding-prompts-1.md](doc/coding-prompts-1.md): the reusable prompt library. Its core cycle is four prompts: plan, audit the plan, implement, audit the implementation.
+- [doc/](doc/README.md): the living product documentation, kept current with the code.
+
+**A trail to follow:** the [unit origin and country flags plan](.spec/completed/unit-origin-and-country-flags-execution-plan.md) opens with ground rules for the executing agent, locked decisions, and verified facts. The code it produced is in [`src/main/unitOrigin/`](src/main/unitOrigin/), with tests beside it (`unitBirthOrigin.test.ts`, `unitBirthCellSelection.test.ts`, and others).
+
+## Architecture
+
+```mermaid
+flowchart LR
+  subgraph Renderer["Renderer (src/renderer)"]
+    UI["Leaflet map, canvas overlay, panels"]
+  end
+  subgraph Main["Main process (src/main)"]
+    IPC["IPC handlers<br/>ipc/"]
+    Rules["Turn resolution, combat, tactical battles<br/>gameActions/, combatResolution.ts, tacticalBattle/"]
+    DB[("SQLite game state<br/>gameDb/")]
+    Policy["When to consult: callbacks and mandatory events<br/>callbackSubscriptions.ts, callbackEvaluation.ts"]
+    Brief["Briefing: ASCII hex map, tables, attention flags<br/>briefing/, briefingFormatter.ts"]
+    Client["Prompt builders and OpenRouter client<br/>openRouter/"]
+    Orders["Standing orders and planning tools<br/>tools/"]
+  end
+  Packs[("Terrain and region packs<br/>data/generated/")]
+  Pipeline["Offline terrain pipeline (Python)<br/>scripts/terrain_pipeline/"]
+  LLM["Any OpenRouter model"]
+
+  UI <-->|"preload bridge (gameApi)"| IPC
+  IPC --> Rules
+  Rules <--> DB
+  Pipeline --> Packs
+  Packs --> DB
+  Rules --> Policy
+  Policy -->|"consult"| Brief
+  Brief --> Client
+  Client <--> LLM
+  Client -->|"orders and callbacks"| Orders
+  Orders --> Rules
+```
+
+## Build from source
+
+Prerequisites: Node.js 24 or later (`.nvmrc` pins 24) and npm 10 or later. Python 3 is used to extract the generated data during the build.
 
 ```bash
 npm install
@@ -42,122 +99,26 @@ npm run build
 npm start
 ```
 
-## OpenRouter setup (required for AI turns)
+- **Build:** compiles the main process and preload with TypeScript (`dist/`) and bundles the renderer with esbuild (`static/renderer.js`). Generated terrain data is extracted as part of the build.
+- **Start:** runs Electron; the window loads the renderer from `static/index.html`. Game state is stored in SQLite through **better-sqlite3** (a native module), in your Electron user-data directory.
+- **Lint and test:** `npm run lint` runs ESLint on `src/`. `npm run test` runs the full check described under [What's inside](#whats-inside).
+- **Package:** `npm run dist`, `dist:win`, `dist:linux`, or `dist:mac` builds with electron-builder (see [.spec/completed/packaging.md](.spec/completed/packaging.md)). Releases are made as described in [doc/releasing.md](doc/releasing.md).
 
-1. Launch the app (`npm start`).
-2. In the right-side panel, open the **Model** tab (the panel starts on it).
-3. Paste your OpenRouter API key into the API key field (placeholder `Set key and blur to save`).
-4. Click outside the field, or press Enter, to save. A saved key loads the model list.
-5. Choose a model. **Refresh model list** reloads the list.
-6. Click **Run** to start opponent planning.
+### Terrain data
 
-Notes:
+The generated terrain and region packs under `data/generated/` are tracked, so building and playing need no GIS tools. To regenerate them:
 
-- API keys are handled only in the Electron main process.
-- The key is stored locally in the Electron user-data directory, not in repo files.
-- If the key or model is missing, the app still runs, Run stays disabled, and the opponent makes no model calls.
+- `npm run terrain:generate` runs the metadata step, then the road/rail sides step. Related scripts: `terrain:generate:landmass`, `terrain:generate:road-rail:high-fidelity`, and `terrain:generate:road-rail-vectors`.
+- `npm run terrain:test` runs the Python tests for the terrain scripts, and `npm run terrain:validate` checks the classification environment.
 
-## Run and verify
+Setup, the Python CLIs, and troubleshooting are in [scripts/terrain_pipeline/README.md](scripts/terrain_pipeline/README.md). What the app loads at run time is in [doc/terrain-pipeline.md](doc/terrain-pipeline.md).
 
-- **Build:** Compiles the main process and preload with TypeScript (`dist/`) and bundles the renderer with esbuild (`static/renderer.js`). Generated terrain data is extracted as part of the build.
-- **Start:** Runs Electron; the window loads the renderer from `static/index.html`.
+## Status
 
-**Note:** Game state is stored in SQLite via **better-sqlite3** (native module). The database file is created in your Electron user data directory.
-
-## How to play
-
-Each match starts on the new-game dialog, with a Global tab and a Regional tab. This regional setup puts South Central against Great Lakes & Ontario in Northern America, at Small size with fog of war, a March start, and every bonus at Low. The open list shows the region's other side groups. The badges over each unit type are the per-side caps for the chosen game size, and the prices follow the selected region.
-
-![Regional new-game dialog for Northern America](doc/media/regional-new-game.png)
-
-1. **Pan:** Drag with the left mouse button, or use WASD / arrow keys.
-2. **Zoom:** Mouse wheel (zooms toward the cursor). Zoomed in, contested strategic hexes show a marker that starts a tactical battle.
-3. **Select units:** Click a teal (human) unit's icon. A lone unit is selected right away. A stack opens a list of its units, where you can pick one or use **+ All**.
-4. **Issue a move order:** With units selected, double-click a destination hex (land/water/terrain rules apply). The order appears under "Movement orders." Standing march orders can also be set for multi-turn movement.
-5. **Ranged attack (armor or naval on strategic; broader types on tactical):** With capable units selected, click **Ranged**, then double-click an enemy hex within range. An all-air selection shows **Strike** instead. Attacks are submitted with Ready.
-6. **Ready:** Click **Ready** to submit orders and resolve the turn. A side wins by controlling the enemy home or wiping out its urban cells (rules in [doc/region-vs-region.md](doc/region-vs-region.md)), or by destroying every enemy unit. The new-game dialog then returns for the next match.
-7. You can issue multiple movement and ranged orders (one per unit each) before clicking Ready.
-
-Hovering a unit's flag, in the stack list or anywhere else it appears, or the token of a one-unit hex, shows the bonuses that unit was born with. On the left, a stack near Mexico City is open, and the tooltip belongs to an armor unit born in the Mexican mountains in rain, with advanced tech. On the right, a lone unit near Colorado Springs was born on Saskatchewan plains in snow, with basic tech.
-
-| Stack list near Mexico City | Lone unit near Colorado Springs |
-| --- | --- |
-| ![Bonuses tooltip for an armor unit in a stack list](doc/media/unit-bonuses-armored-mexico.png) | ![Bonuses tooltip for a single unit token](doc/media/unit-origin-saskatchewan.png) |
-
-## Where messages appear
-
-- **Lower right of the map (map toast):** Errors, rejected orders, turn-loss summaries, and unknown-battle announcements. Use the × to dismiss; it also hides after a fixed interval, and a newer message replaces it.
-- **Upper right of the map (AI strategy toast):** The opponent's Message and Strategy after a consultation. It dismisses and times out the same way.
-- **Right panel, below the Tools and Model tabs (AI activity log):** AI interaction lines and errors, including a one-line copy of each turn update. Starting a new match clears it.
-
-## UI controls summary
-
-- Pan: drag with left mouse, or WASD / arrows.
-- Zoom in/out: mouse wheel.
-- Select units: click a unit icon; a stack opens its unit list.
-- Add move order: select units, then double-click the destination.
-- Ranged attack: select capable units, click "Ranged", then double-click an enemy hex in range.
-- Resolve turn: Ready button.
-- New game: **New** on the Model tab during strategic planning, or the dialog that opens at game over.
-
-## Lint
-
-```bash
-npm run lint
-```
-
-Runs ESLint on `src/` (main and renderer TypeScript).
-
-## Tests
-
-```bash
-npm run test
-```
-
-Runs core main-process and tool contract tests.
-
-## Terrain generation pipeline
-
-**Electron runtime** loads generated metadata under `data/generated/` (extracted from the pack on build/start), classifies hex kinds in the main process, and seeds SQLite from that cache. Packaged builds include those JSON files; regenerate them with `npm run terrain:generate` when the metadata or road/rail pipeline changes. Startup fails fast if required metadata is missing or invalid (including empty res-4 metadata).
-
-**Classification outputs** (res-1 base + res-4 exceptions CSVs and run metadata) are produced by the main Python CLI:
-
-```bash
-python -m scripts.terrain_pipeline.cli validate --verbose
-python -m scripts.terrain_pipeline.cli run --verbose
-```
-
-**Per-hex feature metadata and road/rail sides** use:
-
-```bash
-python -m scripts.terrain_pipeline.metadata_cli validate --verbose
-npm run terrain:generate
-```
-
-- `npm run terrain:generate` → metadata CLI, then road/rail sides CLI (`fast` mode)
-- Related: `terrain:generate:landmass`, `terrain:generate:road-rail:high-fidelity`, `terrain:generate:road-rail-vectors`
-
-Shared Python tests for the terrain scripts:
-
-```bash
-npm run terrain:test
-```
-
-Classification environment check:
-
-```bash
-npm run terrain:validate
-```
-
-Setup and troubleshooting are documented in `scripts/terrain_pipeline/README.md`.
-
-## Early prototype notes (milestones 0.2–0.5)
-
-These describe the throwaway Phase 0 loop that validated combat, tools, and AI before the production baseline. The live game is the 2.x global, regional, and tactical build above.
-
-- **0.2:** Small hex map, WEGO movement only, SQLite state, no AI.
-- **0.4:** Combat (ranged → move → melee), win condition, resolution visuals and stacking.
-- **0.5:** OpenRouter tool-calling AI (`plan_route`, `check_distance`), tool-capable models only, capped planning round-trips.
+- **Version:** 2.5.0, distributed as side-load builds only (no store, signing, or notarization).
+- **Progress:** Phase 0 (hybrid AI validation) and Phase 1 (global strategic game) are complete. Phase 2 is complete through milestone 2.5 (regional game and rules enhancements), including tactical battles (2.1 to 2.4) and playtester UI fixes (2.45). Milestone 2.6 (player-facing save/load and session management) is not shipped. See the [development plan (v3.4)](doc/devleopment-plan-v3.4.md); milestones 0.2 to 0.5 were a throwaway prototype that validated combat, tools, and the AI loop before the production baseline.
+- **CI:** lint and tests run on every push that changes code (Linux). The three-platform packaging build runs on demand and drafts each release.
+- **Contributions:** this is a personal R&D project, so it doesn't take issues or pull requests. To report a security problem, see [SECURITY.md](SECURITY.md).
 
 ## License
 
