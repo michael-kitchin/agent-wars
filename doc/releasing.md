@@ -6,7 +6,7 @@ How a version of Agent Wars becomes a GitHub release. The builds are unsigned si
 
 1. **Set the version.** `npm version <x.y.z> --no-git-tag-version` updates `package.json` and `package-lock.json`. The version names the archives, the Windows and macOS executables (`Agent Wars v<x.y.z>`), and the release tag (`v<x.y.z>`).
 2. **Write the release notes** at `doc/release-notes/v<x.y.z>.md`. The draft-release job fails without them. Start from the previous version's notes: downloads, first-launch steps, what's new, and known limits.
-3. **Update the README.** The executable names under [Play it](../README.md#play-it) and the version under Status carry the version number.
+3. **Update the version where the docs state it.** In the root README: the executable names under [Play it](../README.md#play-it), the version under Status, and the test count under What's inside. In [doc/README.md](README.md): the shipping version.
 4. **Check the third-party notices.** New dependencies or data need entries in [THIRD-PARTY-NOTICES.md](../THIRD-PARTY-NOTICES.md). `npm run test` ends with the notices check.
 5. **Run `npm run test`**, then commit and push to `main`. The CI workflow runs the same check on the push.
 

@@ -1,10 +1,22 @@
-# Build and test Agent Wars 2.5 on Windows, Linux, and macOS.
-# On-demand only (workflow_dispatch). Uploads release artifacts per OS.
-# Artifact names embed the app version from package.json ("version"), via the "Read app version" step.
+# Build and test Agent Wars on Windows, Linux, and macOS.
+# On-demand only (workflow_dispatch). Each OS uploads one release archive, named
+# from the app version in package.json ("version") and the runner's architecture.
+# With "Create a draft release" checked, a last job attaches the archives and
+# SHA256SUMS.txt to a draft GitHub release v<version>, with notes from
+# doc/release-notes/v<version>.md. Publishing the draft stays a manual step.
+# The procedure is in doc/releasing.md.
 name: Build
 
 on:
   workflow_dispatch:
+    inputs:
+      draft_release:
+        description: "Create a draft release from this commit"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
 
 jobs:
   build:
@@ -80,26 +92,111 @@ jobs:
           rm -f release/builder-debug.yml
           rm -f release/builder-effective-config.yaml
 
-      - name: Upload release artifacts (Windows)
-        if: runner.os == 'Windows'
-        continue-on-error: true
-        uses: actions/upload-artifact@v4
-        with:
-          name: agent-wars-${{ steps.app_version.outputs.value }}-${{ runner.os }}
-          path: release/win-unpacked/*
-
-      - name: Upload release artifacts (Linux)
-        if: runner.os == 'Linux'
-        continue-on-error: true
-        uses: actions/upload-artifact@v4
-        with:
-          name: agent-wars-${{ steps.app_version.outputs.value }}-${{ runner.os }}
-          path: release/linux-unpacked/*
-
-      - name: Upload release artifacts (macOS)
+      # Apple silicon will not launch an app without a valid signature, and an ad-hoc
+      # signature is enough for a side-load build. Keep electron-builder's signature
+      # when it verifies; otherwise sign ad hoc, then require that to verify.
+      - name: Check or apply ad-hoc signature (macOS)
         if: runner.os == 'macOS'
-        continue-on-error: true
+        shell: bash
+        run: |
+          shopt -s nullglob
+          apps=(release/mac*/*.app)
+          if [ "${#apps[@]}" -ne 1 ]; then
+            echo "Expected one .app under release/mac*/, found ${#apps[@]}." >&2
+            exit 1
+          fi
+          app="${apps[0]}"
+          if codesign --verify --deep --strict "$app"; then
+            echo "Existing signature verifies: $app"
+          else
+            echo "Signing ad hoc: $app"
+            codesign --force --deep --sign - "$app"
+          fi
+          codesign --verify --deep --strict --verbose=2 "$app"
+
+      # Archive on the runner. upload-artifact drops Unix permissions and follows
+      # symlinks, which would break the Linux launcher and the macOS app bundle.
+      # Windows and macOS get a .zip, Linux a .tar.gz.
+      - name: Archive the build
+        shell: bash
+        env:
+          APP_VERSION: ${{ steps.app_version.outputs.value }}
+        run: |
+          shopt -s nullglob
+          arch="$(echo "$RUNNER_ARCH" | tr '[:upper:]' '[:lower:]')"
+          mkdir -p release-archive
+          case "$RUNNER_OS" in
+            Windows)
+              name="agent-wars-${APP_VERSION}-windows-${arch}"
+              mv release/win-unpacked "release/${name}"
+              (cd release && 7z a -tzip -bd "../release-archive/${name}.zip" "${name}")
+              ;;
+            Linux)
+              name="agent-wars-${APP_VERSION}-linux-${arch}"
+              mv release/linux-unpacked "release/${name}"
+              tar -C release -czf "release-archive/${name}.tar.gz" "${name}"
+              ;;
+            macOS)
+              name="agent-wars-${APP_VERSION}-macos-${arch}"
+              apps=(release/mac*/*.app)
+              ditto -c -k --sequesterRsrc --keepParent "${apps[0]}" "release-archive/${name}.zip"
+              ;;
+            *)
+              echo "Unsupported runner OS: $RUNNER_OS" >&2
+              exit 1
+              ;;
+          esac
+          ls -l release-archive
+
+      - name: Upload release archive
         uses: actions/upload-artifact@v4
         with:
           name: agent-wars-${{ steps.app_version.outputs.value }}-${{ runner.os }}
-          path: release/mac*/*
+          path: release-archive/*
+          if-no-files-found: error
+
+  release:
+    name: Draft release
+    needs: build
+    if: inputs.draft_release
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Read app version
+        id: app_version
+        run: node -e "const fs=require('fs');const v=require('./package.json').version;fs.appendFileSync(process.env.GITHUB_OUTPUT, 'value='+v+String.fromCharCode(10));"
+
+      - name: Download release archives
+        uses: actions/download-artifact@v4
+        with:
+          pattern: agent-wars-${{ steps.app_version.outputs.value }}-*
+          path: release-assets
+          merge-multiple: true
+
+      - name: Write checksums
+        working-directory: release-assets
+        run: |
+          sha256sum agent-wars-* > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Create draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          APP_VERSION: ${{ steps.app_version.outputs.value }}
+        run: |
+          notes="doc/release-notes/v${APP_VERSION}.md"
+          if [ ! -f "$notes" ]; then
+            echo "Release notes not found: $notes" >&2
+            exit 1
+          fi
+          gh release create "v${APP_VERSION}" release-assets/* \
+            --draft \
+            --target "$GITHUB_SHA" \
+            --title "Agent Wars ${APP_VERSION}" \
+            --notes-file "$notes"

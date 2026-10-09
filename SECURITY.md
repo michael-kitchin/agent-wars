@@ -17,5 +17,5 @@ Only the latest release is supported. Fixes ship in a new release rather than as
 ## Hardening in the current build
 
 - The renderer runs with context isolation on and Node integration off. It reaches the main process only through the `gameApi` bridge in `src/main/preload.ts`.
-- `static/index.html` sets a Content-Security-Policy. Scripts load only from the app itself, and images only from the app and the two map tile hosts (Esri and OpenStreetMap). The renderer makes no other network requests.
+- `static/index.html` sets a Content-Security-Policy. Scripts load only from the app itself, and images only from the app, inline data, and the two map tile hosts (Esri and OpenStreetMap). The renderer makes no other network requests.
 - The builds are unsigned side-load builds. Compare a download against `SHA256SUMS.txt` on the release page before you run it.

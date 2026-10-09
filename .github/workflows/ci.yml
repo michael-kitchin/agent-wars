@@ -1,0 +1,56 @@
+# Lint and test Agent Wars on every push and pull request to main.
+# Runs `npm run test`, which builds the main process and then runs ESLint, the
+# naming check, the renderer type check, the main-process tests, and the
+# third-party notices check (see package.json).
+# Pushes that only change documentation skip this workflow.
+# The three-platform packaging build stays on demand in build.yml.
+name: CI
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "**.md"
+      - "doc/**"
+      - ".spec/**"
+  pull_request:
+    branches: [main]
+    paths-ignore:
+      - "**.md"
+      - "doc/**"
+      - ".spec/**"
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Lint and test
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Used by scripts/extract-generated-data.cjs during the build that `npm run test` runs.
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "npm"
+
+      # --ignore-scripts skips Electron's binary download; the tests do not need it.
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Run tests
+        run: npm run test

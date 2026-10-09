@@ -37,7 +37,13 @@ Hovering a unit's flag, in the stack list or anywhere else it appears, or the to
 - Pan: drag with left mouse, or WASD / arrows.
 - Zoom in/out: mouse wheel.
 - Select units: click a unit icon; a stack opens its unit list.
+- Add or remove a lone unit from the selection: Shift-click its icon.
+- Clear the selection: right-click the map. Queued orders stay.
 - Add move order: select units, then double-click the destination.
 - Ranged attack: select capable units, click "Ranged", then double-click an enemy hex in range.
 - Resolve turn: Ready button.
+- See under the terrain: hold T. Terrain fill hides while the key is down, and on the strategic map hex codes and, where they apply, tech icons show.
+- Close a popup or the unit list: Escape.
 - New game: **New** on the Model tab during strategic planning, or the dialog that opens at game over.
+
+The full input map, including the exceptions, is in [ux/input-map.md](ux/input-map.md).

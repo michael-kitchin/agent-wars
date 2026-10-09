@@ -4,7 +4,7 @@
 [![Release](https://img.shields.io/github/v/release/michael-kitchin/agent-wars?include_prereleases)](https://github.com/michael-kitchin/agent-wars/releases)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-A turn-based grand strategy game on a real-Earth hex map, where your opponent is a large language model you choose. Coding agents wrote the code and most of the documentation. One developer set the direction, wrote the specs, prompts, and rules, and reviewed the results. The story of building it is told in the Agent Wars series in [*Standing Orders*](https://standingorders.substack.com).
+A turn-based grand strategy game on a real-Earth hex map, where your opponent is a large language model you choose. Coding agents wrote the code and most of the documentation. One developer set the direction, wrote the prompts and the rules the agents follow, and reviewed the results. The story of building it is told in the Agent Wars series in [*Standing Orders*](https://standingorders.substack.com).
 
 ![Tactical planning over central Mexico](doc/media/tactical-battle-mexico.jpg)
 
@@ -46,7 +46,7 @@ Starting a match, the controls, and where messages appear are covered in [doc/ho
 
 ## How it was built
 
-Every line of production code was written by coding agents, mostly in Cursor. The developer's hand-written work is the specs, the prompts that drove the agents, and the rules they follow. Those artifacts are in the repository:
+Every line of production code was written by coding agents, mostly in Cursor. The developer wrote the prompts that drove the agents and the rules they follow; the agents also wrote the plans and most of the documentation. All of it is in the repository:
 
 - [AGENTS.md](AGENTS.md): what every agent reads first, including which document wins a disagreement and what to update in the same change.
 - [`.cursor/rules/`](.cursor/rules/): fourteen always-on coding rules, from reliable code and testing standards to file-size limits and naming.
