@@ -91,7 +91,7 @@ Ensure all uncommitted files and the code and content within are complete, corre
 
 ## Update the Docs
 
-Review all all uncommitted files and the code and content within and update @doc to capture any spec-level changes, as needed.
+Review all uncommitted files and the code and content within and update @doc to capture any spec-level changes, as needed.
 
 ## Review the Branch
 
