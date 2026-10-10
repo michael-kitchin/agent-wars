@@ -1,4 +1,7 @@
-import { getTacticalTerrainOverridesForRenderer as getTacticalTerrainOverridesFromCache } from '../terrainClassificationCache';
+import {
+  getTacticalTerrainOverridesForRenderer as getTacticalTerrainOverridesFromCache,
+  isTerrainClassificationCacheLoaded,
+} from '../terrainClassificationCache';
 import { logDebug, logTrace } from '../logger';
 import { getTacticalRendererOverrideRowsCached } from './tacticalRendererOverrideCache';
 import type { BuildUnitType } from '../productionRules';
@@ -869,8 +872,8 @@ export function getTacticalTerrainOverridesForRendererFromGame(ops: ControlDbOps
  *
  * Purpose: Inner rebuild used by `getTacticalRendererOverrideRowsCached` on cache miss.
  * When to use: Only from the cache wrapper in this module.
- * Expected outcome: Same row list as the pre-memoization implementation.
- * Exceptions: None.
+ * Expected outcome: Base pack rows overlaid with match feature rows. An empty list when the classification cache has not been loaded, so a startup request cannot publish feature rows as the whole tactical map.
+ * Exceptions: Propagates SQLite errors from the feature-override read after the cache is loaded.
  */
 function buildTacticalTerrainOverridesForRendererFromGameUncached(ops: ControlDbOps): Array<{
   h3Index: string;
@@ -881,6 +884,10 @@ function buildTacticalTerrainOverridesForRendererFromGameUncached(ops: ControlDb
   isRubble?: boolean;
 }> {
   logDebug('gameDb buildRes4TerrainOverridesForRendererFromGameUncached');
+  if (!isTerrainClassificationCacheLoaded()) {
+    logDebug('gameDb buildRes4TerrainOverridesForRendererFromGameUncached: terrain cache empty, returning []');
+    return [];
+  }
   const baseRows = getTacticalTerrainOverridesFromCache();
   const mergedByH3 = new Map(
     baseRows.map((row) => [

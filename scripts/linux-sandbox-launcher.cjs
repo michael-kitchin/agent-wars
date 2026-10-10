@@ -99,9 +99,9 @@ async function restoreLinuxExecutable(binaryPath, runtimePath) {
  * symlink (deb `/usr/bin` links) and so root does not hit Chromium's unsandboxed-root refusal.
  * When to use: From `installLinuxSandboxLauncher` after the executable name is validated.
  * Expected outcome: A POSIX script with LF line endings. It execs the renamed binary
- * with no sandbox flag when `chrome-sandbox` is root mode 4755, or when that file
+ * with no sandbox flag when `chrome-sandbox` is root mode 4755, and when that file
  * is absent and this process can create a user namespace. A present helper that is
- * not root mode 4755 gets `--disable-setuid-sandbox` only in that second case.
+ * not root mode 4755 gets `--disable-setuid-sandbox` when namespaces work.
  * `--no-sandbox` is used for root, when user namespaces are missing, and when
  * AppArmor or `kernel.unprivileged_userns_clone` denies them to an unconfined
  * binary. `unshare` succeeding is not that proof: Ubuntu profiles that command.
