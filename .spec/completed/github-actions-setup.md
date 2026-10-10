@@ -38,14 +38,12 @@ The workflow in **`.github/workflows/build.yml`** runs when someone starts it fr
   - **Linux:** unpacked `release/linux-unpacked/`. The entry point `agent-wars` is the sandbox launcher; the Electron binary is `agent-wars.bin`. See [packaging.md](packaging.md).
   - **macOS:** unpacked `.app` under `release/`.
 
-Artifacts are uploaded per run. Windows is `agent-wars-<version>-windows-<arch>`, one zip of the unpacked app. Linux and macOS are `agent-wars-<version>-Linux` and `agent-wars-<version>-macOS`, and each contains the archive made on that runner. To download them:
+Artifacts are uploaded per run. Windows is `agent-wars-<version>-windows-<arch>`, one zip of the unpacked app. Linux and macOS are `agent-wars-<version>-linux-<arch>.tar.gz` and `agent-wars-<version>-macos-<arch>.zip`; each artifact is that archive. The draft-release job in the same workflow publishes those files. The procedure is [doc/releasing.md](../../doc/releasing.md). To download them:
 
 1. Open the run in the **Actions** tab.
 2. Scroll to the **Artifacts** section.
 3. Download the artifact for that operating system.
 
-## 3. Optional: publishing releases
+## 3. Publishing releases
 
-To attach built artifacts to a **GitHub Release** (e.g. when you tag a version):
-
-- You can add a second workflow that triggers on `release published` or on tags like `v*`, run the same build matrix, then use `softprops/action-gh-release` to upload the `release/` contents as release assets. If you want this, the workflow can be extended or a separate `release.yml` can be added.
+The Build workflow's draft-release job attaches the archives. The procedure is [doc/releasing.md](../../doc/releasing.md).

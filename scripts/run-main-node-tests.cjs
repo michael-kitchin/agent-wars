@@ -106,6 +106,7 @@ function main() {
     collectTestJsUnderDir(sharedDist, files);
     files.sort((a, b) => a.localeCompare(b));
     for (const extraName of [
+      'collect-release-archives.test.cjs',
       'electron-builder-config.test.cjs',
       'linux-sandbox-launcher.test.cjs',
       'generated-data-packaging.test.cjs',

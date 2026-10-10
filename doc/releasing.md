@@ -13,8 +13,8 @@ How a version of Agent Wars becomes a GitHub release. The builds are unsigned si
 ## Build and draft the release
 
 1. Start the Build workflow on `main` with **Create a draft release from this commit** checked: in GitHub under **Actions > Build > Run workflow**, or with `gh workflow run build.yml --ref main -f draft_release=true`.
-2. Each OS job tests and packages its build. Windows uploads the unpacked app, so the Actions artifact is one zip. Linux and macOS archive on the runner first, because the upload drops Unix permissions and follows symlinks. The macOS job keeps electron-builder's signature when it verifies and signs ad hoc when it doesn't, since Apple silicon won't launch an app without a valid signature.
-3. The release job runs only when all three builds pass. It zips the Windows app, writes `SHA256SUMS.txt` for the three archives, and creates a draft release `v<x.y.z>` on the built commit, with the notes file as its body.
+2. Each OS job tests and packages its build. Windows uploads the unpacked app, so the Actions artifact is one zip. Linux and macOS archive on the runner first, then upload that tar.gz or zip as the artifact file. A directory upload drops Unix permissions and follows symlinks, and wrapping the archive would put a compressed file inside another zip. The macOS job keeps electron-builder's signature when it verifies and signs ad hoc when it doesn't, since Apple silicon won't launch an app without a valid signature.
+3. The release job runs only when all three builds pass. It publishes the three stored archives, writes `SHA256SUMS.txt`, and creates a draft release `v<x.y.z>` on the built commit, with the notes file as its body.
 
 If a build fails, nothing is drafted: fix the problem, push, and run the workflow again. Delete an older draft for the same version before drafting a new one (`gh release delete v<x.y.z>`).
 
@@ -34,8 +34,8 @@ Then review the notes and the asset list on the draft and choose **Publish relea
 
 Run the Build workflow with the box unchecked. Each run uploads one artifact per OS, kept until the repository's artifact retention period ends.
 
-The Windows artifact is named `agent-wars-<version>-windows-<arch>`. Downloading it from the Actions page gives one zip of the unpacked app, with the executable at the root of the zip. The upload always stores a zip, so the Windows job does not zip the app itself; a zip made on the runner would be wrapped in a second zip. `gh run download` extracts that artifact, so the zip to hand out is the Actions download or the draft-release asset, not the extracted folder.
+The Windows artifact is named `agent-wars-<version>-windows-<arch>`. Downloading it from the Actions page gives one zip of the unpacked app, with the executable at the root of the zip. The upload stores a zip, so the Windows job does not zip the app itself; a zip made on the runner would be wrapped in a second zip. `gh run download` extracts that artifact, so the zip to hand out is the Actions download or the draft-release asset, not the extracted folder.
 
-Linux and macOS artifacts are named `agent-wars-<version>-Linux` and `agent-wars-<version>-macOS`. Each contains the archive made on that runner, because the upload drops Unix permissions and follows symlinks. Downloading those from the Actions page wraps that archive in a zip. `gh run download <run-id>` removes the wrapper and leaves `agent-wars-<version>-linux-<arch>.tar.gz` or `agent-wars-<version>-macos-<arch>.zip`.
+Linux and macOS artifacts are named `agent-wars-<version>-linux-<arch>.tar.gz` and `agent-wars-<version>-macos-<arch>.zip`. Each artifact is that archive. The runner builds it so Unix permissions and symlinks survive, and the upload stores the file itself. The Actions page download is that tar.gz or zip. Hand out that download or the draft-release asset. `gh run download` extracts zip payloads, so the macOS artifact unpacks to the app and the Linux tar.gz fails extraction.
 
 Hand out the Windows zip, the Linux tar.gz, and the macOS zip as they are. Don't re-zip the Linux or macOS archives on Windows: that drops the Unix permissions the Linux launcher needs, and a macOS app bundle needs its symlinks kept.

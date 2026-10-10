@@ -1,8 +1,9 @@
 # Build and test Agent Wars on Windows, Linux, and macOS.
 # On-demand only (workflow_dispatch). Windows uploads the unpacked app as
 # agent-wars-<version>-windows-<arch>; that artifact is the zip. Linux and macOS
-# upload an archive made on the runner, because the artifact upload drops Unix
-# permissions and follows symlinks.
+# make a tar.gz or zip on the runner, then upload that one file. A directory
+# upload would drop Unix permissions and follow symlinks, and zipping the
+# archive again would put a compressed file inside the artifact zip.
 # With "Create a draft release" checked, a last job attaches the archives and
 # SHA256SUMS.txt to a draft GitHub release v<version>, with notes from
 # doc/release-notes/v<version>.md. Publishing the draft stays a manual step.
@@ -116,10 +117,9 @@ jobs:
           fi
           codesign --verify --deep --strict --verbose=2 "$app"
 
-      # Linux and macOS are archived on the runner. upload-artifact always stores a
-      # zip, drops Unix permissions, and follows symlinks, which would break the
-      # Linux launcher and the macOS app bundle. Windows is left unpacked: zipping
-      # it here would put that zip inside the artifact zip.
+      # Linux and macOS are archived on the runner so the archive keeps Unix
+      # permissions and symlinks. Windows stays unpacked: the upload stores a zip,
+      # and a zip made here would sit inside that zip.
       - name: Archive the build
         id: archive
         shell: bash
@@ -140,12 +140,22 @@ jobs:
             Linux)
               name="agent-wars-${APP_VERSION}-linux-${arch}"
               mv release/linux-unpacked "release/${name}"
-              tar -C release -czf "release-archive/${name}.tar.gz" "${name}"
+              archive="release-archive/${name}.tar.gz"
+              tar -C release -czf "$archive" -- "${name}"
+              test -s "$archive"
+              echo "archive_path=${archive}" >> "$GITHUB_OUTPUT"
               ;;
             macOS)
               name="agent-wars-${APP_VERSION}-macos-${arch}"
               apps=(release/mac*/*.app)
-              ditto -c -k --sequesterRsrc --keepParent "${apps[0]}" "release-archive/${name}.zip"
+              if [ "${#apps[@]}" -ne 1 ]; then
+                echo "Expected one .app under release/mac*/, found ${#apps[@]}." >&2
+                exit 1
+              fi
+              archive="release-archive/${name}.zip"
+              ditto -c -k --sequesterRsrc --keepParent "${apps[0]}" "$archive"
+              test -s "$archive"
+              echo "archive_path=${archive}" >> "$GITHUB_OUTPUT"
               ;;
             *)
               echo "Unsupported runner OS: $RUNNER_OS" >&2
@@ -154,12 +164,14 @@ jobs:
           esac
           ls -l release-archive
 
+      # archive: false stores this one file. The artifact name is the file name,
+      # so the Actions download is the tar.gz or zip and not a zip of that archive.
       - name: Upload release archive
         if: runner.os != 'Windows'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
-          name: agent-wars-${{ steps.app_version.outputs.value }}-${{ runner.os }}
-          path: release-archive/*
+          path: ${{ steps.archive.outputs.archive_path }}
+          archive: false
           if-no-files-found: error
 
       # The artifact name is the zip name. upload-artifact creates that zip from
@@ -168,7 +180,7 @@ jobs:
       # app can contain dotfiles that are part of the build.
       - name: Upload Windows build
         if: runner.os == 'Windows'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ steps.archive.outputs.archive_name }}
           path: ${{ steps.archive.outputs.archive_path }}
@@ -191,49 +203,20 @@ jobs:
         id: app_version
         run: node -e "const fs=require('fs');const v=require('./package.json').version;fs.appendFileSync(process.env.GITHUB_OUTPUT, 'value='+v+String.fromCharCode(10));"
 
+      # skip-decompress keeps each stored file intact. The macOS artifact is
+      # itself a zip; extracting it would make this job zip the bundle again.
       - name: Download release archives
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: agent-wars-${{ steps.app_version.outputs.value }}-*
           path: release-assets
+          skip-decompress: true
 
-      # Linux and macOS artifacts each hold one archive. The Windows artifact is
-      # the unpacked app, so this step zips it once, with files at the zip root,
-      # under the artifact's name. found must be 3, one file for each matrix OS.
+      # Publishes the stored bytes. Linux and macOS keep the archive name.
+      # The Windows name has no extension; the asset is that name plus .zip.
+      # The script requires one archive per OS and does not pack the files again.
       - name: Collect release files
-        shell: bash
-        run: |
-          set -eu
-          shopt -s nullglob
-          mkdir -p publish
-          found=0
-          for dir in release-assets/*; do
-            [ -d "$dir" ] || continue
-            base="$(basename "$dir")"
-            archives=( "$dir"/*.zip "$dir"/*.tar.gz )
-            entries=( "$dir"/* )
-            if [ "${#archives[@]}" -eq 1 ] && [ "${#entries[@]}" -eq 1 ]; then
-              mv "${archives[0]}" publish/
-              found=$((found + 1))
-              continue
-            fi
-            if [ "${#archives[@]}" -ne 0 ]; then
-              echo "Artifact ${base} mixes an archive with other files." >&2
-              exit 1
-            fi
-            if [ "${#entries[@]}" -eq 0 ]; then
-              echo "Artifact ${base} is empty." >&2
-              exit 1
-            fi
-            publish_dir="$PWD/publish"
-            (cd "$dir" && zip -r -q "${publish_dir}/${base}.zip" .)
-            found=$((found + 1))
-          done
-          if [ "$found" -ne 3 ]; then
-            echo "Expected 3 release files, found ${found}." >&2
-            exit 1
-          fi
-          ls -l publish
+        run: node scripts/collect-release-archives.cjs release-assets publish
 
       - name: Write checksums
         working-directory: publish
