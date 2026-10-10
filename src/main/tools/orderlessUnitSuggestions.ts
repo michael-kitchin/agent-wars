@@ -65,9 +65,23 @@ const EMPTY_LAND_MASS: LandMassByH3 = new Map();
  * Exceptions: None.
  */
 export interface OrderlessMissionActionSignals {
-  /** Units that can strike this turn, so an orderless air unit can be told to defend. */
+  /**
+   * Units that can strike this turn, so an orderless air unit can be told to defend.
+   *
+   * Contract: Names units whose Best Options row includes an air-strike label.
+   * When to use: Deciding whether an orderless air unit gets a defend mission.
+   * Expected outcome: A unit absent from the set is not told to defend.
+   * Exceptions: None.
+   */
   airStrikeUnitIds: ReadonlySet<string>;
-  /** Units with a this-turn approach or move/melee row, so Action needed can count that step. */
+  /**
+   * Units with a this-turn approach or move/melee row, so Action needed can count that step.
+   *
+   * Contract: Names units whose Best Options row includes approach or move/melee.
+   * When to use: Marking Action needed for a listed one-step move.
+   * Expected outcome: A unit in both this set and `airStrikeUnitIds` appears in both.
+   * Exceptions: None.
+   */
   oneStepMoveUnitIds: ReadonlySet<string>;
 }
 
@@ -109,9 +123,23 @@ export function orderlessMissionSignalsFromActionRows(
  * Exceptions: None.
  */
 export interface OrderlessActionNeededSets {
-  /** Units `suggestApproachDestinationsForOrderlessUnits` returned a mission for. */
+  /**
+   * Units `suggestApproachDestinationsForOrderlessUnits` returned a mission for.
+   *
+   * Contract: Keys of the suggestion map from the same collection pass.
+   * When to use: Unit Status and attention flags, as a reason for Action needed.
+   * Expected outcome: Membership means a march or defend mission exists for that id.
+   * Exceptions: None.
+   */
   suggestedUnitIds: ReadonlySet<string>;
-  /** Units with a Best Options approach or move/melee row this turn. */
+  /**
+   * Units with a Best Options approach or move/melee row this turn.
+   *
+   * Contract: The same id set as `OrderlessMissionActionSignals.oneStepMoveUnitIds` for this pass.
+   * When to use: Action needed when the unit has a listed step and no standing order.
+   * Expected outcome: A neighbor step that Best Options did not list is absent.
+   * Exceptions: None.
+   */
   oneStepMoveUnitIds: ReadonlySet<string>;
 }
 
@@ -240,9 +268,23 @@ export function orderlessMissionAttentionText(count: number): string {
  * Exceptions: None.
  */
 export interface OrderlessMissionSuggestion {
-  /** `assign_order` type the cell is asking for. March is a ground unit; defend is an air unit that can strike. */
+  /**
+   * `assign_order` type the cell is asking for.
+   *
+   * Contract: `march` is a ground unit; `defend` is an air unit that can strike.
+   * When to use: Choosing the standing-order type to copy into the prompt.
+   * Expected outcome: `defend` pairs with the air unit's current hex.
+   * Exceptions: None.
+   */
   orderType: 'march' | 'defend';
-  /** H3 the order should name. Never the unit's own hex when `orderType` is `march`. */
+  /**
+   * H3 the order should name.
+   *
+   * Contract: Never the unit's own hex when `orderType` is `march`.
+   * When to use: The destination cell of the suggested `assign_order`.
+   * Expected outcome: A hex the briefing can print without another search.
+   * Exceptions: None.
+   */
   destinationH3: string;
 }
 
