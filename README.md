@@ -8,7 +8,7 @@ A turn-based grand strategy game on a real-Earth hex map, where your opponent is
 
 ![Tactical planning over central Mexico](doc/media/tactical-battle-mexico.jpg)
 
-*A tactical battle in central Mexico on turn 2, a rainy August. Teal human units face the rose opponent (in this case, Gemini Flash Lite), and their movement orders are queued in the right panel. The hex readout for Guerrero, Morelos, and México lists the road, the forest and urban terrain, the rain, and what those do to range, movement, and cover. At the upper right, the LLM's message reads "Your lines will shatter before you even realize the battle has begun."*
+*A tactical battle in central Mexico on turn 2, a rainy August. Teal/human units face the rose/LLM opponent (in this case, Gemini Flash Lite), and their movement orders are queued in the right panel. The hex readout for Guerrero, Morelos, and México lists the road, the forest and urban terrain, the rain, and what those do to range, movement, and cover. At the upper right, the LLM's message reads "Your lines will shatter before you even realize the battle has begun."*
 
 [Play it](#play-it) · [What's inside](#whats-inside) · [Under the hood](#under-the-hood) · [How it was built](#how-it-was-built) · [Architecture](#architecture) · [Build from source](#build-from-source) · [Status](#status) · [License](#license)
 
@@ -39,12 +39,10 @@ Starting a match, the controls, and where messages appear are covered in [doc/ho
 ## What's inside
 
 - **A hybrid AI opponent.** The engine pre-computes a briefing (an ASCII hex map, Markdown tables of units and threats, and attention flags) before it consults the model. Standing orders carry the plan forward on turns the model isn't consulted, and event callbacks decide when it is. Any OpenRouter model can play; one without tool calls plays without the [planning tools](#the-opponents-tools). See [doc/hybrid-ai.md](doc/hybrid-ai.md) and [doc/ai-tools.md](doc/ai-tools.md).
-- **Prompts as code.** The prompts are assembled by builders in [`src/main/openRouter/promptSpec/`](src/main/openRouter/promptSpec/), documented in [doc/ai-commander-prompts/](doc/ai-commander-prompts/README.md), and held to that contract by tests such as `consultationContract.test.ts`, `envelopeJsonSchema.test.ts`, and `variantConformance.test.ts`.
+- **Prompts as code.** The prompts are assembled by builders in `[src/main/openRouter/promptSpec/](src/main/openRouter/promptSpec/)`, documented in [doc/ai-commander-prompts/](doc/ai-commander-prompts/README.md), and held to that contract by tests such as `consultationContract.test.ts`, `envelopeJsonSchema.test.ts`, and `variantConformance.test.ts`.
 - **A real-Earth hex grid at two scales.** Strategic play uses H3 resolution 1 on the global map, or 2 or 3 on one of the regional maps. Tactical battles sit three resolutions finer. Terrain, roads, place names, and climate come from public datasets through an offline Python pipeline (`scripts/terrain_pipeline/`). The cell sizes and sources are under [Under the hood](#under-the-hood).
 - **Simultaneous turns.** Both sides plan, then the engine resolves air strikes, ranged fire, movement, ferry, and melee in a fixed phase order, with optional zoomed-in tactical battles. The rules are in [doc/combat-rules-v3.md](doc/combat-rules-v3.md).
-- **Guardrails.** `npm test` builds the main process, then runs ESLint (with custom rules in [`eslint-rules/`](eslint-rules/)), a naming-convention check, a renderer type check, the main-process and tool tests (808 tests), and a third-party-notices check. The renderer runs with context isolation, without Node integration, and under a Content-Security-Policy.
-
-
+- **Guardrails.** `npm test` builds the main process, then runs ESLint (with custom rules in `[eslint-rules/](eslint-rules/)`), a naming-convention check, a renderer type check, the main-process and tool tests (808 tests), and a third-party-notices check. The renderer runs with context isolation, without Node integration, and under a Content-Security-Policy.
 
 ## Under the hood
 
@@ -126,12 +124,12 @@ Memory writes and standing-order changes travel in the model's JSON reply. The f
 Every line of production code was written by coding agents, mostly in Cursor. The developer wrote the prompts that drove the agents and the rules they follow; the agents also wrote the plans and most of the documentation. All of it is in the repository:
 
 - [AGENTS.md](AGENTS.md): what every agent reads first, including which document wins a disagreement and what to update in the same change.
-- [`.cursor/rules/`](.cursor/rules/): fourteen always-on coding rules, from reliable code and testing standards to file-size limits and naming.
-- [`.spec/completed/`](.spec/completed/): the execution plans, audits, and verification records behind each change.
+- `[.cursor/rules/](.cursor/rules/)`: fourteen always-on coding rules, from reliable code and testing standards to file-size limits and naming.
+- `[.spec/completed/](.spec/completed/)`: the execution plans, audits, and verification records behind each change.
 - [doc/coding-prompts-1.md](doc/coding-prompts-1.md): the reusable prompt library. Its core cycle is four prompts: plan, audit the plan, implement, audit the implementation.
 - [doc/](doc/README.md): the living product documentation, kept current with the code.
 
-**A trail to follow:** the [unit origin and country flags plan](.spec/completed/unit-origin-and-country-flags-execution-plan.md) opens with ground rules for the executing agent, locked decisions, and verified facts. The code it produced is in [`src/main/unitOrigin/`](src/main/unitOrigin/), with tests beside it (`unitBirthOrigin.test.ts`, `unitBirthCellSelection.test.ts`, and others).
+**A trail to follow:** the [unit origin and country flags plan](.spec/completed/unit-origin-and-country-flags-execution-plan.md) opens with ground rules for the executing agent, locked decisions, and verified facts. The code it produced is in `[src/main/unitOrigin/](src/main/unitOrigin/)`, with tests beside it (`unitBirthOrigin.test.ts`, `unitBirthCellSelection.test.ts`, and others).
 
 ### Time and tokens
 
@@ -172,8 +170,6 @@ npm start
 - **Lint and test:** `npm run lint` runs ESLint on `src/`. `npm run test` runs the full check described under [What's inside](#whats-inside).
 - **Package:** `npm run dist`, `dist:win`, `dist:linux`, or `dist:mac` builds with electron-builder (see [.spec/completed/packaging.md](.spec/completed/packaging.md)). Releases are made as described in [doc/releasing.md](doc/releasing.md).
 
-
-
 ### Terrain data
 
 The generated terrain and region packs under `data/generated/` are tracked, so building and playing need no GIS tools. To regenerate them:
@@ -189,8 +185,6 @@ Setup, the Python CLIs, and troubleshooting are in [scripts/terrain_pipeline/REA
 - **Progress:** Phase 0 (hybrid AI validation) and Phase 1 (global strategic game) are complete. Phase 2 is complete through milestone 2.5 (regional game and rules enhancements), including tactical battles (2.1 to 2.4) and playtester UI fixes (2.45). Milestone 2.6 (player-facing save/load and session management) is not shipped. See the [development plan (v3.4)](doc/devleopment-plan-v3.4.md); milestones 0.2 to 0.5 were a throwaway prototype that validated combat, tools, and the AI loop before the production baseline.
 - **CI:** lint and tests run on every push that changes code (Linux). The three-platform packaging build runs on demand and drafts each release.
 - **Contributions:** this is a personal R&D project, so it doesn't take issues or pull requests. To report a security problem, see [SECURITY.md](SECURITY.md).
-
-
 
 ## License
 
