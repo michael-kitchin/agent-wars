@@ -503,11 +503,11 @@ export function getTerrainStrategicKindsFromCache(): ReadonlyMap<string, Pipelin
 }
 
 /**
- * Defines the `getTacticalTerrainOverridesForRenderer` function shape (export function getTacticalTerrainOverridesForRenderer(): Array<).
-
- * Purpose: Supports maintainability by documenting why `getTacticalTerrainOverridesForRenderer` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Returns tactical terrain override rows for the renderer map.
+ *
+ * Purpose: Supplies the base res-4 kind, urban, and rubble rows that the match database overlays.
+ * When to use: The `game:getRes4TerrainOverrides` handler at startup and after a match loads the classification cache.
+ * Expected outcome: The snapshot rows when the cache is loaded. An empty array before a match loads terrain, the same fallback as the city and road overlay handlers.
  * Exceptions: None.
  */
 export function getTacticalTerrainOverridesForRenderer(): Array<{
@@ -518,9 +518,8 @@ export function getTacticalTerrainOverridesForRenderer(): Array<{
 }> {
   logTrace('terrainClassificationCache getRes4TerrainOverridesForRenderer');
   if (!cached) {
-    const err = new Error('terrainClassificationCache: load ensureTerrainClassificationCacheLoaded() first');
-    logError('terrainClassificationCache getRes4TerrainOverridesForRenderer: cache empty', err);
-    throw err;
+    logDebug('terrainClassificationCache getRes4TerrainOverridesForRenderer: cache empty, returning []');
+    return [];
   }
   return tacticalTerrainOverridesRowsForRenderer(cached);
 }

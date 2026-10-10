@@ -10,6 +10,7 @@ import {
   getStrategicBaselineUrbanHexCountsForRenderer,
   getTacticalCityOverlaysForRenderer,
   getTacticalRoadRailOverlaysForRenderer,
+  getTacticalTerrainOverridesForRenderer,
 } from './terrainClassificationCache';
 import { reduceTacticalCityOverlayLabelsByH3 } from './terrainTacticalCityOverlayReduce';
 import { parseTerrainTacticalRoadRailSidesJson } from './terrainRoadRailSidesLoad';
@@ -171,6 +172,7 @@ function testOverlayIpcGettersReturnEmptyWhenCacheCleared(): void {
   assert.deepStrictEqual(getTacticalCityOverlaysForRenderer(), []);
   assert.deepStrictEqual(getTacticalRoadRailOverlaysForRenderer(), []);
   assert.deepStrictEqual(getStrategicBaselineUrbanHexCountsForRenderer(), []);
+  assert.deepStrictEqual(getTacticalTerrainOverridesForRenderer(), []);
 }
 
 /**
