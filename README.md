@@ -53,14 +53,14 @@ Cell areas and edge lengths are averages from the H3 library. The other counts c
 Every map is a grid of [H3](https://h3geo.org) cells, Uber's hierarchical hexagon index. A battle zooms in three resolutions, so one strategic hex contains 343 tactical cells (286 under one of H3's twelve pentagons), plus three rings of neighboring cells.
 
 
-| H3 resolution | Used for                          | Average hex | Edge   | About the size of |
-| ------------- | --------------------------------- | ----------- | ------ | ----------------- |
-| 1             | Global strategic map (842 hexes)  | 609,800 km² | 483 km | Ukraine           |
-| 2             | Strategic map on 6 regional maps  | 86,800 km²  | 183 km | Austria           |
-| 3             | Strategic map on 17 regional maps | 12,400 km²  | 69 km  | Montenegro        |
-| 4             | Global battles                    | 1,770 km²   | 26 km  | Greater London    |
-| 5             | Battles on resolution 2 maps      | 253 km²     | 9.9 km | Malta             |
-| 6             | Battles on resolution 3 maps      | 36 km²      | 3.7 km | Macau             |
+| H3 resolution | Used for                         | Average hex | Edge   | About the size of |
+| ------------- | -------------------------------- | ----------- | ------ | ----------------- |
+| 1             | Global strategic map (842 hexes) | 609,800 km² | 483 km | Ukraine           |
+| 2             | Strategic map for 6 regions      | 86,800 km²  | 183 km | Austria           |
+| 3             | Strategic map for 17 regions     | 12,400 km²  | 69 km  | Montenegro        |
+| 4             | Global battles                   | 1,770 km²   | 26 km  | Greater London    |
+| 5             | Battles on resolution 2 maps     | 253 km²     | 9.9 km | Malta             |
+| 6             | Battles on resolution 3 maps     | 36 km²      | 3.7 km | Macau             |
 
 
 Each of the 23 regional maps holds 257 to 352 strategic hexes. Those are the footprint totals in [doc/region-summary-1.md](doc/region-summary-1.md): South-Eastern Asia is the smallest and Southern Asia east is the largest.
