@@ -40,7 +40,7 @@ The minimum rank is 0 for every layer.
 
 ## Commands
 
-From the repository root, with Natural Earth and the rasters in `F:/Data`:
+From the repository root. Natural Earth, the EarthEnv rasters, and the extra shapefiles live in the [source directory](../terrain_pipeline/README.md#source-directory). `validate`, `footprint`, `run`, and `origins` take `--data-root` (default `F:/Data` in `regional_cli.py`). `regional:validate`, `regional:footprint`, `regional:generate`, and the `origins` command below omit that flag. `economy`, `check`, `report`, and `zip` read generated packs. The regional `weather` step still reads `WORLDCLIM_DIR`, described in that source-directory section.
 
 1. `npm run regional:validate`
 2. `npm run regional:footprint`

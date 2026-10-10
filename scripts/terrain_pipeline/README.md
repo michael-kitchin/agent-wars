@@ -47,16 +47,65 @@ Res-4 records include all res-1 fields plus urban metrics:
 4. PostgreSQL extensions installed in that DB:
    - `postgis`
    - `h3`
-5. Source rasters in `F:\Data` (EarthEnv land-cover classes 1-12 + topography files).
-6. **Water + urban + point shapefiles** at `F:\Data\<...>`:
-   - water masks: defaults **`ne_10m_ocean.shp`**, **`ne_10m_lakes.shp`**
-   - urban polygons: default **`ne_10m_urban_areas.shp`**
-   - airports: default **`ne_10m_airports.shp`** (`featurecla == "Airport"`)
-   - seaports: default **`ne_10m_ports.shp`** (`featurecla == "Port"`)
-
-   Ocean drives res-1 water; lakes are merged with ocean for res-4 water; urban polygons are applied only to res-4 cells that are not fully in water. Airport/seaport points are assigned to exactly one hex per resolution using `h3.latlng_to_cell(...)`. Paths are `InputRasterSet.root` / `InputRasterSet.*_shapefile_name` in `config.py`. Phase 1 validates these files are present and readable. Sidecar files (`.dbf`, `.shx`, `.prj`, …) must accompany each `.shp` where required by the driver.
+5. The files listed under [Source directory](#source-directory). Classification and metadata phase 1 check the EarthEnv rasters plus `ne_10m_ocean.shp`, `ne_10m_lakes.shp`, `ne_10m_urban_areas.shp`, `ne_10m_airports.shp`, and `ne_10m_ports.shp`. Landmass validation checks `ne_10m_geography_regions_polys.shp`. Road and rail validation checks `ne_10m_roads.shp` and `ne_10m_railroads.shp`.
 
 Phase 1 validation also requires `AGENT_WARS_DB_PASSWORD` (see [Credentials](#credentials)) so it can open a test connection to Postgres.
+
+## Source directory
+
+Offline generation reads Natural Earth vectors and EarthEnv rasters from directories outside this repo. Each setting below ships as `F:/Data`. Weather ships as `F:\Data\worldclim`. Point every setting you run at your directory. A setting you leave unchanged still reads its shipped path. Plans in `.spec/completed/` still name `F:/Data`. That was the directory on the machine where those plans were written. Change the settings in this section for a local setup.
+
+Which setting a command reads:
+
+- Classification (`cli`), metadata export, landmass export, and calibration use `InputRasterSet.root` in `scripts/terrain_pipeline/config.py`. Change that field. Those commands have no path flag.
+- Road and rail commands (`road_rail_sides_cli`, including `qa-line-coverage`, and `road_rail_vectors_cli`) take `--data-root`. The default string `F:/Data` is set in those two files, separate from `InputRasterSet.root`. Example: `python -m scripts.terrain_pipeline.road_rail_sides_cli run --mode fast --data-root D:\gis`. `npm run terrain:generate` runs metadata, which uses `InputRasterSet.root`, then `terrain:generate:road-rail`, which uses `--data-root`. That script, `terrain:generate:road-rail:high-fidelity`, and `terrain:generate:road-rail-vectors` omit `--data-root`.
+- Regional `validate`, `footprint`, `run`, and `origins` take `--data-root` (default `F:/Data` in `scripts/regional_pipeline/regional_cli.py`). See [../regional_pipeline/README.md](../regional_pipeline/README.md).
+- Hex naming takes `--data-root` on `python -m scripts.naming_pipeline.generate_hex_naming`. The default is `DEFAULT_DATA_ROOT` in `generate_hex_naming.py`.
+- Weather reads `WORLDCLIM_DIR` in `scripts/weather_pipeline/weather_pack.py`. Global weather export and the regional `weather` step both use it, including when regional `--data-root` points elsewhere. The export downloads `wc2.1_10m_tavg_*.tif` and `wc2.1_10m_prec_*.tif` into that folder when those files are absent.
+
+Put the shapefiles and EarthEnv rasters directly in the directory the command reads. Each `.shp` needs the sidecar files the driver requires (`.dbf`, `.shx`, `.prj`, and any others shipped with that layer).
+
+### Files the terrain pipeline reads
+
+Shapefile names for ocean, lakes, urban areas, airports, seaports, and geography regions are fields on `InputRasterSet` in `config.py`. Road and rail names are `RoadRailSidesExporter.road_shapefile_name` and `rail_shapefile_name`. `road_rail_vectors_cli._validate_inputs` repeats those two filenames as literals. Raster names are `InputRasterSet.landcover_by_class` and `InputRasterSet.topo_files`.
+
+Airport and seaport points are assigned with `h3.latlng_to_cell`. Water and urban label rules are under [Classification notes](#classification-notes).
+
+| File | Role |
+| --- | --- |
+| `ne_10m_ocean.shp` | Res-1 water, and the ocean polygons in the res-4 water mask |
+| `ne_10m_lakes.shp` | Merged with the ocean polygons for the res-4 water mask |
+| `ne_10m_urban_areas.shp` | Res-4 urban metrics and the classification urban label |
+| `ne_10m_airports.shp` | Airport points (`featurecla` `Airport`) |
+| `ne_10m_ports.shp` | Seaport points (`featurecla` `Port`) |
+| `ne_10m_geography_regions_polys.shp` | Landmass continent and island ids |
+| `ne_10m_roads.shp` | Road side masks and display vectors |
+| `ne_10m_railroads.shp` | Rail side masks and display vectors |
+| `consensus_full_class_1.tif` through `consensus_full_class_12.tif` | EarthEnv consensus land cover, classes 1 through 12; every file is required |
+| `tri_5KMmn_GMTEDmd.tif` | EarthEnv topography |
+| `tri_5KMma_GMTEDmd.tif` | EarthEnv topography |
+| `tri_50KMmn_GMTEDmd.tif` | EarthEnv topography |
+| `tri_50KMma_GMTEDmd.tif` | EarthEnv topography |
+| `slope_5KMmn_GMTEDmd.tif` | EarthEnv topography |
+| `slope_5KMma_GMTEDmd.tif` | EarthEnv topography |
+| `slope_50KMmn_GMTEDmd.tif` | EarthEnv topography |
+| `slope_50KMma_GMTEDmd.tif` | EarthEnv topography |
+| `elevation_5KMmn_GMTEDmn.tif` | EarthEnv topography |
+| `elevation_5KMma_GMTEDma.tif` | EarthEnv topography |
+| `elevation_50KMmn_GMTEDmn.tif` | EarthEnv topography |
+| `elevation_50KMma_GMTEDma.tif` | EarthEnv topography |
+
+### Files regional packs and hex naming also read
+
+Regional and naming commands read these from their `--data-root`. Regional `validate` checks `_REQUIRED_SHAPEFILES` in `regional_cli.py` plus every raster named on `InputRasterSet`. Hex naming reads the admin, populated-places, lakes, and marine layers (`COUNTRIES_SHP`, `STATES_SHP`, `CITIES_SHP`, `LAKES_SHP`, `MARINE_POLYS_SHP` in `generate_hex_naming.py`). Lakes are listed in the terrain table above.
+
+| File | Role |
+| --- | --- |
+| `ne_10m_admin_0_countries.shp` | Regional members, origins, and hex naming |
+| `ne_10m_admin_1_states_provinces.shp` | Admin-1 exclusions, origins, and hex naming |
+| `ne_10m_populated_places.shp` | City labels, footprints, and tactical naming |
+| `ne_10m_geography_marine_polys.shp` | Sea and ocean names |
+| `ne_10m_land.shp` | Regional footprints (landmass index). `regional:validate` does not check this file |
 
 ## Run
 
@@ -102,7 +151,7 @@ python -m scripts.terrain_pipeline.metadata_cli run --max-child-cells 5000 --ver
 
 Per-res-1 hex continent/island membership and water percentage for strategic land-unit movement.
 
-**Polygon source:** `F:/Data/ne_10m_geography_regions_polys.shp`
+**Polygon source:** `ne_10m_geography_regions_polys.shp` in the [source directory](#source-directory) (`InputRasterSet.geography_regions_shapefile_name`).
 
 - Continent-tier: `FEATURECLA` in `Continent`, `Isthmus` → stored in `continent_ids` using `NE_ID`
 - Islands: `FEATURECLA == Island` with area ≥ **2000 km²** → stored in `island_ids` using `NE_ID`
@@ -155,7 +204,7 @@ Commit `data/generated/terrain_res1_landmass.json.zip` (not the extracted `.json
 
 ### Road/rail side-mask export (separate CLI)
 
-Per-touched-res4 JSON describing which cell sides are used by Natural Earth roads and railroads (for glyphs and pathfinding). Inputs default to `F:/Data/ne_10m_roads.shp` and `F:/Data/ne_10m_railroads.shp`. Output: `data/generated/terrain_res4_road_rail_sides.json` (naming-style envelope: `schema_version`, `resolution`, `generated_at_utc`, `record_count`, `side_ordering_contract`, `inputs`, `records`). Each record has `h3_index`, `road_sides`, and `rail_sides` (equal-length boolean arrays; length 5 or 6). Side index semantics are defined only by the global `side_ordering_contract` string. The Electron renderer draws these segments together with reduced city labels only while **res4 hexes are visible** and the **`t` inspection key is held**; that path is display-only and does not affect gameplay state.
+Per-touched-res4 JSON describing which cell sides are used by Natural Earth roads and railroads (for glyphs and pathfinding). Inputs are `ne_10m_roads.shp` and `ne_10m_railroads.shp` under `--data-root` (see [Source directory](#source-directory)). Output: `data/generated/terrain_res4_road_rail_sides.json` (naming-style envelope: `schema_version`, `resolution`, `generated_at_utc`, `record_count`, `side_ordering_contract`, `inputs`, `records`). Each record has `h3_index`, `road_sides`, and `rail_sides` (equal-length boolean arrays; length 5 or 6). Side index semantics are defined only by the global `side_ordering_contract` string. The Electron renderer draws these segments together with reduced city labels only while **res4 hexes are visible** and the **`t` inspection key is held**; that path is display-only and does not affect gameplay state.
 
 Validation:
 
@@ -233,7 +282,7 @@ Regional packs, which the app does not load yet, are described in [../regional_p
 ## Troubleshooting
 
 - **Missing extension error**: install `postgis` / `h3` in `agent_wars_1`.
-- **Missing raster error**: verify files exist in `F:\Data` with exact names.
+- **Missing raster error**: verify the [source directory](#source-directory) files exist under the path that command reads, with those exact names.
 - **PROJ / `proj.db` version warnings** (e.g. PostgreSQL PostGIS vs Rasterio): phase 1 forces `PROJ_LIB` to Rasterio’s bundled `proj_data` before opening GeoTIFFs. If you still see conflicts, unset a global `PROJ_LIB` that points at `PostgreSQL\...\share\contrib\postgis...\proj` for the shell that runs the pipeline.
 - **Shapefile “not a supported format” from Rasterio**: only `.tif` inputs are opened with Rasterio; the ocean `.shp` is opened with Fiona. If you see this error, update the pipeline (older builds mistakenly passed the shapefile through `rasterio.open`).
 - **Performance concerns**: use `--max-child-cells` first to validate setup, then run full.
