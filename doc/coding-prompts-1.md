@@ -1,3 +1,4 @@
+```
 Please create a design document in the .spec directory reflecting the changes needed for <capability>. Before you get started, ask any questions you need to ‌ensure reliable execution of the plan and reliable and high-quality results.
 
 Details:
@@ -179,15 +180,4 @@ Now generate acceptance criteria (AC) for this capability, as follows:
 8. No semicolon, emdash, emoji, or arrow use.
 9. Use only alphanumeric characters with standard punctuation.
 
-===
-
-Broadcom-specific rules:
-1. Please review the package-info.java file in new or updated packages and ensure the semantics called for in that file are present in all new or updated code. In particular, ensure we're using @CheckForNull where appropriate.
-7. Please trust the nullability annotations in package-info.java files and that only method arguments and label ctor-assigned fields that should reasonably be null are marked with @CheckForNull and checked for null values.
-8. Please ensure all new and updated class files include the following copyright at the top of the file, substituting "2026" for whatever the current year is at the time.
-/*
- * Copyright (c) 2026 Broadcom. All Rights Reserved. The term "Broadcom"
- *  refers to Broadcom Inc. and/or its subsidiaries. All trademarks, trade
- *  names, service marks, and logos referenced herein belong to their
- *  respective companies.
- */
+```
