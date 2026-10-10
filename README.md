@@ -4,15 +4,31 @@
 ![Release](https://img.shields.io/github/v/release/michael-kitchin/agent-wars?include_prereleases)
 ![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)
 
-A turn-based grand strategy game on a real-Earth hex map, where your opponent is a large language model you choose. Coding agents wrote the code and most of the documentation. One developer set the direction, wrote the prompts and the rules the agents follow, and reviewed the results. The story of building it is told in the Agent Wars series in *[Standing Orders](https://standingorders.substack.com)*.
+A turn-based grand strategy game on a real-Earth hex map, where your opponent is a large language model you choose. Coding agents wrote the code and most of the documentation. I set the direction, wrote the prompts and the rules the agents follow, and reviewed the results. The story of building it is told in the Agent Wars series in *[Standing Orders](https://standingorders.substack.com)*.
 
 ![Tactical planning over central Mexico](doc/media/tactical-battle-mexico.jpg)
 
 *A tactical battle in central Mexico on turn 2, a rainy August. Teal/human units face the rose/LLM opponent (in this case, Gemini Flash Lite), and their movement orders are queued in the right panel. The hex readout for Guerrero, Morelos, and México lists the road, the forest and urban terrain, the rain, and what those do to range, movement, and cover. At the upper right, the LLM's message reads "Your lines will shatter before you even realize the battle has begun."*
 
-[Play it](#play-it) · [What's inside](#whats-inside) · [Under the hood](#under-the-hood) · [How it was built](#how-it-was-built) · [Architecture](#architecture) · [Build from source](#build-from-source) · [Status](#status) · [License](#license)
+[Play It](#play-it) · [Why This Exists](#why-this-exists) · [What's Inside](#whats-inside) · [Under the Hood](#under-the-hood) · [How It Was Built](#how-it-was-built) · [Architecture](#architecture) · [Build from Source](#build-from-source) · [Status](#status) · [License](#license)
 
-## Play it
+## Why This Exists
+
+When I started Agent Wars I'd been writing software by hand for more than forty years, but I knew very little about agentic development. This project was how I started learning about it.
+
+I chose this approach because:
+- I wanted a crash course in agentic development, on work I could afford to screw up. I especially wanted to see how it holds up as an application grows, from greenfield to feature additions and bug fixes against an ever-growing codebase.
+- It feels good to blow up commercial LLMs on imaginary battlefields, even if I'm paying their vendors for the privilege.
+- For something new, I wanted LLMs to reason about real-world geography, planning combat, movement, and logistics on a hex map across many turns.
+- For calibration, I built it on familiar ground (Electron and TypeScript, database development, and geospatial data), so I could catch bad agent output sooner.
+
+## Why I'm Sharing This
+
+To share what I've learned and give other people a chance to blow up their (not) favorite LLMs, too.
+
+Also: I don't intend to charge money for Agent Wars, now or ever.
+
+## Play It
 
 Download a build for Windows (x64), macOS (Apple silicon), or Linux (x64) from [Releases](https://github.com/michael-kitchin/agent-wars/releases). The builds are unsigned side-load builds, so Windows and macOS warn before the first launch. Each release lists SHA-256 checksums in `SHA256SUMS.txt`.
 
@@ -36,19 +52,19 @@ Starting a match, the controls, and where messages appear are covered in [doc/ho
 
 *Re-invading the New World, at the start of a global game. What could go wrong?*
 
-## What's inside
+## What's Inside
 
 - **A hybrid AI opponent.** The engine pre-computes a briefing (an ASCII hex map, Markdown tables of units and threats, and attention flags) before it consults the model. Standing orders carry the plan forward on turns the model isn't consulted, and event callbacks decide when it is. Any OpenRouter model can play; one without tool calls plays without the [planning tools](#the-opponents-tools). See [doc/hybrid-ai.md](doc/hybrid-ai.md) and [doc/ai-tools.md](doc/ai-tools.md).
-- **Prompts as code.** The prompts are assembled by builders in `[src/main/openRouter/promptSpec/](src/main/openRouter/promptSpec/)`, documented in [doc/ai-commander-prompts/](doc/ai-commander-prompts/README.md), and held to that contract by tests such as `consultationContract.test.ts`, `envelopeJsonSchema.test.ts`, and `variantConformance.test.ts`.
-- **A real-Earth hex grid at two scales.** Strategic play uses H3 resolution 1 on the global map, or 2 or 3 on one of the regional maps. Tactical battles sit three resolutions finer. Terrain, roads, place names, and climate come from public datasets through an offline Python pipeline (`scripts/terrain_pipeline/`). The cell sizes and sources are under [Under the hood](#under-the-hood).
+- **Prompts as code.** The prompts are assembled by builders in [`src/main/openRouter/promptSpec/`](src/main/openRouter/promptSpec/), documented in [doc/ai-commander-prompts/](doc/ai-commander-prompts/README.md), and held to that contract by tests such as `consultationContract.test.ts`, `envelopeJsonSchema.test.ts`, and `variantConformance.test.ts`.
+- **A real-Earth hex grid at two scales.** Strategic play uses H3 resolution 1 on the global map, or 2 or 3 on one of the regional maps. Tactical battles sit three resolutions finer. Terrain, roads, place names, and climate come from public datasets through an offline Python pipeline (`scripts/terrain_pipeline/`). The cell sizes and sources are under [Under the Hood](#under-the-hood).
 - **Simultaneous turns.** Both sides plan, then the engine resolves air strikes, ranged fire, movement, ferry, and melee in a fixed phase order, with optional zoomed-in tactical battles. The rules are in [doc/combat-rules-v3.md](doc/combat-rules-v3.md).
-- **Guardrails.** `npm test` builds the main process, then runs ESLint (with custom rules in `[eslint-rules/](eslint-rules/)`), a naming-convention check, a renderer type check, the main-process and tool tests (808 tests), and a third-party-notices check. The renderer runs with context isolation, without Node integration, and under a Content-Security-Policy.
+- **Guardrails.** `npm test` builds the main process, then runs ESLint (with custom rules in [`eslint-rules/`](eslint-rules/)), a naming-convention check, a renderer type check, the main-process and tool tests (808 tests), and a third-party-notices check. The renderer runs with context isolation, without Node integration, and under a Content-Security-Policy.
 
-## Under the hood
+## Under the Hood
 
 Cell areas and edge lengths are averages from the H3 library. The other counts come from the engine and the generated packs.
 
-### Hex scales
+### Hex Scales
 
 Every map is a grid of [H3](https://h3geo.org) cells, Uber's hierarchical hexagon index. A battle zooms in three resolutions, so one strategic hex contains 343 tactical cells (286 under one of H3's twelve pentagons), plus three rings of neighboring cells.
 
@@ -65,7 +81,7 @@ Every map is a grid of [H3](https://h3geo.org) cells, Uber's hierarchical hexago
 
 Each of the 23 regional maps holds 257 to 352 strategic hexes. Those are the footprint totals in [doc/region-summary-1.md](doc/region-summary-1.md): South-Eastern Asia is the smallest and Southern Asia east is the largest.
 
-### Where the data comes from
+### Where the Data Comes From
 
 The offline pipeline samples rasters with rasterio and vector layers with Shapely, indexes the cells with H3, and ships the results as zipped JSON. PostGIS is part of that pipeline.
 
@@ -87,7 +103,7 @@ A month is labeled from that hex's mean temperature and its monthly precipitatio
 
 Credits and license terms are in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 
-### How the economy works
+### How the Economy Works
 
 Production is based on real-world urban land cover: the Natural Earth urban areas in the table above, mapped from MODIS. Each strategic hex earns one point per turn for every intact urban cell inside it. The global map has 4,643 of those cells, on 283 hexes, counting cells that meet an urban area of scalerank 5 or lower (`urbanOverlay` in `activeGameMap.ts`). A queued unit spawns once its hex has saved enough points. On the global map each air-strike hit destroys 9 urban cells for good (`strategicUrbanCellsDestroyedPerHit`), so bombing a city cuts its output for the rest of the match.
 
@@ -102,7 +118,7 @@ Production is based on real-world urban land cover: the Natural Earth urban area
 
 Each regional map rescales costs, minimums, and strike size from its own urban counts, keeping the price ratio of 1:2:5:3 for infantry, armor, naval, and air, and the global share of hexes that can build each type. Infantry costs 60 in Western Europe and 10 in South America ([doc/region-summary-1.md](doc/region-summary-1.md)).
 
-### The opponent's tools
+### The Opponent's Tools
 
 The opponent plans and manages its forces through six groups of MCP-style tools: engine services with JSON schemas that return the same result for the same game state, offered to the model through OpenRouter function calling. Each of these groups can be switched off from the **Tools** tab.
 
@@ -119,21 +135,21 @@ The opponent plans and manages its forces through six groups of MCP-style tools:
 
 Memory writes and standing-order changes travel in the model's JSON reply. The full catalog is in [doc/ai-tools.md](doc/ai-tools.md).
 
-## How it was built
+## How It Was Built
 
-Every line of production code was written by coding agents, mostly in Cursor. The developer wrote the prompts that drove the agents and the rules they follow; the agents also wrote the plans and most of the documentation. All of it is in the repository:
+Every line of production code was written by coding agents, mostly in Cursor. I wrote the prompts that drove the agents and the rules they follow; the agents also wrote the plans and most of the documentation. All of it is in the repository:
 
 - [AGENTS.md](AGENTS.md): what every agent reads first, including which document wins a disagreement and what to update in the same change.
-- `[.cursor/rules/](.cursor/rules/)`: fourteen always-on coding rules, from reliable code and testing standards to file-size limits and naming.
-- `[.spec/completed/](.spec/completed/)`: the execution plans, audits, and verification records behind each change.
+- [`.cursor/rules/`](.cursor/rules/): fourteen always-on coding rules, from reliable code and testing standards to file-size limits and naming.
+- [`.spec/completed/`](.spec/completed/): the execution plans, audits, and verification records behind each change.
 - [doc/coding-prompts-1.md](doc/coding-prompts-1.md): the reusable prompt library. Its core cycle is four prompts: plan, audit the plan, implement, audit the implementation.
 - [doc/](doc/README.md): the living product documentation, kept current with the code.
 
-**A trail to follow:** the [unit origin and country flags plan](.spec/completed/unit-origin-and-country-flags-execution-plan.md) opens with ground rules for the executing agent, locked decisions, and verified facts. The code it produced is in `[src/main/unitOrigin/](src/main/unitOrigin/)`, with tests beside it (`unitBirthOrigin.test.ts`, `unitBirthCellSelection.test.ts`, and others).
+**A trail to follow:** the [unit origin and country flags plan](.spec/completed/unit-origin-and-country-flags-execution-plan.md) opens with ground rules for the executing agent, locked decisions, and verified facts. The code it produced is in [`src/main/unitOrigin/`](src/main/unitOrigin/), with tests beside it (`unitBirthOrigin.test.ts`, `unitBirthCellSelection.test.ts`, and others).
 
-### Time and tokens
+### Time and Tokens
 
-The developer logged hours in Toggl from 1 Jan to 14 Sep 2026. The charts' 169 hours leave out 2.9 hours of planning and 6.5 hours of promotion. Cursor tokens are usage attributed to Agent Wars sessions by the window between milestone tags. Both records stop in September, before the October work on milestone 2.5.
+I logged hours in Toggl from 1 Jan to 14 Sep 2026. The charts' 169 hours leave out 2.9 hours of planning and 6.5 hours of promotion. Cursor tokens are usage attributed to Agent Wars sessions by the window between milestone tags. Both records stop in September, before the October work on milestone 2.5.
 
 ![Bar chart of logged time and Cursor tokens by project stage: proof of concept 14% of time and 7% of tokens, feature building 69% and 59%, fixes 16% and 33%](doc/media/hours-and-tokens-by-stage.png)
 
@@ -155,7 +171,7 @@ The developer logged hours in Toggl from 1 Jan to 14 Sep 2026. The charts' 169 h
 
 The override list is the return of `evaluateMandatoryOverrides`, and the five-turn deadman is `DEADMAN_TURNS`, both in `callbackEvaluation.ts`. What ships now is in [doc/hybrid-ai.md](doc/hybrid-ai.md).
 
-## Build from source
+## Build from Source
 
 Prerequisites: Node.js 24 or later (`.nvmrc` pins 24) and npm 10 or later. Python 3 is used to extract the generated data during the build.
 
@@ -167,10 +183,10 @@ npm start
 
 - **Build:** compiles the main process and preload with TypeScript (`dist/`) and bundles the renderer with esbuild (`static/renderer.js`). Generated terrain data is extracted as part of the build.
 - **Start:** runs Electron; the window loads the renderer from `static/index.html`. Game state is stored in SQLite through **better-sqlite3** (a native module), in your Electron user-data directory.
-- **Lint and test:** `npm run lint` runs ESLint on `src/`. `npm run test` runs the full check described under [What's inside](#whats-inside).
+- **Lint and test:** `npm run lint` runs ESLint on `src/`. `npm run test` runs the full check described under [What's Inside](#whats-inside).
 - **Package:** `npm run dist`, `dist:win`, `dist:linux`, or `dist:mac` builds with electron-builder (see [.spec/completed/packaging.md](.spec/completed/packaging.md)). Releases are made as described in [doc/releasing.md](doc/releasing.md).
 
-### Terrain data
+### Terrain Data
 
 The generated terrain and region packs under `data/generated/` are tracked, so building and playing need no GIS tools. To regenerate them:
 
@@ -182,7 +198,7 @@ Setup, the Python CLIs, and troubleshooting are in [scripts/terrain_pipeline/REA
 ## Status
 
 - **Version:** 2.5.0, distributed as side-load builds only (no store, signing, or notarization).
-- **Progress:** Phase 0 (hybrid AI validation) and Phase 1 (global strategic game) are complete. Phase 2 is complete through milestone 2.5 (regional game and rules enhancements), including tactical battles (2.1 to 2.4) and playtester UI fixes (2.45). Milestone 2.6 (player-facing save/load and session management) is not shipped. See the [development plan (v3.4)](doc/devleopment-plan-v3.4.md); milestones 0.2 to 0.5 were a throwaway prototype that validated combat, tools, and the AI loop before the production baseline.
+- **Progress:** Phase 0 (hybrid AI validation) and Phase 1 (global strategic game) are complete. Phase 2 is complete through milestone 2.5 (regional game and rules enhancements), including tactical battles (2.1 to 2.4) and playtester UI fixes (2.45). Milestone 2.6 (player-facing save/load and session management) isn't shipped. See the [development plan (v3.4)](doc/devleopment-plan-v3.4.md); milestones 0.2 to 0.5 were a throwaway prototype that validated combat, tools, and the AI loop before the production baseline.
 - **CI:** lint and tests run on every push that changes code (Linux). The three-platform packaging build runs on demand and drafts each release.
 - **Contributions:** this is a personal R&D project, so it doesn't take issues or pull requests. To report a security problem, see [SECURITY.md](SECURITY.md).
 
