@@ -103,7 +103,7 @@ The offline pipeline samples rasters with rasterio and vector layers with Shapel
 | Landmasses          | Which land is connected, so land units march within a landmass                                    | Natural Earth geography regions: continents, isthmuses, and islands of 2,000 km² or more                                      |
 
 
-A month is labeled from that hex's mean temperature and its monthly precipitation, checked in this order (`classifyWeatherMonth` in `weatherBonusRules.ts`): "snow" at 0 °C or below, "rain" at 120 mm or more, "heat" at 23 °C or more, and mild when none of those match. Rain at 23 °C or above still counts as heat.
+Strategic hexes are assigned a per-month weather from that hex's mean temperature and its monthly precipitation, checked in this order (`classifyWeatherMonth` in `weatherBonusRules.ts`): "snow" at 0 °C or below, "rain" at 120 mm or more, "heat" at 23 °C or more, and mild when none of those match. Rain at 23 °C or above still counts as heat.
 
 Credits and license terms are in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 
