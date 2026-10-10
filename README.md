@@ -1,8 +1,8 @@
 # Agent Wars
 
-![CI](https://github.com/michael-kitchin/agent-wars/actions/workflows/ci.yml/badge.svg)
-![Release](https://img.shields.io/github/v/release/michael-kitchin/agent-wars?include_prereleases)
-![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)
+[![CI](https://github.com/michael-kitchin/agent-wars/actions/workflows/ci.yml/badge.svg)](https://github.com/michael-kitchin/agent-wars/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/michael-kitchin/agent-wars?include_prereleases)](https://github.com/michael-kitchin/agent-wars/releases)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 A turn-based grand strategy game on a real-Earth hex map, where your opponent is a large language model you choose. Coding agents wrote the code and most of the documentation. I set the direction, wrote the prompts and the rules the agents follow, and reviewed the results.
 
@@ -203,7 +203,7 @@ Setup, the Python CLIs, and troubleshooting are in [scripts/terrain_pipeline/REA
 
 - **Version:** 2.5.0, distributed as side-load builds only (no store, signing, or notarization).
 - **Progress:** Phase 0 (hybrid AI validation) and Phase 1 (global strategic game) are complete. Phase 2 is complete through milestone 2.5 (regional game and rules enhancements), including tactical battles (2.1 to 2.4) and playtester UI fixes (2.45). Milestone 2.6 (player-facing save/load and session management) isn't shipped. See the [development plan (v3.4)](doc/devleopment-plan-v3.4.md); milestones 0.2 to 0.5 were a throwaway prototype that validated combat, tools, and the AI loop before the production baseline.
-- **CI:** lint and tests run on every push that changes code (Linux). The three-platform packaging build runs on demand and drafts each release.
+- **CI:** lint and tests run on every push that changes code, and on demand (Linux). The three-platform packaging build runs on demand and drafts each release.
 - **Contributions:** this is a personal R&D project, so it doesn't take issues or pull requests. To report a security problem, see [SECURITY.md](SECURITY.md).
 
 ## License

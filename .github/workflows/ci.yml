@@ -1,4 +1,4 @@
-# Lint and test Agent Wars on every push and pull request to main.
+# Lint and test Agent Wars on every push and pull request to main, and on demand.
 # Runs `npm run test`, which builds the main process and then runs ESLint, the
 # naming check, the renderer type check, the main-process tests, and the
 # third-party notices check (see package.json).
@@ -19,6 +19,7 @@ on:
       - "**.md"
       - "doc/**"
       - ".spec/**"
+  workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.ref }}
