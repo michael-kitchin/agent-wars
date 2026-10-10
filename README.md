@@ -22,7 +22,7 @@ I chose this approach because:
 - For something new, I wanted LLMs to reason about real-world geography, planning combat, movement, and logistics on a hex map across many turns.
 - For calibration, I built it on familiar ground (Electron and TypeScript, database development, and geospatial data), so I could catch bad agent output sooner.
 
-I'm telling the story how I built Agent Wars (and am still adding to it) in *[Standing Orders](https://standingorders.substack.com)*.
+I'm telling the story of how I built Agent Wars (and am still adding to it) in *[Standing Orders](https://standingorders.substack.com)*.
 
 You can learn more about me on [LinkedIn](https://www.linkedin.com/in/mkitchin/).
 
