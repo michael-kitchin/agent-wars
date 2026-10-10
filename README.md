@@ -144,7 +144,7 @@ Memory writes and standing-order changes travel in the model's JSON reply. The f
 Every line of production code was written by coding agents, mostly in Cursor. I wrote the prompts that drove the agents and the rules they follow; the agents also wrote the plans and most of the documentation. All of it is in the repository:
 
 - [AGENTS.md](AGENTS.md): what every agent reads first, including which document wins a disagreement and what to update in the same change.
-- [`.cursor/rules/`](.cursor/rules/): fourteen always-on coding rules, from reliable code and testing standards to file-size limits and naming.
+- [`.cursor/rules/`](.cursor/rules/): fifteen always-on coding rules, from reliable code and testing standards to file-size limits, naming, and secrets.
 - [`.spec/completed/`](.spec/completed/): the execution plans, audits, and verification records behind each change.
 - [doc/coding-prompts-1.md](doc/coding-prompts-1.md): the reusable prompt library. Its core cycle is four prompts: plan, audit the plan, implement, audit the implementation.
 - [doc/](doc/README.md): the living product documentation, kept current with the code.
