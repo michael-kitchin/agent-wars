@@ -47,6 +47,7 @@ When you change one of these, update `combat-rules-v3.md` (and any table that qu
 | Weather tags, movement, and attack penalties | `src/shared/weatherBonusRules.ts` |
 | Tactical ranged and movement budgets | `src/shared/tacticalRanges.ts` |
 | Tactical terrain enter costs | `tacticalEnterHexMovementCost` in `src/shared/tacticalTerrainMovement.ts` |
+| Tactical terrain-bonus movement | `terrainBonusMarchCategoryFor` in `src/shared/terrainBonusMarch.ts` (who may stop on which birth terrain), `classifyTacticalMarchStep` in `src/shared/tacticalMarchStepCost.ts`, and `preferFasterTerrainBonusMarch` in `src/shared/tacticalMarchBeatSearch.ts` (fewer-beats route choice) |
 | Tactical combat modifiers (LOS, range caps, MP) | `src/shared/tacticalTerrainCombatModifiers.ts` |
 | Strategic and tactical H3 resolutions | `strategicH3Resolution` and `tacticalH3Resolution` in `src/shared/h3Resolutions.ts`. On the global map those are 1 and 4 (`GLOBAL_STRATEGIC_H3_RESOLUTION`, `GLOBAL_TACTICAL_H3_RESOLUTION`). A regional map uses strategic resolution 2 or 3 and tactical resolution 5 or 6. |
 | Sub-unit multiplication | `tacticalSubUnitCountForStrategicUnitType` in `src/main/tacticalBattle/computeTacticalBattleSnapshot.ts` |

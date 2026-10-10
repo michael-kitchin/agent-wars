@@ -303,6 +303,8 @@ export function planTacticalMarchWithSessionCache(
     weatherEnabled?: boolean;
     weather?: import('../../shared/weatherBonusTypes').WeatherState | null;
     weatherTags?: readonly import('../../shared/weatherBonusTypes').WeatherState[] | null;
+    /** From `terrainBonusMarchCategoryForMover`; part of the memo key so units with different births never share a plan. */
+    terrainBonusCategory?: import('../../shared/tacticalTerrainMovement').TacticalMovementCategory | null;
   }
 ): TacticalMarchPlanResult {
   ensureTerrainAndFootprintCache(battle, args.tacticalSet);
@@ -310,7 +312,7 @@ export function planTacticalMarchWithSessionCache(
   const footprintNeighbors = footprintNeighborsRestrictedToSet(args.tacticalSet);
   const setTag = tacticalSetMemoTag(args.tacticalSet, cachedFullFootprintSize);
   const tagKey = (args.weatherTags ?? []).join(',');
-  const qk = `${args.fromH3}|${args.toH3}|${args.unitTypeForMovement}|${args.movementPointBudget}|${setTag}|${args.weatherEnabled ? args.weather ?? '' : ''}|${tagKey}`;
+  const qk = `${args.fromH3}|${args.toH3}|${args.unitTypeForMovement}|${args.movementPointBudget}|${setTag}|${args.weatherEnabled ? args.weather ?? '' : ''}|${tagKey}|tb:${args.terrainBonusCategory ?? ''}`;
   const hit = planMemo.get(qk);
   if (hit) {
     tacticalLogQuery('planTacticalRes4MarchWithSessionCache hit', { qk });
@@ -339,6 +341,8 @@ export function planTacticalMarchWithSessionCache(
       battleId: battle.battleId,
       tacticalTurnNumber: battle.tacticalTurnNumber,
       qk,
+      terrainBonusCategory: args.terrainBonusCategory ?? null,
+      usesTerrainBonus: fresh.usesTerrainBonus === true,
       memoSize: planMemo.size,
       elapsedMs: Math.round(performance.now() - planStartedAt),
     });

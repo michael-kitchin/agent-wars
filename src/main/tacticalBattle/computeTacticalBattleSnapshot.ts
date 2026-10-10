@@ -564,6 +564,7 @@ export function computeTacticalBattleSnapshot(
       tacticalTurnNumber: 1,
       ...(weatherOn && battleWeather ? { weatherBonusEnabled: true as const, weatherBonusLevel: weatherSettings.weatherBonusLevel ?? 'low', weather: battleWeather } : {}),
       ...(techOn ? { techBonusEnabled: true as const, techBonusLevel: weatherSettings.techBonusLevel ?? 'low' } : {}),
+      ...(weatherSettings.terrainBonusEnabled === true ? { terrainBonusEnabled: true as const } : {}),
       strategicHexTerrain: hexRow.terrain,
       strategicHexTerrainKind: hexRow.terrain_kind,
       tacticalTerrainKindByH3,

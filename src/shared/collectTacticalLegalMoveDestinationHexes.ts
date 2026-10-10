@@ -14,6 +14,7 @@ import {
 } from './tacticalTransportLink';
 import { buildTacticalTerrainKindResolverFromSnapshot } from './tacticalTerrainMovement';
 import { effectiveTacticalMovementPointBudgetForMarchLeg } from './tacticalTerrainCombatModifiers';
+import { terrainBonusMarchCategoryForMover } from './terrainBonusMarch';
 import { gridDisk } from 'h3-js';
 
 /**
@@ -41,6 +42,7 @@ export function collectTacticalLegalMoveDestinationHexes(
     | 'weather'
     | 'weatherBonusEnabled'
     | 'weatherBonusLevel'
+    | 'terrainBonusEnabled'
   >,
   moverSubUnitId: string
 ): string[] {
@@ -59,6 +61,7 @@ export function collectTacticalLegalMoveDestinationHexes(
   const footprintNeighbors = tacticalFootprintNeighborLookupFromMap(
     buildTacticalFootprintAdjacencyMap(footprint)
   );
+  const terrainBonusCategory = terrainBonusMarchCategoryForMover(battle, u, u.unitType);
   if (u.unitType === 'infantry' || u.unitType === 'armor') {
     return collectInfantryArmorReachableWithinBudget({
       fromH3: u.h3Index,
@@ -70,6 +73,7 @@ export function collectTacticalLegalMoveDestinationHexes(
       weatherEnabled: battle.weatherBonusEnabled === true,
       weather: battle.weather,
       weatherTags: u.weatherTags,
+      terrainBonusCategory,
     });
   }
   return collectSimpleEnterCostReachableWithinBudget({
@@ -79,6 +83,7 @@ export function collectTacticalLegalMoveDestinationHexes(
     movementPointBudget: budget,
     terrain,
     footprintNeighbors,
+    terrainBonusCategory,
   });
 }
 
@@ -129,6 +134,7 @@ export function collectTacticalLegalMoveDestinationHexesBruteForceForTests(
       weatherEnabled: battle.weatherBonusEnabled === true,
       weather: battle.weather,
       weatherTags: u.weatherTags,
+      terrainBonusCategory: terrainBonusMarchCategoryForMover(battle, u, u.unitType),
     });
     if (plan.reachableThisTurn) out.push(toH3);
   }

@@ -4,13 +4,16 @@
 
 import type { WeatherState } from './weatherBonusTypes';
 import { tacticalWeatherOpenGroundCost } from './weatherBonusRules';
-import type { TacticalTerrainKindResolver } from './tacticalTerrainMovement';
+import type { TacticalMovementCategory, TacticalTerrainKindResolver } from './tacticalTerrainMovement';
 import {
-  isNavalTacticalCellNavigable,
-  nativeTacticalTerrainKindIsWaterOrCoastalForNavalRouting,
   normalizeDbTerrainKindToTacticalCategory,
   tacticalEnterHexMovementCost,
 } from './tacticalTerrainMovement';
+import {
+  collectTerrainBonusStopsFromReached,
+  tacticalNavalEnterNeighborCost,
+} from './tacticalMarchStepCost';
+import { preferFasterTerrainBonusMarch } from './tacticalMarchBeatSearch';
 import {
   landInfantryArmorEnterCost,
   planInfantryArmorLandContinuityMarch,
@@ -55,6 +58,48 @@ export type TacticalMarchPlanResult = {
   pathToDestination: string[] | null;
   firstStopWithinBudget: { stopH3: string; consumedFullPath: boolean };
   failureReason?: TacticalMarchPlanFailureReason;
+  /**
+   * The route uses at least one terrain-bonus stop.
+   *
+   * Contract: Set only by `preferFasterTerrainBonusMarch`; today's plans omit it. On such a plan the total is the full
+   * budget for every beat before arrival plus the arrival beat's spend, so `ceil(total / budget)` is the beat count.
+   * When to use: Logs and tests that need to know why a route crosses terrain the unit cannot normally enter.
+   * Expected outcome: `true` or absent.
+   * Exceptions: None.
+   */
+  usesTerrainBonus?: true;
+};
+
+/**
+ * Arguments to `planTacticalMarch`.
+ *
+ * Purpose: Names the planner input once, so the planner and its terrain-bonus comparison read the same fields.
+ * When to use: Every battle march plan.
+ * Expected outcome: Weather fields are ignored unless `weatherEnabled` is true; `terrainBonusCategory` null or omitted
+ * means today's behavior exactly.
+ * Exceptions: None.
+ */
+export type TacticalMarchPlanArgs = {
+  fromH3: string;
+  toH3: string;
+  tacticalSet: ReadonlySet<string>;
+  unitTypeForMovement: string;
+  movementPointBudget: number;
+  terrain: TacticalTerrainKindResolver;
+  /** Precomputed footprint adjacency; when omitted, falls back to `tacticalNeighborsInFootprint` per state. */
+  footprintNeighbors?: TacticalFootprintNeighborLookup;
+  weatherEnabled?: boolean;
+  weather?: WeatherState | null;
+  weatherTags?: readonly WeatherState[] | null;
+  /**
+   * Terrain-bonus stop category for the moving sub-unit.
+   *
+   * Contract: From `terrainBonusMarchCategoryForMover`. Null or omitted disables terrain-bonus stops.
+   * When to use: Every call that knows the moving sub-unit and its battle.
+   * Expected outcome: Today's route is kept unless a route with stops arrives in strictly fewer beats.
+   * Exceptions: None.
+   */
+  terrainBonusCategory?: TacticalMovementCategory | null;
 };
 
 /**
@@ -74,46 +119,6 @@ function stopIdxWithMinimumOneHexProgress(args: {
   const { stopIdx, pathLength, movementPointBudget } = args;
   if (movementPointBudget > 0 && stopIdx === 0 && pathLength >= 2) return 1;
   return stopIdx;
-}
-
-/**
- * Movement cost for a naval unit to step from `fromH3` into `toH3` (§12.4 naval footprint rules).
- *
- * Purpose: Single implementation shared by Dijkstra relaxation and tactical spawn checks so “navigable” matches “can leave this cell”.
- * When to use: `enterCostForHex` for naval, and `tacticalNavalHasMovableNeighborInFootprint` when filtering snapshot spawns.
- * Expected outcome: `1` for a legal enter; `Infinity` when the destination is not navigable or when the move is adjacent land-berth→land-berth seaport (both endpoints lack native water/coastal kinds even if `is_seaport` is set on channel tiles).
- * Exceptions: None; `fromH3` null skips the seaport adjacency guard (unused by pathfinding today).
- */
-function tacticalNavalEnterNeighborCost(
-  fromH3: string | null,
-  toH3: string,
-  terrain: TacticalTerrainKindResolver
-): number {
-  if (terrain.isUrbanTactical?.(toH3) || terrain.isRubbleTactical?.(toH3)) {
-    return Infinity;
-  }
-  const resolved = terrain.effectiveKindForTacticalHex(toH3);
-  const seaportTo = terrain.isSeaportTactical?.(toH3) ?? false;
-  if (
-    !isNavalTacticalCellNavigable({
-      resolvedKindForCell: resolved,
-      parentTerrain: terrain.parentTerrain,
-      parentTerrainKind: terrain.parentTerrainKind,
-      isSeaportCell: seaportTo,
-    })
-  ) {
-    return Infinity;
-  }
-  if (seaportTo && fromH3 != null && (terrain.isSeaportTactical?.(fromH3) ?? false)) {
-    const fromResolved = terrain.effectiveKindForTacticalHex(fromH3);
-    if (
-      !nativeTacticalTerrainKindIsWaterOrCoastalForNavalRouting(fromResolved) &&
-      !nativeTacticalTerrainKindIsWaterOrCoastalForNavalRouting(resolved)
-    ) {
-      return Infinity;
-    }
-  }
-  return 1;
 }
 
 /**
@@ -216,21 +221,27 @@ function reconstructPath(parent: Map<string, string | null>, from: string, to: s
  * When to use: Any tactical march validation or preview that must respect terrain and per-turn MP budget.
  * Expected outcome: `firstStopWithinBudget` walks the cheapest path until the next enter would exceed `movementPointBudget`; if that
  * would spend zero MPs on a path of length ≥ 2 while the budget is positive, the first stop is still the first cell after the origin.
- * Exceptions: Catches H3 failures and returns `reachable: false` with `no_path`.
+ * With a `terrainBonusCategory`, a route through terrain-bonus stops replaces that plan only when it arrives in strictly
+ * fewer beats (see `preferFasterTerrainBonusMarch`).
+ * Exceptions: None; unreachable destinations return `reachable: false` with a failure reason.
  */
-export function planTacticalMarch(args: {
-  fromH3: string;
-  toH3: string;
-  tacticalSet: ReadonlySet<string>;
-  unitTypeForMovement: string;
-  movementPointBudget: number;
-  terrain: TacticalTerrainKindResolver;
-  /** Precomputed footprint adjacency; when omitted, falls back to `tacticalNeighborsInFootprint` per state. */
-  footprintNeighbors?: TacticalFootprintNeighborLookup;
-  weatherEnabled?: boolean;
-  weather?: WeatherState | null;
-  weatherTags?: readonly WeatherState[] | null;
-}): TacticalMarchPlanResult {
+export function planTacticalMarch(args: TacticalMarchPlanArgs): TacticalMarchPlanResult {
+  const plan = planTacticalMarchWithoutTerrainBonus(args);
+  if (args.terrainBonusCategory == null) return plan;
+  const footprintNeighbors =
+    args.footprintNeighbors ?? ((h: string) => tacticalNeighborsInFootprint(h, args.tacticalSet));
+  return preferFasterTerrainBonusMarch({ plan, search: { ...args, footprintNeighbors } });
+}
+
+/**
+ * Computes today's least movement-point plan, with no terrain-bonus stops.
+ *
+ * Purpose: The planner as it was before terrain-bonus movement, kept intact so that rule can only add a faster route.
+ * When to use: Only from `planTacticalMarch`.
+ * Expected outcome: Same contract as `planTacticalMarch` with no `terrainBonusCategory`.
+ * Exceptions: None.
+ */
+function planTacticalMarchWithoutTerrainBonus(args: TacticalMarchPlanArgs): TacticalMarchPlanResult {
   const { fromH3, toH3, tacticalSet, unitTypeForMovement, movementPointBudget, terrain } = args;
   const neighborsOf = args.footprintNeighbors ?? ((h: string) => tacticalNeighborsInFootprint(h, tacticalSet));
   if (unitTypeForMovement === 'air') {
@@ -429,7 +440,8 @@ export function planTacticalMarch(args: {
  * Purpose: Tactical Best Options analogue of strategic naval `gridDisk` + passability listing — one Dijkstra from the origin
  * using the same `enterCostForHex` rules as `planTacticalMarch`, instead of one plan per disk candidate.
  * When to use: `collectTacticalLegalMoveDestinationTacticalHexes` for naval (and any future non-infantry/armor march types that share this enter-cost path).
- * Expected outcome: Destination hexes with total enter cost ≤ budget, excluding the origin.
+ * Expected outcome: Destination hexes with total enter cost ≤ budget, excluding the origin, plus the terrain-bonus stop
+ * cells next to them when `terrainBonusCategory` is set (see `collectTerrainBonusStopsFromReached`).
  * Exceptions: None; never throws.
  */
 export function collectSimpleEnterCostReachableWithinBudget(args: {
@@ -442,6 +454,8 @@ export function collectSimpleEnterCostReachableWithinBudget(args: {
   weatherEnabled?: boolean;
   weather?: WeatherState | null;
   weatherTags?: readonly WeatherState[] | null;
+  /** Same meaning as `TacticalMarchPlanArgs.terrainBonusCategory`. */
+  terrainBonusCategory?: TacticalMovementCategory | null;
 }): string[] {
   const { fromH3, tacticalSet, unitTypeForMovement, movementPointBudget, terrain } = args;
   const neighborsOf = args.footprintNeighbors ?? ((h: string) => tacticalNeighborsInFootprint(h, tacticalSet));
@@ -475,5 +489,21 @@ export function collectSimpleEnterCostReachableWithinBudget(args: {
   for (const [h, cost] of dist) {
     if (h !== fromH3 && cost <= movementPointBudget) out.push(h);
   }
-  return out;
+  if (args.terrainBonusCategory == null) return out;
+  const stops = collectTerrainBonusStopsFromReached({
+    ctx: {
+      terrain,
+      moveType: unitTypeForMovement,
+      tacticalSet,
+      marchStartH3: fromH3,
+      marchGoalH3: '',
+      footprintNeighbors: neighborsOf,
+      terrainBonusCategory: args.terrainBonusCategory,
+    },
+    reached: [...dist].map(([h3, spent]) => ({ h3, spent, prevH3: null })),
+    exclude: new Set(out),
+    movementPointBudget,
+    neighborsOf,
+  });
+  return [...out, ...stops];
 }

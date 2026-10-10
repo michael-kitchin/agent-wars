@@ -293,6 +293,7 @@ export function commitHumanTacticalDraftOrders(args: {
       ...(preBattle.tacticalRoadSidesByH3 ? { tacticalRoadSidesByH3: preBattle.tacticalRoadSidesByH3 } : {}),
       ...(preBattle.tacticalRailSidesByH3 ? { tacticalRailSidesByH3: preBattle.tacticalRailSidesByH3 } : {}),
       ...(preBattle.weatherBonusEnabled ? { weatherBonusEnabled: true as const, weatherBonusLevel: preBattle.weatherBonusLevel, weather: preBattle.weather } : {}),
+      ...(preBattle.terrainBonusEnabled === true ? { terrainBonusEnabled: true as const } : {}),
     };
     const appliedMovementOrders: { unitId: string; toH3Index: string }[] = [];
     const tacticalMarchContinuations: { subUnitId: string; destinationH3Index: string }[] = [];
@@ -318,7 +319,7 @@ export function commitHumanTacticalDraftOrders(args: {
         tacticalSet,
         terrainBattle,
         moveType,
-        sub.weatherTags
+        sub
       );
       humanMarchPlanByUnitId.set(o.unitId, marchPlan);
       const { stopH3, consumedFullPath } = marchPlan;
@@ -409,7 +410,7 @@ export function commitHumanTacticalDraftOrders(args: {
             tacticalSet,
             terrainBattle,
             oppMoveType,
-            su.weatherTags
+            su
           );
           pathH3Indexes = clipTacticalMarchPathToDestination(to, oppMarch.pathH3Prefix);
         }

@@ -201,6 +201,16 @@ export interface TacticalBattleSnapshot {
    */
   weatherBonusLevel?: ActiveBonusLevel;
   /**
+   * Whether the match that opened this battle has the terrain bonus on.
+   *
+   * Contract: Omitted when off. True when the match flag was on at battle start. A battle saved before this field
+   * existed has none, which means off.
+   * When to use: Through `terrainBonusMarchCategoryForMover` before planning a battle march.
+   * Expected outcome: Movement only; terrain-bonus dice still read the match settings.
+   * Exceptions: None.
+   */
+  terrainBonusEnabled?: boolean;
+  /**
    * Whether the match that opened this battle has the tech bonus on.
    *
    * Contract: Omitted when off. True when the strategic snapshot had the flag on.

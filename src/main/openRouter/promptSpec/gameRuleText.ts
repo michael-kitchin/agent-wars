@@ -36,6 +36,7 @@ import {
   TACTICAL_TRANSPORT_ROAD_BUDGET_MULTIPLIER,
 } from '../../../shared/tacticalTransportLink';
 import { originHitBonusForSource } from '../../../shared/originBonusRules';
+import { TERRAIN_BONUS_MOVEMENT_PROMPT_SENTENCE } from '../../../shared/terrainBonusMarch';
 import type { OriginBonusSettings } from '../../../shared/originBonusTypes';
 import {
   TACTICAL_WEATHER_BUDGET_CAP,
@@ -198,7 +199,8 @@ export function buildCasualtySortRule(): string {
  * When to use: Combat paragraph right after the casualty rule.
  * Expected outcome: Null when no flag applies (terrain alone does nothing on the strategic map); otherwise the
  * applicable clauses, each stating that bonus's level amount, the no-stacking note with the larger amount when both
- * apply, the air base note when air exists, and the unchanged casualty order.
+ * apply, the air base note when air exists, and the unchanged casualty order. The tactical terrain clause also carries
+ * `TERRAIN_BONUS_MOVEMENT_PROMPT_SENTENCE`.
  * Exceptions: None.
  */
 export function buildOriginBonusRule(gates: GameRuleTextGates): string | null {
@@ -224,7 +226,7 @@ export function buildOriginBonusRule(gates: GameRuleTextGates): string | null {
   }
   if (terrainApplies) {
     parts.push(
-      `Terrain bonus is on: a unit on a cell whose terrain kind matches its birth terrain kind ${rollClause(terrainAmount)}; urban and rubble do not change a cell's terrain kind.`
+      `Terrain bonus is on: a unit on a cell whose terrain kind matches its birth terrain kind ${rollClause(terrainAmount)}; urban and rubble do not change a cell's terrain kind. ${TERRAIN_BONUS_MOVEMENT_PROMPT_SENTENCE}`
     );
   }
   if (originBonusEnabled && terrainApplies) {

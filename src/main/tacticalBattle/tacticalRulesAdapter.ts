@@ -2,9 +2,10 @@
  * Tactical rules adapter seed: tactical spatial checks that future tactical combat/movement will share with strategic parity layers.
  */
 
-import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
+import type { TacticalBattleSnapshot, TacticalSubUnitSnapshot } from '../../shared/tacticalBattleTypes';
 import { planTacticalMarch } from '../../shared/tacticalMovementPlanner';
 import { buildTacticalTerrainKindResolverFromSnapshot } from '../../shared/tacticalTerrainMovement';
+import { terrainBonusMarchCategoryForMover } from '../../shared/terrainBonusMarch';
 import { planTacticalMarchWithSessionCache } from './tacticalMovementPlanningCache';
 import { tacticalLogQuery } from './tacticalLogging';
 import { tacticalGridDistance } from './tacticalSpatialAdapter';
@@ -36,6 +37,7 @@ export function tacticalMarchWithinGridSteps(
  * When to use: `commitHumanTacticalDraftOrders` before `applyHumanTacticalDraftBeatInStrategicOrder`, using the same footprint and terrain snapshot as march validation.
  * Expected outcome: `stopH3` lies on the minimum movement-point path; `consumedFullPath` is true when the ordered destination is reached within budget.
  * When the budget cannot pay for the first step but the path exists and the budget is positive, `planTacticalMarch` still advances one hex along that path.
+ * The mover's weather tags and, with the battle's terrain bonus on, its birth terrain shape the plan.
  * Exceptions: When no finite-cost path exists, returns `{ stopH3: from, consumedFullPath: false }` so callers do not advance illegally.
  */
 export function tacticalMarchFirstStopAlongPath(
@@ -58,15 +60,19 @@ export function tacticalMarchFirstStopAlongPath(
     | 'tacticalRailSidesByH3'
     | 'weather'
     | 'weatherBonusEnabled'
+    | 'terrainBonusEnabled'
   >,
   unitTypeForMovement = 'infantry',
-  weatherTags?: readonly import('../../shared/weatherBonusTypes').WeatherState[] | null
+  mover?: Pick<TacticalSubUnitSnapshot, 'unitType' | 'origin' | 'weatherTags'>
 ): { stopH3: string; consumedFullPath: boolean; pathH3Prefix?: string[] } {
+  const terrainBonusCategory =
+    battle && mover ? terrainBonusMarchCategoryForMover(battle, mover, unitTypeForMovement) : null;
   tacticalLogQuery('tacticalMarchFirstStopAlongPath', {
     fromTacticalH3Index,
     toTacticalH3Index,
     movementPointBudget,
     unitTypeForMovement,
+    terrainBonusCategory,
   });
   if (movementPointBudget <= 0) {
     return { stopH3: fromTacticalH3Index, consumedFullPath: false, pathH3Prefix: undefined };
@@ -79,7 +85,8 @@ export function tacticalMarchFirstStopAlongPath(
     movementPointBudget,
     weatherEnabled: battle?.weatherBonusEnabled === true,
     weather: battle?.weather,
-    weatherTags,
+    weatherTags: mover?.weatherTags,
+    terrainBonusCategory,
   };
   const plan =
     battle && battle.battleId && battle.subUnits

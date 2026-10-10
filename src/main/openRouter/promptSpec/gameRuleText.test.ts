@@ -16,6 +16,8 @@ import {
 } from '../../../shared/tacticalTransportLink';
 import { UNIT_COST_BY_TYPE } from '../../productionRules';
 import { ORIGIN_BONUS_OFF } from '../../../shared/originBonusRules';
+import type { OriginBonusSettings } from '../../../shared/originBonusTypes';
+import { TERRAIN_BONUS_MOVEMENT_PROMPT_SENTENCE } from '../../../shared/terrainBonusMarch';
 import {
   buildAirEmploymentRule,
   buildCasualtySortRule,
@@ -165,10 +167,22 @@ test('the origin bonus sentences keep their exact wording', () => {
     'Origin bonus is on: a unit on a cell in the area where it was built adds 2 to every attack or defense value it rolls there. ' +
       'That area is its birth country in a global game and its origin area in a regional game. ' +
       "Terrain bonus is on: a unit on a cell whose terrain kind matches its birth terrain kind adds 2 to every attack or defense value it rolls there; urban and rubble do not change a cell's terrain kind. " +
+      `${TERRAIN_BONUS_MOVEMENT_PROMPT_SENTENCE} ` +
       'The two bonuses do not stack; the most is +2. ' +
       'An air unit qualifies by the cell of its base, whatever it strikes. ' +
       'Casualty order still uses the printed defense values.'
   );
+});
+
+test('the terrain bonus movement sentence appears only in tactical text with the terrain bonus on', () => {
+  const rule = (coordinateMode: 'strategic' | 'tactical', settings: OriginBonusSettings) =>
+    buildOriginBonusRule(gates({ coordinateMode, originBonusSettings: settings })) ?? '';
+  for (const terrainBonusLevel of ['low', 'high'] as const) {
+    const on = { originBonusEnabled: true, terrainBonusEnabled: true, terrainBonusLevel };
+    assert.ok(rule('tactical', on).includes(TERRAIN_BONUS_MOVEMENT_PROMPT_SENTENCE));
+    assert.ok(!rule('strategic', on).includes(TERRAIN_BONUS_MOVEMENT_PROMPT_SENTENCE));
+  }
+  assert.ok(!rule('tactical', { originBonusEnabled: true, terrainBonusEnabled: false }).includes('Terrain bonus movement'));
 });
 
 test('a High origin bonus states 4, and the stacking note states the larger amount', () => {

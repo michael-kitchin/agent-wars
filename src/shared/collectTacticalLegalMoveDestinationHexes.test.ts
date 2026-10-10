@@ -18,6 +18,8 @@ import {
 import { buildTacticalTerrainKindResolverFromSnapshot } from './tacticalTerrainMovement';
 import { effectiveTacticalMovementPointBudgetForMarchLeg } from './tacticalTerrainCombatModifiers';
 import type { TacticalBattleSnapshot } from './tacticalBattleTypes';
+import type { UnitOrigin } from './unitOriginTypes';
+import { tacticalLine } from './testSupport/tacticalLineFixtures';
 
 /**
  * Builds a plains footprint battle with one armor sub-unit for collector equality checks.
@@ -137,4 +139,67 @@ test('adjacent plains neighbor remains collectable', () => {
   };
   const hexes = collectTacticalLegalMoveDestinationHexes(battle, 'opp:01');
   assert.ok(hexes.includes(neighbor!), 'adjacent plains hex must be this-beat reachable');
+});
+
+/**
+ * Builds a one-unit battle over a straight line whose cells have the given terrain kinds.
+ *
+ * Purpose: Terrain-bonus collector tests need a single route with a stop cell on it.
+ * When to use: The terrain-bonus tests below.
+ * Expected outcome: The unit stands on the first cell, with the given type and birth kind.
+ * Exceptions: None.
+ */
+function lineBattle(args: {
+  readonly kinds: readonly string[];
+  readonly unitType: 'armor' | 'naval';
+  readonly birthTerrainKind: string;
+  readonly terrainBonusEnabled: boolean;
+}): { battle: TacticalBattleSnapshot; line: string[] } {
+  const line = tacticalLine(args.kinds.length);
+  const battle: TacticalBattleSnapshot = {
+    battleId: 'collect-terrain-bonus',
+    enclosingStrategicH3Index: cellToParent(line[0]!, 1),
+    tacticalChildH3Indexes: line,
+    strategicTurnNumber: 1,
+    tacticalTurnNumber: 1,
+    strategicHexTerrain: 'land',
+    strategicHexTerrainKind: 'plains',
+    tacticalTerrainKindByH3: Object.fromEntries(line.map((h, i) => [h, args.kinds[i]!])),
+    ...(args.terrainBonusEnabled ? { terrainBonusEnabled: true } : {}),
+    subUnits: [
+      {
+        id: 'opp:01',
+        parentUnitId: 'opp',
+        player: 'opponent',
+        unitType: args.unitType,
+        h3Index: line[0]!,
+        displayName: 'Opp',
+        origin: { birthTerrainKind: args.birthTerrainKind } as UnitOrigin,
+      },
+    ],
+  };
+  return { battle, line };
+}
+
+test('mountain-born armor lists the mountain stop but nothing beyond it', () => {
+  const args = { kinds: ['plains', 'mountain', 'plains'], unitType: 'armor', birthTerrainKind: 'mountain' } as const;
+  const { battle, line } = lineBattle({ ...args, terrainBonusEnabled: true });
+  assert.deepEqual(collectTacticalLegalMoveDestinationHexes(battle, 'opp:01'), [line[1]]);
+  assert.deepEqual(
+    collectTacticalLegalMoveDestinationHexesBruteForceForTests(battle, 'opp:01'),
+    [line[1]],
+    'every listed stop must be reachable this beat under the planner'
+  );
+  const off = lineBattle({ ...args, terrainBonusEnabled: false });
+  assert.deepEqual(collectTacticalLegalMoveDestinationHexes(off.battle, 'opp:01'), []);
+});
+
+test('wetlands-born naval lists one wetlands cell', () => {
+  const { battle, line } = lineBattle({
+    kinds: ['water', 'wetlands', 'wetlands'],
+    unitType: 'naval',
+    birthTerrainKind: 'wetlands',
+    terrainBonusEnabled: true,
+  });
+  assert.deepEqual(collectTacticalLegalMoveDestinationHexes(battle, 'opp:01'), [line[1]]);
 });

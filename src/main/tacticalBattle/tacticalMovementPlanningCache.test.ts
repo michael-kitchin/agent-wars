@@ -6,6 +6,8 @@
 import assert from 'node:assert/strict';
 import { beforeEach, test } from 'node:test';
 import type { TacticalSubUnitSnapshot } from '../../shared/tacticalBattleTypes';
+import type { UnitOrigin } from '../../shared/unitOriginTypes';
+import { terrainBonusMarchCategoryForMover } from '../../shared/terrainBonusMarch';
 import { firstRingCellDistinctFrom, tacticalCell } from './testSupport/tacticalHexFixtures';
 import { tacticalGridDiskNeighborsOrdered } from '../../shared/tacticalTransportLink';
 import {
@@ -265,4 +267,45 @@ test('avoid-enemies subset plan does not leave human origin cells with empty adj
     (humanPlan.pathToDestination?.length ?? 0) >= 2,
     'human plan should include a real path'
   );
+});
+
+test('cached plans for the same order differ by birth terrain', () => {
+  const center = tacticalCell(91, 17);
+  const neighbor = firstRingCellDistinctFrom(center);
+  const footprint = new Set([center, neighbor]);
+  const armor = (id: string, birthTerrainKind: string): TacticalSubUnitSnapshot => ({
+    id,
+    parentUnitId: 'p',
+    player: 'human',
+    unitType: 'armor',
+    h3Index: center,
+    displayName: id,
+    origin: { birthTerrainKind } as UnitOrigin,
+  });
+  const mountainBorn = armor('born-mountain', 'mountain');
+  const plainsBorn = armor('born-plains', 'plains');
+  const battle = {
+    battleId: 'b-birth',
+    tacticalTurnNumber: 1,
+    subUnits: [mountainBorn, plainsBorn],
+    strategicHexTerrain: 'land' as const,
+    strategicHexTerrainKind: 'plains',
+    tacticalChildH3Indexes: [...footprint],
+    tacticalTerrainKindByH3: { [center]: 'plains', [neighbor]: 'mountain' },
+    terrainBonusEnabled: true as const,
+  };
+  const planFor = (mover: TacticalSubUnitSnapshot) =>
+    planTacticalMarchWithSessionCache(battle, {
+      fromH3: center,
+      toH3: neighbor,
+      tacticalSet: footprint,
+      unitTypeForMovement: 'armor',
+      movementPointBudget: 4,
+      terrainBonusCategory: terrainBonusMarchCategoryForMover(battle, mover, 'armor'),
+    });
+  const withBonus = planFor(mountainBorn);
+  assert.equal(withBonus.reachableThisTurn, true);
+  assert.equal(withBonus.usesTerrainBonus, true);
+  const without = planFor(plainsBorn);
+  assert.equal(without.reachable, false);
 });

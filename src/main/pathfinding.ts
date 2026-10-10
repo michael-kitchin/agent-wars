@@ -1,4 +1,3 @@
-
 /**
  * Pathfinding over the hex map: BFS with domain (land/water) and optional blocked hexes.
  * Used by MCP Tool 1 (plan_route, check_distance). All coordinates are H3 indices internally.

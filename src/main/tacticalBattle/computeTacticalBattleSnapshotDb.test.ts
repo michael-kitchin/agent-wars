@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { CombatUnit } from '../combatUnitTypes';
 import { filterMeleeCandidateHexesWithTacticalEntry, listMeleeCandidateHexes } from '../gameActions/meleeInterceptCandidates';
-import { dbGetOne, dbRun, listUnitsForSnapshot } from '../gameDb';
+import { dbGetOne, dbRun, isDbReady, listUnitsForSnapshot } from '../gameDb';
 import { getOrderedHexList } from '../mapData';
 import { withTempGameDb } from '../testSupport/withTempGameDb';
 import { tacticalChildrenOf } from '../../shared/h3Resolutions';
@@ -15,6 +15,7 @@ import { tacticalBattleFootprint } from '../../shared/tacticalBattleFootprint';
 import { parseTacticalSubUnitId } from '../../shared/unitIds';
 import { updateTacticalSealiftSlot } from '../gameActions';
 import { computeTacticalBattleSnapshot } from './computeTacticalBattleSnapshot';
+import { persistOriginBonusSettings } from '../gameDb/originBonusConfig';
 import {
   applyValidatedOpponentTacticalOrders,
   endTacticalBattleSession,
@@ -30,6 +31,18 @@ import {
 import { tacticalCell } from './testSupport/tacticalHexFixtures';
 
 tacticalDbFixtureRegisterDefaultAfterEach();
+
+test('computeTacticalBattleSnapshot copies the terrain bonus only while it is on', () => {
+  tacticalDbFixtureWithTempDbContestedPlanning('aw-tactical-snap-terrain-bonus-', ({ targetStrategicH3 }) => {
+    const settings = { originBonusEnabled: false, terrainBonusEnabled: true } as const;
+    persistOriginBonusSettings({ run: dbRun, hasDb: isDbReady }, settings);
+    const on = computeTacticalBattleSnapshot(targetStrategicH3, 'battle-terrain-bonus-on');
+    assert.equal(on.snapshot?.terrainBonusEnabled, true);
+    persistOriginBonusSettings({ run: dbRun, hasDb: isDbReady }, { ...settings, terrainBonusEnabled: false });
+    const off = computeTacticalBattleSnapshot(targetStrategicH3, 'battle-terrain-bonus-off');
+    assert.equal(off.snapshot?.terrainBonusEnabled, undefined);
+  });
+});
 
 test('computeTacticalBattleSnapshot rejects non-res1 enclosing index', () => {
   withTempGameDb('aw-tactical-snap-r1-', () => {

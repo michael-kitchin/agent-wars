@@ -4,6 +4,7 @@
 
 import type { TacticalBattleSnapshot, TacticalSubUnitSnapshot } from '../../shared/tacticalBattleTypes';
 import { effectiveTacticalMovementPointBudgetForMarchLeg } from '../../shared/tacticalTerrainCombatModifiers';
+import { terrainBonusMarchCategoryForMover } from '../../shared/terrainBonusMarch';
 import { planTacticalMarchWithSessionCache } from '../tacticalBattle/tacticalMovementPlanningCache';
 import { logTrace } from '../logger';
 
@@ -91,7 +92,7 @@ export function estimateTacticalTurnsRequired(totalCost: number, budget: number,
  */
 export function estimateTacticalMarch(
   battle: TacticalBattleSnapshot,
-  mover: Pick<TacticalSubUnitSnapshot, 'unitType' | 'h3Index' | 'embarkedOnSubUnitId' | 'weatherTags'>,
+  mover: Pick<TacticalSubUnitSnapshot, 'unitType' | 'h3Index' | 'embarkedOnSubUnitId' | 'weatherTags' | 'origin'>,
   toH3: string,
   tacticalSet?: ReadonlySet<string>
 ): TacticalMarchEstimate {
@@ -125,6 +126,7 @@ export function estimateTacticalMarch(
     weatherEnabled: battle.weatherBonusEnabled === true,
     weather: battle.weather,
     weatherTags: mover.weatherTags,
+    terrainBonusCategory: terrainBonusMarchCategoryForMover(battle, mover, mover.unitType),
   });
   if (!plan.reachable || !plan.pathToDestination) return unreachable(budget);
   const pathLen = plan.pathToDestination.length;

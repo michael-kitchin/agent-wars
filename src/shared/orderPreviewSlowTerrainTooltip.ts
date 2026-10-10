@@ -33,6 +33,8 @@ import {
   tacticalEnterHexMovementCost,
 } from './tacticalTerrainMovement';
 import type { TacticalMovementCategory } from './tacticalTerrainMovement';
+import { classifyTacticalMarchStep, type TacticalMarchStepContext } from './tacticalMarchStepCost';
+import { terrainBonusMarchCategoryForMover } from './terrainBonusMarch';
 import { TOOLTIP_SECTION_GAP_HTML } from './tooltipSectionGap';
 
 /** Stable ordering for multi-terrain comma lists in order-preview HTML (lower sorts earlier). */
@@ -274,11 +276,51 @@ function weatherBudgetSlowLabel(
 }
 
 /**
+ * Names the birth terrain of each terrain-bonus stop along a battle march path.
+ *
+ * Purpose: A stop spends the rest of the beat, so the march tooltip lists that terrain on its `Slower:` line beside
+ * weather and costly terrain.
+ * When to use: Both branches of `collectTacticalMarchTerrainImpact`.
+ * Expected outcome: Distinct terrain labels such as Mountain or Wetlands, empty when the battle's terrain bonus is off,
+ * the mover has no stop category, or no step on the path is a stop. Road and rail steps are never stops.
+ * Exceptions: None.
+ */
+function terrainBonusStopLabelsAlongPath(args: {
+  battle: TacticalBattleSnapshot;
+  subUnit: TacticalSubUnitSnapshot;
+  moveType: string;
+  pathH3: readonly string[];
+}): string[] {
+  const { battle, subUnit, moveType, pathH3 } = args;
+  const terrainBonusCategory = terrainBonusMarchCategoryForMover(battle, subUnit, moveType);
+  if (terrainBonusCategory == null) return [];
+  const label = displayTitleForSlowTerrainBucket(terrainBonusCategory);
+  if (!label) return [];
+  const ctx: TacticalMarchStepContext = {
+    terrain: buildTacticalTerrainKindResolverFromSnapshot(battle),
+    moveType,
+    tacticalSet: new Set(battle.tacticalChildH3Indexes),
+    marchStartH3: pathH3[0]!,
+    marchGoalH3: pathH3[pathH3.length - 1]!,
+    weatherEnabled: battle.weatherBonusEnabled === true,
+    weather: battle.weather,
+    weatherTags: subUnit.weatherTags,
+    terrainBonusCategory,
+  };
+  const usesStop = pathH3.slice(1).some(
+    (toH3, i) =>
+      classifyTacticalMarchStep(ctx, { fromH3: pathH3[i]!, prevH3: i >= 1 ? pathH3[i - 1]! : null, toH3 }).kind ===
+      'terrainBonusStop'
+  );
+  return usesStop ? [label] : [];
+}
+
+/**
  * Collects tactical march slow terrain labels along `pathH3` plus whether any step paid the road or rail rate.
  *
  * Purpose: Replaces the first-label helper with one result suitable for HTML tooltips.
  * When to use: After a battle march plan succeeds.
- * Expected outcome: Slow-terrain labels for the start cell's budget and for steps that did not pay the road or rail rate. The battle's weather is named for the budget only when its cap is below the start cell's terrain budget. A line-rate step sets `road` or `rail` and does not add that cell's terrain. Air and trivial paths yield empty labels and `roadRail: false`.
+ * Expected outcome: Slow-terrain labels for the start cell's budget and for steps that did not pay the road or rail rate. The battle's weather is named for the budget only when its cap is below the start cell's terrain budget. A line-rate step sets `road` or `rail` and does not add that cell's terrain. A terrain-bonus stop adds its birth terrain, for naval as well. Air and trivial paths yield empty labels and `roadRail: false`.
  * Exceptions: None.
  */
 export function collectTacticalMarchTerrainImpact(args: {
@@ -293,7 +335,7 @@ export function collectTacticalMarchTerrainImpact(args: {
   }
   if (moveType === 'naval') {
     const label = weatherBudgetSlowLabel(battle, subUnit, moveType);
-    return { slower: label ? [label] : [], roadRail: false };
+    return { slower: [...(label ? [label] : []), ...terrainBonusStopLabelsAlongPath(args)], roadRail: false };
   }
 
   const slowerOrder: string[] = [];
@@ -391,6 +433,7 @@ export function collectTacticalMarchTerrainImpact(args: {
       push('Mountain');
     }
   }
+  terrainBonusStopLabelsAlongPath(args).forEach(push);
   return {
     slower: slowerOrder,
     roadRail,

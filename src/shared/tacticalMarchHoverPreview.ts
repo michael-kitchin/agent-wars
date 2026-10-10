@@ -28,6 +28,7 @@ import {
   tacticalTerrainLayerSignature,
 } from './tacticalTerrainMovement';
 import { isTacticalCell } from './h3Resolutions';
+import { terrainBonusMarchCategoryForMover } from './terrainBonusMarch';
 
 /** Renderer-only march plan memo bound (LRU by Map insertion order). */
 const MAX_TACTICAL_HOVER_PLAN_MEMO = 64;
@@ -144,7 +145,8 @@ function buildPreviewForSubUnit(args: {
   const weatherKey = args.battle.weatherBonusEnabled === true
     ? `${args.battle.weather ?? ''}|${(sub.weatherTags ?? []).join(',')}`
     : '';
-  const memoKey = `${args.unitId}|${origin}|${args.hoveredH3Index}|${moveType}|${budget}|${weatherKey}`;
+  const terrainBonusCategory = terrainBonusMarchCategoryForMover(args.battle, sub, moveType);
+  const memoKey = `${args.unitId}|${origin}|${args.hoveredH3Index}|${moveType}|${budget}|${weatherKey}|${terrainBonusCategory ?? ''}`;
   let plan = tacticalHoverPlanMemo.get(memoKey);
   if (plan) {
     tacticalHoverPlanMemo.delete(memoKey);
@@ -160,6 +162,7 @@ function buildPreviewForSubUnit(args: {
       weatherEnabled: args.battle.weatherBonusEnabled === true,
       weather: args.battle.weather,
       weatherTags: sub.weatherTags,
+      terrainBonusCategory,
     });
     while (tacticalHoverPlanMemo.size >= MAX_TACTICAL_HOVER_PLAN_MEMO) {
       const oldest = tacticalHoverPlanMemo.keys().next().value;

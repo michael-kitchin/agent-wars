@@ -18,6 +18,7 @@ import {
   tacticalCell,
 } from './tacticalBattle/testSupport/tacticalHexFixtures';
 import type { TacticalBattleSnapshot } from '../shared/tacticalBattleTypes';
+import type { UnitOrigin } from '../shared/unitOriginTypes';
 
 const roadMark = '<img class="feature-icon" src="transport/road.svg" alt="" aria-hidden="true" />Road';
 const railMark = '<img class="feature-icon" src="transport/rail.svg" alt="" aria-hidden="true" />Rail';
@@ -593,6 +594,88 @@ test('collectTacticalMarchTerrainImpact marks a mountain road when only the moun
   assert.equal(impact.road, true);
   assert.equal(impact.rail, undefined);
   assert.deepEqual(impact.slower, []);
+});
+
+test('collectTacticalMarchTerrainImpact names the birth terrain of a terrain-bonus stop, but not on a road', () => {
+  const a = tacticalCell(91, 101);
+  const b = firstRingCellDistinctFrom(a);
+  const slowerFor = (args: {
+    readonly unitType: 'armor' | 'naval';
+    readonly kinds: readonly [string, string];
+    readonly birthTerrainKind: string;
+    readonly road?: boolean;
+  }): readonly string[] => {
+    const mover = {
+      id: 'u1',
+      parentUnitId: 'p1',
+      player: 'human',
+      unitType: args.unitType,
+      h3Index: a,
+      displayName: 'A',
+      origin: { birthTerrainKind: args.birthTerrainKind } as UnitOrigin,
+    } as const;
+    return collectTacticalMarchTerrainImpact({
+      battle: {
+        battleId: `tb-terrain-bonus-${args.unitType}-${args.road === true}`,
+        enclosingStrategicH3Index: '8f283082dcb519f',
+        tacticalChildH3Indexes: [a, b],
+        strategicTurnNumber: 1,
+        tacticalTurnNumber: 1,
+        strategicHexTerrain: 'land',
+        strategicHexTerrainKind: 'plains',
+        tacticalTerrainKindByH3: { [a]: args.kinds[0], [b]: args.kinds[1] },
+        ...(args.road ? pairedTransportSidesForAdjacentHexes(a, b, 'road') : {}),
+        terrainBonusEnabled: true,
+        subUnits: [mover],
+      },
+      subUnit: mover,
+      moveType: args.unitType,
+      pathH3: [a, b],
+    }).slower;
+  };
+  const armor = { unitType: 'armor', kinds: ['plains', 'mountain'], birthTerrainKind: 'mountain' } as const;
+  assert.deepEqual(slowerFor(armor), ['Mountain']);
+  assert.deepEqual(slowerFor({ ...armor, road: true }), []);
+  assert.deepEqual(slowerFor({ unitType: 'naval', kinds: ['water', 'wetlands'], birthTerrainKind: 'wetlands' }), [
+    'Wetlands',
+  ]);
+});
+
+test('collectTacticalMarchTerrainImpact keeps snow beside a naval wetlands stop', () => {
+  const a = tacticalCell(92, 102);
+  const b = firstRingCellDistinctFrom(a);
+  const mover = {
+    id: 'u1',
+    parentUnitId: 'p1',
+    player: 'human',
+    unitType: 'naval',
+    h3Index: a,
+    displayName: 'A',
+    origin: { birthTerrainKind: 'wetlands' } as UnitOrigin,
+  } as const;
+  assert.deepEqual(
+    collectTacticalMarchTerrainImpact({
+      battle: {
+        battleId: 'tb-terrain-bonus-naval-snow',
+        enclosingStrategicH3Index: '8f283082dcb519f',
+        tacticalChildH3Indexes: [a, b],
+        strategicTurnNumber: 1,
+        tacticalTurnNumber: 1,
+        strategicHexTerrain: 'land',
+        strategicHexTerrainKind: 'plains',
+        tacticalTerrainKindByH3: { [a]: 'water', [b]: 'wetlands' },
+        weather: 'snow',
+        weatherBonusEnabled: true,
+        weatherBonusLevel: 'low',
+        terrainBonusEnabled: true,
+        subUnits: [mover],
+      },
+      subUnit: mover,
+      moveType: 'naval',
+      pathH3: [a, b],
+    }).slower,
+    ['Snow', 'Wetlands']
+  );
 });
 
 test('collectTacticalRangedSlowTerrainLabels preserves first-seen order across units', () => {

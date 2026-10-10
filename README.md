@@ -1,8 +1,8 @@
 # Agent Wars
 
-[![CI](https://github.com/michael-kitchin/agent-wars/actions/workflows/ci.yml/badge.svg)](https://github.com/michael-kitchin/agent-wars/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/michael-kitchin/agent-wars?include_prereleases)](https://github.com/michael-kitchin/agent-wars/releases)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+![CI](https://github.com/michael-kitchin/agent-wars/actions/workflows/ci.yml/badge.svg)
+![Release](https://img.shields.io/github/v/release/michael-kitchin/agent-wars?include_prereleases)
+![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)
 
 A turn-based grand strategy game on a real-Earth hex map, where your opponent is a large language model you choose. Coding agents wrote the code and most of the documentation. One developer set the direction, wrote the prompts and the rules the agents follow, and reviewed the results. The story of building it is told in the Agent Wars series in *[Standing Orders](https://standingorders.substack.com)*.
 
@@ -10,7 +10,7 @@ A turn-based grand strategy game on a real-Earth hex map, where your opponent is
 
 *A tactical battle in central Mexico on turn 2, a rainy August. Teal human units face the rose opponent (in this case, Gemini Flash Lite), and their movement orders are queued in the right panel. The hex readout for Guerrero, Morelos, and México lists the road, the forest and urban terrain, the rain, and what those do to range, movement, and cover. At the upper right, the LLM's message reads "Your lines will shatter before you even realize the battle has begun."*
 
-[Play it](#play-it) · [What's inside](#whats-inside) · [How it was built](#how-it-was-built) · [Architecture](#architecture) · [Build from source](#build-from-source) · [Status](#status) · [License](#license)
+[Play it](#play-it) · [What's inside](#whats-inside) · [Under the hood](#under-the-hood) · [How it was built](#how-it-was-built) · [Architecture](#architecture) · [Build from source](#build-from-source) · [Status](#status) · [License](#license)
 
 ## Play it
 
@@ -38,13 +38,88 @@ Starting a match, the controls, and where messages appear are covered in [doc/ho
 
 ## What's inside
 
-- **A hybrid AI opponent.** The engine pre-computes a briefing (an ASCII hex map, Markdown tables of units and threats, and attention flags) before it consults the model. Standing orders carry the plan forward on turns the model isn't consulted, and event callbacks decide when it is. Any OpenRouter model can play; one without tool calls plays without the planning tools. See [doc/hybrid-ai.md](doc/hybrid-ai.md) and [doc/ai-tools.md](doc/ai-tools.md).
+- **A hybrid AI opponent.** The engine pre-computes a briefing (an ASCII hex map, Markdown tables of units and threats, and attention flags) before it consults the model. Standing orders carry the plan forward on turns the model isn't consulted, and event callbacks decide when it is. Any OpenRouter model can play; one without tool calls plays without the [planning tools](#the-opponents-tools). See [doc/hybrid-ai.md](doc/hybrid-ai.md) and [doc/ai-tools.md](doc/ai-tools.md).
 - **Prompts as code.** The prompts are assembled by builders in [`src/main/openRouter/promptSpec/`](src/main/openRouter/promptSpec/), documented in [doc/ai-commander-prompts/](doc/ai-commander-prompts/README.md), and held to that contract by tests such as `consultationContract.test.ts`, `envelopeJsonSchema.test.ts`, and `variantConformance.test.ts`.
-- **A real-Earth hex grid at two scales.** Strategic play uses H3 resolution 1 on the global map, or 2 or 3 on one of the regional maps. Tactical battles sit three resolutions finer. Terrain, roads, place names, and climate come from public datasets through an offline Python pipeline (`scripts/terrain_pipeline/`).
+- **A real-Earth hex grid at two scales.** Strategic play uses H3 resolution 1 on the global map, or 2 or 3 on one of the regional maps. Tactical battles sit three resolutions finer. Terrain, roads, place names, and climate come from public datasets through an offline Python pipeline (`scripts/terrain_pipeline/`). The cell sizes and sources are under [Under the hood](#under-the-hood).
 - **Simultaneous turns.** Both sides plan, then the engine resolves air strikes, ranged fire, movement, ferry, and melee in a fixed phase order, with optional zoomed-in tactical battles. The rules are in [doc/combat-rules-v3.md](doc/combat-rules-v3.md).
-- **Guardrails.** `npm test` builds the main process, then runs ESLint (with custom rules in [`eslint-rules/`](eslint-rules/)), a naming-convention check, a renderer type check, the main-process and tool tests (785 tests at 2.5.0), and a third-party-notices check. The renderer runs with context isolation, without Node integration, and under a Content-Security-Policy.
+- **Guardrails.** `npm test` builds the main process, then runs ESLint (with custom rules in [`eslint-rules/`](eslint-rules/)), a naming-convention check, a renderer type check, the main-process and tool tests (808 tests), and a third-party-notices check. The renderer runs with context isolation, without Node integration, and under a Content-Security-Policy.
 
 
+
+## Under the hood
+
+Cell areas and edge lengths are averages from the H3 library. The other counts come from the engine and the generated packs.
+
+### Hex scales
+
+Every map is a grid of [H3](https://h3geo.org) cells, Uber's hierarchical hexagon index. A battle zooms in three resolutions, so one strategic hex contains 343 tactical cells (286 under one of H3's twelve pentagons), plus three rings of neighboring cells.
+
+
+| H3 resolution | Used for                          | Average hex | Edge   | About the size of |
+| ------------- | --------------------------------- | ----------- | ------ | ----------------- |
+| 1             | Global strategic map (842 hexes)  | 609,800 km² | 483 km | Ukraine           |
+| 2             | Strategic map on 6 regional maps  | 86,800 km²  | 183 km | Austria           |
+| 3             | Strategic map on 17 regional maps | 12,400 km²  | 69 km  | Montenegro        |
+| 4             | Global battles                    | 1,770 km²   | 26 km  | Greater London    |
+| 5             | Battles on resolution 2 maps      | 253 km²     | 9.9 km | Malta             |
+| 6             | Battles on resolution 3 maps      | 36 km²      | 3.7 km | Macau             |
+
+
+Each of the 23 regional maps holds 257 to 352 strategic hexes. Those are the footprint totals in [doc/region-summary-1.md](doc/region-summary-1.md): South-Eastern Asia is the smallest and Southern Asia east is the largest.
+
+### Where the data comes from
+
+The offline pipeline samples rasters with rasterio and vector layers with Shapely, indexes the cells with H3, and ships the results as zipped JSON. PostGIS is part of that pipeline.
+
+
+| Layer               | What it drives                                                                                    | Source                                                                                                                        |
+| ------------------- | ------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| Land cover          | Forest, desert, arctic, and plains                                                                | [EarthEnv](https://www.earthenv.org/landcover) 1 km consensus land cover, 12 classes                                          |
+| Topography          | Mountain cells. The 50 km grids where a hex edge is at least 100 km, and the 5 km grids otherwise | [EarthEnv](https://www.earthenv.org/topography) ruggedness, slope, and elevation from GMTED2010                               |
+| Climate             | Each hex's weather in each month                                                                  | [WorldClim 2.1](https://worldclim.org/data/worldclim21.html) monthly temperature and precipitation, 1970–2000, 10 arc-minutes |
+| Water               | Water, coast, and shoreline wetlands                                                              | [Natural Earth](https://www.naturalearthdata.com) 1:10m ocean and lakes                                                       |
+| Cities              | Urban cells, and so the economy                                                                   | Natural Earth urban areas, from 2002–2003 MODIS satellite data at 1 km                                                        |
+| Ports and airfields | Where naval and air units are built and based                                                     | Natural Earth airports and ports                                                                                              |
+| Roads and railroads | Infantry and armor enter a battle cell for half a point on a road and a third on a rail           | Natural Earth roads and railroads                                                                                             |
+| Names and borders   | Hex names, unit origins and flags, regional origin areas                                          | Natural Earth countries, states and provinces, populated places, and marine areas                                             |
+| Landmasses          | Which land is connected, so land units march within a landmass                                    | Natural Earth geography regions: continents, isthmuses, and islands of 2,000 km² or more                                      |
+
+
+A month is labeled from that hex's mean temperature and its monthly precipitation, checked in this order (`classifyWeatherMonth` in `weatherBonusRules.ts`): "snow" at 0 °C or below, "rain" at 120 mm or more, "heat" at 23 °C or more, and mild when none of those match. Rain at 23 °C or above still counts as heat.
+
+Credits and license terms are in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
+
+### How the economy works
+
+Production is based on real-world urban land cover: the Natural Earth urban areas in the table above, mapped from MODIS. Each strategic hex earns one point per turn for every intact urban cell inside it. The global map has 4,643 of those cells, on 283 hexes, counting cells that meet an urban area of scalerank 5 or lower (`urbanOverlay` in `activeGameMap.ts`). A queued unit spawns once its hex has saved enough points. On the global map each air-strike hit destroys 9 urban cells for good (`strategicUrbanCellsDestroyedPerHit`), so bombing a city cuts its output for the rest of the match.
+
+
+| Unit     | Cost | The hex also needs           |
+| -------- | ---- | ---------------------------- |
+| Infantry | 20   | 1 urban cell                 |
+| Armor    | 40   | 2 urban cells                |
+| Air      | 60   | 5 urban cells and an airport |
+| Naval    | 100  | 10 urban cells and a seaport |
+
+
+Each regional map rescales costs, minimums, and strike size from its own urban counts, keeping the price ratio of 1:2:5:3 for infantry, armor, naval, and air, and the global share of hexes that can build each type. Infantry costs 60 in Western Europe and 10 in South America ([doc/region-summary-1.md](doc/region-summary-1.md)).
+
+### The opponent's tools
+
+The opponent plans and manages its forces through six groups of MCP-style tools: engine services with JSON schemas that return the same result for the same game state, offered to the model through OpenRouter function calling. Each of these groups can be switched off from the **Tools** tab.
+
+
+| Group      | What the model gets                     | Tools                                 |
+| ---------- | --------------------------------------- | ------------------------------------- |
+| Planning   | Multi-turn routes and turn counts       | `plan_route`, `check_distance`        |
+| Assessment | Threats, terrain, and occupants         | `assess_unit`, `assess_hex`           |
+| Estimation | Analytic hit odds for a proposed attack | `estimate_combat`                     |
+| Memory     | Notes it saved on earlier turns         | `memory_read`                         |
+| Orders     | The standing orders it has assigned     | `query_orders`                        |
+| Production | Income, build options, and queues       | `query_production`, `set_build_queue` |
+
+
+Memory writes and standing-order changes travel in the model's JSON reply. The full catalog is in [doc/ai-tools.md](doc/ai-tools.md).
 
 ## How it was built
 

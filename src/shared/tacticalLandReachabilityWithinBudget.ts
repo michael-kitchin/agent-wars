@@ -14,7 +14,8 @@ import {
 } from './tacticalLandMarchContinuity';
 import type { TacticalFootprintNeighborLookup } from './tacticalTransportLink';
 import type { WeatherState } from './weatherBonusTypes';
-import type { TacticalTerrainKindResolver } from './tacticalTerrainMovement';
+import type { TacticalMovementCategory, TacticalTerrainKindResolver } from './tacticalTerrainMovement';
+import { collectTerrainBonusStopsFromReached } from './tacticalMarchStepCost';
 import {
   popNumericPriorityMinHeap,
   pushNumericPriorityMinHeap,
@@ -32,6 +33,7 @@ const TRANSIT_ONLY_GOAL = '';
  * Expected outcome: Destination hexes with a finite path totaling ≤ `movementPointBudget`, including the weather open-ground
  * cost when the weather fields are given, excluding the origin; blocking
  * destinations are recovered via goal short-circuit backfill so membership matches per-destination `reachableThisTurn`.
+ * With `terrainBonusCategory`, terrain-bonus stop cells next to reached cells are added last; nothing beyond them is.
  * Exceptions: None; never throws.
  */
 export function collectInfantryArmorReachableWithinBudget(args: {
@@ -47,6 +49,8 @@ export function collectInfantryArmorReachableWithinBudget(args: {
   weather?: WeatherState | null;
   /** The mover's acclimation tags; a tag matching `weather` keeps printed costs. */
   weatherTags?: readonly WeatherState[] | null;
+  /** Same meaning as `TacticalMarchPlanArgs.terrainBonusCategory`; adds terrain-bonus stop cells when set. */
+  terrainBonusCategory?: TacticalMovementCategory | null;
 }): string[] {
   const { fromH3, tacticalSet, unitTypeForMovement, movementPointBudget, terrain } = args;
   const weatherEnter = { weatherEnabled: args.weatherEnabled, weather: args.weather, weatherTags: args.weatherTags };
@@ -145,5 +149,22 @@ export function collectInfantryArmorReachableWithinBudget(args: {
       }
     }
   }
-  return out;
+  if (args.terrainBonusCategory == null) return out;
+  const stops = collectTerrainBonusStopsFromReached({
+    ctx: {
+      terrain,
+      moveType: unitTypeForMovement,
+      tacticalSet,
+      marchStartH3: fromH3,
+      marchGoalH3: TRANSIT_ONLY_GOAL,
+      footprintNeighbors: neighborsOf,
+      ...weatherEnter,
+      terrainBonusCategory: args.terrainBonusCategory,
+    },
+    reached: [...bestCostByHex].map(([h3, spent]) => ({ h3, spent, prevH3: bestPrevByHex.get(h3) ?? null })),
+    exclude: outSet,
+    movementPointBudget,
+    neighborsOf,
+  });
+  return [...out, ...stops];
 }

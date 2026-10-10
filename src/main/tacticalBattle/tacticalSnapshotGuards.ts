@@ -15,7 +15,9 @@ import { planTacticalMarchWithSessionCache } from './tacticalMovementPlanningCac
 import {
   buildTacticalTerrainKindResolverFromSnapshot,
   tacticalMovementUnitTypeForPathfinding,
+  type TacticalMovementCategory,
 } from '../../shared/tacticalTerrainMovement';
+import { terrainBonusMarchCategoryForMover } from '../../shared/terrainBonusMarch';
 import { effectiveTacticalMovementPointBudgetForMarchLeg } from '../../shared/tacticalTerrainCombatModifiers';
 import { tacticalLogError, tacticalLogMutate } from './tacticalLogging';
 import { logDebug } from '../logger';
@@ -58,6 +60,7 @@ type TacticalMarchPlanBattleArgs = Pick<
   | 'weather'
   | 'weatherBonusEnabled'
   | 'weatherBonusLevel'
+  | 'terrainBonusEnabled'
 >;
 
 /**
@@ -104,6 +107,8 @@ export function tacticalLandMarchBestEffortPlanTowardOrderedHex(args: {
   moveType: string;
   movementPointBudget: number;
   weatherTags?: readonly import('../../shared/weatherBonusTypes').WeatherState[] | null;
+  /** From `terrainBonusMarchCategoryForMover` for the moving sub-unit; null or omitted means no terrain-bonus stops. */
+  terrainBonusCategory?: TacticalMovementCategory | null;
 }): TacticalMarchPlanResult | null {
   logDebug('tacticalSnapshotGuards tacticalLandMarchBestEffortPlanTowardOrderedHex', {
     battleId: args.battle.battleId,
@@ -111,6 +116,7 @@ export function tacticalLandMarchBestEffortPlanTowardOrderedHex(args: {
     orderedToH3: args.orderedToH3,
     moveType: args.moveType,
     movementPointBudget: args.movementPointBudget,
+    terrainBonusCategory: args.terrainBonusCategory ?? null,
   });
   if (args.movementPointBudget < 1) return null;
   if (args.moveType !== 'infantry' && args.moveType !== 'armor') return null;
@@ -129,6 +135,7 @@ export function tacticalLandMarchBestEffortPlanTowardOrderedHex(args: {
       weatherEnabled: args.battle.weatherBonusEnabled === true,
       weather: args.battle.weather,
       weatherTags: args.weatherTags,
+      terrainBonusCategory: args.terrainBonusCategory,
     });
     if (!p.reachable) continue;
     const applied = p.firstStopWithinBudget.stopH3;
@@ -238,6 +245,7 @@ function logTacticalMarchPlanOk(args: {
     reachableThisTurn: args.plan.reachableThisTurn,
     firstStopH3: args.plan.firstStopWithinBudget.stopH3,
     firstStopConsumedFullPath: args.plan.firstStopWithinBudget.consumedFullPath,
+    usesTerrainBonus: args.plan.usesTerrainBonus === true,
     pathLen: path?.length ?? 0,
     pathHead: path?.slice(0, 4) ?? [],
     pathTail: path?.slice(-3) ?? [],
@@ -294,6 +302,7 @@ type TacticalMovementOrderOutcomeArgs = {
     | 'weather'
     | 'weatherBonusEnabled'
     | 'weatherBonusLevel'
+    | 'terrainBonusEnabled'
   >;
 };
 
@@ -365,15 +374,17 @@ function tacticalComputeMovementOrderOutcomeForPlayer(
     return { ok: false, reason: 'air_no_march', context: { unitId: args.order.unitId } };
   }
   const budget = effectiveTacticalMovementPointBudgetForMarchLeg(args.battle, pathfindUnit, args.sub, moveType);
+  const terrainBonusCategory = terrainBonusMarchCategoryForMover(args.battle, pathfindUnit, moveType);
   let plan = planTacticalMarchWithSessionCache(args.battle, {
     fromH3: u.h3Index,
     toH3: args.order.toH3Index,
     tacticalSet: args.tacticalSet,
     unitTypeForMovement: moveType,
-      movementPointBudget: Math.max(0, budget),
-      weatherEnabled: args.battle.weatherBonusEnabled === true,
-      weather: args.battle.weather,
-      weatherTags: pathfindUnit.weatherTags,
+    movementPointBudget: Math.max(0, budget),
+    weatherEnabled: args.battle.weatherBonusEnabled === true,
+    weather: args.battle.weather,
+    weatherTags: pathfindUnit.weatherTags,
+    terrainBonusCategory,
   });
   if (!plan.reachable) {
     const bestEffortPlan =
@@ -386,6 +397,7 @@ function tacticalComputeMovementOrderOutcomeForPlayer(
             moveType,
             movementPointBudget: Math.max(0, budget),
             weatherTags: pathfindUnit.weatherTags,
+            terrainBonusCategory,
           })
         : null;
     if (bestEffortPlan) {

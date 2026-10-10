@@ -288,13 +288,13 @@ Each row is a pair of gates that would otherwise fight. The resolution column ma
 
 ## 8. Origin bonus and terrain bonus
 
-Gate: `state.originBonusEnabled` and `state.terrainBonusEnabled` with their levels (`originBonusLevel`, `terrainBonusLevel`), read through `originBonusSettingsFromSnapshot` into `GameRuleTextGates.originBonusSettings`. On the strategic map only the origin bonus applies; in battle either flag applies. With no applicable flag, every surface is byte-for-byte unchanged. Low and High differ only in the amounts: at Low the rule text says `adds 2`, the `Bonus` cell reads `+2 …`, and `originBonus` and `originBonusAmount` report 2; at High the rule text says `adds 4`, the stacking sentence names the larger amount, the `Bonus` cell reads `+4 …`, and `originBonus` and `originBonusAmount` report 4.
+Gate: `state.originBonusEnabled` and `state.terrainBonusEnabled` with their levels (`originBonusLevel`, `terrainBonusLevel`), read through `originBonusSettingsFromSnapshot` into `GameRuleTextGates.originBonusSettings`. On the strategic map only the origin bonus applies; in battle either flag applies. With no applicable flag, every surface is byte-for-byte unchanged. In battle the terrain bonus also turns on terrain-bonus movement ([combat rules §4.9](../combat-rules-v3.md)), which is the same at Low and High. Low and High differ only in the dice amounts: at Low the rule text says `adds 2`, the `Bonus` cell reads `+2 …`, and `originBonus` and `originBonusAmount` report 2; at High the rule text says `adds 4`, the stacking sentence names the larger amount, the `Bonus` cell reads `+4 …`, and `originBonus` and `originBonusAmount` report 4.
 
 | Surface | Contract |
 | --- | --- |
-| system | The combat paragraph adds `buildOriginBonusRule` after the casualty rule. The Unit Status table gains a `Bonus` column after `Hex`. With the origin bonus on, Supplemental Hex Intelligence bullets append `; origin` and the place id. |
+| system | The combat paragraph adds `buildOriginBonusRule` after the casualty rule. In battle with the terrain bonus on, its terrain clause ends with `TERRAIN_BONUS_MOVEMENT_PROMPT_SENTENCE`. The Unit Status table gains a `Bonus` column after `Hex`. With the origin bonus on, Supplemental Hex Intelligence bullets append `; origin` and the place id. |
 | user | unchanged |
-| tools | Tool names stay the same. `estimate_combat` reports effective values and `originBonus` (2 or 4); `assess_unit` adds `originBonusHere`, `originBonusAmount`, `birthOrigin` (the place label, not the place id), and in battle `birthTerrain`; `assess_hex` adds `origin` (the place id). |
+| tools | Tool names stay the same. `estimate_combat` reports effective values and `originBonus` (2 or 4); `assess_unit` adds `originBonusHere`, `originBonusAmount`, `birthOrigin` (the place label, not the place id), and in battle `birthTerrain`; `assess_hex` adds `origin` (the place id). In battle with the terrain bonus on, `plan_route`, `check_distance`, and the `assess_unit` beat estimates count terrain-bonus stops, and Best Options lists a stop cell as a this-beat destination. |
 | envelope | unchanged |
 | coaching | unchanged |
 | empty-state | A unit that does not qualify reads `—` in the `Bonus` column, `[]` in `originBonusHere`, and 0 in `originBonusAmount`. |

@@ -11,7 +11,10 @@ import { effectiveTacticalMovementPointBudgetForMarchLeg } from '../../shared/ta
 import {
   buildTacticalTerrainKindResolverFromSnapshot,
   isNavalTacticalCellNavigable,
+  type TacticalMovementCategory,
 } from '../../shared/tacticalTerrainMovement';
+import { cellAllowsTerrainBonusStop } from '../../shared/tacticalMarchStepCost';
+import { terrainBonusMarchCategoryForMover } from '../../shared/terrainBonusMarch';
 import type { GameStateSnapshot } from '../gameDb';
 import { logDebug, logError } from '../logger';
 import { h3ToLatLng, type LatLng } from './h3LatLng';
@@ -128,6 +131,37 @@ function nearestNavigableNavalTacticalTo(
 }
 
 /**
+ * Resolves a naval destination for `plan_route` and `check_distance`.
+ *
+ * Purpose: A naval unit cannot end on most land cells, so a land destination is moved to the nearest navigable cell.
+ * A naval unit born on wetlands may stop on a wetlands cell through the terrain bonus, so that destination is kept.
+ * When to use: Before planning a naval march in either battle tool.
+ * Expected outcome: The given cell when naval can enter it or stop on it, otherwise the nearest navigable footprint
+ * cell with `redirected: true`. The given cell when no navigable cell exists.
+ * Exceptions: None.
+ */
+function resolveNavalTacticalDestination(args: {
+  battle: TacticalBattleSnapshot;
+  destH3: string;
+  footprint: ReadonlySet<string>;
+  terrainBonusCategory: TacticalMovementCategory | null;
+}): { destH3: string; redirected: boolean } {
+  const { battle, destH3, footprint, terrainBonusCategory } = args;
+  const terrain = buildTacticalTerrainKindResolverFromSnapshot(battle);
+  const navigable = isNavalTacticalCellNavigable({
+    resolvedKindForCell: terrain.effectiveKindForTacticalHex(destH3),
+    parentTerrain: terrain.parentTerrain,
+    parentTerrainKind: terrain.parentTerrainKind,
+    isSeaportCell: terrain.isSeaportTactical?.(destH3) === true,
+  });
+  if (navigable || cellAllowsTerrainBonusStop({ terrain, moveType: 'naval', terrainBonusCategory }, destH3)) {
+    return { destH3, redirected: false };
+  }
+  const waterHex = nearestNavigableNavalTacticalTo(battle, destH3, footprint);
+  return waterHex ? { destH3: waterHex, redirected: true } : { destH3, redirected: false };
+}
+
+/**
  * Plans a tactical land/naval march and builds a Tool1 plan_route success payload truncated to the first Ready leg.
  *
  * Purpose: Fixes tactical AI plan_route when strategic land-mass rejects every tactical cell.
@@ -179,20 +213,12 @@ export function executeTacticalPlanRoute(
       return { status: 'error', error: 'Origin or destination is outside the tactical battle footprint.' };
     }
     const warnings: string[] = [];
+    const terrainBonusCategory = sub ? terrainBonusMarchCategoryForMover(battle, sub, unit.unitType) : null;
     if (unit.unitType === 'naval') {
-      const terrain = buildTacticalTerrainKindResolverFromSnapshot(battle);
-      const destNavigable = isNavalTacticalCellNavigable({
-        resolvedKindForCell: terrain.effectiveKindForTacticalHex(destH3),
-        parentTerrain: terrain.parentTerrain,
-        parentTerrainKind: terrain.parentTerrainKind,
-        isSeaportCell: terrain.isSeaportTactical?.(destH3) === true,
-      });
-      if (!destNavigable) {
-        const waterHex = nearestNavigableNavalTacticalTo(battle, destH3, footprint);
-        if (waterHex) {
-          destH3 = waterHex;
-          warnings.push('Naval destination redirected to nearest water/coastal/seaport hex in the tactical footprint.');
-        }
+      const resolved = resolveNavalTacticalDestination({ battle, destH3, footprint, terrainBonusCategory });
+      if (resolved.redirected) {
+        destH3 = resolved.destH3;
+        warnings.push('Naval destination redirected to nearest water/coastal/seaport hex in the tactical footprint.');
       }
     }
     if (originH3 === destH3) {
@@ -234,6 +260,7 @@ export function executeTacticalPlanRoute(
         weatherEnabled: battle.weatherBonusEnabled === true,
         weather: battle.weather,
         weatherTags: sub?.weatherTags,
+        terrainBonusCategory,
       });
 
     let plan = tryPlan(buildTacticalRouteSet(battle, originH3, destH3, avoidEnemies, unit.player));
@@ -253,6 +280,7 @@ export function executeTacticalPlanRoute(
         moveType: unit.unitType,
         movementPointBudget: budget,
         weatherTags: sub?.weatherTags,
+        terrainBonusCategory,
       });
       if (bestEffort) {
         plan = bestEffort;
@@ -297,6 +325,8 @@ export function executeTacticalPlanRoute(
       totalCostToDestination: plan.totalCostToDestination,
       turnsRequired,
       budget,
+      terrainBonusCategory,
+      usesTerrainBonus: plan.usesTerrainBonus === true,
     });
 
     return {
@@ -335,7 +365,8 @@ export function executeTacticalPlanRoute(
  * When to use: `executePathfinding` when `tacticalBattle` is set for `check_distance`.
  * Expected outcome: hexDistance from path length; estimatedTurns from MP cost / budget; reachable when a finite path exists.
  * Weather budgets and enter costs use the tags of the sub-unit `checkDistanceTagSourceUnit` picks on the start cell, as
- * strategic `check_distance` does; an empty start cell means an untagged mover.
+ * strategic `check_distance` does; an empty start cell means an untagged mover. Terrain-bonus stops use that same
+ * sub-unit's birth terrain, so an empty start cell gets none.
  * Exceptions: Returns error for invalid hexes; air unitType yields unreachable ok with zero distances.
  */
 export function executeTacticalCheckDistance(
@@ -363,30 +394,21 @@ export function executeTacticalCheckDistance(
   if (unitType === 'air') {
     return { status: 'ok', from: fromLl, to: toLl, hexDistance: 0, estimatedTurns: 0, reachable: false };
   }
-  let toH3Resolved = toH3;
-  if (unitType === 'naval') {
-    const terrain = buildTacticalTerrainKindResolverFromSnapshot(battle);
-    const destNavigable = isNavalTacticalCellNavigable({
-      resolvedKindForCell: terrain.effectiveKindForTacticalHex(toH3Resolved),
-      parentTerrain: terrain.parentTerrain,
-      parentTerrainKind: terrain.parentTerrainKind,
-      isSeaportCell: terrain.isSeaportTactical?.(toH3Resolved) === true,
-    });
-    if (!destNavigable) {
-      const waterHex = nearestNavigableNavalTacticalTo(battle, toH3Resolved, footprint);
-      if (waterHex) toH3Resolved = waterHex;
-    }
-  }
+  const occupant = checkDistanceTagSourceUnit(battle.subUnits, fromH3, unitType);
+  const mover = { unitType, h3Index: fromH3, weatherTags: occupant?.weatherTags, origin: occupant?.origin };
+  const toH3Resolved =
+    unitType === 'naval'
+      ? resolveNavalTacticalDestination({
+          battle,
+          destH3: toH3,
+          footprint,
+          terrainBonusCategory: terrainBonusMarchCategoryForMover(battle, mover, unitType),
+        }).destH3
+      : toH3;
   if (fromH3 === toH3Resolved) {
     return { status: 'ok', from: fromLl, to: h3ToLatLng(toH3Resolved, latLngByH3, 'origin'), hexDistance: 0, estimatedTurns: 0, reachable: true };
   }
-  const occupant = checkDistanceTagSourceUnit(battle.subUnits, fromH3, unitType);
-  const estimate = estimateTacticalMarch(
-    battle,
-    { unitType, h3Index: fromH3, weatherTags: occupant?.weatherTags },
-    toH3Resolved,
-    footprint
-  );
+  const estimate = estimateTacticalMarch(battle, mover, toH3Resolved, footprint);
   return {
     status: 'ok',
     from: fromLl,

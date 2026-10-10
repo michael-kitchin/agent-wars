@@ -6,6 +6,7 @@ import * as assert from 'assert';
 import { cellToLatLng, cellToParent, gridDisk, gridDistance } from 'h3-js';
 import type { GameStateSnapshot } from '../gameDb';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
+import type { UnitOrigin } from '../../shared/unitOriginTypes';
 import { buildTacticalAiPlanState } from '../tacticalBattle/buildTacticalAiPlanState';
 import { tacticalParentCell, tacticalUnderCorner } from '../tacticalBattle/testSupport/tacticalHexFixtures';
 import { buildTacticalToolFixture } from '../tacticalBattle/testSupport/tacticalToolFixtures';
@@ -202,6 +203,49 @@ function testTacticalCheckDistanceUsesStartCellTags(): void {
 }
 
 /**
+ * Ensures tactical check_distance keeps a wetlands destination that a wetlands-born naval unit can stop on.
+ *
+ * Purpose: The naval redirect to the nearest navigable cell must not hide a terrain-bonus stop.
+ * When to use: After edits to naval destination handling in `executeTacticalCheckDistance`.
+ * Expected outcome: With the terrain bonus on, a wetlands-born ship keeps the wetlands cell and reaches it in one
+ * beat; a plains-born ship is redirected back to its own water cell.
+ * Exceptions: None.
+ */
+function testTacticalCheckDistanceKeepsTerrainBonusWetlands(): void {
+  const check = (birthTerrainKind: string) => {
+    const fx = buildTacticalToolFixture({
+      battleId: `t-tool1-wetlands-${birthTerrainKind}`,
+      units: [
+        {
+          id: 'opp-nav',
+          player: 'opponent',
+          unitType: 'naval',
+          cell: 'near',
+          origin: { birthTerrainKind } as UnitOrigin,
+        },
+      ],
+      terrainByCell: { near: 'water', mid: 'wetlands' },
+    });
+    const result = executeTacticalCheckDistance(
+      cellToLatLng(fx.cells.near) as [number, number],
+      cellToLatLng(fx.cells.mid) as [number, number],
+      'naval',
+      { ...fx.battle, terrainBonusEnabled: true },
+      fx.latLngByH3,
+      fx.resolveToH3
+    ) as { status: string; to?: [number, number]; reachable?: boolean; estimatedTurns?: number };
+    assert.strictEqual(result.status, 'ok');
+    return { fx, result };
+  };
+  const wetlandsBorn = check('wetlands');
+  assert.deepStrictEqual(wetlandsBorn.result.to, wetlandsBorn.fx.latLngByH3.get(wetlandsBorn.fx.cells.mid));
+  assert.strictEqual(wetlandsBorn.result.reachable, true);
+  assert.strictEqual(wetlandsBorn.result.estimatedTurns, 1);
+  const plainsBorn = check('plains');
+  assert.deepStrictEqual(plainsBorn.result.to, plainsBorn.fx.latLngByH3.get(plainsBorn.fx.cells.near));
+}
+
+/**
  * Ensures tactical plan_route rejects air units with an air-strike guidance error.
  *
  * Purpose: Contract parity with strategic Tool1 air handling.
@@ -314,6 +358,7 @@ const tests = [
   { name: 'strategic plan_route on res4 planState still land-mass', fn: testStrategicPlanRouteOnPlanStateStillUsesLandMass },
   { name: 'tactical check_distance adjacent ok', fn: testTacticalCheckDistanceAdjacentOk },
   { name: 'tactical check_distance uses start cell tags', fn: testTacticalCheckDistanceUsesStartCellTags },
+  { name: 'tactical check_distance keeps terrain bonus wetlands', fn: testTacticalCheckDistanceKeepsTerrainBonusWetlands },
   { name: 'tactical plan_route rejects air', fn: testTacticalPlanRouteRejectsAir },
   { name: 'tactical plan_route rejects embarked', fn: testTacticalPlanRouteRejectsEmbarked },
 ];

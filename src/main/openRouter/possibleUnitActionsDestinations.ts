@@ -12,6 +12,7 @@ import {
   tacticalMovementTerrainAnchorH3,
 } from '../../shared/tacticalTerrainCombatModifiers';
 import { AIR_FERRY_RANGE_HEXES, AIR_STRIKE_RANGE_HEXES } from '../../shared/tacticalRanges';
+import { terrainBonusMarchCategoryForMover } from '../../shared/terrainBonusMarch';
 import { isWithinAirFerryGridRange, isWithinAirStrikeGridRange } from '../gameActions/gridRange';
 import { strategicFerryRangeOnState } from '../weather/weatherMatch';
 import { logInfo, logTrace } from '../logger';
@@ -120,8 +121,9 @@ export function rememberComputedHexList(
 /**
  * Cache key for tactical MP reachability shared by stacked same-type sub-units.
  *
- * Purpose: Best Options was running one Dijkstra per opponent pawn; same origin, type, budget, weather tags, and embark
- * state share dests, because tags change the weather open-ground cost.
+ * Purpose: Best Options was running one Dijkstra per opponent pawn; same origin, type, budget, weather tags, terrain-bonus
+ * stop category, and embark state share dests, because tags change the weather open-ground cost and the category adds
+ * birth-terrain stop cells.
  * When to use: `collectAggregatedPossibleActionRows` before `collectTacticalLegalMoveDestinationTacticalHexes`.
  * Expected outcome: Air units share one empty dest list; unknown ids get a unique key; embarked cargo shares one empty dest list.
  * Exceptions: None.
@@ -140,7 +142,8 @@ export function tacticalLegalMoveDestCacheKey(
     battle.subUnits,
     u.unitType
   );
-  return `${u.h3Index}|${u.unitType}|b${budget}|${u.weatherTags?.join(',') ?? ''}`;
+  const terrainBonusCategory = terrainBonusMarchCategoryForMover(battle, u, u.unitType);
+  return `${u.h3Index}|${u.unitType}|b${budget}|${u.weatherTags?.join(',') ?? ''}${terrainBonusCategory ? `|tb:${terrainBonusCategory}` : ''}`;
 }
 
 /**

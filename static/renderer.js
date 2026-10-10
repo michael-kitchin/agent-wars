@@ -18371,6 +18371,12 @@
     mountains: "mountain",
     wetland: "wetlands"
   });
+  function normalizeOriginTerrainKind(raw) {
+    const kind = (raw ?? "").trim().toLowerCase();
+    if (kind.length === 0) return null;
+    const aliased = TERRAIN_KIND_ALIASES[kind] ?? kind;
+    return isPipelineTerrainKind(aliased) ? aliased : null;
+  }
 
   // src/shared/techBonusRules.ts
   var TECH_ADVANCED_MIN_URBAN_HEX_COUNT = GLOBAL_GAME_MAP.rules.advancedMinUrbanCells;
@@ -20846,6 +20852,92 @@ ${bonuses}`;
     return { path, totalCost: total };
   }
 
+  // src/shared/tacticalMarchStepCost.ts
+  function tacticalNavalEnterNeighborCost(fromH3, toH3, terrain) {
+    if (terrain.isUrbanTactical?.(toH3) || terrain.isRubbleTactical?.(toH3)) {
+      return Infinity;
+    }
+    const resolved = terrain.effectiveKindForTacticalHex(toH3);
+    const seaportTo = terrain.isSeaportTactical?.(toH3) ?? false;
+    if (!isNavalTacticalCellNavigable({
+      resolvedKindForCell: resolved,
+      parentTerrain: terrain.parentTerrain,
+      parentTerrainKind: terrain.parentTerrainKind,
+      isSeaportCell: seaportTo
+    })) {
+      return Infinity;
+    }
+    if (seaportTo && fromH3 != null && (terrain.isSeaportTactical?.(fromH3) ?? false)) {
+      const fromResolved = terrain.effectiveKindForTacticalHex(fromH3);
+      if (!nativeTacticalTerrainKindIsWaterOrCoastalForNavalRouting(fromResolved) && !nativeTacticalTerrainKindIsWaterOrCoastalForNavalRouting(resolved)) {
+        return Infinity;
+      }
+    }
+    return 1;
+  }
+  function tacticalMarchStepCostWithoutBonus(ctx, step) {
+    const { terrain, moveType } = ctx;
+    if (moveType === "naval") return tacticalNavalEnterNeighborCost(step.fromH3, step.toH3, terrain);
+    if (moveType !== "infantry" && moveType !== "armor") return Infinity;
+    if (!blockedHexLandTransitAllowsRelaxation({
+      unitTypeForMovement: moveType,
+      terrain,
+      h: step.fromH3,
+      prev: step.prevH3,
+      nb: step.toH3,
+      marchStartH3: ctx.marchStartH3,
+      marchGoalH3: ctx.marchGoalH3
+    })) {
+      return Infinity;
+    }
+    return landInfantryArmorEnterCost({
+      toH3: step.toH3,
+      unitTypeForMovement: moveType,
+      terrain,
+      fromH3: step.fromH3,
+      prevOfFrom: step.prevH3,
+      marchGoalH3: ctx.marchGoalH3,
+      tacticalSet: ctx.tacticalSet,
+      footprintNeighbors: ctx.footprintNeighbors,
+      weatherEnabled: ctx.weatherEnabled,
+      weather: ctx.weather,
+      weatherTags: ctx.weatherTags
+    });
+  }
+  function cellAllowsTerrainBonusStop(ctx, toH3) {
+    const category = ctx.terrainBonusCategory;
+    if (category == null) return false;
+    const { terrain } = ctx;
+    if (terrain.isUrbanTactical?.(toH3) || terrain.isRubbleTactical?.(toH3)) return false;
+    if (ctx.moveType === "naval" && terrain.isSeaportTactical?.(toH3)) return false;
+    return normalizeDbTerrainKindToTacticalCategory(terrain.effectiveKindForTacticalHex(toH3), terrain.parentTerrain) === category;
+  }
+  function classifyTacticalMarchStep(ctx, step) {
+    const cost = tacticalMarchStepCostWithoutBonus(ctx, step);
+    if (Number.isFinite(cost) && cost > 0) return { kind: "normal", cost };
+    return cellAllowsTerrainBonusStop(ctx, step.toH3) ? { kind: "terrainBonusStop" } : { kind: "blocked" };
+  }
+
+  // src/shared/terrainBonusMarch.ts
+  function terrainBonusMarchCategoryFor(input) {
+    if (!input.enabled) return null;
+    const birthKind = normalizeOriginTerrainKind(input.birthTerrainKind);
+    if (birthKind === null) return null;
+    const category = normalizeDbTerrainKindToTacticalCategory(birthKind, "land");
+    if (category === "water") return null;
+    if (input.unitType === "naval") return category === "wetlands" ? category : null;
+    if (input.unitType !== "infantry" && input.unitType !== "armor") return null;
+    return Number.isFinite(tacticalEnterHexMovementCost(input.unitType, category)) ? null : category;
+  }
+  function terrainBonusMarchCategoryForMover(battle, mover, moveType) {
+    if (battle.terrainBonusEnabled !== true || moveType !== mover.unitType) return null;
+    return terrainBonusMarchCategoryFor({
+      enabled: true,
+      unitType: moveType,
+      birthTerrainKind: mover.origin?.birthTerrainKind
+    });
+  }
+
   // src/shared/tooltipSectionGap.ts
   var TOOLTIP_SECTION_GAP_HTML = '<br/><span style="display:block;height:0.5em"></span>';
 
@@ -20908,6 +21000,28 @@ ${bonuses}`;
     });
     return slowed ? formatWeatherLabel(battle.weather) : null;
   }
+  function terrainBonusStopLabelsAlongPath(args) {
+    const { battle, subUnit, moveType, pathH3 } = args;
+    const terrainBonusCategory = terrainBonusMarchCategoryForMover(battle, subUnit, moveType);
+    if (terrainBonusCategory == null) return [];
+    const label = displayTitleForSlowTerrainBucket(terrainBonusCategory);
+    if (!label) return [];
+    const ctx = {
+      terrain: buildTacticalTerrainKindResolverFromSnapshot(battle),
+      moveType,
+      tacticalSet: new Set(battle.tacticalChildH3Indexes),
+      marchStartH3: pathH3[0],
+      marchGoalH3: pathH3[pathH3.length - 1],
+      weatherEnabled: battle.weatherBonusEnabled === true,
+      weather: battle.weather,
+      weatherTags: subUnit.weatherTags,
+      terrainBonusCategory
+    };
+    const usesStop = pathH3.slice(1).some(
+      (toH3, i) => classifyTacticalMarchStep(ctx, { fromH3: pathH3[i], prevH3: i >= 1 ? pathH3[i - 1] : null, toH3 }).kind === "terrainBonusStop"
+    );
+    return usesStop ? [label] : [];
+  }
   function collectTacticalMarchTerrainImpact(args) {
     const { battle, subUnit, moveType, pathH3 } = args;
     if (pathH3.length < 2 || moveType === "air") {
@@ -20915,7 +21029,7 @@ ${bonuses}`;
     }
     if (moveType === "naval") {
       const label = weatherBudgetSlowLabel(battle, subUnit, moveType);
-      return { slower: label ? [label] : [], roadRail: false };
+      return { slower: [...label ? [label] : [], ...terrainBonusStopLabelsAlongPath(args)], roadRail: false };
     }
     const slowerOrder = [];
     const seen = /* @__PURE__ */ new Set();
@@ -21010,6 +21124,7 @@ ${bonuses}`;
         push("Mountain");
       }
     }
+    terrainBonusStopLabelsAlongPath(args).forEach(push);
     return {
       slower: slowerOrder,
       roadRail,
@@ -26886,33 +27001,121 @@ ${bonuses}`;
     };
   }
 
+  // src/shared/tacticalMarchBeatSearch.ts
+  function advanceBeatPosition(from, step, budget) {
+    if (step.kind === "blocked") return null;
+    if (step.kind === "terrainBonusStop") {
+      return from.spent < budget ? { beat: from.beat, spent: budget } : { beat: from.beat + 1, spent: budget };
+    }
+    if (from.spent + step.cost <= budget) return { beat: from.beat, spent: from.spent + step.cost };
+    if (from.spent === 0) return { beat: from.beat, spent: budget };
+    return { beat: from.beat + 1, spent: Math.min(step.cost, budget) };
+  }
+  function beatRouteFromStates(states, goalKey) {
+    const reversed = [];
+    for (let key = goalKey; key !== null; ) {
+      const state = states.get(key);
+      reversed.push(state);
+      key = state.parentKey;
+    }
+    const ordered = reversed.reverse();
+    const goal = ordered[ordered.length - 1];
+    return {
+      path: ordered.map((s) => s.h3),
+      beatByIndex: ordered.map((s) => s.beat),
+      arrivalBeat: goal.beat,
+      arrivalSpent: goal.spent,
+      usesTerrainBonus: goal.usesTerrainBonus
+    };
+  }
+  function searchTacticalMarchBeats(args) {
+    const { fromH3, toH3, tacticalSet, movementPointBudget: budget } = args;
+    if (!(budget >= 1) || fromH3 === toH3 || !tacticalSet.has(fromH3) || !tacticalSet.has(toH3)) return null;
+    const isLand = args.unitTypeForMovement === "infantry" || args.unitTypeForMovement === "armor";
+    const ctx = {
+      terrain: args.terrain,
+      moveType: args.unitTypeForMovement,
+      tacticalSet,
+      marchStartH3: fromH3,
+      marchGoalH3: toH3,
+      footprintNeighbors: args.footprintNeighbors,
+      weatherEnabled: args.weatherEnabled,
+      weather: args.weather,
+      weatherTags: args.weatherTags,
+      terrainBonusCategory: args.allowTerrainBonusStops ? args.terrainBonusCategory : null
+    };
+    const keyOf = (h3, prevH3) => isLand ? landStateKey(h3, prevH3) : h3;
+    const priorityOf = (p) => p.beat * (budget + 1) + p.spent;
+    const states = /* @__PURE__ */ new Map();
+    const heap = [];
+    const startKey = keyOf(fromH3, null);
+    const start = { h3: fromH3, prevH3: null, parentKey: null, beat: 1, spent: 0, usesTerrainBonus: false };
+    states.set(startKey, start);
+    pushNumericPriorityMinHeap(heap, startKey, priorityOf(start));
+    while (heap.length > 0) {
+      const node = popNumericPriorityMinHeap(heap);
+      if (!node) break;
+      const state = states.get(node.payload);
+      if (!state || node.d !== priorityOf(state)) continue;
+      if (state.h3 === toH3) return beatRouteFromStates(states, node.payload);
+      for (const nb of args.footprintNeighbors(state.h3)) {
+        const step = classifyTacticalMarchStep(ctx, { fromH3: state.h3, prevH3: state.prevH3, toH3: nb });
+        const next = advanceBeatPosition(state, step, budget);
+        if (!next) continue;
+        const key = keyOf(nb, state.h3);
+        const existing = states.get(key);
+        if (existing && priorityOf(existing) <= priorityOf(next)) continue;
+        states.set(key, {
+          ...next,
+          h3: nb,
+          prevH3: state.h3,
+          parentKey: node.payload,
+          usesTerrainBonus: state.usesTerrainBonus || step.kind === "terrainBonusStop"
+        });
+        pushNumericPriorityMinHeap(heap, key, priorityOf(next));
+      }
+    }
+    return null;
+  }
+  function footprintHasTerrainBonusCell(search, category) {
+    const { terrain } = search;
+    for (const h3 of search.tacticalSet) {
+      if (terrain.isUrbanTactical?.(h3) || terrain.isRubbleTactical?.(h3)) continue;
+      if (normalizeDbTerrainKindToTacticalCategory(terrain.effectiveKindForTacticalHex(h3), terrain.parentTerrain) === category) {
+        return true;
+      }
+    }
+    return false;
+  }
+  function marchPlanFromBeatRoute(route, budget) {
+    const firstStopIdx = route.beatByIndex.lastIndexOf(1);
+    return {
+      reachable: true,
+      reachableThisTurn: route.arrivalBeat === 1,
+      totalCostToDestination: (route.arrivalBeat - 1) * budget + route.arrivalSpent,
+      pathToDestination: route.path,
+      firstStopWithinBudget: { stopH3: route.path[firstStopIdx], consumedFullPath: route.arrivalBeat === 1 },
+      usesTerrainBonus: true
+    };
+  }
+  function preferFasterTerrainBonusMarch(args) {
+    const { plan, search } = args;
+    const category = search.terrainBonusCategory;
+    if (category == null || !(search.movementPointBudget >= 1)) return plan;
+    const mayImprove = plan.reachable && !plan.reachableThisTurn || plan.failureReason === "no_path";
+    if (!mayImprove || !footprintHasTerrainBonusCell(search, category)) return plan;
+    const withStops = searchTacticalMarchBeats({ ...search, allowTerrainBonusStops: true });
+    if (!withStops?.usesTerrainBonus) return plan;
+    const withoutStops = searchTacticalMarchBeats({ ...search, allowTerrainBonusStops: false });
+    if (withoutStops && withoutStops.arrivalBeat <= withStops.arrivalBeat) return plan;
+    return marchPlanFromBeatRoute(withStops, search.movementPointBudget);
+  }
+
   // src/shared/tacticalMovementPlanner.ts
   function stopIdxWithMinimumOneHexProgress(args) {
     const { stopIdx, pathLength, movementPointBudget } = args;
     if (movementPointBudget > 0 && stopIdx === 0 && pathLength >= 2) return 1;
     return stopIdx;
-  }
-  function tacticalNavalEnterNeighborCost(fromH3, toH3, terrain) {
-    if (terrain.isUrbanTactical?.(toH3) || terrain.isRubbleTactical?.(toH3)) {
-      return Infinity;
-    }
-    const resolved = terrain.effectiveKindForTacticalHex(toH3);
-    const seaportTo = terrain.isSeaportTactical?.(toH3) ?? false;
-    if (!isNavalTacticalCellNavigable({
-      resolvedKindForCell: resolved,
-      parentTerrain: terrain.parentTerrain,
-      parentTerrainKind: terrain.parentTerrainKind,
-      isSeaportCell: seaportTo
-    })) {
-      return Infinity;
-    }
-    if (seaportTo && fromH3 != null && (terrain.isSeaportTactical?.(fromH3) ?? false)) {
-      const fromResolved = terrain.effectiveKindForTacticalHex(fromH3);
-      if (!nativeTacticalTerrainKindIsWaterOrCoastalForNavalRouting(fromResolved) && !nativeTacticalTerrainKindIsWaterOrCoastalForNavalRouting(resolved)) {
-        return Infinity;
-      }
-    }
-    return 1;
   }
   function enterCostForHex(h, unitTypeForMovement, terrain, fromH3, weatherEnter) {
     if (unitTypeForMovement === "naval") {
@@ -26959,6 +27162,12 @@ ${bonuses}`;
     return rev.reverse();
   }
   function planTacticalMarch(args) {
+    const plan = planTacticalMarchWithoutTerrainBonus(args);
+    if (args.terrainBonusCategory == null) return plan;
+    const footprintNeighbors = args.footprintNeighbors ?? ((h) => tacticalNeighborsInFootprint(h, args.tacticalSet));
+    return preferFasterTerrainBonusMarch({ plan, search: { ...args, footprintNeighbors } });
+  }
+  function planTacticalMarchWithoutTerrainBonus(args) {
     const { fromH3, toH3, tacticalSet, unitTypeForMovement, movementPointBudget, terrain } = args;
     const neighborsOf = args.footprintNeighbors ?? ((h) => tacticalNeighborsInFootprint(h, tacticalSet));
     if (unitTypeForMovement === "air") {
@@ -27217,7 +27426,8 @@ ${bonuses}`;
     const terrain = buildTacticalTerrainKindResolverFromSnapshot(args.battle);
     ensureTacticalHoverPlanMemo(args.battle);
     const weatherKey = args.battle.weatherBonusEnabled === true ? `${args.battle.weather ?? ""}|${(sub.weatherTags ?? []).join(",")}` : "";
-    const memoKey = `${args.unitId}|${origin}|${args.hoveredH3Index}|${moveType}|${budget}|${weatherKey}`;
+    const terrainBonusCategory = terrainBonusMarchCategoryForMover(args.battle, sub, moveType);
+    const memoKey = `${args.unitId}|${origin}|${args.hoveredH3Index}|${moveType}|${budget}|${weatherKey}|${terrainBonusCategory ?? ""}`;
     let plan = tacticalHoverPlanMemo.get(memoKey);
     if (plan) {
       tacticalHoverPlanMemo.delete(memoKey);
@@ -27232,7 +27442,8 @@ ${bonuses}`;
         terrain,
         weatherEnabled: args.battle.weatherBonusEnabled === true,
         weather: args.battle.weather,
-        weatherTags: sub.weatherTags
+        weatherTags: sub.weatherTags,
+        terrainBonusCategory
       });
       while (tacticalHoverPlanMemo.size >= MAX_TACTICAL_HOVER_PLAN_MEMO) {
         const oldest = tacticalHoverPlanMemo.keys().next().value;
