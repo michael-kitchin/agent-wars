@@ -13,13 +13,15 @@ const EXECUTABLE_NAME_PATTERN = /^[A-Za-z0-9._+-]+$/;
  * Installs the portable Linux entry point after electron-builder packs the app.
  *
  * Purpose: Chromium aborts when `chrome-sandbox` is present but not owned by root
- * with mode 4755. CI artifacts and user-extracted archives cannot keep that ownership,
- * and the abort runs when unprivileged user namespaces are also unavailable.
+ * with mode 4755, including when user namespaces are available. CI artifacts and
+ * user-extracted archives cannot keep that ownership.
  * When to use: electron-builder `afterPack` on every platform. Darwin and Windows return
  * immediately because those builds use other sandboxes and do not ship `chrome-sandbox`.
  * Expected outcome: On Linux, `agent-wars` becomes this launcher and the Electron binary
- * moves to `agent-wars.bin` beside `resources/` and `chrome-sandbox`. The sandbox stays
- * on when user namespaces work or the helper really is root mode 4755.
+ * moves to `agent-wars.bin` beside `resources/` and `chrome-sandbox`. A correct
+ * root mode 4755 helper is left in charge. A present helper that is not that mode
+ * is ignored when user namespaces work. `--no-sandbox` is reserved for root and
+ * for hosts where neither namespaces nor a correct helper are available.
  * Exceptions: Throws if the executable name is unsafe to embed, the packaged binary is
  * missing, or `agent-wars.bin` already exists. If writing the launcher fails after the
  * rename, the Electron binary is moved back to its original name and the error is rethrown.
@@ -94,7 +96,11 @@ async function restoreLinuxExecutable(binaryPath, runtimePath) {
  * symlink (deb `/usr/bin` links) and so root does not hit Chromium's unsandboxed-root refusal.
  * When to use: From `installLinuxSandboxLauncher` after the executable name is validated.
  * Expected outcome: A POSIX script with LF line endings. It execs the renamed binary
- * with `--no-sandbox` only when namespaces and a correct helper are both unavailable, or when the process is root.
+ * with no sandbox flag when `chrome-sandbox` is root mode 4755, or when that file
+ * is absent and user namespaces work. A present helper that is not root mode 4755
+ * gets `--disable-setuid-sandbox` when namespaces work, so Chromium does not abort
+ * on the helper. `--no-sandbox` is used when the process is root, or when neither
+ * namespaces nor a correct helper are available.
  * Exceptions: Throws if `executableName` is unsafe to embed.
  *
  * @param {string} executableName Linux executable file name, without a directory
@@ -148,7 +154,19 @@ if [ -L /proc/self/ns/user ] && unshare --user true >/dev/null 2>&1; then
   userns_ok=1
 fi
 
-if [ "$userns_ok" = "1" ] || [ "$sandbox_ok" = "1" ]; then
+if [ "$sandbox_ok" = "1" ]; then
+  exec "$runtime" "$@"
+fi
+
+# A normal extract leaves chrome-sandbox owned by the user. Chromium treats that
+# file as a broken setuid helper and aborts, even when user namespaces work.
+# --disable-setuid-sandbox ignores the helper and keeps the namespace sandbox.
+if [ "$userns_ok" = "1" ] && [ -e "$sandbox" ]; then
+  echo "${executableName}: starting without the setuid sandbox helper because chrome-sandbox is not root mode 4755." >&2
+  exec "$runtime" --disable-setuid-sandbox "$@"
+fi
+
+if [ "$userns_ok" = "1" ]; then
   exec "$runtime" "$@"
 fi
 

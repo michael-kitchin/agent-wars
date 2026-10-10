@@ -22,9 +22,11 @@ function testLauncherScriptKeepsSandboxWhenPossible() {
   assert.ok(script.includes('id -u'), 'launcher must detect root, which Chromium will not sandbox');
   assert.ok(script.includes('chrome-sandbox'), 'launcher must recognize a root-owned helper');
   assert.ok(script.includes('4755'), 'launcher must require the mode Chromium demands');
+  assert.ok(script.includes('--disable-setuid-sandbox'), 'a user-owned helper must not be left for Chromium to reject');
   const probeAt = script.indexOf('unshare --user true');
+  const ignoreHelperAt = script.indexOf('--disable-setuid-sandbox');
   const fallbackAt = script.indexOf('user namespaces are unavailable');
-  assert.ok(probeAt !== -1 && fallbackAt > probeAt, 'namespace probe must precede the unsandboxed fallback');
+  assert.ok(probeAt !== -1 && ignoreHelperAt > probeAt && fallbackAt > ignoreHelperAt, 'namespace probe must precede ignoring a bad helper and the unsandboxed fallback');
 }
 
 async function testLinuxPackReplacesExecutableWithLauncher() {
@@ -238,7 +240,7 @@ exit 0
     if (options.withHelper) {
       const helperPath = path.join(appOutDir, 'chrome-sandbox');
       fs.writeFileSync(helperPath, '');
-      fs.chmodSync(helperPath, 0o4755);
+      fs.chmodSync(helperPath, options.helperMode ?? 0o4755);
     }
     await installLinuxSandboxLauncher({
       electronPlatformName: 'linux',
@@ -281,6 +283,18 @@ async function testLauncherDecisions(bash, userNamespaceLinkPresent) {
     });
     assert.strictEqual(namespaced.status, 0, `${namespaced.stderr}\n${namespaced.stdout}`);
     assert.strictEqual(namespaced.args, 'extra-arg', 'user namespaces must keep the sandbox');
+
+    const userOwnedHelper = await runLauncherScenario(bash, {
+      uid: '1000',
+      usernsOk: true,
+      sandboxUid: '1000',
+      sandboxMode: '0755',
+      withHelper: true,
+      helperMode: 0o755,
+    });
+    assert.strictEqual(userOwnedHelper.status, 0, `${userOwnedHelper.stderr}\n${userOwnedHelper.stdout}`);
+    assert.strictEqual(userOwnedHelper.args, '--disable-setuid-sandbox extra-arg', 'a user-owned helper must not reach Chromium setuid setup');
+    assert.ok(userOwnedHelper.stderr.includes('not root mode 4755'));
   }
 
   const unsandboxed = await runLauncherScenario(bash, {
