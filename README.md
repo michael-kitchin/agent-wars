@@ -14,7 +14,7 @@ A turn-based grand strategy game on a real-Earth hex map, where your opponent is
 
 ## Why This Exists
 
-When I started Agent Wars I'd been writing software by hand for a long time, but I knew very little about agentic development. This project was how I started learning about it.
+Before I started Agent Wars I'd been writing software by hand for a long time, but I knew very little about agentic development. This project was how I started learning about it.
 
 I chose this approach because:
 - I wanted a crash course in agentic development, on work I could afford to screw up. I especially wanted to see how it holds up as an application grows, from greenfield to feature additions and bug fixes against an ever-growing codebase.
