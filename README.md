@@ -4,7 +4,7 @@
 [![Release](https://img.shields.io/github/v/release/michael-kitchin/agent-wars?include_prereleases)](https://github.com/michael-kitchin/agent-wars/releases)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-A turn-based grand strategy game on a real-Earth hex map, where your opponent is a large language model you choose. Coding agents wrote the code and most of the documentation. I set the direction, wrote the prompts and the rules the agents follow, and reviewed the results.
+A turn-based grand strategy game on a real-Earth hex map, where your opponent is a large language model you choose. Coding agents wrote the code and most of the documentation. I set the direction, wrote the prompts and coding rules, and reviewed the results.
 
 ![Tactical planning over central Mexico](doc/media/tactical-battle-mexico.jpg)
 
