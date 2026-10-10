@@ -577,8 +577,9 @@ function testStrategicBestOptionsApproachSkipsFriendlyOccupiedAndMatchesOrderles
   const suggestions = suggestApproachDestinationsForOrderlessUnits('opponent', state, ['opponent-arm-mover']);
   const suggested = suggestions.get('opponent-arm-mover');
   assert.ok(suggested, 'orderless table must offer a closing dest when one exists');
+  assert.strictEqual(suggested?.orderType, 'march');
   assert.ok(
-    approaches.some((r) => r.targetH3 === suggested),
+    approaches.some((r) => r.targetH3 === suggested?.destinationH3),
     'Suggested Destination must be one of this unit\'s Best Options approach hexes'
   );
 }
@@ -645,7 +646,11 @@ function testStrategicBestOptionsApproachListsHexAFriendlyIsLeaving(): void {
   );
   const suggested = suggestions.get('opponent-inf-mover');
   assert.ok(suggested, 'orderless table must offer a closing dest when a leaver origin is eligible');
-  assert.ok(resolved.hexes.includes(suggested), 'Suggested Destination must be one of the stay-put-filtered approach hexes');
+  assert.strictEqual(suggested?.orderType, 'march');
+  assert.ok(
+    resolved.hexes.includes(suggested?.destinationH3),
+    'Suggested Destination must be one of the stay-put-filtered approach hexes'
+  );
 }
 
 /**

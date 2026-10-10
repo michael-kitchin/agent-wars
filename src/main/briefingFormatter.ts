@@ -30,6 +30,12 @@ import { getMovementBudgetForUnit } from './pathfinding';
 import { formatBriefingWeatherCell } from '../shared/weatherBonusRules';
 import { marchStepRecedesFromEnemy } from './tools/standingMarchReceding';
 import {
+  collectOrderlessMissionContext,
+  orderlessMissionAttentionText,
+  orderlessUnitNeedsMission,
+  type OrderlessActionNeededSets,
+} from './tools/orderlessUnitSuggestions';
+import {
   SECTION_TITLE_ACTIVE_CALLBACKS,
   SECTION_TITLE_COMMANDERS_BRIEFING,
   SECTION_TITLE_RECENT_TURN_NOTES,
@@ -488,7 +494,17 @@ export function buildUnitStatusTable(
    * Expected outcome: Advanced rows name the tech clause for the match level.
    * Exceptions: None.
    */
-  originBonusSettings: OriginBonusSettings = ORIGIN_BONUS_OFF
+  originBonusSettings: OriginBonusSettings = ORIGIN_BONUS_OFF,
+  /**
+   * Precomputed orderless missions and one-step move ids.
+   *
+   * Contract: Optional. Missing means no extra Action needed beyond `needsAction`. Strategic briefings pass the
+   * result of one `collectOrderlessMissionContext` call. Tactical briefings omit it.
+   * When to use: `formatBriefing` after standing orders are known to be active.
+   * Expected outcome: An orderless unit in either set reads Action needed yes. A unit with a standing order does not.
+   * Exceptions: None.
+   */
+  orderlessAction?: OrderlessActionNeededSets
 ): string {
   logDebug('briefingFormatter buildUnitStatusTable', {
     unitCount: unitAssessments.length,
@@ -523,7 +539,11 @@ export function buildUnitStatusTable(
           : severities.includes('moderate')
             ? 'moderate'
             : 'low';
-    const action = needsAction(a, standingOrdersActive, ctx.mode === 'strategic') ? 'yes' : 'no';
+    const action =
+      needsAction(a, standingOrdersActive, ctx.mode === 'strategic') ||
+      missionActionNeeded(a, standingOrdersActive, ctx.mode === 'strategic', orderlessAction)
+        ? 'yes'
+        : 'no';
     const selfLabel = formatUnitDisplayRef(a.unitId);
     const actionCell =
       ctx.mode === 'strategic' && isQuiet(a, standingOrdersActive) ? `${action} (quiet)` : action;
@@ -580,7 +600,7 @@ function buildSupplementalHexIntelligenceBlock(hexAssessments: HexAssessmentEntr
  *
  * Purpose: Short triage bullets for units that need attention this consultation.
  * When to use: Strategic and tactical Commander briefings after assessments.
- * Expected outcome: Up to five bullets sorted critical→moderate→other, or `None.`; omits standing-order language in tactical mode or when Orders tools are off.
+ * Expected outcome: Up to five bullets, threats first, then the attack bullet, then the orderless-mission bullet, or `None.`. Tactical mode and inactive standing orders omit standing-order language and the mission bullet.
  * Exceptions: None.
  */
 export function buildAttentionFlags(
@@ -592,15 +612,26 @@ export function buildAttentionFlags(
   /**
    * When false, strategic bullets ignore standing-order gaps/warnings and only flag moderate/critical threats.
    */
-  standingOrdersActive = true
+  standingOrdersActive = true,
+  /**
+   * Same precomputed sets as `buildUnitStatusTable`.
+   *
+   * Contract: Optional. When present on a strategic briefing with standing orders active, one mission bullet is
+   * reserved after threat bullets and the attack bullet. Tactical mode ignores it.
+   * When to use: The strategic `formatBriefing` call that built the sets.
+   * Expected outcome: At most five lines. The mission sentence does not replace a critical threat or the attack bullet.
+   * Exceptions: None.
+   */
+  orderlessAction?: OrderlessActionNeededSets
 ): string {
   logDebug('briefingFormatter buildAttentionFlags', {
     unitCount: unitAssessments.length,
     coordinateMode,
     standingOrdersActive,
   });
-  // Ranks 0-3 are threat severities; rank 4 is reserved for the available-attack bullet, which must never displace
-  // a threat from the five-bullet cap.
+  // Ranks 0-3 are threat severities. Rank 4 is the attack bullet and rank 5 is the orderless-mission bullet.
+  // Both are reserved, so they cannot push a higher threat out of the five-line cap. When both are present the
+  // lowest-ranked threat is the one that drops.
   const severityRank = (sev: 'critical' | 'moderate' | 'low' | null): number => {
     if (sev === 'critical') return 0;
     if (sev === 'moderate') return 1;
@@ -684,14 +715,69 @@ export function buildAttentionFlags(
       }),
     });
   }
+  const missionCount = orderlessMissionCount(unitAssessments, soActive, coordinateMode === 'strategic', orderlessAction);
+  if (missionCount > 0) {
+    candidates.push({ rank: 5, text: orderlessMissionAttentionText(missionCount) });
+  }
   if (candidates.length === 0) return 'None.';
   candidates.sort((a, b) => a.rank - b.rank || a.text.localeCompare(b.text));
   const threatCandidates = candidates.filter((c) => c.rank < 4);
   const armedCandidate = candidates.find((c) => c.rank === 4);
-  const threatLimit = armedCandidate ? 4 : 5;
-  const selected = threatCandidates.slice(0, threatLimit);
+  const missionCandidate = candidates.find((c) => c.rank === 5);
+  const reserved = (armedCandidate ? 1 : 0) + (missionCandidate ? 1 : 0);
+  const selected = threatCandidates.slice(0, 5 - reserved);
   if (armedCandidate) selected.push(armedCandidate);
+  if (missionCandidate) selected.push(missionCandidate);
   return selected.map((c) => `- ${c.text}`).join('\n');
+}
+
+/**
+ * Counts orderless units whose mission, shot, or listed one-step move is not already a standing order.
+ *
+ * Purpose: The mission bullet is one sentence for the whole group. Counting here keeps that sentence off the
+ * legal-attack bullet and out of `needsAction`.
+ * When to use: The end of `buildAttentionFlags`, strategic mode with standing orders active.
+ * Expected outcome: Zero when the sets are omitted, the mode is tactical, or no orderless unit qualifies.
+ * Exceptions: None.
+ */
+function orderlessMissionCount(
+  unitAssessments: readonly UnitAssessmentResult[],
+  standingOrdersActive: boolean,
+  strategic: boolean,
+  orderlessAction: OrderlessActionNeededSets | undefined
+): number {
+  if (!orderlessAction) return 0;
+  let count = 0;
+  for (const assessment of unitAssessments) {
+    if (missionActionNeeded(assessment, standingOrdersActive, strategic, orderlessAction)) count += 1;
+  }
+  return count;
+}
+
+/**
+ * Applies the orderless-mission Action needed rule without searching destinations.
+ *
+ * Purpose: `needsAction` stays the threat predicate. This adds a mission only from sets the caller already computed.
+ * When to use: Unit Status rows and the mission-bullet count.
+ * Expected outcome: True when `orderlessUnitNeedsMission` is true for this assessment. False when the sets were omitted.
+ * Exceptions: None.
+ */
+function missionActionNeeded(
+  assessment: UnitAssessmentResult,
+  standingOrdersActive: boolean,
+  strategic: boolean,
+  orderlessAction: OrderlessActionNeededSets | undefined
+): boolean {
+  if (!orderlessAction) return false;
+  return orderlessUnitNeedsMission({
+    strategic,
+    standingOrdersActive,
+    hasStandingOrder: assessment.result.unit?.currentStandingOrder != null,
+    hasLegalAttack: hasLegalAttackThisTurn(assessment),
+    unitId: assessment.unitId,
+    suggestedUnitIds: orderlessAction.suggestedUnitIds,
+    oneStepMoveUnitIds: orderlessAction.oneStepMoveUnitIds,
+  });
 }
 
 /**
@@ -777,11 +863,27 @@ export function formatBriefing(
     if (fogPathLine.length > 0) caveatParts.push(fogPathLine);
     if (caveatParts.length > 0) sections.push(caveatParts.join('\n\n') + '\n\n');
   }
+  const orderlessAction = standingOrdersActive
+    ? collectOrderlessMissionContext({
+        playerId: 'opponent',
+        state,
+        orderlessUnitIds: precomputed.unitAssessments
+          .filter((assessment) => assessment.result.unit?.currentStandingOrder == null)
+          .map((assessment) => assessment.unitId),
+        latLngByH3,
+      })
+    : undefined;
   sections.push(
-    buildUnitStatusTable(precomputed.unitAssessments, coordCtx, standingOrdersActive, originBonusSettingsFromSnapshot(state))
+    buildUnitStatusTable(
+      precomputed.unitAssessments,
+      coordCtx,
+      standingOrdersActive,
+      originBonusSettingsFromSnapshot(state),
+      orderlessAction
+    )
   );
   sections.push(markdownHeading2(SECTION_TITLE_ATTENTION_FLAGS));
-  sections.push(buildAttentionFlags(precomputed.unitAssessments, 'strategic', standingOrdersActive));
+  sections.push(buildAttentionFlags(precomputed.unitAssessments, 'strategic', standingOrdersActive, orderlessAction));
   const operational = buildStrategicOperationalMapSectionMarkdown({
     state,
     latLngByH3,

@@ -91,6 +91,8 @@ test('strategic coaching includes every required item when its gate is on', () =
   assert.match(text, /inside this turn's movement budget, including weather/);
   assert.match(text, /Do not copy a farther hex from the printed nearest-enemy path/);
   assert.match(text, /Never march to the unit's current Hex/);
+  assert.match(text, /beyond this turn's movement budget/);
+  assert.match(text, /Suggested Destination starts with defend/);
   assert.match(text, /healthy standing order/i);
   assert.match(text, /recedes from the nearest enemy/i);
   assert.match(text, /move\/melee Target Hex is such an override/i);

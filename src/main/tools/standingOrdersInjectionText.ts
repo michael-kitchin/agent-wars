@@ -8,7 +8,10 @@ import { h3ToCode } from '../briefing/map/hexCodeTranslator';
 import { buildPromptTableLines } from '../promptTableHelpers';
 import { SECTION_TITLE_STANDING_ORDER_STATUS, topLevelHeading } from '../openRouter/promptSpec/sectionHeadings';
 import { parseComputedRoute, parseOrderParams, type StandingOrderRow } from './standingOrdersShared';
-import { suggestApproachDestinationsForOrderlessUnits } from './orderlessUnitSuggestions';
+import {
+  collectOrderlessMissionContext,
+  type OrderlessMissionSuggestion,
+} from './orderlessUnitSuggestions';
 import { expireAndUpdateStatus } from './standingOrdersGeneration';
 import { marchStepRecedesFromEnemy, nearestObservedEnemyH3 } from './standingMarchReceding';
 
@@ -235,11 +238,29 @@ function standingOrderRowRecedesFromEnemy(
 }
 
 /**
+ * Renders one Suggested Destination cell.
+ *
+ * Purpose: A march and a defend order share one column, and the coaching text tells the model to read the shape of
+ * the cell rather than guess. A bare hex is a march. `defend` plus a hex is defend. An em dash means no mission.
+ * When to use: Each orderless row inside `getInjectionText`.
+ * Expected outcome: The briefing hex, `defend` and that hex separated by one space, or `—`.
+ * Exceptions: `h3ToBriefingHexDisplay` throws when the hex has no briefing code. That is a registry failure, not a missing mission.
+ */
+function suggestedDestinationCell(
+  suggestion: OrderlessMissionSuggestion | undefined,
+  coordinateContext: CoordinateContext
+): string {
+  if (!suggestion) return '—';
+  const code = h3ToBriefingHexDisplay(suggestion.destinationH3, coordinateContext);
+  return suggestion.orderType === 'defend' ? `defend ${code}` : code;
+}
+
+/**
  * Builds the strategic Standing Order Status briefing block for the opponent AI.
  *
  * Purpose: Injects parent-unit standing-order tables into strategic Commander prompts only. Arrived marches are expired first so completed missions are not listed as active.
  * When to use: Strategic `formatBriefing` / `buildSystemPromptForTools` when Orders tools are enabled.
- * Expected outcome: Markdown `# Standing Order Status` (+ units without orders); empty string in tactical mode. Units already at their march destination appear under Units Without Standing Orders, each with a suggested closing destination so the model does not have to join that table against Best Options to find one.
+ * Expected outcome: Markdown `# Standing Order Status` (+ units without orders); empty string in tactical mode. Units already at their march destination appear under Units Without Standing Orders. Suggested Destination is a bare briefing hex for a march, `defend` plus that hex for a striking air unit, or an em dash when no mission was chosen.
  * Exceptions: None.
  */
 export function getInjectionText(
@@ -317,21 +338,18 @@ export function getInjectionText(
   lines.push('');
   lines.push('## Units Without Standing Orders');
   lines.push('');
-  const suggestedDestinations = suggestApproachDestinationsForOrderlessUnits(
+  const suggestedDestinations = collectOrderlessMissionContext({
     playerId,
     state,
-    unitIdsWithoutOrders
-  );
+    orderlessUnitIds: unitIdsWithoutOrders,
+  }).suggestions;
   const withoutOrderHeaders = ['Unit ID', 'Unit Type', 'Suggested Destination'];
   const withoutOrderBlanks = ['—', '—', '—'];
-  const withoutOrderRows = unitIdsWithoutOrders.map((unitId) => {
-    const suggestion = suggestedDestinations.get(unitId);
-    return [
-      unitId,
-      aiUnitTypeById.get(unitId) ?? '—',
-      suggestion ? h3ToBriefingHexDisplay(suggestion, ctx) : '—',
-    ];
-  });
+  const withoutOrderRows = unitIdsWithoutOrders.map((unitId) => [
+    unitId,
+    aiUnitTypeById.get(unitId) ?? '—',
+    suggestedDestinationCell(suggestedDestinations.get(unitId), ctx),
+  ]);
   lines.push(
     ...buildPromptTableLines(
       withoutOrderHeaders,

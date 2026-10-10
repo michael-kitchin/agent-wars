@@ -131,12 +131,12 @@ Gates: presence of each arm among the opponent's own units, presence of observed
 
 | Surface | Contract |
 | --- | --- |
-| system | Include the scouting directive. The narrative's first sentence states the observed count as zero and adds that enemy forces may be out of view. Nearest-enemy cells in the unit table are em dashes. The observed-enemy roster line uses its empty phrasing. |
+| system | Include the scouting directive. The narrative's first sentence states the observed count as zero and adds that enemy forces may be out of view. Nearest-enemy cells in the unit table are em dashes. Suggested Destination follows section 3.5. The observed-enemy roster line uses its empty phrasing. |
 | user | unchanged |
 | tools | unchanged |
 | envelope | unchanged |
 | coaching | Include the scouting rule. Suppress target-selection coaching that presumes a target: the casualty rule and the tempo rule still hold as statements of how combat works, but the worklist framing that tells the model to work through ranged rows must degrade gracefully when there are no such rows. |
-| empty-state | Attention flags will typically be `None.`, and the model's only work is movement, production, and orders. |
+| empty-state | Attention flags are `None.` when no unit has a threat, a shot, or an orderless mission. When an orderless unit has a Suggested Destination or a listed one-step move, the mission bullet replaces `None.` The model's work is that mission, movement, production, and orders. |
 
 ### 3.4 No option rows
 
@@ -153,7 +153,7 @@ Gates: presence of each arm among the opponent's own units, presence of observed
 
 | Surface | Contract |
 | --- | --- |
-| system | The orderless table is emitted whenever the standing-order block is present, listing every march-capable unit without an order. A suggested destination is required when a closing cell exists. An em dash means none does, including when the unit is already on the enemy. |
+| system | The orderless table is emitted whenever the standing-order block is present, listing every unit without an order. When an enemy is visible, a bare hex is required when a closing cell exists, and an em dash means none does, including when the unit is already on the enemy. When no enemy is visible, a bare hex is the enemy-home march when a passable home hex remains: same landmass and below the land-route water cap for land and armor, or `water` or `coastal` on the snapshot for naval (fog-masked `unknown` is not water). `defend` plus the current hex is used for an air unit that can strike, and an em dash means no such mission was chosen. |
 | user | unchanged |
 | tools | unchanged |
 | envelope | unchanged |
