@@ -24,7 +24,7 @@ I chose this approach because:
 
 ## Why I'm Sharing This
 
-To share what I've learned and give other people a chance to blow up their (not) favorite LLMs, too.
+To offer what I've learned and give others a chance to blow up their (not) favorite LLMs, too.
 
 Also: I don't intend to charge money for Agent Wars, now or ever.
 
