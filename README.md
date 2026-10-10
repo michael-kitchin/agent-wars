@@ -4,7 +4,7 @@
 ![Release](https://img.shields.io/github/v/release/michael-kitchin/agent-wars?include_prereleases)
 ![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)
 
-A turn-based grand strategy game on a real-Earth hex map, where your opponent is a large language model you choose. Coding agents wrote the code and most of the documentation. I set the direction, wrote the prompts and the rules the agents follow, and reviewed the results. The story of building it is told in the Agent Wars series in *[Standing Orders](https://standingorders.substack.com)*.
+A turn-based grand strategy game on a real-Earth hex map, where your opponent is a large language model you choose. Coding agents wrote the code and most of the documentation. I set the direction, wrote the prompts and the rules the agents follow, and reviewed the results.
 
 ![Tactical planning over central Mexico](doc/media/tactical-battle-mexico.jpg)
 
@@ -21,6 +21,8 @@ I chose this approach because:
 - It feels good to blow up commercial LLMs on imaginary battlefields, even if I'm paying their vendors for the privilege.
 - For something new, I wanted LLMs to reason about real-world geography, planning combat, movement, and logistics on a hex map across many turns.
 - For calibration, I built it on familiar ground (Electron and TypeScript, database development, and geospatial data), so I could catch bad agent output sooner.
+
+I'm telling the story how I built Agent Wars (and am still adding to it) in *[Standing Orders](https://standingorders.substack.com)*.
 
 ## Why I'm Sharing This
 
