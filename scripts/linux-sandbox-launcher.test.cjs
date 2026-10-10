@@ -23,10 +23,12 @@ function testLauncherScriptKeepsSandboxWhenPossible() {
   assert.ok(script.includes('chrome-sandbox'), 'launcher must recognize a root-owned helper');
   assert.ok(script.includes('4755'), 'launcher must require the mode Chromium demands');
   assert.ok(script.includes('--disable-setuid-sandbox'), 'a user-owned helper must not be left for Chromium to reject');
+  assert.ok(script.includes('apparmor_restrict_unprivileged_userns'), 'launcher must treat Ubuntu AppArmor as denying the namespace sandbox');
+  const restrictAt = script.indexOf('apparmor_restrict_unprivileged_userns');
   const probeAt = script.indexOf('unshare --user true');
   const ignoreHelperAt = script.indexOf('--disable-setuid-sandbox');
   const fallbackAt = script.indexOf('user namespaces are unavailable');
-  assert.ok(probeAt !== -1 && ignoreHelperAt > probeAt && fallbackAt > ignoreHelperAt, 'namespace probe must precede ignoring a bad helper and the unsandboxed fallback');
+  assert.ok(restrictAt !== -1 && restrictAt < probeAt && ignoreHelperAt > probeAt && fallbackAt > ignoreHelperAt, 'AppArmor check must precede the unshare probe, and that probe must precede the unsandboxed fallback');
 }
 
 async function testLinuxPackReplacesExecutableWithLauncher() {
@@ -168,6 +170,14 @@ const RUN_LAUNCHER_COMMAND = `if command -v cygpath >/dev/null 2>&1; then
   LAUNCHER_PATH=$(cygpath -u "$LAUNCHER_PATH")
   STUB_DIR=$(cygpath -u "$STUB_DIR")
   RECORD_PATH=$(cygpath -u "$RECORD_PATH")
+  if [ -n "\${AGENT_WARS_APPARMOR_RESTRICT_FILE:-}" ]; then
+    AGENT_WARS_APPARMOR_RESTRICT_FILE=$(cygpath -u "$AGENT_WARS_APPARMOR_RESTRICT_FILE")
+    export AGENT_WARS_APPARMOR_RESTRICT_FILE
+  fi
+  if [ -n "\${AGENT_WARS_USERNS_CLONE_FILE:-}" ]; then
+    AGENT_WARS_USERNS_CLONE_FILE=$(cygpath -u "$AGENT_WARS_USERNS_CLONE_FILE")
+    export AGENT_WARS_USERNS_CLONE_FILE
+  fi
 fi
 export PATH="$STUB_DIR:$PATH"
 export RECORD_ARGS_FILE="$RECORD_PATH"
@@ -242,6 +252,10 @@ exit 0
       fs.writeFileSync(helperPath, '');
       fs.chmodSync(helperPath, options.helperMode ?? 0o4755);
     }
+    const restrictPath = path.join(appOutDir, 'apparmor-restrict');
+    const clonePath = path.join(appOutDir, 'userns-clone');
+    fs.writeFileSync(restrictPath, `${options.apparmorRestrict ?? '0'}\n`);
+    fs.writeFileSync(clonePath, `${options.usernsClone ?? '1'}\n`);
     await installLinuxSandboxLauncher({
       electronPlatformName: 'linux',
       appOutDir,
@@ -258,6 +272,8 @@ exit 0
         FAKE_USERNS_OK: options.usernsOk ? '1' : '0',
         FAKE_SANDBOX_UID: options.sandboxUid,
         FAKE_SANDBOX_MODE: options.sandboxMode,
+        AGENT_WARS_APPARMOR_RESTRICT_FILE: restrictPath,
+        AGENT_WARS_USERNS_CLONE_FILE: clonePath,
       }),
     });
     const args = fs.existsSync(recordPath) ? fs.readFileSync(recordPath, 'utf8').trim() : '';
@@ -308,6 +324,31 @@ async function testLauncherDecisions(bash, userNamespaceLinkPresent) {
   assert.strictEqual(unsandboxed.args, '--no-sandbox extra-arg');
   assert.ok(unsandboxed.stderr.includes('user namespaces are unavailable'));
 
+  const apparmorRestricted = await runLauncherScenario(bash, {
+    uid: '1000',
+    usernsOk: true,
+    sandboxUid: '1000',
+    sandboxMode: '0755',
+    withHelper: true,
+    helperMode: 0o755,
+    apparmorRestrict: '1',
+  });
+  assert.strictEqual(apparmorRestricted.status, 0, `${apparmorRestricted.stderr}\n${apparmorRestricted.stdout}`);
+  assert.strictEqual(apparmorRestricted.args, '--no-sandbox extra-arg', 'AppArmor must not leave Chromium with no usable sandbox');
+  assert.ok(apparmorRestricted.stderr.includes('restricts unprivileged user namespaces'));
+
+  const cloneDisabled = await runLauncherScenario(bash, {
+    uid: '1000',
+    usernsOk: true,
+    sandboxUid: '1000',
+    sandboxMode: '0755',
+    withHelper: true,
+    helperMode: 0o755,
+    usernsClone: '0',
+  });
+  assert.strictEqual(cloneDisabled.status, 0, `${cloneDisabled.stderr}\n${cloneDisabled.stdout}`);
+  assert.strictEqual(cloneDisabled.args, '--no-sandbox extra-arg', 'a disabled user-namespace sysctl must not reach Chromium sandbox setup');
+
   const root = await runLauncherScenario(bash, {
     uid: '0',
     usernsOk: true,
@@ -327,6 +368,7 @@ async function testSetuidHelperKeepsSandbox(bash) {
     sandboxUid: '0',
     sandboxMode: '4755',
     withHelper: true,
+    apparmorRestrict: '1',
   });
   assert.strictEqual(result.status, 0, `${result.stderr}\n${result.stdout}`);
   assert.strictEqual(result.args, 'extra-arg', 'a root mode 4755 helper must keep the sandbox');

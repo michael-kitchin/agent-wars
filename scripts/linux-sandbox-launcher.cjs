@@ -13,15 +13,18 @@ const EXECUTABLE_NAME_PATTERN = /^[A-Za-z0-9._+-]+$/;
  * Installs the portable Linux entry point after electron-builder packs the app.
  *
  * Purpose: Chromium aborts when `chrome-sandbox` is present but not owned by root
- * with mode 4755, including when user namespaces are available. CI artifacts and
- * user-extracted archives cannot keep that ownership.
+ * with mode 4755. Skipping that helper is not enough on Ubuntu 23.10 and later:
+ * AppArmor blocks unprivileged user namespaces for this binary, and Chromium then
+ * aborts with no usable sandbox. A downloaded archive cannot keep the helper
+ * setuid root and cannot install an AppArmor profile.
  * When to use: electron-builder `afterPack` on every platform. Darwin and Windows return
  * immediately because those builds use other sandboxes and do not ship `chrome-sandbox`.
  * Expected outcome: On Linux, `agent-wars` becomes this launcher and the Electron binary
  * moves to `agent-wars.bin` beside `resources/` and `chrome-sandbox`. A correct
  * root mode 4755 helper is left in charge. A present helper that is not that mode
- * is ignored when user namespaces work. `--no-sandbox` is reserved for root and
- * for hosts where neither namespaces nor a correct helper are available.
+ * is ignored when this process can create a user namespace. When the kernel
+ * restricts those namespaces, or none are available, the app starts with
+ * `--no-sandbox`.
  * Exceptions: Throws if the executable name is unsafe to embed, the packaged binary is
  * missing, or `agent-wars.bin` already exists. If writing the launcher fails after the
  * rename, the Electron binary is moved back to its original name and the error is rethrown.
@@ -97,10 +100,11 @@ async function restoreLinuxExecutable(binaryPath, runtimePath) {
  * When to use: From `installLinuxSandboxLauncher` after the executable name is validated.
  * Expected outcome: A POSIX script with LF line endings. It execs the renamed binary
  * with no sandbox flag when `chrome-sandbox` is root mode 4755, or when that file
- * is absent and user namespaces work. A present helper that is not root mode 4755
- * gets `--disable-setuid-sandbox` when namespaces work, so Chromium does not abort
- * on the helper. `--no-sandbox` is used when the process is root, or when neither
- * namespaces nor a correct helper are available.
+ * is absent and this process can create a user namespace. A present helper that is
+ * not root mode 4755 gets `--disable-setuid-sandbox` only in that second case.
+ * `--no-sandbox` is used for root, when user namespaces are missing, and when
+ * AppArmor or `kernel.unprivileged_userns_clone` denies them to an unconfined
+ * binary. `unshare` succeeding is not that proof: Ubuntu profiles that command.
  * Exceptions: Throws if `executableName` is unsafe to embed.
  *
  * @param {string} executableName Linux executable file name, without a directory
@@ -146,11 +150,27 @@ if [ -e "$sandbox" ] && [ -u "$sandbox" ] && [ -x "$sandbox" ]; then
   fi
 fi
 
-# Same probe electron-builder's Linux install script uses. unshare is a different
-# binary from the app; if it succeeds while the app cannot create a user namespace,
-# Chromium still aborts and the helper must be root mode 4755.
+# /usr/bin/unshare is often AppArmor-profiled with permission to create a user
+# namespace. That success does not mean this unconfined Electron binary can.
+# Ubuntu 23.10+ sets kernel.apparmor_restrict_unprivileged_userns=1, and Chromium
+# then aborts with "No usable sandbox" unless chrome-sandbox is root mode 4755.
+# Debian can set kernel.unprivileged_userns_clone=0 for the same result.
+# The *_FILE variables let tests substitute those sysctl files.
 userns_ok=0
-if [ -L /proc/self/ns/user ] && unshare --user true >/dev/null 2>&1; then
+userns_restricted=0
+apparmor_restrict_file=\${AGENT_WARS_APPARMOR_RESTRICT_FILE:-/proc/sys/kernel/apparmor_restrict_unprivileged_userns}
+userns_clone_file=\${AGENT_WARS_USERNS_CLONE_FILE:-/proc/sys/kernel/unprivileged_userns_clone}
+apparmor_restrict=0
+userns_clone=1
+if [ -r "$apparmor_restrict_file" ]; then
+  apparmor_restrict=$(cat "$apparmor_restrict_file" 2>/dev/null || echo 0)
+fi
+if [ -r "$userns_clone_file" ]; then
+  userns_clone=$(cat "$userns_clone_file" 2>/dev/null || echo 1)
+fi
+if [ "$apparmor_restrict" = "1" ] || [ "$userns_clone" = "0" ]; then
+  userns_restricted=1
+elif [ -L /proc/self/ns/user ] && unshare --user true >/dev/null 2>&1; then
   userns_ok=1
 fi
 
@@ -170,7 +190,11 @@ if [ "$userns_ok" = "1" ]; then
   exec "$runtime" "$@"
 fi
 
-echo "${executableName}: starting without the Chromium sandbox because chrome-sandbox is not root mode 4755 and user namespaces are unavailable." >&2
+if [ "$userns_restricted" = "1" ]; then
+  echo "${executableName}: starting without the Chromium sandbox because chrome-sandbox is not root mode 4755 and the kernel restricts unprivileged user namespaces." >&2
+else
+  echo "${executableName}: starting without the Chromium sandbox because chrome-sandbox is not root mode 4755 and user namespaces are unavailable." >&2
+fi
 exec "$runtime" --no-sandbox "$@"
 `;
 }
