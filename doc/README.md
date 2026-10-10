@@ -8,7 +8,7 @@ Shipping version as of this writing: **2.5.0** (`package.json`). Phase 0 (hybrid
 
 | Document | Role | Status |
 | --- | --- | --- |
-| [how-to-play.md](how-to-play.md) | Player guide: starting a match, a turn's controls, unit bonuses, and where messages appear | **Current UI.** Downloads and the OpenRouter key are under Play it in the root `README.md`. Per-surface detail is in [ux/](ux/). |
+| [how-to-play.md](how-to-play.md) | Player guide: setup, global and regional maps, turn order, targeting, air power, sealift, building, battles, roads and rail, unit bonuses, common surprises, messages, and controls | **Current UI.** Downloads and the OpenRouter key are under Play it in the root `README.md`. Per-surface detail is in [ux/](ux/). |
 | [combat-rules-v3.md](combat-rules-v3.md) | Combat, movement, production, fog, sealift, and tactical battles | **Current mechanics.** Numbers are taken from engine constants. |
 | [game-size-unit-caps.md](game-size-unit-caps.md) | Small / Medium / Large per-side caps | **Current.** Matches `getMaxUnitsPerType`. |
 | [region-vs-region.md](region-vs-region.md) | Shipped scenario, home regions, win evaluation | **Current.** Matches `evaluateRegionControlWinnerAtEndOfTurn`. |

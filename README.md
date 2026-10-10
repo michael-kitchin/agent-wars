@@ -50,7 +50,7 @@ The opponent needs an [OpenRouter](https://openrouter.ai) API key of your own:
 
 The key is handled only in the Electron main process and stored locally in the Electron user-data directory, not in repository files. Without a key or a model the app still runs, **Run** stays disabled, and the opponent makes no model calls.
 
-Starting a match, the controls, and where messages appear are covered in [doc/how-to-play.md](doc/how-to-play.md).
+How a match plays, from setup and turn order to battles, air power, sealift, and the controls, is covered in [doc/how-to-play.md](doc/how-to-play.md).
 
 ![Spain's 1st Fleet heading west across the Atlantic on the global map](doc/media/global-spain-new-world.png)
 

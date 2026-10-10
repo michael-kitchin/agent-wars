@@ -28,6 +28,7 @@ When no match is loaded, the basemap can still be visible under the new-game ove
 
 - When the player drags the map, it pans. Panning stops at the loaded map's bounds. A global match uses the Mercator world. A regional match uses the loaded region's hexes, and zoom out stops at the zoom that fits that region. Keyboard pan uses the same bounds. The minimap shows that extent and does not pan or zoom. Leaving a tactical battle restores the match's bounds.
 - When the player uses the wheel, the map zooms. Double-click does not zoom. While the new-game overlay is open, drag and the wheel reach the map only while that form is hidden, as in [new-game-dialog.md](new-game-dialog.md).
+- When the player drags with Shift held, the map draws a box and zooms to fit it. It does not pan or select.
 - When the player clicks, the gesture follows [selection-model.md](selection-model.md) and [order-lifecycle.md](order-lifecycle.md).
 - When the player clicks outside the battle area during Tactical planning, the map shows an error toast and does not select or order.
 - During Resolution playback, clicks and double-clicks do not select, target, or order. Drag, wheel, hex tooltips, and right-click still work.

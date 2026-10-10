@@ -11,6 +11,7 @@ Tell an agent which input does what, and which binding wins when two surfaces co
 | Input | Context | Result | Details In |
 | --- | --- | --- | --- |
 | Drag | Main map | Pans the map. | [map-surface.md](map-surface.md) |
+| Shift-drag | Main map | Draws a box and zooms the map to fit it. It does not pan or select. | [map-surface.md](map-surface.md) |
 | Wheel | Main map | Zooms the map. | [map-surface.md](map-surface.md) |
 | Click | Main map | Selects and opens map popups. A plain click on one stationary selectable human unit's icon sole-selects that unit and starts movement planning, and does not open the unit list. Hovering that icon shows the Bonuses tooltip and does not open the list. A stack, an enemy-only token, and an embarked-only token open the list from a click. While Ranged or Strike targeting is on, a click does not place the attack and does not change the selection. | [selection-model.md](selection-model.md) |
 | Double-click | Main map | Plans a march or ferry, or clears the selection, when targeting is off. While Ranged or Strike targeting is on, places that attack and does not plan a move. Map zoom-on-double-click is off. | [order-lifecycle.md](order-lifecycle.md) |
