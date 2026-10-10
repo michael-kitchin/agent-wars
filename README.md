@@ -14,7 +14,7 @@ A turn-based grand strategy game on a real-Earth hex map, where your opponent is
 
 ## Why This Exists
 
-When I started Agent Wars I'd been writing software by hand for more than forty years, but I knew very little about agentic development. This project was how I started learning about it.
+When I started Agent Wars I'd been writing software by hand for a long time, but I knew very little about agentic development. This project was how I started learning about it.
 
 I chose this approach because:
 - I wanted a crash course in agentic development, on work I could afford to screw up. I especially wanted to see how it holds up as an application grows, from greenfield to feature additions and bug fixes against an ever-growing codebase.
@@ -23,6 +23,8 @@ I chose this approach because:
 - For calibration, I built it on familiar ground (Electron and TypeScript, database development, and geospatial data), so I could catch bad agent output sooner.
 
 I'm telling the story how I built Agent Wars (and am still adding to it) in *[Standing Orders](https://standingorders.substack.com)*.
+
+You can learn more about me on [LinkedIn](https://www.linkedin.com/in/mkitchin/).
 
 ## Why I'm Sharing This
 
