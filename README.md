@@ -28,7 +28,7 @@ You can learn more about me on [LinkedIn](https://www.linkedin.com/in/mkitchin/)
 
 ## Why I'm Sharing This
 
-To offer what I've learned and give others a chance to blow up their (not) favorite LLMs, too.
+To offer what I've learned, and give others a chance to blow up their (not) favorite LLMs, too.
 
 Also: I don't intend to charge money for Agent Wars, now or ever.
 
