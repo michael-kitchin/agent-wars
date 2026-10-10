@@ -17,7 +17,7 @@ A turn-based grand strategy game on a real-Earth hex map, where your opponent is
 Before I started Agent Wars I'd been writing software by hand for a long time, but I knew very little about agentic development. This project was how I started learning about it.
 
 I chose this approach because:
-- I wanted a crash course in agentic development, on work I could afford to screw up. I especially wanted to see how it holds up as an application grows, from greenfield to feature additions and bug fixes against an ever-growing codebase.
+- I wanted a crash course in agentic development, on work I could afford to screw up. I especially wanted to see how it holds up as an application grows, from greenfield to feature additions and bug fixes in an ever-growing codebase.
 - It feels good to blow up commercial LLMs on imaginary battlefields, even if I'm paying their vendors for the privilege.
 - For something new, I wanted LLMs to reason about real-world geography, planning combat, movement, and logistics on a hex map across many turns.
 - For calibration, I built it on familiar ground (Electron and TypeScript, database development, and geospatial data), so I could catch bad agent output sooner.
@@ -28,7 +28,7 @@ You can learn more about me on [LinkedIn](https://www.linkedin.com/in/mkitchin/)
 
 ## Why I'm Sharing This
 
-To offer what I've learned, and give others a chance to blow up their (not) favorite LLMs, too.
+To offer what I've learned, and to give others a chance to blow up their (not) favorite LLMs, too.
 
 Also: I don't intend to charge money for Agent Wars, now or ever.
 
