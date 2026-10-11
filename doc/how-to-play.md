@@ -154,6 +154,10 @@ I'll add screenshots of specific functions as I can.
 
 ## Battles
 
+*Tactical battle dialog in southern Mexico, from a regional game. Click the **Fight** button to fight the battle manually or **Ignore** to leave the outcome to chance.*
+
+![Tactical battle dialog in southern Mexico, from a regional game. Click the Fight button to fight the battle manually or Ignore to leave the outcome to chance.](media/tactical-battle-dialog.png)
+
 Tactical battles are initiated when human and LLM units end their turns in the same hex. The human player has the option of fighting manually or leaving the results to dice rolls. If they choose to fight, their stratetgic units will be broken into sub-units on the tactical battlefield, and the fight is on.
 
 That said:
@@ -163,10 +167,6 @@ That said:
 Human players win tactical battles by destroying all LLM units, but they can leave at any time by clicking the **Exit Battle** button. Any strategic units with half or more of their sub-units remaining by the end of a battle will be returned to the strategic map. There is no concept of battle damage, to keep things simple.
 
 Complete rules are in [combat-rules-v3.md](combat-rules-v3.md) §12.
-
-*Tactical battle dialog in southern Mexico, from a regional game. Click the **Fight** button to fight the battle manually or **Ignore** to leave the outcome to chance.*
-
-![Tactical battle dialog in southern Mexico, from a regional game. Click the Fight button to fight the battle manually or Ignore to leave the outcome to chance.](media/tactical-battle-dialog.png)
 
 *Tactical battle in central Mexico, from a global game.*
 
