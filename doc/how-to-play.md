@@ -2,7 +2,7 @@
 
 This guide covers a match in the current build, from the new-game dialog to the end. Downloading the game and setting up the OpenRouter key for the opponent are covered under [Play it](../README.md#play-it) in the README. The full rules are in [combat-rules-v3.md](combat-rules-v3.md).
 
-Agent Wars is a WEGO game ("we go"), where neither player can see what the other is planning to do. For each turn, both sides create movement, production, and combat orders at the same time, based on different, partial views of the battlefield. Once both players are ready, the game engine executes those orders and resolves the outcomes automatically.
+Agent Wars is a WEGO game ("we go"), where neither player can see what the other is planning to do. For each turn, both sides create movement, production, and combat orders at the same time, based on partial, subjective views of the battlefield. Once both players are ready, the game engine executes those orders and resolves the outcomes automatically.
 
 I'm a geographer by training, so Agent Wars is built around geospatial features more than nationality. Each player starts with a home region made of real-world countries, provinces, or states, but those are mostly labels. What matters is what's on the ground: the size and location of urban areas, and how terrain, coastlines, and chokepoints shape what units can do.
 

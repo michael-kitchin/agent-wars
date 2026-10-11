@@ -6,7 +6,7 @@
 
 A turn-based grand strategy game on a real-Earth hex map, where your opponent is a large language model you choose. Coding agents wrote the code and most of the documentation. I set the direction, wrote the prompts and coding rules, and reviewed the results.
 
-Agent Wars is a WEGO game ("we go"), where neither player can see what the other is planning to do. For each turn, both sides create movement, production, and combat orders at the same time, based on different, partial views of the battlefield. Once both players are ready, the game engine executes those orders and resolves the outcomes automatically.
+Agent Wars is a WEGO game ("we go"), where neither player can see what the other is planning to do. For each turn, both sides create movement, production, and combat orders at the same time, based on partial, subjective views of the battlefield. Once both players are ready, the game engine executes those orders and resolves the outcomes automatically.
 
 The game is intended to be simple to learn and quick to play, but with enough depth to make things interesting and believable.
 
