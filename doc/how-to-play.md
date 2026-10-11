@@ -12,11 +12,11 @@ Each match starts on the new-game dialog, with a Global tab and a Regional tab. 
 
 ## Global and regional maps
 
-*Global new-game preview, with human and LLM sides selected (Eastern Asia vs Southern Africa)*
+*Global new-game preview, with human and LLM sides selected (Eastern Asia vs Southern Africa).*
 
 ![Global new-game preview, with human and LLM sides selected (Eastern Asia vs Southern Africa)](media/global-preview.png)
 
-*Regional new-game preview for Eastern Asia, with human and LLM sides selected (Japan vs  South & East China)*
+*Regional new-game preview for Eastern Asia, with human and LLM sides selected (Japan vs  South & East China).*
 
 ![Regional new-game preview for Eastern Asia, with human and LLM sides selected (Japan vs  South & East China)](media/regional-preview.png)
 
@@ -141,9 +141,9 @@ Each match starts on the new-game dialog, with a Global tab and a Regional tab. 
 
 ## Battles
 
-*Tactical planning over central Mexico.*
+*Tactical battle in central Mexico.*
 
-![Tactical planning over central Mexico](media/tactical-battle-mexico.jpg)
+![Tactical battle in central Mexico](media/tactical-battle-mexico.jpg)
 
 A battle zooms in on one contested hex and fights it out on a finer grid. The rules are in [combat-rules-v3.md](combat-rules-v3.md) §12.
 
