@@ -12,13 +12,13 @@ Each match starts on the new-game dialog, with a Global tab and a Regional tab. 
 
 ## Global and regional maps
 
-![Global new-game preview, with human and LLM sides selected (Eastern Asia vs Southern Africa)](media/global-preview.png)
-
 *Global new-game preview, with human and LLM sides selected (Eastern Asia vs Southern Africa)*
 
-![Regional new-game preview for Eastern Asia, with human and LLM sides selected (Japan vs  South & East China)](media/regional-preview.png)
+![Global new-game preview, with human and LLM sides selected (Eastern Asia vs Southern Africa)](media/global-preview.png)
 
 *Regional new-game preview for Eastern Asia, with human and LLM sides selected (Japan vs  South & East China)*
+
+![Regional new-game preview for Eastern Asia, with human and LLM sides selected (Japan vs  South & East China)](media/regional-preview.png)
 
 - **Global:** the whole world, 842 strategic hexes at H3 resolution 1. Each side picks a home region, and both may pick the same one.
 - **Regional:** one of 23 maps drawn from UN subregions, at strategic resolution 2 or 3. Each side picks a different side group of provinces.
@@ -29,21 +29,15 @@ Each match starts on the new-game dialog, with a Global tab and a Regional tab. 
 - **Winning by control:** on the global map, hold every hex of the enemy home. On a regional map, hold enemy-home hexes with at least 75% of its original urban cells.
 - **Other ways to win:** destroy every urban cell in the enemy home while yours keeps one, or destroy every enemy unit. Details are in [region-vs-region.md](region-vs-region.md).
 
-
-
 ## Playing a turn
-
-![Planning panel showing the Ready button and movement/strike orders](media/planning-panel.png)
 
 *Planning panel showing the Ready button and movement/strike orders.*
 
-![Stack selection in normal/single-unit mode](media/stack-select-1.png)
+![Planning panel showing the Ready button and movement/strike orders](media/planning-panel.png)
 
-*Stack selection in normal/single-unit mode.*
-
-![Stack selection in multi-unit mode (holding down shift key)](media/stack-select-2.png)
-
-*Stack selection in multi-unit mode (holding down shift key).*
+| *Stack selection in normal/single-unit mode.*              | *Stack selection in multi-unit mode (holding down shift key).*
+| ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| ![Stack selection in normal/single-unit mode](media/stack-select-1.png) | ![Stack selection in multi-unit mode (holding down shift key)](media/stack-select-2.png) |
 
 1. **Pan:** Drag with the left mouse button, or use WASD / arrow keys.
 2. **Zoom:** Mouse wheel (zooms toward the cursor). Zoomed in, contested strategic hexes show a marker that starts a tactical battle.
@@ -52,8 +46,6 @@ Each match starts on the new-game dialog, with a Global tab and a Regional tab. 
 5. **Ranged attack (armor or naval on strategic; broader types on tactical):** With capable units selected, click **Ranged**, then double-click an enemy hex within range. An all-air selection shows **Strike** instead. Attacks are submitted with Ready. See [Aiming ranged attacks and air strikes](#aiming-ranged-attacks-and-air-strikes).
 6. **Ready:** Click **Ready** to submit orders and resolve the turn. A side wins by controlling the enemy home or wiping out its urban cells (rules in [region-vs-region.md](region-vs-region.md)), or by destroying every enemy unit. The new-game dialog then returns for the next match.
 7. You can issue multiple movement and ranged orders (one per unit each) before clicking Ready.
-
-
 
 ## How a turn resolves
 
@@ -67,17 +59,11 @@ Each match starts on the new-game dialog, with a Global tab and a Regional tab. 
 - In melee, which side rolls attack and which rolls defense is random each turn. Moving in doesn't make you the attacker.
 - Enemies still sharing a hex after melee fight again next turn.
 
-
-
 ## Aiming ranged attacks and air strikes
 
-![French 1st Armored plans a ranged attack (part 1)](media/ranged-attack-1.png)
-
-*French 1st Armored plans a ranged attack (part 1).*
-
-![French 1st Armored plans a ranged attack (part 2)](media/ranged-attack-2.png)
-
-*French 1st Armored plans a ranged attack (part 2).*
+| *French 1st Armored plans a ranged attack (part 1).*              | *French 1st Armored plans a ranged attack (part 2).*
+| ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| ![French 1st Armored plans a ranged attack (part 1)](media/ranged-attack-1.png) | ![French 1st Armored plans a ranged attack (part 2)](media/ranged-attack-2.png) |
 
 - **Ranged:** select units that can all fire, then click **Ranged**. The button reads **Cancel** while you aim.
 - **Strike:** select only air units, then click **Strike**. Pick a target type from the list that takes the button's place.
@@ -93,13 +79,11 @@ Each match starts on the new-game dialog, with a Global tab and a Regional tab. 
 - **What it doesn't show:** the outline ignores line of sight. In a battle, a mountain can still block a shot inside it.
 - **Moves:** there is no reach outline for movement. Hovering a destination draws a teal route, solid for this turn and dashed beyond.
 
-
-
 ## Air power
 
-![French 1st Squadron plans a production atttack](media/air-strike.png)
-
 *French 1st Squadron plans a production atttack.*
+
+![French 1st Squadron plans a production atttack](media/air-strike.png)
 
 - **Bases:** air units sit at an airport and don't march. They strike from there and return in the same turn.
 - **One action a turn:** strike or ferry, not both.
@@ -116,13 +100,11 @@ Each match starts on the new-game dialog, with a Global tab and a Regional tab. 
 - **Vision:** each air unit sees 3 hexes around its base, even when it does nothing.
 - **Regional maps:** a city hit destroys that map's own number of urban cells.
 
-
-
 ## Sealift
 
-![French 2nd Infantry embarks at a seaport hex](media/sealift.png)
-
 *French 2nd Infantry embarks at a seaport hex.*
+
+![French 2nd Infantry embarks at a seaport hex](media/sealift.png)
 
 - **Capacity:** each naval unit carries one armor or two infantry.
 - **Where to load:** a coastal hex or a land seaport, or a water seaport you control.
@@ -135,13 +117,11 @@ Each match starts on the new-game dialog, with a Global tab and a Regional tab. 
 - **Risk:** if the ship dies, its cargo dies with it.
 - **Why it matters:** land units can't cross water on their own, so sealift is the way between landmasses.
 
-
-
 ## Building units
 
-![Planning unit construction in southern France, on a wealthy hex with an airport and seaport](media/unit-building.png)
+*Planning unit construction in southern France, on a high-production hex with an airport and seaport.*
 
-*Planning unit construction in southern France, on a wealthy hex with an airport and seaport.*
+![Planning unit construction in southern France, on a high-production hex with an airport and seaport](media/unit-building.png)
 
 - **Income:** each strategic hex earns one production point per turn for each intact urban cell in it.
 - **Idle hexes save nothing:** points build up only in hexes you control that have a queue or **Keep building** on.
@@ -159,13 +139,11 @@ Each match starts on the new-game dialog, with a Global tab and a Regional tab. 
 - **Caps:** each side has a per-type cap set by game size. Small allows 12 infantry, 8 armor, 8 naval, and 6 air. See [game-size-unit-caps.md](game-size-unit-caps.md).
 - **Bombing hurts:** destroyed urban cells lower income for the rest of the match.
 
-
-
 ## Battles
 
-![Tactical planning over central Mexico](media/tactical-battle-mexico.jpg)
-
 *Tactical planning over central Mexico.*
+
+![Tactical planning over central Mexico](media/tactical-battle-mexico.jpg)
 
 A battle zooms in on one contested hex and fights it out on a finer grid. The rules are in [combat-rules-v3.md](combat-rules-v3.md) §12.
 
@@ -177,8 +155,6 @@ A battle zooms in on one contested hex and fights it out on a finer grid. The ru
 - **Who decides:** only you choose whether to fight a battle. The opponent never does.
 - **Turning battles off:** uncheck **Tactical battles** on the Model tab. Every melee then resolves as if you chose Ignore.
 
-
-
 ### How battles differ
 
 - **Scale:** the battlefield is the contested hex's cells, three H3 resolutions finer, plus three rings of neighboring cells.
@@ -189,7 +165,6 @@ A battle zooms in on one contested hex and fights it out on a finer grid. The ru
 - **No fog:** both sides see everything in a battle.
 - **No production:** nothing is built while a battle runs.
 
-
 |               | Strategic map                    | Battle                                        |
 | ------------- | -------------------------------- | --------------------------------------------- |
 | Infantry fire | None                             | 2 cells                                       |
@@ -197,7 +172,6 @@ A battle zooms in on one contested hex and fights it out on a finer grid. The ru
 | Naval fire    | 2 hexes                          | 10 cells                                      |
 | Air strikes   | 3 hexes from base                | Anywhere on the battlefield                   |
 | Movement      | Infantry 1 hex, armor 2, naval 2 | Points per beat: infantry 2, armor 4, naval 3 |
-
 
 - **Infantry fires in battles.** It can also shoot back at air strikes, which it can't do on the strategic map.
 - **Cover limits reach:** infantry or armor firing from a forest, urban, or rubble cell reaches only 1 cell.
@@ -211,8 +185,6 @@ A battle zooms in on one contested hex and fights it out on a finer grid. The ru
 - **Rubble counts:** rubbled urban cells lower the hex's production after the battle. A rubbled airport can take the air units based there with it.
 - **Outer rings:** cells in the three neighboring rings slow movement and give cover. Shots there don't damage any hex's infrastructure.
 
-
-
 ### Ending a battle
 
 - **Annihilation:** when one side has no sub-units left, a dialog shows the result. Press its **Exit Battle** to return.
@@ -220,8 +192,6 @@ A battle zooms in on one contested hex and fights it out on a finer grid. The ru
 - **Back to the map:** your strategic orders return, minus units that died, and Ready runs at once.
 - **Plan first:** before you click a 🔍 marker, queue the turn's strategic orders, because leaving the battle resolves the turn.
 - **After Fight, no planning:** a battle from Fight opens before you can plan that turn. Leaving it resolves the turn with only your standing marches.
-
-
 
 ## Roads and rail in battles
 
@@ -235,17 +205,13 @@ A battle zooms in on one contested hex and fights it out on a finer grid. The ru
 - **Deployment:** roads and rail can let units start on cells they couldn't otherwise enter.
 - **Naval units** ignore roads and rail.
 
-
-
 ## Unit bonuses
 
 Hovering a unit's flag, in the stack list or anywhere else it appears, or the token of a one-unit hex, shows the bonuses that unit was born with. On the left, a stack near Mexico City is open, and the tooltip belongs to an armor unit born in the Mexican mountains in rain, with advanced tech. On the right, a lone unit near Colorado Springs was born on Saskatchewan plains in snow, with basic tech.
 
-
-| Stack list near Mexico City                                                                 | Lone unit near Colorado Springs                                                |
+| *Stack list near Mexico City*                                                                 | *Lone unit near Colorado Springs*                                                |
 | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
 | ![Bonuses tooltip for an armor unit in a stack list](media/unit-bonuses-armored-mexico.png) | ![Bonuses tooltip for a single unit token](media/unit-origin-saskatchewan.png) |
-
 
 Each bonus is Off, Low, or High in the new-game dialog, and starts at Low.
 
@@ -281,15 +247,11 @@ The full bonus rules are in [combat-rules-v3.md](combat-rules-v3.md) §4.9.
 - **Playback blocks orders:** while a turn plays back, you can pan, zoom, and read tooltips, but not give orders.
 - **No save slots yet:** the app keeps the match in progress and reopens it, but there's no load list. Starting a new game replaces it.
 
-
-
 ## Where messages appear
 
 - **Lower right of the map (map toast):** Errors, rejected orders, turn-loss summaries, and unknown-battle announcements. Use the × to dismiss; it also hides after a fixed interval, and a newer message replaces it.
 - **Upper right of the map (AI strategy toast):** The opponent's Message and Strategy after a consultation. It dismisses and times out the same way.
 - **Right panel, below the Tools and Model tabs (AI activity log):** AI interaction lines and errors, including a one-line copy of each turn update. Starting a new match clears it.
-
-
 
 ## UI controls summary
 
