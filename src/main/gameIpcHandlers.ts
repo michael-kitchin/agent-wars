@@ -19,7 +19,6 @@ import { shouldEndTacticalBattleForAnnihilation } from '../shared/tacticalAnnihi
 import { getActiveTacticalBattleSnapshot } from './tacticalBattle/tacticalBattleSession';
 import {
   hasDeferredPlaybackConsultPending,
-  setPendingMeleeResolveConsult,
   setPendingStrategicReadyConsult,
 } from './ipc/deferredResolutionPlaybackConsult';
 import {
@@ -31,6 +30,8 @@ import {
 import { tacticalLogMutate } from './tacticalBattle/tacticalLogging';
 import { logHybridPipelineBoundary } from './hybridTurnPipeline';
 import { logDebug } from './logger';
+import { getMatchGeneration } from './matchGeneration';
+import { beginModelCall } from './openRouter/modelCallControl';
 import type { TacticalBattleSnapshot } from '../shared/tacticalBattleTypes';
 import { tacticalOpponentPlanFromRequestOrdersSuccess } from '../shared/ipc/tacticalOpponentPlanMerge';
 import type {
@@ -41,11 +42,14 @@ import type {
   EmbarkOrder,
   FerryOrder,
   ReadyResult,
-  ResolveMeleeInterceptIpcPayload,
 } from '../shared/ipcTypes';
 import { AI_CONSULTATION_WAIT_TIMEOUT_MS } from '../shared/aiConsultationLimits';
 import { buildStrategicUnitDisplayLabelResolver } from '../shared/unitDisplayNames';
 export type { RequestAiOrdersResult } from '../shared/ipcTypes';
+export {
+  handleResolveMeleeIntercept,
+  type ResolveMeleeInterceptDeps,
+} from './ipc/meleeInterceptResolveIpc';
 
 /**
  * Documents the module-scope binding `POST_RESOLUTION_CONSULT_TIMEOUT_MS` (POST_RESOLUTION_CONSULT_TIMEOUT_MS).
@@ -200,8 +204,9 @@ export async function handleRequestAiOrders(
   if (deps.controllerRef.current) {
     deps.controllerRef.current.abort();
   }
-  deps.controllerRef.current = new AbortController();
-  const signal = deps.controllerRef.current.signal;
+  const scope = beginModelCall('background requestAiOrders', activeTactical ? 'tactical' : 'strategic');
+  deps.controllerRef.current = scope.controller;
+  const signal = scope.signal;
   try {
     const raw = await deps.requestOrders(state, modelId, {
       enabledToolNames,
@@ -240,7 +245,8 @@ export async function handleRequestAiOrders(
     }
     return raw;
   } finally {
-    if (deps.controllerRef.current?.signal === signal) {
+    scope.end();
+    if (deps.controllerRef.current === scope.controller) {
       deps.controllerRef.current = null;
     }
   }
@@ -335,7 +341,7 @@ defaultGroupIds: string[];
 requestOrders: (
     state: GameStateSnapshot,
     modelId: string,
-    options: { enabledToolNames: string[]; usePrecomputation?: boolean }
+    options: { enabledToolNames: string[]; usePrecomputation?: boolean; signal?: AbortSignal }
   ) => Promise<RequestAiOrdersResult>;
     /**
    * Specifies the contract for the `ready` member (ready: ( aiOrders: { unitId: string; toH3Index: string }[], aiRangedOrders: RangedAttackOrder[], aiAirStrikeOrders?: AirStrikeOrder[], aiFer).
@@ -353,26 +359,6 @@ ready: (
     aiEmbarkOrders?: EmbarkOrder[]
   ) => ReadyResult;
 }
-
-/**
- * Documents the `ResolveMeleeInterceptDeps` type alias (export type ResolveMeleeInterceptDeps).
-
- * Purpose: Reuses ready IPC dependencies while swapping the game-action entry point to melee-intercept resolve.
- * When to use: `handleResolveMeleeIntercept` wiring from `main.ts`.
- * Expected outcome: Same consultation hooks as `ReadyDeps` except `ready` is replaced by `resolveMeleeIntercept`.
- * Exceptions: None.
- */
-export type ResolveMeleeInterceptDeps = Omit<ReadyDeps, 'ready'> & {
-    /**
-   * Specifies the contract for the `resolveMeleeIntercept` member (resolveMeleeIntercept: (payload: ResolveMeleeInterceptIpcPayload) => ReadyResult;).
-
-   * Contract: Completes paused strategic resolution after modal submission.
-   * When to use: Invoked once per pending intercept.
-   * Expected outcome: Returns the same completion shape as `ready` for a finished turn.
-   * Exceptions: None.
-   */
-resolveMeleeIntercept: (payload: ResolveMeleeInterceptIpcPayload) => ReadyResult;
-};
 
 /**
  * Builds the opponent's unconsulted turn: standing orders plus a tempo sweep over whatever is still idle.
@@ -422,6 +408,7 @@ export async function handleGameReady(
   deps: ReadyDeps
 ): Promise<ReadyResultMinimal> {
   logDebug('handleGameReady', { hasPayload: payload !== undefined });
+  const generationAtStart = getMatchGeneration();
   if (hasDeferredPlaybackConsultPending()) {
     logDebug('handleGameReady blocked: deferred playback consult pending', {});
     return { success: false, reason: 'Resolution playback consultation is still in progress.' };
@@ -500,48 +487,61 @@ export async function handleGameReady(
       }
     }
   } else {
-  if (usePrecomputed) {
-    applyPrecomputedOrdersFromPayload(payload);
-  } else if (aiPlanningRunEnabled && modelId && deps.hasKey()) {
-    const result = await deps.requestOrders(aiState, modelId, {
-      enabledToolNames,
-      usePrecomputation,
-    });
-    if (result.success) {
-      aiOrders = result.orders;
-      aiRangedOrders = result.rangedAttacks ?? [];
-      aiAirStrikeOrders = result.airStrikes ?? [];
-      aiFerryOrders = result.ferryOrders ?? [];
-      aiEmbarkOrders = result.embarkOrders ?? [];
-      aiStrategy = result.strategy;
-      aiMessage = result.message;
-      aiDropped = result.dropped;
-      aiDropReasons = result.dropReasons?.length ? result.dropReasons : undefined;
-      toolInvocationCounts = result.toolInvocationCounts;
-      if (result.cost !== undefined) turnCost = result.cost;
-      turnWallClockMs = result.wallClockMs;
-      turnInputTokens = result.inputTokens;
-      turnOutputTokens = result.outputTokens;
+    if (usePrecomputed) {
+      applyPrecomputedOrdersFromPayload(payload);
+    } else if (aiPlanningRunEnabled && modelId && deps.hasKey()) {
+      const scope = beginModelCall('ready inline consult', 'strategic');
+      try {
+        const result = await deps.requestOrders(aiState, modelId, {
+          enabledToolNames,
+          usePrecomputation,
+          signal: scope.signal,
+        });
+        if (scope.signal.aborted || ('error' in result && result.error === 'Cancelled')) {
+          aiSkipped = true;
+          aiSkipReason = 'Cancelled';
+        } else if (result.success) {
+          aiOrders = result.orders;
+          aiRangedOrders = result.rangedAttacks ?? [];
+          aiAirStrikeOrders = result.airStrikes ?? [];
+          aiFerryOrders = result.ferryOrders ?? [];
+          aiEmbarkOrders = result.embarkOrders ?? [];
+          aiStrategy = result.strategy;
+          aiMessage = result.message;
+          aiDropped = result.dropped;
+          aiDropReasons = result.dropReasons?.length ? result.dropReasons : undefined;
+          toolInvocationCounts = result.toolInvocationCounts;
+          if (result.cost !== undefined) turnCost = result.cost;
+          turnWallClockMs = result.wallClockMs;
+          turnInputTokens = result.inputTokens;
+          turnOutputTokens = result.outputTokens;
+        } else {
+          aiSkipped = true;
+          aiSkipReason = result.error;
+        }
+      } finally {
+        scope.end();
+      }
     } else {
-      aiSkipped = true;
-      aiSkipReason = result.error;
+      const generated = buildUnconsultedOpponentOrders(aiState);
+      aiOrders = generated.movementOrders;
+      aiRangedOrders = generated.rangedAttacks;
+      aiAirStrikeOrders = generated.airStrikes;
+      if (aiPlanningRunEnabled) {
+        aiSkipped = true;
+        aiSkipReason = !deps.hasKey()
+          ? 'Set your OpenRouter API key in the panel on the right.'
+          : 'Select an AI model from the dropdown.';
+      }
     }
-  } else {
-    const generated = buildUnconsultedOpponentOrders(aiState);
-    aiOrders = generated.movementOrders;
-    aiRangedOrders = generated.rangedAttacks;
-    aiAirStrikeOrders = generated.airStrikes;
-    if (aiPlanningRunEnabled) {
-      aiSkipped = true;
-      aiSkipReason = !deps.hasKey()
-        ? 'Set your OpenRouter API key in the panel on the right.'
-        : 'Select an AI model from the dropdown.';
-    }
-  }
   }
 
   const aiMoves = buildDistinctAiMovesFromPlanningOrders(state, aiOrders);
 
+  if (getMatchGeneration() !== generationAtStart) {
+    logDebug('handleGameReady: match generation changed before resolution', { generationAtStart });
+    return { success: false, reason: 'A new game started before this turn finished.' };
+  }
   const readyResult = deps.ready(aiOrders, aiRangedOrders, aiAirStrikeOrders, aiFerryOrders, aiEmbarkOrders);
   if (!readyResult.success) {
     return { success: false, reason: readyResult.reason };
@@ -653,119 +653,6 @@ export async function handleGameReady(
     inputTokens: turnInputTokens,
     outputTokens: turnOutputTokens,
     tacticalAutoStartH3Index: readyResult.tacticalAutoStartH3Index,
-    ...(shouldDeferPostResolutionConsult
-      ? {
-          postResolutionConsultDeferred: true,
-          deferredResolutionPlanningTurnNumber: planningTurnNumberAfterResolution,
-        }
-      : {}),
-  };
-}
-
-/**
- * Handles renderer submission after a paused pre-melee intercept, including optional post-resolution AI consultation.
- *
- * Purpose: Keeps consultation and cost accounting aligned with `handleGameReady` without re-running movement.
- * When to use: IPC `game:resolveMeleeIntercept` from the renderer modal.
- * Expected outcome: Full `ReadyResult` fields for a completed turn plus `tacticalAutoStartStrategicH3Index` when applicable.
- * Exceptions: Delegates failure reasons to `resolveMeleeIntercept` in the main process.
- */
-export async function handleResolveMeleeIntercept(
-  payload: ResolveMeleeInterceptIpcPayload | undefined,
-  deps: ResolveMeleeInterceptDeps
-): Promise<ReadyResultMinimal> {
-  logDebug('handleResolveMeleeIntercept', { hasPayload: payload !== undefined });
-  if (hasDeferredPlaybackConsultPending()) {
-    logDebug('handleResolveMeleeIntercept blocked: deferred playback consult pending', {});
-    return { success: false, reason: 'Resolution playback consultation is still in progress.' };
-  }
-  const state = deps.getGameState();
-  logHybridPipelineBoundary('handleResolveMeleeIntercept', { turnNumber: state.turnNumber, phase: state.phase });
-  const modelId = deps.getSelectedModel();
-  const enabledGroupIds =
-    payload?.enabledToolGroups && payload.enabledToolGroups.length > 0
-      ? payload.enabledToolGroups
-      : deps.defaultGroupIds;
-  const enabledToolNames = deps.getToolNamesForEnabledGroups(enabledGroupIds);
-  const useEventDrivenConsultation = payload?.useEventDrivenConsultation === true;
-  const aiPlanningRunEnabled = payload?.aiPlanningRunEnabled === true;
-
-  let aiStrategy: string | undefined;
-  let aiMessage: string | undefined;
-  let toolInvocationCounts: Record<string, number> | undefined;
-  let turnCost: number | undefined;
-  let turnWallClockMs: number | undefined;
-  let turnInputTokens: number | undefined;
-  let turnOutputTokens: number | undefined;
-
-  if (!payload?.meleeDecisionToken || (payload.decision !== 'fight' && payload.decision !== 'ignore')) {
-    return { success: false, reason: 'Invalid melee intercept payload.' };
-  }
-
-  const resolveResult = deps.resolveMeleeIntercept(payload);
-  if (!resolveResult.success) {
-    return { success: false, reason: resolveResult.reason };
-  }
-
-  const shouldDeferPostResolutionConsult = useEventDrivenConsultation && aiPlanningRunEnabled;
-  const planningTurnNumberAfterResolution = deps.getGameState().turnNumber;
-
-  if (shouldDeferPostResolutionConsult) {
-    setPendingMeleeResolveConsult(planningTurnNumberAfterResolution, {
-      useEventDrivenConsultation,
-      resolutionSuccess: resolveResult.success,
-      aiPlanningRunEnabled,
-      opponentState: deps.getGameStateForPlayer('opponent'),
-      resolution: resolveResult,
-      modelId: modelId ?? '',
-      enabledToolNames,
-      hasKey: deps.hasKey,
-      requestOrders: deps.requestOrders,
-      timeoutMs: POST_RESOLUTION_CONSULT_TIMEOUT_MS,
-      errorLogMessage: 'handleResolveMeleeIntercept: afterResolution failed or timed out',
-    });
-  } else {
-    const resolvePostConsult = await runEventDrivenAfterResolutionConsultation({
-      useEventDrivenConsultation,
-      resolutionSuccess: resolveResult.success,
-      aiPlanningRunEnabled,
-      opponentState: deps.getGameStateForPlayer('opponent'),
-      resolution: resolveResult,
-      modelId: modelId ?? '',
-      enabledToolNames,
-      hasKey: deps.hasKey,
-      requestOrders: deps.requestOrders,
-      timeoutMs: POST_RESOLUTION_CONSULT_TIMEOUT_MS,
-      errorLogMessage: 'handleResolveMeleeIntercept: afterResolution failed or timed out',
-    });
-    if (resolvePostConsult.aiStrategy) {
-      aiStrategy = resolvePostConsult.aiStrategy;
-    }
-    if (resolvePostConsult.aiMessage) {
-      aiMessage = resolvePostConsult.aiMessage;
-    }
-    if (resolvePostConsult.toolInvocationCounts) {
-      toolInvocationCounts = resolvePostConsult.toolInvocationCounts;
-    }
-    if (typeof resolvePostConsult.cost === 'number' && Number.isFinite(resolvePostConsult.cost)) {
-      turnCost = resolvePostConsult.cost;
-    }
-  }
-
-  return {
-    success: true,
-    ...pickReadyResolutionIpcMirrorFields(resolveResult),
-    humanMoves: resolveResult.humanMoves,
-    opponentCombatParticipantUnitIds: resolveResult.opponentCombatParticipantUnitIds,
-    removedOpponentUnitIds: resolveResult.removedOpponentUnitIds,
-    tacticalAutoStartH3Index: resolveResult.tacticalAutoStartH3Index,
-    aiStrategy,
-    aiMessage,
-    toolInvocationCounts,
-    cost: turnCost,
-    wallClockMs: turnWallClockMs,
-    inputTokens: turnInputTokens,
-    outputTokens: turnOutputTokens,
     ...(shouldDeferPostResolutionConsult
       ? {
           postResolutionConsultDeferred: true,

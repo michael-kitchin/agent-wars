@@ -12,7 +12,7 @@ Opens in New game and in Game over. See [modes-and-transitions.md](modes-and-tra
 
 ## Information Displayed
 
-- A message: "Start the world map game when ready.", "Start a new world map game when ready.", "You win!", or "You lose."
+- A message: "Start the global game when ready." or "Start the regional game when ready." at startup, "Start a new global game when ready." or "Start a new regional game when ready." after New, and "You win!" or "You lose." The startup and New sentences follow the selected tab. Game over does not.
 - Global and Regional tabs. Opening the overlay selects Global when no match is loaded or the loaded match is global, and Regional when the loaded match is a region. Game size, the four bonuses, fog of war, and the starting month stay outside the tabs.
 - On Global: a human home-region choice and a randomize control labeled "Randomize human home region". That dropdown, the AI home-region dropdown, and the regional region dropdown share one closed width, wide enough for the longest name in any of those three lists. Choosing a shorter name does not shrink the dropdown. The randomize control is a square button the same height as that dropdown.
 - On Global: an AI home-region choice and a randomize control labeled "Randomize AI home region". The dropdown is the same width as the human home-region dropdown. The randomize control is a square button the same height as that dropdown, in the opponent rose from the [UI style guide](../ui-style-guide.md). The two home regions may match.
@@ -66,7 +66,7 @@ Opens in New game and in Game over. See [modes-and-transitions.md](modes-and-tra
 
 ## Strategic and Tactical Differences
 
-The overlay is not used inside a battle. Starting a match from it ends any tactical session and returns to Strategic planning.
+New opens this overlay during strategic planning, tactical planning, and resolution playback in either theater. It does not open while the tactical annihilation dialog is open, or while the tactical battles list is open, because those dialogs already take the window. Opening it stops opponent planning and playback immediately. The current match is replaced when Start succeeds. Starting a match ends any tactical session and returns to Strategic planning.
 
 ## Related Documents
 
@@ -90,6 +90,8 @@ None.
 - `static/index.html` (`#game-over-overlay`, `#new-game-dialog-collapse`, `#game-over-dialog`, `#game-over-message`, `#new-game-tab-global`, `#new-game-tab-regional`, `#new-game-human-region-select`, `#new-game-human-region-randomize`, `#new-game-ai-region-select`, `#new-game-ai-region-randomize`, `#new-game-region-select`, `#new-game-region-randomize`, `#new-game-human-side-select`, `#new-game-human-side-randomize`, `#new-game-ai-side-select`, `#new-game-ai-side-randomize`, `#new-game-advanced-tech`, `#new-game-cost-infantry`, `#new-game-cost-armor`, `#new-game-cost-naval`, `#new-game-cost-air`, `#new-game-size-select`, `#new-game-size-cap-infantry`, `#new-game-size-cap-armor`, `#new-game-size-cap-naval`, `#new-game-size-cap-air`, `#new-game-fog-checkbox`, `#new-game-country-bonus-select`, `#new-game-terrain-bonus-select`, `#new-game-weather-bonus-select`, `#new-game-tech-bonus-select`, `#new-game-start-month`, `#new-game-start-month-randomize`, `#new-game-btn`)
 - `src/renderer/gameplay/newGameDialogCollapse.ts`
 - `src/renderer/gameplay/newGame.ts`
+- `src/renderer/gameplay/newGameBanner.ts`
+- `src/shared/newGameBannerText.ts`
 - `src/renderer/map/mainMapInteractions.ts`
 - `src/renderer/map/drawInteraction.ts`
 - `src/renderer/gameplay/newGameMapUi.ts`

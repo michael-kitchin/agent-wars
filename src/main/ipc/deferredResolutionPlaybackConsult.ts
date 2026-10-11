@@ -27,6 +27,8 @@ import type {
   TacticalPostBeatConsultMergeSource,
 } from '../../shared/ipc/consultationPushTypes';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
+import { getMatchGeneration } from '../matchGeneration';
+import { getModelCallCancelEpoch, hasModelCallCancelSince } from '../openRouter/modelCallControl';
 import {
   runEventDrivenAfterResolutionConsultation,
   runEventDrivenAfterTacticalBeatConsultation,
@@ -53,7 +55,7 @@ export type DeferredStrategicResolutionConsultArgs = {
   requestOrders: (
     state: GameStateSnapshot,
     modelId: string,
-    options: { enabledToolNames: string[]; usePrecomputation?: boolean }
+    options: { enabledToolNames: string[]; usePrecomputation?: boolean; signal?: AbortSignal }
   ) => Promise<RequestAiOrdersResult>;
   timeoutMs: number;
   errorLogMessage: string;
@@ -83,16 +85,47 @@ export type DeferredTacticalBeatConsultArgs = {
       enabledToolNames: string[];
       usePrecomputation?: boolean;
       tacticalAiBattle?: TacticalBattleSnapshot;
+      signal?: AbortSignal;
     }
   ) => Promise<RequestAiOrdersResult>;
   timeoutMs: number;
   errorLogMessage: string;
 };
 
-type PendingPlaybackConsult =
-  | { tag: 'strategic-ready'; planningTurnNumber: number; consultArgs: DeferredStrategicResolutionConsultArgs }
-  | { tag: 'melee-resolve'; planningTurnNumber: number; consultArgs: DeferredStrategicResolutionConsultArgs }
-  | { tag: 'tactical-beat'; battleId: string; consultArgs: DeferredTacticalBeatConsultArgs };
+export type PendingPlaybackConsult =
+  | {
+      tag: 'strategic-ready';
+      planningTurnNumber: number;
+      consultArgs: DeferredStrategicResolutionConsultArgs;
+      cancelEpoch: number;
+      generationAtStart: number;
+    }
+  | {
+      tag: 'melee-resolve';
+      planningTurnNumber: number;
+      consultArgs: DeferredStrategicResolutionConsultArgs;
+      cancelEpoch: number;
+      generationAtStart: number;
+    }
+  | {
+      tag: 'tactical-beat';
+      battleId: string;
+      consultArgs: DeferredTacticalBeatConsultArgs;
+      cancelEpoch: number;
+      generationAtStart: number;
+    };
+
+/**
+ * The cancel epoch and match generation captured when a deferred consult is stored.
+ *
+ * Purpose: Notify skips a consult the player already stopped, and a late finish does not push onto a newer match.
+ * When to use: Inside each `setPending*` helper.
+ * Expected outcome: The epoch and generation at the moment the mutex is taken.
+ * Exceptions: None.
+ */
+function deferredConsultStamp(): { cancelEpoch: number; generationAtStart: number } {
+  return { cancelEpoch: getModelCallCancelEpoch(), generationAtStart: getMatchGeneration() };
+}
 
 let pendingPlaybackConsult: PendingPlaybackConsult | null = null;
 
@@ -107,6 +140,58 @@ let pendingPlaybackConsult: PendingPlaybackConsult | null = null;
 export function hasDeferredPlaybackConsultPending(): boolean {
   logTrace('hasDeferredPlaybackConsultPending', { pending: pendingPlaybackConsult !== null });
   return pendingPlaybackConsult !== null;
+}
+
+/**
+ * The tag of the deferred consult that is waiting, if one is.
+ *
+ * Purpose: A stop log can say which consult was waiting without running it.
+ * When to use: `stopModelWork`, before it clears a New-game consult.
+ * Expected outcome: The pending tag, or null when the mutex is empty.
+ * Exceptions: None.
+ */
+export function peekDeferredPlaybackConsultTag(): PendingPlaybackConsult['tag'] | null {
+  const tag = pendingPlaybackConsult?.tag ?? null;
+  logTrace('peekDeferredPlaybackConsultTag', { tag });
+  return tag;
+}
+
+/**
+ * The deferred consult record itself.
+ *
+ * Purpose: A test can finish that record after the slot has been replaced, the way a late completion would.
+ * When to use: Tests of `releaseDeferredConsultSlot`. Production notify keeps the record it captured at the start.
+ * Expected outcome: The current record, or null.
+ * Exceptions: None.
+ */
+export function peekPendingPlaybackConsult(): PendingPlaybackConsult | null {
+  logTrace('peekPendingPlaybackConsult', { pending: pendingPlaybackConsult !== null });
+  return pendingPlaybackConsult;
+}
+
+/**
+ * Decides whether a consult that already finished may push, and clears the slot only when it still owns it.
+ *
+ * Purpose: A new match, Exit Battle, or a newer consult must not lose its pending record to a late completion.
+ * When to use: After the consult runner returns.
+ * Expected outcome: `'push'` after this record is cleared from the slot. `'drop'` when the match generation changed,
+ * when a tactical record no longer owns the slot, or when a different record is stored. A generation change still
+ * clears this record when it is the one stored, and leaves a newer record in place.
+ * Exceptions: None.
+ */
+export function releaseDeferredConsultSlot(
+  pending: PendingPlaybackConsult,
+  generationAtStart: number
+): 'push' | 'drop' {
+  logDebug('releaseDeferredConsultSlot', { tag: pending.tag, generationAtStart });
+  if (getMatchGeneration() !== generationAtStart) {
+    if (pendingPlaybackConsult === pending) pendingPlaybackConsult = null;
+    return 'drop';
+  }
+  if (pending.tag === 'tactical-beat' && pendingPlaybackConsult !== pending) return 'drop';
+  if (pendingPlaybackConsult !== null && pendingPlaybackConsult !== pending) return 'drop';
+  pendingPlaybackConsult = null;
+  return 'push';
 }
 
 /**
@@ -135,7 +220,7 @@ export function setPendingStrategicReadyConsult(
   consultArgs: DeferredStrategicResolutionConsultArgs
 ): void {
   logDebug('setPendingStrategicReadyConsult', { planningTurnNumber });
-  pendingPlaybackConsult = { tag: 'strategic-ready', planningTurnNumber, consultArgs };
+  pendingPlaybackConsult = { tag: 'strategic-ready', planningTurnNumber, consultArgs, ...deferredConsultStamp() };
 }
 
 /**
@@ -151,7 +236,7 @@ export function setPendingMeleeResolveConsult(
   consultArgs: DeferredStrategicResolutionConsultArgs
 ): void {
   logDebug('setPendingMeleeResolveConsult', { planningTurnNumber });
-  pendingPlaybackConsult = { tag: 'melee-resolve', planningTurnNumber, consultArgs };
+  pendingPlaybackConsult = { tag: 'melee-resolve', planningTurnNumber, consultArgs, ...deferredConsultStamp() };
 }
 
 /**
@@ -164,13 +249,13 @@ export function setPendingMeleeResolveConsult(
  */
 export function setPendingTacticalBeatConsult(battleId: string, consultArgs: DeferredTacticalBeatConsultArgs): void {
   logDebug('setPendingTacticalBeatConsult', { battleId });
-  pendingPlaybackConsult = { tag: 'tactical-beat', battleId, consultArgs };
+  pendingPlaybackConsult = { tag: 'tactical-beat', battleId, consultArgs, ...deferredConsultStamp() };
 }
 
 function strategicPayloadMatchesPending(
   payload: NotifyResolutionPlaybackCompletePayload,
   pending: PendingPlaybackConsult
-): pending is { tag: 'strategic-ready'; planningTurnNumber: number; consultArgs: DeferredStrategicResolutionConsultArgs } {
+): pending is Extract<PendingPlaybackConsult, { tag: 'strategic-ready' }> {
   return (
     pending.tag === 'strategic-ready' &&
     payload.kind === 'strategic' &&
@@ -181,7 +266,7 @@ function strategicPayloadMatchesPending(
 function meleePayloadMatchesPending(
   payload: NotifyResolutionPlaybackCompletePayload,
   pending: PendingPlaybackConsult
-): pending is { tag: 'melee-resolve'; planningTurnNumber: number; consultArgs: DeferredStrategicResolutionConsultArgs } {
+): pending is Extract<PendingPlaybackConsult, { tag: 'melee-resolve' }> {
   return (
     pending.tag === 'melee-resolve' &&
     payload.kind === 'melee' &&
@@ -192,7 +277,7 @@ function meleePayloadMatchesPending(
 function tacticalPayloadMatchesPending(
   payload: NotifyResolutionPlaybackCompletePayload,
   pending: PendingPlaybackConsult
-): pending is { tag: 'tactical-beat'; battleId: string; consultArgs: DeferredTacticalBeatConsultArgs } {
+): pending is Extract<PendingPlaybackConsult, { tag: 'tactical-beat' }> {
   return pending.tag === 'tactical-beat' && payload.kind === 'tactical' && payload.battleId === pending.battleId;
 }
 
@@ -237,6 +322,50 @@ function abandonDeferredPlaybackConsult(
 }
 
 /**
+ * Drops a consult the player already stopped, and pushes an empty result so Ready unlatches.
+ *
+ * Purpose: Run off, New, and a model change during playback must not start the model call when notify arrives.
+ * When to use: After the notify matches the pending record and before the consult runner.
+ * Expected outcome: True when the cancel epoch moved. The slot is cleared and an empty push is sent. False when this consult may start.
+ * Exceptions: None.
+ */
+function skipDeferredConsultBecausePlayerStopped(sender: WebContents, pending: PendingPlaybackConsult): boolean {
+  if (!hasModelCallCancelSince(pending.cancelEpoch)) return false;
+  pendingPlaybackConsult = null;
+  logDebug('handleNotifyResolutionPlaybackComplete: skipped because planning was stopped', { tag: pending.tag });
+  if (pending.tag === 'tactical-beat') {
+    sender.send(IPC_GAME.postTacticalBeatConsultation, toTacticalPostBeatConsultFields(pending.battleId, {}));
+    return true;
+  }
+  const push: PostResolutionConsultationPushPayload = { planningTurnNumber: pending.planningTurnNumber };
+  sender.send(IPC_GAME.postResolutionConsultation, push);
+  return true;
+}
+
+/**
+ * Applies the post-consult slot rule and reports whether the caller may push.
+ *
+ * Purpose: A late completion must not clear a newer deferred record or publish orders into a new match.
+ * When to use: After the consult runner returns.
+ * Expected outcome: `'push'` when the slot was released for this record. `{ ok: false }` when the match generation changed.
+ * `{ ok: true }` when the result is dropped because a newer record owns the slot.
+ * Exceptions: None.
+ */
+function finishDeferredConsult(
+  pending: PendingPlaybackConsult,
+  generationAtStart: number
+): 'push' | { ok: true } | { ok: false; reason: string } {
+  const decision = releaseDeferredConsultSlot(pending, generationAtStart);
+  if (decision === 'push') return 'push';
+  if (getMatchGeneration() !== generationAtStart) {
+    logDebug('handleNotifyResolutionPlaybackComplete: dropped after a new game', { tag: pending.tag });
+    return { ok: false, reason: 'Deferred consultation finished after a new game started.' };
+  }
+  logDebug('handleNotifyResolutionPlaybackComplete: dropped because a newer consult owns the slot', { tag: pending.tag });
+  return { ok: true };
+}
+
+/**
  * Runs deferred consultation after the renderer finishes resolution playback and validates pending mutex metadata.
  *
  * Purpose: IPC handler body for `game:notifyResolutionPlaybackComplete` — performs LLM consultation + `webContents.send`.
@@ -264,23 +393,12 @@ export async function handleNotifyResolutionPlaybackComplete(
     return { ok: false, reason: 'Invalid notify payload.' };
   }
 
-  if (strategicPayloadMatchesPending(payload, pending)) {
+  if (strategicPayloadMatchesPending(payload, pending) || meleePayloadMatchesPending(payload, pending)) {
+    if (skipDeferredConsultBecausePlayerStopped(sender, pending)) return { ok: true };
+    const generationAtStart = pending.generationAtStart;
     const postConsult = await runEventDrivenAfterResolutionConsultation(pending.consultArgs);
-    pendingPlaybackConsult = null;
-    const push: PostResolutionConsultationPushPayload = {
-      planningTurnNumber: pending.planningTurnNumber,
-      ...(postConsult.aiStrategy ? { aiStrategy: postConsult.aiStrategy } : {}),
-      ...(postConsult.aiMessage ? { aiMessage: postConsult.aiMessage } : {}),
-      ...(postConsult.toolInvocationCounts ? { toolInvocationCounts: postConsult.toolInvocationCounts } : {}),
-      ...(typeof postConsult.cost === 'number' && Number.isFinite(postConsult.cost) ? { cost: postConsult.cost } : {}),
-    };
-    sender.send(IPC_GAME.postResolutionConsultation, push);
-    return { ok: true };
-  }
-
-  if (meleePayloadMatchesPending(payload, pending)) {
-    const postConsult = await runEventDrivenAfterResolutionConsultation(pending.consultArgs);
-    pendingPlaybackConsult = null;
+    const finished = finishDeferredConsult(pending, generationAtStart);
+    if (finished !== 'push') return finished;
     const push: PostResolutionConsultationPushPayload = {
       planningTurnNumber: pending.planningTurnNumber,
       ...(postConsult.aiStrategy ? { aiStrategy: postConsult.aiStrategy } : {}),
@@ -293,12 +411,14 @@ export async function handleNotifyResolutionPlaybackComplete(
   }
 
   if (tacticalPayloadMatchesPending(payload, pending)) {
+    if (skipDeferredConsultBecausePlayerStopped(sender, pending)) return { ok: true };
+    const generationAtStart = pending.generationAtStart;
     const mergeSource: TacticalPostBeatConsultMergeSource = await runEventDrivenAfterTacticalBeatConsultation(
       pending.consultArgs
     );
-    const battleId = pending.battleId;
-    pendingPlaybackConsult = null;
-    const fields = toTacticalPostBeatConsultFields(battleId, mergeSource);
+    const finished = finishDeferredConsult(pending, generationAtStart);
+    if (finished !== 'push') return finished;
+    const fields = toTacticalPostBeatConsultFields(pending.battleId, mergeSource);
     sender.send(IPC_GAME.postTacticalBeatConsultation, fields);
     return { ok: true };
   }

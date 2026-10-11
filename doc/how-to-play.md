@@ -2,13 +2,14 @@
 
 This guide covers a match in the current build, from the new-game dialog to the end. Downloading the game and setting up the OpenRouter key for the opponent are covered under [Play it](../README.md#play-it) in the README. The full rules are in [combat-rules-v3.md](combat-rules-v3.md).
 
-Agent Wars is a WEGO game ("we go"), where neither player can see what the other is planning to do. For each turn, both sides create movement, production, and combat orders at the same time, based on different, subjective views of the battlefield. Once both players are ready, the game engine executes their orders and resolves the outcomes automatically.
+Agent Wars is a WEGO game ("we go"), where neither player can see what the other is planning to do. For each turn, both sides create movement, production, and combat orders at the same time, based on different, partial views of the battlefield. Once both players are ready, the game engine executes those orders and resolves the outcomes automatically.
 
-Since I'm a geographer by training, gameplay is organized around geospatial features and metrics instead of nationality. Players start from regions built from countries, provinces, or other sub-divisions, but victory derives from how well geography and production capacity are managed.
+I'm a geographer by training, so Agent Wars is built around geospatial features more than nationality. Each player starts with a home region made of real-world countries, provinces, or states, but those are mostly labels. What matters is what's on the ground: the size and location of urban areas, and how terrain, coastlines, and chokepoints shape what units can do.
 
-Unit nationality and terrain experience, technology levels, and weather also matter, but they're less important.
+This means the winner is the player who best manages geography and the resources tied to it. Unit nationality, terrain familiarity, technology levels, and weather still matter, but not as much.
 
 A player wins when:
+
 - They capture the other player's home region hexes
 - Or destroy all production capacity in those hexes
 
@@ -161,6 +162,7 @@ I'll add screenshots of specific functions as I can.
 Tactical battles are initiated when human and LLM units end their turns in the same hex. The human player has the option of fighting manually or leaving the results to dice rolls. If they choose to fight, their stratetgic units will be broken into sub-units on the tactical battlefield, and the fight is on.
 
 That said:
+
 - Committing to a manual battle prevents players (human and LLM) from issuing strategic orders during the same turn. Existing orders will still be followed, however, and units will continue to defend themselves.
 - Players can only fight one tactical battle at a time.
 
@@ -269,7 +271,7 @@ The full bonus rules are in [combat-rules-v3.md](combat-rules-v3.md) §4.9.
 
 - **You pay for the opponent:** each model call bills your OpenRouter account. The model list shows each model's price per million tokens.
 - **Reasoning costs more:** a higher reasoning level on the Model tab makes each consult slower and dearer.
-- **Waiting on the AI:** while the model plans, Ready shows **AI:** and a timer, and the turn can't resolve until the plan arrives. You can keep giving orders during the wait.
+- **Waiting on the AI:** while the model plans, Ready shows **AI:** and a timer. You can keep giving orders during the wait. Turn **Run** off to stop that plan. If the turn has not resolved yet, Ready can resolve it without those orders. If the turn already played back, Ready unlocks and the next turn does not use that plan. Changing the model stops the current plan. If Run is still on and Ready is still waiting, planning starts again with the new model.
 - **Not every turn:** with **Events** on (the default) on the Tools tab, the model is called when an event it's watching or a mandatory trigger fires, and at least every five turns. Otherwise its standing orders run.
 - **Every turn, if you like:** turn **Events** off to consult the model every turn, at more cost.
 - **The opponent nearly always shoots:** unless the model told it to hold fire, each enemy unit that can fire picks a legal target on its own when the model gives it none.
@@ -288,7 +290,7 @@ The full bonus rules are in [combat-rules-v3.md](combat-rules-v3.md) §4.9.
 
 - **Lower right of the map (map toast):** Errors, rejected orders, turn-loss summaries, and unknown-battle announcements. Use the × to dismiss; it also hides after a fixed interval, and a newer message replaces it.
 - **Upper right of the map (AI strategy toast):** The opponent's Message and Strategy after a consultation. It dismisses and times out the same way.
-- **Right panel, below the Tools and Model tabs (AI activity log):** AI interaction lines and errors, including a one-line copy of each turn update. Starting a new match clears it.
+- **Right panel, below the Tools and Model tabs (AI activity log):** AI interaction lines and errors, including a retry, a line when opponent planning stops, and a one-line copy of each turn update. Starting a new match clears it.
 
 ## UI controls summary
 
@@ -307,12 +309,12 @@ The full bonus rules are in [combat-rules-v3.md](combat-rules-v3.md) §4.9.
 - Build: zoom in, click a build marker, and add units to its queue. Shift-click more markers to build in several hexes.
 - Sealift: open a coastal or seaport hex's stack list and set the ship's slots.
 - Start a battle: zoom in one level and click the 🔍 marker on a contested hex.
-- Leave a battle: **Exit Battle**, between beats.
+- Leave a battle: **Exit Battle**, between beats, including while the model is planning that battle. Leaving stops that plan. A plan from the world-map turn keeps going.
 - Resolve turn: Ready button.
 - See under the terrain: hold T. Terrain fill hides while the key is down, and on the strategic map hex codes and, where they apply, tech icons show. Weather icons hide while T is down. In a battle, only the terrain fill hides.
 - Read a hex: rest the pointer on it for a second. Hold Shift while aiming to pause aiming and see the hex tooltip.
 - Close a popup or the unit list: Escape. On the battles list, Escape means **Ignore**. Escape doesn't exit a battle or end aiming.
 - The minimap only shows where you are. Clicking it does nothing.
-- New game: **New** on the Model tab during strategic planning, or the dialog that opens at game over.
+- New game: **New** on the Model tab during strategic planning, tactical planning, or while a turn or beat is playing back. It does not open while the battles list or the annihilation result is on screen. Opening it stops opponent planning and playback. The dialog at game over is the same screen.
 
 The full input map, including the exceptions, is in [ux/input-map.md](ux/input-map.md).

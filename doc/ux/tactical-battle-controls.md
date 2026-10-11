@@ -30,7 +30,7 @@ The Exit Battle control is shown whenever a battle is active, including during a
 ### Other
 
 - When a beat leaves at least one side with no units, the annihilation dialog opens, map and panel input turn off, the in-battle Exit Battle control hides, and Ready disables.
-- Leaving the battle cancels in-flight opponent planning for that battle.
+- Leaving the battle cancels in-flight opponent planning for that battle, including a post-beat consult that has not finished. Exit Battle stays enabled during a model call. It is still disabled while a beat is resolving or playing back, and hidden while the annihilation dialog is open. A strategic consult from the world-map turn keeps running.
 
 ## States
 

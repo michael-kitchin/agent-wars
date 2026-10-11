@@ -10,13 +10,14 @@ test('ready resolution announcements use collectUnknownBattleContinentNames', ()
   assert.ok(!announcementsSource.includes('if (!unknownContinentNames.includes(n))'));
 });
 
-test('readyHandler has a single tool-count rollback helper', () => {
-  const source = readRendererSource('gameplay', 'readyHandler.ts');
-  const matches = source.match(/function rollbackReadyToolCounts\(/g) ?? [];
-  assert.equal(matches.length, 1);
-  assert.equal(
-    (source.match(/S.toolInvocationCounts = toolCountsBeforeReadyClick;/g) ?? []).length,
-    0,
-    'all six assignment sites should use rollbackReadyToolCounts'
-  );
+test('ready tool-count rollback stays one shared helper', () => {
+  const readyHandlerSource = readRendererSource('gameplay', 'readyHandler.ts');
+  const tacticalCommitSource = readRendererSource('gameplay', 'readyTacticalCommit.ts');
+  assert.equal((readyHandlerSource.match(/function rollbackReadyToolCounts\(/g) ?? []).length, 0);
+  assert.equal((tacticalCommitSource.match(/function rollbackReadyToolCounts\(/g) ?? []).length, 1);
+  const inlineRestore = /S\.toolInvocationCounts = toolCountsBeforeReadyClick;/g;
+  assert.equal((readyHandlerSource.match(inlineRestore) ?? []).length, 0);
+  assert.equal((tacticalCommitSource.match(inlineRestore) ?? []).length, 0);
+  assert.ok(readyHandlerSource.includes('rollbackReadyToolCounts('));
+  assert.ok(tacticalCommitSource.includes('rollbackReadyToolCounts('));
 });

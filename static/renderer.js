@@ -24988,6 +24988,37 @@ ${bonuses}`;
     return [extent.south, extent.west, extent.north, extent.east, extent.referenceLng].join(",");
   }
 
+  // src/shared/newGameBannerText.ts
+  function newGameBannerText(kind, tab) {
+    if (kind === "startup") return `Start the ${tab} game when ready.`;
+    return `Start a new ${tab} game when ready.`;
+  }
+
+  // src/renderer/gameplay/newGameBanner.ts
+  var bannerKind = null;
+  function writeNewGameBanner(text) {
+    const messageEl = document.getElementById("game-over-message");
+    if (!messageEl) return;
+    messageEl.textContent = text;
+    messageEl.style.display = "";
+  }
+  function showNewGameBanner(kind, tab) {
+    bannerKind = kind;
+    writeNewGameBanner(newGameBannerText(kind, tab));
+  }
+  function showGameOverBanner(text) {
+    bannerKind = null;
+    writeNewGameBanner(text);
+  }
+  function syncNewGameBannerToTab(tab) {
+    if (bannerKind === null) return;
+    writeNewGameBanner(newGameBannerText(bannerKind, tab));
+  }
+  function isNewGameOverlayOpen() {
+    const overlay = document.getElementById("game-over-overlay");
+    return overlay != null && !overlay.classList.contains("hidden");
+  }
+
   // src/renderer/gameplay/newGameMapUi.ts
   var NEW_GAME_TABS = [
     { tabId: "new-game-tab-global", panelId: "new-game-panel-global" },
@@ -25046,6 +25077,7 @@ ${bonuses}`;
     selectTabPanel(which === "regional" ? "new-game-tab-regional" : "new-game-tab-global", NEW_GAME_TABS);
     applyVisibleCosts();
     syncStartEnabled();
+    syncNewGameBannerToTab(which);
   }
   function fillRegionSelect(regions) {
     const select = document.getElementById("new-game-region-select");
@@ -25139,6 +25171,9 @@ ${bonuses}`;
   }
   function regionalTabSelected() {
     return document.getElementById("new-game-tab-regional")?.getAttribute("aria-selected") === "true";
+  }
+  function selectedNewGameTab() {
+    return regionalTabSelected() ? "regional" : "global";
   }
   function selectValue2(id) {
     return document.getElementById(id)?.value ?? "";
@@ -25571,7 +25606,6 @@ ${bonuses}`;
   }
   function updateGameOverUI(state, updateReadyButtonState2) {
     const overlay = document.getElementById("game-over-overlay");
-    const messageEl = document.getElementById("game-over-message");
     const newGameBtn = document.getElementById("new-game-btn");
     const rangedBtn = document.getElementById("ranged-attack-btn");
     const noGame = !state || state.hexes.length === 0;
@@ -25599,14 +25633,10 @@ ${bonuses}`;
     }
     syncGameSizeCapPreview();
     setMainUIControlsEnabled(false);
-    if (messageEl) {
-      if (gameOver) {
-        messageEl.textContent = state.winner === "human" ? "You win!" : "You lose.";
-        messageEl.style.display = "";
-      } else {
-        messageEl.textContent = "Start the world map game when ready.";
-        messageEl.style.display = "";
-      }
+    if (gameOver) {
+      showGameOverBanner(state.winner === "human" ? "You win!" : "You lose.");
+    } else {
+      showNewGameBanner("startup", selectedNewGameTab());
     }
     if (newGameBtn) {
       newGameBtn.textContent = noGame ? "Start game" : "New game";
@@ -26358,6 +26388,268 @@ ${bonuses}`;
     }
   }
 
+  // src/shared/abortError.ts
+  function isLikelyAbortError(err) {
+    if (err instanceof Error && err.name === "AbortError") return true;
+    const msg = String(err);
+    return msg.includes("AbortError") || msg.toLowerCase().includes("abort");
+  }
+
+  // src/renderer/openRouter/precomputedAiState.ts
+  function createEmptyTacticalOpponentDraft() {
+    return {
+      movementOrders: [],
+      rangedAttacks: [],
+      airStrikes: [],
+      ferryOrders: [],
+      embarkOrders: []
+    };
+  }
+  var EMPTY_TACTICAL_OPPONENT_DRAFT = createEmptyTacticalOpponentDraft();
+  function resetPrecomputedAiState(mode) {
+    if (mode === "empty") {
+      rendererSharedState.precomputedAiOrders = [];
+      rendererSharedState.precomputedAiRangedOrders = [];
+      rendererSharedState.precomputedAiEmbarkOrders = [];
+    } else {
+      rendererSharedState.precomputedAiOrders = null;
+      rendererSharedState.precomputedAiRangedOrders = null;
+      rendererSharedState.precomputedAiEmbarkOrders = null;
+    }
+    rendererSharedState.precomputedAiStrategy = null;
+    rendererSharedState.precomputedAiMessage = null;
+    rendererSharedState.precomputedToolInvocationCounts = null;
+  }
+  function unblockPrecomputedAiPlanningAfterBackgroundFailure() {
+    resetPrecomputedAiState("empty");
+    if (rendererSharedState.tacticalBattleSnapshot && rendererSharedState.tacticalPhasePlanning) {
+      rendererSharedState.tacticalOpponentDraft = EMPTY_TACTICAL_OPPONENT_DRAFT;
+    }
+  }
+  function applySuccessfulPrecomputedAiResult(result) {
+    if (result.tacticalOpponentPlan) {
+      rendererSharedState.precomputedAiOrders = null;
+      rendererSharedState.precomputedAiRangedOrders = [];
+      rendererSharedState.precomputedAiEmbarkOrders = [];
+    } else {
+      rendererSharedState.precomputedAiOrders = result.orders;
+      rendererSharedState.precomputedAiRangedOrders = result.rangedAttacks ?? [];
+      rendererSharedState.precomputedAiEmbarkOrders = result.embarkOrders ?? [];
+    }
+    rendererSharedState.precomputedAiStrategy = result.strategy ?? null;
+    rendererSharedState.precomputedAiMessage = result.message ?? null;
+    if (result.tacticalBattle) {
+      rendererSharedState.tacticalBattleSnapshot = result.tacticalBattle;
+    }
+    if (result.tacticalOpponentPlan) {
+      const replacedPriorDraft = rendererSharedState.tacticalOpponentDraft !== null;
+      if (replacedPriorDraft) {
+        console.debug("[agent-wars] tactical opponent draft replaced by newer AI plan (D5)", {
+          movementCount: result.tacticalOpponentPlan.movementOrders.length,
+          rangedCount: result.tacticalOpponentPlan.rangedAttacks.length,
+          airCount: result.tacticalOpponentPlan.airStrikes.length
+        });
+      }
+      rendererSharedState.tacticalOpponentDraft = result.tacticalOpponentPlan;
+    }
+  }
+
+  // src/renderer/openRouter/openRouterRuntime.ts
+  var BACKGROUND_AI_REQUEST_TIMEOUT_MS = AI_CONSULTATION_WAIT_TIMEOUT_MS;
+  var backgroundAiRequestSequence = 0;
+  function invalidateBackgroundAiRequest() {
+    backgroundAiRequestSequence += 1;
+    rendererSharedState.backgroundRequestInFlight = false;
+  }
+  async function stopOpponentPlanning(reason) {
+    invalidateBackgroundAiRequest();
+    try {
+      await window.gameApi?.cancelRequestAiOrders?.({ reason });
+    } catch (err) {
+      console.error("stopOpponentPlanning failed", reason, err);
+    }
+  }
+  var openRouterRuntimeDepsRef = null;
+  function cancelInFlightBackgroundAiRequestForRendererTeardown() {
+    invalidateBackgroundAiRequest();
+    void window.gameApi?.cancelRequestAiOrders?.({ reason: "battle_exit" });
+    unblockPrecomputedAiPlanningAfterBackgroundFailure();
+    openRouterRuntimeDepsRef?.updateReadyButtonState();
+  }
+  function cancelTacticalScopedBackgroundPrefetchForSessionTeardown() {
+    cancelInFlightBackgroundAiRequestForRendererTeardown();
+  }
+  function syncEventDrivenFromTools() {
+    rendererSharedState.useEventDrivenConsultation = rendererSharedState.enabledToolGroups.has("events");
+  }
+  function strategicPhaseAllowsBackgroundAi() {
+    if (rendererSharedState.gameState?.phase === "planning") return true;
+    return !!(rendererSharedState.tacticalBattleSnapshot && rendererSharedState.tacticalPhasePlanning);
+  }
+  function startBackgroundRequestIfAllowed(deps) {
+    if (rendererSharedState.tacticalAnnihilationOutcomeDialog != null) return;
+    if (isNewGameOverlayOpen()) return;
+    if (isDeferredResolutionPlaybackConsultPending()) return;
+    if (rendererSharedState.backgroundRequestInFlight || !isWaitingForPrecomputedAiOrders() || !strategicPhaseAllowsBackgroundAi()) return;
+    openRouterRuntimeDepsRef = deps;
+    const keyPromise = window.gameApi?.openRouter?.getKey?.();
+    const modelPromise = window.gameApi?.openRouter?.getSelectedModel?.();
+    if (!keyPromise || !modelPromise) return;
+    const requestSequence = ++backgroundAiRequestSequence;
+    rendererSharedState.backgroundRequestInFlight = true;
+    Promise.all([keyPromise, modelPromise]).then(([keyResult, modelId]) => {
+      if (requestSequence !== backgroundAiRequestSequence) return;
+      if (!keyResult?.hasKey || !modelId?.trim()) {
+        rendererSharedState.backgroundRequestInFlight = false;
+        deps.appendOpenRouterLog("Run is on but API key or model not set.", true);
+        deps.updateReadyButtonState();
+        return;
+      }
+      if (!rendererSharedState.runButtonOn || !window.gameApi?.requestAiOrders) {
+        rendererSharedState.backgroundRequestInFlight = false;
+        deps.updateReadyButtonState();
+        return;
+      }
+      const enabledToolGroupsPayload = Array.from(rendererSharedState.enabledToolGroups).filter((id) => id !== "events");
+      const requestPromise = window.gameApi.requestAiOrders({ enabledToolGroups: enabledToolGroupsPayload });
+      let timeoutId;
+      const timeoutPromise = new Promise((_resolve, reject) => {
+        timeoutId = setTimeout(
+          () => reject(new Error(`AI planning timed out after ${BACKGROUND_AI_REQUEST_TIMEOUT_MS}ms`)),
+          BACKGROUND_AI_REQUEST_TIMEOUT_MS
+        );
+      });
+      const settleTimer = () => {
+        if (timeoutId !== void 0) clearTimeout(timeoutId);
+      };
+      Promise.race([requestPromise, timeoutPromise]).then((result) => {
+        settleTimer();
+        if (requestSequence !== backgroundAiRequestSequence) return;
+        rendererSharedState.backgroundRequestInFlight = false;
+        if (rendererSharedState.useEventDrivenConsultation && !rendererSharedState.eventDrivenInitialConsultationDone) {
+          rendererSharedState.eventDrivenInitialConsultationDone = true;
+        }
+        if (rendererSharedState.runButtonOn && result.success) {
+          if (!rendererSharedState.tacticalBattleSnapshot && (result.tacticalBattle != null || result.tacticalOpponentPlan != null)) {
+            deps.appendOpenRouterLog("Discarded tactical prefetch (tactical session no longer active).", false);
+            deps.updateReadyButtonState();
+            return;
+          }
+          applySuccessfulPrecomputedAiResult(result);
+          if (rendererSharedState.tacticalBattleSnapshot && rendererSharedState.tacticalPhasePlanning && hasAiStrategyToastContent({ message: result.message, strategy: result.strategy })) {
+            deps.showAiStrategyToast({ message: result.message, strategy: result.strategy });
+          }
+          if (result.tacticalBattle) {
+            deps.requestRedraw?.();
+          }
+          if (result.toolInvocationCounts) {
+            rendererSharedState.precomputedToolInvocationCounts = { ...result.toolInvocationCounts };
+            for (const [groupId, count] of Object.entries(result.toolInvocationCounts)) {
+              rendererSharedState.toolInvocationCounts[groupId] = count;
+            }
+            deps.updateOpenRouterToolCountLabels();
+          } else {
+            rendererSharedState.precomputedToolInvocationCounts = null;
+          }
+          if (result.cost !== void 0) {
+            rendererSharedState.openRouterGameCost += result.cost;
+            deps.updateOpenRouterCostLabel();
+          }
+        } else if (!result.success) {
+          if (result.error === "Cancelled") {
+            startBackgroundRequestIfAllowed(deps);
+            if (!rendererSharedState.backgroundRequestInFlight) {
+              if (rendererSharedState.runButtonOn) {
+                deps.appendOpenRouterLog(
+                  "AI planning did not restart after the cancel; this beat proceeds without opponent orders.",
+                  true
+                );
+              }
+              unblockPrecomputedAiPlanningAfterBackgroundFailure();
+            }
+          } else {
+            deps.appendOpenRouterLog(`Background planning failed: ${result.error ?? "Unknown error"}`, true);
+            deps.showSidebarError(result.error ?? "Background AI request failed");
+            unblockPrecomputedAiPlanningAfterBackgroundFailure();
+          }
+        }
+        deps.updateReadyButtonState();
+      }).catch((err) => {
+        settleTimer();
+        if (requestSequence !== backgroundAiRequestSequence) return;
+        const msg = String(err);
+        const isAbort = isLikelyAbortError(err);
+        if (!isAbort) {
+          void stopOpponentPlanning("teardown");
+        }
+        rendererSharedState.backgroundRequestInFlight = false;
+        if (isAbort && rendererSharedState.tacticalBattleSnapshot && rendererSharedState.tacticalPhasePlanning) {
+          deps.appendOpenRouterLog("Tactical AI prefetch aborted.", false);
+          deps.updateReadyButtonState();
+          if (isWaitingForPrecomputedAiOrders()) {
+            startBackgroundRequestIfAllowed(deps);
+          }
+          return;
+        }
+        deps.appendOpenRouterLog(`Background planning request rejected: ${msg}`, true);
+        deps.showSidebarError(msg);
+        unblockPrecomputedAiPlanningAfterBackgroundFailure();
+        deps.updateReadyButtonState();
+      });
+    }).catch((err) => {
+      if (requestSequence !== backgroundAiRequestSequence) return;
+      rendererSharedState.backgroundRequestInFlight = false;
+      deps.showSidebarError(String(err));
+      unblockPrecomputedAiPlanningAfterBackgroundFailure();
+      deps.updateReadyButtonState();
+    });
+  }
+  function handleEventDrivenModeTransition(deps, wasEventDriven) {
+    if (!rendererSharedState.runButtonOn || wasEventDriven === rendererSharedState.useEventDrivenConsultation) return;
+    void stopOpponentPlanning("teardown");
+    resetPrecomputedAiState("null");
+    rendererSharedState.eventDrivenInitialConsultationDone = false;
+    startBackgroundRequestIfAllowed(deps);
+  }
+  function renderOpenRouterToolsList(deps) {
+    const container = document.getElementById("openrouter-tools-list");
+    if (!container) return;
+    container.innerHTML = "";
+    for (const group of rendererSharedState.openRouterToolGroups) {
+      const cell = document.createElement("div");
+      cell.className = "openrouter-tool-cell";
+      const tip = toolGroupTooltipText(group.id);
+      if (tip) cell.setAttribute("data-control-tooltip", tip);
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "openrouter-tool-toggle";
+      btn.setAttribute("data-tool-group", group.id);
+      btn.setAttribute("aria-pressed", rendererSharedState.enabledToolGroups.has(group.id) ? "true" : "false");
+      btn.textContent = String(rendererSharedState.toolInvocationCounts[group.id] ?? 0);
+      btn.addEventListener("click", () => {
+        if (rendererSharedState.enabledToolGroups.has(group.id)) {
+          rendererSharedState.enabledToolGroups.delete(group.id);
+        } else {
+          rendererSharedState.enabledToolGroups.add(group.id);
+        }
+        btn.setAttribute("aria-pressed", rendererSharedState.enabledToolGroups.has(group.id) ? "true" : "false");
+        btn.textContent = String(rendererSharedState.toolInvocationCounts[group.id] ?? 0);
+        if (group.id === "events") {
+          const wasEventDriven = rendererSharedState.useEventDrivenConsultation;
+          syncEventDrivenFromTools();
+          handleEventDrivenModeTransition(deps, wasEventDriven);
+          deps.updateReadyButtonState();
+        }
+      });
+      cell.appendChild(btn);
+      const label = document.createElement("span");
+      label.className = "openrouter-tool-label";
+      label.textContent = group.label;
+      cell.appendChild(label);
+      container.appendChild(cell);
+    }
+  }
+
   // src/renderer/tactical/tacticalExitButtonDom.ts
   function syncTacticalExitButtonElementVisibility() {
     const hud = document.getElementById("tactical-battle-hud");
@@ -26388,7 +26680,7 @@ ${bonuses}`;
   }
   function openTacticalAnnihilationOutcomeDialog(outcome) {
     rendererSharedState.tacticalAnnihilationOutcomeDialog = outcome;
-    void window.gameApi?.cancelRequestAiOrders?.();
+    void stopOpponentPlanning("teardown");
     const overlay = document.getElementById("tactical-annihilation-overlay");
     const messageEl = document.getElementById("tactical-annihilation-message");
     if (messageEl) messageEl.textContent = tacticalAnnihilationMessageForOutcome(outcome);
@@ -26536,244 +26828,6 @@ ${bonuses}`;
   }
   function discardStrategicOrderUiStash() {
     strategicOrderDraftStash = null;
-  }
-
-  // src/shared/abortError.ts
-  function isLikelyAbortError(err) {
-    if (err instanceof Error && err.name === "AbortError") return true;
-    const msg = String(err);
-    return msg.includes("AbortError") || msg.toLowerCase().includes("abort");
-  }
-
-  // src/renderer/openRouter/precomputedAiState.ts
-  function createEmptyTacticalOpponentDraft() {
-    return {
-      movementOrders: [],
-      rangedAttacks: [],
-      airStrikes: [],
-      ferryOrders: [],
-      embarkOrders: []
-    };
-  }
-  var EMPTY_TACTICAL_OPPONENT_DRAFT = createEmptyTacticalOpponentDraft();
-  function resetPrecomputedAiState(mode) {
-    if (mode === "empty") {
-      rendererSharedState.precomputedAiOrders = [];
-      rendererSharedState.precomputedAiRangedOrders = [];
-      rendererSharedState.precomputedAiEmbarkOrders = [];
-    } else {
-      rendererSharedState.precomputedAiOrders = null;
-      rendererSharedState.precomputedAiRangedOrders = null;
-      rendererSharedState.precomputedAiEmbarkOrders = null;
-    }
-    rendererSharedState.precomputedAiStrategy = null;
-    rendererSharedState.precomputedAiMessage = null;
-    rendererSharedState.precomputedToolInvocationCounts = null;
-  }
-  function unblockPrecomputedAiPlanningAfterBackgroundFailure() {
-    resetPrecomputedAiState("empty");
-    if (rendererSharedState.tacticalBattleSnapshot && rendererSharedState.tacticalPhasePlanning) {
-      rendererSharedState.tacticalOpponentDraft = EMPTY_TACTICAL_OPPONENT_DRAFT;
-    }
-  }
-  function applySuccessfulPrecomputedAiResult(result) {
-    if (result.tacticalOpponentPlan) {
-      rendererSharedState.precomputedAiOrders = null;
-      rendererSharedState.precomputedAiRangedOrders = [];
-      rendererSharedState.precomputedAiEmbarkOrders = [];
-    } else {
-      rendererSharedState.precomputedAiOrders = result.orders;
-      rendererSharedState.precomputedAiRangedOrders = result.rangedAttacks ?? [];
-      rendererSharedState.precomputedAiEmbarkOrders = result.embarkOrders ?? [];
-    }
-    rendererSharedState.precomputedAiStrategy = result.strategy ?? null;
-    rendererSharedState.precomputedAiMessage = result.message ?? null;
-    if (result.tacticalBattle) {
-      rendererSharedState.tacticalBattleSnapshot = result.tacticalBattle;
-    }
-    if (result.tacticalOpponentPlan) {
-      const replacedPriorDraft = rendererSharedState.tacticalOpponentDraft !== null;
-      if (replacedPriorDraft) {
-        console.debug("[agent-wars] tactical opponent draft replaced by newer AI plan (D5)", {
-          movementCount: result.tacticalOpponentPlan.movementOrders.length,
-          rangedCount: result.tacticalOpponentPlan.rangedAttacks.length,
-          airCount: result.tacticalOpponentPlan.airStrikes.length
-        });
-      }
-      rendererSharedState.tacticalOpponentDraft = result.tacticalOpponentPlan;
-    }
-  }
-
-  // src/renderer/openRouter/openRouterRuntime.ts
-  var BACKGROUND_AI_REQUEST_TIMEOUT_MS = AI_CONSULTATION_WAIT_TIMEOUT_MS;
-  var openRouterRuntimeDepsRef = null;
-  var OPEN_ROUTER_LOG_BACKGROUND_AI_CANCEL_SESSION_ENDED = "Tactical AI prefetch cancelled (tactical session ended).";
-  var OPEN_ROUTER_LOG_BACKGROUND_AI_CANCEL_TACTICAL_BATTLE_EXIT = "Background AI request cancelled (exiting tactical battle).";
-  function cancelInFlightBackgroundAiRequestForRendererTeardown(logLine) {
-    if (!rendererSharedState.backgroundRequestInFlight) return;
-    void window.gameApi?.cancelRequestAiOrders?.();
-    rendererSharedState.backgroundRequestInFlight = false;
-    openRouterRuntimeDepsRef?.appendOpenRouterLog(logLine, false);
-    unblockPrecomputedAiPlanningAfterBackgroundFailure();
-    openRouterRuntimeDepsRef?.updateReadyButtonState();
-  }
-  function cancelTacticalScopedBackgroundPrefetchForSessionTeardown() {
-    cancelInFlightBackgroundAiRequestForRendererTeardown(OPEN_ROUTER_LOG_BACKGROUND_AI_CANCEL_SESSION_ENDED);
-  }
-  function syncEventDrivenFromTools() {
-    rendererSharedState.useEventDrivenConsultation = rendererSharedState.enabledToolGroups.has("events");
-  }
-  function strategicPhaseAllowsBackgroundAi() {
-    if (rendererSharedState.gameState?.phase === "planning") return true;
-    return !!(rendererSharedState.tacticalBattleSnapshot && rendererSharedState.tacticalPhasePlanning);
-  }
-  function startBackgroundRequestIfAllowed(deps) {
-    if (rendererSharedState.tacticalAnnihilationOutcomeDialog != null) return;
-    if (isDeferredResolutionPlaybackConsultPending()) return;
-    if (rendererSharedState.backgroundRequestInFlight || !isWaitingForPrecomputedAiOrders() || !strategicPhaseAllowsBackgroundAi()) return;
-    openRouterRuntimeDepsRef = deps;
-    const keyPromise = window.gameApi?.openRouter?.getKey?.();
-    const modelPromise = window.gameApi?.openRouter?.getSelectedModel?.();
-    if (!keyPromise || !modelPromise) return;
-    rendererSharedState.backgroundRequestInFlight = true;
-    Promise.all([keyPromise, modelPromise]).then(([keyResult, modelId]) => {
-      if (!keyResult?.hasKey || !modelId?.trim()) {
-        rendererSharedState.backgroundRequestInFlight = false;
-        deps.appendOpenRouterLog("Run is on but API key or model not set.", true);
-        deps.updateReadyButtonState();
-        return;
-      }
-      if (!rendererSharedState.runButtonOn || !window.gameApi?.requestAiOrders) {
-        rendererSharedState.backgroundRequestInFlight = false;
-        deps.updateReadyButtonState();
-        return;
-      }
-      const enabledToolGroupsPayload = Array.from(rendererSharedState.enabledToolGroups).filter((id) => id !== "events");
-      const requestPromise = window.gameApi.requestAiOrders({ enabledToolGroups: enabledToolGroupsPayload });
-      const timeoutPromise = new Promise((_resolve, reject) => {
-        setTimeout(() => reject(new Error(`AI planning timed out after ${BACKGROUND_AI_REQUEST_TIMEOUT_MS}ms`)), BACKGROUND_AI_REQUEST_TIMEOUT_MS);
-      });
-      Promise.race([requestPromise, timeoutPromise]).then((result) => {
-        rendererSharedState.backgroundRequestInFlight = false;
-        if (rendererSharedState.useEventDrivenConsultation && !rendererSharedState.eventDrivenInitialConsultationDone) {
-          rendererSharedState.eventDrivenInitialConsultationDone = true;
-        }
-        if (rendererSharedState.runButtonOn && result.success) {
-          if (!rendererSharedState.tacticalBattleSnapshot && (result.tacticalBattle != null || result.tacticalOpponentPlan != null)) {
-            deps.appendOpenRouterLog("Discarded tactical prefetch (tactical session no longer active).", false);
-            deps.updateReadyButtonState();
-            return;
-          }
-          applySuccessfulPrecomputedAiResult(result);
-          if (rendererSharedState.tacticalBattleSnapshot && rendererSharedState.tacticalPhasePlanning && hasAiStrategyToastContent({ message: result.message, strategy: result.strategy })) {
-            deps.showAiStrategyToast({ message: result.message, strategy: result.strategy });
-          }
-          if (result.tacticalBattle) {
-            deps.requestRedraw?.();
-          }
-          if (result.toolInvocationCounts) {
-            rendererSharedState.precomputedToolInvocationCounts = { ...result.toolInvocationCounts };
-            for (const [groupId, count] of Object.entries(result.toolInvocationCounts)) {
-              rendererSharedState.toolInvocationCounts[groupId] = count;
-            }
-            deps.updateOpenRouterToolCountLabels();
-          } else {
-            rendererSharedState.precomputedToolInvocationCounts = null;
-          }
-          if (result.cost !== void 0) {
-            rendererSharedState.openRouterGameCost += result.cost;
-            deps.updateOpenRouterCostLabel();
-          }
-        } else if (!result.success) {
-          if (result.error === "Cancelled") {
-            startBackgroundRequestIfAllowed(deps);
-            if (!rendererSharedState.backgroundRequestInFlight) {
-              if (rendererSharedState.runButtonOn) {
-                deps.appendOpenRouterLog(
-                  "AI planning did not restart after the cancel; this beat proceeds without opponent orders.",
-                  true
-                );
-              }
-              unblockPrecomputedAiPlanningAfterBackgroundFailure();
-            }
-          } else {
-            deps.appendOpenRouterLog(`Background planning failed: ${result.error ?? "Unknown error"}`, true);
-            deps.showSidebarError(result.error ?? "Background AI request failed");
-            unblockPrecomputedAiPlanningAfterBackgroundFailure();
-          }
-        }
-        deps.updateReadyButtonState();
-      }).catch((err) => {
-        const msg = String(err);
-        const isAbort = isLikelyAbortError(err);
-        if (!isAbort) {
-          window.gameApi?.cancelRequestAiOrders?.();
-        }
-        rendererSharedState.backgroundRequestInFlight = false;
-        if (isAbort && rendererSharedState.tacticalBattleSnapshot && rendererSharedState.tacticalPhasePlanning) {
-          deps.appendOpenRouterLog("Tactical AI prefetch aborted.", false);
-          deps.updateReadyButtonState();
-          if (isWaitingForPrecomputedAiOrders()) {
-            startBackgroundRequestIfAllowed(deps);
-          }
-          return;
-        }
-        deps.appendOpenRouterLog(`Background planning request rejected: ${msg}`, true);
-        deps.showSidebarError(msg);
-        unblockPrecomputedAiPlanningAfterBackgroundFailure();
-        deps.updateReadyButtonState();
-      });
-    }).catch((err) => {
-      rendererSharedState.backgroundRequestInFlight = false;
-      deps.showSidebarError(String(err));
-      unblockPrecomputedAiPlanningAfterBackgroundFailure();
-      deps.updateReadyButtonState();
-    });
-  }
-  function handleEventDrivenModeTransition(deps, wasEventDriven) {
-    if (!rendererSharedState.runButtonOn || wasEventDriven === rendererSharedState.useEventDrivenConsultation) return;
-    window.gameApi?.cancelRequestAiOrders?.();
-    resetPrecomputedAiState("null");
-    rendererSharedState.eventDrivenInitialConsultationDone = false;
-    startBackgroundRequestIfAllowed(deps);
-  }
-  function renderOpenRouterToolsList(deps) {
-    const container = document.getElementById("openrouter-tools-list");
-    if (!container) return;
-    container.innerHTML = "";
-    for (const group of rendererSharedState.openRouterToolGroups) {
-      const cell = document.createElement("div");
-      cell.className = "openrouter-tool-cell";
-      const tip = toolGroupTooltipText(group.id);
-      if (tip) cell.setAttribute("data-control-tooltip", tip);
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "openrouter-tool-toggle";
-      btn.setAttribute("data-tool-group", group.id);
-      btn.setAttribute("aria-pressed", rendererSharedState.enabledToolGroups.has(group.id) ? "true" : "false");
-      btn.textContent = String(rendererSharedState.toolInvocationCounts[group.id] ?? 0);
-      btn.addEventListener("click", () => {
-        if (rendererSharedState.enabledToolGroups.has(group.id)) {
-          rendererSharedState.enabledToolGroups.delete(group.id);
-        } else {
-          rendererSharedState.enabledToolGroups.add(group.id);
-        }
-        btn.setAttribute("aria-pressed", rendererSharedState.enabledToolGroups.has(group.id) ? "true" : "false");
-        btn.textContent = String(rendererSharedState.toolInvocationCounts[group.id] ?? 0);
-        if (group.id === "events") {
-          const wasEventDriven = rendererSharedState.useEventDrivenConsultation;
-          syncEventDrivenFromTools();
-          handleEventDrivenModeTransition(deps, wasEventDriven);
-          deps.updateReadyButtonState();
-        }
-      });
-      cell.appendChild(btn);
-      const label = document.createElement("span");
-      label.className = "openrouter-tool-label";
-      label.textContent = group.label;
-      cell.appendChild(label);
-      container.appendChild(cell);
-    }
   }
 
   // src/shared/rangePerimeterModel.ts
@@ -28434,16 +28488,16 @@ ${bonuses}`;
     dropQueuedResolutionPlaybackCompleteNotifies();
   }
   function tacticalBattleExitTeardownTransientRendererState() {
-    cancelInFlightBackgroundAiRequestForRendererTeardown(OPEN_ROUTER_LOG_BACKGROUND_AI_CANCEL_TACTICAL_BATTLE_EXIT);
+    cancelInFlightBackgroundAiRequestForRendererTeardown();
     clearResolutionPlaybackAnimationState();
     rendererSharedState.pendingDeferredTacticalPostBeatConsult = false;
     clearPendingTacticalOrders();
     rendererSharedState.hideCommittedOrderLinesAfterReady = false;
   }
-  function tacticalReleaseRendererSessionForNewStrategicMatch(nextState) {
+  function tacticalReleaseRendererSessionForNewStrategicMatch(nextState, cancelOpponentPlanning = true) {
     closeTacticalAnnihilationOutcomeDialog();
     clearResolutionPlaybackAnimationState();
-    cancelTacticalScopedBackgroundPrefetchForSessionTeardown();
+    if (cancelOpponentPlanning) cancelTacticalScopedBackgroundPrefetchForSessionTeardown();
     rendererSharedState.pendingDeferredTacticalPostBeatConsult = false;
     rendererSharedState.tacticalBattleSnapshot = null;
     rendererSharedState.tacticalOpponentDraft = null;
@@ -29993,6 +30047,19 @@ ${bonuses}`;
     setLoadedStrategicFootprint(state.hexes.map((hex) => hex.h3Index), roles);
   }
 
+  // src/renderer/core/matchEpoch.ts
+  var rendererMatchEpoch = 0;
+  function advanceRendererMatchEpoch() {
+    rendererMatchEpoch += 1;
+    return rendererMatchEpoch;
+  }
+  function currentRendererMatchEpoch() {
+    return rendererMatchEpoch;
+  }
+  function rendererMatchEpochCurrent(captured) {
+    return captured === rendererMatchEpoch;
+  }
+
   // src/renderer/gameplay/newGame.ts
   function registerRegionRandomizeButtons() {
     document.getElementById("new-game-human-region-randomize")?.addEventListener("click", () => {
@@ -30033,6 +30100,7 @@ ${bonuses}`;
     registerNewGameOptionSeparators();
     document.getElementById("new-game-btn")?.addEventListener("click", async () => {
       if (!window.gameApi?.newGame) return;
+      const matchEpoch = advanceRendererMatchEpoch();
       if (regionalStartBlocked()) {
         showMapToast("This map has no two sides.");
         return;
@@ -30048,6 +30116,7 @@ ${bonuses}`;
           ...readNewGameMapChoice(),
           gameSize: readSelectedGameSizeFromDocument()
         });
+        if (!rendererMatchEpochCurrent(matchEpoch)) return;
         installRendererGameMap(state);
         await deps.refreshTacticalTerrainOverridesForRenderer({ reloadStaticOverlays: true });
         rendererSharedState.gameState = state;
@@ -30100,8 +30169,13 @@ ${bonuses}`;
     });
   }
   function openNewGameOverlayFromModelTab(setMainUIControlsEnabled2, updateReadyButtonState2) {
-    if (rendererSharedState.tacticalBattleSnapshot != null || rendererSharedState.resolutionMoveAnimation != null) return false;
-    window.gameApi?.cancelRequestAiOrders?.();
+    if (rendererSharedState.tacticalAnnihilationOutcomeDialog != null) return false;
+    advanceRendererMatchEpoch();
+    void stopOpponentPlanning("new_game");
+    clearResolutionPlaybackAnimationState();
+    if (rendererSharedState.tacticalBattleSnapshot && rendererSharedState.gameState) {
+      tacticalReleaseRendererSessionForNewStrategicMatch(rendererSharedState.gameState, false);
+    }
     resetPrecomputedAiState("null");
     rendererSharedState.pendingDeferredStrategicPostResolutionConsult = false;
     rendererSharedState.pendingDeferredTacticalPostBeatConsult = false;
@@ -30109,12 +30183,8 @@ ${bonuses}`;
     rendererSharedState.readyRequestInFlight = false;
     rendererSharedState.eventDrivenInitialConsultationDone = false;
     const overlay = document.getElementById("game-over-overlay");
-    const messageEl = document.getElementById("game-over-message");
     const newGameBtn = document.getElementById("new-game-btn");
-    if (messageEl) {
-      messageEl.textContent = "Start a new world map game when ready.";
-      messageEl.style.display = "";
-    }
+    showNewGameBanner("newGame", selectedNewGameTab());
     if (newGameBtn) {
       newGameBtn.textContent = "Start game";
       newGameBtn.setAttribute("data-control-tooltip", newGameButtonTooltipText(true));
@@ -30180,15 +30250,19 @@ ${bonuses}`;
   async function tacticalPerformBattleExit(session, io) {
     const boundary = tacticalBoundaryPlanningExitAllowed(session.getBattleSnapshot(), session.getPhasePlanning());
     if (!boundary.ok) return;
+    const matchEpoch = currentRendererMatchEpoch();
+    invalidateBackgroundAiRequest();
     try {
       if (io.endTacticalBattle) {
         await io.endTacticalBattle();
       }
     } catch (err) {
       console.error("endTacticalBattle failed:", err);
+      if (!rendererMatchEpochCurrent(matchEpoch)) return;
       io.showMapToast("Could not exit tactical battle.", { isError: true });
       return;
     }
+    if (!rendererMatchEpochCurrent(matchEpoch)) return;
     tacticalBattleExitTeardownTransientRendererState();
     session.setBattleSnapshot(null);
     closeTacticalAnnihilationOutcomeDialog();
@@ -30204,10 +30278,12 @@ ${bonuses}`;
     } catch (err) {
       console.error("refreshStrategicSnapshotAfterExit failed:", err);
     }
+    if (!rendererMatchEpochCurrent(matchEpoch)) return;
     updateGameStateSidebar(rendererSharedState.gameState);
     restoreStrategicOrderDraftsAfterTacticalSession();
     io.refreshSidebarAfterTacticalDraftTeardown?.();
     io.redraw();
+    if (!rendererMatchEpochCurrent(matchEpoch)) return;
     await io.runReadyAfterExit();
   }
 
@@ -30292,9 +30368,11 @@ ${bonuses}`;
     };
   }
   async function startTacticalBattleFromEntryHex(enclosingStrategicH3Index, deps) {
+    const matchEpoch = currentRendererMatchEpoch();
     if (deps.prepareStrategicUiBeforeTacticalStart) {
       await deps.prepareStrategicUiBeforeTacticalStart();
     }
+    if (!rendererMatchEpochCurrent(matchEpoch)) return;
     const resumedSession = rendererSharedState.gameState?.tacticalBattleSession && rendererSharedState.gameState.tacticalBattleSession.enclosingStrategicH3Index === enclosingStrategicH3Index && !rendererSharedState.tacticalBattleSnapshot ? rendererSharedState.gameState.tacticalBattleSession : null;
     if (resumedSession) {
       deps.hideBuildPopup();
@@ -30308,6 +30386,7 @@ ${bonuses}`;
     }
     deps.hideBuildPopup();
     const result = await ipc({ enclosingStrategicH3Index });
+    if (!rendererMatchEpochCurrent(matchEpoch)) return;
     tacticalRendererApplyStartBattleIpcResult(result, deps.getActivationSideEffects());
   }
   function activateRestoredTacticalBattleFromMainSnapshot(battle, getActivationSideEffects) {
@@ -31150,6 +31229,24 @@ ${bonuses}`;
     return { handleBuildEntryClick: handleBuildEntryClick2, hideBuildPopup: hideBuildPopup3, showBuildPopup: showBuildPopup2, refreshBuildPopupIfOpen: refreshBuildPopupIfOpen2 };
   }
 
+  // src/renderer/gameplay/tacticalBattlePromptPreference.ts
+  var STORAGE_KEY = "agentWars.tacticalBattlesInterceptPrompt";
+  function readTacticalBattlesInterceptPromptEnabled() {
+    try {
+      const v = localStorage.getItem(STORAGE_KEY);
+      if (v === null) return true;
+      return v !== "0" && v !== "false";
+    } catch {
+      return true;
+    }
+  }
+  function writeTacticalBattlesInterceptPromptEnabled(enabled) {
+    try {
+      localStorage.setItem(STORAGE_KEY, enabled ? "1" : "0");
+    } catch {
+    }
+  }
+
   // src/shared/ipc/tacticalOpponentPlanMerge.ts
   function tacticalOpponentPlanPayloadHasAnyOrders(plan) {
     if (plan == null) return false;
@@ -31194,230 +31291,6 @@ ${bonuses}`;
     deps.appendOpenRouterLog("Tactical post-beat consultation applied.", false);
     deps.redraw();
     deps.updateReadyButtonState();
-  }
-
-  // src/shared/pendingMovementSidebarLabels.ts
-  var TACTICAL_DRAFT_MARCH_DISPLAY_STATUS = "en_route";
-  function formatPendingMovementSidebarTargetLabel(distanceHexSteps, orderStatus) {
-    return `${distanceHexSteps}h (${orderStatus})`;
-  }
-  function formatTacticalDraftMarchPendingOrderTargetLabel(battle, subUnitId, destinationH3Index) {
-    const origin = battle.subUnits.find((u) => u.id === subUnitId)?.h3Index;
-    if (!origin) return formatPendingMovementSidebarTargetLabel(0, TACTICAL_DRAFT_MARCH_DISPLAY_STATUS);
-    try {
-      const steps = gridDistance(origin, destinationH3Index);
-      return formatPendingMovementSidebarTargetLabel(steps, TACTICAL_DRAFT_MARCH_DISPLAY_STATUS);
-    } catch {
-      return formatPendingMovementSidebarTargetLabel(0, TACTICAL_DRAFT_MARCH_DISPLAY_STATUS);
-    }
-  }
-
-  // src/renderer/gameplay/sidebarSupport.ts
-  function estimateHexesLeftForOrder(order) {
-    if (!Array.isArray(order.routeSegments) || order.routeSegments.length === 0) return 0;
-    let total = 0;
-    for (const segment of order.routeSegments) {
-      if (!Array.isArray(segment.hexes) || segment.hexes.length < 2) continue;
-      total += Math.max(0, segment.hexes.length - 1);
-    }
-    return total;
-  }
-  function isPendingMovementOrderForDisplay(order) {
-    return estimateHexesLeftForOrder(order) > 0;
-  }
-  function applySelectionFromSidebarUnitButton(unitId, event, deps) {
-    if (shouldBlockEmbarkedLandUnitSelect(unitId)) return;
-    const useMultiSelect = event.shiftKey || rendererSharedState.shiftKeyActive;
-    if (useMultiSelect) {
-      if (shouldBlockToggleSelectionDuringHoverPlanning(unitId)) return;
-      deps.toggleUnitSelection(unitId);
-    } else {
-      if (shouldBlockSelectionReplaceDuringHoverPlanning([unitId])) return;
-      deps.replaceSelection([unitId]);
-    }
-    deps.syncUiAfterSelectionChange();
-  }
-  function formatUnitArrowLabel(unitId, targetLabel, formatUnitDisplayName3) {
-    return `${formatUnitDisplayName3(unitId)} \u2192 ${targetLabel}`;
-  }
-  function formatPendingOrderSidebarLabel(order, formatUnitArrowLabelFn) {
-    return formatUnitArrowLabelFn(
-      order.unitId,
-      formatPendingMovementSidebarTargetLabel(estimateHexesLeftForOrder(order), order.status)
-    );
-  }
-  function formatKillToastLine(kill, formatDisplayUnitName) {
-    const killers = kill.killerIds.map((unitId) => formatDisplayUnitName(unitId)).join(", ");
-    return `${killers} destroyed ${formatDisplayUnitName(kill.victimId)}`;
-  }
-  function buildTacticalSubUnitKillLabelOverlay(args) {
-    const byId = /* @__PURE__ */ new Map();
-    for (const row of args.subUnitsBeforeCommit ?? []) {
-      byId.set(row.id, row.displayName);
-    }
-    for (const row of args.subUnitsAfterCommit ?? []) {
-      byId.set(row.id, row.displayName);
-    }
-    for (const u of args.removedUnits ?? []) {
-      if (u.displayName) byId.set(u.id, u.displayName);
-    }
-    return [...byId.entries()].map(([id, displayName]) => ({ id, displayName }));
-  }
-  function buildKillToastFormatterBundle(state, removedUnits, tacticalSubUnitsForKillLabels, killLabelUnits) {
-    const removedUnitsForDisplay = removedUnits ?? [];
-    const rosterFromRemoved = removedUnitsForDisplay.filter((u) => !u.displayName).map((u) => ({
-      id: u.id,
-      player: u.player,
-      unitType: u.unitType,
-      displayOrder: u.displayOrder
-    }));
-    const rosterById = /* @__PURE__ */ new Map();
-    for (const unit of state.units ?? []) {
-      rosterById.set(unit.id, {
-        id: unit.id,
-        unitType: unit.unitType,
-        displayOrder: unit.displayOrder,
-        player: unit.player
-      });
-    }
-    for (const unit of rosterFromRemoved) {
-      if (rosterById.has(unit.id)) continue;
-      rosterById.set(unit.id, {
-        id: unit.id,
-        unitType: unit.unitType,
-        displayOrder: unit.displayOrder,
-        player: unit.player
-      });
-    }
-    for (const unit of killLabelUnits ?? []) {
-      if (rosterById.has(unit.id)) continue;
-      rosterById.set(unit.id, unit);
-    }
-    const rosterForDisplay = [...rosterById.values()];
-    const displayNameById = buildUnitDisplayNameLookup(rosterForDisplay);
-    for (const u of removedUnitsForDisplay) {
-      if (u.displayName) displayNameById.set(u.id, u.displayName);
-    }
-    for (const row of tacticalSubUnitsForKillLabels ?? []) {
-      displayNameById.set(row.id, row.displayName);
-    }
-    const formatDisplayUnitName = (unitId) => displayNameById.get(unitId) ?? rendererSharedState.unitDisplayNameById.get(unitId) ?? fallbackDisplayNameFromUnitId(unitId);
-    const formatKillLine = (kill) => formatKillToastLine(kill, formatDisplayUnitName);
-    return { formatUnitName: formatDisplayUnitName, formatKillLine };
-  }
-  function syncUiAfterSelectionChange2(deps, options = {}) {
-    if (options.refreshHoverPreview !== false) {
-      void deps.refreshHoverRoutePreview();
-    }
-    deps.updateSidebar();
-    deps.updatePendingOrdersSidebar();
-    deps.updateRangedSidebar();
-    if (options.refreshStackCallout !== false) {
-      deps.refreshStackCalloutIfOpen();
-    }
-    deps.redraw();
-  }
-  function updatePendingOrdersSidebar2(deps) {
-    const container = document.getElementById("pending-orders-list");
-    if (!container) return;
-    container.innerHTML = "";
-    if (rendererSharedState.tacticalBattleSnapshot) {
-      if (rendererSharedState.tacticalPendingMarches.length === 0 && rendererSharedState.pendingFerryOrders.length === 0) {
-        appendMutedPlaceholder(container, "None");
-        return;
-      }
-      for (const row of rendererSharedState.tacticalPendingMarches) {
-        const rowEl = deps.createSidebarOrderRow({
-          labelText: deps.formatUnitArrowLabel(
-            row.subUnitId,
-            formatTacticalDraftMarchPendingOrderTargetLabel(rendererSharedState.tacticalBattleSnapshot, row.subUnitId, row.destinationH3Index)
-          ),
-          unitId: row.subUnitId,
-          selected: rendererSharedState.selectedUnitIds.includes(row.subUnitId),
-          onToggleSelect: (event) => deps.applySelectionFromSidebarUnitButton(row.subUnitId, event),
-          onCancel: () => {
-            rendererSharedState.tacticalPendingMarches = rendererSharedState.tacticalPendingMarches.filter((r) => r.subUnitId !== row.subUnitId);
-            deps.updatePendingOrdersSidebar?.();
-            deps.redraw?.();
-          },
-          compactBlueButtons: true
-        });
-        container.appendChild(rowEl);
-      }
-      for (const ferry of rendererSharedState.pendingFerryOrders) {
-        const rowEl = deps.createSidebarOrderRow({
-          labelText: deps.formatUnitArrowLabel(
-            ferry.unitId,
-            formatPendingFerryOrderSidebarLabel(rendererSharedState.gameState, ferry, rendererSharedState.tacticalBattleSnapshot.subUnits)
-          ),
-          unitId: ferry.unitId,
-          selected: rendererSharedState.selectedUnitIds.includes(ferry.unitId),
-          onToggleSelect: (event) => deps.applySelectionFromSidebarUnitButton(ferry.unitId, event),
-          onCancel: () => {
-            deps.cancelFerryForUnit(ferry.unitId);
-            deps.refreshStackCalloutIfOpen?.();
-          },
-          compactBlueButtons: true
-        });
-        container.appendChild(rowEl);
-      }
-      return;
-    }
-    const pendingOrders = rendererSharedState.humanStandingOrders.filter((order) => deps.isPendingMovementOrderForDisplay(order));
-    if (pendingOrders.length === 0 && rendererSharedState.pendingFerryOrders.length === 0) {
-      appendMutedPlaceholder(container, "None");
-      return;
-    }
-    for (const order of pendingOrders) {
-      const row = deps.createSidebarOrderRow({
-        labelText: deps.formatPendingOrderSidebarLabel(order),
-        unitId: order.unitId,
-        selected: rendererSharedState.selectedUnitIds.includes(order.unitId),
-        onToggleSelect: (event) => deps.applySelectionFromSidebarUnitButton(order.unitId, event),
-        onCancel: () => {
-          void deps.cancelOrderForUnit(order.unitId);
-        },
-        compactBlueButtons: true
-      });
-      container.appendChild(row);
-    }
-    for (const ferry of rendererSharedState.pendingFerryOrders) {
-      const row = deps.createSidebarOrderRow({
-        labelText: deps.formatUnitArrowLabel(ferry.unitId, formatPendingFerryOrderSidebarLabel(rendererSharedState.gameState, ferry)),
-        unitId: ferry.unitId,
-        selected: rendererSharedState.selectedUnitIds.includes(ferry.unitId),
-        onToggleSelect: (event) => deps.applySelectionFromSidebarUnitButton(ferry.unitId, event),
-        onCancel: () => deps.cancelFerryForUnit(ferry.unitId),
-        compactBlueButtons: true
-      });
-      container.appendChild(row);
-    }
-  }
-  function showSidebarError(message, showMapToast2, clearSidebarError2) {
-    showMapToast2(message, { isError: true });
-    clearSidebarError2();
-  }
-  function clearSidebarError() {
-    const el = document.getElementById("sidebar-error");
-    if (el) el.style.display = "none";
-  }
-
-  // src/renderer/gameplay/tacticalBattlePromptPreference.ts
-  var STORAGE_KEY = "agentWars.tacticalBattlesInterceptPrompt";
-  function readTacticalBattlesInterceptPromptEnabled() {
-    try {
-      const v = localStorage.getItem(STORAGE_KEY);
-      if (v === null) return true;
-      return v !== "0" && v !== "false";
-    } catch {
-      return true;
-    }
-  }
-  function writeTacticalBattlesInterceptPromptEnabled(enabled) {
-    try {
-      localStorage.setItem(STORAGE_KEY, enabled ? "1" : "0");
-    } catch {
-    }
   }
 
   // src/shared/marchPathHelpers.ts
@@ -31861,6 +31734,412 @@ ${bonuses}`;
     }
   }
 
+  // src/shared/pendingMovementSidebarLabels.ts
+  var TACTICAL_DRAFT_MARCH_DISPLAY_STATUS = "en_route";
+  function formatPendingMovementSidebarTargetLabel(distanceHexSteps, orderStatus) {
+    return `${distanceHexSteps}h (${orderStatus})`;
+  }
+  function formatTacticalDraftMarchPendingOrderTargetLabel(battle, subUnitId, destinationH3Index) {
+    const origin = battle.subUnits.find((u) => u.id === subUnitId)?.h3Index;
+    if (!origin) return formatPendingMovementSidebarTargetLabel(0, TACTICAL_DRAFT_MARCH_DISPLAY_STATUS);
+    try {
+      const steps = gridDistance(origin, destinationH3Index);
+      return formatPendingMovementSidebarTargetLabel(steps, TACTICAL_DRAFT_MARCH_DISPLAY_STATUS);
+    } catch {
+      return formatPendingMovementSidebarTargetLabel(0, TACTICAL_DRAFT_MARCH_DISPLAY_STATUS);
+    }
+  }
+
+  // src/renderer/gameplay/sidebarSupport.ts
+  function estimateHexesLeftForOrder(order) {
+    if (!Array.isArray(order.routeSegments) || order.routeSegments.length === 0) return 0;
+    let total = 0;
+    for (const segment of order.routeSegments) {
+      if (!Array.isArray(segment.hexes) || segment.hexes.length < 2) continue;
+      total += Math.max(0, segment.hexes.length - 1);
+    }
+    return total;
+  }
+  function isPendingMovementOrderForDisplay(order) {
+    return estimateHexesLeftForOrder(order) > 0;
+  }
+  function applySelectionFromSidebarUnitButton(unitId, event, deps) {
+    if (shouldBlockEmbarkedLandUnitSelect(unitId)) return;
+    const useMultiSelect = event.shiftKey || rendererSharedState.shiftKeyActive;
+    if (useMultiSelect) {
+      if (shouldBlockToggleSelectionDuringHoverPlanning(unitId)) return;
+      deps.toggleUnitSelection(unitId);
+    } else {
+      if (shouldBlockSelectionReplaceDuringHoverPlanning([unitId])) return;
+      deps.replaceSelection([unitId]);
+    }
+    deps.syncUiAfterSelectionChange();
+  }
+  function formatUnitArrowLabel(unitId, targetLabel, formatUnitDisplayName3) {
+    return `${formatUnitDisplayName3(unitId)} \u2192 ${targetLabel}`;
+  }
+  function formatPendingOrderSidebarLabel(order, formatUnitArrowLabelFn) {
+    return formatUnitArrowLabelFn(
+      order.unitId,
+      formatPendingMovementSidebarTargetLabel(estimateHexesLeftForOrder(order), order.status)
+    );
+  }
+  function formatKillToastLine(kill, formatDisplayUnitName) {
+    const killers = kill.killerIds.map((unitId) => formatDisplayUnitName(unitId)).join(", ");
+    return `${killers} destroyed ${formatDisplayUnitName(kill.victimId)}`;
+  }
+  function buildTacticalSubUnitKillLabelOverlay(args) {
+    const byId = /* @__PURE__ */ new Map();
+    for (const row of args.subUnitsBeforeCommit ?? []) {
+      byId.set(row.id, row.displayName);
+    }
+    for (const row of args.subUnitsAfterCommit ?? []) {
+      byId.set(row.id, row.displayName);
+    }
+    for (const u of args.removedUnits ?? []) {
+      if (u.displayName) byId.set(u.id, u.displayName);
+    }
+    return [...byId.entries()].map(([id, displayName]) => ({ id, displayName }));
+  }
+  function buildKillToastFormatterBundle(state, removedUnits, tacticalSubUnitsForKillLabels, killLabelUnits) {
+    const removedUnitsForDisplay = removedUnits ?? [];
+    const rosterFromRemoved = removedUnitsForDisplay.filter((u) => !u.displayName).map((u) => ({
+      id: u.id,
+      player: u.player,
+      unitType: u.unitType,
+      displayOrder: u.displayOrder
+    }));
+    const rosterById = /* @__PURE__ */ new Map();
+    for (const unit of state.units ?? []) {
+      rosterById.set(unit.id, {
+        id: unit.id,
+        unitType: unit.unitType,
+        displayOrder: unit.displayOrder,
+        player: unit.player
+      });
+    }
+    for (const unit of rosterFromRemoved) {
+      if (rosterById.has(unit.id)) continue;
+      rosterById.set(unit.id, {
+        id: unit.id,
+        unitType: unit.unitType,
+        displayOrder: unit.displayOrder,
+        player: unit.player
+      });
+    }
+    for (const unit of killLabelUnits ?? []) {
+      if (rosterById.has(unit.id)) continue;
+      rosterById.set(unit.id, unit);
+    }
+    const rosterForDisplay = [...rosterById.values()];
+    const displayNameById = buildUnitDisplayNameLookup(rosterForDisplay);
+    for (const u of removedUnitsForDisplay) {
+      if (u.displayName) displayNameById.set(u.id, u.displayName);
+    }
+    for (const row of tacticalSubUnitsForKillLabels ?? []) {
+      displayNameById.set(row.id, row.displayName);
+    }
+    const formatDisplayUnitName = (unitId) => displayNameById.get(unitId) ?? rendererSharedState.unitDisplayNameById.get(unitId) ?? fallbackDisplayNameFromUnitId(unitId);
+    const formatKillLine = (kill) => formatKillToastLine(kill, formatDisplayUnitName);
+    return { formatUnitName: formatDisplayUnitName, formatKillLine };
+  }
+  function syncUiAfterSelectionChange2(deps, options = {}) {
+    if (options.refreshHoverPreview !== false) {
+      void deps.refreshHoverRoutePreview();
+    }
+    deps.updateSidebar();
+    deps.updatePendingOrdersSidebar();
+    deps.updateRangedSidebar();
+    if (options.refreshStackCallout !== false) {
+      deps.refreshStackCalloutIfOpen();
+    }
+    deps.redraw();
+  }
+  function updatePendingOrdersSidebar2(deps) {
+    const container = document.getElementById("pending-orders-list");
+    if (!container) return;
+    container.innerHTML = "";
+    if (rendererSharedState.tacticalBattleSnapshot) {
+      if (rendererSharedState.tacticalPendingMarches.length === 0 && rendererSharedState.pendingFerryOrders.length === 0) {
+        appendMutedPlaceholder(container, "None");
+        return;
+      }
+      for (const row of rendererSharedState.tacticalPendingMarches) {
+        const rowEl = deps.createSidebarOrderRow({
+          labelText: deps.formatUnitArrowLabel(
+            row.subUnitId,
+            formatTacticalDraftMarchPendingOrderTargetLabel(rendererSharedState.tacticalBattleSnapshot, row.subUnitId, row.destinationH3Index)
+          ),
+          unitId: row.subUnitId,
+          selected: rendererSharedState.selectedUnitIds.includes(row.subUnitId),
+          onToggleSelect: (event) => deps.applySelectionFromSidebarUnitButton(row.subUnitId, event),
+          onCancel: () => {
+            rendererSharedState.tacticalPendingMarches = rendererSharedState.tacticalPendingMarches.filter((r) => r.subUnitId !== row.subUnitId);
+            deps.updatePendingOrdersSidebar?.();
+            deps.redraw?.();
+          },
+          compactBlueButtons: true
+        });
+        container.appendChild(rowEl);
+      }
+      for (const ferry of rendererSharedState.pendingFerryOrders) {
+        const rowEl = deps.createSidebarOrderRow({
+          labelText: deps.formatUnitArrowLabel(
+            ferry.unitId,
+            formatPendingFerryOrderSidebarLabel(rendererSharedState.gameState, ferry, rendererSharedState.tacticalBattleSnapshot.subUnits)
+          ),
+          unitId: ferry.unitId,
+          selected: rendererSharedState.selectedUnitIds.includes(ferry.unitId),
+          onToggleSelect: (event) => deps.applySelectionFromSidebarUnitButton(ferry.unitId, event),
+          onCancel: () => {
+            deps.cancelFerryForUnit(ferry.unitId);
+            deps.refreshStackCalloutIfOpen?.();
+          },
+          compactBlueButtons: true
+        });
+        container.appendChild(rowEl);
+      }
+      return;
+    }
+    const pendingOrders = rendererSharedState.humanStandingOrders.filter((order) => deps.isPendingMovementOrderForDisplay(order));
+    if (pendingOrders.length === 0 && rendererSharedState.pendingFerryOrders.length === 0) {
+      appendMutedPlaceholder(container, "None");
+      return;
+    }
+    for (const order of pendingOrders) {
+      const row = deps.createSidebarOrderRow({
+        labelText: deps.formatPendingOrderSidebarLabel(order),
+        unitId: order.unitId,
+        selected: rendererSharedState.selectedUnitIds.includes(order.unitId),
+        onToggleSelect: (event) => deps.applySelectionFromSidebarUnitButton(order.unitId, event),
+        onCancel: () => {
+          void deps.cancelOrderForUnit(order.unitId);
+        },
+        compactBlueButtons: true
+      });
+      container.appendChild(row);
+    }
+    for (const ferry of rendererSharedState.pendingFerryOrders) {
+      const row = deps.createSidebarOrderRow({
+        labelText: deps.formatUnitArrowLabel(ferry.unitId, formatPendingFerryOrderSidebarLabel(rendererSharedState.gameState, ferry)),
+        unitId: ferry.unitId,
+        selected: rendererSharedState.selectedUnitIds.includes(ferry.unitId),
+        onToggleSelect: (event) => deps.applySelectionFromSidebarUnitButton(ferry.unitId, event),
+        onCancel: () => deps.cancelFerryForUnit(ferry.unitId),
+        compactBlueButtons: true
+      });
+      container.appendChild(row);
+    }
+  }
+  function showSidebarError(message, showMapToast2, clearSidebarError2) {
+    showMapToast2(message, { isError: true });
+    clearSidebarError2();
+  }
+  function clearSidebarError() {
+    const el = document.getElementById("sidebar-error");
+    if (el) el.style.display = "none";
+  }
+
+  // src/renderer/gameplay/readyTacticalCommit.ts
+  function rollbackReadyToolCounts(deps, snapshot) {
+    rendererSharedState.toolInvocationCounts = snapshot;
+    deps.updateOpenRouterToolCountLabels();
+  }
+  async function runTacticalReadyCommit(context) {
+    const { deps, toolCountsBeforeReadyClick, cachedPrecomputedToolCountsAtReadyStart, matchEpoch } = context;
+    if (!(rendererSharedState.tacticalBattleSnapshot && rendererSharedState.tacticalPhasePlanning)) return false;
+    if (!window.gameApi) return true;
+    const commit = window.gameApi.commitHumanTacticalDraftOrders;
+    if (!commit) {
+      rollbackReadyToolCounts(deps, toolCountsBeforeReadyClick);
+      deps.showSidebarError("Tactical commit is not available in this build.");
+      deps.updateReadyButtonState();
+      return true;
+    }
+    const livingSubUnitIds = new Set(rendererSharedState.tacticalBattleSnapshot.subUnits.map((u) => u.id));
+    rendererSharedState.tacticalPendingMarches = rendererSharedState.tacticalPendingMarches.filter(
+      (row) => livingSubUnitIds.has(row.subUnitId)
+    );
+    const movementOrders = rendererSharedState.tacticalPendingMarches.map((r) => ({
+      unitId: r.subUnitId,
+      toH3Index: r.destinationH3Index
+    }));
+    const commitResult = await commit({
+      movementOrders,
+      rangedAttacks: [...rendererSharedState.pendingRangedAttacks],
+      airStrikes: [...rendererSharedState.pendingAirStrikes],
+      ferryOrders: [...rendererSharedState.pendingFerryOrders],
+      embarkOrders: [...rendererSharedState.pendingEmbarkOrders],
+      ...rendererSharedState.tacticalOpponentDraft && tacticalOpponentPlanPayloadHasAnyOrders(rendererSharedState.tacticalOpponentDraft) ? { opponentTacticalDraft: rendererSharedState.tacticalOpponentDraft } : {},
+      useEventDrivenConsultation: rendererSharedState.useEventDrivenConsultation,
+      aiPlanningRunEnabled: rendererSharedState.runButtonOn
+    });
+    if (!rendererMatchEpochCurrent(matchEpoch)) return true;
+    if (!commitResult.success) {
+      rollbackReadyToolCounts(deps, toolCountsBeforeReadyClick);
+      deps.showSidebarError(commitResult.reason ?? "Tactical commit failed");
+      deps.updateReadyButtonState();
+      return true;
+    }
+    const tacticalSubUnitsBeforeCommit = rendererSharedState.tacticalBattleSnapshot?.subUnits;
+    const playback = commitResult.tacticalResolutionPlayback;
+    const hasMoves = (playback?.humanMoves?.length ?? 0) > 0 || (playback?.opponentMoves?.length ?? 0) > 0;
+    const hasRangedPlayback = (playback?.rangedCombatHexes?.length ?? 0) > 0 || (playback?.rangedCasualtyHexes?.length ?? 0) > 0 || (playback?.rangedRemovedUnits?.length ?? 0) > 0;
+    const hasMeleePlayback = (playback?.meleeCombatHexes?.length ?? 0) > 0 || (playback?.meleeCasualtyHexes?.length ?? 0) > 0 || (playback?.meleeRemovedUnits?.length ?? 0) > 0 || (playback?.killsByMelee?.length ?? 0) > 0;
+    const hasKillPlayback = (playback?.killsByDirectFire?.length ?? 0) > 0 || (playback?.killsByAirStrike?.length ?? 0) > 0 || (playback?.killsByReturnFire?.length ?? 0) > 0 || (playback?.killsByMelee?.length ?? 0) > 0;
+    const hasAirStrikePlaybackAnim = (playback?.airStrikeAttemptCount ?? 0) > 0 || (playback?.airStrikeMoves?.length ?? 0) > 0 || (playback?.airStrikeHexes?.length ?? 0) > 0 || (playback?.airStrikeCasualtyHexes?.length ?? 0) > 0;
+    const needsResolutionPlayback = hasMoves || hasRangedPlayback || hasMeleePlayback || hasKillPlayback || hasAirStrikePlaybackAnim;
+    if (playback && needsResolutionPlayback) {
+      if (rendererSharedState.resolutionMoveAnimationFrameId !== null) cancelAnimationFrame(rendererSharedState.resolutionMoveAnimationFrameId);
+      rendererSharedState.resolutionMoveAnimationFrameId = null;
+      const tacticalMarchPlaybackUnits = tacticalSubUnitsBeforeCommit?.length ? tacticalSubUnitsBeforeCommit.map((u) => ({
+        id: u.id,
+        player: u.player,
+        unitType: u.unitType,
+        h3Index: u.h3Index
+      })) : void 0;
+      const airStrikeOutboundMoves = deps.buildAirStrikeOutboundPlaybackMoves(playback.airStrikeMoves);
+      const airStrikeReturnMoves = deps.buildAirStrikeReturnPlaybackMoves(playback.airStrikeMoves);
+      rendererSharedState.resolutionMoveAnimation = {
+        moves: [...playback.humanMoves, ...playback.opponentMoves ?? []],
+        startTime: Date.now(),
+        tacticalDeferResolutionClock: true,
+        ...tacticalMarchPlaybackUnits ? { tacticalMarchPlaybackUnits } : {},
+        ...airStrikeOutboundMoves.length > 0 ? { airStrikeOutboundMoves } : {},
+        ...airStrikeReturnMoves.length > 0 ? { airStrikeReturnMoves } : {},
+        ...playback.airStrikeHexes?.length ? { airStrikeCombatHexes: playback.airStrikeHexes } : {},
+        ...playback.airStrikeCasualtyHexes?.length ? { airStrikeCasualtyHexes: playback.airStrikeCasualtyHexes } : {},
+        ...playback.airStrikeRemovedUnits?.length ? { airStrikeRemovedUnits: playback.airStrikeRemovedUnits } : {},
+        rangedCombatHexes: playback.rangedCombatHexes,
+        rangedCasualtyHexes: playback.rangedCasualtyHexes,
+        rangedRemovedUnits: playback.rangedRemovedUnits,
+        ...playback.rangedResolutionShotLines?.length ? { rangedResolutionShotLines: playback.rangedResolutionShotLines } : {},
+        meleeCombatHexes: playback.meleeCombatHexes?.length ? playback.meleeCombatHexes : void 0,
+        meleeCasualtyHexes: playback.meleeCasualtyHexes?.length ? playback.meleeCasualtyHexes : void 0,
+        meleeRemovedUnits: playback.meleeRemovedUnits?.length ? playback.meleeRemovedUnits : void 0,
+        ...pickPlaybackDiceRolls(playback)
+      };
+    }
+    if (commitResult.tacticalBattle) {
+      rendererSharedState.tacticalBattleSnapshot = commitResult.tacticalBattle;
+    }
+    if (rendererSharedState.resolutionMoveAnimation != null && rendererSharedState.tacticalBattleSnapshot != null) {
+      deps.updateGameStateSidebar(rendererSharedState.gameState);
+      deps.syncTacticalExitButton?.();
+    }
+    reconcileSelectionToCurrentState();
+    if ("committedOpponentTacticalDraft" in commitResult) {
+      rendererSharedState.tacticalOpponentDraft = null;
+    }
+    if (commitResult.tacticalPostBeatConsultDeferred) {
+      rendererSharedState.pendingDeferredTacticalPostBeatConsult = true;
+      rendererSharedState.deferredResolutionConsultNotifySent = false;
+    }
+    if (!commitResult.tacticalPostBeatConsultDeferred && isTacticalPostBeatConsultOnCommit(commitResult)) {
+      applyTacticalPostBeatConsultSideEffects(commitResult, deps);
+    } else if (!commitResult.tacticalPostBeatConsultDeferred) {
+      if ("tacticalOpponentPlan" in commitResult) {
+        rendererSharedState.tacticalOpponentDraft = commitResult.tacticalOpponentPlan ?? null;
+      }
+      deps.showAiStrategyToast({ message: commitResult.aiMessage, strategy: commitResult.aiStrategy });
+    }
+    applyToolInvocationCountsAfterReady({
+      fromResult: commitResult.toolInvocationCounts,
+      cachedPrecomputed: cachedPrecomputedToolCountsAtReadyStart,
+      allowPrecomputedFallback: rendererSharedState.runButtonOn && cachedPrecomputedToolCountsAtReadyStart != null
+    });
+    const previousPendingMarches = new Map(rendererSharedState.tacticalPendingMarches.map((row) => [row.subUnitId, row]));
+    rendererSharedState.tacticalPendingMarches = commitResult.tacticalMarchContinuations?.length ? buildTacticalPendingMarchRowsFromContinuations({
+      battle: commitResult.tacticalBattle ?? rendererSharedState.tacticalBattleSnapshot,
+      continuations: commitResult.tacticalMarchContinuations,
+      previousBySubUnitId: previousPendingMarches
+    }) : [];
+    rendererSharedState.pendingRangedAttacks = [];
+    rendererSharedState.pendingAirStrikes = [];
+    rendererSharedState.pendingFerryOrders = [];
+    rendererSharedState.pendingEmbarkOrders = [];
+    rendererSharedState.rangedModeActive = false;
+    rendererSharedState.airStrikeModeActive = false;
+    if (window.gameApi?.getGameState) {
+      try {
+        const refreshedStrategic = await window.gameApi.getGameState();
+        if (!rendererMatchEpochCurrent(matchEpoch)) return true;
+        await deps.applyGameStateSnapshot(refreshedStrategic, {
+          refreshStandingOrders: false,
+          updateGameStateSidebarUi: false,
+          updateSelectionUi: false,
+          updateGameOverUi: false,
+          updateReadyButton: false,
+          refreshBuildPopup: true,
+          redraw: false
+        });
+        if (!rendererMatchEpochCurrent(matchEpoch)) return true;
+      } catch (err) {
+        console.error("tactical commit: failed to refresh strategic game state snapshot", err);
+        if (!rendererMatchEpochCurrent(matchEpoch)) return true;
+      }
+    }
+    if (playback && rendererSharedState.gameState && needsResolutionPlayback) {
+      const tacticalReadySlice = buildTacticalCommitReadyResultForToast(playback);
+      const visibleHexes = deps.getVisibleHexSet(rendererSharedState.gameState);
+      const visibility = deriveCombatVisibilityClassification(tacticalReadySlice, visibleHexes);
+      const killToastFormatter = deps.buildKillToastFormatterBundle(
+        rendererSharedState.gameState,
+        tacticalReadySlice.removedUnits,
+        buildTacticalSubUnitKillLabelOverlay({
+          subUnitsBeforeCommit: tacticalSubUnitsBeforeCommit,
+          subUnitsAfterCommit: rendererSharedState.tacticalBattleSnapshot?.subUnits,
+          removedUnits: tacticalReadySlice.removedUnits
+        })
+      );
+      await announceResolutionTurnUpdate(
+        {
+          readySlice: tacticalReadySlice,
+          visibility,
+          killToastFormatter,
+          extraKills: {
+            killsByMelee: playback.killsByMelee,
+            killsByAirStrike: playback.killsByAirStrike
+          }
+        },
+        deps
+      );
+      if (!rendererMatchEpochCurrent(matchEpoch)) return true;
+    }
+    await deps.refreshTacticalTerrainOverridesForRenderer();
+    if (!rendererMatchEpochCurrent(matchEpoch)) return true;
+    deps.updatePendingOrdersSidebar();
+    deps.updateRangedSidebar();
+    deps.updateSidebar();
+    deps.updateGameStateSidebar(rendererSharedState.gameState);
+    if (rendererSharedState.resolutionMoveAnimation?.tacticalDeferResolutionClock) {
+      rendererSharedState.resolutionMoveAnimation.tacticalDeferResolutionClock = false;
+      rendererSharedState.resolutionMoveAnimation.startTime = Date.now();
+    }
+    if (rendererSharedState.resolutionMoveAnimation && needsResolutionPlayback && rendererSharedState.resolutionMoveAnimationFrameId === null) {
+      rendererSharedState.resolutionMoveAnimationFrameId = requestAnimationFrame(deps.tickResolutionMoveAnimation);
+    }
+    deps.redraw();
+    deps.scheduleTacticalAnnihilationExit?.();
+    if (commitResult.tacticalPostBeatConsultDeferred) {
+      const bid = commitResult.tacticalBattle?.battleId;
+      if (bid) {
+        const sendTacticalNotify = () => {
+          void window.gameApi?.notifyResolutionPlaybackComplete?.({ kind: "tactical", battleId: bid });
+          rendererSharedState.deferredResolutionConsultNotifySent = true;
+          deps.updateReadyButtonState();
+        };
+        scheduleResolutionPlaybackCompleteNotify(sendTacticalNotify, needsResolutionPlayback);
+      }
+    }
+    if (rendererSharedState.runButtonOn && !commitResult.tacticalPostBeatConsultDeferred) {
+      const oppAlive = rendererSharedState.tacticalBattleSnapshot?.subUnits.some((u) => u.player === "opponent") ?? false;
+      if (oppAlive) deps.startBackgroundRequestIfAllowed();
+    }
+    deps.updateReadyButtonState();
+    return true;
+  }
+
   // src/renderer/gameplay/readyHandler.ts
   function buildReadyPayload(args) {
     const { enabledToolGroupsPayload, useEventDriven, usePrecomputed, aiPlanningRunEnabled } = args;
@@ -31879,10 +32158,6 @@ ${bonuses}`;
     base.precomputedAiMessage = rendererSharedState.precomputedAiMessage ?? void 0;
     return base;
   }
-  function rollbackReadyToolCounts(deps, snapshot) {
-    rendererSharedState.toolInvocationCounts = snapshot;
-    deps.updateOpenRouterToolCountLabels();
-  }
   async function handleReadyButtonClick(deps) {
     if (!window.gameApi) return;
     if (rendererSharedState.gameState?.gameOver) return;
@@ -31894,6 +32169,7 @@ ${bonuses}`;
     }
     deps.clearSidebarError();
     rendererSharedState.readyRequestInFlight = true;
+    const matchEpoch = currentRendererMatchEpoch();
     const toolCountsBeforeReadyClick = { ...rendererSharedState.toolInvocationCounts };
     const cachedPrecomputedToolCountsAtReadyStart = rendererSharedState.precomputedToolInvocationCounts ? { ...rendererSharedState.precomputedToolInvocationCounts } : null;
     rendererSharedState.toolInvocationCounts = Object.fromEntries(rendererSharedState.openRouterToolGroups.map((g) => [g.id, 0]));
@@ -31907,191 +32183,12 @@ ${bonuses}`;
         deps.updateReadyButtonState();
         return;
       }
-      if (rendererSharedState.tacticalBattleSnapshot && rendererSharedState.tacticalPhasePlanning) {
-        const commit = window.gameApi.commitHumanTacticalDraftOrders;
-        if (!commit) {
-          rollbackReadyToolCounts(deps, toolCountsBeforeReadyClick);
-          deps.showSidebarError("Tactical commit is not available in this build.");
-          deps.updateReadyButtonState();
-          return;
-        }
-        const livingSubUnitIds = new Set(rendererSharedState.tacticalBattleSnapshot.subUnits.map((u) => u.id));
-        rendererSharedState.tacticalPendingMarches = rendererSharedState.tacticalPendingMarches.filter(
-          (row) => livingSubUnitIds.has(row.subUnitId)
-        );
-        const movementOrders = rendererSharedState.tacticalPendingMarches.map((r) => ({
-          unitId: r.subUnitId,
-          toH3Index: r.destinationH3Index
-        }));
-        const commitResult = await commit({
-          movementOrders,
-          rangedAttacks: [...rendererSharedState.pendingRangedAttacks],
-          airStrikes: [...rendererSharedState.pendingAirStrikes],
-          ferryOrders: [...rendererSharedState.pendingFerryOrders],
-          embarkOrders: [...rendererSharedState.pendingEmbarkOrders],
-          ...rendererSharedState.tacticalOpponentDraft && tacticalOpponentPlanPayloadHasAnyOrders(rendererSharedState.tacticalOpponentDraft) ? { opponentTacticalDraft: rendererSharedState.tacticalOpponentDraft } : {},
-          useEventDrivenConsultation: rendererSharedState.useEventDrivenConsultation,
-          aiPlanningRunEnabled: rendererSharedState.runButtonOn
-        });
-        if (!commitResult.success) {
-          rollbackReadyToolCounts(deps, toolCountsBeforeReadyClick);
-          deps.showSidebarError(commitResult.reason ?? "Tactical commit failed");
-          deps.updateReadyButtonState();
-          return;
-        }
-        const tacticalSubUnitsBeforeCommit = rendererSharedState.tacticalBattleSnapshot?.subUnits;
-        const playback = commitResult.tacticalResolutionPlayback;
-        const hasMoves = (playback?.humanMoves?.length ?? 0) > 0 || (playback?.opponentMoves?.length ?? 0) > 0;
-        const hasRangedPlayback = (playback?.rangedCombatHexes?.length ?? 0) > 0 || (playback?.rangedCasualtyHexes?.length ?? 0) > 0 || (playback?.rangedRemovedUnits?.length ?? 0) > 0;
-        const hasMeleePlayback = (playback?.meleeCombatHexes?.length ?? 0) > 0 || (playback?.meleeCasualtyHexes?.length ?? 0) > 0 || (playback?.meleeRemovedUnits?.length ?? 0) > 0 || (playback?.killsByMelee?.length ?? 0) > 0;
-        const hasKillPlayback = (playback?.killsByDirectFire?.length ?? 0) > 0 || (playback?.killsByAirStrike?.length ?? 0) > 0 || (playback?.killsByReturnFire?.length ?? 0) > 0 || (playback?.killsByMelee?.length ?? 0) > 0;
-        const hasAirStrikePlaybackAnim = (playback?.airStrikeAttemptCount ?? 0) > 0 || (playback?.airStrikeMoves?.length ?? 0) > 0 || (playback?.airStrikeHexes?.length ?? 0) > 0 || (playback?.airStrikeCasualtyHexes?.length ?? 0) > 0;
-        const needsResolutionPlayback = hasMoves || hasRangedPlayback || hasMeleePlayback || hasKillPlayback || hasAirStrikePlaybackAnim;
-        if (playback && needsResolutionPlayback) {
-          if (rendererSharedState.resolutionMoveAnimationFrameId !== null) cancelAnimationFrame(rendererSharedState.resolutionMoveAnimationFrameId);
-          rendererSharedState.resolutionMoveAnimationFrameId = null;
-          const tacticalMarchPlaybackUnits = tacticalSubUnitsBeforeCommit?.length ? tacticalSubUnitsBeforeCommit.map((u) => ({
-            id: u.id,
-            player: u.player,
-            unitType: u.unitType,
-            h3Index: u.h3Index
-          })) : void 0;
-          const airStrikeOutboundMoves2 = deps.buildAirStrikeOutboundPlaybackMoves(playback.airStrikeMoves);
-          const airStrikeReturnMoves2 = deps.buildAirStrikeReturnPlaybackMoves(playback.airStrikeMoves);
-          rendererSharedState.resolutionMoveAnimation = {
-            moves: [...playback.humanMoves, ...playback.opponentMoves ?? []],
-            startTime: Date.now(),
-            tacticalDeferResolutionClock: true,
-            ...tacticalMarchPlaybackUnits ? { tacticalMarchPlaybackUnits } : {},
-            ...airStrikeOutboundMoves2.length > 0 ? { airStrikeOutboundMoves: airStrikeOutboundMoves2 } : {},
-            ...airStrikeReturnMoves2.length > 0 ? { airStrikeReturnMoves: airStrikeReturnMoves2 } : {},
-            ...playback.airStrikeHexes?.length ? { airStrikeCombatHexes: playback.airStrikeHexes } : {},
-            ...playback.airStrikeCasualtyHexes?.length ? { airStrikeCasualtyHexes: playback.airStrikeCasualtyHexes } : {},
-            ...playback.airStrikeRemovedUnits?.length ? { airStrikeRemovedUnits: playback.airStrikeRemovedUnits } : {},
-            rangedCombatHexes: playback.rangedCombatHexes,
-            rangedCasualtyHexes: playback.rangedCasualtyHexes,
-            rangedRemovedUnits: playback.rangedRemovedUnits,
-            ...playback.rangedResolutionShotLines?.length ? { rangedResolutionShotLines: playback.rangedResolutionShotLines } : {},
-            meleeCombatHexes: playback.meleeCombatHexes?.length ? playback.meleeCombatHexes : void 0,
-            meleeCasualtyHexes: playback.meleeCasualtyHexes?.length ? playback.meleeCasualtyHexes : void 0,
-            meleeRemovedUnits: playback.meleeRemovedUnits?.length ? playback.meleeRemovedUnits : void 0,
-            ...pickPlaybackDiceRolls(playback)
-          };
-        }
-        if (commitResult.tacticalBattle) {
-          rendererSharedState.tacticalBattleSnapshot = commitResult.tacticalBattle;
-        }
-        if (rendererSharedState.resolutionMoveAnimation != null && rendererSharedState.tacticalBattleSnapshot != null) {
-          deps.updateGameStateSidebar(rendererSharedState.gameState);
-          deps.syncTacticalExitButton?.();
-        }
-        reconcileSelectionToCurrentState();
-        if ("committedOpponentTacticalDraft" in commitResult) {
-          rendererSharedState.tacticalOpponentDraft = null;
-        }
-        if (commitResult.tacticalPostBeatConsultDeferred) {
-          rendererSharedState.pendingDeferredTacticalPostBeatConsult = true;
-          rendererSharedState.deferredResolutionConsultNotifySent = false;
-        }
-        if (!commitResult.tacticalPostBeatConsultDeferred && isTacticalPostBeatConsultOnCommit(commitResult)) {
-          applyTacticalPostBeatConsultSideEffects(commitResult, deps);
-        } else if (!commitResult.tacticalPostBeatConsultDeferred) {
-          if ("tacticalOpponentPlan" in commitResult) {
-            rendererSharedState.tacticalOpponentDraft = commitResult.tacticalOpponentPlan ?? null;
-          }
-          deps.showAiStrategyToast({ message: commitResult.aiMessage, strategy: commitResult.aiStrategy });
-        }
-        applyToolInvocationCountsAfterReady({
-          fromResult: commitResult.toolInvocationCounts,
-          cachedPrecomputed: cachedPrecomputedToolCountsAtReadyStart,
-          allowPrecomputedFallback: rendererSharedState.runButtonOn && cachedPrecomputedToolCountsAtReadyStart != null
-        });
-        const previousPendingMarches = new Map(rendererSharedState.tacticalPendingMarches.map((row) => [row.subUnitId, row]));
-        rendererSharedState.tacticalPendingMarches = commitResult.tacticalMarchContinuations?.length ? buildTacticalPendingMarchRowsFromContinuations({
-          battle: commitResult.tacticalBattle ?? rendererSharedState.tacticalBattleSnapshot,
-          continuations: commitResult.tacticalMarchContinuations,
-          previousBySubUnitId: previousPendingMarches
-        }) : [];
-        rendererSharedState.pendingRangedAttacks = [];
-        rendererSharedState.pendingAirStrikes = [];
-        rendererSharedState.pendingFerryOrders = [];
-        rendererSharedState.pendingEmbarkOrders = [];
-        rendererSharedState.rangedModeActive = false;
-        rendererSharedState.airStrikeModeActive = false;
-        if (window.gameApi?.getGameState) {
-          try {
-            const refreshedStrategic = await window.gameApi.getGameState();
-            await deps.applyGameStateSnapshot(refreshedStrategic, {
-              refreshStandingOrders: false,
-              updateGameStateSidebarUi: false,
-              updateSelectionUi: false,
-              updateGameOverUi: false,
-              updateReadyButton: false,
-              refreshBuildPopup: true,
-              redraw: false
-            });
-          } catch (err) {
-            console.error("tactical commit: failed to refresh strategic game state snapshot", err);
-          }
-        }
-        if (playback && rendererSharedState.gameState && needsResolutionPlayback) {
-          const tacticalReadySlice = buildTacticalCommitReadyResultForToast(playback);
-          const visibleHexes2 = deps.getVisibleHexSet(rendererSharedState.gameState);
-          const visibility2 = deriveCombatVisibilityClassification(tacticalReadySlice, visibleHexes2);
-          const killToastFormatter = deps.buildKillToastFormatterBundle(
-            rendererSharedState.gameState,
-            tacticalReadySlice.removedUnits,
-            buildTacticalSubUnitKillLabelOverlay({
-              subUnitsBeforeCommit: tacticalSubUnitsBeforeCommit,
-              subUnitsAfterCommit: rendererSharedState.tacticalBattleSnapshot?.subUnits,
-              removedUnits: tacticalReadySlice.removedUnits
-            })
-          );
-          await announceResolutionTurnUpdate(
-            {
-              readySlice: tacticalReadySlice,
-              visibility: visibility2,
-              killToastFormatter,
-              extraKills: {
-                killsByMelee: playback.killsByMelee,
-                killsByAirStrike: playback.killsByAirStrike
-              }
-            },
-            deps
-          );
-        }
-        await deps.refreshTacticalTerrainOverridesForRenderer();
-        deps.updatePendingOrdersSidebar();
-        deps.updateRangedSidebar();
-        deps.updateSidebar();
-        deps.updateGameStateSidebar(rendererSharedState.gameState);
-        if (rendererSharedState.resolutionMoveAnimation?.tacticalDeferResolutionClock) {
-          rendererSharedState.resolutionMoveAnimation.tacticalDeferResolutionClock = false;
-          rendererSharedState.resolutionMoveAnimation.startTime = Date.now();
-        }
-        if (rendererSharedState.resolutionMoveAnimation && needsResolutionPlayback && rendererSharedState.resolutionMoveAnimationFrameId === null) {
-          rendererSharedState.resolutionMoveAnimationFrameId = requestAnimationFrame(deps.tickResolutionMoveAnimation);
-        }
-        deps.redraw();
-        deps.scheduleTacticalAnnihilationExit?.();
-        if (commitResult.tacticalPostBeatConsultDeferred) {
-          const bid = commitResult.tacticalBattle?.battleId;
-          if (bid) {
-            const sendTacticalNotify = () => {
-              void window.gameApi?.notifyResolutionPlaybackComplete?.({ kind: "tactical", battleId: bid });
-              rendererSharedState.deferredResolutionConsultNotifySent = true;
-              deps.updateReadyButtonState();
-            };
-            scheduleResolutionPlaybackCompleteNotify(sendTacticalNotify, needsResolutionPlayback);
-          }
-        }
-        if (rendererSharedState.runButtonOn && !commitResult.tacticalPostBeatConsultDeferred) {
-          const oppAlive = rendererSharedState.tacticalBattleSnapshot?.subUnits.some((u) => u.player === "opponent") ?? false;
-          if (oppAlive) deps.startBackgroundRequestIfAllowed();
-        }
-        deps.updateReadyButtonState();
-        return;
-      }
+      if (await runTacticalReadyCommit({
+        deps,
+        toolCountsBeforeReadyClick,
+        cachedPrecomputedToolCountsAtReadyStart,
+        matchEpoch
+      })) return;
       const hasPendingDraftOrders = rendererSharedState.pendingRangedAttacks.length > 0 || rendererSharedState.pendingAirStrikes.length > 0 || rendererSharedState.pendingFerryOrders.length > 0;
       if (hasPendingDraftOrders) {
         const submitResult = await window.gameApi.submitOrders({
@@ -32100,6 +32197,7 @@ ${bonuses}`;
           airStrikes: rendererSharedState.pendingAirStrikes,
           ferryOrders: rendererSharedState.pendingFerryOrders
         });
+        if (!rendererMatchEpochCurrent(matchEpoch)) return;
         if (!submitResult.success) {
           deps.showSidebarError(submitResult.reason ?? "Submit failed");
           deps.updateReadyButtonState();
@@ -32118,6 +32216,7 @@ ${bonuses}`;
       });
       const visibleHexesBeforeTurn = deps.getVisibleHexSet(rendererSharedState.gameState);
       let readyResult = await deps.callReadyWithTimeout(readyPayload);
+      if (!rendererMatchEpochCurrent(matchEpoch)) return;
       let resolutionPlaybackNotifyKind = "strategic";
       if (!readyResult.success) {
         rollbackReadyToolCounts(deps, toolCountsBeforeReadyClick);
@@ -32134,6 +32233,7 @@ ${bonuses}`;
         }
         await deps.refreshTacticalTerrainOverridesForRenderer();
         const pausedState = await window.gameApi.getGameState();
+        if (!rendererMatchEpochCurrent(matchEpoch)) return;
         await deps.applyGameStateSnapshot(pausedState, {
           refreshStandingOrders: false,
           updateGameStateSidebarUi: false,
@@ -32155,6 +32255,7 @@ ${bonuses}`;
           aiPlanningRunEnabled: rendererSharedState.runButtonOn,
           enabledToolGroups: enabledToolGroupsPayload
         });
+        if (!rendererMatchEpochCurrent(matchEpoch)) return;
         if (!resolveResult.success) {
           rollbackReadyToolCounts(deps, toolCountsBeforeReadyClick);
           deps.showSidebarError(resolveResult.reason ?? "Melee resolve failed");
@@ -32168,6 +32269,7 @@ ${bonuses}`;
       const humanMoves = readyResult.humanMoves ?? [];
       await deps.refreshTacticalTerrainOverridesForRenderer();
       const nextState = await window.gameApi.getGameState();
+      if (!rendererMatchEpochCurrent(matchEpoch)) return;
       const state = nextState;
       await deps.applyGameStateSnapshot(state, {
         refreshStandingOrders: false,
@@ -32178,6 +32280,7 @@ ${bonuses}`;
         refreshBuildPopup: true,
         redraw: false
       });
+      if (!rendererMatchEpochCurrent(matchEpoch)) return;
       const aiMoves = readyResult.aiMoves ?? [];
       const resolutionMoves = [...humanMoves, ...aiMoves];
       const airStrikeOutboundMoves = deps.buildAirStrikeOutboundPlaybackMoves(readyResult.airStrikeMoves);
@@ -32260,30 +32363,39 @@ ${bonuses}`;
           },
           deps
         );
+        if (!rendererMatchEpochCurrent(matchEpoch)) return;
         rendererSharedState.resolutionMoveAnimationFrameId = requestAnimationFrame(deps.tickResolutionMoveAnimation);
       }
       rendererSharedState.hoverRoutePreview = null;
       rendererSharedState.hideCommittedOrderLinesAfterReady = false;
+      if (!rendererMatchEpochCurrent(matchEpoch)) return;
       await prepareStrategicPlanningUiBeforeTacticalAutoStart(state, deps);
+      if (!rendererMatchEpochCurrent(matchEpoch)) return;
       deps.updateGameOverUI(state);
       deps.updateReadyButtonState();
       if (rendererSharedState.runButtonOn && !rendererSharedState.pendingDeferredStrategicPostResolutionConsult) deps.startBackgroundRequestIfAllowed();
       deps.redraw();
       if (readyResult.tacticalAutoStartH3Index) {
         await deps.startTacticalBattleFromInterceptHex(readyResult.tacticalAutoStartH3Index);
+        if (!rendererMatchEpochCurrent(matchEpoch)) return;
         if (rendererSharedState.runButtonOn && !rendererSharedState.pendingDeferredStrategicPostResolutionConsult) deps.startBackgroundRequestIfAllowed();
       }
     } catch (err) {
+      if (!rendererMatchEpochCurrent(matchEpoch)) return;
       deps.showSidebarError(String(err));
       deps.updateReadyButtonState();
     } finally {
-      rendererSharedState.readyRequestInFlight = false;
-      deps.updateReadyButtonState();
+      if (rendererMatchEpochCurrent(matchEpoch)) {
+        rendererSharedState.readyRequestInFlight = false;
+        deps.updateReadyButtonState();
+      }
     }
   }
   async function prepareStrategicPlanningUiBeforeTacticalAutoStart(gameState, deps) {
+    const matchEpoch = currentRendererMatchEpoch();
     deps.clearPendingTacticalOrders();
     await deps.refreshHumanStandingOrders();
+    if (!rendererMatchEpochCurrent(matchEpoch)) return;
     if (gameState) {
       deps.updateGameStateSidebar(gameState);
     }
@@ -32825,7 +32937,7 @@ ${bonuses}`;
         if (rendererSharedState.runButtonOn) {
           rendererSharedState.runButtonOn = false;
           runBtn.setAttribute("aria-pressed", "false");
-          window.gameApi?.cancelRequestAiOrders?.();
+          void stopOpponentPlanning("run_off");
           resetPrecomputedAiState("null");
           rendererSharedState.eventDrivenInitialConsultationDone = false;
           updateReadyButtonState();
@@ -33099,6 +33211,11 @@ ${bonuses}`;
   }
   function initDeferredResolutionPlaybackPushListeners(deps) {
     window.gameApi?.registerPostResolutionConsultationListener?.((payload2) => {
+      if (isNewGameOverlayOpen()) {
+        rendererSharedState.pendingDeferredStrategicPostResolutionConsult = false;
+        deps.updateReadyButtonState();
+        return;
+      }
       if (payload2.abandoned === true) {
         applyAbandonedDeferredConsultRecovery("strategic", deps);
         return;
@@ -33127,6 +33244,11 @@ ${bonuses}`;
       deps.updateReadyButtonState();
     });
     window.gameApi?.registerPostTacticalBeatConsultationListener?.((fields) => {
+      if (isNewGameOverlayOpen()) {
+        rendererSharedState.pendingDeferredTacticalPostBeatConsult = false;
+        deps.updateReadyButtonState();
+        return;
+      }
       if (fields.abandoned === true) {
         applyAbandonedDeferredConsultRecovery("tactical", deps);
         return;
@@ -33359,13 +33481,23 @@ ${bonuses}`;
     }
     if (modelSelect) {
       modelSelect.addEventListener("change", () => {
-        api.setSelectedModel(modelSelect.value);
-        playerChangedModel = true;
-        persistedReasoningEffort = "";
-        showReasoningEffortForSelectedModel();
-        if (modelSelect.value) deps.hideMapToast();
-        else modelDescriptionTooltip?.clear();
-        void deps.syncOpenRouterRunToggleInteractable();
+        void (async () => {
+          try {
+            await api.setSelectedModel(modelSelect.value);
+            playerChangedModel = true;
+            persistedReasoningEffort = "";
+            showReasoningEffortForSelectedModel();
+            if (modelSelect.value) deps.hideMapToast();
+            else modelDescriptionTooltip?.clear();
+            if (rendererSharedState.runButtonOn && (rendererSharedState.backgroundRequestInFlight || isDeferredResolutionPlaybackConsultPending())) {
+              await stopOpponentPlanning("model_changed");
+              deps.startBackgroundRequestIfAllowed();
+            }
+            void deps.syncOpenRouterRunToggleInteractable();
+          } catch (err) {
+            console.error("model change failed", err);
+          }
+        })();
       });
     }
     const tacticalBattlesCb = document.getElementById("openrouter-tactical-battles");
@@ -33390,7 +33522,7 @@ ${bonuses}`;
           deps.updateReadyButtonState();
           deps.startBackgroundRequestIfAllowed();
         } else {
-          window.gameApi?.cancelRequestAiOrders?.();
+          void stopOpponentPlanning("run_off");
           resetPrecomputedAiState("null");
           rendererSharedState.precomputedAiEmbarkOrders = null;
           rendererSharedState.precomputedAiStrategy = null;

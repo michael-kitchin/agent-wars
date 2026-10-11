@@ -440,6 +440,7 @@ export async function requestOrdersFlow(
         outputTokens: usage.totalOutputTokens > 0 ? usage.totalOutputTokens : undefined,
       };
     }
+    if (signal?.aborted) return failRequest('Cancelled');
     const content = loopResult.content;
     const productionEnabledForParse = tacticalBattle ? false : flags.productionEnabled;
     let parsed = parseOrdersResponse(content, resolveToH3, planState, latLngByH3, productionEnabledForParse, coordinateContext);
@@ -495,7 +496,7 @@ export async function requestOrdersFlow(
     });
   } catch (err) {
     if (isLikelyAbortError(err)) {
-      if (onLog) onLog('Cancelled.');
+      logDebug('openRouter requestOrders: cancelled', { turnNumber: state.turnNumber });
       return failRequest('Cancelled');
     }
     logError('openRouter requestOrders: exception', err);

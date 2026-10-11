@@ -1,6 +1,6 @@
 {
   "name": "agent-wars",
-  "version": "2.5.0",
+  "version": "2.5.1",
   "description": "Grand strategy wargame with LLM opponents on a real-Earth H3 hex map, its code written entirely by coding agents",
   "private": true,
   "homepage": "https://github.com/michael-kitchin/agent-wars#readme",

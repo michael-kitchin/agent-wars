@@ -13,6 +13,8 @@ import { exitTacticalMapView } from '../map/tacticalMapView';
 import { hideTacticalEntryLayer } from '../map/tacticalEntryLayer';
 import { closeTacticalAnnihilationOutcomeDialog, openTacticalAnnihilationOutcomeDialog } from './tacticalAnnihilationDialog';
 import { restoreStrategicOrderDraftsAfterTacticalSession } from './tacticalStrategicOrderUiStash';
+import { invalidateBackgroundAiRequest } from '../openRouter/openRouterRuntime';
+import { currentRendererMatchEpoch, rendererMatchEpochCurrent } from '../core/matchEpoch';
 import {
   tacticalApplyStrategicSidebarForTacticalMode,
   tacticalBattleExitTeardownTransientRendererState,
@@ -91,20 +93,24 @@ export function tacticalMaybeScheduleAnnihilationExit(session: TacticalExitSessi
  * Contract: Early return when boundary check fails; does not throw on IPC errors (toast + return).
  * When to use: Tactical exit button and annihilation modal confirmation.
  * Expected outcome: In-flight Run-mode AI canceled, tactical drafts cleared, post-exit strategic snapshot applied, living-unit stash restored, sidebar DOM refreshed, Ready pipeline invoked on success path.
- * Exceptions: `endTacticalBattle` failures keep renderer snapshot unchanged after toast; post-exit `getGameState` failures log and continue with the last-beat snapshot.
+ * Exceptions: `endTacticalBattle` failures keep the renderer snapshot unchanged after a toast, unless a newer match has already started. Post-exit `getGameState` failures log and continue with the last-beat snapshot.
  */
 export async function tacticalPerformBattleExit(session: TacticalExitSessionAccessor, io: TacticalBattleExitIo): Promise<void> {
   const boundary = tacticalBoundaryPlanningExitAllowed(session.getBattleSnapshot(), session.getPhasePlanning());
   if (!boundary.ok) return;
+  const matchEpoch = currentRendererMatchEpoch();
+  invalidateBackgroundAiRequest();
   try {
     if (io.endTacticalBattle) {
       await io.endTacticalBattle();
     }
   } catch (err) {
     console.error('endTacticalBattle failed:', err);
+    if (!rendererMatchEpochCurrent(matchEpoch)) return;
     io.showMapToast('Could not exit tactical battle.', { isError: true });
     return;
   }
+  if (!rendererMatchEpochCurrent(matchEpoch)) return;
   tacticalBattleExitTeardownTransientRendererState();
   session.setBattleSnapshot(null);
   closeTacticalAnnihilationOutcomeDialog();
@@ -120,10 +126,12 @@ export async function tacticalPerformBattleExit(session: TacticalExitSessionAcce
   } catch (err) {
     console.error('refreshStrategicSnapshotAfterExit failed:', err);
   }
+  if (!rendererMatchEpochCurrent(matchEpoch)) return;
   updateGameStateSidebar(S.gameState);
   restoreStrategicOrderDraftsAfterTacticalSession();
   io.refreshSidebarAfterTacticalDraftTeardown?.();
   io.redraw();
+  if (!rendererMatchEpochCurrent(matchEpoch)) return;
   await io.runReadyAfterExit();
 }
 

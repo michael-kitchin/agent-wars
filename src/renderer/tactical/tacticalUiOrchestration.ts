@@ -13,7 +13,6 @@ import { restoreStrategicOrderDraftsAfterTacticalSession } from './tacticalStrat
 import {
   cancelInFlightBackgroundAiRequestForRendererTeardown,
   cancelTacticalScopedBackgroundPrefetchForSessionTeardown,
-  OPEN_ROUTER_LOG_BACKGROUND_AI_CANCEL_TACTICAL_BATTLE_EXIT,
 } from '../openRouter/openRouterRuntime';
 import { clearPendingTacticalOrders } from '../gameplay/tacticalOrders';
 import { dropQueuedResolutionPlaybackCompleteNotifies } from '../openRouter/resolutionPlaybackDeferral';
@@ -27,7 +26,7 @@ import { dropQueuedResolutionPlaybackCompleteNotifies } from '../openRouter/reso
  * leftover playback-complete notifies are dropped so they cannot flush after a later strategic/melee animation.
  * Exceptions: None.
  */
-function clearResolutionPlaybackAnimationState(): void {
+export function clearResolutionPlaybackAnimationState(): void {
   if (S.resolutionMoveAnimationFrameId !== null) {
     cancelAnimationFrame(S.resolutionMoveAnimationFrameId);
   }
@@ -45,7 +44,7 @@ function clearResolutionPlaybackAnimationState(): void {
  * Exceptions: None.
  */
 export function tacticalBattleExitTeardownTransientRendererState(): void {
-  cancelInFlightBackgroundAiRequestForRendererTeardown(OPEN_ROUTER_LOG_BACKGROUND_AI_CANCEL_TACTICAL_BATTLE_EXIT);
+  cancelInFlightBackgroundAiRequestForRendererTeardown();
   clearResolutionPlaybackAnimationState();
   S.pendingDeferredTacticalPostBeatConsult = false;
   clearPendingTacticalOrders();
@@ -56,14 +55,17 @@ export function tacticalBattleExitTeardownTransientRendererState(): void {
  * Clears renderer tactical mode and map constraints when the main process has no tactical session (e.g. new game).
  *
  * Purpose: `newGame` IPC clears the active battle in main but does not run tactical exit UI; this mirrors that teardown on the renderer.
- * When to use: After a fresh `GameStateSnapshot` with no `tacticalBattleSession`, including `newGame` and any `getGameState` apply where main dropped the session.
+ * When to use: After a fresh `GameStateSnapshot` with no `tacticalBattleSession`, including `newGame` and any `getGameState` apply where main dropped the session. Pass `cancelOpponentPlanning` false when the caller already stopped planning for a new game, so this release does not send a second stop.
  * Expected outcome: Tactical HUD hidden, tactical map bounds released, resolution animation cancelled, `S.tacticalBattleSnapshot` null; sidebar turn uses `nextState`.
  * Exceptions: None; safe when already strategic (no-op aside from `exitTacticalMapView` if pre-tactical zoom was captured).
  */
-export function tacticalReleaseRendererSessionForNewStrategicMatch(nextState: GameStateSnapshot): void {
+export function tacticalReleaseRendererSessionForNewStrategicMatch(
+  nextState: GameStateSnapshot,
+  cancelOpponentPlanning = true
+): void {
   closeTacticalAnnihilationOutcomeDialog();
   clearResolutionPlaybackAnimationState();
-  cancelTacticalScopedBackgroundPrefetchForSessionTeardown();
+  if (cancelOpponentPlanning) cancelTacticalScopedBackgroundPrefetchForSessionTeardown();
   S.pendingDeferredTacticalPostBeatConsult = false;
   S.tacticalBattleSnapshot = null;
   S.tacticalOpponentDraft = null;

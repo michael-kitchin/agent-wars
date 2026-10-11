@@ -10,15 +10,15 @@ Name the modes a player can be in, what starts and ends each one, and what plann
 
 ### New game
 
-The player sees the new-game overlay. The message is "Start the world map game when ready." when no match is loaded, and "Start a new world map game when ready." when the player opened the overlay from the Model tab during a match. The button reads "Start game". Global and Regional tabs sit under the message. Global chooses a home region for each side. Regional chooses one region and a different side group for each side. Game size, fog of war, a level (Off, Low, or High) for each of the origin bonus, tech bonus, terrain bonus, and weather bonus, and a starting month sit outside the tabs. The right panel is not on screen, and the map fills the window. While the form is showing, the map does not accept pointer input either. While the form is hidden, drag and the wheel pan and zoom the preview, and a click, double-click, or right-click does not select, order, or change the selection. Ready is disabled. The map behind the overlay shows that tab's preview, as in [new-game-dialog.md](new-game-dialog.md). The dialog sits at the minimap's usual corner, with no dark veil. The minimap, the terrain legend, and the map's + and − zoom control are hidden. This mode ends when Start game succeeds and a match is loaded.
+The player sees the new-game overlay. The message is "Start the global game when ready." or "Start the regional game when ready." when no match is loaded, and "Start a new global game when ready." or "Start a new regional game when ready." when the player opened the overlay from the Model tab during a match. The sentence follows the selected tab. A win or loss does not. The button reads "Start game". Global and Regional tabs sit under the message. Global chooses a home region for each side. Regional chooses one region and a different side group for each side. Game size, fog of war, a level (Off, Low, or High) for each of the origin bonus, tech bonus, terrain bonus, and weather bonus, and a starting month sit outside the tabs. The right panel is not on screen, and the map fills the window. While the form is showing, the map does not accept pointer input either. While the form is hidden, drag and the wheel pan and zoom the preview, and a click, double-click, or right-click does not select, order, or change the selection. Ready is disabled. The map behind the overlay shows that tab's preview, as in [new-game-dialog.md](new-game-dialog.md). The dialog sits at the minimap's usual corner, with no dark veil. The minimap, the terrain legend, and the map's + and − zoom control are hidden. This mode ends when Start game succeeds and a match is loaded.
 
 ### Strategic planning
 
 The player sees the strategic world map and the right panel. The game-state readout shows "Phase: Planning" and the strategic turn. The player can pan and zoom, select units, draft orders, open build and stack popups, and press Ready when it is enabled. Strategic planning is blocked while the new-game overlay, the game-over overlay, or the tactical annihilation dialog is open, and it is replaced while a tactical battle is active or the tactical battles list is open.
 
-While the Run control is pressed and the opponent's precomputed orders are not ready yet, Ready is disabled and its label becomes "AI:" plus an elapsed time. That wait is every-turn prefetch, and the first event-driven consult after a new game, after Run is turned on, or after Events is turned on. The map stays usable. Pressing Ready in that condition shows a map toast that planning is still running and does not end the turn. After a failed AI planning request, Ready becomes usable again with an empty opponent plan. Drafting, changing, or cancelling orders during that wait does not cancel or restart opponent planning.
+While the Run control is pressed and the opponent's precomputed orders are not ready yet, Ready is disabled and its label becomes "AI:" plus an elapsed time. That wait is every-turn prefetch, and the first event-driven consult after a new game, after Run is turned on, or after Events is turned on. The map stays usable. Pressing Ready in that condition shows a map toast that planning is still running and does not end the turn. Turning Run off stops the wait, and Ready can end the turn without a precomputed plan. After a failed AI planning request, Ready becomes usable again with an empty opponent plan. Drafting, changing, or cancelling orders during that wait does not cancel or restart opponent planning.
 
-Once that first event-driven consult has finished, later strategic turns do not wait on a new precomputed plan. The next turn's orders come from the deferred consultation after resolution, or from standing orders when that consultation does not call the model. Ready stays disabled until the deferred consultation finishes. Its label is "Ready" during playback, then "AI:" plus an elapsed time while the consultation runs. See [Resolution playback](#resolution-playback).
+Once that first event-driven consult has finished, later strategic turns do not wait on a new precomputed plan. The next turn's orders come from the deferred consultation after resolution, or from standing orders when that consultation does not call the model. Ready stays disabled until the deferred consultation finishes or the player turns Run off. Its label is "Ready" during playback, then "AI:" plus an elapsed time while the consultation runs. Turning Run off stops that consultation, and the label returns to "Ready". See [Resolution playback](#resolution-playback).
 
 While a Ready request is in flight, Ready stays disabled and keeps the label "Ready". A failed Ready request shows the reason on the map toast and returns the player to strategic planning.
 
@@ -44,7 +44,7 @@ Clicks outside the battle area show an error toast and do not issue an order. Th
 
 Tactical planning ends when the player exits, when the battle is reconciled away because the strategic turn no longer matches, or when annihilation opens.
 
-While Run is pressed, opponent sub-units remain, and no opponent plan is buffered yet, Ready is disabled with the same "AI:" elapsed-time label used in strategic planning. As in strategic planning, editing the tactical draft during that wait does not cancel or restart opponent planning. Entering from Fight holds that request while the strategic post-resolution consult is still running. The battle request starts when that consult's result is applied, and when the push is discarded because the turn no longer matches. Ready keeps the AI wait label until the battle plan is buffered.
+While Run is pressed, opponent sub-units remain, and no opponent plan is buffered yet, Ready is disabled with the same "AI:" elapsed-time label used in strategic planning. As in strategic planning, editing the tactical draft during that wait does not cancel or restart opponent planning. Turning Run off, or leaving the battle, stops that wait. Entering from Fight holds that request while the strategic post-resolution consult is still running. The battle request starts when that consult's result is applied, and when the push is discarded because the turn no longer matches. Ready keeps the AI wait label until the battle plan is buffered or the player stops that planning.
 
 ### Tactical annihilation
 
@@ -69,7 +69,9 @@ stateDiagram-v2
   TacticalBattlesList --> ResolutionPlayback: Fight or Ignore with playback
   TacticalBattlesList --> TacticalPlanning: Fight starts the battle
   ResolutionPlayback --> StrategicPlanning: playback ends
+  ResolutionPlayback --> NewGame: New
   ResolutionPlayback --> TacticalPlanning: battle entry cancels playback
+  TacticalPlanning --> NewGame: New
   TacticalPlanning --> ResolutionPlayback: Ready commits a beat with playback
   TacticalPlanning --> TacticalAnnihilation: a side is wiped
   TacticalPlanning --> StrategicPlanning: Exit Battle, then Ready
@@ -79,7 +81,9 @@ stateDiagram-v2
 
 - App start with no loaded match -> New game.
 - New game -> Strategic planning: Start game succeeds.
-- Strategic planning -> New game: New on the Model tab. In-flight AI planning is cancelled.
+- Strategic planning -> New game: New on the Model tab. Opponent planning and any playback stop immediately. The match is replaced when Start succeeds.
+- Resolution playback -> New game: New on the Model tab, in either theater. Playback stops.
+- Tactical planning -> New game: New on the Model tab. The battle preview stops. The annihilation dialog and the tactical battles list do not accept New.
 - Strategic planning -> Tactical battles list: Ready reports melee candidates and the Tactical battles checkbox is checked.
 - Strategic planning -> Resolution playback: Ready succeeds and the turn has movement or combat to animate. If the Tactical battles checkbox is unchecked, melee is ignored without the list.
 - Strategic planning -> Tactical planning: the player uses a tactical entry marker, or Fight auto-starts the chosen battle.
@@ -98,7 +102,7 @@ stateDiagram-v2
 
 - New game and Game over into Strategic planning: selection, hex selection, draft orders, the strategic-order stash, hover preview, the running AI cost, and the AI activity log are cleared. The right panel is on screen, and the map view frames the new match beside it, as in [map-surface.md](map-surface.md).
 - Strategic planning into Tactical planning: strategic draft orders are stashed and the order lists empty. Ranged and Strike targeting turn off. The build popup closes. Selection is reconciled to units that exist in the battle, which is usually empty. The map view changes to the battle area.
-- Tactical planning or Tactical annihilation into Strategic planning: tactical draft orders are cleared. Stashed strategic drafts return, minus drafts whose units are gone. The map view leaves the battle area. A failed exit does not clear the battle. A successful exit then runs Ready, using the same rules as pressing Ready in Strategic planning. That can submit the restored drafts, open the tactical battles list, or start resolution playback. It does nothing while a deferred consultation is outstanding, and it shows the AI-wait toast while opponent orders are not ready.
+- Tactical planning or Tactical annihilation into Strategic planning: tactical draft orders are cleared. Stashed strategic drafts return, minus drafts whose units are gone. The map view leaves the battle area. A failed exit does not clear the battle. Leaving the battle stops the battle's opponent planning, including a post-beat consult. A strategic consult still running from the world-map turn keeps running and can still hold Ready. A successful exit then runs Ready, using the same rules as pressing Ready in Strategic planning. That can submit the restored drafts, open the tactical battles list, or start resolution playback. It does nothing while a deferred consultation is outstanding, and it shows the AI-wait toast while opponent orders are not ready.
 - Ready, in either theater: a successful commit clears the drafts that were just submitted. Grouped march and ferry commits also clear the selection. Hover preview is cleared after strategic Ready. Tactical march continuations can reappear as pending movement after a tactical commit.
 - Resolution playback: it does not by itself clear the stash or restore drafts. Cancelling playback to enter a battle flushes a deferred consultation notice if one was waiting on the animation.
 - Opening New during a match discards the stash instead of restoring it.
@@ -127,7 +131,9 @@ None.
 - `static/index.html` (`#game-over-overlay`, `#tactical-annihilation-overlay`, `#tactical-battle-hud`, `#ready-btn`)
 - `src/renderer/core/uiState.ts`
 - `src/renderer/gameplay/newGame.ts`
+- `src/renderer/gameplay/newGameBanner.ts`
 - `src/renderer/gameplay/readyHandler.ts`
+- `src/renderer/gameplay/readyTacticalCommit.ts`
 - `src/renderer/gameplay/meleeInterceptModal.ts`
 - `src/renderer/gameplay/tacticalBattlePromptPreference.ts`
 - `src/renderer/openRouter/aiPlanningState.ts`

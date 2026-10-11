@@ -18,6 +18,9 @@ Shown with the right panel in every mode where the panel is visible, whichever t
 - An ordinary line, not an error line, appears when a provider rejects a consultation's structured JSON request. The request is retried once without it, so the line does not mean the consultation failed. Anthropic models currently produce this line once per session, on their first request that carries the schema (normally the first request after the model's first tool call), because the envelope schema uses `anyOf` and exceeds Anthropic's schema limits.
 - An ordinary line, not an error line, appears when a provider rejects a required tool call. The request is retried once with automatic tool choice, so the line does not mean the consultation failed. Claude served by Amazon Bedrock produces this line once per session.
 - An ordinary line, not an error line, reads "This model does not support tool calls; planning without tools." the first time in an app session that a model whose listing does not include tool support is consulted. Its consultations run as if every group of model-callable tools were off; Events still applies. A new match clears the log but does not show the line again for the same model.
+- A model call that fails writes an error line naming the attempt, such as `Model call timed out after 90s (attempt 1 of 2). Retrying...` or `Model call failed with HTTP 503 (attempt 1 of 2). Retrying...`. The last attempt ends with `No retries left.` A stalled response, and an HTTP status that is not retried, end with `Not retried.` A network failure uses the same attempt numbers.
+- Stopping opponent planning writes one ordinary line, and only when that stop aborted a call, or when New found a deferred consult still waiting. A second stop that aborts nothing does not add another line. Leaving a battle does not add a line merely because a strategic consult is still pending. The sentences are `Opponent planning stopped: Run was turned off.`, `Opponent planning stopped: the model changed.`, `Opponent planning stopped for a new game.`, `Opponent planning stopped: you left the battle.`, and `Opponent planning stopped.`
+- With the developer hang simulator on, an ordinary line reads `Simulating a hung model call (AGENT_WARS_SIMULATE_MODEL_HANG).`
 - A consultation that still fails shows `API error: …`. When OpenRouter's own message is only "Provider returned error", that line also includes the provider's message, such as a schema or `tool_choice` refusal.
 
 The log does not show the API key.
@@ -73,3 +76,4 @@ None.
 - `src/renderer/openRouter/openRouterUiHelpers.ts`
 - `src/renderer/openRouter/openRouterControls.ts`
 - `src/renderer/openRouter/openRouterRuntime.ts`
+- `src/shared/ipc/modelCallCancelTypes.ts` (`modelCallCancelLogLine`)

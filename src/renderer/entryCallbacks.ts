@@ -26,7 +26,7 @@ import type { TacticalRendererStartBattleSideEffects } from './tactical/tactical
 import { tacticalReconcileBattleAfterStrategicSnapshot, tacticalSyncTacticalEntryButtonOverlay } from './tactical/tacticalUiOrchestration';
 import { createBuildQueuePopupHandler } from './gameplay/buildQueuePopup';
 
-import { renderOpenRouterToolsList as renderOpenRouterToolsListFromModule, startBackgroundRequestIfAllowed as startBackgroundRequestIfAllowedFromModule } from './openRouter/openRouterRuntime';
+import { renderOpenRouterToolsList as renderOpenRouterToolsListFromModule, startBackgroundRequestIfAllowed as startBackgroundRequestIfAllowedFromModule, stopOpponentPlanning } from './openRouter/openRouterRuntime';
 import { resetPrecomputedAiState } from './openRouter/precomputedAiState';
 
 import { clearPendingTacticalOrders, refreshHoverRoutePreview as refreshHoverRoutePreviewFromModule, type RefreshHoverRoutePreviewOptions } from './gameplay/tacticalOrders';
@@ -788,7 +788,7 @@ export function updateGameOverUI(state: GameStateSnapshot | null): void {
  *
  * Purpose: The right panel leaves the layout when that dialog opens. The map has to take the freed width before the preview fits.
  * When to use: The Model tab's New button.
- * Expected outcome: A battle or playback ignores the click. Otherwise the dialog opens, and the map resizes only when the overlay was hidden.
+ * Expected outcome: The annihilation dialog ignores the click. Otherwise opponent planning and playback stop, the dialog opens, and the map resizes only when the overlay was hidden.
  * Exceptions: None.
  */
 export function openNewGameOverlayFromModelTab(): void {
@@ -921,7 +921,7 @@ export async function syncOpenRouterRunToggleInteractable(): Promise<void> {
       if (S.runButtonOn) {
         S.runButtonOn = false;
         runBtn.setAttribute('aria-pressed', 'false');
-        window.gameApi?.cancelRequestAiOrders?.();
+        void stopOpponentPlanning('run_off');
         resetPrecomputedAiState('null');
         S.eventDrivenInitialConsultationDone = false;
         updateReadyButtonState();

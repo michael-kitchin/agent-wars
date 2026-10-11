@@ -30,6 +30,7 @@ import { NAVAL_DESTINATION_MUST_BE_WATER_COASTAL } from '../navalMovementMessage
 import { buildSystemPromptForTools } from './openRouterBuildSystemPrompt';
 import { buildToolDefinitions } from './openRouterToolCatalog';
 import { resolveOpenRouterChatTransport } from './openRouterChatTransport';
+import { registerLiveModelIdReader } from './liveModelId';
 import type {
   RequestOrdersError,
   RequestOrdersOptions,
@@ -554,4 +555,6 @@ export async function requestOrders(
     options
   );
 }
+
+registerLiveModelIdReader(getSelectedModel);
 

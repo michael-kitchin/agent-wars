@@ -6,6 +6,7 @@ import type { TacticalAnnihilationOutcomeKind } from '../../shared/tacticalAnnih
 import { rendererSharedState as S } from '../core/state';
 import { setMainUIControlsEnabled } from '../core/uiState';
 import { updateReadyButtonState } from '../openRouter/openRouterUiHelpers';
+import { stopOpponentPlanning } from '../openRouter/openRouterRuntime';
 import { syncTacticalExitButtonElementVisibility } from './tacticalExitButtonDom';
 
 /** Neutral copy when both tactical sides have zero sub-units after the same beat. */
@@ -36,7 +37,7 @@ function tacticalAnnihilationMessageForOutcome(outcome: TacticalAnnihilationOutc
  */
 export function openTacticalAnnihilationOutcomeDialog(outcome: TacticalAnnihilationOutcomeKind): void {
   S.tacticalAnnihilationOutcomeDialog = outcome;
-  void window.gameApi?.cancelRequestAiOrders?.();
+  void stopOpponentPlanning('teardown');
   const overlay = document.getElementById('tactical-annihilation-overlay');
   const messageEl = document.getElementById('tactical-annihilation-message');
   if (messageEl) messageEl.textContent = tacticalAnnihilationMessageForOutcome(outcome);

@@ -16,6 +16,7 @@ import {
   type RequestAiOrdersResult,
   type ReadyResultMinimal,
 } from './gameIpcHandlers';
+import { advanceMatchGeneration } from './matchGeneration';
 import type { AirStrikeOrder, EmbarkOrder, FerryOrder, ReadyResult, TacticalOpponentPlanPayload } from '../shared/ipcTypes';
 import { setActiveTacticalBattleSnapshotRef } from './tacticalBattle/activeTacticalBattleRef';
 import type { TacticalBattleSnapshot } from '../shared/tacticalBattleTypes';
@@ -772,6 +773,38 @@ async function testHandleResolveMeleeInterceptOmitsTacticalAutoStartOnIgnore(): 
   assert.strictEqual((result as { tacticalAutoStartH3Index?: string }).tacticalAutoStartH3Index, undefined);
 }
 
+/**
+ * A new match started during the inline consult must not resolve the old turn.
+ *
+ * Purpose: Opening New retires the match generation. Ready that is still waiting on the model must not call `ready()`.
+ * When to use: This file's runner.
+ * Expected outcome: `ready` is not called, and the result says a new game started.
+ * Exceptions: None.
+ */
+async function testGameReadyNewGameDuringConsultDoesNotResolve(): Promise<void> {
+  let readyCalled = false;
+  const deps = {
+    getGameState: () => minimalPlanningState,
+    getGameStateForPlayer: () => minimalPlanningState,
+    getSelectedModel: () => 'test-model',
+    hasKey: () => true,
+    getToolNamesForEnabledGroups: () => ['planning'],
+    defaultGroupIds: ['planning'],
+    requestOrders: async (): Promise<RequestAiOrdersResult> => {
+      advanceMatchGeneration('new_game');
+      return { success: false, error: 'Cancelled' };
+    },
+    ready: (): ReadyResultMinimal & { success: boolean } => {
+      readyCalled = true;
+      return { success: true, aiOrderCount: 0 };
+    },
+  };
+  const result = await handleGameReady({ enabledToolGroups: ['planning'], aiPlanningRunEnabled: true }, deps);
+  assert.strictEqual(readyCalled, false);
+  assert.strictEqual(result.success, false);
+  assert.strictEqual(result.reason, 'A new game started before this turn finished.');
+}
+
 async function runAll(): Promise<void> {
   const tests: { name: string; fn: () => void | Promise<void> }[] = [
     { name: 'requestAiOrders not in planning phase', fn: testRequestAiOrdersNotInPlanningPhase },
@@ -789,6 +822,10 @@ async function runAll(): Promise<void> {
     {
       name: 'game:ready Run off skips LLM (non-event-driven)',
       fn: testGameReadyRunOffSkipsRequestOrdersNonEventDriven,
+    },
+    {
+      name: 'game:ready does not resolve a turn after a new game starts',
+      fn: testGameReadyNewGameDuringConsultDoesNotResolve,
     },
     { name: 'game:ready precomputed with orders', fn: testGameReadyPrecomputedWithOrders },
     {

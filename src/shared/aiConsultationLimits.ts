@@ -34,7 +34,7 @@ export const AI_CONSULTATION_WALL_CLOCK_MS = 300_000;
  * Purpose: Shorter outer races (the old 75s background timer and 120s post-resolution race) cancelled consultations the loop was still allowed to finish.
  * When to use: Post-resolution `Promise.race` and the renderer's background `requestAiOrders` timer.
  * Expected outcome: Covers the 5-minute loop plus the in-flight round and the parse-repair call, each including its one retry (660s).
- * Exceptions: Does not abort the in-flight HTTP call; it only stops the waiter. The transport's own 90s abort still applies.
+ * Exceptions: The waiter aborts the in-flight model call when it fires. The transport's own 90s abort still applies to each attempt.
  */
 export const AI_CONSULTATION_WAIT_TIMEOUT_MS =
   AI_CONSULTATION_WALL_CLOCK_MS + 2 * (1 + AI_MODEL_REQUEST_RETRY_COUNT) * AI_MODEL_REQUEST_TIMEOUT_MS;

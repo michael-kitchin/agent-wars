@@ -1,32 +1,21 @@
-import type {
-  CommitHumanTacticalDraftOrdersIpcResult,
-  GameReadyIpcPayload,
-  GameStateSnapshot,
-} from '../../shared/ipcTypes';
-import {
-  applyTacticalPostBeatConsultSideEffects,
-  isTacticalPostBeatConsultOnCommit,
-} from '../tactical/applyTacticalPostBeatConsultSideEffects';
+import type { GameReadyIpcPayload, GameStateSnapshot } from '../../shared/ipcTypes';
 import type { MeleeInterceptModalOutcome } from './meleeInterceptModal';
-import { buildTacticalSubUnitKillLabelOverlay } from './sidebarSupport';
 import { readTacticalBattlesInterceptPromptEnabled } from './tacticalBattlePromptPreference';
 import type { ResolutionMove } from '../core/types';
 import { rendererSharedState as S } from '../core/state';
-import { tacticalOpponentPlanPayloadHasAnyOrders } from '../../shared/ipc/tacticalOpponentPlanMerge';
 import { pickPlaybackDiceRolls } from '../../shared/combatDiceChips';
 import { resetPrecomputedAiState } from '../openRouter/precomputedAiState';
 import {
   isDeferredResolutionPlaybackConsultPending,
   isWaitingForPrecomputedAiOrders,
 } from '../openRouter/aiPlanningState';
-import { buildTacticalPendingMarchRowsFromContinuations } from '../tactical/tacticalPendingMarchPath';
-import { reconcileSelectionToCurrentState } from '../core/selection';
 import { applyToolInvocationCountsAfterReady } from '../openRouter/openRouterUiHelpers';
 
+import { currentRendererMatchEpoch, rendererMatchEpochCurrent } from '../core/matchEpoch';
 import type { ReadyHandlerDeps } from './readyHandlerTypes';
+import { rollbackReadyToolCounts, runTacticalReadyCommit } from './readyTacticalCommit';
 import {
   announceResolutionTurnUpdate,
-  buildTacticalCommitReadyResultForToast,
   deriveCombatVisibilityClassification,
   scheduleResolutionPlaybackCompleteNotify,
 } from './readyResolutionAnnouncements';
@@ -105,23 +94,6 @@ function buildReadyPayload(args: ReadyPayloadBuildArgs): GameReadyIpcPayload {
   return base;
 }
 
-
-/**
- * Restores tool invocation counts captured before Ready and refreshes the OpenRouter count labels.
- *
- * Purpose: One restore path for Ready aborts that already zeroed `S.toolInvocationCounts`.
- * When to use: When a Ready or tactical-commit path returns after the pre-click snapshot was taken.
- * Expected outcome: `S.toolInvocationCounts` matches `snapshot` and labels are updated.
- * Exceptions: None.
- */
-function rollbackReadyToolCounts(
-  deps: ReadyHandlerDeps,
-  snapshot: Readonly<typeof S.toolInvocationCounts>
-): void {
-  S.toolInvocationCounts = snapshot;
-  deps.updateOpenRouterToolCountLabels();
-}
-
 /**
  * Runs the Ready button: commits a tactical beat in battle, or resolves the strategic turn on the world map.
  *
@@ -132,7 +104,7 @@ function rollbackReadyToolCounts(
  *   On the world map, submits drafts, resolves the turn (pausing for the tactical battles list when melee candidates
  *   are reported), reloads state, and plays the turn back with fog-filtered combat marks and dice chips. It can then
  *   start a battle the turn chose. Failures show on the map toast and return the player to planning.
- * Exceptions: None; errors are caught and reported.
+ * Exceptions: None; errors are caught and reported. A newer match skips that report.
  */
 export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<void> {
   if (!window.gameApi) return;
@@ -145,6 +117,7 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
   }
   deps.clearSidebarError();
   S.readyRequestInFlight = true;
+  const matchEpoch = currentRendererMatchEpoch();
   const toolCountsBeforeReadyClick = { ...S.toolInvocationCounts };
   const cachedPrecomputedToolCountsAtReadyStart = S.precomputedToolInvocationCounts
     ? { ...S.precomputedToolInvocationCounts }
@@ -160,225 +133,12 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
       deps.updateReadyButtonState();
       return;
     }
-    if (S.tacticalBattleSnapshot && S.tacticalPhasePlanning) {
-      const commit = window.gameApi.commitHumanTacticalDraftOrders;
-      if (!commit) {
-        rollbackReadyToolCounts(deps, toolCountsBeforeReadyClick);
-        deps.showSidebarError('Tactical commit is not available in this build.');
-        deps.updateReadyButtonState();
-        return;
-      }
-      const livingSubUnitIds = new Set(S.tacticalBattleSnapshot.subUnits.map((u) => u.id));
-      S.tacticalPendingMarches = S.tacticalPendingMarches.filter((row) =>
-        livingSubUnitIds.has(row.subUnitId)
-      );
-      const movementOrders = S.tacticalPendingMarches.map((r) => ({
-        unitId: r.subUnitId,
-        toH3Index: r.destinationH3Index,
-      }));
-      const commitResult = (await commit({
-        movementOrders,
-        rangedAttacks: [...S.pendingRangedAttacks],
-        airStrikes: [...S.pendingAirStrikes],
-        ferryOrders: [...S.pendingFerryOrders],
-        embarkOrders: [...S.pendingEmbarkOrders],
-        ...(S.tacticalOpponentDraft && tacticalOpponentPlanPayloadHasAnyOrders(S.tacticalOpponentDraft)
-          ? { opponentTacticalDraft: S.tacticalOpponentDraft }
-          : {}),
-        useEventDrivenConsultation: S.useEventDrivenConsultation,
-        aiPlanningRunEnabled: S.runButtonOn,
-      })) as CommitHumanTacticalDraftOrdersIpcResult;
-      if (!commitResult.success) {
-        rollbackReadyToolCounts(deps, toolCountsBeforeReadyClick);
-        deps.showSidebarError(commitResult.reason ?? 'Tactical commit failed');
-        deps.updateReadyButtonState();
-        return;
-      }
-      const tacticalSubUnitsBeforeCommit = S.tacticalBattleSnapshot?.subUnits;
-      const playback = commitResult.tacticalResolutionPlayback;
-      const hasMoves =
-        (playback?.humanMoves?.length ?? 0) > 0 || (playback?.opponentMoves?.length ?? 0) > 0;
-      const hasRangedPlayback =
-        (playback?.rangedCombatHexes?.length ?? 0) > 0 ||
-        (playback?.rangedCasualtyHexes?.length ?? 0) > 0 ||
-        (playback?.rangedRemovedUnits?.length ?? 0) > 0;
-      const hasMeleePlayback =
-        (playback?.meleeCombatHexes?.length ?? 0) > 0 ||
-        (playback?.meleeCasualtyHexes?.length ?? 0) > 0 ||
-        (playback?.meleeRemovedUnits?.length ?? 0) > 0 ||
-        (playback?.killsByMelee?.length ?? 0) > 0;
-      const hasKillPlayback =
-        (playback?.killsByDirectFire?.length ?? 0) > 0 ||
-        (playback?.killsByAirStrike?.length ?? 0) > 0 ||
-        (playback?.killsByReturnFire?.length ?? 0) > 0 ||
-        (playback?.killsByMelee?.length ?? 0) > 0;
-      const hasAirStrikePlaybackAnim =
-        (playback?.airStrikeAttemptCount ?? 0) > 0 ||
-        (playback?.airStrikeMoves?.length ?? 0) > 0 ||
-        (playback?.airStrikeHexes?.length ?? 0) > 0 ||
-        (playback?.airStrikeCasualtyHexes?.length ?? 0) > 0;
-      const needsResolutionPlayback =
-        hasMoves || hasRangedPlayback || hasMeleePlayback || hasKillPlayback || hasAirStrikePlaybackAnim;
-      // Start resolution playback before updating the tactical snapshot so no redraw can paint post-commit cells
-      // while `resolutionMoveAnimation` is still null (avoids a one-frame teleport hop).
-      // Defer the playback clock and the first rAF until after post-commit `getGameState` / terrain refresh so the
-      // movement segment is not consumed invisibly (avoids a short initial glide, pause, then tail).
-      if (playback && needsResolutionPlayback) {
-        if (S.resolutionMoveAnimationFrameId !== null) cancelAnimationFrame(S.resolutionMoveAnimationFrameId);
-        S.resolutionMoveAnimationFrameId = null;
-        const tacticalMarchPlaybackUnits = tacticalSubUnitsBeforeCommit?.length
-          ? (tacticalSubUnitsBeforeCommit.map((u) => ({
-              id: u.id,
-              player: u.player,
-              unitType: u.unitType,
-              h3Index: u.h3Index,
-            })) as GameStateSnapshot['units'])
-          : undefined;
-        const airStrikeOutboundMoves = deps.buildAirStrikeOutboundPlaybackMoves(playback.airStrikeMoves);
-        const airStrikeReturnMoves = deps.buildAirStrikeReturnPlaybackMoves(playback.airStrikeMoves);
-        S.resolutionMoveAnimation = {
-          moves: [...playback.humanMoves, ...(playback.opponentMoves ?? [])],
-          startTime: Date.now(),
-          tacticalDeferResolutionClock: true,
-          ...(tacticalMarchPlaybackUnits ? { tacticalMarchPlaybackUnits } : {}),
-          ...(airStrikeOutboundMoves.length > 0 ? { airStrikeOutboundMoves } : {}),
-          ...(airStrikeReturnMoves.length > 0 ? { airStrikeReturnMoves } : {}),
-          ...(playback.airStrikeHexes?.length ? { airStrikeCombatHexes: playback.airStrikeHexes } : {}),
-          ...(playback.airStrikeCasualtyHexes?.length ? { airStrikeCasualtyHexes: playback.airStrikeCasualtyHexes } : {}),
-          ...(playback.airStrikeRemovedUnits?.length ? { airStrikeRemovedUnits: playback.airStrikeRemovedUnits } : {}),
-          rangedCombatHexes: playback.rangedCombatHexes,
-          rangedCasualtyHexes: playback.rangedCasualtyHexes,
-          rangedRemovedUnits: playback.rangedRemovedUnits,
-          ...(playback.rangedResolutionShotLines?.length
-            ? { rangedResolutionShotLines: playback.rangedResolutionShotLines }
-            : {}),
-          meleeCombatHexes: playback.meleeCombatHexes?.length ? playback.meleeCombatHexes : undefined,
-          meleeCasualtyHexes: playback.meleeCasualtyHexes?.length ? playback.meleeCasualtyHexes : undefined,
-          meleeRemovedUnits: playback.meleeRemovedUnits?.length ? playback.meleeRemovedUnits : undefined,
-          ...pickPlaybackDiceRolls(playback),
-        };
-      }
-      if (commitResult.tacticalBattle) {
-        S.tacticalBattleSnapshot = commitResult.tacticalBattle;
-      }
-      if (S.resolutionMoveAnimation != null && S.tacticalBattleSnapshot != null) {
-        deps.updateGameStateSidebar(S.gameState);
-        deps.syncTacticalExitButton?.();
-      }
-      // Drop selection / drafts that referenced sub-units removed during this beat before the next planning click.
-      reconcileSelectionToCurrentState();
-      // Consume any opponent draft that was just applied (or emptied by sanitize). Post-beat consult may refill below.
-      if ('committedOpponentTacticalDraft' in commitResult) {
-        S.tacticalOpponentDraft = null;
-      }
-      if (commitResult.tacticalPostBeatConsultDeferred) {
-        S.pendingDeferredTacticalPostBeatConsult = true;
-        S.deferredResolutionConsultNotifySent = false;
-      }
-      if (!commitResult.tacticalPostBeatConsultDeferred && isTacticalPostBeatConsultOnCommit(commitResult)) {
-        applyTacticalPostBeatConsultSideEffects(commitResult, deps);
-      } else if (!commitResult.tacticalPostBeatConsultDeferred) {
-        if ('tacticalOpponentPlan' in commitResult) {
-          S.tacticalOpponentDraft = commitResult.tacticalOpponentPlan ?? null;
-        }
-        deps.showAiStrategyToast({ message: commitResult.aiMessage, strategy: commitResult.aiStrategy });
-      }
-      // Same rule as strategic Ready: prefer this beat's consult counts, else keep prefetch telemetry visible.
-      applyToolInvocationCountsAfterReady({
-        fromResult: commitResult.toolInvocationCounts,
-        cachedPrecomputed: cachedPrecomputedToolCountsAtReadyStart,
-        allowPrecomputedFallback: S.runButtonOn && cachedPrecomputedToolCountsAtReadyStart != null,
-      });
-      // Replaces pending rows from the successful commit (continuations plus cleared ranged/air/ferry/embark). A late
-      // requestAiOrders result is dropped in openRouterRuntime when tacticalBattleSnapshot is gone.
-      const previousPendingMarches = new Map(S.tacticalPendingMarches.map((row) => [row.subUnitId, row]));
-      S.tacticalPendingMarches = commitResult.tacticalMarchContinuations?.length
-        ? buildTacticalPendingMarchRowsFromContinuations({
-            battle: commitResult.tacticalBattle ?? S.tacticalBattleSnapshot!,
-            continuations: commitResult.tacticalMarchContinuations,
-            previousBySubUnitId: previousPendingMarches,
-          })
-        : [];
-      S.pendingRangedAttacks = [];
-      S.pendingAirStrikes = [];
-      S.pendingFerryOrders = [];
-      S.pendingEmbarkOrders = [];
-      S.rangedModeActive = false;
-      S.airStrikeModeActive = false;
-      if (window.gameApi?.getGameState) {
-        try {
-          const refreshedStrategic = (await window.gameApi.getGameState()) as GameStateSnapshot;
-          await deps.applyGameStateSnapshot(refreshedStrategic, {
-            refreshStandingOrders: false,
-            updateGameStateSidebarUi: false,
-            updateSelectionUi: false,
-            updateGameOverUi: false,
-            updateReadyButton: false,
-            refreshBuildPopup: true,
-            redraw: false,
-          });
-        } catch (err) {
-          console.error('tactical commit: failed to refresh strategic game state snapshot', err);
-        }
-      }
-      if (playback && S.gameState && needsResolutionPlayback) {
-        const tacticalReadySlice = buildTacticalCommitReadyResultForToast(playback);
-        const visibleHexes = deps.getVisibleHexSet(S.gameState);
-        const visibility = deriveCombatVisibilityClassification(tacticalReadySlice, visibleHexes);
-        const killToastFormatter = deps.buildKillToastFormatterBundle(
-          S.gameState,
-          tacticalReadySlice.removedUnits,
-          buildTacticalSubUnitKillLabelOverlay({
-            subUnitsBeforeCommit: tacticalSubUnitsBeforeCommit,
-            subUnitsAfterCommit: S.tacticalBattleSnapshot?.subUnits,
-            removedUnits: tacticalReadySlice.removedUnits,
-          })
-        );
-        await announceResolutionTurnUpdate(
-          {
-            readySlice: tacticalReadySlice,
-            visibility,
-            killToastFormatter,
-            extraKills: {
-              killsByMelee: playback.killsByMelee,
-              killsByAirStrike: playback.killsByAirStrike,
-            },
-          },
-          deps
-        );
-      }
-      await deps.refreshTacticalTerrainOverridesForRenderer();
-      deps.updatePendingOrdersSidebar();
-      deps.updateRangedSidebar();
-      deps.updateSidebar();
-      deps.updateGameStateSidebar(S.gameState);
-      if (S.resolutionMoveAnimation?.tacticalDeferResolutionClock) {
-        S.resolutionMoveAnimation.tacticalDeferResolutionClock = false;
-        S.resolutionMoveAnimation.startTime = Date.now();
-      }
-      if (S.resolutionMoveAnimation && needsResolutionPlayback && S.resolutionMoveAnimationFrameId === null) {
-        S.resolutionMoveAnimationFrameId = requestAnimationFrame(deps.tickResolutionMoveAnimation);
-      }
-      deps.redraw();
-      deps.scheduleTacticalAnnihilationExit?.();
-      if (commitResult.tacticalPostBeatConsultDeferred) {
-        const bid = commitResult.tacticalBattle?.battleId;
-        if (bid) {
-          const sendTacticalNotify = (): void => {
-            void window.gameApi?.notifyResolutionPlaybackComplete?.({ kind: 'tactical', battleId: bid });
-            S.deferredResolutionConsultNotifySent = true;
-            deps.updateReadyButtonState();
-          };
-          scheduleResolutionPlaybackCompleteNotify(sendTacticalNotify, needsResolutionPlayback);
-        }
-      }
-      if (S.runButtonOn && !commitResult.tacticalPostBeatConsultDeferred) {
-        const oppAlive = S.tacticalBattleSnapshot?.subUnits.some((u) => u.player === 'opponent') ?? false;
-        if (oppAlive) deps.startBackgroundRequestIfAllowed();
-      }
-      deps.updateReadyButtonState();
-      return;
-    }
+    if (await runTacticalReadyCommit({
+      deps,
+      toolCountsBeforeReadyClick,
+      cachedPrecomputedToolCountsAtReadyStart,
+      matchEpoch,
+    })) return;
     const hasPendingDraftOrders =
       S.pendingRangedAttacks.length > 0 ||
       S.pendingAirStrikes.length > 0 ||
@@ -390,6 +150,7 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
         airStrikes: S.pendingAirStrikes,
         ferryOrders: S.pendingFerryOrders,
       })) as { success: boolean; reason?: string };
+      if (!rendererMatchEpochCurrent(matchEpoch)) return;
       if (!submitResult.success) {
         deps.showSidebarError(submitResult.reason ?? 'Submit failed');
         deps.updateReadyButtonState();
@@ -410,6 +171,7 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
     });
     const visibleHexesBeforeTurn = deps.getVisibleHexSet(S.gameState);
     let readyResult = await deps.callReadyWithTimeout(readyPayload);
+    if (!rendererMatchEpochCurrent(matchEpoch)) return;
     let resolutionPlaybackNotifyKind: 'strategic' | 'melee' = 'strategic';
     if (!readyResult.success) {
       rollbackReadyToolCounts(deps, toolCountsBeforeReadyClick);
@@ -427,6 +189,7 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
       }
       await deps.refreshTacticalTerrainOverridesForRenderer();
       const pausedState = (await window.gameApi.getGameState()) as GameStateSnapshot;
+      if (!rendererMatchEpochCurrent(matchEpoch)) return;
       await deps.applyGameStateSnapshot(pausedState, {
         refreshStandingOrders: false,
         updateGameStateSidebarUi: false,
@@ -450,6 +213,7 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
         aiPlanningRunEnabled: S.runButtonOn,
         enabledToolGroups: enabledToolGroupsPayload,
       });
+      if (!rendererMatchEpochCurrent(matchEpoch)) return;
       if (!resolveResult.success) {
         rollbackReadyToolCounts(deps, toolCountsBeforeReadyClick);
         deps.showSidebarError(resolveResult.reason ?? 'Melee resolve failed');
@@ -464,6 +228,7 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
     const humanMoves: ResolutionMove[] = readyResult.humanMoves ?? [];
     await deps.refreshTacticalTerrainOverridesForRenderer();
     const nextState = (await window.gameApi.getGameState()) as GameStateSnapshot;
+    if (!rendererMatchEpochCurrent(matchEpoch)) return;
     const state = nextState;
     await deps.applyGameStateSnapshot(state, {
       refreshStandingOrders: false,
@@ -474,6 +239,7 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
       refreshBuildPopup: true,
       redraw: false,
     });
+    if (!rendererMatchEpochCurrent(matchEpoch)) return;
     const aiMoves = readyResult.aiMoves ?? [];
     const resolutionMoves = [...humanMoves, ...aiMoves];
     const airStrikeOutboundMoves = deps.buildAirStrikeOutboundPlaybackMoves(readyResult.airStrikeMoves);
@@ -574,25 +340,32 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
         },
         deps
       );
+      if (!rendererMatchEpochCurrent(matchEpoch)) return;
       S.resolutionMoveAnimationFrameId = requestAnimationFrame(deps.tickResolutionMoveAnimation);
     }
     S.hoverRoutePreview = null;
     S.hideCommittedOrderLinesAfterReady = false;
+    if (!rendererMatchEpochCurrent(matchEpoch)) return;
     await prepareStrategicPlanningUiBeforeTacticalAutoStart(state, deps);
+    if (!rendererMatchEpochCurrent(matchEpoch)) return;
     deps.updateGameOverUI(state);
     deps.updateReadyButtonState();
     if (S.runButtonOn && !S.pendingDeferredStrategicPostResolutionConsult) deps.startBackgroundRequestIfAllowed();
     deps.redraw();
     if (readyResult.tacticalAutoStartH3Index) {
       await deps.startTacticalBattleFromInterceptHex(readyResult.tacticalAutoStartH3Index);
+      if (!rendererMatchEpochCurrent(matchEpoch)) return;
       if (S.runButtonOn && !S.pendingDeferredStrategicPostResolutionConsult) deps.startBackgroundRequestIfAllowed();
     }
   } catch (err) {
+    if (!rendererMatchEpochCurrent(matchEpoch)) return;
     deps.showSidebarError(String(err));
     deps.updateReadyButtonState();
   } finally {
-    S.readyRequestInFlight = false;
-    deps.updateReadyButtonState();
+    if (rendererMatchEpochCurrent(matchEpoch)) {
+      S.readyRequestInFlight = false;
+      deps.updateReadyButtonState();
+    }
   }
 }
 
@@ -618,15 +391,17 @@ export type PrepareStrategicPlanningUiBeforeTacticalAutoStartDeps = {
  *
  * Purpose: Single sequence shared by `handleReadyButtonClick` immediately before `tacticalAutoStartStrategicH3Index` tactical entry and magnifier `prepareStrategicUiBeforeTacticalStart` so Fight and magnifier paths cannot drift.
  * When to use: After strategic resolution updates game state and before activating tactical battle from the same planning turn.
- * Expected outcome: Right-hand panels reflect `listHumanStandingOrders` and empty tactical drafts before `stashStrategicOrderDraftsForTacticalSession` runs inside tactical activation.
+ * Expected outcome: Right-hand panels reflect `listHumanStandingOrders` and empty tactical drafts before `stashStrategicOrderDraftsForTacticalSession` runs inside tactical activation. A newer match skips the sidebar refresh after standing orders reload.
  * Exceptions: None.
  */
 export async function prepareStrategicPlanningUiBeforeTacticalAutoStart(
   gameState: GameStateSnapshot | null,
   deps: PrepareStrategicPlanningUiBeforeTacticalAutoStartDeps
 ): Promise<void> {
+  const matchEpoch = currentRendererMatchEpoch();
   deps.clearPendingTacticalOrders();
   await deps.refreshHumanStandingOrders();
+  if (!rendererMatchEpochCurrent(matchEpoch)) return;
   if (gameState) {
     deps.updateGameStateSidebar(gameState);
   }

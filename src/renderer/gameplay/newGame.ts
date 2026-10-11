@@ -23,7 +23,11 @@ import { installRendererGameMap } from '../core/installRendererGameMap';
 import { blurMapChromeIfFocused } from '../core/uiState';
 import { expandNewGameDialog, toggleNewGameDialogCollapsed } from './newGameDialogCollapse';
 import { syncMapExtentToSnapshot } from '../map/mapExtent';
-import { prepareNewGameMapPanel, readNewGameMapChoice, regionalStartBlocked, registerNewGameMapControls } from './newGameMapUi';
+import { prepareNewGameMapPanel, readNewGameMapChoice, regionalStartBlocked, registerNewGameMapControls, selectedNewGameTab } from './newGameMapUi';
+import { showNewGameBanner } from './newGameBanner';
+import { advanceRendererMatchEpoch, rendererMatchEpochCurrent } from '../core/matchEpoch';
+import { stopOpponentPlanning } from '../openRouter/openRouterRuntime';
+import { clearResolutionPlaybackAnimationState } from '../tactical/tacticalUiOrchestration';
 import {
   holdNewGameMapPreviewCamera,
   refreshNewGameMapPreview,
@@ -277,6 +281,7 @@ export function registerNewGameButton(deps: NewGameDeps): void {
   registerNewGameOptionSeparators();
   document.getElementById('new-game-btn')?.addEventListener('click', async () => {
     if (!window.gameApi?.newGame) return;
+    const matchEpoch = advanceRendererMatchEpoch();
     if (regionalStartBlocked()) {
       showMapToast('This map has no two sides.');
       return;
@@ -292,6 +297,7 @@ export function registerNewGameButton(deps: NewGameDeps): void {
         ...readNewGameMapChoice(),
         gameSize: readSelectedGameSizeFromDocument(),
       })) as GameStateSnapshot;
+      if (!rendererMatchEpochCurrent(matchEpoch)) return;
       installRendererGameMap(state);
       await deps.refreshTacticalTerrainOverridesForRenderer({ reloadStaticOverlays: true });
       S.gameState = state;
@@ -349,16 +355,21 @@ export function registerNewGameButton(deps: NewGameDeps): void {
  *
  * Purpose: Lets the player abandon the current match; stops pending AI work first so it cannot land on the new one.
  * When to use: The Model tab's New game button.
- * Expected outcome: Returns false when a battle or playback is active, or when the overlay was already open or
- *   missing, and in the battle and playback case does nothing else. Otherwise AI requests are cancelled, Fog of war
+ * Expected outcome: Returns false when the annihilation dialog is open. Otherwise opponent planning and playback stop
+ *   immediately, a tactical preview is released, Fog of war
  *   and the bonus dropdowns return to their defaults, the home regions, starting month, and map preview are drawn
  *   again, the form starts showing, and the overlay opens. Returns true only when this call removes `hidden` from
  *   `#game-over-overlay`.
  * Exceptions: None.
  */
 export function openNewGameOverlayFromModelTab(setMainUIControlsEnabled: (enabled: boolean) => void, updateReadyButtonState: () => void): boolean {
-  if (S.tacticalBattleSnapshot != null || S.resolutionMoveAnimation != null) return false;
-  window.gameApi?.cancelRequestAiOrders?.();
+  if (S.tacticalAnnihilationOutcomeDialog != null) return false;
+  advanceRendererMatchEpoch();
+  void stopOpponentPlanning('new_game');
+  clearResolutionPlaybackAnimationState();
+  if (S.tacticalBattleSnapshot && S.gameState) {
+    tacticalReleaseRendererSessionForNewStrategicMatch(S.gameState, false);
+  }
   resetPrecomputedAiState('null');
   S.pendingDeferredStrategicPostResolutionConsult = false;
   S.pendingDeferredTacticalPostBeatConsult = false;
@@ -366,12 +377,8 @@ export function openNewGameOverlayFromModelTab(setMainUIControlsEnabled: (enable
   S.readyRequestInFlight = false;
   S.eventDrivenInitialConsultationDone = false;
   const overlay = document.getElementById('game-over-overlay');
-  const messageEl = document.getElementById('game-over-message');
   const newGameBtn = document.getElementById('new-game-btn');
-  if (messageEl) {
-    messageEl.textContent = 'Start a new world map game when ready.';
-    messageEl.style.display = '';
-  }
+  showNewGameBanner('newGame', selectedNewGameTab());
   if (newGameBtn) {
     newGameBtn.textContent = 'Start game';
     newGameBtn.setAttribute('data-control-tooltip', newGameButtonTooltipText(true));

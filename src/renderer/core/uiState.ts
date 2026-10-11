@@ -4,7 +4,8 @@ import { formatWeatherIconHtml } from '../../shared/weatherIcons';
 import { rendererSharedState as S } from './state';
 import { setUnitNameContent } from './unitOriginFlags';
 import { initializeScenarioRegionSelectorsOnOverlayOpen } from '../gameplay/newGameRegionUi';
-import { prepareNewGameMapPanel } from '../gameplay/newGameMapUi';
+import { prepareNewGameMapPanel, selectedNewGameTab } from '../gameplay/newGameMapUi';
+import { showGameOverBanner, showNewGameBanner } from '../gameplay/newGameBanner';
 import { refreshNewGameMapPreview, resetNewGameMapPreviewFrame } from '../gameplay/newGameMapPreviewUi';
 import { repaintNewGameMapPreview } from '../map/newGameMapPreviewRendering';
 import { syncGameSizeCapPreview } from '../gameplay/newGameSizeUi';
@@ -149,7 +150,6 @@ export function updateGameOverUI(
   updateReadyButtonState: () => void
 ): boolean {
   const overlay = document.getElementById('game-over-overlay');
-  const messageEl = document.getElementById('game-over-message');
   const newGameBtn = document.getElementById('new-game-btn');
   const rangedBtn = document.getElementById('ranged-attack-btn') as HTMLButtonElement | null;
 
@@ -180,14 +180,10 @@ export function updateGameOverUI(
   }
   syncGameSizeCapPreview();
   setMainUIControlsEnabled(false);
-  if (messageEl) {
-    if (gameOver) {
-      messageEl.textContent = state!.winner === 'human' ? 'You win!' : 'You lose.';
-      messageEl.style.display = '';
-    } else {
-      messageEl.textContent = 'Start the world map game when ready.';
-      messageEl.style.display = '';
-    }
+  if (gameOver) {
+    showGameOverBanner(state!.winner === 'human' ? 'You win!' : 'You lose.');
+  } else {
+    showNewGameBanner('startup', selectedNewGameTab());
   }
   if (newGameBtn) {
     newGameBtn.textContent = noGame ? 'Start game' : 'New game';

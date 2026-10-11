@@ -361,6 +361,10 @@ export async function runRequestOrdersToolLoop(
   let malformedRetryCount = 0;
   let hasCalledTool = false;
   while (iteration < REQUEST_ORDERS_MAX_TOOL_ROUNDS) {
+    if (signal?.aborted) {
+      logDebug('openRouter requestOrders: round skipped because the call was cancelled', { iteration, turnNumber });
+      return { kind: 'fail', error: 'Cancelled' };
+    }
     if (Date.now() - wallClockStart > REQUEST_ORDERS_MAX_WALL_CLOCK_MS) {
       const timeoutMsg = 'AI planning took too long and was cancelled. Please try again.';
       if (onLog) onLog(timeoutMsg, true);

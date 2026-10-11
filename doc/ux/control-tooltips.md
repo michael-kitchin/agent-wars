@@ -57,7 +57,7 @@ The tip can appear whenever the control can receive the pointer or keyboard focu
 - Refresh models: Load the model list again. If that fails, the message appears in the AI activity log.
 - Run, while it cannot be clicked: Turn opponent planning on or off. Enter an API key and choose a model first.
 - Run, while it can be clicked: Turn opponent planning on or off. On opens the Tools tab and can hold Ready until a plan exists; off cancels a plan that is still running.
-- New: Open the new-game screen during world-map planning. During a battle, or while a turn is playing back, the click does nothing.
+- New: Open the new-game screen. Opponent planning and any playback stop right away; the current match is replaced when you start the new one.
 - Reasoning effort: Choose how much reasoning this model uses. You only see levels this model offers, its default is marked, and the list stays unavailable when it has fewer than two.
 - Tactical battles: Leave this checked if you want Ready to let you fight one melee. Uncheck it to skip that list and resolve melee as Ignore.
 - Precomputation: Turn on a summary of units, hexes, and combat that is prepared before the model plans. The number counts uses since the last Ready, and the button stays pressed while this is on.

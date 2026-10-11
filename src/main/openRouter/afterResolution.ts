@@ -5,6 +5,7 @@
  * Call synchronously after ready() returns so pending orders are set before the next Ready.
  */
 
+import { isLikelyAbortError } from '../../shared/abortError';
 import { logDebug, logError } from '../logger';
 import type { GameStateSnapshot } from '../gameDb';
 import {
@@ -85,8 +86,17 @@ hasKey: () => boolean;
 requestOrders: (
     state: GameStateSnapshot,
     modelId: string,
-    options: { enabledToolNames: string[]; usePrecomputation: boolean }
+    options: { enabledToolNames: string[]; usePrecomputation: boolean; signal?: AbortSignal }
   ) => Promise<RequestAiOrdersResult>;
+  /**
+   * Aborts this consult when the player stops opponent planning or the waiter gives up.
+   *
+   * Contract: When aborted, or when `requestOrders` returns `Cancelled`, pending orders are left as they were.
+   * When to use: The post-resolution runner passes the attempt signal.
+   * Expected outcome: A cancel returns `{ consulted: false }` without `clearAiPendingOrders`.
+   * Exceptions: None.
+   */
+  signal?: AbortSignal;
 }
 
 /**
@@ -213,7 +223,12 @@ export async function afterResolution(
       const result = await deps.requestOrders(state, deps.modelId, {
         enabledToolNames: deps.enabledToolNames,
         usePrecomputation: true,
+        signal: deps.signal,
       });
+      if (deps.signal?.aborted || ('error' in result && result.error === 'Cancelled')) {
+        logDebug('afterResolution: consultation cancelled', { turnNumber: state.turnNumber });
+        return { consulted: false };
+      }
       if (result.success === true) {
         setAiPendingOrders(
           'opponent',
@@ -246,6 +261,10 @@ export async function afterResolution(
       clearAiPendingOrders('opponent');
       return { consulted: false };
     } catch (err) {
+      if (deps.signal?.aborted || isLikelyAbortError(err)) {
+        logDebug('afterResolution: consultation cancelled', { turnNumber: state.turnNumber });
+        return { consulted: false };
+      }
       logError('afterResolution: requestOrders exception', err);
       clearAiPendingOrders('opponent');
       return { consulted: false };
@@ -345,8 +364,18 @@ export interface AfterTacticalBeatResolutionDeps {
       enabledToolNames: string[];
       usePrecomputation?: boolean;
       tacticalAiBattle?: TacticalBattleSnapshot;
+      signal?: AbortSignal;
     }
   ) => Promise<RequestAiOrdersResult>;
+  /**
+   * Aborts this post-beat consult when the player stops tactical planning or the waiter gives up.
+   *
+   * Contract: A cancel does not clear strategic pending orders and does not attach a tactical plan.
+   * When to use: The post-beat runner passes the attempt signal.
+   * Expected outcome: `{ consulted: false, attachTacticalOpponentPlanToIpc: false }`.
+   * Exceptions: None.
+   */
+  signal?: AbortSignal;
 }
 
 /**
@@ -505,7 +534,12 @@ export async function afterTacticalBeatResolution(
       enabledToolNames: deps.enabledToolNames,
       usePrecomputation: false,
       tacticalAiBattle: tacticalBattle,
+      signal: deps.signal,
     });
+    if (deps.signal?.aborted || ('error' in result && result.error === 'Cancelled')) {
+      logDebug('afterTacticalBeatResolution: consultation cancelled', { turnNumber: state.turnNumber });
+      return { consulted: false, attachTacticalOpponentPlanToIpc: false };
+    }
     if (result.success === true) {
       const tacticalOpponentPlan =
         result.tacticalOpponentPlan ?? tacticalOpponentPlanFromRequestOrdersSuccess(result);
@@ -532,6 +566,10 @@ export async function afterTacticalBeatResolution(
     clearAiPendingOrders('opponent');
     return { consulted: false, attachTacticalOpponentPlanToIpc: true };
   } catch (err) {
+    if (deps.signal?.aborted || isLikelyAbortError(err)) {
+      logDebug('afterTacticalBeatResolution: consultation cancelled', { turnNumber: state.turnNumber });
+      return { consulted: false, attachTacticalOpponentPlanToIpc: false };
+    }
     logError('afterTacticalBeatResolution: requestOrders exception', err);
     clearAiPendingOrders('opponent');
     return { consulted: false, attachTacticalOpponentPlanToIpc: true };

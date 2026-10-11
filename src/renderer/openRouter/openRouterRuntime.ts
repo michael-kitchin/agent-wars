@@ -1,4 +1,6 @@
 import { isLikelyAbortError } from '../../shared/abortError';
+import type { ModelCallCancelReason } from '../../shared/ipc/modelCallCancelTypes';
+import { isNewGameOverlayOpen } from '../gameplay/newGameBanner';
 import { hasAiStrategyToastContent, type AiStrategyToastFields } from '../../shared/aiStrategyToastContent';
 import { rendererSharedState as S } from '../core/state';
 import {
@@ -21,6 +23,46 @@ import { toolGroupTooltipText } from '../chrome/controlTooltipText';
 const BACKGROUND_AI_REQUEST_TIMEOUT_MS = AI_CONSULTATION_WAIT_TIMEOUT_MS;
 
 /**
+ * Identity of the background `requestAiOrders` the renderer is willing to apply.
+ *
+ * Purpose: A late result must not clear the in-flight flag or restart planning after Run off, New, or a model change.
+ * When to use: `startBackgroundRequestIfAllowed` increments it when a request starts. `invalidateBackgroundAiRequest` increments it again.
+ * Expected outcome: Callbacks whose captured value differs return without writing renderer state.
+ * Exceptions: None.
+ */
+let backgroundAiRequestSequence = 0;
+
+/**
+ * Retires every background request that has already started.
+ *
+ * Purpose: The bump is synchronous, so a caller does not have to wait for the cancel IPC before ignoring late results.
+ * When to use: The first line of `stopOpponentPlanning`, and before Exit Battle's IPC.
+ * Expected outcome: The sequence increases by one and `backgroundRequestInFlight` is false.
+ * Exceptions: None.
+ */
+export function invalidateBackgroundAiRequest(): void {
+  backgroundAiRequestSequence += 1;
+  S.backgroundRequestInFlight = false;
+}
+
+/**
+ * Stops opponent planning in the renderer and asks main to abort matching model calls.
+ *
+ * Purpose: Run off, a model change, New, and teardown share one path that invalidates before the first await.
+ * When to use: Those player actions. Callers do not need to await it for the sequence bump.
+ * Expected outcome: Late background results are ignored. Main logs a stop when it aborted work. A rejected IPC is logged.
+ * Exceptions: A rejected cancel is written to the console and does not throw.
+ */
+export async function stopOpponentPlanning(reason: ModelCallCancelReason): Promise<void> {
+  invalidateBackgroundAiRequest();
+  try {
+    await window.gameApi?.cancelRequestAiOrders?.({ reason });
+  } catch (err) {
+    console.error('stopOpponentPlanning failed', reason, err);
+  }
+}
+
+/**
  * Documents the `OpenRouterRuntimeDeps` interface as a named contract surface (interface OpenRouterRuntimeDeps).
 
  * Purpose: Supports maintainability by documenting why `OpenRouterRuntimeDeps` exists.
@@ -31,41 +73,18 @@ const BACKGROUND_AI_REQUEST_TIMEOUT_MS = AI_CONSULTATION_WAIT_TIMEOUT_MS;
 let openRouterRuntimeDepsRef: OpenRouterRuntimeDeps | null = null;
 
 /**
- * Log line when background `requestAiOrders` is cancelled because the main/renderer tactical session ended (reconcile, new game).
+ * Cancels tactical opponent planning from the renderer when a battle session is torn down.
  *
- * Purpose: Single source for grep and copy used by `cancelTacticalScopedBackgroundPrefetchForSessionTeardown`.
- * When to use: Pass to `cancelInFlightBackgroundAiRequestForRendererTeardown`; do not concatenate ad hoc at call sites.
- * Expected outcome: Matches prior user-visible OpenRouter log wording.
- * Exceptions: None.
+ * Purpose: Exit Battle and reconciling a battle away must ignore a late prefetch. Main aborts tactical scopes only,
+ * so a strategic consult that is still running is left alone. A second call aborts nothing and does not log again.
+ * When to use: Tactical battle exit teardown, `tacticalReleaseRendererSessionForNewStrategicMatch`, and
+ * `tacticalReconcileBattleAfterStrategicSnapshot`.
+ * Expected outcome: The background sequence moves, main is asked to stop tactical work, and Ready is refreshed.
+ * Exceptions: None. Safe when `openRouterRuntimeDepsRef` is unset.
  */
-export const OPEN_ROUTER_LOG_BACKGROUND_AI_CANCEL_SESSION_ENDED =
-  'Tactical AI prefetch cancelled (tactical session ended).';
-
-/**
- * Log line when background `requestAiOrders` is cancelled because the player exited tactical combat voluntarily.
- *
- * Purpose: Single source for `tacticalBattleExitTeardownTransientRendererState` in `tacticalUiOrchestration.ts`.
- * When to use: Pass to `cancelInFlightBackgroundAiRequestForRendererTeardown` from tactical exit teardown only.
- * Expected outcome: Matches prior user-visible OpenRouter log wording.
- * Exceptions: None.
- */
-export const OPEN_ROUTER_LOG_BACKGROUND_AI_CANCEL_TACTICAL_BATTLE_EXIT =
-  'Background AI request cancelled (exiting tactical battle).';
-
-/**
- * Cancels any in-flight `requestAiOrders` work from the renderer (tactical prefetch or strategic background planning).
- *
- * Purpose: Battle exit, session reconciliation, and similar teardown must abort main-process AI work and release the
- * Ready latch so a late result is never applied to a torn-down session.
- * When to use: Tactical battle exit, `tacticalReleaseRendererSessionForNewStrategicMatch`, `tacticalReconcileBattleAfterStrategicSnapshot`, and other renderer teardown that must not apply late AI results.
- * Expected outcome: No-op when no background request; otherwise `cancelRequestAiOrders`, cleared in-flight flags, log line, `unblockPrecomputedAiPlanningAfterBackgroundFailure`, and Ready UI refresh.
- * Exceptions: None; safe when `openRouterRuntimeDepsRef` is unset (still cancels on main).
- */
-export function cancelInFlightBackgroundAiRequestForRendererTeardown(logLine: string): void {
-  if (!S.backgroundRequestInFlight) return;
-  void window.gameApi?.cancelRequestAiOrders?.();
-  S.backgroundRequestInFlight = false;
-  openRouterRuntimeDepsRef?.appendOpenRouterLog(logLine, false);
+export function cancelInFlightBackgroundAiRequestForRendererTeardown(): void {
+  invalidateBackgroundAiRequest();
+  void window.gameApi?.cancelRequestAiOrders?.({ reason: 'battle_exit' });
   unblockPrecomputedAiPlanningAfterBackgroundFailure();
   openRouterRuntimeDepsRef?.updateReadyButtonState();
 }
@@ -79,7 +98,7 @@ export function cancelInFlightBackgroundAiRequestForRendererTeardown(logLine: st
  * Exceptions: None.
  */
 export function cancelTacticalScopedBackgroundPrefetchForSessionTeardown(): void {
-  cancelInFlightBackgroundAiRequestForRendererTeardown(OPEN_ROUTER_LOG_BACKGROUND_AI_CANCEL_SESSION_ENDED);
+  cancelInFlightBackgroundAiRequestForRendererTeardown();
 }
 
 interface OpenRouterRuntimeDeps {
@@ -190,14 +209,17 @@ function strategicPhaseAllowsBackgroundAi(): boolean {
  */
 export function startBackgroundRequestIfAllowed(deps: OpenRouterRuntimeDeps): void {
   if (S.tacticalAnnihilationOutcomeDialog != null) return;
+  if (isNewGameOverlayOpen()) return;
   if (isDeferredResolutionPlaybackConsultPending()) return;
   if (S.backgroundRequestInFlight || !isWaitingForPrecomputedAiOrders() || !strategicPhaseAllowsBackgroundAi()) return;
   openRouterRuntimeDepsRef = deps;
   const keyPromise = window.gameApi?.openRouter?.getKey?.();
   const modelPromise = window.gameApi?.openRouter?.getSelectedModel?.();
   if (!keyPromise || !modelPromise) return;
+  const requestSequence = ++backgroundAiRequestSequence;
   S.backgroundRequestInFlight = true;
   Promise.all([keyPromise, modelPromise]).then(([keyResult, modelId]) => {
+    if (requestSequence !== backgroundAiRequestSequence) return;
     if (!keyResult?.hasKey || !modelId?.trim()) {
       S.backgroundRequestInFlight = false;
       deps.appendOpenRouterLog('Run is on but API key or model not set.', true);
@@ -211,11 +233,20 @@ export function startBackgroundRequestIfAllowed(deps: OpenRouterRuntimeDeps): vo
     }
     const enabledToolGroupsPayload = Array.from(S.enabledToolGroups).filter((id) => id !== 'events');
     const requestPromise = window.gameApi.requestAiOrders({ enabledToolGroups: enabledToolGroupsPayload });
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
     const timeoutPromise = new Promise<never>((_resolve, reject) => {
-      setTimeout(() => reject(new Error(`AI planning timed out after ${BACKGROUND_AI_REQUEST_TIMEOUT_MS}ms`)), BACKGROUND_AI_REQUEST_TIMEOUT_MS);
+      timeoutId = setTimeout(
+        () => reject(new Error(`AI planning timed out after ${BACKGROUND_AI_REQUEST_TIMEOUT_MS}ms`)),
+        BACKGROUND_AI_REQUEST_TIMEOUT_MS
+      );
     });
+    const settleTimer = (): void => {
+      if (timeoutId !== undefined) clearTimeout(timeoutId);
+    };
     Promise.race([requestPromise, timeoutPromise])
       .then((result) => {
+        settleTimer();
+        if (requestSequence !== backgroundAiRequestSequence) return;
         S.backgroundRequestInFlight = false;
         if (S.useEventDrivenConsultation && !S.eventDrivenInitialConsultationDone) {
           S.eventDrivenInitialConsultationDone = true;
@@ -275,10 +306,12 @@ export function startBackgroundRequestIfAllowed(deps: OpenRouterRuntimeDeps): vo
         deps.updateReadyButtonState();
       })
       .catch((err) => {
+        settleTimer();
+        if (requestSequence !== backgroundAiRequestSequence) return;
         const msg = String(err);
         const isAbort = isLikelyAbortError(err);
         if (!isAbort) {
-          window.gameApi?.cancelRequestAiOrders?.();
+          void stopOpponentPlanning('teardown');
         }
         S.backgroundRequestInFlight = false;
         if (isAbort && S.tacticalBattleSnapshot && S.tacticalPhasePlanning) {
@@ -295,6 +328,7 @@ export function startBackgroundRequestIfAllowed(deps: OpenRouterRuntimeDeps): vo
         deps.updateReadyButtonState();
       });
   }).catch((err) => {
+    if (requestSequence !== backgroundAiRequestSequence) return;
     S.backgroundRequestInFlight = false;
     deps.showSidebarError(String(err));
     unblockPrecomputedAiPlanningAfterBackgroundFailure();
@@ -312,7 +346,7 @@ export function startBackgroundRequestIfAllowed(deps: OpenRouterRuntimeDeps): vo
  */
 function handleEventDrivenModeTransition(deps: OpenRouterRuntimeDeps, wasEventDriven: boolean): void {
   if (!S.runButtonOn || wasEventDriven === S.useEventDrivenConsultation) return;
-  window.gameApi?.cancelRequestAiOrders?.();
+  void stopOpponentPlanning('teardown');
   resetPrecomputedAiState('null');
   S.eventDrivenInitialConsultationDone = false;
   startBackgroundRequestIfAllowed(deps);

@@ -7,10 +7,16 @@ import {
   clearDeferredPlaybackConsultPending,
   handleNotifyResolutionPlaybackComplete,
   hasDeferredPlaybackConsultPending,
+  peekPendingPlaybackConsult,
+  releaseDeferredConsultSlot,
   setPendingMeleeResolveConsult,
   setPendingStrategicReadyConsult,
+  setPendingTacticalBeatConsult,
   type DeferredStrategicResolutionConsultArgs,
+  type DeferredTacticalBeatConsultArgs,
 } from './deferredResolutionPlaybackConsult';
+import { cancelModelCalls, modelCallsBegun } from '../openRouter/modelCallControl';
+import { advanceMatchGeneration } from '../matchGeneration';
 import { IPC_GAME, IPC_OPENROUTER } from '../../shared/ipc/channels';
 import { DEFERRED_PLAYBACK_CONSULT_ABANDONED_LOG } from '../../shared/ipc/deferredPlaybackConsultAbandoned';
 import type { ReadyResult } from '../../shared/ipcTypes';
@@ -120,9 +126,67 @@ async function testMismatchedNotifyAbandonsPendingMeleeConsult(): Promise<void> 
   });
 }
 
+/**
+ * A stop before notify must not start the consult.
+ *
+ * Purpose: Run off during playback skips the model call and still unlatches Ready.
+ * When to use: This file's runner.
+ * Expected outcome: `requestOrders` is not reached, because the runner is not entered. The empty push still happens.
+ * Exceptions: None.
+ */
+async function testCancelBeforeNotifySkipsConsult(): Promise<void> {
+  clearDeferredPlaybackConsultPending();
+  const before = modelCallsBegun();
+  const { sender, getPayload } = createCaptureSender();
+  setPendingStrategicReadyConsult(9, {
+    ...minimalConsultArgs(),
+    useEventDrivenConsultation: true,
+    resolutionSuccess: true,
+    aiPlanningRunEnabled: true,
+    hasKey: () => true,
+    modelId: 'm',
+  });
+  cancelModelCalls('run_off', 'all');
+  const result = await handleNotifyResolutionPlaybackComplete(sender as never, {
+    kind: 'strategic',
+    planningTurnNumber: 9,
+  });
+  assert.strictEqual(result.ok, true);
+  assert.strictEqual(modelCallsBegun(), before);
+  assert.strictEqual(hasDeferredPlaybackConsultPending(), false);
+  assert.deepStrictEqual(getPayload(IPC_GAME.postResolutionConsultation), { planningTurnNumber: 9 });
+}
+
+/**
+ * A late tactical completion must not clear a newer strategic consult.
+ *
+ * Purpose: Exit Battle can clear the tactical slot while that consult is still finishing.
+ * When to use: This file's runner.
+ * Expected outcome: The newer strategic record stays pending and the late tactical record does not push.
+ * Exceptions: None.
+ */
+async function testLateTacticalCompletionLeavesNewerStrategicPending(): Promise<void> {
+  clearDeferredPlaybackConsultPending();
+  setPendingTacticalBeatConsult('battle-1', {} as DeferredTacticalBeatConsultArgs);
+  const tactical = peekPendingPlaybackConsult();
+  assert.ok(tactical);
+  const generationAtStart = tactical.generationAtStart;
+  clearDeferredPlaybackConsultPending();
+  setPendingStrategicReadyConsult(3, minimalConsultArgs());
+  assert.strictEqual(releaseDeferredConsultSlot(tactical, generationAtStart), 'drop');
+  assert.strictEqual(peekPendingPlaybackConsult()?.tag, 'strategic-ready');
+  advanceMatchGeneration('new_game');
+  const strategic = peekPendingPlaybackConsult();
+  assert.ok(strategic);
+  assert.strictEqual(releaseDeferredConsultSlot(strategic, strategic.generationAtStart), 'drop');
+  assert.strictEqual(peekPendingPlaybackConsult(), null);
+}
+
 async function runAll(): Promise<void> {
   await testNotifyClearsMutexStrategic();
   await testMismatchedNotifyAbandonsPendingMeleeConsult();
+  await testCancelBeforeNotifySkipsConsult();
+  await testLateTacticalCompletionLeavesNewerStrategicPending();
   console.log('OK deferredResolutionPlaybackConsult tests');
 }
 

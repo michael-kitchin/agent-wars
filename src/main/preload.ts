@@ -4,6 +4,7 @@
  */
 
 import { contextBridge, ipcRenderer } from 'electron';
+import type { ModelCallCancelReason } from '../shared/ipc/modelCallCancelTypes';
 import type {
   SubmitOrdersIpcPayload,
   GameReadyIpcPayload,
@@ -609,8 +610,8 @@ requestAiOrders: (payload?: { enabledToolGroups?: string[] }): Promise<RequestAi
    * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
    * Exceptions: None.
    */
-cancelRequestAiOrders: (): Promise<void> =>
-    ipcRenderer.invoke(IPC_GAME.cancelRequestAiOrders),
+cancelRequestAiOrders: (payload?: { reason?: ModelCallCancelReason }): Promise<void> =>
+    ipcRenderer.invoke(IPC_GAME.cancelRequestAiOrders, payload),
     /**
    * Documents the object literal property `registerOpenRouterLogListener` (registerOpenRouterLogListener: (callback: (payload: { line: string; isError?: boolean }) => void): void => { openRouterLogListener = callback; }).
 

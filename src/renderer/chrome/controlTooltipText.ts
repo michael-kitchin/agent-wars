@@ -270,13 +270,13 @@ export function runButtonTooltipText(enabled: boolean): string {
 }
 
 /**
- * Purpose: Says the click does nothing during a battle or playback.
+ * Purpose: Says New opens the new-game screen and stops planning and playback immediately.
  * When to use: `#openrouter-new-btn`.
  * Expected outcome: The control tip shows this sentence.
  * Exceptions: None.
  */
 export const newButtonTooltipText =
-  'Open the new-game screen during world-map planning. During a battle, or while a turn is playing back, the click does nothing.';
+  'Open the new-game screen. Opponent planning and any playback stop right away; the current match is replaced when you start the new one.';
 
 /**
  * Purpose: Says the list is limited to the selected model's levels.

@@ -5,6 +5,7 @@ import { showMapToast } from '../openRouter/openRouterUiHelpers';
 import { rendererSharedState as S } from '../core/state';
 import { refreshNewGameMapPreview } from './newGameMapPreviewUi';
 import { syncNewGameRegionSelectWidths } from './newGameRegionSelectWidth';
+import { syncNewGameBannerToTab } from './newGameBanner';
 
 /**
  * Tab buttons and panels on the new-game dialog.
@@ -138,6 +139,7 @@ function selectNewGameTab(which: 'global' | 'regional'): void {
   selectTabPanel(which === 'regional' ? 'new-game-tab-regional' : 'new-game-tab-global', NEW_GAME_TABS);
   applyVisibleCosts();
   syncStartEnabled();
+  syncNewGameBannerToTab(which);
 }
 
 /**
@@ -357,6 +359,18 @@ function selectedRegionalEntry(): GameMapListEntry | null {
  */
 function regionalTabSelected(): boolean {
   return document.getElementById('new-game-tab-regional')?.getAttribute('aria-selected') === 'true';
+}
+
+/**
+ * The new-game tab that is selected.
+ *
+ * Purpose: The overlay banner names that tab.
+ * When to use: When the overlay opens, before writing the banner.
+ * Expected outcome: `'regional'` when that tab is selected, otherwise `'global'`.
+ * Exceptions: None. A missing tab is global.
+ */
+export function selectedNewGameTab(): 'global' | 'regional' {
+  return regionalTabSelected() ? 'regional' : 'global';
 }
 
 /**

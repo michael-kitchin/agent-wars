@@ -525,14 +525,14 @@ startTacticalBattle: (payload: { enclosingStrategicH3Index: string }) => Promise
    */
 endTacticalBattle: () => Promise<EndTacticalBattleIpcResult>;
     /**
-   * Specifies the contract for the `cancelRequestAiOrders` member (cancelRequestAiOrders: () => Promise<void>;).
-
-   * Contract: Describes stable behavior for callers of `cancelRequestAiOrders` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Stops opponent model calls for one player action.
+   *
+   * Contract: Optional `reason` selects which calls stop. An omitted or unknown reason stops as teardown. The channel name stays `game:cancelRequestAiOrders`.
+   * When to use: Run off, a model change, New, leaving a battle, and session teardown.
+   * Expected outcome: Matching in-flight calls abort. Main writes at most one ordinary activity line.
    * Exceptions: None.
    */
-cancelRequestAiOrders: () => Promise<void>;
+cancelRequestAiOrders: (payload?: { reason?: import('./modelCallCancelTypes').ModelCallCancelReason }) => Promise<void>;
     /**
    * Specifies the contract for the `registerOpenRouterLogListener` member (registerOpenRouterLogListener?: (callback: (payload: { line: string; isError?: boolean }) => void) => void;).
 

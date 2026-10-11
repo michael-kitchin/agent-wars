@@ -10,6 +10,7 @@
 import type { GameApi } from '../../shared/ipcTypes';
 import type { StartTacticalBattleIpcResult, TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { rendererSharedState as S } from '../core/state';
+import { currentRendererMatchEpoch, rendererMatchEpochCurrent } from '../core/matchEpoch';
 import { enterTacticalMapView } from '../map/tacticalMapView';
 import {
   tacticalPerformBattleExit,
@@ -127,9 +128,11 @@ export async function startTacticalBattleFromEntryHex(
   enclosingStrategicH3Index: string,
   deps: StartTacticalBattleFromEntryHexDeps
 ): Promise<void> {
+  const matchEpoch = currentRendererMatchEpoch();
   if (deps.prepareStrategicUiBeforeTacticalStart) {
     await deps.prepareStrategicUiBeforeTacticalStart();
   }
+  if (!rendererMatchEpochCurrent(matchEpoch)) return;
   const resumedSession =
     S.gameState?.tacticalBattleSession &&
     S.gameState.tacticalBattleSession.enclosingStrategicH3Index === enclosingStrategicH3Index &&
@@ -148,6 +151,7 @@ export async function startTacticalBattleFromEntryHex(
   }
   deps.hideBuildPopup();
   const result: StartTacticalBattleIpcResult = await ipc({ enclosingStrategicH3Index });
+  if (!rendererMatchEpochCurrent(matchEpoch)) return;
   tacticalRendererApplyStartBattleIpcResult(result, deps.getActivationSideEffects());
 }
 

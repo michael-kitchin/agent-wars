@@ -3,14 +3,15 @@
  *
  * Purpose: Keeps combat-resolution field mirroring in one place so `handleGameReady` and `handleResolveMeleeIntercept`
  * cannot drift when `ReadyResult` evolves.
- * When to use: Only from `gameIpcHandlers` when building success responses after `deps.ready` or `resolveMeleeIntercept`.
+ * When to use: From strategic Ready and from melee-intercept resolve when building success responses after `deps.ready` or `resolveMeleeIntercept`.
  * Expected outcome: Identical field wiring as the previous inline spreads; no DB or game-rule side effects.
  * Exceptions: None; callers must only pass successful resolution objects.
  */
 
 import type { GameStateSnapshot } from '../gameDb';
-import { logDebug, logError, logTrace } from '../logger';
+import { logDebug, logTrace } from '../logger';
 import { afterResolution, afterTacticalBeatResolution } from '../openRouter/afterResolution';
+import { executeAbortableConsult } from './modelConsultAttempt';
 import type {
   ReadyResult,
   RangedAttackOrder,
@@ -238,7 +239,7 @@ export async function runEventDrivenAfterResolutionConsultation(args: {
   requestOrders: (
     state: GameStateSnapshot,
     modelId: string,
-    options: { enabledToolNames: string[]; usePrecomputation?: boolean }
+    options: { enabledToolNames: string[]; usePrecomputation?: boolean; signal?: AbortSignal }
   ) => Promise<RequestAiOrdersResult>;
   timeoutMs: number;
   errorLogMessage: string;
@@ -247,32 +248,29 @@ export async function runEventDrivenAfterResolutionConsultation(args: {
     return {};
   }
   logDebug('runEventDrivenAfterResolutionConsultation', { timeoutMs: args.timeoutMs });
-  try {
-    const postResolution = await Promise.race([
+  const attempt = await executeAbortableConsult({
+    label: 'post-resolution consult',
+    theater: 'strategic',
+    timeoutMs: args.timeoutMs,
+    fallbackModelId: args.modelId ?? '',
+    errorLogMessage: args.errorLogMessage,
+    run: ({ signal, modelId }) =>
       afterResolution(args.opponentState, args.resolution, {
-        modelId: args.modelId ?? '',
+        modelId,
         enabledToolNames: args.enabledToolNames,
         hasKey: args.hasKey,
-        requestOrders: args.requestOrders,
+        signal,
+        requestOrders: (state, orderModelId, options) =>
+          args.requestOrders(state, orderModelId, { ...options, signal }),
       }),
-      new Promise<never>((_resolve, reject) => {
-        setTimeout(
-          () => reject(new Error(`afterResolution consultation timed out after ${args.timeoutMs}ms`)),
-          args.timeoutMs
-        );
-      }),
-    ]);
-    return {
-      ...optionalConsultToastFields(postResolution.message, postResolution.strategy),
-      ...(postResolution.toolInvocationCounts ? { toolInvocationCounts: postResolution.toolInvocationCounts } : {}),
-      ...(typeof postResolution.cost === 'number' && Number.isFinite(postResolution.cost)
-        ? { cost: postResolution.cost }
-        : {}),
-    };
-  } catch (err) {
-    logError(args.errorLogMessage, err);
-    return {};
-  }
+  });
+  if (!attempt.ok) return {};
+  const postResolution = attempt.value;
+  return {
+    ...optionalConsultToastFields(postResolution.message, postResolution.strategy),
+    ...(postResolution.toolInvocationCounts ? { toolInvocationCounts: postResolution.toolInvocationCounts } : {}),
+    ...(typeof postResolution.cost === 'number' && Number.isFinite(postResolution.cost) ? { cost: postResolution.cost } : {}),
+  };
 }
 
 /**
@@ -299,6 +297,7 @@ export async function runEventDrivenAfterTacticalBeatConsultation(args: {
       enabledToolNames: string[];
       usePrecomputation?: boolean;
       tacticalAiBattle?: TacticalBattleSnapshot;
+      signal?: AbortSignal;
     }
   ) => Promise<RequestAiOrdersResult>;
   timeoutMs: number;
@@ -308,31 +307,30 @@ export async function runEventDrivenAfterTacticalBeatConsultation(args: {
     return {};
   }
   logDebug('runEventDrivenAfterTacticalBeatConsultation', { timeoutMs: args.timeoutMs });
-  try {
-    const post = await Promise.race([
+  const attempt = await executeAbortableConsult({
+    label: 'post-beat consult',
+    theater: 'tactical',
+    timeoutMs: args.timeoutMs,
+    fallbackModelId: args.modelId ?? '',
+    errorLogMessage: args.errorLogMessage,
+    run: ({ signal, modelId }) =>
       afterTacticalBeatResolution(args.opponentState, args.tacticalBattle, args.tacticalResolutionPlayback, {
-        modelId: args.modelId ?? '',
+        modelId,
         enabledToolNames: args.enabledToolNames,
         hasKey: args.hasKey,
-        requestOrders: args.requestOrders,
+        signal,
+        requestOrders: (state, orderModelId, options) =>
+          args.requestOrders(state, orderModelId, { ...options, signal }),
       }),
-      new Promise<never>((_resolve, reject) => {
-        setTimeout(
-          () => reject(new Error(`afterTacticalBeatResolution timed out after ${args.timeoutMs}ms`)),
-          args.timeoutMs
-        );
-      }),
-    ]);
-    return {
-      attachTacticalOpponentPlanToIpc: post.attachTacticalOpponentPlanToIpc,
-      tacticalOpponentPlan: post.tacticalOpponentPlan,
-      strategy: post.strategy,
-      message: post.message,
-      toolInvocationCounts: post.toolInvocationCounts,
-      ...(typeof post.cost === 'number' && Number.isFinite(post.cost) ? { cost: post.cost } : {}),
-    };
-  } catch (err) {
-    logError(args.errorLogMessage, err);
-    return {};
-  }
+  });
+  if (!attempt.ok) return {};
+  const post = attempt.value;
+  return {
+    attachTacticalOpponentPlanToIpc: post.attachTacticalOpponentPlanToIpc,
+    tacticalOpponentPlan: post.tacticalOpponentPlan,
+    strategy: post.strategy,
+    message: post.message,
+    toolInvocationCounts: post.toolInvocationCounts,
+    ...(typeof post.cost === 'number' && Number.isFinite(post.cost) ? { cost: post.cost } : {}),
+  };
 }

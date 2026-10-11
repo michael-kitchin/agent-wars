@@ -82,6 +82,8 @@ import {
   hasDeferredPlaybackConsultPending,
   setPendingTacticalBeatConsult,
 } from './ipc/deferredResolutionPlaybackConsult';
+import { stopModelWork } from './ipc/modelWorkCancellation';
+import { parseModelCallCancelReason } from '../shared/ipc/modelCallCancelTypes';
 import type {
   SubmitOrdersPayload,
   ReadyResult,
@@ -314,6 +316,9 @@ function registerIpcHandlers(): void {
     buildNewGameMapPreview(request)
   );
   ipcMain.handle(IPC_GAME.newGame, (_event, payload: NewGameIpcPayload | undefined) => {
+    stopModelWork('new_game', (line) => {
+      mainWindow?.webContents?.send(IPC_OPENROUTER.log, { line, isError: false });
+    });
     const fogOfWarEnabled = payload?.fogOfWarEnabled !== false;
     const gameSize = parseGameSize(payload?.gameSize);
     const originBonusLevel = parseBonusLevel(payload?.originBonusLevel, 'off');
@@ -491,6 +496,9 @@ function registerIpcHandlers(): void {
     return startTacticalBattleForEnclosingHex(payload.enclosingStrategicH3Index);
   });
   ipcMain.handle(IPC_GAME.endTacticalBattle, () => {
+    stopModelWork('battle_exit', (line) => {
+      mainWindow?.webContents?.send(IPC_OPENROUTER.log, { line, isError: false });
+    });
     clearDeferredPlaybackConsultPending();
     endTacticalBattleSessionForHumanVoluntaryExitBailout();
     return { success: true as const };
@@ -532,8 +540,12 @@ function registerIpcHandlers(): void {
     }
   );
 
-  ipcMain.handle(IPC_GAME.cancelRequestAiOrders, () => {
-    logDebug('main game:cancelRequestAiOrders');
+  ipcMain.handle(IPC_GAME.cancelRequestAiOrders, (_event, payload?: { reason?: string }) => {
+    const reason = parseModelCallCancelReason(payload?.reason);
+    logDebug('main game:cancelRequestAiOrders', { reason });
+    stopModelWork(reason, (line) => {
+      mainWindow?.webContents?.send(IPC_OPENROUTER.log, { line, isError: false });
+    });
     cancelRequestAiOrders(requestAiOrdersControllerRef);
   });
 

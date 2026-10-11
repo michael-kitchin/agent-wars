@@ -6,6 +6,8 @@ import {
   AI_MODEL_REQUEST_TIMEOUT_MS,
 } from '../../shared/aiConsultationLimits';
 import { logDebug, logError } from '../logger';
+import { formatModelCallFailureLine } from './modelCallAttemptMessages';
+import { readModelHangSimulationMs, shouldSimulateModelHang } from './modelHangSimulation';
 import {
   formatOpenRouterChatApiError,
   noteOpenRouterAffordableMaxTokens,
@@ -81,15 +83,41 @@ function getRetryDelayMs(): number {
 }
 
 /**
- * Defines the `delayMs` function shape (function delayMs(ms: number): Promise<void>).
-
- * Purpose: Supports maintainability by documenting why `delayMs` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Waits `ms`, or returns early when `signal` aborts.
+ *
+ * Purpose: A player cancel during the gap between attempts must not sit through the retry delay.
+ * When to use: After a retryable failure, before the next attempt.
+ * Expected outcome: Resolves when the delay ends or the signal aborts. The caller checks the signal and returns `Cancelled`.
  * Exceptions: None.
  */
-function delayMs(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+function delayMs(ms: number, signal?: AbortSignal): Promise<void> {
+  if (signal?.aborted) return Promise.resolve();
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort);
+      resolve();
+    }, ms);
+    const onAbort = (): void => {
+      clearTimeout(timer);
+      resolve();
+    };
+    signal?.addEventListener('abort', onAbort, { once: true });
+  });
+}
+
+/**
+ * Rejects when `signal` aborts.
+ *
+ * Purpose: A simulated hang has no HTTPS request. The attempt's abort timer, or the player's cancel, ends the wait.
+ * When to use: Instead of `postChatViaHttps` when the hang simulator is on for this attempt.
+ * Expected outcome: Rejects with `AbortError` once the signal aborts. Already-aborted signals reject immediately.
+ * Exceptions: None.
+ */
+function waitForAbort(signal: AbortSignal): Promise<never> {
+  if (signal.aborted) return Promise.reject(new Error('AbortError'));
+  return new Promise((_resolve, reject) => {
+    signal.addEventListener('abort', () => reject(new Error('AbortError')), { once: true });
+  });
 }
 
 /**
@@ -129,6 +157,7 @@ async function defaultPostOpenRouterChatWithTimeoutAndRetry(
   let creditClampRetried = false;
   let networkAttempt = 0;
   let sendOrdinal = 0;
+  const maxAttempts = 1 + OPENROUTER_REQUEST_RETRY_COUNT;
   while (networkAttempt <= OPENROUTER_REQUEST_RETRY_COUNT) {
     const controller = new AbortController();
     const parentSignal = payload.signal;
@@ -137,26 +166,39 @@ async function defaultPostOpenRouterChatWithTimeoutAndRetry(
       if (parentSignal.aborted) controller.abort();
       else parentSignal.addEventListener('abort', onParentAbort, { once: true });
     }
-    const timeoutId = setTimeout(() => controller.abort(), OPENROUTER_REQUEST_TIMEOUT_MS);
+    const simulateHang = shouldSimulateModelHang(networkAttempt);
+    const attemptTimeoutMs = simulateHang ? readModelHangSimulationMs() : OPENROUTER_REQUEST_TIMEOUT_MS;
+    const timeoutId = setTimeout(() => controller.abort(), attemptTimeoutMs);
     sendOrdinal += 1;
+    const attempt = networkAttempt + 1;
+    const willRetry = networkAttempt < OPENROUTER_REQUEST_RETRY_COUNT;
     try {
+      if (parentSignal?.aborted) return { ok: false, error: 'Cancelled' };
       requestBody = applySessionAffordableMaxTokensToBody(requestBody);
       logDebug(`openRouter ${payload.requestLabel}: request attempt start`, {
         attempt: sendOrdinal,
-        networkAttempt: networkAttempt + 1,
-        timeoutMs: OPENROUTER_REQUEST_TIMEOUT_MS,
+        networkAttempt: attempt,
+        timeoutMs: attemptTimeoutMs,
         maxTokens: typeof requestBody.max_tokens === 'number' ? requestBody.max_tokens : null,
+        simulateHang,
       });
-      const chatResponse = await postChatViaHttps({
-        key: payload.key,
-        requestBody,
-        signal: controller.signal,
-        timeoutMs: OPENROUTER_REQUEST_TIMEOUT_MS,
-        responseIdleTimeoutMs: OPENROUTER_RESPONSE_IDLE_TIMEOUT_MS,
-        responseHardTimeoutMs: OPENROUTER_RESPONSE_HARD_TIMEOUT_MS,
-        attempt: sendOrdinal,
-        requestLabel: payload.requestLabel,
-      });
+      const chatResponse = simulateHang
+        ? await (async () => {
+            if (payload.onLog) payload.onLog('Simulating a hung model call (AGENT_WARS_SIMULATE_MODEL_HANG).');
+            logDebug(`openRouter ${payload.requestLabel}: simulating a hung model call`, { attempt });
+            await waitForAbort(controller.signal);
+            throw new Error('AbortError');
+          })()
+        : await postChatForAttempt({
+            key: payload.key,
+            requestBody,
+            signal: controller.signal,
+            timeoutMs: attemptTimeoutMs,
+            responseIdleTimeoutMs: OPENROUTER_RESPONSE_IDLE_TIMEOUT_MS,
+            responseHardTimeoutMs: OPENROUTER_RESPONSE_HARD_TIMEOUT_MS,
+            attempt: sendOrdinal,
+            requestLabel: payload.requestLabel,
+          });
       logDebug(`openRouter ${payload.requestLabel}: request attempt completed`, {
         attempt: sendOrdinal,
         ok: chatResponse.status >= 200 && chatResponse.status < 300,
@@ -167,7 +209,6 @@ async function defaultPostOpenRouterChatWithTimeoutAndRetry(
       }
       lastError = formatOpenRouterChatApiError(chatResponse.status, chatResponse.bodyText);
       logError(`openRouter ${payload.requestLabel}: API error`, chatResponse.status, chatResponse.bodyText.slice(0, 200));
-      if (chatResponse.status === 401) return { ok: false, error: lastError, status: chatResponse.status };
       if (chatResponse.status === 402 && !creditClampRetried) {
         const affordable = parseAffordableMaxTokensFromOpenRouterError(chatResponse.bodyText);
         const currentMax = typeof requestBody.max_tokens === 'number' ? requestBody.max_tokens : null;
@@ -191,7 +232,20 @@ async function defaultPostOpenRouterChatWithTimeoutAndRetry(
           continue;
         }
       }
-      if (networkAttempt < OPENROUTER_REQUEST_RETRY_COUNT && isRetryableStatus(chatResponse.status)) {
+      const retryStatus = willRetry && isRetryableStatus(chatResponse.status);
+      if (payload.onLog) {
+        payload.onLog(
+          formatModelCallFailureLine({
+            cause: 'httpStatus',
+            attempt,
+            maxAttempts,
+            willRetry: retryStatus,
+            httpStatus: chatResponse.status,
+          }),
+          true
+        );
+      }
+      if (retryStatus) {
         const waitMs = getRetryDelayMs();
         logDebug(`openRouter ${payload.requestLabel}: retrying after API error`, {
           attempt: sendOrdinal,
@@ -199,7 +253,8 @@ async function defaultPostOpenRouterChatWithTimeoutAndRetry(
           retryInMs: waitMs,
         });
         networkAttempt += 1;
-        await delayMs(waitMs);
+        await delayMs(waitMs, parentSignal);
+        if (parentSignal?.aborted) return { ok: false, error: 'Cancelled' };
         continue;
       }
       return { ok: false, error: lastError, status: chatResponse.status };
@@ -211,32 +266,55 @@ async function defaultPostOpenRouterChatWithTimeoutAndRetry(
         String(err).includes('HTTPS_RESPONSE_SOCKET_TIMEOUT_') ||
         String(err).includes('HTTPS_RESPONSE_HARD_TIMEOUT_');
       if (timeoutLike) {
-        lastError = 'AI request timed out. Please try again.';
-        if (payload.onLog) payload.onLog(lastError, true);
+        if (payload.onLog) {
+          payload.onLog(
+            formatModelCallFailureLine({
+              cause: 'timeout',
+              attempt,
+              maxAttempts,
+              willRetry,
+              timeoutMs: attemptTimeoutMs,
+            }),
+            true
+          );
+        }
+        if (!willRetry) lastError = `Model call timed out after ${maxAttempts} attempts.`;
         logError(`openRouter ${payload.requestLabel}: timeout`, {
-          timeoutMs: OPENROUTER_REQUEST_TIMEOUT_MS,
-          attempt: sendOrdinal,
+          timeoutMs: attemptTimeoutMs,
+          attempt,
         });
       } else if (isResponseStreamStall) {
-        lastError = 'AI response stream stalled. Please try again.';
-        if (payload.onLog) payload.onLog(lastError, true);
+        const line = formatModelCallFailureLine({
+          cause: 'streamStall',
+          attempt,
+          maxAttempts,
+          willRetry: false,
+        });
+        if (payload.onLog) payload.onLog(line, true);
         logError(`openRouter ${payload.requestLabel}: response stream timeout`, {
-          attempt: sendOrdinal,
+          attempt,
           error: String(err),
         });
-        return { ok: false, error: lastError };
+        return { ok: false, error: line };
       } else {
-        lastError = `Network error while requesting AI orders: ${String(err)}`;
+        if (payload.onLog) {
+          payload.onLog(
+            formatModelCallFailureLine({ cause: 'network', attempt, maxAttempts, willRetry }),
+            true
+          );
+        }
+        if (!willRetry) lastError = `Model call network error after ${maxAttempts} attempts.`;
         logError(`openRouter ${payload.requestLabel}: fetch exception`, err);
       }
-      if (networkAttempt < OPENROUTER_REQUEST_RETRY_COUNT) {
+      if (willRetry) {
         const waitMs = getRetryDelayMs();
         logDebug(`openRouter ${payload.requestLabel}: retrying after exception`, {
           attempt: sendOrdinal,
           retryInMs: waitMs,
         });
         networkAttempt += 1;
-        await delayMs(waitMs);
+        await delayMs(waitMs, parentSignal);
+        if (parentSignal?.aborted) return { ok: false, error: 'Cancelled' };
         continue;
       }
       return { ok: false, error: lastError };
@@ -348,6 +426,29 @@ let chatTransportOverride: OpenRouterChatTransport | null = null;
 export function setChatTransportOverrideForTests(override: OpenRouterChatTransport | null): void {
   logDebug('openRouter setChatTransportOverrideForTests', { enabled: override !== null });
   chatTransportOverride = override;
+}
+
+/**
+ * The HTTPS poster the default transport calls. Tests replace it so a retry can be scripted without a network.
+ *
+ * Purpose: The hang simulator and the retry loop stay in `defaultPostOpenRouterChatWithTimeoutAndRetry`.
+ * When to use: A transport test, then set back to null.
+ * Expected outcome: Null restores `postChatViaHttps`.
+ * Exceptions: None.
+ */
+let postChatForAttempt: typeof postChatViaHttps = postChatViaHttps;
+
+/**
+ * Replaces the HTTPS poster used by the default chat transport.
+ *
+ * Purpose: Lets a test return a status or throw without opening a socket, while the retry and hang logic still run.
+ * When to use: Transport tests. Pass null when the test finishes.
+ * Expected outcome: The next default transport call uses `override`, or `postChatViaHttps` when `override` is null.
+ * Exceptions: None.
+ */
+export function setOpenRouterPostChatForTests(override: typeof postChatViaHttps | null): void {
+  logDebug('openRouter setOpenRouterPostChatForTests', { enabled: override !== null });
+  postChatForAttempt = override ?? postChatViaHttps;
 }
 
 /**

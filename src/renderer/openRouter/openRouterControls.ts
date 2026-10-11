@@ -13,6 +13,9 @@ import { updateOpenRouterCostLabel } from './openRouterUiHelpers';
 import { attachModelDescriptionTooltip } from './modelDescriptionTooltip';
 import { attachReasoningEffortSelect } from './reasoningEffortSelect';
 import { resetPrecomputedAiState } from './precomputedAiState';
+import { isDeferredResolutionPlaybackConsultPending } from './aiPlanningState';
+import { stopOpponentPlanning } from './openRouterRuntime';
+import { isNewGameOverlayOpen } from '../gameplay/newGameBanner';
 
 /**
  * Documents the `OpenRouterUiDeps` interface as a named contract surface (interface OpenRouterUiDeps).
@@ -172,6 +175,11 @@ function startTacticalOpponentPlanAfterStrategicConsult(deps: OpenRouterUiDeps):
  */
 function initDeferredResolutionPlaybackPushListeners(deps: OpenRouterUiDeps): void {
   window.gameApi?.registerPostResolutionConsultationListener?.((payload: PostResolutionConsultationPushPayload) => {
+    if (isNewGameOverlayOpen()) {
+      S.pendingDeferredStrategicPostResolutionConsult = false;
+      deps.updateReadyButtonState();
+      return;
+    }
     if (payload.abandoned === true) {
       applyAbandonedDeferredConsultRecovery('strategic', deps);
       return;
@@ -200,6 +208,11 @@ function initDeferredResolutionPlaybackPushListeners(deps: OpenRouterUiDeps): vo
     deps.updateReadyButtonState();
   });
   window.gameApi?.registerPostTacticalBeatConsultationListener?.((fields) => {
+    if (isNewGameOverlayOpen()) {
+      S.pendingDeferredTacticalPostBeatConsult = false;
+      deps.updateReadyButtonState();
+      return;
+    }
     if (fields.abandoned === true) {
       applyAbandonedDeferredConsultRecovery('tactical', deps);
       return;
@@ -518,13 +531,23 @@ export function initOpenRouterUI(deps: OpenRouterUiDeps): void {
 
   if (modelSelect) {
     modelSelect.addEventListener('change', () => {
-      api.setSelectedModel(modelSelect.value);
-      playerChangedModel = true;
-      persistedReasoningEffort = '';
-      showReasoningEffortForSelectedModel();
-      if (modelSelect.value) deps.hideMapToast();
-      else modelDescriptionTooltip?.clear();
-      void deps.syncOpenRouterRunToggleInteractable();
+      void (async () => {
+        try {
+          await api.setSelectedModel(modelSelect.value);
+          playerChangedModel = true;
+          persistedReasoningEffort = '';
+          showReasoningEffortForSelectedModel();
+          if (modelSelect.value) deps.hideMapToast();
+          else modelDescriptionTooltip?.clear();
+          if (S.runButtonOn && (S.backgroundRequestInFlight || isDeferredResolutionPlaybackConsultPending())) {
+            await stopOpponentPlanning('model_changed');
+            deps.startBackgroundRequestIfAllowed();
+          }
+          void deps.syncOpenRouterRunToggleInteractable();
+        } catch (err) {
+          console.error('model change failed', err);
+        }
+      })();
     });
   }
 
@@ -552,7 +575,7 @@ export function initOpenRouterUI(deps: OpenRouterUiDeps): void {
         deps.updateReadyButtonState();
         deps.startBackgroundRequestIfAllowed();
       } else {
-        window.gameApi?.cancelRequestAiOrders?.();
+        void stopOpponentPlanning('run_off');
         resetPrecomputedAiState('null');
         S.precomputedAiEmbarkOrders = null;
         S.precomputedAiStrategy = null;

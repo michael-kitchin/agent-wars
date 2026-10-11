@@ -72,6 +72,7 @@ None.
 - `src/renderer/gameplay/meleeInterceptModal.ts`
 - `src/renderer/gameplay/meleeInterceptHexTooltip.ts`
 - `src/renderer/gameplay/readyHandler.ts`
+- `src/renderer/gameplay/readyTacticalCommit.ts`
 - `src/renderer/gameplay/tacticalBattlePromptPreference.ts`
 - `src/renderer/map/visibleMapFrame.ts`
 - `static/overlayChrome.css` (`.melee-intercept-*`)

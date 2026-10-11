@@ -6,7 +6,7 @@
 
 A turn-based grand strategy game on a real-Earth hex map, where your opponent is a large language model you choose. Coding agents wrote the code and most of the documentation. I set the direction, wrote the prompts and coding rules, and reviewed the results.
 
-Agent Wars is a WEGO game ("we go"), where neither player can see what the other is planning to do. For each turn, both sides create movement, production, and combat orders at the same time, based on different, subjective views of the battlefield. Once both players are ready, the game engine executes their orders and resolves the outcomes automatically.
+Agent Wars is a WEGO game ("we go"), where neither player can see what the other is planning to do. For each turn, both sides create movement, production, and combat orders at the same time, based on different, partial views of the battlefield. Once both players are ready, the game engine executes those orders and resolves the outcomes automatically.
 
 The game is intended to be simple to learn and quick to play, but with enough depth to make things interesting and believable.
 
@@ -41,8 +41,8 @@ Also: I don't intend to charge money for Agent Wars, now or ever.
 
 Download a build for Windows (x64), macOS (Apple silicon), or Linux (x64) from [Releases](https://github.com/michael-kitchin/agent-wars/releases). The builds are unsigned side-load builds, so Windows and macOS warn before the first launch. Each release lists SHA-256 checksums in `SHA256SUMS.txt`.
 
-- **Windows:** unzip, then run `Agent Wars v2.5.0.exe`. If SmartScreen stops it, choose **More info**, then **Run anyway**.
-- **macOS:** unzip, then open `Agent Wars v2.5.0.app`. If macOS blocks it, open **System Settings > Privacy & Security** and choose **Open Anyway**.
+- **Windows:** unzip, then run `Agent Wars v2.5.1.exe`. If SmartScreen stops it, choose **More info**, then **Run anyway**.
+- **macOS:** unzip, then open `Agent Wars v2.5.1.app`. If macOS blocks it, open **System Settings > Privacy & Security** and choose **Open Anyway**.
 - **Linux:** extract the archive, then run `./agent-wars`. That launcher handles Chromium's sandbox when the archive can't keep `chrome-sandbox` owned by root. On Ubuntu 23.10 and later, where AppArmor blocks unprivileged user namespaces, it starts without the sandbox and says so.
 
 The opponent needs an [OpenRouter](https://openrouter.ai) API key of your own:
@@ -57,7 +57,7 @@ The opponent needs an [OpenRouter](https://openrouter.ai) API key of your own:
 
 The key is handled only in the Electron main process and stored locally in the Electron user-data directory, not in repository files. Without a key or a model the app still runs, **Run** stays disabled, and the opponent makes no model calls.
 
-How a match plays, from setup and turn order to battles, air power, sealift, and the controls, is covered in [doc/how-to-play.md](doc/how-to-play.md).
+How to play the game, from setup and turn order to battles, air power, sealift, and the controls, is covered in [doc/how-to-play.md](doc/how-to-play.md).
 
 
 | *Step 1: Enter an OpenRouter API key, pick a model, and click Run. The ongoing cost of the current game (in US$) is shown on the right.*                           | *Step 2: Watch the LLM do its thing, and optionally enable/disable tools.*                          |
@@ -78,6 +78,8 @@ AGENT_WARS_LOG_LEVEL=debug
 - `AGENT_WARS_LOG_FULL_PROMPTS` controls prompt logging. Set to `1`, `true`, `yes`, or `on` to enable, anything else to disable.
 - `AGENT_WARS_LOG_FULL_RESPONSES` controls OpenRouter response logging. Follows the same rules as `AGENT_WARS_LOG_FULL_PROMPTS`.
 - `AGENT_WARS_LOG_LEVEL` turns file-based logging on, at a specific level of detail. In addition to `debug`, there's also `trace`, `info`, and `error`. Logging may impact game performance, particularly at the `trace` or `debug` levels.
+- `AGENT_WARS_SIMULATE_MODEL_HANG` is a developer-only stand-in for a model that never answers. `off` is the default. `first` hangs the first network attempt and lets the retry call OpenRouter. `all` hangs every attempt. Anything else is off. The comparison ignores case.
+- `AGENT_WARS_SIMULATE_MODEL_HANG_MS` is how long that hang waits before the normal timeout path runs. It is an integer from 100 through the real request timeout. A missing or non-integer value waits 15000 ms. Remove both lines when you are done reproducing a hang.
 
 The game's "working directory" is:
 
@@ -254,7 +256,7 @@ Setup, the Python CLIs, and troubleshooting are in [scripts/terrain_pipeline/REA
 
 ## Status
 
-- **Version:** 2.5.0, distributed as side-load builds only (no store, signing, or notarization).
+- **Version:** 2.5.1, distributed as side-load builds only (no store, signing, or notarization).
 - **Progress:** Phase 0 (hybrid AI validation) and Phase 1 (global strategic game) are complete. Phase 2 is complete through milestone 2.5 (regional game and rules enhancements), including tactical battles (2.1 to 2.4) and playtester UI fixes (2.45). Milestone 2.6 (player-facing save/load and session management) isn't shipped. See the [development plan (v3.4)](doc/devleopment-plan-v3.4.md); milestones 0.2 to 0.5 were a throwaway prototype that validated combat, tools, and the AI loop before the production baseline.
 - **CI:** lint and tests run on every push that changes code, and on demand (Linux). The three-platform packaging build runs on demand and drafts each release.
 - **Contributions:** this is a personal R&D project, so it doesn't take issues or pull requests. To report a security problem, see [SECURITY.md](SECURITY.md).

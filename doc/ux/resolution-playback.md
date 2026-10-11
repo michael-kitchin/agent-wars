@@ -47,7 +47,7 @@ A map toast can summarize losses the player can see. Combat outside vision is an
 
 ### Other
 
-- When playback was scheduled together with a deferred opponent consultation, Ready stays disabled until that consultation is released, including after the animation ends. The label stays "Ready" during the animation. When the animation ends and the consultation starts, the label switches to the AI wait label. It returns to "Ready" when the consultation's result arrives, unless a battle is already in planning. In that case the battle's opponent-plan request starts at the same moment, and the AI wait label continues until that plan is buffered. A discarded push whose turn no longer matches starts that battle request as well. A consultation that ends with standing orders and no model call shows the strategic wait only briefly. Log lines, including error lines, never stop that timer. A finished strategic consultation is the opponent plan for the next turn. It does not start another strategic planning request.
+- When playback was scheduled together with a deferred opponent consultation, Ready stays disabled until that consultation is released, including after the animation ends. The label stays "Ready" during the animation. When the animation ends and the consultation starts, the label switches to the AI wait label. Turning Run off stops the consultation, stores no orders from that call, and the label returns to "Ready". Otherwise the label returns to "Ready" when the consultation's result arrives, unless a battle is already in planning. In that case the battle's opponent-plan request starts at the same moment, and the AI wait label continues until that plan is buffered. A discarded push whose turn no longer matches starts that battle request as well. A consultation that ends with standing orders and no model call shows the strategic wait only briefly. Log lines, including error lines, never stop that timer. A finished strategic consultation is the opponent plan for the next turn. It does not start another strategic planning request.
 - When there is nothing to animate, a waiting consultation is released immediately.
 
 ## States
@@ -103,5 +103,6 @@ None.
 - `src/main/combatDiceRecording.ts`
 - `src/renderer/openRouter/resolutionPlaybackDeferral.ts`
 - `src/renderer/gameplay/readyHandler.ts`
+- `src/renderer/gameplay/readyTacticalCommit.ts`
 - `src/renderer/gameplay/readyResolutionAnnouncements.ts`
 - `src/renderer/gameplay/turnUpdateSummary.ts`
