@@ -48,6 +48,8 @@ The opponent needs an [OpenRouter](https://openrouter.ai) API key of your own:
 4. Choose a model. **Refresh model list** reloads the list.
 5. Click **Run** to start opponent planning.
 
+![Model list with a subset of available choices](doc/media/model-selection.png)
+
 The key is handled only in the Electron main process and stored locally in the Electron user-data directory, not in repository files. Without a key or a model the app still runs, **Run** stays disabled, and the opponent makes no model calls.
 
 How a match plays, from setup and turn order to battles, air power, sealift, and the controls, is covered in [doc/how-to-play.md](doc/how-to-play.md).
