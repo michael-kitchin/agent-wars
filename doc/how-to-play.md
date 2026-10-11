@@ -158,6 +158,10 @@ A battle zooms in on one contested hex and fights it out on a finer grid. The ru
 
 ### How battles differ
 
+*Ukraine's 1st Fleet moves through wetlands, thanks to their terrain bonus (built on a wetland hex, near the Black Sea).*
+
+![Ukraine's 1st Fleet moves through wetlands, thanks to their terrain bonus (built on a wetland hex, near the Black Sea).](media/terrain-bonus-movement.png)
+
 - **Scale:** the battlefield is the contested hex's cells, three H3 resolutions finer, plus three rings of neighboring cells.
 - **Pause:** the rest of the map waits until the battle ends. The date and weather stay fixed.
 - **Beats:** each Ready in a battle resolves one beat: air strikes, ranged fire, movement, then melee.
@@ -196,6 +200,10 @@ A battle zooms in on one contested hex and fights it out on a finer grid. The ru
 
 ## Roads and rail in battles
 
+| *Shaanxi 1st Armored moving faster by road, then slower through urban hexes.*                                                                 | *A stack of Ukraine's armormed units plan an flanking movement by rail.*                                                |
+| ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| ![Shaanxi 1st Armored moving faster by road, then slower through urban hexes](media/tactical-road-movement.png) | ![A stack of Ukraine's armormed units plan an flanking movement by rail](media/tactical-rail-movement.png) |
+
 - **Battles only:** strategic movement ignores roads and rail.
 - **Cheaper steps:** infantry and armor pay half a point to enter an intact road cell, and a third of a point for rail.
 - **Any terrain:** the price holds through forest and mountains, so armor can cross mountains along a road.
@@ -210,9 +218,9 @@ A battle zooms in on one contested hex and fights it out on a finer grid. The ru
 
 Hovering a unit's flag, in the stack list or anywhere else it appears, or the token of a one-unit hex, shows the bonuses that unit was born with. On the left, a stack near Mexico City is open, and the tooltip belongs to an armor unit born in the Mexican mountains in rain, with advanced tech. On the right, a lone unit near Colorado Springs was born on Saskatchewan plains in snow, with basic tech.
 
-| *Stack list near Mexico City*                                                                 | *Lone unit near Colorado Springs*                                                |
+| *Bonuses for the Mexican 5th Armorned, near Mexico City.*                                                                 | *Bonuses for the Saskatchewan 7th Infantry, near Colorado Springs.*                                                |
 | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| ![Bonuses tooltip for an armor unit in a stack list](media/unit-bonuses-armored-mexico.png) | ![Bonuses tooltip for a single unit token](media/unit-origin-saskatchewan.png) |
+| ![Bonuses for the Mexican 5th Armorned, near Mexico City](media/unit-bonuses-armored-mexico.png) | ![Bonuses for the Saskatchewan 7th Infantry, near Colorado Springs](media/unit-origin-saskatchewan.png) |
 
 Each bonus is Off, Low, or High in the new-game dialog, and starts at Low.
 
