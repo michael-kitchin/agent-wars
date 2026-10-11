@@ -160,6 +160,10 @@ That said:
 - Committing to a manual battle prevents players (human and LLM) from issuing strategic orders during the same turn. Existing orders will still be followed, however, and units will continue to defend themselves.
 - Players can only fight one tactical battle at a time.
 
+Human players win tactical battles by destroying all LLM units, but they can leave at any time by clicking the **Exit Battle** button. Any strategic units with half or more of their sub-units remaining by the end of a battle will be returned to the strategic map. There is no concept of battle damage, to keep things simple.
+
+Complete rules are in [combat-rules-v3.md](combat-rules-v3.md) §12.
+
 *Tactical battle dialog in southern Mexico, from a regional game. Click the **Fight** button to fight the battle manually or **Ignore** to leave the outcome to chance.*
 
 ![Tactical battle dialog in southern Mexico, from a regional game. Click the Fight button to fight the battle manually or Ignore to leave the outcome to chance.](media/tactical-battle-dialog.png)
@@ -167,10 +171,6 @@ That said:
 *Tactical battle in central Mexico, from a global game.*
 
 ![Tactical battle in central Mexico, from a global game](media/tactical-battle-mexico.jpg)
-
-A battle zooms in on one contested hex and fights it out on a finer grid. The rules are in [combat-rules-v3.md](combat-rules-v3.md) §12.
-
-Human players win tactical battles by destroying all LLM units, but they can leave at any time by clicking the Exit Battle button. Any strategic units with half or more of their sub-units remaining by the end of a battle will be returned to the strategic map. There is no concept of battle damage, to keep things simple.
 
 ### Starting a battle
 
