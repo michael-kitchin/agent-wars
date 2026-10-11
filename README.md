@@ -10,7 +10,7 @@ Agent Wars is a WEGO game ("we go"), where neither player can see what the other
 
 The game is intended to be simple to learn and quick to play, but with enough depth to make things interesting and believable.
 
-[Play It](#play-it) · [Why This Exists](#why-this-exists) · [What's Inside](#whats-inside) · [Under the Hood](#under-the-hood) · [How It Was Built](#how-it-was-built) · [Architecture](#architecture) · [Build from Source](#build-from-source) · [Status](#status) · [License](#license)
+[Play It](#play-it) · [See the Prompts](#see-the-prompts-and-everything-else) · [Why This Exists](#why-this-exists) · [What's Inside](#whats-inside) · [Under the Hood](#under-the-hood) · [How It Was Built](#how-it-was-built) · [Architecture](#architecture) · [Build from Source](#build-from-source) · [Status](#status) · [License](#license)
 
 ![Tactical planning over central Mexico](doc/media/tactical-battle-mexico.jpg)
 
@@ -62,11 +62,42 @@ How a match plays, from setup and turn order to battles, air power, sealift, and
 
 The key is handled only in the Electron main process and stored locally in the Electron user-data directory, not in repository files. Without a key or a model the app still runs, **Run** stays disabled, and the opponent makes no model calls.
 
+## See the Prompts (and Everything Else)
+
+Create a text file called `.env` in the game's working directory, with the following:
+```
+AGENT_WARS_LOG_FULL_PROMPTS=1
+AGENT_WARS_LOG_FULL_RESPONSES=1
+AGENT_WARS_LOG_LEVEL=debug
+```
+- `AGENT_WARS_LOG_FULL_PROMPTS` controls prompt logging. Set to `1`, `true`, `yes`, or `on` to enable, anything else to disable.
+- `AGENT_WARS_LOG_FULL_RESPONSES` controls OpenRouter response logging. Follows the same rules as `AGENT_WARS_LOG_FULL_PROMPTS`.
+- `AGENT_WARS_LOG_LEVEL` turns file-based logging on, at a specific level of detail. In addition to `debug`, there's also `trace`, `info`, and `error`.
+
+The game's "working directory" is:
+- **On Windows:** The same as the executable, when the executable is double-clicked (the normal way to start programs).
+- **On Linux:** Wherever the `agent-wars` command is invoked from.
+- **On macOS:** Not verified, but opening the app from Finder probably won’t pick up `.env`. I'll provide an update when I can.
+
+When the `.env` file is present at runtime, the game will create the following files in the same directory:
+```
+debug-last-openrouter-response-body.txt
+debug-last-strategic-prompt.txt
+debug-last-tactical-prompt.txt
+debug-last-user-prompt.txt
+debug.log
+```
+- **debug-last-openrouter-response-body.txt**: The last response from OpenRouter, including tool calls.
+- **debug-last-strategic-prompt.txt**: The last system prompt sent during a strategic game. This doesn't include any tool calls or results.
+- **debug-last-tactical-prompt.txt**: The last system prompt sent during a tactical battle. This also doesn't include any tool calls or results.
+- **debug-last-user-prompt.txt**: Stock prompt suffix, sent after the strategic/tactical prompts.
+- **debug.log**: Complete log output at the specified level of detail, including truncated tool calls. At `trace` or `debug` this may impact game performance. This is appended to with every run, so it should be deleted when no longer needed.
+
+## What's Inside
+
 ![Spain's 1st Fleet heading west across the Atlantic on the global map](doc/media/global-spain-new-world.png)
 
 *Re-invading the New World, at the start of a global game. What could go wrong?*
-
-## What's Inside
 
 - **A hybrid AI opponent.** The engine pre-computes a briefing (an ASCII hex map, Markdown tables of units and threats, and attention flags) before it consults the model. Standing orders carry the plan forward on turns the model isn't consulted, and event callbacks decide when it is. Any OpenRouter model can play; one without tool calls plays without the [planning tools](#the-opponents-tools). See [doc/hybrid-ai.md](doc/hybrid-ai.md) and [doc/ai-tools.md](doc/ai-tools.md).
 - **Prompts as code.** The prompts are assembled by builders in [`src/main/openRouter/promptSpec/`](src/main/openRouter/promptSpec/), documented in [doc/ai-commander-prompts/](doc/ai-commander-prompts/README.md), and held to that contract by tests such as `consultationContract.test.ts`, `envelopeJsonSchema.test.ts`, and `variantConformance.test.ts`.
