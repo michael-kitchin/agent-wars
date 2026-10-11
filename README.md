@@ -54,13 +54,13 @@ The opponent needs an [OpenRouter](https://openrouter.ai) API key of your own:
     - Ollama/other local model support is on my radar (pun intended, I guess).
 5. Click **Run** to start opponent planning.
 
+The key is handled only in the Electron main process and stored locally in the Electron user-data directory, not in repository files. Without a key or a model the app still runs, **Run** stays disabled, and the opponent makes no model calls.
+
 How a match plays, from setup and turn order to battles, air power, sealift, and the controls, is covered in [doc/how-to-play.md](doc/how-to-play.md).
 
 | *Step 1: Enter an OpenRouter API key, pick a model, and click Run. The ongoing cost of the current game (in US$) is shown on the right.*                                                                 | *Step 2: Watch the LLM do its thing, and optionally enable/disable tools.*                                                |
 | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
 | ![Step 1: Enter an OpenRouter API key, pick a model, and click Run. The ongoing cost of the current game (in US$) is shown on the right.](doc/media/model-tab.png) | ![Step 2: Watch the LLM do its thing, and optionally enable/disable tools](doc/media/tools-tab.png) |
-
-The key is handled only in the Electron main process and stored locally in the Electron user-data directory, not in repository files. Without a key or a model the app still runs, **Run** stays disabled, and the opponent makes no model calls.
 
 ## See the Prompts (and Everything Else)
 
@@ -70,12 +70,14 @@ AGENT_WARS_LOG_FULL_PROMPTS=1
 AGENT_WARS_LOG_FULL_RESPONSES=1
 AGENT_WARS_LOG_LEVEL=debug
 ```
+
 - `AGENT_WARS_LOG_FULL_PROMPTS` controls prompt logging. Set to `1`, `true`, `yes`, or `on` to enable, anything else to disable.
 - `AGENT_WARS_LOG_FULL_RESPONSES` controls OpenRouter response logging. Follows the same rules as `AGENT_WARS_LOG_FULL_PROMPTS`.
-- `AGENT_WARS_LOG_LEVEL` turns file-based logging on, at a specific level of detail. In addition to `debug`, there's also `trace`, `info`, and `error`.
+- `AGENT_WARS_LOG_LEVEL` turns file-based logging on, at a specific level of detail. In addition to `debug`, there's also `trace`, `info`, and `error`. Logging may impact game performance, particularly at the `trace` or `debug` levels.
 
 The game's "working directory" is:
-- **On Windows:** The same as the executable, when the executable is double-clicked (the normal way to start programs).
+
+- **On Windows:** The same as the executable, when the executable or a shortcut is double-clicked.
 - **On Linux:** Wherever the `agent-wars` command is invoked from.
 - **On macOS:** Not verified, but opening the app from Finder probably won’t pick up `.env`. I'll provide an update when I can.
 
@@ -87,11 +89,12 @@ debug-last-tactical-prompt.txt
 debug-last-user-prompt.txt
 debug.log
 ```
+
 - **debug-last-openrouter-response-body.txt**: The last response from OpenRouter, including tool calls.
 - **debug-last-strategic-prompt.txt**: The last system prompt sent during a strategic game. This doesn't include any tool calls or results.
 - **debug-last-tactical-prompt.txt**: The last system prompt sent during a tactical battle. This also doesn't include any tool calls or results.
 - **debug-last-user-prompt.txt**: Stock prompt suffix, sent after the strategic/tactical prompts.
-- **debug.log**: Complete log output at the specified level of detail, including truncated tool calls. At `trace` or `debug` this may impact game performance. This is appended to with every run, so it should be deleted when no longer needed.
+- **debug.log**: Complete log output at the specified level of detail, including truncated tool calls. This file is appended to with every run, so it should be deleted when no longer needed.
 
 ## What's Inside
 
