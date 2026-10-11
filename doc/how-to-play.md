@@ -18,7 +18,7 @@ Each match starts on the new-game dialog, with a Global tab and a Regional tab. 
 
 *Regional new-game preview for Eastern Asia, with human and LLM sides selected (Japan vs South & East China).*
 
-![Regional new-game preview for Eastern Asia, with human and LLM sides selected (Japan vs  South & East China)](media/regional-preview.png)
+![Regional new-game preview for Eastern Asia, with human and LLM sides selected (Japan vs South & East China)](media/regional-preview.png)
 
 - **Global:** the whole world, 842 strategic hexes at H3 resolution 1. Each side picks a home region, and both may pick the same one.
 - **Regional:** one of 23 maps drawn from UN subregions, at strategic resolution 2 or 3. Each side picks a different side group of provinces.
@@ -35,7 +35,7 @@ Each match starts on the new-game dialog, with a Global tab and a Regional tab. 
 
 ![Planning panel showing the Ready button and movement/strike orders](media/planning-panel.png)
 
-| *Stack selection in normal/single-unit mode.*              | *Stack selection in multi-unit mode (holding down shift key).*
+| *Stack selection in normal/single-unit mode.*              | *Stack selection in multi-unit mode (holding down a shift key).*
 | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
 | ![Stack selection in normal/single-unit mode](media/stack-select-1.png) | ![Stack selection in multi-unit mode (holding down a shift key)](media/stack-select-2.png) |
 
@@ -61,9 +61,9 @@ Each match starts on the new-game dialog, with a Global tab and a Regional tab. 
 
 ## Aiming ranged attacks and air strikes
 
-| *French 1st Armored plans a ranged attack (part 1).*              | *French 1st Armored plans a ranged attack (part 2).*
+| *French 1st Armored plans a ranged attack (step 1).*              | *French 1st Armored plans a ranged attack (step 2).*
 | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| ![French 1st Armored plans a ranged attack (part 1)](media/ranged-attack-1.png) | ![French 1st Armored plans a ranged attack (part 2)](media/ranged-attack-2.png) |
+| ![French 1st Armored plans a ranged attack (step 1)](media/ranged-attack-1.png) | ![French 1st Armored plans a ranged attack (step 2)](media/ranged-attack-2.png) |
 
 - **Ranged:** select units that can all fire, then click **Ranged**. The button reads **Cancel** while you aim.
 - **Strike:** select only air units, then click **Strike**. Pick a target type from the list that takes the button's place.
