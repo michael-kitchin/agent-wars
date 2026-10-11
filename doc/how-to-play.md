@@ -16,7 +16,7 @@ Each match starts on the new-game dialog, with a Global tab and a Regional tab. 
 
 ![Global new-game preview, with human and LLM sides selected (Eastern Asia vs Southern Africa)](media/global-preview.png)
 
-*Regional new-game preview for Eastern Asia, with human and LLM sides selected (Japan vs  South & East China).*
+*Regional new-game preview for Eastern Asia, with human and LLM sides selected (Japan vs South & East China).*
 
 ![Regional new-game preview for Eastern Asia, with human and LLM sides selected (Japan vs  South & East China)](media/regional-preview.png)
 
@@ -37,7 +37,7 @@ Each match starts on the new-game dialog, with a Global tab and a Regional tab. 
 
 | *Stack selection in normal/single-unit mode.*              | *Stack selection in multi-unit mode (holding down shift key).*
 | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| ![Stack selection in normal/single-unit mode](media/stack-select-1.png) | ![Stack selection in multi-unit mode (holding down shift key)](media/stack-select-2.png) |
+| ![Stack selection in normal/single-unit mode](media/stack-select-1.png) | ![Stack selection in multi-unit mode (holding down a shift key)](media/stack-select-2.png) |
 
 1. **Pan:** Drag with the left mouse button, or use WASD / arrow keys.
 2. **Zoom:** Mouse wheel (zooms toward the cursor). Zoomed in, contested strategic hexes show a marker that starts a tactical battle.
