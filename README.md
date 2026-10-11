@@ -46,7 +46,9 @@ The opponent needs an [OpenRouter](https://openrouter.ai) API key of your own:
 2. Paste your OpenRouter API key into the API key field (placeholder `Set key and blur to save`).
 3. Click outside the field, or press Enter, to save. A saved key loads the model list.
 4. Choose a model. **Refresh model list** reloads the list.
-5. Click **Run** to start opponent planning.
+    - My go-to playtesting model is Google Gemini Flash Lite (version 3.5, currently). A fast, inexpensive, tool-using model that fights reasonably well. Can finish a typical game for <$1.
+    - Ollama/other local model support is on my radar (pun intended, I guess).
+6. Click **Run** to start opponent planning.
 
 ![Model list with a subset of available choices](doc/media/model-selection.png)
 
