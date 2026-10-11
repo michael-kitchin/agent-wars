@@ -160,7 +160,7 @@ That said:
 - Committing to a manual battle prevents players (human and LLM) from issuing strategic orders during the same turn. Existing orders will still be followed, however, and units will continue to defend themselves.
 - Players can only fight one tactical battle at a time.
 
-*Tactical battle dialog in southern Mexico, from a regional game. Click the **Fight** button to fight the battle manually or Ignore to leave the outcome to chance.*
+*Tactical battle dialog in southern Mexico, from a regional game. Click the **Fight** button to fight the battle manually or **Ignore** to leave the outcome to chance.*
 
 ![Tactical battle dialog in southern Mexico, from a regional game. Click the Fight button to fight the battle manually or Ignore to leave the outcome to chance.](media/tactical-battle-dialog.png)
 
@@ -178,7 +178,7 @@ Human players win tactical battles by destroying all LLM units, but they can lea
 - **During resolution:** when melee is about to happen, a **Tactical Battles** list can open. Pick a hex and click **Fight**, or click **Ignore** to roll that melee on the strategic map.
 - **After Fight:** the current turn finishes first, and the battle opens as the next turn begins.
 - **Who decides:** only you choose whether to fight a battle. The opponent never does.
-- **Turning battles off:** uncheck **Tactical battles** on the Model tab. Every melee then resolves as if you chose Ignore.
+- **Turning battles off:** uncheck **Tactical battles** on the Model tab. Every melee then resolves as if you chose **Ignore**.
 
 ### How battles differ
 
@@ -311,7 +311,7 @@ The full bonus rules are in [combat-rules-v3.md](combat-rules-v3.md) §4.9.
 - Resolve turn: Ready button.
 - See under the terrain: hold T. Terrain fill hides while the key is down, and on the strategic map hex codes and, where they apply, tech icons show. Weather icons hide while T is down. In a battle, only the terrain fill hides.
 - Read a hex: rest the pointer on it for a second. Hold Shift while aiming to pause aiming and see the hex tooltip.
-- Close a popup or the unit list: Escape. On the battles list, Escape means Ignore. Escape doesn't exit a battle or end aiming.
+- Close a popup or the unit list: Escape. On the battles list, Escape means **Ignore**. Escape doesn't exit a battle or end aiming.
 - The minimap only shows where you are. Clicking it does nothing.
 - New game: **New** on the Model tab during strategic planning, or the dialog that opens at game over.
 
