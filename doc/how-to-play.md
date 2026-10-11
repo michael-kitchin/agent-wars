@@ -154,9 +154,9 @@ I'll add screenshots of specific functions as I can.
 
 ## Battles
 
-*Tactical battle dialog in southern Mexico, from a regional game. Click the **Fight** button to fight the battle manually or **Ignore** to leave the outcome to chance.*
+*Tactical battle dialog in southern Mexico, from a regional game. Click the **Fight** button to run the battle manually or **Ignore** to leave the outcome to chance.*
 
-![Tactical battle dialog in southern Mexico, from a regional game. Click the Fight button to fight the battle manually or Ignore to leave the outcome to chance.](media/tactical-battle-dialog.png)
+![Tactical battle dialog in southern Mexico, from a regional game. Click the Fight button to run the battle manually or Ignore to leave the outcome to chance.](media/tactical-battle-dialog.png)
 
 Tactical battles are initiated when human and LLM units end their turns in the same hex. The human player has the option of fighting manually or leaving the results to dice rolls. If they choose to fight, their stratetgic units will be broken into sub-units on the tactical battlefield, and the fight is on.
 
