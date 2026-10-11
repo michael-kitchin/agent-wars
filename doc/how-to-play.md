@@ -154,7 +154,7 @@ I'll add screenshots of specific functions as I can.
 
 ## Battles
 
-Tactical battles are initiated when human and LLM units end their turns in the same hex. The human player has the option of fighting manually or leaving the results to dice rolls. If they choose to fight, their stratetgic units will be broken into tactical sub-units on the tactical battlefield, and the fight is on.
+Tactical battles are initiated when human and LLM units end their turns in the same hex. The human player has the option of fighting manually or leaving the results to dice rolls. If they choose to fight, their stratetgic units will be broken into sub-units on the tactical battlefield, and the fight is on.
 
 That said:
 - Committing to a manual battle prevents players (human and LLM) from issuing strategic orders during the same turn. Existing orders will still be followed, however, and units will continue to defend themselves.
