@@ -160,9 +160,9 @@ That said:
 - Committing to a manual battle prevents players (human and LLM) from issuing strategic orders during the same turn. Existing orders will still be followed, however, and units will continue to defend themselves.
 - Players can only fight one tactical battle at a time.
 
-*Tactical battle dialog in southern Mexico, from a regional game. Click Fight to fight the battle manually or Ignore to leave the outcome to chance.*
+*Tactical battle dialog in southern Mexico, from a regional game. Click the **Fight** button to fight the battle manually or Ignore to leave the outcome to chance.*
 
-![Tactical battle dialog in southern Mexico, from a regional game. Click Fight to fight the battle manually or Ignore to leave the outcome to chance.](media/tactical-battle-dialog.png)
+![Tactical battle dialog in southern Mexico, from a regional game. Click the Fight button to fight the battle manually or Ignore to leave the outcome to chance.](media/tactical-battle-dialog.png)
 
 *Tactical battle in central Mexico, from a global game.*
 
@@ -220,7 +220,7 @@ Human players win tactical battles by destroying all LLM units, but they can lea
 - **Exit Battle:** you can leave between beats. A unit that kept fewer than half its sub-units is destroyed. Exactly half survives.
 - **Back to the map:** your strategic orders return, minus units that died, and Ready runs at once.
 - **Plan first:** before you click a 🔍 marker, queue the turn's strategic orders, because leaving the battle resolves the turn.
-- **After Fight, no planning:** a battle from Fight opens before you can plan that turn. Leaving it resolves the turn with only your standing marches.
+- **After Fight, no planning:** a battle opens before you can plan that turn. Leaving it resolves the turn with only your standing marches.
 
 ## Roads and rail in battles
 
