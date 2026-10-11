@@ -51,11 +51,8 @@ The opponent needs an [OpenRouter](https://openrouter.ai) API key of your own:
 2. Paste your OpenRouter API key into the API key field (placeholder `Set key and blur to save`).
 3. Click outside the field, or press Enter, to save. A saved key loads the model list.
 4. Choose a model from Anthropic, Google, Meta, OpenAI, SpaceX, etc. **Refresh model list** reloads the list.
-
-  - My go-to playtesting model is Google Gemini Flash Lite (version 3.5, currently). A fast, inexpensive, tool-using model that fights reasonably well. It can also finish a typical game for <$1.
-
-  - Ollama/other local model support is on my radar (pun intended, I guess).
-
+    - My go-to playtesting model is Google Gemini Flash Lite (version 3.5, currently). A fast, inexpensive, tool-using model that fights reasonably well. It can also finish a typical game for <$1.
+    - Ollama/other local model support is on my radar (pun intended, I guess).
 5. Click **Run** to start opponent planning.
 
 The key is handled only in the Electron main process and stored locally in the Electron user-data directory, not in repository files. Without a key or a model the app still runs, **Run** stays disabled, and the opponent makes no model calls.
