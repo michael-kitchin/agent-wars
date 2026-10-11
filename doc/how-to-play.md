@@ -2,7 +2,7 @@
 
 This guide covers a match in the current build, from the new-game dialog to the end. Downloading the game and setting up the OpenRouter key for the opponent are covered under [Play it](../README.md#play-it) in the README. The full rules are in [combat-rules-v3.md](combat-rules-v3.md).
 
-Numbers here are the global map's unless a line says otherwise. The combat rules name the engine symbol behind each one.
+Agent Wars is a WEGO game ("we go"). You and the AI opponent don't move one after the other. For each turn, both sides set orders without seeing the other's, and the engine carries both sets out together.
 
 I'll add screenshots of specific functions as I can.
 
@@ -50,6 +50,7 @@ Each match starts on the new-game dialog, with a Global tab and a Regional tab. 
 ## How a turn resolves
 
 - Both sides give orders for the same turn, and the engine resolves them together.
+- You can plan your turn while the AI opponent plans its own. Moving, aiming, and building all work while it thinks. Only Ready waits for its plan.
 - The order is fixed: air strikes, then ranged fire, then movement, then melee.
 - Strikes and ranged fire use positions from before anyone moves, so they land where you aimed.
 - Melee happens wherever enemy units share a hex after movement.
@@ -236,7 +237,7 @@ The full bonus rules are in [combat-rules-v3.md](combat-rules-v3.md) §4.9.
 
 - **You pay for the opponent:** each model call bills your OpenRouter account. The model list shows each model's price per million tokens.
 - **Reasoning costs more:** a higher reasoning level on the Model tab makes each consult slower and dearer.
-- **Waiting on the AI:** while the model plans, Ready shows **AI:** and a timer, and the turn can't resolve until the plan arrives.
+- **Waiting on the AI:** while the model plans, Ready shows **AI:** and a timer, and the turn can't resolve until the plan arrives. You can keep giving orders during the wait.
 - **Not every turn:** with **Events** on (the default) on the Tools tab, the model is called when an event it's watching or a mandatory trigger fires, and at least every five turns. Otherwise its standing orders run.
 - **Every turn, if you like:** turn **Events** off to consult the model every turn, at more cost.
 - **The opponent nearly always shoots:** unless the model told it to hold fire, each enemy unit that can fire picks a legal target on its own when the model gives it none.
