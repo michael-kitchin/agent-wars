@@ -93,8 +93,8 @@ debug.log
 ```
 
 - **debug-last-openrouter-response-body.txt**: The last response from OpenRouter, including tool calls.
-- **debug-last-strategic-prompt.txt**: The last system prompt sent during a strategic game. This doesn't include any tool calls or results.
-- **debug-last-tactical-prompt.txt**: The last system prompt sent during a tactical battle. This also doesn't include any tool calls or results.
+- **debug-last-strategic-prompt.txt**: The last system prompt sent during a strategic game. This doesn't include tool calls or results.
+- **debug-last-tactical-prompt.txt**: The last system prompt sent during a tactical battle. This also doesn't include tool calls or results.
 - **debug-last-user-prompt.txt**: Stock prompt suffix, sent after the strategic/tactical prompts.
 - **debug.log**: Complete log output at the specified level of detail, including truncated tool calls. This file is appended to with every run, so it should be deleted when no longer needed.
 
