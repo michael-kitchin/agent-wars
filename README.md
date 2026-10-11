@@ -98,6 +98,8 @@ debug.log
 - **debug-last-user-prompt.txt**: Stock prompt suffix, sent after the strategic/tactical prompts.
 - **debug.log**: Complete log output at the specified level of detail, including truncated tool calls. This file is appended to with every run, so it should be deleted when no longer needed.
 
+See [doc/hybrid-ai.md](doc/hybrid-ai.md) and [doc/ai-tools.md](doc/ai-tools.md)for explanations of what goes into these prompts and how they're assembled and used.
+
 ## What's Inside
 
 ![Spain's 1st Fleet heading west across the Atlantic on the global map](doc/media/global-spain-new-world.png)
