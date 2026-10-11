@@ -200,7 +200,7 @@ A battle zooms in on one contested hex and fights it out on a finer grid. The ru
 
 ## Roads and rail in battles
 
-| *Shaanxi 1st Armored moving faster by road, then slower through urban hexes.*                                                                 | *A stack of Ukraine's armormed units plan an flanking movement by rail.*                                                |
+| *Shaanxi 1st Armored moving faster by road, then slower through urban hexes.*                                                                 | *A stack of Ukraine's armormed units plan rapid movement by rail.*                                                |
 | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
 | ![Shaanxi 1st Armored moving faster by road, then slower through urban hexes](media/tactical-road-movement.png) | ![A stack of Ukraine's armormed units plan an flanking movement by rail](media/tactical-rail-movement.png) |
 
