@@ -2,23 +2,29 @@
 
 This guide covers a match in the current build, from the new-game dialog to the end. Downloading the game and setting up the OpenRouter key for the opponent are covered under [Play it](../README.md#play-it) in the README. The full rules are in [combat-rules-v3.md](combat-rules-v3.md).
 
-Agent Wars is a WEGO game ("we go"). You and the AI opponent don't move one after the other. For each turn, both sides set orders without seeing the other's, and the engine carries both sets out together.
+Agent Wars is a WEGO game ("we go"), where neither player can see what the other is planning to do. For each turn, both sides create movement, production, and combat orders at the same time, based on different, subjective views of the battlefield. Once both players are ready, the game engine executes their orders and resolves the outcomes automatically.
+
+Since I'm a geographer by training, gameplay is organized around geospatial features and metrics instead of nationality. Players start from regions built from countries, provinces, or other sub-divisions, but victory is defined by how geography and production capacity are managed.
+
+Unit nationality and terrain experience, technology levels, and weather also matter, but they're less important.
+
+A player wins when:
+- They capture the other player's home region hexes
+- Or destroy all production capacity in those hexes
 
 I'll add screenshots of specific functions as I can.
 
 ## Starting a match
 
-Each match starts on the new-game dialog, with a Global tab and a Regional tab. This regional setup puts South Central against Great Lakes & Ontario in Northern America, at Small size with fog of war, a March start, and every bonus at Low. The open list shows the region's other side groups. The badges over each unit type are the per-side caps for the chosen game size, and the prices follow the selected region.
-
 ## Global and regional maps
 
-*Global new-game preview, with human and LLM sides selected (Eastern Asia vs Southern Africa).*
+*Global game: Click the Global tab, then pick human and LLM home regions (in this case: Eastern Asia vs Southern Africa). Buttons to the right of the drop-down lists pick random choices.*
 
-![Global new-game preview, with human and LLM sides selected (Eastern Asia vs Southern Africa)](media/global-preview.png)
+![Global game: Click the Global tab, then pick human and LLM home regions (in this case: Eastern Asia vs Southern Africa). Buttons to the right of the drop-down lists pick random choices.](media/global-preview.png)
 
-*Regional new-game preview for Eastern Asia, with human and LLM sides selected (Japan vs South & East China).*
+*Regional game: Click the Regional tab, then pick the region and player home sub-regions (in this case: Japan vs South & East China).*
 
-![Regional new-game preview for Eastern Asia, with human and LLM sides selected (Japan vs South & East China)](media/regional-preview.png)
+![Regional game: Click the Regional tab, then pick the region and player home sub-regions (in this case: Japan vs South & East China).](media/regional-preview.png)
 
 - **Global:** the whole world, 842 strategic hexes at H3 resolution 1. Each side picks a home region, and both may pick the same one.
 - **Regional:** one of 23 maps drawn from UN subregions, at strategic resolution 2 or 3. Each side picks a different side group of provinces.
@@ -27,24 +33,30 @@ Each match starts on the new-game dialog, with a Global tab and a Regional tab. 
 - **Tech cutoff:** the dialog's `Advanced tech: $N+ hexes` line shows the selected map's cutoff.
 - **Map edges:** a few regional maps have neutral-border hexes at their edges. Those produce nothing and can't base air or naval units.
 - **Winning by control:** on the global map, hold every hex of the enemy home. On a regional map, hold enemy-home hexes with at least 75% of its original urban cells.
-- **Other ways to win:** destroy every urban cell in the enemy home while yours keeps one, or destroy every enemy unit. Details are in [region-vs-region.md](region-vs-region.md).
+- **Other way to win:** destroy every urban cell in the enemy home while yours keeps one. Details are in [region-vs-region.md](region-vs-region.md).
 
 ## Playing a turn
 
-*Planning panel showing the Ready button and movement/strike orders.*
+### Selecting Units
 
-![Planning panel showing the Ready button and movement/strike orders](media/planning-panel.png)
-
-| *Stack selection in normal/single-unit mode.*              | *Stack selection in multi-unit mode (holding down a shift key).*
+| *Click to select lone units or open the stack popup. In the stack popup, click + to select or +All to select all units.*              | *Shift-click to multi-select. In the stack popup, click +/- to select/deselect, or +All/-All to select/deselect all units.*
 | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| ![Stack selection in normal/single-unit mode](media/stack-select-1.png) | ![Stack selection in multi-unit mode (holding down a shift key)](media/stack-select-2.png) |
+| ![Click to select lone units or open the stack popup. In the stack popup, click + to select or +All to select all units.](media/stack-select-1.png) | ![Shift-click to multi-select. In the stack popup, click +/- to select/deselect, or +All/-All to select/deselect all units.](media/stack-select-2.png) |
+
+### Planning Movement
+
+| *Step 1: Plan movement orders by selecting units, then hovering over a destination hex. The game will automatically pick the fastest route.*              | *Step 2: Double-click to create movement orders, or right-click to stop. Orders are listed on the planning panel, on the right.*
+| ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| ![Step 1: Plan movement orders by selecting units, then hovering over a destination hex. The game will automatically pick the fastest route.](media/movement-planning-1.png) | ![Step 2: Double-click to create movement orders, or right-click to stop. Orders are listed on the planning panel, on the right.](media/movement-planning-2.png) |
+
+### Other Operations
 
 1. **Pan:** Drag with the left mouse button, or use WASD / arrow keys.
 2. **Zoom:** Mouse wheel (zooms toward the cursor). Zoomed in, contested strategic hexes show a marker that starts a tactical battle.
 3. **Select units:** Click a teal (human) unit's icon. A lone unit is selected right away. A stack opens a list of its units, where you can pick one or use **+ All**.
 4. **Issue a move order:** With units selected, double-click a destination hex (land/water/terrain rules apply). The order appears under "Movement orders." A destination beyond this turn's reach becomes a march that continues on later turns.
 5. **Ranged attack (armor or naval on strategic; broader types on tactical):** With capable units selected, click **Ranged**, then double-click an enemy hex within range. An all-air selection shows **Strike** instead. Attacks are submitted with Ready. See [Aiming ranged attacks and air strikes](#aiming-ranged-attacks-and-air-strikes).
-6. **Ready:** Click **Ready** to submit orders and resolve the turn. A side wins by controlling the enemy home or wiping out its urban cells (rules in [region-vs-region.md](region-vs-region.md)), or by destroying every enemy unit. The new-game dialog then returns for the next match.
+6. **Ready:** Click **Ready** to submit orders and resolve the turn. A side wins by controlling the enemy home or wiping out its urban cells (rules in [region-vs-region.md](region-vs-region.md)). The new-game dialog then returns for the next match.
 7. You can issue multiple movement and ranged orders (one per unit each) before clicking Ready.
 
 ## How a turn resolves
@@ -62,9 +74,9 @@ Each match starts on the new-game dialog, with a Global tab and a Regional tab. 
 
 ## Aiming ranged attacks and air strikes
 
-| *French 1st Armored plans a ranged attack (step 1).*              | *French 1st Armored plans a ranged attack (step 2).*
+| *Step 1: Select a unit or stack, then click the **Ranged** button.*              | *Step 2: Double-click on a visible target to order the attack.*
 | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| ![French 1st Armored plans a ranged attack (step 1)](media/ranged-attack-1.png) | ![French 1st Armored plans a ranged attack (step 2)](media/ranged-attack-2.png) |
+| ![Step 1: Select a unit or stack, then the Ranged button](media/ranged-attack-1.png) | ![Step 2: Step 2: Double-click on a visible target to order the attack](media/ranged-attack-2.png) |
 
 - **Ranged:** select units that can all fire, then click **Ranged**. The button reads **Cancel** while you aim.
 - **Strike:** select only air units, then click **Strike**. Pick a target type from the list that takes the button's place.
@@ -82,9 +94,9 @@ Each match starts on the new-game dialog, with a Global tab and a Regional tab. 
 
 ## Air power
 
-*French 1st Squadron plans a production atttack.*
+*Select an air unit or stack, then click the **Strike** button and pick the type of strike. Then double-click on a hex to order the attack.*
 
-![French 1st Squadron plans a production atttack](media/air-strike.png)
+![Select an air unit or stack, then click the Strike button and pick the type of strike. Then double-click on a hex to order the attack.](media/air-strike.png)
 
 - **Bases:** air units sit at an airport and don't march. They strike from there and return in the same turn.
 - **One action a turn:** strike or ferry, not both.
@@ -97,15 +109,15 @@ Each match starts on the new-game dialog, with a Global tab and a Regional tab. 
 - **Several ports:** some hexes have more than one airport or seaport cell. They keep basing air units or building ships until every one is wrecked.
 - **For good:** destroyed cities, airports, and seaports never rebuild. You can bomb your own.
 - **Losing a base:** an air unit dies if an enemy ground unit takes its airport hex, or if a strike hits that hex's airport.
-- **Ferrying:** with only air units selected and Strike off, double-click one of your airports within 4 hexes. With the weather bonus on, a unit without the snow tag can ferry only 2 hexes into snow.
+- **Ferrying:** with only air units selected, double-click one of your airports within 4 hexes. With the weather bonus on, a unit without the snow tag can ferry only 2 hexes into snow.
 - **Vision:** each air unit sees 3 hexes around its base, even when it does nothing.
 - **Regional maps:** a city hit destroys that map's own number of urban cells.
 
 ## Sealift
 
-*French 2nd Infantry embarks at a seaport hex.*
+*Select a stack including naval and ground units within a seaport hex, then load/unload units using the stack popup. Ground units can be unloaded in any coastal hex.*
 
-![French 2nd Infantry embarks at a seaport hex](media/sealift.png)
+![Select a stack including naval and ground units within a seaport hex, then load/unload units using the stack popup. Ground units can be unloaded in any coastal hex.](media/sealift.png)
 
 - **Capacity:** each naval unit carries one armor or two infantry.
 - **Where to load:** a coastal hex or a land seaport, or a water seaport you control.
@@ -120,9 +132,9 @@ Each match starts on the new-game dialog, with a Global tab and a Regional tab. 
 
 ## Building units
 
-*Planning unit construction in southern France, on a high-production hex with an airport and seaport.*
+*Zoom in until the production capacity ($) becomes a button, then click to open the build popup. The choice of buildable units depends on the capacity of the hex and presence of airports or seaports.*
 
-![Planning unit construction in southern France, on a high-production hex with an airport and seaport](media/unit-building.png)
+![Zoom in until the production capacity ($) becomes a button, then click to open the build popup. The choice of buildable units depends on the capacity of the hex and presence of airports or seaports.](media/unit-building.png)
 
 - **Income:** each strategic hex earns one production point per turn for each intact urban cell in it.
 - **Idle hexes save nothing:** points build up only in hexes you control that have a queue or **Keep building** on.
@@ -142,11 +154,23 @@ Each match starts on the new-game dialog, with a Global tab and a Regional tab. 
 
 ## Battles
 
+Tactical battles are initiated when human and LLM units end their turns in the same hex. The human player has the option of fighting manually or leaving the results to dice rolls. If they choose to fight, their stratetgic units will be broken into tactical sub-units on the tactical battlefield, and the fight is on.
+
+That said:
+- Committing to a manual battle prevents players (human and LLM) from issuing strategic orders during the same turn. Existing orders will still be followed, however, and units will continue to defend themselves.
+- Players can only fight one tactical battle at a time.
+
+*Tactical battle dialog in southern Mexico, from a regional game. Click Fight to fight the battle manually or Ignore to leave the outcome to chance.*
+
+![Tactical battle dialog in southern Mexico, from a regional game. Click Fight to fight the battle manually or Ignore to leave the outcome to chance.](media/tactical-battle-dialog.png)
+
 *Tactical battle in central Mexico, from a global game.*
 
 ![Tactical battle in central Mexico, from a global game](media/tactical-battle-mexico.jpg)
 
 A battle zooms in on one contested hex and fights it out on a finer grid. The rules are in [combat-rules-v3.md](combat-rules-v3.md) §12.
+
+Human players win tactical battles by destroying all LLM units, but they can leave at any time by clicking the Exit Battle button. Any strategic units with half or more of their sub-units remaining by the end of a battle will be returned to the strategic map. There is no concept of battle damage, to keep things simple.
 
 ### Starting a battle
 
@@ -158,9 +182,9 @@ A battle zooms in on one contested hex and fights it out on a finer grid. The ru
 
 ### How battles differ
 
-*Ukraine's 1st Fleet moves through wetlands, thanks to their terrain bonus (built on a wetland hex, near the Black Sea).*
+*Ukrainian 1st Fleet moves through wetlands, thanks to their terrain bonus (built on a wetland hex, near the Black Sea).*
 
-![Ukraine's 1st Fleet moves through wetlands, thanks to their terrain bonus (built on a wetland hex, near the Black Sea).](media/terrain-bonus-movement.png)
+![Ukrainian 1st Fleet moves through wetlands, thanks to their terrain bonus (built on a wetland hex, near the Black Sea).](media/terrain-bonus-movement.png)
 
 - **Scale:** the battlefield is the contested hex's cells, three H3 resolutions finer, plus three rings of neighboring cells.
 - **Pause:** the rest of the map waits until the battle ends. The date and weather stay fixed.
@@ -200,9 +224,9 @@ A battle zooms in on one contested hex and fights it out on a finer grid. The ru
 
 ## Roads and rail in battles
 
-| *Shaanxi 1st Armored moving faster by road, then slower through urban hexes.*                                                                 | *A stack of Ukraine's armormed units plan rapid movement by rail.*                                                |
+| *Shaanxi 1st Armored moving faster by road, then slower through urban hexes. Movement planning automatically picks the fastest route.*                                                                 | *A stack of Ukraine's armored units plans rapid movement by rail. Rail is faster than road, and movement planning will use both.*                                                |
 | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| ![Shaanxi 1st Armored moving faster by road, then slower through urban hexes](media/tactical-road-movement.png) | ![A stack of Ukraine's armormed units plan rapid movement by rail](media/tactical-rail-movement.png) |
+| ![Shaanxi 1st Armored moving faster by road, then slower through urban hexes. Movement planning automatically picks the fastest route.](media/tactical-road-movement.png) | ![A stack of Ukraine's armored units plans rapid movement by rail. Rail is faster than road, and movement planning will use both.](media/tactical-rail-movement.png) |
 
 - **Battles only:** strategic movement ignores roads and rail.
 - **Cheaper steps:** infantry and armor pay half a point to enter an intact road cell, and a third of a point for rail.
@@ -218,9 +242,9 @@ A battle zooms in on one contested hex and fights it out on a finer grid. The ru
 
 Hovering a unit's flag, in the stack list or anywhere else it appears, or the token of a one-unit hex, shows the bonuses that unit was born with. On the left, a stack near Mexico City is open, and the tooltip belongs to an armor unit born in the Mexican mountains in rain, with advanced tech. On the right, a lone unit near Colorado Springs was born on Saskatchewan plains in snow, with basic tech.
 
-| *Bonuses for the Mexican 5th Armorned, near Mexico City.*                                                                 | *Bonuses for the Saskatchewan 7th Infantry, near Colorado Springs.*                                                |
+| *Bonuses for the Mexican 5th Armored, near Mexico City.*                                                                 | *Bonuses for the Saskatchewan 7th Infantry, near Colorado Springs.*                                                |
 | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| ![Bonuses for the Mexican 5th Armorned, near Mexico City](media/unit-bonuses-armored-mexico.png) | ![Bonuses for the Saskatchewan 7th Infantry, near Colorado Springs](media/unit-origin-saskatchewan.png) |
+| ![Bonuses for the Mexican 5th Armored, near Mexico City](media/unit-bonuses-armored-mexico.png) | ![Bonuses for the Saskatchewan 7th Infantry, near Colorado Springs](media/unit-origin-saskatchewan.png) |
 
 Each bonus is Off, Low, or High in the new-game dialog, and starts at Low.
 
@@ -257,6 +281,10 @@ The full bonus rules are in [combat-rules-v3.md](combat-rules-v3.md) §4.9.
 - **No save slots yet:** the app keeps the match in progress and reopens it, but there's no load list. Starting a new game replaces it.
 
 ## Where messages appear
+
+| *LLM-supplied taunts (in this case, Claude Opus) and strategy messages appear in the upper-right.*                                                                 | *End-of-turn updates appear in the lower-right.*                                                |
+| ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| ![LLM-supplied taunts (in this case, Claude Opus) and strategy messages appear in the upper-right](media/message-popup.png) | ![End-of-turn updates appear in the lower-right](media/status-popup.png) |
 
 - **Lower right of the map (map toast):** Errors, rejected orders, turn-loss summaries, and unknown-battle announcements. Use the × to dismiss; it also hides after a fixed interval, and a newer message replaces it.
 - **Upper right of the map (AI strategy toast):** The opponent's Message and Strategy after a consultation. It dismisses and times out the same way.

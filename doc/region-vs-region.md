@@ -37,7 +37,7 @@ Evaluated at end of turn after combat, movement, control, and production (`evalu
 
 Prompt copy for the AI (`scenarioGoals.ts`) states the same two paths. On a regional map the control sentence is the 75% urban-cell share, and the prompt adds two progress lines: enemy-home urban cells in hexes you control, and your-home urban cells in hexes the enemy controls. The hex-count lines remain territory. On the global map the control sentence is still every enemy home hex.
 
-**Force elimination** (one side has no strategic units left) is a separate game-over path in turn finalize, not this function.
+Losing every strategic unit does not end the match. `finalizeReadyTurnAfterMelee` in `src/main/gameActions/meleeInterceptReadyFinalize.ts` calls `setGameOver` only with this function's result, so a side with no units left keeps playing and can still build.
 
 Tactical battles do **not** restate home-region victory. The tactical goal is to engage and defeat forces in the footprint (`buildTacticalBattleGoalClause`).
 

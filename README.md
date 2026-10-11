@@ -6,11 +6,15 @@
 
 A turn-based grand strategy game on a real-Earth hex map, where your opponent is a large language model you choose. Coding agents wrote the code and most of the documentation. I set the direction, wrote the prompts and coding rules, and reviewed the results.
 
+Agent Wars is a WEGO game ("we go"), where neither player can see what the other is planning to do. For each turn, both sides create movement, production, and combat orders at the same time, based on different, subjective views of the battlefield. Once both players are ready, the game engine executes their orders and resolves the outcomes automatically.
+
+The game is intended to be simple to learn and quick to play, but with enough depth to make things interesting and believable.
+
+[Play It](#play-it) · [Why This Exists](#why-this-exists) · [What's Inside](#whats-inside) · [Under the Hood](#under-the-hood) · [How It Was Built](#how-it-was-built) · [Architecture](#architecture) · [Build from Source](#build-from-source) · [Status](#status) · [License](#license)
+
 ![Tactical planning over central Mexico](doc/media/tactical-battle-mexico.jpg)
 
 *A tactical battle in central Mexico on turn 2, a rainy August. Teal/human units face the rose/LLM opponent (in this case, Gemini Flash Lite), and their movement orders are queued in the right panel. The hex readout for Guerrero, Morelos, and México lists the road, the forest and urban terrain, the rain, and what those do to range, movement, and cover. At the upper right, the LLM's message reads "Your lines will shatter before you even realize the battle has begun."*
-
-[Play It](#play-it) · [Why This Exists](#why-this-exists) · [What's Inside](#whats-inside) · [Under the Hood](#under-the-hood) · [How It Was Built](#how-it-was-built) · [Architecture](#architecture) · [Build from Source](#build-from-source) · [Status](#status) · [License](#license)
 
 ## Why This Exists
 
@@ -45,16 +49,18 @@ The opponent needs an [OpenRouter](https://openrouter.ai) API key of your own:
 1. In the right-side panel, open the **Model** tab (the panel starts on it).
 2. Paste your OpenRouter API key into the API key field (placeholder `Set key and blur to save`).
 3. Click outside the field, or press Enter, to save. A saved key loads the model list.
-4. Choose a model. **Refresh model list** reloads the list.
-    - My go-to playtesting model is Google Gemini Flash Lite (version 3.5, currently). A fast, inexpensive, tool-using model that fights reasonably well. Can finish a typical game for <$1.
+4. Choose a model from Anthropic, Google, Meta, OpenAI, SpaceX, etc. **Refresh model list** reloads the list.
+    - My go-to playtesting model is Google Gemini Flash Lite (version 3.5, currently). A fast, inexpensive, tool-using model that fights reasonably well. It can also finish a typical game for <$1.
     - Ollama/other local model support is on my radar (pun intended, I guess).
-6. Click **Run** to start opponent planning.
-
-![Model list with a subset of available choices](doc/media/model-selection.png)
-
-The key is handled only in the Electron main process and stored locally in the Electron user-data directory, not in repository files. Without a key or a model the app still runs, **Run** stays disabled, and the opponent makes no model calls.
+5. Click **Run** to start opponent planning.
 
 How a match plays, from setup and turn order to battles, air power, sealift, and the controls, is covered in [doc/how-to-play.md](doc/how-to-play.md).
+
+| *Step 1: Enter an OpenRouter API key, pick a model, and click Run. The ongoing cost of the current game (in US$) is shown on the right.*                                                                 | *Step 2: Watch the LLM do its thing, and optionally enable/disable tools.*                                                |
+| ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| ![Step 1: Enter an OpenRouter API key, pick a model, and click Run. The ongoing cost of the current game (in US$) is shown on the right.](doc/media/model-tab.png) | ![Step 2: Watch the LLM do its thing, and optionally enable/disable tools](doc/media/tools-tab.png) |
+
+The key is handled only in the Electron main process and stored locally in the Electron user-data directory, not in repository files. Without a key or a model the app still runs, **Run** stays disabled, and the opponent makes no model calls.
 
 ![Spain's 1st Fleet heading west across the Atlantic on the global map](doc/media/global-spain-new-world.png)
 

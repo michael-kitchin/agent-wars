@@ -653,4 +653,4 @@ The shipped scenario id is `region_vs_region`. Details: [region-vs-region.md](re
 1. **Control:** On the global map you control every strategic hex in the enemy home, and the enemy does not symmetrically control yours. On a regional map your controlled enemy-home hexes must hold at least 75% of that home's generated urban cells. Bombing does not lower the target. A home with no generated urban cells falls back to every hex. The enemy must not symmetrically meet theirs.
 2. **Urban elimination:** The enemy home's tactical urban count sums to zero, and your home still has at least one urban cell. Mutual zero (scorched earth both homes) is not an urban-only win.
 
-If one side has no remaining strategic units, the match also ends (force elimination in finalize). Both home-region outlines stay visible on the map regardless of fog.
+A side with no remaining strategic units has not lost. The match continues, and that side can still build. Both home-region outlines stay visible on the map regardless of fog.

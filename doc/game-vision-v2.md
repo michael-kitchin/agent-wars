@@ -71,7 +71,7 @@ Per-side caps scale with match size (Small 12/8/8/6 infantry/armor/naval/air; Me
 
 The global roster is validated when: the LLM reasons clearly about force allocation, production decisions feel meaningful, and games at this level alone produce interesting strategic tension for 15–30 turns.
 
-**Live scenario:** [`region_vs_region`](region-vs-region.md). Each side has a home. On the global map that home is a region, and the two homes may match. On a regional map each home is a different side group. Win at end of turn by controlling the enemy home, or by eliminating all urban production in the enemy home while your own home still has urban cells. On the global map, control means every strategic hex in that home. On a regional map, it means controlled enemy-home hexes that hold at least 75% of that home's generated urban cells. Bombing does not lower that target. A home with no generated urban cells falls back to every hex. Both home outlines are always visible. Destroying the last enemy unit also ends the match.
+**Live scenario:** [`region_vs_region`](region-vs-region.md). Each side has a home. On the global map that home is a region, and the two homes may match. On a regional map each home is a different side group. Win at end of turn by controlling the enemy home, or by eliminating all urban production in the enemy home while your own home still has urban cells. On the global map, control means every strategic hex in that home. On a regional map, it means controlled enemy-home hexes that hold at least 75% of that home's generated urban cells. Bombing does not lower that target. A home with no generated urban cells falls back to every hex. Both home outlines are always visible.
 
 ### Tactical Level: Unit Multiplication
 
