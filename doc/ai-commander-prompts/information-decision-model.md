@@ -1,6 +1,6 @@
 # Information and decision model
 
-What the AI commander has to decide, what it is allowed to know, and which facts the builders therefore carry. This file names jobs and information items. Where a section, heading, or column carries an item is described in `assembly-contract.md`, `strategic-prompt.md`, and `tactical-prompt.md`, matching the builders. If an item's emission disagrees with code, the builders win.
+What the AI commander has to decide, what it is allowed to know, and which facts the builders therefore carry. This file names jobs and information items. Where a section, heading, or column carries an item is described in [`assembly-contract.md`](assembly-contract.md), [`strategic-prompt.md`](strategic-prompt.md), and [`tactical-prompt.md`](tactical-prompt.md), matching the builders. If an item's emission disagrees with code, the builders win.
 
 Item ids defined here are the stable vocabulary for the rest of the package. Cite them; do not rename them.
 
@@ -56,7 +56,7 @@ What the commander may be told is decided by the snapshot it is given, never by 
 
 ## 3. Information items
 
-Scope is `strategic`, `tactical`, `both`, or `consult-only`. Status is `required`, `conditional` (with the gate), or `exclude` (with the reason). Conditional gates name the symbol from `source-inventory.md` section 6.
+Scope is `strategic`, `tactical`, `both`, or `consult-only`. Status is `required`, `conditional` (with the gate), or `exclude` (with the reason). Conditional gates name the symbol from [`source-inventory.md`](source-inventory.md) section 6.
 
 ### 3.1 Identity and frame
 

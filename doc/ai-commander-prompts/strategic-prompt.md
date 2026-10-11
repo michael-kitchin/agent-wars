@@ -1,6 +1,6 @@
 # Strategic prompt
 
-The strategic system prompt as `buildSystemPromptForTools` emits it. On the global map the preamble states H3 resolution 1. Shared assembly comes from `assembly-contract.md`. Messages after the system prompt are in `consultation-flow.md`; gates are in `variants.md`. If this file disagrees with the builders, the builders win.
+The strategic system prompt as `buildSystemPromptForTools` emits it. On the global map the preamble states H3 resolution 1. Shared assembly comes from [`assembly-contract.md`](assembly-contract.md). Messages after the system prompt are in [`consultation-flow.md`](consultation-flow.md); gates are in [`variants.md`](variants.md). If this file disagrees with the builders, the builders win.
 
 Heading strings in backticks are exact and must match the generated prompt character for character.
 
@@ -19,7 +19,7 @@ Emit order. Each entry states purpose, the information items it carries, include
 
 - **Shape:** the victory conditions in plain language, followed by how they are achieved: units die to ranged and melee combat, production capacity dies to air strikes.
 - **Items:** `WIN_CONDITIONS`.
-- **Include:** always. **Empty-state:** when no scenario is set, state the generic objective of destroying enemy forces and taking territory, and do not name home regions. See `variants.md`.
+- **Include:** always. **Empty-state:** when no scenario is set, state the generic objective of destroying enemy forces and taking territory, and do not name home regions. See [`variants.md`](variants.md).
 - **Model use:** decides whether this turn's effort goes to territory, production, or attrition.
 
 ### 1.3 Situational directives
@@ -78,7 +78,7 @@ Assessment-tool and combat-estimate hints must **not** appear when a precomputed
 #### `## Unit Status and Threats`
 
 - **Include:** always inside the briefing.
-- **Distance-basis caveat line:** immediately after the heading and before the table. With fog off on the strategic map, include one line stating that nearest-enemy distances and threat estimates are straight hop counts rather than march or sail paths, and that option-table targets are already this-turn legal destinations. With fog on, include the intel-staleness sentence and one line stating that nearest-enemy distances are march or sail path lengths when a path exists (otherwise a hop count), and that the length can be longer than one movement budget. Best Options Target Hexes are the one-step destinations already inside this turn's budget, including weather. Copy a Target Hex into explicit_move. Do not copy a farther hex from the printed path; an explicit_move past the budget is dropped. Omit both caveat lines in battle. `variants.md` fixes the gates.
+- **Distance-basis caveat line:** immediately after the heading and before the table. With fog off on the strategic map, include one line stating that nearest-enemy distances and threat estimates are straight hop counts rather than march or sail paths, and that option-table targets are already this-turn legal destinations. With fog on, include the intel-staleness sentence and one line stating that nearest-enemy distances are march or sail path lengths when a path exists (otherwise a hop count), and that the length can be longer than one movement budget. Best Options Target Hexes are the one-step destinations already inside this turn's budget, including weather. Copy a Target Hex into explicit_move. Do not copy a farther hex from the printed path; an explicit_move past the budget is dropped. Omit both caveat lines in battle. [`variants.md`](variants.md) fixes the gates.
 - **Rows:** one per own unit. **No cap.** The table lists every unit the snapshot includes, at every game size.
 - **Bonus column:** a `Bonus` column follows `Hex` when the origin bonus is on or the tech bonus is on. Origin reads `+2 origin` (`+4 origin` at High) for a unit that qualifies where it stands. Tech appends `tech +2 attack` at Low, or `tech +2 attack and defense` at High, for an Advanced unit. A row with neither reads `—`. With both flags off the table is unchanged. Carries `ORIGIN_BONUS` and `TECH_BONUS`.
 - **Items:** `OWN_UNIT_TABLE`, `UNIT_IDENTITY`, `NEAREST_ENEMY_DISTANCE`, `CONTACT_FLAGS`, `THREAT_SEVERITY`, `ACTION_NEEDED_FLAG`, `INTEL_FRESHNESS`, `INTEL_STALENESS_WINDOW`, `HOP_VS_PATH_CAVEAT`.
@@ -110,7 +110,7 @@ Assessment-tool and combat-estimate hints must **not** appear when a precomputed
 - **Include:** when at least one option row exists. **Omit** heading and table otherwise.
 - **Items:** `BEST_OPTIONS_ROWS`, `LEGAL_DEST_OCCUPANCY`, `RANGED_LEGAL_TARGETS`, `AIR_STRIKE_ENVELOPE`.
 - **Model use:** the primary source of destinations and targets; copying a row is always preferred to routing. A unit listed on an `air strike` row this turn must not also appear on a `ferry` row; strike-or-ferry exclusivity is already decided by the table, not left as a join.
-- **Empty-state consequence:** when the table is absent, destinations must come from the routing tool. The prompt must say this rather than leaving the copy instruction pointing at nothing. See `variants.md`.
+- **Empty-state consequence:** when the table is absent, destinations must come from the routing tool. The prompt must say this rather than leaving the copy instruction pointing at nothing. See [`variants.md`](variants.md).
 
 #### `## Supplemental Hex Intelligence`
 
@@ -260,7 +260,7 @@ Cell contracts that carry meaning beyond the column name:
 
 ### 3.1 Field contract
 
-Fields, order, and presence follow `assembly-contract.md` section 5.1. Strategic prompts offer the standing-order actions, memory updates when memory tools are enabled, and production orders when production tools are enabled.
+Fields, order, and presence follow [`assembly-contract.md`](assembly-contract.md) section 5.1. Strategic prompts offer the standing-order actions, memory updates when memory tools are enabled, and production orders when production tools are enabled.
 
 ### 3.2 Legal actions and their required fields
 

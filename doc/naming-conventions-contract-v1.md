@@ -2,7 +2,7 @@
 
 *Version 1.0 — August 2026*
 
-This document is the authoritative naming contract for Agent Wars TypeScript. It pairs with `.spec/completed/naming-conventions-execution-plan-v1.md`. When this file and an implementation disagree, fix the implementation.
+This document is the authoritative naming contract for Agent Wars TypeScript. It pairs with [`.spec/completed/naming-conventions-execution-plan-v1.md`](../.spec/completed/naming-conventions-execution-plan-v1.md). When this file and an implementation disagree, fix the implementation.
 
 ---
 

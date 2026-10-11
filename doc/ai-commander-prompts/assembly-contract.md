@@ -2,7 +2,7 @@
 
 Rules that hold for both coordinate modes: how positions and units are named, the order the system prompt is assembled in, which sections appear when, how tool reads relate to envelope writes, and the response envelope itself.
 
-Mode-specific detail lives in `strategic-prompt.md` and `tactical-prompt.md`. Messages after the system prompt live in `consultation-flow.md`. Gate-by-gate behaviour lives in `variants.md`.
+Mode-specific detail lives in [`strategic-prompt.md`](strategic-prompt.md) and [`tactical-prompt.md`](tactical-prompt.md). Messages after the system prompt live in [`consultation-flow.md`](consultation-flow.md). Gate-by-gate behaviour lives in [`variants.md`](variants.md).
 
 **The system prompt owns every rule and every heuristic.** No other message may add a rule, weaken one, or restate one in different words.
 
@@ -51,7 +51,7 @@ Every cell is binary. `always` means unconditional in that mode; `never` means t
 | Block | Strategic | Tactical | Empty-state |
 | --- | --- | --- | --- |
 | Role and clock line | always | always | n/a |
-| Goal statement | always (win conditions) | always (battle-local goal) | strategic with no scenario set falls back to the generic objective in `strategic-prompt.md` 1.2; never reuse scenario wording |
+| Goal statement | always (win conditions) | always (battle-local goal) | strategic with no scenario set falls back to the generic objective in [`strategic-prompt.md`](strategic-prompt.md) 1.2; never reuse scenario wording |
 | Scouting directive | when no enemy unit is observed | never | omit |
 | Tool-budget warning | when the previous consultation exhausted its tool budget and planning or orders tools are enabled | when the same condition holds | omit |
 | Coordinate preamble | always (strategic wording) | always (tactical wording) | n/a |
@@ -153,7 +153,7 @@ Envelope-wide rules the prompt must state:
 | `memoryUpdates` entries | legal when memory tools are enabled | **forbidden** |
 | `productionOrders` entries | legal when production tools are enabled | **forbidden** |
 
-The repair schema in `consultation-flow.md` must offer exactly the fields this table permits for the active mode, with the same field order as 5.1. A field forbidden here must not appear there.
+The repair schema in [`consultation-flow.md`](consultation-flow.md) must offer exactly the fields this table permits for the active mode, with the same field order as 5.1. A field forbidden here must not appear there.
 
 ## 6. Shared coaching
 
@@ -178,7 +178,7 @@ Two claims the builders **omit** (matrix tests forbid the substrings):
 
 ## 7. Carrier assignment for required items
 
-Every item marked `required` in `information-decision-model.md` names its carrier block here. Conditional items are carried by the same block when their gate is true. Full section-level detail is in the mode files.
+Every item marked `required` in [`information-decision-model.md`](information-decision-model.md) names its carrier block here. Conditional items are carried by the same block when their gate is true. Full section-level detail is in the mode files.
 
 | Item | Carrier block |
 | --- | --- |
@@ -210,4 +210,4 @@ Every item marked `required` in `information-decision-model.md` names its carrie
 | `CONSULT_POLICY` | Response envelope contract, beside the callback clause |
 | `HOP_VS_PATH_CAVEAT` | Distance-basis caveat line |
 | `INTEL_FRESHNESS`, `INTEL_STALENESS_WINDOW` | `## Unit Status and Threats` |
-| `SUBMIT_INSTRUCTION`, `REPAIR_SCHEMA` | Not system-prompt content; see `consultation-flow.md` |
+| `SUBMIT_INSTRUCTION`, `REPAIR_SCHEMA` | Not system-prompt content; see [`consultation-flow.md`](consultation-flow.md) |

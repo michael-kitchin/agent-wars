@@ -19,23 +19,23 @@ It records two things:
 2. **Prompt-generating code is first authority for wording.** The system prompt is assembled by `buildSystemPromptForTools` (`openRouterBuildSystemPrompt.ts`). Combat sentences live in `promptSpec/gameRuleText.ts`. Coaching lives in `promptSpec/coachingTextStrategic.ts` and `coachingTextTactical.ts`. Envelope shape lives in `promptSpec/envelopeContract.ts`; the structured-output schema built from the same gates lives in `promptSpec/envelopeJsonSchema.ts`. Opening and repair user messages live in `promptSpec/consultationText.ts`. Briefing tables live in `briefingFormatter.ts`, `formatTacticalBriefing.ts`, and the section builders they call.
 3. **This package describes that emission.** A sentence here is evidence of what we tell the model only insofar as it matches those builders.
 4. Captured dumps (`debug-last-strategic-prompt.txt`, `debug-last-user-prompt.txt`) are examples of emitted shape for one consultation. The tactical dump on disk may be stale; tactical catalogs below are derived from code.
-5. `devleopment-plan-v3.4.md` is historical architecture and is not prompt authority.
+5. [`devleopment-plan-v3.4.md`](../devleopment-plan-v3.4.md) is historical architecture and is not prompt authority.
 
 ## 3. How to use this package
 
 | You want to | Read |
 | --- | --- |
-| Understand what the model is being asked to do | `information-decision-model.md` |
-| See which fact a section carries | `information-decision-model.md`, then the mode file, then `crosswalk.md` |
-| See section order, headings, or the response shape | `assembly-contract.md`, then the mode file |
-| See a strategic section, column, or coaching bullet | `strategic-prompt.md` |
-| See a tactical section, column, or coaching bullet | `tactical-prompt.md` |
-| See anything after the system prompt | `consultation-flow.md` |
-| See a configuration, roster, or scenario case | `variants.md` |
-| Find where an existing prompt section is specified | `crosswalk.md` |
-| Know what the builders emit today, and remaining engine-versus-copy gaps | `source-inventory.md` |
+| Understand what the model is being asked to do | [`information-decision-model.md`](information-decision-model.md) |
+| See which fact a section carries | [`information-decision-model.md`](information-decision-model.md), then the mode file, then [`crosswalk.md`](crosswalk.md) |
+| See section order, headings, or the response shape | [`assembly-contract.md`](assembly-contract.md), then the mode file |
+| See a strategic section, column, or coaching bullet | [`strategic-prompt.md`](strategic-prompt.md) |
+| See a tactical section, column, or coaching bullet | [`tactical-prompt.md`](tactical-prompt.md) |
+| See anything after the system prompt | [`consultation-flow.md`](consultation-flow.md) |
+| See a configuration, roster, or scenario case | [`variants.md`](variants.md) |
+| Find where an existing prompt section is specified | [`crosswalk.md`](crosswalk.md) |
+| Know what the builders emit today, and remaining engine-versus-copy gaps | [`source-inventory.md`](source-inventory.md) |
 
-Reading order for a first pass: this file, then `information-decision-model.md`, `assembly-contract.md`, the mode file you need, `consultation-flow.md`, `variants.md`. `source-inventory.md` and `crosswalk.md` are reference.
+Reading order for a first pass: this file, then [`information-decision-model.md`](information-decision-model.md), [`assembly-contract.md`](assembly-contract.md), the mode file you need, [`consultation-flow.md`](consultation-flow.md), [`variants.md`](variants.md). [`source-inventory.md`](source-inventory.md) and [`crosswalk.md`](crosswalk.md) are reference.
 
 Two rules the builders actually enforce:
 
@@ -57,12 +57,12 @@ Two rules the builders actually enforce:
 
 These documents keep their mechanics content. They do not override emitted prompt copy.
 
-- `../combat-rules-v3.md` — mechanics reference, aligned to the engine as of 2.5.0.
-- `../hybrid-ai.md`, `../ai-tools.md` — consult loop and tool names, not prompt copy.
-- `../devleopment-plan-v3.4.md` — historical architecture.
-- `../../.spec/prompt-debug-log-split.md` — which debug file each consultation writes, not what the prompt says.
+- [`../combat-rules-v3.md`](../combat-rules-v3.md) — mechanics reference, aligned to the engine as of 2.5.0.
+- [`../hybrid-ai.md`](../hybrid-ai.md), [`../ai-tools.md`](../ai-tools.md) — consult loop and tool names, not prompt copy.
+- [`../devleopment-plan-v3.4.md`](../devleopment-plan-v3.4.md) — historical architecture.
+- [`../../.spec/completed/prompt-debug-log-split.md`](../../.spec/completed/prompt-debug-log-split.md) — which debug file each consultation writes, not what the prompt says.
 
-Completed execution plans under `../../.spec/completed/` that specified prompt wording are historical. Their decisions are either reflected in the builders or were superseded.
+Completed execution plans under [`../../.spec/completed/`](../../.spec/completed/) that specified prompt wording are historical. Their decisions are either reflected in the builders or were superseded.
 
 ## 6. Out of scope
 

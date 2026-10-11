@@ -1,8 +1,8 @@
-# Agent Wars
+#  Agent Wars
 
-[![CI](https://github.com/michael-kitchin/agent-wars/actions/workflows/ci.yml/badge.svg)](https://github.com/michael-kitchin/agent-wars/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/michael-kitchin/agent-wars?include_prereleases)](https://github.com/michael-kitchin/agent-wars/releases)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+![CI](https://github.com/michael-kitchin/agent-wars/actions/workflows/ci.yml/badge.svg)
+![Release](https://img.shields.io/github/v/release/michael-kitchin/agent-wars?include_prereleases)
+![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)
 
 A turn-based grand strategy game on a real-Earth hex map, where your opponent is a large language model you choose. Coding agents wrote the code and most of the documentation. I set the direction, wrote the prompts and coding rules, and reviewed the results.
 
@@ -21,6 +21,7 @@ The game is intended to be simple to learn and quick to play, but with enough de
 Before I started Agent Wars I'd been writing software by hand for a long time, but I knew very little about agentic development. This project was how I started learning about it.
 
 I chose this approach because:
+
 - I wanted a crash course in agentic development, on work I could afford to screw up. I especially wanted to see how it holds up as an application grows, from greenfield to feature additions and bug fixes in an ever-growing codebase.
 - It feels good to blow up commercial LLMs on imaginary battlefields, even if I'm paying their vendors for the privilege.
 - For something new, I wanted LLMs to reason about real-world geography, planning combat, movement, and logistics on a hex map across many turns.
@@ -50,7 +51,7 @@ The opponent needs an [OpenRouter](https://openrouter.ai) API key of your own:
 2. Paste your OpenRouter API key into the API key field (placeholder `Set key and blur to save`).
 3. Click outside the field, or press Enter, to save. A saved key loads the model list.
 4. Choose a model from Anthropic, Google, Meta, OpenAI, SpaceX, etc. **Refresh model list** reloads the list.
-    - My go-to playtesting model is Google Gemini Flash Lite (version 3.5, currently). A fast, inexpensive, tool-using model that fights reasonably well. It can also finish a typical game for <$1.
+  - My go-to playtesting model is Google Gemini Flash Lite (version 3.5, currently). A fast, inexpensive, tool-using model that fights reasonably well. It can also finish a typical game for <$1.
     - Ollama/other local model support is on my radar (pun intended, I guess).
 5. Click **Run** to start opponent planning.
 
@@ -58,13 +59,16 @@ The key is handled only in the Electron main process and stored locally in the E
 
 How a match plays, from setup and turn order to battles, air power, sealift, and the controls, is covered in [doc/how-to-play.md](doc/how-to-play.md).
 
-| *Step 1: Enter an OpenRouter API key, pick a model, and click Run. The ongoing cost of the current game (in US$) is shown on the right.*                                                                 | *Step 2: Watch the LLM do its thing, and optionally enable/disable tools.*                                                |
-| ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+
+| *Step 1: Enter an OpenRouter API key, pick a model, and click Run. The ongoing cost of the current game (in US$) is shown on the right.*                           | *Step 2: Watch the LLM do its thing, and optionally enable/disable tools.*                          |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------- |
 | ![Step 1: Enter an OpenRouter API key, pick a model, and click Run. The ongoing cost of the current game (in US$) is shown on the right.](doc/media/model-tab.png) | ![Step 2: Watch the LLM do its thing, and optionally enable/disable tools](doc/media/tools-tab.png) |
+
 
 ## See the Prompts (and Everything Else)
 
 Create a text file called `.env` in the game's working directory, with the following:
+
 ```
 AGENT_WARS_LOG_FULL_PROMPTS=1
 AGENT_WARS_LOG_FULL_RESPONSES=1
@@ -84,6 +88,7 @@ The game's "working directory" is:
 - **Linux:** Wherever the executable is invoked from.
 
 When the `.env` file is present at runtime, the game will create the following files in the same directory:
+
 ```
 debug-last-openrouter-response-body.txt
 debug-last-strategic-prompt.txt
@@ -98,7 +103,7 @@ debug.log
 - **debug-last-user-prompt.txt**: Stock prompt suffix, sent after the strategic/tactical prompts.
 - **debug.log**: Complete log output at the specified level of detail, including truncated tool calls. This file is appended to with every run, so it should be deleted when no longer needed.
 
-See [doc/hybrid-ai.md](doc/hybrid-ai.md) and [doc/ai-tools.md](doc/ai-tools.md)for explanations of what goes into these prompts and how they're assembled and used.
+See [doc/hybrid-ai.md](doc/hybrid-ai.md) and [doc/ai-tools.md](doc/ai-tools.md) for what goes into these prompts and how they're assembled and used.
 
 ## What's Inside
 
@@ -107,10 +112,10 @@ See [doc/hybrid-ai.md](doc/hybrid-ai.md) and [doc/ai-tools.md](doc/ai-tools.md)f
 *Re-invading the New World, at the start of a global game. What could go wrong?*
 
 - **A hybrid AI opponent.** The engine pre-computes a briefing (an ASCII hex map, Markdown tables of units and threats, and attention flags) before it consults the model. Standing orders carry the plan forward on turns the model isn't consulted, and event callbacks decide when it is. Any OpenRouter model can play; one without tool calls plays without the [planning tools](#the-opponents-tools). See [doc/hybrid-ai.md](doc/hybrid-ai.md) and [doc/ai-tools.md](doc/ai-tools.md).
-- **Prompts as code.** The prompts are assembled by builders in [`src/main/openRouter/promptSpec/`](src/main/openRouter/promptSpec/), documented in [doc/ai-commander-prompts/](doc/ai-commander-prompts/README.md), and held to that contract by tests such as `consultationContract.test.ts`, `envelopeJsonSchema.test.ts`, and `variantConformance.test.ts`.
+- **Prompts as code.** The prompts are assembled by builders in `[src/main/openRouter/promptSpec/](src/main/openRouter/promptSpec/)`, documented in [doc/ai-commander-prompts/](doc/ai-commander-prompts/README.md), and held to that contract by tests such as `consultationContract.test.ts`, `envelopeJsonSchema.test.ts`, and `variantConformance.test.ts`.
 - **A real-Earth hex grid at two scales.** Strategic play uses H3 resolution 1 on the global map, or 2 or 3 on one of the regional maps. Tactical battles sit three resolutions finer. Terrain, roads, place names, and climate come from public datasets through an offline Python pipeline (`scripts/terrain_pipeline/`). The cell sizes and sources are under [Under the Hood](#under-the-hood).
 - **Simultaneous turns.** Both sides plan, then the engine resolves air strikes, ranged fire, movement, ferry, and melee in a fixed phase order, with optional zoomed-in tactical battles. The rules are in [doc/combat-rules-v3.md](doc/combat-rules-v3.md).
-- **Guardrails.** `npm test` builds the main process, then runs ESLint (with custom rules in [`eslint-rules/`](eslint-rules/)), a naming-convention check, a renderer type check, the main-process and tool tests (808 tests), and a third-party-notices check. The renderer runs with context isolation, without Node integration, and under a Content-Security-Policy.
+- **Guardrails.** `npm test` builds the main process, then runs ESLint (with custom rules in `[eslint-rules/](eslint-rules/)`), a naming-convention check, a renderer type check, the main-process and tool tests (808 tests), and a third-party-notices check. The renderer runs with context isolation, without Node integration, and under a Content-Security-Policy.
 
 ## Under the Hood
 
@@ -192,12 +197,12 @@ Memory writes and standing-order changes travel in the model's JSON reply. The f
 Every line of production code was written by coding agents, mostly in Cursor. I wrote the prompts that drove the agents and the rules they follow; the agents also wrote the plans and most of the documentation. All of it is in the repository:
 
 - [AGENTS.md](AGENTS.md): what every agent reads first, including which document wins a disagreement and what to update in the same change.
-- [`.cursor/rules/`](.cursor/rules/): fifteen always-on coding rules, from reliable code and testing standards to file-size limits, naming, and secrets.
-- [`.spec/completed/`](.spec/completed/): the execution plans, audits, and verification records behind each change.
+- `[.cursor/rules/](.cursor/rules/)`: fifteen always-on coding rules, from reliable code and testing standards to file-size limits, naming, and secrets.
+- `[.spec/completed/](.spec/completed/)`: the execution plans, audits, and verification records behind each change.
 - [doc/coding-prompts-1.md](doc/coding-prompts-1.md): the reusable prompt library. Its core cycle is four prompts: plan, audit the plan, implement, audit the implementation.
 - [doc/](doc/README.md): the living product documentation, kept current with the code.
 
-**A trail to follow:** the [unit origin and country flags plan](.spec/completed/unit-origin-and-country-flags-execution-plan.md) opens with ground rules for the executing agent, locked decisions, and verified facts. The code it produced is in [`src/main/unitOrigin/`](src/main/unitOrigin/), with tests beside it (`unitBirthOrigin.test.ts`, `unitBirthCellSelection.test.ts`, and others).
+**A trail to follow:** the [unit origin and country flags plan](.spec/completed/unit-origin-and-country-flags-execution-plan.md) opens with ground rules for the executing agent, locked decisions, and verified facts. The code it produced is in `[src/main/unitOrigin/](src/main/unitOrigin/)`, with tests beside it (`unitBirthOrigin.test.ts`, `unitBirthCellSelection.test.ts`, and others).
 
 ### Time and Tokens
 

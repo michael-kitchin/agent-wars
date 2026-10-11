@@ -190,7 +190,7 @@ Adding a scenario is a change to this file and to the goal statement. Silently l
 
 ### 4.3 Tactical mode
 
-Scenario surfaces are omitted in battle regardless of the scenario id, per `tactical-prompt.md`.
+Scenario surfaces are omitted in battle regardless of the scenario id, per [`tactical-prompt.md`](tactical-prompt.md).
 
 ## 5. Game size and large rosters
 

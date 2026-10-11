@@ -156,7 +156,7 @@ Please ensure all new and updated fields and non-overriding methods of all cardi
 
 Write working specs, execution plans, design proposals, and debugging notes as markdown files in the `.spec` directory.
 
-Living product documentation belongs in `doc/`. This includes the UX specification suite (`doc/ux-specification.md` and the `doc/ux/` folder) and the mechanics documents indexed by `doc/README.md`. Update those documents in place; do not copy them into `.spec`.
+Living product documentation belongs in `doc/`. This includes the UX specification suite ([`doc/ux-specification.md`](ux-specification.md) and the [`doc/ux/`](ux/) folder) and the mechanics documents indexed by [`doc/README.md`](README.md). Update those documents in place; do not copy them into `.spec`.
 
 ### 6. Reusable Code
 
@@ -192,7 +192,7 @@ Classes, fields, variables, arguments, functions and other symbols should be mar
 
 ### 14. Naming Conventions
 
-Follow `doc/naming-conventions-contract-v1.md`. Directories and TypeScript files under `src/` use camelCase. Exported functions are camelCase; exported types are PascalCase. Use only the allowed role suffixes (`Handler`, `Helpers`, `Guards`, `Adapter`, `Pipeline`, `Core`, `Types`). Do not use `Utils` or `Impl`. Do not put milestone or tool-group numbers in identifiers. Do not rename frozen string values (IPC channels, LLM tool names, SQL columns, vendor JSON fields). Do not put identifiers used to name plans, workflows, or spec phases into product code, comments, configuration, or lint messages.
+Follow [`doc/naming-conventions-contract-v1.md`](naming-conventions-contract-v1.md). Directories and TypeScript files under `src/` use camelCase. Exported functions are camelCase; exported types are PascalCase. Use only the allowed role suffixes (`Handler`, `Helpers`, `Guards`, `Adapter`, `Pipeline`, `Core`, `Types`). Do not use `Utils` or `Impl`. Do not put milestone or tool-group numbers in identifiers. Do not rename frozen string values (IPC channels, LLM tool names, SQL columns, vendor JSON fields). Do not put identifiers used to name plans, workflows, or spec phases into product code, comments, configuration, or lint messages.
 
 ### 15. No Secrets or PII in Version Control
 
