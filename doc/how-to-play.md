@@ -174,10 +174,10 @@ Complete rules are in [combat-rules-v3.md](combat-rules-v3.md) §12.
 
 ### Starting a battle
 
-- **From planning:** zoom in one level, or two clicks of the + button. A 🔍 marker appears on each explored hex where your units and enemy units meet. Click it to fight there. The strategic turn waits for the battle.
 - **During resolution:** when melee is about to happen, a **Tactical Battles** list can open. Pick a hex and click **Fight**, or click **Ignore** to roll that melee on the strategic map.
 - **After Fight:** the current turn finishes first, and the battle opens as the next turn begins.
 - **Who decides:** only you choose whether to fight a battle. The opponent never does.
+- **Joining ongoing battles:** On the strategic map, hexes with ongoing tactical battles are marked with magnifying glass icons (🔍). Click to join.
 - **Turning battles off:** uncheck **Tactical battles** on the Model tab. Every melee then resolves as if you chose **Ignore**.
 
 ### How battles differ
