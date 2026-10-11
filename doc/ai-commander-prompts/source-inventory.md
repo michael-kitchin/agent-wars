@@ -266,7 +266,7 @@ Every row still resolves the same way: **the engine wins** for mechanics. Wordin
 | Id | Status |
 | --- | --- |
 | `CAPS_V3_STALE` | Resolved in [`doc/combat-rules-v3.md`](../combat-rules-v3.md) |
-| `TACTICAL_STRUCTURE_V3` | Resolved in combat-rules §12.6 |
+| `TACTICAL_STRUCTURE_V3` | Resolved in [combat-rules](../combat-rules-v3.md) §12.6 |
 | `WEGO_ORDER_UNSTATED` | Resolved: combat paragraph states the engine order |
 | `INFANTRY_RANGE_SPLIT` | Resolved: combat paragraph splits by mode |
 | `CALLBACK_DETAILS_THIN` | Details names parameters; unfiltered `infrastructure_destroyed` describes the unfiltered watch |

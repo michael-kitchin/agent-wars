@@ -22,7 +22,7 @@ This file is the original phased plan. **It is not live rules.** Combat, caps, v
 
 **Do not copy unit costs, caps, fog radii, tactical ranges, or bail-out formulas from the milestone writeups below.** Those paragraphs were design-time targets.
 
-**Renumbering in version 3.4.** Two milestones were built after 2.4 without a number in this plan: 2.45 (playtester UI fixes) and 2.5 (the regional game, plus the rules and UI enhancements built alongside it). Save/load and session management, formerly 2.5, is now 2.6. Phase 3 and Phase 4 numbers are unchanged. Commits, execution plans under [`.spec/completed/`](../.spec/completed/), and blog drafts written before October 2026 that say "milestone 2.5" mean save/load.
+**Renumbering in version 3.4.** Two milestones were built after 2.4 without a number in this plan: 2.45 (playtester UI fixes) and 2.5 (the regional game, plus the rules and UI enhancements built alongside it). Save/load and session management, formerly 2.5, is now 2.6. Phase 3 and Phase 4 numbers are unchanged. Commits, execution plans under [.spec/completed/](../.spec/completed/), and blog drafts written before October 2026 that say "milestone 2.5" mean save/load.
 
 **Filename:** `devleopment-plan-v3.4.md` keeps the historical spelling. Version 3.3 is in git history.
 
@@ -483,7 +483,7 @@ Ensure scenarios from milestone 1.7 work correctly with tactical battles availab
 
 *Added in version 3.4. Built in September 2026, after 2.4. Status: complete.*
 
-**Build:** Work through a round of external playtester feedback on the 2.4 build. The fixes covered map clicks and selection (double-click planning and deselect, clicks during resolution playback), Shift as the multi-select modifier, opening unit placement, ranged-attack button visibility, build-queue seeding and failed queue edits, toasts and tooltips during playback, the Model tab across match start and end, Escape in the tactical battles list, the tactical ferry movement list, and the tactical phase label and exit control during playback. The same pass wrote the UX specification suite under [`doc/ux/`](ux/), one page per surface, so later UI work has a written contract to check against.
+**Build:** Work through a round of external playtester feedback on the 2.4 build. The fixes covered map clicks and selection (double-click planning and deselect, clicks during resolution playback), Shift as the multi-select modifier, opening unit placement, ranged-attack button visibility, build-queue seeding and failed queue edits, toasts and tooltips during playback, the Model tab across match start and end, Escape in the tactical battles list, the tactical ferry movement list, and the tactical phase label and exit control during playback. The same pass wrote the UX specification suite under [doc/ux/](ux/), one page per surface, so later UI work has a written contract to check against.
 
 Two feedback items were deferred to the design backlog rather than fixed: port-to-port land travel rules and automatic build planning.
 
