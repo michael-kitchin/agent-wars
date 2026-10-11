@@ -77,9 +77,11 @@ AGENT_WARS_LOG_LEVEL=debug
 
 The game's "working directory" is:
 
-- **On Windows:** The same as the executable, when the executable or a shortcut is double-clicked.
-- **On Linux:** Wherever the `agent-wars` command is invoked from.
-- **On macOS:** Not verified, but opening the app from Finder probably won’t pick up `.env`. I'll provide an update when I can.
+- **Windows:**
+  - When the game is started by double-clicking on the executable or a shortcut: wherever the executable is located.
+  - When the game is stared from PowerShell or the Command Line: wherever the executable is invoked from.
+- **macOS:** Not verified, but opening the app from Finder probably won’t pick up `.env`. I'll provide an update when I can.
+- **Linux:** Wherever the executable is invoked from.
 
 When the `.env` file is present at runtime, the game will create the following files in the same directory:
 ```
