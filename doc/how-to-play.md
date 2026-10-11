@@ -4,7 +4,7 @@ This guide covers a match in the current build, from the new-game dialog to the 
 
 Agent Wars is a WEGO game ("we go"), where neither player can see what the other is planning to do. For each turn, both sides create movement, production, and combat orders at the same time, based on different, subjective views of the battlefield. Once both players are ready, the game engine executes their orders and resolves the outcomes automatically.
 
-Since I'm a geographer by training, gameplay is organized around geospatial features and metrics instead of nationality. Players start from regions built from countries, provinces, or other sub-divisions, but victory is defined by how geography and production capacity are managed.
+Since I'm a geographer by training, gameplay is organized around geospatial features and metrics instead of nationality. Players start from regions built from countries, provinces, or other sub-divisions, but victory derives from how well geography and production capacity are managed.
 
 Unit nationality and terrain experience, technology levels, and weather also matter, but they're less important.
 
