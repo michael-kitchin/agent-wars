@@ -142,9 +142,9 @@ Each match starts on the new-game dialog, with a Global tab and a Regional tab. 
 
 ## Battles
 
-*Tactical battle in central Mexico.*
+*Tactical battle in central Mexico, from a global game.*
 
-![Tactical battle in central Mexico](media/tactical-battle-mexico.jpg)
+![Tactical battle in central Mexico, from a global game](media/tactical-battle-mexico.jpg)
 
 A battle zooms in on one contested hex and fights it out on a finer grid. The rules are in [combat-rules-v3.md](combat-rules-v3.md) §12.
 
