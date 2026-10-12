@@ -14,7 +14,7 @@ The game is intended to be simple to learn and quick to play, but with enough de
 
 ![Tactical planning over central Mexico](doc/media/tactical-battle-mexico.jpg)
 
-*A tactical battle in central Mexico on turn 2, a rainy August. Teal/human units face the rose/LLM opponent (in this case, Gemini Flash Lite), and their movement orders are queued in the right panel.*
+*A tactical battle in central Mexico on turn 2, during a rainy August. Teal/human units face the rose/LLM opponent (in this case, Gemini Flash Lite), and their movement orders are queued in the right panel.*
 
 ## Why This Exists
 
