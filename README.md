@@ -59,9 +59,9 @@ The key is handled only in the Electron main process and stored locally in the E
 
 See [doc/how-to-play.md](doc/how-to-play.md) for how to play the game.
 
-| *Step 1: Enter an OpenRouter API key, pick a model, and click Run. The ongoing cost of the current game (in US$) is displayed on the right.*                           | *Step 2: Watch the LLM do its thing, and optionally enable/disable tools.*                          |
+| *Step 1: Enter an OpenRouter API key, pick a model, and click Run. The ongoing cost of the game (in US$) is displayed on the right.*                           | *Step 2: Watch the LLM do its thing, and optionally enable/disable tools.*                          |
 | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------- |
-| ![Step 1: Enter an OpenRouter API key, pick a model, and click Run. The ongoing cost of the current game (in US$) is displayed on the right.](doc/media/model-tab.png) | ![Step 2: Watch the LLM do its thing, and optionally enable/disable tools](doc/media/tools-tab.png) |
+| ![Step 1: Enter an OpenRouter API key, pick a model, and click Run. The ongoing cost of the game (in US$) is displayed on the right.](doc/media/model-tab.png) | ![Step 2: Watch the LLM do its thing, and optionally enable/disable tools](doc/media/tools-tab.png) |
 
 
 ## See the Prompts (and Everything Else)
