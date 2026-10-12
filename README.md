@@ -41,8 +41,8 @@ Also: I don't intend to charge money for Agent Wars, now or ever.
 
 I currently plan to:
 
-1. Throw features at this project (multiple human/LLM players, a diplomacy system, local LLM support, game save/load, etc.) until I've learned whnat I need to from this codebase.
-2. Then regenerate Agent Wars in a different language, framework, etc. (thinking of C#/[Godot](https://godotengine.org/)), and head down the road some more.
+1. Throw features at this project (multiple human/LLM players, a diplomacy system, local LLM support, game save/load, etc.) until I've learned what I need to from this codebase.
+2. Then regenerate Agent Wars in a different language, framework, etc. (thinking of C#/[Godot](https://godotengine.org/)) and figure out what's next from there.
 
 ## Play It
 
