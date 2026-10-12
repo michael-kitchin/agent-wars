@@ -66,7 +66,7 @@ See [doc/how-to-play.md](doc/how-to-play.md) for how to play the game.
 
 ### See the Prompts (and Everything Else)
 
-To see how Agent Wars is prompting the LLM, create a text file called `.env` in the game's working directory with the following:
+To see how Agent Wars prompts the LLM, create a text file called `.env` in the game's working directory with the following:
 
 ```
 AGENT_WARS_LOG_FULL_PROMPTS=1
