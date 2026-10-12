@@ -59,6 +59,8 @@ I'll add screenshots of specific functions as I can.
 6. **Ready:** Click **Ready** to submit orders and resolve the turn. A side wins by controlling the enemy home or wiping out its urban cells (rules in [region-vs-region.md](region-vs-region.md)). The new-game dialog then returns for the next match.
 7. You can issue multiple movement and ranged orders (one per unit each) before clicking Ready.
 
+The full input map, including the exceptions, is in [ux/input-map.md](ux/input-map.md).
+
 ## How a turn resolves
 
 - Both sides give orders for the same turn, and the engine resolves them together.
@@ -293,30 +295,3 @@ The full bonus rules are in [combat-rules-v3.md](combat-rules-v3.md) §4.9.
 - **Lower right of the map (map toast):** Errors, rejected orders, turn-loss summaries, and unknown-battle announcements. Use the × to dismiss; it also hides after a fixed interval, and a newer message replaces it.
 - **Upper right of the map (AI strategy toast):** The opponent's Message and Strategy after a consultation. It dismisses and times out the same way.
 - **Right panel, below the Tools and Model tabs (AI activity log):** AI interaction lines and errors, including a retry, a line when opponent planning stops, and a one-line copy of each turn update. Starting a new match clears it.
-
-## UI controls summary
-
-- Pan: drag with left mouse, or WASD / arrows.
-- Zoom in/out: mouse wheel, or the map's + and − buttons. Double-click never zooms.
-- Select units: click a unit icon; a stack opens its unit list.
-- Add or remove a lone unit from the selection: Shift-click its icon.
-- Select several units in a stack: Shift-click rows in its unit list to add or remove units. A plain click selects only that unit.
-- **+ All** selects all your units in the hex, except loaded cargo. With Shift held, **+ All** adds them and **- All** removes them.
-- There is no drag-box selection. Dragging pans, and Shift-drag zooms to the box you draw.
-- Clear the selection: right-click the map. Queued orders stay.
-- Add move order: select units, then double-click the destination.
-- Ranged attack: select capable units, click "Ranged", then double-click an enemy hex in range.
-- Air strike: select only air units, click **Strike**, choose a target type, then double-click a hex inside the purple outline.
-- Ferry: select only air units, then double-click one of your airports within 4 hexes.
-- Build: zoom in, click a build marker, and add units to its queue. Shift-click more markers to build in several hexes.
-- Sealift: open a coastal or seaport hex's stack list and set the ship's slots.
-- Start a battle: zoom in one level and click the 🔍 marker on a contested hex.
-- Leave a battle: **Exit Battle**, between beats, including while the model is planning that battle. Leaving stops that plan. A plan from the world-map turn keeps going.
-- Resolve turn: Ready button.
-- See under the terrain: hold T. Terrain fill hides while the key is down, and on the strategic map hex codes and, where they apply, tech icons show. Weather icons hide while T is down. In a battle, only the terrain fill hides.
-- Read a hex: rest the pointer on it for a second. Hold Shift while aiming to pause aiming and see the hex tooltip.
-- Close a popup or the unit list: Escape. On the battles list, Escape means **Ignore**. Escape doesn't exit a battle or end aiming.
-- The minimap only shows where you are. Clicking it does nothing.
-- New game: **New** on the Model tab during strategic planning, tactical planning, or while a turn or beat is playing back. It does not open while the battles list or the annihilation result is on screen. Opening it stops opponent planning and playback. The dialog at game over is the same screen.
-
-The full input map, including the exceptions, is in [ux/input-map.md](ux/input-map.md).
