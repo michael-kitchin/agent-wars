@@ -27,12 +27,13 @@ I'll add screenshots of specific functions as I can.
 
 ![Regional game: Click the Regional tab, then pick the region and player home sub-regions (in this case: Japan vs South & East China).](media/regional-preview.png)
 
-- **Global:** the whole world, 842 strategic hexes at H3 resolution 1. Each side picks a home region, and both may pick the same one.
-- **Regional:** one of 23 maps drawn from UN subregions, at strategic resolution 2 or 3. Each side picks a different side group of provinces.
-- **Turn length:** a global turn is one month. A regional turn is one week, so the weather changes about every four turns.
+- **Global:** the whole world, 842 strategic hexes at H3 resolution 1. Each side picks a home region, and both may pick the same one. Units are at the scale of WW2-style field armies, air wings, and naval fleets.
+- **Regional:** one of 23 maps drawn from UN subregions, at strategic resolution 2 or 3. Sides are made up of countries, provinces, or states grouped by production capacity. Units are at the scale of WW2-style divisons, air groups, and naval task forces.
+- **Turn length:** a global strategic turn represents one month of game time, wheras regional turns represent one week.
 - **Economy:** each regional map sets its own unit prices, build minimums, and bomb damage. The dialog shows that map's price beside each unit type.
 - **Tech cutoff:** the dialog's `Advanced tech: $N+ hexes` line shows the selected map's cutoff.
 - **Map edges:** a few regional maps have neutral-border hexes at their edges. Those produce nothing and can't base air or naval units.
+- **Weather:** the hex-level weather changes with every month, meaning every global strategic turn or roughly four regional turns.
 - **Winning by control:** on the global map, hold every hex of the enemy home. On a regional map, hold enemy-home hexes with at least 75% of its original urban cells.
 - **Other way to win:** destroy every urban cell in the enemy home while yours keeps one. Details are in [region-vs-region.md](region-vs-region.md).
 
@@ -159,12 +160,15 @@ I'll add screenshots of specific functions as I can.
 
 ![Tactical battle dialog in southern Mexico, from a regional game. Click the Fight button to run the battle manually or Ignore to leave the outcome to chance.](media/tactical-battle-dialog.png)
 
-Tactical battles are initiated when human and LLM units end their turns in the same hex. The human player has the option of fighting manually or leaving the results to dice rolls. If they choose to fight, their stratetgic units will be broken into sub-units on the tactical battlefield, and the fight is on.
+Tactical battles are initiated when human and LLM units end their turns in the same hex. The human player has the option of fighting manually or leaving the results up to dice rolls. If players choose to fight, their stratetgic units will be broken into sub-units on the tactical battlefield, the map will zoom in, and the fight is on.
 
-That said:
+Tactical sub-units are at the scale of WW2-style regiments, squadrons, and naval task groups.
 
-- Committing to a manual battle prevents players (human and LLM) from issuing strategic orders during the same turn. Existing orders will still be followed, however, and units will continue to defend themselves.
-- Players can only fight one tactical battle at a time.
+Manually fought battles take place entirely within one strategic turn, with the following consequences:
+
+- Fighting a tactical battle means ignoring the strategic part of the game for one turn (for both human and LLM players).
+- During that turn, strategic units will continue to follow existing orders and defend themselves.
+- When the battle is over, the strategic game part of the game resumes with the next turn.
 
 Human players win tactical battles by destroying all LLM units, but they can leave at any time by clicking the **Exit Battle** button. Any strategic units with half or more of their sub-units remaining by the end of a battle will be returned to the strategic map. There is no concept of battle damage, to keep things simple.
 
