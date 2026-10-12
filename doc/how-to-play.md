@@ -8,10 +8,10 @@ I'm a geographer by training, so Agent Wars is built around geospatial features 
 
 This means the winner is the player who best manages geography and the resources tied to it. Unit nationality, terrain familiarity, technology levels, and weather still matter, but not as much.
 
-A player wins when:
+Accordingly, the game is over when one player:
 
-- They capture the other player's home region hexes
-- Or destroy all production capacity in those hexes
+- Captures all the other player's home region hexes
+- Or destroys all production capacity in those hexes
 
 I'll add screenshots of specific functions as I can.
 
