@@ -160,9 +160,7 @@ The full input map, including the exceptions, is in [ux/input-map.md](ux/input-m
 
 ![Tactical battle dialog in southern Mexico, from a regional game. Click the Fight button to run the battle manually or Ignore to leave the outcome to chance.](media/tactical-battle-dialog.png)
 
-Tactical battles are initiated when human and LLM units end their turns in the same hex. The human player has the option of fighting manually or leaving the results up to dice rolls. If players choose to fight, their stratetgic units will be broken into sub-units, the map will zoom in, and the fight is on.
-
-Tactical sub-units are at the scale of WW2-style regiments, squadrons, and naval task groups.
+Tactical battles are initiated when human and LLM units end their turns in the same hex. The human player has the option of fighting manually or leaving the results up to dice rolls. If players choose to fight, their stratetgic units will be broken into sub-units, the map will zoom in, and the fight is on. Tactical sub-units are at the scale of WW2-style regiments, squadrons, and naval task groups.
 
 Manually fought battles take place entirely within one strategic turn, with the following consequences:
 
