@@ -4,11 +4,9 @@ This guide covers a match in the current build, from the new-game dialog to the 
 
 Agent Wars is a WEGO game ("we go"), where neither player can see what the other is planning. For each turn, both sides create combat, movement, and production orders at the same time, based on partial, subjective views of the battlefield. Once players are ready, the game executes their orders and determines the outcomes (think: "Axis & Allies" meets "Diplomacy", with a software referee).
 
-I'm a geographer by training, so Agent Wars is built around geospatial features more than nationality. Each player starts with a home region made up of real-world countries, provinces, or states, but those are mostly labels. What matters is what's on the ground: the size and location of urban areas, and how terrain, coastlines, and chokepoints shape what players can do.
+I'm a geographer by training, so Agent Wars focuses more on geospatial features than nationality. Players start with home regions made up of real-world countries, provinces, or states, but those are mostly labels. What really matters is on the ground: the size and placement of cities, and how terrain and coastlines shape what players can do. Unit origins, terrain familiarity, technology levels, and weather still matter, but not as much.
 
-This means the winner is the player who best manages geography and the resources tied to it. Unit nationality, terrain familiarity, technology levels, and weather still matter, but not as much.
-
-Accordingly, the game is over when one player:
+Accordingly, the game ends when one player:
 
 - Captures all the other player's home region hexes
 - Or destroys all production capacity in those hexes
