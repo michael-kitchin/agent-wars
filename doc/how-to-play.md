@@ -27,13 +27,13 @@ I'll add screenshots of specific functions as I can.
 
 ![Regional game: Click the Regional tab, then pick the region and player home sub-regions (in this case: Japan vs South & East China).](media/regional-preview.png)
 
-- **Global:** the whole world, 842 strategic hexes at H3 resolution 1. Each side picks a home region, and both may pick the same one. Units are at the scale of WW2-style field armies, air wings, and naval fleets.
-- **Regional:** one of 23 maps drawn from UN subregions, at strategic resolution 2 or 3. Sides are made up of countries, provinces, or states grouped by production capacity. Units are at the scale of WW2-style divisons, air groups, and naval task forces.
+- **Global games:** the whole world, 842 strategic hexes at H3 resolution 1. Each side picks a home region, and both may pick the same one. Units are at the scale of WW2-style field armies, air wings, and naval fleets.
+- **Regional games:** one of 23 maps drawn from UN subregions, at strategic resolution 2 or 3. Sides are made up of countries, provinces, or states grouped by production capacity. Units are at the scale of WW2-style divisons, air groups, and naval task forces.
 - **Turn length:** a global strategic turn represents one month of game time, wheras regional turns represent one week.
 - **Economy:** each regional map sets its own unit prices, build minimums, and bomb damage. The dialog shows that map's price beside each unit type.
 - **Tech cutoff:** the dialog's `Advanced tech: $N+ hexes` line shows the selected map's cutoff.
 - **Map edges:** a few regional maps have neutral-border hexes at their edges. Those produce nothing and can't base air or naval units.
-- **Weather:** the hex-level weather changes with every month, meaning every global strategic turn or roughly four regional turns.
+- **Weather:** the hex-level weather changes every month, meaning with every global game turn or roughly four regional turns.
 - **Winning by control:** on the global map, hold every hex of the enemy home. On a regional map, hold enemy-home hexes with at least 75% of its original urban cells.
 - **Other way to win:** destroy every urban cell in the enemy home while yours keeps one. Details are in [region-vs-region.md](region-vs-region.md).
 
