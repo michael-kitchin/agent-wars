@@ -26,7 +26,7 @@ I'll add screenshots of specific functions as I can.
 ![New regional game: Click the Regional tab, then pick the region and player home sub-regions (in this case: Japan vs South & East China).](media/regional-preview.png)
 
 - **Global games:** the whole world, 842 strategic hexes at H3 resolution 1. Each side picks a home region, and both may pick the same one. Units are at the scale of WW2-style field armies, air wings, and naval fleets.
-- **Regional games:** one of 23 maps drawn from UN subregions, at strategic resolution 2 or 3. Sides are made up of countries, provinces, or states grouped by production capacity. Units are at the scale of WW2-style divisons, air groups, and naval task forces.
+- **Regional games:** one of 23 maps drawn from UN subregions, ranging from 257 to 352 strategic hexes. Sides are made up of countries, provinces, or states grouped by production capacity. Units are at the scale of WW2-style divisons, air groups, and naval task forces.
 - **Turn length:** a global strategic turn represents one month of game time, wheras regional turns represent one week.
 - **Economy:** each regional map sets its own unit prices, build minimums, and bomb damage. The dialog shows that map's price beside each unit type.
 - **Tech cutoff:** the dialog's `Advanced tech: $N+ hexes` line shows the selected map's cutoff.
