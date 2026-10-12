@@ -10,7 +10,7 @@ Agent Wars is a WEGO game ("we go"), where neither player can see what the other
 
 The game is intended to be simple to learn and quick to play, but with enough depth to make things interesting and believable.
 
-[Play It](#play-it) · [See the Prompts](#see-the-prompts-and-everything-else) · [Why This Exists](#why-this-exists) · [What's Inside](#whats-inside) · [Under the Hood](#under-the-hood) · [How It Was Built](#how-it-was-built) · [Architecture](#architecture) · [Build from Source](#build-from-source) · [Status](#status) · [License](#license)
+**[Play It](#play-it) · [Why This Exists](#why-this-exists) · [Why I'm Sharing This](#why-im-sharing-this) · [What's Inside](#whats-inside) · [How It Was Built](#how-it-was-built) · [Architecture](#architecture) · [Build from Source](#build-from-source) · [Status](#status) · [License](#license)**
 
 ![Tactical planning over central Mexico](doc/media/tactical-battle-mexico.jpg)
 
@@ -64,7 +64,7 @@ See [doc/how-to-play.md](doc/how-to-play.md) for how to play the game.
 | ![Step 1: Enter an OpenRouter API key, pick a model, and click Run. The ongoing cost of LLM calls (in US$) is displayed on the right.](doc/media/model-tab.png) | ![Step 2: Watch the LLM do its thing, and optionally enable/disable tools](doc/media/tools-tab.png) |
 
 
-## See the Prompts (and Everything Else)
+### See the Prompts (and Everything Else)
 
 Create a text file called `.env` in the game's working directory, with the following:
 
@@ -116,10 +116,6 @@ See [doc/hybrid-ai.md](doc/hybrid-ai.md) and [doc/ai-tools.md](doc/ai-tools.md) 
 - **Simultaneous turns.** Both sides plan, then the engine resolves air strikes, ranged fire, movement, ferry, and melee in a fixed phase order, with optional zoomed-in tactical battles. The rules are in [doc/combat-rules-v3.md](doc/combat-rules-v3.md).
 - **Guardrails.** `npm test` builds the main process, then runs ESLint (with custom rules in [eslint-rules/](eslint-rules/)), a naming-convention check, a renderer type check, the main-process and tool tests (808 tests), and a third-party-notices check. The renderer runs with context isolation, without Node integration, and under a Content-Security-Policy.
 
-## Under the Hood
-
-Cell areas and edge lengths are averages from the H3 library. The other counts come from the engine and the generated packs.
-
 ### Hex Scales
 
 Every map is a grid of [H3](https://h3geo.org) cells, Uber's hierarchical hexagon index. A battle zooms in three resolutions, so one strategic hex contains 343 tactical cells (286 under one of H3's twelve pentagons), plus three rings of neighboring cells.
@@ -136,6 +132,8 @@ Every map is a grid of [H3](https://h3geo.org) cells, Uber's hierarchical hexago
 
 
 Each of the 23 regional maps holds 257 to 352 strategic hexes. Those are the footprint totals in [doc/region-summary-1.md](doc/region-summary-1.md): South-Eastern Asia is the smallest and Southern Asia east is the largest.
+
+Cell areas and edge lengths are averages from the H3 library. The other counts come from the engine and the generated packs.
 
 ### Where the Data Comes From
 
