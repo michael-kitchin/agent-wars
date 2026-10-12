@@ -57,8 +57,7 @@ The LLM opponent needs an [OpenRouter](https://openrouter.ai) API key to work:
 
 The key is handled only in the Electron main process and stored locally in the Electron user-data directory, not in repository files. Without a key or a model the app still runs, **Run** stays disabled, and the opponent makes no model calls.
 
-How to play the game, from setup and turn order to battles, air power, sealift, and the controls, is covered in [doc/how-to-play.md](doc/how-to-play.md).
-
+See [doc/how-to-play.md](doc/how-to-play.md) for how to play the game.
 
 | *Step 1: Enter an OpenRouter API key, pick a model, and click Run. The ongoing cost of the current game (in US$) is shown on the right.*                           | *Step 2: Watch the LLM do its thing, and optionally enable/disable tools.*                          |
 | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------- |
