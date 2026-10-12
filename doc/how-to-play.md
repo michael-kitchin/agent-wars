@@ -95,9 +95,9 @@ I'll add screenshots of specific functions as I can.
 
 ## Air power
 
-*Select an air unit or stack, then click the **Strike** button and pick the type of strike. Then double-click on a hex to order the attack.*
+*Select an air unit or stack, then click the **Strike** button and pick a type of air strike to order. Then double-click on a hex to order the attack.*
 
-![Select an air unit or stack, then click the Strike button and pick the type of strike. Then double-click on a hex to order the attack.](media/air-strike.png)
+![Select an air unit or stack, then click the Strike button and pick a type of air strike to order. Then double-click on a hex to order the attack.](media/air-strike.png)
 
 - **Bases:** air units sit at an airport and don't march. They strike from there and return in the same turn.
 - **One action a turn:** strike or ferry, not both.
