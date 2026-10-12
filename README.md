@@ -78,8 +78,6 @@ AGENT_WARS_LOG_LEVEL=debug
 - `AGENT_WARS_LOG_FULL_PROMPTS` controls prompt logging. Set to `1`, `true`, `yes`, or `on` to enable, anything else to disable.
 - `AGENT_WARS_LOG_FULL_RESPONSES` controls OpenRouter response logging. Follows the same rules as `AGENT_WARS_LOG_FULL_PROMPTS`.
 - `AGENT_WARS_LOG_LEVEL` turns file-based logging on, at a specific level of detail. In addition to `debug`, there's also `trace`, `info`, and `error`. Logging may impact game performance, particularly at the `trace` or `debug` levels.
-- `AGENT_WARS_SIMULATE_MODEL_HANG` is a developer-only stand-in for a model that never answers. `off` is the default. `first` hangs the first network attempt and lets the retry call OpenRouter. `all` hangs every attempt. Anything else is off. The comparison ignores case.
-- `AGENT_WARS_SIMULATE_MODEL_HANG_MS` is how long that hang waits before the normal timeout path runs. It is an integer from 100 through the real request timeout. A missing or non-integer value waits 15000 ms. Remove both lines when you are done reproducing a hang.
 
 The game's "working directory" is:
 
