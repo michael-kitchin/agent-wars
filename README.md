@@ -37,6 +37,13 @@ To offer what I've learned, and to give others a chance to blow up their (not) f
 
 Also: I don't intend to charge money for Agent Wars, now or ever.
 
+### Where We Go From Here
+
+I currently plan to:
+
+1. Throw features at this project (multiple human/LLM players, a diplomacy system, local LLM support, game save/load, etc.) until I've learned whnat I need to from this codebase.
+2. Then regenerate Agent Wars in a different language, framework, etc. (thinking of C#/[Godot](https://godotengine.org/)), and head down the road some more.
+
 ## Play It
 
 Download a build for Windows (x64), macOS (Apple silicon), or Linux (x64) from [Releases](https://github.com/michael-kitchin/agent-wars/releases). The builds are unsigned side-load builds, so Windows and macOS warn before the first launch. Each release lists SHA-256 checksums in `SHA256SUMS.txt`.
