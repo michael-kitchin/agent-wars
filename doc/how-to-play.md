@@ -19,13 +19,13 @@ I'll add screenshots of specific functions as I can.
 
 ## Global and regional maps
 
-*Global game: Click the Global tab, then pick human and LLM home regions (in this case: Eastern Asia vs Southern Africa). Buttons to the right of the drop-down lists pick random choices.*
+*New global game: Click the Global tab, then pick human and LLM home regions (in this case: Eastern Asia vs Southern Africa). Buttons to the right of the drop-down lists pick random choices.*
 
-![Global game: Click the Global tab, then pick human and LLM home regions (in this case: Eastern Asia vs Southern Africa). Buttons to the right of the drop-down lists pick random choices.](media/global-preview.png)
+![New global game: Click the Global tab, then pick human and LLM home regions (in this case: Eastern Asia vs Southern Africa). Buttons to the right of the drop-down lists pick random choices.](media/global-preview.png)
 
-*Regional game: Click the Regional tab, then pick the region and player home sub-regions (in this case: Japan vs South & East China).*
+*New regional game: Click the Regional tab, then pick the region and player home sub-regions (in this case: Japan vs South & East China).*
 
-![Regional game: Click the Regional tab, then pick the region and player home sub-regions (in this case: Japan vs South & East China).](media/regional-preview.png)
+![New regional game: Click the Regional tab, then pick the region and player home sub-regions (in this case: Japan vs South & East China).](media/regional-preview.png)
 
 - **Global games:** the whole world, 842 strategic hexes at H3 resolution 1. Each side picks a home region, and both may pick the same one. Units are at the scale of WW2-style field armies, air wings, and naval fleets.
 - **Regional games:** one of 23 maps drawn from UN subregions, at strategic resolution 2 or 3. Sides are made up of countries, provinces, or states grouped by production capacity. Units are at the scale of WW2-style divisons, air groups, and naval task forces.
