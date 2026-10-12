@@ -32,7 +32,7 @@ export type OrderPreviewEffectsContextArgs = {
  *
  * Purpose: Classifies march, ferry, air strike, and ranged attack the same way the preview was built.
  * When to use: When deciding whether `#order-slower-tooltip` has anything to say.
- * Expected outcome: Tactical ferry is still passed through; the formatter returns null for it. Strategic terrain is consulted only for the target's cover.
+ * Expected outcome: Tactical ferry is still passed through; the formatter returns null for it. Armor stop chips arrive on `marchImpact`. Cover still reads the target hex.
  * Exceptions: None.
  */
 export function buildOrderPreviewEffectsTooltipInput(
@@ -53,7 +53,6 @@ export function buildOrderPreviewEffectsTooltipInput(
     rangedBattle: kind === 'ranged' ? battle : null,
     rangedPreviewUnitIds: args.preview.data.previews.map((row) => row.unitId),
     targetCover: kind === 'ranged' || kind === 'airStrike' ? targetCoverPlace(args.preview.hoveredH3Index) : null,
-    destinationStopsArmor: kind === 'strategicMarch' && destinationStopsArmor(args.preview.hoveredH3Index),
   };
 }
 
@@ -81,20 +80,6 @@ function targetCoverPlace(hoveredH3Index: string): TerrainCoverPlace | null {
     rugged: hex?.rugged === true,
     city: hex?.city === true,
   };
-}
-
-/**
- * True when the hovered strategic hex ends an armor move and armor is selected.
- *
- * Purpose: The planning tooltip only names the stop for a legal armor march onto that hex.
- * When to use: From `buildOrderPreviewEffectsTooltipInput` for a strategic march.
- * Expected outcome: True when a selected armor unit's destination is rugged, arctic, or city.
- * Exceptions: None.
- */
-function destinationStopsArmor(hoveredH3Index: string): boolean {
-  const hex = S.gameState?.hexes.find((row) => row.h3Index === hoveredH3Index);
-  if (!hex || !(hex.rugged === true || hex.arctic === true || hex.city === true)) return false;
-  return strategicSelection().some((unit) => unit.unitType === 'armor');
 }
 
 /**

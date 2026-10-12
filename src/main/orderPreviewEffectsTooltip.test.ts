@@ -16,6 +16,7 @@ import {
 } from '../shared/orderPreviewEffectsTooltip';
 import { TOOLTIP_SECTION_GAP_HTML } from '../shared/tooltipSectionGap';
 import { formatStatusIconHtml } from '../shared/statusIconHtml';
+import { formatTerrainNameListHtml } from '../shared/terrainSwatchHtml';
 import { tacticalCell } from './tacticalBattle/testSupport/tacticalHexFixtures';
 
 const snowIcon = '<img class="weather-icon" src="weather/snow.svg" alt="" aria-hidden="true" />Snow';
@@ -77,33 +78,38 @@ test('resolveOrderPreviewEffectsTooltipHtml names origin weather that slows a st
   assert.equal(html, `<strong>Slower:</strong> ${snowIcon}`);
 });
 
-test('a legal armor march onto a stop hex shows the blocked clause and keeps a weather slowdown', () => {
-  const blocked = `${formatStatusIconHtml('blocked')}Armored Movement`;
+test('a legal armor march names stop terrain on Slower, with weather on the same line', () => {
+  const mountain = formatTerrainNameListHtml('Mountain');
+  const urban = formatTerrainNameListHtml('Urban');
   const stopped = resolveOrderPreviewEffectsTooltipHtml(
     legal({
       kind: 'strategicMarch',
-      destinationStopsArmor: true,
+      marchImpact: { slower: ['Mountain'], roadRail: false },
       units: [{ unitType: 'armor', originWeather: 'mild', weatherTags: [] }],
     })
   );
-  assert.equal(stopped, `<strong>Effects:</strong> ${blocked}`);
-  assert.equal(stopped?.includes(formatStatusIconHtml('down')), false);
+  assert.equal(stopped, `<strong>Slower:</strong> ${mountain}`);
   const slowed = resolveOrderPreviewEffectsTooltipHtml(
     legal({
       kind: 'strategicMarch',
-      destinationStopsArmor: true,
+      marchImpact: { slower: ['Mountain'], roadRail: false },
       units: [{ unitType: 'armor', originWeather: 'snow', weatherTags: [] }],
     })
   );
-  assert.equal(
-    slowed,
-    `<strong>Slower:</strong> ${snowIcon}${TOOLTIP_SECTION_GAP_HTML}<strong>Effects:</strong> ${blocked}`
+  assert.equal(slowed, `<strong>Slower:</strong> ${mountain}, ${snowIcon}`);
+  const cityAndRugged = resolveOrderPreviewEffectsTooltipHtml(
+    legal({
+      kind: 'strategicMarch',
+      marchImpact: { slower: ['Urban', 'Mountain'], roadRail: false },
+      units: [{ unitType: 'armor', originWeather: 'mild', weatherTags: [] }],
+    })
   );
+  assert.equal(cityAndRugged, `<strong>Slower:</strong> ${urban}, ${mountain}`);
   assert.equal(
     resolveOrderPreviewEffectsTooltipHtml(
       legal({
         kind: 'strategicMarch',
-        destinationStopsArmor: true,
+        marchImpact: { slower: ['Mountain'], roadRail: false },
         validForAll: false,
         units: [{ unitType: 'armor', originWeather: 'mild', weatherTags: [] }],
       })

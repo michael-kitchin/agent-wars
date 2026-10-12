@@ -345,6 +345,23 @@ function formatSymbolSet(symbols: ReadonlySet<EffectSymbol>): string {
 }
 
 /**
+ * Returns the movement symbol one land or naval unit would show on this cell.
+ *
+ * Purpose: Entry checks need the same `x` the Effects line uses, without parsing the collapsed line.
+ * When to use: Before deciding whether a battle destination is terrain the unit cannot enter.
+ * Expected outcome: `x`, `-`, `+`, or null. An intact road or rail is `+` for infantry and armor. The All collapse is not applied.
+ * Exceptions: None.
+ */
+export function movementEffectSymbolForUnit(
+  unitType: 'infantry' | 'armor' | 'naval',
+  input: TerrainEffectsInput
+): EffectSymbol | null {
+  const cat = normalizeDbTerrainKindToTacticalCategory(input.terrainKind, input.parentTerrain);
+  const hasTransport = !input.isRubble && (input.hasRoad || input.hasRail);
+  return movementSymbolForUnit(unitType, cat, input, hasTransport);
+}
+
+/**
  * Returns the movement effect symbol for one land/naval unit before All-collapse.
  *
  * Purpose: Encodes base enter cost, urban/rubble overrides, exception D, and exception C transport.

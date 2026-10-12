@@ -111,18 +111,18 @@ function testSessionInvalidatesOnVisibleOccupancyChange(): void {
 }
 
 /**
- * Ensures strategic march previews never attach slower-terrain tooltip fields.
+ * Ensures an infantry strategic march does not attach stop-terrain tooltip fields.
  *
- * Purpose: Strategic movement has no §12.4 slowdowns; `#order-slower-tooltip` must stay dark on the strategic map.
- * When to use: After edits to `emptyStrategicTerrainFields` or grouped envelope merge.
+ * Purpose: Only armor names rugged, arctic, and city hexes on `Slower:`.
+ * When to use: After edits to `armorMarchStopImpact` or grouped envelope merge.
  * Expected outcome: Envelope and per-row `slowerTerrainDisplayTitle` / `orderPreviewTerrainImpact` are null.
  * Exceptions: None.
  */
 function testStrategicPreviewOmitsSlowerTerrainImpact(): void {
   withTempDb(() => {
     const state = getGameState();
-    const landUnit = state.units.find((u) => u.player === 'human' && (u.unitType === 'armor' || u.unitType === 'infantry'));
-    assert.ok(landUnit, 'expected a seeded human land unit');
+    const landUnit = state.units.find((u) => u.player === 'human' && u.unitType === 'infantry');
+    assert.ok(landUnit, 'expected a seeded human infantry unit');
     const hovered = state.hexes.find((hex) => hex.h3Index !== landUnit!.h3Index && hex.terrain !== 'water')?.h3Index;
     assert.ok(hovered, 'expected a non-water destination hex');
     const result = resolveHumanMarchOrderPreviews([landUnit!.id], hovered);

@@ -1,4 +1,5 @@
 import type { GameStateSnapshot } from '../gameDb';
+import { activeGameMap } from '../../shared/activeGameMap';
 import { computeRoundedPercentage } from '../../shared/progressFormatting';
 import { getValidDestinations } from '../oneStepMoveDestinations';
 import { PRODUCTION_CAP_QUEUE_GUIDANCE } from '../productionCaps';
@@ -114,16 +115,22 @@ const PRODUCTION_REQUIREMENT_BASE =
 const PRODUCTION_CAP_GUIDANCE = PRODUCTION_CAP_QUEUE_GUIDANCE;
 
 /**
- * Defines the `buildLatLngPreamble` function shape (export function buildLatLngPreamble(h3Resolution: number, decimalPlaces: number): string).
-
- * Purpose: Supports maintainability by documenting why `buildLatLngPreamble` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Opening geography clause for strategic AI prompts.
+ *
+ * Purpose: The model must be told which map is loaded and which strategic H3 resolution that map uses.
+ * When to use: `buildSystemPromptForTools` when the consultation is strategic.
+ * Expected outcome: `Global Earth map` at `strategicResolution` when the profile id is `global`. Any other map is named by `displayName` at that same field. The second paragraph still forbids raw H3 and latitude/longitude.
  * Exceptions: None.
  */
-export function buildLatLngPreamble(h3Resolution: number, decimalPlaces: number): string {
-  void decimalPlaces;
-  return `Global Earth map, H3 resolution ${h3Resolution}. Positions are two-character briefing hex codes (A–Z and 0–9) from the operational map and Unit Status table — copy exactly; never invent codes. Distances are hex counts where shown.
+export function buildLatLngPreamble(): string {
+  const map = activeGameMap();
+  const label = map.id === 'global' ? 'Global Earth map' : map.displayName;
+  logDebug('promptText buildLatLngPreamble', {
+    id: map.id,
+    label,
+    strategicResolution: map.strategicResolution,
+  });
+  return `${label}, H3 resolution ${map.strategicResolution}. Positions are two-character briefing hex codes (A–Z and 0–9) from the operational map and Unit Status table — copy exactly; never invent codes. Distances are hex counts where shown.
 
 Final JSON: use briefing hex codes for cells; standing-order pursue uses enemy unit id (targetUnitId). Never emit raw H3 strings or latitude/longitude pairs.`;
 }

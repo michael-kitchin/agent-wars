@@ -69,7 +69,7 @@ test('a forest city covers 2/1 and a rugged wetlands hex covers 2/0', () => {
 });
 
 test('a strategic stop hex names armored movement and cover, and a battle cell does not', () => {
-  const blocked = `${formatStatusIconHtml('blocked')}Armored Movement`;
+  const blocked = `${formatStatusIconHtml('doubleDown')}Armored Movement`;
   const ground = `${formatStatusIconHtml('doubleUp')}Ground &amp; Naval Cover`;
   const air = `${formatStatusIconHtml('up')}Air Cover`;
   const rugged = strategicHexEffectsBodyHtml(1, true, terrainCoverPairFor({ terrainKind: 'plains', rugged: true }), null);

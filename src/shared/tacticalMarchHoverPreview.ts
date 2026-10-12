@@ -26,9 +26,14 @@ import {
   buildTacticalTerrainKindResolverFromSnapshot,
   tacticalMovementUnitTypeForPathfinding,
   tacticalTerrainLayerSignature,
+  type TacticalMovementCategory,
+  type TacticalTerrainKindResolver,
 } from './tacticalTerrainMovement';
 import { isTacticalCell } from './h3Resolutions';
 import { terrainBonusMarchCategoryForMover } from './terrainBonusMarch';
+import { cellAllowsTerrainBonusStop } from './tacticalMarchStepCost';
+import { TACTICAL_DESTINATION_BLOCKS_ENTRY_REASON } from './marchInvalidReasons';
+import { tacticalDestinationBlocksMarch } from './tacticalMarchDestinationBlock';
 
 /** Renderer-only march plan memo bound (LRU by Map insertion order). */
 const MAX_TACTICAL_HOVER_PLAN_MEMO = 64;
@@ -77,6 +82,42 @@ function ensureTacticalHoverPlanMemo(battle: TacticalBattleSnapshot): void {
  */
 function tacticalMarchCommittedOriginH3(battle: TacticalBattleSnapshot, subUnitId: string): string {
   return battle.subUnits.find((u) => u.id === subUnitId)?.h3Index ?? '';
+}
+
+/**
+ * Reason when a battle march cannot reach the hovered cell.
+ *
+ * Purpose: A cell the unit cannot enter names terrain. Every other miss stays a missing route.
+ * When to use: Both unreachable branches of `buildPreviewForSubUnit`.
+ * Expected outcome: `TACTICAL_DESTINATION_BLOCKS_ENTRY_REASON` when a different cell blocks this mover. A path that is only the occupied cell stays `No valid tactical route`, so it is not described as an entry block. Every other miss stays `No valid tactical route`.
+ * Exceptions: None. Air is refused before this runs.
+ */
+function tacticalMarchUnreachableReason(args: {
+  readonly battle: TacticalBattleSnapshot;
+  readonly originH3Index: string;
+  readonly hoveredH3Index: string;
+  readonly moveType: string;
+  readonly terrain: TacticalTerrainKindResolver;
+  readonly terrainBonusCategory: TacticalMovementCategory | null;
+}): string {
+  if (args.hoveredH3Index === args.originH3Index) return 'No valid tactical route';
+  if (args.moveType !== 'infantry' && args.moveType !== 'armor' && args.moveType !== 'naval') {
+    return 'No valid tactical route';
+  }
+  const blocks = tacticalDestinationBlocksMarch({
+    battle: args.battle,
+    h3: args.hoveredH3Index,
+    moveType: args.moveType,
+    allowsTerrainBonusStop: cellAllowsTerrainBonusStop(
+      {
+        terrain: args.terrain,
+        moveType: args.moveType,
+        terrainBonusCategory: args.terrainBonusCategory,
+      },
+      args.hoveredH3Index
+    ),
+  });
+  return blocks ? TACTICAL_DESTINATION_BLOCKS_ENTRY_REASON : 'No valid tactical route';
 }
 
 function h3PathToLatLngHexes(path: readonly string[]): [number, number][] {
@@ -172,11 +213,35 @@ function buildPreviewForSubUnit(args: {
     tacticalHoverPlanMemo.set(memoKey, plan);
   }
   if (!plan.reachable || !plan.pathToDestination || plan.pathToDestination.length < 2) {
-    return invalid({ valid: false, showInvalidMarker: true, invalidReason: 'No valid tactical route', segments: [] });
+    return invalid({
+      valid: false,
+      showInvalidMarker: true,
+      invalidReason: tacticalMarchUnreachableReason({
+        battle: args.battle,
+        originH3Index: origin,
+        hoveredH3Index: args.hoveredH3Index,
+        moveType,
+        terrain,
+        terrainBonusCategory,
+      }),
+      segments: [],
+    });
   }
   const displayPath = args.overridePathH3Indexes ?? plan.pathToDestination;
   if (displayPath.length < 2) {
-    return invalid({ valid: false, showInvalidMarker: true, invalidReason: 'No valid tactical route', segments: [] });
+    return invalid({
+      valid: false,
+      showInvalidMarker: true,
+      invalidReason: tacticalMarchUnreachableReason({
+        battle: args.battle,
+        originH3Index: origin,
+        hoveredH3Index: args.hoveredH3Index,
+        moveType,
+        terrain,
+        terrainBonusCategory,
+      }),
+      segments: [],
+    });
   }
   const pathH3Indexes = [...displayPath];
   const [destLat, destLng] = cellToLatLng(args.hoveredH3Index);

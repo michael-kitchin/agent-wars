@@ -202,6 +202,15 @@ turnsRequired: number;
    * Exceptions: None.
    */
 path: PlanRoutePathSegment[];
+  /**
+   * Hex indexes of the route the player sees, origin first.
+   *
+   * Contract: Same order as `path`, with a shared endpoint listed once. Empty when the unit is already there.
+   * When to use: Armor stop labels. Redaction removes this before a model sees the result.
+   * Expected outcome: The entered hexes are `pathH3Indexes` after the origin.
+   * Exceptions: None.
+   */
+  pathH3Indexes: readonly string[];
     /**
    * Specifies the contract for the `warnings` member (warnings: string[];).
 
@@ -364,8 +373,27 @@ export function buildAlreadyAtDestinationResult(payload: {
     hexDistance: 0,
     turnsRequired: 0,
     path: [],
+    pathH3Indexes: [],
     warnings: warningsWhenAlreadyThere,
   };
+}
+
+/**
+ * Hex ids of the segments the player sees, origin first, with shared endpoints once.
+ *
+ * Purpose: Armor stop labels must follow the route that was returned, including a route cut short at the turn cap.
+ * When to use: Both success returns of `buildPlanRouteSuccessResult`.
+ * Expected outcome: The same hex order as the segments, junctions listed once.
+ * Exceptions: None. An empty segment list returns an empty array.
+ */
+function pathH3IndexesFromSegments(segments: readonly { readonly hexes: readonly string[] }[]): string[] {
+  const indexes: string[] = [];
+  for (const segment of segments) {
+    for (const h3 of segment.hexes) {
+      if (indexes.length === 0 || indexes[indexes.length - 1] !== h3) indexes.push(h3);
+    }
+  }
+  return indexes;
 }
 
 /**
@@ -451,6 +479,7 @@ export function buildPlanRouteSuccessResult(payload: {
       hexDistance: hops,
       turnsRequired,
       path: pathForResponse,
+      pathH3Indexes: pathH3IndexesFromSegments(kept),
       warnings: payload.warnings,
       error: null,
       reachable: false,
@@ -477,6 +506,7 @@ export function buildPlanRouteSuccessResult(payload: {
     hexDistance: payload.path.length - 1,
     turnsRequired,
     path: pathForResponse,
+    pathH3Indexes: pathH3IndexesFromSegments(segments),
     warnings: payload.warnings,
     error: null,
   };

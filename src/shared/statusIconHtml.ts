@@ -1,8 +1,8 @@
 /**
  * Status icons for magnitude on the hex tooltip Effects line.
  *
- * Purpose: Movement, range, and cover share one set of up, down, and blocked marks.
- * When to use: Any HTML clause that shows a bonus of 1, a bonus of 2 or more, a penalty of 1, or a block.
+ * Purpose: Movement, range, and cover share one set of up, down, blocked, and stop marks.
+ * When to use: Any HTML clause that shows a bonus of 1, a bonus of 2 or more, a penalty of 1, a block, or an armor stop.
  * Expected outcome: An escaped `<img>` at text size. The alt text is the magnitude.
  * Exceptions: None.
  */
@@ -24,10 +24,10 @@ export const STATUS_ICON_CLASS_NAME = 'status-icon';
  *
  * Purpose: Keeps magnitude a closed set.
  * When to use: `formatStatusIconHtml` and the movement-symbol walk.
- * Expected outcome: `up`, `down`, and `blocked` are magnitude 1. `doubleUp` is 2 or more.
+ * Expected outcome: `up`, `down`, and `blocked` are magnitude 1. `doubleUp` is 2 or more. `doubleDown` is an armor stop, not a second down arrow.
  * Exceptions: None.
  */
-export type StatusIconKind = 'up' | 'doubleUp' | 'down' | 'blocked';
+export type StatusIconKind = 'up' | 'doubleUp' | 'down' | 'doubleDown' | 'blocked';
 
 /**
  * Icon file and alt text for one magnitude.
@@ -41,6 +41,7 @@ const STATUS_ICON: Readonly<Record<StatusIconKind, { readonly file: string; read
   up: Object.freeze({ file: 'arrow_up.svg', alt: '+' }),
   doubleUp: Object.freeze({ file: 'arrow_up_double.svg', alt: '++' }),
   down: Object.freeze({ file: 'arrow_down.svg', alt: '-' }),
+  doubleDown: Object.freeze({ file: 'arrow_down_double.svg', alt: '--' }),
   blocked: Object.freeze({ file: 'x_mark.svg', alt: 'x' }),
 });
 
@@ -63,7 +64,7 @@ const EFFECT_SYMBOL_KIND: Readonly<Record<string, StatusIconKind>> = Object.free
  *
  * Purpose: Effects clauses lead with a mark the way weather leads with one.
  * When to use: Cover clauses and movement or range prefixes.
- * Expected outcome: Escaped HTML. `up` is `arrow_up.svg` with alt `+`. `doubleUp` is `arrow_up_double.svg` with alt `++`. `down` is `arrow_down.svg` with alt `-`. `blocked` is `x_mark.svg` with alt `x`.
+ * Expected outcome: Escaped HTML. `up` is `arrow_up.svg` with alt `+`. `doubleUp` is `arrow_up_double.svg` with alt `++`. `down` is `arrow_down.svg` with alt `-`. `doubleDown` is `arrow_down_double.svg` with alt `--`. `blocked` is `x_mark.svg` with alt `x`.
  * Exceptions: None.
  */
 export function formatStatusIconHtml(kind: StatusIconKind): string {

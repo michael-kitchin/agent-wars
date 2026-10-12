@@ -1,6 +1,6 @@
 # Strategic prompt
 
-The strategic system prompt as `buildSystemPromptForTools` emits it. On the global map the preamble states H3 resolution 1. Shared assembly comes from [`assembly-contract.md`](assembly-contract.md). Messages after the system prompt are in [`consultation-flow.md`](consultation-flow.md); gates are in [`variants.md`](variants.md). If this file disagrees with the builders, the builders win.
+The strategic system prompt as `buildSystemPromptForTools` emits it. On the global map the preamble says `Global Earth map` at that profile's strategic resolution (`1`, from `activeGameMap().strategicResolution`). On a regional map it names that map's `displayName` at the same field. Shared assembly comes from [`assembly-contract.md`](assembly-contract.md). Messages after the system prompt are in [`consultation-flow.md`](consultation-flow.md); gates are in [`variants.md`](variants.md). If this file disagrees with the builders, the builders win.
 
 Heading strings in backticks are exact and must match the generated prompt character for character.
 
@@ -31,7 +31,7 @@ Emit order. Each entry states purpose, the information items it carries, include
 
 ### 1.4 Coordinate preamble
 
-- **Shape:** two paragraphs. First: global Earth map at the strategic H3 resolution passed in (1 on the global map), positions are two-character briefing codes taken from the operational map and unit table, copied exactly and never invented, distances are hex counts. Second: in the response, cells are briefing codes and a pursue target is an enemy unit id; raw H3 strings and latitude/longitude pairs are never emitted.
+- **Shape:** two paragraphs. First: `Global Earth map, H3 resolution 1.` when the profile id is `global`. Otherwise `{displayName}, H3 resolution {strategicResolution}.`, from `activeGameMap().displayName` and `activeGameMap().strategicResolution`. Positions are two-character briefing codes taken from the operational map and unit table, copied exactly and never invented, distances are hex counts. Second: in the response, cells are briefing codes and a pursue target is an enemy unit id; raw H3 strings and latitude/longitude pairs are never emitted.
 - **Items:** `HEX_IDENTITY`, `UNIT_IDENTITY`.
 - **Include:** always. **Empty-state:** not possible.
 

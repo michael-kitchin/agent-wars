@@ -61,6 +61,37 @@ function testBuildHumanOrderGroupPreviewEnvelopeClearsSegmentsWhenAnyInvalid(): 
 }
 
 /**
+ * Keeps a strategic armor stop off the plain title while still merging the impact.
+ *
+ * Purpose: The effects tooltip reads `orderPreviewTerrainImpact`. The plain title stays null unless a row already named one.
+ * When to use: After changes to envelope title assembly.
+ * Expected outcome: Impact slower is `Mountain`. The envelope title is null. Two titled rows join as the sorted union.
+ * Exceptions: None.
+ */
+function testEnvelopeTitleFollowsRowTitlesAndKeepsArmorImpact(): void {
+  const armor = previewRow('armor-1', true, 1);
+  armor.preview.orderPreviewTerrainImpact = { slower: ['Mountain'], roadRail: false };
+  const quiet = buildHumanOrderGroupPreviewEnvelope({
+    previews: [armor],
+    slowestMovementRange: 2,
+  });
+  assert.equal(quiet.slowerTerrainDisplayTitle ?? null, null);
+  assert.deepEqual(quiet.orderPreviewTerrainImpact?.slower, ['Mountain']);
+
+  const forest = previewRow('inf-1', true, 1);
+  forest.preview.slowerTerrainDisplayTitle = 'Forest';
+  forest.preview.orderPreviewTerrainImpact = { slower: ['Forest'], roadRail: false };
+  const urban = previewRow('inf-2', true, 1);
+  urban.preview.slowerTerrainDisplayTitle = 'Urban';
+  urban.preview.orderPreviewTerrainImpact = { slower: ['Urban'], roadRail: false };
+  const titled = buildHumanOrderGroupPreviewEnvelope({
+    previews: [forest, urban],
+    slowestMovementRange: 2,
+  });
+  assert.equal(titled.slowerTerrainDisplayTitle, 'Urban, Forest');
+}
+
+/**
  * Regression guard: grouped envelope keeps route segments when every unit preview is valid.
  *
  * Purpose: Ensures successful grouped previews retain drawable route geometry for all units.
@@ -163,6 +194,7 @@ function testGroupedTacticalMarchPreviewUnitIdsIncludesAllMixedSelectionUnits():
  */
 function main(): void {
   testBuildHumanOrderGroupPreviewEnvelopeClearsSegmentsWhenAnyInvalid();
+  testEnvelopeTitleFollowsRowTitlesAndKeepsArmorImpact();
   testBuildHumanOrderGroupPreviewEnvelopeKeepsSegmentsWhenAllValid();
   testGroupedStrategicMarchPreviewUnitIdsIncludesAllMixedSelectionUnits();
   testGroupedStrategicMarchPreviewUnitIdsUsesRepresentativeForHomogeneousSelection();

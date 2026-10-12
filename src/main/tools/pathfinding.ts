@@ -349,6 +349,15 @@ path: {
     movementBudget: number;
     endHex: LatLng;
   }[];
+  /**
+   * Hex indexes of the route the player sees, origin first.
+   *
+   * Contract: Same order as `path`, with a shared endpoint listed once. Empty when the unit is already there.
+   * When to use: Armor stop labels. Redaction removes this before a model sees the result.
+   * Expected outcome: The entered hexes are `pathH3Indexes` after the origin.
+   * Exceptions: None.
+   */
+  pathH3Indexes: readonly string[];
     /**
    * Specifies the contract for the `warnings` member (warnings: string[];).
 

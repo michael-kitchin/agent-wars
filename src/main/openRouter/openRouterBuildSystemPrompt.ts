@@ -1,7 +1,7 @@
 import type { GameStateSnapshot } from '../gameDb';
 import { getAndClearAiToolLimitExceededLastTurn } from '../gameDb';
 import { unitHasDirectRangedPlanning } from '../../shared/rangePerimeterModel';
-import { H3_RESOLUTION, LATLNG_DECIMAL_PLACES } from '../mapData';
+import { LATLNG_DECIMAL_PLACES } from '../mapData';
 import { getValidDestinationsUnoccupied } from '../oneStepMoveDestinations';
 import {
   computeHomeRegionHexPartitionsForPrompting,
@@ -310,7 +310,7 @@ ${contextCoaching}
   const latLngBlock =
     coordinateContext.mode === 'tactical'
       ? buildTacticalLatLngPreamble(LATLNG_DECIMAL_PLACES)
-      : buildLatLngPreamble(H3_RESOLUTION, LATLNG_DECIMAL_PLACES);
+      : buildLatLngPreamble();
   const combatRulesParagraph = buildCombatRulesParagraph({
     coordinateMode: coordinateContext.mode,
     hasAirUnits: hasAir,

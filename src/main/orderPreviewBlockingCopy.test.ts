@@ -7,6 +7,13 @@ import {
   blockingHoverMessageHtmlFromPlainMessage,
   composeResolutionMapToastBullets,
 } from '../shared/orderPreviewBlockingCopy';
+import { LAND_UNIT_DESTINATION_NOT_LANDMASS_REASON } from '../shared/landTraversalStrategic';
+import {
+  NAVAL_DESTINATION_NOT_OCCUPIABLE_REASON,
+  STRATEGIC_DESTINATION_UNREACHABLE_REASON,
+  TACTICAL_DESTINATION_BLOCKS_ENTRY_REASON,
+} from '../shared/marchInvalidReasons';
+import { ARMOR_MOVE_ENDS_ON_ENTER_REASON } from '../shared/strategicTerrainFlags';
 
 test('composeResolutionMapToastBullets keeps primary when present', () => {
   const out = composeResolutionMapToastBullets(['• Direct fire: x'], ['• Melee engagements at 1 hex.']);
@@ -44,7 +51,13 @@ test('blockingHoverMessageFromRangedReason (table)', () => {
 });
 
 const marchBlockingCases: { reason: string; terrainKind: string | null; expected: string | null }[] = [
-  { reason: 'No valid tactical route', terrainKind: 'mountain', expected: 'Blocked: Mountain' },
+  { reason: 'No valid tactical route', terrainKind: 'mountain', expected: 'Blocked: Unreachable' },
+  { reason: TACTICAL_DESTINATION_BLOCKS_ENTRY_REASON, terrainKind: 'mountain', expected: 'Blocked: Mountain' },
+  { reason: LAND_UNIT_DESTINATION_NOT_LANDMASS_REASON, terrainKind: 'water', expected: 'Blocked: Water' },
+  { reason: NAVAL_DESTINATION_NOT_OCCUPIABLE_REASON, terrainKind: 'forest', expected: 'Blocked: Forest' },
+  { reason: 'Outside tactical footprint', terrainKind: 'plains', expected: 'Blocked: Unreachable' },
+  { reason: STRATEGIC_DESTINATION_UNREACHABLE_REASON, terrainKind: 'plains', expected: 'Blocked: Unreachable' },
+  { reason: ARMOR_MOVE_ENDS_ON_ENTER_REASON, terrainKind: 'arctic', expected: 'Blocked: Unreachable' },
   { reason: 'Destination out of ferry range (4).', terrainKind: null, expected: 'Blocked: Range' },
   {
     reason: 'Ferry destination must be a human-controlled airport hex.',
@@ -90,7 +103,9 @@ const marchBlockingCases: { reason: string; terrainKind: string | null; expected
 
 test('blockingHoverMessageFromMarchInvalidReason (table)', () => {
   for (const { reason, terrainKind, expected } of marchBlockingCases) {
-    assert.equal(blockingHoverMessageFromMarchInvalidReason(reason, terrainKind), expected, reason);
+    const message = blockingHoverMessageFromMarchInvalidReason(reason, terrainKind);
+    assert.equal(message, expected, reason);
+    if (reason === ARMOR_MOVE_ENDS_ON_ENTER_REASON) assert.equal(message?.includes('Arctic'), false);
   }
 });
 

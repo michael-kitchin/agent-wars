@@ -1,5 +1,12 @@
 import { escapeHtmlForOrderPreviewTooltip } from './orderPreviewSlowTerrainTooltip';
 import { formatTerrainNameListHtml } from './terrainSwatchHtml';
+import { LAND_UNIT_DESTINATION_NOT_LANDMASS_REASON } from './landTraversalStrategic';
+import {
+  NAVAL_DESTINATION_NOT_OCCUPIABLE_REASON,
+  STRATEGIC_DESTINATION_UNREACHABLE_REASON,
+  TACTICAL_DESTINATION_BLOCKS_ENTRY_REASON,
+} from './marchInvalidReasons';
+import { ARMOR_MOVE_ENDS_ON_ENTER_REASON } from './strategicTerrainFlags';
 
 /**
  * Pure copy + classification for “Blocked: …” hover hints during march / ranged / air-strike order preview.
@@ -123,12 +130,10 @@ export function blockingHoverMessageFromAirStrikeReason(reason: string): string 
 /**
  * Derives the march-preview hover string from `previewHumanMarchOrders` / tactical planner `invalidReason` text.
  *
- * Purpose: March preview strings mix movement rules, terrain vocabulary, and generic unreachable messages; this
- * collapses them into the two buckets the UI shows (`Blocked: Range` vs `Blocked: <Terrain>`).
+ * Purpose: March preview strings mix movement rules, terrain vocabulary, and generic unreachable messages.
+ * An entry block names the hovered terrain. Every other illegal march says `Blocked: Unreachable`.
  * When to use: Renderer hover while movement planning shows `showInvalidMarker` on the grouped envelope or per-unit preview.
- * Expected outcome: Prefer explicit out-of-range / ferry-range copy; list every terrain named by the rule when the
- * failure text encodes multiple domains (water+arctic hop, land+coastal+wetlands eligibility, mixed-stack coastal-only);
- * otherwise use `hoveredTerrainKind` for generic “no route” / footprint failures.
+ * Expected outcome: An entry block names the hovered terrain. Every other illegal march, including a missing route and a cell outside the battle, says `Blocked: Unreachable`.
  * Exceptions: Returns `null` when `invalidReason` is empty or clearly non-terrain (e.g. database errors).
  */
 export function blockingHoverMessageFromMarchInvalidReason(
@@ -136,6 +141,14 @@ export function blockingHoverMessageFromMarchInvalidReason(
   hoveredTerrainKind: string | null
 ): string | null {
   if (!invalidReason) return null;
+  if (
+    invalidReason === TACTICAL_DESTINATION_BLOCKS_ENTRY_REASON ||
+    invalidReason === NAVAL_DESTINATION_NOT_OCCUPIABLE_REASON ||
+    invalidReason === LAND_UNIT_DESTINATION_NOT_LANDMASS_REASON
+  ) {
+    return blockedTerrainOrUnreachable(hoveredTerrainKind);
+  }
+  if (invalidReason === ARMOR_MOVE_ENDS_ON_ENTER_REASON) return 'Blocked: Unreachable';
   const low = invalidReason.toLowerCase();
   if (low.includes('database not initialized') || low.includes('unavailable') || low.includes('no selected units')) {
     return null;
@@ -159,17 +172,27 @@ export function blockingHoverMessageFromMarchInvalidReason(
   if (low.includes('cannot move directly from one water') || (low.includes('water') && low.includes('cannot')))
     return 'Blocked: Water';
   if (low.includes('mountain')) return 'Blocked: Mountain';
-  if (hoveredTerrainKind) {
-    if (
-      low.includes('no valid tactical route') ||
-      low.includes('unreachable') ||
-      low.includes('invalid for this unit type') ||
-      low.includes('outside tactical footprint')
-    ) {
-      return `Blocked: ${titleCaseTerrainKindToken(hoveredTerrainKind)}`;
-    }
+  if (
+    invalidReason === 'No valid tactical route' ||
+    invalidReason === STRATEGIC_DESTINATION_UNREACHABLE_REASON ||
+    invalidReason === 'Outside tactical footprint'
+  ) {
+    return 'Blocked: Unreachable';
   }
   return null;
+}
+
+/**
+ * Names the hovered terrain, or Unreachable when that kind is missing.
+ *
+ * Purpose: An entry block needs a terrain word. A missing kind must not invent one.
+ * When to use: After an exact entry-block reason match.
+ * Expected outcome: `Blocked:` plus the title-cased kind, or `Blocked: Unreachable`.
+ * Exceptions: None.
+ */
+function blockedTerrainOrUnreachable(hoveredTerrainKind: string | null): string {
+  if (!hoveredTerrainKind) return 'Blocked: Unreachable';
+  return `Blocked: ${titleCaseTerrainKindToken(hoveredTerrainKind)}`;
 }
 
 /**

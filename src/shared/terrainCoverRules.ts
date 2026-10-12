@@ -265,7 +265,7 @@ export function joinHexTooltipEffectsHtml(movementRangeHtml: string | null, cove
  *
  * Purpose: A strategic stop and strategic cover belong on world hexes. A battle cell keeps its own movement line.
  * When to use: From the terrain tooltip formatter, and from tests of that line.
- * Expected outcome: A world hex that stops armor leads with the blocked icon and `Armored Movement`, then cover. A plains hex with no cover returns null. A battle cell uses `tacticalMovementHtml` and does not add the armor-stop clause.
+ * Expected outcome: A world hex that stops armor leads with the double-down icon and `Armored Movement`, then cover. A plains hex with no cover returns null. A battle cell uses `tacticalMovementHtml` and does not add the armor-stop clause.
  * Exceptions: None.
  */
 export function strategicHexEffectsBodyHtml(
@@ -275,7 +275,7 @@ export function strategicHexEffectsBodyHtml(
   tacticalMovementHtml: string | null
 ): string | null {
   const armorStop =
-    resolution === 1 && stopsArmor ? `${formatStatusIconHtml('blocked')}Armored Movement` : null;
+    resolution === 1 && stopsArmor ? `${formatStatusIconHtml('doubleDown')}Armored Movement` : null;
   const coverHtml = cover ? formatTerrainCoverTooltipHtml(cover) : null;
   return joinHexTooltipEffectsHtml(armorStop ?? tacticalMovementHtml, coverHtml);
 }

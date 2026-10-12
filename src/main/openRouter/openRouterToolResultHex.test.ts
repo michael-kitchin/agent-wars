@@ -106,10 +106,37 @@ function testEncodeEstimateCombatTargetHexString(): void {
  * Expected outcome: Process exits 0 when all cases pass.
  * Exceptions: None.
  */
+/**
+ * Ensures a `plan_route` result does not give the model raw hex indexes.
+ *
+ * Purpose: `pathH3Indexes` is for the player's stop labels. The model sees hex codes only.
+ * When to use: After edits to `redactPlanRouteResult`.
+ * Expected outcome: The encoded JSON has neither the field nor a raw index from it.
+ * Exceptions: None.
+ */
+function testEncodePlanRouteDropsPathH3Indexes(): void {
+  ensureStrategicCoordinateRegistryInitialized();
+  const cells = listStrategicH3Indexes().slice(0, 2);
+  const resolveToH3 = makeResolveToH3(cells);
+  const secret = '8ffffffffffffffff';
+  const raw = {
+    status: 'ok' as const,
+    unitId: 'h1-t1',
+    pathH3Indexes: [cells[0], secret],
+    path: [],
+    orderToH3: cells[0],
+  };
+  const out = encodeOpenRouterToolResultForLlm('plan_route', raw as Record<string, unknown>, strategicCtx, resolveToH3);
+  assert.strictEqual(out.pathH3Indexes, undefined);
+  assert.strictEqual(JSON.stringify(out).includes(secret), false);
+  assert.strictEqual(JSON.stringify(out).includes(String(cells[0])), false);
+}
+
 function run(): void {
   const tests = [
     { name: 'assess_unit positions redacted', fn: testEncodeAssessUnitReplacesPositionTuples },
     { name: 'estimate_combat targetHex redacted', fn: testEncodeEstimateCombatTargetHexString },
+    { name: 'plan_route pathH3Indexes redacted', fn: testEncodePlanRouteDropsPathH3Indexes },
   ];
   for (const t of tests) {
     try {

@@ -14,7 +14,7 @@ import {
   type TerrainCoverPlace,
   type TerrainCoverShooter,
 } from './terrainCoverRules';
-import { collectTacticalRangedSlowTerrainLabels } from './orderPreviewSlowTerrainTooltip';
+import { collectTacticalRangedSlowTerrainLabels, sortSlowTerrainLabels } from './orderPreviewSlowTerrainTooltip';
 import type { TacticalBattleSnapshot } from './tacticalBattleTypes';
 import type { TacticalBattleTerrainPick } from './tacticalTerrainCombatModifiers';
 import { formatTransportIconsHtml, transportLineSpecified } from './featureIconHtml';
@@ -103,15 +103,6 @@ export type OrderPreviewEffectsTooltipInput = {
    * Exceptions: None.
    */
   readonly targetCover?: TerrainCoverPlace | null;
-  /**
-   * The strategic march destination stops armor.
-   *
-   * Contract: True only for a legal armor march onto a rugged, arctic, or city hex.
-   * When to use: The renderer sets it from the destination hex's flags.
-   * Expected outcome: The march tooltip adds an Effects line with the blocked icon.
-   * Exceptions: None.
-   */
-  readonly destinationStopsArmor?: boolean;
 };
 
 const WEATHER_WORDS: Readonly<Record<string, WeatherState>> = Object.freeze({
@@ -177,15 +168,15 @@ function tacticalMarchHtml(
 }
 
 /**
- * Names origin weather that cuts a strategic march.
+ * Names weather and armor-stop terrain that change a strategic march.
  *
- * Purpose: Weather can slow the march, and a rugged, arctic, or city destination ends an armor move.
+ * Purpose: Weather and every stop hex the route enters share one `Slower:` line.
  * When to use: A legal strategic march.
- * Expected outcome: A `Slower:` line when weather slows a selected unit, an `Effects:` line when the destination stops armor, or null when neither applies.
+ * Expected outcome: Null when nothing slows the march. Otherwise one `Slower:` line, labels sorted with `sortSlowTerrainLabels`.
  * Exceptions: None.
  */
 function strategicMarchHtml(input: OrderPreviewEffectsTooltipInput): string | null {
-  const weathers: WeatherState[] = [];
+  const labels: string[] = [];
   for (const unit of input.units) {
     if (
       !weatherSlowsMovement({
@@ -198,16 +189,16 @@ function strategicMarchHtml(input: OrderPreviewEffectsTooltipInput): string | nu
       continue;
     }
     const weather = unit.originWeather;
-    if (weather && !weathers.includes(weather)) weathers.push(weather);
+    if (!weather) continue;
+    const word = weatherDisplayWord(weather);
+    if (!labels.includes(word)) labels.push(word);
   }
-  const parts: string[] = [];
-  if (weathers.length > 0) {
-    parts.push(`<strong>Slower:</strong> ${weathers.map((weather) => formatWeatherIconHtml(weather)).join(', ')}`);
+  for (const label of input.marchImpact?.slower ?? []) {
+    if (!labels.includes(label)) labels.push(label);
   }
-  if (input.destinationStopsArmor === true) {
-    parts.push(`<strong>Effects:</strong> ${formatStatusIconHtml('blocked')}Armored Movement`);
-  }
-  return parts.length > 0 ? parts.join(TOOLTIP_SECTION_GAP_HTML) : null;
+  if (labels.length === 0) return null;
+  const sorted = sortSlowTerrainLabels(labels);
+  return `<strong>Slower:</strong> ${sorted.map((label) => labelHtml(label)).join(', ')}`;
 }
 
 /**
@@ -354,7 +345,7 @@ function effectsLine(labels: readonly string[]): string | null {
  * Renders one label with a weather icon or a terrain swatch.
  *
  * Purpose: Snow, Rain, and Heat are weather. Map-key terrain, Urban, and Rubble keep a swatch.
- * When to use: Effects lines. March lines handle weather before this runs.
+ * When to use: Slower and Effects lines. Weather words use the weather icon. Terrain words use a swatch.
  * Expected outcome: Icon HTML already includes the weather word. Terrain words, including Urban and Rubble, keep their swatch span. The chip color is applied when the tooltip opens.
  * Exceptions: None.
  */

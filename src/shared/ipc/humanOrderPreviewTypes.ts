@@ -180,7 +180,7 @@ segments: HumanOrderPreviewSegment[];
     /**
    * Optional title-case terrain word when this preview is **valid** but terrain throttles movement (e.g. `Forest`, `Urban`).
    *
-   * Contract: Omitted or `null` on strategic marches (no strategic slowdowns) and when not applicable; never required with `valid: false`.
+   * Contract: Omitted or `null` on strategic marches. Armor stop chips use `orderPreviewTerrainImpact` instead. Never required with `valid: false`.
    * When to use: Tactical `buildTacticalMarchHoverPreview` and merged grouped envelopes; strategic `previewHumanMarchOrders` leaves it null.
    * Expected outcome: Plain-text aggregate for logs/sidebar; comma-separated when multiple terrains apply; renderer prefers `orderPreviewTerrainImpact` for tooltips.
    * Exceptions: None.
@@ -189,9 +189,9 @@ slowerTerrainDisplayTitle?: string | null;
     /**
    * Terrain throttle + road/rail transport flags for HTML order-preview tooltips (`#order-slower-tooltip`).
    *
-   * Contract: Present only when `valid` and at least one of `slower.length > 0` or `roadRail` is true. Strategic marches omit this.
-   * When to use: Tactical `buildTacticalMarchHoverPreview` and merged grouped envelopes.
-   * Expected outcome: The order-effects tooltip reads `slower` and `roadRail` for a battle march without recomputing the path.
+   * Contract: Present only when `valid` and at least one of `slower.length > 0` or `roadRail` is true. An armor march sets `slower` when the route enters a rugged, arctic, or city hex. Other strategic marches omit this.
+   * When to use: Tactical `buildTacticalMarchHoverPreview`, armor march preview, and merged grouped envelopes.
+   * Expected outcome: The order-effects tooltip reads `slower` and `roadRail` without recomputing the path.
    * Exceptions: None.
    */
 orderPreviewTerrainImpact?: OrderPreviewTerrainImpact | null;
@@ -368,18 +368,18 @@ previews: HumanOrderGroupPreviewUnitResult[];
     /**
    * Aggregated slow-terrain label for grouped march hover when any representative preview is terrain-throttled.
    *
-   * Contract: First non-null `preview.slowerTerrainDisplayTitle` among `previews` order, or explicit envelope override. Strategic grouped previews omit this.
+   * Contract: Null unless a row already has a title, or the caller passed one. A row title uses the sorted union of impact labels. A strategic armor stop leaves this null and keeps the chips on `orderPreviewTerrainImpact`.
    * When to use: Renderer `publishHoverRoutePreview` for tactical march modes after `buildHumanOrderGroupPreviewEnvelope`.
-   * Expected outcome: Title-case words, comma-separated when merged across origins; `null` when no row is slowed or the preview is strategic.
+   * Expected outcome: Title-case words, comma-separated when merged across origins. Null for a strategic armor march.
    * Exceptions: None.
    */
 slowerTerrainDisplayTitle?: string | null;
     /**
    * Merged `orderPreviewTerrainImpact` across grouped march previews (union of `slower`, OR of `roadRail`).
    *
-   * Contract: Same shape as per-row `HumanOrderPreviewResult.orderPreviewTerrainImpact`; omitted when nothing applies or the preview is strategic.
-   * When to use: After `buildHumanOrderGroupPreviewEnvelope` for tactical grouped hovers.
-   * Expected outcome: Superset of contributing rows for tooltip HTML; null on strategic grouped previews.
+   * Contract: Same shape as per-row `HumanOrderPreviewResult.orderPreviewTerrainImpact`. Omitted when nothing applies. An armor group sets it when any route enters a stop hex.
+   * When to use: After `buildHumanOrderGroupPreviewEnvelope`.
+   * Expected outcome: Superset of contributing rows for tooltip HTML.
    * Exceptions: None.
    */
 orderPreviewTerrainImpact?: OrderPreviewTerrainImpact | null;

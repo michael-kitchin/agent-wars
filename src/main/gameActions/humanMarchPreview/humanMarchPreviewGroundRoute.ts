@@ -14,9 +14,17 @@ import { terrainIsPassableForDomain } from '../../pathfinding';
 import {
   canLandUnitTraverseEdge,
   landUnitCanOccupyHex,
+  LAND_UNIT_DESTINATION_NOT_LANDMASS_REASON,
 } from '../../../shared/landTraversalStrategic';
 import { isLandUnitType } from '../landMovementConstraints';
+import {
+  NAVAL_DESTINATION_NOT_OCCUPIABLE_REASON,
+  STRATEGIC_DESTINATION_UNREACHABLE_REASON,
+} from '../../../shared/marchInvalidReasons';
 import type { PlanRouteError, PlanRouteOk } from '../../tools/pathfinding';
+import type { OrderPreviewTerrainImpact } from '../../../shared/ipc/humanOrderPreviewTypes';
+import { sortSlowTerrainLabels } from '../../../shared/orderPreviewSlowTerrainTooltip';
+import { armorStopTerrainLabels, strategicTerrainFlagsFor } from '../../../shared/strategicTerrainFlags';
 import type { HumanMarchPreviewComputationContext } from '../humanMarchPreviewComputationContext';
 import {
   navalLookupForHexState,
@@ -54,11 +62,11 @@ const MAX_NEARBY_FALLBACK_RADIUS = 6;
 const MAX_NEARBY_FALLBACK_BUDGET_MS = 20;
 
 /**
- * Successful ground-unit march preview fields (no strategic terrain slowdown).
+ * Successful ground-unit march preview fields.
  *
  * Purpose: Avoid importing `HumanOrderPreviewResult` from the impl module (circular).
  * When to use: Return type of `resolveLandOrNavalMarchPreview` and nearby fallback.
- * Expected outcome: Structurally assignable to `HumanOrderPreviewResult`.
+ * Expected outcome: Structurally assignable to `HumanOrderPreviewResult`. Armor may set `orderPreviewTerrainImpact` when the route enters a stop hex. `slowerTerrainDisplayTitle` stays null.
  * Exceptions: None.
  */
 export type GroundMarchPreviewOk = {
@@ -67,7 +75,7 @@ export type GroundMarchPreviewOk = {
   arrowLatLng: [number, number];
   segments: Array<{ turn: number; hexes: [number, number][] }>;
   slowerTerrainDisplayTitle: null;
-  orderPreviewTerrainImpact: null;
+  orderPreviewTerrainImpact: OrderPreviewTerrainImpact | null;
 };
 
 /**
@@ -150,19 +158,44 @@ export interface ResolveLandOrNavalMarchPreviewArgs {
 }
 
 /**
- * Builds the empty strategic-terrain tooltip fields for a successful ground march preview.
+ * Stop-terrain chips for an armor route, excluding the hex the unit already occupies.
  *
- * Purpose: Strategic land/naval previews must not show tactical slower-terrain chrome.
- * When to use: After a successful `plan_route` in this module.
- * Expected outcome: Both tooltip fields are null.
+ * Purpose: A legal armor march names every rugged, arctic, or city hex it enters.
+ * When to use: After `plan_route` returns `pathH3Indexes`.
+ * Expected outcome: Null for non-armor, a path shorter than two hexes, or a path that enters no stop hex. Otherwise `slower` holds the legend words and `roadRail` is false.
  * Exceptions: None.
  */
-function emptyStrategicTerrainFields(
-  unitId: string,
-  unitType: string
-): Pick<GroundMarchPreviewOk, 'slowerTerrainDisplayTitle' | 'orderPreviewTerrainImpact'> {
-  logTrace('humanMarchPreviewGroundRoute emptyStrategicTerrainFields', { unitId, unitType });
-  return { slowerTerrainDisplayTitle: null, orderPreviewTerrainImpact: null };
+export function armorMarchStopImpact(
+  unitType: string,
+  pathH3Indexes: readonly string[] | undefined
+): OrderPreviewTerrainImpact | null {
+  if (unitType !== 'armor' || pathH3Indexes == null || pathH3Indexes.length < 2) {
+    logTrace('humanMarchPreviewGroundRoute armorMarchStopImpact', {
+      unitType,
+      pathLength: pathH3Indexes?.length ?? 0,
+      slower: '',
+    });
+    return null;
+  }
+  const labels = new Set<string>();
+  for (const h3 of pathH3Indexes.slice(1)) {
+    for (const label of armorStopTerrainLabels(strategicTerrainFlagsFor(h3))) labels.add(label);
+  }
+  if (labels.size === 0) {
+    logTrace('humanMarchPreviewGroundRoute armorMarchStopImpact', {
+      unitType,
+      pathLength: pathH3Indexes.length,
+      slower: '',
+    });
+    return null;
+  }
+  const slower = sortSlowTerrainLabels([...labels]);
+  logTrace('humanMarchPreviewGroundRoute armorMarchStopImpact', {
+    unitType,
+    pathLength: pathH3Indexes.length,
+    slower: slower.join(','),
+  });
+  return { slower, roadRail: false };
 }
 
 /**
@@ -170,7 +203,7 @@ function emptyStrategicTerrainFields(
  *
  * Purpose: Shared construction for direct and nearby land successes.
  * When to use: After `planRoute` returns status ok.
- * Expected outcome: Valid preview with route segments and no slower-terrain tooltip.
+ * Expected outcome: Valid preview with route segments. Armor sets stop chips when the route enters a stop hex.
  * Exceptions: None.
  */
 function previewFromPlanRouteOk(unit: GroundMarchPreviewUnit, planned: PlanRouteOk): GroundMarchPreviewOk {
@@ -180,7 +213,8 @@ function previewFromPlanRouteOk(unit: GroundMarchPreviewUnit, planned: PlanRoute
     showInvalidMarker: false,
     arrowLatLng: planned.destination,
     segments: planned.path.map((seg) => ({ turn: seg.turn, hexes: seg.hexes })),
-    ...emptyStrategicTerrainFields(unit.id, unit.unitType),
+    slowerTerrainDisplayTitle: null,
+    orderPreviewTerrainImpact: armorMarchStopImpact(unit.unitType, planned.pathH3Indexes),
   };
 }
 
@@ -236,6 +270,51 @@ function findNearbyLandMarchPreview(
     }
   }
   return null;
+}
+
+/**
+ * Reason when a land or naval hover has no route.
+ *
+ * Purpose: An inland naval hex names terrain. A land hex off every land mass keeps the land-mass sentence. Everything else is unreachable.
+ * When to use: After `resolveLandOrNavalMarchPreview` returns null.
+ * Expected outcome: One of the three stable sentences. The hover copy turns the first two into `Blocked:` plus the hovered terrain, and the third into `Blocked: Unreachable`.
+ * Exceptions: None.
+ */
+export function groundMarchInvalidReason(args: {
+  readonly context: HumanMarchPreviewComputationContext;
+  readonly unitType: string;
+  readonly hoveredH3Index: string;
+}): string {
+  const landMass = args.context.pathfindingSession.landMass;
+  if (isLandUnitType(args.unitType) && !landUnitCanOccupyHex(args.hoveredH3Index, landMass)) {
+    logDebug('humanMarchPreviewGroundRoute groundMarchInvalidReason', {
+      unitType: args.unitType,
+      hoveredH3Index: args.hoveredH3Index,
+      reason: 'land-mass',
+    });
+    return LAND_UNIT_DESTINATION_NOT_LANDMASS_REASON;
+  }
+  if (args.unitType === 'naval') {
+    const lookup = navalLookupForHexState(
+      args.context.pathfindingSession,
+      args.context.state.hexes,
+      args.context.state.strategicInfrastructure
+    );
+    if (!navalStrategicHexIsOccupiable(args.hoveredH3Index, lookup)) {
+      logDebug('humanMarchPreviewGroundRoute groundMarchInvalidReason', {
+        unitType: args.unitType,
+        hoveredH3Index: args.hoveredH3Index,
+        reason: 'naval-occupancy',
+      });
+      return NAVAL_DESTINATION_NOT_OCCUPIABLE_REASON;
+    }
+  }
+  logDebug('humanMarchPreviewGroundRoute groundMarchInvalidReason', {
+    unitType: args.unitType,
+    hoveredH3Index: args.hoveredH3Index,
+    reason: 'unreachable',
+  });
+  return STRATEGIC_DESTINATION_UNREACHABLE_REASON;
 }
 
 /**

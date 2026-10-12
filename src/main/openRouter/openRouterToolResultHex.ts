@@ -144,7 +144,7 @@ function latLngTupleToHexCode(
  *
  * Purpose: `PlanRouteOk` historically included `origin`, `destination`, `orderToXY`, and per-step `endHex` as `[lat,lng]`.
  * When to use: Only from `encodeOpenRouterToolResultForLlm` for `toolName === 'plan_route'`.
- * Expected outcome: Adds `orderToHexCode`, per-segment `hexCodes` / `endHexCode`, optional `suggestedDestinationHexCodes`, drops sensitive fields.
+ * Expected outcome: Adds `orderToHexCode`, per-segment `hexCodes` / `endHexCode`, optional `suggestedDestinationHexCodes`, drops sensitive fields, including `pathH3Indexes`.
  * Exceptions: If `orderToH3` is missing, `orderToHexCode` may be omitted; path entries are copied through when malformed.
  */
 function redactPlanRouteResult(
@@ -158,6 +158,7 @@ function redactPlanRouteResult(
   delete out.destination;
   delete out.orderToXY;
   delete out.orderToH3;
+  delete out.pathH3Indexes;
   if (orderH3) {
     try {
       out.orderToHexCode = h3ToCode(orderH3, context);

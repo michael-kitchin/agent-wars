@@ -43,7 +43,7 @@ import type { HumanMarchPreviewComputationContext } from '../humanMarchPreviewCo
 import { buildHumanMarchPreviewComputationContextFromState } from '../humanMarchPreviewComputationContext';
 import { cacheSetBounded } from '../humanMarchPreviewCache';
 import { hexSupportsMixedLandAndNaval, selectionHasMixedLandAndNaval } from '../humanMarchPreviewMixedSelection';
-import { resolveLandOrNavalMarchPreview } from './humanMarchPreviewGroundRoute';
+import { groundMarchInvalidReason, resolveLandOrNavalMarchPreview } from './humanMarchPreviewGroundRoute';
 import { hexHasSeaport } from '../../movementTerrain';
 /**
  * Documents the `HumanOwnedUnit` type alias (type HumanOwnedUnit).
@@ -350,9 +350,9 @@ slowerTerrainDisplayTitle?: string | null;
     /**
    * Terrain throttle hints for HTML order-preview tooltips (parity with `humanOrderPreviewTypes`).
    *
-   * Contract: Strategic march previews omit this; tactical rows may set `slower` / `roadRail`.
-   * When to use: Tactical hover after a successful tactical plan; not used for strategic `PlanRouteOk`.
-   * Expected outcome: Null on strategic previews.
+   * Contract: Armor marches set `slower` when the route enters a rugged, arctic, or city hex. Other strategic marches omit this. Tactical rows may set `slower` / `roadRail`.
+   * When to use: After a successful plan.
+   * Expected outcome: Null when the route enters no such hex. `slowerTerrainDisplayTitle` stays null on strategic marches.
    * Exceptions: None.
    */
 orderPreviewTerrainImpact?: OrderPreviewTerrainImpact | null;
@@ -453,9 +453,9 @@ previews: HumanOrderGroupPreviewUnitResult[];
     /**
    * Aggregated slow-terrain label for grouped march hover (parity with `humanOrderPreviewTypes`).
    *
-   * Contract: Optional; omitted when no row is slowed.
+   * Contract: Optional. Null when no row has a title, including a strategic armor march whose stop chips live only on `orderPreviewTerrainImpact`.
    * When to use: Returned from `resolveHumanMarchOrderPreviews` after envelope assembly.
-   * Expected outcome: First non-null per-row title or explicit envelope override.
+   * Expected outcome: When a row has a title, the joined impact labels. Otherwise null.
    * Exceptions: None.
    */
 slowerTerrainDisplayTitle?: string | null;
@@ -464,7 +464,7 @@ slowerTerrainDisplayTitle?: string | null;
    *
    * Contract: Union of contributing per-row impacts after envelope assembly.
    * When to use: Returned from `resolveHumanMarchOrderPreviews` after `buildHumanOrderGroupPreviewEnvelope`.
-   * Expected outcome: Sorted union of `slower`; omitted on strategic grouped previews.
+   * Expected outcome: Sorted union of `slower`, including armor stop words on a strategic march. Null when no row has an impact.
    * Exceptions: None.
    */
 orderPreviewTerrainImpact?: OrderPreviewTerrainImpact | null;
@@ -729,10 +729,11 @@ function computeHumanMarchPreviewForUnit(
   result = {
     valid: false,
     showInvalidMarker: true,
-    invalidReason:
-      unitIsLand && !landUnitCanOccupyHex(hoveredH3Index, context.pathfindingSession.landMass)
-        ? LAND_UNIT_DESTINATION_NOT_LANDMASS_REASON
-        : 'Destination is invalid for this unit type or unreachable.',
+    invalidReason: groundMarchInvalidReason({
+      context,
+      unitType: unit.unitType,
+      hoveredH3Index,
+    }),
     segments: [],
   };
   cacheSetBounded(previewResultCache, cacheKey, result, maxPreviewResultCacheEntries);

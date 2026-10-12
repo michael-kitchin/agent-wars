@@ -202,7 +202,7 @@ export function minMovementRangeAmongUnitTypes(
  *
  * Purpose: Single place for `validForAll`, `showInvalidMarker`, `invalidReason`, merged terrain tooltips, and movement-range aggregation.
  * When to use: Final assembly step after all per-unit previews are computed.
- * Expected outcome: Shallow-copied `previews`; when any row is invalid, every row’s `segments` are cleared so grouped hovers draw only the blocked marker; when `orderPreviewTerrainImpact` is omitted, it is merged from row `preview.orderPreviewTerrainImpact` (union of `slower`, OR of `roadRail`); `slowerTerrainDisplayTitle` prefers explicit arg, then merged impact text, then first row string.
+ * Expected outcome: Shallow-copied `previews`. An invalid row clears every row's segments. `orderPreviewTerrainImpact` is the union of the row impacts unless the caller passed one. `slowerTerrainDisplayTitle` uses that union only when a row already has a title, so a strategic armor stop keeps the title null.
  * Exceptions: None.
  */
 export function buildHumanOrderGroupPreviewEnvelope(args: {
@@ -227,7 +227,7 @@ export function buildHumanOrderGroupPreviewEnvelope(args: {
         : 'Road/Rail'
       : null;
   const slowerTerrainDisplayTitle =
-    explicit !== undefined ? explicit : (slowerFromImpact ?? fromRows) ?? null;
+    explicit !== undefined ? explicit : fromRows != null ? (slowerFromImpact ?? fromRows) : null;
   const validForAll = invalid === undefined;
   const normalizedPreviews = validForAll
     ? previews

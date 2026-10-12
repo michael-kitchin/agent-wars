@@ -2,8 +2,8 @@
  * Copy and light terrain classification for transient “Slower: …” hover hints during valid tactical marches.
  *
  * Purpose: Keeps tactical march preview labels aligned without importing renderer or Electron main modules.
- * When to use: `buildTacticalMarchHoverPreview` and the order-effects tooltip. Strategic marches do not use these labels.
- * Expected outcome: Structured `OrderPreviewTerrainImpact` for IPC plus HTML fragments with bold section labels; `null` when no slowdown applies.
+ * When to use: `buildTacticalMarchHoverPreview` and the order-effects tooltip. Strategic armor stop chips use `sortSlowTerrainLabels` only.
+ * Expected outcome: Structured `OrderPreviewTerrainImpact` for a battle march. `sortSlowTerrainLabels` also orders strategic armor stop chips. `null` when no slowdown applies.
  * Exceptions: None; invalid inputs yield `null` or empty collections.
  */
 

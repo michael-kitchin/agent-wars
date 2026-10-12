@@ -83,6 +83,26 @@ export function armorMoveEndsOnHex(h3Index: string): boolean {
 }
 
 /**
+ * Legend words for a world hex where armor must stop.
+ *
+ * Purpose: Planning `Slower:` names the legend kinds, not the flag words.
+ * When to use: For each hex an armor route enters, after the origin.
+ * Expected outcome: `Urban` when `city`, `Mountain` when `rugged`, `Arctic` when `arctic`, in that order. Empty when none are set.
+ * Exceptions: None.
+ */
+export function armorStopTerrainLabels(flags: {
+  readonly rugged: boolean;
+  readonly arctic: boolean;
+  readonly city: boolean;
+}): readonly string[] {
+  const labels: string[] = [];
+  if (flags.city) labels.push('Urban');
+  if (flags.rugged) labels.push('Mountain');
+  if (flags.arctic) labels.push('Arctic');
+  return labels;
+}
+
+/**
  * Cover and tooltip flags for one strategic hex.
  *
  * Purpose: The tooltip and the cover resolver must not each retest the cells.

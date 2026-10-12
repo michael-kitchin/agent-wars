@@ -21160,6 +21160,31 @@ ${bonuses}`;
     return order;
   }
 
+  // src/shared/landTraversalStrategic.ts
+  var LAND_UNIT_DESTINATION_NOT_LANDMASS_REASON = "Land units must move to a hex that overlaps a continent or large island.";
+
+  // src/shared/marchInvalidReasons.ts
+  var TACTICAL_DESTINATION_BLOCKS_ENTRY_REASON = "This unit cannot enter that terrain.";
+  var NAVAL_DESTINATION_NOT_OCCUPIABLE_REASON = "Naval destination is not occupiable.";
+  var STRATEGIC_DESTINATION_UNREACHABLE_REASON = "Destination is unreachable.";
+
+  // src/shared/strategicTerrainFlags.ts
+  var ruggedHexes = /* @__PURE__ */ new Set();
+  var arcticHexes = /* @__PURE__ */ new Set();
+  var cityHexes = /* @__PURE__ */ new Set();
+  function setStrategicTerrainFlags(next) {
+    if (!next) {
+      ruggedHexes = /* @__PURE__ */ new Set();
+      arcticHexes = /* @__PURE__ */ new Set();
+      cityHexes = /* @__PURE__ */ new Set();
+      return;
+    }
+    ruggedHexes = new Set(next.rugged);
+    arcticHexes = new Set(next.arctic);
+    cityHexes = new Set(next.city);
+  }
+  var ARMOR_MOVE_ENDS_ON_ENTER_REASON = "Armor must end its move on entering a rugged, arctic, or city hex.";
+
   // src/shared/orderPreviewBlockingCopy.ts
   var MELEE_ENGAGEMENT_LINE = /^\u2022 Melee engagements at \d+ hex(es)?\.\s*$/;
   var RANGED_ENGAGEMENT_LINE = /^\u2022 Ranged engagements at \d+ hex(es)?\.\s*$/;
@@ -21216,6 +21241,10 @@ ${bonuses}`;
   }
   function blockingHoverMessageFromMarchInvalidReason(invalidReason, hoveredTerrainKind) {
     if (!invalidReason) return null;
+    if (invalidReason === TACTICAL_DESTINATION_BLOCKS_ENTRY_REASON || invalidReason === NAVAL_DESTINATION_NOT_OCCUPIABLE_REASON || invalidReason === LAND_UNIT_DESTINATION_NOT_LANDMASS_REASON) {
+      return blockedTerrainOrUnreachable(hoveredTerrainKind);
+    }
+    if (invalidReason === ARMOR_MOVE_ENDS_ON_ENTER_REASON) return "Blocked: Unreachable";
     const low = invalidReason.toLowerCase();
     if (low.includes("database not initialized") || low.includes("unavailable") || low.includes("no selected units")) {
       return null;
@@ -21236,12 +21265,14 @@ ${bonuses}`;
     if (low.includes("cannot move directly from one water") || low.includes("water") && low.includes("cannot"))
       return "Blocked: Water";
     if (low.includes("mountain")) return "Blocked: Mountain";
-    if (hoveredTerrainKind) {
-      if (low.includes("no valid tactical route") || low.includes("unreachable") || low.includes("invalid for this unit type") || low.includes("outside tactical footprint")) {
-        return `Blocked: ${titleCaseTerrainKindToken(hoveredTerrainKind)}`;
-      }
+    if (invalidReason === "No valid tactical route" || invalidReason === STRATEGIC_DESTINATION_UNREACHABLE_REASON || invalidReason === "Outside tactical footprint") {
+      return "Blocked: Unreachable";
     }
     return null;
+  }
+  function blockedTerrainOrUnreachable(hoveredTerrainKind) {
+    if (!hoveredTerrainKind) return "Blocked: Unreachable";
+    return `Blocked: ${titleCaseTerrainKindToken(hoveredTerrainKind)}`;
   }
   function blockingHoverMessageHtmlFromPlainMessage(message) {
     const t = message.trim();
@@ -21463,6 +21494,7 @@ ${bonuses}`;
     up: Object.freeze({ file: "arrow_up.svg", alt: "+" }),
     doubleUp: Object.freeze({ file: "arrow_up_double.svg", alt: "++" }),
     down: Object.freeze({ file: "arrow_down.svg", alt: "-" }),
+    doubleDown: Object.freeze({ file: "arrow_down_double.svg", alt: "--" }),
     blocked: Object.freeze({ file: "x_mark.svg", alt: "x" })
   });
   var EFFECT_SYMBOL_KIND = Object.freeze({
@@ -21569,6 +21601,11 @@ ${bonuses}`;
   }
   function formatSymbolSet(symbols) {
     return SYMBOL_ORDER.filter((s) => symbols.has(s)).join("/");
+  }
+  function movementEffectSymbolForUnit(unitType, input) {
+    const cat = normalizeDbTerrainKindToTacticalCategory(input.terrainKind, input.parentTerrain);
+    const hasTransport = !input.isRubble && (input.hasRoad || input.hasRail);
+    return movementSymbolForUnit(unitType, cat, input, hasTransport);
   }
   function movementSymbolForUnit(unitType, cat, input, hasTransport) {
     if (hasTransport && (unitType === "infantry" || unitType === "armor")) {
@@ -21738,7 +21775,7 @@ ${bonuses}`;
     return `${movement}, ${cover}`;
   }
   function strategicHexEffectsBodyHtml(resolution, stopsArmor, cover, tacticalMovementHtml) {
-    const armorStop = resolution === 1 && stopsArmor ? `${formatStatusIconHtml("blocked")}Armored Movement` : null;
+    const armorStop = resolution === 1 && stopsArmor ? `${formatStatusIconHtml("doubleDown")}Armored Movement` : null;
     const coverHtml = cover ? formatTerrainCoverTooltipHtml(cover) : null;
     return joinHexTooltipEffectsHtml(armorStop ?? tacticalMovementHtml, coverHtml);
   }
@@ -27035,7 +27072,7 @@ ${bonuses}`;
     const explicit = args.slowerTerrainDisplayTitle;
     const mergedImpact = args.orderPreviewTerrainImpact !== void 0 ? args.orderPreviewTerrainImpact : mergeOrderPreviewTerrainImpactsFromPreviews(previews);
     const slowerFromImpact = mergedImpact && (mergedImpact.slower.length > 0 || mergedImpact.roadRail) ? mergedImpact.slower.length > 0 ? mergedImpact.slower.join(", ") : "Road/Rail" : null;
-    const slowerTerrainDisplayTitle = explicit !== void 0 ? explicit : slowerFromImpact ?? fromRows ?? null;
+    const slowerTerrainDisplayTitle = explicit !== void 0 ? explicit : fromRows != null ? slowerFromImpact ?? fromRows : null;
     const validForAll = invalid === void 0;
     const normalizedPreviews = validForAll ? previews : previews.map((row) => ({
       ...row,
@@ -27411,6 +27448,43 @@ ${bonuses}`;
     };
   }
 
+  // src/shared/tacticalMarchDestinationBlock.ts
+  function anyTransportSide(sides) {
+    return sides?.some((side) => side) === true;
+  }
+  function terrainEffectsInputForBattleCell(battle, h3) {
+    const terrainKind = battle.tacticalTerrainKindByH3?.[h3] ?? battle.strategicHexTerrainKind ?? "";
+    return {
+      terrainKind,
+      parentTerrain: battle.strategicHexTerrain ?? "land",
+      parentTerrainKind: battle.strategicHexTerrainKind ?? "plains",
+      isUrban: battle.tacticalIsUrbanByH3?.[h3] === true,
+      isRubble: battle.tacticalIsRubbleByH3?.[h3] === true,
+      isSeaport: battle.tacticalIsSeaportByH3?.[h3] === true,
+      hasRoad: anyTransportSide(battle.tacticalRoadSidesByH3?.[h3]),
+      hasRail: anyTransportSide(battle.tacticalRailSidesByH3?.[h3])
+    };
+  }
+  function tacticalCellBlocksEntry(args) {
+    if (args.allowsTerrainBonusStop) return false;
+    if (args.moveType === "naval") {
+      return !isNavalTacticalCellNavigable({
+        resolvedKindForCell: args.input.terrainKind,
+        parentTerrain: args.input.parentTerrain,
+        parentTerrainKind: args.input.parentTerrainKind,
+        isSeaportCell: args.input.isSeaport
+      });
+    }
+    return movementEffectSymbolForUnit(args.moveType, args.input) === "x";
+  }
+  function tacticalDestinationBlocksMarch(args) {
+    return tacticalCellBlocksEntry({
+      input: terrainEffectsInputForBattleCell(args.battle, args.h3),
+      moveType: args.moveType,
+      allowsTerrainBonusStop: args.allowsTerrainBonusStop
+    });
+  }
+
   // src/shared/tacticalMarchHoverPreview.ts
   var MAX_TACTICAL_HOVER_PLAN_MEMO = 64;
   function tacticalHoverSubUnitPlacementSignature(subUnits) {
@@ -27427,6 +27501,26 @@ ${bonuses}`;
   }
   function tacticalMarchCommittedOriginH3(battle, subUnitId) {
     return battle.subUnits.find((u) => u.id === subUnitId)?.h3Index ?? "";
+  }
+  function tacticalMarchUnreachableReason(args) {
+    if (args.hoveredH3Index === args.originH3Index) return "No valid tactical route";
+    if (args.moveType !== "infantry" && args.moveType !== "armor" && args.moveType !== "naval") {
+      return "No valid tactical route";
+    }
+    const blocks = tacticalDestinationBlocksMarch({
+      battle: args.battle,
+      h3: args.hoveredH3Index,
+      moveType: args.moveType,
+      allowsTerrainBonusStop: cellAllowsTerrainBonusStop(
+        {
+          terrain: args.terrain,
+          moveType: args.moveType,
+          terrainBonusCategory: args.terrainBonusCategory
+        },
+        args.hoveredH3Index
+      )
+    });
+    return blocks ? TACTICAL_DESTINATION_BLOCKS_ENTRY_REASON : "No valid tactical route";
   }
   function h3PathToLatLngHexes(path) {
     return path.map((h) => {
@@ -27507,11 +27601,35 @@ ${bonuses}`;
       tacticalHoverPlanMemo.set(memoKey, plan);
     }
     if (!plan.reachable || !plan.pathToDestination || plan.pathToDestination.length < 2) {
-      return invalid({ valid: false, showInvalidMarker: true, invalidReason: "No valid tactical route", segments: [] });
+      return invalid({
+        valid: false,
+        showInvalidMarker: true,
+        invalidReason: tacticalMarchUnreachableReason({
+          battle: args.battle,
+          originH3Index: origin,
+          hoveredH3Index: args.hoveredH3Index,
+          moveType,
+          terrain,
+          terrainBonusCategory
+        }),
+        segments: []
+      });
     }
     const displayPath = args.overridePathH3Indexes ?? plan.pathToDestination;
     if (displayPath.length < 2) {
-      return invalid({ valid: false, showInvalidMarker: true, invalidReason: "No valid tactical route", segments: [] });
+      return invalid({
+        valid: false,
+        showInvalidMarker: true,
+        invalidReason: tacticalMarchUnreachableReason({
+          battle: args.battle,
+          originH3Index: origin,
+          hoveredH3Index: args.hoveredH3Index,
+          moveType,
+          terrain,
+          terrainBonusCategory
+        }),
+        segments: []
+      });
     }
     const pathH3Indexes = [...displayPath];
     const [destLat, destLng] = cellToLatLng(args.hoveredH3Index);
@@ -27745,7 +27863,7 @@ ${bonuses}`;
     return parts.join(TOOLTIP_SECTION_GAP_HTML);
   }
   function strategicMarchHtml(input) {
-    const weathers = [];
+    const labels = [];
     for (const unit of input.units) {
       if (!weatherSlowsMovement({
         unitType: unit.unitType,
@@ -27756,16 +27874,16 @@ ${bonuses}`;
         continue;
       }
       const weather = unit.originWeather;
-      if (weather && !weathers.includes(weather)) weathers.push(weather);
+      if (!weather) continue;
+      const word = weatherDisplayWord(weather);
+      if (!labels.includes(word)) labels.push(word);
     }
-    const parts = [];
-    if (weathers.length > 0) {
-      parts.push(`<strong>Slower:</strong> ${weathers.map((weather) => formatWeatherIconHtml(weather)).join(", ")}`);
+    for (const label of input.marchImpact?.slower ?? []) {
+      if (!labels.includes(label)) labels.push(label);
     }
-    if (input.destinationStopsArmor === true) {
-      parts.push(`<strong>Effects:</strong> ${formatStatusIconHtml("blocked")}Armored Movement`);
-    }
-    return parts.length > 0 ? parts.join(TOOLTIP_SECTION_GAP_HTML) : null;
+    if (labels.length === 0) return null;
+    const sorted = sortSlowTerrainLabels(labels);
+    return `<strong>Slower:</strong> ${sorted.map((label) => labelHtml(label)).join(", ")}`;
   }
   function strategicFerryHtml(input) {
     const shortened = input.units.some(
@@ -27883,8 +28001,7 @@ ${bonuses}`;
       marchImpact: args.preview.data.orderPreviewTerrainImpact ?? null,
       rangedBattle: kind === "ranged" ? battle : null,
       rangedPreviewUnitIds: args.preview.data.previews.map((row) => row.unitId),
-      targetCover: kind === "ranged" || kind === "airStrike" ? targetCoverPlace(args.preview.hoveredH3Index) : null,
-      destinationStopsArmor: kind === "strategicMarch" && destinationStopsArmor(args.preview.hoveredH3Index)
+      targetCover: kind === "ranged" || kind === "airStrike" ? targetCoverPlace(args.preview.hoveredH3Index) : null
     };
   }
   function targetCoverPlace(hoveredH3Index) {
@@ -27903,11 +28020,6 @@ ${bonuses}`;
       rugged: hex?.rugged === true,
       city: hex?.city === true
     };
-  }
-  function destinationStopsArmor(hoveredH3Index) {
-    const hex = rendererSharedState.gameState?.hexes.find((row) => row.h3Index === hoveredH3Index);
-    if (!hex || !(hex.rugged === true || hex.arctic === true || hex.city === true)) return false;
-    return strategicSelection().some((unit) => unit.unitType === "armor");
   }
   function effectsKind(preview) {
     if (preview.renderAsSupportTargeting === "ranged") return "ranged";
@@ -30009,22 +30121,6 @@ ${bonuses}`;
       terrainInfraTacticalAirport,
       terrainInfraTacticalSeaport
     };
-  }
-
-  // src/shared/strategicTerrainFlags.ts
-  var ruggedHexes = /* @__PURE__ */ new Set();
-  var arcticHexes = /* @__PURE__ */ new Set();
-  var cityHexes = /* @__PURE__ */ new Set();
-  function setStrategicTerrainFlags(next) {
-    if (!next) {
-      ruggedHexes = /* @__PURE__ */ new Set();
-      arcticHexes = /* @__PURE__ */ new Set();
-      cityHexes = /* @__PURE__ */ new Set();
-      return;
-    }
-    ruggedHexes = new Set(next.rugged);
-    arcticHexes = new Set(next.arctic);
-    cityHexes = new Set(next.city);
   }
 
   // src/renderer/core/installRendererGameMap.ts

@@ -9,6 +9,10 @@ test('each status kind uses its icon file and alt text', () => {
     '<img class="status-icon" src="status/arrow_up_double.svg" alt="++" />'
   );
   assert.equal(formatStatusIconHtml('down'), '<img class="status-icon" src="status/arrow_down.svg" alt="-" />');
+  assert.equal(
+    formatStatusIconHtml('doubleDown'),
+    '<img class="status-icon" src="status/arrow_down_double.svg" alt="--" />'
+  );
   assert.equal(formatStatusIconHtml('blocked'), '<img class="status-icon" src="status/x_mark.svg" alt="x" />');
 });
 
