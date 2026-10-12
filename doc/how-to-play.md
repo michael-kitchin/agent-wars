@@ -168,7 +168,7 @@ Manually fought battles take place entirely within one strategic turn, with the 
 
 - Fighting a tactical battle means ignoring the strategic part of the game for one turn (for both human and LLM players).
 - During that turn, strategic units will continue to follow existing orders and defend themselves.
-- When the battle is over, the strategic part of the game resumes with the next turn.
+- When the battle is over, the strategic part of the game resumes in the next turn.
 
 Players win tactical battles by destroying their opponent's units, but they can leave at any time by clicking the **Exit Battle** button. Any strategic units with half or more of their sub-units remaining by the end of a battle will be returned to the strategic map. There is no concept of battle damage, to keep things simple.
 
