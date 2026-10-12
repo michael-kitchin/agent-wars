@@ -14,7 +14,7 @@ The game is intended to be simple to learn and quick to play, but with enough de
 
 ![Tactical planning over central Mexico](doc/media/tactical-battle-mexico.jpg)
 
-*A tactical battle in central Mexico on turn 2, during a rainy August. Teal/human units face the rose/LLM opponent (in this case, Gemini Flash Lite), and their movement orders are queued in the right panel.*
+*A tactical battle in central Mexico on turn 2, during a rainy August. Teal/human units face the rose/LLM opponent (in this case, Gemini Flash Lite). < m>ovement orders are queued in the planning panel, to the right.*
 
 ## Why This Exists
 
@@ -59,9 +59,9 @@ The key is handled only in the Electron main process and stored locally in the E
 
 See [doc/how-to-play.md](doc/how-to-play.md) for how to play the game.
 
-| *Step 1: Enter an OpenRouter API key, pick a model, and click Run. The ongoing cost of the current game (in US$) is shown on the right.*                           | *Step 2: Watch the LLM do its thing, and optionally enable/disable tools.*                          |
+| *Step 1: Enter an OpenRouter API key, pick a model, and click Run. The ongoing cost of the current game (in US$) is displayed on the right.*                           | *Step 2: Watch the LLM do its thing, and optionally enable/disable tools.*                          |
 | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------- |
-| ![Step 1: Enter an OpenRouter API key, pick a model, and click Run. The ongoing cost of the current game (in US$) is shown on the right.](doc/media/model-tab.png) | ![Step 2: Watch the LLM do its thing, and optionally enable/disable tools](doc/media/tools-tab.png) |
+| ![Step 1: Enter an OpenRouter API key, pick a model, and click Run. The ongoing cost of the current game (in US$) is displayed on the right.](doc/media/model-tab.png) | ![Step 2: Watch the LLM do its thing, and optionally enable/disable tools](doc/media/tools-tab.png) |
 
 
 ## See the Prompts (and Everything Else)
