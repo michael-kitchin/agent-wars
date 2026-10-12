@@ -45,7 +45,7 @@ Download a build for Windows (x64), macOS (Apple silicon), or Linux (x64) from [
 - **macOS:** unzip, then open `Agent Wars v2.5.1.app`. If macOS blocks it, open **System Settings > Privacy & Security** and choose **Open Anyway**.
 - **Linux:** extract the archive, then run `./agent-wars`. That launcher handles Chromium's sandbox when the archive can't keep `chrome-sandbox` owned by root. On Ubuntu 23.10 and later, where AppArmor blocks unprivileged user namespaces, it starts without the sandbox and says so.
 
-The opponent needs an [OpenRouter](https://openrouter.ai) API key of your own:
+The LLM opponent needs an [OpenRouter](https://openrouter.ai) API key to work:
 
 1. In the right-side panel, open the **Model** tab (the panel starts on it).
 2. Paste your OpenRouter API key into the API key field (placeholder `Set key and blur to save`).
