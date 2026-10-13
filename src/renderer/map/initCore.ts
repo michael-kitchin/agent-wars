@@ -2,6 +2,7 @@ import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import { selectionSupportButtonMode } from '../../shared/selectionSupportButtonMode';
 import { panBindingToDirection, panPhysicalKeyId } from '../../shared/mapKeyboardPanLogic';
 import { clearMapKeyboardPan, mapPanKeyDown, mapPanKeyUp } from './mapKeyboardPan';
+import { observeMapContainerResize } from './mapContainerResize';
 import { isEditableKeyboardTarget, shouldIgnoreGlobalKeydown } from './mapHelpers';
 import { rendererSharedState as S } from '../core/state';
 import { hidePlanningChromeToasts } from '../openRouter/openRouterUiHelpers';
@@ -449,9 +450,7 @@ export function wireInitCore(deps: InitCoreDeps): void {
     });
   }
 
-  window.addEventListener('resize', () => {
-    deps.resizeAndRedraw();
-  });
+  observeMapContainerResize(() => deps.resizeAndRedraw());
   window.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
       if (tacticalBattlesDialogIsOpen()) return;

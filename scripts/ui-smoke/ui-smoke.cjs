@@ -247,6 +247,15 @@ async function runScenes(app, page, report, outDir) {
   await parkPointer(page);
   await page.waitForTimeout(SETTLE_MS.click);
 
+  await page.click('#console-collapse-btn');
+  await parkPointer(page);
+  await page.waitForTimeout(SETTLE_MS.resize);
+  await recordScene(page, report, outDir, SCENES.consoleCollapsed);
+  await page.click('#console-tab-orders');
+  await parkPointer(page);
+  await page.waitForTimeout(SETTLE_MS.resize);
+  await recordScene(page, report, outDir, SCENES.consoleExpandedAgain);
+
   await openNewGameOverlay(page);
   await recordScene(page, report, outDir, SCENES.newGameReopened);
 }

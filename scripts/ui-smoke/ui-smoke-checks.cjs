@@ -31,6 +31,16 @@ const TOPBAR_HEIGHT = 44;
 const CONSOLE_EXPANDED_WIDTH = 376;
 
 /**
+ * Width of the collapsed console in CSS pixels: the tab rail alone.
+ *
+ * Purpose: A collapsed console must give the rest of the width to the map.
+ * When to use: The collapsed-console geometry check.
+ * Expected outcome: Matches `--console-rail-width` in `static/shellChrome.css`.
+ * Exceptions: None.
+ */
+const CONSOLE_COLLAPSED_WIDTH = 56;
+
+/**
  * Scene names. Each check lists the scenes it applies to; the runner records one probe per scene.
  *
  * Purpose: Keeps scene names in one place for the runner and the checks.
@@ -42,6 +52,8 @@ const SCENES = Object.freeze({
   newGameStartup: 'new-game-startup',
   strategic: 'strategic',
   opponentTab: 'opponent-tab',
+  consoleCollapsed: 'console-collapsed',
+  consoleExpandedAgain: 'console-expanded-again',
   readyTip: 'ready-tip',
   newGameReopened: 'new-game-reopened',
 });
@@ -278,7 +290,7 @@ const CHECKS = Object.freeze([
   },
   {
     name: 'console-expanded-geometry',
-    scenes: MATCH_SCENES,
+    scenes: MATCH_SCENES.filter((scene) => scene !== SCENES.consoleCollapsed),
     needs: ['#sidebar', '#console-main', '#console-rail'],
     run: (p, el) => {
       const s = el('#sidebar');
@@ -301,7 +313,7 @@ const CHECKS = Object.freeze([
   },
   {
     name: 'orders-tab-shows-panel',
-    scenes: [SCENES.strategic],
+    scenes: [SCENES.strategic, SCENES.consoleExpandedAgain],
     needs: ['#console-panel-orders', '#console-panel-opponent', '#console-title'],
     run: (p, el) => {
       if (!el('#console-panel-orders').shown) return 'the Orders panel is not shown';
@@ -334,6 +346,26 @@ const CHECKS = Object.freeze([
         ? null
         : `the Ready tip is at ${fmt(t)}, outside the ${p.viewport.w}x${p.viewport.h} window`;
     },
+  },
+  {
+    name: 'console-collapsed-geometry',
+    scenes: [SCENES.consoleCollapsed],
+    needs: ['#sidebar', '#console-main', '#ready-btn'],
+    run: (p, el) => {
+      const s = el('#sidebar');
+      if (s.collapsed !== 'true') return `#sidebar data-collapsed is "${s.collapsed}"`;
+      if (!(near(s.w, CONSOLE_COLLAPSED_WIDTH) && near(s.x + s.w, p.viewport.w))) {
+        return `#sidebar is ${fmt(s)}, expected ${CONSOLE_COLLAPSED_WIDTH} wide on the right edge`;
+      }
+      if (el('#console-main').shown) return 'the console content column is still shown';
+      return el('#ready-btn').shown ? null : 'Ready is not shown while collapsed';
+    },
+  },
+  {
+    name: 'console-expands-on-tab-click',
+    scenes: [SCENES.consoleExpandedAgain],
+    needs: ['#sidebar'],
+    run: (p, el) => (el('#sidebar').collapsed === 'false' ? null : `#sidebar data-collapsed is "${el('#sidebar').collapsed}"`),
   },
 ]);
 

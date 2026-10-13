@@ -56,6 +56,7 @@ The tip can appear whenever the control can receive the pointer or keyboard focu
 - Orders tab: Show the selected unit and the orders queued for this turn or beat.
 - Opponent tab: Show the opponent's model, its tools, and the AI activity log.
 - Settings, Help, Build, and Forces: "<name> is not available in this version.", for example "Settings is not available in this version."
+- Collapse the console: Hide the console to widen the map. Click a tab to show it again.
 - API key: Enter your OpenRouter key, then click away or press Enter to save it. The key stays hidden after that; clear the field and leave it to forget the saved key.
 - Refresh models: Load the model list again. If that fails, the message appears in the AI activity log.
 - Run, while it cannot be clicked: Turn opponent planning on or off. Enter an API key and choose a model first.

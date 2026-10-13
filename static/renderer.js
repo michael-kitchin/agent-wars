@@ -23592,9 +23592,9 @@ ${bonuses}`;
   }
 
   // src/renderer/chrome/selectTabPanel.ts
-  function selectTabPanel(activeTabId2, tabs) {
+  function selectTabPanel(activeTabId, tabs) {
     for (const tab of tabs) {
-      const selected = tab.tabId === activeTabId2;
+      const selected = tab.tabId === activeTabId;
       const tabEl = document.getElementById(tab.tabId);
       const panelEl = document.getElementById(tab.panelId);
       tabEl?.setAttribute("aria-selected", selected ? "true" : "false");
@@ -33841,8 +33841,30 @@ ${bonuses}`;
     }
   }
 
-  // src/renderer/map/visibleMapFrame.ts
+  // src/renderer/map/mapContainerResize.ts
   var MAP_CONTAINER_ID = "canvas-container";
+  function observeMapContainerResize(onResize) {
+    let frameId = 0;
+    const schedule = () => {
+      if (frameId !== 0) return;
+      frameId = window.requestAnimationFrame(() => {
+        frameId = 0;
+        onResize();
+      });
+    };
+    window.addEventListener("resize", schedule);
+    const container = document.getElementById(MAP_CONTAINER_ID);
+    const observer = container && typeof ResizeObserver !== "undefined" ? new ResizeObserver(schedule) : null;
+    if (container) observer?.observe(container);
+    return () => {
+      window.removeEventListener("resize", schedule);
+      observer?.disconnect();
+      if (frameId !== 0) window.cancelAnimationFrame(frameId);
+      frameId = 0;
+    };
+  }
+
+  // src/renderer/map/visibleMapFrame.ts
   function syncFrameToVisibleMap(frame) {
     const rect = document.getElementById(MAP_CONTAINER_ID)?.getBoundingClientRect();
     const hasArea = rect !== void 0 && rect.width > 0 && rect.height > 0;
@@ -33852,19 +33874,8 @@ ${bonuses}`;
     frame.style.height = `${hasArea ? rect.height : window.innerHeight}px`;
   }
   function attachFrameToVisibleMap(frame) {
-    const sync = () => syncFrameToVisibleMap(frame);
-    sync();
-    const container = document.getElementById(MAP_CONTAINER_ID);
-    const observer = container && typeof ResizeObserver !== "undefined" ? new ResizeObserver(sync) : null;
-    if (container) observer?.observe(container);
-    window.addEventListener("resize", sync);
-    let attached = true;
-    return () => {
-      if (!attached) return;
-      attached = false;
-      observer?.disconnect();
-      window.removeEventListener("resize", sync);
-    };
+    syncFrameToVisibleMap(frame);
+    return observeMapContainerResize(() => syncFrameToVisibleMap(frame));
   }
 
   // src/renderer/gameplay/meleeInterceptModal.ts
@@ -34351,26 +34362,39 @@ ${bonuses}`;
     window.addEventListener("blur", hideUnitOriginTooltip);
   }
 
+  // src/shared/consoleTabState.ts
+  function nextConsoleTabState(current, clickedTabId) {
+    if (current.collapsed) return { activeTabId: clickedTabId, collapsed: false };
+    if (clickedTabId === current.activeTabId) return { activeTabId: current.activeTabId, collapsed: true };
+    return { activeTabId: clickedTabId, collapsed: false };
+  }
+
   // src/renderer/chrome/consoleFrame.ts
   var CONSOLE_TABS = Object.freeze([
     { tabId: "console-tab-orders", panelId: "console-panel-orders", title: "Orders" },
     { tabId: "console-tab-opponent", panelId: "console-panel-opponent", title: "Opponent", onShow: scrollOpenRouterLogToEnd }
   ]);
-  var activeTabId = CONSOLE_TABS[0].tabId;
+  var consoleState = { activeTabId: CONSOLE_TABS[0].tabId, collapsed: false };
   function applyConsoleState() {
-    selectTabPanel(activeTabId, CONSOLE_TABS);
-    const active2 = CONSOLE_TABS.find((tab) => tab.tabId === activeTabId);
+    selectTabPanel(consoleState.activeTabId, CONSOLE_TABS);
+    const active2 = CONSOLE_TABS.find((tab) => tab.tabId === consoleState.activeTabId);
     const title = document.getElementById("console-title");
     if (title && active2) title.textContent = active2.title;
-    active2?.onShow?.();
+    document.getElementById("sidebar")?.setAttribute("data-collapsed", consoleState.collapsed ? "true" : "false");
+    document.getElementById("console-collapse-btn")?.setAttribute("aria-expanded", consoleState.collapsed ? "false" : "true");
+    if (!consoleState.collapsed) active2?.onShow?.();
   }
   function wireConsoleFrame() {
     for (const tab of CONSOLE_TABS) {
       document.getElementById(tab.tabId)?.addEventListener("click", () => {
-        activeTabId = tab.tabId;
+        consoleState = nextConsoleTabState(consoleState, tab.tabId);
         applyConsoleState();
       });
     }
+    document.getElementById("console-collapse-btn")?.addEventListener("click", () => {
+      consoleState = { activeTabId: consoleState.activeTabId, collapsed: true };
+      applyConsoleState();
+    });
     applyConsoleState();
   }
 
@@ -35490,9 +35514,7 @@ ${bonuses}`;
         console.error("refreshRes4TerrainOverridesForRenderer failed:", err);
       });
     }
-    window.addEventListener("resize", () => {
-      deps.resizeAndRedraw();
-    });
+    observeMapContainerResize(() => deps.resizeAndRedraw());
     window.addEventListener("keydown", (e) => {
       if (e.key === "Escape") {
         if (tacticalBattlesDialogIsOpen()) return;

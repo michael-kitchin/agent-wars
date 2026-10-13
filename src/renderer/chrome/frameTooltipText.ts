@@ -32,3 +32,11 @@ export const opponentTabTooltipText = "Show the opponent's model, its tools, and
 export function unavailableTooltipText(name: string): string {
   return `${name} is not available in this version.`;
 }
+
+/**
+ * Purpose: Says collapsing widens the map and how to bring the console back.
+ * When to use: `#console-collapse-btn`.
+ * Expected outcome: The control tip shows this sentence.
+ * Exceptions: None.
+ */
+export const collapseConsoleTooltipText = 'Hide the console to widen the map. Click a tab to show it again.';

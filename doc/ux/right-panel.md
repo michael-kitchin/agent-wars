@@ -4,7 +4,7 @@ The console docked on the right of the map. It holds the Orders tab, the Opponen
 
 ## Purpose
 
-Keep orders, the opponent's model controls, and Ready in one place that stays usable during both theaters.
+Keep orders, the opponent's model controls, and Ready in one place that stays usable during both theaters, and let the player fold it away to widen the map.
 
 ## Availability
 
@@ -12,19 +12,23 @@ Shown in Strategic planning, Tactical planning, Resolution playback, the tactica
 
 ## Information Displayed
 
-- A tab rail on the panel's outer edge, with Orders, Opponent, Build, and Forces. Build and Forces are disabled in this version. The selected tab is marked.
-- A header with the selected tab's name.
+- A tab rail on the panel's outer edge, with Orders, Opponent, Build, and Forces. Build and Forces are disabled in this version. The selected tab is marked while the panel is expanded, and the mark is cleared while the panel is collapsed.
+- A header with the selected tab's name and a button that collapses the panel.
 - The Orders tab: the selected-unit readout, the Ranged and Strike controls, and the order lists. See [right-panel-command-bar.md](right-panel-command-bar.md) and [right-panel-selection-and-orders.md](right-panel-selection-and-orders.md).
 - The Opponent tab: the Tools tab and the Model tab, one shown at a time, with the AI activity log under them. See [right-panel-tools-tab.md](right-panel-tools-tab.md), [right-panel-model-tab.md](right-panel-model-tab.md), and [ai-activity-log.md](ai-activity-log.md).
 - A footer with Ready, under the tab content. See [right-panel-command-bar.md](right-panel-command-bar.md).
-- Control tips for the tabs are in [control-tooltips.md](control-tooltips.md).
+- While collapsed, only the tab rail and a smaller Ready show. While Ready reads "AI:" and a time, that label takes two lines.
+- Control tips for the tabs and the collapse button are in [control-tooltips.md](control-tooltips.md).
 
 ## Inputs and Responses
 
 ### Mouse
 
 - When the player clicks a tab other than the selected one, that tab's content shows and the header names it.
-- When the player clicks the selected tab, nothing changes.
+- When the player clicks the selected tab, the panel collapses to its rail.
+- When the player clicks the collapse button, the panel collapses to its rail.
+- When the player clicks any tab while the panel is collapsed, the panel expands on that tab.
+- The map takes the width the panel gives up, and gives it back when the panel expands.
 - Inside the Opponent tab, clicking Tools or Model shows that sub-tab. Turning Run on also selects the Tools sub-tab. See [right-panel-model-tab.md](right-panel-model-tab.md).
 
 ### Keyboard
@@ -33,13 +37,14 @@ Shown in Strategic planning, Tactical planning, Resolution playback, the tactica
 
 ### Other
 
-- The panel starts on the Orders tab. Inside the Opponent tab, the Model sub-tab is selected first.
-- The selected tab lasts until the app closes. It is not saved.
+- The panel starts expanded on the Orders tab. Inside the Opponent tab, the Model sub-tab is selected first.
+- The selected tab, and whether the panel is collapsed, last until the app closes. Neither is saved.
 
 ## States
 
-- Orders tab selected: the start state.
-- Opponent tab selected.
+- Expanded on Orders: the start state.
+- Expanded on Opponent.
+- Collapsed: only the rail and Ready show. The last selected tab is remembered.
 - Absent: New game and Game over, including while the new-game form is hidden. The map fills the window.
 - Pointer input off: the tactical battles list, and Tactical annihilation.
 
@@ -47,8 +52,8 @@ Shown in Strategic planning, Tactical planning, Resolution playback, the tactica
 
 - The panel is never hidden just because a tactical battle is active.
 - The panel is absent for the whole New game and Game over overlay, and present again as soon as that overlay closes.
-- Exactly one tab's content shows.
-- Ready is on screen whenever the panel is.
+- Exactly one tab's content shows while the panel is expanded.
+- Ready is on screen whenever the panel is, expanded or collapsed.
 - Build and Forces never open a tab in this version.
 
 ## Strategic and Tactical Differences
@@ -76,8 +81,10 @@ None.
 
 ## Code Entry Points
 
-- `static/index.html` (`#sidebar`, `#console-main`, `#console-title`, `#console-panel-orders`, `#console-panel-opponent`, `#console-rail`, `#console-tab-orders`, `#console-tab-opponent`, `#console-tab-build`, `#console-tab-forces`, `#console-footer`, `#openrouter-tab-tools`, `#openrouter-tab-model`)
+- `static/index.html` (`#sidebar`, `#console-main`, `#console-title`, `#console-collapse-btn`, `#console-panel-orders`, `#console-panel-opponent`, `#console-rail`, `#console-tab-orders`, `#console-tab-opponent`, `#console-tab-build`, `#console-tab-forces`, `#console-footer`, `#openrouter-tab-tools`, `#openrouter-tab-model`)
 - `static/frameChrome.css`
 - `src/renderer/chrome/consoleFrame.ts`
+- `src/shared/consoleTabState.ts`
+- `src/renderer/map/mapContainerResize.ts`
 - `src/renderer/openRouter/openRouterControls.ts`
 - `src/renderer/tactical/tacticalUiOrchestration.ts`

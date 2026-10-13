@@ -225,10 +225,11 @@
       <button type="button" id="tactical-exit-btn" class="tactical-exit-btn" aria-label="Exit battle">Exit Battle</button>
     </div>
   </div>
-  <aside id="sidebar" class="console" aria-label="Console">
+  <aside id="sidebar" class="console" aria-label="Console" data-collapsed="false">
     <div id="console-main" class="console-main">
       <div class="console-header">
         <h2 id="console-title" class="console-title">Orders</h2>
+        <button type="button" id="console-collapse-btn" class="console-collapse-btn" aria-label="Collapse the console" aria-controls="sidebar" aria-expanded="true" data-control-tooltip="Hide the console to widen the map. Click a tab to show it again."><svg class="chrome-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3l5 5-5 5"></path></svg></button>
       </div>
       <section id="console-panel-orders" class="console-panel active" role="tabpanel" aria-labelledby="console-tab-orders">
         <p><strong>Selected unit</strong><br><span id="sidebar-selected-unit">—</span></p>
