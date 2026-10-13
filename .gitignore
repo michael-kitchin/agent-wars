@@ -25,3 +25,6 @@ __pycache__/
 data/generated/**/*.json
 data/generated/**/*.csv
 !data/generated/**/*.zip
+
+# UI smoke run output (screenshots and report.json)
+.test/

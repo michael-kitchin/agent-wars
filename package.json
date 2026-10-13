@@ -18,6 +18,7 @@
     "check:circular": "node scripts/check-circular-deps.cjs",
     "verify:modularization": "npm run build:main && npm run build:renderer && npm run lint && npm run check:renderer-types && npm run check:circular && node scripts/run-main-node-tests.cjs --manifest scripts/verify-modularization-tests.manifest",
     "start": "npm run generated:extract && npm run rebuild:native:electron && electron .",
+    "ui:smoke": "npm run build && npm run rebuild:native:electron && node scripts/ui-smoke/ui-smoke.cjs",
     "rebuild:native": "npm run rebuild:native:electron",
     "rebuild:native:electron": "node scripts/rebuild-native.cjs --runtime=electron",
     "rebuild:native:node": "node scripts/rebuild-native.cjs --runtime=node",
@@ -95,6 +96,7 @@
     "electron-builder": "^25.0.0",
     "esbuild": "^0.27.3",
     "eslint": "^9.16.0",
+    "playwright-core": "1.62.0",
     "typescript": "^5.7.2",
     "typescript-eslint": "^8.16.0"
   },

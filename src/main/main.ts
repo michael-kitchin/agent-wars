@@ -58,6 +58,7 @@ import {
   TOOL_GROUP_REGISTRY,
 } from './openRouter/openRouter';
 import { logDebug, logError } from './logger';
+import { applyUserDataDirOverride } from './userDataDirOverride';
 import { parseBonusLevel } from '../shared/bonusLevel';
 import { parseGameSize } from '../shared/gameSize';
 import {
@@ -553,6 +554,7 @@ function registerIpcHandlers(): void {
 }
 
 applyVersionedAppName();
+applyUserDataDirOverride(app);
 
 process.on('uncaughtException', (err) => {
   logError('main uncaughtException', { message: err?.message ?? String(err), stack: err?.stack ?? null });

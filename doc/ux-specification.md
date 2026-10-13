@@ -18,6 +18,8 @@ Visual styling and the arrangement of items inside an element are out of scope. 
 4. If your change alters user-visible behavior, update the requirement text in the same change.
 5. If the spec is silent or ambiguous, add an Open Question rather than inventing a requirement.
 
+`npm run ui:smoke` checks the layout after a change. It builds the app, starts it in Electron with a throwaway user-data folder (the `AGENT_WARS_USER_DATA_DIR` environment variable), plays one fixed global match, and writes numbered screenshots and `report.json` to `.test/ui-smoke/<label>/`. Pass `-- --label <name>` to name that folder. It prints one PASS or FAIL line per check and exits with an error when any check fails. The checks are in `scripts/ui-smoke/ui-smoke-checks.cjs`; add one there when a layout rule needs a machine check.
+
 ## Routing Table
 
 | If you are changing | Read first | Then read |
