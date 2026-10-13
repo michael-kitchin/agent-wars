@@ -100,6 +100,37 @@ body:has(#game-over-overlay:not(.hidden)) #sidebar {
   background: var(--player-opponent);
   box-shadow: 0 0 0 2px var(--chrome-opponent-edge);
 }
+.topbar-stat {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex: none;
+  padding: 0 12px;
+  border-left: 1px solid var(--chrome-divider);
+}
+.topbar-stat-caption {
+  color: var(--chrome-muted);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.topbar-stat-value {
+  font-size: 14px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.topbar-stat-suffix {
+  color: var(--chrome-muted);
+  font-size: 11px;
+  font-weight: 500;
+}
+/* Narrow windows keep the numbers. Each readout's tip still names it. */
+@media (max-width: 1359px) {
+  .topbar-stat-caption {
+    display: none;
+  }
+}
 .topbar-spacer {
   flex: 1 1 auto;
   min-width: 8px;

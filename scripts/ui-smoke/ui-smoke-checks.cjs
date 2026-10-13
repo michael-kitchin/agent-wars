@@ -367,6 +367,34 @@ const CHECKS = Object.freeze([
     needs: ['#sidebar'],
     run: (p, el) => (el('#sidebar').collapsed === 'false' ? null : `#sidebar data-collapsed is "${el('#sidebar').collapsed}"`),
   },
+  {
+    name: 'topbar-stats',
+    scenes: [SCENES.strategic],
+    needs: [
+      '#topbar-stat-production',
+      '#topbar-stat-forces',
+      '#topbar-stat-forces-cap',
+      '#topbar-stat-human-home',
+      '#topbar-stat-human-home-total',
+      '#topbar-stat-opponent-home',
+      '#topbar-stat-opponent-home-total',
+    ],
+    run: (p, el) => {
+      const text = (selector) => el(selector).text;
+      const problems = [];
+      if (!/^\+[\d,]+$/.test(text('#topbar-stat-production'))) problems.push(`production "${text('#topbar-stat-production')}"`);
+      if (!/^\d+$/.test(text('#topbar-stat-forces')) || text('#topbar-stat-forces-cap') !== '/34') {
+        problems.push(`forces "${text('#topbar-stat-forces')}${text('#topbar-stat-forces-cap')}" (cap should be /34)`);
+      }
+      if (!/^\d+$/.test(text('#topbar-stat-human-home')) || text('#topbar-stat-human-home-total') !== '/15') {
+        problems.push(`your home "${text('#topbar-stat-human-home')}${text('#topbar-stat-human-home-total')}" (total should be /15)`);
+      }
+      if (!/^\d+$/.test(text('#topbar-stat-opponent-home')) || text('#topbar-stat-opponent-home-total') !== '/24') {
+        problems.push(`enemy home "${text('#topbar-stat-opponent-home')}${text('#topbar-stat-opponent-home-total')}" (total should be /24)`);
+      }
+      return problems.length === 0 ? null : problems.join('; ');
+    },
+  },
 ]);
 
 /**

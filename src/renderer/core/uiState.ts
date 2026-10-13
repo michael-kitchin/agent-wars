@@ -44,7 +44,7 @@ export function updateSidebar(
  *
  * Purpose: Keeps the name every caller already uses; the old Phase and Turn lines now live in the top bar.
  * When to use: After `applyGameStateSnapshot`, tactical entry/exit, tactical Ready commit, and when beat playback ends.
- * Expected outcome: The top bar's sides and date block match `state` and the current battle. Null shows em dashes.
+ * Expected outcome: The top bar's sides, readouts, and date block match `state` and the current battle. Null shows em dashes.
  * Exceptions: None.
  */
 export function updateGameStateSidebar(state: GameStateSnapshot | null): void {

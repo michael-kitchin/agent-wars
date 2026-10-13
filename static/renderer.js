@@ -21438,6 +21438,12 @@ ${bonuses}`;
     return html + escapeHtmlText(text.slice(cursor));
   }
 
+  // src/shared/progressFormatting.ts
+  function computeRoundedPercentage(numerator, denominator) {
+    if (denominator <= 0) return 0;
+    return Math.round(numerator / denominator * 100);
+  }
+
   // src/shared/homeRegionRules.ts
   function resolveHomeRegionOwnerIdentity(input) {
     const inHuman = (input.humanHomeRegionHexes ?? []).includes(input.h3Index);
@@ -21490,6 +21496,14 @@ ${bonuses}`;
     if (input.controllerPlayerId === "human") return "normalControlledByHuman";
     if (input.controllerPlayerId === "opponent") return "normalControlledByOpponent";
     return "none";
+  }
+  function countControlledHexesInRegion(controlRows, regionHexes, playerId) {
+    const uniqueRegionHexes = uniqueSortedHexes(regionHexes ?? []);
+    const controlByHex = new Map(controlRows.map((row) => [row.h3Index, row.controllerPlayerId]));
+    const controlled = uniqueRegionHexes.filter((h3Index) => controlByHex.get(h3Index) === playerId).length;
+    const total = uniqueRegionHexes.length;
+    const pct = computeRoundedPercentage(controlled, total);
+    return { controlled, total, pct };
   }
 
   // src/shared/statusIconHtml.ts
@@ -25591,6 +25605,53 @@ ${bonuses}`;
     return { date, turnPhase: `Turn ${args.turnNumber} \xB7 ${args.strategicPhaseLabel}` };
   }
 
+  // src/shared/topBarStats.ts
+  function computeTopBarStats(input, isNeutralBorder = isNeutralBorderHex) {
+    const control = input.strategicControl ?? [];
+    const humanHexes = new Set(control.filter((row) => row.controllerPlayerId === "human").map((row) => row.h3Index));
+    const productionPerTurn = (input.strategicInfrastructure ?? []).filter((row) => humanHexes.has(row.h3Index) && !isNeutralBorder(row.h3Index)).reduce((sum, row) => sum + Math.max(0, Math.trunc(row.urbanHexCount)), 0);
+    const fieldedByType = getPlayerUnitCountsByType(Array.from(input.units), "human");
+    const capByType = getMaxUnitsPerType(parseGameSize(input.gameSize));
+    const unitsFielded = ALL_BUILD_UNIT_TYPES.reduce((sum, unitType) => sum + fieldedByType[unitType], 0);
+    const unitCap = ALL_BUILD_UNIT_TYPES.reduce((sum, unitType) => sum + capByType[unitType], 0);
+    const controlRows = Array.from(control);
+    const humanHome = countControlledHexesInRegion(controlRows, input.humanHomeRegionHexes, "human");
+    const opponentHome = countControlledHexesInRegion(controlRows, input.aiHomeRegionHexes, "human");
+    return {
+      productionPerTurn,
+      fieldedByType,
+      capByType,
+      unitsFielded,
+      unitCap,
+      humanHome: { held: humanHome.controlled, total: humanHome.total },
+      opponentHome: { held: opponentHome.controlled, total: opponentHome.total }
+    };
+  }
+  function formatCount(value) {
+    return value.toLocaleString("en-US");
+  }
+  function formatTopBarStatParts(stats) {
+    return {
+      production: `+${formatCount(stats.productionPerTurn)}`,
+      forces: formatCount(stats.unitsFielded),
+      forcesCap: `/${formatCount(stats.unitCap)}`,
+      humanHome: formatCount(stats.humanHome.held),
+      humanHomeTotal: `/${formatCount(stats.humanHome.total)}`,
+      opponentHome: formatCount(stats.opponentHome.held),
+      opponentHomeTotal: `/${formatCount(stats.opponentHome.total)}`
+    };
+  }
+  function formatForcesBreakdown(stats) {
+    return ALL_BUILD_UNIT_TYPES.map(
+      (unitType) => `${unitType} ${formatCount(stats.fieldedByType[unitType])} of ${formatCount(stats.capByType[unitType])}`
+    ).join(", ");
+  }
+
+  // src/renderer/chrome/frameTooltipText.ts
+  function forcesStatTooltipText(breakdown) {
+    return `Units you have fielded, out of the most this game size allows: ${breakdown}.`;
+  }
+
   // src/renderer/chrome/topBar.ts
   function formatStrategicPhaseLabel(phase) {
     if (!phase) return phase;
@@ -25621,8 +25682,31 @@ ${bonuses}`;
     }
     setText("topbar-turn-phase", text.turnPhase);
   }
+  function renderTopBarStats(state) {
+    if (!state) {
+      for (const id of ["topbar-stat-production", "topbar-stat-forces", "topbar-stat-human-home", "topbar-stat-opponent-home"]) {
+        setText(id, "\u2014");
+      }
+      for (const id of ["topbar-stat-production-suffix", "topbar-stat-forces-cap", "topbar-stat-human-home-total", "topbar-stat-opponent-home-total"]) {
+        setText(id, "");
+      }
+      return;
+    }
+    const stats = computeTopBarStats(state);
+    const parts = formatTopBarStatParts(stats);
+    setText("topbar-stat-production", parts.production);
+    setText("topbar-stat-production-suffix", "/turn");
+    setText("topbar-stat-forces", parts.forces);
+    setText("topbar-stat-forces-cap", parts.forcesCap);
+    setText("topbar-stat-human-home", parts.humanHome);
+    setText("topbar-stat-human-home-total", parts.humanHomeTotal);
+    setText("topbar-stat-opponent-home", parts.opponentHome);
+    setText("topbar-stat-opponent-home-total", parts.opponentHomeTotal);
+    document.getElementById("topbar-stat-forces-host")?.setAttribute("data-control-tooltip", forcesStatTooltipText(formatForcesBreakdown(stats)));
+  }
   function renderTopBarStatus(state) {
     renderTopBarSides(state);
+    renderTopBarStats(state);
     renderTopBarDateBlock(state);
   }
 

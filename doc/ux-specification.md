@@ -33,7 +33,7 @@ Visual styling and the arrangement of items inside an element are out of scope. 
 | The stack callout | [selection-model.md](ux/selection-model.md), [input-map.md](ux/input-map.md) | [stack-callout.md](ux/stack-callout.md) |
 | Single-hex build | [input-map.md](ux/input-map.md), [modes-and-transitions.md](ux/modes-and-transitions.md) | [build-popup.md](ux/build-popup.md) |
 | Multi-hex build | [build-popup.md](ux/build-popup.md) | [multi-hex-build-popup.md](ux/multi-hex-build-popup.md) |
-| The top bar or its date block | [modes-and-transitions.md](ux/modes-and-transitions.md) | [top-bar.md](ux/top-bar.md) |
+| The top bar, its readouts, or its date block | [modes-and-transitions.md](ux/modes-and-transitions.md) | [top-bar.md](ux/top-bar.md) |
 | The right panel as a whole, its tabs, or collapsing it | [modes-and-transitions.md](ux/modes-and-transitions.md) | [right-panel.md](ux/right-panel.md) |
 | Ready, Ranged, or Strike | [selection-model.md](ux/selection-model.md), [order-lifecycle.md](ux/order-lifecycle.md), [modes-and-transitions.md](ux/modes-and-transitions.md) | [right-panel-command-bar.md](ux/right-panel-command-bar.md) |
 | Selected unit or order lists | [order-lifecycle.md](ux/order-lifecycle.md), [selection-model.md](ux/selection-model.md) | [right-panel-selection-and-orders.md](ux/right-panel-selection-and-orders.md) |
@@ -81,7 +81,7 @@ Element documents share a fixed heading set:
 - [stack-callout.md](ux/stack-callout.md): the list of units in a hex, the Bonuses tooltip, and how the list changes the selection.
 - [build-popup.md](ux/build-popup.md): the single-hex build queue popup and the markers that open it.
 - [multi-hex-build-popup.md](ux/multi-hex-build-popup.md): the build queue popup used when several build hexes are selected together.
-- [top-bar.md](ux/top-bar.md): the bar across the top: the two sides and the date block.
+- [top-bar.md](ux/top-bar.md): the bar across the top: the two sides, the Production, Forces, and home readouts, and the date block.
 - [right-panel.md](ux/right-panel.md): the console docked on the right: its tab rail, collapsing it, and the footer that holds Ready.
 - [right-panel-command-bar.md](ux/right-panel-command-bar.md): Ready, Ranged, and air strike controls.
 - [right-panel-selection-and-orders.md](ux/right-panel-selection-and-orders.md): the selected-unit readout and the movement, ranged, and air-strike lists.

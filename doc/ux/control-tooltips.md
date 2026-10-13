@@ -8,7 +8,7 @@ Say why the player would use the control, and state a limit only when the player
 
 ## Availability
 
-The tip can appear whenever the control can receive the pointer or keyboard focus. A control inside a surface that has pointer input turned off cannot show it. A disabled control still shows its tip when the pointer can rest on it. That includes Ready while its label reads "AI:", Run before a key and model are set, a reasoning list with fewer than two levels, a sealift slot that cannot be changed, Fight before a row is chosen, Keep building when it cannot be turned on, and Exit Battle while a battle turn is resolving or playing back. It also includes every disabled placeholder: Settings and Help in the top bar, and the Build and Forces tabs.
+The tip can appear whenever the control can receive the pointer or keyboard focus. A control inside a surface that has pointer input turned off cannot show it. A disabled control still shows its tip when the pointer can rest on it. That includes Ready while its label reads "AI:", Run before a key and model are set, a reasoning list with fewer than two levels, a sealift slot that cannot be changed, Fight before a row is chosen, Keep building when it cannot be turned on, and Exit Battle while a battle turn is resolving or playing back. It also includes every disabled placeholder: Settings and Help in the top bar, and the Build and Forces tabs. The top bar's four readouts show a tip the same way, though they are not controls.
 
 ## Information Displayed
 
@@ -57,6 +57,10 @@ The tip can appear whenever the control can receive the pointer or keyboard focu
 - Opponent tab: Show the opponent's model, its tools, and the AI activity log.
 - Settings, Help, Build, and Forces: "<name> is not available in this version.", for example "Settings is not available in this version."
 - Collapse the console: Hide the console to widen the map. Click a tab to show it again.
+- Production readout: The production your cities can add each turn. A city adds its share only while it is building, and a city on the neutral border adds none.
+- Forces readout: Units you have fielded, out of the most this game size allows: then each unit type as "infantry 3 of 12", separated by commas, ending with a period.
+- Your home readout: Hexes of your home region that you hold, out of all its hexes.
+- Enemy home readout: Hexes of the opponent's home region that you hold, out of all its hexes.
 - API key: Enter your OpenRouter key, then click away or press Enter to save it. The key stays hidden after that; clear the field and leave it to forget the saved key.
 - Refresh models: Load the model list again. If that fails, the message appears in the AI activity log.
 - Run, while it cannot be clicked: Turn opponent planning on or off. Enter an API key and choose a model first.
