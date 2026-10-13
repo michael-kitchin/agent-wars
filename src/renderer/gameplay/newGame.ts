@@ -351,10 +351,10 @@ export function registerNewGameButton(deps: NewGameDeps): void {
 }
 
 /**
- * Opens the new-game dialog mid-match from the Model tab.
+ * Opens the new-game dialog mid-match from the game menu.
  *
  * Purpose: Lets the player abandon the current match; stops pending AI work first so it cannot land on the new one.
- * When to use: The Model tab's New game button.
+ * When to use: The game menu's New game item.
  * Expected outcome: Returns false when the annihilation dialog is open. Otherwise opponent planning and playback stop
  *   immediately, a tactical preview is released, Fog of war
  *   and the bonus dropdowns return to their defaults, the home regions, starting month, and map preview are drawn

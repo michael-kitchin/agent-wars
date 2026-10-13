@@ -27,6 +27,7 @@ Tell an agent which input does what, and which binding wins when two surfaces co
 | W, A, S, D, and the arrow keys | Not typing in a field, and no Shift, Control, Alt, or Meta | Pans the map. Holding a key keeps panning. Opposite keys cancel. W and Up are the same direction and can be held together. | [map-surface.md](map-surface.md) |
 | T | Same as pan | Hides terrain fill while held. On the strategic map, outside battle-detail zoom, also shows hex codes, hides the weather icon, and shows the tech icon where [map-surface.md](map-surface.md) says it applies. Restores the fill, removes the codes, and restores the weather icon on release. While the new-game overlay is open, the hold draws the global preview's strategic hex grid, and it does not show hex codes or production labels. A regional preview keeps its hex grid. Weather and tech follow [new-game-dialog.md](new-game-dialog.md). | [map-surface.md](map-surface.md) |
 | Shift | Key down or up | Key down refreshes an open stack callout. Key up closes it, including one that is scheduled but not open yet. Shift-click on a unit icon whose hex has one selectable human unit toggles that unit and does not open the callout. Shift-click on an icon with two or more selectable human units, or with none, schedules the callout when a plain click would, and does not toggle a unit. | [selection-model.md](selection-model.md) |
+| Escape | Game menu open | Closes the game menu and moves focus to its button. Does nothing else. | [game-menu.md](game-menu.md) |
 | Escape | Build popup open | Closes the build popup and does not also close the stack callout. | [build-popup.md](build-popup.md) |
 | Escape | Stack callout open, build popup closed | Closes the stack callout, including one that is scheduled but not open yet. | [stack-callout.md](stack-callout.md) |
 | Escape | Tactical battles list open | Chooses Ignore and does nothing else. | [tactical-battles-list.md](tactical-battles-list.md) |
@@ -42,7 +43,7 @@ Keys other than these do not pan, toggle terrain, or close popups.
 - Hiding the window stops keyboard pan.
 - Holding Shift, Control, Alt, or Meta stops keyboard pan and does not start a new pan.
 - Key repeat does not start another pan or another terrain hold.
-- Escape closes the build popup before the stack callout. While the tactical battles list is open, Escape only chooses Ignore. A build popup or stack callout under the dialog stays as it is.
+- Escape closes the game menu first, then the build popup, then the stack callout. While the tactical battles list is open, Escape only chooses Ignore. A build popup or stack callout under the dialog stays as it is.
 - Holding T is a deliberate inspection gesture. Terrain fill stays hidden while the key is down. On the strategic map, outside battle-detail zoom, the hex codes stay up, the weather icon is hidden, and the tech icon is shown when [map-surface.md](map-surface.md) says it applies. Releasing the key restores the fill, removes the codes, and restores the weather icon. Window blur does the same. While the new-game overlay is open, that hold follows [new-game-dialog.md](new-game-dialog.md): it draws the global preview's hex grid, and it does not show hex codes or production labels. A regional preview keeps its hex grid.
 - The map's own keyboard handling is off, so the pan keys above are the only keyboard pan.
 

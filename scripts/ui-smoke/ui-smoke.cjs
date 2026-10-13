@@ -162,12 +162,11 @@ async function startScenarioMatch(page) {
  *
  * Purpose: The last scene checks the overlay opened from a match, not only at startup.
  * When to use: For the last scene.
- * Expected outcome: The console's Opponent tab and its Model sub-tab are selected, New is clicked, and the overlay is open.
+ * Expected outcome: The game menu is opened, New game is clicked, and the overlay is open.
  * Exceptions: Throws a Playwright timeout when a control is missing or the overlay does not open.
  */
 async function openNewGameOverlay(page) {
-  await page.click('#console-tab-opponent');
-  await page.click('#openrouter-tab-model');
+  await page.click('#game-menu-btn');
   await page.click('#openrouter-new-btn');
   await waitForNewGameOverlay(page);
   await page.waitForTimeout(SETTLE_MS.click);
@@ -255,6 +254,20 @@ async function runScenes(app, page, report, outDir) {
   await parkPointer(page);
   await page.waitForTimeout(SETTLE_MS.resize);
   await recordScene(page, report, outDir, SCENES.consoleExpandedAgain);
+
+  await page.click('#game-menu-btn');
+  await parkPointer(page);
+  await page.waitForTimeout(SETTLE_MS.click);
+  await recordScene(page, report, outDir, SCENES.gameMenuOpen);
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(SETTLE_MS.click);
+  await recordScene(page, report, outDir, SCENES.gameMenuEscape);
+  await page.click('#game-menu-btn');
+  await page.waitForTimeout(SETTLE_MS.click);
+  // Empty top-bar space is outside the menu, and a click there does nothing else.
+  await page.click('#app-topbar .topbar-spacer');
+  await page.waitForTimeout(SETTLE_MS.click);
+  await recordScene(page, report, outDir, SCENES.gameMenuOutside);
 
   await openNewGameOverlay(page);
   await recordScene(page, report, outDir, SCENES.newGameReopened);

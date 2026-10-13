@@ -8,11 +8,11 @@ Collect the settings for a match, and later tell the player who won.
 
 ## Availability
 
-Opens in New game and in Game over. See [modes-and-transitions.md](modes-and-transitions.md). It opens at startup when no match is loaded, when the player clicks New, and when the match ends. It cannot be dismissed without starting a match. The top bar and the right panel are not on screen while it is open, including while the form is hidden, and the map fills the window. While the form is showing, the map does not accept pointer input either. While the form is hidden, drag and the wheel pan and zoom the preview.
+Opens in New game and in Game over. See [modes-and-transitions.md](modes-and-transitions.md). It opens at startup when no match is loaded, when the player clicks New game in the game menu, and when the match ends. It cannot be dismissed without starting a match. The top bar and the right panel are not on screen while it is open, including while the form is hidden, and the map fills the window. While the form is showing, the map does not accept pointer input either. While the form is hidden, drag and the wheel pan and zoom the preview.
 
 ## Information Displayed
 
-- A message: "Start the global game when ready." or "Start the regional game when ready." at startup, "Start a new global game when ready." or "Start a new regional game when ready." after New, and "You win!" or "You lose." The startup and New sentences follow the selected tab. Game over does not.
+- A message: "Start the global game when ready." or "Start the regional game when ready." at startup, "Start a new global game when ready." or "Start a new regional game when ready." after New game, and "You win!" or "You lose." The startup and New game sentences follow the selected tab. Game over does not.
 - Global and Regional tabs. Opening the overlay selects Global when no match is loaded or the loaded match is global, and Regional when the loaded match is a region. Game size, the four bonuses, fog of war, and the starting month stay outside the tabs.
 - On Global: a human home-region choice and a randomize control labeled "Randomize human home region". That dropdown, the AI home-region dropdown, and the regional region dropdown share one closed width, wide enough for the longest name in any of those three lists. Choosing a shorter name does not shrink the dropdown. The randomize control is a square button the same height as that dropdown.
 - On Global: an AI home-region choice and a randomize control labeled "Randomize AI home region". The dropdown is the same width as the human home-region dropdown. The randomize control is a square button the same height as that dropdown, in the opponent rose from the [UI style guide](../ui-style-guide.md). The two home regions may match.
@@ -21,7 +21,7 @@ Opens in New game and in Game over. See [modes-and-transitions.md](modes-and-tra
 - A game-size choice. The dropdown sits on the same line as its label, to the right, with the same gap as each bonus dropdown, and only as wide as its longest item. Under that dropdown, a line reads `Advanced tech: $N+ hexes`. On Global, N is the world map's threshold. On Regional, N is the selected region's threshold, and it changes with the region.
 - Cap badges for infantry, armor, naval, and air: gray disks with the map glyphs drawn dark. The numbers are in [game size and unit caps](../game-size-unit-caps.md).
 - Two option lines. The first line is Origin bonus, a slash (/) with a small space on each side, then Tech bonus. The second line is Terrain bonus, a slash the same way, then Weather bonus. When a narrow window wraps a line, a slash that would sit at the start or end of that line is hidden. Each label ends with a colon, for example "Tech bonus:". Each dropdown lists Off, Low, and High. Whenever the overlay opens, every dropdown is set to Low. Each dropdown is independent. The next row starts with a Fog of war checkbox, then a slash (/) with a small space on each side, then a "Starting month:" control that lists the full English month names and is only as wide as its longest month. Whenever the overlay opens, Fog of war is checked and that control shows a random month, the same way the home regions are drawn. To the right of the month is a randomize control labeled "Randomize starting month", a square button the same height and color as the human home-region randomize button. The bonus rules for each level are in [combat rules §4.9](../combat-rules-v3.md).
-- A button labeled "Start game" when no match is loaded or when New opened the overlay, and "New game" when the match is over.
+- A button labeled "Start game" when no match is loaded or when New game opened the overlay, and "New game" when the match is over.
 - A square button in the dialog's upper-left corner, the same size as a randomize button. While the form is showing it displays a dash, the same mark as a remove-select button. While the form is hidden it displays a plus, the same mark as an add-select button, and it is the only part of the dialog still on screen. Whenever the overlay opens, the form is showing.
 - Control tips for these choices and those buttons are in [control-tooltips.md](control-tooltips.md).
 - The map behind the overlay shows the selected tab's preview. Global frames the Mercator world one zoom level closer than that world fit. Regional frames the selected region, including sea and neutral-border hexes. Global draws the selected home regions with the same terrain fills a started match uses on those hexes, and leaves the rest of the strategic hex grid undrawn until the player holds T. Holding T draws that grid, with those same fills and strokes. A regional preview always draws its strategic hex grid, with those same fills and strokes. The human and AI home areas are highlighted with the same rings a match in progress uses: an exclusive home uses that player's color for both rings, and a shared or identical home uses the gray overlap rings. Weather icons sit on the same band as in a match, on every strategic hex of the preview, and follow the selected starting month while Weather bonus is Low or High. Low and High use the same glyph. Off hides the icons. Holding T hides the weather icons. While T is held and Tech bonus is Low or High, each strategic hex whose original urban count can produce units shows that map's tech icon, Basic or Advanced, on the same band. Low and High use the same glyph. Off hides the tech icons. Battle-detail zoom of that map's strategic hexes hides the weather icons and the tech icons. The preview draws no units, hex codes, production labels, build markers, battle-entry markers, or other match chrome. Fog of war does not hide the preview icons. Basic and Advanced follow that map's Advanced threshold, the same N as the Advanced tech line. Opening the overlay frames the main map to that extent. Changing a home does not move the view. Changing the tab or the regional region does. The overlay has no dark veil. Its upper-left corner is the minimap's usual corner, 12px from the top and left of the map pane. The minimap, the terrain legend, and the map's + and − zoom control are hidden until the overlay closes. A short or narrow map pane scrolls the dialog, and the form keeps its size.
@@ -53,20 +53,20 @@ Opens in New game and in Game over. See [modes-and-transitions.md](modes-and-tra
 ## States
 
 - Hidden: a match is in progress and not over.
-- Open for a new match: no match, or the player clicked New.
+- Open for a new match: no match, or the player clicked New game.
 - Open for game over: the match has a winner. The button reads "New game".
 
 ## Invariants
 
 - The overlay never closes itself. Only a successful start closes it.
 - Whenever the overlay opens, the form is showing. A refresh while the overlay stays open leaves a hidden form hidden.
-- The startup, New, and game-over messages stay distinct from each other.
+- The startup, New game, and game-over messages stay distinct from each other.
 - Fog of war is checked and Origin bonus, Tech bonus, Terrain bonus, and Weather bonus are all at Low every time the overlay opens, including game over. The starting month is a new random month every time the overlay opens, including game over.
 - Starting a match clears the previous selection and drafts.
 
 ## Strategic and Tactical Differences
 
-New opens this overlay during strategic planning, tactical planning, and resolution playback in either theater. It does not open while the tactical annihilation dialog is open, or while the tactical battles list is open, because those dialogs already take the window. Opening it stops opponent planning and playback immediately. The current match is replaced when Start succeeds. Starting a match ends any tactical session and returns to Strategic planning.
+New game, in the game menu, opens this overlay during strategic planning, tactical planning, and resolution playback in either theater. It does not open while the tactical annihilation dialog is open, or while the tactical battles list is open, because those dialogs already take the window. Opening it stops opponent planning and playback immediately. The current match is replaced when Start succeeds. Starting a match ends any tactical session and returns to Strategic planning.
 
 ## Related Documents
 

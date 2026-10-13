@@ -13,6 +13,7 @@
 </head>
 <body>
   <header id="app-topbar" aria-label="Match status">
+    <button type="button" id="game-menu-btn" class="topbar-icon-btn topbar-menu-btn" aria-label="Game menu" aria-haspopup="true" aria-expanded="false" aria-controls="game-menu" data-control-tooltip="Open the game menu to start a new game, choose whether Ready offers tactical battles, or quit."><svg class="chrome-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 4h12M2 8h12M2 12h12"></path></svg></button>
     <div class="topbar-sides">
       <span class="topbar-side-mark topbar-side-mark-human" aria-hidden="true"></span>
       <span id="topbar-human-side" class="topbar-side-name">—</span>
@@ -44,6 +45,16 @@
     <span class="control-tooltip-host" data-control-tooltip="Settings is not available in this version."><button type="button" id="topbar-settings-btn" class="topbar-icon-btn" aria-label="Settings" disabled><svg class="chrome-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 4h6.5M12.5 4H14M2 8h1.5M7.5 8H14M2 12h8.5"></path><circle cx="10.5" cy="4" r="1.8"></circle><circle cx="5.5" cy="8" r="1.8"></circle><circle cx="12.3" cy="12" r="1.8"></circle></svg></button></span>
     <span class="control-tooltip-host" data-control-tooltip="Help is not available in this version."><button type="button" id="topbar-help-btn" class="topbar-icon-btn" aria-label="Help" disabled><svg class="chrome-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.3"></circle><path d="M6.3 6.2a1.8 1.8 0 1 1 2.5 1.7c-.5.2-.8.6-.8 1.1v.5M8 11.4v.1"></path></svg></button></span>
   </header>
+  <div id="game-menu" class="game-menu" role="group" aria-label="Game menu" hidden>
+    <button type="button" id="openrouter-new-btn" class="game-menu-item" data-control-tooltip="Open the new-game screen. Opponent planning and any playback stop right away; the current match is replaced when you start the new one."><svg class="chrome-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3v10M3 8h10"></path></svg>New game…</button>
+    <span class="control-tooltip-host game-menu-host" data-control-tooltip="Saving to a file is not available in this version. The match in progress is kept on disk between sessions."><button type="button" id="game-menu-save-btn" class="game-menu-item" disabled><svg class="chrome-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 2.5h8l3 3v8h-11zM5 2.5v3.5h5V2.5M5 13.5V9.5h6v4"></path></svg>Save game…</button></span>
+    <span class="control-tooltip-host game-menu-host" data-control-tooltip="Load game is not available in this version."><button type="button" id="game-menu-load-btn" class="game-menu-item" disabled><svg class="chrome-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 4.5h4.5l1.5 1.5h7v7.5h-13z"></path></svg>Load game…</button></span>
+    <div class="game-menu-separator" aria-hidden="true"></div>
+    <label class="game-menu-item game-menu-check" data-control-tooltip="Leave this checked if you want Ready to let you fight one melee. Uncheck it to skip that list and resolve melee as Ignore."><input type="checkbox" id="openrouter-tactical-battles" checked />Offer tactical battles</label>
+    <span class="control-tooltip-host game-menu-host" data-control-tooltip="How to play is not available in this version."><button type="button" id="game-menu-how-to-play-btn" class="game-menu-item" disabled><svg class="chrome-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 3h4.5a1.5 1.5 0 0 1 1.5 1.5V14a1.5 1.5 0 0 0-1.5-1.5H2.5zM13.5 3H9a1.5 1.5 0 0 0-1.5 1.5M13.5 3v9.5H9a1.5 1.5 0 0 0-1.5 1.5"></path></svg>How to play</button></span>
+    <div class="game-menu-separator" aria-hidden="true"></div>
+    <button type="button" id="game-menu-quit-btn" class="game-menu-item" data-control-tooltip="Close Agent Wars."><svg class="chrome-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.8v6M4.4 4.3a5 5 0 1 0 7.2 0"></path></svg>Quit</button>
+  </div>
   <!-- #app-body holds the map (#canvas-container) and the console (#sidebar) side by side. -->
   <div id="app-body">
   <div id="canvas-container">
@@ -270,7 +281,7 @@
       <section id="console-panel-opponent" class="console-panel" role="tabpanel" aria-labelledby="console-tab-opponent" hidden>
         <div class="openrouter-tab-bar" role="tablist" aria-label="AI panel">
           <button type="button" id="openrouter-tab-tools" role="tab" aria-selected="false" aria-controls="openrouter-tools-panel" data-control-tooltip="Show the tools the opponent can use, and turn each group on or off.">Tools</button>
-          <button type="button" id="openrouter-tab-model" role="tab" aria-selected="true" aria-controls="openrouter-model-panel" data-control-tooltip="Show the API key, model, reasoning effort, and the controls for opponent planning and a new match.">Model</button>
+          <button type="button" id="openrouter-tab-model" role="tab" aria-selected="true" aria-controls="openrouter-model-panel" data-control-tooltip="Show the API key, model, reasoning effort, and the Run control for opponent planning.">Model</button>
         </div>
         <div id="openrouter-tools-panel" class="openrouter-tab-panel" role="tabpanel" aria-labelledby="openrouter-tab-tools" hidden>
           <div id="openrouter-tools-list" class="openrouter-tools-list"></div>
@@ -291,18 +302,9 @@
               </select>
               <button type="button" id="openrouter-refresh-models" class="openrouter-refresh-btn" aria-label="Refresh model list" data-control-tooltip="Load the model list again. If that fails, the message appears in the AI activity log."></button>
               <span class="control-tooltip-host" data-control-tooltip="Turn opponent planning on or off. Enter an API key and choose a model first."><button type="button" id="openrouter-run-btn" class="openrouter-tool-toggle" aria-pressed="false" disabled>Run</button></span>
-              <button type="button" id="openrouter-new-btn" class="openrouter-tool-toggle" aria-label="Start a new game" data-control-tooltip="Open the new-game screen. Opponent planning and any playback stop right away; the current match is replaced when you start the new one.">New</button>
               <span class="control-tooltip-host" data-control-tooltip="Choose how much reasoning this model uses. You only see levels this model offers, its default is marked, and the list stays unavailable when it has fewer than two."><select id="openrouter-reasoning-effort" aria-label="Reasoning effort" disabled>
                 <option value="">Model default</option>
               </select></span>
-              <div class="openrouter-inline-checkbox openrouter-model-grid-checkbox" data-control-tooltip="Leave this checked if you want Ready to let you fight one melee. Uncheck it to skip that list and resolve melee as Ignore.">
-                <input
-                  type="checkbox"
-                  id="openrouter-tactical-battles"
-                  checked
-                />
-                <label for="openrouter-tactical-battles">Tactical battles</label>
-              </div>
             </div>
           </div>
         </div>

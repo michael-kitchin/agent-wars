@@ -75,3 +75,29 @@ export const humanHomeStatTooltipText = 'Hexes of your home region that you hold
  * Exceptions: None.
  */
 export const opponentHomeStatTooltipText = "Hexes of the opponent's home region that you hold, out of all its hexes.";
+
+/**
+ * Purpose: Names what the game menu holds.
+ * When to use: `#game-menu-btn`.
+ * Expected outcome: The control tip shows this sentence.
+ * Exceptions: None.
+ */
+export const gameMenuButtonTooltipText =
+  'Open the game menu to start a new game, choose whether Ready offers tactical battles, or quit.';
+
+/**
+ * Purpose: Says Quit closes the app.
+ * When to use: `#game-menu-quit-btn`.
+ * Expected outcome: The control tip shows this sentence.
+ * Exceptions: None.
+ */
+export const quitTooltipText = 'Close Agent Wars.';
+
+/**
+ * Purpose: Says saving to a file is not available, and that the match in progress is still kept.
+ * When to use: The tip host around `#game-menu-save-btn`.
+ * Expected outcome: The control tip shows this sentence.
+ * Exceptions: None.
+ */
+export const saveGameUnavailableTooltipText =
+  'Saving to a file is not available in this version. The match in progress is kept on disk between sessions.';

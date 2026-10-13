@@ -1,4 +1,4 @@
-/* App frame: the top bar, the row that holds the map and the console, and the console's tab rail and footer. Colors and sizes come from the tokens in shellChrome.css. */
+/* App frame: the top bar, the row that holds the map and the console, the console's tab rail and footer, and the game menu. Colors and sizes come from the tokens in shellChrome.css. */
 
 /* ---------- Shared ---------- */
 /* Line icons in the frame: 16px, drawn with the text color so disabled and hover states need no extra rules. */
@@ -14,6 +14,7 @@
 }
 /* The match chrome leaves the window while the new-game overlay is open, so the map fills it as before. */
 body:has(#game-over-overlay:not(.hidden)) #app-topbar,
+body:has(#game-over-overlay:not(.hidden)) #game-menu,
 body:has(#game-over-overlay:not(.hidden)) #sidebar {
   display: none;
 }
@@ -65,6 +66,15 @@ body:has(#game-over-overlay:not(.hidden)) #sidebar {
   background: transparent;
   color: var(--chrome-disabled);
   border-color: var(--chrome-divider);
+}
+.topbar-menu-btn {
+  border-left: 0;
+  border-right: 1px solid var(--button-border);
+  background: var(--button-bg);
+}
+.topbar-menu-btn:hover,
+.topbar-menu-btn[aria-expanded="true"] {
+  background: var(--button-bg-hover);
 }
 .topbar-sides {
   display: flex;
@@ -159,6 +169,64 @@ body:has(#game-over-overlay:not(.hidden)) #sidebar {
   .topbar-side-name {
     max-width: 120px;
   }
+}
+
+/* ---------- Game menu ---------- */
+.game-menu {
+  position: fixed;
+  left: 0;
+  top: var(--topbar-height);
+  z-index: 7050;
+  width: 248px;
+  padding: 6px 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--chrome-bg);
+  color: var(--chrome-text);
+  color-scheme: dark;
+  border: 1px solid var(--chrome-border);
+  border-top: 0;
+  border-radius: 0 0 6px 0;
+  box-shadow: 0 8px 28px rgba(8, 14, 22, 0.45);
+}
+/* `display: flex` above would otherwise override the hidden attribute. */
+.game-menu[hidden] {
+  display: none;
+}
+.game-menu-host {
+  display: flex;
+}
+.game-menu-item {
+  width: 100%;
+  height: 34px;
+  padding: 0 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--chrome-text);
+  font-size: 13px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+}
+.game-menu-item:hover {
+  background: var(--chrome-bg-raised);
+}
+.game-menu-item:disabled {
+  background: transparent;
+  color: var(--chrome-disabled);
+}
+.game-menu-check input[type="checkbox"] {
+  width: 15px;
+  height: 15px;
+}
+.game-menu-separator {
+  height: 1px;
+  margin: 6px 0;
+  background: var(--chrome-divider);
 }
 
 /* ---------- Map and console row ---------- */

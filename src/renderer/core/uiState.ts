@@ -12,6 +12,7 @@ import { dismissStaleControlTooltip } from '../chrome/controlTooltip';
 import { newGameButtonTooltipText } from '../chrome/controlTooltipText';
 import { expandNewGameDialog, syncNewGameDialogMapPointer } from '../gameplay/newGameDialogCollapse';
 import { renderTopBarStatus } from '../chrome/topBar';
+import { closeGameMenu } from '../chrome/gameMenu';
 
 /**
  * Refreshes the selected-unit line in the right sidebar.
@@ -54,9 +55,9 @@ export function updateGameStateSidebar(state: GameStateSnapshot | null): void {
 /**
  * Drops focus and a control tip from chrome the new-game overlay is about to cover.
  *
- * Purpose: The minimap, the legend, the top bar, and the console are not on screen while that overlay is open. A focused control would still take keys, and a tip for the New button would stay up over the map.
+ * Purpose: The minimap, the legend, the top bar, the game menu, and the console are not on screen while that overlay is open. A focused control would still take keys, and a tip for New game would stay up over the map.
  * When to use: When that overlay goes from hidden to shown, after its `hidden` class is removed.
- * Expected outcome: Focus leaves the minimap, the legend, the top bar, or the console. A dialog control that already has focus is left alone. A tip whose control has no box is dismissed.
+ * Expected outcome: Focus leaves the minimap, the legend, the top bar, the game menu, or the console. A dialog control that already has focus is left alone. A tip whose control has no box is dismissed.
  * Exceptions: None.
  */
 export function blurMapChromeIfFocused(): void {
@@ -65,6 +66,7 @@ export function blurMapChromeIfFocused(): void {
     const insideHiddenChrome = active.closest('#minimap') != null
       || active.closest('#terrain-legend') != null
       || active.closest('#app-topbar') != null
+      || active.closest('#game-menu') != null
       || active.closest('#sidebar') != null;
     if (insideHiddenChrome) active.blur();
   }
@@ -76,7 +78,7 @@ export function blurMapChromeIfFocused(): void {
  *
  * Purpose: The new-game overlay and the annihilation dialog stay clickable while the match controls do not.
  * When to use: When those overlays open or close, and when the tactical battles list opens or closes.
- * Expected outcome: Children of the map pane other than those two overlays ignore the pointer while `enabled` is false. The top bar and the console match. While the new-game form is hidden, the main map takes the pointer again so drag and the wheel still move the preview.
+ * Expected outcome: Children of the map pane other than those two overlays ignore the pointer while `enabled` is false. The top bar and the console match, and the game menu closes. While the new-game form is hidden, the main map takes the pointer again so drag and the wheel still move the preview.
  * Exceptions: None.
  */
 export function setMainUIControlsEnabled(enabled: boolean): void {
@@ -94,6 +96,7 @@ export function setMainUIControlsEnabled(enabled: boolean): void {
     chrome.style.pointerEvents = enabled ? '' : 'none';
     chrome.classList.toggle('main-ui-disabled', !enabled);
   }
+  if (!enabled) closeGameMenu();
   syncNewGameDialogMapPointer();
 }
 

@@ -8,7 +8,7 @@ Say why the player would use the control, and state a limit only when the player
 
 ## Availability
 
-The tip can appear whenever the control can receive the pointer or keyboard focus. A control inside a surface that has pointer input turned off cannot show it. A disabled control still shows its tip when the pointer can rest on it. That includes Ready while its label reads "AI:", Run before a key and model are set, a reasoning list with fewer than two levels, a sealift slot that cannot be changed, Fight before a row is chosen, Keep building when it cannot be turned on, and Exit Battle while a battle turn is resolving or playing back. It also includes every disabled placeholder: Settings and Help in the top bar, and the Build and Forces tabs. The top bar's four readouts show a tip the same way, though they are not controls.
+The tip can appear whenever the control can receive the pointer or keyboard focus. A control inside a surface that has pointer input turned off cannot show it. A disabled control still shows its tip when the pointer can rest on it. That includes Ready while its label reads "AI:", Run before a key and model are set, a reasoning list with fewer than two levels, a sealift slot that cannot be changed, Fight before a row is chosen, Keep building when it cannot be turned on, and Exit Battle while a battle turn is resolving or playing back. It also includes every disabled placeholder: Settings and Help in the top bar, Save game, Load game, and How to play in the game menu, and the Build and Forces tabs. The top bar's four readouts show a tip the same way, though they are not controls.
 
 ## Information Displayed
 
@@ -52,22 +52,25 @@ The tip can appear whenever the control can receive the pointer or keyboard focu
 - Air-strike target: Choose enemy units, production, airports, or seaports. Your next double-click uses that choice until you cancel.
 - Air-strike Cancel: Stop aiming an air strike and show Strike again. Strikes already in the list stay there.
 - Tools tab: Show the tools the opponent can use, and turn each group on or off.
-- Model tab: Show the API key, model, reasoning effort, and the controls for opponent planning and a new match.
+- Model tab: Show the API key, model, reasoning effort, and the Run control for opponent planning.
 - Orders tab: Show the selected unit and the orders queued for this turn or beat.
 - Opponent tab: Show the opponent's model, its tools, and the AI activity log.
-- Settings, Help, Build, and Forces: "<name> is not available in this version.", for example "Settings is not available in this version."
+- Settings, Help, Load game, How to play, Build, and Forces: "<name> is not available in this version.", for example "Settings is not available in this version."
 - Collapse the console: Hide the console to widen the map. Click a tab to show it again.
 - Production readout: The production your cities can add each turn. A city adds its share only while it is building, and a city on the neutral border adds none.
 - Forces readout: Units you have fielded, out of the most this game size allows: then each unit type as "infantry 3 of 12", separated by commas, ending with a period.
 - Your home readout: Hexes of your home region that you hold, out of all its hexes.
 - Enemy home readout: Hexes of the opponent's home region that you hold, out of all its hexes.
+- Game menu button: Open the game menu to start a new game, choose whether Ready offers tactical battles, or quit.
+- Quit: Close Agent Wars.
+- Save game: Saving to a file is not available in this version. The match in progress is kept on disk between sessions.
 - API key: Enter your OpenRouter key, then click away or press Enter to save it. The key stays hidden after that; clear the field and leave it to forget the saved key.
 - Refresh models: Load the model list again. If that fails, the message appears in the AI activity log.
 - Run, while it cannot be clicked: Turn opponent planning on or off. Enter an API key and choose a model first.
 - Run, while it can be clicked: Turn opponent planning on or off. On opens the Tools tab and can hold Ready until a plan exists; off cancels a plan that is still running.
-- New: Open the new-game screen. Opponent planning and any playback stop right away; the current match is replaced when you start the new one.
+- New game in the game menu: Open the new-game screen. Opponent planning and any playback stop right away; the current match is replaced when you start the new one.
 - Reasoning effort: Choose how much reasoning this model uses. You only see levels this model offers, its default is marked, and the list stays unavailable when it has fewer than two.
-- Tactical battles: Leave this checked if you want Ready to let you fight one melee. Uncheck it to skip that list and resolve melee as Ignore.
+- Offer tactical battles: Leave this checked if you want Ready to let you fight one melee. Uncheck it to skip that list and resolve melee as Ignore.
 - Precomputation: Turn on a summary of units, hexes, and combat that is prepared before the model plans. The number counts uses since the last Ready, and the button stays pressed while this is on.
 - Events: Turn this on to stop a background plan every turn. One plan still runs when the match starts, when you turn Run on, or when you turn this on, and the number counts uses since the last Ready.
 - Planning: Let the opponent plan routes and measure distances. The number counts uses since the last Ready, and this does nothing when the model cannot use tools.

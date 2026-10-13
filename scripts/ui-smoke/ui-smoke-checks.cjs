@@ -54,6 +54,9 @@ const SCENES = Object.freeze({
   opponentTab: 'opponent-tab',
   consoleCollapsed: 'console-collapsed',
   consoleExpandedAgain: 'console-expanded-again',
+  gameMenuOpen: 'game-menu-open',
+  gameMenuEscape: 'game-menu-escape',
+  gameMenuOutside: 'game-menu-outside',
   readyTip: 'ready-tip',
   newGameReopened: 'new-game-reopened',
 });
@@ -219,7 +222,7 @@ const CHECKS = Object.freeze([
   {
     name: 'frame-hidden-during-new-game',
     scenes: NEW_GAME_SCENES,
-    needs: ['#sidebar', '#app-topbar'],
+    needs: ['#sidebar', '#app-topbar', '#game-menu'],
     run: (p) => {
       const shown = Object.entries(p.elements).filter(([, e]) => e.shown).map(([selector]) => selector);
       return shown.length === 0 ? null : `still shown during the new-game overlay: ${shown.join(', ')}`;
@@ -281,8 +284,16 @@ const CHECKS = Object.freeze([
   },
   {
     name: 'placeholders-disabled',
-    scenes: [SCENES.strategic],
-    needs: ['#topbar-settings-btn', '#topbar-help-btn', '#console-tab-build', '#console-tab-forces'],
+    scenes: [SCENES.strategic, SCENES.gameMenuOpen],
+    needs: [
+      '#topbar-settings-btn',
+      '#topbar-help-btn',
+      '#console-tab-build',
+      '#console-tab-forces',
+      '#game-menu-save-btn',
+      '#game-menu-load-btn',
+      '#game-menu-how-to-play-btn',
+    ],
     run: (p, el) => {
       const enabled = Object.entries(p.elements).filter(([, e]) => e && !e.disabled).map(([selector]) => selector);
       return enabled.length === 0 ? null : `placeholders that are not disabled: ${enabled.join(', ')}`;
@@ -394,6 +405,35 @@ const CHECKS = Object.freeze([
       }
       return problems.length === 0 ? null : problems.join('; ');
     },
+  },
+  {
+    name: 'game-menu-opens',
+    scenes: [SCENES.gameMenuOpen],
+    needs: ['#game-menu', '#game-menu-btn', '#openrouter-new-btn', '#openrouter-tactical-battles'],
+    run: (p, el) => {
+      const m = el('#game-menu');
+      if (!m.shown) return 'the game menu is not shown';
+      if (el('#game-menu-btn').expanded !== 'true') return `menu button aria-expanded is "${el('#game-menu-btn').expanded}"`;
+      if (!(near(m.x, 0) && near(m.y, TOPBAR_HEIGHT))) return `game menu is at ${fmt(m)}, expected its top-left at 0,${TOPBAR_HEIGHT}`;
+      const moved = ['#openrouter-new-btn', '#openrouter-tactical-battles'].filter((selector) => !el(selector).ancestorIds.includes('game-menu'));
+      return moved.length === 0 ? null : `not inside #game-menu: ${moved.join(', ')}`;
+    },
+  },
+  {
+    name: 'game-menu-escape-closes',
+    scenes: [SCENES.gameMenuEscape],
+    needs: ['#game-menu', '#game-menu-btn'],
+    run: (p, el) => {
+      if (el('#game-menu').shown) return 'Escape left the game menu open';
+      if (el('#game-menu-btn').expanded !== 'false') return `menu button aria-expanded is "${el('#game-menu-btn').expanded}"`;
+      return p.activeElementId === 'game-menu-btn' ? null : `focus is on "${p.activeElementId}", expected the menu button`;
+    },
+  },
+  {
+    name: 'game-menu-outside-click-closes',
+    scenes: [SCENES.gameMenuOutside],
+    needs: ['#game-menu', '#game-menu-btn'],
+    run: (p, el) => (!el('#game-menu').shown && el('#game-menu-btn').expanded === 'false' ? null : 'a click outside the menu left it open'),
   },
 ]);
 

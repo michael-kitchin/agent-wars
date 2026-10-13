@@ -118,6 +118,7 @@ import {
   installUnitOriginTooltip,
 } from './core/unitOriginTooltip';
 import { wireConsoleFrame } from './chrome/consoleFrame';
+import { wireGameMenu } from './chrome/gameMenu';
 import {
   tacticalMaybeScheduleAnnihilationExit,
   type TacticalExitSessionAccessor,
@@ -625,6 +626,7 @@ function init(): void {
   });
   installUnitOriginTooltip();
   wireConsoleFrame();
+  wireGameMenu();
   // Contract anchors retained after extraction:
   // applyModifierDrivenPopoverCloseRules('shift_pressed');
   // applyModifierDrivenPopoverCloseRules('shift_released');

@@ -182,7 +182,7 @@ Complete rules are in [combat-rules-v3.md](combat-rules-v3.md) §12.
 - **After Fight:** the current turn finishes first, and the battle opens as the next turn begins.
 - **Who decides:** only you choose whether to fight a battle. The opponent never does.
 - **Joining ongoing battles:** On the strategic map, hexes with ongoing tactical battles are marked with magnifying glass icons (🔍). Click to join.
-- **Turning battles off:** uncheck **Tactical battles** on the Model tab. Every melee then resolves as if you chose **Ignore**.
+- **Turning battles off:** open the game menu (top left) and uncheck **Offer tactical battles**. Every melee then resolves as if you chose **Ignore**.
 
 ### How battles differ
 

@@ -264,34 +264,14 @@ body {
 }
 .openrouter-model-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   gap: 0.4rem;
   align-items: center;
 }
 .openrouter-model-grid select {
   min-width: 0;
 }
-.openrouter-model-grid-checkbox {
-  grid-column: 2 / -1;
-}
-.openrouter-model-grid-checkbox label {
-  white-space: nowrap;
-}
-.openrouter-inline-checkbox {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 0.45rem;
-}
-.openrouter-inline-checkbox input[type="checkbox"] {
-  margin: 0;
-  flex-shrink: 0;
-}
-.openrouter-inline-checkbox label {
-  margin: 0;
-  font-weight: normal;
-}
-/* The model dropdown sets this row's height. Refresh, Run, and New stretch to that border box. */
+/* The model dropdown sets this row's height. Refresh and Run stretch to that border box. */
 .openrouter-model-grid > button {
   align-self: stretch;
   height: auto;

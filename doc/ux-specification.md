@@ -34,11 +34,12 @@ Visual styling and the arrangement of items inside an element are out of scope. 
 | Single-hex build | [input-map.md](ux/input-map.md), [modes-and-transitions.md](ux/modes-and-transitions.md) | [build-popup.md](ux/build-popup.md) |
 | Multi-hex build | [build-popup.md](ux/build-popup.md) | [multi-hex-build-popup.md](ux/multi-hex-build-popup.md) |
 | The top bar, its readouts, or its date block | [modes-and-transitions.md](ux/modes-and-transitions.md) | [top-bar.md](ux/top-bar.md) |
+| The game menu, New game, or Offer tactical battles | [modes-and-transitions.md](ux/modes-and-transitions.md), [input-map.md](ux/input-map.md) | [game-menu.md](ux/game-menu.md) |
 | The right panel as a whole, its tabs, or collapsing it | [modes-and-transitions.md](ux/modes-and-transitions.md) | [right-panel.md](ux/right-panel.md) |
 | Ready, Ranged, or Strike | [selection-model.md](ux/selection-model.md), [order-lifecycle.md](ux/order-lifecycle.md), [modes-and-transitions.md](ux/modes-and-transitions.md) | [right-panel-command-bar.md](ux/right-panel-command-bar.md) |
 | Selected unit or order lists | [order-lifecycle.md](ux/order-lifecycle.md), [selection-model.md](ux/selection-model.md) | [right-panel-selection-and-orders.md](ux/right-panel-selection-and-orders.md) |
 | The Tools tab | [modes-and-transitions.md](ux/modes-and-transitions.md) | [right-panel-tools-tab.md](ux/right-panel-tools-tab.md) |
-| API key, model, reasoning effort, Run, New, or Tactical battles | [modes-and-transitions.md](ux/modes-and-transitions.md), [notifications-and-feedback.md](ux/notifications-and-feedback.md) | [right-panel-model-tab.md](ux/right-panel-model-tab.md) |
+| API key, model, reasoning effort, or Run | [modes-and-transitions.md](ux/modes-and-transitions.md), [notifications-and-feedback.md](ux/notifications-and-feedback.md) | [right-panel-model-tab.md](ux/right-panel-model-tab.md) |
 | The AI activity log | [notifications-and-feedback.md](ux/notifications-and-feedback.md) | [ai-activity-log.md](ux/ai-activity-log.md) |
 | New game or game over | [modes-and-transitions.md](ux/modes-and-transitions.md) | [new-game-dialog.md](ux/new-game-dialog.md) |
 | Turn or beat animation | [modes-and-transitions.md](ux/modes-and-transitions.md), [notifications-and-feedback.md](ux/notifications-and-feedback.md) | [resolution-playback.md](ux/resolution-playback.md) |
@@ -82,11 +83,12 @@ Element documents share a fixed heading set:
 - [build-popup.md](ux/build-popup.md): the single-hex build queue popup and the markers that open it.
 - [multi-hex-build-popup.md](ux/multi-hex-build-popup.md): the build queue popup used when several build hexes are selected together.
 - [top-bar.md](ux/top-bar.md): the bar across the top: the two sides, the Production, Forces, and home readouts, and the date block.
+- [game-menu.md](ux/game-menu.md): the menu under the top bar's menu button: New game, Offer tactical battles, Quit, and the disabled placeholders.
 - [right-panel.md](ux/right-panel.md): the console docked on the right: its tab rail, collapsing it, and the footer that holds Ready.
 - [right-panel-command-bar.md](ux/right-panel-command-bar.md): Ready, Ranged, and air strike controls.
 - [right-panel-selection-and-orders.md](ux/right-panel-selection-and-orders.md): the selected-unit readout and the movement, ranged, and air-strike lists.
 - [right-panel-tools-tab.md](ux/right-panel-tools-tab.md): the Tools tab and its tool list.
-- [right-panel-model-tab.md](ux/right-panel-model-tab.md): API key, model, reasoning effort, Run, New, the Tactical battles checkbox, and the model description tooltip.
+- [right-panel-model-tab.md](ux/right-panel-model-tab.md): API key, model, reasoning effort, Run, and the model description tooltip.
 - [ai-activity-log.md](ux/ai-activity-log.md): the log of AI interactions and errors.
 - [new-game-dialog.md](ux/new-game-dialog.md): the overlay used to start a game and to show game over, and the map preview behind it.
 - [resolution-playback.md](ux/resolution-playback.md): the animated replay of turn resolution and the inputs it blocks.
@@ -123,6 +125,7 @@ Cells are `Shown`, `Hidden`, `Disabled` (visible, but pointer input is off), `Ch
 | Build popup | Hidden | Shown | Disabled | Disabled | Hidden | Hidden | Hidden |
 | Multi-hex build popup | Hidden | Shown | Disabled | Disabled | Hidden | Hidden | Hidden |
 | Top bar | Hidden | Shown | Disabled | Changed | Changed | Disabled | Hidden |
+| Game menu | Hidden | Shown | Hidden | Shown | Shown | Hidden | Hidden |
 | Right panel | Hidden | Shown | Disabled | Shown | Shown | Disabled | Hidden |
 | Command bar | Hidden | Shown | Disabled | Shown | Changed | Disabled | Hidden |
 | Selection and orders | Hidden | Shown | Disabled | Shown | Changed | Disabled | Hidden |

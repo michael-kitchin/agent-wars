@@ -38,7 +38,7 @@ When this guide and the running app disagree, the app wins until this file is up
   - **Semantic states** (e.g., success/warning/error only where needed).
 - Avoid saturated primaries everywhere; accents should read clearly without dominating the map or panels.
 
-**Implemented palette (2.5.0). Map colors live in `src/renderer/core/constants.ts`, except the combat bolt and the casualty mark, which take their colors from the SVGs named below. Panel chrome tokens, and the shared button and field rules, are the `:root` variables in `static/shellChrome.css`. The top bar and the right panel's frame and tab rail are in `static/frameChrome.css`. Map overlays and popups are in `static/overlayChrome.css`. Toasts and the new-game box are in `static/feedbackChrome.css`. The dual-theme rows below are a reference. Chrome is already the navy in the live table; those terrain rows are not a second map theme:**
+**Implemented palette (2.5.0). Map colors live in `src/renderer/core/constants.ts`, except the combat bolt and the casualty mark, which take their colors from the SVGs named below. Panel chrome tokens, and the shared button and field rules, are the `:root` variables in `static/shellChrome.css`. The top bar, the right panel's frame and tab rail, and the game menu are in `static/frameChrome.css`. Map overlays and popups are in `static/overlayChrome.css`. Toasts and the new-game box are in `static/feedbackChrome.css`. The dual-theme rows below are a reference. Chrome is already the navy in the live table; those terrain rows are not a second map theme:**
 
 | Role | Live app | Notes |
 |------|----------|--------|
@@ -46,10 +46,10 @@ When this guide and the running app disagree, the app wins until this file is up
 | Top bar and right-panel footer bg | `#121b27` | `--chrome-bg-deep` |
 | Right-panel tab rail bg | `#141f2d` | `--chrome-rail-bg` |
 | Dividers inside the top bar and the rail | `#243246` | `--chrome-divider` |
-| Panel, popup, tooltip, and toast bg | `#1b2838` | Right panel, legend, hex tooltip, control tips, stack callout, build popup, new-game box, tactical-battles dialog, lower-right update toast, and upper-right message toast |
+| Panel, popup, tooltip, and toast bg | `#1b2838` | Right panel, game menu, legend, hex tooltip, control tips, stack callout, build popup, new-game box, tactical-battles dialog, lower-right update toast, and upper-right message toast |
 | Chrome text / muted | `#f4f6f8` / `#b7c4d4` | Off-white body; blue-gray for secondary lines |
 | Chrome error text | `#f0a8a8` | On the navy surfaces only |
-| Button face / border / hover | `#115e59` / `#7dcec8` / `#3a6a8f` | Every button, styled like Ready, with white text. The Randomize AI home region button keeps the opponent rose. The home-region and starting-month randomize buttons match their dropdowns' height. The model-list refresh button matches the Run and New buttons beside it |
+| Button face / border / hover | `#115e59` / `#7dcec8` / `#3a6a8f` | Every button, styled like Ready, with white text. The Randomize AI home region button keeps the opponent rose. The home-region and starting-month randomize buttons match their dropdowns' height. The model-list refresh button matches the Run button beside it |
 | Button off / disabled | `#3b5654` / `#6b8a87` border | Dimmed teal with `#b5c9c7` text for disabled buttons, toggles that are off, and unselected tabs. A disabled Tools-tab toggle also fades |
 | Text field, dropdown, and checkbox | `#d4efec` / `#0f766e` border | Shared light teal with `#0b3b37` text, distinctly lighter than the button face. Placeholder text is `#456864`. A checkbox uses that same box, with a dark check. Disabled fields and checkboxes are `#9fb8b5` with `#243e3c` text |
 | Player 1 (human) | `#115e59` | Unit fill |
@@ -112,7 +112,7 @@ When this guide and the running app disagree, the app wins until this file is up
 ### 2.3 Top Bar
 
 - **Contents:** Turn number, phase (e.g., Planning / Resolving), and current player or “Your turn” indicator. Global resources (e.g., IPCs or equivalent) if applicable. Keep height minimal.
-- **Live app:** A 44 px bar: the two sides, the Production, Forces, Your home, and Enemy home readouts, then the date and turn on two lines, and disabled Settings and Help buttons. Captions hide below a 1360 px window. See [ux/top-bar.md](ux/top-bar.md).
+- **Live app:** A 44 px bar: the game menu button, the two sides, the Production, Forces, Your home, and Enemy home readouts, then the date and turn on two lines, and disabled Settings and Help buttons. Captions hide below a 1360 px window. See [ux/top-bar.md](ux/top-bar.md).
 - **Style:** Neutral background, clear labels, numeric values prominent. Use the same type scale as the rest of the UI. Optional: small icons next to resources or phase for quick scanning.
 
 ### 2.4 Bottom Bar (Orders and Actions)

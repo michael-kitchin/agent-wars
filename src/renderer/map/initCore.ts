@@ -616,16 +616,16 @@ export function wireInitCore(deps: InitCoreDeps): void {
 
   const canvasContainer = document.getElementById('canvas-container');
   /**
-   * Dismisses map hover tooltip state when the pointer enters the console or the top bar.
+   * Dismisses map hover tooltip state when the pointer enters the console, the top bar, or the game menu.
    *
    * Purpose: `#hex-tooltip` uses `position: fixed` with a higher z-index than that chrome, so the tooltip can
    * paint over it while the pointer is already over its controls; `pointerleave` on `#main-map`
    * may not correlate with that visual in all paths (especially after tactical hover fixes).
-   * When to use: Wired once at init; runs on every `pointerenter` into the console or the top bar.
+   * When to use: Wired once at init; runs on every `pointerenter` into the console, the top bar, or the game menu.
    * Expected outcome: Tooltip timer cleared, `#hex-tooltip` hidden, and map hover preview state cleared.
    * Exceptions: None.
    */
-  for (const chromeId of ['sidebar', 'app-topbar']) {
+  for (const chromeId of ['sidebar', 'app-topbar', 'game-menu']) {
     document.getElementById(chromeId)?.addEventListener('pointerenter', () => {
       dismissTerrainTooltipWhenPointerLeavesMapPanel(deps);
     });

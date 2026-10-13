@@ -25710,6 +25710,69 @@ ${bonuses}`;
     renderTopBarDateBlock(state);
   }
 
+  // src/renderer/chrome/gameMenu.ts
+  var GAME_MENU_ID = "game-menu";
+  var GAME_MENU_BUTTON_ID = "game-menu-btn";
+  function isGameMenuOpen() {
+    const menu = document.getElementById(GAME_MENU_ID);
+    return menu !== null && !menu.hidden;
+  }
+  function openGameMenu() {
+    const menu = document.getElementById(GAME_MENU_ID);
+    const button = document.getElementById(GAME_MENU_BUTTON_ID);
+    if (!menu || !button) return;
+    menu.hidden = false;
+    button.setAttribute("aria-expanded", "true");
+  }
+  function closeGameMenu(options = {}) {
+    const menu = document.getElementById(GAME_MENU_ID);
+    const button = document.getElementById(GAME_MENU_BUTTON_ID);
+    if (!menu || !button || menu.hidden) return;
+    menu.hidden = true;
+    button.setAttribute("aria-expanded", "false");
+    dismissStaleControlTooltip();
+    if (options.restoreFocus) button.focus();
+  }
+  function wireGameMenu() {
+    const menu = document.getElementById(GAME_MENU_ID);
+    const button = document.getElementById(GAME_MENU_BUTTON_ID);
+    if (!menu || !button) return;
+    button.addEventListener("click", () => {
+      const topbar = document.getElementById("app-topbar");
+      if (topbar instanceof HTMLElement && topbar.style.pointerEvents === "none") return;
+      if (isGameMenuOpen()) closeGameMenu();
+      else openGameMenu();
+    });
+    menu.addEventListener("click", (event) => {
+      const target = event.target instanceof Element ? event.target : null;
+      const item = target?.closest("button");
+      if (item && !item.disabled) closeGameMenu();
+    });
+    document.getElementById("game-menu-quit-btn")?.addEventListener("click", () => {
+      window.close();
+    });
+    document.addEventListener(
+      "keydown",
+      (event) => {
+        if (event.key !== "Escape" || !isGameMenuOpen()) return;
+        event.preventDefault();
+        event.stopPropagation();
+        closeGameMenu({ restoreFocus: true });
+      },
+      true
+    );
+    document.addEventListener(
+      "pointerdown",
+      (event) => {
+        if (!isGameMenuOpen()) return;
+        const target = event.target instanceof Node ? event.target : null;
+        if (target && (menu.contains(target) || button.contains(target))) return;
+        closeGameMenu();
+      },
+      true
+    );
+  }
+
   // src/renderer/core/uiState.ts
   function updateSidebar(getPrimarySelectedUnitId2, formatUnitDisplayName3) {
     const selectedUnitEl = document.getElementById("sidebar-selected-unit");
@@ -25730,7 +25793,7 @@ ${bonuses}`;
   function blurMapChromeIfFocused() {
     const active2 = document.activeElement;
     if (active2 instanceof HTMLElement) {
-      const insideHiddenChrome = active2.closest("#minimap") != null || active2.closest("#terrain-legend") != null || active2.closest("#app-topbar") != null || active2.closest("#sidebar") != null;
+      const insideHiddenChrome = active2.closest("#minimap") != null || active2.closest("#terrain-legend") != null || active2.closest("#app-topbar") != null || active2.closest("#game-menu") != null || active2.closest("#sidebar") != null;
       if (insideHiddenChrome) active2.blur();
     }
     dismissStaleControlTooltip();
@@ -25750,6 +25813,7 @@ ${bonuses}`;
       chrome.style.pointerEvents = enabled ? "" : "none";
       chrome.classList.toggle("main-ui-disabled", !enabled);
     }
+    if (!enabled) closeGameMenu();
     syncNewGameDialogMapPointer();
   }
   function updateGameOverUI(state, updateReadyButtonState2) {
@@ -35755,7 +35819,7 @@ ${bonuses}`;
       rendererSharedState.tacticalEntryButtonPointerInside = false;
     });
     const canvasContainer = document.getElementById("canvas-container");
-    for (const chromeId of ["sidebar", "app-topbar"]) {
+    for (const chromeId of ["sidebar", "app-topbar", "game-menu"]) {
       document.getElementById(chromeId)?.addEventListener("pointerenter", () => {
         dismissTerrainTooltipWhenPointerLeavesMapPanel(deps);
       });
@@ -36021,6 +36085,7 @@ ${bonuses}`;
     });
     installUnitOriginTooltip();
     wireConsoleFrame();
+    wireGameMenu();
     wireInitCore({
       requestRedraw: requestRedraw2,
       resizeAndRedraw,

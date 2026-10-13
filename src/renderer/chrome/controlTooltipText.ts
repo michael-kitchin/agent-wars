@@ -215,13 +215,12 @@ export function rangedButtonTooltipText(label: 'Ranged' | 'Cancel' | 'Strike'): 
 export const toolsTabTooltipText = 'Show the tools the opponent can use, and turn each group on or off.';
 
 /**
- * Purpose: Says which opponent and match controls the tab shows.
+ * Purpose: Says which opponent controls the tab shows.
  * When to use: `#openrouter-tab-model`.
  * Expected outcome: The control tip shows this sentence.
  * Exceptions: None.
  */
-export const modelTabTooltipText =
-  'Show the API key, model, reasoning effort, and the controls for opponent planning and a new match.';
+export const modelTabTooltipText = 'Show the API key, model, reasoning effort, and the Run control for opponent planning.';
 
 /**
  * Purpose: Says how to save the key and how to forget it.
@@ -271,7 +270,7 @@ export function runButtonTooltipText(enabled: boolean): string {
 
 /**
  * Purpose: Says New opens the new-game screen and stops planning and playback immediately.
- * When to use: `#openrouter-new-btn`.
+ * When to use: `#openrouter-new-btn`, the game menu's New game item.
  * Expected outcome: The control tip shows this sentence.
  * Exceptions: None.
  */
@@ -289,7 +288,7 @@ export const reasoningEffortTooltipText =
 
 /**
  * Purpose: Says what checked and unchecked do the next time Ready finds a melee.
- * When to use: The wrapper around `#openrouter-tactical-battles`.
+ * When to use: The game-menu label around `#openrouter-tactical-battles`.
  * Expected outcome: The control tip shows this sentence.
  * Exceptions: None.
  */

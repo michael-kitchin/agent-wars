@@ -773,7 +773,7 @@ export function updateSidebar(): void {
 /**
  * Shows or hides the new-game overlay, and resizes the map when that visibility changes.
  *
- * Purpose: The overlay and the right panel share the window width. Leaflet keeps the previous container size until a resize.
+ * Purpose: The overlay hides the top bar and the console, so the map's size changes. Leaflet keeps the previous container size until a resize.
  * When to use: After a snapshot, and when a match ends.
  * Expected outcome: The overlay matches the snapshot. The map is resized only when the overlay opens or closes.
  * Exceptions: None.
@@ -784,10 +784,10 @@ export function updateGameOverUI(state: GameStateSnapshot | null): void {
 }
 
 /**
- * Opens the new-game dialog from the Model tab, and resizes the map when it actually opens.
+ * Opens the new-game dialog from the game menu, and resizes the map when it actually opens.
  *
- * Purpose: The right panel leaves the layout when that dialog opens. The map has to take the freed width before the preview fits.
- * When to use: The Model tab's New button.
+ * Purpose: The top bar and the console leave the layout when that dialog opens. The map has to take the freed space before the preview fits.
+ * When to use: The game menu's New game item (`#openrouter-new-btn`).
  * Expected outcome: The annihilation dialog ignores the click. Otherwise opponent planning and playback stop, the dialog opens, and the map resizes only when the overlay was hidden.
  * Exceptions: None.
  */

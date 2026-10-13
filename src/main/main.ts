@@ -192,6 +192,8 @@ function createWindow(): void {
     y,
     minWidth: MIN_WINDOW_WIDTH,
     minHeight: MIN_WINDOW_HEIGHT,
+    // The game menu in the top bar replaces Electron's default menu bar. Alt still shows it, and its shortcuts still work.
+    autoHideMenuBar: true,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
