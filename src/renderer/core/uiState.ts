@@ -1,6 +1,4 @@
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
-import { formatSidebarPhaseText } from '../../shared/sidebarPhaseLabel';
-import { formatWeatherIconHtml } from '../../shared/weatherIcons';
 import { rendererSharedState as S } from './state';
 import { setUnitNameContent } from './unitOriginFlags';
 import { initializeScenarioRegionSelectorsOnOverlayOpen } from '../gameplay/newGameRegionUi';
@@ -13,19 +11,7 @@ import { resetNewGameOptionControls } from '../gameplay/newGameOptionsUi';
 import { dismissStaleControlTooltip } from '../chrome/controlTooltip';
 import { newGameButtonTooltipText } from '../chrome/controlTooltipText';
 import { expandNewGameDialog, syncNewGameDialogMapPointer } from '../gameplay/newGameDialogCollapse';
-
-/**
- * Title-cases the strategic phase id from main (`planning` / `resolution`) for the sidebar line.
- *
- * Purpose: Keeps raw enum-style ids out of the player-facing panel while remaining stable if new phases are added.
- * When to use: Only from `updateGameStateSidebar` when `state.phase` is present.
- * Expected outcome: `Planning`, `Resolution`, or similar single-token labels.
- * Exceptions: None; empty string passes through unchanged.
- */
-function formatStrategicPhaseLabelForSidebar(phase: string): string {
-  if (!phase) return phase;
-  return phase.charAt(0).toUpperCase() + phase.slice(1).toLowerCase();
-}
+import { renderTopBarStatus } from '../chrome/topBar';
 
 /**
  * Refreshes the selected-unit line in the right sidebar.
@@ -54,46 +40,23 @@ export function updateSidebar(
 }
 
 /**
- * Defines the `updateGameStateSidebar` function shape (export function updateGameStateSidebar(state: GameStateSnapshot | null): void).
-
- * Purpose: Refreshes phase and turn lines in the right sidebar from the latest snapshot.
+ * Refreshes the match status in the top bar from the latest snapshot.
+ *
+ * Purpose: Keeps the name every caller already uses; the old Phase and Turn lines now live in the top bar.
  * When to use: After `applyGameStateSnapshot`, tactical entry/exit, tactical Ready commit, and when beat playback ends.
- * Expected outcome: The phase line is tactical planning or tactical resolution while a battle snapshot is set, otherwise the strategic label, or an em dash when `state` is null. `Turn:` shows the beat number while a tactical session is active, otherwise `state.turnNumber`, then the strategic date when the snapshot has one.
+ * Expected outcome: The top bar's sides and date block match `state` and the current battle. Null shows em dashes.
  * Exceptions: None.
  */
 export function updateGameStateSidebar(state: GameStateSnapshot | null): void {
-  const phaseEl = document.getElementById('sidebar-phase');
-  const turnEl = document.getElementById('sidebar-turn');
-  if (phaseEl) {
-    phaseEl.textContent = formatSidebarPhaseText({
-      hasGameState: state != null,
-      strategicPhaseLabel: state ? formatStrategicPhaseLabelForSidebar(state.phase) : '',
-      battleActive: S.tacticalBattleSnapshot != null,
-      beatPlaybackActive: S.resolutionMoveAnimation != null,
-    });
-  }
-  if (turnEl) {
-    if (!state) {
-      turnEl.textContent = '—';
-    } else if (S.tacticalBattleSnapshot) {
-      const date = state.currentDateLabel ? ` · ${state.currentDateLabel}` : '';
-      const weather = S.tacticalBattleSnapshot.weather
-        ? ` · ${formatWeatherIconHtml(S.tacticalBattleSnapshot.weather)}`
-        : '';
-      turnEl.innerHTML = `Turn: ${S.tacticalBattleSnapshot.tacticalTurnNumber}${date}${weather}`;
-    } else {
-      const date = state.currentDateLabel ? ` · ${state.currentDateLabel}` : '';
-      turnEl.textContent = `Turn: ${state.turnNumber}${date}`;
-    }
-  }
+  renderTopBarStatus(state);
 }
 
 /**
  * Drops focus and a control tip from chrome the new-game overlay is about to cover.
  *
- * Purpose: The minimap, the legend, and the right panel are not on screen while that overlay is open. A focused control would still take keys, and a tip for the New button would stay up over the map.
+ * Purpose: The minimap, the legend, the top bar, and the console are not on screen while that overlay is open. A focused control would still take keys, and a tip for the New button would stay up over the map.
  * When to use: When that overlay goes from hidden to shown, after its `hidden` class is removed.
- * Expected outcome: Focus leaves the minimap, the legend, or the right panel. A dialog control that already has focus is left alone. A tip whose control has no box is dismissed.
+ * Expected outcome: Focus leaves the minimap, the legend, the top bar, or the console. A dialog control that already has focus is left alone. A tip whose control has no box is dismissed.
  * Exceptions: None.
  */
 export function blurMapChromeIfFocused(): void {
@@ -101,6 +64,7 @@ export function blurMapChromeIfFocused(): void {
   if (active instanceof HTMLElement) {
     const insideHiddenChrome = active.closest('#minimap') != null
       || active.closest('#terrain-legend') != null
+      || active.closest('#app-topbar') != null
       || active.closest('#sidebar') != null;
     if (insideHiddenChrome) active.blur();
   }
@@ -108,11 +72,11 @@ export function blurMapChromeIfFocused(): void {
 }
 
 /**
- * Turns pointer input on or off for the map and the right panel.
+ * Turns pointer input on or off for the map, the top bar, and the console.
  *
  * Purpose: The new-game overlay and the annihilation dialog stay clickable while the match controls do not.
  * When to use: When those overlays open or close, and when the tactical battles list opens or closes.
- * Expected outcome: Children of the map pane other than those two overlays ignore the pointer while `enabled` is false. The right panel matches. While the new-game form is hidden, the main map takes the pointer again so drag and the wheel still move the preview.
+ * Expected outcome: Children of the map pane other than those two overlays ignore the pointer while `enabled` is false. The top bar and the console match. While the new-game form is hidden, the main map takes the pointer again so drag and the wheel still move the preview.
  * Exceptions: None.
  */
 export function setMainUIControlsEnabled(enabled: boolean): void {
@@ -124,10 +88,11 @@ export function setMainUIControlsEnabled(enabled: boolean): void {
       (child as HTMLElement).style.pointerEvents = enabled ? '' : 'none';
     }
   }
-  const sidebar = document.getElementById('sidebar');
-  if (sidebar) {
-    (sidebar as HTMLElement).style.pointerEvents = enabled ? '' : 'none';
-    sidebar.classList.toggle('main-ui-disabled', !enabled);
+  for (const id of ['app-topbar', 'sidebar']) {
+    const chrome = document.getElementById(id);
+    if (!chrome) continue;
+    chrome.style.pointerEvents = enabled ? '' : 'none';
+    chrome.classList.toggle('main-ui-disabled', !enabled);
   }
   syncNewGameDialogMapPointer();
 }

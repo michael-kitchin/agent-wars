@@ -8,12 +8,12 @@ Say why the player would use the control, and state a limit only when the player
 
 ## Availability
 
-The tip can appear whenever the control can receive the pointer or keyboard focus. A control inside a surface that has pointer input turned off cannot show it. A disabled control still shows its tip when the pointer can rest on it. That includes Ready while its label reads "AI:", Run before a key and model are set, a reasoning list with fewer than two levels, a sealift slot that cannot be changed, Fight before a row is chosen, Keep building when it cannot be turned on, and Exit Battle while a battle turn is resolving or playing back.
+The tip can appear whenever the control can receive the pointer or keyboard focus. A control inside a surface that has pointer input turned off cannot show it. A disabled control still shows its tip when the pointer can rest on it. That includes Ready while its label reads "AI:", Run before a key and model are set, a reasoning list with fewer than two levels, a sealift slot that cannot be changed, Fight before a row is chosen, Keep building when it cannot be turned on, and Exit Battle while a battle turn is resolving or playing back. It also includes every disabled placeholder: Settings and Help in the top bar, and the Build and Forces tabs.
 
 ## Information Displayed
 
 - One shared tip, using the same chrome as the [hex tooltip](hex-tooltips.md). It is wider than that tooltip and draws above the new-game overlay, the tactical battles list, and the annihilation dialog.
-- The tip appears one second after the pointer or keyboard focus arrives on the control or on its label. Moving on that same control does not start the wait again. It follows the pointer. Keyboard focus, with the pointer on a different control or on none, places the tip at the focused control.
+- The tip appears one second after the pointer or keyboard focus arrives on the control or on its label. Moving on that same control does not start the wait again. It follows the pointer. Keyboard focus, with the pointer on a different control or on none, places the tip at the focused control. The tip opens below and to the right of that point, or above or to the left of it where it would otherwise leave the window.
 - The text is plain. Opening a dropdown, or choosing an item in it, hides the tip until the pointer leaves that control.
 - While a blocked-order tip or an order-effects tip is showing, this tip hides and does not hide those tips. Once that order tip hides, moving on the control starts this wait again. When this tip appears, the hex tooltip hides.
 - Hiding a control hides its tip. The in-battle Exit Battle tip does not remain over the annihilation dialog.
@@ -53,6 +53,9 @@ The tip can appear whenever the control can receive the pointer or keyboard focu
 - Air-strike Cancel: Stop aiming an air strike and show Strike again. Strikes already in the list stay there.
 - Tools tab: Show the tools the opponent can use, and turn each group on or off.
 - Model tab: Show the API key, model, reasoning effort, and the controls for opponent planning and a new match.
+- Orders tab: Show the selected unit and the orders queued for this turn or beat.
+- Opponent tab: Show the opponent's model, its tools, and the AI activity log.
+- Settings, Help, Build, and Forces: "<name> is not available in this version.", for example "Settings is not available in this version."
 - API key: Enter your OpenRouter key, then click away or press Enter to save it. The key stays hidden after that; clear the field and leave it to forget the saved key.
 - Refresh models: Load the model list again. If that fails, the message appears in the AI activity log.
 - Run, while it cannot be clicked: Turn opponent planning on or off. Enter an API key and choose a model first.
@@ -145,3 +148,4 @@ Ready, sealift, and Exit Battle name the battle case in the same sentence. Produ
 - `static/overlayChrome.css` (`.control-tooltip`, `.control-tooltip-host`)
 - `src/renderer/chrome/controlTooltip.ts`
 - `src/renderer/chrome/controlTooltipText.ts`
+- `src/renderer/chrome/frameTooltipText.ts`

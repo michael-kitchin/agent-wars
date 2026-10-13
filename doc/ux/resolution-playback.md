@@ -53,7 +53,7 @@ A map toast can summarize losses the player can see. Combat outside vision is an
 ## States
 
 - Idle: no animation.
-- Playing: one or more stages are on screen, or dice chips are still fading after the last stage. The game-state readout can already show the next planning turn.
+- Playing: one or more stages are on screen, or dice chips are still fading after the last stage. The top bar's date block can already show the next planning turn.
 - Finished: the animation is cleared and Strategic planning or Tactical planning continues.
 
 ## Invariants

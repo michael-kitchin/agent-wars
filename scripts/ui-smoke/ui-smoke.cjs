@@ -62,12 +62,12 @@ const SCENARIO = Object.freeze({
  * How long to let the page settle, in milliseconds.
  *
  * Purpose: Map tiles, canvas redraws, and the new-game overlay's own start-up work finish before a probe.
- * When to use: After a size change (`resize`), a click (`click`), the overlay opening (`overlay`), and a match
- *   start (`start`).
+ * When to use: After a size change (`resize`), a click (`click`), the overlay opening (`overlay`), a match start
+ *   (`start`), and while the pointer rests on a control until its tip shows (`tip`, longer than the one-second dwell).
  * Expected outcome: Fixed waits; the checks do not depend on map tiles having loaded.
  * Exceptions: None.
  */
-const SETTLE_MS = Object.freeze({ resize: 1500, click: 500, overlay: 2500, start: 2500 });
+const SETTLE_MS = Object.freeze({ resize: 1500, click: 500, overlay: 2500, start: 2500, tip: 1500 });
 
 /**
  * Reads `--label <name>` from the command line.
@@ -162,14 +162,29 @@ async function startScenarioMatch(page) {
  *
  * Purpose: The last scene checks the overlay opened from a match, not only at startup.
  * When to use: For the last scene.
- * Expected outcome: The Model tab is selected, New is clicked, and the overlay is open.
+ * Expected outcome: The console's Opponent tab and its Model sub-tab are selected, New is clicked, and the overlay is open.
  * Exceptions: Throws a Playwright timeout when a control is missing or the overlay does not open.
  */
 async function openNewGameOverlay(page) {
+  await page.click('#console-tab-opponent');
   await page.click('#openrouter-tab-model');
   await page.click('#openrouter-new-btn');
   await waitForNewGameOverlay(page);
   await page.waitForTimeout(SETTLE_MS.click);
+}
+
+/**
+ * Moves the pointer to empty space in the top bar.
+ *
+ * Purpose: After a click the pointer would rest on a control, and that control's tip would show up in the next screenshot.
+ * When to use: After each click in a scene, and after a scene that shows a tip.
+ * Expected outcome: The pointer is over the top bar's spacer, which has no tip and no click action.
+ * Exceptions: Throws when the top bar has no spacer.
+ */
+async function parkPointer(page) {
+  const box = await page.locator('#app-topbar .topbar-spacer').boundingBox();
+  if (!box) throw new Error('the top bar spacer is not on screen');
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
 }
 
 /**
@@ -216,6 +231,21 @@ async function runScenes(app, page, report, outDir) {
   }
   await setViewport(app, page, first);
   await page.waitForTimeout(SETTLE_MS.resize);
+
+  await page.click('#console-tab-opponent');
+  await parkPointer(page);
+  await page.waitForTimeout(SETTLE_MS.click);
+  await recordScene(page, report, outDir, SCENES.opponentTab);
+  await page.click('#console-tab-orders');
+  await parkPointer(page);
+  await page.waitForTimeout(SETTLE_MS.click);
+
+  // Ready sits at the window's bottom-right corner, so its tip has to open up and to the left.
+  await page.hover('#console-footer .control-tooltip-host');
+  await page.waitForTimeout(SETTLE_MS.tip);
+  await recordScene(page, report, outDir, SCENES.readyTip);
+  await parkPointer(page);
+  await page.waitForTimeout(SETTLE_MS.click);
 
   await openNewGameOverlay(page);
   await recordScene(page, report, outDir, SCENES.newGameReopened);

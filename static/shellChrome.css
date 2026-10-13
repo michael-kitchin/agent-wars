@@ -1,4 +1,4 @@
-/* Page shell: navy chrome tokens, the right-hand panel, and shared controls. */
+/* Page shell: navy chrome tokens, the map pane, the AI panel's controls, and shared controls. The top bar, the console frame, and the game menu are in frameChrome.css. */
 * { box-sizing: border-box; }
 /* Navy chrome so flags and weather icons separate from the pale map. Text stays off-white so the gold weather icons remain the warm mark. */
 :root {
@@ -28,11 +28,20 @@
   --field-disabled-bg: #9fb8b5;
   --field-disabled-text: #243e3c;
   --field-disabled-border: #6b8a87;
+  /* App frame: the top bar and console footer, the console's tab rail, dividers inside those bars, and the side marks. */
+  --chrome-bg-deep: #121b27;
+  --chrome-rail-bg: #141f2d;
+  --chrome-divider: #243246;
+  --player-human: #115e59;
+  --player-opponent: #9d174d;
+  --topbar-height: 44px;
+  --console-content-width: 320px;
+  --console-rail-width: 56px;
 }
 html, body { height: 100%; margin: 0; overflow: hidden; }
 body {
   display: flex;
-  flex-direction: row;
+  flex-direction: column;
   width: 100vw;
   height: 100vh;
   overflow: hidden;
@@ -113,46 +122,6 @@ body {
   padding: 1px 3px;
   text-align: left;
 }
-#sidebar {
-  width: 320px;
-  min-width: 320px;
-  height: 100%;
-  flex-shrink: 0;
-  position: relative;
-  z-index: 6000;
-  display: flex;
-  flex-direction: column;
-  padding: 0;
-  background: var(--chrome-bg);
-  color: var(--chrome-text);
-  color-scheme: dark;
-  border-left: 1px solid var(--chrome-border);
-  overflow: hidden;
-}
-/* Out of the row for the whole time #game-over-overlay is open, including while its form is collapsed. The map pane takes that width. The battle-result dialog is a different element. */
-body:has(#game-over-overlay:not(.hidden)) #sidebar {
-  display: none;
-}
-#sidebar.main-ui-disabled {
-  opacity: 0.65;
-  transition: opacity 0.15s ease;
-}
-#sidebar-top {
-  flex: 1 1 auto;
-  min-height: 0;
-  padding: 1rem;
-  overflow: auto;
-}
-#sidebar-bottom {
-  flex: 0 0 40%;
-  min-height: 180px;
-  padding: 1rem;
-  border-top: 1px solid var(--chrome-border);
-  background: var(--chrome-bg);
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-}
 .openrouter-tab-bar {
   display: flex;
   gap: 0;
@@ -226,18 +195,6 @@ body:has(#game-over-overlay:not(.hidden)) #sidebar {
 /* A disabled toggle also fades, so it differs from one that is merely off. */
 .openrouter-tool-toggle:disabled {
   opacity: 0.55;
-}
-/* Ready sits in a tip host. A shown control clears its inline display so this rule can center its label. The host and Ranged share one top edge and one height, including Strike's list and Cancel. */
-#sidebar-top p:has(#ready-btn) {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  column-gap: 0.35rem;
-  row-gap: 0.35rem;
-}
-#sidebar-top p:has(#ready-btn) > .control-tooltip-host {
-  height: 1.75rem;
-  align-items: stretch;
 }
 .ready-btn,
 .ranged-btn {

@@ -1,6 +1,6 @@
 # Right Panel Model Tab
 
-The API key, model choice, reasoning effort, Run, New, and the Tactical battles checkbox.
+The API key, model choice, reasoning effort, Run, New, and the Tactical battles checkbox, on the right panel's Opponent tab.
 
 ## Purpose
 
@@ -8,7 +8,7 @@ Let the player connect a model, start or stop opponent planning, and open a new 
 
 ## Availability
 
-Shown when the Model tab is selected. This is the tab the panel starts on. The model description tooltip can appear while this tab's model dropdown is in use. While the tactical battles list is open, the tab stays visible and does not receive pointer input. In New game and Game over the panel is absent, so this tab is absent with it.
+Shown while the right panel's Opponent tab and its Model sub-tab are selected. The Opponent tab starts on this sub-tab. The model description tooltip can appear while this tab's model dropdown is in use. While the tactical battles list is open, the tab stays visible and does not receive pointer input. In New game and Game over the panel is absent, so this tab is absent with it.
 
 ## Information Displayed
 

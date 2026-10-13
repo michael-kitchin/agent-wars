@@ -1,0 +1,284 @@
+/* App frame: the top bar, the row that holds the map and the console, and the console's tab rail and footer. Colors and sizes come from the tokens in shellChrome.css. */
+
+/* ---------- Shared ---------- */
+/* Line icons in the frame: 16px, drawn with the text color so disabled and hover states need no extra rules. */
+.chrome-icon {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+/* The match chrome leaves the window while the new-game overlay is open, so the map fills it as before. */
+body:has(#game-over-overlay:not(.hidden)) #app-topbar,
+body:has(#game-over-overlay:not(.hidden)) #sidebar {
+  display: none;
+}
+
+/* ---------- Top bar ---------- */
+#app-topbar {
+  flex: 0 0 var(--topbar-height);
+  height: var(--topbar-height);
+  position: relative;
+  z-index: 6300;
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  background: var(--chrome-bg-deep);
+  color: var(--chrome-text);
+  color-scheme: dark;
+  border-bottom: 1px solid var(--chrome-border);
+}
+#app-topbar.main-ui-disabled {
+  opacity: 0.65;
+  transition: opacity 0.15s ease;
+}
+/* A tip host in the bar takes the full bar height so its button does too. */
+#app-topbar > .control-tooltip-host {
+  display: flex;
+  align-items: stretch;
+  flex: none;
+}
+.topbar-icon-btn {
+  flex: none;
+  width: var(--topbar-height);
+  height: 100%;
+  padding: 0;
+  border: 0;
+  border-left: 1px solid var(--chrome-divider);
+  border-radius: 0;
+  background: transparent;
+  color: var(--chrome-text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.topbar-icon-btn:hover {
+  background: var(--chrome-bg-raised);
+}
+.topbar-icon-btn:disabled {
+  background: transparent;
+  color: var(--chrome-disabled);
+  border-color: var(--chrome-divider);
+}
+.topbar-sides {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 1 auto;
+  min-width: 0;
+  padding: 0 14px;
+}
+.topbar-side-name {
+  min-width: 0;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 13.5px;
+  font-weight: 600;
+}
+.topbar-vs {
+  color: var(--chrome-muted);
+  font-size: 12px;
+}
+.topbar-side-mark {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+.topbar-side-mark-human {
+  background: var(--player-human);
+  box-shadow: 0 0 0 2px var(--chrome-accent-edge);
+}
+.topbar-side-mark-opponent {
+  background: var(--player-opponent);
+  box-shadow: 0 0 0 2px var(--chrome-opponent-edge);
+}
+.topbar-spacer {
+  flex: 1 1 auto;
+  min-width: 8px;
+}
+.topbar-date-block {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 4px;
+  padding: 0 14px;
+  border-left: 1px solid var(--chrome-divider);
+}
+.topbar-date {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1;
+}
+.topbar-turn-phase {
+  color: var(--chrome-muted);
+  font-size: 11px;
+  line-height: 1;
+}
+/* Narrow windows shorten each side's name sooner. */
+@media (max-width: 1099px) {
+  .topbar-side-name {
+    max-width: 120px;
+  }
+}
+
+/* ---------- Map and console row ---------- */
+#app-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: row;
+}
+
+/* ---------- Console ---------- */
+/* Two columns while expanded: the active tab's content, then the tab rail on the outer edge. The footer sits under the content. */
+#sidebar.console {
+  width: calc(var(--console-content-width) + var(--console-rail-width));
+  min-width: calc(var(--console-content-width) + var(--console-rail-width));
+  height: 100%;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 6000;
+  display: grid;
+  grid-template-columns: var(--console-content-width) var(--console-rail-width);
+  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "main rail"
+    "footer rail";
+  background: var(--chrome-bg);
+  color: var(--chrome-text);
+  color-scheme: dark;
+  overflow: hidden;
+}
+#sidebar.main-ui-disabled {
+  opacity: 0.65;
+  transition: opacity 0.15s ease;
+}
+/* Each grid cell draws its own left edge. */
+.console-main {
+  grid-area: main;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  border-left: 1px solid var(--chrome-border);
+}
+.console-header {
+  flex: 0 0 48px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px 0 16px;
+  border-bottom: 1px solid var(--chrome-border);
+}
+.console-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+.console-panel {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: 1rem;
+}
+.console-panel[hidden] {
+  display: none;
+}
+#console-panel-opponent:not([hidden]) {
+  display: flex;
+  flex-direction: column;
+}
+#console-panel-opponent .openrouter-log {
+  min-height: 120px;
+}
+.console-panel > p:first-child {
+  margin-top: 0;
+}
+/* Ranged, the strike target list, and its Cancel share one row. The row takes no space while all three are hidden. */
+.console-ranged-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 0.35rem;
+}
+.console-ranged-row:not(:has(> :not([style*="display: none"]))) {
+  display: none;
+}
+.console-rail {
+  grid-area: rail;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--chrome-rail-bg);
+  border-left: 1px solid var(--chrome-border);
+}
+.console-tab-host {
+  display: flex;
+  align-items: stretch;
+}
+.console-tab {
+  flex: none;
+  width: 100%;
+  height: 58px;
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid var(--chrome-divider);
+  border-radius: 0;
+  background: transparent;
+  color: var(--chrome-muted);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  font-size: 10px;
+  font-weight: 600;
+}
+.console-tab .chrome-icon {
+  width: 18px;
+  height: 18px;
+}
+.console-tab:hover {
+  background: var(--chrome-bg-raised);
+  color: var(--chrome-text);
+}
+.console-tab[aria-selected="true"] {
+  background: var(--chrome-bg);
+  color: var(--chrome-text);
+  box-shadow: inset -3px 0 0 var(--chrome-accent-edge);
+}
+.console-tab:disabled {
+  background: transparent;
+  color: var(--chrome-disabled);
+  opacity: 0.6;
+}
+.console-tab:focus {
+  outline-offset: -2px;
+}
+.console-footer {
+  grid-area: footer;
+  padding: 12px;
+  border-top: 1px solid var(--chrome-border);
+  border-left: 1px solid var(--chrome-border);
+  background: var(--chrome-bg-deep);
+}
+.console-footer > .control-tooltip-host {
+  display: flex;
+  width: 100%;
+}
+.console-footer #ready-btn {
+  width: 100%;
+  height: 46px;
+  font-size: 16px;
+  font-weight: 600;
+  border-radius: 4px;
+}

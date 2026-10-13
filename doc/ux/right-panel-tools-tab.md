@@ -8,7 +8,7 @@ Let the player turn tool groups on or off and see how many times each group was 
 
 ## Availability
 
-Shown when the Tools tab is selected. The right panel starts on the Model tab. Turning Run on selects this tab. While the tactical battles list is open, the tab stays visible and does not receive pointer input. See [right-panel.md](right-panel.md) and [right-panel-model-tab.md](right-panel-model-tab.md). In New game and Game over the panel is absent, so this tab is absent with it.
+Shown while the right panel's Opponent tab and its Tools sub-tab are selected. The Opponent tab starts on the Model sub-tab. Turning Run on selects this tab. While the tactical battles list is open, the tab stays visible and does not receive pointer input. See [right-panel.md](right-panel.md) and [right-panel-model-tab.md](right-panel-model-tab.md). In New game and Game over the panel is absent, so this tab is absent with it.
 
 ## Information Displayed
 

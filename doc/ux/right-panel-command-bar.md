@@ -1,21 +1,19 @@
 # Right Panel Command Bar
 
-The game-state readout and the Ready, Ranged, and air-strike controls.
+Ready, in the right panel's footer, and the Ranged and air-strike controls on the Orders tab. The game-state readout is the date block in the [top bar](top-bar.md).
 
 ## Purpose
 
-Show whose turn it is and give the player the buttons that end the turn or start a targeted order.
+Give the player the buttons that end the turn or start a targeted order.
 
 ## Availability
 
-Shown with the right panel. Ready, Ranged, and the air-strike controls follow the rules below in Strategic planning and Tactical planning. While the tactical battles list is open, the bar stays visible and does not receive pointer input. In New game and Game over the panel is absent, so these controls are absent with it. In Tactical annihilation they are disabled or hidden as stated in [modes-and-transitions.md](modes-and-transitions.md).
+Ready shows whenever the right panel does. Ranged and the air-strike controls show while the Orders tab is selected. All of them follow the rules below in Strategic planning and Tactical planning. While the tactical battles list is open, the bar stays visible and does not receive pointer input. In New game and Game over the panel is absent, so these controls are absent with it. In Tactical annihilation they are disabled or hidden as stated in [modes-and-transitions.md](modes-and-transitions.md).
 
 ## Information Displayed
 
-- The heading "Selected hex".
-- Game state: "Phase:" and "Turn:". With no match loaded, both lines are an em dash. Outside a battle, the phase line shows the strategic phase label and the turn line shows the strategic turn and the match date, still one line: `Turn: N · November, Year 3` on the global map and `Turn: N · November 22nd, Year 1` on a regional map. While a battle is active, the phase line shows the tactical phase: "Phase: Tactical planning" while the player drafts a beat, and "Phase: Tactical resolution" while a beat resolves or plays back. The turn line shows the tactical beat and that same strategic date. With the weather bonus on it also shows a weather icon for the enclosing hex, still one line.
-- The Ready button. Its label is "Ready", or "AI:" plus the elapsed wait, while opponent planning is still running. Its top edge lines up with Ranged, and the two controls are the same height.
-- The Ranged control. Its label is "Ranged", "Cancel", or "Strike". The air-strike target list and its Cancel button use that same height.
+- The Ready button, across the width of the right panel's footer. Its label is "Ready", or "AI:" plus the elapsed wait, while opponent planning is still running.
+- The Ranged control, on the Orders tab under the selected-unit readout. The row takes no space while Ranged, the target list, and Cancel are all hidden. Its label is "Ranged", "Cancel", or "Strike". The air-strike target list and its Cancel button use that same height.
 - While Strike targeting is on, a target-type choice: Enemy Units, Production, Airports, or Seaports, and a Cancel button for that targeting.
 - Control tips for Ready, Ranged, Strike, the target-type list, and Cancel are in [control-tooltips.md](control-tooltips.md).
 
@@ -51,16 +49,13 @@ Shown with the right panel. Ready, Ranged, and the air-strike controls follow th
 - The target-type choice is never shown unless strike targeting is on.
 - Strategic infantry never shows Ranged. Tactical infantry can.
 - A failed target double-click never turns targeting off.
-- During a battle, the phase line and the turn line never describe different theaters.
 
 ## Strategic and Tactical Differences
 
 | Aspect | Strategic | Tactical |
 | --- | --- | --- |
-| Turn line | Strategic turn | Tactical turn |
 | Ready | Resolves the strategic turn | Commits the battle beat |
 | Ranged | Types that can fire on the strategic map | Types that can fire in a battle, including infantry |
-| Phase line | Strategic phase | Tactical planning or Tactical resolution |
 
 ## Related Documents
 
@@ -80,7 +75,7 @@ None.
 
 ## Code Entry Points
 
-- `static/index.html` (`#sidebar-phase`, `#sidebar-turn`, `#ready-btn`, `#ranged-attack-btn`, `#air-strike-target-type`, `#air-strike-cancel-btn`)
+- `static/index.html` (`#console-footer`, `#ready-btn`, `#ranged-attack-btn`, `#air-strike-target-type`, `#air-strike-cancel-btn`)
 - `src/renderer/gameplay/readyHandler.ts`
 - `src/renderer/gameplay/readyTacticalCommit.ts`
 - `src/renderer/gameplay/tacticalOrders.ts`

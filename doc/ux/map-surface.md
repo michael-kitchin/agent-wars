@@ -8,7 +8,7 @@ Show the current theater and accept the pointer and keyboard gestures that plan 
 
 ## Availability
 
-Shown in Strategic planning, Resolution playback, and Tactical planning. While the tactical battles list is open, the map stays as it was when Ready paused, pointer input is off, and pan keys and T still follow [input-map.md](input-map.md). In New game and Game over, pointer input on the map is off while the new-game form is showing. While that form is hidden, drag and the wheel pan and zoom the preview, and a click, double-click, or right-click does not select, order, or change the selection. In Tactical annihilation the map is visible, pointer input is off, and pan keys and T still follow [input-map.md](input-map.md). In New game and Game over the map fills the window. In the other modes it fills the space beside the right panel.
+Shown in Strategic planning, Resolution playback, and Tactical planning. While the tactical battles list is open, the map stays as it was when Ready paused, pointer input is off, and pan keys and T still follow [input-map.md](input-map.md). In New game and Game over, pointer input on the map is off while the new-game form is showing. While that form is hidden, drag and the wheel pan and zoom the preview, and a click, double-click, or right-click does not select, order, or change the selection. In Tactical annihilation the map is visible, pointer input is off, and pan keys and T still follow [input-map.md](input-map.md). In New game and Game over the map fills the window. In the other modes it fills the space under the top bar and beside the right panel.
 
 ## Information Displayed
 
@@ -70,12 +70,13 @@ When no match is loaded, the basemap can still be visible under the new-game ove
 | Area | World map | The enclosing hex's tactical cells plus three neighboring rings. A new battle leaves out cells beyond a regional map's edge. A battle already underway keeps the cells it started with. Pan stays inside that area |
 | Units | Strategic units | Battle sub-units |
 | Clicks outside the area | Not applicable | Error toast, no order |
-| Turn shown on the panel | Strategic turn | Tactical turn |
+| Turn shown | Top bar, strategic turn | Top bar, tactical beat |
 | Held T | Hides terrain fill. Outside battle-detail zoom, shows hex codes, hides the weather icon, and shows the tech icon where it applies | Hides terrain fill |
 
 ## Related Documents
 
 - [modes-and-transitions.md](modes-and-transitions.md)
+- [top-bar.md](top-bar.md)
 - [selection-model.md](selection-model.md)
 - [input-map.md](input-map.md)
 - [order-lifecycle.md](order-lifecycle.md)

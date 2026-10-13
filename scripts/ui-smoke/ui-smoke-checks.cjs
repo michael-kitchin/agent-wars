@@ -11,6 +11,26 @@
 'use strict';
 
 /**
+ * Height of the top bar in CSS pixels.
+ *
+ * Purpose: The top bar, the map, and the console are all placed against this edge.
+ * When to use: Geometry checks for the top bar, the map, the console, and the game menu.
+ * Expected outcome: Matches `--topbar-height` in `static/shellChrome.css`.
+ * Exceptions: None.
+ */
+const TOPBAR_HEIGHT = 44;
+
+/**
+ * Width of the expanded console in CSS pixels: the content column plus the tab rail.
+ *
+ * Purpose: The map must end where the console starts.
+ * When to use: The expanded-console geometry check.
+ * Expected outcome: Matches `--console-content-width` plus `--console-rail-width` in `static/shellChrome.css`.
+ * Exceptions: None.
+ */
+const CONSOLE_EXPANDED_WIDTH = 376;
+
+/**
  * Scene names. Each check lists the scenes it applies to; the runner records one probe per scene.
  *
  * Purpose: Keeps scene names in one place for the runner and the checks.
@@ -21,6 +41,8 @@
 const SCENES = Object.freeze({
   newGameStartup: 'new-game-startup',
   strategic: 'strategic',
+  opponentTab: 'opponent-tab',
+  readyTip: 'ready-tip',
   newGameReopened: 'new-game-reopened',
 });
 
@@ -185,7 +207,7 @@ const CHECKS = Object.freeze([
   {
     name: 'frame-hidden-during-new-game',
     scenes: NEW_GAME_SCENES,
-    needs: ['#sidebar'],
+    needs: ['#sidebar', '#app-topbar'],
     run: (p) => {
       const shown = Object.entries(p.elements).filter(([, e]) => e.shown).map(([selector]) => selector);
       return shown.length === 0 ? null : `still shown during the new-game overlay: ${shown.join(', ')}`;
@@ -198,18 +220,119 @@ const CHECKS = Object.freeze([
     run: (p, el) => {
       const c = el('#canvas-container');
       const s = el('#sidebar');
-      return near(c.x, 0) && near(c.y, 0) && near(c.x + c.w, s.x) && near(c.y + c.h, p.viewport.h)
+      return near(c.x, 0) && near(c.y, TOPBAR_HEIGHT) && near(c.x + c.w, s.x) && near(c.y + c.h, p.viewport.h)
         ? null
-        : `#canvas-container ${fmt(c)} should run from 0,0 to the right panel at x=${Math.round(s.x)} and the window bottom`;
+        : `#canvas-container ${fmt(c)} should run from 0,${TOPBAR_HEIGHT} to the console at x=${Math.round(s.x)} and the window bottom`;
     },
   },
   {
-    name: 'scenario-turn-line',
-    scenes: [SCENES.strategic],
-    needs: ['#sidebar-turn'],
+    name: 'topbar-geometry',
+    scenes: MATCH_SCENES,
+    needs: ['#app-topbar'],
     run: (p, el) => {
-      const turn = el('#sidebar-turn').text;
-      return turn === 'Turn: 1 · September, Year 1' ? null : `#sidebar-turn reads "${turn}", expected "Turn: 1 · September, Year 1"`;
+      const t = el('#app-topbar');
+      return t.shown && near(t.x, 0) && near(t.y, 0) && near(t.w, p.viewport.w) && near(t.h, TOPBAR_HEIGHT)
+        ? null
+        : `#app-topbar is ${fmt(t)}, expected 0,0 ${p.viewport.w}x${TOPBAR_HEIGHT}`;
+    },
+  },
+  {
+    name: 'topbar-no-overflow',
+    scenes: MATCH_SCENES,
+    needs: ['#app-topbar'],
+    run: (p, el) => {
+      const t = el('#app-topbar');
+      return t.scrollWidth <= t.clientWidth + 1 ? null : `top bar content is ${t.scrollWidth}px wide in ${t.clientWidth}px`;
+    },
+  },
+  {
+    name: 'topbar-sides',
+    scenes: [SCENES.strategic],
+    needs: ['#topbar-human-side', '#topbar-opponent-side'],
+    run: (p, el) => {
+      const human = el('#topbar-human-side').text;
+      const opponent = el('#topbar-opponent-side').text;
+      return human === 'Southern Europe' && opponent === 'Northern Africa' ? null : `sides read "${human}" vs "${opponent}"`;
+    },
+  },
+  {
+    name: 'topbar-date-block',
+    scenes: [SCENES.strategic],
+    needs: ['#topbar-date', '#topbar-turn-phase'],
+    run: (p, el) => {
+      const date = el('#topbar-date').text;
+      const turn = el('#topbar-turn-phase').text;
+      return date === 'September, Year 1' && turn === 'Turn 1 · Planning'
+        ? null
+        : `date block reads "${date}" / "${turn}", expected "September, Year 1" / "Turn 1 · Planning"`;
+    },
+  },
+  {
+    name: 'placeholders-disabled',
+    scenes: [SCENES.strategic],
+    needs: ['#topbar-settings-btn', '#topbar-help-btn', '#console-tab-build', '#console-tab-forces'],
+    run: (p, el) => {
+      const enabled = Object.entries(p.elements).filter(([, e]) => e && !e.disabled).map(([selector]) => selector);
+      return enabled.length === 0 ? null : `placeholders that are not disabled: ${enabled.join(', ')}`;
+    },
+  },
+  {
+    name: 'console-expanded-geometry',
+    scenes: MATCH_SCENES,
+    needs: ['#sidebar', '#console-main', '#console-rail'],
+    run: (p, el) => {
+      const s = el('#sidebar');
+      if (!el('#console-main').shown) return 'the console content column is not shown';
+      return near(s.w, CONSOLE_EXPANDED_WIDTH) && near(s.x + s.w, p.viewport.w) && near(s.y, TOPBAR_HEIGHT) && near(s.y + s.h, p.viewport.h)
+        ? null
+        : `#sidebar is ${fmt(s)}, expected ${CONSOLE_EXPANDED_WIDTH} wide on the right edge from y=${TOPBAR_HEIGHT} to the bottom`;
+    },
+  },
+  {
+    name: 'ready-in-footer',
+    scenes: MATCH_SCENES,
+    needs: ['#console-footer', '#ready-btn'],
+    run: (p, el) => {
+      const f = el('#console-footer');
+      const r = el('#ready-btn');
+      const inside = r.shown && r.x >= f.x - 1 && r.y >= f.y - 1 && r.x + r.w <= f.x + f.w + 1 && r.y + r.h <= f.y + f.h + 1;
+      return inside ? null : `#ready-btn ${fmt(r)} is not inside #console-footer ${fmt(f)}`;
+    },
+  },
+  {
+    name: 'orders-tab-shows-panel',
+    scenes: [SCENES.strategic],
+    needs: ['#console-panel-orders', '#console-panel-opponent', '#console-title'],
+    run: (p, el) => {
+      if (!el('#console-panel-orders').shown) return 'the Orders panel is not shown';
+      if (el('#console-panel-opponent').shown) return 'the Opponent panel is shown with Orders';
+      const title = el('#console-title').text;
+      return title === 'Orders' ? null : `console title is "${title}"`;
+    },
+  },
+  {
+    name: 'opponent-tab-shows-panel',
+    scenes: [SCENES.opponentTab],
+    needs: ['#console-panel-orders', '#console-panel-opponent', '#openrouter-log', '#console-title'],
+    run: (p, el) => {
+      if (!el('#console-panel-opponent').shown) return 'the Opponent panel is not shown';
+      if (el('#console-panel-orders').shown) return 'the Orders panel is still shown';
+      if (!el('#openrouter-log').shown) return 'the AI activity log is not shown';
+      const title = el('#console-title').text;
+      return title === 'Opponent' ? null : `console title is "${title}"`;
+    },
+  },
+  {
+    name: 'control-tip-inside-window',
+    scenes: [SCENES.readyTip],
+    needs: ['#control-tooltip'],
+    run: (p, el) => {
+      const t = el('#control-tooltip');
+      if (!t.shown) return 'the Ready tip is not shown';
+      if (t.w < 100) return `the Ready tip is squeezed to ${Math.round(t.w)}px wide`;
+      return t.x >= 0 && t.y >= 0 && t.x + t.w <= p.viewport.w + 1 && t.y + t.h <= p.viewport.h + 1
+        ? null
+        : `the Ready tip is at ${fmt(t)}, outside the ${p.viewport.w}x${p.viewport.h} window`;
     },
   },
 ]);

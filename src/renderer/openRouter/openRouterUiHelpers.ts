@@ -172,11 +172,12 @@ export function updateOpenRouterCostLabel(): void {
 }
 
 /**
- * Defines the `appendOpenRouterLog` function shape (export function appendOpenRouterLog(line: string, isError = false): void).
-
- * Purpose: Supports maintainability by documenting why `appendOpenRouterLog` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Adds one timestamped line to the AI activity log and scrolls to it.
+ *
+ * Purpose: The player reads model calls, retries, and errors in one running list.
+ * When to use: For every AI interaction or error line the renderer reports.
+ * Expected outcome: A new line with the local time and `line`, styled as an error when `isError` is true. The log
+ *   scrolls to that line while it is shown. A missing log is a no-op.
  * Exceptions: None.
  */
 export function appendOpenRouterLog(line: string, isError = false): void {
@@ -187,7 +188,20 @@ export function appendOpenRouterLog(line: string, isError = false): void {
   span.textContent = `${time} ${line}`;
   if (isError) span.className = 'chrome-error';
   el.appendChild(span);
-  el.scrollTop = el.scrollHeight;
+  scrollOpenRouterLogToEnd();
+}
+
+/**
+ * Scrolls the AI activity log to its newest line.
+ *
+ * Purpose: A line added while the log is hidden cannot scroll it, so the log is scrolled again when it is shown.
+ * When to use: After a line is appended, and each time the console's Opponent tab is shown.
+ * Expected outcome: `#openrouter-log` shows its last line. A missing log is a no-op; a hidden log keeps its position.
+ * Exceptions: None.
+ */
+export function scrollOpenRouterLogToEnd(): void {
+  const el = document.getElementById('openrouter-log');
+  if (el) el.scrollTop = el.scrollHeight;
 }
 
 /**

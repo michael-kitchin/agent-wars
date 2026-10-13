@@ -18764,7 +18764,11 @@ ${bonuses}`;
     span.textContent = `${time} ${line}`;
     if (isError) span.className = "chrome-error";
     el.appendChild(span);
-    el.scrollTop = el.scrollHeight;
+    scrollOpenRouterLogToEnd();
+  }
+  function scrollOpenRouterLogToEnd() {
+    const el = document.getElementById("openrouter-log");
+    if (el) el.scrollTop = el.scrollHeight;
   }
   function clearOpenRouterLog() {
     const el = document.getElementById("openrouter-log");
@@ -23367,14 +23371,6 @@ ${bonuses}`;
     return unitType ? UNIT_TYPE_LABELS[unitType] ?? "?" : "?";
   }
 
-  // src/shared/sidebarPhaseLabel.ts
-  function formatSidebarPhaseText(args) {
-    if (!args.hasGameState) return "\u2014";
-    if (args.battleActive && args.beatPlaybackActive) return "Phase: Tactical resolution";
-    if (args.battleActive) return "Phase: Tactical planning";
-    return `Phase: ${args.strategicPhaseLabel}`;
-  }
-
   // src/renderer/gameplay/newGameOptionsUi.ts
   var NEW_GAME_FOG_CHECKBOX_ID = "new-game-fog-checkbox";
   var NEW_GAME_BONUS_LEVEL_SELECT_IDS = {
@@ -23596,9 +23592,9 @@ ${bonuses}`;
   }
 
   // src/renderer/chrome/selectTabPanel.ts
-  function selectTabPanel(activeTabId, tabs) {
+  function selectTabPanel(activeTabId2, tabs) {
     for (const tab of tabs) {
-      const selected = tab.tabId === activeTabId;
+      const selected = tab.tabId === activeTabId2;
       const tabEl = document.getElementById(tab.tabId);
       const panelEl = document.getElementById(tab.panelId);
       tabEl?.setAttribute("aria-selected", selected ? "true" : "false");
@@ -25310,6 +25306,17 @@ ${bonuses}`;
     if (!(select instanceof HTMLSelectElement)) return null;
     return hostFromTarget(select) ? select : null;
   }
+  function placeTip(el, x, y) {
+    el.style.left = "0px";
+    el.style.top = "0px";
+    const { width, height } = el.getBoundingClientRect();
+    const fitsRight = x + TOOLTIP_OFFSET_PX + width <= window.innerWidth;
+    const fitsBelow = y + TOOLTIP_OFFSET_PX + height <= window.innerHeight;
+    const left = fitsRight ? x + TOOLTIP_OFFSET_PX : Math.max(0, x - TOOLTIP_OFFSET_PX - width);
+    const top = fitsBelow ? y + TOOLTIP_OFFSET_PX : Math.max(0, y - TOOLTIP_OFFSET_PX - height);
+    el.style.left = `${left}px`;
+    el.style.top = `${top}px`;
+  }
   function showTip(host, text) {
     const el = tipElement();
     if (!el) return;
@@ -25323,9 +25330,8 @@ ${bonuses}`;
       y = rect.top;
     }
     el.textContent = text;
-    el.style.left = `${x + TOOLTIP_OFFSET_PX}px`;
-    el.style.top = `${y + TOOLTIP_OFFSET_PX}px`;
     el.classList.remove("hidden");
+    placeTip(el, x, y);
     el.setAttribute("aria-hidden", "false");
     el.setAttribute("role", "tooltip");
   }
@@ -25414,8 +25420,7 @@ ${bonuses}`;
   function moveVisibleTip(clientX, clientY) {
     const el = tipElement();
     if (!el || el.classList.contains("hidden")) return;
-    el.style.left = `${clientX + TOOLTIP_OFFSET_PX}px`;
-    el.style.top = `${clientY + TOOLTIP_OFFSET_PX}px`;
+    placeTip(el, clientX, clientY);
   }
   function installControlTooltip() {
     if (installed) return;
@@ -25575,11 +25580,53 @@ ${bonuses}`;
     map.style.pointerEvents = overlay.classList.contains(COLLAPSED_CLASS) ? "auto" : "none";
   }
 
-  // src/renderer/core/uiState.ts
-  function formatStrategicPhaseLabelForSidebar(phase) {
+  // src/shared/topBarDateBlock.ts
+  function formatTopBarDateBlock(args) {
+    if (!args.hasGameState) return { date: "\u2014", turnPhase: "\u2014" };
+    const date = args.dateLabel.length > 0 ? args.dateLabel : "\u2014";
+    if (args.battleBeat !== null) {
+      const battlePhase = args.beatPlaybackActive ? "Tactical resolution" : "Tactical planning";
+      return { date, turnPhase: `Beat ${args.battleBeat} \xB7 ${battlePhase}` };
+    }
+    return { date, turnPhase: `Turn ${args.turnNumber} \xB7 ${args.strategicPhaseLabel}` };
+  }
+
+  // src/renderer/chrome/topBar.ts
+  function formatStrategicPhaseLabel(phase) {
     if (!phase) return phase;
     return phase.charAt(0).toUpperCase() + phase.slice(1).toLowerCase();
   }
+  function setText(id, text) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = text;
+  }
+  function renderTopBarSides(state) {
+    setText("topbar-human-side", state?.humanHomeRegion || "\u2014");
+    setText("topbar-opponent-side", state?.aiHomeRegion || "\u2014");
+  }
+  function renderTopBarDateBlock(state) {
+    const battle = rendererSharedState.tacticalBattleSnapshot;
+    const text = formatTopBarDateBlock({
+      hasGameState: state != null,
+      dateLabel: state?.currentDateLabel ?? "",
+      turnNumber: state?.turnNumber ?? 0,
+      strategicPhaseLabel: state ? formatStrategicPhaseLabel(state.phase) : "",
+      battleBeat: battle ? battle.tacticalTurnNumber : null,
+      beatPlaybackActive: rendererSharedState.resolutionMoveAnimation != null
+    });
+    const dateEl = document.getElementById("topbar-date");
+    if (dateEl) {
+      dateEl.textContent = text.date;
+      if (state && battle?.weather) dateEl.insertAdjacentHTML("beforeend", ` \xB7 ${formatWeatherIconHtml(battle.weather)}`);
+    }
+    setText("topbar-turn-phase", text.turnPhase);
+  }
+  function renderTopBarStatus(state) {
+    renderTopBarSides(state);
+    renderTopBarDateBlock(state);
+  }
+
+  // src/renderer/core/uiState.ts
   function updateSidebar(getPrimarySelectedUnitId2, formatUnitDisplayName3) {
     const selectedUnitEl = document.getElementById("sidebar-selected-unit");
     if (selectedUnitEl) {
@@ -25594,33 +25641,12 @@ ${bonuses}`;
     }
   }
   function updateGameStateSidebar(state) {
-    const phaseEl = document.getElementById("sidebar-phase");
-    const turnEl = document.getElementById("sidebar-turn");
-    if (phaseEl) {
-      phaseEl.textContent = formatSidebarPhaseText({
-        hasGameState: state != null,
-        strategicPhaseLabel: state ? formatStrategicPhaseLabelForSidebar(state.phase) : "",
-        battleActive: rendererSharedState.tacticalBattleSnapshot != null,
-        beatPlaybackActive: rendererSharedState.resolutionMoveAnimation != null
-      });
-    }
-    if (turnEl) {
-      if (!state) {
-        turnEl.textContent = "\u2014";
-      } else if (rendererSharedState.tacticalBattleSnapshot) {
-        const date = state.currentDateLabel ? ` \xB7 ${state.currentDateLabel}` : "";
-        const weather = rendererSharedState.tacticalBattleSnapshot.weather ? ` \xB7 ${formatWeatherIconHtml(rendererSharedState.tacticalBattleSnapshot.weather)}` : "";
-        turnEl.innerHTML = `Turn: ${rendererSharedState.tacticalBattleSnapshot.tacticalTurnNumber}${date}${weather}`;
-      } else {
-        const date = state.currentDateLabel ? ` \xB7 ${state.currentDateLabel}` : "";
-        turnEl.textContent = `Turn: ${state.turnNumber}${date}`;
-      }
-    }
+    renderTopBarStatus(state);
   }
   function blurMapChromeIfFocused() {
     const active2 = document.activeElement;
     if (active2 instanceof HTMLElement) {
-      const insideHiddenChrome = active2.closest("#minimap") != null || active2.closest("#terrain-legend") != null || active2.closest("#sidebar") != null;
+      const insideHiddenChrome = active2.closest("#minimap") != null || active2.closest("#terrain-legend") != null || active2.closest("#app-topbar") != null || active2.closest("#sidebar") != null;
       if (insideHiddenChrome) active2.blur();
     }
     dismissStaleControlTooltip();
@@ -25634,10 +25660,11 @@ ${bonuses}`;
         child.style.pointerEvents = enabled ? "" : "none";
       }
     }
-    const sidebar = document.getElementById("sidebar");
-    if (sidebar) {
-      sidebar.style.pointerEvents = enabled ? "" : "none";
-      sidebar.classList.toggle("main-ui-disabled", !enabled);
+    for (const id of ["app-topbar", "sidebar"]) {
+      const chrome = document.getElementById(id);
+      if (!chrome) continue;
+      chrome.style.pointerEvents = enabled ? "" : "none";
+      chrome.classList.toggle("main-ui-disabled", !enabled);
     }
     syncNewGameDialogMapPointer();
   }
@@ -34324,6 +34351,29 @@ ${bonuses}`;
     window.addEventListener("blur", hideUnitOriginTooltip);
   }
 
+  // src/renderer/chrome/consoleFrame.ts
+  var CONSOLE_TABS = Object.freeze([
+    { tabId: "console-tab-orders", panelId: "console-panel-orders", title: "Orders" },
+    { tabId: "console-tab-opponent", panelId: "console-panel-opponent", title: "Opponent", onShow: scrollOpenRouterLogToEnd }
+  ]);
+  var activeTabId = CONSOLE_TABS[0].tabId;
+  function applyConsoleState() {
+    selectTabPanel(activeTabId, CONSOLE_TABS);
+    const active2 = CONSOLE_TABS.find((tab) => tab.tabId === activeTabId);
+    const title = document.getElementById("console-title");
+    if (title && active2) title.textContent = active2.title;
+    active2?.onShow?.();
+  }
+  function wireConsoleFrame() {
+    for (const tab of CONSOLE_TABS) {
+      document.getElementById(tab.tabId)?.addEventListener("click", () => {
+        activeTabId = tab.tabId;
+        applyConsoleState();
+      });
+    }
+    applyConsoleState();
+  }
+
   // src/renderer/gameplay/formatTargetingValidationReason.ts
   function formatTargetingValidationReason2(reason, fallbackMessage, resolveUnitDisplayName) {
     const trimmed = reason?.trim();
@@ -35599,10 +35649,11 @@ ${bonuses}`;
       rendererSharedState.tacticalEntryButtonPointerInside = false;
     });
     const canvasContainer = document.getElementById("canvas-container");
-    const sidebarPanel = document.getElementById("sidebar");
-    sidebarPanel?.addEventListener("pointerenter", () => {
-      dismissTerrainTooltipWhenPointerLeavesMapPanel(deps);
-    });
+    for (const chromeId of ["sidebar", "app-topbar"]) {
+      document.getElementById(chromeId)?.addEventListener("pointerenter", () => {
+        dismissTerrainTooltipWhenPointerLeavesMapPanel(deps);
+      });
+    }
     canvasContainer?.addEventListener("pointermove", (e) => {
       deps.updateMapInteractionCursor(e.clientX, e.clientY);
     });
@@ -35863,6 +35914,7 @@ ${bonuses}`;
       syncTacticalEntryButtonOverlay: syncTacticalEntryButtonOverlay2
     });
     installUnitOriginTooltip();
+    wireConsoleFrame();
     wireInitCore({
       requestRedraw: requestRedraw2,
       resizeAndRedraw,

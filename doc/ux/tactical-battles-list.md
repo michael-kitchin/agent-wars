@@ -8,7 +8,7 @@ Let the player pick one contested hex to fight as a tactical battle, or ignore m
 
 ## Availability
 
-Opens in the Tactical battles list mode, after Ready reports melee candidates and the Tactical battles checkbox is checked. A dimmed backdrop covers the window, and the panel is centered on the visible map area (not on the map plus the right panel). The panel follows the map area when the window resizes. On a small map area the panel shrinks to fit, and a long list scrolls inside it. The map and the right panel stay visible underneath and do not receive pointer input. Markers that were already on the map are not refreshed until the dialog closes. When that checkbox is unchecked, the dialog does not open and the turn continues as Ignore. See [modes-and-transitions.md](modes-and-transitions.md) and [right-panel-model-tab.md](right-panel-model-tab.md).
+Opens in the Tactical battles list mode, after Ready reports melee candidates and the Tactical battles checkbox is checked. A dimmed backdrop covers the window, and the panel is centered on the visible map area (not on the map plus the right panel). The panel follows the map area when the window resizes. On a small map area the panel shrinks to fit, and a long list scrolls inside it. The map, the top bar, and the right panel stay visible underneath and do not receive pointer input. Markers that were already on the map are not refreshed until the dialog closes. When that checkbox is unchecked, the dialog does not open and the turn continues as Ignore. See [modes-and-transitions.md](modes-and-transitions.md) and [right-panel-model-tab.md](right-panel-model-tab.md).
 
 ## Information Displayed
 

@@ -33,7 +33,8 @@ Visual styling and the arrangement of items inside an element are out of scope. 
 | The stack callout | [selection-model.md](ux/selection-model.md), [input-map.md](ux/input-map.md) | [stack-callout.md](ux/stack-callout.md) |
 | Single-hex build | [input-map.md](ux/input-map.md), [modes-and-transitions.md](ux/modes-and-transitions.md) | [build-popup.md](ux/build-popup.md) |
 | Multi-hex build | [build-popup.md](ux/build-popup.md) | [multi-hex-build-popup.md](ux/multi-hex-build-popup.md) |
-| The right panel as a whole | [modes-and-transitions.md](ux/modes-and-transitions.md) | [right-panel.md](ux/right-panel.md) |
+| The top bar or its date block | [modes-and-transitions.md](ux/modes-and-transitions.md) | [top-bar.md](ux/top-bar.md) |
+| The right panel as a whole or its tabs | [modes-and-transitions.md](ux/modes-and-transitions.md) | [right-panel.md](ux/right-panel.md) |
 | Ready, Ranged, or Strike | [selection-model.md](ux/selection-model.md), [order-lifecycle.md](ux/order-lifecycle.md), [modes-and-transitions.md](ux/modes-and-transitions.md) | [right-panel-command-bar.md](ux/right-panel-command-bar.md) |
 | Selected unit or order lists | [order-lifecycle.md](ux/order-lifecycle.md), [selection-model.md](ux/selection-model.md) | [right-panel-selection-and-orders.md](ux/right-panel-selection-and-orders.md) |
 | The Tools tab | [modes-and-transitions.md](ux/modes-and-transitions.md) | [right-panel-tools-tab.md](ux/right-panel-tools-tab.md) |
@@ -80,8 +81,9 @@ Element documents share a fixed heading set:
 - [stack-callout.md](ux/stack-callout.md): the list of units in a hex, the Bonuses tooltip, and how the list changes the selection.
 - [build-popup.md](ux/build-popup.md): the single-hex build queue popup and the markers that open it.
 - [multi-hex-build-popup.md](ux/multi-hex-build-popup.md): the build queue popup used when several build hexes are selected together.
-- [right-panel.md](ux/right-panel.md): the right panel as a whole, including tab switching.
-- [right-panel-command-bar.md](ux/right-panel-command-bar.md): game state readout, Ready, Ranged, and air strike controls.
+- [top-bar.md](ux/top-bar.md): the bar across the top: the two sides and the date block.
+- [right-panel.md](ux/right-panel.md): the console docked on the right: its tab rail and the footer that holds Ready.
+- [right-panel-command-bar.md](ux/right-panel-command-bar.md): Ready, Ranged, and air strike controls.
 - [right-panel-selection-and-orders.md](ux/right-panel-selection-and-orders.md): the selected-unit readout and the movement, ranged, and air-strike lists.
 - [right-panel-tools-tab.md](ux/right-panel-tools-tab.md): the Tools tab and its tool list.
 - [right-panel-model-tab.md](ux/right-panel-model-tab.md): API key, model, reasoning effort, Run, New, the Tactical battles checkbox, and the model description tooltip.
@@ -120,6 +122,7 @@ Cells are `Shown`, `Hidden`, `Disabled` (visible, but pointer input is off), `Ch
 | Stack callout | Hidden | Shown | Hidden | Hidden | Shown | Hidden | Hidden |
 | Build popup | Hidden | Shown | Disabled | Disabled | Hidden | Hidden | Hidden |
 | Multi-hex build popup | Hidden | Shown | Disabled | Disabled | Hidden | Hidden | Hidden |
+| Top bar | Hidden | Shown | Disabled | Changed | Changed | Disabled | Hidden |
 | Right panel | Hidden | Shown | Disabled | Shown | Shown | Disabled | Hidden |
 | Command bar | Hidden | Shown | Disabled | Shown | Changed | Disabled | Hidden |
 | Selection and orders | Hidden | Shown | Disabled | Shown | Changed | Disabled | Hidden |
