@@ -70,7 +70,7 @@ When no match is loaded, the basemap can still be visible under the new-game ove
 | Area | World map | The enclosing hex's tactical cells plus three neighboring rings. A new battle leaves out cells beyond a regional map's edge. A battle already underway keeps the cells it started with. Pan stays inside that area |
 | Units | Strategic units | Battle sub-units |
 | Clicks outside the area | Not applicable | Error toast, no order |
-| Turn shown | Top bar, strategic turn | Top bar, tactical beat |
+| Turn shown | Top bar, strategic turn | Battle header, tactical beat |
 | Held T | Hides terrain fill. Outside battle-detail zoom, shows hex codes, hides the weather icon, and shows the tech icon where it applies | Hides terrain fill |
 | Tech view | The same as held T, until the player chooses Weather. No effect while the new-game or game-over overlay is open; Tech applies again when it closes | No effect; the battle keeps its normal view, and Tech applies again after the battle |
 

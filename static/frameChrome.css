@@ -171,6 +171,61 @@ body:has(#game-over-overlay:not(.hidden)) #sidebar {
   }
 }
 
+/* ---------- Battle header ---------- */
+/* While a battle is open, battleHeader.ts puts .topbar-battle on the bar: the match status hides, and the battle's title, beat, and controls show in its place. */
+#app-topbar:not(.topbar-battle) .battle-header-only,
+#app-topbar.topbar-battle .topbar-sides,
+#app-topbar.topbar-battle .topbar-stat,
+#app-topbar.topbar-battle .topbar-spacer,
+#app-topbar.topbar-battle .topbar-date-block {
+  display: none;
+}
+#app-topbar.topbar-battle {
+  background: var(--battle-header-bg);
+  border-bottom-color: var(--battle-header-border);
+}
+/* The title and the status line. The title keeps its width; the caption beside it gives way first. */
+.battle-header-place {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 430px;
+  padding: 0 14px;
+}
+.battle-header-title-line {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+.battle-header-title {
+  flex: none;
+  font-size: 13.5px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+.battle-header-caption,
+.battle-header-status {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--chrome-muted);
+  font-size: 11.5px;
+  line-height: 1.1;
+}
+/* The middle of the header; it fills the space between the title and the controls on the right. */
+.battle-header-center {
+  flex: 1 1 auto;
+  min-width: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-left: 1px solid var(--chrome-divider);
+}
+
 /* ---------- Game menu ---------- */
 .game-menu {
   position: fixed;

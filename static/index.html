@@ -16,6 +16,10 @@
 <body>
   <header id="app-topbar" aria-label="Match status">
     <button type="button" id="game-menu-btn" class="topbar-icon-btn topbar-menu-btn" aria-label="Game menu" aria-haspopup="true" aria-expanded="false" aria-controls="game-menu" data-control-tooltip="Open the game menu to start a new game, choose whether Ready offers tactical battles, or quit."><svg class="chrome-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 4h12M2 8h12M2 12h12"></path></svg></button>
+    <div id="battle-header-place" class="battle-header-place battle-header-only">
+      <span class="battle-header-title-line"><span id="battle-header-title" class="battle-header-title">—</span><span id="battle-header-caption" class="battle-header-caption"></span></span>
+      <span id="battle-header-status" class="battle-header-status">—</span>
+    </div>
     <div class="topbar-sides">
       <span class="topbar-side-mark topbar-side-mark-human" aria-hidden="true"></span>
       <span id="topbar-human-side" class="topbar-side-name">—</span>
@@ -44,6 +48,7 @@
       <span id="topbar-date" class="topbar-date">—</span>
       <span id="topbar-turn-phase" class="topbar-turn-phase">—</span>
     </div>
+    <div id="battle-header-center" class="battle-header-center battle-header-only"></div>
     <span class="control-tooltip-host" data-control-tooltip="Settings is not available in this version."><button type="button" id="topbar-settings-btn" class="topbar-icon-btn" aria-label="Settings" disabled><svg class="chrome-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 4h6.5M12.5 4H14M2 8h1.5M7.5 8H14M2 12h8.5"></path><circle cx="10.5" cy="4" r="1.8"></circle><circle cx="5.5" cy="8" r="1.8"></circle><circle cx="12.3" cy="12" r="1.8"></circle></svg></button></span>
     <span class="control-tooltip-host" data-control-tooltip="Help is not available in this version."><button type="button" id="topbar-help-btn" class="topbar-icon-btn" aria-label="Help" disabled><svg class="chrome-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.3"></circle><path d="M6.3 6.2a1.8 1.8 0 1 1 2.5 1.7c-.5.2-.8.6-.8 1.1v.5M8 11.4v.1"></path></svg></button></span>
   </header>

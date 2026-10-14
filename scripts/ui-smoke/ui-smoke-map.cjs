@@ -316,7 +316,7 @@ async function readBattle(page) {
  *
  * Purpose: A player starts a battle from the marker on a hex both sides hold; the marker shows only when zoomed in.
  * When to use: During world-map planning, on a hex that holds units of both sides, after `captureMainMap`.
- * Expected outcome: The top bar reads "Beat 1 · Tactical planning".
+ * Expected outcome: The battle header's status line starts with "Beat 1 · Tactical planning".
  * Exceptions: Throws when the marker never shows or the battle does not open within a minute.
  */
 async function enterBattleAt(page, h3Index) {
@@ -328,7 +328,7 @@ async function enterBattleAt(page, h3Index) {
     await page.waitForTimeout(MAP_WAIT_MS.settle);
   }
   await page.click(marker);
-  await page.waitForFunction(() => document.getElementById('topbar-turn-phase')?.textContent === 'Beat 1 · Tactical planning', null, { timeout: MAP_WAIT_MS.battle });
+  await page.waitForFunction(() => (document.getElementById('battle-header-status')?.textContent || '').startsWith('Beat 1 · Tactical planning'), null, { timeout: MAP_WAIT_MS.battle });
   await page.waitForTimeout(MAP_WAIT_MS.settle);
 }
 

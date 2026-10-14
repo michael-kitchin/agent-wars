@@ -37,6 +37,9 @@
   --topbar-height: 44px;
   --console-content-width: 320px;
   --console-rail-width: 56px;
+  /* The battle header: the top bar's darker, warmer face while a battle is open, so the theater reads at a glance. */
+  --battle-header-bg: #17141f;
+  --battle-header-border: #4a3247;
   /* Marks what the player has selected, in lists and on the map. */
   --selection-mark: #f2c14e;
 }

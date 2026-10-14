@@ -25783,10 +25783,6 @@ ${bonuses}`;
   function formatTopBarDateBlock(args) {
     if (!args.hasGameState) return { date: "\u2014", turnPhase: "\u2014" };
     const date = args.dateLabel.length > 0 ? args.dateLabel : "\u2014";
-    if (args.battleBeat !== null) {
-      const battlePhase = args.beatPlaybackActive ? "Tactical resolution" : "Tactical planning";
-      return { date, turnPhase: `Beat ${args.battleBeat} \xB7 ${battlePhase}` };
-    }
     return { date, turnPhase: `Turn ${args.turnNumber} \xB7 ${args.strategicPhaseLabel}` };
   }
 
@@ -25832,6 +25828,73 @@ ${bonuses}`;
     ).join(", ");
   }
 
+  // src/shared/battleHeaderText.ts
+  function formatBattleHeaderTitle(hexCode) {
+    return hexCode ? `Battle at (${hexCode})` : "Battle";
+  }
+  function formatBattleBeatLine(beat, beatPlaybackActive) {
+    return `Beat ${beat} \xB7 ${beatPlaybackActive ? "Tactical resolution" : "Tactical planning"}`;
+  }
+  function formatBattleHeaderStatus(input) {
+    const beatLine = formatBattleBeatLine(input.beat, input.beatPlaybackActive);
+    return input.dateLabel.length > 0 ? `${beatLine} \xB7 ${input.dateLabel}` : beatLine;
+  }
+
+  // src/shared/orderTargetHexCode.ts
+  function orderTargetHexCode(h3Index, battle) {
+    if (!h3Index) return null;
+    try {
+      if (!battle) return getStrategicHexCode(h3Index) ?? null;
+      const parentCode = getStrategicHexCode(battle.enclosingStrategicH3Index);
+      const cellCode = tacticalBattleHexCode(battle.enclosingStrategicH3Index, h3Index);
+      return parentCode && cellCode ? `${parentCode}.${cellCode}` : null;
+    } catch {
+      return null;
+    }
+  }
+
+  // src/renderer/chrome/battleHeader.ts
+  var TOPBAR_BATTLE_CLASS = "topbar-battle";
+  var captionRequestSeq = 0;
+  function switchTopBarToBattle(inBattle) {
+    const bar = document.getElementById("app-topbar");
+    if (!bar) return;
+    bar.classList.toggle(TOPBAR_BATTLE_CLASS, inBattle);
+    bar.setAttribute("aria-label", inBattle ? "Battle status" : "Match status");
+  }
+  function renderBattleHeaderCaption(battle) {
+    const captionEl = document.getElementById("battle-header-caption");
+    if (!captionEl || captionEl.dataset.battleId === battle.battleId) return;
+    captionEl.dataset.battleId = battle.battleId;
+    captionEl.innerHTML = "";
+    const requestSeq = ++captionRequestSeq;
+    void getCachedNamingLineForTarget({ h3Index: battle.enclosingStrategicH3Index, resolution: 1 }).then((caption) => {
+      if (requestSeq !== captionRequestSeq) return;
+      captionEl.innerHTML = caption && caption.text.trim() !== "" ? formatHexNamingCaptionHtml(caption) : "";
+    });
+  }
+  function renderBattleHeader(state, battle) {
+    const inBattle = state != null && battle != null;
+    switchTopBarToBattle(inBattle);
+    if (!state || !battle) {
+      const captionEl = document.getElementById("battle-header-caption");
+      if (captionEl) delete captionEl.dataset.battleId;
+      return;
+    }
+    const titleEl = document.getElementById("battle-header-title");
+    if (titleEl) titleEl.textContent = formatBattleHeaderTitle(orderTargetHexCode(battle.enclosingStrategicH3Index, null));
+    const statusEl = document.getElementById("battle-header-status");
+    if (statusEl) {
+      statusEl.textContent = formatBattleHeaderStatus({
+        beat: battle.tacticalTurnNumber,
+        beatPlaybackActive: rendererSharedState.resolutionMoveAnimation != null,
+        dateLabel: state.currentDateLabel ?? ""
+      });
+      if (battle.weather) statusEl.insertAdjacentHTML("beforeend", ` \xB7 ${formatWeatherIconHtml(battle.weather)}`);
+    }
+    renderBattleHeaderCaption(battle);
+  }
+
   // src/renderer/chrome/topBar.ts
   function formatStrategicPhaseLabel(phase) {
     if (!phase) return phase;
@@ -25846,20 +25909,13 @@ ${bonuses}`;
     setText("topbar-opponent-side", state?.aiHomeRegion || "\u2014");
   }
   function renderTopBarDateBlock(state) {
-    const battle = rendererSharedState.tacticalBattleSnapshot;
     const text = formatTopBarDateBlock({
       hasGameState: state != null,
       dateLabel: state?.currentDateLabel ?? "",
       turnNumber: state?.turnNumber ?? 0,
-      strategicPhaseLabel: state ? formatStrategicPhaseLabel(state.phase) : "",
-      battleBeat: battle ? battle.tacticalTurnNumber : null,
-      beatPlaybackActive: rendererSharedState.resolutionMoveAnimation != null
+      strategicPhaseLabel: state ? formatStrategicPhaseLabel(state.phase) : ""
     });
-    const dateEl = document.getElementById("topbar-date");
-    if (dateEl) {
-      dateEl.textContent = text.date;
-      if (state && battle?.weather) dateEl.insertAdjacentHTML("beforeend", ` \xB7 ${formatWeatherIconHtml(battle.weather)}`);
-    }
+    setText("topbar-date", text.date);
     setText("topbar-turn-phase", text.turnPhase);
   }
   function renderTopBarStats(state) {
@@ -25888,6 +25944,7 @@ ${bonuses}`;
     renderTopBarSides(state);
     renderTopBarStats(state);
     renderTopBarDateBlock(state);
+    renderBattleHeader(state, rendererSharedState.tacticalBattleSnapshot);
   }
 
   // src/renderer/chrome/gameMenu.ts
@@ -26130,19 +26187,6 @@ ${bonuses}`;
       const pressed = row.dataset.unitId !== void 0 && selected.has(row.dataset.unitId);
       row.querySelector(".console-order-select")?.setAttribute("aria-pressed", pressed ? "true" : "false");
     });
-  }
-
-  // src/shared/orderTargetHexCode.ts
-  function orderTargetHexCode(h3Index, battle) {
-    if (!h3Index) return null;
-    try {
-      if (!battle) return getStrategicHexCode(h3Index) ?? null;
-      const parentCode = getStrategicHexCode(battle.enclosingStrategicH3Index);
-      const cellCode = tacticalBattleHexCode(battle.enclosingStrategicH3Index, h3Index);
-      return parentCode && cellCode ? `${parentCode}.${cellCode}` : null;
-    } catch {
-      return null;
-    }
   }
 
   // src/shared/selectionPanelSummary.ts

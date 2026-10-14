@@ -1,10 +1,10 @@
 /**
- * Scene names, sizes, and small helpers shared by the UI smoke checks and the runner.
+ * Scene names, sizes, settle times, and small helpers shared by the UI smoke checks and the runner.
  *
- * Purpose: The frame checks, the console checks, the scenario checks, the map chrome checks, and the runner name scenes
- *   and compare boxes the same way.
+ * Purpose: The frame checks, the console checks, the scenario checks, the map chrome checks, the battle checks, and the
+ *   runner name scenes, wait, and compare boxes the same way.
  * When to use: Required by `ui-smoke-checks.cjs`, `ui-smoke-console-checks.cjs`, `ui-smoke-scenario-checks.cjs`,
- *   `ui-smoke-map-chrome-checks.cjs`, and `ui-smoke.cjs`.
+ *   `ui-smoke-map-chrome-checks.cjs`, `ui-smoke-battle-checks.cjs`, `ui-smoke-new-game.cjs`, and `ui-smoke.cjs`.
  * Expected outcome: Plain constants and pure functions; nothing runs on load.
  * Exceptions: None.
  */
@@ -74,6 +74,7 @@ const SCENES = Object.freeze({
   battleStart: 'battle-start',
   battleSelection: 'battle-selection',
   battleOrders: 'battle-orders',
+  battleSmallWindow: 'battle-small-window',
   battleBeat: 'battle-beat',
   newGameReopened: 'new-game-reopened',
   regionalStart: 'regional-start',
@@ -92,6 +93,23 @@ const SCENES = Object.freeze({
 const NEW_GAME_SCENES = Object.freeze([SCENES.newGameStartup, SCENES.newGameReopened, SCENES.gameOverReopened]);
 
 /**
+ * Scenes that show a battle.
+ *
+ * Purpose: In a battle the top bar shows the battle header, so these scenes get their own checks.
+ * When to use: The `scenes` list of a check that applies only while a battle is open.
+ * Expected outcome: The battle's first scene, the selection and the queued march in it, the battle at the 800 x 600
+ *   minimum, and the beat after Ready. The beat can end the battle; its checks allow for that.
+ * Exceptions: None.
+ */
+const BATTLE_SCENES = Object.freeze([
+  SCENES.battleStart,
+  SCENES.battleSelection,
+  SCENES.battleOrders,
+  SCENES.battleSmallWindow,
+  SCENES.battleBeat,
+]);
+
+/**
  * Scenes that show a match: every scene that is not a new-game scene.
  *
  * Purpose: A scene added to `SCENES` is covered by the match checks without editing them.
@@ -100,6 +118,18 @@ const NEW_GAME_SCENES = Object.freeze([SCENES.newGameStartup, SCENES.newGameReop
  * Exceptions: None.
  */
 const MATCH_SCENES = Object.freeze(Object.values(SCENES).filter((scene) => !NEW_GAME_SCENES.includes(scene)));
+
+/**
+ * How long to let the page settle, in milliseconds.
+ *
+ * Purpose: Map tiles, canvas redraws, and the new-game overlay's own start-up work finish before a probe.
+ * When to use: After a size change (`resize`), a click (`click`), the overlay opening (`overlay`), a match start
+ *   (`start`), and while the pointer rests on a control until its tip shows (`tip`, longer than the one-second dwell).
+ *   `turn` is the longest a played turn or battle beat may take before the run gives up.
+ * Expected outcome: Fixed waits; the checks do not depend on map tiles having loaded.
+ * Exceptions: None.
+ */
+const SETTLE_MS = Object.freeze({ resize: 1500, click: 500, overlay: 2500, start: 2500, tip: 1500, turn: 120000 });
 
 /**
  * Reports whether two numbers are within one CSS pixel.
@@ -131,7 +161,9 @@ module.exports = {
   CONSOLE_COLLAPSED_WIDTH,
   SCENES,
   NEW_GAME_SCENES,
+  BATTLE_SCENES,
   MATCH_SCENES,
+  SETTLE_MS,
   near,
   fmt,
 };

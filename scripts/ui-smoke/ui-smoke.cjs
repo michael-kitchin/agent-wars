@@ -20,6 +20,8 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { SCENES, probePage, probeSelectors, runChecks } = require('./ui-smoke-checks.cjs');
+const { SETTLE_MS } = require('./ui-smoke-scenes.cjs');
+const { openNewGameOverlay, startRegionalMatch, startScenarioMatch, waitForNewGameOverlay } = require('./ui-smoke-new-game.cjs');
 const {
   LAND_UNIT_TYPES,
   captureMainMap,
@@ -50,38 +52,6 @@ const VIEWPORTS = Object.freeze([
 ]);
 
 /**
- * The fixed scenario, as option values in the new-game overlay.
- *
- * Purpose: Every run shows the same match, so checks can compare known values.
- * When to use: Only by `startScenarioMatch`.
- * Expected outcome: Southern Europe against Northern Africa, a small game, starting in September.
- * Exceptions: None.
- */
-const SCENARIO = Object.freeze({
-  humanRegion: 'Southern Europe',
-  aiRegion: 'Northern Africa',
-  startMonth: '9',
-  gameSize: 'small',
-});
-
-/**
- * The fixed regional scenario, as option values on the new-game overlay's Regional tab.
- *
- * Purpose: The regional scenes always show the same region and sides, so their checks can compare known values.
- * When to use: Only by `startRegionalMatch`.
- * Expected outcome: Southern Mexico and the isthmus against NE Mexico and the Bajio in Central America, a small game,
- *   starting in April.
- * Exceptions: None.
- */
-const REGIONAL_SCENARIO = Object.freeze({
-  region: 'central_america',
-  humanSide: 'southern_mexico_isthmus',
-  aiSide: 'ne_mexico_bajio',
-  startMonth: '4',
-  gameSize: 'small',
-});
-
-/**
  * The window size of the small-window scene: the app's minimum.
  *
  * Purpose: The console's contents, the selection panel, and the toast band must still fit there.
@@ -90,18 +60,6 @@ const REGIONAL_SCENARIO = Object.freeze({
  * Exceptions: None.
  */
 const SMALL_WINDOW = VIEWPORTS[VIEWPORTS.length - 1];
-
-/**
- * How long to let the page settle, in milliseconds.
- *
- * Purpose: Map tiles, canvas redraws, and the new-game overlay's own start-up work finish before a probe.
- * When to use: After a size change (`resize`), a click (`click`), the overlay opening (`overlay`), a match start
- *   (`start`), and while the pointer rests on a control until its tip shows (`tip`, longer than the one-second dwell).
- *   `turn` is the longest a played turn or battle beat may take before the run gives up.
- * Expected outcome: Fixed waits; the checks do not depend on map tiles having loaded.
- * Exceptions: None.
- */
-const SETTLE_MS = Object.freeze({ resize: 1500, click: 500, overlay: 2500, start: 2500, tip: 1500, turn: 120000 });
 
 /**
  * Reads `--label <name>` from the command line.
@@ -141,82 +99,18 @@ async function setViewport(app, page, size) {
 }
 
 /**
- * Waits for the new-game overlay to be open.
- *
- * Purpose: Both the first start and a new game opened from the match end on this overlay.
- * When to use: After launch, and after opening the overlay from the match.
- * Expected outcome: Resolves once `#game-over-overlay` is in the page without the `hidden` class.
- * Exceptions: Throws a Playwright timeout after 60 seconds.
- */
-async function waitForNewGameOverlay(page) {
-  await page.waitForFunction(() => {
-    const overlay = document.getElementById('game-over-overlay');
-    return overlay !== null && !overlay.classList.contains('hidden');
-  }, null, { timeout: 60000 });
-}
-
-/**
- * Chooses the fixed scenario on the new-game overlay and starts the match.
- *
- * Purpose: Every run must show the same match so checks can compare known values.
- * When to use: Once, while the startup overlay is open.
- * Expected outcome: The overlay closes with Southern Europe against Northern Africa, a small game, starting in September.
- * Exceptions: Throws when a choice does not hold or the match does not start within 60 seconds.
- */
-async function startScenarioMatch(page) {
-  await page.waitForFunction((region) => {
-    const select = document.getElementById('new-game-human-region-select');
-    return select !== null && Array.from(select.options).some((o) => o.value === region || o.textContent.trim() === region);
-  }, SCENARIO.humanRegion, { timeout: 60000 });
-  // The overlay draws random homes and a random month after its lists load; let that finish first.
-  await page.waitForTimeout(SETTLE_MS.overlay);
-  await page.click('#new-game-tab-global');
-  await page.selectOption('#new-game-human-region-select', SCENARIO.humanRegion);
-  await page.selectOption('#new-game-ai-region-select', SCENARIO.aiRegion);
-  await page.selectOption('#new-game-start-month', SCENARIO.startMonth);
-  await page.selectOption('#new-game-size-select', SCENARIO.gameSize);
-  await page.waitForTimeout(SETTLE_MS.click);
-  const chosen = await page.evaluate(() => ({
-    human: document.getElementById('new-game-human-region-select').value,
-    ai: document.getElementById('new-game-ai-region-select').value,
-    month: document.getElementById('new-game-start-month').value,
-    size: document.getElementById('new-game-size-select').value,
-  }));
-  if (chosen.month !== SCENARIO.startMonth || chosen.size !== SCENARIO.gameSize
-    || !chosen.human.includes(SCENARIO.humanRegion) || !chosen.ai.includes(SCENARIO.aiRegion)) {
-    throw new Error(`scenario choices did not hold: ${JSON.stringify(chosen)}`);
-  }
-  await page.click('#new-game-btn');
-  await page.waitForFunction(() => document.getElementById('game-over-overlay').classList.contains('hidden'), null, { timeout: 60000 });
-  await page.waitForTimeout(SETTLE_MS.start);
-}
-
-/**
- * Opens the new-game overlay from the running match, the way a player would.
- *
- * Purpose: One scene checks the overlay opened from a match, not only at startup, and the regional match starts from it.
- * When to use: In the second session, before the regional match.
- * Expected outcome: The game menu is opened, New game is clicked, and the overlay is open.
- * Exceptions: Throws a Playwright timeout when a control is missing or the overlay does not open.
- */
-async function openNewGameOverlay(page) {
-  await page.click('#game-menu-btn');
-  await page.click('#openrouter-new-btn');
-  await waitForNewGameOverlay(page);
-  await page.waitForTimeout(SETTLE_MS.click);
-}
-
-/**
  * Moves the pointer to empty space in the top bar.
  *
  * Purpose: After a click the pointer would rest on a control, and that control's tip would show up in the next screenshot.
  * When to use: After each click in a scene, and after a scene that shows a tip.
- * Expected outcome: The pointer is over the top bar's spacer, which has no tip and no click action.
- * Exceptions: Throws when the top bar has no spacer.
+ * Expected outcome: The pointer is over the top bar's spacer, or over the battle header's title while a battle is open.
+ *   Neither has a tip or a click action.
+ * Exceptions: Throws when neither is on screen.
  */
 async function parkPointer(page) {
-  const box = await page.locator('#app-topbar .topbar-spacer').boundingBox();
-  if (!box) throw new Error('the top bar spacer is not on screen');
+  const spacer = await page.locator('#app-topbar .topbar-spacer').boundingBox();
+  const box = spacer ?? (await page.locator('#battle-header-place').boundingBox());
+  if (!box) throw new Error('neither the top bar spacer nor the battle header title is on screen');
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
 }
 
@@ -243,51 +137,22 @@ async function recordScene(page, report, outDir, sceneName) {
  * Purpose: A played turn can offer the tactical battles list; the run never fights from it, so it chooses Ignore,
  *   which resolves the fight as a player's Ignore does.
  * When to use: After Ready on the world map, and after leaving a battle.
- * Expected outcome: The top bar reads "Turn N · Planning" and Ready can be clicked.
+ * Expected outcome: The battle header is gone, the top bar reads "Turn N · Planning", and Ready can be clicked.
  * Exceptions: Throws a Playwright timeout when planning does not return within `SETTLE_MS.turn`.
  */
 async function waitForWorldPlanning(page) {
   const battlesList = '[role="dialog"][aria-label="Tactical battles"]';
   const deadline = Date.now() + SETTLE_MS.turn;
   while (Date.now() < deadline) {
-    const planning = await page.evaluate(() => /^Turn \d+ · Planning$/.test(document.getElementById('topbar-turn-phase')?.textContent || '')
+    // In a battle the date block is hidden but still names the world-map turn, so the battle header must be gone too.
+    const planning = await page.evaluate(() => !document.getElementById('app-topbar')?.classList.contains('topbar-battle')
+      && /^Turn \d+ · Planning$/.test(document.getElementById('topbar-turn-phase')?.textContent || '')
       && document.getElementById('ready-btn')?.disabled === false);
     if (planning) return;
     if (await page.isVisible(battlesList)) await page.click(`${battlesList} button:has-text("Ignore")`);
     await page.waitForTimeout(SETTLE_MS.click);
   }
   throw new Error('world-map planning did not return after the turn');
-}
-
-/**
- * Chooses the fixed regional scenario on the open new-game overlay and starts the match.
- *
- * Purpose: The regional scenes check the console on a map other than the world map.
- * When to use: While the new-game overlay is open.
- * Expected outcome: The overlay closes with `REGIONAL_SCENARIO`'s region and sides.
- * Exceptions: Throws when a choice does not hold or the match does not start within 90 seconds.
- */
-async function startRegionalMatch(page) {
-  await page.click('#new-game-tab-regional');
-  await page.waitForTimeout(SETTLE_MS.click);
-  await page.selectOption('#new-game-region-select', REGIONAL_SCENARIO.region);
-  await page.waitForTimeout(SETTLE_MS.click);
-  await page.selectOption('#new-game-human-side-select', REGIONAL_SCENARIO.humanSide);
-  await page.selectOption('#new-game-ai-side-select', REGIONAL_SCENARIO.aiSide);
-  await page.selectOption('#new-game-start-month', REGIONAL_SCENARIO.startMonth);
-  await page.selectOption('#new-game-size-select', REGIONAL_SCENARIO.gameSize);
-  await page.waitForTimeout(SETTLE_MS.click);
-  const chosen = await page.evaluate(() => ({
-    region: document.getElementById('new-game-region-select').value,
-    human: document.getElementById('new-game-human-side-select').value,
-    ai: document.getElementById('new-game-ai-side-select').value,
-  }));
-  if (chosen.region !== REGIONAL_SCENARIO.region || chosen.human !== REGIONAL_SCENARIO.humanSide || chosen.ai !== REGIONAL_SCENARIO.aiSide) {
-    throw new Error(`regional choices did not hold: ${JSON.stringify(chosen)}`);
-  }
-  await page.click('#new-game-btn');
-  await page.waitForFunction(() => document.getElementById('game-over-overlay').classList.contains('hidden'), null, { timeout: 90000 });
-  await page.waitForTimeout(SETTLE_MS.start);
 }
 
 /**
@@ -485,11 +350,19 @@ async function runReopenedSession(app, page, report, outDir, battleHex) {
   await page.waitForTimeout(SETTLE_MS.click);
   await recordScene(page, report, outDir, SCENES.battleOrders);
 
+  // The battle header at the 800 x 600 minimum, then back to the first size for the beat.
+  await setViewport(app, page, SMALL_WINDOW);
+  await page.waitForTimeout(SETTLE_MS.resize);
+  await parkPointer(page);
+  await recordScene(page, report, outDir, SCENES.battleSmallWindow);
+  await setViewport(app, page, VIEWPORTS[0]);
+  await page.waitForTimeout(SETTLE_MS.resize);
+
   // Play beat 1. If one side is wiped out, close the result; the world-map turn then plays.
   await page.click('#ready-btn');
   const annihilation = '#tactical-annihilation-overlay:not(.hidden)';
   await page.waitForFunction((selector) => document.querySelector(selector) !== null
-    || (document.getElementById('topbar-turn-phase')?.textContent === 'Beat 2 · Tactical planning'
+    || ((document.getElementById('battle-header-status')?.textContent || '').startsWith('Beat 2 · Tactical planning')
       && document.getElementById('ready-btn')?.disabled === false), annihilation, { timeout: SETTLE_MS.turn });
   await parkPointer(page);
   await page.waitForTimeout(SETTLE_MS.tip);

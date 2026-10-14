@@ -192,7 +192,7 @@ Complete rules are in [combat-rules-v3.md](combat-rules-v3.md) §12.
 
 - **Scale:** the battlefield is the contested hex's cells, three H3 resolutions finer, plus three rings of neighboring cells.
 - **Pause:** the rest of the map waits until the battle ends. The date and weather stay fixed.
-- **Beats:** each Ready in a battle resolves one beat: air strikes, ranged fire, movement, then melee.
+- **Beats:** each Ready in a battle resolves one beat: air strikes, ranged fire, movement, then melee. The top bar becomes the battle header, which names the battle's hex and the beat.
 - **Sub-units:** each unit splits into sub-units with its attack and defense: infantry 8, armor 4, naval 4, and air 3.
 - **Deployment:** units start on the edge of the hex they entered from.
 - **No fog:** both sides see everything in a battle.

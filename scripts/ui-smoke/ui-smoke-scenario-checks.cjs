@@ -91,12 +91,12 @@ const SCENARIO_CHECKS = Object.freeze([
   {
     name: 'orders-battle-start',
     scenes: [SCENES.battleStart],
-    needs: ['#topbar-turn-phase', '#console-subtitle'],
+    needs: ['#battle-header-status', '#console-subtitle'],
     run: (p, el) => {
-      const line = `${el('#topbar-turn-phase').text} / ${el('#console-subtitle').text}`;
-      return line === 'Beat 1 · Tactical planning / 0 queued for beat 1'
-        ? null
-        : `the top bar and the Orders subtitle read "${line}", expected "Beat 1 · Tactical planning / 0 queued for beat 1"`;
+      const status = el('#battle-header-status').text;
+      if (!status.startsWith('Beat 1 · Tactical planning')) return `the battle header reads "${status}", expected beat 1 planning`;
+      const subtitle = el('#console-subtitle').text;
+      return subtitle === '0 queued for beat 1' ? null : `the Orders subtitle reads "${subtitle}", expected "0 queued for beat 1"`;
     },
   },
   {

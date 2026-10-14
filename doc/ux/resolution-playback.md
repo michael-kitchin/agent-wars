@@ -53,7 +53,7 @@ A map toast can summarize losses the player can see. Combat outside vision is an
 ## States
 
 - Idle: no animation.
-- Playing: one or more stages are on screen, or dice chips are still fading after the last stage. The top bar's date block can already show the next planning turn.
+- Playing: one or more stages are on screen, or dice chips are still fading after the last stage. On the world map, the top bar's date block can already show the next planning turn. In a battle, that date block stays hidden and the battle header's status line reads "Tactical resolution" and already names the next beat, until the animation ends.
 - Finished: the animation is cleared and Strategic planning or Tactical planning continues.
 
 ## Invariants
@@ -73,6 +73,7 @@ A map toast can summarize losses the player can see. Combat outside vision is an
 | Aspect | Strategic | Tactical |
 | --- | --- | --- |
 | What plays | The strategic turn, on the world map | The battle beat, on the battle map |
+| Top bar | The date block can already name the next planning turn | The battle header stays up. Its status line reads "Tactical resolution" and already names the next beat |
 | Dice chips | Under hexes in the player's vision before or after the turn only, and not at the zoom that hides strategic units | Under every battle cell that rolled, because battles have no fog |
 | Afterward | Strategic planning, or a battle if Fight started one | Tactical planning, or Tactical annihilation if a side is gone |
 
@@ -98,6 +99,7 @@ None.
 - `src/shared/resolutionCasualtyDraw.ts`
 - `src/renderer/map/drawInteraction.ts`
 - `src/renderer/rendering/gameScene.ts` (`drawGameScene`, `tickResolutionMoveAnimation`)
+- `src/renderer/chrome/battleHeader.ts` (`renderBattleHeader`)
 - `src/renderer/rendering/resolutionCombatOverlays.ts`
 - `src/renderer/rendering/combatDiceChipDrawing.ts`
 - `src/shared/combatDiceChips.ts`

@@ -1,11 +1,12 @@
 /**
- * The top bar's match status: the two sides, the four readouts, and the date block.
+ * The top bar's match status: the two sides, the four readouts, and the date block. In a battle the bar shows the
+ * battle header instead; see `battleHeader.ts`.
  */
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import { formatTopBarDateBlock } from '../../shared/topBarDateBlock';
 import { computeTopBarStats, formatForcesBreakdown, formatTopBarStatParts } from '../../shared/topBarStats';
-import { formatWeatherIconHtml } from '../../shared/weatherIcons';
 import { rendererSharedState as S } from '../core/state';
+import { renderBattleHeader } from './battleHeader';
 import { forcesStatTooltipText } from './frameTooltipText';
 
 /**
@@ -48,28 +49,21 @@ function renderTopBarSides(state: GameStateSnapshot | null): void {
 }
 
 /**
- * Writes the date block, adding the battle's weather to the date line during a battle.
+ * Writes the date block.
  *
- * Purpose: The player reads the date, and the turn or the beat, at a glance.
+ * Purpose: The player reads the date, and the turn and its phase, at a glance.
  * When to use: From `renderTopBarStatus`.
- * Expected outcome: See `formatTopBarDateBlock`. During a battle with weather, the date line ends with the weather icon and word.
+ * Expected outcome: See `formatTopBarDateBlock`. In a battle the block is hidden and the battle header shows the beat.
  * Exceptions: None.
  */
 function renderTopBarDateBlock(state: GameStateSnapshot | null): void {
-  const battle = S.tacticalBattleSnapshot;
   const text = formatTopBarDateBlock({
     hasGameState: state != null,
     dateLabel: state?.currentDateLabel ?? '',
     turnNumber: state?.turnNumber ?? 0,
     strategicPhaseLabel: state ? formatStrategicPhaseLabel(state.phase) : '',
-    battleBeat: battle ? battle.tacticalTurnNumber : null,
-    beatPlaybackActive: S.resolutionMoveAnimation != null,
   });
-  const dateEl = document.getElementById('topbar-date');
-  if (dateEl) {
-    dateEl.textContent = text.date;
-    if (state && battle?.weather) dateEl.insertAdjacentHTML('beforeend', ` · ${formatWeatherIconHtml(battle.weather)}`);
-  }
+  setText('topbar-date', text.date);
   setText('topbar-turn-phase', text.turnPhase);
 }
 
@@ -106,15 +100,17 @@ function renderTopBarStats(state: GameStateSnapshot | null): void {
 }
 
 /**
- * Refreshes everything the top bar shows about the match.
+ * Refreshes everything the top bar shows about the match, or about the battle while one is open.
  *
  * Purpose: One entry point, called wherever the old game-state lines were refreshed.
  * When to use: From `updateGameStateSidebar`, after snapshots, tactical entry and exit, Ready commits, and the end of beat playback.
  * Expected outcome: Sides, readouts, and the date block match `state` and the current battle. Null shows em dashes.
+ *   While a battle is open the bar shows the battle header instead, from `renderBattleHeader`.
  * Exceptions: None.
  */
 export function renderTopBarStatus(state: GameStateSnapshot | null): void {
   renderTopBarSides(state);
   renderTopBarStats(state);
   renderTopBarDateBlock(state);
+  renderBattleHeader(state, S.tacticalBattleSnapshot);
 }

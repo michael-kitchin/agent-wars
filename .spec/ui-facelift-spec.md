@@ -275,13 +275,13 @@ Built in Phase 4. See [ui-facelift-strategic-orders.png](ui-facelift-strategic-o
 
 Built in Phase 5. See [ui-facelift-tactical.png](ui-facelift-tactical.png).
 
-In a battle the top bar becomes a battle header:
+In a battle the top bar becomes a battle header, on a darker, warmer face (`--battle-header-bg`). The sides, the readouts, and the date block hide; the date block always describes the world-map turn.
 
 - Menu button.
-- "Battle at (E8)" and the hex caption.
-- A line reading "Beat 2 · Tactical planning · April, Year 1" with the weather icon.
-- A centred force bar: the player's sub-unit count, a two-colour bar in proportion, and the enemy's count, captioned "Sub-units in battle". Counts come from the battle snapshot. If the snapshot hides enemy sub-units, the count is what the player can see and its tip says so.
-- Exit Battle (`#tactical-exit-btn`, moved from `#tactical-battle-hud`), with the same rules and tip.
+- "Battle at (E8)" and the hex caption, with flags. The caption ends in an ellipsis first when the header is narrow.
+- A line reading "Beat 2 · Tactical planning · April, Year 1", then the weather icon and word when the battle has weather. "Tactical resolution" replaces "Tactical planning" while a beat resolves or plays back.
+- A centred force bar: the player's sub-unit count, a two-colour bar in proportion, and the enemy's count, captioned "Sub-units in battle". Counts come from the battle snapshot and include sub-units carried by a ship. A battle has no fog of war, so the snapshot lists every enemy sub-unit and the tip says the counts are exact. While a beat plays back, the bar keeps the counts from before the beat. Below a 1100 px window the bar narrows and keeps only the two counts and the bar.
+- Exit Battle (`#tactical-exit-btn`, moved from `#tactical-battle-hud`), with the same rules and tip, in the shared button colors.
 - Settings and Help.
 
 The console works as on the world map. Orders shows the beat's orders, and Ready commits the beat. The annihilation dialog is unchanged.
@@ -370,6 +370,15 @@ The existing tokens in `static/shellChrome.css` stay. Phase 2 adds these:
 
 Phase 4 adds `#f2c14e` (selection ring) to `src/renderer/core/constants.ts`, next to the other map colors.
 
+Phase 5 adds these:
+
+| Token | Value | Use |
+| --- | --- | --- |
+| `--battle-header-bg` | `#17141f` | The top bar's face in a battle |
+| `--battle-header-border` | `#4a3247` | The battle header's bottom edge |
+| `--force-bar-human` | `#1b8a82` | The player's part of the force bar |
+| `--force-bar-opponent` | `#b02a62` | The opponent's part of the force bar |
+
 ## New Control Tips
 
 These sentences go in `src/renderer/chrome/frameTooltipText.ts`, beside `controlTooltipText.ts` (which is near the file-size limit), in the static markup, and in the Sentences list of `doc/ux/control-tooltips.md`.
@@ -400,9 +409,8 @@ Phases 3 through 6 add their own tips in their plans.
 | 6 | New game and game over: top bar on the overlay, docked setup panel | The same gates, plus a global and a regional start |
 | 7 | Docs, screenshots, release: refresh `doc/media`; update the README's images, its OpenRouter setup steps (they still name the Model tab), and its test count; sweep `doc/` for "right panel" wording; regression pass | The product owner signs off |
 
-Each phase gets its own execution plans in `.spec`. Phase 2 has five, run in order and committed one at a time; [ui-facelift-frame-execution-plan.md](ui-facelift-frame-execution-plan.md) lists them. Phase 3 also has five, run the same way; [ui-facelift-console-execution-plan.md](ui-facelift-console-execution-plan.md) lists them. Phase 4 has three; [ui-facelift-map-execution-plan.md](ui-facelift-map-execution-plan.md) lists them.
+Each phase gets its own execution plans in `.spec`. Phase 2 has five, run in order and committed one at a time; [ui-facelift-frame-execution-plan.md](ui-facelift-frame-execution-plan.md) lists them. Phase 3 also has five, run the same way; [ui-facelift-console-execution-plan.md](ui-facelift-console-execution-plan.md) lists them. Phase 4 has three; [ui-facelift-map-execution-plan.md](ui-facelift-map-execution-plan.md) lists them. Phase 5 also has three; [ui-facelift-battle-execution-plan.md](ui-facelift-battle-execution-plan.md) lists them.
 
 ## Open Questions
 
 - **macOS Quit.** `window.close()` leaves the app in the dock on macOS. That is normal for closing a window, but it isn't "Quit". A real quit would need an IPC channel, which this milestone avoids. The macOS build has not been opened yet (release notes, Known limits), so this stays as is until someone tests on a Mac.
-- **Enemy count under fog in battles.** Phase 5 checks whether the battle snapshot lists unseen enemy sub-units, and words the force bar's tip to match.

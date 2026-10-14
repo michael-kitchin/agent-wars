@@ -46,6 +46,7 @@ When this guide and the running app disagree, the app wins until this file is up
 | Top bar and right-panel footer bg | `#121b27` | `--chrome-bg-deep` |
 | Right-panel tab rail bg | `#141f2d` | `--chrome-rail-bg` |
 | Dividers inside the top bar and the rail | `#243246` | `--chrome-divider` |
+| Battle header bg / bottom edge | `#17141f` / `#4a3247` | `--battle-header-bg` / `--battle-header-border`. The top bar's face while a battle is open, so the theater reads at a glance |
 | Panel, popup, tooltip, and toast bg | `#1b2838` | Right panel, game menu, legend, hex tooltip, control tips, stack callout, build popup, new-game box, tactical-battles dialog, update toast, message toast, and Reports tab |
 | Chrome text / muted | `#f4f6f8` / `#b7c4d4` | Off-white body; blue-gray for secondary lines |
 | Chrome error text | `#f0a8a8` | On the navy surfaces only |

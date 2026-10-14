@@ -23,6 +23,7 @@ const {
 const { CONSOLE_CHECKS } = require('./ui-smoke-console-checks.cjs');
 const { SCENARIO_CHECKS } = require('./ui-smoke-scenario-checks.cjs');
 const { MAP_CHROME_CHECKS } = require('./ui-smoke-map-chrome-checks.cjs');
+const { BATTLE_CHECKS } = require('./ui-smoke-battle-checks.cjs');
 
 /**
  * Collects what the checks read from the renderer page.
@@ -89,7 +90,8 @@ function probePage(selectors) {
  * When to use: Add a row when a frame layout rule needs a machine check. `needs` lists every selector the row reads;
  *   `run(p, el)` gets the probe and a lookup for those selectors, and returns null on success or a failure message.
  *   Checks of what the console's tabs show belong in `ui-smoke-console-checks.cjs`, checks of the later scenes in
- *   `ui-smoke-scenario-checks.cjs`, and checks of the chrome on the map in `ui-smoke-map-chrome-checks.cjs`.
+ *   `ui-smoke-scenario-checks.cjs`, checks of the chrome on the map in `ui-smoke-map-chrome-checks.cjs`, and checks of
+ *   the battle header in `ui-smoke-battle-checks.cjs`.
  * Expected outcome: Each row is independent of the others.
  * Exceptions: None.
  */
@@ -362,14 +364,15 @@ const FRAME_CHECKS = Object.freeze([
 ]);
 
 /**
- * Every check the run applies: the frame's, then the console's, then the later scenarios', then the map chrome's.
+ * Every check the run applies: the frame's, then the console's, then the later scenarios', then the map chrome's, then
+ * the battle header's.
  *
  * Purpose: The runner and `probeSelectors` read one list.
  * When to use: The default `checks` argument of `probeSelectors` and `runChecks`.
  * Expected outcome: Frame checks first, so the report reads from the outside in.
  * Exceptions: None.
  */
-const CHECKS = Object.freeze([...FRAME_CHECKS, ...CONSOLE_CHECKS, ...SCENARIO_CHECKS, ...MAP_CHROME_CHECKS]);
+const CHECKS = Object.freeze([...FRAME_CHECKS, ...CONSOLE_CHECKS, ...SCENARIO_CHECKS, ...MAP_CHROME_CHECKS, ...BATTLE_CHECKS]);
 
 /**
  * Lists every selector the checks read.
