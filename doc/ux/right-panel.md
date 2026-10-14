@@ -13,8 +13,9 @@ Shown in Strategic planning, Tactical planning, Resolution playback, the tactica
 ## Information Displayed
 
 - A tab rail on the panel's outer edge, with Orders, Opponent, Build, and Forces. Build and Forces are disabled in this version. The selected tab is marked while the panel is expanded, and the mark is cleared while the panel is collapsed.
-- A header with the selected tab's name and a button that collapses the panel.
-- The Orders tab: the selected-unit readout, the Ranged and Strike controls, and the order lists. See [right-panel-command-bar.md](right-panel-command-bar.md) and [right-panel-selection-and-orders.md](right-panel-selection-and-orders.md).
+- A header with the selected tab's name, a subtitle, and a button that collapses the panel. On the Orders tab the subtitle reads "N queued for turn T", or "N queued for beat B" in a battle, where N counts every row of the three order groups (`formatQueuedOrdersSubtitle` in `src/shared/orderRowDetail.ts`). The Opponent tab has no subtitle.
+- A count on the Orders tab in the rail: the number of queued orders, the same N. It is hidden while nothing is queued.
+- The Orders tab: the selected-unit readout, the Ranged and Strike controls, and the order groups. See [right-panel-command-bar.md](right-panel-command-bar.md) and [right-panel-selection-and-orders.md](right-panel-selection-and-orders.md).
 - The Opponent tab: the Tools tab and the Model tab, one shown at a time, with the AI activity log under them. See [right-panel-tools-tab.md](right-panel-tools-tab.md), [right-panel-model-tab.md](right-panel-model-tab.md), and [ai-activity-log.md](ai-activity-log.md).
 - A footer with Ready, under the tab content. See [right-panel-command-bar.md](right-panel-command-bar.md).
 - While collapsed, only the tab rail and a smaller Ready show. While Ready reads "AI:" and a time, that label takes two lines.
@@ -58,7 +59,7 @@ Shown in Strategic planning, Tactical planning, Resolution playback, the tactica
 
 ## Strategic and Tactical Differences
 
-The panel stays visible in both theaters. Its order lists follow the active theater. See [right-panel-selection-and-orders.md](right-panel-selection-and-orders.md).
+The panel stays visible in both theaters. Its order groups follow the active theater. See [right-panel-selection-and-orders.md](right-panel-selection-and-orders.md).
 
 ## Related Documents
 
@@ -81,9 +82,11 @@ None.
 
 ## Code Entry Points
 
-- `static/index.html` (`#sidebar`, `#console-main`, `#console-title`, `#console-collapse-btn`, `#console-panel-orders`, `#console-panel-opponent`, `#console-rail`, `#console-tab-orders`, `#console-tab-opponent`, `#console-tab-build`, `#console-tab-forces`, `#console-footer`, `#openrouter-tab-tools`, `#openrouter-tab-model`)
+- `static/index.html` (`#sidebar`, `#console-main`, `#console-title`, `#console-subtitle`, `#console-tab-orders-badge`, `#console-collapse-btn`, `#console-panel-orders`, `#console-panel-opponent`, `#console-rail`, `#console-tab-orders`, `#console-tab-opponent`, `#console-tab-build`, `#console-tab-forces`, `#console-footer`, `#openrouter-tab-tools`, `#openrouter-tab-model`)
 - `static/frameChrome.css`
+- `static/consoleChrome.css`
 - `src/renderer/chrome/consoleFrame.ts`
+- `src/renderer/gameplay/queuedOrderRows.ts`
 - `src/shared/consoleTabState.ts`
 - `src/renderer/map/mapContainerResize.ts`
 - `src/renderer/openRouter/openRouterControls.ts`

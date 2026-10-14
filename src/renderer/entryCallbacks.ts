@@ -39,8 +39,7 @@ import { paintTerrainSwatches } from './rendering/terrainVisualStyles';
 
 import { applyStrategicBaselineUrbanHexCounts, applyTacticalCityOverlayRows } from './rendererTacticalHydration';
 import { applyGameStateSnapshot as applyGameStateSnapshotFromModule, refreshGameStateAfterBuildQueueChange as refreshGameStateAfterBuildQueueChangeFromModule, updateClientStaleEnemyIntel } from './core/stateSnapshot';
-import { applySelectionFromSidebarUnitButton as applySelectionFromSidebarUnitButtonFromModule, clearSidebarError, formatUnitArrowLabel as formatUnitArrowLabelFromModule, showSidebarError as showSidebarErrorFromModule, syncUiAfterSelectionChange as syncUiAfterSelectionChangeFromModule } from './gameplay/sidebarSupport';
-import { createSidebarOrderRow } from './gameplay/sidebarOrderRow';
+import { applySelectionFromSidebarUnitButton as applySelectionFromSidebarUnitButtonFromModule, clearSidebarError, showSidebarError as showSidebarErrorFromModule, syncUiAfterSelectionChange as syncUiAfterSelectionChangeFromModule } from './gameplay/sidebarSupport';
 
 /**
  * Entry callbacks that still live in renderer.ts.
@@ -813,18 +812,6 @@ export function applySelectionFromSidebarUnitButton(unitId: string, event: Mouse
 }
 
 /**
- * Defines the `formatUnitArrowLabel` function shape (function formatUnitArrowLabel(unitId: string, targetLabel: string): string).
-
- * Purpose: Supports maintainability by documenting why `formatUnitArrowLabel` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-export function formatUnitArrowLabel(unitId: string, targetLabel: string): string {
-  return formatUnitArrowLabelFromModule(unitId, targetLabel, formatUnitDisplayName);
-}
-
-/**
  * Defines the `syncUiAfterSelectionChange` function shape (function syncUiAfterSelectionChange(options:).
 
  * Purpose: Supports maintainability by documenting why `syncUiAfterSelectionChange` exists.
@@ -867,8 +854,7 @@ export function createTacticalSidebarDeps() {
     refreshStackCalloutIfOpen,
     refreshHumanStandingOrders,
     showMapToast,
-    createSidebarOrderRow,
-    formatUnitArrowLabel,
+    formatUnitDisplayName,
     applySelectionFromSidebarUnitButton,
     dismissMapDetailPopoversForHoverPlanning: dismissMapDetailPopoversIfHoverPlanningActive,
   };

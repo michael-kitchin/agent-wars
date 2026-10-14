@@ -7,7 +7,7 @@ import {
 import { rendererSharedState as S } from '../core/state';
 import { showOrderBlockHexTooltip } from '../map/orderBlockHexTooltip';
 import { hideOrderSlowerHexTooltip } from '../map/orderSlowerHexTooltip';
-import { appendMutedPlaceholder } from './sidebarListHelpers';
+import { renderSidebarOrderGroup, sidebarOrderRowArgs } from './sidebarOrderRow';
 import type { TacticalOrderDeps } from './tacticalOrderDeps';
 export type { TacticalOrderDeps } from './tacticalOrderDeps';
 export type { RefreshHoverRoutePreviewOptions } from './hoverRoutePreviewTypes';
@@ -236,46 +236,30 @@ export function updateRangedSidebar(deps: TacticalOrderDeps): void {
   const strikeCancelEl = document.getElementById('air-strike-cancel-btn') as HTMLButtonElement | null;
   if (!listEl) return;
 
-  const tacticalPositions = S.tacticalBattleSnapshot?.subUnits;
-  listEl.innerHTML = '';
-  if (S.pendingRangedAttacks.length === 0) {
-    appendMutedPlaceholder(listEl, 'None');
-  } else {
-    for (const r of S.pendingRangedAttacks) {
-      const row = deps.createSidebarOrderRow({
-        labelText: deps.formatUnitArrowLabel(
-          r.unitId,
-          formatPendingRangedAttackSidebarLabel(S.gameState, r, tacticalPositions)
-        ),
-        unitId: r.unitId,
-        selected: S.selectedUnitIds.includes(r.unitId),
-        onToggleSelect: (event) => deps.applySelectionFromSidebarUnitButton(r.unitId, event),
-        onCancel: () => cancelRangedForUnit(r.unitId, deps),
-        compactBlueButtons: true,
-      });
-      listEl.appendChild(row);
-    }
-  }
+  const battle = S.tacticalBattleSnapshot;
+  renderSidebarOrderGroup(
+    'ranged',
+    S.pendingRangedAttacks.map((r) =>
+      sidebarOrderRowArgs(
+        r.unitId,
+        formatPendingRangedAttackSidebarLabel(S.gameState, r, battle),
+        () => cancelRangedForUnit(r.unitId, deps),
+        deps
+      )
+    )
+  );
   if (strikeListEl) {
-    strikeListEl.innerHTML = '';
-    if (S.pendingAirStrikes.length === 0) {
-      appendMutedPlaceholder(strikeListEl, 'None');
-    } else {
-      for (const strike of S.pendingAirStrikes) {
-        const row = deps.createSidebarOrderRow({
-          labelText: deps.formatUnitArrowLabel(
-            strike.unitId,
-            formatPendingAirStrikeSidebarLabel(S.gameState, strike, tacticalPositions)
-          ),
-          unitId: strike.unitId,
-          selected: S.selectedUnitIds.includes(strike.unitId),
-          onToggleSelect: (event) => deps.applySelectionFromSidebarUnitButton(strike.unitId, event),
-          onCancel: () => cancelAirStrikeForUnit(strike.unitId, deps),
-          compactBlueButtons: true,
-        });
-        strikeListEl.appendChild(row);
-      }
-    }
+    renderSidebarOrderGroup(
+      'strike',
+      S.pendingAirStrikes.map((strike) =>
+        sidebarOrderRowArgs(
+          strike.unitId,
+          formatPendingAirStrikeSidebarLabel(S.gameState, strike, battle),
+          () => cancelAirStrikeForUnit(strike.unitId, deps),
+          deps
+        )
+      )
+    );
   }
 
   if (btnEl) {

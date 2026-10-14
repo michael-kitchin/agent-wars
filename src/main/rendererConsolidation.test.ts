@@ -413,9 +413,9 @@ function testAirFerryDoubleClickContracts(): void {
     'pending ferry sidebar rows should display via the ferry label formatter for Nh parity'
   );
   assert.ok(
-    formatPendingFerryOrderSidebarLabelFn.includes('?h (ferry)') &&
-      !formatPendingFerryOrderSidebarLabelFn.includes('destinationH3Index} (ferry)'),
-    'ferry sidebar labels should avoid raw H3 fallback and stay in Nh notation'
+    formatPendingFerryOrderSidebarLabelFn.includes("order.destinationH3Index, battle, 'Ferry')") &&
+      !formatPendingFerryOrderSidebarLabelFn.includes('${order.destinationH3Index}'),
+    'ferry sidebar labels should name the destination code through the shared order line, never the raw H3 index'
   );
   const overlayStagesPath = path.resolve(process.cwd(), 'src', 'renderer', 'rendering', 'orderOverlayStages.ts');
   const overlayStagesSource = fs.readFileSync(overlayStagesPath, 'utf8');
@@ -494,15 +494,15 @@ function testAirStrikeAndAirGlyphContracts(): void {
   assert.ok(
     tacticalOrdersSource.includes("from './orderLabelFormatting'") &&
       tacticalOrdersSource.includes(
-        'formatPendingRangedAttackSidebarLabel(S.gameState, r, tacticalPositions)'
+        'formatPendingRangedAttackSidebarLabel(S.gameState, r, battle)'
       ) &&
       tacticalOrdersSource.includes(
-        'formatPendingAirStrikeSidebarLabel(S.gameState, strike, tacticalPositions)'
+        'formatPendingAirStrikeSidebarLabel(S.gameState, strike, battle)'
       ) &&
       sidebarSupportSource.includes("from './orderLabelFormatting'") &&
       sidebarSupportSource.includes('formatPendingFerryOrderSidebarLabel(S.gameState, ferry)') &&
       sidebarSupportSource.includes(
-        'formatPendingFerryOrderSidebarLabel(S.gameState, ferry, S.tacticalBattleSnapshot.subUnits)'
+        'formatPendingFerryOrderSidebarLabel(S.gameState, ferry, battle)'
       ) &&
       !getFunctionSource(sidebarSupportSource, 'updatePendingOrdersSidebar').includes('pendingEmbarkOrders'),
     'planned order list labels should use shared order label formatting helpers'

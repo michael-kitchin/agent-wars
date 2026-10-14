@@ -25773,8 +25773,177 @@ ${bonuses}`;
     );
   }
 
+  // src/shared/consoleTabState.ts
+  function nextConsoleTabState(current, clickedTabId) {
+    if (current.collapsed) return { activeTabId: clickedTabId, collapsed: false };
+    if (clickedTabId === current.activeTabId) return { activeTabId: current.activeTabId, collapsed: true };
+    return { activeTabId: clickedTabId, collapsed: false };
+  }
+
+  // src/shared/orderRowDetail.ts
+  var AIR_STRIKE_TARGET_TYPE_LABELS = Object.freeze({
+    units: "Enemy Units",
+    urban: "Production",
+    airport: "Airports",
+    seaport: "Seaports"
+  });
+  function formatOrderRowDetail(parts) {
+    const code = parts.targetCode && parts.targetCode.length > 0 ? parts.targetCode : "?";
+    const distance = parts.distanceHexes == null ? "?" : String(parts.distanceHexes);
+    const note = parts.note ? ` \xB7 ${parts.note}` : "";
+    return `\u2192 ${code} \xB7 ${distance}h${note}`;
+  }
+  function formatQueuedOrdersSubtitle(queuedCount, turnNumber, battleBeat) {
+    const when = battleBeat == null ? `turn ${turnNumber}` : `beat ${battleBeat}`;
+    return `${queuedCount} queued for ${when}`;
+  }
+
+  // src/renderer/gameplay/queuedOrderRows.ts
+  var ordersByGroup = /* @__PURE__ */ new Map();
+  var listeners = [];
+  function publishQueuedOrders(group, orders) {
+    ordersByGroup.set(group, orders);
+    for (const listener of listeners) listener();
+  }
+  function queuedOrderCount() {
+    let count = 0;
+    for (const orders of ordersByGroup.values()) count += orders.length;
+    return count;
+  }
+  function onQueuedOrdersChanged(listener) {
+    listeners.push(listener);
+  }
+
+  // src/renderer/chrome/consoleFrame.ts
+  var CONSOLE_TABS = Object.freeze([
+    { tabId: "console-tab-orders", panelId: "console-panel-orders", title: "Orders", subtitle: ordersSubtitle },
+    {
+      tabId: "console-tab-opponent",
+      panelId: "console-panel-opponent",
+      title: "Opponent",
+      subtitle: () => "",
+      onShow: scrollOpenRouterLogToEnd
+    }
+  ]);
+  var consoleState = { activeTabId: CONSOLE_TABS[0].tabId, collapsed: false };
+  function ordersSubtitle() {
+    return formatQueuedOrdersSubtitle(
+      queuedOrderCount(),
+      rendererSharedState.gameState?.turnNumber ?? 0,
+      rendererSharedState.tacticalBattleSnapshot ? rendererSharedState.tacticalBattleSnapshot.tacticalTurnNumber : null
+    );
+  }
+  function setRailBadge(badgeId, count) {
+    const badge = document.getElementById(badgeId);
+    if (!badge) return;
+    badge.textContent = count > 0 ? String(count) : "";
+    badge.hidden = count <= 0;
+  }
+  function refreshConsoleHeader() {
+    const active2 = CONSOLE_TABS.find((tab) => tab.tabId === consoleState.activeTabId);
+    const subtitle = document.getElementById("console-subtitle");
+    if (subtitle) subtitle.textContent = active2 ? active2.subtitle() : "";
+    setRailBadge("console-tab-orders-badge", queuedOrderCount());
+  }
+  function applyConsoleState() {
+    selectTabPanel(consoleState.activeTabId, CONSOLE_TABS);
+    const active2 = CONSOLE_TABS.find((tab) => tab.tabId === consoleState.activeTabId);
+    const title = document.getElementById("console-title");
+    if (title && active2) title.textContent = active2.title;
+    document.getElementById("sidebar")?.setAttribute("data-collapsed", consoleState.collapsed ? "true" : "false");
+    document.getElementById("console-collapse-btn")?.setAttribute("aria-expanded", consoleState.collapsed ? "false" : "true");
+    refreshConsoleHeader();
+    if (!consoleState.collapsed) active2?.onShow?.();
+  }
+  function wireConsoleFrame() {
+    onQueuedOrdersChanged(refreshConsoleHeader);
+    for (const tab of CONSOLE_TABS) {
+      document.getElementById(tab.tabId)?.addEventListener("click", () => {
+        consoleState = nextConsoleTabState(consoleState, tab.tabId);
+        applyConsoleState();
+      });
+    }
+    document.getElementById("console-collapse-btn")?.addEventListener("click", () => {
+      consoleState = { activeTabId: consoleState.activeTabId, collapsed: true };
+      applyConsoleState();
+    });
+    applyConsoleState();
+  }
+
+  // src/renderer/gameplay/sidebarListHelpers.ts
+  function appendMutedPlaceholder(container, text) {
+    const span = document.createElement("span");
+    span.textContent = text;
+    span.className = "chrome-muted";
+    container.appendChild(span);
+  }
+
+  // src/renderer/gameplay/sidebarOrderRow.ts
+  function sidebarOrderRowArgs(unitId, detail, onCancel, deps) {
+    return {
+      unitId,
+      unitName: deps.formatUnitDisplayName(unitId),
+      detail,
+      selected: rendererSharedState.selectedUnitIds.includes(unitId),
+      onToggleSelect: (event) => deps.applySelectionFromSidebarUnitButton(unitId, event),
+      onCancel
+    };
+  }
+  var ORDER_GROUP_ELEMENT_IDS = Object.freeze({
+    movement: { listId: "pending-orders-list", countId: "pending-orders-count" },
+    ranged: { listId: "ranged-attacks-list", countId: "ranged-attacks-count" },
+    strike: { listId: "air-strikes-list", countId: "air-strikes-count" }
+  });
+  function createSidebarOrderRow(args) {
+    const row = document.createElement("div");
+    row.className = "console-order-row";
+    row.dataset.unitId = args.unitId;
+    const selectBtn = document.createElement("button");
+    selectBtn.type = "button";
+    selectBtn.className = "console-order-select";
+    selectBtn.setAttribute("aria-pressed", args.selected ? "true" : "false");
+    const name = document.createElement("span");
+    name.className = "console-order-name";
+    setUnitNameContent(name, args.unitId, args.unitName);
+    const detail = document.createElement("span");
+    detail.className = "console-order-detail";
+    detail.textContent = args.detail;
+    selectBtn.append(name, detail);
+    selectBtn.addEventListener("click", (event) => args.onToggleSelect(event));
+    const cancelBtn = document.createElement("button");
+    cancelBtn.type = "button";
+    cancelBtn.className = "console-order-cancel";
+    cancelBtn.setAttribute("aria-label", `Cancel the order for ${args.unitName}`);
+    cancelBtn.textContent = "\xD7";
+    cancelBtn.addEventListener("click", args.onCancel);
+    row.append(selectBtn, cancelBtn);
+    return row;
+  }
+  function renderSidebarOrderGroup(group, rows) {
+    const ids = ORDER_GROUP_ELEMENT_IDS[group];
+    const list = document.getElementById(ids.listId);
+    if (!list) return;
+    list.replaceChildren();
+    if (rows.length === 0) appendMutedPlaceholder(list, "None");
+    for (const row of rows) list.appendChild(createSidebarOrderRow(row));
+    const count = document.getElementById(ids.countId);
+    if (count) count.textContent = String(rows.length);
+    publishQueuedOrders(
+      group,
+      rows.map((row) => ({ unitId: row.unitId, detail: row.detail, cancel: row.onCancel }))
+    );
+  }
+  function syncSidebarOrderRowSelection() {
+    const selected = new Set(rendererSharedState.selectedUnitIds);
+    document.querySelectorAll(".console-order-row").forEach((row) => {
+      const pressed = row.dataset.unitId !== void 0 && selected.has(row.dataset.unitId);
+      row.querySelector(".console-order-select")?.setAttribute("aria-pressed", pressed ? "true" : "false");
+    });
+  }
+
   // src/renderer/core/uiState.ts
   function updateSidebar(getPrimarySelectedUnitId2, formatUnitDisplayName3) {
+    syncSidebarOrderRowSelection();
     const selectedUnitEl = document.getElementById("sidebar-selected-unit");
     if (selectedUnitEl) {
       const primary = getPrimarySelectedUnitId2();
@@ -25789,6 +25958,7 @@ ${bonuses}`;
   }
   function updateGameStateSidebar(state) {
     renderTopBarStatus(state);
+    refreshConsoleHeader();
   }
   function blurMapChromeIfFocused() {
     const active2 = document.activeElement;
@@ -27117,12 +27287,23 @@ ${bonuses}`;
     return everyUnitCanRangedAttack ? "ranged" : "hidden";
   }
 
-  // src/renderer/gameplay/orderLabelFormatting.ts
-  function resolveAttackerH3ForOrderLabel(unitId, state, tacticalPositions) {
-    if (tacticalPositions && tacticalPositions.length > 0) {
-      const tactical = tacticalPositions.find((u) => u.id === unitId);
-      if (tactical) return tactical.h3Index;
+  // src/shared/orderTargetHexCode.ts
+  function orderTargetHexCode(h3Index, battle) {
+    if (!h3Index) return null;
+    try {
+      if (!battle) return getStrategicHexCode(h3Index) ?? null;
+      const parentCode = getStrategicHexCode(battle.enclosingStrategicH3Index);
+      const cellCode = tacticalBattleHexCode(battle.enclosingStrategicH3Index, h3Index);
+      return parentCode && cellCode ? `${parentCode}.${cellCode}` : null;
+    } catch {
+      return null;
     }
+  }
+
+  // src/renderer/gameplay/orderLabelFormatting.ts
+  function resolveAttackerH3ForOrderLabel(unitId, state, battle) {
+    const tactical = battle?.subUnits.find((u) => u.id === unitId);
+    if (tactical) return tactical.h3Index;
     if (!state) return null;
     const strategic = state.units.find((u) => u.id === unitId);
     return strategic?.h3Index ?? null;
@@ -27143,32 +27324,28 @@ ${bonuses}`;
       return null;
     }
   }
-  function formatDistanceLabelForPlannedAttack(state, unitId, targetH3Index, tacticalPositions) {
-    const originH3 = resolveAttackerH3ForOrderLabel(unitId, state, tacticalPositions);
-    if (!originH3) return "?h";
-    const distance = computeGridDistanceForLabel(originH3, targetH3Index);
-    return distance == null ? "?h" : `${distance}h`;
+  function formatUnitToTargetDetail(state, unitId, targetH3Index, battle, note) {
+    const originH3 = resolveAttackerH3ForOrderLabel(unitId, state, battle);
+    return formatOrderRowDetail({
+      targetCode: orderTargetHexCode(targetH3Index, battle ?? null),
+      distanceHexes: originH3 ? computeGridDistanceForLabel(originH3, targetH3Index) : null,
+      note
+    });
   }
-  function formatPendingRangedAttackSidebarLabel(state, order, tacticalPositions) {
-    return formatDistanceLabelForPlannedAttack(state, order.unitId, order.targetH3Index, tacticalPositions);
+  function formatPendingRangedAttackSidebarLabel(state, order, battle) {
+    return formatUnitToTargetDetail(state, order.unitId, order.targetH3Index, battle, null);
   }
-  function formatPendingAirStrikeSidebarLabel(state, order, tacticalPositions) {
-    const targetTypeLabel = order.targetType === "units" ? "units" : order.targetType === "urban" ? "urban" : order.targetType === "airport" ? "airport" : "seaport";
-    return `${formatDistanceLabelForPlannedAttack(state, order.unitId, order.targetH3Index, tacticalPositions)} (${targetTypeLabel})`;
+  function formatPendingAirStrikeSidebarLabel(state, order, battle) {
+    return formatUnitToTargetDetail(
+      state,
+      order.unitId,
+      order.targetH3Index,
+      battle,
+      AIR_STRIKE_TARGET_TYPE_LABELS[order.targetType] ?? null
+    );
   }
-  function formatPendingFerryOrderSidebarLabel(state, order, tacticalPositions) {
-    const originH3 = resolveAttackerH3ForOrderLabel(order.unitId, state, tacticalPositions);
-    if (!originH3) return "?h (ferry)";
-    const ferryDistance = computeGridDistanceForLabel(originH3, order.destinationH3Index);
-    return `${ferryDistance == null ? "?" : ferryDistance}h (ferry)`;
-  }
-
-  // src/renderer/gameplay/sidebarListHelpers.ts
-  function appendMutedPlaceholder(container, text) {
-    const span = document.createElement("span");
-    span.textContent = text;
-    span.className = "chrome-muted";
-    container.appendChild(span);
+  function formatPendingFerryOrderSidebarLabel(state, order, battle) {
+    return formatUnitToTargetDetail(state, order.unitId, order.destinationH3Index, battle, "Ferry");
   }
 
   // src/shared/humanMarchPreviewGroupAssembly.ts
@@ -28675,46 +28852,30 @@ ${bonuses}`;
     const strikeTypeEl = document.getElementById("air-strike-target-type");
     const strikeCancelEl = document.getElementById("air-strike-cancel-btn");
     if (!listEl) return;
-    const tacticalPositions = rendererSharedState.tacticalBattleSnapshot?.subUnits;
-    listEl.innerHTML = "";
-    if (rendererSharedState.pendingRangedAttacks.length === 0) {
-      appendMutedPlaceholder(listEl, "None");
-    } else {
-      for (const r of rendererSharedState.pendingRangedAttacks) {
-        const row = deps.createSidebarOrderRow({
-          labelText: deps.formatUnitArrowLabel(
-            r.unitId,
-            formatPendingRangedAttackSidebarLabel(rendererSharedState.gameState, r, tacticalPositions)
-          ),
-          unitId: r.unitId,
-          selected: rendererSharedState.selectedUnitIds.includes(r.unitId),
-          onToggleSelect: (event) => deps.applySelectionFromSidebarUnitButton(r.unitId, event),
-          onCancel: () => cancelRangedForUnit(r.unitId, deps),
-          compactBlueButtons: true
-        });
-        listEl.appendChild(row);
-      }
-    }
+    const battle = rendererSharedState.tacticalBattleSnapshot;
+    renderSidebarOrderGroup(
+      "ranged",
+      rendererSharedState.pendingRangedAttacks.map(
+        (r) => sidebarOrderRowArgs(
+          r.unitId,
+          formatPendingRangedAttackSidebarLabel(rendererSharedState.gameState, r, battle),
+          () => cancelRangedForUnit(r.unitId, deps),
+          deps
+        )
+      )
+    );
     if (strikeListEl) {
-      strikeListEl.innerHTML = "";
-      if (rendererSharedState.pendingAirStrikes.length === 0) {
-        appendMutedPlaceholder(strikeListEl, "None");
-      } else {
-        for (const strike of rendererSharedState.pendingAirStrikes) {
-          const row = deps.createSidebarOrderRow({
-            labelText: deps.formatUnitArrowLabel(
-              strike.unitId,
-              formatPendingAirStrikeSidebarLabel(rendererSharedState.gameState, strike, tacticalPositions)
-            ),
-            unitId: strike.unitId,
-            selected: rendererSharedState.selectedUnitIds.includes(strike.unitId),
-            onToggleSelect: (event) => deps.applySelectionFromSidebarUnitButton(strike.unitId, event),
-            onCancel: () => cancelAirStrikeForUnit(strike.unitId, deps),
-            compactBlueButtons: true
-          });
-          strikeListEl.appendChild(row);
-        }
-      }
+      renderSidebarOrderGroup(
+        "strike",
+        rendererSharedState.pendingAirStrikes.map(
+          (strike) => sidebarOrderRowArgs(
+            strike.unitId,
+            formatPendingAirStrikeSidebarLabel(rendererSharedState.gameState, strike, battle),
+            () => cancelAirStrikeForUnit(strike.unitId, deps),
+            deps
+          )
+        )
+      );
     }
     if (btnEl) {
       const tb = rendererSharedState.tacticalBattleSnapshot;
@@ -32006,19 +32167,28 @@ ${bonuses}`;
   }
 
   // src/shared/pendingMovementSidebarLabels.ts
-  var TACTICAL_DRAFT_MARCH_DISPLAY_STATUS = "en_route";
-  function formatPendingMovementSidebarTargetLabel(distanceHexSteps, orderStatus) {
-    return `${distanceHexSteps}h (${orderStatus})`;
+  function formatPendingMovementSidebarTargetLabel(destinationH3Index, distanceHexSteps) {
+    return formatOrderRowDetail({
+      targetCode: orderTargetHexCode(destinationH3Index, null),
+      distanceHexes: distanceHexSteps,
+      note: null
+    });
   }
   function formatTacticalDraftMarchPendingOrderTargetLabel(battle, subUnitId, destinationH3Index) {
     const origin = battle.subUnits.find((u) => u.id === subUnitId)?.h3Index;
-    if (!origin) return formatPendingMovementSidebarTargetLabel(0, TACTICAL_DRAFT_MARCH_DISPLAY_STATUS);
-    try {
-      const steps = gridDistance(origin, destinationH3Index);
-      return formatPendingMovementSidebarTargetLabel(steps, TACTICAL_DRAFT_MARCH_DISPLAY_STATUS);
-    } catch {
-      return formatPendingMovementSidebarTargetLabel(0, TACTICAL_DRAFT_MARCH_DISPLAY_STATUS);
+    let steps = null;
+    if (origin) {
+      try {
+        steps = gridDistance(origin, destinationH3Index);
+      } catch {
+        steps = null;
+      }
     }
+    return formatOrderRowDetail({
+      targetCode: orderTargetHexCode(destinationH3Index, battle),
+      distanceHexes: steps,
+      note: null
+    });
   }
 
   // src/renderer/gameplay/sidebarSupport.ts
@@ -32046,14 +32216,8 @@ ${bonuses}`;
     }
     deps.syncUiAfterSelectionChange();
   }
-  function formatUnitArrowLabel(unitId, targetLabel, formatUnitDisplayName3) {
-    return `${formatUnitDisplayName3(unitId)} \u2192 ${targetLabel}`;
-  }
-  function formatPendingOrderSidebarLabel(order, formatUnitArrowLabelFn) {
-    return formatUnitArrowLabelFn(
-      order.unitId,
-      formatPendingMovementSidebarTargetLabel(estimateHexesLeftForOrder(order), order.status)
-    );
+  function formatPendingOrderSidebarLabel(order) {
+    return formatPendingMovementSidebarTargetLabel(order.destinationH3Index, estimateHexesLeftForOrder(order));
   }
   function formatKillToastLine(kill, formatDisplayUnitName) {
     const killers = kill.killerIds.map((unitId) => formatDisplayUnitName(unitId)).join(", ");
@@ -32127,80 +32291,35 @@ ${bonuses}`;
     deps.redraw();
   }
   function updatePendingOrdersSidebar2(deps) {
-    const container = document.getElementById("pending-orders-list");
-    if (!container) return;
-    container.innerHTML = "";
-    if (rendererSharedState.tacticalBattleSnapshot) {
-      if (rendererSharedState.tacticalPendingMarches.length === 0 && rendererSharedState.pendingFerryOrders.length === 0) {
-        appendMutedPlaceholder(container, "None");
-        return;
-      }
+    const battle = rendererSharedState.tacticalBattleSnapshot;
+    const rows = [];
+    const rowFor = (unitId, detail, onCancel) => sidebarOrderRowArgs(unitId, detail, onCancel, deps);
+    if (battle) {
       for (const row of rendererSharedState.tacticalPendingMarches) {
-        const rowEl = deps.createSidebarOrderRow({
-          labelText: deps.formatUnitArrowLabel(
-            row.subUnitId,
-            formatTacticalDraftMarchPendingOrderTargetLabel(rendererSharedState.tacticalBattleSnapshot, row.subUnitId, row.destinationH3Index)
-          ),
-          unitId: row.subUnitId,
-          selected: rendererSharedState.selectedUnitIds.includes(row.subUnitId),
-          onToggleSelect: (event) => deps.applySelectionFromSidebarUnitButton(row.subUnitId, event),
-          onCancel: () => {
-            rendererSharedState.tacticalPendingMarches = rendererSharedState.tacticalPendingMarches.filter((r) => r.subUnitId !== row.subUnitId);
-            deps.updatePendingOrdersSidebar?.();
-            deps.redraw?.();
-          },
-          compactBlueButtons: true
-        });
-        container.appendChild(rowEl);
+        const detail = formatTacticalDraftMarchPendingOrderTargetLabel(battle, row.subUnitId, row.destinationH3Index);
+        rows.push(rowFor(row.subUnitId, detail, () => {
+          rendererSharedState.tacticalPendingMarches = rendererSharedState.tacticalPendingMarches.filter((r) => r.subUnitId !== row.subUnitId);
+          deps.updatePendingOrdersSidebar?.();
+          deps.redraw?.();
+        }));
       }
       for (const ferry of rendererSharedState.pendingFerryOrders) {
-        const rowEl = deps.createSidebarOrderRow({
-          labelText: deps.formatUnitArrowLabel(
-            ferry.unitId,
-            formatPendingFerryOrderSidebarLabel(rendererSharedState.gameState, ferry, rendererSharedState.tacticalBattleSnapshot.subUnits)
-          ),
-          unitId: ferry.unitId,
-          selected: rendererSharedState.selectedUnitIds.includes(ferry.unitId),
-          onToggleSelect: (event) => deps.applySelectionFromSidebarUnitButton(ferry.unitId, event),
-          onCancel: () => {
-            deps.cancelFerryForUnit(ferry.unitId);
-            deps.refreshStackCalloutIfOpen?.();
-          },
-          compactBlueButtons: true
-        });
-        container.appendChild(rowEl);
+        rows.push(rowFor(ferry.unitId, formatPendingFerryOrderSidebarLabel(rendererSharedState.gameState, ferry, battle), () => {
+          deps.cancelFerryForUnit(ferry.unitId);
+          deps.refreshStackCalloutIfOpen?.();
+        }));
       }
-      return;
-    }
-    const pendingOrders = rendererSharedState.humanStandingOrders.filter((order) => deps.isPendingMovementOrderForDisplay(order));
-    if (pendingOrders.length === 0 && rendererSharedState.pendingFerryOrders.length === 0) {
-      appendMutedPlaceholder(container, "None");
-      return;
-    }
-    for (const order of pendingOrders) {
-      const row = deps.createSidebarOrderRow({
-        labelText: deps.formatPendingOrderSidebarLabel(order),
-        unitId: order.unitId,
-        selected: rendererSharedState.selectedUnitIds.includes(order.unitId),
-        onToggleSelect: (event) => deps.applySelectionFromSidebarUnitButton(order.unitId, event),
-        onCancel: () => {
+    } else {
+      for (const order of rendererSharedState.humanStandingOrders.filter((o) => deps.isPendingMovementOrderForDisplay(o))) {
+        rows.push(rowFor(order.unitId, deps.formatPendingOrderSidebarLabel(order), () => {
           void deps.cancelOrderForUnit(order.unitId);
-        },
-        compactBlueButtons: true
-      });
-      container.appendChild(row);
+        }));
+      }
+      for (const ferry of rendererSharedState.pendingFerryOrders) {
+        rows.push(rowFor(ferry.unitId, formatPendingFerryOrderSidebarLabel(rendererSharedState.gameState, ferry), () => deps.cancelFerryForUnit(ferry.unitId)));
+      }
     }
-    for (const ferry of rendererSharedState.pendingFerryOrders) {
-      const row = deps.createSidebarOrderRow({
-        labelText: deps.formatUnitArrowLabel(ferry.unitId, formatPendingFerryOrderSidebarLabel(rendererSharedState.gameState, ferry)),
-        unitId: ferry.unitId,
-        selected: rendererSharedState.selectedUnitIds.includes(ferry.unitId),
-        onToggleSelect: (event) => deps.applySelectionFromSidebarUnitButton(ferry.unitId, event),
-        onCancel: () => deps.cancelFerryForUnit(ferry.unitId),
-        compactBlueButtons: true
-      });
-      container.appendChild(row);
-    }
+    renderSidebarOrderGroup("movement", rows);
   }
   function showSidebarError(message, showMapToast2, clearSidebarError2) {
     showMapToast2(message, { isError: true });
@@ -32803,40 +32922,6 @@ ${bonuses}`;
     }
   }
 
-  // src/renderer/gameplay/sidebarOrderRow.ts
-  function createSidebarOrderRow(args) {
-    const row = document.createElement("div");
-    row.style.display = "flex";
-    row.style.alignItems = "center";
-    row.style.gap = "0.5rem";
-    row.style.marginBottom = "0.35rem";
-    const label = document.createElement("span");
-    if (args.unitId) setUnitNameContent(label, args.unitId, args.labelText);
-    else label.textContent = args.labelText;
-    label.style.flex = "1";
-    label.style.fontSize = "0.9em";
-    const selectBtn = document.createElement("button");
-    selectBtn.type = "button";
-    selectBtn.className = args.compactBlueButtons ? "unit-select compact-blue-btn compact-square-btn" : "unit-select";
-    selectBtn.textContent = args.selected ? UNIT_DESELECT_GLYPH : UNIT_SELECT_GLYPH;
-    selectBtn.style.flexShrink = "0";
-    selectBtn.style.fontSize = "0.8em";
-    selectBtn.addEventListener("click", (event) => {
-      args.onToggleSelect(event);
-    });
-    const cancelBtn = document.createElement("button");
-    cancelBtn.type = "button";
-    cancelBtn.className = args.compactBlueButtons ? "unit-select compact-blue-btn compact-square-btn" : "unit-select";
-    cancelBtn.textContent = "\xD7";
-    cancelBtn.style.flexShrink = "0";
-    cancelBtn.style.fontSize = "0.8em";
-    cancelBtn.addEventListener("click", args.onCancel);
-    row.appendChild(label);
-    row.appendChild(selectBtn);
-    row.appendChild(cancelBtn);
-    return row;
-  }
-
   // src/renderer/entryCallbacks.ts
   var maybeScheduleTacticalAnnihilationExit2 = () => {
     throw new Error("entry callbacks host is not bound");
@@ -33154,9 +33239,6 @@ ${bonuses}`;
       syncUiAfterSelectionChange: () => syncUiAfterSelectionChange3()
     });
   }
-  function formatUnitArrowLabel2(unitId, targetLabel) {
-    return formatUnitArrowLabel(unitId, targetLabel, formatUnitDisplayName2);
-  }
   function syncUiAfterSelectionChange3(options = {}) {
     return syncUiAfterSelectionChange2(
       {
@@ -33181,8 +33263,7 @@ ${bonuses}`;
       refreshStackCalloutIfOpen,
       refreshHumanStandingOrders: refreshHumanStandingOrders2,
       showMapToast,
-      createSidebarOrderRow,
-      formatUnitArrowLabel: formatUnitArrowLabel2,
+      formatUnitDisplayName: formatUnitDisplayName2,
       applySelectionFromSidebarUnitButton: applySelectionFromSidebarUnitButton2,
       dismissMapDetailPopoversForHoverPlanning: dismissMapDetailPopoversIfHoverPlanningActive
     };
@@ -34342,7 +34423,7 @@ ${bonuses}`;
     });
   }
   function formatPendingOrderSidebarLabel2(order) {
-    return formatPendingOrderSidebarLabel(order, formatUnitArrowLabel2);
+    return formatPendingOrderSidebarLabel(order);
   }
   async function cancelOrderForUnit2(unitId) {
     return cancelOrderForUnit(unitId, createTacticalSidebarDeps());
@@ -34508,42 +34589,6 @@ ${bonuses}`;
     document.addEventListener("pointerdown", hideUnitOriginTooltip);
     window.addEventListener("scroll", hideUnitOriginTooltip, true);
     window.addEventListener("blur", hideUnitOriginTooltip);
-  }
-
-  // src/shared/consoleTabState.ts
-  function nextConsoleTabState(current, clickedTabId) {
-    if (current.collapsed) return { activeTabId: clickedTabId, collapsed: false };
-    if (clickedTabId === current.activeTabId) return { activeTabId: current.activeTabId, collapsed: true };
-    return { activeTabId: clickedTabId, collapsed: false };
-  }
-
-  // src/renderer/chrome/consoleFrame.ts
-  var CONSOLE_TABS = Object.freeze([
-    { tabId: "console-tab-orders", panelId: "console-panel-orders", title: "Orders" },
-    { tabId: "console-tab-opponent", panelId: "console-panel-opponent", title: "Opponent", onShow: scrollOpenRouterLogToEnd }
-  ]);
-  var consoleState = { activeTabId: CONSOLE_TABS[0].tabId, collapsed: false };
-  function applyConsoleState() {
-    selectTabPanel(consoleState.activeTabId, CONSOLE_TABS);
-    const active2 = CONSOLE_TABS.find((tab) => tab.tabId === consoleState.activeTabId);
-    const title = document.getElementById("console-title");
-    if (title && active2) title.textContent = active2.title;
-    document.getElementById("sidebar")?.setAttribute("data-collapsed", consoleState.collapsed ? "true" : "false");
-    document.getElementById("console-collapse-btn")?.setAttribute("aria-expanded", consoleState.collapsed ? "false" : "true");
-    if (!consoleState.collapsed) active2?.onShow?.();
-  }
-  function wireConsoleFrame() {
-    for (const tab of CONSOLE_TABS) {
-      document.getElementById(tab.tabId)?.addEventListener("click", () => {
-        consoleState = nextConsoleTabState(consoleState, tab.tabId);
-        applyConsoleState();
-      });
-    }
-    document.getElementById("console-collapse-btn")?.addEventListener("click", () => {
-      consoleState = { activeTabId: consoleState.activeTabId, collapsed: true };
-      applyConsoleState();
-    });
-    applyConsoleState();
   }
 
   // src/renderer/gameplay/formatTargetingValidationReason.ts
@@ -36040,11 +36085,10 @@ ${bonuses}`;
     return updatePendingOrdersSidebar2({
       isPendingMovementOrderForDisplay,
       formatPendingOrderSidebarLabel: formatPendingOrderSidebarLabel2,
-      createSidebarOrderRow,
+      formatUnitDisplayName: formatUnitDisplayName2,
       applySelectionFromSidebarUnitButton: applySelectionFromSidebarUnitButton2,
       cancelOrderForUnit: cancelOrderForUnit2,
       cancelFerryForUnit: cancelFerryForUnit2,
-      formatUnitArrowLabel: formatUnitArrowLabel2,
       redraw,
       updatePendingOrdersSidebar: updatePendingOrdersSidebar4,
       refreshStackCalloutIfOpen

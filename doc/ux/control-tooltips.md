@@ -102,7 +102,7 @@ The tip can appear whenever the control can receive the pointer or keyboard focu
 - The map toast dismiss control and the AI strategy toast dismiss control.
 - The stack callout close control, and its per-unit selection controls, including "+ All" and "- All".
 - The build popup close control, and each queue row's remove control, in both the single-hex and multi-hex popups.
-- Sidebar order select and cancel controls.
+- Order rows in the Orders tab, and their cancel controls.
 - The choice on each tactical battles row.
 - The model dropdown. It uses the model description tooltip.
 

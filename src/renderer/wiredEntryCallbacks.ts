@@ -146,7 +146,6 @@ import {
   updateSidebar,
   updateGameOverUI,
   openNewGameOverlayFromModelTab,
-  formatUnitArrowLabel,
   createTacticalSidebarDeps,
   showSidebarError,
   syncOpenRouterRunToggleInteractable,
@@ -481,7 +480,7 @@ export function initNewGameButton(): void {
  * Exceptions: None.
  */
 export function formatPendingOrderSidebarLabel(order: HumanStandingOrderSnapshot): string {
-  return formatPendingOrderSidebarLabelFromModule(order, formatUnitArrowLabel);
+  return formatPendingOrderSidebarLabelFromModule(order);
 }
 
 /**

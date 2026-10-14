@@ -1,5 +1,6 @@
 /**
- * UI smoke run: starts the built app in Electron, plays one fixed scenario, and records screenshots plus layout checks.
+ * UI smoke run: starts the built app in Electron, plays fixed scenarios over three sessions, and records screenshots
+ * plus layout checks.
  *
  * Purpose: Lets a layout change be verified the same way every time, with a report a reviewer can read and
  *   screenshots a person can compare.
@@ -9,25 +10,28 @@
  * Exceptions: Exits 1 when the app cannot start, the scenario cannot be set up, or a check fails.
  *
  * The run uses a fresh, temporary Electron user-data folder (`AGENT_WARS_USER_DATA_DIR`), so it never reads or
- * changes the player's saved match, API key, or model choice, and it never calls a model.
+ * changes the player's saved match, API key, or model choice, and it never calls a model. The three sessions share
+ * that folder: the first plays a new global match, the second reopens it with a hex both sides hold, queues an order
+ * in a battle there, and starts a regional match, and the third reopens that match after the run marks it as lost.
  */
 'use strict';
 
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { _electron: electron } = require('playwright-core');
 const { SCENES, probePage, probeSelectors, runChecks } = require('./ui-smoke-checks.cjs');
-
-/**
- * Repository root, two levels above this file.
- *
- * Purpose: The app is launched from the repository, and the output folder lives under it.
- * When to use: Launch arguments, the working directory, and the output path.
- * Expected outcome: An absolute path.
- * Exceptions: None.
- */
-const REPO_ROOT = path.resolve(__dirname, '..', '..');
+const {
+  LAND_UNIT_TYPES,
+  captureMainMap,
+  contestedHexEdit,
+  enterBattleAt,
+  queueBattleMarch,
+  queueLoneUnitMarch,
+  readGameState,
+  selectLoneBattleUnit,
+  selectLoneUnit,
+} = require('./ui-smoke-map.cjs');
+const { FINISHED_MATCH_EDIT, REPO_ROOT, editSavedMatch, launchApp } = require('./ui-smoke-session.cjs');
 
 /**
  * Window sizes for the strategic scene, in CSS pixels.
@@ -57,6 +61,33 @@ const SCENARIO = Object.freeze({
   startMonth: '9',
   gameSize: 'small',
 });
+
+/**
+ * The fixed regional scenario, as option values on the new-game overlay's Regional tab.
+ *
+ * Purpose: The regional scenes always show the same region and sides, so their checks can compare known values.
+ * When to use: Only by `startRegionalMatch`.
+ * Expected outcome: Southern Mexico and the isthmus against NE Mexico and the Bajio in Central America, a small game,
+ *   starting in April.
+ * Exceptions: None.
+ */
+const REGIONAL_SCENARIO = Object.freeze({
+  region: 'central_america',
+  humanSide: 'southern_mexico_isthmus',
+  aiSide: 'ne_mexico_bajio',
+  startMonth: '4',
+  gameSize: 'small',
+});
+
+/**
+ * The window size of the small-window scene: the app's minimum.
+ *
+ * Purpose: The console's contents must still fit there.
+ * When to use: The small-window scene.
+ * Expected outcome: The last entry of `VIEWPORTS`.
+ * Exceptions: None.
+ */
+const SMALL_WINDOW = VIEWPORTS[VIEWPORTS.length - 1];
 
 /**
  * How long to let the page settle, in milliseconds.
@@ -160,8 +191,8 @@ async function startScenarioMatch(page) {
 /**
  * Opens the new-game overlay from the running match, the way a player would.
  *
- * Purpose: The last scene checks the overlay opened from a match, not only at startup.
- * When to use: For the last scene.
+ * Purpose: One scene checks the overlay opened from a match, not only at startup, and the regional match starts from it.
+ * When to use: In the second session, before the regional match.
  * Expected outcome: The game menu is opened, New game is clicked, and the overlay is open.
  * Exceptions: Throws a Playwright timeout when a control is missing or the overlay does not open.
  */
@@ -204,15 +235,47 @@ async function recordScene(page, report, outDir, sceneName) {
 }
 
 /**
- * Runs every scene in order.
+ * Chooses the fixed regional scenario on the open new-game overlay and starts the match.
  *
- * Purpose: The scene order is part of the contract with the checks. The match starts after the first scene, and
- *   the new-game overlay is opened last because it ends the match view.
- * When to use: Once, after the app window exists.
- * Expected outcome: One recorded scene per step below, in this order.
+ * Purpose: The regional scenes check the console on a map other than the world map.
+ * When to use: While the new-game overlay is open.
+ * Expected outcome: The overlay closes with `REGIONAL_SCENARIO`'s region and sides.
+ * Exceptions: Throws when a choice does not hold or the match does not start within 90 seconds.
+ */
+async function startRegionalMatch(page) {
+  await page.click('#new-game-tab-regional');
+  await page.waitForTimeout(SETTLE_MS.click);
+  await page.selectOption('#new-game-region-select', REGIONAL_SCENARIO.region);
+  await page.waitForTimeout(SETTLE_MS.click);
+  await page.selectOption('#new-game-human-side-select', REGIONAL_SCENARIO.humanSide);
+  await page.selectOption('#new-game-ai-side-select', REGIONAL_SCENARIO.aiSide);
+  await page.selectOption('#new-game-start-month', REGIONAL_SCENARIO.startMonth);
+  await page.selectOption('#new-game-size-select', REGIONAL_SCENARIO.gameSize);
+  await page.waitForTimeout(SETTLE_MS.click);
+  const chosen = await page.evaluate(() => ({
+    region: document.getElementById('new-game-region-select').value,
+    human: document.getElementById('new-game-human-side-select').value,
+    ai: document.getElementById('new-game-ai-side-select').value,
+  }));
+  if (chosen.region !== REGIONAL_SCENARIO.region || chosen.human !== REGIONAL_SCENARIO.humanSide || chosen.ai !== REGIONAL_SCENARIO.aiSide) {
+    throw new Error(`regional choices did not hold: ${JSON.stringify(chosen)}`);
+  }
+  await page.click('#new-game-btn');
+  await page.waitForFunction(() => document.getElementById('game-over-overlay').classList.contains('hidden'), null, { timeout: 90000 });
+  await page.waitForTimeout(SETTLE_MS.start);
+}
+
+/**
+ * Runs the first session: a new match, the frame scenes, the console scenes, and the small window.
+ *
+ * Purpose: The scene order is part of the contract with the checks. The match starts after the first scene. Scenes
+ *   that select units or queue orders come after the frame scenes, so the frame screenshots show an untouched match.
+ *   The session ends with the Orders scene's march still queued, which the reopened match must still show.
+ * When to use: Once, on a fresh user-data folder.
+ * Expected outcome: One recorded scene per step below, in this order. Returns the game state at the end.
  * Exceptions: Propagates Playwright and scenario errors.
  */
-async function runScenes(app, page, report, outDir) {
+async function runFirstSession(app, page, report, outDir) {
   const first = VIEWPORTS[0];
   if (!(await setViewport(app, page, first))) report.notes.push(`could not size the page to ${first.w}x${first.h}`);
   await waitForNewGameOverlay(page);
@@ -269,8 +332,77 @@ async function runScenes(app, page, report, outDir) {
   await page.waitForTimeout(SETTLE_MS.click);
   await recordScene(page, report, outDir, SCENES.gameMenuOutside);
 
+  // Queue a one-hex march with the lone armor unit, then select it again from its row in the Orders tab.
+  await captureMainMap(page);
+  await queueLoneUnitMarch(page);
+  await page.click('#pending-orders-list .console-order-select');
+  await parkPointer(page);
+  await page.waitForTimeout(SETTLE_MS.click);
+  await recordScene(page, report, outDir, SCENES.ordersQueued);
+
+  // At the minimum window size, the Orders tab must still fit the console.
+  await setViewport(app, page, SMALL_WINDOW);
+  await page.waitForTimeout(SETTLE_MS.resize);
+  await parkPointer(page);
+  await recordScene(page, report, outDir, SCENES.smallWindow);
+
+  await setViewport(app, page, first);
+  await page.waitForTimeout(SETTLE_MS.resize);
+  return readGameState(page);
+}
+
+/**
+ * Runs the second session: the reopened match, a battle on the hex both sides now hold, and a new regional match.
+ *
+ * Purpose: Checks what a player sees after restarting the app, inside a battle, and on a regional map.
+ * When to use: After `runFirstSession` and the saved-match change from `contestedHexEdit`, on the same folder.
+ * Expected outcome: One recorded scene per step below, in this order.
+ * Exceptions: Propagates Playwright and scenario errors.
+ */
+async function runReopenedSession(app, page, report, outDir, battleHex) {
+  await setViewport(app, page, VIEWPORTS[0]);
+  await page.waitForFunction(() => document.getElementById('game-over-overlay')?.classList.contains('hidden')
+    && /· Planning$/.test(document.getElementById('topbar-turn-phase')?.textContent || ''), null, { timeout: 60000 });
+  await page.waitForTimeout(SETTLE_MS.start);
+  await parkPointer(page);
+  await recordScene(page, report, outDir, SCENES.matchReopened);
+
+  await captureMainMap(page);
+  await enterBattleAt(page, battleHex);
+  await parkPointer(page);
+  await recordScene(page, report, outDir, SCENES.battleStart);
+  const unit = await selectLoneBattleUnit(page);
+  await parkPointer(page);
+  await recordScene(page, report, outDir, SCENES.battleSelection);
+  await queueBattleMarch(page, unit);
+  await parkPointer(page);
+  await page.waitForTimeout(SETTLE_MS.click);
+  await recordScene(page, report, outDir, SCENES.battleOrders);
+
   await openNewGameOverlay(page);
   await recordScene(page, report, outDir, SCENES.newGameReopened);
+  await startRegionalMatch(page);
+  await parkPointer(page);
+  await recordScene(page, report, outDir, SCENES.regionalStart);
+  await captureMainMap(page);
+  await selectLoneUnit(page, await readGameState(page), LAND_UNIT_TYPES);
+  await parkPointer(page);
+  await recordScene(page, report, outDir, SCENES.regionalSelection);
+}
+
+/**
+ * Runs the last session: the reopened match after it was marked as lost.
+ *
+ * Purpose: A finished match must open on the game-over screen, with the match's chrome out of the way.
+ * When to use: After `runReopenedSession` and `FINISHED_MATCH_EDIT`, on the same folder.
+ * Expected outcome: One recorded scene.
+ * Exceptions: Propagates Playwright errors.
+ */
+async function runFinishedMatchSession(app, page, report, outDir) {
+  await setViewport(app, page, VIEWPORTS[0]);
+  await waitForNewGameOverlay(page);
+  await page.waitForTimeout(SETTLE_MS.overlay);
+  await recordScene(page, report, outDir, SCENES.gameOverReopened);
 }
 
 /**
@@ -296,7 +428,8 @@ function printReport(report, outDir) {
 /**
  * Entry point.
  *
- * Purpose: Owns the app's lifetime and the temporary user-data folder.
+ * Purpose: Owns the app's lifetime and the temporary user-data folder. The three sessions share the folder, so each
+ *   one reopens the match the previous one left, changed as the scenes need.
  * When to use: Run by `npm run ui:smoke`.
  * Expected outcome: The app is closed and the temporary folder removed even when a scene fails.
  * Exceptions: Exits 1 on any failure.
@@ -308,23 +441,24 @@ async function main() {
   fs.mkdirSync(outDir, { recursive: true });
   const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-wars-ui-smoke-'));
   const report = { label, startedAt: new Date().toISOString(), sceneCount: 0, results: [], screenshots: [], notes: [], pageErrors: [], consoleErrors: [] };
-  let app = null;
+  let session = null;
   let exitCode = 1;
   try {
-    app = await electron.launch({
-      executablePath: require('electron'),
-      args: [REPO_ROOT],
-      cwd: REPO_ROOT,
-      env: { ...process.env, AGENT_WARS_USER_DATA_DIR: userDataDir },
-      timeout: 60000,
-    });
-    const page = await app.firstWindow();
-    page.on('pageerror', (err) => report.pageErrors.push(err && err.message ? err.message : String(err)));
-    page.on('console', (msg) => {
-      if (msg.type() === 'error') report.consoleErrors.push(msg.text());
-    });
-    await page.waitForLoadState('domcontentloaded');
-    await runScenes(app, page, report, outDir);
+    session = await launchApp(userDataDir, report);
+    const lastState = await runFirstSession(session.app, session.page, report, outDir);
+    await session.app.close();
+    session = null;
+    const contested = contestedHexEdit(lastState);
+    await editSavedMatch(userDataDir, contested.statements);
+
+    session = await launchApp(userDataDir, report);
+    await runReopenedSession(session.app, session.page, report, outDir, contested.h3Index);
+    await session.app.close();
+    session = null;
+    await editSavedMatch(userDataDir, FINISHED_MATCH_EDIT);
+
+    session = await launchApp(userDataDir, report);
+    await runFinishedMatchSession(session.app, session.page, report, outDir);
     exitCode = printReport(report, outDir);
   } catch (err) {
     report.notes.push(`run stopped: ${err && err.stack ? err.stack : String(err)}`);
@@ -332,7 +466,7 @@ async function main() {
     exitCode = 1;
   } finally {
     fs.writeFileSync(path.join(outDir, 'report.json'), `${JSON.stringify(report, null, 2)}\n`);
-    if (app) await app.close().catch(() => undefined);
+    if (session) await session.app.close().catch(() => undefined);
     try {
       fs.rmSync(userDataDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 300 });
     } catch (err) {

@@ -26,7 +26,7 @@ When Strike targeting is on, a double-click validates the target and the chosen 
 
 ### Sealift
 
-Sealift embark and debark are not draft orders. They apply immediately from the stack callout in both theaters, never appear in a pending list, and do not wait on Ready. See [stack-callout.md](stack-callout.md).
+Sealift embark and debark are not draft orders. They apply immediately from the stack callout in both theaters, never appear in an order group, and do not wait on Ready. See [stack-callout.md](stack-callout.md).
 
 ### Build
 
@@ -34,10 +34,10 @@ Build orders are queue rows on a hex, not map double-clicks. See [build-popup.md
 
 ## Lifecycle
 
-- Draft: the order sits in a pending list on the right panel. Movement orders, ranged attacks, and air strikes are separate lists. Ferries are listed with movement orders in both theaters, with the same select and cancel controls.
+- Draft: the order sits in a group on the right panel's Orders tab. Movement, ranged attacks, and air strikes are separate groups. Ferries are listed in the Movement group in both theaters, and their rows select and cancel the same way.
 - Hover preview: while units are selected and the pointer is over a legal destination, the map draws a preview of the route or shot. The preview is dropped when the selection changes, when targeting turns off, when Ready finishes, and when a newer pointer position supersedes it. A preview that started before targeting turned off must not appear after the button has changed.
 - Commit: Ready submits pending ranged attacks, air strikes, and ferries, then resolves the turn. A tactical Ready submits marches, ranged attacks, air strikes, and ferries for the current beat. A successful grouped march or ferry commit clears the draft selection immediately, before Ready.
-- Pending list: each row can select its unit and cancel that order. Cancel removes that order only.
+- Rows: each row can select its unit and cancel that order. Cancel removes that order only.
 - Resolution: after a successful Ready, queued drafts that were submitted are cleared. Tactical march continuations can come back as pending movement for the next beat. Playback then animates the resolved turn. See [resolution-playback.md](resolution-playback.md) and [modes-and-transitions.md](modes-and-transitions.md).
 
 ## Rejected Orders
@@ -52,7 +52,7 @@ Build orders are queue rows on a hex, not map double-clicks. See [build-popup.md
 | --- | --- | --- |
 | Movement draft | Standing movement orders, plus double-click march | Pending marches for the current beat, including continuations after Ready |
 | Sealift | Applied immediately from the stack callout | Applied immediately from the stack callout |
-| Ferry list | Shown with movement orders | Shown with movement orders |
+| Ferry rows | Shown in the Movement group | Shown in the Movement group |
 | Stash | Drafts are stashed when a battle starts and restored afterward, minus dead units | Drafts are cleared on exit |
 | Ranged types | Infantry does not offer Ranged | Infantry does offer Ranged |
 | Ready | Resolves the strategic turn and may open the tactical battles list | Commits one battle beat |
@@ -65,7 +65,7 @@ Build orders are queue rows on a hex, not map double-clicks. See [build-popup.md
 - Starting a new match clears drafts and discards the stash.
 - A rejected Ranged or Strike target double-click never turns targeting off. Targeting turns off only on Cancel, a successful target double-click, right-click, a selection that can no longer fire, or entering a battle. A single click does not turn it off.
 - Drafting, changing, or cancelling an order never cancels or restarts opponent planning in either theater. See [modes-and-transitions.md](modes-and-transitions.md).
-- Every queued order that Ready will submit is visible in a pending list.
+- Every queued order that Ready will submit is visible in one of the three order groups.
 - Sealift assignment is never a pending order.
 
 ## Open Questions

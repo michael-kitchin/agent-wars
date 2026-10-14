@@ -6,9 +6,8 @@ import {
 } from '../../shared/pendingMovementSidebarLabels';
 import { buildUnitDisplayNameLookup, fallbackDisplayNameFromUnitId, type UnitDisplayIdentity } from '../../shared/unitDisplayNames';
 import { formatPendingFerryOrderSidebarLabel } from './orderLabelFormatting';
-import { appendMutedPlaceholder } from './sidebarListHelpers';
 import { rendererSharedState as S } from '../core/state';
-import type { SidebarOrderRowArgs } from './sidebarOrderRow';
+import { renderSidebarOrderGroup, sidebarOrderRowArgs, type SidebarOrderRowArgs } from './sidebarOrderRow';
 import { shouldBlockEmbarkedLandUnitSelect } from '../core/selection';
 import {
   shouldBlockSelectionReplaceDuringHoverPlanning,
@@ -139,23 +138,14 @@ interface PendingOrdersDeps {
    */
 isPendingMovementOrderForDisplay: (order: HumanStandingOrderSnapshot) => boolean;
     /**
-   * Specifies the contract for the `formatPendingOrderSidebarLabel` member (formatPendingOrderSidebarLabel: (order: HumanStandingOrderSnapshot) => string;).
-
-   * Contract: Describes stable behavior for callers of `formatPendingOrderSidebarLabel` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Builds the line under a strategic march row's unit name.
+   *
+   * Contract: Same behavior as the exported `formatPendingOrderSidebarLabel`.
+   * When to use: For each standing movement order shown in the Movement group.
+   * Expected outcome: For example `→ E5 · 1h`.
    * Exceptions: None.
    */
 formatPendingOrderSidebarLabel: (order: HumanStandingOrderSnapshot) => string;
-    /**
-   * Builds one sidebar order row.
-   *
-   * Contract: Same behavior as the exported `createSidebarOrderRow`.
-   * When to use: For each pending movement or ferry order in the list.
-   * Expected outcome: An unattached row element; the label carries a unit flag when `unitId` is given.
-   * Exceptions: None.
-   */
-createSidebarOrderRow: (args: SidebarOrderRowArgs) => HTMLElement;
     /**
    * Specifies the contract for the `applySelectionFromSidebarUnitButton` member (applySelectionFromSidebarUnitButton: (unitId: string, event: MouseEvent) => void;).
 
@@ -184,14 +174,14 @@ cancelOrderForUnit: (unitId: string) => Promise<void>;
    */
 cancelFerryForUnit: (unitId: string) => void;
     /**
-   * Specifies the contract for the `formatUnitArrowLabel` member (formatUnitArrowLabel: (unitId: string, targetLabel: string) => string;).
-
-   * Contract: Describes stable behavior for callers of `formatUnitArrowLabel` in this codebase.
-   * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
-   * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+   * Returns a unit's display name.
+   *
+   * Contract: Same names the map and the stack callout show.
+   * When to use: The first line of each Movement row.
+   * Expected outcome: The name, or a fallback built from the id.
    * Exceptions: None.
    */
-formatUnitArrowLabel: (unitId: string, targetLabel: string) => string;
+formatUnitDisplayName: (unitId: string) => string;
     /**
    * Redraws the map after tactical draft rows change from sidebar cancel actions.
    *
@@ -273,33 +263,15 @@ export function applySelectionFromSidebarUnitButton(unitId: string, event: Mouse
 }
 
 /**
- * Defines the `formatUnitArrowLabel` function shape (export function formatUnitArrowLabel(unitId: string, targetLabel: string, formatUnitDisplayName: (unitId: string) => string): string).
-
- * Purpose: Supports maintainability by documenting why `formatUnitArrowLabel` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Builds the line under a strategic march row's unit name.
+ *
+ * Purpose: A standing movement order names its destination hex and the hex steps its route has left.
+ * When to use: For each standing movement order shown in the Movement group.
+ * Expected outcome: For example `→ E5 · 3h`; a missing destination shows `?`.
  * Exceptions: None.
  */
-export function formatUnitArrowLabel(unitId: string, targetLabel: string, formatUnitDisplayName: (unitId: string) => string): string {
-  return `${formatUnitDisplayName(unitId)} → ${targetLabel}`;
-}
-
-/**
- * Defines the `formatPendingOrderSidebarLabel` function shape (export function formatPendingOrderSidebarLabel( order: HumanStandingOrderSnapshot, formatUnitArrowLabelFn: (unitId: string, targetLabel: string) => string).
-
- * Purpose: Supports maintainability by documenting why `formatPendingOrderSidebarLabel` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-export function formatPendingOrderSidebarLabel(
-  order: HumanStandingOrderSnapshot,
-  formatUnitArrowLabelFn: (unitId: string, targetLabel: string) => string
-): string {
-  return formatUnitArrowLabelFn(
-    order.unitId,
-    formatPendingMovementSidebarTargetLabel(estimateHexesLeftForOrder(order), order.status)
-  );
+export function formatPendingOrderSidebarLabel(order: HumanStandingOrderSnapshot): string {
+  return formatPendingMovementSidebarTargetLabel(order.destinationH3Index, estimateHexesLeftForOrder(order));
 }
 
 /**
@@ -431,87 +403,46 @@ export function syncUiAfterSelectionChange(
 }
 
 /**
- * Rebuilds the Movement orders list from the active theater's drafts.
+ * Rebuilds the Movement group from the active theater's drafts.
  *
- * When to use: after a march or ferry draft is added, cancelled, or cleared.
- * Expected outcome: the list shows "None" when that theater has no movement rows, otherwise one row per march and ferry. During a battle, sealift embark drafts are omitted. A missing list element leaves the document unchanged.
- * Exceptions: Selection and cancel callbacks may throw. A missing list element returns without throwing.
+ * Purpose: Lists every march and ferry the next Ready will send, with each unit's destination code and distance.
+ * When to use: After a march or ferry draft is added, cancelled, or cleared, and after the selection changes.
+ * Expected outcome: One row per march and ferry, or "None". During a battle, battle marches and ferries are listed
+ *   and sealift embark drafts are omitted. Rows for selected units are highlighted. The group's count and its
+ *   published copy match. A missing list element leaves the document unchanged.
+ * Exceptions: Selection and cancel callbacks may throw.
  */
 export function updatePendingOrdersSidebar(deps: PendingOrdersDeps): void {
-  const container = document.getElementById('pending-orders-list');
-  if (!container) return;
-  container.innerHTML = '';
-  if (S.tacticalBattleSnapshot) {
-    if (S.tacticalPendingMarches.length === 0 && S.pendingFerryOrders.length === 0) {
-      appendMutedPlaceholder(container, 'None');
-      return;
-    }
+  const battle = S.tacticalBattleSnapshot;
+  const rows: SidebarOrderRowArgs[] = [];
+  const rowFor = (unitId: string, detail: string, onCancel: () => void): SidebarOrderRowArgs =>
+    sidebarOrderRowArgs(unitId, detail, onCancel, deps);
+  if (battle) {
     for (const row of S.tacticalPendingMarches) {
-      const rowEl = deps.createSidebarOrderRow({
-        labelText: deps.formatUnitArrowLabel(
-          row.subUnitId,
-          formatTacticalDraftMarchPendingOrderTargetLabel(S.tacticalBattleSnapshot, row.subUnitId, row.destinationH3Index)
-        ),
-        unitId: row.subUnitId,
-        selected: S.selectedUnitIds.includes(row.subUnitId),
-        onToggleSelect: (event) => deps.applySelectionFromSidebarUnitButton(row.subUnitId, event),
-        onCancel: () => {
-          S.tacticalPendingMarches = S.tacticalPendingMarches.filter((r) => r.subUnitId !== row.subUnitId);
-          deps.updatePendingOrdersSidebar?.();
-          deps.redraw?.();
-        },
-        compactBlueButtons: true,
-      });
-      container.appendChild(rowEl);
+      const detail = formatTacticalDraftMarchPendingOrderTargetLabel(battle, row.subUnitId, row.destinationH3Index);
+      rows.push(rowFor(row.subUnitId, detail, () => {
+        S.tacticalPendingMarches = S.tacticalPendingMarches.filter((r) => r.subUnitId !== row.subUnitId);
+        deps.updatePendingOrdersSidebar?.();
+        deps.redraw?.();
+      }));
     }
     for (const ferry of S.pendingFerryOrders) {
-      const rowEl = deps.createSidebarOrderRow({
-        labelText: deps.formatUnitArrowLabel(
-          ferry.unitId,
-          formatPendingFerryOrderSidebarLabel(S.gameState, ferry, S.tacticalBattleSnapshot.subUnits)
-        ),
-        unitId: ferry.unitId,
-        selected: S.selectedUnitIds.includes(ferry.unitId),
-        onToggleSelect: (event) => deps.applySelectionFromSidebarUnitButton(ferry.unitId, event),
-        onCancel: () => {
-          deps.cancelFerryForUnit(ferry.unitId);
-          deps.refreshStackCalloutIfOpen?.();
-        },
-        compactBlueButtons: true,
-      });
-      container.appendChild(rowEl);
+      rows.push(rowFor(ferry.unitId, formatPendingFerryOrderSidebarLabel(S.gameState, ferry, battle), () => {
+        deps.cancelFerryForUnit(ferry.unitId);
+        deps.refreshStackCalloutIfOpen?.();
+      }));
     }
-    return;
-  }
-  const pendingOrders = S.humanStandingOrders.filter((order) => deps.isPendingMovementOrderForDisplay(order));
-  if (pendingOrders.length === 0 && S.pendingFerryOrders.length === 0) {
-    appendMutedPlaceholder(container, 'None');
-    return;
-  }
-  for (const order of pendingOrders) {
-    const row = deps.createSidebarOrderRow({
-      labelText: deps.formatPendingOrderSidebarLabel(order),
-      unitId: order.unitId,
-      selected: S.selectedUnitIds.includes(order.unitId),
-      onToggleSelect: (event) => deps.applySelectionFromSidebarUnitButton(order.unitId, event),
-      onCancel: () => {
+  } else {
+    for (const order of S.humanStandingOrders.filter((o) => deps.isPendingMovementOrderForDisplay(o))) {
+      rows.push(rowFor(order.unitId, deps.formatPendingOrderSidebarLabel(order), () => {
         void deps.cancelOrderForUnit(order.unitId);
-      },
-      compactBlueButtons: true,
-    });
-    container.appendChild(row);
+      }));
+    }
+    for (const ferry of S.pendingFerryOrders) {
+      rows.push(rowFor(ferry.unitId, formatPendingFerryOrderSidebarLabel(S.gameState, ferry), () => deps.cancelFerryForUnit(ferry.unitId)));
+    }
   }
-  for (const ferry of S.pendingFerryOrders) {
-    const row = deps.createSidebarOrderRow({
-      labelText: deps.formatUnitArrowLabel(ferry.unitId, formatPendingFerryOrderSidebarLabel(S.gameState, ferry)),
-      unitId: ferry.unitId,
-      selected: S.selectedUnitIds.includes(ferry.unitId),
-      onToggleSelect: (event) => deps.applySelectionFromSidebarUnitButton(ferry.unitId, event),
-      onCancel: () => deps.cancelFerryForUnit(ferry.unitId),
-      compactBlueButtons: true,
-    });
-    container.appendChild(row);
-  }
+  renderSidebarOrderGroup('movement', rows);
 }
 
 /**

@@ -10,6 +10,7 @@ Everything here was settled with the product owner in the layout review: layout 
 - **The mockups use Inter as a stand-in font.** The app keeps its `system-ui, -apple-system, sans-serif` stack. The renderer's Content Security Policy (`font-src 'self' data:`) blocks web fonts, so do not add any. Numbers use `font-variant-numeric: tabular-nums`, not a monospace face.
 - **The map in the mockups is an approximation.** Hex codes, names, counts, and captions come from game data for the scenario below. The basemap and hex drawing are a stand-in for Leaflet and the canvas overlay.
 - **Phases.** Section [Phases](#phases) lists the phases. Each element section says which phase builds it. Phase numbers belong in `.spec` only. Never put them in code, comments, tests, `doc/`, or configuration (`.cursor/rules/12-no-plan-identifiers.mdc`).
+- **The execution plans are the authority for what gets built.** When a plan and this document disagree, follow the plan and change this document to match.
 
 Mockup scenario: Global map, Small game, bonuses Low, fog of war on, started in September. Southern Europe (human, 15 home hexes) against Northern Africa (opponent, 24 home hexes). Turn 7 is March, Year 1. The battle mockup is at hex E8 in April, Year 1.
 
@@ -39,7 +40,7 @@ These were confirmed with the product owner.
 2. **One milestone, no gameplay changes.** No rule, IPC, or saved-data change. Renderer-only display values, such as top-bar totals, are allowed when a pure function in `src/shared` computes them from the snapshot and has a unit test.
 3. **Placeholders only at entry points.** A future feature gets a disabled control only where a player would look for it: a menu item, a tab, a top-bar button, a map mode, a button on a report. Each one is disabled and has the tip "<Name> is not available in this version." Content features with no entry point are deferred with no placeholder. See [Placeholders and Deferred Items](#placeholders-and-deferred-items).
 4. **Selection ring on the map.** Each hex holding a selected unit gets a gold ring around its top marker.
-5. **Ranged and Strike stay visible.** While units are selected they are greyed out with a one-line reason when they can't be used, instead of hiding.
+5. **Ranged and Strike stay visible.** While units are selected they stay on screen and are greyed out when they can't be used, instead of hiding. The reason, when one of the two sentences applies, is in [Selection Panel](#selection-panel).
 6. **Destination codes in order rows.** Every queued-order row names its target hex code.
 7. **The Opponent tab shows its tools and the activity log together**, with no Tools/Model sub-tabs.
 8. **Force bar in tactical battles**, from layout B2, in the top bar.
@@ -50,7 +51,7 @@ These were confirmed with the product owner.
 13. **Tactical battles lives only in the game menu**, as "Offer tactical battles". It is not on the new-game screen.
 14. **Electron's File/Edit/View menu bar auto-hides** (`autoHideMenuBar: true`). Alt still shows it, and its keyboard shortcuts keep working.
 15. **Window size.** The minimum stays 800 × 600. Layouts are verified at 1280 × 720 and 1920 × 1080, and checked for overflow at 800 × 600.
-16. **Verification includes a screenshot smoke run** (`npm run ui:smoke`), added in Phase 2 and extended by later phases.
+16. **Verification includes a screenshot smoke run** (`npm run ui:smoke`), added in Phase 2 and extended by later phases. From Phase 3 on it also checks the console and the selection panel at the 800 × 600 minimum, after the app restarts on the saved match, inside a battle, in a regional match, and on a finished match's game-over screen.
 
 ## Compatibility Names
 
@@ -168,6 +169,9 @@ The frame and tabs are built in Phase 2. The contents are restyled in Phase 3.
   - Each group has a header with a count. An empty group shows "None".
   - A row shows the unit's flag and name, then a sub-line: an arrow, the target hex code, and the distance. Air strikes add the target type, using the dropdown's option label. A ferry adds "Ferry". Examples: "→ E5 · 1h", "→ GK · 2h · Airports".
   - Each row keeps its cancel ×. Rows for selected units are highlighted.
+  - Clicking a row selects its unit, and Shift-click toggles it. There is no separate select button (today's ⊕ goes away).
+  - Inside a battle, the code names the battle's hex and the cell, for example "E8.K3".
+  - A code or a distance that cannot be found shows "?".
   - Subtitle: "N queued for turn T", or "for beat B" in a battle.
   - The "Selected unit" line and the Ranged/Strike row move to the [selection panel](#selection-panel).
 
@@ -176,8 +180,11 @@ The frame and tabs are built in Phase 2. The contents are restyled in Phase 3.
 - A list of what the two map toasts showed during this match, newest first: the turn update (`#map-toast`) and the opponent's message and strategy (`#ai-strategy-toast`).
   - Each entry shows a tag (T7, or B2 in a battle), a kind (Turn report, Message, or Notice), and the text.
   - Turn reports carry a disabled Replay placeholder.
-- An entry is unread until the Reports tab is shown. The Reports rail tab shows the unread count.
-- The list clears when a new match starts, as the AI activity log does. It is not saved.
+- An entry is unread until the Reports tab is shown. Showing the tab marks every entry read. Entries filed while the tab is shown are never unread. Entries filed since the player last left the tab are marked with a gold dot. The Reports rail tab shows the unread count.
+- The list clears when a new match starts, as the AI activity log does. It is not saved. A restart starts it empty. A toast shown once the app is up, such as a basemap failure, can file a new entry.
+- Kinds: a turn update is a Turn report, the AI strategy toast is a Message, and any other informational map toast, such as "AI: standing orders only (no consultation).", is a Notice. Error toasts are not filed.
+- A turn report's tag is the turn or beat it covers: the report shown when turn 7 begins is tagged T6. The standing-orders and unknown-battle notices that the same Ready raises take that tag too. Other messages and notices take the current turn or beat.
+- The list keeps the newest 200 entries. An empty list reads "No reports yet this match."
 - Toasts keep their behavior. They move to the top centre of the map, between the minimap panel and the zoom control, at most 560 px wide.
 - Two text fixes come with this phase, because these lines become permanent entries. In `consolidatedTurnUpdateToast.ts`, "1 hexes lost to opponent" and "1 infantry units deployed" become singular when the count is 1.
 
@@ -192,6 +199,8 @@ The frame and tabs are built in Phase 2. The contents are restyled in Phase 3.
 
   Turning Run on no longer switches tabs. Update Run's tip to match.
 
+  The status sentence reads "Opponent planning is on." while Run is pressed, and "Opponent planning is off." otherwise. The tab's subtitle names the opponent's home region.
+
 ### Footer status line (Phase 3)
 
 One line above Ready:
@@ -202,6 +211,10 @@ One line above Ready:
 - The match cost.
 
 The line is read-only.
+
+- The dot is grey while planning is off, teal while it is on, and rose while the opponent plans. "Opponent planning…" shows exactly while Ready shows "AI:" and a time.
+- With no model selected, the name reads "No model". A long name ends in "…".
+- The line is hidden while the console is collapsed.
 
 ## Selection Panel
 
@@ -217,20 +230,21 @@ Built in Phase 3. See [ui-facelift-strategic-orders.png](ui-facelift-strategic-o
 - **Header**:
   - The primary unit's hex code in parentheses and the hex caption, the same naming line the hex tooltip shows.
   - A close × that clears the selection, the same as the existing clear-selection action.
-- **Chips**: terrain, weather (while the weather bonus is on), tech tier (while the tech bonus is on), production `$N/turn` (strategic hexes with urban cells), and Home or Enemy home.
+- **Chips**, in this order, each only when it applies: terrain, with the map key's swatch; weather, with its icon, while the weather bonus is on and the weather is known; the tech tier of units built there, while the tech bonus is on and the hex can produce units (not in a battle); production `$N/turn` when the hex has urban cells, that number is at least 1, and the hex is not on the neutral border (not in a battle); and "Home" or "Enemy home" (not in a battle).
 - **Count**: "N selected of M", where M is the player's selectable units in that hex.
 - **Unit rows**:
   - Each row shows a type token, the unit's flag, and its name.
   - The order chip uses the Orders-tab wording, with a cancel ×, or reads "No orders".
   - A selected unit in another hex shows that hex code after its name.
 - **Action row**:
-  - Ranged or Strike is always present while the panel shows. It is greyed out with a reason when it can't be used:
-    - "Infantry can't fire on the world map." when a strategic selection includes infantry.
+  - Ranged or Strike is always present while the panel shows. It is greyed out when it can't be used. A reason shows beside it when one of these sentences applies, and no reason shows otherwise:
+    - "Infantry can't fire on the world map." when a world-map selection includes infantry and no air unit.
     - "Strike needs a selection of air units only." when air is mixed with other types.
-  - The label is Strike when the selection has any air unit, and Ranged otherwise.
+  - The label is Strike when the selection has any air unit, and Ranged otherwise. The panel is hidden when nothing is selected, so an empty selection never shows the button.
   - Aiming keeps today's behavior: Ranged turns into Cancel, and Strike turns into the target-type list and Cancel. Those controls (`#ranged-attack-btn`, `#air-strike-target-type`, `#air-strike-cancel-btn`) move here.
   - `#sidebar-error` moves here, above the action row.
 - **Not added**: no "Clear orders" button. Orders are cancelled per row.
+- **In a battle**: the header names the first selected unit's battle cell, such as "(E8.K3)". The chips are that cell's terrain and the battle's weather.
 
 ## Map Chrome
 
@@ -385,7 +399,7 @@ Phases 3 through 6 add their own tips in their plans.
 | 6 | New game and game over: top bar on the overlay, docked setup panel | The same gates, plus a global and a regional start |
 | 7 | Docs, screenshots, release: refresh `doc/media`; update the README's images, its OpenRouter setup steps (they still name the Model tab), and its test count; sweep `doc/` for "right panel" wording; regression pass | The product owner signs off |
 
-Each phase gets its own execution plans in `.spec`. Phase 2 has five, run in order and committed one at a time; [ui-facelift-frame-execution-plan.md](ui-facelift-frame-execution-plan.md) lists them.
+Each phase gets its own execution plans in `.spec`. Phase 2 has five, run in order and committed one at a time; [ui-facelift-frame-execution-plan.md](ui-facelift-frame-execution-plan.md) lists them. Phase 3 also has five, run the same way; [ui-facelift-console-execution-plan.md](ui-facelift-console-execution-plan.md) lists them.
 
 ## Open Questions
 

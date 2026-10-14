@@ -28,7 +28,6 @@ import {
   startTacticalBattleFromEntryHex,
   updateSidebar,
   applySelectionFromSidebarUnitButton,
-  formatUnitArrowLabel,
   syncUiAfterSelectionChange,
   createTacticalSidebarDeps,
   refreshHoverRoutePreview,
@@ -192,9 +191,6 @@ import {
   isPendingMovementOrderForDisplay,
   updatePendingOrdersSidebar as updatePendingOrdersSidebarFromModule,
 } from './gameplay/sidebarSupport';
-import {
-  createSidebarOrderRow,
-} from './gameplay/sidebarOrderRow';
 
 /**
  * Bridges renderer shared tactical fields into tactical exit/advance helpers without those modules importing `renderer.ts`.
@@ -552,8 +548,8 @@ function buildKillToastFormatterBundle(
 function updateRangedSidebar(): void {
   // Contract anchors retained for rendererConsolidation tests after extraction:
   // btnEl.style.display = S.airStrikeModeActive ? 'none' : '';
-  // formatPendingRangedAttackSidebarLabel(S.gameState, r, tacticalPositions)
-  // formatPendingAirStrikeSidebarLabel(S.gameState, strike, tacticalPositions)
+  // formatPendingRangedAttackSidebarLabel(S.gameState, r, battle)
+  // formatPendingAirStrikeSidebarLabel(S.gameState, strike, battle)
   // formatPendingFerryOrderSidebarLabel(S.gameState, ferry)
   return updateRangedSidebarFromModule(createTacticalSidebarDeps());
 }
@@ -572,11 +568,10 @@ function updatePendingOrdersSidebar(): void {
   return updatePendingOrdersSidebarFromModule({
     isPendingMovementOrderForDisplay,
     formatPendingOrderSidebarLabel,
-    createSidebarOrderRow,
+    formatUnitDisplayName,
     applySelectionFromSidebarUnitButton,
     cancelOrderForUnit,
     cancelFerryForUnit,
-    formatUnitArrowLabel,
     redraw,
     updatePendingOrdersSidebar,
     refreshStackCalloutIfOpen,

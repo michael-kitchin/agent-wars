@@ -13,20 +13,23 @@ import { newGameButtonTooltipText } from '../chrome/controlTooltipText';
 import { expandNewGameDialog, syncNewGameDialogMapPointer } from '../gameplay/newGameDialogCollapse';
 import { renderTopBarStatus } from '../chrome/topBar';
 import { closeGameMenu } from '../chrome/gameMenu';
+import { refreshConsoleHeader } from '../chrome/consoleFrame';
+import { syncSidebarOrderRowSelection } from '../gameplay/sidebarOrderRow';
 
 /**
- * Refreshes the selected-unit line in the right sidebar.
+ * Refreshes the selected-unit line and the selection highlight of the order rows.
  *
  * Purpose: Shows which unit the player has selected, with its origin flag.
  * When to use: After any selection change or snapshot that can change unit names.
  * Expected outcome: The primary unit's flag and name, followed by ` (+N)` when more units are selected;
- *   an em dash when nothing is selected.
+ *   an em dash when nothing is selected. Order rows of selected units are highlighted.
  * Exceptions: None.
  */
 export function updateSidebar(
   getPrimarySelectedUnitId: () => string | null,
   formatUnitDisplayName: (unitId: string) => string
 ): void {
+  syncSidebarOrderRowSelection();
   const selectedUnitEl = document.getElementById('sidebar-selected-unit');
   if (selectedUnitEl) {
     const primary = getPrimarySelectedUnitId();
@@ -41,15 +44,17 @@ export function updateSidebar(
 }
 
 /**
- * Refreshes the match status in the top bar from the latest snapshot.
+ * Refreshes the match status in the top bar, and the console header that names the turn, from the latest snapshot.
  *
  * Purpose: Keeps the name every caller already uses; the old Phase and Turn lines now live in the top bar.
  * When to use: After `applyGameStateSnapshot`, tactical entry/exit, tactical Ready commit, and when beat playback ends.
- * Expected outcome: The top bar's sides, readouts, and date block match `state` and the current battle. Null shows em dashes.
+ * Expected outcome: The top bar's sides, readouts, and date block match `state` and the current battle, and the
+ *   console subtitle names the current turn or beat. Null shows em dashes.
  * Exceptions: None.
  */
 export function updateGameStateSidebar(state: GameStateSnapshot | null): void {
   renderTopBarStatus(state);
+  refreshConsoleHeader();
 }
 
 /**

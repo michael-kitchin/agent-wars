@@ -1,0 +1,126 @@
+/* Console contents: the header subtitle, the rail badges, and the Orders tab's groups and rows. The frame itself is in frameChrome.css. */
+
+/* ---------- Header subtitle and rail badges ---------- */
+.console-subtitle {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--chrome-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+/* The badge sits on the tab icon's upper-right corner; `.console-tab` is its positioning box. */
+.console-tab-badge {
+  position: absolute;
+  top: 6px;
+  left: calc(50% + 4px);
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--button-bg);
+  border: 1px solid var(--chrome-accent-edge);
+  color: var(--button-text);
+  font-size: 10px;
+  line-height: 14px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+.console-tab-badge[hidden] {
+  display: none;
+}
+
+/* ---------- Orders tab groups ---------- */
+.console-order-group + .console-order-group {
+  margin-top: 14px;
+}
+.console-group-heading {
+  margin: 0 0 6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--chrome-muted);
+}
+.console-group-count {
+  margin-left: 6px;
+  color: var(--chrome-text);
+  font-variant-numeric: tabular-nums;
+}
+.console-order-list > .chrome-muted {
+  display: block;
+  padding: 2px 0;
+}
+
+/* ---------- Order rows ---------- */
+/* One row: a select button holding the unit's name and its order's line, then the cancel ×. */
+.console-order-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--chrome-divider);
+  border-radius: 3px;
+}
+.console-order-row:has(> .console-order-select[aria-pressed="true"]) {
+  background: color-mix(in srgb, var(--selection-mark) 12%, transparent);
+}
+.console-order-select {
+  flex: 1 1 auto;
+  min-width: 0;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 0 14px 0 0;
+  border: 0;
+  background: transparent;
+  color: var(--chrome-text);
+  text-align: left;
+}
+.console-order-select:hover {
+  background: transparent;
+  color: var(--chrome-accent-edge);
+}
+/* A gold dot marks a row whose unit is selected, matching the map's selection color. */
+.console-order-select[aria-pressed="true"]::after {
+  content: "";
+  position: absolute;
+  right: 2px;
+  top: 50%;
+  width: 7px;
+  height: 7px;
+  margin-top: -3.5px;
+  border-radius: 50%;
+  background: var(--selection-mark);
+}
+.console-order-name {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+.console-order-detail {
+  color: var(--chrome-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.console-order-cancel {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--chrome-border);
+  border-radius: 3px;
+  background: transparent;
+  color: var(--chrome-text);
+  font-size: 14px;
+  line-height: 1;
+}
+.console-order-cancel:hover {
+  background: var(--chrome-bg-raised);
+}

@@ -37,6 +37,8 @@
   --topbar-height: 44px;
   --console-content-width: 320px;
   --console-rail-width: 56px;
+  /* Marks what the player has selected, in lists and on the map. */
+  --selection-mark: #f2c14e;
 }
 html, body { height: 100%; margin: 0; overflow: hidden; }
 body {
