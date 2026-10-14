@@ -26,7 +26,7 @@ The map toast and the AI strategy toast can appear in Strategic planning, Resolu
 
 ## Information Displayed
 
-- Both toasts show in one band at the top centre of the map, 12 px below the map's top edge. The band is centred in the space from 224 px right of the map's left edge, clear of the minimap, to 12 px short of the map's right edge. It is only as wide as its widest toast, and no wider than 560 px. The AI strategy toast sits above the map toast when both show. Both use the navy chrome in the [UI style guide](../ui-style-guide.md). An error has a light-red border. An informational message, including a turn update, an unknown-battle announcement, a basemap failure, and the AI strategy toast, has the steel border. The body is the message text, not a fixed sentence list.
+- Both toasts show in one band at the top centre of the map, 12 px below the map's top edge. The band is centred in the space between the minimap panel and the zoom buttons, 12 px from each. While the terrain legend is open beside the panel, the space starts 12 px right of the legend instead. When that space is narrower than 280 px, as at the 800 × 600 minimum window, the band is centred between the map's left inset and the zoom buttons, and covers the panel while a toast shows (`toastBandSpan` in `src/shared/mapChromePlacement.ts`). It is only as wide as its widest toast, and no wider than 560 px. The AI strategy toast sits above the map toast when both show. Both use the navy chrome in the [UI style guide](../ui-style-guide.md). An error has a light-red border. An informational message, including a turn update, an unknown-battle announcement, a basemap failure, and the AI strategy toast, has the steel border. The body is the message text, not a fixed sentence list.
 - In a turn-update toast, each victim named on a loss line is preceded by that unit's origin flag. The flag uses the same Bonuses tooltip as the [stack callout](stack-callout.md). A destroyed unit keeps those lines from the birth record remembered after it is gone, including a Tech line when the tech bonus is on and the unit's tech tier is known. Grouped totals such as "3 Infantry", the Updates section, and every other toast line have no flags. If two victims share a display name but would not show the same flag and the same formation date, that name gets no flag.
 - A count of one in that Updates section uses the singular: "1 infantry unit deployed", and "1 hex lost to opponent". Two or more keep the plural, so one armor and one infantry read "1 armor and 1 infantry units deployed" (`buildOtherTurnUpdatePrimaryLines` in `src/shared/consolidatedTurnUpdateToast.ts`).
 - A basemap failure uses the map toast once: some tiles failed to load, and the game remains playable. It hides after the same interval as other map toasts, on dismiss, or when a later map toast replaces it.
@@ -96,5 +96,7 @@ None.
 - `src/renderer/core/unitOriginFlags.ts`
 - `src/shared/lossToastUnitSegments.ts`
 - `src/renderer/map/worldLeafletMap.ts`
+- `src/renderer/map/mapChromeLayout.ts` (`layoutMapChrome`)
+- `src/shared/mapChromePlacement.ts` (`toastBandSpan`)
 - `src/shared/aiStrategyToastContent.ts`
 - `src/renderer/core/constants.ts`

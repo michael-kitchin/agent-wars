@@ -253,21 +253,22 @@ Built in Phase 4. See [ui-facelift-strategic-orders.png](ui-facelift-strategic-o
 - **Minimap panel**, upper-left of the map at (12, 12):
   - Today's 200 × 200 minimap, unchanged, with a 96 px mode column to its right. The column has five 40 px buttons, each with an icon and a label:
     1. **Weather**, selected by default. Today's normal view.
-    2. **Tech**, a latched version of what holding T shows. While Tech is latched, holding T changes nothing; under Weather, T works as today.
+    2. **Tech**, a latched version of what holding T shows, on the world map only. A battle, the new-game preview, and the game-over screen keep their normal view, and Tech applies again when they close. While Tech is latched, holding T changes nothing; under Weather, T works as today.
     3. **Control**, a disabled placeholder.
     4. **Production**, a disabled placeholder.
     5. **Legend**, a toggle.
   - The selected mode lasts for the session.
 - **Legend popover**:
-  - The Legend toggle shows `#terrain-legend`, with its style dropdown and rows unchanged, as a panel to the right of the minimap panel.
+  - The Legend toggle shows `#terrain-legend`, with its style dropdown and rows unchanged, as a panel to the right of the minimap panel. On a map too narrow for that, it opens under the panel instead.
   - It is closed by default, and its open state lasts for the session.
   - It no longer sits permanently under the minimap.
-- **Zoom control**: Leaflet's + and − at the map's top-right.
+- **Zoom control**: Leaflet's + and − at the map's top-right, in the chrome colors. A button is dimmed at the zoom limit.
 - **Scale and attribution**: bottom-right of the map.
+- **Toast band**: between the minimap panel (or the legend open beside it) and the zoom buttons. When that space is narrower than 280 px, as at the 800 × 600 minimum with the console expanded, the band runs from the map's left inset to the zoom buttons and covers the panel while a toast shows.
 - **Order lines**:
-  - Movement, ranged, and air-strike lines — queued, hover previews, and the shot lines drawn during playback — all draw a light outline (casing) first, then the colored dashed line.
-  - Each ends in an arrowhead using the movement arrow geometry (`drawLineArrow`, inset by the unit radius plus the arrow size).
-  - Colors stay as they are: movement teal, ranged amber `#a06020`, strike purple `#7a3db5`.
+  - Movement, ranged, and air-strike lines — queued, hover previews, and the shot lines drawn during playback — all draw a pale casing first, then the colored line.
+  - Ranged and air-strike lines end in the movement arrowhead, its tip a unit radius short of the target (`orderArrowGeometry` in `src/shared/orderArrowGeometry.ts`). Movement lines keep the arrowheads they have today: a move played back for the player, other than an air strike's flight, still has none.
+  - Colors and dash patterns stay as they are: movement teal, solid for this turn and dashed beyond; ranged amber `#a06020`; strike purple `#7a3db5`.
 - **Selection ring**: a 3 px `#f2c14e` ring around the top marker of every hex that holds a selected unit, in both theaters. Existing selection highlights stay.
 
 ## Tactical Battles
@@ -399,7 +400,7 @@ Phases 3 through 6 add their own tips in their plans.
 | 6 | New game and game over: top bar on the overlay, docked setup panel | The same gates, plus a global and a regional start |
 | 7 | Docs, screenshots, release: refresh `doc/media`; update the README's images, its OpenRouter setup steps (they still name the Model tab), and its test count; sweep `doc/` for "right panel" wording; regression pass | The product owner signs off |
 
-Each phase gets its own execution plans in `.spec`. Phase 2 has five, run in order and committed one at a time; [ui-facelift-frame-execution-plan.md](ui-facelift-frame-execution-plan.md) lists them. Phase 3 also has five, run the same way; [ui-facelift-console-execution-plan.md](ui-facelift-console-execution-plan.md) lists them.
+Each phase gets its own execution plans in `.spec`. Phase 2 has five, run in order and committed one at a time; [ui-facelift-frame-execution-plan.md](ui-facelift-frame-execution-plan.md) lists them. Phase 3 also has five, run the same way; [ui-facelift-console-execution-plan.md](ui-facelift-console-execution-plan.md) lists them. Phase 4 has three; [ui-facelift-map-execution-plan.md](ui-facelift-map-execution-plan.md) lists them.
 
 ## Open Questions
 

@@ -1,19 +1,26 @@
 # Minimap
 
-The loaded-map overview beside the main map.
+The minimap panel at the map's top-left: the loaded-map overview, and the column of map-mode buttons beside it.
 
 ## Purpose
 
-Show where the main view sits in the loaded map once the player has zoomed in.
+Show where the main view sits in the loaded map once the player has zoomed in, and let the player choose the map's view and open the terrain legend.
 
 ## Availability
 
-Shown with the map in every mode where the map container is visible, except New game and Game over, where it is hidden. It shows again when that overlay closes. After a successful start it shows the new match. It does not accept pointer input. In Tactical annihilation, and while the tactical battles list is open, it stays visible and pointer input on the whole map container is off, which includes the minimap.
+Shown with the map in every mode where the map container is visible, except New game and Game over, where the whole panel is hidden. It shows again when that overlay closes. After a successful start it shows the new match. The overview does not accept pointer input. In Tactical annihilation, and while the tactical battles list is open, the panel stays visible and pointer input on the whole map container is off, which includes the panel and its buttons.
 
 ## Information Displayed
 
+- The panel sits 12 px in from the map's top-left corner, in the navy chrome. The overview is 200 × 200 px on the left; the mode column is 96 px wide on the right, with five 40 px buttons, each with an icon and a label.
 - An overview of the loaded map, the Mercator world in a global match and the region's hexes in a regional match, using the same basemap family as the main map.
 - A rectangle for the main view when the main view covers less of the world than the overview. When the main view is wide enough, the rectangle is removed.
+- The mode buttons, top to bottom:
+  - Weather: the map's normal view. Chosen when the app opens.
+  - Tech: the view that holding T shows, kept on. On the world map, terrain fill is hidden, and each hex shows its code and its tech icon where one applies, as described in [map-surface.md](map-surface.md). A battle, the new-game preview, and the game-over screen keep their normal view; Tech applies again when they close.
+  - Control and Production: disabled placeholders with the tip "<name> is not available in this version."
+  - Legend: opens or closes the [terrain legend](terrain-legend.md).
+- The chosen view, Weather or Tech, and Legend while the legend is open, read as pressed: a lighter row with a teal mark on its left edge.
 
 The rectangle tracks pan and zoom of the main map.
 
@@ -21,11 +28,13 @@ The rectangle tracks pan and zoom of the main map.
 
 ### Mouse
 
-- When the player clicks, drags, or uses the wheel on the minimap, nothing happens. Dragging, wheel zoom, double-click zoom, and keyboard on the minimap are off.
+- When the player clicks, drags, or uses the wheel on the overview, nothing happens. Dragging, wheel zoom, double-click zoom, and keyboard on the overview are off.
+- When the player clicks Weather or Tech, the map switches to that view and the button reads as pressed. Clicking the view already chosen does nothing.
+- When the player clicks Legend, the terrain legend opens, or closes if it is open.
 
 ### Keyboard
 
-- None.
+- Holding T shows the Tech view while the key is down, as described in [input-map.md](input-map.md). It does not change the chosen view.
 
 ### Other
 
@@ -37,20 +46,24 @@ The rectangle tracks pan and zoom of the main map.
 
 - No rectangle: the main view is not zoomed in enough relative to the overview.
 - Rectangle shown: the main view is zoomed in. The rectangle follows the main bounds.
+- Weather view or Tech view: chosen with the mode buttons. The choice lasts until the app closes, across turns, battles, and new matches. It is not saved.
 
 ## Invariants
 
 - The minimap never pans or zooms the main map.
 - The minimap never zooms itself from the wheel.
+- Exactly one of Weather and Tech reads as pressed.
+- Choosing a view never changes the match, the selection, or queued orders.
 
 ## Strategic and Tactical Differences
 
-In Strategic planning and Tactical planning the overview is the loaded map. During a battle the main view is the battle area, so the view rectangle shows where the battle is in that extent. In New game and Game over the overview is hidden.
+In Strategic planning and Tactical planning the overview is the loaded map. During a battle the main view is the battle area, so the view rectangle shows where the battle is in that extent. The Tech view applies only on the world map, including its Resolution playback. In a battle, including a beat's playback, the mode buttons still work, and the map keeps its normal view until the player leaves the battle. In New game and Game over the panel is hidden.
 
 ## Related Documents
 
 - [map-surface.md](map-surface.md)
 - [input-map.md](input-map.md)
+- [terrain-legend.md](terrain-legend.md)
 
 ## Known Deviations
 
@@ -62,6 +75,11 @@ None.
 
 ## Code Entry Points
 
-- `static/index.html` (`#minimap`)
+- `static/index.html` (`#minimap-panel`, `#minimap`, `#map-mode-column`)
+- `static/shellChrome.css` (`.minimap-panel`, `.map-mode-btn`)
 - `src/renderer/map/worldLeafletMap.ts`
 - `src/renderer/map/mapExtent.ts`
+- `src/renderer/map/mapModeColumn.ts`
+- `src/renderer/map/mapViewModeState.ts`
+- `src/shared/mapViewMode.ts` (`isTerrainInspectionShown`)
+- `src/renderer/gameplay/productionOverlayHelpers.ts` (`isMapInspectionModeHeld`)

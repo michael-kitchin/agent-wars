@@ -130,3 +130,35 @@ export const selectionPanelGripTooltipText = 'Drag to resize this panel. The siz
  * Exceptions: None.
  */
 export const reportsTabTooltipText = 'Show the turn reports, opponent messages, and notices from this match, newest first.';
+
+/**
+ * The Weather map mode's tip.
+ *
+ * Purpose: Says Weather is the map's normal view.
+ * When to use: `#map-mode-weather`.
+ * Expected outcome: The control tip shows this sentence.
+ * Exceptions: None.
+ */
+export const mapWeatherModeTooltipText =
+  "Show the map as usual: terrain, and each hex's weather while the weather bonus is on.";
+
+/**
+ * The Tech map mode's tip.
+ *
+ * Purpose: Says what Tech shows, where it applies, how long it lasts, and how it relates to holding T.
+ * When to use: `#map-mode-tech`.
+ * Expected outcome: The control tip shows this sentence.
+ * Exceptions: None.
+ */
+export const mapTechModeTooltipText =
+  "Show each hex's code, production, and tech tier instead of terrain on the world map, until you choose Weather. Holding T shows the same view while the key is down.";
+
+/**
+ * The Legend button's tip.
+ *
+ * Purpose: Says the button opens and closes the terrain legend, which holds the terrain style choice.
+ * When to use: `#map-legend-toggle`.
+ * Expected outcome: The control tip shows this sentence.
+ * Exceptions: None.
+ */
+export const mapLegendToggleTooltipText = 'Show or hide the terrain legend and its style choice.';

@@ -188,10 +188,12 @@ const SCENARIO_CHECKS = Object.freeze([
   {
     name: 'reports-battle-beat',
     scenes: [SCENES.battleBeat],
-    needs: ['#reports-list .console-report-turn'],
+    needs: ['#reports-list'],
     run: (p, el) => {
-      const turns = el('#reports-list .console-report-turn').allTexts;
-      return turns.some((text) => text.startsWith('B1Turn report')) ? null : `no turn report is tagged B1: ${JSON.stringify(turns)}`;
+      // Reports are not kept across a restart, so every turn report listed here came from the beat just played. The
+      // beat files one only when the dice give it fighting to report, so an empty list also passes.
+      const tags = [...el('#reports-list').text.matchAll(/([TB]\d+)Turn report/g)].map((match) => match[1]);
+      return tags.every((tag) => tag === 'B1') ? null : `the turn reports are tagged ${tags.join(', ')}, expected only B1`;
     },
   },
   {

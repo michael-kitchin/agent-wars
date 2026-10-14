@@ -19,6 +19,8 @@ import { clearOrderEffectsTooltipDwell, hideOrderSlowerHexTooltip } from './orde
 import { resumeHexTooltipDwellAfterAimingEnds } from './mainMapInteractions';
 import { getMainLeafletMap, initWorldLeafletMaps, setMainBasemapByProviderId, setMainBasemapFilter } from './worldLeafletMap';
 import { installControlTooltip } from '../chrome/controlTooltip';
+import { layoutMapChrome } from './mapChromeLayout';
+import { wireMapModeColumn } from './mapModeColumn';
 
 /**
  * Documents the `InitCoreDeps` interface as a named contract surface (interface InitCoreDeps).
@@ -370,6 +372,8 @@ export function wireInitCore(deps: InitCoreDeps): void {
         },
       });
     }
+    wireMapModeColumn(() => deps.requestRedraw());
+    layoutMapChrome();
   } catch (err) {
     console.error('Map init failed:', err);
   }
@@ -450,7 +454,10 @@ export function wireInitCore(deps: InitCoreDeps): void {
     });
   }
 
-  observeMapContainerResize(() => deps.resizeAndRedraw());
+  observeMapContainerResize(() => {
+    deps.resizeAndRedraw();
+    layoutMapChrome();
+  });
   window.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
       if (tacticalBattlesDialogIsOpen()) return;
@@ -524,7 +531,8 @@ export function wireInitCore(deps: InitCoreDeps): void {
     dismissTerrainTooltipWhenPointerLeavesMapPanel(deps);
     S.shiftKeyActive = false;
     deps.applyModifierDrivenPopoverCloseRules('window_blur');
-    if (!deps.isMapInspectionModeHeld()) return;
+    // The held key is separate from the Tech view. Blur releases the key only; a latched Tech view stays.
+    if (!S.hideTerrainFillWhileHeld) return;
     S.hideTerrainFillWhileHeld = false;
     deps.requestRedraw();
   });

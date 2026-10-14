@@ -104,6 +104,7 @@ export type GlobalLeafletFactory = {
   rectangle: (bounds: VendorLatLngBounds, options?: Record<string, unknown>) => { addTo: (map: VendorLeafletMap) => VendorViewportRect };
   control: {
     scale: (options?: Record<string, unknown>) => { addTo: (map: VendorLeafletMap) => void };
+    zoom: (options?: Record<string, unknown>) => { addTo: (map: VendorLeafletMap) => void };
   };
   point: (x: number, y: number) => unknown;
 };
@@ -353,6 +354,8 @@ export function initWorldLeafletMaps(
     maxBoundsViscosity: 1,
     /* App-owned WASD/arrow screen pan; avoid Leaflet’s default keyboard panBy. */
     keyboard: false,
+    /* Added below at the top-right, clear of the minimap panel. */
+    zoomControl: false,
     /* Keep raster tiles and canvas overlay in lockstep (no CSS zoom/pan lag vs hex draw). */
     zoomAnimation: false,
     fadeAnimation: false,
@@ -364,10 +367,12 @@ export function initWorldLeafletMaps(
 
   mainMap.fitBounds(worldBounds, { padding: [2, 2], animate: false });
   mainMap.doubleClickZoom.disable();
+  leafletRef.control.zoom({ position: 'topright' }).addTo(mainMap);
   try {
-    // Show real-world distance context when Leaflet scale control is available.
+    // Show real-world distance context when Leaflet scale control is available, beside the attribution.
     leafletRef.control
       .scale({
+        position: 'bottomright',
         metric: true,
         imperial: true,
         maxWidth: 120,

@@ -19428,6 +19428,8 @@ ${bonuses}`;
       maxBoundsViscosity: 1,
       /* App-owned WASD/arrow screen pan; avoid Leaflet’s default keyboard panBy. */
       keyboard: false,
+      /* Added below at the top-right, clear of the minimap panel. */
+      zoomControl: false,
       /* Keep raster tiles and canvas overlay in lockstep (no CSS zoom/pan lag vs hex draw). */
       zoomAnimation: false,
       fadeAnimation: false,
@@ -19437,8 +19439,10 @@ ${bonuses}`;
     mountRasterBasemap(leafletRef, mainMap, true, startIdx, "main");
     mainMap.fitBounds(worldBounds2, { padding: [2, 2], animate: false });
     mainMap.doubleClickZoom.disable();
+    leafletRef.control.zoom({ position: "topright" }).addTo(mainMap);
     try {
       leafletRef.control.scale({
+        position: "bottomright",
         metric: true,
         imperial: true,
         maxWidth: 120
@@ -24153,6 +24157,53 @@ ${bonuses}`;
     return counts;
   }
 
+  // src/shared/mapViewMode.ts
+  var DEFAULT_MAP_VIEW_MODE = "weather";
+  function isTerrainInspectionShown(input) {
+    if (input.tKeyHeld) return true;
+    return input.mapViewMode === "tech" && !input.inBattle && !input.newGameOverlayOpen;
+  }
+
+  // src/renderer/map/mapViewModeState.ts
+  var mapViewMode = DEFAULT_MAP_VIEW_MODE;
+  function getMapViewMode() {
+    return mapViewMode;
+  }
+  function setMapViewMode(mode) {
+    mapViewMode = mode;
+  }
+
+  // src/shared/newGameBannerText.ts
+  function newGameBannerText(kind, tab) {
+    if (kind === "startup") return `Start the ${tab} game when ready.`;
+    return `Start a new ${tab} game when ready.`;
+  }
+
+  // src/renderer/gameplay/newGameBanner.ts
+  var bannerKind = null;
+  function writeNewGameBanner(text) {
+    const messageEl = document.getElementById("game-over-message");
+    if (!messageEl) return;
+    messageEl.textContent = text;
+    messageEl.style.display = "";
+  }
+  function showNewGameBanner(kind, tab) {
+    bannerKind = kind;
+    writeNewGameBanner(newGameBannerText(kind, tab));
+  }
+  function showGameOverBanner(text) {
+    bannerKind = null;
+    writeNewGameBanner(text);
+  }
+  function syncNewGameBannerToTab(tab) {
+    if (bannerKind === null) return;
+    writeNewGameBanner(newGameBannerText(bannerKind, tab));
+  }
+  function isNewGameOverlayOpen() {
+    const overlay = document.getElementById("game-over-overlay");
+    return overlay != null && !overlay.classList.contains("hidden");
+  }
+
   // src/renderer/gameplay/productionOverlayHelpers.ts
   function getControllerForHex(state, h3Index) {
     const row = state.strategicControl?.find((entry) => entry.h3Index === h3Index);
@@ -24162,7 +24213,14 @@ ${bonuses}`;
     return getUrbanProductionCapacityForHex(h3Index);
   }
   function isMapInspectionModeHeld() {
-    return rendererSharedState.hideTerrainFillWhileHeld;
+    const mapViewMode2 = getMapViewMode();
+    return isTerrainInspectionShown({
+      tKeyHeld: rendererSharedState.hideTerrainFillWhileHeld,
+      mapViewMode: mapViewMode2,
+      inBattle: rendererSharedState.tacticalBattleSnapshot != null,
+      // Drawing asks this for every hex, so the page is read only while the answer can depend on it.
+      newGameOverlayOpen: mapViewMode2 === "tech" && isNewGameOverlayOpen()
+    });
   }
   function isStrategicHexHumanUrbanProduction(state, hx) {
     if (getControllerForHex(state, hx.h3Index) !== "human") return false;
@@ -25187,37 +25245,6 @@ ${bonuses}`;
   function extentKey(extent) {
     if (extent === "world") return "world";
     return [extent.south, extent.west, extent.north, extent.east, extent.referenceLng].join(",");
-  }
-
-  // src/shared/newGameBannerText.ts
-  function newGameBannerText(kind, tab) {
-    if (kind === "startup") return `Start the ${tab} game when ready.`;
-    return `Start a new ${tab} game when ready.`;
-  }
-
-  // src/renderer/gameplay/newGameBanner.ts
-  var bannerKind = null;
-  function writeNewGameBanner(text) {
-    const messageEl = document.getElementById("game-over-message");
-    if (!messageEl) return;
-    messageEl.textContent = text;
-    messageEl.style.display = "";
-  }
-  function showNewGameBanner(kind, tab) {
-    bannerKind = kind;
-    writeNewGameBanner(newGameBannerText(kind, tab));
-  }
-  function showGameOverBanner(text) {
-    bannerKind = null;
-    writeNewGameBanner(text);
-  }
-  function syncNewGameBannerToTab(tab) {
-    if (bannerKind === null) return;
-    writeNewGameBanner(newGameBannerText(bannerKind, tab));
-  }
-  function isNewGameOverlayOpen() {
-    const overlay = document.getElementById("game-over-overlay");
-    return overlay != null && !overlay.classList.contains("hidden");
   }
 
   // src/renderer/gameplay/newGameMapUi.ts
@@ -26581,7 +26608,7 @@ ${bonuses}`;
   function blurMapChromeIfFocused() {
     const active2 = document.activeElement;
     if (active2 instanceof HTMLElement) {
-      const insideHiddenChrome = active2.closest("#minimap") != null || active2.closest("#terrain-legend") != null || active2.closest("#app-topbar") != null || active2.closest("#game-menu") != null || active2.closest("#sidebar") != null;
+      const insideHiddenChrome = active2.closest("#minimap-panel") != null || active2.closest("#terrain-legend") != null || active2.closest("#app-topbar") != null || active2.closest("#game-menu") != null || active2.closest("#sidebar") != null;
       if (insideHiddenChrome) active2.blur();
     }
     dismissStaleControlTooltip();
@@ -35953,6 +35980,89 @@ ${bonuses}`;
     return !shiftKeyAlreadyActive;
   }
 
+  // src/shared/mapChromePlacement.ts
+  var MAP_CHROME_INSET = 12;
+  var MAP_CHROME_GAP = 8;
+  var TOAST_BAND_MIN_WIDTH = 280;
+  function legendPopoverPosition(input) {
+    const besideLeft = input.panelRight + MAP_CHROME_GAP;
+    if (besideLeft + input.legendWidth + MAP_CHROME_INSET <= input.mapWidth) {
+      return { left: besideLeft, top: MAP_CHROME_INSET, beside: true };
+    }
+    return { left: MAP_CHROME_INSET, top: input.panelBottom + MAP_CHROME_GAP, beside: false };
+  }
+  function toastBandSpan(input) {
+    const right = Math.max(MAP_CHROME_INSET, input.mapWidth - input.rightObstacleLeft + MAP_CHROME_INSET);
+    const left = input.leftObstacleRight + MAP_CHROME_INSET;
+    if (input.mapWidth - left - right < TOAST_BAND_MIN_WIDTH) {
+      return { left: MAP_CHROME_INSET, right, overChrome: true };
+    }
+    return { left, right, overChrome: false };
+  }
+
+  // src/renderer/map/mapChromeLayout.ts
+  function layoutMapChrome() {
+    const map = document.getElementById("canvas-container");
+    const panel = document.getElementById("minimap-panel");
+    if (!map || !panel) return;
+    const mapBox = map.getBoundingClientRect();
+    const panelBox = panel.getBoundingClientRect();
+    const panelRight = panelBox.right - mapBox.left;
+    let leftObstacleRight = panelRight;
+    const legend = document.getElementById("terrain-legend");
+    if (legend && !legend.hidden) {
+      const place = legendPopoverPosition({
+        mapWidth: mapBox.width,
+        panelRight,
+        panelBottom: panelBox.bottom - mapBox.top,
+        legendWidth: legend.offsetWidth
+      });
+      legend.style.left = `${place.left}px`;
+      legend.style.top = `${place.top}px`;
+      if (place.beside) leftObstacleRight = place.left + legend.offsetWidth;
+    }
+    const band = document.getElementById("map-toast-band");
+    if (!band) return;
+    const zoomBox = document.querySelector("#main-map .leaflet-control-zoom")?.getBoundingClientRect();
+    const span = toastBandSpan({
+      mapWidth: mapBox.width,
+      leftObstacleRight,
+      rightObstacleLeft: zoomBox && zoomBox.width > 0 ? zoomBox.left - mapBox.left : mapBox.width
+    });
+    band.style.left = `${span.left}px`;
+    band.style.right = `${span.right}px`;
+  }
+
+  // src/renderer/map/mapModeColumn.ts
+  function syncMapModeColumn() {
+    const mode = getMapViewMode();
+    document.getElementById("map-mode-weather")?.setAttribute("aria-pressed", String(mode === "weather"));
+    document.getElementById("map-mode-tech")?.setAttribute("aria-pressed", String(mode === "tech"));
+    const legendOpen = document.getElementById("terrain-legend")?.hidden === false;
+    const legendToggle = document.getElementById("map-legend-toggle");
+    legendToggle?.setAttribute("aria-pressed", String(legendOpen));
+    legendToggle?.setAttribute("aria-expanded", String(legendOpen));
+  }
+  function chooseMapView(mode, requestRedraw3) {
+    if (getMapViewMode() === mode) return;
+    setMapViewMode(mode);
+    syncMapModeColumn();
+    requestRedraw3();
+  }
+  function toggleTerrainLegend() {
+    const legend = document.getElementById("terrain-legend");
+    if (!legend) return;
+    legend.hidden = !legend.hidden;
+    syncMapModeColumn();
+    layoutMapChrome();
+  }
+  function wireMapModeColumn(requestRedraw3) {
+    document.getElementById("map-mode-weather")?.addEventListener("click", () => chooseMapView("weather", requestRedraw3));
+    document.getElementById("map-mode-tech")?.addEventListener("click", () => chooseMapView("tech", requestRedraw3));
+    document.getElementById("map-legend-toggle")?.addEventListener("click", toggleTerrainLegend);
+    syncMapModeColumn();
+  }
+
   // src/renderer/map/initCore.ts
   function beginHoverSupportTargetingMode(deps, mode) {
     hidePlanningChromeToasts();
@@ -36002,6 +36112,8 @@ ${bonuses}`;
           }
         });
       }
+      wireMapModeColumn(() => deps.requestRedraw());
+      layoutMapChrome();
     } catch (err) {
       console.error("Map init failed:", err);
     }
@@ -36070,7 +36182,10 @@ ${bonuses}`;
         console.error("refreshRes4TerrainOverridesForRenderer failed:", err);
       });
     }
-    observeMapContainerResize(() => deps.resizeAndRedraw());
+    observeMapContainerResize(() => {
+      deps.resizeAndRedraw();
+      layoutMapChrome();
+    });
     window.addEventListener("keydown", (e) => {
       if (e.key === "Escape") {
         if (tacticalBattlesDialogIsOpen()) return;

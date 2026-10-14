@@ -305,7 +305,8 @@ async function dragSelectionPanelToCorner(page, size) {
 }
 
 /**
- * Runs the first session: a new match, the frame scenes, the console scenes, the small window, and one played turn.
+ * Runs the first session: a new match, the frame scenes, the map views and the legend, the console scenes, the small
+ * window, and one played turn.
  *
  * Purpose: The scene order is part of the contract with the checks. The match starts after the first scene. Scenes
  *   that select units or queue orders come after the frame scenes, so the frame screenshots show an untouched match.
@@ -371,6 +372,20 @@ async function runFirstSession(app, page, report, outDir) {
   await page.waitForTimeout(SETTLE_MS.click);
   await recordScene(page, report, outDir, SCENES.gameMenuOutside);
 
+  // Choose the Tech view and record it, then go back to Weather.
+  await page.click('#map-mode-tech');
+  await parkPointer(page);
+  await page.waitForTimeout(SETTLE_MS.click);
+  await recordScene(page, report, outDir, SCENES.mapTech);
+  await page.click('#map-mode-weather');
+
+  // Open the terrain legend beside the minimap panel and record it, then close it.
+  await page.click('#map-legend-toggle');
+  await parkPointer(page);
+  await page.waitForTimeout(SETTLE_MS.click);
+  await recordScene(page, report, outDir, SCENES.legendOpen);
+  await page.click('#map-legend-toggle');
+
   // Queue a one-hex march with the lone armor unit, then select it again from its row in the Orders tab.
   await captureMainMap(page);
   await queueLoneUnitMarch(page);
@@ -413,6 +428,15 @@ async function runFirstSession(app, page, report, outDir) {
   await recordScene(page, report, outDir, SCENES.smallWindow);
   // Shrink the panel again, so it cannot cover the units that the march after the turn clicks.
   await dragSelectionPanelGrip(page, -380, 480);
+
+  // At the minimum size the legend opens beside the minimap panel only if it fits, and under it otherwise. Close the
+  // selection panel first so it cannot cover the legend.
+  await page.click('#selection-panel-close');
+  await page.click('#map-legend-toggle');
+  await parkPointer(page);
+  await page.waitForTimeout(SETTLE_MS.click);
+  await recordScene(page, report, outDir, SCENES.legendSmallWindow);
+  await page.click('#map-legend-toggle');
 
   // Play turn 1 in the small window. With no model, the opponent runs its standing orders and says so in a notice.
   await page.click('#ready-btn');

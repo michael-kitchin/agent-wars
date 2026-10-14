@@ -8,6 +8,9 @@ import { getMaxUnitsPerType, parseGameSize } from '../../shared/gameSize';
 import { getPlayerUnitCountsByType } from '../../shared/unitCountsByType';
 import { getUrbanProductionCapacityForHex as getUrbanProductionCapacityForHexFromTooltipState } from '../map/terrainTooltipStrategicState';
 import { rendererSharedState as S } from '../core/state';
+import { isTerrainInspectionShown } from '../../shared/mapViewMode';
+import { getMapViewMode } from '../map/mapViewModeState';
+import { isNewGameOverlayOpen } from './newGameBanner';
 
 /**
  * Per-type unit totals for one side; used when FoW is off and inspection mode reveals all queues.
@@ -26,9 +29,9 @@ export interface ProductionOverlayContext {
     /**
    * Specifies the contract for the `mapInspectionHeld` member (mapInspectionHeld: boolean;).
 
-   * Contract: True while terrain fill is hidden (T held) for stack/inspection tooling.
+   * Contract: True while the inspection view is on: T is held, or Tech is chosen on the world map outside a battle and outside the new-game or game-over overlay.
    * When to use: Read by `drawStrategicProductionOverlays` and `syncBuildEntryButton` each frame.
-   * Expected outcome: Matches `S.hideTerrainFillWhileHeld` via `isMapInspectionModeHeld`.
+   * Expected outcome: Matches `isMapInspectionModeHeld`.
    * Exceptions: None.
    */
 mapInspectionHeld: boolean;
@@ -77,10 +80,24 @@ export function getUrbanProductionCapacityForHex(h3Index: string): number {
 }
 
 /**
- * True while map inspection mode suppresses terrain fill (T key held).
+ * Reports whether the map shows its inspection view: terrain fill hidden and, on the world map, hex codes and tech icons.
+ *
+ * Purpose: Every drawing path that used to ask whether T is held asks here. The name stays because many callers pass
+ *   it along; the answer now also covers the Tech view chosen in the mode column.
+ * When to use: Wherever drawing depends on the inspection view.
+ * Expected outcome: True while T is held, or while the Tech view is chosen outside a battle and outside the new-game
+ *   or game-over overlay. See `isTerrainInspectionShown`.
+ * Exceptions: None.
  */
 export function isMapInspectionModeHeld(): boolean {
-  return S.hideTerrainFillWhileHeld;
+  const mapViewMode = getMapViewMode();
+  return isTerrainInspectionShown({
+    tKeyHeld: S.hideTerrainFillWhileHeld,
+    mapViewMode,
+    inBattle: S.tacticalBattleSnapshot != null,
+    // Drawing asks this for every hex, so the page is read only while the answer can depend on it.
+    newGameOverlayOpen: mapViewMode === 'tech' && isNewGameOverlayOpen(),
+  });
 }
 
 /**

@@ -1,0 +1,81 @@
+/**
+ * How far map chrome stays from the map's edges, in CSS pixels. This module holds the placement rules for the chrome
+ * that shares the top of the map: the minimap panel at the top-left, the terrain legend beside or under it, the zoom
+ * buttons at the top-right, and the toast band between them.
+ *
+ * Purpose: The minimap panel, the legend, the zoom buttons, and the toast band keep the same inset.
+ * When to use: Through `legendPopoverPosition` and `toastBandSpan`.
+ * Expected outcome: 12.
+ * Exceptions: None.
+ */
+export const MAP_CHROME_INSET = 12;
+
+/**
+ * The space between the minimap panel and the legend, in CSS pixels.
+ *
+ * Purpose: The legend reads as a separate panel that the Legend button opened.
+ * When to use: Through `legendPopoverPosition`.
+ * Expected outcome: 8.
+ * Exceptions: None.
+ */
+export const MAP_CHROME_GAP = 8;
+
+/**
+ * The narrowest the toast band may be beside the panel, in CSS pixels.
+ *
+ * Purpose: Below this width a toast wraps into a thin column; the band then spans the top of the map instead.
+ * When to use: Through `toastBandSpan`.
+ * Expected outcome: 280.
+ * Exceptions: None.
+ */
+export const TOAST_BAND_MIN_WIDTH = 280;
+
+/**
+ * Places the terrain legend beside the minimap panel, or under it when the map is too narrow.
+ *
+ * Purpose: The legend opens to the right of the panel, as the layout asks, without running off a narrow map.
+ * When to use: Each time the legend opens and each time the map changes size, with boxes measured relative to the
+ *   map's top-left corner.
+ * Expected outcome: `beside` is true when the legend fits right of the panel with the inset to spare; it then sits
+ *   `MAP_CHROME_GAP` right of the panel, level with the map's top inset. Otherwise it sits at the left inset,
+ *   `MAP_CHROME_GAP` under the panel.
+ * Exceptions: None.
+ */
+export function legendPopoverPosition(input: {
+  readonly mapWidth: number;
+  readonly panelRight: number;
+  readonly panelBottom: number;
+  readonly legendWidth: number;
+}): { readonly left: number; readonly top: number; readonly beside: boolean } {
+  const besideLeft = input.panelRight + MAP_CHROME_GAP;
+  if (besideLeft + input.legendWidth + MAP_CHROME_INSET <= input.mapWidth) {
+    return { left: besideLeft, top: MAP_CHROME_INSET, beside: true };
+  }
+  return { left: MAP_CHROME_INSET, top: input.panelBottom + MAP_CHROME_GAP, beside: false };
+}
+
+/**
+ * Finds the toast band's left and right offsets inside the map.
+ *
+ * Purpose: Toasts sit between the chrome at the top-left (the minimap panel, or the legend when it is open beside the
+ *   panel) and the zoom buttons at the top-right. On a map too narrow for that, a toast is better wide and briefly
+ *   over the panel than squeezed into a thin column.
+ * When to use: Each time the map changes size and each time the legend opens or closes, with x positions measured from
+ *   the map's left edge. Pass the map width as `rightObstacleLeft` when there are no zoom buttons.
+ * Expected outcome: `left` and `right` are CSS offsets from the map's left and right edges, each keeping
+ *   `MAP_CHROME_INSET` from the chrome beside it. When the space between is narrower than `TOAST_BAND_MIN_WIDTH`,
+ *   `left` is the map's own inset instead and `overChrome` is true.
+ * Exceptions: None.
+ */
+export function toastBandSpan(input: {
+  readonly mapWidth: number;
+  readonly leftObstacleRight: number;
+  readonly rightObstacleLeft: number;
+}): { readonly left: number; readonly right: number; readonly overChrome: boolean } {
+  const right = Math.max(MAP_CHROME_INSET, input.mapWidth - input.rightObstacleLeft + MAP_CHROME_INSET);
+  const left = input.leftObstacleRight + MAP_CHROME_INSET;
+  if (input.mapWidth - left - right < TOAST_BAND_MIN_WIDTH) {
+    return { left: MAP_CHROME_INSET, right, overChrome: true };
+  }
+  return { left, right, overChrome: false };
+}

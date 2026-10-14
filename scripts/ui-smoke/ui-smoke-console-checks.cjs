@@ -31,14 +31,30 @@ const WORLD_ORDER_DETAIL = /^→ [0-9A-Z]{2} · \d+h$/;
 const SELECTION_PANEL_LIMITS = Object.freeze({ minWidth: 320, maxWidth: 640, minHeight: 140, mapMargin: 24 });
 
 /**
- * The left edge of the toast band, measured from the map's left edge, in CSS pixels.
+ * The narrowest the toast band may be beside the minimap panel, in CSS pixels.
  *
- * Purpose: The band starts right of the minimap so a toast never covers it.
- * When to use: The toast band check.
- * Expected outcome: Matches `.map-toast-band` in `static/feedbackChrome.css`.
+ * Purpose: Below this width the band spans the top of the map instead, over the panel.
+ * When to use: Only by `toastBandSpace`.
+ * Expected outcome: Matches `TOAST_BAND_MIN_WIDTH` in `src/shared/mapChromePlacement.ts`.
  * Exceptions: None.
  */
-const TOAST_BAND_LEFT = 224;
+const TOAST_BAND_MIN_WIDTH = 280;
+
+/**
+ * Works out where the toast band may sit, from the boxes of the chrome around it.
+ *
+ * Purpose: The band sits between the minimap panel (or the legend, when it is open beside the panel) and the zoom
+ *   buttons, each 12 px away; on a map too narrow for that it spans the top of the map from the left inset.
+ * When to use: The toast band check, with probed boxes in window coordinates.
+ * Expected outcome: `{ left, right }`, the x range the band must fit in.
+ * Exceptions: None.
+ */
+function toastBandSpace(map, panel, legend, zoom) {
+  const legendBeside = legend.shown && legend.y < panel.y + panel.h;
+  const left = (legendBeside ? legend.x + legend.w : panel.x + panel.w) + MAP_OVERLAY_INSET;
+  const right = (zoom.shown ? zoom.x : map.x + map.w) - MAP_OVERLAY_INSET;
+  return right - left >= TOAST_BAND_MIN_WIDTH ? { left, right } : { left: map.x + MAP_OVERLAY_INSET, right };
+}
 
 /**
  * The widest the toast band can be, in CSS pixels.
@@ -89,9 +105,11 @@ const SELECTION_PANEL_WIDTH = 400;
 /**
  * Inset of map overlays from the map's edges, in CSS pixels.
  *
- * Purpose: The selection panel sits this far from the map's left and bottom edges.
- * When to use: The selection panel geometry check.
- * Expected outcome: Matches `.selection-panel` in `static/selectionChrome.css`.
+ * Purpose: The selection panel sits this far from the map's left and bottom edges, and the toast band this far from the
+ *   map's top and from the chrome beside it.
+ * When to use: The selection panel and toast band checks.
+ * Expected outcome: Matches `.selection-panel` in `static/selectionChrome.css` and `MAP_CHROME_INSET` in
+ *   `src/shared/mapChromePlacement.ts`.
  * Exceptions: None.
  */
 const MAP_OVERLAY_INSET = 12;
@@ -284,8 +302,8 @@ const CONSOLE_CHECKS = Object.freeze([
   },
   {
     name: 'toast-band-top-centre',
-    scenes: [SCENES.turnResolved],
-    needs: ['#canvas-container', '#map-toast-band', '#map-toast'],
+    scenes: [SCENES.turnResolved, SCENES.reportsTab],
+    needs: ['#canvas-container', '#map-toast-band', '#map-toast', '#minimap-panel', '#terrain-legend', '#main-map .leaflet-control-zoom'],
     run: (p, el) => {
       const c = el('#canvas-container');
       const band = el('#map-toast-band');
@@ -293,10 +311,11 @@ const CONSOLE_CHECKS = Object.freeze([
       if (!toast.shown || !toast.ancestorIds.includes('map-toast-band')) return 'the map toast is not shown in the toast band';
       if (!near(band.y, c.y + MAP_OVERLAY_INSET)) return `the toast band is at ${fmt(band)}, expected its top ${MAP_OVERLAY_INSET} px below the map's top`;
       if (band.w > TOAST_BAND_MAX_WIDTH + 1) return `the toast band is ${Math.round(band.w)} wide, more than ${TOAST_BAND_MAX_WIDTH}`;
-      if (band.x < c.x + TOAST_BAND_LEFT - 1 || band.x + band.w > c.x + c.w - MAP_OVERLAY_INSET + 1) {
-        return `the toast band is at ${fmt(band)}, outside the space right of the minimap on the map ${fmt(c)}`;
+      const space = toastBandSpace(c, el('#minimap-panel'), el('#terrain-legend'), el('#main-map .leaflet-control-zoom'));
+      if (band.x < space.left - 1 || band.x + band.w > space.right + 1) {
+        return `the toast band is at ${fmt(band)}, outside x=${Math.round(space.left)} to x=${Math.round(space.right)}`;
       }
-      const centre = c.x + (TOAST_BAND_LEFT + c.w - MAP_OVERLAY_INSET) / 2;
+      const centre = (space.left + space.right) / 2;
       return near(band.x + band.w / 2, centre) ? null : `the toast band is at ${fmt(band)}, expected it centred at x=${Math.round(centre)}`;
     },
   },

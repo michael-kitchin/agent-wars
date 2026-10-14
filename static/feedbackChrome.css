@@ -1,9 +1,9 @@
 /* Toasts and the new-game dialog. */
-/* The two toasts stack in one band at the top centre of the map, right of the minimap's 200 px and its 12 px insets. The band is only as wide as its widest toast, so it does not block the map beside them. */
+/* The two toasts stack in one band at the top centre of the map, between the minimap panel (or the legend beside it) and the zoom buttons. mapChromeLayout.ts sets left and right; on a narrow map the band spans the top of the map. The band is only as wide as its widest toast, so it does not block the map beside them. */
 .map-toast-band {
   position: absolute;
   top: 12px;
-  left: 224px;
+  left: 12px;
   right: 12px;
   z-index: 7000;
   width: fit-content;

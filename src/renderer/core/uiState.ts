@@ -47,15 +47,15 @@ export function updateGameStateSidebar(state: GameStateSnapshot | null): void {
 /**
  * Drops focus and a control tip from chrome the new-game overlay is about to cover.
  *
- * Purpose: The minimap, the legend, the top bar, the game menu, and the console are not on screen while that overlay is open. A focused control would still take keys, and a tip for New game would stay up over the map.
+ * Purpose: The minimap panel, the legend, the top bar, the game menu, and the console are not on screen while that overlay is open. A focused control would still take keys, and a tip for New game would stay up over the map.
  * When to use: When that overlay goes from hidden to shown, after its `hidden` class is removed.
- * Expected outcome: Focus leaves the minimap, the legend, the top bar, the game menu, or the console. A dialog control that already has focus is left alone. A tip whose control has no box is dismissed.
+ * Expected outcome: Focus leaves the minimap panel, the legend, the top bar, the game menu, or the console. A dialog control that already has focus is left alone. A tip whose control has no box is dismissed.
  * Exceptions: None.
  */
 export function blurMapChromeIfFocused(): void {
   const active = document.activeElement;
   if (active instanceof HTMLElement) {
-    const insideHiddenChrome = active.closest('#minimap') != null
+    const insideHiddenChrome = active.closest('#minimap-panel') != null
       || active.closest('#terrain-legend') != null
       || active.closest('#app-topbar') != null
       || active.closest('#game-menu') != null

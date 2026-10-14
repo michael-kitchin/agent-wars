@@ -8,10 +8,11 @@ Name the terrain kinds the map uses, and let the player switch the terrain style
 
 ## Availability
 
-Shown with the map. It stays available in Strategic planning and Tactical planning. It is hidden in New game and Game over, and shown again when that overlay closes. In Tactical annihilation, and while the tactical battles list is open, it stays visible and pointer input on the map container is off, so the style dropdown cannot be used.
+Closed until the player clicks Legend in the [minimap panel](minimap.md), and closed again by the next click. Whether it is open lasts until the app closes; it is not saved. While open it stays available in Strategic planning and Tactical planning. It is hidden in New game and Game over, and shown again when that overlay closes if it was open. In Tactical annihilation, and while the tactical battles list is open, it stays visible and pointer input on the map container is off, so the style dropdown cannot be used.
 
 ## Information Displayed
 
+- The legend opens 8 px right of the minimap panel, level with the panel's top. When the map is too narrow for it there, with 12 px to spare at the map's right edge, it opens at the map's left inset, 8 px under the panel instead (`legendPopoverPosition` in `src/shared/mapChromePlacement.ts`). It moves when the map changes size.
 - A terrain style dropdown, left-aligned, with no label beside it. The choices are Default, Atlas, Wargame, and Scientific. The key is only as wide as that dropdown and the rows under it. Its tip is in [control-tooltips.md](control-tooltips.md).
 - One row per terrain kind, in this order: Water, Coastal, Wetlands, Plains, Forest, Mountain, Desert, Arctic. An Urban row follows them, then a Rubble row. Urban and Rubble are overlays, not one of those kinds. The Urban chip is the opaque form of that style's urban fill, flat, not hatched. The Rubble chip is that same opaque fill with a dark-red crosshatch.
 - Each row shows an opaque color chip for that kind under the active style. The chip is in the same family as that style's map fill and is stronger than the translucent hex paint. Coastal and wetlands use different chips. Mountain follows that style's hue. The same chip is drawn, at the size of a country flag, before each of these terrain names in the hex tooltip, the unit tooltip, and the blocked and effects order tooltips. The Rubble chip, hatch included, is drawn the same way before the word Rubble in a zoomed-cell or battle-cell hex tooltip, the blocked tooltip, and the effects tooltip. Snow, rain, and heat in those tooltips use a weather icon, as described in [hex-tooltips.md](hex-tooltips.md). An open tooltip keeps the chips it opened with. Hex paint stays the translucent fill.
@@ -28,11 +29,12 @@ Shown with the map. It stays available in Strategic planning and Tactical planni
 
 ### Other
 
-- None.
+- When the player clicks Legend in the minimap panel, the legend opens, or closes if it is open.
 
 ## States
 
-- Interactive: the map container accepts pointer input, and the dropdown can change style.
+- Closed: the default. Legend in the minimap panel does not read as pressed.
+- Interactive: open, the map container accepts pointer input, and the dropdown can change style.
 - Hidden: New game or Game over.
 - Not interactive: Tactical annihilation, or the tactical battles list, has disabled pointer input on the map container. The legend stays visible.
 
@@ -61,7 +63,10 @@ None.
 
 ## Code Entry Points
 
-- `static/index.html` (`#terrain-legend`)
+- `static/index.html` (`#terrain-legend`, `#map-legend-toggle`)
+- `src/renderer/map/mapModeColumn.ts`
+- `src/renderer/map/mapChromeLayout.ts`
+- `src/shared/mapChromePlacement.ts`
 - `src/renderer/rendering/terrainVisualStyles.ts`
 - `src/renderer/rendering/terrainLegendUrban.ts`
 - `src/renderer/rendering/terrainLegendRubble.ts`

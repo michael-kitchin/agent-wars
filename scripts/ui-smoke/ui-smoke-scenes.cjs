@@ -1,10 +1,10 @@
 /**
  * Scene names, sizes, and small helpers shared by the UI smoke checks and the runner.
  *
- * Purpose: The frame checks, the console checks, the scenario checks, and the runner name scenes and compare boxes the
- *   same way.
- * When to use: Required by `ui-smoke-checks.cjs`, `ui-smoke-console-checks.cjs`, `ui-smoke-scenario-checks.cjs`, and
- *   `ui-smoke.cjs`.
+ * Purpose: The frame checks, the console checks, the scenario checks, the map chrome checks, and the runner name scenes
+ *   and compare boxes the same way.
+ * When to use: Required by `ui-smoke-checks.cjs`, `ui-smoke-console-checks.cjs`, `ui-smoke-scenario-checks.cjs`,
+ *   `ui-smoke-map-chrome-checks.cjs`, and `ui-smoke.cjs`.
  * Expected outcome: Plain constants and pure functions; nothing runs on load.
  * Exceptions: None.
  */
@@ -57,6 +57,8 @@ const SCENES = Object.freeze({
   gameMenuOpen: 'game-menu-open',
   gameMenuEscape: 'game-menu-escape',
   gameMenuOutside: 'game-menu-outside',
+  mapTech: 'map-tech',
+  legendOpen: 'legend-open',
   readyTip: 'ready-tip',
   ordersQueued: 'orders-queued',
   selectionCleared: 'selection-cleared',
@@ -65,6 +67,7 @@ const SCENES = Object.freeze({
   selectionResized: 'selection-resized',
   selectionResizedMin: 'selection-resized-min',
   smallWindow: 'small-window',
+  legendSmallWindow: 'legend-small-window',
   turnResolved: 'turn-resolved',
   reportsTab: 'reports-tab',
   matchReopened: 'match-reopened',

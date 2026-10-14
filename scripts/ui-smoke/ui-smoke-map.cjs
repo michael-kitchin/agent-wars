@@ -369,8 +369,7 @@ async function queueBattleMarch(page, unit) {
  * Works out the saved-match change that gives the reopened match a hex both sides hold.
  *
  * Purpose: A battle starts only on such a hex, and play cannot make one on cue. The change moves every enemy land unit
- *   into the hex where the player has the most land units, so the battle's first beat almost always has fighting to
- *   report.
+ *   into the hex where the player has the most land units, so the battle's first beat usually has fighting to report.
  * When to use: With the game state read just before the app closes; pass the result to `editSavedMatch`.
  * Expected outcome: `{ h3Index, statements }`, where `h3Index` is the hex that will hold both sides.
  * Exceptions: Throws when either side has no land unit left.

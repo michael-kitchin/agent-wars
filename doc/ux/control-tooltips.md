@@ -54,10 +54,13 @@ The tip can appear whenever the control can receive the pointer or keyboard focu
 - Orders tab: Show the orders queued for this turn or beat.
 - Reports tab: Show the turn reports, opponent messages, and notices from this match, newest first.
 - Opponent tab: Show whether the opponent is planning, its model, its tools, and the AI activity log.
-- Settings, Help, Load game, How to play, Build, Forces, and Replay: "<name> is not available in this version.", for example "Settings is not available in this version."
+- Settings, Help, Load game, How to play, Build, Forces, Replay, and the Control and Production map modes: "<name> is not available in this version.", for example "Settings is not available in this version."
 - Collapse the console: Hide the console to widen the map. Click a tab to show it again.
 - Selection panel close: Clear the selection. Queued orders stay.
 - Selection panel grip: Drag to resize this panel. The size lasts until the app closes.
+- Weather map mode: Show the map as usual: terrain, and each hex's weather while the weather bonus is on.
+- Tech map mode: Show each hex's code, production, and tech tier instead of terrain on the world map, until you choose Weather. Holding T shows the same view while the key is down.
+- Legend: Show or hide the terrain legend and its style choice.
 - Production readout: The production your cities can add each turn. A city adds its share only while it is building, and a city on the neutral border adds none.
 - Forces readout: Units you have fielded, out of the most this game size allows: then each unit type as "infantry 3 of 12", separated by commas, ending with a period.
 - Your home readout: Hexes of your home region that you hold, out of all its hexes.
@@ -108,6 +111,7 @@ The tip can appear whenever the control can receive the pointer or keyboard focu
 - Ranged or Strike while it is greyed out. Its reason shows beside it.
 - The choice on each tactical battles row.
 - The model dropdown. It uses the model description tooltip.
+- The map's + and − zoom buttons. They keep the map library's own "Zoom in" and "Zoom out" titles.
 
 ## Inputs and Responses
 

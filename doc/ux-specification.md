@@ -18,7 +18,7 @@ Visual styling and the arrangement of items inside an element are out of scope. 
 4. If your change alters user-visible behavior, update the requirement text in the same change.
 5. If the spec is silent or ambiguous, add an Open Question rather than inventing a requirement.
 
-`npm run ui:smoke` checks the layout after a change. It builds the app and starts it in Electron with a throwaway user-data folder (the `AGENT_WARS_USER_DATA_DIR` environment variable), three times over that folder. The first session starts one fixed global match and records its scenes, one of them at the 800 × 600 minimum window. The second reopens that match, opens a battle in it, and then starts a new regional match. The third reopens the regional match as a finished one. Between sessions the run changes only its throwaway copy of the match: before the second it moves the enemy's land units into the hex where the player has the most, so a battle can start there, and before the third it marks the match as lost (`scripts/ui-smoke/ui-smoke-session.cjs`, which runs `scripts/ui-smoke/ui-smoke-db-edit.cjs` under Electron's own Node). The run writes numbered screenshots and `report.json` to `.test/ui-smoke/<label>/`. Pass `-- --label <name>` to name that folder. It prints one PASS or FAIL line per check and exits with an error when any check fails. The frame's checks are in `scripts/ui-smoke/ui-smoke-checks.cjs`, the console's are in `scripts/ui-smoke/ui-smoke-console-checks.cjs`, and the checks for the later scenarios (the small window, the reopened match, the battle, the regional match, and the finished match) are in `scripts/ui-smoke/ui-smoke-scenario-checks.cjs`; add one to the matching file when a layout rule needs a machine check. Scenes that click units find them through the game state and the main map (`scripts/ui-smoke/ui-smoke-map.cjs`).
+`npm run ui:smoke` checks the layout after a change. It builds the app and starts it in Electron with a throwaway user-data folder (the `AGENT_WARS_USER_DATA_DIR` environment variable), three times over that folder. The first session starts one fixed global match and records its scenes, one of them at the 800 × 600 minimum window. The second reopens that match, opens a battle in it, and then starts a new regional match. The third reopens the regional match as a finished one. Between sessions the run changes only its throwaway copy of the match: before the second it moves the enemy's land units into the hex where the player has the most, so a battle can start there, and before the third it marks the match as lost (`scripts/ui-smoke/ui-smoke-session.cjs`, which runs `scripts/ui-smoke/ui-smoke-db-edit.cjs` under Electron's own Node). The run writes numbered screenshots and `report.json` to `.test/ui-smoke/<label>/`. Pass `-- --label <name>` to name that folder. It prints one PASS or FAIL line per check and exits with an error when any check fails. The frame's checks are in `scripts/ui-smoke/ui-smoke-checks.cjs`, the console's are in `scripts/ui-smoke/ui-smoke-console-checks.cjs`, the checks for the later scenarios (the small window, the reopened match, the battle, the regional match, and the finished match) are in `scripts/ui-smoke/ui-smoke-scenario-checks.cjs`, and the checks of the minimap panel, the legend, and Leaflet's controls are in `scripts/ui-smoke/ui-smoke-map-chrome-checks.cjs`; add one to the matching file when a layout rule needs a machine check. Scenes that click units find them through the game state and the main map (`scripts/ui-smoke/ui-smoke-map.cjs`).
 
 ## Routing Table
 
@@ -26,7 +26,7 @@ Visual styling and the arrangement of items inside an element are out of scope. 
 | --- | --- | --- |
 | Map pan, zoom, or clicks | [modes-and-transitions.md](ux/modes-and-transitions.md), [input-map.md](ux/input-map.md), [selection-model.md](ux/selection-model.md) | [map-surface.md](ux/map-surface.md) |
 | Range, path, order, or combat drawings | [order-lifecycle.md](ux/order-lifecycle.md), [modes-and-transitions.md](ux/modes-and-transitions.md) | [map-overlays.md](ux/map-overlays.md) |
-| The minimap | [map-surface.md](ux/map-surface.md) | [minimap.md](ux/minimap.md) |
+| The minimap panel or its map-mode buttons | [map-surface.md](ux/map-surface.md) | [minimap.md](ux/minimap.md) |
 | The terrain legend or terrain style | [map-surface.md](ux/map-surface.md) | [terrain-legend.md](ux/terrain-legend.md) |
 | Hex or order tooltips | [order-lifecycle.md](ux/order-lifecycle.md), [notifications-and-feedback.md](ux/notifications-and-feedback.md) | [hex-tooltips.md](ux/hex-tooltips.md) |
 | A button, field, checkbox, or dropdown tip | [control-tooltips.md](ux/control-tooltips.md) | the element document for that control |
@@ -77,7 +77,7 @@ Element documents share a fixed heading set:
 
 - [map-surface.md](ux/map-surface.md): the world map as the workspace for pan, zoom, selection, and orders. Pan and zoom-out stop at the loaded map's extent. A new match frames that extent before the first order.
 - [map-overlays.md](ux/map-overlays.md): range, path, order, hover, city, transport, infrastructure, and resolution drawings on the map.
-- [minimap.md](ux/minimap.md): the world overview and how it relates to the main map view.
+- [minimap.md](ux/minimap.md): the minimap panel: the world overview, how it relates to the main map view, and the map-mode buttons beside it.
 - [terrain-legend.md](ux/terrain-legend.md): the terrain legend and any inputs it accepts.
 - [hex-tooltips.md](ux/hex-tooltips.md): the hover information tooltip, whose Effects line includes movement, range, and cover, and the blocked-order and effects tooltips that appear after the pointer rests. The effects tooltip then stays on that cell. The blocked notice hides a short time after the pointer stops.
 - [control-tooltips.md](ux/control-tooltips.md): the one-second tip on buttons, fields, checkboxes, and dropdowns, and the controls that have none.
@@ -121,7 +121,7 @@ Cells are `Shown`, `Hidden`, `Disabled` (visible, but pointer input is off), `Ch
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | Map surface | Changed | Shown | Disabled | Changed | Changed | Disabled | Changed |
 | Map overlays | Hidden | Shown | Disabled | Shown | Changed | Disabled | Hidden |
-| Minimap | Hidden | Shown | Disabled | Shown | Shown | Disabled | Hidden |
+| Minimap panel | Hidden | Shown | Disabled | Changed | Changed | Disabled | Hidden |
 | Terrain legend | Hidden | Shown | Disabled | Shown | Shown | Disabled | Hidden |
 | Map zoom control | Hidden | Shown | Disabled | Shown | Shown | Disabled | Hidden |
 | Hex tooltips | Hidden | Shown | Hidden | Shown | Shown | Hidden | Hidden |
