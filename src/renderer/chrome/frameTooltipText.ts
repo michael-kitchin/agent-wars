@@ -118,3 +118,13 @@ export const selectionPanelCloseTooltipText = 'Clear the selection. Queued order
  * Exceptions: None.
  */
 export const selectionPanelGripTooltipText = 'Drag to resize this panel. The size lasts until the app closes.';
+
+/**
+ * The Reports tab's tip.
+ *
+ * Purpose: Says what the Reports tab lists.
+ * When to use: `#console-tab-reports`.
+ * Expected outcome: The control tip shows this sentence.
+ * Exceptions: None.
+ */
+export const reportsTabTooltipText = 'Show the turn reports, opponent messages, and notices from this match, newest first.';

@@ -242,13 +242,15 @@
         <button type="button" id="tactical-annihilation-exit-btn" data-control-tooltip="Close this result and leave the battle. The world-map turn then plays, as it does when you exit during the fight.">Exit Battle</button>
       </div>
     </div>
-    <div id="map-toast" class="map-toast hidden" aria-live="polite">
-      <p id="map-toast-text"></p>
-      <button type="button" id="map-toast-dismiss" aria-label="Dismiss">×</button>
-    </div>
-    <div id="ai-strategy-toast" class="map-toast ai-strategy-toast hidden" aria-live="polite">
-      <p id="ai-strategy-toast-text"></p>
-      <button type="button" id="ai-strategy-toast-dismiss" aria-label="Dismiss">×</button>
+    <div id="map-toast-band" class="map-toast-band">
+      <div id="ai-strategy-toast" class="map-toast ai-strategy-toast hidden" aria-live="polite">
+        <p id="ai-strategy-toast-text"></p>
+        <button type="button" id="ai-strategy-toast-dismiss" aria-label="Dismiss">×</button>
+      </div>
+      <div id="map-toast" class="map-toast hidden" aria-live="polite">
+        <p id="map-toast-text"></p>
+        <button type="button" id="map-toast-dismiss" aria-label="Dismiss">×</button>
+      </div>
     </div>
     <div id="tactical-battle-hud" class="tactical-battle-hud hidden" role="group" aria-label="Tactical battle controls" data-control-tooltip="Leave the battle, bring back your world-map orders, and play that turn. The button does nothing while a battle turn is resolving or playing back.">
       <button type="button" id="tactical-exit-btn" class="tactical-exit-btn" aria-label="Exit battle">Exit Battle</button>
@@ -299,6 +301,10 @@
           <div id="air-strikes-list" class="console-order-list"></div>
         </div>
       </section>
+      <section id="console-panel-reports" class="console-panel" role="tabpanel" aria-labelledby="console-tab-reports" hidden>
+        <p id="reports-empty" class="chrome-muted">No reports yet this match.</p>
+        <ol id="reports-list" class="console-report-list"></ol>
+      </section>
       <section id="console-panel-opponent" class="console-panel" role="tabpanel" aria-labelledby="console-tab-opponent" hidden>
         <div class="openrouter-tab-bar" role="tablist" aria-label="AI panel">
           <button type="button" id="openrouter-tab-tools" role="tab" aria-selected="false" aria-controls="openrouter-tools-panel" data-control-tooltip="Show the tools the opponent can use, and turn each group on or off.">Tools</button>
@@ -336,6 +342,7 @@
     </div>
     <nav id="console-rail" class="console-rail" role="tablist" aria-orientation="vertical" aria-label="Console tabs">
       <button type="button" id="console-tab-orders" class="console-tab" role="tab" aria-selected="true" aria-controls="console-panel-orders" data-control-tooltip="Show the orders queued for this turn or beat."><svg class="chrome-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M5 4h9M5 8h9M5 12h9M2 4h.1M2 8h.1M2 12h.1"></path></svg><span>Orders</span><span id="console-tab-orders-badge" class="console-tab-badge" hidden></span></button>
+      <button type="button" id="console-tab-reports" class="console-tab" role="tab" aria-selected="false" aria-controls="console-panel-reports" data-control-tooltip="Show the turn reports, opponent messages, and notices from this match, newest first."><svg class="chrome-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 9.5l2-6h9l2 6v4h-13zM1.5 9.5h4l1 1.5h3l1-1.5h4"></path></svg><span>Reports</span><span id="console-tab-reports-badge" class="console-tab-badge" hidden></span></button>
       <button type="button" id="console-tab-opponent" class="console-tab" role="tab" aria-selected="false" aria-controls="console-panel-opponent" data-control-tooltip="Show the opponent's model, its tools, and the AI activity log."><svg class="chrome-icon" viewBox="0 0 16 16" aria-hidden="true"><rect x="4" y="4" width="8" height="8" rx="1"></rect><path d="M6 1.5V4M10 1.5V4M6 12v2.5M10 12v2.5M1.5 6H4M1.5 10H4M12 6h2.5M12 10h2.5"></path></svg><span>Opponent</span></button>
       <span class="control-tooltip-host console-tab-host" data-control-tooltip="Build is not available in this version."><button type="button" id="console-tab-build" class="console-tab" role="tab" aria-selected="false" disabled><svg class="chrome-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 14V7l4 2.2V7l4 2.2V3.5h4.5V14z"></path></svg><span>Build</span></button></span>
       <span class="control-tooltip-host console-tab-host" data-control-tooltip="Forces is not available in this version."><button type="button" id="console-tab-forces" class="console-tab" role="tab" aria-selected="false" disabled><svg class="chrome-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.8l5.2 2v4.1c0 3-2.2 5.3-5.2 6.3-3-1-5.2-3.3-5.2-6.3V3.8z"></path></svg><span>Forces</span></button></span>

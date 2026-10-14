@@ -1,10 +1,19 @@
 /* Toasts and the new-game dialog. */
-.map-toast {
+/* The two toasts stack in one band at the top centre of the map, right of the minimap's 200 px and its 12 px insets. The band is only as wide as its widest toast, so it does not block the map beside them. */
+.map-toast-band {
   position: absolute;
-  bottom: 12px;
+  top: 12px;
+  left: 224px;
   right: 12px;
-  left: auto;
-  max-width: 360px;
+  z-index: 7000;
+  width: fit-content;
+  max-width: 560px;
+  margin-inline: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.map-toast {
   max-height: 40vh;
   overflow-y: auto;
   padding: 0.5rem 0.75rem;
@@ -18,21 +27,12 @@
   display: flex;
   align-items: flex-start;
   gap: 0.5rem;
-  z-index: 7000;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
 }
 .map-toast.toast-info {
   border-color: var(--chrome-border);
 }
 .map-toast.hidden { display: none; }
-.ai-strategy-toast {
-  top: 12px;
-  right: 12px;
-  left: auto;
-  bottom: auto;
-  max-width: min(360px, calc(100% - 240px));
-  opacity: 1;
-}
 .game-over-overlay {
   position: absolute;
   inset: 0;

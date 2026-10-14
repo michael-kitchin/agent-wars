@@ -179,6 +179,30 @@ const SCENARIO_CHECKS = Object.freeze([
         : `Ranged reads "${ranged.text}"${ranged.shown ? '' : ' and is hidden'}${ranged.disabled ? ' and is disabled' : ''}, expected it enabled`;
     },
   },
+  {
+    name: 'reports-after-reopen',
+    scenes: [SCENES.matchReopened],
+    needs: ['#reports-list'],
+    run: (p, el) => (el('#reports-list').text.includes('Turn report') ? 'a turn report from before the app closed is still listed' : null),
+  },
+  {
+    name: 'reports-battle-beat',
+    scenes: [SCENES.battleBeat],
+    needs: ['#reports-list .console-report-turn'],
+    run: (p, el) => {
+      const turns = el('#reports-list .console-report-turn').allTexts;
+      return turns.some((text) => text.startsWith('B1Turn report')) ? null : `no turn report is tagged B1: ${JSON.stringify(turns)}`;
+    },
+  },
+  {
+    name: 'reports-new-match',
+    scenes: [SCENES.regionalStart],
+    needs: ['#reports-list'],
+    run: (p, el) => {
+      const text = el('#reports-list').text;
+      return text.includes('Turn report') || text.includes('B1') ? 'entries from the previous match are still listed' : null;
+    },
+  },
 ]);
 
 module.exports = { SCENARIO_CHECKS };

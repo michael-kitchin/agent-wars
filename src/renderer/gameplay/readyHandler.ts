@@ -1,4 +1,5 @@
 import type { GameReadyIpcPayload, GameStateSnapshot } from '../../shared/ipcTypes';
+import { currentConsoleReportTag } from '../chrome/consoleReports';
 import type { MeleeInterceptModalOutcome } from './meleeInterceptModal';
 import { readTacticalBattlesInterceptPromptEnabled } from './tacticalBattlePromptPreference';
 import type { ResolutionMove } from '../core/types';
@@ -139,6 +140,8 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
       cachedPrecomputedToolCountsAtReadyStart,
       matchEpoch,
     })) return;
+    // The turn this Ready resolves; its reports are filed under it after the snapshot moves on to the next turn.
+    const turnReportTag = currentConsoleReportTag();
     const hasPendingDraftOrders =
       S.pendingRangedAttacks.length > 0 ||
       S.pendingAirStrikes.length > 0 ||
@@ -258,7 +261,10 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
     }
     if (readyResult.aiConsulted === false) {
       deps.appendOpenRouterLog('AI executing standing orders (no event fired).');
-      deps.showMapToast('AI: standing orders only (no consultation).', { isError: false });
+      deps.showMapToast('AI: standing orders only (no consultation).', {
+        isError: false,
+        report: { kind: 'notice', tag: turnReportTag },
+      });
     }
 
     const hasRanged =
@@ -337,6 +343,7 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
           readySlice: readyResult,
           visibility,
           killToastFormatter,
+          reportTag: turnReportTag,
         },
         deps
       );

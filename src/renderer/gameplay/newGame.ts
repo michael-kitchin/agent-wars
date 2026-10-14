@@ -2,6 +2,7 @@ import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import { rendererSharedState as S } from '../core/state';
 import { clearRememberedUnitOrigins } from '../core/unitOriginFlags';
 import { clearOpenRouterLog } from '../openRouter/openRouterUiHelpers';
+import { clearConsoleReports } from '../chrome/consoleReports';
 import { resetPrecomputedAiState } from '../openRouter/precomputedAiState';
 import { tacticalReleaseRendererSessionForNewStrategicMatch } from '../tactical/tacticalUiOrchestration';
 import { discardStrategicOrderUiStash } from '../tactical/tacticalStrategicOrderUiStash';
@@ -333,6 +334,7 @@ export function registerNewGameButton(deps: NewGameDeps): void {
       S.eventDrivenInitialConsultationDone = false;
       S.openRouterGameCost = 0;
       clearOpenRouterLog();
+      clearConsoleReports();
       deps.updateOpenRouterCostLabel();
       deps.updateGameStateSidebar(state);
       await deps.refreshHumanStandingOrders();

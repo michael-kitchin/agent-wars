@@ -44,7 +44,7 @@ When no match is loaded, the basemap can still be visible under the new-game ove
 - When a match starts, the right panel is already on screen. The view frames that match's bounds in the map beside the panel, then zooms one level toward the player's infantry and armor. If the player has neither, that zoom uses any of the player's units. If the player has no units, the view stays on the framed bounds. A global match frames the Mercator world. A regional match frames that region's hexes. Starting a match on the same region as the previous match frames it again. A later turn does not move the view back to that frame while the match's hex footprint is unchanged.
 - When a tactical battle starts, the view moves to the battle area and pan limits follow that area until the battle ends.
 - When the battle ends, pan limits return to the match's bounds. The view returns to the frame saved when that match opened. When no frame was saved, the view fits those bounds.
-- When some basemap tiles fail to load, a map toast says the game remains playable. That toast is shown once per session and hides like other map toasts. See [notifications-and-feedback.md](notifications-and-feedback.md).
+- When some basemap tiles fail to load, a map toast says the game remains playable. That toast is shown once per session and hides like other map toasts. The Reports tab keeps it. See [notifications-and-feedback.md](notifications-and-feedback.md) and [reports-tab.md](reports-tab.md).
 
 ## States
 
@@ -81,6 +81,7 @@ When no match is loaded, the basemap can still be visible under the new-game ove
 - [input-map.md](input-map.md)
 - [order-lifecycle.md](order-lifecycle.md)
 - [notifications-and-feedback.md](notifications-and-feedback.md)
+- [reports-tab.md](reports-tab.md)
 - [resolution-playback.md](resolution-playback.md)
 - [hex-tooltips.md](hex-tooltips.md)
 

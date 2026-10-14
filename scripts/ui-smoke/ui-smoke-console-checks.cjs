@@ -31,6 +31,26 @@ const WORLD_ORDER_DETAIL = /^→ [0-9A-Z]{2} · \d+h$/;
 const SELECTION_PANEL_LIMITS = Object.freeze({ minWidth: 320, maxWidth: 640, minHeight: 140, mapMargin: 24 });
 
 /**
+ * The left edge of the toast band, measured from the map's left edge, in CSS pixels.
+ *
+ * Purpose: The band starts right of the minimap so a toast never covers it.
+ * When to use: The toast band check.
+ * Expected outcome: Matches `.map-toast-band` in `static/feedbackChrome.css`.
+ * Exceptions: None.
+ */
+const TOAST_BAND_LEFT = 224;
+
+/**
+ * The widest the toast band can be, in CSS pixels.
+ *
+ * Purpose: Toasts stay readable lines, not banners across the map.
+ * When to use: The toast band check.
+ * Expected outcome: Matches `.map-toast-band` in `static/feedbackChrome.css`.
+ * Exceptions: None.
+ */
+const TOAST_BAND_MAX_WIDTH = 560;
+
+/**
  * Default width of the selection panel in CSS pixels.
  *
  * Purpose: The panel opens at this width until the player resizes it.
@@ -234,6 +254,57 @@ const CONSOLE_CHECKS = Object.freeze([
       if (missing.length > 0) return `not shown in the selection panel: ${missing.join(', ')}`;
       const count = el('#selection-panel-count').text;
       return count === '1 selected of 1' ? null : `the count reads "${count}", expected "1 selected of 1"`;
+    },
+  },
+  {
+    name: 'toast-band-top-centre',
+    scenes: [SCENES.turnResolved],
+    needs: ['#canvas-container', '#map-toast-band', '#map-toast'],
+    run: (p, el) => {
+      const c = el('#canvas-container');
+      const band = el('#map-toast-band');
+      const toast = el('#map-toast');
+      if (!toast.shown || !toast.ancestorIds.includes('map-toast-band')) return 'the map toast is not shown in the toast band';
+      if (!near(band.y, c.y + MAP_OVERLAY_INSET)) return `the toast band is at ${fmt(band)}, expected its top ${MAP_OVERLAY_INSET} px below the map's top`;
+      if (band.w > TOAST_BAND_MAX_WIDTH + 1) return `the toast band is ${Math.round(band.w)} wide, more than ${TOAST_BAND_MAX_WIDTH}`;
+      if (band.x < c.x + TOAST_BAND_LEFT - 1 || band.x + band.w > c.x + c.w - MAP_OVERLAY_INSET + 1) {
+        return `the toast band is at ${fmt(band)}, outside the space right of the minimap on the map ${fmt(c)}`;
+      }
+      const centre = c.x + (TOAST_BAND_LEFT + c.w - MAP_OVERLAY_INSET) / 2;
+      return near(band.x + band.w / 2, centre) ? null : `the toast band is at ${fmt(band)}, expected it centred at x=${Math.round(centre)}`;
+    },
+  },
+  {
+    name: 'reports-badge-unread',
+    scenes: [SCENES.turnResolved],
+    needs: ['#console-tab-reports-badge', '#console-panel-reports'],
+    run: (p, el) => {
+      const badge = el('#console-tab-reports-badge');
+      if (el('#console-panel-reports').shown) return 'the Reports panel is shown before its tab was clicked';
+      return badge.shown && /^[1-9]\d*$/.test(badge.text) ? null : `the Reports badge reads "${badge.text}"${badge.shown ? '' : ' and is hidden'}`;
+    },
+  },
+  {
+    name: 'reports-tab-shows-panel',
+    scenes: [SCENES.reportsTab],
+    needs: ['#console-panel-reports', '#console-panel-orders', '#console-title', '#console-subtitle', '#reports-empty', '#console-tab-reports-badge'],
+    run: (p, el) => {
+      if (!el('#console-panel-reports').shown || el('#console-panel-orders').shown) return 'the Reports panel is not the only panel shown';
+      const title = `${el('#console-title').text} / ${el('#console-subtitle').text}`;
+      if (title !== 'Reports / this match') return `the header reads "${title}", expected "Reports / this match"`;
+      if (el('#reports-empty').shown) return 'the empty-list sentence shows next to entries';
+      return el('#console-tab-reports-badge').shown ? 'the Reports badge still shows after the tab was opened' : null;
+    },
+  },
+  {
+    name: 'reports-standing-orders-notice',
+    scenes: [SCENES.reportsTab],
+    needs: ['#reports-list .console-report-notice'],
+    run: (p, el) => {
+      const notices = el('#reports-list .console-report-notice').allTexts;
+      return notices.some((text) => text.startsWith('T1Notice') && text.includes('standing orders only'))
+        ? null
+        : `no Notice tagged T1 says "standing orders only": ${JSON.stringify(notices)}`;
     },
   },
   {

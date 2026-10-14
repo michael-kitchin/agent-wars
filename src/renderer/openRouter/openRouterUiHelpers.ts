@@ -14,6 +14,7 @@ import {
   isWaitingForPrecomputedAiOrders,
 } from './aiPlanningState';
 import { resolveToolInvocationCountsAfterReady } from '../../shared/openRouterToolInvocationCounts';
+import { currentConsoleReportTag, recordConsoleReport } from '../chrome/consoleReports';
 
 /**
  * Defines the `formatElapsedMmSs` function shape (export function formatElapsedMmSs(ms: number): string).
@@ -246,6 +247,16 @@ export type MapToastOptions = {
    * Exceptions: None.
    */
   readonly unitOriginByDisplayName?: ReadonlyMap<string, LossFlagIdentity>;
+  /**
+   * How the Reports tab files this toast.
+   *
+   * Contract: Read only when `isError` is false; error toasts are never filed.
+   * When to use: Pass `{ kind: 'turn', tag }` for a turn or beat update, with the tag of the turn or beat it reports
+   *   on. Pass a notice with a tag to file a notice under a turn other than the current one.
+   * Expected outcome: Omitted, an informational toast is filed as a Notice tagged with the current turn or beat.
+   * Exceptions: None.
+   */
+  readonly report?: { readonly kind: 'turn' | 'notice'; readonly tag: string };
 };
 
 /**
@@ -352,12 +363,13 @@ function showToast(
 }
 
 /**
- * Shows the lower-right map toast with a sectioned, bulleted message, replacing any toast already shown.
+ * Shows the map toast with a sectioned, bulleted message, replacing any toast already shown.
  *
  * Purpose: The single entry point for turn updates, validation messages, and other map notices.
  * When to use: Whenever the player needs a transient notice on the map.
  * Expected outcome: The toast shows `message` (see `appendMapToastMessageBody`) and hides after the standard
- *   duration. `options.unitOriginByDisplayName` adds flags before named loss victims.
+ *   duration. `options.unitOriginByDisplayName` adds flags before named loss victims. An informational toast
+ *   (`isError: false`) is also filed on the Reports tab, as `options.report` says.
  * Exceptions: None.
  */
 export function showMapToast(message: string, options?: MapToastOptions): void {
@@ -376,6 +388,9 @@ export function showMapToast(message: string, options?: MapToastOptions): void {
       },
       options?.isError === false
     );
+    if (options?.isError === false) {
+      recordConsoleReport(options.report?.kind ?? 'notice', options.report?.tag ?? currentConsoleReportTag(), textEl);
+    }
   }
   S.toastHideTimer = setTimeout(() => {
     S.toastHideTimer = null;
@@ -401,11 +416,13 @@ export function hideMapToast(): void {
 }
 
 /**
- * Shows the upper-right toast with Message then Strategy sections, or hides it when both are empty.
+ * Shows the AI strategy toast with Message then Strategy sections, or hides it when both are empty.
  *
  * Purpose: Surfaces the opponent's taunt/threat and plan summary after consultation.
  * When to use: After Ready, tactical commit, deferred consult push, or tactical prefetch.
- * Expected outcome: Bold section titles matching the lower-right toast; plain (non-bulleted) body text; empty sections omitted; both empty hides a stale toast.
+ * Expected outcome: Bold section titles matching the map toast; plain (non-bulleted) body text; empty sections
+ *   omitted; both empty hides a stale toast. A shown toast is also filed on the Reports tab as a Message tagged with
+ *   the current turn or beat.
  * Exceptions: None.
  */
 export function showAiStrategyToast(content: AiStrategyToastFields): void {
@@ -436,6 +453,7 @@ export function showAiStrategyToast(content: AiStrategyToastFields): void {
       },
       true
     );
+    recordConsoleReport('message', currentConsoleReportTag(), textEl);
   }
   S.aiStrategyToastHideTimer = setTimeout(() => {
     S.aiStrategyToastHideTimer = null;
@@ -461,7 +479,7 @@ export function hideAiStrategyToast(): void {
 }
 
 /**
- * Dismisses the lower-right map toast and upper-right AI strategy toast together.
+ * Dismisses the map toast and the AI strategy toast together.
  *
  * Purpose: Gives planning entry points one call that clears both chrome toasts without
  * suppressing later `showMapToast` / `showAiStrategyToast` traffic.

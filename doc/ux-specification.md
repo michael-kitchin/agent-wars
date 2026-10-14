@@ -42,6 +42,7 @@ Visual styling and the arrangement of items inside an element are out of scope. 
 | The Tools tab | [modes-and-transitions.md](ux/modes-and-transitions.md) | [right-panel-tools-tab.md](ux/right-panel-tools-tab.md) |
 | API key, model, reasoning effort, or Run | [modes-and-transitions.md](ux/modes-and-transitions.md), [notifications-and-feedback.md](ux/notifications-and-feedback.md) | [right-panel-model-tab.md](ux/right-panel-model-tab.md) |
 | The AI activity log | [notifications-and-feedback.md](ux/notifications-and-feedback.md) | [ai-activity-log.md](ux/ai-activity-log.md) |
+| The Reports tab, or where the map toasts show | [notifications-and-feedback.md](ux/notifications-and-feedback.md) | [reports-tab.md](ux/reports-tab.md) |
 | New game or game over | [modes-and-transitions.md](ux/modes-and-transitions.md) | [new-game-dialog.md](ux/new-game-dialog.md) |
 | Turn or beat animation | [modes-and-transitions.md](ux/modes-and-transitions.md), [notifications-and-feedback.md](ux/notifications-and-feedback.md) | [resolution-playback.md](ux/resolution-playback.md) |
 | Tactical entry markers | [modes-and-transitions.md](ux/modes-and-transitions.md) | [tactical-entry-markers.md](ux/tactical-entry-markers.md) |
@@ -92,6 +93,7 @@ Element documents share a fixed heading set:
 - [right-panel-tools-tab.md](ux/right-panel-tools-tab.md): the Tools tab and its tool list.
 - [right-panel-model-tab.md](ux/right-panel-model-tab.md): API key, model, reasoning effort, Run, and the model description tooltip.
 - [ai-activity-log.md](ux/ai-activity-log.md): the log of AI interactions and errors.
+- [reports-tab.md](ux/reports-tab.md): the console tab that keeps what the map toasts showed during the match.
 - [new-game-dialog.md](ux/new-game-dialog.md): the overlay used to start a game and to show game over, and the map preview behind it.
 - [resolution-playback.md](ux/resolution-playback.md): the animated replay of turn resolution and the inputs it blocks.
 - [tactical-entry-markers.md](ux/tactical-entry-markers.md): markers on contested hexes that lead into a tactical battle.
@@ -135,6 +137,7 @@ Cells are `Shown`, `Hidden`, `Disabled` (visible, but pointer input is off), `Ch
 | Tools tab | Hidden | Shown | Disabled | Shown | Shown | Disabled | Hidden |
 | Model tab | Hidden | Shown | Disabled | Shown | Changed | Disabled | Hidden |
 | AI activity log | Hidden | Shown | Disabled | Shown | Shown | Disabled | Hidden |
+| Reports tab | Hidden | Shown | Disabled | Shown | Shown | Disabled | Hidden |
 | New game dialog | Shown | Hidden | Hidden | Hidden | Hidden | Hidden | Shown |
 | Resolution playback | Hidden | Hidden | Hidden | Shown | Hidden | Hidden | Hidden |
 | Tactical entry markers | Hidden | Shown | Disabled | Shown | Hidden | Hidden | Hidden |

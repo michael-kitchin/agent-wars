@@ -124,3 +124,60 @@
 .console-order-cancel:hover {
   background: var(--chrome-bg-raised);
 }
+
+/* ---------- Reports tab ---------- */
+.console-report-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.console-report {
+  position: relative;
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--chrome-divider);
+  font-size: 12px;
+}
+.console-report-message {
+  background: color-mix(in srgb, var(--player-opponent) 14%, transparent);
+}
+/* A gold dot marks entries filed since the player last left this tab. */
+.console-report[data-fresh]::after {
+  content: "";
+  position: absolute;
+  top: 14px;
+  right: 8px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--selection-mark);
+}
+.console-report-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  padding-right: 14px;
+}
+.console-report-tag {
+  padding: 1px 5px;
+  border: 1px solid var(--chrome-border);
+  border-radius: 3px;
+  color: var(--chrome-muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.console-report-kind {
+  font-size: 13px;
+  font-weight: 600;
+}
+.console-report-replay-host {
+  margin-left: auto;
+}
+.console-report-replay {
+  padding: 2px 8px;
+  font-size: 11px;
+}
+.console-report-body {
+  white-space: pre-line;
+  line-height: 1.45;
+}

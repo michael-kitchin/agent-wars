@@ -39,7 +39,7 @@ The log does not show the API key.
 
 - A new line is appended at the end, and the log scrolls to that line while it is shown. Showing the Opponent tab, or expanding the panel on it, scrolls the log to its newest line, so lines added while it was hidden are in view.
 - Lines are not removed during a match.
-- When a new match starts, from startup, New game, or game over, the log clears, together with the cost readout reset on the Model tab.
+- When a new match starts, from startup, New game, or game over, the log clears, together with the cost readout reset on the Model tab and the [Reports tab](reports-tab.md).
 
 ## States
 

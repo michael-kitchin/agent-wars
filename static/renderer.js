@@ -18685,6 +18685,103 @@ ${bonuses}`;
     return null;
   }
 
+  // src/shared/consoleReportLog.ts
+  var CONSOLE_REPORT_KIND_LABELS = Object.freeze({
+    turn: "Turn report",
+    message: "Message",
+    notice: "Notice"
+  });
+  var MAX_CONSOLE_REPORTS = 200;
+  function formatConsoleReportTag(turnNumber, battleBeat) {
+    if (battleBeat != null) return `B${battleBeat}`;
+    if (turnNumber != null) return `T${turnNumber}`;
+    return "";
+  }
+
+  // src/renderer/chrome/frameTooltipText.ts
+  function unavailableTooltipText(name) {
+    return `${name} is not available in this version.`;
+  }
+  function forcesStatTooltipText(breakdown) {
+    return `Units you have fielded, out of the most this game size allows: ${breakdown}.`;
+  }
+
+  // src/renderer/chrome/consoleReports.ts
+  var unreadCount = 0;
+  var reportsVisible = false;
+  var listeners = [];
+  function notifyReportsChanged() {
+    for (const listener of listeners) listener();
+  }
+  function syncReportsEmptyState(list) {
+    document.getElementById("reports-empty")?.toggleAttribute("hidden", list.childElementCount > 0);
+  }
+  function createReplayPlaceholder() {
+    const host = document.createElement("span");
+    host.className = "control-tooltip-host console-report-replay-host";
+    host.setAttribute("data-control-tooltip", unavailableTooltipText("Replay"));
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "console-report-replay";
+    button.disabled = true;
+    button.textContent = "Replay";
+    host.append(button);
+    return host;
+  }
+  function currentConsoleReportTag() {
+    const battle = rendererSharedState.tacticalBattleSnapshot;
+    return formatConsoleReportTag(rendererSharedState.gameState?.turnNumber ?? null, battle ? battle.tacticalTurnNumber : null);
+  }
+  function recordConsoleReport(kind, tag, body) {
+    const list = document.getElementById("reports-list");
+    if (!list) return;
+    const entry = document.createElement("li");
+    entry.className = `console-report console-report-${kind}`;
+    entry.dataset.fresh = "true";
+    const head = document.createElement("div");
+    head.className = "console-report-head";
+    if (tag) {
+      const tagEl = document.createElement("span");
+      tagEl.className = "console-report-tag";
+      tagEl.textContent = tag;
+      head.append(tagEl);
+    }
+    const kindEl = document.createElement("span");
+    kindEl.className = "console-report-kind";
+    kindEl.textContent = CONSOLE_REPORT_KIND_LABELS[kind];
+    head.append(kindEl);
+    if (kind === "turn") head.append(createReplayPlaceholder());
+    const content = document.createElement("div");
+    content.className = "console-report-body";
+    content.append(...Array.from(body.cloneNode(true).childNodes));
+    entry.append(head, content);
+    list.prepend(entry);
+    while (list.childElementCount > MAX_CONSOLE_REPORTS) list.lastElementChild?.remove();
+    syncReportsEmptyState(list);
+    if (!reportsVisible) unreadCount = Math.min(unreadCount + 1, list.childElementCount);
+    notifyReportsChanged();
+  }
+  function unreadConsoleReportCount() {
+    return unreadCount;
+  }
+  function setConsoleReportsVisible(visible) {
+    if (visible === reportsVisible) return;
+    reportsVisible = visible;
+    if (visible) unreadCount = 0;
+    else document.querySelectorAll("#reports-list [data-fresh]").forEach((entry) => entry.removeAttribute("data-fresh"));
+    notifyReportsChanged();
+  }
+  function clearConsoleReports() {
+    const list = document.getElementById("reports-list");
+    list?.replaceChildren();
+    if (list) syncReportsEmptyState(list);
+    unreadCount = 0;
+    notifyReportsChanged();
+  }
+  function onConsoleReportsChanged(listener) {
+    listeners.push(listener);
+  }
+
   // src/renderer/openRouter/openRouterUiHelpers.ts
   function formatElapsedMmSs(ms) {
     const totalSeconds = Math.floor(ms / 1e3);
@@ -18838,6 +18935,9 @@ ${bonuses}`;
         },
         options?.isError === false
       );
+      if (options?.isError === false) {
+        recordConsoleReport(options.report?.kind ?? "notice", options.report?.tag ?? currentConsoleReportTag(), textEl);
+      }
     }
     rendererSharedState.toastHideTimer = setTimeout(() => {
       rendererSharedState.toastHideTimer = null;
@@ -18880,6 +18980,7 @@ ${bonuses}`;
         },
         true
       );
+      recordConsoleReport("message", currentConsoleReportTag(), textEl);
     }
     rendererSharedState.aiStrategyToastHideTimer = setTimeout(() => {
       rendererSharedState.aiStrategyToastHideTimer = null;
@@ -25660,11 +25761,6 @@ ${bonuses}`;
     ).join(", ");
   }
 
-  // src/renderer/chrome/frameTooltipText.ts
-  function forcesStatTooltipText(breakdown) {
-    return `Units you have fielded, out of the most this game size allows: ${breakdown}.`;
-  }
-
   // src/renderer/chrome/topBar.ts
   function formatStrategicPhaseLabel(phase) {
     if (!phase) return phase;
@@ -25813,10 +25909,10 @@ ${bonuses}`;
 
   // src/renderer/gameplay/queuedOrderRows.ts
   var ordersByGroup = /* @__PURE__ */ new Map();
-  var listeners = [];
+  var listeners2 = [];
   function publishQueuedOrders(group, orders) {
     ordersByGroup.set(group, orders);
-    for (const listener of listeners) listener();
+    for (const listener of listeners2) listener();
   }
   function queuedOrderCount() {
     let count = 0;
@@ -25831,12 +25927,13 @@ ${bonuses}`;
     return null;
   }
   function onQueuedOrdersChanged(listener) {
-    listeners.push(listener);
+    listeners2.push(listener);
   }
 
   // src/renderer/chrome/consoleFrame.ts
   var CONSOLE_TABS = Object.freeze([
     { tabId: "console-tab-orders", panelId: "console-panel-orders", title: "Orders", subtitle: ordersSubtitle },
+    { tabId: "console-tab-reports", panelId: "console-panel-reports", title: "Reports", subtitle: () => "this match" },
     {
       tabId: "console-tab-opponent",
       panelId: "console-panel-opponent",
@@ -25864,6 +25961,7 @@ ${bonuses}`;
     const subtitle = document.getElementById("console-subtitle");
     if (subtitle) subtitle.textContent = active2 ? active2.subtitle() : "";
     setRailBadge("console-tab-orders-badge", queuedOrderCount());
+    setRailBadge("console-tab-reports-badge", unreadConsoleReportCount());
   }
   function applyConsoleState() {
     selectTabPanel(consoleState.activeTabId, CONSOLE_TABS);
@@ -25872,11 +25970,13 @@ ${bonuses}`;
     if (title && active2) title.textContent = active2.title;
     document.getElementById("sidebar")?.setAttribute("data-collapsed", consoleState.collapsed ? "true" : "false");
     document.getElementById("console-collapse-btn")?.setAttribute("aria-expanded", consoleState.collapsed ? "false" : "true");
+    setConsoleReportsVisible(!consoleState.collapsed && consoleState.activeTabId === "console-tab-reports");
     refreshConsoleHeader();
     if (!consoleState.collapsed) active2?.onShow?.();
   }
   function wireConsoleFrame() {
     onQueuedOrdersChanged(refreshConsoleHeader);
+    onConsoleReportsChanged(refreshConsoleHeader);
     for (const tab of CONSOLE_TABS) {
       document.getElementById(tab.tabId)?.addEventListener("click", () => {
         consoleState = nextConsoleTabState(consoleState, tab.tabId);
@@ -30834,6 +30934,7 @@ ${bonuses}`;
         rendererSharedState.eventDrivenInitialConsultationDone = false;
         rendererSharedState.openRouterGameCost = 0;
         clearOpenRouterLog();
+        clearConsoleReports();
         deps.updateOpenRouterCostLabel();
         deps.updateGameStateSidebar(state);
         await deps.refreshHumanStandingOrders();
@@ -32185,10 +32286,12 @@ ${bonuses}`;
     if ((deployed.naval ?? 0) > 0) parts.push(`${deployed.naval.toLocaleString()} naval`);
     if ((deployed.air ?? 0) > 0) parts.push(`${deployed.air.toLocaleString()} air`);
     if (parts.length === 0) return null;
-    if (parts.length === 1) return `${parts[0]} units deployed`;
-    if (parts.length === 2) return `${parts[0]} and ${parts[1]} units deployed`;
-    if (parts.length === 3) return `${parts[0]}, ${parts[1]}, and ${parts[2]} units deployed`;
-    return `${parts[0]}, ${parts[1]}, ${parts[2]}, and ${parts[3]} units deployed`;
+    const total = (deployed.armor ?? 0) + (deployed.infantry ?? 0) + (deployed.naval ?? 0) + (deployed.air ?? 0);
+    const noun = total === 1 ? "unit" : "units";
+    if (parts.length === 1) return `${parts[0]} ${noun} deployed`;
+    if (parts.length === 2) return `${parts[0]} and ${parts[1]} ${noun} deployed`;
+    if (parts.length === 3) return `${parts[0]}, ${parts[1]}, and ${parts[2]} ${noun} deployed`;
+    return `${parts[0]}, ${parts[1]}, ${parts[2]}, and ${parts[3]} ${noun} deployed`;
   }
   function formatDeploymentCapReachedLine(cappedTypes, player) {
     if (player !== "human") return null;
@@ -32206,8 +32309,9 @@ ${bonuses}`;
     if (deployedLine) lines.push(deployedLine);
     const deploymentCapLine = formatDeploymentCapReachedLine(readyResult.humanDeploymentCapReachedUnitTypes, "human");
     if (deploymentCapLine) lines.push(deploymentCapLine);
-    if ((readyResult.humanHexesLostCount ?? 0) > 0) {
-      lines.push(`${readyResult.humanHexesLostCount.toLocaleString()} hexes lost to opponent`);
+    const hexesLost = readyResult.humanHexesLostCount ?? 0;
+    if (hexesLost > 0) {
+      lines.push(`${hexesLost.toLocaleString()} ${hexesLost === 1 ? "hex" : "hexes"} lost to opponent`);
     }
     return lines;
   }
@@ -32377,7 +32481,7 @@ ${bonuses}`;
     return bullets;
   }
   async function announceResolutionTurnUpdate(args, deps) {
-    const { readySlice, visibility, killToastFormatter, extraKills } = args;
+    const { readySlice, visibility, killToastFormatter, extraKills, reportTag } = args;
     const { unknownCombatHexes, unknownCasualtyHexes, knownVictimIds, unknownVictimIds } = visibility;
     const turnLossSummary = buildPopupTurnLossSummary({
       readySlice,
@@ -32393,7 +32497,7 @@ ${bonuses}`;
     });
     if (updateText) {
       const unitOriginByDisplayName = buildUnitOriginByLossDisplayName(turnLossSummary);
-      deps.showMapToast(updateText, { isError: false, unitOriginByDisplayName });
+      deps.showMapToast(updateText, { isError: false, unitOriginByDisplayName, report: { kind: "turn", tag: reportTag } });
       deps.appendOpenRouterLog(`Update: ${updateText.replace(/\n/g, " | ")}`);
     }
     const hasUnknownBattle = unknownCombatHexes.length > 0 || unknownCasualtyHexes.length > 0 || unknownVictimIds.length > 0;
@@ -32404,7 +32508,10 @@ ${bonuses}`;
         unknownCasualtyHexes,
         getContinentNames ? (h3Index) => getContinentNames({ h3Index }) : void 0
       );
-      deps.showMapToast(deps.formatUnknownBattleAnnouncement(unknownContinentNames), { isError: false });
+      deps.showMapToast(deps.formatUnknownBattleAnnouncement(unknownContinentNames), {
+        isError: false,
+        report: { kind: "notice", tag: reportTag }
+      });
     }
   }
   function scheduleResolutionPlaybackCompleteNotify(send, needsPlayback) {
@@ -32589,6 +32696,7 @@ ${bonuses}`;
     const { deps, toolCountsBeforeReadyClick, cachedPrecomputedToolCountsAtReadyStart, matchEpoch } = context;
     if (!(rendererSharedState.tacticalBattleSnapshot && rendererSharedState.tacticalPhasePlanning)) return false;
     if (!window.gameApi) return true;
+    const beatReportTag = currentConsoleReportTag();
     const commit = window.gameApi.commitHumanTacticalDraftOrders;
     if (!commit) {
       rollbackReadyToolCounts(deps, toolCountsBeforeReadyClick);
@@ -32737,6 +32845,7 @@ ${bonuses}`;
           readySlice: tacticalReadySlice,
           visibility,
           killToastFormatter,
+          reportTag: beatReportTag,
           extraKills: {
             killsByMelee: playback.killsByMelee,
             killsByAirStrike: playback.killsByAirStrike
@@ -32829,6 +32938,7 @@ ${bonuses}`;
         cachedPrecomputedToolCountsAtReadyStart,
         matchEpoch
       })) return;
+      const turnReportTag = currentConsoleReportTag();
       const hasPendingDraftOrders = rendererSharedState.pendingRangedAttacks.length > 0 || rendererSharedState.pendingAirStrikes.length > 0 || rendererSharedState.pendingFerryOrders.length > 0;
       if (hasPendingDraftOrders) {
         const submitResult = await window.gameApi.submitOrders({
@@ -32937,7 +33047,10 @@ ${bonuses}`;
       }
       if (readyResult.aiConsulted === false) {
         deps.appendOpenRouterLog("AI executing standing orders (no event fired).");
-        deps.showMapToast("AI: standing orders only (no consultation).", { isError: false });
+        deps.showMapToast("AI: standing orders only (no consultation).", {
+          isError: false,
+          report: { kind: "notice", tag: turnReportTag }
+        });
       }
       const hasRanged = (readyResult.rangedCombatHexes?.length ?? 0) > 0 || (readyResult.rangedCasualtyHexes?.length ?? 0) > 0 || (readyResult.rangedRemovedUnits?.length ?? 0) > 0;
       const hasMelee = (readyResult.meleeCombatHexes?.length ?? 0) > 0 || (readyResult.meleeCasualtyHexes?.length ?? 0) > 0 || (readyResult.meleeRemovedUnits?.length ?? 0) > 0 || (readyResult.controlLossLightningHexes?.length ?? 0) > 0;
@@ -32999,7 +33112,8 @@ ${bonuses}`;
           {
             readySlice: readyResult,
             visibility,
-            killToastFormatter
+            killToastFormatter,
+            reportTag: turnReportTag
           },
           deps
         );

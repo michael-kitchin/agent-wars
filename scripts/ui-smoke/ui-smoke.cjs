@@ -11,8 +11,8 @@
  *
  * The run uses a fresh, temporary Electron user-data folder (`AGENT_WARS_USER_DATA_DIR`), so it never reads or
  * changes the player's saved match, API key, or model choice, and it never calls a model. The three sessions share
- * that folder: the first plays a new global match, the second reopens it with a hex both sides hold, queues an order
- * in a battle there, and starts a regional match, and the third reopens that match after the run marks it as lost.
+ * that folder: the first plays a new global match, the second reopens it with a hex both sides hold, plays the first
+ * beat of a battle there, and starts a regional match, and the third reopens that match after the run marks it as lost.
  */
 'use strict';
 
@@ -84,8 +84,8 @@ const REGIONAL_SCENARIO = Object.freeze({
 /**
  * The window size of the small-window scene: the app's minimum.
  *
- * Purpose: The console's contents and the selection panel must still fit there.
- * When to use: The small-window scene.
+ * Purpose: The console's contents, the selection panel, and the toast band must still fit there.
+ * When to use: The small-window scene and the turn played after it.
  * Expected outcome: The last entry of `VIEWPORTS`.
  * Exceptions: None.
  */
@@ -97,10 +97,11 @@ const SMALL_WINDOW = VIEWPORTS[VIEWPORTS.length - 1];
  * Purpose: Map tiles, canvas redraws, and the new-game overlay's own start-up work finish before a probe.
  * When to use: After a size change (`resize`), a click (`click`), the overlay opening (`overlay`), a match start
  *   (`start`), and while the pointer rests on a control until its tip shows (`tip`, longer than the one-second dwell).
+ *   `turn` is the longest a played turn or battle beat may take before the run gives up.
  * Expected outcome: Fixed waits; the checks do not depend on map tiles having loaded.
  * Exceptions: None.
  */
-const SETTLE_MS = Object.freeze({ resize: 1500, click: 500, overlay: 2500, start: 2500, tip: 1500 });
+const SETTLE_MS = Object.freeze({ resize: 1500, click: 500, overlay: 2500, start: 2500, tip: 1500, turn: 120000 });
 
 /**
  * Reads `--label <name>` from the command line.
@@ -237,6 +238,28 @@ async function recordScene(page, report, outDir, sceneName) {
 }
 
 /**
+ * Waits until world-map planning is open again after a turn plays, skipping any offered battle.
+ *
+ * Purpose: A played turn can offer the tactical battles list; the run never fights from it, so it chooses Ignore,
+ *   which resolves the fight as a player's Ignore does.
+ * When to use: After Ready on the world map, and after leaving a battle.
+ * Expected outcome: The top bar reads "Turn N · Planning" and Ready can be clicked.
+ * Exceptions: Throws a Playwright timeout when planning does not return within `SETTLE_MS.turn`.
+ */
+async function waitForWorldPlanning(page) {
+  const battlesList = '[role="dialog"][aria-label="Tactical battles"]';
+  const deadline = Date.now() + SETTLE_MS.turn;
+  while (Date.now() < deadline) {
+    const planning = await page.evaluate(() => /^Turn \d+ · Planning$/.test(document.getElementById('topbar-turn-phase')?.textContent || '')
+      && document.getElementById('ready-btn')?.disabled === false);
+    if (planning) return;
+    if (await page.isVisible(battlesList)) await page.click(`${battlesList} button:has-text("Ignore")`);
+    await page.waitForTimeout(SETTLE_MS.click);
+  }
+  throw new Error('world-map planning did not return after the turn');
+}
+
+/**
  * Chooses the fixed regional scenario on the open new-game overlay and starts the match.
  *
  * Purpose: The regional scenes check the console on a map other than the world map.
@@ -282,11 +305,11 @@ async function dragSelectionPanelToCorner(page, size) {
 }
 
 /**
- * Runs the first session: a new match, the frame scenes, the console scenes, and the small window.
+ * Runs the first session: a new match, the frame scenes, the console scenes, the small window, and one played turn.
  *
  * Purpose: The scene order is part of the contract with the checks. The match starts after the first scene. Scenes
  *   that select units or queue orders come after the frame scenes, so the frame screenshots show an untouched match.
- *   The session ends with the Orders scene's march still queued, which the reopened match must still show.
+ *   The session ends with one march queued, which the reopened match must still show.
  * When to use: Once, on a fresh user-data folder.
  * Expected outcome: One recorded scene per step below, in this order. Returns the game state at the end.
  * Exceptions: Propagates Playwright and scenario errors.
@@ -388,9 +411,25 @@ async function runFirstSession(app, page, report, outDir) {
   await dragSelectionPanelToCorner(page, SMALL_WINDOW);
   await parkPointer(page);
   await recordScene(page, report, outDir, SCENES.smallWindow);
+  // Shrink the panel again, so it cannot cover the units that the march after the turn clicks.
+  await dragSelectionPanelGrip(page, -380, 480);
 
+  // Play turn 1 in the small window. With no model, the opponent runs its standing orders and says so in a notice.
+  await page.click('#ready-btn');
+  await waitForWorldPlanning(page);
+  await parkPointer(page);
+  await page.waitForTimeout(SETTLE_MS.tip);
+  await recordScene(page, report, outDir, SCENES.turnResolved);
   await setViewport(app, page, first);
   await page.waitForTimeout(SETTLE_MS.resize);
+  await page.click('#console-tab-reports');
+  await parkPointer(page);
+  await page.waitForTimeout(SETTLE_MS.click);
+  await recordScene(page, report, outDir, SCENES.reportsTab);
+  await page.click('#console-tab-orders');
+
+  // Leave one march queued; the reopened match must still list it.
+  await queueLoneUnitMarch(page);
   return readGameState(page);
 }
 
@@ -421,6 +460,20 @@ async function runReopenedSession(app, page, report, outDir, battleHex) {
   await parkPointer(page);
   await page.waitForTimeout(SETTLE_MS.click);
   await recordScene(page, report, outDir, SCENES.battleOrders);
+
+  // Play beat 1. If one side is wiped out, close the result; the world-map turn then plays.
+  await page.click('#ready-btn');
+  const annihilation = '#tactical-annihilation-overlay:not(.hidden)';
+  await page.waitForFunction((selector) => document.querySelector(selector) !== null
+    || (document.getElementById('topbar-turn-phase')?.textContent === 'Beat 2 · Tactical planning'
+      && document.getElementById('ready-btn')?.disabled === false), annihilation, { timeout: SETTLE_MS.turn });
+  await parkPointer(page);
+  await page.waitForTimeout(SETTLE_MS.tip);
+  await recordScene(page, report, outDir, SCENES.battleBeat);
+  if (await page.isVisible(annihilation)) {
+    await page.click('#tactical-annihilation-exit-btn');
+    await waitForWorldPlanning(page);
+  }
 
   await openNewGameOverlay(page);
   await recordScene(page, report, outDir, SCENES.newGameReopened);

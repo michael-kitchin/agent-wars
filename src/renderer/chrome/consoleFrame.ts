@@ -8,6 +8,7 @@ import { formatQueuedOrdersSubtitle } from '../../shared/orderRowDetail';
 import { rendererSharedState as S } from '../core/state';
 import { onQueuedOrdersChanged, queuedOrderCount } from '../gameplay/queuedOrderRows';
 import { scrollOpenRouterLogToEnd } from '../openRouter/openRouterUiHelpers';
+import { onConsoleReportsChanged, setConsoleReportsVisible, unreadConsoleReportCount } from './consoleReports';
 import { selectTabPanel, type TabPanelBinding } from './selectTabPanel';
 
 /**
@@ -58,6 +59,7 @@ interface ConsoleTabBinding extends TabPanelBinding {
  */
 const CONSOLE_TABS: readonly ConsoleTabBinding[] = Object.freeze([
   { tabId: 'console-tab-orders', panelId: 'console-panel-orders', title: 'Orders', subtitle: ordersSubtitle },
+  { tabId: 'console-tab-reports', panelId: 'console-panel-reports', title: 'Reports', subtitle: () => 'this match' },
   {
     tabId: 'console-tab-opponent',
     panelId: 'console-panel-opponent',
@@ -113,8 +115,8 @@ function setRailBadge(badgeId: string, count: number): void {
  *
  * Purpose: They depend on the queued orders and the turn, which change while the tab stays the same.
  * When to use: After the queued orders change, after the turn or beat changes, and when the tab changes.
- * Expected outcome: `#console-subtitle` shows the active tab's subtitle, and the Orders badge shows the number of
- *   queued orders.
+ * Expected outcome: `#console-subtitle` shows the active tab's subtitle. The Orders badge shows the number of
+ *   queued orders, and the Reports badge the number of unread reports.
  * Exceptions: None; missing elements are skipped.
  */
 export function refreshConsoleHeader(): void {
@@ -122,6 +124,7 @@ export function refreshConsoleHeader(): void {
   const subtitle = document.getElementById('console-subtitle');
   if (subtitle) subtitle.textContent = active ? active.subtitle() : '';
   setRailBadge('console-tab-orders-badge', queuedOrderCount());
+  setRailBadge('console-tab-reports-badge', unreadConsoleReportCount());
 }
 
 /**
@@ -130,8 +133,8 @@ export function refreshConsoleHeader(): void {
  * Purpose: The rail, the panels, the title, the collapse attribute, and the collapse button change together.
  * When to use: After every change to `consoleState`, and once at startup.
  * Expected outcome: The active panel shows, the others hide, the title and subtitle match, and `#sidebar` carries
- *   `data-collapsed="true"` or `"false"`. While expanded, the active tab's `onShow` runs. The map resizes on its
- *   own through its resize observer.
+ *   `data-collapsed="true"` or `"false"`. The Reports tab learns whether it is on screen. While expanded, the active
+ *   tab's `onShow` runs. The map resizes on its own through its resize observer.
  * Exceptions: None; missing elements are skipped.
  */
 function applyConsoleState(): void {
@@ -141,6 +144,7 @@ function applyConsoleState(): void {
   if (title && active) title.textContent = active.title;
   document.getElementById('sidebar')?.setAttribute('data-collapsed', consoleState.collapsed ? 'true' : 'false');
   document.getElementById('console-collapse-btn')?.setAttribute('aria-expanded', consoleState.collapsed ? 'false' : 'true');
+  setConsoleReportsVisible(!consoleState.collapsed && consoleState.activeTabId === 'console-tab-reports');
   refreshConsoleHeader();
   if (!consoleState.collapsed) active?.onShow?.();
 }
@@ -151,11 +155,12 @@ function applyConsoleState(): void {
  * Purpose: One bootstrap for the console's own behavior.
  * When to use: Once during renderer startup, after the page markup exists.
  * Expected outcome: A tab click follows `nextConsoleTabState`. The collapse button collapses the console. The header
- *   and badges follow every change to the queued orders. The console starts expanded on Orders.
+ *   and badges follow every change to the queued orders and the reports. The console starts expanded on Orders.
  * Exceptions: None; missing elements are skipped.
  */
 export function wireConsoleFrame(): void {
   onQueuedOrdersChanged(refreshConsoleHeader);
+  onConsoleReportsChanged(refreshConsoleHeader);
   for (const tab of CONSOLE_TABS) {
     document.getElementById(tab.tabId)?.addEventListener('click', () => {
       consoleState = nextConsoleTabState(consoleState, tab.tabId);

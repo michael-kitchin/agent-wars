@@ -286,7 +286,7 @@ async function queueMarchToFirstFree(page, unit, destinations) {
 /**
  * Queues a one-hex march with the first lone land unit that can make one.
  *
- * Purpose: Gives the Orders tab one movement row to show.
+ * Purpose: Gives the Orders tab one movement row to show, at the start of the match or after a played turn.
  * When to use: After `captureMainMap`, while nothing is queued. Armor is tried first, then infantry.
  * Expected outcome: The Movement count reads 1. Returns the unit.
  * Exceptions: Throws when no lone land unit has a neighbor that takes the order.
@@ -369,7 +369,8 @@ async function queueBattleMarch(page, unit) {
  * Works out the saved-match change that gives the reopened match a hex both sides hold.
  *
  * Purpose: A battle starts only on such a hex, and play cannot make one on cue. The change moves every enemy land unit
- *   into the hex where the player has the most land units.
+ *   into the hex where the player has the most land units, so the battle's first beat almost always has fighting to
+ *   report.
  * When to use: With the game state read just before the app closes; pass the result to `editSavedMatch`.
  * Expected outcome: `{ h3Index, statements }`, where `h3Index` is the hex that will hold both sides.
  * Exceptions: Throws when either side has no land unit left.
