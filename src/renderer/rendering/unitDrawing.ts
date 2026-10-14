@@ -1,5 +1,17 @@
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
-import { COUNT_BADGE_OFFSET, MULTI_PLAYER_FILL, MULTI_PLAYER_GLYPH_FILTER, MULTI_PLAYER_STROKE, PLAYER_COLORS, STACK_OFFSET_X, STACK_OFFSET_Y, UNIT_RADIUS, UNIT_TYPE_LABELS } from '../core/constants';
+import {
+  COUNT_BADGE_OFFSET,
+  MULTI_PLAYER_FILL,
+  MULTI_PLAYER_GLYPH_FILTER,
+  MULTI_PLAYER_STROKE,
+  PLAYER_COLORS,
+  SELECTION_RING_COLOR,
+  SELECTION_RING_WIDTH,
+  STACK_OFFSET_X,
+  STACK_OFFSET_Y,
+  UNIT_RADIUS,
+  UNIT_TYPE_LABELS,
+} from '../core/constants';
 import { rendererSharedState as S } from '../core/state';
 import { hexCenterPx } from '../map/mapHelpers';
 import { shouldHideStrategicMapUnitsForZoom } from '../map/terrainView';
@@ -241,11 +253,35 @@ export function drawOneUnitMarker(
 }
 
 /**
- * Defines the `drawUnits` function shape (export function drawUnits().
+ * Draws the gold selection ring around one unit marker.
+ *
+ * Purpose: Marks a hex that holds a selected unit, on top of the marker's own white edge.
+ * When to use: Only by `drawUnits`, at the top marker of a hex that holds a selected unit, after every marker and
+ *   before every count badge.
+ * Expected outcome: A `SELECTION_RING_WIDTH` ring in `SELECTION_RING_COLOR` just outside the marker's edge.
+ * Exceptions: None.
+ */
+function drawSelectionRing(ctx: CanvasRenderingContext2D, x: number, y: number): void {
+  ctx.save();
+  ctx.beginPath();
+  // The marker's 2 px edge ends 1 px outside its radius; the ring starts there.
+  ctx.arc(x, y, UNIT_RADIUS + 1 + SELECTION_RING_WIDTH / 2, 0, Math.PI * 2);
+  ctx.strokeStyle = SELECTION_RING_COLOR;
+  ctx.lineWidth = SELECTION_RING_WIDTH;
+  ctx.stroke();
+  ctx.restore();
+}
 
- * Purpose: Supports maintainability by documenting why `drawUnits` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+/**
+ * Draws one marker per hex for the given units, with a second offset marker and a count badge for a stack.
+ *
+ * Purpose: Units are drawn on the canvas, one token per hex, in both theaters.
+ * When to use: From the scene draw, with the strategic units or the battle's sub-units. Pass the ids of units drawn
+ *   elsewhere this frame, such as units moving in playback, as `movingUnitIds`.
+ * Expected outcome: Each hex gets a marker in its side's color, or the mixed-side fill when both sides are there. A hex
+ *   with two or more units gets a second marker offset up and right, and a count badge. The top marker of a hex that
+ *   holds a unit in the current selection gets the gold selection ring. Markers are drawn first, then rings, then
+ *   badges, so a ring stays visible over a neighboring marker and a badge stays readable over a ring.
  * Exceptions: None.
  */
 export function drawUnits(
@@ -260,9 +296,21 @@ export function drawUnits(
     list.push(u);
     byHex.set(u.h3Index, list);
   }
-  for (const [h3Index, hexUnits] of byHex) {
+  const selectedUnitIds = new Set(S.selectedUnitIds);
+  const tokens = [...byHex].map(([h3Index, hexUnits]) => {
     const { x, y } = hexCenterPx(h3Index);
     const count = hexUnits.length;
+    return {
+      x,
+      y,
+      count,
+      top: count > 1 ? { x: x + STACK_OFFSET_X, y: y + STACK_OFFSET_Y } : { x, y },
+      selected: hexUnits.some((u) => selectedUnitIds.has(u.id)),
+      units: hexUnits,
+    };
+  });
+
+  for (const { x, y, count, top, units: hexUnits } of tokens) {
     const types = new Set(hexUnits.map((u) => u.unitType));
     const players = new Set(hexUnits.map((u) => u.player));
     const mixedType = types.size > 1;
@@ -270,21 +318,26 @@ export function drawUnits(
     const fillColor = multiPlayer ? MULTI_PLAYER_FILL : (PLAYER_COLORS[hexUnits[0]!.player] ?? '#333');
     const strokeColor = multiPlayer ? MULTI_PLAYER_STROKE : '#fff';
     const label = mixedType ? '*' : (UNIT_TYPE_LABELS[hexUnits[0]!.unitType] ?? '?');
-
     drawOneUnitMarker(ctx, x, y, fillColor, label, strokeColor, hexUnits[0]!.player);
     if (count > 1) {
-      drawOneUnitMarker(ctx, x + STACK_OFFSET_X, y + STACK_OFFSET_Y, fillColor, label, strokeColor, hexUnits[0]!.player);
-      const badgeX = x + COUNT_BADGE_OFFSET;
-      const badgeY = y - COUNT_BADGE_OFFSET;
-      ctx.font = 'bold 13px system-ui, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.strokeStyle = '#fff';
-      ctx.lineWidth = 2;
-      ctx.strokeText(String(count), badgeX, badgeY);
-      ctx.fillStyle = '#000';
-      ctx.fillText(String(count), badgeX, badgeY);
+      drawOneUnitMarker(ctx, top.x, top.y, fillColor, label, strokeColor, hexUnits[0]!.player);
     }
+  }
+  for (const { top, selected } of tokens) {
+    if (selected) drawSelectionRing(ctx, top.x, top.y);
+  }
+  for (const { x, y, count } of tokens) {
+    if (count < 2) continue;
+    const badgeX = x + COUNT_BADGE_OFFSET;
+    const badgeY = y - COUNT_BADGE_OFFSET;
+    ctx.font = 'bold 13px system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 2;
+    ctx.strokeText(String(count), badgeX, badgeY);
+    ctx.fillStyle = '#000';
+    ctx.fillText(String(count), badgeX, badgeY);
   }
 }
 

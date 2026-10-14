@@ -8,6 +8,8 @@
   // src/renderer/core/constants.ts
   var BACKGROUND_COLOR = "#e0dcd4";
   var UNIT_RADIUS = 18;
+  var SELECTION_RING_COLOR = "#f2c14e";
+  var SELECTION_RING_WIDTH = 3;
   var PLAYER_COLORS = {
     /**
        * Documents the object literal property `human` (human: '#115e59').
@@ -26290,6 +26292,15 @@ ${bonuses}`;
     if (!drewIcon) ctx.fillText(label, x, y);
     ctx.restore();
   }
+  function drawSelectionRing(ctx, x, y) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(x, y, UNIT_RADIUS + 1 + SELECTION_RING_WIDTH / 2, 0, Math.PI * 2);
+    ctx.strokeStyle = SELECTION_RING_COLOR;
+    ctx.lineWidth = SELECTION_RING_WIDTH;
+    ctx.stroke();
+    ctx.restore();
+  }
   function drawUnits(ctx, units, movingUnitIds) {
     const byHex = /* @__PURE__ */ new Map();
     for (const u of units) {
@@ -26298,9 +26309,20 @@ ${bonuses}`;
       list.push(u);
       byHex.set(u.h3Index, list);
     }
-    for (const [h3Index, hexUnits] of byHex) {
+    const selectedUnitIds = new Set(rendererSharedState.selectedUnitIds);
+    const tokens = [...byHex].map(([h3Index, hexUnits]) => {
       const { x, y } = hexCenterPx(h3Index);
       const count = hexUnits.length;
+      return {
+        x,
+        y,
+        count,
+        top: count > 1 ? { x: x + STACK_OFFSET_X, y: y + STACK_OFFSET_Y } : { x, y },
+        selected: hexUnits.some((u) => selectedUnitIds.has(u.id)),
+        units: hexUnits
+      };
+    });
+    for (const { x, y, count, top, units: hexUnits } of tokens) {
       const types = new Set(hexUnits.map((u) => u.unitType));
       const players = new Set(hexUnits.map((u) => u.player));
       const mixedType = types.size > 1;
@@ -26310,18 +26332,24 @@ ${bonuses}`;
       const label = mixedType ? "*" : UNIT_TYPE_LABELS[hexUnits[0].unitType] ?? "?";
       drawOneUnitMarker(ctx, x, y, fillColor, label, strokeColor, hexUnits[0].player);
       if (count > 1) {
-        drawOneUnitMarker(ctx, x + STACK_OFFSET_X, y + STACK_OFFSET_Y, fillColor, label, strokeColor, hexUnits[0].player);
-        const badgeX = x + COUNT_BADGE_OFFSET;
-        const badgeY = y - COUNT_BADGE_OFFSET;
-        ctx.font = "bold 13px system-ui, sans-serif";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.strokeStyle = "#fff";
-        ctx.lineWidth = 2;
-        ctx.strokeText(String(count), badgeX, badgeY);
-        ctx.fillStyle = "#000";
-        ctx.fillText(String(count), badgeX, badgeY);
+        drawOneUnitMarker(ctx, top.x, top.y, fillColor, label, strokeColor, hexUnits[0].player);
       }
+    }
+    for (const { top, selected } of tokens) {
+      if (selected) drawSelectionRing(ctx, top.x, top.y);
+    }
+    for (const { x, y, count } of tokens) {
+      if (count < 2) continue;
+      const badgeX = x + COUNT_BADGE_OFFSET;
+      const badgeY = y - COUNT_BADGE_OFFSET;
+      ctx.font = "bold 13px system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.strokeStyle = "#fff";
+      ctx.lineWidth = 2;
+      ctx.strokeText(String(count), badgeX, badgeY);
+      ctx.fillStyle = "#000";
+      ctx.fillText(String(count), badgeX, badgeY);
     }
   }
   function drawStaleEnemyIntel(ctx, state, inferUnitTypeLabelFromId2) {

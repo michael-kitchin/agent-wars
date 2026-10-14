@@ -20,6 +20,24 @@ export const BACKGROUND_COLOR = '#e0dcd4';
  */
 export const UNIT_RADIUS = 18;
 /**
+ * The color of the ring around the top marker of a hex that holds a selected unit.
+ *
+ * Purpose: Shows on the map which hexes hold the selection, in the same gold that marks selected rows in the console.
+ * When to use: Only by `drawSelectionRing` in `src/renderer/rendering/unitDrawing.ts`.
+ * Expected outcome: `#f2c14e`, the same color as the `--selection-mark` token in `static/shellChrome.css`.
+ * Exceptions: None.
+ */
+export const SELECTION_RING_COLOR = '#f2c14e';
+/**
+ * The width of the selection ring, in CSS pixels.
+ *
+ * Purpose: Thick enough to read at a glance, thin enough to leave the unit glyph clear.
+ * When to use: Only by `drawSelectionRing`.
+ * Expected outcome: 3.
+ * Exceptions: None.
+ */
+export const SELECTION_RING_WIDTH = 3;
+/**
  * Documents the module-scope binding `PLAYER_COLORS` (PLAYER_COLORS: Record<string, string>).
 
  * Purpose: Supports maintainability by documenting why `PLAYER_COLORS` exists.
