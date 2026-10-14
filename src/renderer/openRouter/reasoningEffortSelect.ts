@@ -8,7 +8,7 @@ import {
 } from '../../shared/openRouterReasoningEffort';
 
 /**
- * Handle for refreshing the Model-tab reasoning dropdown.
+ * Handle for refreshing the Opponent-tab reasoning dropdown.
  *
  * Purpose: Lets the model controls rebuild the reasoning options whenever the selected model or saved effort changes.
  * When to use: Returned by `attachReasoningEffortSelect`; call `showForModel` after every model-list or selection change.
@@ -45,7 +45,7 @@ function formatReasoningEffortOptionLabel(effort: string, isDefault: boolean): s
  * Wires the reasoning dropdown and returns a binding that rebuilds it per model.
  *
  * Purpose: Keeps option building and the "(default) means no override" rule out of the larger model controls.
- * When to use: Once during Model-tab setup, when `#openrouter-reasoning-effort` exists.
+ * When to use: Once during Opponent-tab setup, when `#openrouter-reasoning-effort` exists.
  * Expected outcome: Player changes call `onEffortChange` with `''` for the default option, otherwise the chosen effort.
  * Exceptions: None.
  */

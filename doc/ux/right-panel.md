@@ -1,6 +1,6 @@
 # Right Panel
 
-The console docked on the right of the map. It holds the Orders tab, the Reports tab, the Opponent tab, a tab rail, and a footer with Ready.
+The console docked on the right of the map. It holds the Orders tab, the Reports tab, the Opponent tab, a tab rail, and a footer with the opponent status line and Ready.
 
 ## Purpose
 
@@ -13,14 +13,20 @@ Shown in Strategic planning, Tactical planning, Resolution playback, the tactica
 ## Information Displayed
 
 - A tab rail on the panel's outer edge, with Orders, Reports, Opponent, Build, and Forces. Build and Forces are disabled in this version. The selected tab is marked while the panel is expanded, and the mark is cleared while the panel is collapsed.
-- A header with the selected tab's name, a subtitle, and a button that collapses the panel. On the Orders tab the subtitle reads "N queued for turn T", or "N queued for beat B" in a battle, where N counts every row of the three order groups (`formatQueuedOrdersSubtitle` in `src/shared/orderRowDetail.ts`). On the Reports tab it reads "this match". The Opponent tab has no subtitle.
+- A header with the selected tab's name, a subtitle, and a button that collapses the panel. On the Orders tab the subtitle reads "N queued for turn T", or "N queued for beat B" in a battle, where N counts every row of the three order groups (`formatQueuedOrdersSubtitle` in `src/shared/orderRowDetail.ts`). On the Reports tab it reads "this match". On the Opponent tab it names the opponent's home region, as the top bar does.
 - A count on the Orders tab in the rail: the number of queued orders, the same N. It is hidden while nothing is queued.
 - A count on the Reports tab in the rail: the number of unread reports. It is hidden at zero. See [reports-tab.md](reports-tab.md).
 - The Orders tab: the order groups. See [right-panel-selection-and-orders.md](right-panel-selection-and-orders.md). The selected units, and the Ranged and Strike controls, are in the [selection panel](selection-panel.md) on the map.
 - The Reports tab: what the map toasts showed during this match. See [reports-tab.md](reports-tab.md).
-- The Opponent tab: the Tools tab and the Model tab, one shown at a time, with the AI activity log under them. See [right-panel-tools-tab.md](right-panel-tools-tab.md), [right-panel-model-tab.md](right-panel-model-tab.md), and [ai-activity-log.md](ai-activity-log.md).
-- A footer with Ready, under the tab content. See [right-panel-command-bar.md](right-panel-command-bar.md).
-- While collapsed, only the tab rail and a smaller Ready show. While Ready reads "AI:" and a time, that label takes two lines.
+- The Opponent tab: four sections shown together, with no sub-tabs. Status holds Run and a sentence saying whether opponent planning is on. Commander holds the API key with the match cost, the model with refresh, and the reasoning effort. Tool groups holds the tool toggles in two columns. The AI activity log fills the height that is left. See [right-panel-model-tab.md](right-panel-model-tab.md), [right-panel-tools-tab.md](right-panel-tools-tab.md), and [ai-activity-log.md](ai-activity-log.md).
+- A footer under the tab content, with the opponent status line above Ready. For Ready, see [right-panel-command-bar.md](right-panel-command-bar.md).
+- The opponent status line, read-only and with no tip:
+  - A dot: grey while planning is off, teal while it is on, and rose while the opponent plans.
+  - A label: "Opponent planning off" while Run is off, "Opponent planning…" while Ready shows "AI:" and a time, and "Opponent planning on" otherwise.
+  - The selected model's name: the model option's text before " [", or "No model". A long name is cut short with an ellipsis.
+  - The match cost, the same amount as the Commander section's cost readout.
+  - The labels come from `src/shared/opponentPlanningStatus.ts`.
+- While collapsed, only the tab rail and a smaller Ready show. The opponent status line is hidden. While Ready reads "AI:" and a time, that label takes two lines.
 - Control tips for the tabs and the collapse button are in [control-tooltips.md](control-tooltips.md).
 
 ## Inputs and Responses
@@ -32,7 +38,7 @@ Shown in Strategic planning, Tactical planning, Resolution playback, the tactica
 - When the player clicks the collapse button, the panel collapses to its rail.
 - When the player clicks any tab while the panel is collapsed, the panel expands on that tab.
 - The map takes the width the panel gives up, and gives it back when the panel expands.
-- Inside the Opponent tab, clicking Tools or Model shows that sub-tab. Turning Run on also selects the Tools sub-tab. See [right-panel-model-tab.md](right-panel-model-tab.md).
+- Turning Run on or off does not change the selected tab. See [right-panel-model-tab.md](right-panel-model-tab.md).
 
 ### Keyboard
 
@@ -40,7 +46,8 @@ Shown in Strategic planning, Tactical planning, Resolution playback, the tactica
 
 ### Other
 
-- The panel starts expanded on the Orders tab. Inside the Opponent tab, the Model sub-tab is selected first.
+- The panel starts expanded on the Orders tab.
+- The opponent status line updates whenever Run, the opponent's wait, the selected model, or the match cost changes.
 - The selected tab, and whether the panel is collapsed, last until the app closes. Neither is saved.
 
 ## States
@@ -58,6 +65,7 @@ Shown in Strategic planning, Tactical planning, Resolution playback, the tactica
 - The panel is absent for the whole New game and Game over overlay, and present again as soon as that overlay closes.
 - Exactly one tab's content shows while the panel is expanded.
 - Ready is on screen whenever the panel is, expanded or collapsed.
+- The opponent status line's label always agrees with Run and with Ready's "AI:" label.
 - Build and Forces never open a tab in this version.
 
 ## Strategic and Tactical Differences
@@ -86,12 +94,15 @@ None.
 
 ## Code Entry Points
 
-- `static/index.html` (`#sidebar`, `#console-main`, `#console-title`, `#console-subtitle`, `#console-tab-orders-badge`, `#console-collapse-btn`, `#console-panel-orders`, `#console-panel-reports`, `#console-panel-opponent`, `#console-rail`, `#console-tab-orders`, `#console-tab-reports`, `#console-tab-reports-badge`, `#console-tab-opponent`, `#console-tab-build`, `#console-tab-forces`, `#console-footer`, `#openrouter-tab-tools`, `#openrouter-tab-model`)
+- `static/index.html` (`#sidebar`, `#console-main`, `#console-title`, `#console-subtitle`, `#console-tab-orders-badge`, `#console-collapse-btn`, `#console-panel-orders`, `#console-panel-reports`, `#console-panel-opponent`, `#console-rail`, `#console-tab-orders`, `#console-tab-reports`, `#console-tab-reports-badge`, `#console-tab-opponent`, `#console-tab-build`, `#console-tab-forces`, `#console-footer`, `#opponent-status-line`, `#opponent-status-label`, `#opponent-status-model`, `#opponent-status-cost`)
 - `static/frameChrome.css`
 - `static/consoleChrome.css`
 - `src/renderer/chrome/consoleFrame.ts`
+- `src/renderer/core/uiState.ts` (`updateGameStateSidebar`, which redraws the Opponent subtitle when the snapshot changes)
 - `src/renderer/gameplay/queuedOrderRows.ts`
 - `src/shared/consoleTabState.ts`
+- `src/shared/opponentPlanningStatus.ts`
+- `src/renderer/openRouter/openRouterUiHelpers.ts` (`renderOpponentStatus`)
 - `src/renderer/map/mapContainerResize.ts`
 - `src/renderer/openRouter/openRouterControls.ts`
 - `src/renderer/tactical/tacticalUiOrchestration.ts`

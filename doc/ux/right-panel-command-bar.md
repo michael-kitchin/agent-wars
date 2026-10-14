@@ -12,7 +12,7 @@ Ready shows whenever the right panel does. Ranged and the air-strike controls sh
 
 ## Information Displayed
 
-- The Ready button, across the width of the right panel's footer. Its label is "Ready", or "AI:" plus the elapsed wait, while opponent planning is still running. While the right panel is collapsed, Ready narrows to the tab rail's width and the "AI:" label takes two lines.
+- The Ready button, across the width of the footer, under the opponent status line. Its label is "Ready", or "AI:" plus the elapsed wait, while opponent planning is still running. While the right panel is collapsed, the status line is hidden, Ready narrows to the tab rail's width, and the "AI:" label takes two lines. The status line's own rules are in [right-panel.md](right-panel.md).
 - The Ranged control, in the selection panel's last row, shown whenever the selection panel is. Its label is "Ranged", "Cancel", or "Strike". The air-strike target list and its Cancel button use that same height.
 - While the selection cannot use it, the control is greyed out. Its label is "Strike" when the selection has an air unit and "Ranged" otherwise, and a reason shows beside it: "Infantry can't fire on the world map." when a world-map selection includes infantry and no air unit, or "Strike needs a selection of air units only." when air units are selected with other types (`selectionSupportAction` in `src/shared/selectionSupportButtonMode.ts`).
 - While Strike targeting is on, a target-type choice: Enemy Units, Production, Airports, or Seaports, and a Cancel button for that targeting.

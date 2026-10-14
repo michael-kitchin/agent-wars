@@ -207,22 +207,6 @@ export function rangedButtonTooltipText(label: 'Ranged' | 'Cancel' | 'Strike'): 
 }
 
 /**
- * Purpose: Says the tab is where tool groups are turned on or off.
- * When to use: `#openrouter-tab-tools`.
- * Expected outcome: The control tip shows this sentence.
- * Exceptions: None.
- */
-export const toolsTabTooltipText = 'Show the tools the opponent can use, and turn each group on or off.';
-
-/**
- * Purpose: Says which opponent controls the tab shows.
- * When to use: `#openrouter-tab-model`.
- * Expected outcome: The control tip shows this sentence.
- * Exceptions: None.
- */
-export const modelTabTooltipText = 'Show the API key, model, reasoning effort, and the Run control for opponent planning.';
-
-/**
  * Purpose: Says how to save the key and how to forget it.
  * When to use: `#openrouter-key`.
  * Expected outcome: The control tip shows this sentence.
@@ -250,13 +234,15 @@ export const runDisabledTooltipText =
   'Turn opponent planning on or off. Enter an API key and choose a model first.';
 
 /**
- * Purpose: Says what turning Run on and off does to the Tools tab and to Ready.
+ * Run's tip while it can be clicked.
+ *
+ * Purpose: Says what turning Run on and off does to Ready.
  * When to use: The wrapper around `#openrouter-run-btn` when Run is enabled.
  * Expected outcome: The control tip shows this sentence.
  * Exceptions: None.
  */
 export const runEnabledTooltipText =
-  'Turn opponent planning on or off. On opens the Tools tab and can hold Ready until a plan exists; off cancels a plan that is still running.';
+  'Turn opponent planning on or off. On can hold Ready until a plan exists; off cancels a plan that is still running.';
 
 /**
  * Purpose: Run's tip changes when a key and model become available.
@@ -368,8 +354,10 @@ export const productionTooltipText =
   'Let the opponent read and change build queues on the world map, not during a battle. The number counts uses since the last Ready, and this does nothing when the model cannot use tools.';
 
 /**
+ * Returns a tool group's tip.
+ *
  * Purpose: New group ids must not invent a tip. Known ids keep one sentence each.
- * When to use: While building each Tools-tab cell.
+ * When to use: While building each tool-group cell.
  * Expected outcome: The group's sentence, or null.
  * Exceptions: None.
  */

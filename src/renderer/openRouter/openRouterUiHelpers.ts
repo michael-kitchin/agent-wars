@@ -15,6 +15,12 @@ import {
 } from './aiPlanningState';
 import { resolveToolInvocationCountsAfterReady } from '../../shared/openRouterToolInvocationCounts';
 import { currentConsoleReportTag, recordConsoleReport } from '../chrome/consoleReports';
+import {
+  modelNameFromOptionLabel,
+  OPPONENT_STATUS_LINE_LABELS,
+  opponentPlanningStatus,
+  opponentStatusSentence,
+} from '../../shared/opponentPlanningStatus';
 
 /**
  * Defines the `formatElapsedMmSs` function shape (export function formatElapsedMmSs(ms: number): string).
@@ -68,8 +74,10 @@ export function setReadyButtonLabelAiWait(readyBtn: HTMLButtonElement, elapsedMs
  * deferred post-resolution / post-beat consultation is outstanding (`isDeferredResolutionPlaybackConsultPending`), or
  * while `readyRequestInFlight` is true for an in-progress strategic `game:ready` / melee-resolve IPC. Runs the "AI:"
  * elapsed timer while opponent planning is outstanding: prefetch waits, and deferred consultations from their
- * playback-complete notify until their push arrives. During the playback that precedes a deferred consultation, the
- * label stays "Ready". Log lines, including error lines, never affect the timer.
+ * playback-complete notify until their push arrives, and only while Run stays on. Turning Run off returns the label
+ * to "Ready" even if that consultation has not yet reported that it stopped. During the playback that precedes a
+ * deferred consultation, the label stays "Ready". Log lines, including error lines, never affect the timer. The
+ * opponent status follows.
  * Exceptions: None.
  */
 export function updateReadyButtonState(): void {
@@ -81,8 +89,9 @@ export function updateReadyButtonState(): void {
   const tacticalAnnihilationDialogOpen = S.tacticalAnnihilationOutcomeDialog != null;
   readyBtn.disabled =
     gameOver || waitingOnAi || deferredConsult || S.readyRequestInFlight || tacticalAnnihilationDialogOpen;
+  const showAiWait = waitingOnAi || (S.runButtonOn && isDeferredResolutionConsultRunning());
 
-  if (waitingOnAi || isDeferredResolutionConsultRunning()) {
+  if (showAiWait) {
     const now = Date.now();
     if (S.readyBtnAiWaitStartTime === null) {
       S.readyBtnAiWaitStartTime = now;
@@ -101,6 +110,36 @@ export function updateReadyButtonState(): void {
     S.readyBtnAiWaitStartTime = null;
     setReadyButtonLabelReady(readyBtn);
   }
+  renderOpponentStatus();
+}
+
+/**
+ * Writes the opponent's planning status: the Opponent tab's sentence and the footer line above Ready.
+ *
+ * Purpose: Shows whether opponent planning is on, which model plans, and what this match has cost, from any tab.
+ * When to use: After Run, the opponent's wait, the selected model, or the match cost changes. `updateReadyButtonState`
+ *   and `updateOpenRouterCostLabel` call it.
+ * Expected outcome: `#opponent-status-text` reads "Opponent planning is on." or "... is off." The footer line's
+ *   `data-status` is `off`, `on`, or `planning`, with the matching label, the selected model's name (or "No model"),
+ *   and the match cost. The wait is the one Ready's "AI:" timer shows.
+ * Exceptions: None; missing elements are skipped.
+ */
+export function renderOpponentStatus(): void {
+  const status = opponentPlanningStatus(
+    S.runButtonOn,
+    isWaitingForPrecomputedAiOrders() || isDeferredResolutionConsultRunning()
+  );
+  const sentence = document.getElementById('opponent-status-text');
+  if (sentence) sentence.textContent = opponentStatusSentence(status);
+  document.getElementById('opponent-status-line')?.setAttribute('data-status', status);
+  const label = document.getElementById('opponent-status-label');
+  if (label) label.textContent = OPPONENT_STATUS_LINE_LABELS[status];
+  const modelSelect = document.getElementById('openrouter-model') as HTMLSelectElement | null;
+  const selectedOption = modelSelect && modelSelect.value ? modelSelect.selectedOptions[0] : undefined;
+  const model = document.getElementById('opponent-status-model');
+  if (model) model.textContent = modelNameFromOptionLabel(selectedOption?.textContent ?? '');
+  const cost = document.getElementById('opponent-status-cost');
+  if (cost) cost.textContent = formatOpenRouterCost(S.openRouterGameCost);
 }
 
 /**
@@ -165,11 +204,13 @@ export function formatOpenRouterCost(dollars: number): string {
  * Purpose: Supports maintainability by documenting why `updateOpenRouterCostLabel` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ *   The footer status line shows the same cost.
  * Exceptions: None.
  */
 export function updateOpenRouterCostLabel(): void {
   const el = document.getElementById('openrouter-cost');
   if (el) el.textContent = formatOpenRouterCost(S.openRouterGameCost);
+  renderOpponentStatus();
 }
 
 /**

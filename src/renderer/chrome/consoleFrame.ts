@@ -64,7 +64,7 @@ const CONSOLE_TABS: readonly ConsoleTabBinding[] = Object.freeze([
     tabId: 'console-tab-opponent',
     panelId: 'console-panel-opponent',
     title: 'Opponent',
-    subtitle: () => '',
+    subtitle: () => S.gameState?.aiHomeRegion ?? '',
     onShow: scrollOpenRouterLogToEnd,
   },
 ]);
@@ -113,8 +113,9 @@ function setRailBadge(badgeId: string, count: number): void {
 /**
  * Redraws the header subtitle and the rail badges.
  *
- * Purpose: They depend on the queued orders and the turn, which change while the tab stays the same.
- * When to use: After the queued orders change, after the turn or beat changes, and when the tab changes.
+ * Purpose: The subtitle and badges change while the tab stays the same: queued orders, the turn or beat, unread
+ *   reports, and, on the Opponent tab, the opponent's home region.
+ * When to use: After the queued orders change, after a snapshot or turn or beat changes, and when the tab changes.
  * Expected outcome: `#console-subtitle` shows the active tab's subtitle. The Orders badge shows the number of
  *   queued orders, and the Reports badge the number of unread reports.
  * Exceptions: None; missing elements are skipped.

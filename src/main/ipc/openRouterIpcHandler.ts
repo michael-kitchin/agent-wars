@@ -13,7 +13,7 @@ import {
 } from '../openRouter/openRouter';
 
 /**
- * Registers the Model-tab OpenRouter settings handlers: key, model list, model choice, reasoning effort, tool groups.
+ * Registers the Opponent-tab OpenRouter settings handlers: key, model list, model choice, reasoning effort, tool groups.
  *
  * Purpose: Keeps the OpenRouter settings surface in one place, apart from the game action handlers in `main.ts`.
  * When to use: Once at startup, from `registerIpcHandlers`, before the window loads.

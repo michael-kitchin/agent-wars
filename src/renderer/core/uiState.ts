@@ -30,12 +30,13 @@ export function updateSidebar(formatUnitDisplayName: (unitId: string) => string)
 }
 
 /**
- * Refreshes the match status in the top bar, and the console header that names the turn, from the latest snapshot.
+ * Refreshes the match status in the top bar, and the console header, from the latest snapshot.
  *
  * Purpose: Keeps the name every caller already uses; the old Phase and Turn lines now live in the top bar.
  * When to use: After `applyGameStateSnapshot`, tactical entry/exit, tactical Ready commit, and when beat playback ends.
- * Expected outcome: The top bar's sides, readouts, and date block match `state` and the current battle, and the
- *   console subtitle names the current turn or beat. Null shows em dashes.
+ * Expected outcome: The top bar's sides, readouts, and date block match `state` and the current battle. The
+ *   console subtitle follows the active tab: the queued-order line, "this match", or the opponent's home region.
+ *   Null shows em dashes in the top bar.
  * Exceptions: None.
  */
 export function updateGameStateSidebar(state: GameStateSnapshot | null): void {

@@ -306,48 +306,62 @@
         <ol id="reports-list" class="console-report-list"></ol>
       </section>
       <section id="console-panel-opponent" class="console-panel" role="tabpanel" aria-labelledby="console-tab-opponent" hidden>
-        <div class="openrouter-tab-bar" role="tablist" aria-label="AI panel">
-          <button type="button" id="openrouter-tab-tools" role="tab" aria-selected="false" aria-controls="openrouter-tools-panel" data-control-tooltip="Show the tools the opponent can use, and turn each group on or off.">Tools</button>
-          <button type="button" id="openrouter-tab-model" role="tab" aria-selected="true" aria-controls="openrouter-model-panel" data-control-tooltip="Show the API key, model, reasoning effort, and the Run control for opponent planning.">Model</button>
+        <div class="opponent-section opponent-status">
+          <span class="control-tooltip-host" data-control-tooltip="Turn opponent planning on or off. Enter an API key and choose a model first."><button type="button" id="openrouter-run-btn" class="openrouter-tool-toggle" aria-pressed="false" disabled>Run</button></span>
+          <p id="opponent-status-text" class="opponent-status-text">Opponent planning is off.</p>
         </div>
-        <div id="openrouter-tools-panel" class="openrouter-tab-panel" role="tabpanel" aria-labelledby="openrouter-tab-tools" hidden>
-          <div id="openrouter-tools-list" class="openrouter-tools-list"></div>
-        </div>
-        <div id="openrouter-model-panel" class="openrouter-tab-panel active" role="tabpanel" aria-labelledby="openrouter-tab-model">
-          <div class="openrouter-row">
+        <section id="openrouter-model-panel" class="opponent-section" aria-labelledby="opponent-commander-heading">
+          <h3 id="opponent-commander-heading" class="console-group-heading">Commander</h3>
+          <div class="opponent-field">
             <label for="openrouter-key">API key</label>
             <div class="openrouter-key-row">
               <input type="password" id="openrouter-key" placeholder="Set key and blur to save" autocomplete="off" data-control-tooltip="Enter your OpenRouter key, then click away or press Enter to save it. The key stays hidden after that; clear the field and leave it to forget the saved key." />
               <span id="openrouter-cost" class="openrouter-cost">$0.00</span>
             </div>
           </div>
-          <div class="openrouter-row">
+          <div class="opponent-field">
             <label for="openrouter-model">Model</label>
-            <div class="openrouter-model-grid">
+            <div class="opponent-model-row">
               <select id="openrouter-model">
                 <option value="">— Select model —</option>
               </select>
               <button type="button" id="openrouter-refresh-models" class="openrouter-refresh-btn" aria-label="Refresh model list" data-control-tooltip="Load the model list again. If that fails, the message appears in the AI activity log."></button>
-              <span class="control-tooltip-host" data-control-tooltip="Turn opponent planning on or off. Enter an API key and choose a model first."><button type="button" id="openrouter-run-btn" class="openrouter-tool-toggle" aria-pressed="false" disabled>Run</button></span>
-              <span class="control-tooltip-host" data-control-tooltip="Choose how much reasoning this model uses. You only see levels this model offers, its default is marked, and the list stays unavailable when it has fewer than two."><select id="openrouter-reasoning-effort" aria-label="Reasoning effort" disabled>
-                <option value="">Model default</option>
-              </select></span>
             </div>
           </div>
-        </div>
-        <div class="openrouter-row openrouter-status-row">
+          <div class="opponent-field">
+            <label for="openrouter-reasoning-effort">Reasoning</label>
+            <span class="control-tooltip-host" data-control-tooltip="Choose how much reasoning this model uses. You only see levels this model offers, its default is marked, and the list stays unavailable when it has fewer than two."><select id="openrouter-reasoning-effort" aria-label="Reasoning effort" disabled>
+              <option value="">Model default</option>
+            </select></span>
+          </div>
+        </section>
+        <section id="openrouter-tools-panel" class="opponent-section" aria-labelledby="opponent-tools-heading">
+          <div class="opponent-section-head">
+            <h3 id="opponent-tools-heading" class="console-group-heading">Tool groups</h3>
+            <span class="opponent-section-note">uses since last Ready</span>
+          </div>
+          <div id="openrouter-tools-list" class="openrouter-tools-list"></div>
+        </section>
+        <section class="opponent-section opponent-log-section" aria-labelledby="opponent-log-heading">
+          <h3 id="opponent-log-heading" class="console-group-heading">Activity log</h3>
           <div id="openrouter-log" class="openrouter-log" aria-label="AI interactions and errors"></div>
-        </div>
+        </section>
       </section>
     </div>
     <nav id="console-rail" class="console-rail" role="tablist" aria-orientation="vertical" aria-label="Console tabs">
       <button type="button" id="console-tab-orders" class="console-tab" role="tab" aria-selected="true" aria-controls="console-panel-orders" data-control-tooltip="Show the orders queued for this turn or beat."><svg class="chrome-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M5 4h9M5 8h9M5 12h9M2 4h.1M2 8h.1M2 12h.1"></path></svg><span>Orders</span><span id="console-tab-orders-badge" class="console-tab-badge" hidden></span></button>
       <button type="button" id="console-tab-reports" class="console-tab" role="tab" aria-selected="false" aria-controls="console-panel-reports" data-control-tooltip="Show the turn reports, opponent messages, and notices from this match, newest first."><svg class="chrome-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 9.5l2-6h9l2 6v4h-13zM1.5 9.5h4l1 1.5h3l1-1.5h4"></path></svg><span>Reports</span><span id="console-tab-reports-badge" class="console-tab-badge" hidden></span></button>
-      <button type="button" id="console-tab-opponent" class="console-tab" role="tab" aria-selected="false" aria-controls="console-panel-opponent" data-control-tooltip="Show the opponent's model, its tools, and the AI activity log."><svg class="chrome-icon" viewBox="0 0 16 16" aria-hidden="true"><rect x="4" y="4" width="8" height="8" rx="1"></rect><path d="M6 1.5V4M10 1.5V4M6 12v2.5M10 12v2.5M1.5 6H4M1.5 10H4M12 6h2.5M12 10h2.5"></path></svg><span>Opponent</span></button>
+      <button type="button" id="console-tab-opponent" class="console-tab" role="tab" aria-selected="false" aria-controls="console-panel-opponent" data-control-tooltip="Show whether the opponent is planning, its model, its tools, and the AI activity log."><svg class="chrome-icon" viewBox="0 0 16 16" aria-hidden="true"><rect x="4" y="4" width="8" height="8" rx="1"></rect><path d="M6 1.5V4M10 1.5V4M6 12v2.5M10 12v2.5M1.5 6H4M1.5 10H4M12 6h2.5M12 10h2.5"></path></svg><span>Opponent</span></button>
       <span class="control-tooltip-host console-tab-host" data-control-tooltip="Build is not available in this version."><button type="button" id="console-tab-build" class="console-tab" role="tab" aria-selected="false" disabled><svg class="chrome-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 14V7l4 2.2V7l4 2.2V3.5h4.5V14z"></path></svg><span>Build</span></button></span>
       <span class="control-tooltip-host console-tab-host" data-control-tooltip="Forces is not available in this version."><button type="button" id="console-tab-forces" class="console-tab" role="tab" aria-selected="false" disabled><svg class="chrome-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.8l5.2 2v4.1c0 3-2.2 5.3-5.2 6.3-3-1-5.2-3.3-5.2-6.3V3.8z"></path></svg><span>Forces</span></button></span>
     </nav>
     <div id="console-footer" class="console-footer">
+      <p id="opponent-status-line" class="opponent-status-line" data-status="off">
+        <span class="opponent-status-dot" aria-hidden="true"></span>
+        <span id="opponent-status-label" class="opponent-status-label">Opponent planning off</span>
+        <span id="opponent-status-model" class="opponent-status-model">No model</span>
+        <span id="opponent-status-cost" class="opponent-status-cost">$0.00</span>
+      </p>
       <span class="control-tooltip-host" data-control-tooltip="End this planning step and play out the orders you have queued, on the world map or in a battle. It stays unavailable while the match is over, while the opponent is still planning, or while playback is already running."><button type="button" id="ready-btn" class="ready-btn">Ready</button></span>
     </div>
   </aside>

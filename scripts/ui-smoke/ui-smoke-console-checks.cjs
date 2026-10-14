@@ -51,6 +51,32 @@ const TOAST_BAND_LEFT = 224;
 const TOAST_BAND_MAX_WIDTH = 560;
 
 /**
+ * What the footer status line reads in a fresh match: Run is off and there is no API key, so no model loads.
+ *
+ * Purpose: The smoke run uses an empty user-data folder, so these values never depend on the network.
+ * When to use: The status line check.
+ * Expected outcome: The label, the model name, and the match cost, in that order.
+ * Exceptions: None.
+ */
+const FRESH_STATUS_LINE = Object.freeze(['Opponent planning off', 'No model', '$0.00']);
+
+/**
+ * The Opponent tab's parts, top to bottom.
+ *
+ * Purpose: The four sections show together, in this order, with no sub-tabs.
+ * When to use: The Opponent sections check.
+ * Expected outcome: Run (Status), Commander, Tool groups, the log's heading, and the log.
+ * Exceptions: None.
+ */
+const OPPONENT_SECTION_ORDER = Object.freeze([
+  '#openrouter-run-btn',
+  '#openrouter-model-panel',
+  '#openrouter-tools-panel',
+  '#opponent-log-heading',
+  '#openrouter-log',
+]);
+
+/**
  * Default width of the selection panel in CSS pixels.
  *
  * Purpose: The panel opens at this width until the player resizes it.
@@ -306,6 +332,54 @@ const CONSOLE_CHECKS = Object.freeze([
         ? null
         : `no Notice tagged T1 says "standing orders only": ${JSON.stringify(notices)}`;
     },
+  },
+  {
+    name: 'opponent-sections',
+    scenes: [SCENES.opponentTab],
+    needs: ['#console-subtitle', '#opponent-status-text', ...OPPONENT_SECTION_ORDER],
+    run: (p, el) => {
+      const subtitle = el('#console-subtitle').text;
+      if (subtitle !== 'Northern Africa') return `the Opponent subtitle reads "${subtitle}", expected "Northern Africa"`;
+      const sentence = el('#opponent-status-text').text;
+      if (sentence !== 'Opponent planning is off.') return `the status sentence reads "${sentence}", expected "Opponent planning is off."`;
+      const hidden = OPPONENT_SECTION_ORDER.filter((selector) => !el(selector).shown);
+      if (hidden.length > 0) return `not shown together: ${hidden.join(', ')}`;
+      const misplaced = OPPONENT_SECTION_ORDER.slice(1).filter((selector, i) => el(selector).y <= el(OPPONENT_SECTION_ORDER[i]).y);
+      return misplaced.length === 0 ? null : `not below the part before it: ${misplaced.join(', ')}`;
+    },
+  },
+  {
+    name: 'opponent-tool-groups-two-columns',
+    scenes: [SCENES.opponentTab],
+    needs: ['#openrouter-tools-list', '#openrouter-tools-list .openrouter-tool-cell'],
+    run: (p, el) => {
+      const list = el('#openrouter-tools-list');
+      const cell = el('#openrouter-tools-list .openrouter-tool-cell');
+      if (cell.allTexts.length < 2) return `${cell.allTexts.length} tool groups are listed`;
+      return cell.w <= list.w / 2 + 1 ? null : `a tool group is ${Math.round(cell.w)} wide in a ${Math.round(list.w)}-wide list, expected two columns`;
+    },
+  },
+  {
+    name: 'console-status-line',
+    scenes: [SCENES.strategic, SCENES.opponentTab, SCENES.matchReopened, SCENES.battleStart, SCENES.regionalStart],
+    needs: ['#opponent-status-line', '#opponent-status-label', '#opponent-status-model', '#opponent-status-cost', '#ready-btn'],
+    run: (p, el) => {
+      const line = el('#opponent-status-line');
+      const ready = el('#ready-btn');
+      if (!line.shown || !line.ancestorIds.includes('console-footer')) return 'the status line is not shown in the console footer';
+      if (line.y + line.h > ready.y + 1) return `the status line ${fmt(line)} is not above Ready ${fmt(ready)}`;
+      if (line.h > 24) return `the status line is ${Math.round(line.h)} tall, so it wraps`;
+      const parts = ['#opponent-status-label', '#opponent-status-model', '#opponent-status-cost'].map((selector) => el(selector).text);
+      return parts.every((text, i) => text === FRESH_STATUS_LINE[i])
+        ? null
+        : `the status line reads ${JSON.stringify(parts)}, expected ${JSON.stringify(FRESH_STATUS_LINE)}`;
+    },
+  },
+  {
+    name: 'console-status-line-hidden-collapsed',
+    scenes: [SCENES.consoleCollapsed],
+    needs: ['#opponent-status-line'],
+    run: (p, el) => (el('#opponent-status-line').shown ? 'the status line shows in the collapsed rail' : null),
   },
   {
     name: 'selection-cleared-rows',

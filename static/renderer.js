@@ -18782,6 +18782,26 @@ ${bonuses}`;
     listeners.push(listener);
   }
 
+  // src/shared/opponentPlanningStatus.ts
+  var OPPONENT_STATUS_LINE_LABELS = Object.freeze({
+    off: "Opponent planning off",
+    on: "Opponent planning on",
+    planning: "Opponent planning\u2026"
+  });
+  var NO_MODEL_LABEL = "No model";
+  function opponentPlanningStatus(runOn, planning) {
+    if (!runOn) return "off";
+    return planning ? "planning" : "on";
+  }
+  function opponentStatusSentence(status) {
+    return status === "off" ? "Opponent planning is off." : "Opponent planning is on.";
+  }
+  function modelNameFromOptionLabel(optionLabel) {
+    const bracket = optionLabel.indexOf(" [");
+    const name = (bracket >= 0 ? optionLabel.slice(0, bracket) : optionLabel).trim();
+    return name || NO_MODEL_LABEL;
+  }
+
   // src/renderer/openRouter/openRouterUiHelpers.ts
   function formatElapsedMmSs(ms) {
     const totalSeconds = Math.floor(ms / 1e3);
@@ -18807,7 +18827,8 @@ ${bonuses}`;
     const waitingOnAi = isWaitingForPrecomputedAiOrders();
     const tacticalAnnihilationDialogOpen = rendererSharedState.tacticalAnnihilationOutcomeDialog != null;
     readyBtn.disabled = gameOver || waitingOnAi || deferredConsult || rendererSharedState.readyRequestInFlight || tacticalAnnihilationDialogOpen;
-    if (waitingOnAi || isDeferredResolutionConsultRunning()) {
+    const showAiWait = waitingOnAi || rendererSharedState.runButtonOn && isDeferredResolutionConsultRunning();
+    if (showAiWait) {
       const now = Date.now();
       if (rendererSharedState.readyBtnAiWaitStartTime === null) {
         rendererSharedState.readyBtnAiWaitStartTime = now;
@@ -18826,6 +18847,24 @@ ${bonuses}`;
       rendererSharedState.readyBtnAiWaitStartTime = null;
       setReadyButtonLabelReady(readyBtn);
     }
+    renderOpponentStatus();
+  }
+  function renderOpponentStatus() {
+    const status = opponentPlanningStatus(
+      rendererSharedState.runButtonOn,
+      isWaitingForPrecomputedAiOrders() || isDeferredResolutionConsultRunning()
+    );
+    const sentence = document.getElementById("opponent-status-text");
+    if (sentence) sentence.textContent = opponentStatusSentence(status);
+    document.getElementById("opponent-status-line")?.setAttribute("data-status", status);
+    const label = document.getElementById("opponent-status-label");
+    if (label) label.textContent = OPPONENT_STATUS_LINE_LABELS[status];
+    const modelSelect = document.getElementById("openrouter-model");
+    const selectedOption = modelSelect && modelSelect.value ? modelSelect.selectedOptions[0] : void 0;
+    const model = document.getElementById("opponent-status-model");
+    if (model) model.textContent = modelNameFromOptionLabel(selectedOption?.textContent ?? "");
+    const cost = document.getElementById("opponent-status-cost");
+    if (cost) cost.textContent = formatOpenRouterCost(rendererSharedState.openRouterGameCost);
   }
   function updateOpenRouterToolCountLabels() {
     for (const group of rendererSharedState.openRouterToolGroups) {
@@ -18852,6 +18891,7 @@ ${bonuses}`;
   function updateOpenRouterCostLabel() {
     const el = document.getElementById("openrouter-cost");
     if (el) el.textContent = formatOpenRouterCost(rendererSharedState.openRouterGameCost);
+    renderOpponentStatus();
   }
   function appendOpenRouterLog(line, isError = false) {
     const el = document.getElementById("openrouter-log");
@@ -20226,7 +20266,7 @@ ${bonuses}`;
     return rangedAimTooltipText;
   }
   var runDisabledTooltipText = "Turn opponent planning on or off. Enter an API key and choose a model first.";
-  var runEnabledTooltipText = "Turn opponent planning on or off. On opens the Tools tab and can hold Ready until a plan exists; off cancels a plan that is still running.";
+  var runEnabledTooltipText = "Turn opponent planning on or off. On can hold Ready until a plan exists; off cancels a plan that is still running.";
   function runButtonTooltipText(enabled) {
     return enabled ? runEnabledTooltipText : runDisabledTooltipText;
   }
@@ -25938,7 +25978,7 @@ ${bonuses}`;
       tabId: "console-tab-opponent",
       panelId: "console-panel-opponent",
       title: "Opponent",
-      subtitle: () => "",
+      subtitle: () => rendererSharedState.gameState?.aiHomeRegion ?? "",
       onShow: scrollOpenRouterLogToEnd
     }
   ]);
@@ -34007,17 +34047,6 @@ ${bonuses}`;
     if (!api) return;
     window.gameApi?.registerOpenRouterLogListener?.((p) => deps.appendOpenRouterLog(p.line, p.isError ?? false));
     deps.updateOpenRouterCostLabel();
-    const tabTools = document.getElementById("openrouter-tab-tools");
-    const tabModel = document.getElementById("openrouter-tab-model");
-    function setActiveTab(active2) {
-      selectTabPanel(active2 === "model" ? "openrouter-tab-model" : "openrouter-tab-tools", [
-        { tabId: "openrouter-tab-tools", panelId: "openrouter-tools-panel" },
-        { tabId: "openrouter-tab-model", panelId: "openrouter-model-panel" }
-      ]);
-    }
-    tabTools?.addEventListener("click", () => setActiveTab("tools"));
-    tabModel?.addEventListener("click", () => setActiveTab("model"));
-    setActiveTab("model");
     (async () => {
       try {
         const list = await window.gameApi?.openRouter?.getToolGroupList?.();
@@ -34134,6 +34163,7 @@ ${bonuses}`;
         void deps.syncOpenRouterRunToggleInteractable();
       }).finally(() => {
         modelRefreshInFlight = false;
+        renderOpponentStatus();
       });
     }
     api.getSelectedModel().then((modelId) => {
@@ -34144,6 +34174,7 @@ ${bonuses}`;
         opt.textContent = modelId;
         modelSelect.appendChild(opt);
         modelSelect.value = modelId;
+        renderOpponentStatus();
       }
       refreshModels(true);
     }).catch(() => refreshModels(true));
@@ -34197,6 +34228,7 @@ ${bonuses}`;
     }
     if (modelSelect) {
       modelSelect.addEventListener("change", () => {
+        renderOpponentStatus();
         void (async () => {
           try {
             await api.setSelectedModel(modelSelect.value);
@@ -34232,7 +34264,6 @@ ${bonuses}`;
         rendererSharedState.runButtonOn = !rendererSharedState.runButtonOn;
         runBtn.setAttribute("aria-pressed", rendererSharedState.runButtonOn ? "true" : "false");
         if (rendererSharedState.runButtonOn) {
-          document.getElementById("openrouter-tab-tools")?.click();
           resetPrecomputedAiState("null");
           if (rendererSharedState.useEventDrivenConsultation) rendererSharedState.eventDrivenInitialConsultationDone = false;
           deps.updateReadyButtonState();

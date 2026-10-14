@@ -211,34 +211,6 @@ body {
   align-items: center;
   justify-content: center;
 }
-.openrouter-status-row {
-  margin-top: 0.5rem;
-  padding-top: 0.5rem;
-  border-top: 1px solid var(--chrome-border);
-  flex: 1 1 auto;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-}
-/* Both tabs: no rule line above the shared output log (status row follows both panels in DOM). */
-#openrouter-tools-panel.active ~ .openrouter-status-row,
-#openrouter-model-panel.active ~ .openrouter-status-row {
-  border-top: none;
-  margin-top: 0;
-  padding-top: 0;
-}
-#openrouter-model-panel.active > .openrouter-row:last-child {
-  margin-bottom: 0;
-}
-.openrouter-row {
-  margin-bottom: 0.6rem;
-}
-.openrouter-row label {
-  display: block;
-  font-size: 0.85rem;
-  color: var(--chrome-muted);
-  margin-bottom: 0.2rem;
-}
 .openrouter-key-row {
   display: flex;
   align-items: center;
@@ -256,55 +228,6 @@ body {
   font-variant-numeric: tabular-nums;
   font-size: 0.85rem;
   color: var(--chrome-text);
-}
-.openrouter-row input[type="password"],
-.openrouter-row select {
-  width: 100%;
-  padding: 0.3rem 0.4rem;
-  font-size: 12px;
-  box-sizing: border-box;
-}
-.openrouter-model-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
-  gap: 0.4rem;
-  align-items: center;
-}
-.openrouter-model-grid select {
-  min-width: 0;
-}
-/* The model dropdown sets this row's height. Refresh and Run stretch to that border box. */
-.openrouter-model-grid > button {
-  align-self: stretch;
-  height: auto;
-  box-sizing: border-box;
-  padding-block: 0;
-  line-height: 1;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-.openrouter-model-grid > .control-tooltip-host {
-  display: flex;
-  align-self: stretch;
-  min-width: 0;
-}
-.openrouter-model-grid > .control-tooltip-host > button {
-  align-self: stretch;
-  width: 100%;
-  height: 100%;
-  box-sizing: border-box;
-  padding-block: 0;
-  line-height: 1;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-.openrouter-model-grid > .control-tooltip-host > select {
-  width: 100%;
-  min-width: 0;
-  align-self: center;
-  height: auto;
 }
 .openrouter-refresh-btn {
   flex-shrink: 0;

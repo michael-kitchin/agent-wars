@@ -370,6 +370,9 @@ body:has(#game-over-overlay:not(.hidden)) #sidebar {
 }
 .console-footer {
   grid-area: footer;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
   padding: 12px;
   border-top: 1px solid var(--chrome-border);
   border-left: 1px solid var(--chrome-border);
@@ -407,6 +410,10 @@ body:has(#game-over-overlay:not(.hidden)) #sidebar {
 }
 #sidebar.console[data-collapsed="true"] .console-footer {
   padding: 6px;
+}
+/* The rail is too narrow for the opponent status line; Ready stays. */
+#sidebar.console[data-collapsed="true"] .opponent-status-line {
+  display: none;
 }
 /* The "AI:" label and its timer are separate flex items, so wrapping puts them on two lines. */
 #sidebar.console[data-collapsed="true"] #ready-btn {

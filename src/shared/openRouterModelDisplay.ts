@@ -44,7 +44,7 @@ function formatUsdPerMillion(perMillion: number): string {
 /**
  * Builds the reasoning status phrase for a model option suffix when applicable.
 
- * Purpose: Shows which reasoning levels the model offers, so the player can compare models in the Model-tab dropdown.
+ * Purpose: Shows which reasoning levels the model offers, so the player can compare models in the Opponent-tab dropdown.
  * When to use: Inside `formatModelOptionSuffix` after the optional cost part.
  * Expected outcome: When `listSelectableReasoningEfforts` returns levels, `reasoning: Low/Med/High` style text: lowest
  * first, abbreviated, slash-separated, with an asterisk appended to the default level. That list drops `none` when
@@ -75,7 +75,7 @@ function formatReasoningStatusPart(model: OpenRouterModel): string | null {
 /**
  * Builds the bracket suffix for a model dropdown option.
 
- * Purpose: Encodes optional cost and optional reasoning status into Model-tab list lines.
+ * Purpose: Encodes optional cost and optional reasoning status into Opponent-tab list lines.
  * When to use: When rendering OpenRouter model `<option>` labels after a successful list fetch.
  * Expected outcome: `""`, `" [$…/M]"`, `" [reasoning: Low/Med/High]"` (default level marked with an asterisk), or
  * both parts joined (for example `" [$9.00/M, reasoning: Low/High]"`); omit empty parts.
@@ -102,7 +102,7 @@ export function formatModelOptionSuffix(model: OpenRouterModel): string {
 }
 
 /**
- * Builds the full Model-tab option label for one OpenRouter model.
+ * Builds the full Opponent-tab option label for one OpenRouter model.
 
  * Purpose: Combines display name (or id) with the metadata suffix for the dropdown.
  * When to use: When creating or refreshing `#openrouter-model` options.

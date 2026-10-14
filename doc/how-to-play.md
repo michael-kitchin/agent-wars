@@ -272,9 +272,9 @@ The full bonus rules are in [combat-rules-v3.md](combat-rules-v3.md) §4.9.
 ## Things that may surprise you
 
 - **You pay for the opponent:** each model call bills your OpenRouter account. The model list shows each model's price per million tokens.
-- **Reasoning costs more:** a higher reasoning level on the Model tab makes each consult slower and dearer.
-- **Waiting on the AI:** while the model plans, Ready shows **AI:** and a timer. You can keep giving orders during the wait. Turn **Run** off to stop that plan. If the turn has not resolved yet, Ready can resolve it without those orders. If the turn already played back, Ready unlocks and the next turn does not use that plan. Changing the model stops the current plan. If Run is still on and Ready is still waiting, planning starts again with the new model.
-- **Not every turn:** with **Events** on (the default) on the Tools tab, the model is called when an event it's watching or a mandatory trigger fires, and at least every five turns. Otherwise its standing orders run.
+- **Reasoning costs more:** a higher reasoning level in the Opponent tab's Commander section makes each consult slower and dearer.
+- **Waiting on the AI:** while the model plans, Ready shows **AI:** and a timer, and the line above it reads **Opponent planning…**. You can keep giving orders during the wait. Turn **Run** off to stop that plan. If the turn has not resolved yet, Ready can resolve it without those orders. If the turn already played back, Ready unlocks and the next turn does not use that plan. Changing the model stops the current plan. If Run is still on and Ready is still waiting, planning starts again with the new model.
+- **Not every turn:** with **Events** on (the default) in the Opponent tab's Tool groups, the model is called when an event it's watching or a mandatory trigger fires, and at least every five turns. Otherwise its standing orders run.
 - **Every turn, if you like:** turn **Events** off to consult the model every turn, at more cost.
 - **The opponent nearly always shoots:** unless the model told it to hold fire, each enemy unit that can fire picks a legal target on its own when the model gives it none.
 - **Your units wait for orders:** they fire only when you aim them. There are no player defend or hold-fire orders.
@@ -292,4 +292,4 @@ The full bonus rules are in [combat-rules-v3.md](combat-rules-v3.md) §4.9.
 
 - **Top centre of the map (map toast):** Errors, rejected orders, turn-loss summaries, and unknown-battle announcements. Use the × to dismiss; it also hides after a fixed interval, and a newer message replaces it. The Reports tab keeps every one except errors.
 - **Top centre of the map, above the map toast (AI strategy toast):** The opponent's Message and Strategy after a consultation. It dismisses and times out the same way, and the Reports tab keeps it.
-- **Right panel, Opponent tab, below the Tools and Model tabs (AI activity log):** AI interaction lines and errors, including a retry, a line when opponent planning stops, and a one-line copy of each turn update. Starting a new match clears it.
+- **Right panel, Opponent tab, at the bottom (AI activity log):** AI interaction lines and errors, including a retry, a line when opponent planning stops, and a one-line copy of each turn update. Starting a new match clears it.

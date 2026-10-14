@@ -8,7 +8,7 @@ Give the player a running record of opponent consultations, model-list failures,
 
 ## Availability
 
-Shown on the right panel's Opponent tab, under the Tools and Model sub-tabs, whichever sub-tab is selected, in every mode where the panel is visible and expanded. While the tactical battles list is open, the log stays visible while the panel is expanded and does not receive pointer input. The log itself has no mode of its own. The log is absent in New game and Game over because the panel is absent.
+Shown at the bottom of the console's Opponent tab, under an "Activity log" heading below the [Tool groups](right-panel-tools-tab.md) section, filling the height that is left, in every mode where the panel is visible and expanded. While the tactical battles list is open, the log stays visible while the panel is expanded and does not receive pointer input. The log itself has no mode of its own. The log is absent in New game and Game over because the panel is absent.
 
 ## Information Displayed
 
@@ -39,7 +39,7 @@ The log does not show the API key.
 
 - A new line is appended at the end, and the log scrolls to that line while it is shown. Showing the Opponent tab, or expanding the panel on it, scrolls the log to its newest line, so lines added while it was hidden are in view.
 - Lines are not removed during a match.
-- When a new match starts, from startup, New game, or game over, the log clears, together with the cost readout reset on the Model tab and the [Reports tab](reports-tab.md).
+- When a new match starts, from startup, New game, or game over, the log clears, together with the cost readout reset in the [Commander](right-panel-model-tab.md) section and on the footer status line, and the [Reports tab](reports-tab.md).
 
 ## States
 

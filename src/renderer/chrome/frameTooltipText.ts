@@ -11,12 +11,14 @@
 export const ordersTabTooltipText = 'Show the orders queued for this turn or beat.';
 
 /**
+ * The Opponent tab's tip.
+ *
  * Purpose: Says what the Opponent tab shows.
  * When to use: `#console-tab-opponent`.
  * Expected outcome: The control tip shows this sentence.
  * Exceptions: None.
  */
-export const opponentTabTooltipText = "Show the opponent's model, its tools, and the AI activity log.";
+export const opponentTabTooltipText = "Show whether the opponent is planning, its model, its tools, and the AI activity log.";
 
 /**
  * Builds the tip for a control this version does not offer.

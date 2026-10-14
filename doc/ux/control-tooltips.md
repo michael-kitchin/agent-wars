@@ -51,11 +51,9 @@ The tip can appear whenever the control can receive the pointer or keyboard focu
 - Strike: Turn this on to aim an air strike. A target list and a Cancel button replace this button.
 - Air-strike target: Choose enemy units, production, airports, or seaports. Your next double-click uses that choice until you cancel.
 - Air-strike Cancel: Stop aiming an air strike and show Strike again. Strikes already in the list stay there.
-- Tools tab: Show the tools the opponent can use, and turn each group on or off.
-- Model tab: Show the API key, model, reasoning effort, and the Run control for opponent planning.
 - Orders tab: Show the orders queued for this turn or beat.
 - Reports tab: Show the turn reports, opponent messages, and notices from this match, newest first.
-- Opponent tab: Show the opponent's model, its tools, and the AI activity log.
+- Opponent tab: Show whether the opponent is planning, its model, its tools, and the AI activity log.
 - Settings, Help, Load game, How to play, Build, Forces, and Replay: "<name> is not available in this version.", for example "Settings is not available in this version."
 - Collapse the console: Hide the console to widen the map. Click a tab to show it again.
 - Selection panel close: Clear the selection. Queued orders stay.
@@ -70,7 +68,7 @@ The tip can appear whenever the control can receive the pointer or keyboard focu
 - API key: Enter your OpenRouter key, then click away or press Enter to save it. The key stays hidden after that; clear the field and leave it to forget the saved key.
 - Refresh models: Load the model list again. If that fails, the message appears in the AI activity log.
 - Run, while it cannot be clicked: Turn opponent planning on or off. Enter an API key and choose a model first.
-- Run, while it can be clicked: Turn opponent planning on or off. On opens the Tools tab and can hold Ready until a plan exists; off cancels a plan that is still running.
+- Run, while it can be clicked: Turn opponent planning on or off. On can hold Ready until a plan exists; off cancels a plan that is still running.
 - New game in the game menu: Open the new-game screen. Opponent planning and any playback stop right away; the current match is replaced when you start the new one.
 - Reasoning effort: Choose how much reasoning this model uses. You only see levels this model offers, its default is marked, and the list stays unavailable when it has fewer than two.
 - Offer tactical battles: Leave this checked if you want Ready to let you fight one melee. Uncheck it to skip that list and resolve melee as Ignore.
