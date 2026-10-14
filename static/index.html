@@ -254,23 +254,27 @@
       <button type="button" id="tactical-exit-btn" class="tactical-exit-btn" aria-label="Exit battle">Exit Battle</button>
     </div>
     <section id="selection-panel" class="selection-panel" aria-label="Selected units" hidden>
-      <div class="selection-panel-header">
-        <p id="sidebar-selected-unit" class="selection-panel-place">—</p>
-        <button type="button" id="selection-panel-close" class="selection-panel-close" aria-label="Clear the selection" data-control-tooltip="Clear the selection. Queued orders stay.">×</button>
-      </div>
-      <div id="selection-panel-chips" class="selection-panel-chips"></div>
-      <p id="selection-panel-count" class="selection-panel-count"></p>
-      <ul id="selection-panel-units" class="selection-panel-units"></ul>
-      <p id="sidebar-error" class="chrome-error" style="font-size: 0.9em; display: none;"></p>
-      <div class="selection-panel-actions">
-        <button type="button" id="ranged-attack-btn" class="ranged-btn" style="display: none;">Ranged</button>
-        <select id="air-strike-target-type" class="ranged-btn" style="display: none;" data-control-tooltip="Choose enemy units, production, airports, or seaports. Your next double-click uses that choice until you cancel.">
-          <option value="units">Enemy Units</option>
-          <option value="urban">Production</option>
-          <option value="airport">Airports</option>
-          <option value="seaport">Seaports</option>
-        </select>
-        <button type="button" id="air-strike-cancel-btn" class="ranged-btn" style="display: none;" data-control-tooltip="Stop aiming an air strike and show Strike again. Strikes already in the list stay there.">Cancel</button>
+      <div id="selection-panel-grip" class="selection-panel-grip" aria-hidden="true" data-control-tooltip="Drag to resize this panel. The size lasts until the app closes."></div>
+      <div class="selection-panel-body">
+        <div class="selection-panel-header">
+          <p id="sidebar-selected-unit" class="selection-panel-place">—</p>
+          <button type="button" id="selection-panel-close" class="selection-panel-close" aria-label="Clear the selection" data-control-tooltip="Clear the selection. Queued orders stay.">×</button>
+        </div>
+        <div id="selection-panel-chips" class="selection-panel-chips"></div>
+        <p id="selection-panel-count" class="selection-panel-count"></p>
+        <ul id="selection-panel-units" class="selection-panel-units"></ul>
+        <p id="sidebar-error" class="chrome-error" style="font-size: 0.9em; display: none;"></p>
+        <div class="selection-panel-actions">
+          <button type="button" id="ranged-attack-btn" class="ranged-btn" style="display: none;">Ranged</button>
+          <select id="air-strike-target-type" class="ranged-btn" style="display: none;" data-control-tooltip="Choose enemy units, production, airports, or seaports. Your next double-click uses that choice until you cancel.">
+            <option value="units">Enemy Units</option>
+            <option value="urban">Production</option>
+            <option value="airport">Airports</option>
+            <option value="seaport">Seaports</option>
+          </select>
+          <button type="button" id="air-strike-cancel-btn" class="ranged-btn" style="display: none;" data-control-tooltip="Stop aiming an air strike and show Strike again. Strikes already in the list stay there.">Cancel</button>
+          <span id="selection-panel-action-note" class="selection-panel-action-note"></span>
+        </div>
       </div>
     </section>
   </div>

@@ -24,6 +24,7 @@ const {
   LAND_UNIT_TYPES,
   captureMainMap,
   contestedHexEdit,
+  dragSelectionPanelGrip,
   enterBattleAt,
   queueBattleMarch,
   queueLoneUnitMarch,
@@ -267,6 +268,20 @@ async function startRegionalMatch(page) {
 }
 
 /**
+ * Drags the selection panel's grip to the window's top-right corner.
+ *
+ * Purpose: The largest size a player can drag to must still fit inside the map.
+ * When to use: While the selection panel is shown.
+ * Expected outcome: The panel is as large as its limits and the map allow.
+ * Exceptions: Throws when the grip is not on screen.
+ */
+async function dragSelectionPanelToCorner(page, size) {
+  const box = await page.locator('#selection-panel-grip').boundingBox();
+  if (!box) throw new Error('the selection panel grip is not on screen');
+  await dragSelectionPanelGrip(page, size.w - 8 - (box.x + box.width / 2), 8 - (box.y + box.height / 2));
+}
+
+/**
  * Runs the first session: a new match, the frame scenes, the console scenes, and the small window.
  *
  * Purpose: The scene order is part of the contract with the checks. The match starts after the first scene. Scenes
@@ -358,10 +373,19 @@ async function runFirstSession(app, page, report, outDir) {
   await recordScene(page, report, outDir, SCENES.strikeAiming);
   await page.click('#air-strike-cancel-btn');
 
-  // At the minimum window size, select the stack; the selection panel must stay on the map.
+  // Drag the grip far up and right, then far down and left: both ends stop at the panel's size limits.
+  await dragSelectionPanelGrip(page, 800, -500);
+  await parkPointer(page);
+  await recordScene(page, report, outDir, SCENES.selectionResized);
+  await dragSelectionPanelGrip(page, -600, 600);
+  await parkPointer(page);
+  await recordScene(page, report, outDir, SCENES.selectionResizedMin);
+
+  // At the minimum window size, select the stack and drag the panel as large as it goes; it must stay on the map.
   await setViewport(app, page, SMALL_WINDOW);
   await page.waitForTimeout(SETTLE_MS.resize);
   await selectHumanStack(page);
+  await dragSelectionPanelToCorner(page, SMALL_WINDOW);
   await parkPointer(page);
   await recordScene(page, report, outDir, SCENES.smallWindow);
 

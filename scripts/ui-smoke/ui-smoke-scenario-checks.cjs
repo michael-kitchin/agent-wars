@@ -167,6 +167,18 @@ const SCENARIO_CHECKS = Object.freeze([
       return count === '1 selected of 1' ? null : `the count reads "${count}", expected "1 selected of 1"`;
     },
   },
+  {
+    name: 'support-button-battle',
+    scenes: [SCENES.battleSelection],
+    needs: ['#ranged-attack-btn', '#selection-panel-action-note'],
+    run: (p, el) => {
+      const ranged = el('#ranged-attack-btn');
+      if (el('#selection-panel-action-note').shown) return `a reason shows in a battle: "${el('#selection-panel-action-note').text}"`;
+      return ranged.shown && !ranged.disabled && ranged.text === 'Ranged'
+        ? null
+        : `Ranged reads "${ranged.text}"${ranged.shown ? '' : ' and is hidden'}${ranged.disabled ? ' and is disabled' : ''}, expected it enabled`;
+    },
+  },
 ]);
 
 module.exports = { SCENARIO_CHECKS };

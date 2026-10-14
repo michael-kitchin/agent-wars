@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { selectionSupportButtonMode } from './selectionSupportButtonMode';
+import {
+  INFANTRY_CANNOT_FIRE_REASON,
+  selectionSupportAction,
+  selectionSupportButtonMode,
+  STRIKE_NEEDS_AIR_ONLY_REASON,
+} from './selectionSupportButtonMode';
 
 describe('selectionSupportButtonMode strategic', () => {
   it('hides the button when nothing is selected', () => {
@@ -31,5 +36,38 @@ describe('selectionSupportButtonMode tactical', () => {
 
   it('hides Ranged when air is mixed with a tactical ranged unit', () => {
     assert.equal(selectionSupportButtonMode(['infantry', 'air'], true), 'hidden');
+  });
+});
+
+describe('selectionSupportAction', () => {
+  it('enables Ranged or Strike when the selection can use it', () => {
+    assert.deepEqual(selectionSupportAction(['armor'], false), { label: 'Ranged', enabled: true, reason: null });
+    assert.deepEqual(selectionSupportAction(['air', 'air'], false), { label: 'Strike', enabled: true, reason: null });
+    assert.deepEqual(selectionSupportAction(['infantry'], true), { label: 'Ranged', enabled: true, reason: null });
+  });
+
+  it('greys out Ranged with a reason when a world-map selection includes infantry', () => {
+    assert.deepEqual(selectionSupportAction(['armor', 'infantry'], false), {
+      label: 'Ranged',
+      enabled: false,
+      reason: INFANTRY_CANNOT_FIRE_REASON,
+    });
+  });
+
+  it('greys out Strike with a reason when air is mixed with other types', () => {
+    assert.deepEqual(selectionSupportAction(['infantry', 'air'], false), {
+      label: 'Strike',
+      enabled: false,
+      reason: STRIKE_NEEDS_AIR_ONLY_REASON,
+    });
+    assert.deepEqual(selectionSupportAction(['armor', 'air'], true), {
+      label: 'Strike',
+      enabled: false,
+      reason: STRIKE_NEEDS_AIR_ONLY_REASON,
+    });
+  });
+
+  it('greys out Ranged without a reason for an empty selection', () => {
+    assert.deepEqual(selectionSupportAction([], false), { label: 'Ranged', enabled: false, reason: null });
   });
 });

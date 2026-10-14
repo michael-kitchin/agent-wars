@@ -53,9 +53,9 @@ I'll add screenshots of specific functions as I can.
 
 1. **Pan:** Drag with the left mouse button, or use WASD / arrow keys.
 2. **Zoom:** Mouse wheel (zooms toward the cursor). Zoomed in, contested strategic hexes show a marker that starts a tactical battle.
-3. **Select units:** Click a teal (human) unit's icon. A lone unit is selected right away. A stack opens a list of its units, where you can pick one or use **+ All**. The selection panel at the map's bottom-left names the hex and lists the selected units with their orders; its **×** clears the selection.
+3. **Select units:** Click a teal (human) unit's icon. A lone unit is selected right away. A stack opens a list of its units, where you can pick one or use **+ All**. The selection panel at the map's bottom-left names the hex and lists the selected units with their orders; its **×** clears the selection. Drag its corner grip to resize the panel. The size lasts until you close the app.
 4. **Issue a move order:** With units selected, double-click a destination hex (land/water/terrain rules apply). The order appears in the Movement group of the Orders tab, with the destination's hex code and its distance, such as "→ E5 · 1h". Click a row to select that unit again. A destination beyond this turn's reach becomes a march that continues on later turns.
-5. **Ranged attack (armor or naval on strategic; broader types on tactical):** With capable units selected, click **Ranged** in the selection panel, then double-click an enemy hex within range. An all-air selection shows **Strike** instead. Attacks are submitted with Ready. See [Aiming ranged attacks and air strikes](#aiming-ranged-attacks-and-air-strikes).
+5. **Ranged attack (armor or naval on strategic; broader types on tactical):** With capable units selected, click **Ranged** in the selection panel, then double-click an enemy hex within range. An all-air selection shows **Strike** instead. When the selection cannot fire, the button is greyed out and the panel says why. Attacks are submitted with Ready. See [Aiming ranged attacks and air strikes](#aiming-ranged-attacks-and-air-strikes).
 6. **Ready:** Click **Ready** to submit orders and resolve the turn. A side wins by controlling the enemy home or wiping out its urban cells (rules in [region-vs-region.md](region-vs-region.md)). The new-game dialog then returns for the next match.
 7. You can issue multiple movement and ranged orders (one per unit each) before clicking Ready.
 
@@ -82,7 +82,7 @@ The full input map, including the exceptions, is in [ux/input-map.md](ux/input-m
 
 - **Ranged:** select units that can all fire, then click **Ranged**. The button reads **Cancel** while you aim.
 - **Strike:** select only air units, then click **Strike**. Pick a target type from the list that takes the button's place.
-- **Hidden button:** mixing air with other types, or selecting any unit that can't fire, hides the button. On the strategic map that includes infantry.
+- **Greyed button:** mixing air with other types greys out Strike, and the panel says why. On the strategic map, infantry with no air unit greys out Ranged, and the panel says why. Infantry can fire in a battle.
 - **The outline:** a dashed outline, with no fill, around the combined reach of every selected unit. Its dashes drift slowly.
 - **Colors:** amber for ranged fire, purple for air strikes.
 - **Reach on the strategic map:** armor 1 hex, naval 2, and air 3 from its base airport.

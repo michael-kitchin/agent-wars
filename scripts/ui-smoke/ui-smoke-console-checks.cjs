@@ -21,6 +21,16 @@ const { SCENES, near, fmt } = require('./ui-smoke-scenes.cjs');
 const WORLD_ORDER_DETAIL = /^→ [0-9A-Z]{2} · \d+h$/;
 
 /**
+ * The selection panel's size limits while its grip is dragged, in CSS pixels.
+ *
+ * Purpose: Dragged sizes stop at these limits.
+ * When to use: The dragged-size geometry checks.
+ * Expected outcome: Matches `src/shared/selectionPanelSize.ts`.
+ * Exceptions: None.
+ */
+const SELECTION_PANEL_LIMITS = Object.freeze({ minWidth: 320, maxWidth: 640, minHeight: 140, mapMargin: 24 });
+
+/**
  * Default width of the selection panel in CSS pixels.
  *
  * Purpose: The panel opens at this width until the player resizes it.
@@ -39,6 +49,23 @@ const SELECTION_PANEL_WIDTH = 400;
  * Exceptions: None.
  */
 const MAP_OVERLAY_INSET = 12;
+
+/**
+ * Checks that the selection panel is anchored at the map's bottom-left at the given size.
+ *
+ * Purpose: The default size and both dragged sizes share one geometry rule.
+ * When to use: From the selection panel geometry rows below.
+ * Expected outcome: Null when the panel is shown, 12 px in from the map's left and bottom edges, and the given size
+ *   (within one pixel); otherwise a failure message.
+ * Exceptions: None.
+ */
+function selectionPanelPlacement(c, s, width, height) {
+  if (!s.shown) return 'the selection panel is not shown';
+  const anchored = near(s.x, c.x + MAP_OVERLAY_INSET) && near(s.y + s.h, c.y + c.h - MAP_OVERLAY_INSET);
+  const sized = near(s.w, width) && (height === null || near(s.h, height));
+  const expected = `${width}${height === null ? '' : `x${height}`}`;
+  return anchored && sized ? null : `the selection panel is at ${fmt(s)}, expected ${expected} at the map's bottom-left, ${MAP_OVERLAY_INSET} px in`;
+}
 
 /**
  * The content checks for the console and the selection panel, one row each.
@@ -125,11 +152,25 @@ const CONSOLE_CHECKS = Object.freeze([
     run: (p, el) => {
       const c = el('#canvas-container');
       const s = el('#selection-panel');
-      if (!s.shown) return 'the selection panel is not shown';
-      const placed = near(s.x, c.x + MAP_OVERLAY_INSET) && near(s.y + s.h, c.y + c.h - MAP_OVERLAY_INSET) && near(s.w, SELECTION_PANEL_WIDTH);
-      if (!placed) return `the selection panel is at ${fmt(s)}, expected ${SELECTION_PANEL_WIDTH} wide at the map's bottom-left, ${MAP_OVERLAY_INSET} px in`;
+      const placement = selectionPanelPlacement(c, s, SELECTION_PANEL_WIDTH, null);
+      if (placement) return placement;
       return s.h <= c.h / 2 + 1 ? null : `the selection panel is ${Math.round(s.h)} tall, more than half the map's ${Math.round(c.h)}`;
     },
+  },
+  {
+    name: 'selection-panel-dragged-large',
+    scenes: [SCENES.selectionResized],
+    needs: ['#canvas-container', '#selection-panel'],
+    run: (p, el) => {
+      const c = el('#canvas-container');
+      return selectionPanelPlacement(c, el('#selection-panel'), SELECTION_PANEL_LIMITS.maxWidth, c.h - SELECTION_PANEL_LIMITS.mapMargin);
+    },
+  },
+  {
+    name: 'selection-panel-dragged-small',
+    scenes: [SCENES.selectionResizedMin],
+    needs: ['#canvas-container', '#selection-panel'],
+    run: (p, el) => selectionPanelPlacement(el('#canvas-container'), el('#selection-panel'), SELECTION_PANEL_LIMITS.minWidth, SELECTION_PANEL_LIMITS.minHeight),
   },
   {
     name: 'selection-panel-one-unit',
@@ -140,6 +181,7 @@ const CONSOLE_CHECKS = Object.freeze([
       '#selection-panel-units .selection-panel-order > span',
       '#pending-orders-list .console-order-detail',
       '#ranged-attack-btn',
+      '#selection-panel-action-note',
     ],
     run: (p, el) => {
       const place = el('#sidebar-selected-unit');
@@ -151,9 +193,10 @@ const CONSOLE_CHECKS = Object.freeze([
       const row = el('#pending-orders-list .console-order-detail').text;
       if (chip !== row) return `the order chip reads "${chip}" but the Orders row reads "${row}"`;
       const ranged = el('#ranged-attack-btn');
-      return ranged.shown && ranged.text === 'Ranged' && ranged.ancestorIds.includes('selection-panel')
+      if (el('#selection-panel-action-note').shown) return `a reason shows for an armor unit: "${el('#selection-panel-action-note').text}"`;
+      return ranged.shown && !ranged.disabled && ranged.text === 'Ranged' && ranged.ancestorIds.includes('selection-panel')
         ? null
-        : `Ranged reads "${ranged.text}"${ranged.shown ? '' : ' and is hidden'}, expected it shown in the selection panel`;
+        : `Ranged reads "${ranged.text}"${ranged.shown ? '' : ' and is hidden'}${ranged.disabled ? ' and is disabled' : ''}, expected it enabled in the selection panel`;
     },
   },
   {
@@ -165,6 +208,19 @@ const CONSOLE_CHECKS = Object.freeze([
       if (count !== '2 selected of 2') return `the count reads "${count}", expected "2 selected of 2"`;
       const none = el('#selection-panel-units .selection-panel-order-none').text;
       return none === 'No orders' ? null : `a unit without orders reads "${none}"`;
+    },
+  },
+  {
+    name: 'support-button-greyed',
+    scenes: [SCENES.selectionStack],
+    needs: ['#ranged-attack-btn', '#selection-panel-action-note'],
+    run: (p, el) => {
+      const ranged = el('#ranged-attack-btn');
+      if (!(ranged.shown && ranged.disabled && ranged.text === 'Ranged')) {
+        return `Ranged reads "${ranged.text}"${ranged.shown ? '' : ' and is hidden'}${ranged.disabled ? '' : ' and is enabled'}, expected it greyed out`;
+      }
+      const note = el('#selection-panel-action-note').text;
+      return note === "Infantry can't fire on the world map." ? null : `the reason reads "${note}"`;
     },
   },
   {

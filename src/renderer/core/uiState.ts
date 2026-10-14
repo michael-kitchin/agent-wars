@@ -110,7 +110,6 @@ export function updateGameOverUI(
 ): boolean {
   const overlay = document.getElementById('game-over-overlay');
   const newGameBtn = document.getElementById('new-game-btn');
-  const rangedBtn = document.getElementById('ranged-attack-btn') as HTMLButtonElement | null;
 
   const noGame = !state || state.hexes.length === 0;
   const gameOver = !!state?.gameOver;
@@ -120,7 +119,6 @@ export function updateGameOverUI(
   if (!showOverlay) {
     overlay?.classList.add('hidden');
     setMainUIControlsEnabled(true);
-    if (rangedBtn) rangedBtn.disabled = false;
     updateReadyButtonState();
     return overlay != null && wasHidden === false;
   }
@@ -148,7 +146,6 @@ export function updateGameOverUI(
     newGameBtn.textContent = noGame ? 'Start game' : 'New game';
     newGameBtn.setAttribute('data-control-tooltip', newGameButtonTooltipText(noGame));
   }
-  if (rangedBtn) rangedBtn.disabled = true;
   updateReadyButtonState();
   return overlay != null && wasHidden === true;
 }

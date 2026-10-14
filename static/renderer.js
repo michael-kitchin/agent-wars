@@ -26238,6 +26238,78 @@ ${bonuses}`;
     ctx.restore();
   }
 
+  // src/shared/selectionPanelSize.ts
+  var SELECTION_PANEL_MIN_WIDTH = 320;
+  var SELECTION_PANEL_MAX_WIDTH = 640;
+  var SELECTION_PANEL_MIN_HEIGHT = 140;
+  var SELECTION_PANEL_MAP_MARGIN = 24;
+  function clampSelectionPanelSize(size, mapHeight) {
+    const maxHeight = Math.max(SELECTION_PANEL_MIN_HEIGHT, mapHeight - SELECTION_PANEL_MAP_MARGIN);
+    return {
+      width: Math.min(SELECTION_PANEL_MAX_WIDTH, Math.max(SELECTION_PANEL_MIN_WIDTH, Math.round(size.width))),
+      height: Math.min(maxHeight, Math.max(SELECTION_PANEL_MIN_HEIGHT, Math.round(size.height)))
+    };
+  }
+
+  // src/renderer/map/mapContainerResize.ts
+  var MAP_CONTAINER_ID = "canvas-container";
+  function observeMapContainerResize(onResize) {
+    let frameId = 0;
+    const schedule = () => {
+      if (frameId !== 0) return;
+      frameId = window.requestAnimationFrame(() => {
+        frameId = 0;
+        onResize();
+      });
+    };
+    window.addEventListener("resize", schedule);
+    const container = document.getElementById(MAP_CONTAINER_ID);
+    const observer = container && typeof ResizeObserver !== "undefined" ? new ResizeObserver(schedule) : null;
+    if (container) observer?.observe(container);
+    return () => {
+      window.removeEventListener("resize", schedule);
+      observer?.disconnect();
+      if (frameId !== 0) window.cancelAnimationFrame(frameId);
+      frameId = 0;
+    };
+  }
+
+  // src/renderer/gameplay/selectionPanelResize.ts
+  var dragStart = null;
+  function applyPanelSize(panel, width, height) {
+    panel.style.width = `${width}px`;
+    panel.style.height = `${height}px`;
+    panel.style.maxHeight = "calc(100% - 24px)";
+  }
+  function wireSelectionPanelResize() {
+    const panel = document.getElementById("selection-panel");
+    const grip = document.getElementById("selection-panel-grip");
+    if (!panel || !grip) return;
+    grip.addEventListener("pointerdown", (event) => {
+      if (event.button !== 0) return;
+      event.preventDefault();
+      const box = panel.getBoundingClientRect();
+      dragStart = { x: event.clientX, y: event.clientY, width: box.width, height: box.height };
+      grip.setPointerCapture(event.pointerId);
+    });
+    grip.addEventListener("pointermove", (event) => {
+      if (!dragStart) return;
+      const mapHeight = document.getElementById(MAP_CONTAINER_ID)?.clientHeight ?? 0;
+      const size = clampSelectionPanelSize(
+        { width: dragStart.width + (event.clientX - dragStart.x), height: dragStart.height - (event.clientY - dragStart.y) },
+        mapHeight
+      );
+      applyPanelSize(panel, size.width, size.height);
+    });
+    const endDrag = (event) => {
+      if (!dragStart) return;
+      dragStart = null;
+      if (grip.hasPointerCapture(event.pointerId)) grip.releasePointerCapture(event.pointerId);
+    };
+    grip.addEventListener("pointerup", endDrag);
+    grip.addEventListener("pointercancel", endDrag);
+  }
+
   // src/renderer/gameplay/selectionPanel.ts
   var headerRequestSeq = 0;
   function renderSelectionPanelHeader(panelHex, battle) {
@@ -26354,6 +26426,7 @@ ${bonuses}`;
   }
   function wireSelectionPanel(deps) {
     onQueuedOrdersChanged(() => renderSelectionPanel(deps));
+    wireSelectionPanelResize();
   }
 
   // src/renderer/core/uiState.ts
@@ -26394,7 +26467,6 @@ ${bonuses}`;
   function updateGameOverUI(state, updateReadyButtonState2) {
     const overlay = document.getElementById("game-over-overlay");
     const newGameBtn = document.getElementById("new-game-btn");
-    const rangedBtn = document.getElementById("ranged-attack-btn");
     const noGame = !state || state.hexes.length === 0;
     const gameOver = !!state?.gameOver;
     const showOverlay = noGame || gameOver;
@@ -26402,7 +26474,6 @@ ${bonuses}`;
     if (!showOverlay) {
       overlay?.classList.add("hidden");
       setMainUIControlsEnabled(true);
-      if (rangedBtn) rangedBtn.disabled = false;
       updateReadyButtonState2();
       return overlay != null && wasHidden === false;
     }
@@ -26429,7 +26500,6 @@ ${bonuses}`;
       newGameBtn.textContent = noGame ? "Start game" : "New game";
       newGameBtn.setAttribute("data-control-tooltip", newGameButtonTooltipText(noGame));
     }
-    if (rangedBtn) rangedBtn.disabled = true;
     updateReadyButtonState2();
     return overlay != null && wasHidden === true;
   }
@@ -27462,6 +27532,18 @@ ${bonuses}`;
       (unitType) => unitType !== "air" && unitHasDirectRangedPlanning(unitType, tacticalBattleActive)
     );
     return everyUnitCanRangedAttack ? "ranged" : "hidden";
+  }
+  var INFANTRY_CANNOT_FIRE_REASON = "Infantry can't fire on the world map.";
+  var STRIKE_NEEDS_AIR_ONLY_REASON = "Strike needs a selection of air units only.";
+  function selectionSupportAction(unitTypes, tacticalBattleActive) {
+    const mode = selectionSupportButtonMode(unitTypes, tacticalBattleActive);
+    if (mode === "strike") return { label: "Strike", enabled: true, reason: null };
+    if (mode === "ranged") return { label: "Ranged", enabled: true, reason: null };
+    if (unitTypes.includes("air")) return { label: "Strike", enabled: false, reason: STRIKE_NEEDS_AIR_ONLY_REASON };
+    if (!tacticalBattleActive && unitTypes.includes("infantry")) {
+      return { label: "Ranged", enabled: false, reason: INFANTRY_CANNOT_FIRE_REASON };
+    }
+    return { label: "Ranged", enabled: false, reason: null };
   }
 
   // src/renderer/gameplay/orderLabelFormatting.ts
@@ -29015,6 +29097,7 @@ ${bonuses}`;
     const btnEl = document.getElementById("ranged-attack-btn");
     const strikeTypeEl = document.getElementById("air-strike-target-type");
     const strikeCancelEl = document.getElementById("air-strike-cancel-btn");
+    const actionNoteEl = document.getElementById("selection-panel-action-note");
     if (!listEl) return;
     const battle = rendererSharedState.tacticalBattleSnapshot;
     renderSidebarOrderGroup(
@@ -29046,10 +29129,11 @@ ${bonuses}`;
       const selectedUnits = tb ? rendererSharedState.selectedUnitIds.map((id) => tb.subUnits.find((u) => u.id === id)).filter((unit) => !!unit) : rendererSharedState.selectedUnitIds.map((id) => rendererSharedState.gameState?.units.find((u) => u.id === id)).filter((unit) => !!unit);
       const rangedWasActive = rendererSharedState.rangedModeActive;
       const strikeWasActive = rendererSharedState.airStrikeModeActive;
-      const mode = selectionSupportButtonMode(
-        selectedUnits.map((unit) => unit.unitType),
-        !!tb
-      );
+      const unitTypes = selectedUnits.map((unit) => unit.unitType);
+      const mode = selectionSupportButtonMode(unitTypes, !!tb);
+      const action = selectionSupportAction(unitTypes, !!tb);
+      btnEl.disabled = !action.enabled;
+      if (actionNoteEl) actionNoteEl.textContent = action.reason ?? "";
       if (mode === "strike") {
         rendererSharedState.rangedModeActive = false;
         btnEl.textContent = "Strike";
@@ -29073,7 +29157,9 @@ ${bonuses}`;
         if (strikeTypeEl) strikeTypeEl.style.display = "none";
         if (strikeCancelEl) strikeCancelEl.style.display = "none";
       } else {
-        btnEl.style.display = "none";
+        btnEl.style.display = "";
+        btnEl.textContent = action.label;
+        btnEl.removeAttribute("data-control-tooltip");
         rendererSharedState.rangedModeActive = false;
         rendererSharedState.airStrikeModeActive = false;
         if (strikeTypeEl) strikeTypeEl.style.display = "none";
@@ -34232,29 +34318,6 @@ ${bonuses}`;
       if (want === "") container.style.removeProperty("cursor");
       else container.style.cursor = want;
     }
-  }
-
-  // src/renderer/map/mapContainerResize.ts
-  var MAP_CONTAINER_ID = "canvas-container";
-  function observeMapContainerResize(onResize) {
-    let frameId = 0;
-    const schedule = () => {
-      if (frameId !== 0) return;
-      frameId = window.requestAnimationFrame(() => {
-        frameId = 0;
-        onResize();
-      });
-    };
-    window.addEventListener("resize", schedule);
-    const container = document.getElementById(MAP_CONTAINER_ID);
-    const observer = container && typeof ResizeObserver !== "undefined" ? new ResizeObserver(schedule) : null;
-    if (container) observer?.observe(container);
-    return () => {
-      window.removeEventListener("resize", schedule);
-      observer?.disconnect();
-      if (frameId !== 0) window.cancelAnimationFrame(frameId);
-      frameId = 0;
-    };
   }
 
   // src/renderer/map/visibleMapFrame.ts

@@ -1,4 +1,4 @@
-/* The selection panel at the map's bottom-left: header, chips, count, unit rows, and the Ranged and Strike row. */
+/* The selection panel at the map's bottom-left: header, chips, count, unit rows, the Ranged and Strike row, and the resize grip. */
 
 .selection-panel {
   position: absolute;
@@ -10,9 +10,8 @@
   max-height: calc(50% - 12px);
   display: flex;
   flex-direction: column;
-  gap: 8px;
   box-sizing: border-box;
-  padding: 10px 12px 12px;
+  overflow: hidden;
   background: var(--chrome-bg);
   color: var(--chrome-text);
   color-scheme: dark;
@@ -24,6 +23,16 @@
 .selection-panel[hidden],
 #canvas-container:has(#game-over-overlay:not(.hidden)) #selection-panel {
   display: none;
+}
+/* Everything but the grip. The unit rows scroll first; when the panel is dragged shorter than its fixed parts, the whole body scrolls. */
+.selection-panel-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+  padding: 10px 12px 12px;
 }
 
 /* ---------- Header ---------- */
@@ -97,10 +106,10 @@
 }
 
 /* ---------- Unit rows ---------- */
-/* The rows take the height that is left and scroll past it. */
+/* The rows take the height that is left and scroll past it, keeping room for one row. */
 .selection-panel-units {
   flex: 1 1 auto;
-  min-height: 0;
+  min-height: 35px;
   overflow-y: auto;
   margin: 0;
   padding: 0;
@@ -167,7 +176,7 @@
 }
 
 /* ---------- Ranged and Strike ---------- */
-/* Ranged, the strike target list, and its Cancel share one row. The row takes no space while all three are hidden. */
+/* Ranged or Strike, the strike target list, its Cancel, and the reason a greyed-out button cannot be used share one row. */
 .selection-panel-actions {
   flex: none;
   display: flex;
@@ -177,9 +186,30 @@
   padding-top: 8px;
   border-top: 1px solid var(--chrome-divider);
 }
-.selection-panel-actions:not(:has(> :not([style*="display: none"]))) {
+.selection-panel-action-note {
+  flex: 1 1 160px;
+  min-width: 0;
+  color: var(--chrome-muted);
+  font-size: 12px;
+}
+.selection-panel-action-note:empty {
   display: none;
 }
 .selection-panel #sidebar-error {
   margin: 0;
+}
+
+/* ---------- Resize grip ---------- */
+/* The panel is anchored at its bottom-left, so the grip sits at the opposite, top-right corner. */
+.selection-panel-grip {
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  right: 0;
+  width: 14px;
+  height: 14px;
+  cursor: nesw-resize;
+  touch-action: none;
+  background: linear-gradient(225deg, transparent 0 3px, var(--chrome-border) 3px 4px, transparent 4px 6px, var(--chrome-border) 6px 7px, transparent 7px);
+  border-top-right-radius: 6px;
 }

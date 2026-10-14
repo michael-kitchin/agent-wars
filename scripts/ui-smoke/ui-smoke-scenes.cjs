@@ -62,6 +62,8 @@ const SCENES = Object.freeze({
   selectionCleared: 'selection-cleared',
   selectionStack: 'selection-stack',
   strikeAiming: 'strike-aiming',
+  selectionResized: 'selection-resized',
+  selectionResizedMin: 'selection-resized-min',
   smallWindow: 'small-window',
   matchReopened: 'match-reopened',
   battleStart: 'battle-start',

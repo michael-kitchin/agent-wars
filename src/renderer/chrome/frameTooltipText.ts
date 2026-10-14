@@ -108,3 +108,13 @@ export const saveGameUnavailableTooltipText =
  * Exceptions: None.
  */
 export const selectionPanelCloseTooltipText = 'Clear the selection. Queued orders stay.';
+
+/**
+ * The selection panel grip's tip.
+ *
+ * Purpose: Says how the selection panel's grip resizes it, and that the size is not saved.
+ * When to use: `#selection-panel-grip`.
+ * Expected outcome: The control tip shows this sentence.
+ * Exceptions: None.
+ */
+export const selectionPanelGripTooltipText = 'Drag to resize this panel. The size lasts until the app closes.';

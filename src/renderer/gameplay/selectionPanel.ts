@@ -23,6 +23,7 @@ import { baselineUrbanHexCountForStrategicHex } from '../rendererTacticalHydrati
 import { paintTerrainSwatches } from '../rendering/terrainVisualStyles';
 import { unitIconPathForUnitType } from '../rendering/unitDrawing';
 import { onQueuedOrdersChanged, queuedOrderForUnit } from './queuedOrderRows';
+import { wireSelectionPanelResize } from './selectionPanelResize';
 
 /**
  * Renderer callbacks the panel needs.
@@ -238,13 +239,14 @@ export function renderSelectionPanel(deps: SelectionPanelDeps): void {
 }
 
 /**
- * Keeps the panel's order chips in step with the Orders tab.
+ * Keeps the panel's order chips in step with the Orders tab, and wires its resize grip.
  *
  * Purpose: A queued or cancelled order changes the panel without a selection change.
  * When to use: Once during renderer startup.
- * Expected outcome: The panel redraws after every change to the queued orders.
+ * Expected outcome: The panel redraws after every change to the queued orders, and its grip resizes it.
  * Exceptions: None.
  */
 export function wireSelectionPanel(deps: SelectionPanelDeps): void {
   onQueuedOrdersChanged(() => renderSelectionPanel(deps));
+  wireSelectionPanelResize();
 }

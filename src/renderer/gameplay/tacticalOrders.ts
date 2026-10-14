@@ -1,5 +1,5 @@
 import type { AirStrikeTargetType } from '../../shared/ipcTypes';
-import { selectionSupportButtonMode } from '../../shared/selectionSupportButtonMode';
+import { selectionSupportAction, selectionSupportButtonMode } from '../../shared/selectionSupportButtonMode';
 import {
   formatPendingAirStrikeSidebarLabel,
   formatPendingRangedAttackSidebarLabel,
@@ -221,11 +221,15 @@ export function cancelFerryForUnit(unitId: string, deps: TacticalOrderDeps): voi
 }
 
 /**
- * Rebuilds the pending ranged and air-strike rows and chooses Ranged, Strike, or neither for the current selection.
+ * Rebuilds the pending ranged and air-strike rows and sets Ranged or Strike for the current selection.
  *
- * Purpose: The shared button follows `selectionSupportButtonMode`. Clearing a targeting flag here must also drop a hover preview that sampled the old flag.
+ * Purpose: The shared button follows `selectionSupportButtonMode`, and `selectionSupportAction` labels and explains it
+ *   when it cannot be used. Clearing a targeting flag here must also drop a hover preview that sampled the old flag.
  * When to use: After a selection change, a pending-order change, or a targeting-mode toggle.
- * Expected outcome: Pending rows match the draft arrays. The button is hidden unless every resolved unit can range, or every resolved unit is air. `Cancel` stays while ranged mode is still valid. A true-to-false flag change nulls the hover preview, hides the block and slower tooltips, redraws, and starts one hover refresh.
+ * Expected outcome: Pending rows match the draft arrays. The button shows while units are selected. It is enabled
+ *   when every resolved unit can range, or every resolved unit is air; otherwise it is greyed out with its reason in
+ *   `#selection-panel-action-note`. `Cancel` stays while ranged mode is still valid. A true-to-false flag change nulls
+ *   the hover preview, hides the block and slower tooltips, redraws, and starts one hover refresh.
  * Exceptions: None. Returns immediately when `#ranged-attacks-list` is missing, and then leaves the button untouched.
  */
 export function updateRangedSidebar(deps: TacticalOrderDeps): void {
@@ -234,6 +238,7 @@ export function updateRangedSidebar(deps: TacticalOrderDeps): void {
   const btnEl = document.getElementById('ranged-attack-btn') as HTMLButtonElement | null;
   const strikeTypeEl = document.getElementById('air-strike-target-type') as HTMLSelectElement | null;
   const strikeCancelEl = document.getElementById('air-strike-cancel-btn') as HTMLButtonElement | null;
+  const actionNoteEl = document.getElementById('selection-panel-action-note');
   if (!listEl) return;
 
   const battle = S.tacticalBattleSnapshot;
@@ -273,10 +278,11 @@ export function updateRangedSidebar(deps: TacticalOrderDeps): void {
           .filter((unit): unit is NonNullable<typeof unit> => !!unit);
     const rangedWasActive = S.rangedModeActive;
     const strikeWasActive = S.airStrikeModeActive;
-    const mode = selectionSupportButtonMode(
-      selectedUnits.map((unit) => unit.unitType),
-      !!tb
-    );
+    const unitTypes = selectedUnits.map((unit) => unit.unitType);
+    const mode = selectionSupportButtonMode(unitTypes, !!tb);
+    const action = selectionSupportAction(unitTypes, !!tb);
+    btnEl.disabled = !action.enabled;
+    if (actionNoteEl) actionNoteEl.textContent = action.reason ?? '';
     if (mode === 'strike') {
       S.rangedModeActive = false;
       btnEl.textContent = 'Strike';
@@ -301,7 +307,10 @@ export function updateRangedSidebar(deps: TacticalOrderDeps): void {
       if (strikeTypeEl) strikeTypeEl.style.display = 'none';
       if (strikeCancelEl) strikeCancelEl.style.display = 'none';
     } else {
-      btnEl.style.display = 'none';
+      // Greyed out with its reason: the button stays visible so the player can see why it cannot be used.
+      btnEl.style.display = '';
+      btnEl.textContent = action.label;
+      btnEl.removeAttribute('data-control-tooltip');
       S.rangedModeActive = false;
       S.airStrikeModeActive = false;
       if (strikeTypeEl) strikeTypeEl.style.display = 'none';

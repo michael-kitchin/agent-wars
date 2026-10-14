@@ -37,13 +37,13 @@ One selection drives the [selection panel](selection-panel.md), the highlight on
 
 ## Selection and Targeting Modes
 
-- The support control is hidden when the selection is empty, when the selection mixes air with other types, or when any selected unit cannot make a direct ranged attack in the current theater.
+- The support control is greyed out, with its reason, when the selection mixes air with other types, or when any selected unit cannot make a direct ranged attack in the current theater. It is not on screen while the selection is empty, because the selection panel is hidden. See [right-panel-command-bar.md](right-panel-command-bar.md).
 - When every selected unit is air, the control offers Strike.
 - When every selected unit can make a direct ranged attack and none is air, the control offers Ranged. While that targeting mode is on, the label is Cancel.
 - Choosing Ranged or Strike does not change which units are selected. A successful target double-click then clears the selection. A single click while targeting is on does not.
 - Leaving the mode by Cancel turns the targeting mode off and keeps the selection. A failed target double-click keeps both the selection and the targeting mode. See [order-lifecycle.md](order-lifecycle.md).
 - An empty selection hides the control and turns both targeting modes off.
-- Strategic and tactical theaters use the same control. Which unit types count as ranged-capable follows the [combat rules](../combat-rules-v3.md) for the active theater. Strategic infantry does not show Ranged. Tactical infantry does.
+- Strategic and tactical theaters use the same control. Which unit types count as ranged-capable follows the [combat rules](../combat-rules-v3.md) for the active theater. A world-map selection that includes infantry and no air unit leaves Ranged greyed out, with its reason. Tactical infantry can fire.
 
 ## Strategic and Tactical Differences
 
@@ -56,7 +56,7 @@ The click, Shift-click, delay, and right-click rules are the same in both theate
 - Enemy units never become the selected units.
 - A left click on another hex never clears the unit selection. Right-click is the map gesture that clears it.
 - Shift is the only selection modifier. Control, Alt, and Meta never toggle a unit in or out of the selection.
-- Air mixed with any other type never shows Ranged or Strike.
+- Air mixed with any other type shows Strike greyed out, with its reason, and never starts targeting.
 
 ## Open Questions
 

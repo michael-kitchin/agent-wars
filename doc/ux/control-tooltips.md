@@ -58,6 +58,7 @@ The tip can appear whenever the control can receive the pointer or keyboard focu
 - Settings, Help, Load game, How to play, Build, and Forces: "<name> is not available in this version.", for example "Settings is not available in this version."
 - Collapse the console: Hide the console to widen the map. Click a tab to show it again.
 - Selection panel close: Clear the selection. Queued orders stay.
+- Selection panel grip: Drag to resize this panel. The size lasts until the app closes.
 - Production readout: The production your cities can add each turn. A city adds its share only while it is building, and a city on the neutral border adds none.
 - Forces readout: Units you have fielded, out of the most this game size allows: then each unit type as "infantry 3 of 12", separated by commas, ending with a period.
 - Your home readout: Hexes of your home region that you hold, out of all its hexes.
@@ -105,6 +106,7 @@ The tip can appear whenever the control can receive the pointer or keyboard focu
 - The build popup close control, and each queue row's remove control, in both the single-hex and multi-hex popups.
 - Order rows in the Orders tab, and their cancel controls.
 - The cancel control on an order in the selection panel.
+- Ranged or Strike while it is greyed out. Its reason shows beside it.
 - The choice on each tactical battles row.
 - The model dropdown. It uses the model description tooltip.
 

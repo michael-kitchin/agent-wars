@@ -383,6 +383,26 @@ function contestedHexEdit(state) {
   return { h3Index, statements: enemies.map((enemy) => ({ sql: 'UPDATE units SET h3_index = ? WHERE id = ?', params: [h3Index, enemy.id] })) };
 }
 
+/**
+ * Drags the selection panel's resize grip by an offset and lets go.
+ *
+ * Purpose: Exercises the grip the way a player would, including its size limits.
+ * When to use: While the selection panel is shown. Keep the end point inside the window.
+ * Expected outcome: The panel takes the dragged size, held inside its limits.
+ * Exceptions: Throws when the grip is not on screen.
+ */
+async function dragSelectionPanelGrip(page, dx, dy) {
+  const box = await page.locator('#selection-panel-grip').boundingBox();
+  if (!box) throw new Error('the selection panel grip is not on screen');
+  const x = box.x + box.width / 2;
+  const y = box.y + box.height / 2;
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await page.mouse.move(x + dx, y + dy, { steps: 8 });
+  await page.mouse.up();
+  await page.waitForTimeout(MAP_WAIT_MS.settle);
+}
+
 module.exports = {
   LAND_UNIT_TYPES,
   captureMainMap,
@@ -390,6 +410,7 @@ module.exports = {
   enterBattleAt,
   queueBattleMarch,
   selectLoneBattleUnit,
+  dragSelectionPanelGrip,
   readGameState,
   selectLoneUnit,
   selectHumanStack,
