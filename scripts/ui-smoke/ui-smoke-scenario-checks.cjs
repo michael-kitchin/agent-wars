@@ -2,7 +2,7 @@
  * Checks for the UI smoke run's later scenarios: the small window, the reopened match, a battle, a regional match, and
  * a finished match.
  *
- * Purpose: The console must hold up beyond the first world-map turn. These rows check them in
+ * Purpose: The console and the selection panel must hold up beyond the first world-map turn. These rows check them in
  *   the scenes that the second and third sessions of the run add.
  * When to use: Required by `ui-smoke-checks.cjs`, which runs these rows after the console's rows.
  * Expected outcome: Rows in the same shape as the frame checks: `{ name, scenes, needs, run(p, el) }`.
@@ -10,7 +10,17 @@
  */
 'use strict';
 
-const { SCENES } = require('./ui-smoke-scenes.cjs');
+const { SCENES, fmt } = require('./ui-smoke-scenes.cjs');
+
+/**
+ * Inset of map overlays from the map's edges, in CSS pixels.
+ *
+ * Purpose: The selection panel keeps this distance from every edge of the map, whatever its size.
+ * When to use: The small-window check.
+ * Expected outcome: Matches `.selection-panel` in `static/selectionChrome.css`.
+ * Exceptions: None.
+ */
+const MAP_OVERLAY_INSET = 12;
 
 /**
  * A world-map order row's line: an arrow, a two-character hex code, and the distance in hexes.
@@ -121,12 +131,40 @@ const SCENARIO_CHECKS = Object.freeze([
     },
   },
   {
-    name: 'selection-readout',
-    scenes: [SCENES.battleSelection, SCENES.regionalSelection],
-    needs: ['#sidebar-selected-unit'],
+    name: 'selection-panel-small-window',
+    scenes: [SCENES.smallWindow],
+    needs: ['#canvas-container', '#selection-panel'],
     run: (p, el) => {
-      const readout = el('#sidebar-selected-unit').text;
-      return readout !== '' && readout !== '—' ? null : `the selected-unit line reads "${readout}"`;
+      const c = el('#canvas-container');
+      const s = el('#selection-panel');
+      if (!s.shown) return 'the selection panel is not shown';
+      const inside = s.x >= c.x + MAP_OVERLAY_INSET - 1 && s.y >= c.y + MAP_OVERLAY_INSET - 1
+        && s.x + s.w <= c.x + c.w - MAP_OVERLAY_INSET + 1 && s.y + s.h <= c.y + c.h - MAP_OVERLAY_INSET + 1;
+      return inside ? null : `the selection panel is at ${fmt(s)}, outside the map ${fmt(c)} less ${MAP_OVERLAY_INSET} px on each side`;
+    },
+  },
+  {
+    name: 'selection-panel-battle',
+    scenes: [SCENES.battleSelection],
+    needs: ['#selection-panel', '#sidebar-selected-unit', '#selection-panel-count'],
+    run: (p, el) => {
+      if (!el('#selection-panel').shown) return 'the selection panel is not shown';
+      const header = el('#sidebar-selected-unit').text;
+      if (!/^\([0-9A-Z]{2}\.[0-9A-Z]{2}\)/.test(header)) return `the header reads "${header}", expected a battle cell code such as "(E8.K3)"`;
+      const count = el('#selection-panel-count').text;
+      return /^1 selected of \d+$/.test(count) ? null : `the count reads "${count}", expected "1 selected of N"`;
+    },
+  },
+  {
+    name: 'selection-panel-regional',
+    scenes: [SCENES.regionalSelection],
+    needs: ['#selection-panel', '#sidebar-selected-unit', '#selection-panel-count'],
+    run: (p, el) => {
+      if (!el('#selection-panel').shown) return 'the selection panel is not shown';
+      const header = el('#sidebar-selected-unit').text;
+      if (!/^\([0-9A-Z]{2}\) \S/.test(header)) return `the header reads "${header}", expected a hex code and its caption`;
+      const count = el('#selection-panel-count').text;
+      return count === '1 selected of 1' ? null : `the count reads "${count}", expected "1 selected of 1"`;
     },
   },
 ]);

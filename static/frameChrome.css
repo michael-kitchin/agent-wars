@@ -316,19 +316,6 @@ body:has(#game-over-overlay:not(.hidden)) #sidebar {
 #console-panel-opponent .openrouter-log {
   min-height: 120px;
 }
-.console-panel > p:first-child {
-  margin-top: 0;
-}
-/* Ranged, the strike target list, and its Cancel share one row. The row takes no space while all three are hidden. */
-.console-ranged-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  gap: 0.35rem;
-}
-.console-ranged-row:not(:has(> :not([style*="display: none"]))) {
-  display: none;
-}
 .console-rail {
   grid-area: rail;
   display: flex;

@@ -1,6 +1,6 @@
 # Right Panel Command Bar
 
-Ready, in the right panel's footer, and the Ranged and air-strike controls on the Orders tab. The game-state readout is the date block in the [top bar](top-bar.md).
+Ready, in the right panel's footer, and the Ranged and air-strike controls in the [selection panel](selection-panel.md). The game-state readout is the date block in the [top bar](top-bar.md).
 
 ## Purpose
 
@@ -8,12 +8,12 @@ Give the player the buttons that end the turn or start a targeted order.
 
 ## Availability
 
-Ready shows whenever the right panel does. Ranged and the air-strike controls show while the Orders tab is selected and the panel is expanded. All of them follow the rules below in Strategic planning and Tactical planning. While the tactical battles list is open, the bar stays visible and does not receive pointer input. In New game and Game over the panel is absent, so these controls are absent with it. In Tactical annihilation they are disabled or hidden as stated in [modes-and-transitions.md](modes-and-transitions.md).
+Ready shows whenever the right panel does. Ranged and the air-strike controls show in the selection panel, which shows while units are selected. All of them follow the rules below in Strategic planning and Tactical planning. While the tactical battles list is open, the bar stays visible and does not receive pointer input. In New game and Game over the right panel and the selection panel are absent, so these controls are absent with them. In Tactical annihilation they are disabled or hidden as stated in [modes-and-transitions.md](modes-and-transitions.md).
 
 ## Information Displayed
 
 - The Ready button, across the width of the right panel's footer. Its label is "Ready", or "AI:" plus the elapsed wait, while opponent planning is still running. While the right panel is collapsed, Ready narrows to the tab rail's width and the "AI:" label takes two lines.
-- The Ranged control, on the Orders tab under the selected-unit readout. The row takes no space while Ranged, the target list, and Cancel are all hidden. Its label is "Ranged", "Cancel", or "Strike". The air-strike target list and its Cancel button use that same height.
+- The Ranged control, in the selection panel's last row. The row takes no space while Ranged, the target list, and Cancel are all hidden. Its label is "Ranged", "Cancel", or "Strike". The air-strike target list and its Cancel button use that same height.
 - While Strike targeting is on, a target-type choice: Enemy Units, Production, Airports, or Seaports, and a Cancel button for that targeting.
 - Control tips for Ready, Ranged, Strike, the target-type list, and Cancel are in [control-tooltips.md](control-tooltips.md).
 
@@ -60,6 +60,7 @@ Ready shows whenever the right panel does. Ranged and the air-strike controls sh
 ## Related Documents
 
 - [right-panel.md](right-panel.md)
+- [selection-panel.md](selection-panel.md)
 - [selection-model.md](selection-model.md)
 - [order-lifecycle.md](order-lifecycle.md)
 - [modes-and-transitions.md](modes-and-transitions.md)

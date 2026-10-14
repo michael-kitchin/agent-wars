@@ -8,7 +8,7 @@ Collect the settings for a match, and later tell the player who won.
 
 ## Availability
 
-Opens in New game and in Game over. See [modes-and-transitions.md](modes-and-transitions.md). It opens at startup when no match is loaded, when the player clicks New game in the game menu, and when the match ends. It cannot be dismissed without starting a match. The top bar and the right panel are not on screen while it is open, including while the form is hidden, and the map fills the window. While the form is showing, the map does not accept pointer input either. While the form is hidden, drag and the wheel pan and zoom the preview.
+Opens in New game and in Game over. See [modes-and-transitions.md](modes-and-transitions.md). It opens at startup when no match is loaded, when the player clicks New game in the game menu, and when the match ends. It cannot be dismissed without starting a match. The top bar, the right panel, and the selection panel are not on screen while it is open, including while the form is hidden, and the map fills the window. While the form is showing, the map does not accept pointer input either. While the form is hidden, drag and the wheel pan and zoom the preview.
 
 ## Information Displayed
 

@@ -191,6 +191,7 @@ import {
   isPendingMovementOrderForDisplay,
   updatePendingOrdersSidebar as updatePendingOrdersSidebarFromModule,
 } from './gameplay/sidebarSupport';
+import { wireSelectionPanel } from './gameplay/selectionPanel';
 
 /**
  * Bridges renderer shared tactical fields into tactical exit/advance helpers without those modules importing `renderer.ts`.
@@ -621,6 +622,7 @@ function init(): void {
   });
   installUnitOriginTooltip();
   wireConsoleFrame();
+  wireSelectionPanel({ formatUnitDisplayName });
   wireGameMenu();
   // Contract anchors retained after extraction:
   // applyModifierDrivenPopoverCloseRules('shift_pressed');

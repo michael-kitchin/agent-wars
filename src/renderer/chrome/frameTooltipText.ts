@@ -1,17 +1,14 @@
 /**
- * Purpose: Control tips for the app frame around the map.
- * When to use: Set `data-control-tooltip` from these values. Static markup in `static/index.html` repeats the same characters.
- * Expected outcome: The player sees the sentence unchanged.
- * Exceptions: None.
- */
-
-/**
+ * The Orders tab's tip. This module holds the control tips for the app frame around the map: set
+ * `data-control-tooltip` from these values, and keep the static markup in `static/index.html` the same, character for
+ * character.
+ *
  * Purpose: Says what the Orders tab shows.
  * When to use: `#console-tab-orders`.
  * Expected outcome: The control tip shows this sentence.
  * Exceptions: None.
  */
-export const ordersTabTooltipText = 'Show the selected unit and the orders queued for this turn or beat.';
+export const ordersTabTooltipText = 'Show the orders queued for this turn or beat.';
 
 /**
  * Purpose: Says what the Opponent tab shows.
@@ -101,3 +98,13 @@ export const quitTooltipText = 'Close Agent Wars.';
  */
 export const saveGameUnavailableTooltipText =
   'Saving to a file is not available in this version. The match in progress is kept on disk between sessions.';
+
+/**
+ * The selection panel close button's tip.
+ *
+ * Purpose: Says the selection panel's × clears the selection and keeps the orders.
+ * When to use: `#selection-panel-close`.
+ * Expected outcome: The control tip shows this sentence.
+ * Exceptions: None.
+ */
+export const selectionPanelCloseTooltipText = 'Clear the selection. Queued orders stay.';

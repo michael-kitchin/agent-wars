@@ -28,6 +28,7 @@ const {
   queueBattleMarch,
   queueLoneUnitMarch,
   readGameState,
+  selectHumanStack,
   selectLoneBattleUnit,
   selectLoneUnit,
 } = require('./ui-smoke-map.cjs');
@@ -82,7 +83,7 @@ const REGIONAL_SCENARIO = Object.freeze({
 /**
  * The window size of the small-window scene: the app's minimum.
  *
- * Purpose: The console's contents must still fit there.
+ * Purpose: The console's contents and the selection panel must still fit there.
  * When to use: The small-window scene.
  * Expected outcome: The last entry of `VIEWPORTS`.
  * Exceptions: None.
@@ -340,9 +341,27 @@ async function runFirstSession(app, page, report, outDir) {
   await page.waitForTimeout(SETTLE_MS.click);
   await recordScene(page, report, outDir, SCENES.ordersQueued);
 
-  // At the minimum window size, the Orders tab must still fit the console.
+  await page.click('#selection-panel-close');
+  await parkPointer(page);
+  await page.waitForTimeout(SETTLE_MS.click);
+  await recordScene(page, report, outDir, SCENES.selectionCleared);
+
+  await selectHumanStack(page);
+  await parkPointer(page);
+  await recordScene(page, report, outDir, SCENES.selectionStack);
+
+  // Aim an air strike from the selection panel, record it, then stop aiming.
+  await selectLoneUnit(page, await readGameState(page), 'air');
+  await page.click('#ranged-attack-btn');
+  await parkPointer(page);
+  await page.waitForTimeout(SETTLE_MS.click);
+  await recordScene(page, report, outDir, SCENES.strikeAiming);
+  await page.click('#air-strike-cancel-btn');
+
+  // At the minimum window size, select the stack; the selection panel must stay on the map.
   await setViewport(app, page, SMALL_WINDOW);
   await page.waitForTimeout(SETTLE_MS.resize);
+  await selectHumanStack(page);
   await parkPointer(page);
   await recordScene(page, report, outDir, SCENES.smallWindow);
 

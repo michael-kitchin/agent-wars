@@ -1,6 +1,4 @@
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
-import { rendererSharedState as S } from './state';
-import { setUnitNameContent } from './unitOriginFlags';
 import { initializeScenarioRegionSelectorsOnOverlayOpen } from '../gameplay/newGameRegionUi';
 import { prepareNewGameMapPanel, selectedNewGameTab } from '../gameplay/newGameMapUi';
 import { showGameOverBanner, showNewGameBanner } from '../gameplay/newGameBanner';
@@ -15,32 +13,20 @@ import { renderTopBarStatus } from '../chrome/topBar';
 import { closeGameMenu } from '../chrome/gameMenu';
 import { refreshConsoleHeader } from '../chrome/consoleFrame';
 import { syncSidebarOrderRowSelection } from '../gameplay/sidebarOrderRow';
+import { renderSelectionPanel } from '../gameplay/selectionPanel';
 
 /**
- * Refreshes the selected-unit line and the selection highlight of the order rows.
+ * Refreshes everything that shows the selection: the selection panel and the highlight of the order rows.
  *
- * Purpose: Shows which unit the player has selected, with its origin flag.
+ * Purpose: Keeps the name every caller already uses; the "Selected unit" line is now the selection panel.
  * When to use: After any selection change or snapshot that can change unit names.
- * Expected outcome: The primary unit's flag and name, followed by ` (+N)` when more units are selected;
- *   an em dash when nothing is selected. Order rows of selected units are highlighted.
+ * Expected outcome: The selection panel describes the selected units, or hides when none are selected. Order rows of
+ *   selected units are highlighted.
  * Exceptions: None.
  */
-export function updateSidebar(
-  getPrimarySelectedUnitId: () => string | null,
-  formatUnitDisplayName: (unitId: string) => string
-): void {
+export function updateSidebar(formatUnitDisplayName: (unitId: string) => string): void {
   syncSidebarOrderRowSelection();
-  const selectedUnitEl = document.getElementById('sidebar-selected-unit');
-  if (selectedUnitEl) {
-    const primary = getPrimarySelectedUnitId();
-    if (!primary) {
-      selectedUnitEl.textContent = S.selectedUnitIds.length <= 1 ? '—' : `— (+${S.selectedUnitIds.length - 1})`;
-      return;
-    }
-    const extraCount = S.selectedUnitIds.length - 1;
-    const suffix = extraCount > 0 ? ` (+${extraCount})` : '';
-    setUnitNameContent(selectedUnitEl, primary, `${formatUnitDisplayName(primary)}${suffix}`);
-  }
+  renderSelectionPanel({ formatUnitDisplayName });
 }
 
 /**

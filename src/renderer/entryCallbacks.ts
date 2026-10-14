@@ -766,7 +766,7 @@ export async function buildMeleeInterceptHexPopupHtmlForStrategic(h3Index: strin
  * Exceptions: None.
  */
 export function updateSidebar(): void {
-  return updateSidebarFromModule(getPrimarySelectedUnitId, formatUnitDisplayName);
+  return updateSidebarFromModule(formatUnitDisplayName);
 }
 
 /**

@@ -165,11 +165,41 @@ function loneHumanUnit(units, unitTypes) {
 }
 
 /**
- * Clicks a lone unit's hex and waits until it is selected.
+ * Waits until the selection panel lists exactly these units.
+ *
+ * Purpose: Each selection action ends when the panel shows its result.
+ * When to use: After a click that changes the selection.
+ * Expected outcome: Resolves once the panel's rows are these unit ids, in any order.
+ * Exceptions: Throws a Playwright timeout when the panel does not show them.
+ */
+async function waitForSelectedUnits(page, unitIds) {
+  await page.waitForFunction((expected) => {
+    const rows = [...document.querySelectorAll('#selection-panel-units .selection-panel-unit')].map((row) => row.dataset.unitId);
+    return rows.length === expected.length && expected.every((id) => rows.includes(id));
+  }, unitIds, { timeout: MAP_WAIT_MS.order });
+  await page.waitForTimeout(MAP_WAIT_MS.settle);
+}
+
+/**
+ * Clears the selection with the selection panel's ×, when anything is selected.
+ *
+ * Purpose: While units are selected, a click on another hex plans an order instead of selecting, so every
+ *   selection action starts from an empty selection.
+ * When to use: At the start of each selection action.
+ * Expected outcome: The selection panel is hidden.
+ * Exceptions: Throws a Playwright timeout when the panel stays open.
+ */
+async function clearSelection(page) {
+  if (await page.isVisible('#selection-panel')) await page.click('#selection-panel-close');
+  await page.waitForSelector('#selection-panel', { state: 'hidden', timeout: MAP_WAIT_MS.order });
+}
+
+/**
+ * Clicks a lone unit's hex and waits until it is the only selected unit.
  *
  * Purpose: Starts every scene that needs one selected unit.
- * When to use: After `captureMainMap`, while nothing is selected.
- * Expected outcome: The selected-unit line names a unit. Returns the unit's hex.
+ * When to use: After `captureMainMap`.
+ * Expected outcome: The selection panel lists only that unit. Returns the unit's hex.
  * Exceptions: Throws when the scenario has no such unit, or the selection does not appear.
  */
 async function selectLoneUnit(page, state, unitType) {
@@ -179,21 +209,43 @@ async function selectLoneUnit(page, state, unitType) {
 }
 
 /**
- * Clicks a unit that stands alone in its hex and waits until a unit is selected.
+ * Clicks a unit that stands alone in its hex and waits until it is the only selected unit.
  *
  * Purpose: World-map units and battle units are selected the same way.
- * When to use: For a unit `loneHumanUnits` returned, while nothing else is selected.
- * Expected outcome: The selected-unit line names a unit instead of an em dash.
+ * When to use: For a unit `loneHumanUnits` returned.
+ * Expected outcome: The selection panel lists only that unit.
  * Exceptions: Throws a Playwright timeout when the selection does not appear.
  */
 async function selectUnitInItsHex(page, unit) {
+  await clearSelection(page);
   const point = await hexClientPoint(page, unit.h3Index);
   await page.mouse.click(point.x, point.y);
-  await page.waitForFunction(() => {
-    const readout = document.getElementById('sidebar-selected-unit');
-    return readout !== null && readout.textContent.trim() !== '' && readout.textContent.trim() !== '—';
-  }, null, { timeout: MAP_WAIT_MS.order });
-  await page.waitForTimeout(MAP_WAIT_MS.settle);
+  await waitForSelectedUnits(page, [unit.id]);
+}
+
+/**
+ * Clicks a hex that holds two or more of the player's units and no enemy, and selects them all from the unit list.
+ *
+ * Purpose: Gives the selection panel several units in one hex.
+ * When to use: After `captureMainMap`.
+ * Expected outcome: Every unit in that hex is selected and the unit list is closed again.
+ * Exceptions: Throws when the scenario has no such hex, or the list or the selection does not appear.
+ */
+async function selectHumanStack(page) {
+  const state = await readGameState(page);
+  const countByHex = unitCountByHex(state.units);
+  const stack = state.units.find((u) => u.player === 'human' && countByHex.get(u.h3Index) >= 2
+    && state.units.every((other) => other.h3Index !== u.h3Index || other.player === 'human'));
+  if (!stack) throw new Error('the scenario has no hex holding two or more human units and no enemy');
+  const unitIds = state.units.filter((u) => u.h3Index === stack.h3Index).map((u) => u.id);
+  await clearSelection(page);
+  const point = await hexClientPoint(page, stack.h3Index);
+  await page.mouse.click(point.x, point.y);
+  await page.waitForSelector('#stack-callout:not(.hidden)', { timeout: MAP_WAIT_MS.order });
+  await page.click('#stack-callout .stack-callout-actions button:not(.stack-close-btn)');
+  await waitForSelectedUnits(page, unitIds);
+  await page.keyboard.press('Escape');
+  await page.waitForSelector('#stack-callout.hidden', { state: 'attached', timeout: MAP_WAIT_MS.order });
 }
 
 /**
@@ -340,5 +392,6 @@ module.exports = {
   selectLoneBattleUnit,
   readGameState,
   selectLoneUnit,
+  selectHumanStack,
   queueLoneUnitMarch,
 };

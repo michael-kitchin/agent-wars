@@ -100,6 +100,19 @@ function iconPathForType(unitType: UnitIconType): string {
 }
 
 /**
+ * Path of the glyph for a unit type, for page elements that show a unit's type.
+ *
+ * Purpose: A list row and the map token use the same glyph.
+ * When to use: As an `<img>` source in panel markup.
+ * Expected outcome: `units/<type>.svg`; a type with no glyph of its own uses the mixed glyph.
+ * Exceptions: None.
+ */
+export function unitIconPathForUnitType(unitType: string): string {
+  const known = Object.prototype.hasOwnProperty.call(UNIT_ICON_FILE_BY_TYPE, unitType);
+  return iconPathForType(known ? (unitType as UnitIconType) : 'mixed');
+}
+
+/**
  * Defines the `getOrStartUnitIconLoad` function shape (function getOrStartUnitIconLoad(unitType: UnitIconType): HTMLImageElement | null).
 
  * Purpose: Supports maintainability by documenting why `getOrStartUnitIconLoad` exists.

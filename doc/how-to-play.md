@@ -53,9 +53,9 @@ I'll add screenshots of specific functions as I can.
 
 1. **Pan:** Drag with the left mouse button, or use WASD / arrow keys.
 2. **Zoom:** Mouse wheel (zooms toward the cursor). Zoomed in, contested strategic hexes show a marker that starts a tactical battle.
-3. **Select units:** Click a teal (human) unit's icon. A lone unit is selected right away. A stack opens a list of its units, where you can pick one or use **+ All**.
+3. **Select units:** Click a teal (human) unit's icon. A lone unit is selected right away. A stack opens a list of its units, where you can pick one or use **+ All**. The selection panel at the map's bottom-left names the hex and lists the selected units with their orders; its **×** clears the selection.
 4. **Issue a move order:** With units selected, double-click a destination hex (land/water/terrain rules apply). The order appears in the Movement group of the Orders tab, with the destination's hex code and its distance, such as "→ E5 · 1h". Click a row to select that unit again. A destination beyond this turn's reach becomes a march that continues on later turns.
-5. **Ranged attack (armor or naval on strategic; broader types on tactical):** With capable units selected, click **Ranged**, then double-click an enemy hex within range. An all-air selection shows **Strike** instead. Attacks are submitted with Ready. See [Aiming ranged attacks and air strikes](#aiming-ranged-attacks-and-air-strikes).
+5. **Ranged attack (armor or naval on strategic; broader types on tactical):** With capable units selected, click **Ranged** in the selection panel, then double-click an enemy hex within range. An all-air selection shows **Strike** instead. Attacks are submitted with Ready. See [Aiming ranged attacks and air strikes](#aiming-ranged-attacks-and-air-strikes).
 6. **Ready:** Click **Ready** to submit orders and resolve the turn. A side wins by controlling the enemy home or wiping out its urban cells (rules in [region-vs-region.md](region-vs-region.md)). The new-game dialog then returns for the next match.
 7. You can issue multiple movement and ranged orders (one per unit each) before clicking Ready.
 
@@ -90,7 +90,7 @@ The full input map, including the exceptions, is in [ux/input-map.md](ux/input-m
 - **Hovering a valid target:** a dashed line in the same color runs from each selected unit to the target.
 - **Hovering an invalid target:** a teal X marks the hex. After a second, a tip says why.
 - **Firing:** double-click the target. A single click does nothing. A failed double-click shows an error and keeps you aiming.
-- **Stopping:** click **Cancel** or right-click the map. Escape doesn't end aiming.
+- **Stopping:** click **Cancel**, click the selection panel's **×**, or right-click the map. Escape doesn't end aiming.
 - **What it doesn't show:** the outline ignores line of sight. In a battle, a mountain can still block a shot inside it.
 - **Moves:** there is no reach outline for movement. Hovering a destination draws a teal route, solid for this turn and dashed beyond.
 
@@ -102,7 +102,7 @@ The full input map, including the exceptions, is in [ux/input-map.md](ux/input-m
 
 - **Bases:** air units sit at an airport and don't march. They strike from there and return in the same turn.
 - **One action a turn:** strike or ferry, not both.
-- **Target types:** **Enemy Units**, **Production** (a city's urban cells), **Airports**, and **Seaports**. The list keeps your last choice. The Air strikes row names that choice, such as "· Airports".
+- **Target types:** **Enemy Units**, **Production** (a city's urban cells), **Airports**, and **Seaports**. The list keeps your last choice.
 - **Odds:** a strike hits on 10 or less (50%), before cover and bonuses.
 - **Striking units:** a hit removes one unit. Armor, naval, and air units based in the target hex shoot back, and any hit destroys the striker. Strategic infantry can't shoot back.
 - **Striking a city:** a hit destroys 9 urban cells, which permanently lowers the hex's production. The striker faces a 15% counter-fire roll.
@@ -111,7 +111,7 @@ The full input map, including the exceptions, is in [ux/input-map.md](ux/input-m
 - **Several ports:** some hexes have more than one airport or seaport cell. They keep basing air units or building ships until every one is wrecked.
 - **For good:** destroyed cities, airports, and seaports never rebuild. You can bomb your own.
 - **Losing a base:** an air unit dies if an enemy ground unit takes its airport hex, or if a strike hits that hex's airport.
-- **Ferrying:** with only air units selected, double-click one of your airports within 4 hexes. The Movement row ends with "· Ferry". With the weather bonus on, a unit without the snow tag can ferry only 2 hexes into snow.
+- **Ferrying:** with only air units selected, double-click one of your airports within 4 hexes. With the weather bonus on, a unit without the snow tag can ferry only 2 hexes into snow.
 - **Vision:** each air unit sees 3 hexes around its base, even when it does nothing.
 - **Regional maps:** a city hit destroys that map's own number of urban cells.
 

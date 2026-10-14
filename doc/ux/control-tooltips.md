@@ -53,10 +53,11 @@ The tip can appear whenever the control can receive the pointer or keyboard focu
 - Air-strike Cancel: Stop aiming an air strike and show Strike again. Strikes already in the list stay there.
 - Tools tab: Show the tools the opponent can use, and turn each group on or off.
 - Model tab: Show the API key, model, reasoning effort, and the Run control for opponent planning.
-- Orders tab: Show the selected unit and the orders queued for this turn or beat.
+- Orders tab: Show the orders queued for this turn or beat.
 - Opponent tab: Show the opponent's model, its tools, and the AI activity log.
 - Settings, Help, Load game, How to play, Build, and Forces: "<name> is not available in this version.", for example "Settings is not available in this version."
 - Collapse the console: Hide the console to widen the map. Click a tab to show it again.
+- Selection panel close: Clear the selection. Queued orders stay.
 - Production readout: The production your cities can add each turn. A city adds its share only while it is building, and a city on the neutral border adds none.
 - Forces readout: Units you have fielded, out of the most this game size allows: then each unit type as "infantry 3 of 12", separated by commas, ending with a period.
 - Your home readout: Hexes of your home region that you hold, out of all its hexes.
@@ -103,6 +104,7 @@ The tip can appear whenever the control can receive the pointer or keyboard focu
 - The stack callout close control, and its per-unit selection controls, including "+ All" and "- All".
 - The build popup close control, and each queue row's remove control, in both the single-hex and multi-hex popups.
 - Order rows in the Orders tab, and their cancel controls.
+- The cancel control on an order in the selection panel.
 - The choice on each tactical battles row.
 - The model dropdown. It uses the model description tooltip.
 

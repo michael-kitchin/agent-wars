@@ -4,7 +4,7 @@ How the player selects human units, and what clears or keeps that selection.
 
 ## Purpose
 
-One selection drives the right-panel readout, ranged and strike targeting, and double-click orders. Hex clicks also record the hex under the pointer for orders, which is separate from the unit selection.
+One selection drives the [selection panel](selection-panel.md), the highlight on the Orders tab's rows, ranged and strike targeting, and double-click orders. Hex clicks also record the hex under the pointer for orders, which is separate from the unit selection.
 
 ## What Can Be Selected
 
@@ -24,11 +24,11 @@ One selection drives the right-panel readout, ranged and strike targeting, and d
 - When that hex has two or more selectable human units, or none, Shift-click schedules the callout and does not toggle a unit from the icon. A plain click on a unit icon still schedules the callout, except a hex with exactly one stationary selectable human unit. Releasing Shift closes an open callout, including one that is scheduled but not open yet. Shift-click on an Orders tab row and a callout row's Shift toggle still toggle. See [input-map.md](input-map.md).
 - When the click is the second press of a double-click on the same spot, the click does not retarget the selection. The order is planned for the units selected at the start of the gesture.
 - When Ranged and Strike targeting are off and the player clicks a unit icon, and no hover order preview is already active, the stack callout opens after the same delay, except a Shift-click on one selectable human unit, and except a plain click on a hex with exactly one stationary selectable human unit. The preview that then appears because the pointer is still on the selected units' hex does not cancel or close that callout. A later click while that preview remains active does not open it again. Moving the pointer onto another hex while a preview is active does. The second press of a double-click on that spot does not schedule another callout. A double-click that plans an order cancels the one already scheduled.
-- The selected-unit readout shows one unit name, or that name plus a count of the other selected units. It shows an em dash when nothing is selected.
+- The [selection panel](selection-panel.md) lists the selected units and describes the first selected unit's hex. It is hidden when nothing is selected.
 
 ## Clearing and Keeping a Selection
 
-- When the player right-clicks the map while units are selected or a hover preview is showing, the selection, the gesture snapshot, the selected hex, the hover preview, and both targeting modes clear. Orders already queued stay queued.
+- When the player right-clicks the map, or clicks the selection panel's close control, while units are selected or a hover preview is showing, the selection, the gesture snapshot, the selected hex, the hover preview, and both targeting modes clear. Orders already queued stay queued.
 - When the player right-clicks with nothing selected and no hover preview, only the gesture snapshot clears.
 - When a ranged attack or air strike is accepted, the selection clears and that targeting mode turns off.
 - When a grouped march or ferry is committed, the selection clears. See [order-lifecycle.md](order-lifecycle.md).

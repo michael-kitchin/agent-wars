@@ -37,7 +37,7 @@ A map toast can summarize losses the player can see. Combat outside vision is an
 
 - The animation does not have its own controls.
 - While playback runs, map gestures that change orders or the selection are ignored. That covers unit clicks and Shift-clicks, opening the stack callout, Ranged and Strike target double-clicks, double-click march and ferry, and build marker clicks and build queue edits. Hover order previews are not drawn.
-- While playback runs, the player can still drag to pan, zoom with the wheel, read hex tooltips, and right-click to clear selection chrome. A tactical entry marker still starts a battle, which cancels a strategic playback. Build markers and tactical entry markers are hidden while dice chips are showing, so a tactical entry marker can't be clicked then. Both come back when the chips fade.
+- While playback runs, the player can still drag to pan, zoom with the wheel, read hex tooltips, and right-click to clear selection chrome. The selection panel's close control still clears the selection, and queued orders stay queued. A tactical entry marker still starts a battle, which cancels a strategic playback. Build markers and tactical entry markers are hidden while dice chips are showing, so a tactical entry marker can't be clicked then. Both come back when the chips fade.
 - The right panel is not blocked by playback. Its own rules apply.
 
 ### Keyboard

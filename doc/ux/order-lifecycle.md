@@ -63,7 +63,7 @@ Build orders are queue rows on a hex, not map double-clicks. See [build-popup.md
 - Right-click never cancels queued orders.
 - Entering a tactical battle never deletes strategic drafts. It hides them until the battle ends.
 - Starting a new match clears drafts and discards the stash.
-- A rejected Ranged or Strike target double-click never turns targeting off. Targeting turns off only on Cancel, a successful target double-click, right-click, a selection that can no longer fire, or entering a battle. A single click does not turn it off.
+- A rejected Ranged or Strike target double-click never turns targeting off. Targeting turns off only on Cancel, a successful target double-click, right-click, the selection panel's close control, a selection that can no longer fire, or entering a battle. The close control clears targeting the same way right-click does, and queued orders stay queued. A single click does not turn it off.
 - Drafting, changing, or cancelling an order never cancels or restarts opponent planning in either theater. See [modes-and-transitions.md](modes-and-transitions.md).
 - Every queued order that Ready will submit is visible in one of the three order groups.
 - Sealift assignment is never a pending order.

@@ -31,7 +31,7 @@ When no match is loaded, the basemap can still be visible under the new-game ove
 - When the player drags with Shift held, the map draws a box and zooms to fit it. It does not pan or select.
 - When the player clicks, the gesture follows [selection-model.md](selection-model.md) and [order-lifecycle.md](order-lifecycle.md).
 - When the player clicks outside the battle area during Tactical planning, the map shows an error toast and does not select or order.
-- During Resolution playback, clicks and double-clicks do not select, target, or order. Drag, wheel, hex tooltips, and right-click still work.
+- During Resolution playback, clicks and double-clicks do not select, target, or order. Drag, wheel, hex tooltips, and right-click still work. The selection panel's close control still clears the selection.
 - When the player right-clicks, selection chrome clears and queued orders stay. See [selection-model.md](selection-model.md).
 
 ### Keyboard

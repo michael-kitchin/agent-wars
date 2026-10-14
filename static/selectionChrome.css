@@ -1,0 +1,185 @@
+/* The selection panel at the map's bottom-left: header, chips, count, unit rows, and the Ranged and Strike row. */
+
+.selection-panel {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  z-index: 6200;
+  width: 400px;
+  max-width: calc(100% - 24px);
+  max-height: calc(50% - 12px);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-sizing: border-box;
+  padding: 10px 12px 12px;
+  background: var(--chrome-bg);
+  color: var(--chrome-text);
+  color-scheme: dark;
+  border: 1px solid var(--chrome-border);
+  border-radius: 6px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+  font-size: 13px;
+}
+.selection-panel[hidden],
+#canvas-container:has(#game-over-overlay:not(.hidden)) #selection-panel {
+  display: none;
+}
+
+/* ---------- Header ---------- */
+.selection-panel-header {
+  flex: none;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.selection-panel-place {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+}
+.selection-panel-place strong:first-child {
+  font-size: 14px;
+}
+.selection-panel-close {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--chrome-border);
+  border-radius: 3px;
+  background: transparent;
+  color: var(--chrome-text);
+  font-size: 14px;
+  line-height: 1;
+}
+.selection-panel-close:hover {
+  background: var(--chrome-bg-raised);
+}
+
+/* ---------- Chips and count ---------- */
+.selection-panel-chips {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.selection-panel-chips:empty {
+  display: none;
+}
+.selection-panel-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border: 1px solid var(--chrome-border);
+  border-radius: 10px;
+  background: var(--chrome-bg-raised);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.selection-panel-chip-home {
+  border-color: var(--chrome-accent-edge);
+}
+.selection-panel-chip-enemy-home {
+  border-color: var(--chrome-opponent-edge);
+}
+.selection-panel-count {
+  flex: none;
+  margin: 2px 0 0;
+  color: var(--chrome-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* ---------- Unit rows ---------- */
+/* The rows take the height that is left and scroll past it. */
+.selection-panel-units {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.selection-panel-unit {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border-top: 1px solid var(--chrome-divider);
+}
+.selection-panel-unit-type {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  padding: 3px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  background: var(--player-human);
+  border: 1px solid var(--chrome-accent-edge);
+}
+.selection-panel-unit-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.selection-panel-unit-hex {
+  flex: none;
+  color: var(--chrome-muted);
+  font-size: 12px;
+}
+.selection-panel-order {
+  flex: none;
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 1px 2px 1px 8px;
+  border: 1px solid var(--chrome-accent-edge);
+  border-radius: 3px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.selection-panel-order-none {
+  padding: 2px 8px;
+  border-color: var(--chrome-border);
+  color: var(--chrome-muted);
+}
+.selection-panel-order-cancel {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: 2px;
+  background: transparent;
+  color: var(--chrome-text);
+  font-size: 13px;
+  line-height: 1;
+}
+.selection-panel-order-cancel:hover {
+  background: var(--chrome-bg-raised);
+}
+
+/* ---------- Ranged and Strike ---------- */
+/* Ranged, the strike target list, and its Cancel share one row. The row takes no space while all three are hidden. */
+.selection-panel-actions {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  padding-top: 8px;
+  border-top: 1px solid var(--chrome-divider);
+}
+.selection-panel-actions:not(:has(> :not([style*="display: none"]))) {
+  display: none;
+}
+.selection-panel #sidebar-error {
+  margin: 0;
+}

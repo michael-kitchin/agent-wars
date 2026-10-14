@@ -9,6 +9,7 @@
 
 import { rendererSharedState as S } from '../core/state';
 import {
+  clearMapSelectionChrome,
   shouldBlockEmbarkedLandUnitSelect,
 } from '../core/selection';
 import { emitParityDiagnosticsBreadcrumb } from '../core/parityDiagnostics';
@@ -57,6 +58,68 @@ export function clearDeferredStackCalloutTimer(): void {
     clearTimeout(S.pendingStackCalloutTimeout);
     S.pendingStackCalloutTimeout = null;
   }
+}
+
+/**
+ * Renderer callbacks that refresh the views after the selection is cleared.
+ *
+ * Purpose: Keeps `clearSelectionLikeRightClick` free of a dependency on the renderer entry module.
+ * When to use: Pass the main-map interaction dependencies, which include all three.
+ * Expected outcome: The selection panel, the Ranged and Strike row, and the map follow the cleared selection.
+ * Exceptions: None.
+ */
+export interface SelectionClearRefreshDeps {
+  /**
+   * Redraws the selection panel and the order-row highlight.
+   *
+   * Contract: Same as `updateSidebar` in the renderer entry module.
+   * When to use: After the selection changes.
+   * Expected outcome: The panel hides when nothing is selected.
+   * Exceptions: None.
+   */
+  readonly updateSidebar: () => void;
+  /**
+   * Redraws the ranged and air-strike groups and the Ranged and Strike controls.
+   *
+   * Contract: Same as `updateRangedSidebar` in the renderer entry module.
+   * When to use: After the selection changes.
+   * Expected outcome: The controls match the cleared selection.
+   * Exceptions: None.
+   */
+  readonly updateRangedSidebar: () => void;
+  /**
+   * Redraws the map.
+   *
+   * Contract: Same as `redraw` in the renderer entry module.
+   * When to use: After the selection changes.
+   * Expected outcome: Selection marks and previews disappear.
+   * Exceptions: None.
+   */
+  readonly redraw: () => void;
+}
+
+/**
+ * Clears the selection the way a right-click on the map does, and leaves queued orders alone.
+ *
+ * Purpose: A right-click on the map and the selection panel's × must drop the same things.
+ * When to use: From those two controls, while no new-game overlay is open.
+ * Expected outcome: Pending select and callout timers stop. With nothing selected and no hover preview, only the
+ *   gesture snapshot resets. Otherwise the selection, the gesture snapshot, the selected hex, the hover preview, and
+ *   both targeting modes clear, and the selection views and the map redraw.
+ * Exceptions: None.
+ */
+export function clearSelectionLikeRightClick(deps: SelectionClearRefreshDeps): void {
+  clearDeferredHumanUnitSingleSelectTimer();
+  clearDeferredStackCalloutTimer();
+  if (S.selectedUnitIds.length === 0 && !S.hoverRoutePreview) {
+    S.selectedUnitIdsAtMouseDown = [];
+    S.gestureSelectionSnapshotAtMs = 0;
+    return;
+  }
+  clearMapSelectionChrome();
+  deps.updateSidebar();
+  deps.updateRangedSidebar();
+  deps.redraw();
 }
 
 /**

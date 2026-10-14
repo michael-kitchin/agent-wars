@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="shellChrome.css" />
   <link rel="stylesheet" href="frameChrome.css" />
   <link rel="stylesheet" href="consoleChrome.css" />
+  <link rel="stylesheet" href="selectionChrome.css" />
   <link rel="stylesheet" href="feedbackChrome.css" />
   <link rel="stylesheet" href="overlayChrome.css" />
 </head>
@@ -252,6 +253,26 @@
     <div id="tactical-battle-hud" class="tactical-battle-hud hidden" role="group" aria-label="Tactical battle controls" data-control-tooltip="Leave the battle, bring back your world-map orders, and play that turn. The button does nothing while a battle turn is resolving or playing back.">
       <button type="button" id="tactical-exit-btn" class="tactical-exit-btn" aria-label="Exit battle">Exit Battle</button>
     </div>
+    <section id="selection-panel" class="selection-panel" aria-label="Selected units" hidden>
+      <div class="selection-panel-header">
+        <p id="sidebar-selected-unit" class="selection-panel-place">—</p>
+        <button type="button" id="selection-panel-close" class="selection-panel-close" aria-label="Clear the selection" data-control-tooltip="Clear the selection. Queued orders stay.">×</button>
+      </div>
+      <div id="selection-panel-chips" class="selection-panel-chips"></div>
+      <p id="selection-panel-count" class="selection-panel-count"></p>
+      <ul id="selection-panel-units" class="selection-panel-units"></ul>
+      <p id="sidebar-error" class="chrome-error" style="font-size: 0.9em; display: none;"></p>
+      <div class="selection-panel-actions">
+        <button type="button" id="ranged-attack-btn" class="ranged-btn" style="display: none;">Ranged</button>
+        <select id="air-strike-target-type" class="ranged-btn" style="display: none;" data-control-tooltip="Choose enemy units, production, airports, or seaports. Your next double-click uses that choice until you cancel.">
+          <option value="units">Enemy Units</option>
+          <option value="urban">Production</option>
+          <option value="airport">Airports</option>
+          <option value="seaport">Seaports</option>
+        </select>
+        <button type="button" id="air-strike-cancel-btn" class="ranged-btn" style="display: none;" data-control-tooltip="Stop aiming an air strike and show Strike again. Strikes already in the list stay there.">Cancel</button>
+      </div>
+    </section>
   </div>
   <aside id="sidebar" class="console" aria-label="Console" data-collapsed="false">
     <div id="console-main" class="console-main">
@@ -261,17 +282,6 @@
         <button type="button" id="console-collapse-btn" class="console-collapse-btn" aria-label="Collapse the console" aria-controls="sidebar" aria-expanded="true" data-control-tooltip="Hide the console to widen the map. Click a tab to show it again."><svg class="chrome-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3l5 5-5 5"></path></svg></button>
       </div>
       <section id="console-panel-orders" class="console-panel active" role="tabpanel" aria-labelledby="console-tab-orders">
-        <p><strong>Selected unit</strong><br><span id="sidebar-selected-unit">—</span></p>
-        <p class="console-ranged-row">
-          <button type="button" id="ranged-attack-btn" class="ranged-btn" style="display: none;">Ranged</button>
-          <select id="air-strike-target-type" class="ranged-btn" style="display: none;" data-control-tooltip="Choose enemy units, production, airports, or seaports. Your next double-click uses that choice until you cancel.">
-            <option value="units">Enemy Units</option>
-            <option value="urban">Production</option>
-            <option value="airport">Airports</option>
-            <option value="seaport">Seaports</option>
-          </select>
-          <button type="button" id="air-strike-cancel-btn" class="ranged-btn" style="display: none;" data-control-tooltip="Stop aiming an air strike and show Strike again. Strikes already in the list stay there.">Cancel</button>
-        </p>
         <div class="console-order-group">
           <h3 class="console-group-heading">Movement <span id="pending-orders-count" class="console-group-count">0</span></h3>
           <div id="pending-orders-list" class="console-order-list"></div>
@@ -284,7 +294,6 @@
           <h3 class="console-group-heading">Air strikes <span id="air-strikes-count" class="console-group-count">0</span></h3>
           <div id="air-strikes-list" class="console-order-list"></div>
         </div>
-        <p id="sidebar-error" class="chrome-error" style="font-size: 0.9em; display: none;"></p>
       </section>
       <section id="console-panel-opponent" class="console-panel" role="tabpanel" aria-labelledby="console-tab-opponent" hidden>
         <div class="openrouter-tab-bar" role="tablist" aria-label="AI panel">
@@ -322,7 +331,7 @@
       </section>
     </div>
     <nav id="console-rail" class="console-rail" role="tablist" aria-orientation="vertical" aria-label="Console tabs">
-      <button type="button" id="console-tab-orders" class="console-tab" role="tab" aria-selected="true" aria-controls="console-panel-orders" data-control-tooltip="Show the selected unit and the orders queued for this turn or beat."><svg class="chrome-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M5 4h9M5 8h9M5 12h9M2 4h.1M2 8h.1M2 12h.1"></path></svg><span>Orders</span><span id="console-tab-orders-badge" class="console-tab-badge" hidden></span></button>
+      <button type="button" id="console-tab-orders" class="console-tab" role="tab" aria-selected="true" aria-controls="console-panel-orders" data-control-tooltip="Show the orders queued for this turn or beat."><svg class="chrome-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M5 4h9M5 8h9M5 12h9M2 4h.1M2 8h.1M2 12h.1"></path></svg><span>Orders</span><span id="console-tab-orders-badge" class="console-tab-badge" hidden></span></button>
       <button type="button" id="console-tab-opponent" class="console-tab" role="tab" aria-selected="false" aria-controls="console-panel-opponent" data-control-tooltip="Show the opponent's model, its tools, and the AI activity log."><svg class="chrome-icon" viewBox="0 0 16 16" aria-hidden="true"><rect x="4" y="4" width="8" height="8" rx="1"></rect><path d="M6 1.5V4M10 1.5V4M6 12v2.5M10 12v2.5M1.5 6H4M1.5 10H4M12 6h2.5M12 10h2.5"></path></svg><span>Opponent</span></button>
       <span class="control-tooltip-host console-tab-host" data-control-tooltip="Build is not available in this version."><button type="button" id="console-tab-build" class="console-tab" role="tab" aria-selected="false" disabled><svg class="chrome-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 14V7l4 2.2V7l4 2.2V3.5h4.5V14z"></path></svg><span>Build</span></button></span>
       <span class="control-tooltip-host console-tab-host" data-control-tooltip="Forces is not available in this version."><button type="button" id="console-tab-forces" class="console-tab" role="tab" aria-selected="false" disabled><svg class="chrome-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.8l5.2 2v4.1c0 3-2.2 5.3-5.2 6.3-3-1-5.2-3.3-5.2-6.3V3.8z"></path></svg><span>Forces</span></button></span>

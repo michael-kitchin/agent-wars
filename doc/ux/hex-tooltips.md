@@ -39,6 +39,7 @@ The hex tooltip can appear in Strategic planning, Tactical planning, and Resolut
 
 - When the pointer rests on a hex and the player is not aiming an order, the hex tooltip appears one second after the pointer rests, then follows the pointer. Holding Shift to inspect starts that wait when the pointer is already on the hex. Moving farther than 6 pixels on that hex before the tooltip opens starts the one-second wait again. Movement of 6 pixels or less does not. Moving onto a different world hex, zoomed cell, or battle cell hides it and starts that wait again. Resting on the token of a hex that holds one stationary unit with a recorded origin shows that unit's Bonuses tooltip instead, after the same second. A token with no recorded origin keeps this tooltip. Leaving the token for the rest of the hex starts the hex tooltip dwell again. A stack token does not. See [stack-callout.md](stack-callout.md).
 - When the pointer leaves the map, the hex tooltip, the effects tooltip, and the blocked tooltip hide. A blocked notice that has not opened yet is cancelled.
+- When the pointer enters the selection panel, the hex tooltip, the effects tooltip, and the blocked tooltip hide. The same hide runs when the pointer enters the console, the top bar, or the game menu. A blocked notice that has not opened yet is cancelled.
 - While the player is aiming a march, ferry, air strike, or ranged attack, the hex tooltip does not appear. The effects tooltip appears one second after the pointer rests when terrain, weather, or target cover changes the order, then stays while the pointer remains on that cell. Stopping the aim hides it, including a notice that has not opened yet. Moving farther than 6 pixels before it opens starts that wait again. Movement of 6 pixels or less does not.
 - When the hovered order is illegal, the blocked tooltip appears one second after the pointer rests, replaces the effects tooltip, and follows the pointer. It hides itself a short time after the pointer stops. Moving farther than 6 pixels before it opens starts that wait again. Movement of 6 pixels or less does not. Moving onto another world hex, zoomed cell, or battle cell hides it and starts that wait again. When the preview becomes legal, or the player stops aiming, it hides, including a notice that has not opened yet. A press hides it and leaves the effects tooltip up.
 
@@ -79,6 +80,7 @@ The hex tooltip can appear in Strategic planning, Tactical planning, and Resolut
 ## Related Documents
 
 - [map-surface.md](map-surface.md)
+- [selection-panel.md](selection-panel.md)
 - [order-lifecycle.md](order-lifecycle.md)
 - [notifications-and-feedback.md](notifications-and-feedback.md)
 - [combat rules](../combat-rules-v3.md)

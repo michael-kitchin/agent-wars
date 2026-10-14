@@ -19971,6 +19971,19 @@ ${bonuses}`;
       rendererSharedState.pendingStackCalloutTimeout = null;
     }
   }
+  function clearSelectionLikeRightClick(deps) {
+    clearDeferredHumanUnitSingleSelectTimer();
+    clearDeferredStackCalloutTimer();
+    if (rendererSharedState.selectedUnitIds.length === 0 && !rendererSharedState.hoverRoutePreview) {
+      rendererSharedState.selectedUnitIdsAtMouseDown = [];
+      rendererSharedState.gestureSelectionSnapshotAtMs = 0;
+      return;
+    }
+    clearMapSelectionChrome();
+    deps.updateSidebar();
+    deps.updateRangedSidebar();
+    deps.redraw();
+  }
   function clearDeferredStackCalloutTimerForPressAway(clientX, clientY) {
     if (rendererSharedState.pendingStackCalloutTimeout === null) return;
     const withinAnchor = Math.abs(clientX - rendererSharedState.pendingStackCalloutAnchorClientX) <= MAP_DOUBLE_CLICK_ANCHOR_TOLERANCE_PX && Math.abs(clientY - rendererSharedState.pendingStackCalloutAnchorClientY) <= MAP_DOUBLE_CLICK_ANCHOR_TOLERANCE_PX;
@@ -25810,6 +25823,13 @@ ${bonuses}`;
     for (const orders of ordersByGroup.values()) count += orders.length;
     return count;
   }
+  function queuedOrderForUnit(unitId) {
+    for (const group of ["movement", "ranged", "strike"]) {
+      const match = ordersByGroup.get(group)?.find((order) => order.unitId === unitId);
+      if (match) return match;
+    }
+    return null;
+  }
   function onQueuedOrdersChanged(listener) {
     listeners.push(listener);
   }
@@ -25941,190 +25961,49 @@ ${bonuses}`;
     });
   }
 
-  // src/renderer/core/uiState.ts
-  function updateSidebar(getPrimarySelectedUnitId2, formatUnitDisplayName3) {
-    syncSidebarOrderRowSelection();
-    const selectedUnitEl = document.getElementById("sidebar-selected-unit");
-    if (selectedUnitEl) {
-      const primary = getPrimarySelectedUnitId2();
-      if (!primary) {
-        selectedUnitEl.textContent = rendererSharedState.selectedUnitIds.length <= 1 ? "\u2014" : `\u2014 (+${rendererSharedState.selectedUnitIds.length - 1})`;
-        return;
-      }
-      const extraCount = rendererSharedState.selectedUnitIds.length - 1;
-      const suffix = extraCount > 0 ? ` (+${extraCount})` : "";
-      setUnitNameContent(selectedUnitEl, primary, `${formatUnitDisplayName3(primary)}${suffix}`);
+  // src/shared/orderTargetHexCode.ts
+  function orderTargetHexCode(h3Index, battle) {
+    if (!h3Index) return null;
+    try {
+      if (!battle) return getStrategicHexCode(h3Index) ?? null;
+      const parentCode = getStrategicHexCode(battle.enclosingStrategicH3Index);
+      const cellCode = tacticalBattleHexCode(battle.enclosingStrategicH3Index, h3Index);
+      return parentCode && cellCode ? `${parentCode}.${cellCode}` : null;
+    } catch {
+      return null;
     }
-  }
-  function updateGameStateSidebar(state) {
-    renderTopBarStatus(state);
-    refreshConsoleHeader();
-  }
-  function blurMapChromeIfFocused() {
-    const active2 = document.activeElement;
-    if (active2 instanceof HTMLElement) {
-      const insideHiddenChrome = active2.closest("#minimap") != null || active2.closest("#terrain-legend") != null || active2.closest("#app-topbar") != null || active2.closest("#game-menu") != null || active2.closest("#sidebar") != null;
-      if (insideHiddenChrome) active2.blur();
-    }
-    dismissStaleControlTooltip();
-  }
-  function setMainUIControlsEnabled(enabled) {
-    const container = document.getElementById("canvas-container");
-    if (container) {
-      for (const child of container.children) {
-        const id = child.id;
-        if (id === "game-over-overlay" || id === "tactical-annihilation-overlay") continue;
-        child.style.pointerEvents = enabled ? "" : "none";
-      }
-    }
-    for (const id of ["app-topbar", "sidebar"]) {
-      const chrome = document.getElementById(id);
-      if (!chrome) continue;
-      chrome.style.pointerEvents = enabled ? "" : "none";
-      chrome.classList.toggle("main-ui-disabled", !enabled);
-    }
-    if (!enabled) closeGameMenu();
-    syncNewGameDialogMapPointer();
-  }
-  function updateGameOverUI(state, updateReadyButtonState2) {
-    const overlay = document.getElementById("game-over-overlay");
-    const newGameBtn = document.getElementById("new-game-btn");
-    const rangedBtn = document.getElementById("ranged-attack-btn");
-    const noGame = !state || state.hexes.length === 0;
-    const gameOver = !!state?.gameOver;
-    const showOverlay = noGame || gameOver;
-    const wasHidden = overlay?.classList.contains("hidden") !== false;
-    if (!showOverlay) {
-      overlay?.classList.add("hidden");
-      setMainUIControlsEnabled(true);
-      if (rangedBtn) rangedBtn.disabled = false;
-      updateReadyButtonState2();
-      return overlay != null && wasHidden === false;
-    }
-    overlay?.classList.remove("hidden");
-    resetNewGameOptionControls();
-    if (wasHidden) {
-      expandNewGameDialog();
-      blurMapChromeIfFocused();
-      resetNewGameMapPreviewFrame();
-      repaintNewGameMapPreview();
-      void (async () => {
-        await Promise.all([initializeScenarioRegionSelectorsOnOverlayOpen(), prepareNewGameMapPanel()]);
-        await refreshNewGameMapPreview();
-      })();
-    }
-    syncGameSizeCapPreview();
-    setMainUIControlsEnabled(false);
-    if (gameOver) {
-      showGameOverBanner(state.winner === "human" ? "You win!" : "You lose.");
-    } else {
-      showNewGameBanner("startup", selectedNewGameTab());
-    }
-    if (newGameBtn) {
-      newGameBtn.textContent = noGame ? "Start game" : "New game";
-      newGameBtn.setAttribute("data-control-tooltip", newGameButtonTooltipText(noGame));
-    }
-    if (rangedBtn) rangedBtn.disabled = true;
-    updateReadyButtonState2();
-    return overlay != null && wasHidden === true;
   }
 
-  // src/shared/resolutionPlaybackPhase.ts
-  function progressAtStage(elapsed, startMs, durationMs) {
-    if (elapsed < startMs) return 0;
-    if (durationMs <= 0 || elapsed >= startMs + durationMs) return 1;
-    return (elapsed - startMs) / durationMs;
-  }
-  function getResolutionPlaybackPhase(args) {
-    const fadeMs = args.fadeMs;
-    const lightningMs = args.lightningMs;
-    const airStrikeOutboundStart = 0;
-    const airStrikeOutboundEnd = airStrikeOutboundStart + (args.hasAirStrikeOutbound ? fadeMs : 0);
-    const airStrikeCombatStart = airStrikeOutboundEnd;
-    const airStrikeCombatEnd = airStrikeCombatStart + (args.hasAirStrikeCombat ? lightningMs : 0);
-    const airStrikeCasualtyStart = airStrikeCombatEnd;
-    const airStrikeCasualtyEnd = airStrikeCasualtyStart + (args.hasAirStrikeCasualties ? lightningMs : 0);
-    const airStrikeReturnStart = airStrikeCasualtyEnd;
-    const airStrikeReturnEnd = airStrikeReturnStart + (args.hasAirStrikeReturn ? fadeMs : 0);
-    const rangedCombatStart = airStrikeReturnEnd;
-    const rangedLightningEnd = rangedCombatStart + (args.hasRangedCombat ? lightningMs : 0);
-    const rangedCasualtyStart = rangedLightningEnd;
-    const rangedCasualtyEnd = rangedCasualtyStart + (args.hasRangedCasualties ? lightningMs : 0);
-    const movementStart = rangedCasualtyEnd;
-    const movementMs = args.hasMoves ? fadeMs : 0;
-    const movementEnd = movementStart + movementMs;
-    const meleeCombatStart = movementEnd;
-    const meleeLightningEnd = meleeCombatStart + (args.hasMeleeCombat ? lightningMs : 0);
-    const meleeCasualtyStart = meleeLightningEnd;
-    const meleeCasualtyEnd = meleeCasualtyStart + (args.hasMeleeCasualties ? lightningMs : 0);
-    const airStrikeOutboundProgress = !args.hasAirStrikeOutbound || args.elapsed < airStrikeOutboundStart ? 0 : args.elapsed >= airStrikeOutboundEnd ? 1 : (args.elapsed - airStrikeOutboundStart) / fadeMs;
-    const airStrikeReturnProgress = !args.hasAirStrikeReturn || args.elapsed < airStrikeReturnStart ? 0 : args.elapsed >= airStrikeReturnEnd ? 1 : (args.elapsed - airStrikeReturnStart) / fadeMs;
+  // src/shared/selectionPanelSummary.ts
+  function summarizeSelectionPanel(selectedIds, units, isSelectable) {
+    const byId = new Map(units.map((unit) => [unit.id, unit]));
+    const selected = selectedIds.map((id) => byId.get(id)).filter((unit) => unit !== void 0);
+    if (selected.length === 0) return null;
+    const panelHex = selected[0].h3Index;
+    const selectedHere = selected.filter((unit) => unit.h3Index === panelHex).length;
+    const selectableHere = units.filter((unit) => unit.h3Index === panelHex && unit.player === "human" && isSelectable(unit.id)).length;
     return {
-      airStrikeOutboundStart,
-      airStrikeCombatStart,
-      airStrikeCasualtyStart,
-      airStrikeReturnStart,
-      rangedCombatStart,
-      rangedCasualtyStart,
-      movementStart,
-      meleeCombatStart,
-      meleeCasualtyStart,
-      totalMs: meleeCasualtyEnd,
-      airStrikeOutboundProgress,
-      airStrikeReturnProgress,
-      moveProgress: progressAtStage(args.elapsed, movementStart, movementMs),
-      inAirStrikeOutbound: args.hasAirStrikeOutbound && args.elapsed >= airStrikeOutboundStart && args.elapsed < airStrikeOutboundEnd,
-      inAirStrikeLightning: args.hasAirStrikeCombat && args.elapsed >= airStrikeCombatStart && args.elapsed < airStrikeCombatEnd,
-      inAirStrikeCasualty: args.hasAirStrikeCasualties && args.elapsed >= airStrikeCasualtyStart && args.elapsed < airStrikeCasualtyEnd,
-      inAirStrikeReturn: args.hasAirStrikeReturn && args.elapsed >= airStrikeReturnStart && args.elapsed < airStrikeReturnEnd,
-      inRangedLightning: args.hasRangedCombat && args.elapsed >= rangedCombatStart && args.elapsed < rangedLightningEnd,
-      inRangedCasualty: args.hasRangedCasualties && args.elapsed >= rangedCasualtyStart && args.elapsed < rangedCasualtyEnd,
-      inMovement: args.hasMoves && movementMs > 0 && args.elapsed >= movementStart && args.elapsed < movementEnd,
-      inMeleeLightning: args.hasMeleeCombat && args.elapsed >= meleeCombatStart && args.elapsed < meleeLightningEnd,
-      inMeleeCasualty: args.hasMeleeCasualties && args.elapsed >= meleeCasualtyStart && args.elapsed < meleeCasualtyEnd
+      panelHex,
+      countText: `${selectedHere} selected of ${Math.max(selectableHere, selectedHere)}`,
+      rows: selected.map((unit) => ({
+        unitId: unit.id,
+        unitType: unit.unitType,
+        h3Index: unit.h3Index,
+        inPanelHex: unit.h3Index === panelHex
+      }))
     };
   }
-
-  // src/renderer/rendering/resolutionPlayback.ts
-  var RESOLUTION_FADE_MS = 1e3;
-  var LIGHTNING_DURATION_MS = 1e3;
-  function resolutionAnimationElapsedMs(anim) {
-    if (anim.tacticalDeferResolutionClock) return 0;
-    return Date.now() - anim.startTime;
-  }
-  function buildResolutionPlaybackState(anim, elapsed) {
-    const hasAirStrikeOutbound = (anim.airStrikeOutboundMoves?.length ?? 0) > 0;
-    const hasAirStrikeCombat = (anim.airStrikeCombatHexes?.length ?? 0) > 0;
-    const hasAirStrikeCasualties = (anim.airStrikeCasualtyHexes?.length ?? 0) > 0;
-    const hasAirStrikeReturn = (anim.airStrikeReturnMoves?.length ?? 0) > 0;
-    const hasRangedCombat = (anim.rangedCombatHexes?.length ?? 0) > 0 || (anim.combatHexes?.length ?? 0) > 0;
-    const hasRangedCasualties = (anim.rangedCasualtyHexes?.length ?? 0) > 0 || (anim.casualtyHexes?.length ?? 0) > 0;
-    const hasMeleeCombat = (anim.meleeCombatHexes?.length ?? 0) > 0 || (anim.controlLossLightningHexes?.length ?? 0) > 0;
-    const hasMeleeCasualties = (anim.meleeCasualtyHexes?.length ?? 0) > 0;
-    return {
-      hasAirStrikeOutbound,
-      hasAirStrikeCombat,
-      hasAirStrikeCasualties,
-      hasAirStrikeReturn,
-      hasRangedCombat,
-      hasRangedCasualties,
-      hasMeleeCombat,
-      hasMeleeCasualties,
-      phase: getResolutionPlaybackPhase({
-        elapsed,
-        fadeMs: RESOLUTION_FADE_MS,
-        lightningMs: LIGHTNING_DURATION_MS,
-        hasAirStrikeOutbound,
-        hasAirStrikeCombat,
-        hasAirStrikeCasualties,
-        hasAirStrikeReturn,
-        hasRangedCombat,
-        hasRangedCasualties,
-        hasMoves: (anim.moves?.length ?? 0) > 0,
-        hasMeleeCombat,
-        hasMeleeCasualties
-      })
-    };
+  function buildSelectionPanelChips(input) {
+    const chips = [];
+    if (input.terrainKind) chips.push({ kind: "terrain", html: formatTerrainKindHtml(input.terrainKind) });
+    if (input.weather) chips.push({ kind: "weather", html: formatWeatherIconHtml(input.weather) });
+    if (input.techLevel) chips.push({ kind: "tech", html: formatTechTierHtml(input.techLevel) });
+    if (input.productionPerTurn != null && input.productionPerTurn > 0) {
+      chips.push({ kind: "production", html: escapeHtmlText(`$${input.productionPerTurn.toLocaleString("en-US")}/turn`) });
+    }
+    if (input.homeSide === "human") chips.push({ kind: "home", html: "Home" });
+    if (input.homeSide === "opponent") chips.push({ kind: "enemy-home", html: "Enemy home" });
+    return chips;
   }
 
   // src/renderer/rendering/unitDrawing.ts
@@ -26179,6 +26058,10 @@ ${bonuses}`;
   var unitIconCache = /* @__PURE__ */ new Map();
   function iconPathForType(unitType) {
     return `units/${UNIT_ICON_FILE_BY_TYPE[unitType]}`;
+  }
+  function unitIconPathForUnitType(unitType) {
+    const known = Object.prototype.hasOwnProperty.call(UNIT_ICON_FILE_BY_TYPE, unitType);
+    return iconPathForType(known ? unitType : "mixed");
   }
   function getOrStartUnitIconLoad(unitType) {
     if (unitIconCache.has(unitType)) return unitIconCache.get(unitType) ?? null;
@@ -26353,6 +26236,300 @@ ${bonuses}`;
       drawOneUnitMarker(ctx, x, y, "#7a7a7a", "?", "#202020");
     }
     ctx.restore();
+  }
+
+  // src/renderer/gameplay/selectionPanel.ts
+  var headerRequestSeq = 0;
+  function renderSelectionPanelHeader(panelHex, battle) {
+    const place = document.getElementById("sidebar-selected-unit");
+    if (!place) return;
+    const code = orderTargetHexCode(panelHex, battle);
+    const codeHtml = code ? `<strong>(${escapeHtmlText(code)})</strong>` : "";
+    const resolution = battle ? 4 : 1;
+    const hexKey = `${resolution}:${panelHex}`;
+    if (place.dataset.hexKey !== hexKey) {
+      place.innerHTML = codeHtml;
+      place.dataset.hexKey = hexKey;
+    }
+    const requestSeq = ++headerRequestSeq;
+    void getCachedNamingLineForTarget({ h3Index: panelHex, resolution }).then((caption) => {
+      if (requestSeq !== headerRequestSeq) return;
+      const captionHtml = caption && caption.text.trim() !== "" ? ` ${formatHexNamingCaptionHtml(caption)}` : "";
+      place.innerHTML = `${codeHtml}${captionHtml}`;
+    });
+  }
+  function worldChipInput(hex) {
+    const state = rendererSharedState.gameState;
+    const row = state?.hexes.find((h) => h.h3Index === hex);
+    const baselineUrban = baselineUrbanHexCountForStrategicHex(hex);
+    const urban = state?.strategicInfrastructure?.find((r) => r.h3Index === hex)?.urbanHexCount ?? 0;
+    const homeSide = state?.humanHomeRegionHexes?.includes(hex) ? "human" : state?.aiHomeRegionHexes?.includes(hex) ? "opponent" : null;
+    return {
+      terrainKind: row?.terrainKind ?? null,
+      weather: row?.weather ?? null,
+      techLevel: state?.techBonusEnabled === true && baselineUrban > 0 ? techLevelFromUrbanHexCount(baselineUrban) : null,
+      productionPerTurn: isNeutralBorderHex(hex) ? null : Math.max(0, Math.trunc(urban)),
+      homeSide
+    };
+  }
+  function battleChipInput(cell, battle) {
+    return {
+      terrainKind: battle.tacticalTerrainKindByH3?.[cell] ?? battle.strategicHexTerrainKind ?? null,
+      weather: battle.weatherBonusEnabled === true ? battle.weather ?? null : null,
+      techLevel: null,
+      productionPerTurn: null,
+      homeSide: null
+    };
+  }
+  function renderSelectionPanelChips(panelHex, battle) {
+    const host = document.getElementById("selection-panel-chips");
+    if (!host) return;
+    const chips = buildSelectionPanelChips(battle ? battleChipInput(panelHex, battle) : worldChipInput(panelHex));
+    host.replaceChildren(
+      ...chips.map((chip) => {
+        const span = document.createElement("span");
+        span.className = `selection-panel-chip selection-panel-chip-${chip.kind}`;
+        span.innerHTML = chip.html;
+        return span;
+      })
+    );
+    paintTerrainSwatches(host);
+  }
+  function createOrderChip(unitId, unitName) {
+    const chip = document.createElement("span");
+    const order = queuedOrderForUnit(unitId);
+    if (!order) {
+      chip.className = "selection-panel-order selection-panel-order-none";
+      chip.textContent = "No orders";
+      return chip;
+    }
+    chip.className = "selection-panel-order";
+    const detail = document.createElement("span");
+    detail.textContent = order.detail;
+    const cancel = document.createElement("button");
+    cancel.type = "button";
+    cancel.className = "selection-panel-order-cancel";
+    cancel.setAttribute("aria-label", `Cancel the order for ${unitName}`);
+    cancel.textContent = "\xD7";
+    cancel.addEventListener("click", order.cancel);
+    chip.append(detail, cancel);
+    return chip;
+  }
+  function createUnitRow(row, battle, deps) {
+    const item = document.createElement("li");
+    item.className = "selection-panel-unit";
+    item.dataset.unitId = row.unitId;
+    const token = document.createElement("img");
+    token.className = "selection-panel-unit-type";
+    token.src = unitIconPathForUnitType(row.unitType);
+    token.alt = "";
+    const unitName = deps.formatUnitDisplayName(row.unitId);
+    const name = document.createElement("span");
+    name.className = "selection-panel-unit-name";
+    setUnitNameContent(name, row.unitId, unitName);
+    item.append(token, name);
+    if (!row.inPanelHex) {
+      const where = document.createElement("span");
+      where.className = "selection-panel-unit-hex";
+      where.textContent = `(${orderTargetHexCode(row.h3Index, battle) ?? "?"})`;
+      item.append(where);
+    }
+    item.append(createOrderChip(row.unitId, unitName));
+    return item;
+  }
+  function renderSelectionPanel(deps) {
+    const panel = document.getElementById("selection-panel");
+    if (!panel) return;
+    const battle = rendererSharedState.tacticalBattleSnapshot;
+    const units = battle ? battle.subUnits : rendererSharedState.gameState?.units ?? [];
+    const summary = summarizeSelectionPanel(rendererSharedState.selectedUnitIds, units, (unitId) => !isEmbarkedLandUnitBlockedForSelection(unitId));
+    panel.hidden = summary === null;
+    if (!summary) return;
+    renderSelectionPanelHeader(summary.panelHex, battle);
+    renderSelectionPanelChips(summary.panelHex, battle);
+    const count = document.getElementById("selection-panel-count");
+    if (count) count.textContent = summary.countText;
+    const list = document.getElementById("selection-panel-units");
+    list?.replaceChildren(...summary.rows.map((row) => createUnitRow(row, battle, deps)));
+  }
+  function wireSelectionPanel(deps) {
+    onQueuedOrdersChanged(() => renderSelectionPanel(deps));
+  }
+
+  // src/renderer/core/uiState.ts
+  function updateSidebar(formatUnitDisplayName3) {
+    syncSidebarOrderRowSelection();
+    renderSelectionPanel({ formatUnitDisplayName: formatUnitDisplayName3 });
+  }
+  function updateGameStateSidebar(state) {
+    renderTopBarStatus(state);
+    refreshConsoleHeader();
+  }
+  function blurMapChromeIfFocused() {
+    const active2 = document.activeElement;
+    if (active2 instanceof HTMLElement) {
+      const insideHiddenChrome = active2.closest("#minimap") != null || active2.closest("#terrain-legend") != null || active2.closest("#app-topbar") != null || active2.closest("#game-menu") != null || active2.closest("#sidebar") != null;
+      if (insideHiddenChrome) active2.blur();
+    }
+    dismissStaleControlTooltip();
+  }
+  function setMainUIControlsEnabled(enabled) {
+    const container = document.getElementById("canvas-container");
+    if (container) {
+      for (const child of container.children) {
+        const id = child.id;
+        if (id === "game-over-overlay" || id === "tactical-annihilation-overlay") continue;
+        child.style.pointerEvents = enabled ? "" : "none";
+      }
+    }
+    for (const id of ["app-topbar", "sidebar"]) {
+      const chrome = document.getElementById(id);
+      if (!chrome) continue;
+      chrome.style.pointerEvents = enabled ? "" : "none";
+      chrome.classList.toggle("main-ui-disabled", !enabled);
+    }
+    if (!enabled) closeGameMenu();
+    syncNewGameDialogMapPointer();
+  }
+  function updateGameOverUI(state, updateReadyButtonState2) {
+    const overlay = document.getElementById("game-over-overlay");
+    const newGameBtn = document.getElementById("new-game-btn");
+    const rangedBtn = document.getElementById("ranged-attack-btn");
+    const noGame = !state || state.hexes.length === 0;
+    const gameOver = !!state?.gameOver;
+    const showOverlay = noGame || gameOver;
+    const wasHidden = overlay?.classList.contains("hidden") !== false;
+    if (!showOverlay) {
+      overlay?.classList.add("hidden");
+      setMainUIControlsEnabled(true);
+      if (rangedBtn) rangedBtn.disabled = false;
+      updateReadyButtonState2();
+      return overlay != null && wasHidden === false;
+    }
+    overlay?.classList.remove("hidden");
+    resetNewGameOptionControls();
+    if (wasHidden) {
+      expandNewGameDialog();
+      blurMapChromeIfFocused();
+      resetNewGameMapPreviewFrame();
+      repaintNewGameMapPreview();
+      void (async () => {
+        await Promise.all([initializeScenarioRegionSelectorsOnOverlayOpen(), prepareNewGameMapPanel()]);
+        await refreshNewGameMapPreview();
+      })();
+    }
+    syncGameSizeCapPreview();
+    setMainUIControlsEnabled(false);
+    if (gameOver) {
+      showGameOverBanner(state.winner === "human" ? "You win!" : "You lose.");
+    } else {
+      showNewGameBanner("startup", selectedNewGameTab());
+    }
+    if (newGameBtn) {
+      newGameBtn.textContent = noGame ? "Start game" : "New game";
+      newGameBtn.setAttribute("data-control-tooltip", newGameButtonTooltipText(noGame));
+    }
+    if (rangedBtn) rangedBtn.disabled = true;
+    updateReadyButtonState2();
+    return overlay != null && wasHidden === true;
+  }
+
+  // src/shared/resolutionPlaybackPhase.ts
+  function progressAtStage(elapsed, startMs, durationMs) {
+    if (elapsed < startMs) return 0;
+    if (durationMs <= 0 || elapsed >= startMs + durationMs) return 1;
+    return (elapsed - startMs) / durationMs;
+  }
+  function getResolutionPlaybackPhase(args) {
+    const fadeMs = args.fadeMs;
+    const lightningMs = args.lightningMs;
+    const airStrikeOutboundStart = 0;
+    const airStrikeOutboundEnd = airStrikeOutboundStart + (args.hasAirStrikeOutbound ? fadeMs : 0);
+    const airStrikeCombatStart = airStrikeOutboundEnd;
+    const airStrikeCombatEnd = airStrikeCombatStart + (args.hasAirStrikeCombat ? lightningMs : 0);
+    const airStrikeCasualtyStart = airStrikeCombatEnd;
+    const airStrikeCasualtyEnd = airStrikeCasualtyStart + (args.hasAirStrikeCasualties ? lightningMs : 0);
+    const airStrikeReturnStart = airStrikeCasualtyEnd;
+    const airStrikeReturnEnd = airStrikeReturnStart + (args.hasAirStrikeReturn ? fadeMs : 0);
+    const rangedCombatStart = airStrikeReturnEnd;
+    const rangedLightningEnd = rangedCombatStart + (args.hasRangedCombat ? lightningMs : 0);
+    const rangedCasualtyStart = rangedLightningEnd;
+    const rangedCasualtyEnd = rangedCasualtyStart + (args.hasRangedCasualties ? lightningMs : 0);
+    const movementStart = rangedCasualtyEnd;
+    const movementMs = args.hasMoves ? fadeMs : 0;
+    const movementEnd = movementStart + movementMs;
+    const meleeCombatStart = movementEnd;
+    const meleeLightningEnd = meleeCombatStart + (args.hasMeleeCombat ? lightningMs : 0);
+    const meleeCasualtyStart = meleeLightningEnd;
+    const meleeCasualtyEnd = meleeCasualtyStart + (args.hasMeleeCasualties ? lightningMs : 0);
+    const airStrikeOutboundProgress = !args.hasAirStrikeOutbound || args.elapsed < airStrikeOutboundStart ? 0 : args.elapsed >= airStrikeOutboundEnd ? 1 : (args.elapsed - airStrikeOutboundStart) / fadeMs;
+    const airStrikeReturnProgress = !args.hasAirStrikeReturn || args.elapsed < airStrikeReturnStart ? 0 : args.elapsed >= airStrikeReturnEnd ? 1 : (args.elapsed - airStrikeReturnStart) / fadeMs;
+    return {
+      airStrikeOutboundStart,
+      airStrikeCombatStart,
+      airStrikeCasualtyStart,
+      airStrikeReturnStart,
+      rangedCombatStart,
+      rangedCasualtyStart,
+      movementStart,
+      meleeCombatStart,
+      meleeCasualtyStart,
+      totalMs: meleeCasualtyEnd,
+      airStrikeOutboundProgress,
+      airStrikeReturnProgress,
+      moveProgress: progressAtStage(args.elapsed, movementStart, movementMs),
+      inAirStrikeOutbound: args.hasAirStrikeOutbound && args.elapsed >= airStrikeOutboundStart && args.elapsed < airStrikeOutboundEnd,
+      inAirStrikeLightning: args.hasAirStrikeCombat && args.elapsed >= airStrikeCombatStart && args.elapsed < airStrikeCombatEnd,
+      inAirStrikeCasualty: args.hasAirStrikeCasualties && args.elapsed >= airStrikeCasualtyStart && args.elapsed < airStrikeCasualtyEnd,
+      inAirStrikeReturn: args.hasAirStrikeReturn && args.elapsed >= airStrikeReturnStart && args.elapsed < airStrikeReturnEnd,
+      inRangedLightning: args.hasRangedCombat && args.elapsed >= rangedCombatStart && args.elapsed < rangedLightningEnd,
+      inRangedCasualty: args.hasRangedCasualties && args.elapsed >= rangedCasualtyStart && args.elapsed < rangedCasualtyEnd,
+      inMovement: args.hasMoves && movementMs > 0 && args.elapsed >= movementStart && args.elapsed < movementEnd,
+      inMeleeLightning: args.hasMeleeCombat && args.elapsed >= meleeCombatStart && args.elapsed < meleeLightningEnd,
+      inMeleeCasualty: args.hasMeleeCasualties && args.elapsed >= meleeCasualtyStart && args.elapsed < meleeCasualtyEnd
+    };
+  }
+
+  // src/renderer/rendering/resolutionPlayback.ts
+  var RESOLUTION_FADE_MS = 1e3;
+  var LIGHTNING_DURATION_MS = 1e3;
+  function resolutionAnimationElapsedMs(anim) {
+    if (anim.tacticalDeferResolutionClock) return 0;
+    return Date.now() - anim.startTime;
+  }
+  function buildResolutionPlaybackState(anim, elapsed) {
+    const hasAirStrikeOutbound = (anim.airStrikeOutboundMoves?.length ?? 0) > 0;
+    const hasAirStrikeCombat = (anim.airStrikeCombatHexes?.length ?? 0) > 0;
+    const hasAirStrikeCasualties = (anim.airStrikeCasualtyHexes?.length ?? 0) > 0;
+    const hasAirStrikeReturn = (anim.airStrikeReturnMoves?.length ?? 0) > 0;
+    const hasRangedCombat = (anim.rangedCombatHexes?.length ?? 0) > 0 || (anim.combatHexes?.length ?? 0) > 0;
+    const hasRangedCasualties = (anim.rangedCasualtyHexes?.length ?? 0) > 0 || (anim.casualtyHexes?.length ?? 0) > 0;
+    const hasMeleeCombat = (anim.meleeCombatHexes?.length ?? 0) > 0 || (anim.controlLossLightningHexes?.length ?? 0) > 0;
+    const hasMeleeCasualties = (anim.meleeCasualtyHexes?.length ?? 0) > 0;
+    return {
+      hasAirStrikeOutbound,
+      hasAirStrikeCombat,
+      hasAirStrikeCasualties,
+      hasAirStrikeReturn,
+      hasRangedCombat,
+      hasRangedCasualties,
+      hasMeleeCombat,
+      hasMeleeCasualties,
+      phase: getResolutionPlaybackPhase({
+        elapsed,
+        fadeMs: RESOLUTION_FADE_MS,
+        lightningMs: LIGHTNING_DURATION_MS,
+        hasAirStrikeOutbound,
+        hasAirStrikeCombat,
+        hasAirStrikeCasualties,
+        hasAirStrikeReturn,
+        hasRangedCombat,
+        hasRangedCasualties,
+        hasMoves: (anim.moves?.length ?? 0) > 0,
+        hasMeleeCombat,
+        hasMeleeCasualties
+      })
+    };
   }
 
   // src/renderer/rendering/combatDiceChipDrawing.ts
@@ -27285,19 +27462,6 @@ ${bonuses}`;
       (unitType) => unitType !== "air" && unitHasDirectRangedPlanning(unitType, tacticalBattleActive)
     );
     return everyUnitCanRangedAttack ? "ranged" : "hidden";
-  }
-
-  // src/shared/orderTargetHexCode.ts
-  function orderTargetHexCode(h3Index, battle) {
-    if (!h3Index) return null;
-    try {
-      if (!battle) return getStrategicHexCode(h3Index) ?? null;
-      const parentCode = getStrategicHexCode(battle.enclosingStrategicH3Index);
-      const cellCode = tacticalBattleHexCode(battle.enclosingStrategicH3Index, h3Index);
-      return parentCode && cellCode ? `${parentCode}.${cellCode}` : null;
-    } catch {
-      return null;
-    }
   }
 
   // src/renderer/gameplay/orderLabelFormatting.ts
@@ -33222,7 +33386,7 @@ ${bonuses}`;
     });
   }
   function updateSidebar2() {
-    return updateSidebar(getPrimarySelectedUnitId, formatUnitDisplayName2);
+    return updateSidebar(formatUnitDisplayName2);
   }
   function updateGameOverUI2(state) {
     const visibilityChanged = updateGameOverUI(state, updateReadyButtonState);
@@ -35553,18 +35717,9 @@ ${bonuses}`;
     mainMapEl.addEventListener("contextmenu", (e) => {
       e.preventDefault();
       if (newGameOverlayIsOpen()) return;
-      clearDeferredHumanUnitSingleSelectTimer();
-      clearDeferredStackCalloutTimer();
-      if (rendererSharedState.selectedUnitIds.length === 0 && !rendererSharedState.hoverRoutePreview) {
-        rendererSharedState.selectedUnitIdsAtMouseDown = [];
-        rendererSharedState.gestureSelectionSnapshotAtMs = 0;
-        return;
-      }
-      clearMapSelectionChrome();
-      deps.updateSidebar();
-      deps.updateRangedSidebar();
-      deps.redraw();
+      clearSelectionLikeRightClick(deps);
     });
+    document.getElementById("selection-panel-close")?.addEventListener("click", () => clearSelectionLikeRightClick(deps));
   }
 
   // src/renderer/map/mapKeyboardPan.ts
@@ -35864,7 +36019,7 @@ ${bonuses}`;
       rendererSharedState.tacticalEntryButtonPointerInside = false;
     });
     const canvasContainer = document.getElementById("canvas-container");
-    for (const chromeId of ["sidebar", "app-topbar", "game-menu"]) {
+    for (const chromeId of ["sidebar", "app-topbar", "game-menu", "selection-panel"]) {
       document.getElementById(chromeId)?.addEventListener("pointerenter", () => {
         dismissTerrainTooltipWhenPointerLeavesMapPanel(deps);
       });
@@ -36129,6 +36284,7 @@ ${bonuses}`;
     });
     installUnitOriginTooltip();
     wireConsoleFrame();
+    wireSelectionPanel({ formatUnitDisplayName: formatUnitDisplayName2 });
     wireGameMenu();
     wireInitCore({
       requestRedraw: requestRedraw2,
