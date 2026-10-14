@@ -130,6 +130,24 @@ export const ORDER_ARROW_SIZE = 10;
  * Exceptions: None.
  */
 export const AI_ORDER_LINE_COLOR = PLAYER_COLORS.opponent;
+/**
+ * The pale outline drawn under every order line, in CSS color.
+ *
+ * Purpose: A dashed teal, amber, or purple line can vanish on similar terrain; the casing keeps it readable anywhere.
+ * When to use: Only by `drawOrderLine` in `src/renderer/rendering/orderLineStroke.ts`.
+ * Expected outcome: White at 80% opacity.
+ * Exceptions: None.
+ */
+export const ORDER_LINE_CASING_COLOR = 'rgba(255, 255, 255, 0.8)';
+/**
+ * How far the order-line casing shows on each side of the line, in CSS pixels.
+ *
+ * Purpose: Wide enough to read as an outline, narrow enough not to look like a second line.
+ * When to use: Only by `drawOrderLine` in `src/renderer/rendering/orderLineStroke.ts`.
+ * Expected outcome: 1.5.
+ * Exceptions: None.
+ */
+export const ORDER_LINE_CASING_PAD = 1.5;
 
 /**
  * Documents the module-scope binding `TOOLTIP_OFFSET_PX` (TOOLTIP_OFFSET_PX).

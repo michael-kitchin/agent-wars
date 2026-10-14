@@ -87,12 +87,12 @@ The full input map, including the exceptions, is in [ux/input-map.md](ux/input-m
 - **Colors:** amber for ranged fire, purple for air strikes.
 - **Reach on the strategic map:** armor 1 hex, naval 2, and air 3 from its base airport.
 - **Reach in a battle:** the ranged outline uses each unit's range after terrain limits. The strike outline covers the whole battlefield.
-- **Hovering a valid target:** a dashed line in the same color runs from each selected unit to the target.
+- **Hovering a valid target:** a dashed line in the same color runs from each selected unit to the target and ends in an arrowhead. A queued attack keeps that line.
 - **Hovering an invalid target:** a teal X marks the hex. After a second, a tip says why.
 - **Firing:** double-click the target. A single click does nothing. A failed double-click shows an error and keeps you aiming.
 - **Stopping:** click **Cancel**, click the selection panel's **×**, or right-click the map. Escape doesn't end aiming.
 - **What it doesn't show:** the outline ignores line of sight. In a battle, a mountain can still block a shot inside it.
-- **Moves:** there is no reach outline for movement. Hovering a destination draws a teal route, solid for this turn and dashed beyond.
+- **Moves:** there is no reach outline for movement. Hovering a destination draws a teal route, solid for this turn and dashed beyond, ending in an arrowhead. A queued move keeps that route. Move routes and the attack lines above are drawn over a pale edge so they stay readable.
 
 ## Air power
 

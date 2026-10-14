@@ -56,6 +56,7 @@ When this guide and the running app disagree, the app wins until this file is up
 | Player 2 (opponent) | `#9d174d` | Distinct from human |
 | Selection / slower / warning | `#a06020` | Range perimeter (ranged) |
 | Air-strike perimeter | `#7a3db5` | Distinct from ground ranged |
+| Order-line casing | `#ffffff` at 80% | A solid outline 1.5 px wider than the line on each side, under every movement, ranged, and air-strike line and its arrowhead (`ORDER_LINE_CASING_COLOR`, `ORDER_LINE_CASING_PAD`) |
 | Combat lightning | `#F5C400` | Resolution overlay. The bolt is `resolution/lightning_bolt.svg`, with a `#8A6D00` outline. It is drawn smaller than a unit token |
 | Casualty X | `#E53935` | Removal overlay. The mark is `resolution/x_destroyed.svg`, with an `#8E1C1A` outline. It is drawn a little larger than the bolt |
 | Dice chip bg / border | `#1b2838` at 92% / `#5a7090` | Resolution dice chips, with the chrome text and muted colors for text and tags. Mini-token outlines are `#7dcec8` (human) and `#f0b4c8` (opponent). See `src/renderer/rendering/combatDiceChipDrawing.ts` |

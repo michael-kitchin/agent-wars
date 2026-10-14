@@ -3,7 +3,6 @@ import { alignLngToReference, clampLatForWebMercatorDisplay } from '../map/hexGr
 import {
   AI_ORDER_LINE_COLOR,
   COUNT_BADGE_OFFSET,
-  ORDER_ARROW_SIZE,
   ORDER_LINE_COLOR,
   ORDER_LINE_WIDTH,
   PLAYER_COLORS,
@@ -21,13 +20,22 @@ import { buildTacticalMarchDraftDestinationPreview } from '../../shared/tactical
 import type { ResolutionPlaybackMove } from '../core/types';
 import { latLngAlongPolylineByArcFraction } from '../../shared/pathPolylineInterp.js';
 import { drawOneUnitMarker } from './unitDrawing';
+import {
+  ORDER_LINE_LATER_DASH,
+  ORDER_LINE_SOLID,
+  drawOrderLine,
+  routeEndArrow,
+  straightOrderLineShape,
+  type OrderLineRun,
+} from './orderLineStroke';
 
 /**
- * Defines the `drawLineArrow` function shape (export function drawLineArrow().
-
- * Purpose: Supports maintainability by documenting why `drawLineArrow` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Draws a straight movement line from one unit marker toward another, with the movement arrowhead.
+ *
+ * Purpose: Standing orders without a route, and played-back moves that need an arrow, share this look.
+ * When to use: `from` and `to` are hex centers in canvas pixels, and a unit marker may sit at `to`.
+ * Expected outcome: A cased line in `color` that stops at the arrow's base, and an arrowhead whose tip stops a unit
+ *   radius short of `to`.
  * Exceptions: None.
  */
 export function drawLineArrow(
@@ -36,91 +44,16 @@ export function drawLineArrow(
   to: { x: number; y: number },
   color: string
 ): void {
-  const dx = to.x - from.x;
-  const dy = to.y - from.y;
-  const len = Math.hypot(dx, dy) || 1;
-  const ux = dx / len;
-  const uy = dy / len;
-  const inset = UNIT_RADIUS + ORDER_ARROW_SIZE;
-  const endX = to.x - ux * inset;
-  const endY = to.y - uy * inset;
-  ctx.beginPath();
-  ctx.moveTo(from.x, from.y);
-  ctx.lineTo(endX, endY);
-  ctx.strokeStyle = color;
-  ctx.lineWidth = ORDER_LINE_WIDTH;
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-  ctx.stroke();
-  const ax = endX + ux * ORDER_ARROW_SIZE;
-  const ay = endY + uy * ORDER_ARROW_SIZE;
-  const perpX = -uy * (ORDER_ARROW_SIZE * 0.6);
-  const perpY = ux * (ORDER_ARROW_SIZE * 0.6);
-  ctx.beginPath();
-  ctx.moveTo(ax, ay);
-  ctx.lineTo(endX - perpX, endY - perpY);
-  ctx.lineTo(endX + perpX, endY + perpY);
-  ctx.closePath();
-  ctx.fillStyle = color;
-  ctx.fill();
-  ctx.strokeStyle = color;
-  ctx.lineWidth = ORDER_LINE_WIDTH;
-  ctx.stroke();
+  drawOrderLine(ctx, straightOrderLineShape(from, to, UNIT_RADIUS), { color, width: ORDER_LINE_WIDTH });
 }
 
-/**
- * Defines the `drawArrowheadOnly` function shape (export function drawArrowheadOnly( ctx: CanvasRenderingContext2D, from: { x: number; y: number }, to: { x: number; y: number }, color: string, op).
-
- * Purpose: Supports maintainability by documenting why `drawArrowheadOnly` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-export function drawArrowheadOnly(
-  ctx: CanvasRenderingContext2D,
-  from: { x: number; y: number },
-  to: { x: number; y: number },
-  color: string,
-  options?: { tipAtTargetCenter?: boolean }
-): void {
-  const dx = to.x - from.x;
-  const dy = to.y - from.y;
-  const len = Math.hypot(dx, dy) || 1;
-  const ux = dx / len;
-  const uy = dy / len;
-  const inset = options?.tipAtTargetCenter ? ORDER_ARROW_SIZE : UNIT_RADIUS + ORDER_ARROW_SIZE;
-  const endX = to.x - ux * inset;
-  const endY = to.y - uy * inset;
-  const ax = endX + ux * ORDER_ARROW_SIZE;
-  const ay = endY + uy * ORDER_ARROW_SIZE;
-  const perpX = -uy * (ORDER_ARROW_SIZE * 0.6);
-  const perpY = ux * (ORDER_ARROW_SIZE * 0.6);
-  ctx.beginPath();
-  ctx.moveTo(ax, ay);
-  ctx.lineTo(endX - perpX, endY - perpY);
-  ctx.lineTo(endX + perpX, endY + perpY);
-  ctx.closePath();
-  ctx.fillStyle = color;
-  ctx.fill();
-  ctx.strokeStyle = color;
-  ctx.lineWidth = ORDER_LINE_WIDTH;
-  ctx.stroke();
-}
-
-/**
- * Defines the `strokePolylineSkippingWrap` function shape (export function strokePolylineSkippingWrap( ctx: CanvasRenderingContext2D, points: Array<{ x: number; y: number }>, wrapJumpThresholdPx: number ): voi).
-
- * Purpose: Supports maintainability by documenting why `strokePolylineSkippingWrap` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
 /**
  * Strokes human march-style route segments (solid turn-1, dashed continuation) with a terminal arrowhead.
  *
  * Purpose: Single visual contract for standing orders, tactical draft marches, pending ferry lines, and matching hover previews.
  * When to use: Any committed or planned human movement polyline that should match ground march line styling.
- * Expected outcome: Polylines at `ORDER_LINE_COLOR` / `ORDER_LINE_WIDTH`; arrowhead at route end with `tipAtTargetCenter`.
+ * Expected outcome: One cased line at `ORDER_LINE_COLOR` / `ORDER_LINE_WIDTH`, solid for turn 1 and dashed after, with an
+ *   arrowhead whose tip is the route's last hex center.
  * Exceptions: Skips segments with fewer than two lat/lng points; no-op when Leaflet map is unavailable.
  */
 export function drawHumanMarchStyleRouteSegments(
@@ -132,52 +65,23 @@ export function drawHumanMarchStyleRouteSegments(
   const map = getMainLeafletMap() as { latLngToContainerPoint: (ll: unknown) => { x: number; y: number } } | null;
   if (!map) return;
   const L = getLeafletGlobal();
-  ctx.save();
-  if (options?.globalAlpha !== undefined) {
-    ctx.globalAlpha = options.globalAlpha;
-  }
-  let lastPenultimate: { x: number; y: number } | null = null;
-  let lastPoint: { x: number; y: number } | null = null;
+  const runs: OrderLineRun[] = [];
   for (const seg of segments) {
     if (!Array.isArray(seg.hexes) || seg.hexes.length < 2) continue;
     const points = seg.hexes.map(([lat, lng]) => {
       const p = map.latLngToContainerPoint(L.latLng(clampLatForWebMercatorDisplay(lat), lng));
       return { x: p.x, y: p.y };
     });
-    ctx.setLineDash(seg.turn <= 1 ? [] : [6, 4]);
-    ctx.strokeStyle = ORDER_LINE_COLOR;
-    ctx.lineWidth = ORDER_LINE_WIDTH;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    strokePolylineSkippingWrap(ctx, points, ctx.canvas.width * 0.5);
-    lastPenultimate = points[points.length - 2] ?? null;
-    lastPoint = points[points.length - 1] ?? null;
+    runs.push({ points, dash: seg.turn <= 1 ? ORDER_LINE_SOLID : ORDER_LINE_LATER_DASH });
   }
-  ctx.setLineDash([]);
-  if (lastPenultimate && lastPoint) {
-    drawArrowheadOnly(ctx, lastPenultimate, lastPoint, ORDER_LINE_COLOR, { tipAtTargetCenter: true });
+  const lastPoints = runs[runs.length - 1]?.points;
+  const arrow = lastPoints ? routeEndArrow(lastPoints[lastPoints.length - 2]!, lastPoints[lastPoints.length - 1]!) : null;
+  ctx.save();
+  if (options?.globalAlpha !== undefined) {
+    ctx.globalAlpha = options.globalAlpha;
   }
+  drawOrderLine(ctx, { runs, arrow }, { color: ORDER_LINE_COLOR, width: ORDER_LINE_WIDTH });
   ctx.restore();
-}
-
-export function strokePolylineSkippingWrap(
-  ctx: CanvasRenderingContext2D,
-  points: Array<{ x: number; y: number }>,
-  wrapJumpThresholdPx: number
-): void {
-  if (points.length < 2) return;
-  ctx.beginPath();
-  ctx.moveTo(points[0]!.x, points[0]!.y);
-  for (let i = 1; i < points.length; i++) {
-    const prev = points[i - 1]!;
-    const current = points[i]!;
-    if (Math.abs(current.x - prev.x) > wrapJumpThresholdPx) {
-      ctx.moveTo(current.x, current.y);
-      continue;
-    }
-    ctx.lineTo(current.x, current.y);
-  }
-  ctx.stroke();
 }
 
 /**
@@ -250,12 +154,16 @@ export function drawTacticalPendingMarchPlanLines(
 }
 
 /**
- * Defines the `drawResolutionMoveLines` function shape (export function drawResolutionMoveLines( ctx: CanvasRenderingContext2D, canvasWidth: number, canvasHeight: number, moves: ResolutionPlaybackMove[],).
-
- * Purpose: Supports maintainability by documenting why `drawResolutionMoveLines` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
+ * Draws the lines of the moves being played back, each from its origin along its path.
+ *
+ * Purpose: During playback the player sees where every unit, theirs and the opponent's, is going.
+ * When to use: From the scene draw while a resolution playback is running.
+ * Expected outcome: One cased line per move, in the mover's color, at `opacity`. A move with a path follows that path.
+ *   When it has an arrowhead, the tip is the path's last hex center. A move with no path runs straight: to the
+ *   destination's center when it has no arrowhead, or to an arrowhead whose tip stops a unit radius short when it has
+ *   one. The opponent's moves have an arrowhead. The player's have one only when `includeArrowForHuman` is set, which
+ *   is an air-strike flight.
+ * Exceptions: None. Draws nothing without moves, a hex list, or a positive opacity.
  */
 export function drawResolutionMoveLines(
   ctx: CanvasRenderingContext2D,
@@ -276,7 +184,8 @@ export function drawResolutionMoveLines(
   const L = getLeafletGlobal();
   for (const move of moves) {
     const isHumanMove = move.player === 'human';
-    const lineColor = move.player === 'human' ? ORDER_LINE_COLOR : AI_ORDER_LINE_COLOR;
+    const withArrow = !isHumanMove || includeArrowForHuman;
+    const style = { color: isHumanMove ? ORDER_LINE_COLOR : AI_ORDER_LINE_COLOR, width: ORDER_LINE_WIDTH };
     const path = move.pathH3Indexes;
     if (path && path.length >= 2 && map) {
       const points = path.map((h) => {
@@ -284,49 +193,17 @@ export function drawResolutionMoveLines(
         const p = map.latLngToContainerPoint(L.latLng(clampLatForWebMercatorDisplay(lat), lng));
         return { x: p.x, y: p.y };
       });
-      ctx.strokeStyle = lineColor;
-      ctx.lineWidth = ORDER_LINE_WIDTH;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      strokePolylineSkippingWrap(ctx, points, ctx.canvas.width * 0.5);
       const hPen = path[path.length - 2]!;
-      const hLast = path[path.length - 1]!;
-      const fromPt = hexCenterPx(hPen);
-      const toPt = hexCenterPxRelativeTo(hPen, hLast);
-      if (isHumanMove && includeArrowForHuman) {
-        drawArrowheadOnly(ctx, fromPt, toPt, lineColor, { tipAtTargetCenter: true });
-        continue;
-      }
-      if (isHumanMove) {
-        continue;
-      }
-      drawArrowheadOnly(ctx, fromPt, toPt, lineColor, { tipAtTargetCenter: true });
+      const arrow = withArrow ? routeEndArrow(hexCenterPx(hPen), hexCenterPxRelativeTo(hPen, path[path.length - 1]!)) : null;
+      drawOrderLine(ctx, { runs: [{ points, dash: ORDER_LINE_SOLID }], arrow }, style);
       continue;
     }
     const from = hexCenterPx(move.fromH3Index);
     const to = hexCenterPxRelativeTo(move.fromH3Index, move.toH3Index);
-    if (isHumanMove && includeArrowForHuman) {
-      drawLineArrow(ctx, from, to, lineColor);
-      continue;
-    }
-    const dx = to.x - from.x;
-    const dy = to.y - from.y;
-    const len = Math.hypot(dx, dy) || 1;
-    const ux = dx / len;
-    const uy = dy / len;
-    const inset = isHumanMove ? 0 : UNIT_RADIUS + ORDER_ARROW_SIZE;
-    const endX = to.x - ux * inset;
-    const endY = to.y - uy * inset;
-    ctx.beginPath();
-    ctx.moveTo(from.x, from.y);
-    ctx.lineTo(endX, endY);
-    ctx.strokeStyle = lineColor;
-    ctx.lineWidth = ORDER_LINE_WIDTH;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    ctx.stroke();
-    if (isHumanMove) continue;
-    drawArrowheadOnly(ctx, from, to, lineColor);
+    const shape = withArrow
+      ? straightOrderLineShape(from, to, UNIT_RADIUS)
+      : { runs: [{ points: [from, to], dash: ORDER_LINE_SOLID }], arrow: null };
+    drawOrderLine(ctx, shape, style);
   }
   ctx.restore();
 }

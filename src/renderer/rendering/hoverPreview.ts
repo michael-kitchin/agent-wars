@@ -1,15 +1,17 @@
 import { strategicMovementHexesFor, weatherBonusLevelOf } from '../../shared/weatherBonusRules';
 import { tacticalHoverSolidEdgeCapByOriginH3 } from '../../shared/tacticalMarchHoverPreview';
-import {
-  ORDER_LINE_COLOR,
-  ORDER_LINE_WIDTH,
-  RANGE_PERIMETER_ALPHA,
-} from '../core/constants';
+import { ORDER_LINE_COLOR, ORDER_LINE_WIDTH } from '../core/constants';
 import { clampLatForWebMercatorDisplay } from '../map/hexGrid';
-import { rangePerimeterStaticLineStyle } from './orderDrawing';
-import { drawArrowheadOnly, strokePolylineSkippingWrap } from './pathDrawing';
+import { strokeSupportOrderLines } from './orderDrawing';
+import {
+  ORDER_LINE_LATER_DASH,
+  ORDER_LINE_SOLID,
+  drawOrderLine,
+  routeEndArrow,
+  type OrderLineRun,
+} from './orderLineStroke';
 import { rendererSharedState as S } from '../core/state';
-import { getLeafletGlobal, hexCenterPx, hexCenterPxRelativeTo } from '../map/mapHelpers';
+import { getLeafletGlobal, hexCenterPx } from '../map/mapHelpers';
 import { getMainLeafletMap } from '../map/worldLeafletMap';
 
 /**
@@ -17,11 +19,12 @@ import { getMainLeafletMap } from '../map/worldLeafletMap';
  *
  * Purpose: Shows where an order would go before the player commits it.
  * When to use: Once per scene draw while `S.hoverRoutePreview` is set.
- * Expected outcome: Ranged and strike targeting draw one dashed line per origin to the hovered target. Otherwise each
- *   origin stack draws its route solid for the part it covers this turn or beat and dashed beyond, with an arrowhead
- *   at the end. Air routes are solid throughout. On the strategic map the solid part is the slowest selected unit's
- *   weather-adjusted movement; in battle it comes from `tacticalHoverSolidEdgeCapByOriginH3`. An X marks the hovered
- *   hex when the preview says the order is invalid. Nothing is drawn without a preview or a map.
+ * Expected outcome: Ranged and strike targeting draw one dashed line per origin toward the hovered target, as a queued
+ *   ranged or strike line looks. Otherwise each origin stack draws its route solid for the part it covers this turn or
+ *   beat and dashed beyond, with an arrowhead at the end. Every line has the order-line casing. Air routes are solid
+ *   throughout. On the strategic map the solid part is the slowest selected unit's weather-adjusted movement; in battle
+ *   it comes from `tacticalHoverSolidEdgeCapByOriginH3`. An X marks the hovered hex when the preview says the order is
+ *   invalid. Nothing is drawn without a preview or a map.
  * Exceptions: None.
  */
 export function drawHoverRoutePreview(ctx: CanvasRenderingContext2D): void {
@@ -36,7 +39,7 @@ export function drawHoverRoutePreview(ctx: CanvasRenderingContext2D): void {
   if (supportMode) {
     if (!state && !tb) return;
     const targetH3 = S.hoverRoutePreview.hoveredH3Index;
-    const style = rangePerimeterStaticLineStyle(supportMode === 'ranged' ? 'ranged' : 'airStrike');
+    const segments: Array<{ fromH3Index: string; toH3Index: string }> = [];
     for (const perUnit of previewGroup.previews) {
       const preview = perUnit.preview;
       if (!preview.valid || preview.segments.length === 0) continue;
@@ -46,21 +49,9 @@ export function drawHoverRoutePreview(ctx: CanvasRenderingContext2D): void {
           ? tb.subUnits.find((s) => s.id === perUnit.unitId)?.h3Index
           : state?.units.find((u) => u.id === perUnit.unitId)?.h3Index);
       if (!originH3 || !targetH3 || originH3 === targetH3) continue;
-      const from = hexCenterPx(originH3);
-      const to = hexCenterPxRelativeTo(originH3, targetH3);
-      ctx.save();
-      ctx.globalAlpha = RANGE_PERIMETER_ALPHA;
-      ctx.setLineDash(style.dash);
-      ctx.strokeStyle = style.strokeColor;
-      ctx.lineWidth = style.lineWidth;
-      ctx.lineCap = style.lineCap;
-      ctx.lineJoin = 'round';
-      ctx.beginPath();
-      ctx.moveTo(from.x, from.y);
-      ctx.lineTo(to.x, to.y);
-      ctx.stroke();
-      ctx.restore();
+      segments.push({ fromH3Index: originH3, toH3Index: targetH3 });
     }
+    strokeSupportOrderLines(ctx, supportMode === 'ranged' ? 'ranged' : 'airStrike', segments);
   } else {
   if (!state && !tb) return;
   const solidEdgeCapByOriginH3 = tb
@@ -113,8 +104,7 @@ export function drawHoverRoutePreview(ctx: CanvasRenderingContext2D): void {
     let lastSegmentPenultimate: { x: number; y: number } | null = null;
     let lastSegmentLast: { x: number; y: number } | null = null;
     let remainingSolidEdges = perStackSolidCap;
-    ctx.save();
-    ctx.globalAlpha = preview.valid ? 0.55 : 0.75;
+    const runs: OrderLineRun[] = [];
     for (const seg of preview.segments) {
       if (!Array.isArray(seg.hexes) || seg.hexes.length < 2) continue;
       const points = seg.hexes.map(([lat, lng]) => {
@@ -123,65 +113,33 @@ export function drawHoverRoutePreview(ctx: CanvasRenderingContext2D): void {
       });
       const edgeCount = Math.max(0, points.length - 1);
       if (remainingSolidEdges >= edgeCount) {
-        ctx.setLineDash([]);
-        ctx.strokeStyle = ORDER_LINE_COLOR;
-        ctx.lineWidth = ORDER_LINE_WIDTH;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-        strokePolylineSkippingWrap(ctx, points, ctx.canvas.width * 0.5);
+        runs.push({ points, dash: ORDER_LINE_SOLID });
       } else if (remainingSolidEdges <= 0) {
-        ctx.setLineDash([6, 4]);
-        ctx.strokeStyle = ORDER_LINE_COLOR;
-        ctx.lineWidth = ORDER_LINE_WIDTH;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-        strokePolylineSkippingWrap(ctx, points, ctx.canvas.width * 0.5);
+        runs.push({ points, dash: ORDER_LINE_LATER_DASH });
       } else {
+        // The solid part ends where this turn's movement runs out; the rest of the segment is dashed.
         const splitIndex = Math.min(points.length - 1, remainingSolidEdges);
-        const solidPoints = points.slice(0, splitIndex + 1);
-        if (solidPoints.length >= 2) {
-          ctx.setLineDash([]);
-          ctx.strokeStyle = ORDER_LINE_COLOR;
-          ctx.lineWidth = ORDER_LINE_WIDTH;
-          ctx.lineCap = 'round';
-          ctx.lineJoin = 'round';
-          strokePolylineSkippingWrap(ctx, solidPoints, ctx.canvas.width * 0.5);
-        }
-        const dashedPoints = points.slice(splitIndex);
-        if (dashedPoints.length >= 2) {
-          ctx.setLineDash([6, 4]);
-          ctx.strokeStyle = ORDER_LINE_COLOR;
-          ctx.lineWidth = ORDER_LINE_WIDTH;
-          ctx.lineCap = 'round';
-          ctx.lineJoin = 'round';
-          strokePolylineSkippingWrap(ctx, dashedPoints, ctx.canvas.width * 0.5);
-        }
+        runs.push({ points: points.slice(0, splitIndex + 1), dash: ORDER_LINE_SOLID });
+        runs.push({ points: points.slice(splitIndex), dash: ORDER_LINE_LATER_DASH });
       }
       remainingSolidEdges -= edgeCount;
       lastSegmentPenultimate = points[points.length - 2] ?? null;
       lastSegmentLast = points[points.length - 1] ?? null;
     }
-    ctx.setLineDash([]);
-    if (lastSegmentPenultimate && lastSegmentLast) {
-      drawArrowheadOnly(ctx, lastSegmentPenultimate, lastSegmentLast, ORDER_LINE_COLOR, {
-        tipAtTargetCenter: true,
-      });
-    } else if (preview.arrowLatLng && preview.segments.length > 0) {
+    let arrow = lastSegmentPenultimate && lastSegmentLast ? routeEndArrow(lastSegmentPenultimate, lastSegmentLast) : null;
+    if (!arrow && preview.arrowLatLng && preview.segments.length > 0) {
       const firstHex = preview.segments[0]?.hexes[0];
       if (firstHex) {
         const fromPoint = map.latLngToContainerPoint(L.latLng(clampLatForWebMercatorDisplay(firstHex[0]), firstHex[1]));
         const toPoint = map.latLngToContainerPoint(
           L.latLng(clampLatForWebMercatorDisplay(preview.arrowLatLng[0]), preview.arrowLatLng[1])
         );
-        drawArrowheadOnly(
-          ctx,
-          { x: fromPoint.x, y: fromPoint.y },
-          { x: toPoint.x, y: toPoint.y },
-          ORDER_LINE_COLOR,
-          { tipAtTargetCenter: true }
-        );
+        arrow = routeEndArrow({ x: fromPoint.x, y: fromPoint.y }, { x: toPoint.x, y: toPoint.y });
       }
     }
+    ctx.save();
+    ctx.globalAlpha = preview.valid ? 0.55 : 0.75;
+    drawOrderLine(ctx, { runs, arrow }, { color: ORDER_LINE_COLOR, width: ORDER_LINE_WIDTH });
     ctx.restore();
   }
   }

@@ -70,6 +70,8 @@
   var ORDER_LINE_WIDTH = 2.5;
   var ORDER_ARROW_SIZE = 10;
   var AI_ORDER_LINE_COLOR = PLAYER_COLORS.opponent;
+  var ORDER_LINE_CASING_COLOR = "rgba(255, 255, 255, 0.8)";
+  var ORDER_LINE_CASING_PAD = 1.5;
   var TOOLTIP_OFFSET_PX = 12;
   var HEX_DETAILS_TOOLTIP_DELAY_MS = 1e3;
   var HEX_DETAILS_TOOLTIP_REST_PX = 6;
@@ -29467,109 +29469,117 @@ ${bonuses}`;
     return { lat: coords[coords.length - 1].lat, lng: coords[coords.length - 1].lng };
   }
 
+  // src/shared/orderArrowGeometry.ts
+  var ARROW_HALF_BASE_RATIO = 0.6;
+  function orderArrowGeometry(from, to, sizes) {
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    const length = Math.hypot(dx, dy);
+    const ux = length > 0 ? dx / length : 1;
+    const uy = length > 0 ? dy / length : 0;
+    const tip = { x: to.x - ux * sizes.tipInset, y: to.y - uy * sizes.tipInset };
+    const lineEnd = { x: tip.x - ux * sizes.arrowSize, y: tip.y - uy * sizes.arrowSize };
+    const halfBase = sizes.arrowSize * ARROW_HALF_BASE_RATIO;
+    return {
+      lineEnd,
+      tip,
+      left: { x: lineEnd.x + uy * halfBase, y: lineEnd.y - ux * halfBase },
+      right: { x: lineEnd.x - uy * halfBase, y: lineEnd.y + ux * halfBase }
+    };
+  }
+
+  // src/renderer/rendering/orderLineStroke.ts
+  var ORDER_LINE_LATER_DASH = [6, 4];
+  var ORDER_LINE_SOLID = [];
+  function traceRun(ctx, points) {
+    const wrapJumpPx = ctx.canvas.width * 0.5;
+    ctx.beginPath();
+    ctx.moveTo(points[0].x, points[0].y);
+    for (let i = 1; i < points.length; i++) {
+      const current = points[i];
+      if (Math.abs(current.x - points[i - 1].x) > wrapJumpPx) ctx.moveTo(current.x, current.y);
+      else ctx.lineTo(current.x, current.y);
+    }
+  }
+  function traceArrow(ctx, arrow) {
+    ctx.beginPath();
+    ctx.moveTo(arrow.tip.x, arrow.tip.y);
+    ctx.lineTo(arrow.left.x, arrow.left.y);
+    ctx.lineTo(arrow.right.x, arrow.right.y);
+    ctx.closePath();
+  }
+  function drawOrderLine(ctx, shape, style) {
+    const runs = shape.runs.filter((run) => run.points.length >= 2);
+    if (runs.length === 0 && !shape.arrow) return;
+    ctx.save();
+    ctx.lineJoin = "round";
+    ctx.setLineDash([]);
+    ctx.lineCap = "round";
+    ctx.strokeStyle = ORDER_LINE_CASING_COLOR;
+    ctx.fillStyle = ORDER_LINE_CASING_COLOR;
+    ctx.lineWidth = style.width + ORDER_LINE_CASING_PAD * 2;
+    for (const run of runs) {
+      traceRun(ctx, run.points);
+      ctx.stroke();
+    }
+    if (shape.arrow) {
+      ctx.lineWidth = ORDER_LINE_WIDTH + ORDER_LINE_CASING_PAD * 2;
+      traceArrow(ctx, shape.arrow);
+      ctx.fill();
+      ctx.stroke();
+    }
+    ctx.lineCap = style.cap ?? "round";
+    ctx.strokeStyle = style.color;
+    ctx.fillStyle = style.color;
+    ctx.lineWidth = style.width;
+    for (const run of runs) {
+      ctx.setLineDash([...run.dash]);
+      traceRun(ctx, run.points);
+      ctx.stroke();
+    }
+    if (shape.arrow) {
+      ctx.setLineDash([]);
+      ctx.lineWidth = ORDER_LINE_WIDTH;
+      traceArrow(ctx, shape.arrow);
+      ctx.fill();
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+  function straightOrderLineShape(from, to, tipInset, dash = ORDER_LINE_SOLID) {
+    const arrow = orderArrowGeometry(from, to, { arrowSize: ORDER_ARROW_SIZE, tipInset });
+    return { runs: [{ points: [from, arrow.lineEnd], dash }], arrow };
+  }
+  function routeEndArrow(from, to) {
+    return orderArrowGeometry(from, to, { arrowSize: ORDER_ARROW_SIZE, tipInset: 0 });
+  }
+
   // src/renderer/rendering/pathDrawing.ts
   function drawLineArrow(ctx, from, to, color) {
-    const dx = to.x - from.x;
-    const dy = to.y - from.y;
-    const len = Math.hypot(dx, dy) || 1;
-    const ux = dx / len;
-    const uy = dy / len;
-    const inset = UNIT_RADIUS + ORDER_ARROW_SIZE;
-    const endX = to.x - ux * inset;
-    const endY = to.y - uy * inset;
-    ctx.beginPath();
-    ctx.moveTo(from.x, from.y);
-    ctx.lineTo(endX, endY);
-    ctx.strokeStyle = color;
-    ctx.lineWidth = ORDER_LINE_WIDTH;
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-    ctx.stroke();
-    const ax = endX + ux * ORDER_ARROW_SIZE;
-    const ay = endY + uy * ORDER_ARROW_SIZE;
-    const perpX = -uy * (ORDER_ARROW_SIZE * 0.6);
-    const perpY = ux * (ORDER_ARROW_SIZE * 0.6);
-    ctx.beginPath();
-    ctx.moveTo(ax, ay);
-    ctx.lineTo(endX - perpX, endY - perpY);
-    ctx.lineTo(endX + perpX, endY + perpY);
-    ctx.closePath();
-    ctx.fillStyle = color;
-    ctx.fill();
-    ctx.strokeStyle = color;
-    ctx.lineWidth = ORDER_LINE_WIDTH;
-    ctx.stroke();
-  }
-  function drawArrowheadOnly(ctx, from, to, color, options) {
-    const dx = to.x - from.x;
-    const dy = to.y - from.y;
-    const len = Math.hypot(dx, dy) || 1;
-    const ux = dx / len;
-    const uy = dy / len;
-    const inset = options?.tipAtTargetCenter ? ORDER_ARROW_SIZE : UNIT_RADIUS + ORDER_ARROW_SIZE;
-    const endX = to.x - ux * inset;
-    const endY = to.y - uy * inset;
-    const ax = endX + ux * ORDER_ARROW_SIZE;
-    const ay = endY + uy * ORDER_ARROW_SIZE;
-    const perpX = -uy * (ORDER_ARROW_SIZE * 0.6);
-    const perpY = ux * (ORDER_ARROW_SIZE * 0.6);
-    ctx.beginPath();
-    ctx.moveTo(ax, ay);
-    ctx.lineTo(endX - perpX, endY - perpY);
-    ctx.lineTo(endX + perpX, endY + perpY);
-    ctx.closePath();
-    ctx.fillStyle = color;
-    ctx.fill();
-    ctx.strokeStyle = color;
-    ctx.lineWidth = ORDER_LINE_WIDTH;
-    ctx.stroke();
+    drawOrderLine(ctx, straightOrderLineShape(from, to, UNIT_RADIUS), { color, width: ORDER_LINE_WIDTH });
   }
   function drawHumanMarchStyleRouteSegments(ctx, segments, options) {
     if (segments.length === 0) return;
     const map = getMainLeafletMap();
     if (!map) return;
     const L = getLeafletGlobal();
-    ctx.save();
-    if (options?.globalAlpha !== void 0) {
-      ctx.globalAlpha = options.globalAlpha;
-    }
-    let lastPenultimate = null;
-    let lastPoint = null;
+    const runs = [];
     for (const seg of segments) {
       if (!Array.isArray(seg.hexes) || seg.hexes.length < 2) continue;
       const points = seg.hexes.map(([lat, lng]) => {
         const p = map.latLngToContainerPoint(L.latLng(clampLatForWebMercatorDisplay(lat), lng));
         return { x: p.x, y: p.y };
       });
-      ctx.setLineDash(seg.turn <= 1 ? [] : [6, 4]);
-      ctx.strokeStyle = ORDER_LINE_COLOR;
-      ctx.lineWidth = ORDER_LINE_WIDTH;
-      ctx.lineCap = "round";
-      ctx.lineJoin = "round";
-      strokePolylineSkippingWrap(ctx, points, ctx.canvas.width * 0.5);
-      lastPenultimate = points[points.length - 2] ?? null;
-      lastPoint = points[points.length - 1] ?? null;
+      runs.push({ points, dash: seg.turn <= 1 ? ORDER_LINE_SOLID : ORDER_LINE_LATER_DASH });
     }
-    ctx.setLineDash([]);
-    if (lastPenultimate && lastPoint) {
-      drawArrowheadOnly(ctx, lastPenultimate, lastPoint, ORDER_LINE_COLOR, { tipAtTargetCenter: true });
+    const lastPoints = runs[runs.length - 1]?.points;
+    const arrow = lastPoints ? routeEndArrow(lastPoints[lastPoints.length - 2], lastPoints[lastPoints.length - 1]) : null;
+    ctx.save();
+    if (options?.globalAlpha !== void 0) {
+      ctx.globalAlpha = options.globalAlpha;
     }
+    drawOrderLine(ctx, { runs, arrow }, { color: ORDER_LINE_COLOR, width: ORDER_LINE_WIDTH });
     ctx.restore();
-  }
-  function strokePolylineSkippingWrap(ctx, points, wrapJumpThresholdPx) {
-    if (points.length < 2) return;
-    ctx.beginPath();
-    ctx.moveTo(points[0].x, points[0].y);
-    for (let i = 1; i < points.length; i++) {
-      const prev = points[i - 1];
-      const current = points[i];
-      if (Math.abs(current.x - prev.x) > wrapJumpThresholdPx) {
-        ctx.moveTo(current.x, current.y);
-        continue;
-      }
-      ctx.lineTo(current.x, current.y);
-    }
-    ctx.stroke();
   }
   function drawStandingOrderLines(ctx, orders, units, excludeUnitIds) {
     if (orders.length === 0) return;
@@ -29619,7 +29629,8 @@ ${bonuses}`;
     const L = getLeafletGlobal();
     for (const move of moves) {
       const isHumanMove = move.player === "human";
-      const lineColor = move.player === "human" ? ORDER_LINE_COLOR : AI_ORDER_LINE_COLOR;
+      const withArrow = !isHumanMove || includeArrowForHuman;
+      const style = { color: isHumanMove ? ORDER_LINE_COLOR : AI_ORDER_LINE_COLOR, width: ORDER_LINE_WIDTH };
       const path = move.pathH3Indexes;
       if (path && path.length >= 2 && map) {
         const points = path.map((h) => {
@@ -29627,49 +29638,15 @@ ${bonuses}`;
           const p = map.latLngToContainerPoint(L.latLng(clampLatForWebMercatorDisplay(lat), lng));
           return { x: p.x, y: p.y };
         });
-        ctx.strokeStyle = lineColor;
-        ctx.lineWidth = ORDER_LINE_WIDTH;
-        ctx.lineCap = "round";
-        ctx.lineJoin = "round";
-        strokePolylineSkippingWrap(ctx, points, ctx.canvas.width * 0.5);
         const hPen = path[path.length - 2];
-        const hLast = path[path.length - 1];
-        const fromPt = hexCenterPx(hPen);
-        const toPt = hexCenterPxRelativeTo(hPen, hLast);
-        if (isHumanMove && includeArrowForHuman) {
-          drawArrowheadOnly(ctx, fromPt, toPt, lineColor, { tipAtTargetCenter: true });
-          continue;
-        }
-        if (isHumanMove) {
-          continue;
-        }
-        drawArrowheadOnly(ctx, fromPt, toPt, lineColor, { tipAtTargetCenter: true });
+        const arrow = withArrow ? routeEndArrow(hexCenterPx(hPen), hexCenterPxRelativeTo(hPen, path[path.length - 1])) : null;
+        drawOrderLine(ctx, { runs: [{ points, dash: ORDER_LINE_SOLID }], arrow }, style);
         continue;
       }
       const from = hexCenterPx(move.fromH3Index);
       const to = hexCenterPxRelativeTo(move.fromH3Index, move.toH3Index);
-      if (isHumanMove && includeArrowForHuman) {
-        drawLineArrow(ctx, from, to, lineColor);
-        continue;
-      }
-      const dx = to.x - from.x;
-      const dy = to.y - from.y;
-      const len = Math.hypot(dx, dy) || 1;
-      const ux = dx / len;
-      const uy = dy / len;
-      const inset = isHumanMove ? 0 : UNIT_RADIUS + ORDER_ARROW_SIZE;
-      const endX = to.x - ux * inset;
-      const endY = to.y - uy * inset;
-      ctx.beginPath();
-      ctx.moveTo(from.x, from.y);
-      ctx.lineTo(endX, endY);
-      ctx.strokeStyle = lineColor;
-      ctx.lineWidth = ORDER_LINE_WIDTH;
-      ctx.lineCap = "round";
-      ctx.lineJoin = "round";
-      ctx.stroke();
-      if (isHumanMove) continue;
-      drawArrowheadOnly(ctx, from, to, lineColor);
+      const shape = withArrow ? straightOrderLineShape(from, to, UNIT_RADIUS) : { runs: [{ points: [from, to], dash: ORDER_LINE_SOLID }], arrow: null };
+      drawOrderLine(ctx, shape, style);
     }
     ctx.restore();
   }
@@ -29776,21 +29753,14 @@ ${bonuses}`;
   function strokeSupportOrderLines(ctx, mode, segments) {
     if (segments.length === 0) return;
     const style = rangePerimeterStaticLineStyle(mode);
+    const lineStyle = { color: style.strokeColor, width: style.lineWidth, cap: style.lineCap };
     ctx.save();
     ctx.globalAlpha = RANGE_PERIMETER_ALPHA;
-    ctx.setLineDash(style.dash);
-    ctx.strokeStyle = style.strokeColor;
-    ctx.lineWidth = style.lineWidth;
-    ctx.lineCap = style.lineCap;
-    ctx.lineJoin = "round";
     for (const segment of segments) {
       if (segment.fromH3Index === segment.toH3Index) continue;
       const from = hexCenterPx(segment.fromH3Index);
       const to = hexCenterPxRelativeTo(segment.fromH3Index, segment.toH3Index);
-      ctx.beginPath();
-      ctx.moveTo(from.x, from.y);
-      ctx.lineTo(to.x, to.y);
-      ctx.stroke();
+      drawOrderLine(ctx, straightOrderLineShape(from, to, UNIT_RADIUS, style.dash), lineStyle);
     }
     ctx.restore();
   }
@@ -35015,27 +34985,15 @@ ${bonuses}`;
     if (supportMode) {
       if (!state && !tb) return;
       const targetH3 = rendererSharedState.hoverRoutePreview.hoveredH3Index;
-      const style = rangePerimeterStaticLineStyle(supportMode === "ranged" ? "ranged" : "airStrike");
+      const segments = [];
       for (const perUnit of previewGroup.previews) {
         const preview = perUnit.preview;
         if (!preview.valid || preview.segments.length === 0) continue;
         const originH3 = perUnit.originH3Index ?? (tb ? tb.subUnits.find((s) => s.id === perUnit.unitId)?.h3Index : state?.units.find((u) => u.id === perUnit.unitId)?.h3Index);
         if (!originH3 || !targetH3 || originH3 === targetH3) continue;
-        const from = hexCenterPx(originH3);
-        const to = hexCenterPxRelativeTo(originH3, targetH3);
-        ctx.save();
-        ctx.globalAlpha = RANGE_PERIMETER_ALPHA;
-        ctx.setLineDash(style.dash);
-        ctx.strokeStyle = style.strokeColor;
-        ctx.lineWidth = style.lineWidth;
-        ctx.lineCap = style.lineCap;
-        ctx.lineJoin = "round";
-        ctx.beginPath();
-        ctx.moveTo(from.x, from.y);
-        ctx.lineTo(to.x, to.y);
-        ctx.stroke();
-        ctx.restore();
+        segments.push({ fromH3Index: originH3, toH3Index: targetH3 });
       }
+      strokeSupportOrderLines(ctx, supportMode === "ranged" ? "ranged" : "airStrike", segments);
     } else {
       if (!state && !tb) return;
       const solidEdgeCapByOriginH3 = tb ? tacticalHoverSolidEdgeCapByOriginH3(
@@ -35079,8 +35037,7 @@ ${bonuses}`;
           let lastSegmentPenultimate = null;
           let lastSegmentLast = null;
           let remainingSolidEdges = perStackSolidCap;
-          ctx.save();
-          ctx.globalAlpha = preview.valid ? 0.55 : 0.75;
+          const runs = [];
           for (const seg of preview.segments) {
             if (!Array.isArray(seg.hexes) || seg.hexes.length < 2) continue;
             const points = seg.hexes.map(([lat, lng]) => {
@@ -35089,65 +35046,32 @@ ${bonuses}`;
             });
             const edgeCount = Math.max(0, points.length - 1);
             if (remainingSolidEdges >= edgeCount) {
-              ctx.setLineDash([]);
-              ctx.strokeStyle = ORDER_LINE_COLOR;
-              ctx.lineWidth = ORDER_LINE_WIDTH;
-              ctx.lineCap = "round";
-              ctx.lineJoin = "round";
-              strokePolylineSkippingWrap(ctx, points, ctx.canvas.width * 0.5);
+              runs.push({ points, dash: ORDER_LINE_SOLID });
             } else if (remainingSolidEdges <= 0) {
-              ctx.setLineDash([6, 4]);
-              ctx.strokeStyle = ORDER_LINE_COLOR;
-              ctx.lineWidth = ORDER_LINE_WIDTH;
-              ctx.lineCap = "round";
-              ctx.lineJoin = "round";
-              strokePolylineSkippingWrap(ctx, points, ctx.canvas.width * 0.5);
+              runs.push({ points, dash: ORDER_LINE_LATER_DASH });
             } else {
               const splitIndex = Math.min(points.length - 1, remainingSolidEdges);
-              const solidPoints = points.slice(0, splitIndex + 1);
-              if (solidPoints.length >= 2) {
-                ctx.setLineDash([]);
-                ctx.strokeStyle = ORDER_LINE_COLOR;
-                ctx.lineWidth = ORDER_LINE_WIDTH;
-                ctx.lineCap = "round";
-                ctx.lineJoin = "round";
-                strokePolylineSkippingWrap(ctx, solidPoints, ctx.canvas.width * 0.5);
-              }
-              const dashedPoints = points.slice(splitIndex);
-              if (dashedPoints.length >= 2) {
-                ctx.setLineDash([6, 4]);
-                ctx.strokeStyle = ORDER_LINE_COLOR;
-                ctx.lineWidth = ORDER_LINE_WIDTH;
-                ctx.lineCap = "round";
-                ctx.lineJoin = "round";
-                strokePolylineSkippingWrap(ctx, dashedPoints, ctx.canvas.width * 0.5);
-              }
+              runs.push({ points: points.slice(0, splitIndex + 1), dash: ORDER_LINE_SOLID });
+              runs.push({ points: points.slice(splitIndex), dash: ORDER_LINE_LATER_DASH });
             }
             remainingSolidEdges -= edgeCount;
             lastSegmentPenultimate = points[points.length - 2] ?? null;
             lastSegmentLast = points[points.length - 1] ?? null;
           }
-          ctx.setLineDash([]);
-          if (lastSegmentPenultimate && lastSegmentLast) {
-            drawArrowheadOnly(ctx, lastSegmentPenultimate, lastSegmentLast, ORDER_LINE_COLOR, {
-              tipAtTargetCenter: true
-            });
-          } else if (preview.arrowLatLng && preview.segments.length > 0) {
+          let arrow = lastSegmentPenultimate && lastSegmentLast ? routeEndArrow(lastSegmentPenultimate, lastSegmentLast) : null;
+          if (!arrow && preview.arrowLatLng && preview.segments.length > 0) {
             const firstHex = preview.segments[0]?.hexes[0];
             if (firstHex) {
               const fromPoint = map.latLngToContainerPoint(L.latLng(clampLatForWebMercatorDisplay(firstHex[0]), firstHex[1]));
               const toPoint = map.latLngToContainerPoint(
                 L.latLng(clampLatForWebMercatorDisplay(preview.arrowLatLng[0]), preview.arrowLatLng[1])
               );
-              drawArrowheadOnly(
-                ctx,
-                { x: fromPoint.x, y: fromPoint.y },
-                { x: toPoint.x, y: toPoint.y },
-                ORDER_LINE_COLOR,
-                { tipAtTargetCenter: true }
-              );
+              arrow = routeEndArrow({ x: fromPoint.x, y: fromPoint.y }, { x: toPoint.x, y: toPoint.y });
             }
           }
+          ctx.save();
+          ctx.globalAlpha = preview.valid ? 0.55 : 0.75;
+          drawOrderLine(ctx, { runs, arrow }, { color: ORDER_LINE_COLOR, width: ORDER_LINE_WIDTH });
           ctx.restore();
         }
       }
@@ -36255,7 +36179,7 @@ ${bonuses}`;
       dismissTerrainTooltipWhenPointerLeavesMapPanel(deps);
       rendererSharedState.shiftKeyActive = false;
       deps.applyModifierDrivenPopoverCloseRules("window_blur");
-      if (!deps.isMapInspectionModeHeld()) return;
+      if (!rendererSharedState.hideTerrainFillWhileHeld) return;
       rendererSharedState.hideTerrainFillWhileHeld = false;
       deps.requestRedraw();
     });

@@ -9,9 +9,11 @@ import {
   RANGE_PERIMETER_AIR_STRIKE_COLOR,
   RANGE_PERIMETER_ALPHA,
   RANGE_PERIMETER_RANGED_COLOR,
+  UNIT_RADIUS,
 } from '../core/constants';
 import { hexCenterPx, hexCenterPxRelativeTo } from '../map/mapHelpers';
 import { drawHumanMarchStyleRouteSegments } from './pathDrawing';
+import { drawOrderLine, straightOrderLineShape } from './orderLineStroke';
 import {
   buildRangeOverlayDashArray,
   getCurrentRangeOverlayLineWidth,
@@ -70,33 +72,30 @@ type SupportOrderLineSegment = { fromH3Index: string; toH3Index: string };
 /**
  * Strokes dashed support-order connectors with the shared ranged or air-strike perimeter style.
  *
- * Purpose: Single save/alpha/dash/stroke/restore path for planned and resolution shot lines.
- * When to use: From `drawRangedAttackLines`, `drawAirStrikeLines`, and `drawRangedResolutionShotLines`.
- * Expected outcome: Each unequal endpoint pair is stroked; equal endpoints are skipped.
+ * Purpose: Single path for planned, previewed, and resolution shot lines, so every ranged and air-strike line has the
+ *   same color, dash, casing, and arrowhead.
+ * When to use: From `drawRangedAttackLines`, `drawAirStrikeLines`, `drawRangedResolutionShotLines`, and the hover
+ *   preview while Ranged or Strike is aiming.
+ * Expected outcome: Each unequal endpoint pair is drawn from the origin's center toward the target, cased, dashed, at
+ *   `RANGE_PERIMETER_ALPHA`, ending in the movement arrowhead whose tip stops a unit radius short of the target's center.
+ *   Equal endpoints are skipped.
  * Exceptions: None.
  */
-function strokeSupportOrderLines(
+export function strokeSupportOrderLines(
   ctx: CanvasRenderingContext2D,
   mode: 'ranged' | 'airStrike',
   segments: readonly SupportOrderLineSegment[]
 ): void {
   if (segments.length === 0) return;
   const style = rangePerimeterStaticLineStyle(mode);
+  const lineStyle = { color: style.strokeColor, width: style.lineWidth, cap: style.lineCap };
   ctx.save();
   ctx.globalAlpha = RANGE_PERIMETER_ALPHA;
-  ctx.setLineDash(style.dash);
-  ctx.strokeStyle = style.strokeColor;
-  ctx.lineWidth = style.lineWidth;
-  ctx.lineCap = style.lineCap;
-  ctx.lineJoin = 'round';
   for (const segment of segments) {
     if (segment.fromH3Index === segment.toH3Index) continue;
     const from = hexCenterPx(segment.fromH3Index);
     const to = hexCenterPxRelativeTo(segment.fromH3Index, segment.toH3Index);
-    ctx.beginPath();
-    ctx.moveTo(from.x, from.y);
-    ctx.lineTo(to.x, to.y);
-    ctx.stroke();
+    drawOrderLine(ctx, straightOrderLineShape(from, to, UNIT_RADIUS, style.dash), lineStyle);
   }
   ctx.restore();
 }
