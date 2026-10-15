@@ -73,11 +73,11 @@ export function blurMapChromeIfFocused(): void {
  *
  * Purpose: The new-game overlay and the annihilation dialog stay clickable while the match controls do not.
  * When to use: When those overlays open or close, and when the tactical battles list opens or closes.
- * Expected outcome: Children of the map pane other than those two overlays, and the console, ignore the pointer while
- *   `enabled` is false. The top bar does too, except while the new-game overlay is open: it is the new-game bar then,
- *   and its game menu keeps working. The game menu closes whenever the top bar stops taking the pointer, and its New
- *   game item follows the overlay. While the new-game form is hidden, the main map takes the pointer again so drag and
- *   the wheel still move the preview.
+ * Expected outcome: Children of the map pane other than the annihilation dialog, and the console, ignore the pointer
+ *   while `enabled` is false. The top bar does too, except while the new-game overlay is open: it is the new-game bar
+ *   then, and its game menu keeps working. The game menu closes whenever the top bar stops taking the pointer, and its
+ *   New game item follows the overlay. The new-game overlay sits beside the map pane, not in it, so this never turns
+ *   it off. While it is open, the main map takes the pointer again so drag and the wheel move the preview.
  * Exceptions: None.
  */
 export function setMainUIControlsEnabled(enabled: boolean): void {
@@ -85,7 +85,7 @@ export function setMainUIControlsEnabled(enabled: boolean): void {
   if (container) {
     for (const child of container.children) {
       const id = (child as HTMLElement).id;
-      if (id === 'game-over-overlay' || id === 'tactical-annihilation-overlay') continue;
+      if (id === 'tactical-annihilation-overlay') continue;
       (child as HTMLElement).style.pointerEvents = enabled ? '' : 'none';
     }
   }
@@ -114,8 +114,8 @@ export function setMainUIControlsEnabled(enabled: boolean): void {
  *   stays open, stays closed, or the element is missing. With a live game the overlay hides and controls are
  *   enabled. Otherwise the overlay shows a win, loss, or start message. Fog of war and the bonus dropdowns return
  *   to their defaults on every call while it shows. The home regions, the starting month, and the map preview are
- *   drawn only when the overlay opens, and that open closes the game menu. The form starts showing only on that open.
- *   A later refresh leaves a hidden form hidden.
+ *   drawn only when the overlay opens, and that open closes the game menu. The choices start showing only on that
+ *   open. A later refresh leaves hidden choices hidden.
  * Exceptions: None.
  */
 export function updateGameOverUI(

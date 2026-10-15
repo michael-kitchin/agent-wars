@@ -51,6 +51,7 @@ const CONSOLE_COLLAPSED_WIDTH = 56;
 const SCENES = Object.freeze({
   newGameStartup: 'new-game-startup',
   newGameMenu: 'new-game-menu',
+  newGameHidden: 'new-game-hidden',
   strategic: 'strategic',
   opponentTab: 'opponent-tab',
   consoleCollapsed: 'console-collapsed',
@@ -84,6 +85,7 @@ const SCENES = Object.freeze({
   regionalStart: 'regional-start',
   regionalSelection: 'regional-selection',
   gameOverReopened: 'game-over-reopened',
+  gameOverSmallWindow: 'game-over-small-window',
 });
 
 /**
@@ -91,15 +93,17 @@ const SCENES = Object.freeze({
  *
  * Purpose: The overlay replaces the match chrome with the new-game screen, so these scenes get their own checks.
  * When to use: The `scenes` list of a check that applies only while the overlay is open.
- * Expected outcome: The first scene, the game menu opened on it, the overlay opened from a match, and the finished
- *   match reopened.
+ * Expected outcome: The first scene, the game menu opened on it, the choices hidden, the overlay opened from a match,
+ *   and the finished match reopened, then at the 800 x 600 minimum.
  * Exceptions: None.
  */
 const NEW_GAME_SCENES = Object.freeze([
   SCENES.newGameStartup,
   SCENES.newGameMenu,
+  SCENES.newGameHidden,
   SCENES.newGameReopened,
   SCENES.gameOverReopened,
+  SCENES.gameOverSmallWindow,
 ]);
 
 /**

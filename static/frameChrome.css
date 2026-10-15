@@ -370,7 +370,9 @@ body:has(#game-over-overlay:not(.hidden)) #sidebar {
 }
 
 /* ---------- Map and console row ---------- */
+/* The containing block for the new-game panel's hide-choices button while the choices are hidden. */
 #app-body {
+  position: relative;
   flex: 1 1 auto;
   min-height: 0;
   display: flex;

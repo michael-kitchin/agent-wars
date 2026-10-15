@@ -8,7 +8,7 @@ Keep orders, the reports from this match, the opponent's model controls, and Rea
 
 ## Availability
 
-Shown in Strategic planning, Tactical planning, Resolution playback, the tactical battles list, and Tactical annihilation. It is not on screen in New game or Game over, including while the new-game form is hidden, and the map widens to the window's right edge. It accepts pointer input in Strategic planning, Tactical planning, and Resolution playback. While the tactical battles list is open, the panel stays visible and does not receive pointer input. In Tactical annihilation, pointer input on the panel is off except the annihilation dialog, which is not part of this panel.
+Shown in Strategic planning, Tactical planning, Resolution playback, the tactical battles list, and Tactical annihilation. It is not on screen in New game or Game over, including while the new-game choices are hidden, and the map widens to the window's right edge. It accepts pointer input in Strategic planning, Tactical planning, and Resolution playback. While the tactical battles list is open, the panel stays visible and does not receive pointer input. In Tactical annihilation, pointer input on the panel is off except the annihilation dialog, which is not part of this panel.
 
 ## Information Displayed
 
@@ -56,7 +56,7 @@ Shown in Strategic planning, Tactical planning, Resolution playback, the tactica
 - Expanded on Reports.
 - Expanded on Opponent.
 - Collapsed: only the rail and Ready show. The last selected tab is remembered.
-- Absent: New game and Game over, including while the new-game form is hidden. The map widens to the window's right edge.
+- Absent: New game and Game over, including while the new-game choices are hidden. The map widens to the window's right edge.
 - Pointer input off: the tactical battles list, and Tactical annihilation.
 
 ## Invariants

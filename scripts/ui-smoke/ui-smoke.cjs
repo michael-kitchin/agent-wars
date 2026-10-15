@@ -207,6 +207,14 @@ async function runFirstSession(app, page, report, outDir) {
   await recordScene(page, report, outDir, SCENES.newGameMenu);
   await page.keyboard.press('Escape');
   await page.waitForTimeout(SETTLE_MS.click);
+  // Hiding the choices widens the map under the hide-choices button. Show them again before starting the match.
+  await page.click('#new-game-dialog-collapse');
+  await parkPointer(page);
+  await page.waitForTimeout(SETTLE_MS.resize);
+  await recordScene(page, report, outDir, SCENES.newGameHidden);
+  await page.click('#new-game-dialog-collapse');
+  await parkPointer(page);
+  await page.waitForTimeout(SETTLE_MS.resize);
 
   await startScenarioMatch(page);
   for (const size of VIEWPORTS) {
@@ -418,9 +426,10 @@ async function runReopenedSession(app, page, report, outDir, battleHex) {
 /**
  * Runs the last session: the reopened match after it was marked as lost.
  *
- * Purpose: A finished match must open on the game-over screen, with the match's chrome out of the way.
+ * Purpose: A finished match must open on the game-over screen, with the match's chrome out of the way, and the setup
+ *   panel must still fit the 800 x 600 minimum.
  * When to use: After `runReopenedSession` and `FINISHED_MATCH_EDIT`, on the same folder.
- * Expected outcome: One recorded scene.
+ * Expected outcome: Two recorded scenes: the game-over screen, then the same screen at the minimum window.
  * Exceptions: Propagates Playwright errors.
  */
 async function runFinishedMatchSession(app, page, report, outDir) {
@@ -428,6 +437,9 @@ async function runFinishedMatchSession(app, page, report, outDir) {
   await waitForNewGameOverlay(page);
   await page.waitForTimeout(SETTLE_MS.overlay);
   await recordScene(page, report, outDir, SCENES.gameOverReopened);
+  await setViewport(app, page, SMALL_WINDOW);
+  await page.waitForTimeout(SETTLE_MS.resize);
+  await recordScene(page, report, outDir, SCENES.gameOverSmallWindow);
 }
 
 /**

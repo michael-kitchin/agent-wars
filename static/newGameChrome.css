@@ -1,4 +1,7 @@
-/* The new-game screen. While the new-game overlay is open, the top bar becomes the new-game bar. */
+/* The new-game screen. While the new-game overlay is open, the top bar becomes the new-game bar, and the setup panel is
+   docked at the left of the window, under the top bar, with the map preview beside it. The panel's header holds the
+   hide-choices button and the message, the body scrolls, and the footer holds Start game. Hiding the choices leaves only
+   that button, in the same spot over the map's top-left corner, and the map widens under it. */
 
 /* ---------- New-game bar ---------- */
 /* While the new-game overlay is open, the bar shows only the menu button, the title "New game", Load game…, Settings,
@@ -46,4 +49,269 @@ body:has(#game-over-overlay:not(.hidden)) #app-topbar.topbar-battle {
   background: transparent;
   color: var(--chrome-disabled);
   border-color: var(--chrome-divider);
+}
+
+/* ---------- Panel ---------- */
+.new-game-panel {
+  position: relative;
+  z-index: 7002;
+  flex: none;
+  width: var(--new-game-panel-width);
+  height: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  background: var(--chrome-bg);
+  color: var(--chrome-text);
+  color-scheme: dark;
+  border-right: 1px solid var(--chrome-border);
+  box-shadow: 4px 0 12px rgba(8, 14, 22, 0.35);
+}
+.new-game-panel.hidden {
+  display: none;
+}
+.new-game-panel-header {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border-bottom: 1px solid var(--chrome-border);
+}
+#game-over-message {
+  min-width: 0;
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+/* The square matches a randomize button (`--new-game-collapse-size`). It keeps the pointer while the choices are
+   hidden and the rest of the panel does not. */
+#new-game-dialog-collapse {
+  flex: none;
+  width: var(--new-game-collapse-size, 1.75rem);
+  height: var(--new-game-collapse-size, 1.75rem);
+  min-width: 0;
+  margin-left: 0;
+  padding: 0;
+  box-sizing: border-box;
+  pointer-events: auto;
+}
+.new-game-panel-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: 16px 18px;
+  text-align: center;
+}
+.new-game-panel-body button {
+  padding: 0.5rem 1rem;
+  font-size: 14px;
+}
+.new-game-panel-footer {
+  flex: none;
+  padding: 12px 18px;
+  border-top: 1px solid var(--chrome-border);
+}
+#new-game-btn {
+  width: 100%;
+  height: 42px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* ---------- Hidden choices ---------- */
+/* Only the hide-choices button stays. The panel leaves the row, so the map widens to the window's left edge, and the
+   header keeps its padding, so the button does not move. #app-body is the containing block. */
+.new-game-panel.game-over-dialog-collapsed {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: auto;
+  height: auto;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  pointer-events: none;
+}
+.new-game-panel.game-over-dialog-collapsed .new-game-panel-header {
+  border-bottom: 0;
+}
+.new-game-panel.game-over-dialog-collapsed #game-over-message,
+.new-game-panel.game-over-dialog-collapsed .new-game-panel-body,
+.new-game-panel.game-over-dialog-collapsed .new-game-panel-footer {
+  display: none;
+}
+
+/* ---------- Choices ---------- */
+/* Two lines: Country with Tech, then Terrain with Weather. Each line keeps the slash gap. */
+.game-over-options {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 0.9rem 0;
+  font-size: 0.95rem;
+  color: var(--chrome-text);
+}
+.game-over-options-line {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+/* Bonus labels and the Game size label. Change the gap here so those dropdowns stay aligned with each other. */
+.game-over-options label,
+.game-over-size-row label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.game-over-start-month {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  margin: 0 0 0.9rem 0;
+  font-size: 0.95rem;
+  color: var(--chrome-text);
+}
+/* The two sides wrap onto two lines when the panel is too narrow for them side by side. */
+.game-over-region-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 0.7rem 0.9rem;
+  margin: 0 0 0.7rem 0;
+}
+/* Centers the Game size label and dropdown. The gap lives on the shared label rule above. */
+.game-over-size-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 0 0.2rem 0;
+}
+.game-over-region-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.22rem;
+  text-align: left;
+}
+.game-over-region-cell label,
+.game-over-size-row label {
+  font-size: 0.88rem;
+  color: var(--chrome-text);
+  font-weight: 600;
+}
+/* Select column shares one closed width. The randomize button sits in the next column at the same height. */
+.game-over-region-controls {
+  display: grid;
+  width: max-content;
+  grid-template-columns: auto auto;
+  align-items: stretch;
+  column-gap: 0.3rem;
+}
+.new-game-panel-body select {
+  font-size: 12px;
+  padding: 0.16rem 0.28rem;
+}
+/* Longest option, not the selected one, so Medium still fits while Small is selected. Regular weight so the bold label does not inherit onto the control and change that width. */
+.game-over-size-row select {
+  width: max-content;
+  flex-shrink: 0;
+  font-weight: 400;
+}
+/* One closed width for home-region, region, and side selectors. The variable is the widest region option, so a short selection does not shrink a control and a long side name does not widen one. */
+.game-over-region-controls select {
+  box-sizing: border-box;
+  width: var(--new-game-region-select-width, max-content);
+  min-width: var(--new-game-region-select-width, max-content);
+  max-width: var(--new-game-region-select-width, none);
+}
+/* Size to the longest month. Overrides the shared region width so a long region name does not widen this control and a short region list does not clip a month name. */
+.game-over-start-month .game-over-region-controls select {
+  width: max-content;
+  min-width: max-content;
+  max-width: none;
+}
+/* Matches the dropdown beside it. The fixed square size on `.compact-square-btn` is for other buttons. */
+.new-game-panel-body .compact-square-btn.game-over-region-randomize {
+  align-self: stretch;
+  justify-self: center;
+  width: auto;
+  min-width: 0;
+  height: auto;
+  margin-left: 0;
+  aspect-ratio: 1;
+  padding: 0;
+  line-height: 1;
+  font-size: 11px;
+  font-weight: 700;
+}
+.game-over-size-caps {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 1.1rem;
+  margin: 0 0 0.9rem 0;
+}
+.game-over-size-cap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.28rem;
+}
+.game-over-size-token {
+  position: relative;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #b0b0b0;
+  border: 2px solid #222;
+  box-sizing: content-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.game-over-size-token img {
+  width: 32px;
+  height: 32px;
+  pointer-events: none;
+  filter: brightness(0.133);
+}
+.game-over-size-badge {
+  position: absolute;
+  left: calc(50% + 16px);
+  top: calc(50% - 16px);
+  transform: translate(-50%, -50%);
+  font: bold 13px system-ui, sans-serif;
+  color: #000;
+  -webkit-text-stroke: 2px #fff;
+  paint-order: stroke fill;
+  pointer-events: none;
+}
+.game-over-size-name {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--chrome-text);
+  white-space: nowrap;
+}
+.game-over-tab-bar {
+  margin: 0 0 0.75rem 0;
+}
+.game-over-regional-region {
+  display: flex;
+  justify-content: center;
+  margin: 0 0 0.75rem 0;
+}
+.new-game-panel-body p.game-over-advanced-tech {
+  text-align: center;
+  margin: 0 0 0.55rem 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+.new-game-panel-body p.game-over-advanced-tech:empty {
+  display: none;
+  margin: 0;
 }

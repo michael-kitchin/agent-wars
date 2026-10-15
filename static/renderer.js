@@ -25203,9 +25203,12 @@ ${bonuses}`;
       if (serial !== requestSerial || !newGameOverlayOpen() || mapCameraHeldForStart) return;
       if (!storeNewGameMapPreview(preview)) return;
       const key = extentKey(preview.extent);
-      if (key !== framedExtentKey && applyLoadedMapExtent(preview.extent, true)) {
-        framedExtentKey = key;
-        if (preview.gameMapId === "global") zoomGlobalPreviewInOneLevel();
+      if (key !== framedExtentKey) {
+        invalidateLeafletMapSizes();
+        if (applyLoadedMapExtent(preview.extent, true)) {
+          framedExtentKey = key;
+          if (preview.gameMapId === "global") zoomGlobalPreviewInOneLevel();
+        }
       }
       repaintNewGameMapPreview();
     } catch (err) {
@@ -25724,7 +25727,7 @@ ${bonuses}`;
   // src/renderer/gameplay/newGameDialogCollapse.ts
   var COLLAPSED_CLASS = "game-over-dialog-collapsed";
   var EXPANDED_LABEL = "Hide the new game choices";
-  var EXPANDED_TOOLTIP = "Hide the new game choices. The map stays up.";
+  var EXPANDED_TOOLTIP = "Hide the new game choices and widen the map.";
   var COLLAPSED_LABEL = "Show the new game choices";
   var COLLAPSED_TOOLTIP = "Show the new game choices.";
   function newGameOverlayIsOpen() {
@@ -25749,15 +25752,12 @@ ${bonuses}`;
   }
   function applyCollapsedChrome(overlay, button) {
     const active2 = document.activeElement;
-    const dialog = document.getElementById("game-over-dialog");
-    if (active2 instanceof HTMLElement && dialog?.contains(active2)) active2.blur();
+    if (active2 instanceof HTMLElement && active2 !== button && overlay.contains(active2)) active2.blur();
     overlay.classList.add(COLLAPSED_CLASS);
     button.textContent = UNIT_SELECT_GLYPH;
     button.setAttribute("aria-expanded", "false");
     button.setAttribute("aria-label", COLLAPSED_LABEL);
     button.setAttribute("data-control-tooltip", COLLAPSED_TOOLTIP);
-    overlay.scrollTop = 0;
-    overlay.scrollLeft = 0;
   }
   function expandNewGameDialog() {
     const overlay = document.getElementById("game-over-overlay");
@@ -25778,7 +25778,7 @@ ${bonuses}`;
     const map = document.getElementById("main-map");
     if (!(overlay instanceof HTMLElement) || !(map instanceof HTMLElement)) return;
     if (overlay.classList.contains("hidden")) return;
-    map.style.pointerEvents = overlay.classList.contains(COLLAPSED_CLASS) ? "auto" : "none";
+    map.style.pointerEvents = "auto";
   }
 
   // src/shared/topBarDateBlock.ts
@@ -26878,7 +26878,7 @@ ${bonuses}`;
     if (container) {
       for (const child of container.children) {
         const id = child.id;
-        if (id === "game-over-overlay" || id === "tactical-annihilation-overlay") continue;
+        if (id === "tactical-annihilation-overlay") continue;
         child.style.pointerEvents = enabled ? "" : "none";
       }
     }

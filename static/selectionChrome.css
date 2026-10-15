@@ -22,7 +22,7 @@
   font-size: 13px;
 }
 .selection-panel[hidden],
-#canvas-container:has(#game-over-overlay:not(.hidden)) #selection-panel {
+body:has(#game-over-overlay:not(.hidden)) #selection-panel {
   display: none;
 }
 /* While the player aims, the border takes the color of the order being aimed. */

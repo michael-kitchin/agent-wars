@@ -360,7 +360,7 @@ export function registerNewGameButton(deps: NewGameDeps): void {
  * Expected outcome: Returns false when the annihilation dialog is open. Otherwise opponent planning and playback stop
  *   immediately, a tactical preview is released, Fog of war
  *   and the bonus dropdowns return to their defaults, the home regions, starting month, and map preview are drawn
- *   again, the form starts showing, and the overlay opens. Returns true only when this call removes `hidden` from
+ *   again, the choices start showing, and the overlay opens. Returns true only when this call removes `hidden` from
  *   `#game-over-overlay`.
  * Exceptions: None.
  */

@@ -1,6 +1,6 @@
 /**
  * Checks of the new-game screen for the UI smoke run: the top bar while the new-game overlay is open, the game menu
- * there, and where the map sits.
+ * there, the setup panel docked at the left, and the map beside it.
  *
  * Purpose: Keeps the new-game screen's checks apart from the frame, console, scenario, map chrome, and battle checks,
  *   so each table stays readable.
@@ -11,6 +11,28 @@
 'use strict';
 
 const { TOPBAR_HEIGHT, SCENES, NEW_GAME_SCENES, near, fmt } = require('./ui-smoke-scenes.cjs');
+
+/**
+ * Sizes of the setup panel, in CSS pixels.
+ *
+ * Purpose: The panel is docked at the left, the hide-choices button sits 12 px in from the panel's top-left corner,
+ *   and Start game spans the footer inside its 18 px padding.
+ * When to use: The panel and hidden-choices checks.
+ * Expected outcome: Matches `--new-game-panel-width` in `static/shellChrome.css` and the padding in
+ *   `static/newGameChrome.css`.
+ * Exceptions: None.
+ */
+const PANEL = Object.freeze({ width: 432, headerInset: 12, footerInset: 18 });
+
+/**
+ * The new-game scenes that show the setup panel: every new-game scene except the one with the choices hidden.
+ *
+ * Purpose: The panel's layout checks apply only while the panel shows.
+ * When to use: The `scenes` list of a panel layout check.
+ * Expected outcome: Derived from `NEW_GAME_SCENES`.
+ * Exceptions: None.
+ */
+const PANEL_SCENES = Object.freeze(NEW_GAME_SCENES.filter((scene) => scene !== SCENES.newGameHidden));
 
 /**
  * The top bar's parts that the new-game screen shows, and the parts it hides.
@@ -49,16 +71,69 @@ const NEW_GAME_ITEM_OPEN_TIP = 'The new-game screen is already open.';
  */
 const NEW_GAME_CHECKS = Object.freeze([
   {
-    name: 'new-game-map-under-top-bar',
-    scenes: NEW_GAME_SCENES,
-    needs: ['#canvas-container', '#game-over-overlay'],
+    name: 'new-game-panel-beside-map',
+    scenes: PANEL_SCENES,
+    needs: ['#game-over-overlay', '#canvas-container'],
+    run: (p, el) => {
+      const panel = el('#game-over-overlay');
+      const c = el('#canvas-container');
+      if (!panel.shown) return 'the setup panel is not shown';
+      if (!near(panel.x, 0) || !near(panel.y, TOPBAR_HEIGHT) || !near(panel.w, PANEL.width) || !near(panel.y + panel.h, p.viewport.h)) {
+        return `the setup panel is at ${fmt(panel)}, expected ${PANEL.width} px wide at the left, from the top bar to the window's bottom`;
+      }
+      return near(c.x, PANEL.width) && near(c.y, TOPBAR_HEIGHT) && near(c.x + c.w, p.viewport.w) && near(c.y + c.h, p.viewport.h)
+        ? null
+        : `#canvas-container ${fmt(c)} should fill the rest of the window, right of the panel and under the top bar`;
+    },
+  },
+  {
+    name: 'new-game-panel-layout',
+    scenes: PANEL_SCENES,
+    needs: ['#game-over-overlay', '#new-game-dialog-collapse', '#game-over-message', '#game-over-dialog', '#new-game-btn'],
+    run: (p, el) => {
+      const panel = el('#game-over-overlay');
+      const collapse = el('#new-game-dialog-collapse');
+      const message = el('#game-over-message');
+      const body = el('#game-over-dialog');
+      const start = el('#new-game-btn');
+      if (!near(collapse.x, panel.x + PANEL.headerInset) || !near(collapse.y, panel.y + PANEL.headerInset)) {
+        return `the hide-choices button is at ${fmt(collapse)}, expected ${PANEL.headerInset} px in from the panel's top-left corner`;
+      }
+      if (collapse.expanded !== 'true') return `the hide-choices button reads aria-expanded=${collapse.expanded}`;
+      if (!message.shown || message.x < collapse.x + collapse.w) return `the message ${fmt(message)} is not right of the hide-choices button`;
+      if (!start.shown || !near(start.x, panel.x + PANEL.footerInset) || !near(start.x + start.w, panel.x + panel.w - 1 - PANEL.footerInset)) {
+        return `Start game is at ${fmt(start)}, expected the footer's width inside ${PANEL.footerInset} px of padding`;
+      }
+      if (start.y + start.h > p.viewport.h || start.y + start.h < p.viewport.h - 2 * PANEL.footerInset) {
+        return `Start game is at ${fmt(start)}, expected at the bottom of the window`;
+      }
+      if (body.y < collapse.y + collapse.h || body.y + body.h > start.y) return `the choices ${fmt(body)} are not between the header and the footer`;
+      return body.scrollWidth <= body.clientWidth + 1 ? null : `the choices are ${body.scrollWidth} px wide in a ${body.clientWidth} px panel`;
+    },
+  },
+  {
+    name: 'new-game-choices-hidden',
+    scenes: [SCENES.newGameHidden],
+    needs: ['#game-over-overlay', '#canvas-container', '#new-game-dialog-collapse', '#game-over-message', '#game-over-dialog', '#new-game-btn'],
     run: (p, el) => {
       const c = el('#canvas-container');
-      if (!el('#game-over-overlay').shown) return 'the new-game overlay is not shown';
-      return near(c.x, 0) && near(c.y, TOPBAR_HEIGHT) && near(c.w, p.viewport.w) && near(c.y + c.h, p.viewport.h)
-        ? null
-        : `#canvas-container ${fmt(c)} should fill the window under the ${TOPBAR_HEIGHT} px top bar`;
+      const collapse = el('#new-game-dialog-collapse');
+      if (!near(c.x, 0) || !near(c.y, TOPBAR_HEIGHT) || !near(c.w, p.viewport.w)) {
+        return `#canvas-container ${fmt(c)} should fill the window's width under the top bar while the choices are hidden`;
+      }
+      if (!collapse.shown || !near(collapse.x, PANEL.headerInset) || !near(collapse.y, TOPBAR_HEIGHT + PANEL.headerInset)) {
+        return `the hide-choices button is at ${fmt(collapse)}, expected where it sits while the choices show`;
+      }
+      if (collapse.expanded !== 'false') return `the hide-choices button reads aria-expanded=${collapse.expanded}`;
+      const shown = ['#game-over-message', '#game-over-dialog', '#new-game-btn'].filter((selector) => el(selector).shown);
+      return shown.length === 0 ? null : `still shown with the choices hidden: ${shown.join(', ')}`;
     },
+  },
+  {
+    name: 'new-game-map-takes-pointer',
+    scenes: NEW_GAME_SCENES,
+    needs: ['#main-map'],
+    run: (p, el) => (el('#main-map').pointerEvents === 'none' ? 'the preview map ignores the pointer on the new-game screen' : null),
   },
   {
     name: 'new-game-console-hidden',

@@ -8,7 +8,7 @@ Show the match's standing and its date at a glance, without opening a panel, and
 
 ## Availability
 
-Shown in every mode. In New game and Game over it is the new-game bar, including while the new-game form is hidden. It accepts pointer input in Strategic planning, Tactical planning, Resolution playback, New game, and Game over. While the tactical battles list or the annihilation dialog is open, it stays visible and does not receive pointer input.
+Shown in every mode. In New game and Game over it is the new-game bar, including while the new-game choices are hidden. It accepts pointer input in Strategic planning, Tactical planning, Resolution playback, New game, and Game over. While the tactical battles list or the annihilation dialog is open, it stays visible and does not receive pointer input.
 
 ## Information Displayed
 

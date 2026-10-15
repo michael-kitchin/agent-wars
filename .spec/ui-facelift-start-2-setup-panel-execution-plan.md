@@ -324,6 +324,7 @@ Replace them with:
  *
  * Purpose: The corner button is the only control that hides or shows that form.
  * When to use: From the corner button's click.
+ * Expected outcome: The other state is applied, then the main map's pointer follows that state.
 ```
 
 Replace them with:
@@ -333,6 +334,7 @@ Replace them with:
  *
  * Purpose: The hide-choices button is the only control that hides or shows them.
  * When to use: From the hide-choices button's click.
+ * Expected outcome: The other state is applied. The map keeps the pointer either way, so drag and the wheel still move the preview.
 ```
 
 11. In `src/renderer/gameplay/newGameDialogCollapse.ts`, find these lines. Together they occur exactly once:
@@ -1946,7 +1948,7 @@ Expected, one line per file:
 
 | File | Hash |
 | --- | --- |
-| `src/renderer/gameplay/newGameDialogCollapse.ts` | `3a3d68988fb15092` |
+| `src/renderer/gameplay/newGameDialogCollapse.ts` | `d995e99c93522420` |
 | `src/renderer/gameplay/newGameMapPreviewUi.ts` | `ceb742d6a33b70a8` |
 | `src/renderer/core/uiState.ts` | `82a2f9b2335588f9` |
 | `src/renderer/gameplay/newGame.ts` | `49bf8a50c4a59fd4` |

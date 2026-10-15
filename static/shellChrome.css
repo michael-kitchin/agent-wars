@@ -48,6 +48,8 @@
   --chrome-tab-label-size: 9px;
   /* The minimap overview's width, and so the width of the tab row above it: five tabs of 56 px. */
   --minimap-width: 280px;
+  /* The new-game setup panel's width, docked at the left of the window while the new-game overlay is open. */
+  --new-game-panel-width: 432px;
   /* The ranged and air-strike order colors the map draws (RANGE_PERIMETER_RANGED_COLOR, RANGE_PERIMETER_AIR_STRIKE_COLOR). */
   --order-ranged: #a06020;
   --order-strike: #7a3db5;
@@ -192,12 +194,12 @@ body {
   display: none;
 }
 /* Hidden, not removed, so the panel and the legend keep their boxes while the start dialog is open. */
-#canvas-container:has(#game-over-overlay:not(.hidden)) #minimap-panel,
-#canvas-container:has(#game-over-overlay:not(.hidden)) #terrain-legend {
+body:has(#game-over-overlay:not(.hidden)) #minimap-panel,
+body:has(#game-over-overlay:not(.hidden)) #terrain-legend {
   visibility: hidden;
 }
-/* Hidden for the whole time the start dialog is open, including while its form is collapsed. Not removed, so it shows again when that dialog closes. The battle-result dialog does not use this overlay. */
-#canvas-container:has(#game-over-overlay:not(.hidden)) #main-map .leaflet-control-zoom {
+/* Hidden for the whole time the start dialog is open, including while its choices are hidden. Not removed, so it shows again when that dialog closes. The battle-result dialog does not use this overlay. */
+body:has(#game-over-overlay:not(.hidden)) #main-map .leaflet-control-zoom {
   visibility: hidden;
 }
 /* Leaflet's right-hand corners keep the map's 12px inset: the zoom buttons at the top, and the scale right of the attribution at the bottom. */

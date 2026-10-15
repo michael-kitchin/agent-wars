@@ -22,7 +22,7 @@ Keep errors, turn summaries, and the opponent's consultation text on the surface
 
 ## Availability
 
-The map toast and the AI strategy toast can appear in Strategic planning, Resolution playback, and Tactical planning. They do not require a mode change. While the new-game overlay is open, those toasts stay without pointer input, including while its form is hidden and the map can be dragged.
+The map toast and the AI strategy toast can appear in Strategic planning, Resolution playback, and Tactical planning. They do not require a mode change. While the new-game overlay is open, those toasts stay without pointer input, though the map beside the setup panel can be dragged. They sit in the map's band, so they stay clear of the setup panel.
 
 ## Information Displayed
 
