@@ -56,8 +56,8 @@ When this guide and the running app disagree, the app wins until this file is up
 | Text field, dropdown, and checkbox | `#d4efec` / `#0f766e` border | Shared light teal with `#0b3b37` text, distinctly lighter than the button face. Placeholder text is `#456864`. A checkbox uses that same box, with a dark check. Disabled fields and checkboxes are `#9fb8b5` with `#243e3c` text |
 | Player 1 (human) | `#115e59` | Unit fill |
 | Player 2 (opponent) | `#9d174d` | Distinct from human |
-| Selection / slower / warning | `#a06020` | Range perimeter (ranged) |
-| Air-strike perimeter | `#7a3db5` | Distinct from ground ranged |
+| Selection / slower / warning | `#a06020` | Range perimeter (ranged), and the selection panel's border while Ranged is aimed (`--order-ranged`) |
+| Air-strike perimeter | `#7a3db5` | Distinct from ground ranged. Also the selection panel's border while Strike is aimed (`--order-strike`) |
 | Selection ring | `#f2c14e` | 3 px ring around the top marker of each hex that holds a selected unit (`SELECTION_RING_COLOR`). The same gold as the `--selection-mark` token on selected order rows |
 | Order-line casing | `#ffffff` at 80% | A solid outline 1.5 px wider than the line on each side, under every movement, ranged, and air-strike line and its arrowhead (`ORDER_LINE_CASING_COLOR`, `ORDER_LINE_CASING_PAD`) |
 | Combat lightning | `#F5C400` | Resolution overlay. The bolt is `resolution/lightning_bolt.svg`, with a `#8A6D00` outline. It is drawn smaller than a unit token |
@@ -129,6 +129,7 @@ When this guide and the running app disagree, the app wins until this file is up
 - **Collapsible:** Allow collapsing or pinning so the map can expand. Remember state (open/closed) per session if feasible.
 - **Contents:** Selected unit(s): type, strength, position (hex/coords), movement range, current orders. For stacks: list or summary with expand/collapse. Links to relevant rules or tooltips where helpful.
 - **Style:** Same typography and color system as the rest of the UI. Use sections or headings to separate identity, status, and orders. Keep lists scannable (e.g., one line per unit in a stack).
+- **Live app:** The selection panel at the map's bottom-left, 440 px wide by default. A 50 px summary bar across its top holds the hex code and count, a hint for the next map gesture, Ranged or Strike, and the close control. The hex's caption and chips and one row per unit sit under it. While an attack is aimed, the panel's border takes that order's color. See [ux/selection-panel.md](ux/selection-panel.md).
 
 ### 2.6 Notifications and Alerts
 

@@ -2,12 +2,13 @@
  * The narrowest the panel can be dragged, in CSS pixels. This module holds the selection panel's size limits and the
  * rule that keeps a dragged size inside them, so a reviewer can read and test them in one place.
  *
- * Purpose: Keeps the header, the chips, and an order chip readable.
+ * Purpose: Leaves the summary bar room for its two lines of text beside the strike target list, Cancel, and the close
+ *   control.
  * When to use: Through `clampSelectionPanelSize`.
- * Expected outcome: 320.
+ * Expected outcome: 400.
  * Exceptions: None.
  */
-export const SELECTION_PANEL_MIN_WIDTH = 320;
+export const SELECTION_PANEL_MIN_WIDTH = 400;
 
 /**
  * The widest the panel can be dragged, in CSS pixels.
@@ -22,7 +23,7 @@ export const SELECTION_PANEL_MAX_WIDTH = 640;
 /**
  * The shortest the panel can be dragged, in CSS pixels.
  *
- * Purpose: Keeps the header and at least one unit row visible.
+ * Purpose: Keeps the summary bar and at least one unit row visible.
  * When to use: Through `clampSelectionPanelSize`.
  * Expected outcome: 140.
  * Exceptions: None.
@@ -44,7 +45,7 @@ export const SELECTION_PANEL_MAP_MARGIN = 24;
  *
  * Purpose: The grip can be dragged anywhere; the panel must stay usable and inside the map.
  * When to use: On every pointer move while the grip is dragged, with the map container's current height.
- * Expected outcome: Width from 320 to 640. Height from 140 to the map height minus 24; on a map too short for
+ * Expected outcome: Width from 400 to 640. Height from 140 to the map height minus 24; on a map too short for
  *   that range the height is 140.
  * Exceptions: None.
  */

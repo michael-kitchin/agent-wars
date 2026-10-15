@@ -12,6 +12,7 @@ import type { TacticalOrderDeps } from './tacticalOrderDeps';
 export type { TacticalOrderDeps } from './tacticalOrderDeps';
 export type { RefreshHoverRoutePreviewOptions } from './hoverRoutePreviewTypes';
 import { refreshHoverRoutePreview } from './hoverRoutePreviewRefresh';
+import { renderSelectionBarState, selectedUnitTypes } from './selectionBar';
 import { rangedButtonTooltipText } from '../chrome/controlTooltipText';
 export { refreshHoverRoutePreview };
 
@@ -226,16 +227,19 @@ export function cancelFerryForUnit(unitId: string, deps: TacticalOrderDeps): voi
  * Purpose: The shared button follows `selectionSupportButtonMode`, and `selectionSupportAction` labels and explains it
  *   when it cannot be used. Clearing a targeting flag here must also drop a hover preview that sampled the old flag.
  * When to use: After a selection change, a pending-order change, or a targeting-mode toggle.
- * Expected outcome: Pending rows match the draft arrays. The button shows while units are selected. It is enabled
- *   when every resolved unit can range, or every resolved unit is air; otherwise it is greyed out with its reason in
- *   `#selection-panel-action-note`. `Cancel` stays while ranged mode is still valid. A true-to-false flag change nulls
- *   the hover preview, hides the block and slower tooltips, redraws, and starts one hover refresh.
+ * Expected outcome: Pending rows match the draft arrays. The button shows while units are selected; its tip host
+ *   (`#ranged-attack-tip-host`) is what shows and hides. It is enabled when every resolved unit can range, or every
+ *   resolved unit is air; otherwise it is greyed out, and its reason is in `#selection-panel-action-note` and is the
+ *   tip host's tip. `Cancel` stays while ranged mode is still valid. A true-to-false flag change nulls the hover preview,
+ *   hides the block and slower tooltips, redraws, and starts one hover refresh. The selection bar's hint and border then
+ *   follow the flags (`renderSelectionBarState`).
  * Exceptions: None. Returns immediately when `#ranged-attacks-list` is missing, and then leaves the button untouched.
  */
 export function updateRangedSidebar(deps: TacticalOrderDeps): void {
   const listEl = document.getElementById('ranged-attacks-list');
   const strikeListEl = document.getElementById('air-strikes-list');
   const btnEl = document.getElementById('ranged-attack-btn') as HTMLButtonElement | null;
+  const btnHostEl = document.getElementById('ranged-attack-tip-host');
   const strikeTypeEl = document.getElementById('air-strike-target-type') as HTMLSelectElement | null;
   const strikeCancelEl = document.getElementById('air-strike-cancel-btn') as HTMLButtonElement | null;
   const actionNoteEl = document.getElementById('selection-panel-action-note');
@@ -267,28 +271,24 @@ export function updateRangedSidebar(deps: TacticalOrderDeps): void {
     );
   }
 
-  if (btnEl) {
+  if (btnEl && btnHostEl) {
     const tb = S.tacticalBattleSnapshot;
-    const selectedUnits = tb
-      ? S.selectedUnitIds
-          .map((id) => tb.subUnits.find((u) => u.id === id))
-          .filter((unit): unit is NonNullable<typeof unit> => !!unit)
-      : S.selectedUnitIds
-          .map((id) => S.gameState?.units.find((u) => u.id === id))
-          .filter((unit): unit is NonNullable<typeof unit> => !!unit);
     const rangedWasActive = S.rangedModeActive;
     const strikeWasActive = S.airStrikeModeActive;
-    const unitTypes = selectedUnits.map((unit) => unit.unitType);
+    const unitTypes = selectedUnitTypes();
     const mode = selectionSupportButtonMode(unitTypes, !!tb);
     const action = selectionSupportAction(unitTypes, !!tb);
     btnEl.disabled = !action.enabled;
     if (actionNoteEl) actionNoteEl.textContent = action.reason ?? '';
+    // The host carries the reason, because a disabled button gets no pointer events.
+    if (!action.enabled && action.reason) btnHostEl.setAttribute('data-control-tooltip', action.reason);
+    else btnHostEl.removeAttribute('data-control-tooltip');
     if (mode === 'strike') {
       S.rangedModeActive = false;
       btnEl.textContent = 'Strike';
       btnEl.setAttribute('data-control-tooltip', rangedButtonTooltipText('Strike'));
-      // An empty display lets the command-row rule center the label in the shared height.
-      btnEl.style.display = S.airStrikeModeActive ? 'none' : '';
+      // An empty display hands the host back to `.control-tooltip-host`, whose inline flex keeps the button centered.
+      btnHostEl.style.display = S.airStrikeModeActive ? 'none' : '';
       if (strikeTypeEl) {
         strikeTypeEl.style.display = S.airStrikeModeActive ? '' : 'none';
         strikeTypeEl.value = S.airStrikeTargetType;
@@ -298,7 +298,7 @@ export function updateRangedSidebar(deps: TacticalOrderDeps): void {
       }
     } else if (mode === 'ranged') {
       S.airStrikeModeActive = false;
-      btnEl.style.display = '';
+      btnHostEl.style.display = '';
       btnEl.textContent = S.rangedModeActive ? 'Cancel' : 'Ranged';
       btnEl.setAttribute(
         'data-control-tooltip',
@@ -308,7 +308,7 @@ export function updateRangedSidebar(deps: TacticalOrderDeps): void {
       if (strikeCancelEl) strikeCancelEl.style.display = 'none';
     } else {
       // Greyed out with its reason: the button stays visible so the player can see why it cannot be used.
-      btnEl.style.display = '';
+      btnHostEl.style.display = '';
       btnEl.textContent = action.label;
       btnEl.removeAttribute('data-control-tooltip');
       S.rangedModeActive = false;
@@ -326,4 +326,5 @@ export function updateRangedSidebar(deps: TacticalOrderDeps): void {
       void refreshHoverRoutePreview(deps);
     }
   }
+  renderSelectionBarState();
 }

@@ -1,11 +1,11 @@
-/* The selection panel at the map's bottom-left: header, chips, count, unit rows, the Ranged and Strike row, and the resize grip. */
+/* The selection panel at the map's bottom-left: the summary bar, the details under it, and the resize grip. */
 
 .selection-panel {
   position: absolute;
   left: 12px;
   bottom: 12px;
   z-index: 6200;
-  width: 400px;
+  width: 440px;
   max-width: calc(100% - 24px);
   max-height: calc(50% - 12px);
   display: flex;
@@ -24,33 +24,53 @@
 #canvas-container:has(#game-over-overlay:not(.hidden)) #selection-panel {
   display: none;
 }
-/* Everything but the grip. The unit rows scroll first; when the panel is dragged shorter than its fixed parts, the whole body scrolls. */
-.selection-panel-body {
-  flex: 1 1 auto;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  overflow-y: auto;
-  padding: 10px 12px 12px;
+/* While the player aims, the border takes the color of the order being aimed. */
+.selection-panel[data-aim="ranged"] {
+  border-color: var(--order-ranged);
+}
+.selection-panel[data-aim="strike"] {
+  border-color: var(--order-strike);
 }
 
-/* ---------- Header ---------- */
-.selection-panel-header {
+/* ---------- Summary bar ---------- */
+/* One 50 px row that never scrolls: two lines of text, a divider, Ranged or Strike, and the close control. The controls
+   keep their size and the text gives way. The right padding keeps the close control clear of the grip. */
+.selection-panel-bar {
   flex: none;
+  height: 50px;
   display: flex;
-  align-items: flex-start;
-  gap: 8px;
+  align-items: center;
+  gap: 10px;
+  padding: 0 16px 0 12px;
+  box-sizing: border-box;
 }
-.selection-panel-place {
+.selection-panel-text {
   flex: 1 1 auto;
   min-width: 0;
-  margin: 0;
-  font-size: 12px;
-  line-height: 1.45;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
 }
-.selection-panel-place strong:first-child {
-  font-size: 14px;
+.selection-panel-summary,
+.selection-panel-hint {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.selection-panel-summary {
+  font-size: 13px;
+  font-weight: 600;
+}
+.selection-panel-hint {
+  color: var(--chrome-muted);
+  font-size: 11px;
+}
+.selection-panel-divider {
+  flex: none;
+  width: 1px;
+  height: 30px;
+  background: var(--chrome-divider);
 }
 .selection-panel-close {
   flex: none;
@@ -68,7 +88,28 @@
   background: var(--chrome-bg-raised);
 }
 
-/* ---------- Chips and count ---------- */
+/* ---------- Details ---------- */
+/* Everything under the bar. The unit rows scroll first; when the panel is dragged shorter than the caption, the chips,
+   and one row, the whole details scroll. */
+.selection-panel-details {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+  padding: 10px 12px 12px;
+  border-top: 1px solid var(--chrome-divider);
+}
+.selection-panel-caption {
+  flex: none;
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+}
+.selection-panel-caption:empty {
+  display: none;
+}
 .selection-panel-chips {
   flex: none;
   display: flex;
@@ -94,15 +135,6 @@
 }
 .selection-panel-chip-enemy-home {
   border-color: var(--chrome-opponent-edge);
-}
-.selection-panel-count {
-  flex: none;
-  margin: 2px 0 0;
-  color: var(--chrome-muted);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
 }
 
 /* ---------- Unit rows ---------- */
@@ -176,19 +208,17 @@
 }
 
 /* ---------- Ranged and Strike ---------- */
-/* Ranged or Strike, the strike target list, its Cancel, and the reason a greyed-out button cannot be used share one row. */
+/* Ranged or Strike, or the strike target list and its Cancel, in the bar. The reason a greyed-out control cannot be used
+   sits in the details under the unit rows. */
 .selection-panel-actions {
   flex: none;
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   gap: 0.35rem;
-  padding-top: 8px;
-  border-top: 1px solid var(--chrome-divider);
 }
 .selection-panel-action-note {
-  flex: 1 1 160px;
-  min-width: 0;
+  flex: none;
+  margin: 0;
   color: var(--chrome-muted);
   font-size: 12px;
 }

@@ -10,7 +10,7 @@
  */
 'use strict';
 
-const { SCENES, fmt } = require('./ui-smoke-scenes.cjs');
+const { SCENES, SELECTION_BAR, fmt, readSummaryLine } = require('./ui-smoke-scenes.cjs');
 
 /**
  * Inset of map overlays from the map's edges, in CSS pixels.
@@ -146,25 +146,31 @@ const SCENARIO_CHECKS = Object.freeze([
   {
     name: 'selection-panel-battle',
     scenes: [SCENES.battleSelection],
-    needs: ['#selection-panel', '#sidebar-selected-unit', '#selection-panel-count'],
+    needs: ['#selection-panel', '#sidebar-selected-unit', '#selection-panel-units .selection-panel-unit-name', '#selection-panel-hint'],
     run: (p, el) => {
       if (!el('#selection-panel').shown) return 'the selection panel is not shown';
-      const header = el('#sidebar-selected-unit').text;
-      if (!/^\([0-9A-Z]{2}\.[0-9A-Z]{2}\)/.test(header)) return `the header reads "${header}", expected a battle cell code such as "(E8.K3)"`;
-      const count = el('#selection-panel-count').text;
-      return /^1 selected of \d+$/.test(count) ? null : `the count reads "${count}", expected "1 selected of N"`;
+      const text = el('#sidebar-selected-unit').text;
+      const line = readSummaryLine(text);
+      const name = el('#selection-panel-units .selection-panel-unit-name').text;
+      if (!line || !line.code.includes('.') || line.rest !== name) {
+        return `the first line reads "${text}", expected a battle cell code such as "(E8.K3)", then "${name}"`;
+      }
+      const hint = el('#selection-panel-hint').text;
+      return hint === SELECTION_BAR.moveHint ? null : `the hint reads "${hint}", expected "${SELECTION_BAR.moveHint}"`;
     },
   },
   {
     name: 'selection-panel-regional',
     scenes: [SCENES.regionalSelection],
-    needs: ['#selection-panel', '#sidebar-selected-unit', '#selection-panel-count'],
+    needs: ['#selection-panel', '#sidebar-selected-unit', '#selection-panel-units .selection-panel-unit-name', '#selection-panel-caption'],
     run: (p, el) => {
       if (!el('#selection-panel').shown) return 'the selection panel is not shown';
-      const header = el('#sidebar-selected-unit').text;
-      if (!/^\([0-9A-Z]{2}\) \S/.test(header)) return `the header reads "${header}", expected a hex code and its caption`;
-      const count = el('#selection-panel-count').text;
-      return count === '1 selected of 1' ? null : `the count reads "${count}", expected "1 selected of 1"`;
+      const text = el('#sidebar-selected-unit').text;
+      const line = readSummaryLine(text);
+      const name = el('#selection-panel-units .selection-panel-unit-name').text;
+      if (!line || line.code.includes('.') || line.rest !== name) return `the first line reads "${text}", expected a hex code such as "(D4)", then "${name}"`;
+      const caption = el('#selection-panel-caption').text;
+      return caption !== '' ? null : 'the hex caption is empty';
     },
   },
   {

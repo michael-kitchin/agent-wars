@@ -156,6 +156,35 @@ function fmt(b) {
   return `${Math.round(b.x)},${Math.round(b.y)} ${Math.round(b.w)}x${Math.round(b.h)}${b.shown ? '' : ' (hidden)'}`;
 }
 
+/**
+ * The selection bar's hints the smoke scenes reach, and the border color while a strike is aimed.
+ *
+ * Purpose: The checks compare the bar's second line and border with the rules in `src/shared/selectionBarText.ts` and
+ *   `static/selectionChrome.css`.
+ * When to use: The selection bar checks.
+ * Expected outcome: The move hint, the targeting hint, and the strike purple as a computed color.
+ * Exceptions: None.
+ */
+const SELECTION_BAR = Object.freeze({
+  moveHint: 'Double-click a hex to move · right-click to deselect',
+  targetingHint: 'Double-click a target in range',
+  strikeBorder: 'rgb(122, 61, 181)',
+});
+
+/**
+ * Reads the code and the rest of the selection bar's first line.
+ *
+ * Purpose: Every selection check reads that line the same way.
+ * When to use: With the text of `#sidebar-selected-unit`.
+ * Expected outcome: `{ code, rest }` for a line such as "(D4) · 2 selected of 2", or null when the line does not start
+ *   with a code in parentheses and " · ".
+ * Exceptions: None.
+ */
+function readSummaryLine(text) {
+  const match = /^\(([0-9A-Z]{2}(?:\.[0-9A-Z]{2})?)\) · (.+)$/.exec(text);
+  return match ? { code: match[1], rest: match[2] } : null;
+}
+
 module.exports = {
   TOPBAR_HEIGHT,
   CONSOLE_EXPANDED_WIDTH,
@@ -165,6 +194,8 @@ module.exports = {
   BATTLE_SCENES,
   MATCH_SCENES,
   SETTLE_MS,
+  SELECTION_BAR,
   near,
   fmt,
+  readSummaryLine,
 };

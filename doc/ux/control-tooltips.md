@@ -51,6 +51,7 @@ The tip can appear whenever the control can receive the pointer or keyboard focu
 - Strike: Turn this on to aim an air strike. A target list and a Cancel button replace this button.
 - Air-strike target: Choose enemy units, production, airports, or seaports. Your next double-click uses that choice until you cancel.
 - Air-strike Cancel: Stop aiming an air strike and show Strike again. Strikes already in the list stay there.
+- Ranged or Strike while it is greyed out: its reason, "Infantry can't fire on the world map." or "Strike needs a selection of air units only." (`selectionSupportAction` in `src/shared/selectionSupportButtonMode.ts`). The tip sits on a host around the control (`#ranged-attack-tip-host`), because a disabled control gets no pointer events.
 - Orders tab: Show the orders queued for this turn or beat.
 - Reports tab: Show the turn reports, opponent messages, and notices from this match, newest first.
 - Opponent tab: Show whether the opponent is planning, its model, its tools, and the AI activity log.
@@ -109,7 +110,7 @@ The tip can appear whenever the control can receive the pointer or keyboard focu
 - The build popup close control, and each queue row's remove control, in both the single-hex and multi-hex popups.
 - Order rows in the Orders tab, and their cancel controls.
 - The cancel control on an order in the selection panel.
-- Ranged or Strike while it is greyed out. Its reason shows beside it.
+- Ranged or Strike while it is greyed out and neither reason applies.
 - The choice on each tactical battles row.
 - The model dropdown. It uses the model description tooltip.
 - The map's + and − zoom buttons. They keep the map library's own "Zoom in" and "Zoom out" titles.

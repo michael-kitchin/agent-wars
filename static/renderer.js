@@ -26217,6 +26217,25 @@ ${bonuses}`;
     });
   }
 
+  // src/shared/selectionBarText.ts
+  var SELECTION_HINT_PLAYBACK = "Playback is running \xB7 right-click to deselect";
+  var SELECTION_HINT_TARGETING = "Double-click a target in range";
+  var SELECTION_HINT_FERRY = "Double-click a hex to ferry \xB7 right-click to deselect";
+  var SELECTION_HINT_MIXED = "Air units can't move with other units";
+  var SELECTION_HINT_MOVE = "Double-click a hex to move \xB7 right-click to deselect";
+  function selectionBarHint(input) {
+    if (input.playbackRunning) return SELECTION_HINT_PLAYBACK;
+    if (input.targetingOn) return SELECTION_HINT_TARGETING;
+    const airCount = input.unitTypes.filter((unitType) => unitType === "air").length;
+    if (airCount > 0 && airCount === input.unitTypes.length) return SELECTION_HINT_FERRY;
+    if (airCount > 0) return SELECTION_HINT_MIXED;
+    return SELECTION_HINT_MOVE;
+  }
+  function selectionElsewhereText(rows) {
+    const elsewhere = rows.filter((row) => !row.inPanelHex).length;
+    return elsewhere > 0 ? `+${elsewhere} elsewhere` : null;
+  }
+
   // src/shared/selectionPanelSummary.ts
   function summarizeSelectionPanel(selectedIds, units, isSelectable) {
     const byId = new Map(units.map((unit) => [unit.id, unit]));
@@ -26507,8 +26526,48 @@ ${bonuses}`;
     ctx.restore();
   }
 
+  // src/shared/mapOrderGestureGate.ts
+  function resolutionPlaybackBlocksMapOrders(animation) {
+    return animation != null;
+  }
+  function hexTooltipSuppressedForOrderPlanning(input) {
+    return input.hasSelection && !input.shiftHeld && !input.playbackActive;
+  }
+  function tacticalHitIsInsideBattle(hasBattle, hit, footprintSaysInside) {
+    if (!hasBattle) return true;
+    if (hit == null) return false;
+    return footprintSaysInside;
+  }
+
+  // src/renderer/gameplay/selectionBar.ts
+  function selectedUnitTypes() {
+    const battle = rendererSharedState.tacticalBattleSnapshot;
+    const units = battle ? battle.subUnits : rendererSharedState.gameState?.units ?? [];
+    const byId = new Map(units.map((unit) => [unit.id, unit.unitType]));
+    return rendererSharedState.selectedUnitIds.flatMap((id) => {
+      const unitType = byId.get(id);
+      return unitType === void 0 ? [] : [unitType];
+    });
+  }
+  function renderSelectionBarState() {
+    const aim = rendererSharedState.airStrikeModeActive ? "strike" : rendererSharedState.rangedModeActive ? "ranged" : null;
+    const panel = document.getElementById("selection-panel");
+    if (panel) {
+      if (aim) panel.dataset.aim = aim;
+      else delete panel.dataset.aim;
+    }
+    const hint = document.getElementById("selection-panel-hint");
+    if (hint) {
+      hint.textContent = selectionBarHint({
+        playbackRunning: resolutionPlaybackBlocksMapOrders(rendererSharedState.resolutionMoveAnimation),
+        targetingOn: aim !== null,
+        unitTypes: selectedUnitTypes()
+      });
+    }
+  }
+
   // src/shared/selectionPanelSize.ts
-  var SELECTION_PANEL_MIN_WIDTH = 320;
+  var SELECTION_PANEL_MIN_WIDTH = 400;
   var SELECTION_PANEL_MAX_WIDTH = 640;
   var SELECTION_PANEL_MIN_HEIGHT = 140;
   var SELECTION_PANEL_MAP_MARGIN = 24;
@@ -26580,23 +26639,36 @@ ${bonuses}`;
   }
 
   // src/renderer/gameplay/selectionPanel.ts
-  var headerRequestSeq = 0;
-  function renderSelectionPanelHeader(panelHex, battle) {
-    const place = document.getElementById("sidebar-selected-unit");
-    if (!place) return;
-    const code = orderTargetHexCode(panelHex, battle);
-    const codeHtml = code ? `<strong>(${escapeHtmlText(code)})</strong>` : "";
+  var captionRequestSeq2 = 0;
+  function renderSelectionPanelSummaryLine(summary, battle, deps) {
+    const line = document.getElementById("sidebar-selected-unit");
+    if (!line) return;
+    const code = document.createElement("strong");
+    code.textContent = `(${orderTargetHexCode(summary.panelHex, battle) ?? "?"})`;
+    const what = document.createElement("span");
+    if (summary.rows.length === 1) {
+      const unitId = summary.rows[0].unitId;
+      setUnitNameContent(what, unitId, deps.formatUnitDisplayName(unitId));
+    } else {
+      what.textContent = summary.countText;
+    }
+    line.replaceChildren(code, " \xB7 ", what);
+    const elsewhere = selectionElsewhereText(summary.rows);
+    if (elsewhere) line.append(` \xB7 ${elsewhere}`);
+  }
+  function renderSelectionPanelCaption(panelHex, battle) {
+    const caption = document.getElementById("selection-panel-caption");
+    if (!caption) return;
     const resolution = battle ? 4 : 1;
     const hexKey = `${resolution}:${panelHex}`;
-    if (place.dataset.hexKey !== hexKey) {
-      place.innerHTML = codeHtml;
-      place.dataset.hexKey = hexKey;
+    if (caption.dataset.hexKey !== hexKey) {
+      caption.replaceChildren();
+      caption.dataset.hexKey = hexKey;
     }
-    const requestSeq = ++headerRequestSeq;
-    void getCachedNamingLineForTarget({ h3Index: panelHex, resolution }).then((caption) => {
-      if (requestSeq !== headerRequestSeq) return;
-      const captionHtml = caption && caption.text.trim() !== "" ? ` ${formatHexNamingCaptionHtml(caption)}` : "";
-      place.innerHTML = `${codeHtml}${captionHtml}`;
+    const requestSeq = ++captionRequestSeq2;
+    void getCachedNamingLineForTarget({ h3Index: panelHex, resolution }).then((line) => {
+      if (requestSeq !== captionRequestSeq2) return;
+      caption.innerHTML = line && line.text.trim() !== "" ? formatHexNamingCaptionHtml(line) : "";
     });
   }
   function worldChipInput(hex) {
@@ -26686,12 +26758,12 @@ ${bonuses}`;
     const summary = summarizeSelectionPanel(rendererSharedState.selectedUnitIds, units, (unitId) => !isEmbarkedLandUnitBlockedForSelection(unitId));
     panel.hidden = summary === null;
     if (!summary) return;
-    renderSelectionPanelHeader(summary.panelHex, battle);
+    renderSelectionPanelSummaryLine(summary, battle, deps);
+    renderSelectionPanelCaption(summary.panelHex, battle);
     renderSelectionPanelChips(summary.panelHex, battle);
-    const count = document.getElementById("selection-panel-count");
-    if (count) count.textContent = summary.countText;
     const list = document.getElementById("selection-panel-units");
     list?.replaceChildren(...summary.rows.map((row) => createUnitRow(row, battle, deps)));
+    renderSelectionBarState();
   }
   function wireSelectionPanel(deps) {
     onQueuedOrdersChanged(() => renderSelectionPanel(deps));
@@ -26706,6 +26778,7 @@ ${bonuses}`;
   function updateGameStateSidebar(state) {
     renderTopBarStatus(state);
     refreshConsoleHeader();
+    renderSelectionBarState();
   }
   function blurMapChromeIfFocused() {
     const active2 = document.activeElement;
@@ -28678,19 +28751,6 @@ ${bonuses}`;
     return buildHumanOrderGroupPreviewEnvelope({ previews, slowestMovementRange: 1 });
   }
 
-  // src/shared/mapOrderGestureGate.ts
-  function resolutionPlaybackBlocksMapOrders(animation) {
-    return animation != null;
-  }
-  function hexTooltipSuppressedForOrderPlanning(input) {
-    return input.hasSelection && !input.shiftHeld && !input.playbackActive;
-  }
-  function tacticalHitIsInsideBattle(hasBattle, hit, footprintSaysInside) {
-    if (!hasBattle) return true;
-    if (hit == null) return false;
-    return footprintSaysInside;
-  }
-
   // src/shared/orderPreviewEffectsTooltip.ts
   var WEATHER_WORDS = Object.freeze({
     Snow: "snow",
@@ -29362,6 +29422,7 @@ ${bonuses}`;
     const listEl = document.getElementById("ranged-attacks-list");
     const strikeListEl = document.getElementById("air-strikes-list");
     const btnEl = document.getElementById("ranged-attack-btn");
+    const btnHostEl = document.getElementById("ranged-attack-tip-host");
     const strikeTypeEl = document.getElementById("air-strike-target-type");
     const strikeCancelEl = document.getElementById("air-strike-cancel-btn");
     const actionNoteEl = document.getElementById("selection-panel-action-note");
@@ -29391,21 +29452,22 @@ ${bonuses}`;
         )
       );
     }
-    if (btnEl) {
+    if (btnEl && btnHostEl) {
       const tb = rendererSharedState.tacticalBattleSnapshot;
-      const selectedUnits = tb ? rendererSharedState.selectedUnitIds.map((id) => tb.subUnits.find((u) => u.id === id)).filter((unit) => !!unit) : rendererSharedState.selectedUnitIds.map((id) => rendererSharedState.gameState?.units.find((u) => u.id === id)).filter((unit) => !!unit);
       const rangedWasActive = rendererSharedState.rangedModeActive;
       const strikeWasActive = rendererSharedState.airStrikeModeActive;
-      const unitTypes = selectedUnits.map((unit) => unit.unitType);
+      const unitTypes = selectedUnitTypes();
       const mode = selectionSupportButtonMode(unitTypes, !!tb);
       const action = selectionSupportAction(unitTypes, !!tb);
       btnEl.disabled = !action.enabled;
       if (actionNoteEl) actionNoteEl.textContent = action.reason ?? "";
+      if (!action.enabled && action.reason) btnHostEl.setAttribute("data-control-tooltip", action.reason);
+      else btnHostEl.removeAttribute("data-control-tooltip");
       if (mode === "strike") {
         rendererSharedState.rangedModeActive = false;
         btnEl.textContent = "Strike";
         btnEl.setAttribute("data-control-tooltip", rangedButtonTooltipText("Strike"));
-        btnEl.style.display = rendererSharedState.airStrikeModeActive ? "none" : "";
+        btnHostEl.style.display = rendererSharedState.airStrikeModeActive ? "none" : "";
         if (strikeTypeEl) {
           strikeTypeEl.style.display = rendererSharedState.airStrikeModeActive ? "" : "none";
           strikeTypeEl.value = rendererSharedState.airStrikeTargetType;
@@ -29415,7 +29477,7 @@ ${bonuses}`;
         }
       } else if (mode === "ranged") {
         rendererSharedState.airStrikeModeActive = false;
-        btnEl.style.display = "";
+        btnHostEl.style.display = "";
         btnEl.textContent = rendererSharedState.rangedModeActive ? "Cancel" : "Ranged";
         btnEl.setAttribute(
           "data-control-tooltip",
@@ -29424,7 +29486,7 @@ ${bonuses}`;
         if (strikeTypeEl) strikeTypeEl.style.display = "none";
         if (strikeCancelEl) strikeCancelEl.style.display = "none";
       } else {
-        btnEl.style.display = "";
+        btnHostEl.style.display = "";
         btnEl.textContent = action.label;
         btnEl.removeAttribute("data-control-tooltip");
         rendererSharedState.rangedModeActive = false;
@@ -29441,6 +29503,7 @@ ${bonuses}`;
         void refreshHoverRoutePreview2(deps);
       }
     }
+    renderSelectionBarState();
   }
 
   // src/renderer/tactical/tacticalUiOrchestration.ts

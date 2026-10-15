@@ -8,7 +8,7 @@
  */
 'use strict';
 
-const { SCENES, near, fmt } = require('./ui-smoke-scenes.cjs');
+const { SCENES, SELECTION_BAR, near, fmt, readSummaryLine } = require('./ui-smoke-scenes.cjs');
 
 /**
  * The line under a queued order's unit name: an arrow, a two-character hex code, and the distance in hexes.
@@ -28,7 +28,7 @@ const WORLD_ORDER_DETAIL = /^→ [0-9A-Z]{2} · \d+h$/;
  * Expected outcome: Matches `src/shared/selectionPanelSize.ts`.
  * Exceptions: None.
  */
-const SELECTION_PANEL_LIMITS = Object.freeze({ minWidth: 320, maxWidth: 640, minHeight: 140, mapMargin: 24 });
+const SELECTION_PANEL_LIMITS = Object.freeze({ minWidth: 400, maxWidth: 640, minHeight: 140, mapMargin: 24 });
 
 /**
  * The narrowest the toast band may be beside the minimap panel, in CSS pixels.
@@ -100,7 +100,17 @@ const OPPONENT_SECTION_ORDER = Object.freeze([
  * Expected outcome: Matches `.selection-panel` in `static/selectionChrome.css`.
  * Exceptions: None.
  */
-const SELECTION_PANEL_WIDTH = 400;
+const SELECTION_PANEL_WIDTH = 440;
+
+/**
+ * Height of the selection panel's summary bar in CSS pixels.
+ *
+ * Purpose: The bar is one row at the top of the panel.
+ * When to use: The summary bar layout check.
+ * Expected outcome: Matches `.selection-panel-bar` in `static/selectionChrome.css`.
+ * Exceptions: None.
+ */
+const SELECTION_BAR_HEIGHT = 50;
 
 /**
  * Inset of map overlays from the map's edges, in CSS pixels.
@@ -237,39 +247,59 @@ const CONSOLE_CHECKS = Object.freeze([
     run: (p, el) => selectionPanelPlacement(el('#canvas-container'), el('#selection-panel'), SELECTION_PANEL_LIMITS.minWidth, SELECTION_PANEL_LIMITS.minHeight),
   },
   {
+    name: 'selection-bar-layout',
+    scenes: [SCENES.ordersQueued, SCENES.selectionStack, SCENES.strikeAiming],
+    needs: ['#selection-panel', '#selection-panel-bar', '#selection-panel-close', '#selection-panel-details'],
+    run: (p, el) => {
+      const s = el('#selection-panel');
+      const bar = el('#selection-panel-bar');
+      if (!bar.shown || !near(bar.y, s.y + 1) || !near(bar.h, SELECTION_BAR_HEIGHT)) {
+        return `the summary bar is at ${fmt(bar)}, expected a ${SELECTION_BAR_HEIGHT} px row at the top of the panel ${fmt(s)}`;
+      }
+      if (!el('#selection-panel-close').ancestorIds.includes('selection-panel-bar')) return 'the close control is not in the summary bar';
+      const details = el('#selection-panel-details');
+      return details.y >= bar.y + bar.h - 1 ? null : `the details start at ${fmt(details)}, above the bottom of the bar ${fmt(bar)}`;
+    },
+  },
+  {
     name: 'selection-panel-one-unit',
     scenes: [SCENES.ordersQueued],
     needs: [
       '#sidebar-selected-unit',
-      '#selection-panel-count',
+      '#selection-panel-hint',
+      '#selection-panel-units .selection-panel-unit-name',
       '#selection-panel-units .selection-panel-order > span',
       '#pending-orders-list .console-order-detail',
       '#ranged-attack-btn',
       '#selection-panel-action-note',
+      '#selection-panel',
     ],
     run: (p, el) => {
       const place = el('#sidebar-selected-unit');
-      if (!place.ancestorIds.includes('selection-panel')) return '#sidebar-selected-unit is not inside the selection panel';
-      if (!/^\([0-9A-Z]{2}\)/.test(place.text)) return `the header reads "${place.text}", expected it to start with a hex code such as "(D4)"`;
-      const count = el('#selection-panel-count').text;
-      if (count !== '1 selected of 1') return `the count reads "${count}", expected "1 selected of 1"`;
+      if (!place.ancestorIds.includes('selection-panel-bar')) return '#sidebar-selected-unit is not in the summary bar';
+      const line = readSummaryLine(place.text);
+      const name = el('#selection-panel-units .selection-panel-unit-name').text;
+      if (!line || line.rest !== name) return `the first line reads "${place.text}", expected a hex code such as "(D4)", then "${name}"`;
+      const hint = el('#selection-panel-hint').text;
+      if (hint !== SELECTION_BAR.moveHint) return `the hint reads "${hint}", expected "${SELECTION_BAR.moveHint}"`;
       const chip = el('#selection-panel-units .selection-panel-order > span').text;
       const row = el('#pending-orders-list .console-order-detail').text;
       if (chip !== row) return `the order chip reads "${chip}" but the Orders row reads "${row}"`;
+      if (el('#selection-panel').borderColor === SELECTION_BAR.strikeBorder) return 'the panel has the strike border while nothing is aimed';
       const ranged = el('#ranged-attack-btn');
       if (el('#selection-panel-action-note').shown) return `a reason shows for an armor unit: "${el('#selection-panel-action-note').text}"`;
-      return ranged.shown && !ranged.disabled && ranged.text === 'Ranged' && ranged.ancestorIds.includes('selection-panel')
+      return ranged.shown && !ranged.disabled && ranged.text === 'Ranged' && ranged.ancestorIds.includes('selection-panel-bar')
         ? null
-        : `Ranged reads "${ranged.text}"${ranged.shown ? '' : ' and is hidden'}${ranged.disabled ? ' and is disabled' : ''}, expected it enabled in the selection panel`;
+        : `Ranged reads "${ranged.text}"${ranged.shown ? '' : ' and is hidden'}${ranged.disabled ? ' and is disabled' : ''}, expected it enabled in the summary bar`;
     },
   },
   {
     name: 'selection-panel-stack',
     scenes: [SCENES.selectionStack],
-    needs: ['#selection-panel-count', '#selection-panel-units .selection-panel-unit:nth-child(2)', '#selection-panel-units .selection-panel-order-none'],
+    needs: ['#sidebar-selected-unit', '#selection-panel-units .selection-panel-unit:nth-child(2)', '#selection-panel-units .selection-panel-order-none'],
     run: (p, el) => {
-      const count = el('#selection-panel-count').text;
-      if (count !== '2 selected of 2') return `the count reads "${count}", expected "2 selected of 2"`;
+      const line = readSummaryLine(el('#sidebar-selected-unit').text);
+      if (!line || line.rest !== '2 selected of 2') return `the first line reads "${el('#sidebar-selected-unit').text}", expected a hex code, then "2 selected of 2"`;
       const none = el('#selection-panel-units .selection-panel-order-none').text;
       return none === 'No orders' ? null : `a unit without orders reads "${none}"`;
     },
@@ -277,27 +307,33 @@ const CONSOLE_CHECKS = Object.freeze([
   {
     name: 'support-button-greyed',
     scenes: [SCENES.selectionStack],
-    needs: ['#ranged-attack-btn', '#selection-panel-action-note'],
+    needs: ['#ranged-attack-btn', '#ranged-attack-tip-host', '#selection-panel-action-note'],
     run: (p, el) => {
       const ranged = el('#ranged-attack-btn');
       if (!(ranged.shown && ranged.disabled && ranged.text === 'Ranged')) {
         return `Ranged reads "${ranged.text}"${ranged.shown ? '' : ' and is hidden'}${ranged.disabled ? '' : ' and is enabled'}, expected it greyed out`;
       }
-      const note = el('#selection-panel-action-note').text;
-      return note === "Infantry can't fire on the world map." ? null : `the reason reads "${note}"`;
+      const reason = "Infantry can't fire on the world map.";
+      const note = el('#selection-panel-action-note');
+      if (note.text !== reason || !note.ancestorIds.includes('selection-panel-details')) return `the reason in the details reads "${note.text}"`;
+      const tip = el('#ranged-attack-tip-host').tip;
+      return tip === reason ? null : `the greyed-out control's tip reads "${tip}", expected "${reason}"`;
     },
   },
   {
     name: 'strike-aiming-in-panel',
     scenes: [SCENES.strikeAiming],
-    needs: ['#ranged-attack-btn', '#air-strike-target-type', '#air-strike-cancel-btn', '#selection-panel-count'],
+    needs: ['#ranged-attack-btn', '#air-strike-target-type', '#air-strike-cancel-btn', '#sidebar-selected-unit', '#selection-panel-hint', '#selection-panel'],
     run: (p, el) => {
       if (el('#ranged-attack-btn').shown) return 'Strike still shows while aiming';
       const missing = ['#air-strike-target-type', '#air-strike-cancel-btn']
-        .filter((selector) => !el(selector).shown || !el(selector).ancestorIds.includes('selection-panel'));
-      if (missing.length > 0) return `not shown in the selection panel: ${missing.join(', ')}`;
-      const count = el('#selection-panel-count').text;
-      return count === '1 selected of 1' ? null : `the count reads "${count}", expected "1 selected of 1"`;
+        .filter((selector) => !el(selector).shown || !el(selector).ancestorIds.includes('selection-panel-bar'));
+      if (missing.length > 0) return `not shown in the summary bar: ${missing.join(', ')}`;
+      if (!readSummaryLine(el('#sidebar-selected-unit').text)) return `the first line reads "${el('#sidebar-selected-unit').text}", expected a hex code, then the unit`;
+      const hint = el('#selection-panel-hint').text;
+      if (hint !== SELECTION_BAR.targetingHint) return `the hint reads "${hint}", expected "${SELECTION_BAR.targetingHint}"`;
+      const border = el('#selection-panel').borderColor;
+      return border === SELECTION_BAR.strikeBorder ? null : `the panel's border is ${border}, expected the strike purple ${SELECTION_BAR.strikeBorder}`;
     },
   },
   {

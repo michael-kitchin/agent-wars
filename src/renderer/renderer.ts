@@ -548,7 +548,7 @@ function buildKillToastFormatterBundle(
  */
 function updateRangedSidebar(): void {
   // Contract anchors retained for rendererConsolidation tests after extraction:
-  // btnEl.style.display = S.airStrikeModeActive ? 'none' : '';
+  // btnHostEl.style.display = S.airStrikeModeActive ? 'none' : '';
   // formatPendingRangedAttackSidebarLabel(S.gameState, r, battle)
   // formatPendingAirStrikeSidebarLabel(S.gameState, strike, battle)
   // formatPendingFerryOrderSidebarLabel(S.gameState, ferry)

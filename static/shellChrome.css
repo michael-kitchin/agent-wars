@@ -48,6 +48,9 @@
   --chrome-tab-label-size: 9px;
   /* The minimap overview's width, and so the width of the tab row above it: five tabs of 56 px. */
   --minimap-width: 280px;
+  /* The ranged and air-strike order colors the map draws (RANGE_PERIMETER_RANGED_COLOR, RANGE_PERIMETER_AIR_STRIKE_COLOR). */
+  --order-ranged: #a06020;
+  --order-strike: #7a3db5;
   /* Marks what the player has selected, in lists and on the map. */
   --selection-mark: #f2c14e;
 }

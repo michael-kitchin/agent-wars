@@ -280,17 +280,14 @@
     </div>
     <section id="selection-panel" class="selection-panel" aria-label="Selected units" hidden>
       <div id="selection-panel-grip" class="selection-panel-grip" aria-hidden="true" data-control-tooltip="Drag to resize this panel. The size lasts until the app closes."></div>
-      <div class="selection-panel-body">
-        <div class="selection-panel-header">
-          <p id="sidebar-selected-unit" class="selection-panel-place">—</p>
-          <button type="button" id="selection-panel-close" class="selection-panel-close" aria-label="Clear the selection" data-control-tooltip="Clear the selection. Queued orders stay.">×</button>
+      <div id="selection-panel-bar" class="selection-panel-bar">
+        <div class="selection-panel-text">
+          <p id="sidebar-selected-unit" class="selection-panel-summary">—</p>
+          <p id="selection-panel-hint" class="selection-panel-hint"></p>
         </div>
-        <div id="selection-panel-chips" class="selection-panel-chips"></div>
-        <p id="selection-panel-count" class="selection-panel-count"></p>
-        <ul id="selection-panel-units" class="selection-panel-units"></ul>
-        <p id="sidebar-error" class="chrome-error" style="font-size: 0.9em; display: none;"></p>
+        <span class="selection-panel-divider" aria-hidden="true"></span>
         <div class="selection-panel-actions">
-          <button type="button" id="ranged-attack-btn" class="ranged-btn" style="display: none;">Ranged</button>
+          <span id="ranged-attack-tip-host" class="control-tooltip-host" style="display: none;"><button type="button" id="ranged-attack-btn" class="ranged-btn">Ranged</button></span>
           <select id="air-strike-target-type" class="ranged-btn" style="display: none;" data-control-tooltip="Choose enemy units, production, airports, or seaports. Your next double-click uses that choice until you cancel.">
             <option value="units">Enemy Units</option>
             <option value="urban">Production</option>
@@ -298,8 +295,15 @@
             <option value="seaport">Seaports</option>
           </select>
           <button type="button" id="air-strike-cancel-btn" class="ranged-btn" style="display: none;" data-control-tooltip="Stop aiming an air strike and show Strike again. Strikes already in the list stay there.">Cancel</button>
-          <span id="selection-panel-action-note" class="selection-panel-action-note"></span>
         </div>
+        <button type="button" id="selection-panel-close" class="selection-panel-close" aria-label="Clear the selection" data-control-tooltip="Clear the selection. Queued orders stay.">×</button>
+      </div>
+      <div id="selection-panel-details" class="selection-panel-details">
+        <p id="selection-panel-caption" class="selection-panel-caption"></p>
+        <div id="selection-panel-chips" class="selection-panel-chips"></div>
+        <ul id="selection-panel-units" class="selection-panel-units"></ul>
+        <p id="selection-panel-action-note" class="selection-panel-action-note"></p>
+        <p id="sidebar-error" class="chrome-error" style="font-size: 0.9em; display: none;"></p>
       </div>
     </section>
   </div>

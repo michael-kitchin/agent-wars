@@ -14,6 +14,7 @@ import { closeGameMenu } from '../chrome/gameMenu';
 import { refreshConsoleHeader } from '../chrome/consoleFrame';
 import { syncSidebarOrderRowSelection } from '../gameplay/sidebarOrderRow';
 import { renderSelectionPanel } from '../gameplay/selectionPanel';
+import { renderSelectionBarState } from '../gameplay/selectionBar';
 
 /**
  * Refreshes everything that shows the selection: the selection panel and the highlight of the order rows.
@@ -30,18 +31,20 @@ export function updateSidebar(formatUnitDisplayName: (unitId: string) => string)
 }
 
 /**
- * Refreshes the match status in the top bar, and the console header, from the latest snapshot.
+ * Refreshes the match status in the top bar, the console header, and the selection bar's hint, from the latest snapshot.
  *
  * Purpose: Keeps the name every caller already uses; the old Phase and Turn lines now live in the top bar.
  * When to use: After `applyGameStateSnapshot`, tactical entry/exit, tactical Ready commit, and when beat playback ends.
  * Expected outcome: The top bar's sides, readouts, and date block match `state` and the current battle. The
  *   console subtitle follows the active tab: the queued-order line, "this match", or the opponent's home region.
- *   Null shows em dashes in the top bar.
+ *   The selection bar's hint follows playback, which starts and ends around these calls. Null shows em dashes in the
+ *   top bar.
  * Exceptions: None.
  */
 export function updateGameStateSidebar(state: GameStateSnapshot | null): void {
   renderTopBarStatus(state);
   refreshConsoleHeader();
+  renderSelectionBarState();
 }
 
 /**

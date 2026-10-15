@@ -36,7 +36,7 @@ function applyPanelSize(panel: HTMLElement, width: number, height: number): void
  *
  * Purpose: Lets the player make the panel wider for long captions or taller for many units.
  * When to use: Once during renderer startup, after the page markup exists.
- * Expected outcome: Width stays from 320 to 640 px and height from 140 px to the map height minus 24 px
+ * Expected outcome: Width stays from 400 to 640 px and height from 140 px to the map height minus 24 px
  *   (`clampSelectionPanelSize`). The size is not saved.
  * Exceptions: None; does nothing when the markup is missing.
  */

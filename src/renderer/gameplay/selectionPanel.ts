@@ -1,17 +1,19 @@
 /**
- * The selection panel at the map's bottom-left: the selected units' hex, its chips, the units, and their orders.
+ * The selection panel at the map's bottom-left: a summary bar with the selection's hex and count, a hint, and Ranged or
+ * Strike, then the hex's caption and chips, the units, and their orders.
  *
- * The panel replaces the Orders tab's "Selected unit" line. Its header keeps the id `sidebar-selected-unit`.
+ * The panel replaces the Orders tab's "Selected unit" line. The bar's first line keeps the id `sidebar-selected-unit`.
  */
 import { isNeutralBorderHex } from '../../shared/h3Resolutions';
 import { formatHexNamingCaptionHtml } from '../../shared/hexNamingCaption';
-import { escapeHtmlText } from '../../shared/htmlTextFormatting';
 import { orderTargetHexCode } from '../../shared/orderTargetHexCode';
+import { selectionElsewhereText } from '../../shared/selectionBarText';
 import {
   buildSelectionPanelChips,
   summarizeSelectionPanel,
   type SelectionPanelChipInput,
   type SelectionPanelRow,
+  type SelectionPanelSummary,
 } from '../../shared/selectionPanelSummary';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
 import { techLevelFromUrbanHexCount } from '../../shared/techBonusRules';
@@ -23,6 +25,7 @@ import { baselineUrbanHexCountForStrategicHex } from '../rendererTacticalHydrati
 import { paintTerrainSwatches } from '../rendering/terrainVisualStyles';
 import { unitIconPathForUnitType } from '../rendering/unitDrawing';
 import { onQueuedOrdersChanged, queuedOrderForUnit } from './queuedOrderRows';
+import { renderSelectionBarState } from './selectionBar';
 import { wireSelectionPanelResize } from './selectionPanelResize';
 
 /**
@@ -46,40 +49,69 @@ export interface SelectionPanelDeps {
 }
 
 /**
- * Counts header redraws, so a slow caption lookup cannot overwrite a newer header.
+ * Counts caption lookups, so a slow lookup cannot overwrite a newer caption.
  *
  * Purpose: The hex caption arrives asynchronously.
- * When to use: Incremented by `renderSelectionPanelHeader` only.
+ * When to use: Incremented by `renderSelectionPanelCaption` only.
  * Expected outcome: Only the latest lookup writes the caption.
  * Exceptions: None.
  */
-let headerRequestSeq = 0;
+let captionRequestSeq = 0;
 
 /**
- * Writes the header: the hex code in parentheses, then the hex caption once it arrives.
+ * Writes the bar's first line: the hex code in parentheses, then the count, or the unit's flag and name when one unit
+ * is selected, then how many selected units stand in other hexes.
+ *
+ * Purpose: Says where the selection is and what it holds, even while the details are hidden.
+ * When to use: From `renderSelectionPanel`.
+ * Expected outcome: `#sidebar-selected-unit` reads like "(D4) · 3 selected of 3", "(D3) · 2nd Squadron" with the
+ *   unit's flag, or "(D4) · 2 selected of 3 · +1 elsewhere". In a battle the code names the battle cell, such as
+ *   "(E8.K3)". A code that cannot be found shows "?".
+ * Exceptions: None.
+ */
+function renderSelectionPanelSummaryLine(
+  summary: SelectionPanelSummary,
+  battle: TacticalBattleSnapshot | null,
+  deps: SelectionPanelDeps
+): void {
+  const line = document.getElementById('sidebar-selected-unit');
+  if (!line) return;
+  const code = document.createElement('strong');
+  code.textContent = `(${orderTargetHexCode(summary.panelHex, battle) ?? '?'})`;
+  const what = document.createElement('span');
+  if (summary.rows.length === 1) {
+    const unitId = summary.rows[0].unitId;
+    setUnitNameContent(what, unitId, deps.formatUnitDisplayName(unitId));
+  } else {
+    what.textContent = summary.countText;
+  }
+  line.replaceChildren(code, ' · ', what);
+  const elsewhere = selectionElsewhereText(summary.rows);
+  if (elsewhere) line.append(` · ${elsewhere}`);
+}
+
+/**
+ * Writes the hex's caption at the top of the details once it arrives.
  *
  * Purpose: Names the hex the way the hex tooltip does.
  * When to use: From `renderSelectionPanel`.
- * Expected outcome: `#sidebar-selected-unit` shows `(D4)` at once, then `(D4)` and the caption. On the same hex the
- *   old caption stays until the new one is written, so the header does not flicker.
- * Exceptions: None; a failed lookup leaves the code alone.
+ * Expected outcome: `#selection-panel-caption` empties when the hex changes, then shows the caption with its flags. On
+ *   the same hex the old caption stays until the new one is written, so it does not flicker.
+ * Exceptions: None; a failed lookup leaves the caption as it was.
  */
-function renderSelectionPanelHeader(panelHex: string, battle: TacticalBattleSnapshot | null): void {
-  const place = document.getElementById('sidebar-selected-unit');
-  if (!place) return;
-  const code = orderTargetHexCode(panelHex, battle);
-  const codeHtml = code ? `<strong>(${escapeHtmlText(code)})</strong>` : '';
+function renderSelectionPanelCaption(panelHex: string, battle: TacticalBattleSnapshot | null): void {
+  const caption = document.getElementById('selection-panel-caption');
+  if (!caption) return;
   const resolution = battle ? 4 : 1;
   const hexKey = `${resolution}:${panelHex}`;
-  if (place.dataset.hexKey !== hexKey) {
-    place.innerHTML = codeHtml;
-    place.dataset.hexKey = hexKey;
+  if (caption.dataset.hexKey !== hexKey) {
+    caption.replaceChildren();
+    caption.dataset.hexKey = hexKey;
   }
-  const requestSeq = ++headerRequestSeq;
-  void getCachedNamingLineForTarget({ h3Index: panelHex, resolution }).then((caption) => {
-    if (requestSeq !== headerRequestSeq) return;
-    const captionHtml = caption && caption.text.trim() !== '' ? ` ${formatHexNamingCaptionHtml(caption)}` : '';
-    place.innerHTML = `${codeHtml}${captionHtml}`;
+  const requestSeq = ++captionRequestSeq;
+  void getCachedNamingLineForTarget({ h3Index: panelHex, resolution }).then((line) => {
+    if (requestSeq !== captionRequestSeq) return;
+    caption.innerHTML = line && line.text.trim() !== '' ? formatHexNamingCaptionHtml(line) : '';
   });
 }
 
@@ -218,8 +250,9 @@ function createUnitRow(row: SelectionPanelRow, battle: TacticalBattleSnapshot | 
  *
  * Purpose: The panel follows every selection change on the map, in the stack callout, and in the Orders tab.
  * When to use: From `updateSidebar` after any selection change or snapshot, and whenever the queued orders change.
- * Expected outcome: Hidden when no selected unit exists. Otherwise the header, chips, count line, and one row per
- *   selected unit describe the first selected unit's hex. During a battle the panel describes battle cells.
+ * Expected outcome: Hidden when no selected unit exists. Otherwise the bar's first line, the caption, the chips, and one
+ *   row per selected unit describe the first selected unit's hex, and the bar's hint and border follow targeting and
+ *   playback. During a battle the panel describes battle cells.
  * Exceptions: None; missing elements are skipped.
  */
 export function renderSelectionPanel(deps: SelectionPanelDeps): void {
@@ -230,12 +263,12 @@ export function renderSelectionPanel(deps: SelectionPanelDeps): void {
   const summary = summarizeSelectionPanel(S.selectedUnitIds, units, (unitId) => !isEmbarkedLandUnitBlockedForSelection(unitId));
   panel.hidden = summary === null;
   if (!summary) return;
-  renderSelectionPanelHeader(summary.panelHex, battle);
+  renderSelectionPanelSummaryLine(summary, battle, deps);
+  renderSelectionPanelCaption(summary.panelHex, battle);
   renderSelectionPanelChips(summary.panelHex, battle);
-  const count = document.getElementById('selection-panel-count');
-  if (count) count.textContent = summary.countText;
   const list = document.getElementById('selection-panel-units');
   list?.replaceChildren(...summary.rows.map((row) => createUnitRow(row, battle, deps)));
+  renderSelectionBarState();
 }
 
 /**
