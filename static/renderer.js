@@ -230,7 +230,7 @@
     /**
        * Documents the object literal property `tacticalAnnihilationOutcomeDialog` (tacticalAnnihilationOutcomeDialog: null as TacticalAnnihilationOutcomeKind | null).
     
-       * Purpose: While non-null, the tactical annihilation win/loss modal is shown and the HUD exit control stays hidden until the player confirms `Exit Battle`.
+       * Purpose: While non-null, the tactical annihilation win/loss modal is shown and Exit Battle in the battle header stays hidden until the player confirms `Exit Battle`.
        * When to use: Set when `getTacticalAnnihilationOutcome` is terminal during tactical planning; cleared on acknowledged exit, new game, or strategic reconciliation that drops the tactical session.
        * Expected outcome: Blocks Ready and map interaction (via `setMainUIControlsEnabled`) until dismissal; mirrors strategic `updateGameOverUI` message strings for win/loss.
        * Exceptions: None; keep `null` whenever no tactical snapshot exists.
@@ -27522,15 +27522,13 @@ ${bonuses}`;
 
   // src/renderer/tactical/tacticalExitButtonDom.ts
   function syncTacticalExitButtonElementVisibility() {
-    const hud = document.getElementById("tactical-battle-hud");
     const exitBtn = document.getElementById("tactical-exit-btn");
     const active2 = !!rendererSharedState.tacticalBattleSnapshot;
     const annihilationDialogOpen = rendererSharedState.tacticalAnnihilationOutcomeDialog != null;
-    hud?.classList.toggle("hidden", !active2);
     const playbackDisablesExit = rendererSharedState.tacticalBattleSnapshot != null && rendererSharedState.resolutionMoveAnimation != null;
-    const disabled = !active2 || !rendererSharedState.tacticalPhasePlanning || playbackDisablesExit;
+    const disabled = !rendererSharedState.tacticalPhasePlanning || playbackDisablesExit;
     if (exitBtn) {
-      if (annihilationDialogOpen) {
+      if (annihilationDialogOpen || !active2) {
         exitBtn.classList.add("hidden");
         exitBtn.disabled = true;
       } else {
@@ -31214,7 +31212,7 @@ ${bonuses}`;
     }
     fx.enterTacticalView(result.battle.tacticalChildH3Indexes);
     fx.setStrategicSidebarTactical(true);
-    fx.refreshTacticalExitHud();
+    fx.refreshTacticalExitButton();
     fx.scheduleAnnihilationExit();
     fx.refreshReadyButton();
     fx.syncTacticalEntryOverlay();
@@ -31229,7 +31227,7 @@ ${bonuses}`;
     fx.setPhasePlanning(true);
     fx.enterTacticalView(battle.tacticalChildH3Indexes);
     fx.setStrategicSidebarTactical(true);
-    fx.refreshTacticalExitHud();
+    fx.refreshTacticalExitButton();
     fx.scheduleAnnihilationExit();
     fx.refreshReadyButton();
     fx.syncTacticalEntryOverlay();
@@ -31251,7 +31249,7 @@ ${bonuses}`;
       },
       enterTacticalView: enterTacticalMapView,
       setStrategicSidebarTactical: tacticalApplyStrategicSidebarForTacticalMode,
-      refreshTacticalExitHud: tacticalUpdateExitButtonVisibility,
+      refreshTacticalExitButton: tacticalUpdateExitButtonVisibility,
       scheduleAnnihilationExit: bindings.scheduleAnnihilationExit,
       refreshReadyButton: bindings.refreshReadyButton,
       syncTacticalEntryOverlay: bindings.syncTacticalEntryOverlay,
@@ -31657,8 +31655,7 @@ ${bonuses}`;
     const popup = document.getElementById("build-popup");
     const layer = document.getElementById("build-entry-layer");
     const tacticalLayer = document.getElementById("tactical-entry-layer");
-    const tacticalHud = document.getElementById("tactical-battle-hud");
-    return !!(popup?.contains(target) || layer?.contains(target) || tacticalLayer?.contains(target) || tacticalHud?.contains(target));
+    return !!(popup?.contains(target) || layer?.contains(target) || tacticalLayer?.contains(target));
   }
   function createBuildQueuePopupHandler(deps) {
     let buildEntryInteractionChain = Promise.resolve();

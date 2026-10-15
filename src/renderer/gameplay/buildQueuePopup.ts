@@ -51,25 +51,19 @@ export function isBuildQueueSelectInPopupFocused(): boolean {
 }
 
 /**
- * Defines the `isBuildPopupOrEntryTarget` function shape (export function isBuildPopupOrEntryTarget(target: EventTarget | null): boolean).
-
- * Purpose: Supports maintainability by documenting why `isBuildPopupOrEntryTarget` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
+ * Reports whether a pointer target is the build popup, a build marker, or a battle-entry marker.
+ *
+ * Purpose: A press on any of these must not close the open build popup; a press anywhere else does.
+ * When to use: From the window's `pointerdown` handler while the build popup is open.
+ * Expected outcome: True when `target` is inside `#build-popup`, `#build-entry-layer`, or `#tactical-entry-layer`.
+ * Exceptions: None; a target that is not a DOM node returns false.
  */
 export function isBuildPopupOrEntryTarget(target: EventTarget | null): boolean {
   if (!(target instanceof Node)) return false;
   const popup = document.getElementById('build-popup');
   const layer = document.getElementById('build-entry-layer');
   const tacticalLayer = document.getElementById('tactical-entry-layer');
-  const tacticalHud = document.getElementById('tactical-battle-hud');
-  return !!(
-    popup?.contains(target) ||
-    layer?.contains(target) ||
-    tacticalLayer?.contains(target) ||
-    tacticalHud?.contains(target)
-  );
+  return !!(popup?.contains(target) || layer?.contains(target) || tacticalLayer?.contains(target));
 }
 
 /**

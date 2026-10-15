@@ -601,7 +601,7 @@ There is no production step in a beat.
 A tactical battle ends in one of these ways:
 
 1. **Annihilation:** One side has zero remaining sub-units. The UI shows an annihilation result. Remaining strategic parents on the winning side are not run through the less-than-half pass (the bail-out eliminator skips when one side is already gone).
-2. **Human voluntary exit:** The player clicks the tactical HUD exit control. Remaining sub-units on **both** sides are mapped back using the **strict less-than-half** rule in §12.9. There is **no** extra dice-with-modifiers fight on exit. The LLM has no separate bail-out action.
+2. **Human voluntary exit:** The player clicks Exit Battle in the battle header. Remaining sub-units on **both** sides are mapped back using the **strict less-than-half** rule in §12.9. There is **no** extra dice-with-modifiers fight on exit. The LLM has no separate bail-out action.
 3. **Failed start:** If placement cannot put at least one sub-unit on each side, the battle never begins.
 
 ### 12.9 Mapping sub-units back to strategic units
@@ -642,7 +642,7 @@ Dice chips listing every die rolled in the air strike, ranged, and melee phases 
 
 Tactical battle animation follows the same removal rule as §13.1. A battle has no unknown casualty hexes. Movement uses interpolation between that battle's tactical hexes. Ranged fire shows directional indicators. Casualties use the same red X overlay. The same dice chips sit on top of every other playback layer, for twice the time from lightning through casualties, on the battle's tactical cells.
 
-The tactical battle UI displays the battlefield from the opening of §12, with each cell's own terrain, road and rail overlays, and sub-unit markers. Airport and seaport marks are the enclosing hex's own cells. An exit control triggers voluntary-exit mapping (§12.8).
+The tactical battle UI displays the battlefield from the opening of §12, with each cell's own terrain, road and rail overlays, and sub-unit markers. Airport and seaport marks are the enclosing hex's own cells. Exit Battle, in the battle header, triggers voluntary-exit mapping (§12.8).
 
 ---
 

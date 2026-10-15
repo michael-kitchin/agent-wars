@@ -55,7 +55,7 @@ export type TacticalRendererStartBattleSideEffects = {
   setPhasePlanning: (planning: boolean) => void;
   enterTacticalView: (childTacticalH3Indexes: string[]) => void;
   setStrategicSidebarTactical: (tactical: boolean) => void;
-  refreshTacticalExitHud: () => void;
+  refreshTacticalExitButton: () => void;
   scheduleAnnihilationExit: () => void;
   refreshReadyButton: () => void;
   syncTacticalEntryOverlay: () => void;
@@ -97,7 +97,7 @@ export function tacticalRendererApplyStartBattleIpcResult(
   }
   fx.enterTacticalView(result.battle.tacticalChildH3Indexes);
   fx.setStrategicSidebarTactical(true);
-  fx.refreshTacticalExitHud();
+  fx.refreshTacticalExitButton();
   fx.scheduleAnnihilationExit();
   fx.refreshReadyButton();
   fx.syncTacticalEntryOverlay();
@@ -111,7 +111,7 @@ export function tacticalRendererApplyStartBattleIpcResult(
  *
  * Purpose: Reuses the same renderer sequencing as `tacticalRendererApplyStartBattleIpcResult` without an IPC round-trip.
  * When to use: `applyGameStateSnapshot` when `nextState.tacticalBattleSession` is present and differs from local state.
- * Expected outcome: Tactical HUD, sidebar suppression, and map bounds match a freshly started tactical session.
+ * Expected outcome: Exit Battle, sidebar suppression, and map bounds match a freshly started tactical session.
  * Exceptions: None; assumes `battle` was validated in the main process before attachment.
  */
 export function tacticalRendererActivateRestoredBattleSnapshot(
@@ -124,7 +124,7 @@ export function tacticalRendererActivateRestoredBattleSnapshot(
   fx.setPhasePlanning(true);
   fx.enterTacticalView(battle.tacticalChildH3Indexes);
   fx.setStrategicSidebarTactical(true);
-  fx.refreshTacticalExitHud();
+  fx.refreshTacticalExitButton();
   fx.scheduleAnnihilationExit();
   fx.refreshReadyButton();
   fx.syncTacticalEntryOverlay();

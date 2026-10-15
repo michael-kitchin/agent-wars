@@ -168,7 +168,7 @@ Manually fought battles take place entirely within one strategic turn, with the 
 - During that turn, strategic units will continue to follow existing orders and defend themselves.
 - When the battle is over, the strategic part of the game resumes in the next turn.
 
-Players win tactical battles by destroying their opponent's units, but they can leave at any time by clicking the **Exit Battle** button. Any strategic units with half or more of their sub-units remaining by the end of a battle will be returned to the strategic map. There is no concept of battle damage, to keep things simple.
+Players win tactical battles by destroying their opponent's units, but they can leave between beats by clicking **Exit Battle** at the top right of the window. Any strategic units with half or more of their sub-units remaining by the end of a battle will be returned to the strategic map. There is no concept of battle damage, to keep things simple.
 
 Complete rules are in [combat-rules-v3.md](combat-rules-v3.md) §12.
 
@@ -221,7 +221,7 @@ Complete rules are in [combat-rules-v3.md](combat-rules-v3.md) §12.
 ### Ending a battle
 
 - **Annihilation:** when one side has no sub-units left, a dialog shows the result. Press its **Exit Battle** to return.
-- **Exit Battle:** you can leave between beats. A unit that kept fewer than half its sub-units is destroyed. Exactly half survives.
+- **Exit Battle:** you can leave between beats with **Exit Battle** in the battle header, beside Settings. A unit that kept fewer than half its sub-units is destroyed. Exactly half survives.
 - **Back to the map:** your strategic orders return, minus units that died, and Ready runs at once.
 - **Plan first:** before you click a 🔍 marker, queue the turn's strategic orders, because leaving the battle resolves the turn.
 - **After Fight, no planning:** a battle opens before you can plan that turn. Leaving it resolves the turn with only your standing marches.

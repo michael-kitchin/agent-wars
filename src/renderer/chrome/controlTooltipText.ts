@@ -520,7 +520,7 @@ export const ignoreTooltipText =
 
 /**
  * Purpose: Says world-map orders return and the button does nothing during playback.
- * When to use: `#tactical-battle-hud`.
+ * When to use: `#tactical-exit-host`, around Exit Battle in the battle header.
  * Expected outcome: The control tip shows this sentence.
  * Exceptions: None.
  */

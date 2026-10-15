@@ -1,28 +1,30 @@
 /**
- * DOM sync for the tactical battle HUD exit control from `rendererSharedState`.
+ * DOM sync for Exit Battle in the battle header from `rendererSharedState`.
  */
 
 import { rendererSharedState as S } from '../core/state';
 import { dismissStaleControlTooltip } from '../chrome/controlTooltip';
 
 /**
- * Updates `#tactical-battle-hud` / `#tactical-exit-btn` visibility and disabled state from tactical session flags.
+ * Updates `#tactical-exit-btn` visibility and disabled state from tactical session flags.
  *
  * Purpose: Single place for exit-button rules so annihilation dialog code does not import the broader tactical UI orchestration module.
- * When to use: After tactical snapshot or phase changes, beat playback start or end, annihilation dialog open/close, and tactical HUD teardown.
- * Expected outcome: HUD hidden when no snapshot; exit hidden and disabled while `S.tacticalAnnihilationOutcomeDialog` is set; otherwise exit is disabled when there is no battle, when `S.tacticalPhasePlanning` is false, or while a battle snapshot is set and beat playback is running. A control tip whose control no longer has an on-screen area is hidden.
+ * When to use: After tactical snapshot or phase changes, beat playback start or end, annihilation dialog open/close, and battle teardown.
+ * Expected outcome: Hidden and disabled while no battle snapshot is active, and while
+ *   `S.tacticalAnnihilationOutcomeDialog` is set. Hiding it with the snapshot keeps it off screen when a battle ends
+ *   before `renderBattleHeader` leaves battle form. Otherwise it stays shown and is disabled when
+ *   `S.tacticalPhasePlanning` is false or while beat playback is running. A control tip whose control no longer has an
+ *   on-screen area is hidden.
  * Exceptions: None when nodes are missing (no-op for absent elements).
  */
 export function syncTacticalExitButtonElementVisibility(): void {
-  const hud = document.getElementById('tactical-battle-hud');
   const exitBtn = document.getElementById('tactical-exit-btn') as HTMLButtonElement | null;
   const active = !!S.tacticalBattleSnapshot;
   const annihilationDialogOpen = S.tacticalAnnihilationOutcomeDialog != null;
-  hud?.classList.toggle('hidden', !active);
   const playbackDisablesExit = S.tacticalBattleSnapshot != null && S.resolutionMoveAnimation != null;
-  const disabled = !active || !S.tacticalPhasePlanning || playbackDisablesExit;
+  const disabled = !S.tacticalPhasePlanning || playbackDisablesExit;
   if (exitBtn) {
-    if (annihilationDialogOpen) {
+    if (annihilationDialogOpen || !active) {
       exitBtn.classList.add('hidden');
       exitBtn.disabled = true;
     } else {

@@ -76,6 +76,7 @@ const SCENES = Object.freeze({
   battleOrders: 'battle-orders',
   battleSmallWindow: 'battle-small-window',
   battleBeat: 'battle-beat',
+  battleExited: 'battle-exited',
   newGameReopened: 'new-game-reopened',
   regionalStart: 'regional-start',
   regionalSelection: 'regional-selection',

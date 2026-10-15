@@ -318,7 +318,7 @@ scheduleTacticalAnnihilationExit?: () => void;
     /**
    * Refreshes Exit Battle from the current battle snapshot and beat playback.
    *
-   * Contract: Tactical Ready stores playback before later awaits, and the HUD must disable Exit Battle before those awaits return.
+   * Contract: Tactical Ready stores playback before later awaits, and Exit Battle must be disabled before those awaits return.
    * When to use: Immediately after a tactical commit stores beat playback, while a later redraw still refreshes the same control.
    * Expected outcome: The in-battle Exit Battle control is disabled while a battle snapshot and beat playback are both set. Does not change `S.tacticalPhasePlanning`.
    * Exceptions: Optional. Callers that omit it leave the control unchanged until the next redraw.

@@ -323,7 +323,8 @@ async function runFirstSession(app, page, report, outDir) {
 }
 
 /**
- * Runs the second session: the reopened match, a battle on the hex both sides now hold, and a new regional match.
+ * Runs the second session: the reopened match, a battle on the hex both sides now hold, leaving that battle, and a new
+ * regional match.
  *
  * Purpose: Checks what a player sees after restarting the app, inside a battle, and on a regional map.
  * When to use: After `runFirstSession` and the saved-match change from `contestedHexEdit`, on the same folder.
@@ -367,10 +368,13 @@ async function runReopenedSession(app, page, report, outDir, battleHex) {
   await parkPointer(page);
   await page.waitForTimeout(SETTLE_MS.tip);
   await recordScene(page, report, outDir, SCENES.battleBeat);
-  if (await page.isVisible(annihilation)) {
-    await page.click('#tactical-annihilation-exit-btn');
-    await waitForWorldPlanning(page);
-  }
+
+  // Leave the battle mid-fight with Exit Battle in the header, or close the result if a side was wiped out. Either way
+  // the world-map turn then plays.
+  await page.click((await page.isVisible(annihilation)) ? '#tactical-annihilation-exit-btn' : '#tactical-exit-btn');
+  await waitForWorldPlanning(page);
+  await parkPointer(page);
+  await recordScene(page, report, outDir, SCENES.battleExited);
 
   await openNewGameOverlay(page);
   await recordScene(page, report, outDir, SCENES.newGameReopened);

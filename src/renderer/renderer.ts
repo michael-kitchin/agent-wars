@@ -476,7 +476,7 @@ function maybeScheduleTacticalAnnihilationExit(): void {
  * Ends the tactical session in the main process then resumes strategic Ready handling.
  *
  * Purpose: Delegates boundary checks and DOM restoration to `tacticalPerformBattleExit` while preserving renderer IPC wiring.
- * When to use: Tactical HUD exit button and annihilation modal `Exit Battle` confirmation.
+ * When to use: Exit Battle in the battle header, and the annihilation modal's `Exit Battle` confirmation.
  * Expected outcome: Clears renderer tactical snapshot, applies post-exit strategic state without reloading standing orders, restores living-unit stash drafts, then invokes Ready pipeline on success.
  * Exceptions: Surfaces toasts when IPC fails per tactical helper contract.
  */

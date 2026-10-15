@@ -115,7 +115,7 @@ When this guide and the running app disagree, the app wins until this file is up
 ### 2.3 Top Bar
 
 - **Contents:** Turn number, phase (e.g., Planning / Resolving), and current player or “Your turn” indicator. Global resources (e.g., IPCs or equivalent) if applicable. Keep height minimal.
-- **Live app:** A 44 px bar: the game menu button, the two sides, the Production, Forces, Your home, and Enemy home readouts, then the date and turn on two lines, and disabled Settings and Help buttons. Captions hide below a 1360 px window. See [ux/top-bar.md](ux/top-bar.md).
+- **Live app:** A 44 px bar: the game menu button, the two sides, the Production, Forces, Your home, and Enemy home readouts, then the date and turn on two lines, and disabled Settings and Help buttons. Captions hide below a 1360 px window. In a battle the bar is the battle header, and Exit Battle sits beside Settings. See [ux/top-bar.md](ux/top-bar.md).
 - **Style:** Neutral background, clear labels, numeric values prominent. Use the same type scale as the rest of the UI. Optional: small icons next to resources or phase for quick scanning.
 
 ### 2.4 Bottom Bar (Orders and Actions)

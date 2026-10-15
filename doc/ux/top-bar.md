@@ -30,6 +30,7 @@ While a battle is open, the bar is the battle header. Its face is darker and war
 - The game menu button.
 - The title, "Battle at (E8)", naming the battle's world hex by its code (`orderTargetHexCode`), then that hex's caption as the hex tooltip shows it, with flags. The caption ends in an ellipsis when the header is narrow; the title keeps its width.
 - Under the title, the status line: "Beat N · Tactical planning" while the player drafts, or "Beat N · Tactical resolution" while a beat resolves or plays back. N is the battle's current beat. A committed beat advances that number before playback, so the resolution line names the next beat. The line then gives the match date (`formatBattleHeaderStatus` in `src/shared/battleHeaderText.ts`), then the battle's weather icon and word when the battle has weather (`formatWeatherIconHtml`, added by `renderBattleHeader`).
+- Exit Battle, beside Settings. When it is shown, enabled, or hidden is in [tactical-battle-controls.md](tactical-battle-controls.md).
 - Settings and Help.
 
 ## Inputs and Responses
@@ -65,7 +66,7 @@ While a battle is open, the bar is the battle header. Its face is darker and war
 
 | Aspect | Strategic | Tactical |
 | --- | --- | --- |
-| What the bar shows | The match status: sides, readouts, and the date block | The battle header: the title, the hex caption, and the status line |
+| What the bar shows | The match status: sides, readouts, and the date block | The battle header: the title, the hex caption, the status line, and Exit Battle beside Settings |
 | Turn line | "Turn N · Planning" in the date block | "Beat N · Tactical planning" while drafting. While a beat plays back, "Beat N · Tactical resolution", and N is already the next beat. Then the match date and the battle's weather |
 | Face | `--chrome-bg-deep` | `--battle-header-bg` |
 | Readouts | Strategic snapshot | Hidden; a battle does not change them |
@@ -76,6 +77,7 @@ While a battle is open, the bar is the battle header. Its face is darker and war
 - [game-menu.md](game-menu.md)
 - [right-panel.md](right-panel.md)
 - [control-tooltips.md](control-tooltips.md)
+- [tactical-battle-controls.md](tactical-battle-controls.md)
 - [home region rules](../region-vs-region.md)
 
 ## Known Deviations
@@ -88,7 +90,7 @@ None.
 
 ## Code Entry Points
 
-- `static/index.html` (`#app-topbar`, `#game-menu-btn`, `#topbar-human-side`, `#topbar-opponent-side`, `#topbar-stat-production`, `#topbar-stat-production-suffix`, `#topbar-stat-forces-host`, `#topbar-stat-forces`, `#topbar-stat-forces-cap`, `#topbar-stat-human-home`, `#topbar-stat-human-home-total`, `#topbar-stat-opponent-home`, `#topbar-stat-opponent-home-total`, `#topbar-date`, `#topbar-turn-phase`, `#topbar-settings-btn`, `#topbar-help-btn`, `#battle-header-place`, `#battle-header-title`, `#battle-header-caption`, `#battle-header-status`, `#battle-header-center`)
+- `static/index.html` (`#app-topbar`, `#game-menu-btn`, `#topbar-human-side`, `#topbar-opponent-side`, `#topbar-stat-production`, `#topbar-stat-production-suffix`, `#topbar-stat-forces-host`, `#topbar-stat-forces`, `#topbar-stat-forces-cap`, `#topbar-stat-human-home`, `#topbar-stat-human-home-total`, `#topbar-stat-opponent-home`, `#topbar-stat-opponent-home-total`, `#topbar-date`, `#topbar-turn-phase`, `#topbar-settings-btn`, `#topbar-help-btn`, `#battle-header-place`, `#battle-header-title`, `#battle-header-caption`, `#battle-header-status`, `#battle-header-center`, `#tactical-exit-host`, `#tactical-exit-btn`)
 - `static/frameChrome.css`
 - `src/renderer/chrome/topBar.ts`
 - `src/renderer/chrome/battleHeader.ts` (`renderBattleHeader`)

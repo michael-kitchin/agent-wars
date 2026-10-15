@@ -153,40 +153,10 @@
   box-shadow: 0 1px 4px rgba(0,0,0,0.18);
   cursor: default;
 }
-.tactical-battle-hud {
-  position: absolute;
-  left: 50%;
-  bottom: 14px;
-  transform: translateX(-50%);
-  z-index: 6600;
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 0.45rem;
-  pointer-events: auto;
-  max-width: calc(100vw - 24px);
-  flex-wrap: wrap;
-  justify-content: center;
-}
-.tactical-battle-hud.hidden { display: none; }
-.tactical-exit-btn {
-  margin: 0;
-  padding: 0.4rem 0.9rem;
-  font-size: 13px;
-  font-weight: 600;
-  font-family: system-ui, sans-serif;
-  border-radius: 3px;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
-  cursor: default;
-}
 /* Buttons drawn over the pale map get a navy focus ring; the light teal ring would vanish there. */
 .build-entry-btn:focus,
-.tactical-entry-btn:focus,
-.tactical-exit-btn:focus {
+.tactical-entry-btn:focus {
   outline: 1px solid var(--chrome-bg);
-}
-.tactical-exit-btn.hidden {
-  display: none;
 }
 aside#sidebar.tactical-strategic-suppress {
   visibility: hidden;

@@ -280,7 +280,7 @@ export function syncTacticalEntryButtonOverlay(): void {
  *
  * Purpose: Deduplicates the `TacticalRendererStartBattleSideEffects` literal previously repeated in `applyGameStateSnapshot`.
  * When to use: Passed to `startTacticalBattleFromEntryHexFromModule` and `activateRestoredTacticalBattleFromMainSnapshot`.
- * Expected outcome: Identical sequencing for sidebar suppression, tactical entry, HUD refresh, and redraw.
+ * Expected outcome: Identical sequencing for sidebar suppression, tactical entry, Exit Battle refresh, and redraw.
  * Exceptions: None.
  */
 export function getTacticalBattleActivationSideEffects(): TacticalRendererStartBattleSideEffects {

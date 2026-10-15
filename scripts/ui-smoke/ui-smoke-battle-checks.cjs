@@ -1,6 +1,6 @@
 /**
  * Checks of the battle header for the UI smoke run: while a battle is open the top bar names the battle and its beat
- * in place of the match status.
+ * in place of the match status, and holds Exit Battle.
  *
  * Purpose: Keeps the battle header's checks apart from the frame, console, scenario, and map chrome checks.
  * When to use: Required by `ui-smoke-checks.cjs`, which runs these rows after the map chrome checks.
@@ -84,6 +84,27 @@ const BATTLE_CHECKS = Object.freeze([
       if (shown.length > 0) return `the battle header shows outside a battle: ${shown.join(', ')}`;
       const hidden = MATCH_STATUS_PARTS.filter((selector) => !el(selector).shown);
       return hidden.length === 0 ? null : `the match status is hidden outside a battle: ${hidden.join(', ')}`;
+    },
+  },
+  {
+    name: 'exit-battle-in-header',
+    scenes: BATTLE_SCENES,
+    needs: ['#tactical-exit-btn', '#tactical-annihilation-overlay'],
+    run: (p, el) => {
+      const exit = el('#tactical-exit-btn');
+      if (el('#tactical-annihilation-overlay').shown) return exit.shown ? 'Exit Battle shows beside the annihilation dialog' : null;
+      if (!exit.shown || exit.disabled) return `Exit Battle is ${exit.shown ? 'disabled' : 'hidden'} while the player plans a beat`;
+      return exit.ancestorIds.includes('app-topbar') ? null : 'Exit Battle is not in the top bar';
+    },
+  },
+  {
+    name: 'world-map-after-exit',
+    scenes: [SCENES.battleExited],
+    needs: ['#topbar-turn-phase', '#tactical-exit-btn'],
+    run: (p, el) => {
+      const turn = el('#topbar-turn-phase').text;
+      if (!/^Turn \d+ · Planning$/.test(turn)) return `the top bar reads "${turn}", expected world-map planning`;
+      return el('#tactical-exit-btn').shown ? 'Exit Battle still shows on the world map' : null;
     },
   },
   {
