@@ -156,6 +156,20 @@ async function waitForWorldPlanning(page) {
 }
 
 /**
+ * Clicks the selection panel's expand control and waits for the panel to settle.
+ *
+ * Purpose: The panel slides between compact and expanded for 150 ms; the click wait is longer.
+ * When to use: While the selection panel is shown.
+ * Expected outcome: The panel has switched between compact and expanded, and the pointer is parked.
+ * Exceptions: Propagates Playwright errors.
+ */
+async function toggleSelectionPanel(page) {
+  await page.click('#selection-panel-expand');
+  await parkPointer(page);
+  await page.waitForTimeout(SETTLE_MS.click);
+}
+
+/**
  * Drags the selection panel's grip to the window's top-right corner.
  *
  * Purpose: The largest size a player can drag to must still fit inside the map.
@@ -276,6 +290,11 @@ async function runFirstSession(app, page, report, outDir) {
   await recordScene(page, report, outDir, SCENES.strikeAiming);
   await page.click('#air-strike-cancel-btn');
 
+  // Expand the panel on the stack and record it. It stays expanded for the rest of this session, so its grip shows.
+  await selectHumanStack(page);
+  await toggleSelectionPanel(page);
+  await recordScene(page, report, outDir, SCENES.selectionExpanded);
+
   // Drag the grip far up and right, then far down and left: both ends stop at the panel's size limits.
   await dragSelectionPanelGrip(page, 800, -500);
   await parkPointer(page);
@@ -291,8 +310,10 @@ async function runFirstSession(app, page, report, outDir) {
   await dragSelectionPanelToCorner(page, SMALL_WINDOW);
   await parkPointer(page);
   await recordScene(page, report, outDir, SCENES.smallWindow);
-  // Shrink the panel again, so it cannot cover the units that the march after the turn clicks.
-  await dragSelectionPanelGrip(page, -380, 480);
+  // Collapse the panel to its bar and record it, so it cannot cover the units that the march after the turn clicks. It
+  // stays compact for the rest of this session.
+  await toggleSelectionPanel(page);
+  await recordScene(page, report, outDir, SCENES.selectionCollapsed);
 
   // At the minimum size the legend opens beside the minimap panel only if it fits, and under it otherwise. Close the
   // selection panel first so it cannot cover the legend.

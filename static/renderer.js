@@ -18709,6 +18709,8 @@ ${bonuses}`;
   function forcesStatTooltipText(breakdown) {
     return `Units you have fielded, out of the most this game size allows: ${breakdown}.`;
   }
+  var selectionPanelExpandTooltipText = "Show the hex, its terrain, and each selected unit's orders.";
+  var selectionPanelCollapseTooltipText = "Hide the details. The bar stays.";
 
   // src/renderer/chrome/consoleReports.ts
   var unreadCount = 0;
@@ -26604,17 +26606,27 @@ ${bonuses}`;
 
   // src/renderer/gameplay/selectionPanelResize.ts
   var dragStart = null;
+  var draggedHeight = null;
+  function applyDraggedPanelHeight(panel) {
+    if (draggedHeight === null) return;
+    panel.style.height = `${draggedHeight}px`;
+    panel.style.maxHeight = "calc(100% - 24px)";
+  }
+  function clearPanelHeight(panel) {
+    panel.style.height = "";
+    panel.style.maxHeight = "";
+  }
   function applyPanelSize(panel, width, height) {
     panel.style.width = `${width}px`;
-    panel.style.height = `${height}px`;
-    panel.style.maxHeight = "calc(100% - 24px)";
+    draggedHeight = height;
+    applyDraggedPanelHeight(panel);
   }
   function wireSelectionPanelResize() {
     const panel = document.getElementById("selection-panel");
     const grip = document.getElementById("selection-panel-grip");
     if (!panel || !grip) return;
     grip.addEventListener("pointerdown", (event) => {
-      if (event.button !== 0) return;
+      if (event.button !== 0 || panel.dataset.state !== "expanded") return;
       event.preventDefault();
       const box = panel.getBoundingClientRect();
       dragStart = { x: event.clientX, y: event.clientY, width: box.width, height: box.height };
@@ -26636,6 +26648,70 @@ ${bonuses}`;
     };
     grip.addEventListener("pointerup", endDrag);
     grip.addEventListener("pointercancel", endDrag);
+  }
+
+  // src/renderer/gameplay/selectionPanelExpand.ts
+  var SELECTION_PANEL_SLIDE_MS = 150;
+  var expanded = false;
+  var slide = null;
+  function syncExpandControl(button) {
+    button.setAttribute("aria-expanded", String(expanded));
+    button.setAttribute("aria-label", expanded ? "Hide selection details" : "Show selection details");
+    const tip = expanded ? selectionPanelCollapseTooltipText : selectionPanelExpandTooltipText;
+    button.setAttribute("data-control-tooltip", tip);
+  }
+  function reducedMotionRequested() {
+    return window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
+  }
+  function settle(panel) {
+    slide?.cancel();
+    slide = null;
+    panel.dataset.state = expanded ? "expanded" : "compact";
+    if (!expanded) clearPanelHeight(panel);
+  }
+  function slidePanel(panel, from, to) {
+    if (reducedMotionRequested() || Math.abs(from - to) < 1 || typeof panel.animate !== "function") {
+      settle(panel);
+      return;
+    }
+    const running = panel.animate([{ height: `${from}px` }, { height: `${to}px` }], {
+      duration: SELECTION_PANEL_SLIDE_MS,
+      easing: "ease-out"
+    });
+    slide = running;
+    running.onfinish = () => {
+      if (slide === running) settle(panel);
+    };
+  }
+  function toggleSelectionPanel(panel, bar, button) {
+    const from = panel.getBoundingClientRect().height;
+    slide?.cancel();
+    slide = null;
+    expanded = !expanded;
+    syncExpandControl(button);
+    if (expanded) {
+      panel.dataset.state = "expanding";
+      applyDraggedPanelHeight(panel);
+      slidePanel(panel, from, panel.getBoundingClientRect().height);
+      return;
+    }
+    panel.dataset.state = "collapsing";
+    clearPanelHeight(panel);
+    const borders = panel.offsetHeight - panel.clientHeight;
+    slidePanel(panel, from, bar.offsetHeight + borders);
+  }
+  function settleSelectionPanelSlide() {
+    const panel = document.getElementById("selection-panel");
+    if (panel && slide) settle(panel);
+  }
+  function wireSelectionPanelExpand() {
+    const panel = document.getElementById("selection-panel");
+    const bar = document.getElementById("selection-panel-bar");
+    const button = document.getElementById("selection-panel-expand");
+    if (!panel || !bar || !button) return;
+    settle(panel);
+    syncExpandControl(button);
+    button.addEventListener("click", () => toggleSelectionPanel(panel, bar, button));
   }
 
   // src/renderer/gameplay/selectionPanel.ts
@@ -26757,7 +26833,10 @@ ${bonuses}`;
     const units = battle ? battle.subUnits : rendererSharedState.gameState?.units ?? [];
     const summary = summarizeSelectionPanel(rendererSharedState.selectedUnitIds, units, (unitId) => !isEmbarkedLandUnitBlockedForSelection(unitId));
     panel.hidden = summary === null;
-    if (!summary) return;
+    if (!summary) {
+      settleSelectionPanelSlide();
+      return;
+    }
     renderSelectionPanelSummaryLine(summary, battle, deps);
     renderSelectionPanelCaption(summary.panelHex, battle);
     renderSelectionPanelChips(summary.panelHex, battle);
@@ -26767,6 +26846,7 @@ ${bonuses}`;
   }
   function wireSelectionPanel(deps) {
     onQueuedOrdersChanged(() => renderSelectionPanel(deps));
+    wireSelectionPanelExpand();
     wireSelectionPanelResize();
   }
 

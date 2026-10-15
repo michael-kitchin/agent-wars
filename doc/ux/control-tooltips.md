@@ -59,6 +59,8 @@ The tip can appear whenever the control can receive the pointer or keyboard focu
 - Collapse the console: Hide the console to widen the map. Click a tab to show it again.
 - Selection panel close: Clear the selection. Queued orders stay.
 - Selection panel grip: Drag to resize this panel. The size lasts until the app closes.
+- Selection panel expand control, while the panel is compact: Show the hex, its terrain, and each selected unit's orders.
+- Selection panel expand control, while the panel is expanded: Hide the details. The bar stays.
 - Weather map mode: Show the map as usual: terrain, and each hex's weather while the weather bonus is on.
 - Tech map mode: Show each hex's code, production, and tech tier instead of terrain on the world map, until you choose Weather. Holding T shows the same view while the key is down.
 - Legend: Show or hide the terrain legend and its style choice.

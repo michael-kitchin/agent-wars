@@ -12,13 +12,15 @@ Shown in Strategic planning, Resolution playback, and Tactical planning while at
 
 ## Information Displayed
 
-- A summary bar, one 50 px row across the top of the panel that never scrolls. From left to right:
+- Two states. Compact: the summary bar alone. Expanded: the summary bar on top and the details under it. The app opens compact (`src/renderer/gameplay/selectionPanelExpand.ts`).
+- A summary bar, one 50 px row across the top of the panel in both states, that never scrolls. From left to right:
+  - The expand control, the bar's full height and 32 px wide, with a chevron that points up while the panel is compact and down while it is expanded.
   - Two lines of text. Each ends in an ellipsis when it does not fit, and the controls beside them keep their size.
   - The first line: the hex code of the first selected unit's hex in parentheses, such as "(D4)", then " · " and "N selected of M". N is the number of selected units in that hex, and M is the number of the player's units there that can be selected (`summarizeSelectionPanel` in `src/shared/selectionPanelSummary.ts`). An embarked land unit cannot be selected. When exactly one unit is selected, its origin flag and name take the place of the count. When selected units also stand in other hexes, the line ends with " · +K elsewhere", where K counts them (`selectionElsewhereText` in `src/shared/selectionBarText.ts`). In a battle the code names the battle cell, such as "(E8.K3)". A code that cannot be found shows "?".
   - The second line, a hint for the next map gesture (`selectionBarHint` in `src/shared/selectionBarText.ts`). The first that applies: "Playback is running · right-click to deselect" while a turn or a battle beat plays back; "Double-click a target in range" while Ranged or Strike targeting is on; "Double-click a hex to ferry · right-click to deselect" when every selected unit is air; "Air units can't move with other units" when air units are selected with other types; otherwise "Double-click a hex to move · right-click to deselect".
   - A divider, then the Ranged and Strike controls. See [right-panel-command-bar.md](right-panel-command-bar.md).
   - A close control (×).
-- The details, under the bar:
+- The details, under the bar, shown only while the panel is expanded:
   - That hex's caption, the same naming line the [hex tooltip](hex-tooltips.md) shows, with its flags. It appears once its lookup returns.
   - Chips describing that hex, in this order, each only when it applies:
     - The terrain kind, with the map key's swatch.
@@ -30,32 +32,37 @@ Shown in Strategic planning, Resolution playback, and Tactical planning while at
   - The reason a greyed-out Ranged or Strike cannot be used, when one applies.
   - The sidebar error line, which stays hidden. See [notifications-and-feedback.md](notifications-and-feedback.md).
 - While Ranged targeting is on, the panel's border is the ranged amber, and while Strike targeting is on, the strike purple (`--order-ranged` and `--order-strike` in `static/shellChrome.css`).
-- A resize grip at the top-right corner, clear of the close control.
-- The panel opens 440 px wide, 12 px in from the map's left and bottom edges, and is never wider than the map minus 24 px. Its height fits the bar and the details, up to half the map's height; past that the unit rows scroll. When the panel is shorter than the bar, the caption, the chips, and one row, the details scroll as a whole. Where it overlaps the terrain legend, the map scale, or the minimap panel, it draws above them.
-- Control tips for the close control, the grip, and a greyed-out Ranged or Strike are in [control-tooltips.md](control-tooltips.md).
+- A resize grip at the top-right corner, clear of the close control, shown only while the panel is expanded.
+- The panel opens 440 px wide, 12 px in from the map's left and bottom edges, and is never wider than the map minus 24 px; both states share that width. Compact, it is the bar's height. Expanded, its height fits the bar and the details, up to half the map's height; past that the unit rows scroll. When the panel is shorter than the bar, the caption, the chips, and one row, the details scroll as a whole. Where it overlaps the terrain legend, the map scale, or the minimap panel, it draws above them.
+- Control tips for the expand control, the close control, the grip, and a greyed-out Ranged or Strike are in [control-tooltips.md](control-tooltips.md).
 
 ## Inputs and Responses
 
 ### Mouse
 
+- When the player clicks the expand control, the panel switches between compact and expanded. Its bottom-left corner stays put, so expanding slides the bar up as the details open under it, and collapsing slides it back down, over 150 ms. When the system asks for reduced motion, the change is immediate. A click during a slide sends the panel back the other way from where it is.
 - When the player clicks the close control, the selection clears exactly as a right-click on the map clears it. Queued orders stay. See [selection-model.md](selection-model.md).
 - When the player clicks an order's cancel control, that order is cancelled exactly as its Orders tab row's cancel control does.
-- When the player drags the grip, the panel resizes. Its bottom-left corner stays put. The width stays from 400 to 640 px and the height from 140 px to the map's height minus 24 px (`clampSelectionPanelSize` in `src/shared/selectionPanelSize.ts`). A dragged height replaces the half-the-map limit.
+- When the player drags the grip, which shows only while the panel is expanded, the panel resizes. Its bottom-left corner stays put. The width stays from 400 to 640 px and the height from 140 px to the map's height minus 24 px (`clampSelectionPanelSize` in `src/shared/selectionPanelSize.ts`). A dragged width applies to both states. A dragged height applies while the panel is expanded and replaces the half-the-map limit.
 - Clicks on a unit row do nothing else.
 
 ### Keyboard
 
-- None.
+- Enter or Space on the focused expand control switches the panel, as a click does. There is no other key.
 
 ### Other
 
 - The panel follows every selection change, every snapshot, and every change to the queued orders. The hint and the border also follow Ranged and Strike targeting, and playback, as they start and stop (`renderSelectionBarState` in `src/renderer/gameplay/selectionBar.ts`).
-- A dragged size lasts until the app closes, including while the panel is hidden. It is not saved.
+- The state the player picks, compact or expanded, lasts until the app closes: across selection changes, while the panel is hidden, and in and out of battles. It is not saved. If the panel hides during a slide, it keeps the state the last click chose.
+- A dragged size lasts until the app closes, including while the panel is hidden or compact. It is not saved.
+- `aria-expanded` and the expand control's name and tip change on the click; the chevron turns when the slide ends.
 - Moving the pointer onto the panel hides the hex tooltip, the effects tooltip, and the blocked tooltip.
 
 ## States
 
 - Hidden: nothing is selected, or the new-game overlay is open.
+- Compact: the summary bar alone. The app opens in this state.
+- Expanded: the summary bar and the details, with the grip.
 - One hex: every selected unit stands in the described hex.
 - Several hexes: the first line ends with "+K elsewhere", and rows for units in other hexes show their hex code.
 - Resized: the panel keeps the size the player dragged it to.
@@ -92,10 +99,11 @@ None.
 
 ## Code Entry Points
 
-- `static/index.html` (`#selection-panel`, `#selection-panel-grip`, `#selection-panel-bar`, `#sidebar-selected-unit`, `#selection-panel-hint`, `#ranged-attack-tip-host`, `#selection-panel-close`, `#selection-panel-details`, `#selection-panel-caption`, `#selection-panel-chips`, `#selection-panel-units`, `#selection-panel-action-note`, `#sidebar-error`)
+- `static/index.html` (`#selection-panel`, `#selection-panel-grip`, `#selection-panel-bar`, `#selection-panel-expand`, `#sidebar-selected-unit`, `#selection-panel-hint`, `#ranged-attack-tip-host`, `#selection-panel-close`, `#selection-panel-details`, `#selection-panel-caption`, `#selection-panel-chips`, `#selection-panel-units`, `#selection-panel-action-note`, `#sidebar-error`)
 - `static/selectionChrome.css`
 - `src/renderer/gameplay/selectionPanel.ts`
 - `src/renderer/gameplay/selectionBar.ts`
+- `src/renderer/gameplay/selectionPanelExpand.ts`
 - `src/shared/selectionBarText.ts`
 - `src/renderer/gameplay/selectionPanelResize.ts`
 - `src/shared/selectionPanelSummary.ts`

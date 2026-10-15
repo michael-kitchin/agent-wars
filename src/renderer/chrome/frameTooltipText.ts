@@ -122,6 +122,26 @@ export const selectionPanelCloseTooltipText = 'Clear the selection. Queued order
 export const selectionPanelGripTooltipText = 'Drag to resize this panel. The size lasts until the app closes.';
 
 /**
+ * The selection panel expand control's tip while the panel is compact.
+ *
+ * Purpose: Says what expanding the panel shows.
+ * When to use: `#selection-panel-expand` while the panel shows only its summary bar.
+ * Expected outcome: The control tip shows this sentence.
+ * Exceptions: None.
+ */
+export const selectionPanelExpandTooltipText = "Show the hex, its terrain, and each selected unit's orders.";
+
+/**
+ * The selection panel expand control's tip while the panel is expanded.
+ *
+ * Purpose: Says that collapsing hides the details and keeps the summary bar.
+ * When to use: `#selection-panel-expand` while the panel shows its details.
+ * Expected outcome: The control tip shows this sentence.
+ * Exceptions: None.
+ */
+export const selectionPanelCollapseTooltipText = 'Hide the details. The bar stays.';
+
+/**
  * The Reports tab's tip.
  *
  * Purpose: Says what the Reports tab lists.

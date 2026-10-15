@@ -1,4 +1,5 @@
-/* The selection panel at the map's bottom-left: the summary bar, the details under it, and the resize grip. */
+/* The selection panel at the map's bottom-left: the summary bar, the details under it, and the resize grip. The panel is
+   compact (the bar alone) or expanded; selectionPanelExpand.ts sets data-state and slides between the two. */
 
 .selection-panel {
   position: absolute;
@@ -32,17 +33,50 @@
   border-color: var(--order-strike);
 }
 
+/* The details show while the panel is expanded and while it slides; the grip only once it is fully expanded. */
+.selection-panel[data-state="compact"] .selection-panel-details,
+.selection-panel:not([data-state="expanded"]) .selection-panel-grip {
+  display: none;
+}
+
 /* ---------- Summary bar ---------- */
-/* One 50 px row that never scrolls: two lines of text, a divider, Ranged or Strike, and the close control. The controls
-   keep their size and the text gives way. The right padding keeps the close control clear of the grip. */
+/* One 50 px row that never scrolls: the expand control, two lines of text, a divider, Ranged or Strike, and the close
+   control. The controls keep their size and the text gives way. The right padding keeps the close control clear of the
+   grip. */
 .selection-panel-bar {
   flex: none;
   height: 50px;
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 0 16px 0 12px;
+  padding: 0 16px 0 0;
   box-sizing: border-box;
+}
+/* The bar's full height on its left edge. The chevron points up while the panel is compact or expanding, and turns down
+   once it is expanded, until it is compact again. */
+.selection-panel-expand {
+  flex: none;
+  align-self: stretch;
+  width: 32px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-right: 1px solid var(--chrome-divider);
+  border-radius: 0;
+  background: transparent;
+  color: var(--chrome-text);
+}
+.selection-panel-expand:hover {
+  background: var(--chrome-bg-raised);
+}
+.selection-panel-expand:focus {
+  outline-offset: -2px;
+}
+.selection-panel[data-state="expanded"] .selection-panel-chevron,
+.selection-panel[data-state="collapsing"] .selection-panel-chevron {
+  transform: rotate(180deg);
 }
 .selection-panel-text {
   flex: 1 1 auto;

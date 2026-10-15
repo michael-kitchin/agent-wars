@@ -129,7 +129,7 @@ When this guide and the running app disagree, the app wins until this file is up
 - **Collapsible:** Allow collapsing or pinning so the map can expand. Remember state (open/closed) per session if feasible.
 - **Contents:** Selected unit(s): type, strength, position (hex/coords), movement range, current orders. For stacks: list or summary with expand/collapse. Links to relevant rules or tooltips where helpful.
 - **Style:** Same typography and color system as the rest of the UI. Use sections or headings to separate identity, status, and orders. Keep lists scannable (e.g., one line per unit in a stack).
-- **Live app:** The selection panel at the map's bottom-left, 440 px wide by default. A 50 px summary bar across its top holds the hex code and count, a hint for the next map gesture, Ranged or Strike, and the close control. The hex's caption and chips and one row per unit sit under it. While an attack is aimed, the panel's border takes that order's color. See [ux/selection-panel.md](ux/selection-panel.md).
+- **Live app:** The selection panel at the map's bottom-left, 440 px wide by default. It opens compact: a 50 px summary bar with an expand control, the hex code and count, a hint for the next map gesture, Ranged or Strike, and the close control. A click on the expand control slides the bar up, and the hex's caption and chips and one row per unit open under it; the state lasts for the session. While an attack is aimed, the panel's border takes that order's color. See [ux/selection-panel.md](ux/selection-panel.md).
 
 ### 2.6 Notifications and Alerts
 

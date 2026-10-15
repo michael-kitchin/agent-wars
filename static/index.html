@@ -278,9 +278,10 @@
         <button type="button" id="map-toast-dismiss" aria-label="Dismiss">×</button>
       </div>
     </div>
-    <section id="selection-panel" class="selection-panel" aria-label="Selected units" hidden>
+    <section id="selection-panel" class="selection-panel" aria-label="Selected units" data-state="compact" hidden>
       <div id="selection-panel-grip" class="selection-panel-grip" aria-hidden="true" data-control-tooltip="Drag to resize this panel. The size lasts until the app closes."></div>
       <div id="selection-panel-bar" class="selection-panel-bar">
+        <button type="button" id="selection-panel-expand" class="selection-panel-expand" aria-expanded="false" aria-controls="selection-panel-details" aria-label="Show selection details" data-control-tooltip="Show the hex, its terrain, and each selected unit's orders."><svg class="chrome-icon selection-panel-chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 10l4.5-4.5 4.5 4.5"></path></svg></button>
         <div class="selection-panel-text">
           <p id="sidebar-selected-unit" class="selection-panel-summary">—</p>
           <p id="selection-panel-hint" class="selection-panel-hint"></p>

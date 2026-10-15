@@ -1,7 +1,8 @@
 /**
- * The selection panel's resize grip at its top-right corner.
+ * The selection panel's resize grip at its top-right corner, shown only while the panel is expanded.
  *
  * The panel is anchored at the map's bottom-left, so dragging the grip right widens it and dragging it up makes it taller.
+ * A dragged width applies to both of the panel's states; a dragged height applies only while it is expanded.
  */
 import { clampSelectionPanelSize } from '../../shared/selectionPanelSize';
 import { MAP_CONTAINER_ID } from '../map/mapContainerResize';
@@ -17,18 +18,57 @@ import { MAP_CONTAINER_ID } from '../map/mapContainerResize';
 let dragStart: { readonly x: number; readonly y: number; readonly width: number; readonly height: number } | null = null;
 
 /**
- * Applies a size to the panel for the rest of the session.
+ * The height the player last dragged the expanded panel to, in CSS pixels.
  *
- * Purpose: A dragged size replaces the panel's fit-to-rows height.
+ * Purpose: The compact panel is the bar's height, so the dragged height must be kept apart from the panel's style while
+ *   it is compact, and given back when it expands.
+ * When to use: Set by drags; read by `applyDraggedPanelHeight`.
+ * Expected outcome: Null until the first drag, then kept until the app closes.
+ * Exceptions: None.
+ */
+let draggedHeight: number | null = null;
+
+/**
+ * Gives the panel the height the player dragged it to, if there is one.
+ *
+ * Purpose: A dragged height replaces the expanded panel's fit-to-rows height.
+ * When to use: During a drag, and when the panel expands.
+ * Expected outcome: Inline height on `#selection-panel`, which may then grow to the map height minus 24 px instead of
+ *   half the map. Nothing changes before the first drag.
+ * Exceptions: None.
+ */
+export function applyDraggedPanelHeight(panel: HTMLElement): void {
+  if (draggedHeight === null) return;
+  panel.style.height = `${draggedHeight}px`;
+  panel.style.maxHeight = 'calc(100% - 24px)';
+}
+
+/**
+ * Takes the dragged height off the panel, and keeps it for the next expand.
+ *
+ * Purpose: The compact panel is exactly its summary bar.
+ * When to use: When the panel starts to collapse, and when it settles compact.
+ * Expected outcome: No inline height or max height on `#selection-panel`; the dragged width stays.
+ * Exceptions: None.
+ */
+export function clearPanelHeight(panel: HTMLElement): void {
+  panel.style.height = '';
+  panel.style.maxHeight = '';
+}
+
+/**
+ * Applies a dragged size to the panel for the rest of the session.
+ *
+ * Purpose: A dragged size replaces the panel's default width and fit-to-rows height.
  * When to use: On each pointer move during a drag.
- * Expected outcome: Inline width and height on `#selection-panel`. The height may then grow to the map height minus
- *   24 px instead of half the map. The size stays while the panel hides and shows again, until the app closes.
+ * Expected outcome: Inline width, which both states use, and the dragged height. The size stays while the panel hides,
+ *   shows again, collapses, and expands, until the app closes.
  * Exceptions: None.
  */
 function applyPanelSize(panel: HTMLElement, width: number, height: number): void {
   panel.style.width = `${width}px`;
-  panel.style.height = `${height}px`;
-  panel.style.maxHeight = 'calc(100% - 24px)';
+  draggedHeight = height;
+  applyDraggedPanelHeight(panel);
 }
 
 /**
@@ -45,7 +85,8 @@ export function wireSelectionPanelResize(): void {
   const grip = document.getElementById('selection-panel-grip');
   if (!panel || !grip) return;
   grip.addEventListener('pointerdown', (event) => {
-    if (event.button !== 0) return;
+    // The grip only shows while the panel is expanded; a press during a slide does nothing.
+    if (event.button !== 0 || panel.dataset.state !== 'expanded') return;
     event.preventDefault();
     const box = panel.getBoundingClientRect();
     dragStart = { x: event.clientX, y: event.clientY, width: box.width, height: box.height };

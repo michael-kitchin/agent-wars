@@ -248,17 +248,42 @@ const CONSOLE_CHECKS = Object.freeze([
   },
   {
     name: 'selection-bar-layout',
-    scenes: [SCENES.ordersQueued, SCENES.selectionStack, SCENES.strikeAiming],
-    needs: ['#selection-panel', '#selection-panel-bar', '#selection-panel-close', '#selection-panel-details'],
+    scenes: [SCENES.ordersQueued, SCENES.selectionStack, SCENES.strikeAiming, SCENES.selectionExpanded],
+    needs: ['#selection-panel', '#selection-panel-bar', '#selection-panel-expand', '#selection-panel-close', '#selection-panel-details'],
     run: (p, el) => {
       const s = el('#selection-panel');
       const bar = el('#selection-panel-bar');
       if (!bar.shown || !near(bar.y, s.y + 1) || !near(bar.h, SELECTION_BAR_HEIGHT)) {
         return `the summary bar is at ${fmt(bar)}, expected a ${SELECTION_BAR_HEIGHT} px row at the top of the panel ${fmt(s)}`;
       }
+      const expand = el('#selection-panel-expand');
+      if (!near(expand.x, s.x + 1) || !near(expand.h, SELECTION_BAR_HEIGHT)) return `the expand control is at ${fmt(expand)}, expected the bar's full height at its left edge`;
       if (!el('#selection-panel-close').ancestorIds.includes('selection-panel-bar')) return 'the close control is not in the summary bar';
       const details = el('#selection-panel-details');
+      if (!details.shown) return null;
       return details.y >= bar.y + bar.h - 1 ? null : `the details start at ${fmt(details)}, above the bottom of the bar ${fmt(bar)}`;
+    },
+  },
+  {
+    name: 'selection-panel-compact',
+    scenes: [SCENES.ordersQueued, SCENES.selectionStack, SCENES.strikeAiming, SCENES.selectionCollapsed, SCENES.battleSelection, SCENES.regionalSelection],
+    needs: ['#selection-panel', '#selection-panel-expand', '#selection-panel-details', '#selection-panel-grip'],
+    run: (p, el) => {
+      const s = el('#selection-panel');
+      const expand = el('#selection-panel-expand');
+      if (expand.expanded !== 'false') return `the expand control reads aria-expanded=${expand.expanded}, expected false while the panel is compact`;
+      if (el('#selection-panel-details').shown || el('#selection-panel-grip').shown) return 'the details or the grip show while the panel is compact';
+      return near(s.h, SELECTION_BAR_HEIGHT + 2) ? null : `the compact panel is ${fmt(s)}, expected only the ${SELECTION_BAR_HEIGHT} px bar inside its border`;
+    },
+  },
+  {
+    name: 'selection-panel-expanded',
+    scenes: [SCENES.selectionExpanded, SCENES.selectionResized, SCENES.selectionResizedMin, SCENES.smallWindow],
+    needs: ['#selection-panel-expand', '#selection-panel-details', '#selection-panel-grip'],
+    run: (p, el) => {
+      const expand = el('#selection-panel-expand');
+      if (expand.expanded !== 'true') return `the expand control reads aria-expanded=${expand.expanded}, expected true while the panel is expanded`;
+      return el('#selection-panel-details').shown && el('#selection-panel-grip').shown ? null : 'the details or the grip are hidden while the panel is expanded';
     },
   },
   {
@@ -295,7 +320,7 @@ const CONSOLE_CHECKS = Object.freeze([
   },
   {
     name: 'selection-panel-stack',
-    scenes: [SCENES.selectionStack],
+    scenes: [SCENES.selectionStack, SCENES.selectionExpanded],
     needs: ['#sidebar-selected-unit', '#selection-panel-units .selection-panel-unit:nth-child(2)', '#selection-panel-units .selection-panel-order-none'],
     run: (p, el) => {
       const line = readSummaryLine(el('#sidebar-selected-unit').text);
@@ -306,7 +331,7 @@ const CONSOLE_CHECKS = Object.freeze([
   },
   {
     name: 'support-button-greyed',
-    scenes: [SCENES.selectionStack],
+    scenes: [SCENES.selectionStack, SCENES.selectionExpanded],
     needs: ['#ranged-attack-btn', '#ranged-attack-tip-host', '#selection-panel-action-note'],
     run: (p, el) => {
       const ranged = el('#ranged-attack-btn');

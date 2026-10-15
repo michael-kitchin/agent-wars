@@ -26,6 +26,7 @@ import { paintTerrainSwatches } from '../rendering/terrainVisualStyles';
 import { unitIconPathForUnitType } from '../rendering/unitDrawing';
 import { onQueuedOrdersChanged, queuedOrderForUnit } from './queuedOrderRows';
 import { renderSelectionBarState } from './selectionBar';
+import { settleSelectionPanelSlide, wireSelectionPanelExpand } from './selectionPanelExpand';
 import { wireSelectionPanelResize } from './selectionPanelResize';
 
 /**
@@ -250,9 +251,9 @@ function createUnitRow(row: SelectionPanelRow, battle: TacticalBattleSnapshot | 
  *
  * Purpose: The panel follows every selection change on the map, in the stack callout, and in the Orders tab.
  * When to use: From `updateSidebar` after any selection change or snapshot, and whenever the queued orders change.
- * Expected outcome: Hidden when no selected unit exists. Otherwise the bar's first line, the caption, the chips, and one
- *   row per selected unit describe the first selected unit's hex, and the bar's hint and border follow targeting and
- *   playback. During a battle the panel describes battle cells.
+ * Expected outcome: Hidden when no selected unit exists, with any slide between its states settled. Otherwise the bar's
+ *   first line, the caption, the chips, and one row per selected unit describe the first selected unit's hex, and the
+ *   bar's hint and border follow targeting and playback. During a battle the panel describes battle cells.
  * Exceptions: None; missing elements are skipped.
  */
 export function renderSelectionPanel(deps: SelectionPanelDeps): void {
@@ -262,7 +263,10 @@ export function renderSelectionPanel(deps: SelectionPanelDeps): void {
   const units = battle ? battle.subUnits : S.gameState?.units ?? [];
   const summary = summarizeSelectionPanel(S.selectedUnitIds, units, (unitId) => !isEmbarkedLandUnitBlockedForSelection(unitId));
   panel.hidden = summary === null;
-  if (!summary) return;
+  if (!summary) {
+    settleSelectionPanelSlide();
+    return;
+  }
   renderSelectionPanelSummaryLine(summary, battle, deps);
   renderSelectionPanelCaption(summary.panelHex, battle);
   renderSelectionPanelChips(summary.panelHex, battle);
@@ -272,14 +276,16 @@ export function renderSelectionPanel(deps: SelectionPanelDeps): void {
 }
 
 /**
- * Keeps the panel's order chips in step with the Orders tab, and wires its resize grip.
+ * Keeps the panel's order chips in step with the Orders tab, and wires its expand control and resize grip.
  *
  * Purpose: A queued or cancelled order changes the panel without a selection change.
  * When to use: Once during renderer startup.
- * Expected outcome: The panel redraws after every change to the queued orders, and its grip resizes it.
+ * Expected outcome: The panel redraws after every change to the queued orders, opens compact, expands and collapses
+ *   from its expand control, and resizes from its grip while expanded.
  * Exceptions: None.
  */
 export function wireSelectionPanel(deps: SelectionPanelDeps): void {
   onQueuedOrdersChanged(() => renderSelectionPanel(deps));
+  wireSelectionPanelExpand();
   wireSelectionPanelResize();
 }
