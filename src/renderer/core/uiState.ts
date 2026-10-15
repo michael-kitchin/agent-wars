@@ -8,9 +8,9 @@ import { syncGameSizeCapPreview } from '../gameplay/newGameSizeUi';
 import { resetNewGameOptionControls } from '../gameplay/newGameOptionsUi';
 import { dismissStaleControlTooltip } from '../chrome/controlTooltip';
 import { newGameButtonTooltipText } from '../chrome/controlTooltipText';
-import { expandNewGameDialog, syncNewGameDialogMapPointer } from '../gameplay/newGameDialogCollapse';
+import { expandNewGameDialog, newGameOverlayIsOpen, syncNewGameDialogMapPointer } from '../gameplay/newGameDialogCollapse';
 import { renderTopBarStatus } from '../chrome/topBar';
-import { closeGameMenu } from '../chrome/gameMenu';
+import { closeGameMenu, syncGameMenuNewGameItem } from '../chrome/gameMenu';
 import { refreshConsoleHeader } from '../chrome/consoleFrame';
 import { syncSidebarOrderRowSelection } from '../gameplay/sidebarOrderRow';
 import { renderSelectionPanel } from '../gameplay/selectionPanel';
@@ -73,7 +73,11 @@ export function blurMapChromeIfFocused(): void {
  *
  * Purpose: The new-game overlay and the annihilation dialog stay clickable while the match controls do not.
  * When to use: When those overlays open or close, and when the tactical battles list opens or closes.
- * Expected outcome: Children of the map pane other than those two overlays ignore the pointer while `enabled` is false. The top bar and the console match, and the game menu closes. While the new-game form is hidden, the main map takes the pointer again so drag and the wheel still move the preview.
+ * Expected outcome: Children of the map pane other than those two overlays, and the console, ignore the pointer while
+ *   `enabled` is false. The top bar does too, except while the new-game overlay is open: it is the new-game bar then,
+ *   and its game menu keeps working. The game menu closes whenever the top bar stops taking the pointer, and its New
+ *   game item follows the overlay. While the new-game form is hidden, the main map takes the pointer again so drag and
+ *   the wheel still move the preview.
  * Exceptions: None.
  */
 export function setMainUIControlsEnabled(enabled: boolean): void {
@@ -85,13 +89,19 @@ export function setMainUIControlsEnabled(enabled: boolean): void {
       (child as HTMLElement).style.pointerEvents = enabled ? '' : 'none';
     }
   }
-  for (const id of ['app-topbar', 'sidebar']) {
+  const topBarEnabled = enabled || newGameOverlayIsOpen();
+  const chromeEnabled: readonly (readonly [string, boolean])[] = [
+    ['app-topbar', topBarEnabled],
+    ['sidebar', enabled],
+  ];
+  for (const [id, on] of chromeEnabled) {
     const chrome = document.getElementById(id);
     if (!chrome) continue;
-    chrome.style.pointerEvents = enabled ? '' : 'none';
-    chrome.classList.toggle('main-ui-disabled', !enabled);
+    chrome.style.pointerEvents = on ? '' : 'none';
+    chrome.classList.toggle('main-ui-disabled', !on);
   }
-  if (!enabled) closeGameMenu();
+  if (!topBarEnabled) closeGameMenu();
+  syncGameMenuNewGameItem();
   syncNewGameDialogMapPointer();
 }
 
@@ -104,8 +114,8 @@ export function setMainUIControlsEnabled(enabled: boolean): void {
  *   stays open, stays closed, or the element is missing. With a live game the overlay hides and controls are
  *   enabled. Otherwise the overlay shows a win, loss, or start message. Fog of war and the bonus dropdowns return
  *   to their defaults on every call while it shows. The home regions, the starting month, and the map preview are
- *   drawn only when the overlay opens. The form starts showing only on that open. A later refresh leaves a hidden
- *   form hidden.
+ *   drawn only when the overlay opens, and that open closes the game menu. The form starts showing only on that open.
+ *   A later refresh leaves a hidden form hidden.
  * Exceptions: None.
  */
 export function updateGameOverUI(
@@ -130,6 +140,7 @@ export function updateGameOverUI(
   overlay?.classList.remove('hidden');
   resetNewGameOptionControls();
   if (wasHidden) {
+    closeGameMenu();
     expandNewGameDialog();
     blurMapChromeIfFocused();
     resetNewGameMapPreviewFrame();

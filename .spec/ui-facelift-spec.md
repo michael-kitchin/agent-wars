@@ -2,7 +2,7 @@
 
 This is the target layout for the UI facelift milestone. Each phase's execution plan cites it, and the plans hold the step-by-step work. The milestone changes where things are on screen and how they are reached. It does not change game rules, the opponent, saved data, or IPC.
 
-Everything here was settled with the product owner in the layout review: layout C, the docked operations console, plus parts of layouts A and B. Two changes were settled after Phase 4 was built: the map modes move into a row of tabs across the top of the minimap, and the selection panel opens as a compact bar from layout C that expands upward. Phase 6 builds them.
+Everything here was settled with the product owner in the layout review: layout C, the docked operations console, plus parts of layouts A and B. Two changes were settled after Phase 4 was built: the map modes move into a row of tabs across the top of the minimap, and the selection panel opens as a compact bar from layout C that expands upward. Phase 6 builds them. Three details of the new-game screen were settled when Phase 7 was planned: the map beside the setup panel always takes drag and the wheel, the hide-choices button sits at the left of the panel's header and hiding the choices widens the map, and the panel uses the mockups' wording. [New Game and Game Over](#new-game-and-game-over) has them.
 
 ## How to Read This Document
 
@@ -73,15 +73,16 @@ A later cleanup can rename these with the naming tool (`npm run naming:apply`). 
 | Region | Element | Size and position |
 | --- | --- | --- |
 | Top bar | `header#app-topbar` | Full width, 44 px tall, at the top of the window |
-| Map | `#canvas-container`, inside `#app-body` | Everything under the top bar and left of the console |
+| Map | `#canvas-container`, inside `#app-body` | Everything under the top bar and left of the console. On the new-game screen, everything right of the setup panel |
+| Setup panel | `#game-over-overlay.new-game-panel`, first in `#app-body` | Left edge, full height under the top bar, 432 px. Shown only while the new-game overlay is open |
 | Console | `aside#sidebar.console`, inside `#app-body` | Right edge, full height under the top bar. 376 px expanded (320 px content column and a 56 px tab rail on the outer edge); 56 px collapsed |
 | Game menu | `#game-menu` | Fixed popup, 248 px wide, top-left corner at (0, 44) |
 
 - `body` is a column: `#app-topbar`, then `#app-body`, a row holding the map and the console.
-- While the new-game overlay is open (`#game-over-overlay` without `hidden`), the top bar, the console, and the game menu are not displayed, and the map fills the window. Phase 7 changes this for the top bar only.
+- While the new-game overlay is open (`#game-over-overlay` without `hidden`), the console is not displayed, the top bar is the new-game bar, and the setup panel docks at the left of `#app-body`, so the map is the area right of it. Before Phase 7 the top bar and the game menu were hidden too, and the map filled the window.
 - Overlays drawn on the map keep a 12 px inset from the map's edges. That covers the minimap panel, the selection panel, the zoom control, toasts, scale, and attribution.
 - Fixed-position popups (build popup, stack callout, tooltips) already use viewport coordinates and need no change. Code that turns a pointer into a map position must subtract the map container's `getBoundingClientRect()`, as the existing code does. Phase 2 verifies this by hand near the top edge of the map.
-- When the map container changes size (window resize, console collapse, overlay open or close), the canvas and Leaflet resize on the next animation frame. A `ResizeObserver` on `#canvas-container` triggers this. The tactical battles dialog, which already sized itself to the map, uses the same watcher.
+- When the map container changes size (window resize, console collapse, overlay open or close, hiding or showing the new-game choices), the canvas and Leaflet resize on the next animation frame. A `ResizeObserver` on `#canvas-container` triggers this. The tactical battles dialog, which already sized itself to the map, uses the same watcher.
 - Control tips open below and to the right of the pointer, or above or to the left of it where they would leave the window. The console's rail and Ready sit at the window's edges, so their tips need this.
 
 ### Visibility by mode
@@ -91,9 +92,9 @@ A later cleanup can rename these with the naming tool (`npm run naming:apply`). 
 | Strategic planning, resolution playback | Match status | Shown | Shown |
 | Tactical planning and beat playback | Battle header (Phase 5) | Shown | Shown |
 | Tactical battles list, annihilation dialog | Shown, no pointer input | Shown, no pointer input | Shown, no pointer input |
-| New game, game over | Hidden (Phase 7: a "New game" bar) | Hidden | Hidden; the map shows the preview |
+| New game, game over | New-game bar (Phase 7), taking pointer input | Hidden | Hidden; the map beside the setup panel shows the preview |
 
-Pointer input is switched off by `setMainUIControlsEnabled(false)`. From Phase 2 it covers the top bar and closes the game menu.
+Pointer input is switched off by `setMainUIControlsEnabled(false)`. From Phase 2 it covers the top bar and closes the game menu. From Phase 7 the top bar keeps pointer input while the new-game overlay is open, so the game menu works there.
 
 ## Top Bar
 
@@ -139,7 +140,7 @@ A disclosure popup (`#game-menu`, `role="group"`, toggled with the `hidden` attr
 - A pointer press anywhere outside the menu and its button closes it.
 - Escape closes it and puts focus back on the menu button. The menu takes Escape first, so the map's Escape handling doesn't also run.
 - Opening the new-game overlay, or switching pointer input off, closes it.
-- The menu is not shown during the new-game overlay. In Phase 7, New game… is disabled there.
+- From Phase 7 the menu works on the new-game screen. New game… is disabled there, inside a tip host with the tip "The new-game screen is already open." Offer tactical battles and Quit work. Before Phase 7 the menu was not shown during the overlay.
 
 ## Console
 
@@ -326,19 +327,24 @@ The console works as on the world map. Orders shows the beat's orders, and Ready
 
 ## New Game and Game Over
 
-Built in Phase 7. See [ui-facelift-new-game-global.png](ui-facelift-new-game-global.png) and [ui-facelift-new-game-regional.png](ui-facelift-new-game-regional.png).
+Built in Phase 7. See [ui-facelift-new-game-global.png](ui-facelift-new-game-global.png) and [ui-facelift-new-game-regional.png](ui-facelift-new-game-regional.png). Every control keeps its id, its tip, its options, and its behavior; only its place and its label change.
 
-- **Top bar** while the overlay is open:
-  - The menu button, the title "New game", Load game… (disabled placeholder), Settings, and Help.
-  - The game menu works: New game… is disabled, Offer tactical battles and Quit work.
-  - The console stays hidden.
-- **Setup panel** docked at the left, 432 px wide, replacing today's centred dialog box. It keeps every control id and behavior. From top to bottom:
-  1. **Header**: the overlay message (`#game-over-message`) and the hide-choices button (`#new-game-dialog-collapse`).
-  2. **Map**: the Global and Regional tabs, then the region and sides with their randomize buttons. Add another opponent is a disabled placeholder.
-  3. **Forces**: game size, the cap badges with prices, and the Advanced tech line.
-  4. **Rules**: the four bonuses, the starting month with randomize, and Fog of war.
-  5. **Footer**: Start game, or New game after a match ends, full width.
-- **Map**: the preview fills the rest of the window. The preview frame centres on the area right of the panel. Hiding the choices leaves only the hide-choices button.
+- **Top bar** while the overlay is open: the new-game bar.
+  - The menu button, the title "New game", the spacer, Load game… (a disabled placeholder with a folder icon and text), Settings, and Help.
+  - The sides, the readouts, the date block, and the battle header are hidden, and a battle's darker face gives way. The overlay's own `hidden` class drives this in `static/newGameChrome.css`, a new stylesheet for the new-game screen, so the bar follows however the overlay opens.
+  - The top bar takes pointer input. The game menu works: New game… is disabled with its tip, and Offer tactical battles and Quit work.
+  - After a start, the top bar shows the match status again.
+- **Setup panel** (`#game-over-overlay.new-game-panel`) docked at the left of `#app-body`, 432 px wide (`--new-game-panel-width`), replacing today's centred dialog box. Its styles follow the bar's in `static/newGameChrome.css`. From top to bottom:
+  1. **Header**: the hide-choices button (`#new-game-dialog-collapse`) at the left, then the overlay message (`#game-over-message`).
+  2. **Body** (`#game-over-dialog`), which scrolls when the window is short, in three sections with titles:
+     - **Map**: the Global and Regional tabs, then rows of a label, a dropdown, and a randomize button, with every dropdown the same width. Global has the rows Human and AI. Regional has Region, Your side, and Opponent. The label column is 5em in both tabs, so the dropdowns line up across them. Under the rows, Add another opponent is a disabled placeholder, full width, with a dashed border.
+     - **Forces**: the title with the Advanced tech line at its right, the game size, and the unit row. Each unit is its icon, its cap, a dot, and its price, as in "12 · $20". Each icon's alt text names the type: Infantry, Armor, Naval, Air.
+     - **Rules**: the four bonuses in a grid of two label and dropdown pairs per line (Origin bonus, Tech bonus, Terrain bonus, Weather bonus), the starting month with its randomize button, then Fog of war.
+  3. **Footer**: Start game, or New game after a match ends, full width.
+- **Wording**: the mockups' labels. No label ends in a colon, and no line uses a slash between items. The Advanced tech line keeps its colon, as in the mockups. The price format comes from `formatUnitCostLabel` in `src/shared/gameMapList.ts` ("$20").
+- **Map**: the preview fills the area right of the panel. The preview frame centres on that area, and Leaflet's size is brought up to date before a new preview is fitted. While the overlay is open, drag and the wheel always reach the preview; a click still does not select a unit or give an order.
+- **Hiding the choices**: the hide-choices button hides the message, the body, and the footer. The panel leaves the row, the map widens to the full window under the top bar and keeps its centre and zoom, and the button stays in the same spot over the map's top-left corner. Its tip is "Hide the new game choices and widen the map." while the choices show and "Show the new game choices." while they are hidden.
+- **Game over**: a finished match opens the same panel, with the result as the message. At the 800 × 600 minimum nothing overflows sideways.
 - **Not on this screen**: the opponent model, a matchup summary, Tactical battles (it lives in the game menu), and any way to cancel the overlay. The overlay still closes only when a start succeeds (`doc/ux/new-game-dialog.md`).
 
 ## Placeholders and Deferred Items
@@ -393,7 +399,9 @@ Deferred with no placeholder:
 | Selection panel header and action row | The summary bar (`#selection-panel-bar`) with the expand control | 6 |
 | Selection panel caption, chips, and unit rows | The details (`#selection-panel-details`), shown while expanded | 6 |
 | `#selection-panel-count` | Removed; its text moves into line 1 of the selection bar | 6 |
-| `#game-over-overlay` dialog box | Left setup panel | 7 |
+| `#game-over-overlay` dialog box inside `#canvas-container` | The setup panel, first in `#app-body`: header, body (`#game-over-dialog`), and footer | 7 |
+| The new-game controls' styles in `static/feedbackChrome.css` | `static/newGameChrome.css`, after the new-game bar's | 7 |
+| `src/renderer/gameplay/newGameRegionSelectWidth.ts`, and the code that hid a slash at a wrapped bonus line | Removed; the rows' grid and the Rules grid do the same work in CSS | 7 |
 | `#tactical-annihilation-overlay`, `#build-popup`, `#stack-callout`, all tooltips | Unchanged | — |
 
 ## Colors and Tokens
@@ -432,6 +440,12 @@ Phase 6 adds these. The first three give the console rail and the map-mode tabs 
 | `--order-ranged` | `#a06020` | The selection panel's border while Ranged is aimed |
 | `--order-strike` | `#7a3db5` | The selection panel's border while Strike is aimed |
 
+Phase 7 adds this:
+
+| Token | Value | Use |
+| --- | --- | --- |
+| `--new-game-panel-width` | `432px` | The new-game setup panel |
+
 ## New Control Tips
 
 These sentences go in `src/renderer/chrome/frameTooltipText.ts`, beside `controlTooltipText.ts` (which is near the file-size limit), in the static markup, and in the Sentences list of `doc/ux/control-tooltips.md`.
@@ -448,7 +462,7 @@ These sentences go in `src/renderer/chrome/frameTooltipText.ts`, beside `control
 - **Model tab**, changed: Show the API key, model, reasoning effort, and the Run control for opponent planning.
 - **Placeholders:** see [Placeholders and Deferred Items](#placeholders-and-deferred-items).
 
-Phases 3 through 7 add their own tips in their plans. Phase 6's tips are in [Selection Panel](#selection-panel).
+Phases 3 through 7 add their own tips in their plans. Phase 6's tips are in [Selection Panel](#selection-panel). Phase 7's are in [Game Menu](#game-menu) and [New Game and Game Over](#new-game-and-game-over).
 
 ## Phases
 
@@ -460,10 +474,10 @@ Phases 3 through 7 add their own tips in their plans. Phase 6's tips are in [Sel
 | 4 | Map chrome and drawing: minimap panel and modes, legend popover, Leaflet control positions, line casing and arrowheads, selection ring | The same gates |
 | 5 | Battles: battle header, force bar, Exit Battle in the header | The same gates, plus a battle played to the end and an exit mid-battle |
 | 6 | Map chrome revision: map-mode tabs across the top of the minimap panel and the wider overview; the console rail's labels at 9 px; the selection panel's compact bar, its expansion, and its hints | The same gates, plus the selection bar checked compact, expanded, and while aiming a strike, at 1280 × 720 and at the 800 × 600 minimum |
-| 7 | New game and game over: top bar on the overlay, docked setup panel | The same gates, plus a global and a regional start |
+| 7 | New game and game over: the new-game bar and the game menu on the overlay, the docked setup panel, and its sections with the mockups' wording | The same gates, plus a global and a regional start, and the choices hidden and shown again |
 | 8 | Docs, screenshots, release: refresh `doc/media`; update the README's images, its OpenRouter setup steps (they still name the Model tab), and its test count; sweep `doc/` for "right panel" wording; regression pass | The product owner signs off |
 
-Each phase gets its own execution plans in `.spec`. Phase 2 has five, run in order and committed one at a time; [ui-facelift-frame-execution-plan.md](ui-facelift-frame-execution-plan.md) lists them. Phase 3 also has five, run the same way; [ui-facelift-console-execution-plan.md](ui-facelift-console-execution-plan.md) lists them. Phase 4 has three; [ui-facelift-map-execution-plan.md](ui-facelift-map-execution-plan.md) lists them. Phase 5 also has three; [ui-facelift-battle-execution-plan.md](ui-facelift-battle-execution-plan.md) lists them. Phase 6 also has three; [ui-facelift-revision-execution-plan.md](ui-facelift-revision-execution-plan.md) lists them.
+Each phase gets its own execution plans in `.spec`. Phase 2 has five, run in order and committed one at a time; [ui-facelift-frame-execution-plan.md](ui-facelift-frame-execution-plan.md) lists them. Phase 3 also has five, run the same way; [ui-facelift-console-execution-plan.md](ui-facelift-console-execution-plan.md) lists them. Phase 4 has three; [ui-facelift-map-execution-plan.md](ui-facelift-map-execution-plan.md) lists them. Phase 5 also has three; [ui-facelift-battle-execution-plan.md](ui-facelift-battle-execution-plan.md) lists them. Phase 6 also has three; [ui-facelift-revision-execution-plan.md](ui-facelift-revision-execution-plan.md) lists them. Phase 7 also has three; [ui-facelift-start-execution-plan.md](ui-facelift-start-execution-plan.md) lists them.
 
 ## Open Questions
 

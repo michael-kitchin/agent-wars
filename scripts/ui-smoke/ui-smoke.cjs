@@ -200,6 +200,13 @@ async function runFirstSession(app, page, report, outDir) {
   await waitForNewGameOverlay(page);
   await page.waitForTimeout(SETTLE_MS.resize);
   await recordScene(page, report, outDir, SCENES.newGameStartup);
+  // The game menu works on the new-game screen, with New game disabled there.
+  await page.click('#game-menu-btn');
+  await parkPointer(page);
+  await page.waitForTimeout(SETTLE_MS.click);
+  await recordScene(page, report, outDir, SCENES.newGameMenu);
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(SETTLE_MS.click);
 
   await startScenarioMatch(page);
   for (const size of VIEWPORTS) {

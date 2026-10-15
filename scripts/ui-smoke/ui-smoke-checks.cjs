@@ -24,6 +24,7 @@ const { CONSOLE_CHECKS } = require('./ui-smoke-console-checks.cjs');
 const { SCENARIO_CHECKS } = require('./ui-smoke-scenario-checks.cjs');
 const { MAP_CHROME_CHECKS } = require('./ui-smoke-map-chrome-checks.cjs');
 const { BATTLE_CHECKS } = require('./ui-smoke-battle-checks.cjs');
+const { NEW_GAME_CHECKS } = require('./ui-smoke-new-game-checks.cjs');
 
 /**
  * Collects what the checks read from the renderer page.
@@ -31,8 +32,8 @@ const { BATTLE_CHECKS } = require('./ui-smoke-battle-checks.cjs');
  * Purpose: Runs inside the page through `page.evaluate`, so it may only use browser globals and its argument.
  * When to use: Once per scene, after the scene has settled, with every selector that any check reads.
  * Expected outcome: A plain object that can be passed back to Node. `elements` has one entry per selector:
- *   null when the selector matches nothing, otherwise the first match's box, text, font size, border color, tip, and
- *   the attributes the checks use, plus the text of every match in `allTexts`.
+ *   null when the selector matches nothing, otherwise the first match's box, text, font size, border color, pointer
+ *   events, tip, and the attributes the checks use, plus the text of every match in `allTexts`.
  * Exceptions: None.
  */
 function probePage(selectors) {
@@ -41,9 +42,9 @@ function probePage(selectors) {
    *
    * Purpose: Every check reads elements the same way.
    * When to use: For each selector passed to `probePage`.
-   * Expected outcome: The first match's box, whether it is shown, its trimmed text, its computed font size and top
-   *   border color, its control tip sentence, and selected attributes, and the trimmed text of every match, or null when
-   *   the selector matches nothing.
+   * Expected outcome: The first match's box, whether it is shown, its trimmed text, its computed font size, top
+   *   border color, and pointer events, its control tip sentence, and selected attributes, and the trimmed text of every
+   *   match, or null when the selector matches nothing.
    * Exceptions: None.
    */
   const describe = (selector) => {
@@ -73,6 +74,7 @@ function probePage(selectors) {
       pressed: el.getAttribute('aria-pressed'),
       fontSize: getComputedStyle(el).fontSize,
       borderColor: getComputedStyle(el).borderTopColor,
+      pointerEvents: getComputedStyle(el).pointerEvents,
       tip: el.getAttribute('data-control-tooltip'),
       ancestorIds,
     };
@@ -135,27 +137,6 @@ const FRAME_CHECKS = Object.freeze([
       return near(o.canvasWidth, expectedWidth) && near(o.canvasHeight, expectedHeight)
         ? null
         : `canvas backing store ${o.canvasWidth}x${o.canvasHeight}, expected about ${expectedWidth}x${expectedHeight}`;
-    },
-  },
-  {
-    name: 'new-game-fills-window',
-    scenes: NEW_GAME_SCENES,
-    needs: ['#canvas-container', '#game-over-overlay'],
-    run: (p, el) => {
-      const c = el('#canvas-container');
-      if (!el('#game-over-overlay').shown) return 'the new-game overlay is not shown';
-      return near(c.x, 0) && near(c.y, 0) && near(c.w, p.viewport.w) && near(c.h, p.viewport.h)
-        ? null
-        : `#canvas-container ${fmt(c)} does not fill the ${p.viewport.w}x${p.viewport.h} window`;
-    },
-  },
-  {
-    name: 'frame-hidden-during-new-game',
-    scenes: NEW_GAME_SCENES,
-    needs: ['#sidebar', '#app-topbar', '#game-menu'],
-    run: (p) => {
-      const shown = Object.entries(p.elements).filter(([, e]) => e.shown).map(([selector]) => selector);
-      return shown.length === 0 ? null : `still shown during the new-game overlay: ${shown.join(', ')}`;
     },
   },
   {
@@ -369,14 +350,21 @@ const FRAME_CHECKS = Object.freeze([
 
 /**
  * Every check the run applies: the frame's, then the console's, then the later scenarios', then the map chrome's, then
- * the battle header's.
+ * the battle header's, then the new-game screen's.
  *
  * Purpose: The runner and `probeSelectors` read one list.
  * When to use: The default `checks` argument of `probeSelectors` and `runChecks`.
  * Expected outcome: Frame checks first, so the report reads from the outside in.
  * Exceptions: None.
  */
-const CHECKS = Object.freeze([...FRAME_CHECKS, ...CONSOLE_CHECKS, ...SCENARIO_CHECKS, ...MAP_CHROME_CHECKS, ...BATTLE_CHECKS]);
+const CHECKS = Object.freeze([
+  ...FRAME_CHECKS,
+  ...CONSOLE_CHECKS,
+  ...SCENARIO_CHECKS,
+  ...MAP_CHROME_CHECKS,
+  ...BATTLE_CHECKS,
+  ...NEW_GAME_CHECKS,
+]);
 
 /**
  * Lists every selector the checks read.

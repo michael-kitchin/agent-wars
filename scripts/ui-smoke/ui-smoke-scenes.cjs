@@ -50,6 +50,7 @@ const CONSOLE_COLLAPSED_WIDTH = 56;
  */
 const SCENES = Object.freeze({
   newGameStartup: 'new-game-startup',
+  newGameMenu: 'new-game-menu',
   strategic: 'strategic',
   opponentTab: 'opponent-tab',
   consoleCollapsed: 'console-collapsed',
@@ -88,12 +89,18 @@ const SCENES = Object.freeze({
 /**
  * Scenes that show the new-game overlay.
  *
- * Purpose: The overlay hides the match chrome, so these scenes get their own checks.
+ * Purpose: The overlay replaces the match chrome with the new-game screen, so these scenes get their own checks.
  * When to use: The `scenes` list of a check that applies only while the overlay is open.
- * Expected outcome: The first scene, the overlay opened from a match, and the finished match reopened.
+ * Expected outcome: The first scene, the game menu opened on it, the overlay opened from a match, and the finished
+ *   match reopened.
  * Exceptions: None.
  */
-const NEW_GAME_SCENES = Object.freeze([SCENES.newGameStartup, SCENES.newGameReopened, SCENES.gameOverReopened]);
+const NEW_GAME_SCENES = Object.freeze([
+  SCENES.newGameStartup,
+  SCENES.newGameMenu,
+  SCENES.newGameReopened,
+  SCENES.gameOverReopened,
+]);
 
 /**
  * Scenes that show a battle.

@@ -8,13 +8,13 @@ Keep match-level actions that the player uses rarely in one place, out of the wa
 
 ## Availability
 
-The menu button is on the [top bar](top-bar.md), so the menu can open wherever the top bar accepts pointer input: Strategic planning, Tactical planning, and Resolution playback. It closes, and cannot open, while the tactical battles list or the annihilation dialog is open. It is not on screen in New game or Game over.
+The menu button is on the [top bar](top-bar.md), so the menu can open wherever the top bar accepts pointer input: Strategic planning, Tactical planning, Resolution playback, New game, and Game over. It closes, and cannot open, while the tactical battles list or the annihilation dialog is open.
 
 ## Information Displayed
 
 A popup under the menu button, in this order:
 
-- New game…
+- New game…, disabled while the new-game overlay is open.
 - Save game…, disabled in this version.
 - Load game…, disabled in this version.
 - A separator.
@@ -30,7 +30,7 @@ Control tips for these items are in [control-tooltips.md](control-tooltips.md).
 ### Mouse
 
 - When the player clicks the menu button, the menu opens. A second click closes it.
-- When the player clicks New game…, the menu closes and the new-game overlay opens. New game works during strategic planning, tactical planning, and resolution playback. Opponent planning and playback stop immediately. See [new-game-dialog.md](new-game-dialog.md).
+- When the player clicks New game…, the menu closes and the new-game overlay opens. New game works during strategic planning, tactical planning, and resolution playback. Opponent planning and playback stop immediately. See [new-game-dialog.md](new-game-dialog.md). While that overlay is open, in New game and Game over, New game… is disabled, and its tip says the new-game screen is already open (`syncGameMenuNewGameItem`).
 - When the player changes Offer tactical battles, the menu stays open. Later Ready resolutions either show the tactical battles list or skip it and resolve melee as Ignore. The choice survives a restart. See [tactical-battles-list.md](tactical-battles-list.md).
 - When the player clicks Quit, the menu closes and the window closes. On Windows and Linux the app quits. On macOS the app stays in the dock.
 - A press anywhere outside the menu and its button closes the menu.
@@ -82,7 +82,7 @@ None.
 
 - `static/index.html` (`#game-menu-btn`, `#game-menu`, `#openrouter-new-btn`, `#game-menu-save-btn`, `#game-menu-load-btn`, `#openrouter-tactical-battles`, `#game-menu-how-to-play-btn`, `#game-menu-quit-btn`)
 - `static/frameChrome.css`
-- `src/renderer/chrome/gameMenu.ts`
+- `src/renderer/chrome/gameMenu.ts` (`syncGameMenuNewGameItem`)
 - `src/renderer/openRouter/openRouterControls.ts` (New game and Offer tactical battles handlers)
 - `src/renderer/gameplay/newGame.ts` (`openNewGameOverlayFromModelTab`)
 - `src/renderer/gameplay/tacticalBattlePromptPreference.ts`

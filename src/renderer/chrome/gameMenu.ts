@@ -2,9 +2,10 @@
  * The game menu under the top bar's menu button: New game, the placeholders, Offer tactical battles, and Quit.
  *
  * The menu is a disclosure popup. The button's `aria-expanded` and the menu's `hidden` attribute always agree.
- * New game and Offer tactical battles keep their own handlers in `openRouterControls.ts`; this module only opens
- * and closes the menu and handles Quit.
+ * New game and Offer tactical battles keep their own handlers in `openRouterControls.ts`; this module opens and
+ * closes the menu, disables New game while the new-game screen is open, and handles Quit.
  */
+import { newGameOverlayIsOpen } from '../gameplay/newGameDialogCollapse';
 import { dismissStaleControlTooltip } from './controlTooltip';
 
 /**
@@ -28,6 +29,16 @@ const GAME_MENU_ID = 'game-menu';
 const GAME_MENU_BUTTON_ID = 'game-menu-btn';
 
 /**
+ * Id of the menu's New game item.
+ *
+ * Purpose: One place for the id shared with `static/index.html`.
+ * When to use: Every lookup of the New game item in this module.
+ * Expected outcome: Matches the markup.
+ * Exceptions: None.
+ */
+const NEW_GAME_ITEM_ID = 'openrouter-new-btn';
+
+/**
  * Reports whether the game menu is open.
  *
  * Purpose: Key and pointer handlers act only while the menu shows.
@@ -41,17 +52,35 @@ export function isGameMenuOpen(): boolean {
 }
 
 /**
+ * Disables the menu's New game item while the new-game screen is open.
+ *
+ * Purpose: The menu also works on the new-game screen, where opening that screen again would only throw away the
+ *   choices the player has made.
+ * When to use: When the menu opens, and whenever pointer input for the match controls is switched on or off, which
+ *   happens each time the new-game overlay opens or closes.
+ * Expected outcome: New game is disabled while `#game-over-overlay` is open and enabled otherwise. Its tip host says
+ *   why while it is disabled.
+ * Exceptions: None; does nothing when the item is missing.
+ */
+export function syncGameMenuNewGameItem(): void {
+  const item = document.getElementById(NEW_GAME_ITEM_ID);
+  if (item instanceof HTMLButtonElement) item.disabled = newGameOverlayIsOpen();
+}
+
+/**
  * Opens the game menu.
  *
  * Purpose: Shows the menu under its button.
  * When to use: From the menu button's click handler.
- * Expected outcome: The menu shows and the button reports `aria-expanded="true"`.
+ * Expected outcome: The menu shows with New game enabled or disabled for the current screen, and the button reports
+ *   `aria-expanded="true"`.
  * Exceptions: None; does nothing when the markup is missing.
  */
 export function openGameMenu(): void {
   const menu = document.getElementById(GAME_MENU_ID);
   const button = document.getElementById(GAME_MENU_BUTTON_ID);
   if (!menu || !button) return;
+  syncGameMenuNewGameItem();
   menu.hidden = false;
   button.setAttribute('aria-expanded', 'true');
 }
@@ -99,10 +128,11 @@ export function wireGameMenu(): void {
     else openGameMenu();
   });
 
+  // A disabled button gets no clicks, so a click that reaches the menu from a button came from an enabled item. That
+  // item's own handler has already run and may have disabled it: New game does, by opening the new-game screen.
   menu.addEventListener('click', (event) => {
     const target = event.target instanceof Element ? event.target : null;
-    const item = target?.closest('button');
-    if (item && !(item as HTMLButtonElement).disabled) closeGameMenu();
+    if (target?.closest('button')) closeGameMenu();
   });
 
   document.getElementById('game-menu-quit-btn')?.addEventListener('click', () => {

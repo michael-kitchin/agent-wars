@@ -1,0 +1,49 @@
+/* The new-game screen. While the new-game overlay is open, the top bar becomes the new-game bar. */
+
+/* ---------- New-game bar ---------- */
+/* While the new-game overlay is open, the bar shows only the menu button, the title "New game", Load game…, Settings,
+   and Help. The overlay's `hidden` class switches it, so the bar follows the overlay however it opens or closes,
+   including from a battle. */
+body:not(:has(#game-over-overlay:not(.hidden))) #app-topbar .new-game-only,
+body:has(#game-over-overlay:not(.hidden)) #app-topbar .topbar-sides,
+body:has(#game-over-overlay:not(.hidden)) #app-topbar .topbar-stat,
+body:has(#game-over-overlay:not(.hidden)) #app-topbar .topbar-date-block,
+body:has(#game-over-overlay:not(.hidden)) #app-topbar .battle-header-only {
+  display: none;
+}
+body:has(#game-over-overlay:not(.hidden)) #app-topbar .topbar-spacer {
+  display: block;
+}
+body:has(#game-over-overlay:not(.hidden)) #app-topbar.topbar-battle {
+  background: var(--chrome-bg-deep);
+  border-bottom-color: var(--chrome-border);
+}
+.topbar-new-game-title {
+  display: flex;
+  align-items: center;
+  flex: none;
+  padding: 0 16px;
+  font-size: 15px;
+  font-weight: 600;
+}
+/* Load game…, a disabled placeholder that names itself beside its icon. */
+.topbar-text-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 100%;
+  padding: 0 16px;
+  border: 0;
+  border-left: 1px solid var(--chrome-divider);
+  border-radius: 0;
+  background: transparent;
+  color: var(--chrome-text);
+  font-size: 13px;
+  font-weight: 500;
+}
+/* Keeps the divider: the shared disabled-button rule would recolor it. */
+.topbar-text-btn:disabled {
+  background: transparent;
+  color: var(--chrome-disabled);
+  border-color: var(--chrome-divider);
+}

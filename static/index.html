@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="consoleChrome.css" />
   <link rel="stylesheet" href="selectionChrome.css" />
   <link rel="stylesheet" href="feedbackChrome.css" />
+  <link rel="stylesheet" href="newGameChrome.css" />
   <link rel="stylesheet" href="overlayChrome.css" />
 </head>
 <body>
@@ -20,6 +21,7 @@
       <span class="battle-header-title-line"><span id="battle-header-title" class="battle-header-title">—</span><span id="battle-header-caption" class="battle-header-caption"></span></span>
       <span id="battle-header-status" class="battle-header-status">—</span>
     </div>
+    <span id="topbar-new-game-title" class="topbar-new-game-title new-game-only">New game</span>
     <div class="topbar-sides">
       <span class="topbar-side-mark topbar-side-mark-human" aria-hidden="true"></span>
       <span id="topbar-human-side" class="topbar-side-name">—</span>
@@ -61,11 +63,12 @@
     <div class="battle-header-exit battle-header-only">
       <span id="tactical-exit-host" class="control-tooltip-host" data-control-tooltip="Leave the battle, bring back your world-map orders, and play that turn. The button does nothing while a battle turn is resolving or playing back."><button type="button" id="tactical-exit-btn" class="battle-exit-btn"><svg class="chrome-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3H3v10h3M10 5l3 3-3 3M13 8H6"></path></svg>Exit Battle</button></span>
     </div>
+    <span class="control-tooltip-host new-game-only" data-control-tooltip="Load game is not available in this version."><button type="button" id="topbar-load-btn" class="topbar-text-btn" disabled><svg class="chrome-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 4.5h4.5l1.5 1.5h7v7.5h-13z"></path></svg>Load game…</button></span>
     <span class="control-tooltip-host" data-control-tooltip="Settings is not available in this version."><button type="button" id="topbar-settings-btn" class="topbar-icon-btn" aria-label="Settings" disabled><svg class="chrome-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 4h6.5M12.5 4H14M2 8h1.5M7.5 8H14M2 12h8.5"></path><circle cx="10.5" cy="4" r="1.8"></circle><circle cx="5.5" cy="8" r="1.8"></circle><circle cx="12.3" cy="12" r="1.8"></circle></svg></button></span>
     <span class="control-tooltip-host" data-control-tooltip="Help is not available in this version."><button type="button" id="topbar-help-btn" class="topbar-icon-btn" aria-label="Help" disabled><svg class="chrome-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.3"></circle><path d="M6.3 6.2a1.8 1.8 0 1 1 2.5 1.7c-.5.2-.8.6-.8 1.1v.5M8 11.4v.1"></path></svg></button></span>
   </header>
   <div id="game-menu" class="game-menu" role="group" aria-label="Game menu" hidden>
-    <button type="button" id="openrouter-new-btn" class="game-menu-item" data-control-tooltip="Open the new-game screen. Opponent planning and any playback stop right away; the current match is replaced when you start the new one."><svg class="chrome-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3v10M3 8h10"></path></svg>New game…</button>
+    <span class="control-tooltip-host game-menu-host" data-control-tooltip="The new-game screen is already open."><button type="button" id="openrouter-new-btn" class="game-menu-item" data-control-tooltip="Open the new-game screen. Opponent planning and any playback stop right away; the current match is replaced when you start the new one."><svg class="chrome-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3v10M3 8h10"></path></svg>New game…</button></span>
     <span class="control-tooltip-host game-menu-host" data-control-tooltip="Saving to a file is not available in this version. The match in progress is kept on disk between sessions."><button type="button" id="game-menu-save-btn" class="game-menu-item" disabled><svg class="chrome-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 2.5h8l3 3v8h-11zM5 2.5v3.5h5V2.5M5 13.5V9.5h6v4"></path></svg>Save game…</button></span>
     <span class="control-tooltip-host game-menu-host" data-control-tooltip="Load game is not available in this version."><button type="button" id="game-menu-load-btn" class="game-menu-item" disabled><svg class="chrome-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 4.5h4.5l1.5 1.5h7v7.5h-13z"></path></svg>Load game…</button></span>
     <div class="game-menu-separator" aria-hidden="true"></div>

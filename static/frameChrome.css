@@ -12,9 +12,8 @@
   stroke-linecap: round;
   stroke-linejoin: round;
 }
-/* The match chrome leaves the window while the new-game overlay is open, so the map fills it as before. */
-body:has(#game-over-overlay:not(.hidden)) #app-topbar,
-body:has(#game-over-overlay:not(.hidden)) #game-menu,
+/* The console leaves the window while the new-game overlay is open. The top bar becomes the new-game bar
+   (static/newGameChrome.css). */
 body:has(#game-over-overlay:not(.hidden)) #sidebar {
   display: none;
 }

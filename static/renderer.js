@@ -25980,14 +25980,20 @@ ${bonuses}`;
   // src/renderer/chrome/gameMenu.ts
   var GAME_MENU_ID = "game-menu";
   var GAME_MENU_BUTTON_ID = "game-menu-btn";
+  var NEW_GAME_ITEM_ID = "openrouter-new-btn";
   function isGameMenuOpen() {
     const menu = document.getElementById(GAME_MENU_ID);
     return menu !== null && !menu.hidden;
+  }
+  function syncGameMenuNewGameItem() {
+    const item = document.getElementById(NEW_GAME_ITEM_ID);
+    if (item instanceof HTMLButtonElement) item.disabled = newGameOverlayIsOpen();
   }
   function openGameMenu() {
     const menu = document.getElementById(GAME_MENU_ID);
     const button = document.getElementById(GAME_MENU_BUTTON_ID);
     if (!menu || !button) return;
+    syncGameMenuNewGameItem();
     menu.hidden = false;
     button.setAttribute("aria-expanded", "true");
   }
@@ -26012,8 +26018,7 @@ ${bonuses}`;
     });
     menu.addEventListener("click", (event) => {
       const target = event.target instanceof Element ? event.target : null;
-      const item = target?.closest("button");
-      if (item && !item.disabled) closeGameMenu();
+      if (target?.closest("button")) closeGameMenu();
     });
     document.getElementById("game-menu-quit-btn")?.addEventListener("click", () => {
       window.close();
@@ -26877,13 +26882,19 @@ ${bonuses}`;
         child.style.pointerEvents = enabled ? "" : "none";
       }
     }
-    for (const id of ["app-topbar", "sidebar"]) {
+    const topBarEnabled = enabled || newGameOverlayIsOpen();
+    const chromeEnabled = [
+      ["app-topbar", topBarEnabled],
+      ["sidebar", enabled]
+    ];
+    for (const [id, on] of chromeEnabled) {
       const chrome = document.getElementById(id);
       if (!chrome) continue;
-      chrome.style.pointerEvents = enabled ? "" : "none";
-      chrome.classList.toggle("main-ui-disabled", !enabled);
+      chrome.style.pointerEvents = on ? "" : "none";
+      chrome.classList.toggle("main-ui-disabled", !on);
     }
-    if (!enabled) closeGameMenu();
+    if (!topBarEnabled) closeGameMenu();
+    syncGameMenuNewGameItem();
     syncNewGameDialogMapPointer();
   }
   function updateGameOverUI(state, updateReadyButtonState2) {
@@ -26902,6 +26913,7 @@ ${bonuses}`;
     overlay?.classList.remove("hidden");
     resetNewGameOptionControls();
     if (wasHidden) {
+      closeGameMenu();
       expandNewGameDialog();
       blurMapChromeIfFocused();
       resetNewGameMapPreviewFrame();

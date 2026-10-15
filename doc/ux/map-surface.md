@@ -8,7 +8,7 @@ Show the current theater and accept the pointer and keyboard gestures that plan 
 
 ## Availability
 
-Shown in Strategic planning, Resolution playback, and Tactical planning. While the tactical battles list is open, the map stays as it was when Ready paused, pointer input is off, and pan keys and T still follow [input-map.md](input-map.md). In New game and Game over, pointer input on the map is off while the new-game form is showing. While that form is hidden, drag and the wheel pan and zoom the preview, and a click, double-click, or right-click does not select, order, or change the selection. In Tactical annihilation the map is visible, pointer input is off, and pan keys and T still follow [input-map.md](input-map.md). In New game and Game over the map fills the window. In the other modes it fills the space under the top bar and beside the right panel.
+Shown in Strategic planning, Resolution playback, and Tactical planning. While the tactical battles list is open, the map stays as it was when Ready paused, pointer input is off, and pan keys and T still follow [input-map.md](input-map.md). In New game and Game over, pointer input on the map is off while the new-game form is showing. While that form is hidden, drag and the wheel pan and zoom the preview, and a click, double-click, or right-click does not select, order, or change the selection. In Tactical annihilation the map is visible, pointer input is off, and pan keys and T still follow [input-map.md](input-map.md). In New game and Game over the map fills the window under the top bar. In the other modes it fills the space under the top bar and beside the right panel.
 
 ## Information Displayed
 

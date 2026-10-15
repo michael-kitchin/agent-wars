@@ -1,6 +1,6 @@
 # Top Bar
 
-The bar across the top of the window. It holds the game menu button, the two sides, four match readouts, the date block, and the Settings and Help buttons. In a battle it becomes the battle header.
+The bar across the top of the window. It holds the game menu button, the two sides, four match readouts, the date block, and the Settings and Help buttons. In a battle it becomes the battle header, and on the new-game screen it becomes the new-game bar.
 
 ## Purpose
 
@@ -8,7 +8,7 @@ Show the match's standing and its date at a glance, without opening a panel, and
 
 ## Availability
 
-Shown in Strategic planning, Resolution playback, Tactical planning, the tactical battles list, and Tactical annihilation. It is not on screen in New game or Game over, including while the new-game form is hidden, and the map fills the window. It accepts pointer input in Strategic planning, Tactical planning, and Resolution playback. While the tactical battles list or the annihilation dialog is open, it stays visible and does not receive pointer input.
+Shown in every mode. In New game and Game over it is the new-game bar, including while the new-game form is hidden. It accepts pointer input in Strategic planning, Tactical planning, Resolution playback, New game, and Game over. While the tactical battles list or the annihilation dialog is open, it stays visible and does not receive pointer input.
 
 ## Information Displayed
 
@@ -34,6 +34,13 @@ While a battle is open, the bar is the battle header. Its face is darker and war
 - Exit Battle, beside Settings. When it is shown, enabled, or hidden is in [tactical-battle-controls.md](tactical-battle-controls.md).
 - Settings and Help.
 
+While the new-game overlay is open, in New game and Game over, the bar is the new-game bar, on the usual face. The sides, the readouts, the date block, and the battle header are hidden, even when the overlay was opened from a battle. The overlay's own visibility switches the bar, so it follows every way the overlay opens or closes. From left to right:
+
+- The game menu button. The menu works there, with New game… disabled. See [game-menu.md](game-menu.md).
+- The title "New game", also on the game-over screen.
+- Load game…, with a folder icon, disabled in this version.
+- Settings and Help.
+
 ## Inputs and Responses
 
 ### Mouse
@@ -53,14 +60,14 @@ While a battle is open, the bar is the battle header. Its face is darker and war
 
 - Match loaded: names, readouts, and the date block show the match.
 - Battle: the battle header shows in place of the names, readouts, and date block.
-- No match: em dashes, and the readout suffixes are empty.
+- No match: em dashes, and the readout suffixes are empty. The new-game bar covers this case while the new-game overlay is open.
+- New game bar: New game and Game over.
 - Pointer input off: the tactical battles list or Tactical annihilation.
-- Absent: New game and Game over.
 
 ## Invariants
 
 - The sides, the readouts, and the date block are display only. They never change game state.
-- The match status and the battle header never show together. The date block always describes the world-map turn.
+- The match status, the battle header, and the new-game bar never show together. The date block always describes the world-map turn.
 - The bar's height never changes with the window width; captions and names give way instead.
 
 ## Strategic and Tactical Differences
@@ -91,8 +98,9 @@ None.
 
 ## Code Entry Points
 
-- `static/index.html` (`#app-topbar`, `#game-menu-btn`, `#topbar-human-side`, `#topbar-opponent-side`, `#topbar-stat-production`, `#topbar-stat-production-suffix`, `#topbar-stat-forces-host`, `#topbar-stat-forces`, `#topbar-stat-forces-cap`, `#topbar-stat-human-home`, `#topbar-stat-human-home-total`, `#topbar-stat-opponent-home`, `#topbar-stat-opponent-home-total`, `#topbar-date`, `#topbar-turn-phase`, `#topbar-settings-btn`, `#topbar-help-btn`, `#battle-header-place`, `#battle-header-title`, `#battle-header-caption`, `#battle-header-status`, `#battle-header-center`, `#battle-force-bar`, `#battle-force-human-count`, `#battle-force-opponent-count`, `#battle-force-human-fill`, `#tactical-exit-host`, `#tactical-exit-btn`)
+- `static/index.html` (`#app-topbar`, `#game-menu-btn`, `#topbar-human-side`, `#topbar-opponent-side`, `#topbar-stat-production`, `#topbar-stat-production-suffix`, `#topbar-stat-forces-host`, `#topbar-stat-forces`, `#topbar-stat-forces-cap`, `#topbar-stat-human-home`, `#topbar-stat-human-home-total`, `#topbar-stat-opponent-home`, `#topbar-stat-opponent-home-total`, `#topbar-date`, `#topbar-turn-phase`, `#topbar-settings-btn`, `#topbar-help-btn`, `#topbar-new-game-title`, `#topbar-load-btn`, `#battle-header-place`, `#battle-header-title`, `#battle-header-caption`, `#battle-header-status`, `#battle-header-center`, `#battle-force-bar`, `#battle-force-human-count`, `#battle-force-opponent-count`, `#battle-force-human-fill`, `#tactical-exit-host`, `#tactical-exit-btn`)
 - `static/frameChrome.css`
+- `static/newGameChrome.css`
 - `src/renderer/chrome/topBar.ts`
 - `src/renderer/chrome/battleHeader.ts` (`renderBattleHeader`)
 - `src/renderer/core/uiState.ts` (`updateGameStateSidebar`, `setMainUIControlsEnabled`)
