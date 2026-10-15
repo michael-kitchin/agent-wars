@@ -23558,8 +23558,6 @@ ${bonuses}`;
     techBonusLevel: "new-game-tech-bonus-select"
   };
   var NEW_GAME_START_MONTH_ID = "new-game-start-month";
-  var NEW_GAME_OPTIONS_BLOCK_SELECTOR = ".game-over-options";
-  var NEW_GAME_OPTION_SEPARATOR_CLASS = "game-over-options-separator";
   function fogCheckbox() {
     return document.getElementById(NEW_GAME_FOG_CHECKBOX_ID);
   }
@@ -23592,110 +23590,6 @@ ${bonuses}`;
       if (select) select.value = DEFAULT_BONUS_LEVEL;
     }
   }
-  function isOnSeparatorLine(separatorMidY, neighbor) {
-    if (!neighbor) return false;
-    const rect = neighbor.getBoundingClientRect();
-    return separatorMidY >= rect.top && separatorMidY <= rect.bottom;
-  }
-  function syncNewGameOptionSeparators(block) {
-    for (const separator of block.querySelectorAll(`.${NEW_GAME_OPTION_SEPARATOR_CLASS}`)) {
-      const rect = separator.getBoundingClientRect();
-      const midY = (rect.top + rect.bottom) / 2;
-      const joinsNeighbors = isOnSeparatorLine(midY, separator.previousElementSibling) && isOnSeparatorLine(midY, separator.nextElementSibling);
-      separator.style.visibility = joinsNeighbors ? "" : "hidden";
-    }
-  }
-  function registerNewGameOptionSeparators() {
-    const block = document.querySelector(NEW_GAME_OPTIONS_BLOCK_SELECTOR);
-    if (!block || typeof ResizeObserver === "undefined") return;
-    new ResizeObserver(() => syncNewGameOptionSeparators(block)).observe(block);
-  }
-
-  // src/renderer/gameplay/newGameRegionSelectWidth.ts
-  var REGION_SELECT_IDS = [
-    "new-game-human-region-select",
-    "new-game-ai-region-select",
-    "new-game-region-select"
-  ];
-  var REGION_SELECT_WIDTH_PROPERTY = "--new-game-region-select-width";
-  function syncNewGameRegionSelectWidths() {
-    const dialog = document.getElementById("game-over-dialog");
-    if (!(dialog instanceof HTMLElement)) return;
-    const width = measureWidestRegionOption();
-    if (width <= 0) return;
-    dialog.style.setProperty(REGION_SELECT_WIDTH_PROPERTY, `${width}px`);
-  }
-  function measureWidestRegionOption() {
-    const labels = regionOptionLabels();
-    const source = metricSourceSelect();
-    if (labels.length === 0 || !source) return 0;
-    const probe = document.createElement("select");
-    probe.tabIndex = -1;
-    probe.setAttribute("aria-hidden", "true");
-    copySelectMetrics(probe, source);
-    for (const label of labels) {
-      const option = document.createElement("option");
-      option.textContent = label;
-      probe.appendChild(option);
-    }
-    document.body.appendChild(probe);
-    try {
-      let widest = 0;
-      for (let index = 0; index < probe.options.length; index += 1) {
-        probe.selectedIndex = index;
-        widest = Math.max(widest, Math.ceil(probe.getBoundingClientRect().width));
-      }
-      return widest;
-    } finally {
-      probe.remove();
-    }
-  }
-  function regionOptionLabels() {
-    const labels = /* @__PURE__ */ new Set();
-    for (const id of REGION_SELECT_IDS) {
-      const select = document.getElementById(id);
-      if (!(select instanceof HTMLSelectElement)) continue;
-      for (const option of select.options) {
-        const label = option.textContent ?? "";
-        if (label.trim()) labels.add(label);
-      }
-    }
-    return [...labels];
-  }
-  function metricSourceSelect() {
-    let fallback = null;
-    for (const id of REGION_SELECT_IDS) {
-      const select = document.getElementById(id);
-      if (!(select instanceof HTMLSelectElement)) continue;
-      if (!fallback) fallback = select;
-      if (select.getClientRects().length > 0) return select;
-    }
-    return fallback;
-  }
-  function copySelectMetrics(probe, source) {
-    const style = getComputedStyle(source);
-    probe.style.position = "fixed";
-    probe.style.left = "0";
-    probe.style.top = "0";
-    probe.style.visibility = "hidden";
-    probe.style.pointerEvents = "none";
-    probe.style.margin = "0";
-    probe.style.fontStyle = style.fontStyle;
-    probe.style.fontVariant = style.fontVariant;
-    probe.style.fontWeight = style.fontWeight;
-    probe.style.fontStretch = style.fontStretch;
-    probe.style.fontSize = style.fontSize;
-    probe.style.lineHeight = style.lineHeight;
-    probe.style.fontFamily = style.fontFamily;
-    probe.style.letterSpacing = style.letterSpacing;
-    probe.style.padding = style.padding;
-    probe.style.borderWidth = style.borderWidth;
-    probe.style.borderStyle = style.borderStyle;
-    probe.style.boxSizing = style.boxSizing;
-    probe.style.width = "max-content";
-    probe.style.minWidth = "0";
-    probe.style.maxWidth = "none";
-  }
 
   // src/renderer/gameplay/newGameRegionUi.ts
   var HUMAN_REGION_SELECT_ID = "new-game-human-region-select";
@@ -23717,10 +23611,7 @@ ${bonuses}`;
     const humanSelect = getRegionSelect(HUMAN_REGION_SELECT_ID);
     const aiSelect = getRegionSelect(AI_REGION_SELECT_ID);
     if (!humanSelect || !aiSelect) return;
-    if (humanSelect.options.length > 0 && aiSelect.options.length > 0) {
-      syncNewGameRegionSelectWidths();
-      return;
-    }
+    if (humanSelect.options.length > 0 && aiSelect.options.length > 0) return;
     const regions = await window.gameApi?.listScenarioHomeRegions?.();
     if (!Array.isArray(regions) || regions.length <= 0) return;
     const renderOptions = (select) => {
@@ -23734,7 +23625,6 @@ ${bonuses}`;
     };
     renderOptions(humanSelect);
     renderOptions(aiSelect);
-    syncNewGameRegionSelectWidths();
   }
   async function initializeScenarioRegionSelectorsOnOverlayOpen() {
     randomizeNewGameStartMonth();
@@ -23750,7 +23640,7 @@ ${bonuses}`;
 
   // src/shared/gameMapList.ts
   function formatUnitCostLabel(cost) {
-    return `($${cost})`;
+    return `$${cost}`;
   }
   function formatAdvancedTechLine(advancedMinUrbanCells) {
     return `Advanced tech: $${advancedMinUrbanCells}+ hexes`;
@@ -25326,7 +25216,6 @@ ${bonuses}`;
       option.textContent = region.displayName;
       select.appendChild(option);
     }
-    syncNewGameRegionSelectWidths();
   }
   function randomizeRegionalMap() {
     pickRandomRegionIndex();
@@ -25436,8 +25325,8 @@ ${bonuses}`;
   function syncGameSizeCapPreview() {
     const rows = gameSizeCapPreviewRows(readSelectedGameSizeFromDocument());
     for (const row of rows) {
-      const badge = document.getElementById(`new-game-size-cap-${row.unitType}`);
-      if (badge) badge.textContent = String(row.cap);
+      const capText = document.getElementById(`new-game-size-cap-${row.unitType}`);
+      if (capText) capText.textContent = String(row.cap);
     }
   }
   function registerGameSizeSelect() {
@@ -31169,7 +31058,6 @@ ${bonuses}`;
     registerRegionRandomizeButtons();
     registerNewGameMapControls();
     registerGameSizeSelect();
-    registerNewGameOptionSeparators();
     document.getElementById("new-game-btn")?.addEventListener("click", async () => {
       if (!window.gameApi?.newGame) return;
       const matchEpoch = advanceRendererMatchEpoch();

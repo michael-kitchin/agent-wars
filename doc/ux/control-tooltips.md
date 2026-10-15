@@ -8,7 +8,7 @@ Say why the player would use the control, and state a limit only when the player
 
 ## Availability
 
-The tip can appear whenever the control can receive the pointer or keyboard focus. A control inside a surface that has pointer input turned off cannot show it. A disabled control still shows its tip when the pointer can rest on it. That includes Ready while its label reads "AI:", Run before a key and model are set, a reasoning list with fewer than two levels, a sealift slot that cannot be changed, Fight before a row is chosen, Keep building when it cannot be turned on, and Exit Battle while a battle turn is resolving or playing back. It also includes New game in the game menu while the new-game screen is open, and every disabled placeholder: Settings and Help in the top bar, Load game on the new-game bar, Save game, Load game, and How to play in the game menu, the Build and Forces tabs, and Replay on a turn report. The top bar's four readouts show a tip the same way, though they are not controls.
+The tip can appear whenever the control can receive the pointer or keyboard focus. A control inside a surface that has pointer input turned off cannot show it. A disabled control still shows its tip when the pointer can rest on it. That includes Ready while its label reads "AI:", Run before a key and model are set, a reasoning list with fewer than two levels, a sealift slot that cannot be changed, Fight before a row is chosen, Keep building when it cannot be turned on, and Exit Battle while a battle turn is resolving or playing back. It also includes New game in the game menu while the new-game screen is open, and every disabled placeholder: Settings and Help in the top bar, Load game on the new-game bar, Add another opponent on the new-game screen, Save game, Load game, and How to play in the game menu, the Build and Forces tabs, and Replay on a turn report. The top bar's four readouts show a tip the same way, though they are not controls.
 
 ## Information Displayed
 
@@ -55,7 +55,7 @@ The tip can appear whenever the control can receive the pointer or keyboard focu
 - Orders tab: Show the orders queued for this turn or beat.
 - Reports tab: Show the turn reports, opponent messages, and notices from this match, newest first.
 - Opponent tab: Show whether the opponent is planning, its model, its tools, and the AI activity log.
-- Settings, Help, Load game, How to play, Build, Forces, Replay, and the Control and Production map modes: "<name> is not available in this version.", for example "Settings is not available in this version."
+- Settings, Help, Load game, How to play, Add another opponent, Build, Forces, Replay, and the Control and Production map modes: "<name> is not available in this version.", for example "Settings is not available in this version."
 - Collapse the console: Hide the console to widen the map. Click a tab to show it again.
 - Selection panel close: Clear the selection. Queued orders stay.
 - Selection panel grip: Drag to resize this panel. The size lasts until the app closes.

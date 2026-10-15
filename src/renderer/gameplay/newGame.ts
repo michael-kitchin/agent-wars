@@ -16,7 +16,6 @@ import {
   randomizeNewGameStartMonth,
   readNewGameOptionChoices,
   readNewGameStartMonth,
-  registerNewGameOptionSeparators,
   resetNewGameOptionControls,
 } from './newGameOptionsUi';
 import { newGameButtonTooltipText } from '../chrome/controlTooltipText';
@@ -264,7 +263,7 @@ setMainUIControlsEnabled: (enabled: boolean) => void;
  *
  * Purpose: Starts a match from the dialog's choices and resets every renderer cache the old match left behind.
  * When to use: Once at renderer startup.
- * Expected outcome: The randomize buttons, game-size preview, and bonus-line separators are live. Clicking Start sends
+ * Expected outcome: The randomize buttons and the game-size caps are live. Clicking Start sends
  *   fog, the four bonus levels, the starting month, home regions, and game size to `newGame`, then reloads the map,
  *   sidebars, and overlay from the returned state. The overlay closes, and the map is resized beside the right panel,
  *   before the loaded extent is fit. Start then zooms one level toward human infantry and armor, or any human units
@@ -279,7 +278,6 @@ export function registerNewGameButton(deps: NewGameDeps): void {
   registerRegionRandomizeButtons();
   registerNewGameMapControls();
   registerGameSizeSelect();
-  registerNewGameOptionSeparators();
   document.getElementById('new-game-btn')?.addEventListener('click', async () => {
     if (!window.gameApi?.newGame) return;
     const matchEpoch = advanceRendererMatchEpoch();

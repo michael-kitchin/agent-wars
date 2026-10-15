@@ -6,15 +6,23 @@ The engine under `src/` wins if this file drifts.
 
 ## Setup
 
-On the Global tab the player picks:
+The player picks the homes in the Map section. On the Global tab:
 
 - Human home region
 - AI home region
+
+On the Regional tab the player picks one region and two different side groups.
+
+In the Forces section the player picks:
+
 - Game size (caps only — [game-size-unit-caps.md](game-size-unit-caps.md))
+
+In the Rules section the player picks:
+
 - Origin bonus and Terrain bonus dropdowns (Off, Low, or High; both default to Low; rules in [combat-rules-v3.md](combat-rules-v3.md) §4.9, "Origin bonus and terrain bonus")
 - Weather bonus dropdown (Off, Low, or High; default Low; rules in [combat-rules-v3.md](combat-rules-v3.md) §4.9, "Weather bonus")
 - Tech bonus dropdown (Off, Low, or High; default Low; rules in [combat-rules-v3.md](combat-rules-v3.md) §4.9, "Tech bonus")
-- Fog of war (default on), on the same row as the starting month and to its left. The month is a random month whenever the new-game dialog opens, with a square randomize button beside the list.
+- Fog of war (default on), on the line after the starting month. The month is a random month whenever the new-game dialog opens, with a square randomize button beside the list.
 
 A global match stores the two home-region names in `scenario_region_human` and `scenario_region_ai`. Those two regions may be the same.
 

@@ -414,6 +414,10 @@ async function runReopenedSession(app, page, report, outDir, battleHex) {
 
   await openNewGameOverlay(page);
   await recordScene(page, report, outDir, SCENES.newGameReopened);
+  await page.click('#new-game-tab-regional');
+  await parkPointer(page);
+  await page.waitForTimeout(SETTLE_MS.overlay);
+  await recordScene(page, report, outDir, SCENES.newGameRegional);
   await startRegionalMatch(page);
   await parkPointer(page);
   await recordScene(page, report, outDir, SCENES.regionalStart);

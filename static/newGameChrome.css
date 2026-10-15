@@ -1,7 +1,8 @@
 /* The new-game screen. While the new-game overlay is open, the top bar becomes the new-game bar, and the setup panel is
    docked at the left of the window, under the top bar, with the map preview beside it. The panel's header holds the
-   hide-choices button and the message, the body scrolls, and the footer holds Start game. Hiding the choices leaves only
-   that button, in the same spot over the map's top-left corner, and the map widens under it. */
+   hide-choices button and the message, the body holds the Map, Forces, and Rules sections and scrolls, and the footer
+   holds Start game. Hiding the choices leaves only that button, in the same spot over the map's top-left corner, and
+   the map widens under it. */
 
 /* ---------- New-game bar ---------- */
 /* While the new-game overlay is open, the bar shows only the menu button, the title "New game", Load game…, Settings,
@@ -100,12 +101,6 @@ body:has(#game-over-overlay:not(.hidden)) #app-topbar.topbar-battle {
   flex: 1 1 auto;
   min-height: 0;
   overflow: auto;
-  padding: 16px 18px;
-  text-align: center;
-}
-.new-game-panel-body button {
-  padding: 0.5rem 1rem;
-  font-size: 14px;
 }
 .new-game-panel-footer {
   flex: none;
@@ -142,176 +137,187 @@ body:has(#game-over-overlay:not(.hidden)) #app-topbar.topbar-battle {
   display: none;
 }
 
-/* ---------- Choices ---------- */
-/* Two lines: Country with Tech, then Terrain with Weather. Each line keeps the slash gap. */
-.game-over-options {
+/* ---------- Sections ---------- */
+/* Map, Forces, and Rules, each under a small title and a divider. Controls are 30 px tall, the same as a randomize
+   square, so every row lines up. */
+.new-game-section {
+  padding: 14px 18px 16px;
+  border-bottom: 1px solid var(--chrome-divider);
+  font-size: 13px;
+}
+.new-game-section:last-child {
+  border-bottom: 0;
+}
+.new-game-section-head {
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.5rem;
-  margin: 0 0 0.9rem 0;
-  font-size: 0.95rem;
-  color: var(--chrome-text);
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
 }
-.game-over-options-line {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-}
-/* Bonus labels and the Game size label. Change the gap here so those dropdowns stay aligned with each other. */
-.game-over-options label,
-.game-over-size-row label {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-}
-.game-over-start-month {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  margin: 0 0 0.9rem 0;
-  font-size: 0.95rem;
-  color: var(--chrome-text);
-}
-/* The two sides wrap onto two lines when the panel is too narrow for them side by side. */
-.game-over-region-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  justify-content: center;
-  gap: 0.7rem 0.9rem;
-  margin: 0 0 0.7rem 0;
-}
-/* Centers the Game size label and dropdown. The gap lives on the shared label rule above. */
-.game-over-size-row {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin: 0 0 0.2rem 0;
-}
-.game-over-region-cell {
-  display: flex;
-  flex-direction: column;
-  gap: 0.22rem;
-  text-align: left;
-}
-.game-over-region-cell label,
-.game-over-size-row label {
-  font-size: 0.88rem;
-  color: var(--chrome-text);
+.new-game-section-title {
+  margin: 0 0 10px;
+  color: var(--chrome-muted);
+  font-size: 10.5px;
   font-weight: 600;
-}
-/* Select column shares one closed width. The randomize button sits in the next column at the same height. */
-.game-over-region-controls {
-  display: grid;
-  width: max-content;
-  grid-template-columns: auto auto;
-  align-items: stretch;
-  column-gap: 0.3rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 .new-game-panel-body select {
-  font-size: 12px;
-  padding: 0.16rem 0.28rem;
-}
-/* Longest option, not the selected one, so Medium still fits while Small is selected. Regular weight so the bold label does not inherit onto the control and change that width. */
-.game-over-size-row select {
-  width: max-content;
-  flex-shrink: 0;
-  font-weight: 400;
-}
-/* One closed width for home-region, region, and side selectors. The variable is the widest region option, so a short selection does not shrink a control and a long side name does not widen one. */
-.game-over-region-controls select {
+  height: 30px;
+  padding: 0 8px;
   box-sizing: border-box;
-  width: var(--new-game-region-select-width, max-content);
-  min-width: var(--new-game-region-select-width, max-content);
-  max-width: var(--new-game-region-select-width, none);
+  font-size: 13px;
 }
-/* Size to the longest month. Overrides the shared region width so a long region name does not widen this control and a short region list does not clip a month name. */
-.game-over-start-month .game-over-region-controls select {
-  width: max-content;
-  min-width: max-content;
-  max-width: none;
-}
-/* Matches the dropdown beside it. The fixed square size on `.compact-square-btn` is for other buttons. */
-.new-game-panel-body .compact-square-btn.game-over-region-randomize {
-  align-self: stretch;
-  justify-self: center;
-  width: auto;
-  min-width: 0;
-  height: auto;
+/* A square the height of the dropdown beside it. `--new-game-collapse-size` copies this size onto the hide-choices
+   button. */
+.new-game-panel-body .compact-square-btn.new-game-randomize {
+  width: 30px;
+  min-width: 30px;
+  height: 30px;
   margin-left: 0;
-  aspect-ratio: 1;
-  padding: 0;
-  line-height: 1;
-  font-size: 11px;
-  font-weight: 700;
+  font-size: 13px;
 }
-.game-over-size-caps {
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  gap: 1.1rem;
-  margin: 0 0 0.9rem 0;
+
+/* ---------- Map ---------- */
+.new-game-tabs {
+  margin: 0 0 12px;
 }
-.game-over-size-cap {
-  display: flex;
-  flex-direction: column;
+.new-game-tabs button {
+  width: 110px;
+  height: 30px;
+  font-size: 13px;
+}
+/* Label, dropdown, randomize. Each tab has its own grid, so the label column has one width in both: 5em fits "Your side"
+   and "Opponent" in common system fonts, and every dropdown in both tabs then has the same left edge and width. A wider
+   font grows the column rather than running a label into its dropdown. */
+.new-game-rows {
+  display: grid;
+  grid-template-columns: minmax(5em, max-content) minmax(0, 1fr) 30px;
   align-items: center;
-  gap: 0.28rem;
+  gap: 8px 6px;
 }
-.game-over-size-token {
-  position: relative;
-  width: 36px;
-  height: 36px;
+.new-game-rows select {
+  width: 100%;
+  min-width: 0;
+}
+/* Two classes, so the shared tip host's inline display does not win: the slot spans the section. */
+.control-tooltip-host.new-game-add-opponent-host {
+  display: flex;
+  width: 100%;
+  margin-top: 10px;
+}
+/* A disabled placeholder drawn as a dashed slot, so it reads as room for a later feature rather than a broken button. */
+.new-game-add-opponent,
+.new-game-add-opponent:disabled {
+  flex: 1 1 auto;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0;
+  background: transparent;
+  color: var(--chrome-muted);
+  border: 1px dashed var(--chrome-border);
+  border-radius: 2px;
+  font-size: 12.5px;
+}
+
+/* ---------- Forces ---------- */
+.new-game-advanced-tech {
+  margin: 0;
+  color: var(--chrome-muted);
+  font-size: 11px;
+}
+.new-game-advanced-tech:empty {
+  display: none;
+}
+.new-game-size-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 0 0 12px;
+}
+.new-game-size-row select {
+  width: max-content;
+}
+/* One row of the four unit types: the map glyph on a gray disk, the cap for the game size, and the price. A wide font
+   wraps the row rather than widening the panel. */
+.new-game-units {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 6px 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.new-game-unit {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.new-game-unit-token {
+  flex: none;
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
   background: #b0b0b0;
-  border: 2px solid #222;
-  box-sizing: content-box;
+  border: 1px solid #222;
   display: flex;
   align-items: center;
   justify-content: center;
 }
-.game-over-size-token img {
-  width: 32px;
-  height: 32px;
+.new-game-unit-token img {
+  width: 18px;
+  height: 18px;
   pointer-events: none;
   filter: brightness(0.133);
 }
-.game-over-size-badge {
-  position: absolute;
-  left: calc(50% + 16px);
-  top: calc(50% - 16px);
-  transform: translate(-50%, -50%);
-  font: bold 13px system-ui, sans-serif;
-  color: #000;
-  -webkit-text-stroke: 2px #fff;
-  paint-order: stroke fill;
-  pointer-events: none;
+.new-game-unit-cap {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }
-.game-over-size-name {
-  font-size: 0.78rem;
-  font-weight: 600;
-  color: var(--chrome-text);
+.new-game-unit-dot,
+.new-game-unit-cost {
+  color: var(--chrome-muted);
+  font-size: 12px;
+}
+
+/* ---------- Rules ---------- */
+/* One grid of label and dropdown pairs: Origin and Tech, then Terrain and Weather, then the starting month across the
+   last three columns. Each label column is as wide as its longest label and the two dropdown columns share what is
+   left, so every dropdown in a column starts at the same edge however the system font measures the labels. */
+.new-game-rules {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr) max-content minmax(0, 1fr);
+  align-items: center;
+  gap: 8px 6px;
+}
+.new-game-rules > label {
   white-space: nowrap;
 }
-.game-over-tab-bar {
-  margin: 0 0 0.75rem 0;
+/* Tech and Weather open the second pair, set a little apart from the first pair's dropdowns. */
+.new-game-rules > label:nth-of-type(2n) {
+  padding-left: 10px;
 }
-.game-over-regional-region {
+.new-game-rules > select {
+  width: 100%;
+  min-width: 0;
+}
+.new-game-month-controls {
+  grid-column: 2 / -1;
   display: flex;
-  justify-content: center;
-  margin: 0 0 0.75rem 0;
+  align-items: center;
+  gap: 6px;
 }
-.new-game-panel-body p.game-over-advanced-tech {
-  text-align: center;
-  margin: 0 0 0.55rem 0;
-  font-size: 0.78rem;
-  font-weight: 600;
+.new-game-month-controls select {
+  width: max-content;
 }
-.new-game-panel-body p.game-over-advanced-tech:empty {
-  display: none;
-  margin: 0;
+.new-game-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
 }

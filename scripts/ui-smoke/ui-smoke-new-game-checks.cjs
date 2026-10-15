@@ -1,6 +1,6 @@
 /**
  * Checks of the new-game screen for the UI smoke run: the top bar while the new-game overlay is open, the game menu
- * there, the setup panel docked at the left, and the map beside it.
+ * there, the setup panel docked at the left with its Map, Forces, and Rules sections, and the map beside it.
  *
  * Purpose: Keeps the new-game screen's checks apart from the frame, console, scenario, map chrome, and battle checks,
  *   so each table stays readable.
@@ -16,13 +16,69 @@ const { TOPBAR_HEIGHT, SCENES, NEW_GAME_SCENES, near, fmt } = require('./ui-smok
  * Sizes of the setup panel, in CSS pixels.
  *
  * Purpose: The panel is docked at the left, the hide-choices button sits 12 px in from the panel's top-left corner,
- *   and Start game spans the footer inside its 18 px padding.
- * When to use: The panel and hidden-choices checks.
- * Expected outcome: Matches `--new-game-panel-width` in `static/shellChrome.css` and the padding in
- *   `static/newGameChrome.css`.
+ *   Start game spans the footer inside its 18 px padding, and each section's content sits inside 18 px of padding. A
+ *   map row's dropdown starts after that padding, the 5em label column (65 px at the rows' 13 px text), and a 6 px gap.
+ * When to use: The panel, hidden-choices, and section checks.
+ * Expected outcome: Matches `--new-game-panel-width` in `static/shellChrome.css` and the padding, the label column,
+ *   and the gap in `static/newGameChrome.css`.
  * Exceptions: None.
  */
-const PANEL = Object.freeze({ width: 432, headerInset: 12, footerInset: 18 });
+const PANEL = Object.freeze({ width: 432, headerInset: 12, footerInset: 18, sectionInset: 18, rowSelectInset: 89 });
+
+/**
+ * The rows of each map tab: the label of each row, then each row's dropdown and randomize button, top to bottom.
+ *
+ * Purpose: Both tabs line their dropdowns up on one left edge with one width, and their randomize buttons on the
+ *   panel's inner right edge. The left edge is the same fixed inset in both tabs, so it also shows that no label is
+ *   wider than its column.
+ * When to use: The map rows check.
+ * Expected outcome: Matches the rows in `static/index.html`.
+ * Exceptions: None.
+ */
+const MAP_TABS = Object.freeze({
+  global: {
+    panel: '#new-game-panel-global',
+    labels: ['Human', 'AI'],
+    rows: [
+      ['#new-game-human-region-select', '#new-game-human-region-randomize'],
+      ['#new-game-ai-region-select', '#new-game-ai-region-randomize'],
+    ],
+  },
+  regional: {
+    panel: '#new-game-panel-regional',
+    labels: ['Region', 'Your side', 'Opponent'],
+    rows: [
+      ['#new-game-region-select', '#new-game-region-randomize'],
+      ['#new-game-human-side-select', '#new-game-human-side-randomize'],
+      ['#new-game-ai-side-select', '#new-game-ai-side-randomize'],
+    ],
+  },
+});
+
+/**
+ * The unit types in the Forces row, left to right, with each icon's name.
+ *
+ * Purpose: The row shows icons without words, so each icon names its type for assistive technology.
+ * When to use: The unit row check.
+ * Expected outcome: Infantry, Armor, Naval, Air.
+ * Exceptions: None.
+ */
+const UNIT_ICONS = Object.freeze(['Infantry', 'Armor', 'Naval', 'Air'].map((name) => `.new-game-unit-token img[alt="${name}"]`));
+
+/**
+ * The four bonus dropdowns, in reading order: Origin and Tech on the first row, Terrain and Weather on the second.
+ *
+ * Purpose: The Rules section lays them out in two columns.
+ * When to use: The rules check.
+ * Expected outcome: Matches the ids in `static/index.html`.
+ * Exceptions: None.
+ */
+const BONUS_SELECTS = Object.freeze([
+  '#new-game-origin-bonus-select',
+  '#new-game-tech-bonus-select',
+  '#new-game-terrain-bonus-select',
+  '#new-game-weather-bonus-select',
+]);
 
 /**
  * The new-game scenes that show the setup panel: every new-game scene except the one with the choices hidden.
@@ -58,6 +114,28 @@ const NEW_GAME_BAR = Object.freeze({
  */
 const NEW_GAME_ITEM_HOST = '#game-menu .control-tooltip-host:has(#openrouter-new-btn)';
 const NEW_GAME_ITEM_OPEN_TIP = 'The new-game screen is already open.';
+
+/**
+ * The tip host around the setup panel's Add another opponent placeholder.
+ *
+ * Purpose: The placeholder is disabled, so its host carries the tip.
+ * When to use: The Add another opponent check.
+ * Expected outcome: Matches the host in `static/index.html`.
+ * Exceptions: None.
+ */
+const ADD_OPPONENT_HOST = '.control-tooltip-host:has(#new-game-add-opponent-btn)';
+
+/**
+ * Finds the right edge of a section's content in the panel's body.
+ *
+ * Purpose: The body scrolls when the window is short, and its scrollbar then takes width from the sections.
+ * When to use: Checks of controls that reach a section's right edge.
+ * Expected outcome: The body's left edge plus its client width, less the sections' padding.
+ * Exceptions: None.
+ */
+function sectionInnerRight(body) {
+  return body.x + body.clientWidth - PANEL.sectionInset;
+}
 
 /**
  * The new-game screen's checks, one row each.
@@ -127,6 +205,82 @@ const NEW_GAME_CHECKS = Object.freeze([
       if (collapse.expanded !== 'false') return `the hide-choices button reads aria-expanded=${collapse.expanded}`;
       const shown = ['#game-over-message', '#game-over-dialog', '#new-game-btn'].filter((selector) => el(selector).shown);
       return shown.length === 0 ? null : `still shown with the choices hidden: ${shown.join(', ')}`;
+    },
+  },
+  {
+    name: 'new-game-sections',
+    scenes: PANEL_SCENES,
+    needs: ['#new-game-section-map', '#new-game-section-forces', '#new-game-section-rules'],
+    run: (p, el) => {
+      const titles = ['#new-game-section-map', '#new-game-section-forces', '#new-game-section-rules'].map(el);
+      const text = titles.map((title) => title.text).join(', ');
+      if (text !== 'Map, Forces, Rules') return `the section titles read "${text}", expected "Map, Forces, Rules"`;
+      return titles[0].y < titles[1].y && titles[1].y < titles[2].y ? null : 'the sections are not in the order Map, Forces, Rules';
+    },
+  },
+  {
+    name: 'new-game-map-rows',
+    scenes: PANEL_SCENES,
+    needs: [
+      '#game-over-dialog',
+      ...Object.values(MAP_TABS).flatMap((tab) => [tab.panel, `${tab.panel} label`, ...tab.rows.flat()]),
+    ],
+    run: (p, el) => {
+      const tab = el(MAP_TABS.global.panel).shown ? MAP_TABS.global : MAP_TABS.regional;
+      const labels = el(`${tab.panel} label`).allTexts.join(', ');
+      if (labels !== tab.labels.join(', ')) return `the ${tab.panel} labels read "${labels}", expected "${tab.labels.join(', ')}"`;
+      const body = el('#game-over-dialog');
+      const innerRight = sectionInnerRight(body);
+      const selectLeft = body.x + PANEL.rowSelectInset;
+      for (const [selectId, buttonId] of tab.rows) {
+        const select = el(selectId);
+        const button = el(buttonId);
+        if (!near(select.x, selectLeft) || !near(select.x + select.w, button.x - 6)) {
+          return `${selectId} is at ${fmt(select)}, expected from x=${selectLeft} to the randomize button, in either tab`;
+        }
+        if (!near(button.x + button.w, innerRight) || !near(button.h, select.h)) return `${buttonId} is at ${fmt(button)}, expected a square the dropdown's height at the panel's inner right edge`;
+      }
+      return null;
+    },
+  },
+  {
+    name: 'new-game-add-opponent',
+    scenes: PANEL_SCENES,
+    needs: ['#game-over-dialog', '#new-game-add-opponent-btn', ADD_OPPONENT_HOST],
+    run: (p, el) => {
+      const body = el('#game-over-dialog');
+      const button = el('#new-game-add-opponent-btn');
+      if (!button.disabled) return 'Add another opponent is enabled';
+      const tip = el(ADD_OPPONENT_HOST).tip;
+      if (tip !== 'Add another opponent is not available in this version.') return `Add another opponent's host tip reads "${tip}"`;
+      return near(button.x, body.x + PANEL.sectionInset) && near(button.x + button.w, sectionInnerRight(body))
+        ? null
+        : `Add another opponent is at ${fmt(button)}, expected the section's inner width`;
+    },
+  },
+  {
+    name: 'new-game-unit-row',
+    scenes: PANEL_SCENES,
+    needs: ['.new-game-unit', '.new-game-unit:first-child', '.new-game-unit:last-child', ...UNIT_ICONS],
+    run: (p, el) => {
+      const texts = el('.new-game-unit').allTexts;
+      const bad = texts.filter((text) => !/^\d+·\$\d+$/.test(text));
+      if (texts.length !== 4 || bad.length > 0) return `the unit row reads "${texts.join(' | ')}", expected four "cap·$price" entries`;
+      return near(el('.new-game-unit:first-child').y, el('.new-game-unit:last-child').y) ? null : 'the four unit types are not on one row';
+    },
+  },
+  {
+    name: 'new-game-rules',
+    scenes: PANEL_SCENES,
+    needs: [...BONUS_SELECTS, '#new-game-start-month', '#new-game-start-month-randomize', '#new-game-fog-checkbox'],
+    run: (p, el) => {
+      const [origin, tech, terrain, weather] = BONUS_SELECTS.map(el);
+      if (!near(origin.y, tech.y) || !near(terrain.y, weather.y) || terrain.y <= origin.y) return 'the bonuses are not two rows of two';
+      if (!near(origin.x, terrain.x) || !near(tech.x, weather.x) || tech.x <= origin.x) return 'the bonuses are not two columns';
+      const month = el('#new-game-start-month');
+      if (!near(month.x, origin.x) || month.y <= terrain.y) return `the starting month ${fmt(month)} should sit under the bonuses, on the first column's edge`;
+      const fog = el('#new-game-fog-checkbox');
+      return fog.shown && fog.y > month.y ? null : 'Fog of war is not under the starting month';
     },
   },
   {

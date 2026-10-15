@@ -86,153 +86,105 @@
       <p id="game-over-message"></p>
     </div>
     <div class="new-game-panel-body" id="game-over-dialog">
-      <div class="openrouter-tab-bar game-over-tab-bar" role="tablist">
-        <button type="button" id="new-game-tab-global" role="tab" aria-selected="true" aria-controls="new-game-panel-global" data-control-tooltip="Start on the world map and pick a home region for each side.">Global</button>
-        <button type="button" id="new-game-tab-regional" role="tab" aria-selected="false" aria-controls="new-game-panel-regional" data-control-tooltip="Start on one region and pick a different side group for each player.">Regional</button>
-      </div>
-      <div id="new-game-panel-global" class="openrouter-tab-panel active" role="tabpanel" aria-labelledby="new-game-tab-global">
-      <div class="game-over-region-row">
-        <div class="game-over-region-cell">
-          <label for="new-game-human-region-select">Human Player:</label>
-          <div class="game-over-region-controls">
+      <section class="new-game-section" aria-labelledby="new-game-section-map">
+        <h2 id="new-game-section-map" class="new-game-section-title">Map</h2>
+        <div class="openrouter-tab-bar new-game-tabs" role="tablist">
+          <button type="button" id="new-game-tab-global" role="tab" aria-selected="true" aria-controls="new-game-panel-global" data-control-tooltip="Start on the world map and pick a home region for each side.">Global</button>
+          <button type="button" id="new-game-tab-regional" role="tab" aria-selected="false" aria-controls="new-game-panel-regional" data-control-tooltip="Start on one region and pick a different side group for each player.">Regional</button>
+        </div>
+        <div id="new-game-panel-global" class="openrouter-tab-panel active" role="tabpanel" aria-labelledby="new-game-tab-global">
+          <div class="new-game-rows">
+            <label for="new-game-human-region-select">Human</label>
             <select id="new-game-human-region-select" data-control-tooltip="Pick your side's home region. The opponent may start in the same region."></select>
-            <button type="button" id="new-game-human-region-randomize" class="compact-blue-btn compact-square-btn game-over-region-randomize" aria-label="Randomize human home region" data-control-tooltip="Pick one of the listed regions at random for your side, including the region already shown.">↻</button>
-          </div>
-        </div>
-        <div class="game-over-region-cell">
-          <label for="new-game-ai-region-select">AI Player:</label>
-          <div class="game-over-region-controls">
+            <button type="button" id="new-game-human-region-randomize" class="compact-blue-btn compact-square-btn new-game-randomize" aria-label="Randomize human home region" data-control-tooltip="Pick one of the listed regions at random for your side, including the region already shown.">↻</button>
+            <label for="new-game-ai-region-select">AI</label>
             <select id="new-game-ai-region-select" data-control-tooltip="Pick the opponent's home region. It may be the same as yours."></select>
-            <button type="button" id="new-game-ai-region-randomize" class="compact-blue-btn compact-square-btn compact-opponent-btn game-over-region-randomize" aria-label="Randomize AI home region" data-control-tooltip="Pick one of the listed regions at random for the opponent, including the region already shown.">↻</button>
+            <button type="button" id="new-game-ai-region-randomize" class="compact-blue-btn compact-square-btn compact-opponent-btn new-game-randomize" aria-label="Randomize AI home region" data-control-tooltip="Pick one of the listed regions at random for the opponent, including the region already shown.">↻</button>
           </div>
         </div>
-      </div>
-      </div>
-      <div id="new-game-panel-regional" class="openrouter-tab-panel" role="tabpanel" aria-labelledby="new-game-tab-regional" hidden>
-        <div class="game-over-regional-region">
-          <div class="game-over-region-cell">
-            <label for="new-game-region-select">Region:</label>
-            <div class="game-over-region-controls">
-              <select id="new-game-region-select" data-control-tooltip="Pick the region both sides fight over. Changing it draws two different sides again."></select>
-              <button type="button" id="new-game-region-randomize" class="compact-blue-btn compact-square-btn game-over-region-randomize" aria-label="Randomize region" data-control-tooltip="Pick one of the listed regions at random, including the region already shown.">↻</button>
-            </div>
+        <div id="new-game-panel-regional" class="openrouter-tab-panel" role="tabpanel" aria-labelledby="new-game-tab-regional" hidden>
+          <div class="new-game-rows">
+            <label for="new-game-region-select">Region</label>
+            <select id="new-game-region-select" data-control-tooltip="Pick the region both sides fight over. Changing it draws two different sides again."></select>
+            <button type="button" id="new-game-region-randomize" class="compact-blue-btn compact-square-btn new-game-randomize" aria-label="Randomize region" data-control-tooltip="Pick one of the listed regions at random, including the region already shown.">↻</button>
+            <label for="new-game-human-side-select">Your side</label>
+            <select id="new-game-human-side-select" data-control-tooltip="Pick your side. It stays different from the opponent's side."></select>
+            <button type="button" id="new-game-human-side-randomize" class="compact-blue-btn compact-square-btn new-game-randomize" aria-label="Randomize human side" data-control-tooltip="Pick one of the other sides at random for your side.">↻</button>
+            <label for="new-game-ai-side-select">Opponent</label>
+            <select id="new-game-ai-side-select" data-control-tooltip="Pick the opponent's side. It stays different from yours."></select>
+            <button type="button" id="new-game-ai-side-randomize" class="compact-blue-btn compact-square-btn compact-opponent-btn new-game-randomize" aria-label="Randomize AI side" data-control-tooltip="Pick one of the other sides at random for the opponent.">↻</button>
           </div>
         </div>
-        <div class="game-over-region-row">
-          <div class="game-over-region-cell">
-            <label for="new-game-human-side-select">Human Player:</label>
-            <div class="game-over-region-controls">
-              <select id="new-game-human-side-select" data-control-tooltip="Pick your side. It stays different from the opponent's side."></select>
-              <button type="button" id="new-game-human-side-randomize" class="compact-blue-btn compact-square-btn game-over-region-randomize" aria-label="Randomize human side" data-control-tooltip="Pick one of the other sides at random for your side.">↻</button>
-            </div>
-          </div>
-          <div class="game-over-region-cell">
-            <label for="new-game-ai-side-select">AI Player:</label>
-            <div class="game-over-region-controls">
-              <select id="new-game-ai-side-select" data-control-tooltip="Pick the opponent's side. It stays different from yours."></select>
-              <button type="button" id="new-game-ai-side-randomize" class="compact-blue-btn compact-square-btn compact-opponent-btn game-over-region-randomize" aria-label="Randomize AI side" data-control-tooltip="Pick one of the other sides at random for the opponent.">↻</button>
-            </div>
-          </div>
+        <span class="control-tooltip-host new-game-add-opponent-host" data-control-tooltip="Add another opponent is not available in this version."><button type="button" id="new-game-add-opponent-btn" class="new-game-add-opponent" disabled><svg class="chrome-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3v10M3 8h10"></path></svg>Add another opponent</button></span>
+      </section>
+      <section class="new-game-section" aria-labelledby="new-game-section-forces">
+        <div class="new-game-section-head">
+          <h2 id="new-game-section-forces" class="new-game-section-title">Forces</h2>
+          <p id="new-game-advanced-tech" class="new-game-advanced-tech"></p>
         </div>
-      </div>
-      <div class="game-over-size-row">
-        <label for="new-game-size-select">Game size:
+        <div class="new-game-size-row">
+          <label for="new-game-size-select">Game size</label>
           <select id="new-game-size-select" data-control-tooltip="Set how many units each side may field. Small is the baseline, Medium doubles it, and Large triples it, without changing the map or the starting forces.">
             <option value="small" selected>Small</option>
             <option value="medium">Medium</option>
             <option value="large">Large</option>
           </select>
-        </label>
-      </div>
-      <p id="new-game-advanced-tech" class="game-over-advanced-tech"></p>
-      <div class="game-over-size-caps" aria-live="polite">
-        <div class="game-over-size-cap">
-          <div class="game-over-size-token">
-            <img src="units/infantry.svg" alt="" />
-            <span id="new-game-size-cap-infantry" class="game-over-size-badge">12</span>
-          </div>
-          <div class="game-over-size-name">Infantry <span id="new-game-cost-infantry">($20)</span></div>
         </div>
-        <div class="game-over-size-cap">
-          <div class="game-over-size-token">
-            <img src="units/armor.svg" alt="" />
-            <span id="new-game-size-cap-armor" class="game-over-size-badge">8</span>
-          </div>
-          <div class="game-over-size-name">Armor <span id="new-game-cost-armor">($40)</span></div>
-        </div>
-        <div class="game-over-size-cap">
-          <div class="game-over-size-token">
-            <img src="units/naval.svg" alt="" />
-            <span id="new-game-size-cap-naval" class="game-over-size-badge">8</span>
-          </div>
-          <div class="game-over-size-name">Naval <span id="new-game-cost-naval">($100)</span></div>
-        </div>
-        <div class="game-over-size-cap">
-          <div class="game-over-size-token">
-            <img src="units/air.svg" alt="" />
-            <span id="new-game-size-cap-air" class="game-over-size-badge">6</span>
-          </div>
-          <div class="game-over-size-name">Air <span id="new-game-cost-air">($60)</span></div>
-        </div>
-      </div>
-      <div class="game-over-options">
-        <div class="game-over-options-line">
-          <label for="new-game-origin-bonus-select">Origin bonus:
-            <select id="new-game-origin-bonus-select" data-control-tooltip="Low adds 2 and High adds 4 when a unit fights in the area where it was built: a country in a global game, and the origin area in a regional game.">
-              <option value="off">Off</option>
-              <option value="low" selected>Low</option>
-              <option value="high">High</option>
-            </select>
-          </label>
-          <span class="game-over-options-separator" aria-hidden="true">/</span>
-          <label for="new-game-tech-bonus-select">Tech bonus:
-            <select id="new-game-tech-bonus-select" data-control-tooltip="Choose Off, Low, or High. Advanced units gain 2 attack at either level, High also adds 2 defense, and Basic units gain nothing.">
-              <option value="off">Off</option>
-              <option value="low" selected>Low</option>
-              <option value="high">High</option>
-            </select>
-          </label>
-        </div>
-        <div class="game-over-options-line">
-          <label for="new-game-terrain-bonus-select">Terrain bonus:
-            <select id="new-game-terrain-bonus-select" data-control-tooltip="In a battle, Low adds 2 and High adds 4 when a unit fights on the terrain where it was built. Off adds nothing, and a unit that also gets the origin bonus receives only the larger of the two.">
-              <option value="off">Off</option>
-              <option value="low" selected>Low</option>
-              <option value="high">High</option>
-            </select>
-          </label>
-          <span class="game-over-options-separator" aria-hidden="true">/</span>
-          <label for="new-game-weather-bonus-select">Weather bonus:
-            <select id="new-game-weather-bonus-select" data-control-tooltip="Choose Off to ignore weather. Low and High slow movement and cut some attacks for units that lack that weather, and High is the harsher penalty.">
-              <option value="off">Off</option>
-              <option value="low" selected>Low</option>
-              <option value="high">High</option>
-            </select>
-          </label>
-        </div>
-      </div>
-      <div class="game-over-start-month">
-        <label for="new-game-fog-checkbox"><input type="checkbox" id="new-game-fog-checkbox" checked data-control-tooltip="Leave this checked to hide places and enemy units you have not seen. Uncheck it to show the whole map for the next match." /> Fog of war</label>
-        <span aria-hidden="true">/</span>
-        <label for="new-game-start-month">Starting month:</label>
-        <div class="game-over-region-controls">
-          <select id="new-game-start-month" data-control-tooltip="Pick the month the match starts in. A global turn is one month. A regional turn is one week, starting on the 1st. Weather changes when the date enters a new month, and a battle stays on the date that is current.">
-            <option value="1" selected>January</option>
-            <option value="2">February</option>
-            <option value="3">March</option>
-            <option value="4">April</option>
-            <option value="5">May</option>
-            <option value="6">June</option>
-            <option value="7">July</option>
-            <option value="8">August</option>
-            <option value="9">September</option>
-            <option value="10">October</option>
-            <option value="11">November</option>
-            <option value="12">December</option>
+        <ul class="new-game-units" aria-live="polite">
+          <li class="new-game-unit"><span class="new-game-unit-token"><img src="units/infantry.svg" alt="Infantry" /></span><span id="new-game-size-cap-infantry" class="new-game-unit-cap">12</span><span class="new-game-unit-dot" aria-hidden="true">·</span><span id="new-game-cost-infantry" class="new-game-unit-cost">$20</span></li>
+          <li class="new-game-unit"><span class="new-game-unit-token"><img src="units/armor.svg" alt="Armor" /></span><span id="new-game-size-cap-armor" class="new-game-unit-cap">8</span><span class="new-game-unit-dot" aria-hidden="true">·</span><span id="new-game-cost-armor" class="new-game-unit-cost">$40</span></li>
+          <li class="new-game-unit"><span class="new-game-unit-token"><img src="units/naval.svg" alt="Naval" /></span><span id="new-game-size-cap-naval" class="new-game-unit-cap">8</span><span class="new-game-unit-dot" aria-hidden="true">·</span><span id="new-game-cost-naval" class="new-game-unit-cost">$100</span></li>
+          <li class="new-game-unit"><span class="new-game-unit-token"><img src="units/air.svg" alt="Air" /></span><span id="new-game-size-cap-air" class="new-game-unit-cap">6</span><span class="new-game-unit-dot" aria-hidden="true">·</span><span id="new-game-cost-air" class="new-game-unit-cost">$60</span></li>
+        </ul>
+      </section>
+      <section class="new-game-section" aria-labelledby="new-game-section-rules">
+        <h2 id="new-game-section-rules" class="new-game-section-title">Rules</h2>
+        <div class="new-game-rules">
+          <label for="new-game-origin-bonus-select">Origin bonus</label>
+          <select id="new-game-origin-bonus-select" data-control-tooltip="Low adds 2 and High adds 4 when a unit fights in the area where it was built: a country in a global game, and the origin area in a regional game.">
+            <option value="off">Off</option>
+            <option value="low" selected>Low</option>
+            <option value="high">High</option>
           </select>
-          <button type="button" id="new-game-start-month-randomize" class="compact-blue-btn compact-square-btn game-over-region-randomize" aria-label="Randomize starting month" data-control-tooltip="Pick a month at random, including the month already shown.">↻</button>
+          <label for="new-game-tech-bonus-select">Tech bonus</label>
+          <select id="new-game-tech-bonus-select" data-control-tooltip="Choose Off, Low, or High. Advanced units gain 2 attack at either level, High also adds 2 defense, and Basic units gain nothing.">
+            <option value="off">Off</option>
+            <option value="low" selected>Low</option>
+            <option value="high">High</option>
+          </select>
+          <label for="new-game-terrain-bonus-select">Terrain bonus</label>
+          <select id="new-game-terrain-bonus-select" data-control-tooltip="In a battle, Low adds 2 and High adds 4 when a unit fights on the terrain where it was built. Off adds nothing, and a unit that also gets the origin bonus receives only the larger of the two.">
+            <option value="off">Off</option>
+            <option value="low" selected>Low</option>
+            <option value="high">High</option>
+          </select>
+          <label for="new-game-weather-bonus-select">Weather bonus</label>
+          <select id="new-game-weather-bonus-select" data-control-tooltip="Choose Off to ignore weather. Low and High slow movement and cut some attacks for units that lack that weather, and High is the harsher penalty.">
+            <option value="off">Off</option>
+            <option value="low" selected>Low</option>
+            <option value="high">High</option>
+          </select>
+          <label for="new-game-start-month">Starting month</label>
+          <div class="new-game-month-controls">
+            <select id="new-game-start-month" data-control-tooltip="Pick the month the match starts in. A global turn is one month. A regional turn is one week, starting on the 1st. Weather changes when the date enters a new month, and a battle stays on the date that is current.">
+              <option value="1" selected>January</option>
+              <option value="2">February</option>
+              <option value="3">March</option>
+              <option value="4">April</option>
+              <option value="5">May</option>
+              <option value="6">June</option>
+              <option value="7">July</option>
+              <option value="8">August</option>
+              <option value="9">September</option>
+              <option value="10">October</option>
+              <option value="11">November</option>
+              <option value="12">December</option>
+            </select>
+            <button type="button" id="new-game-start-month-randomize" class="compact-blue-btn compact-square-btn new-game-randomize" aria-label="Randomize starting month" data-control-tooltip="Pick a month at random, including the month already shown.">↻</button>
+          </div>
         </div>
-      </div>
+        <label class="new-game-check" for="new-game-fog-checkbox"><input type="checkbox" id="new-game-fog-checkbox" checked data-control-tooltip="Leave this checked to hide places and enemy units you have not seen. Uncheck it to show the whole map for the next match." /> Fog of war</label>
+      </section>
     </div>
     <div class="new-game-panel-footer">
       <button type="button" id="new-game-btn" data-control-tooltip="Start the match with the choices on this screen. If the start fails, the screen stays open.">Start game</button>

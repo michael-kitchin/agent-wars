@@ -125,7 +125,7 @@ export interface GameMapListEntry {
    * Urban cells that make a birth hex Advanced.
    *
    * Contract: 21 on the global map. The catalog threshold on a regional map.
-   * When to use: The Advanced line under the game size selector, for the tab that is showing.
+   * When to use: The Advanced line beside the Forces title on the start screen, for the tab that is showing.
    * Expected outcome: A positive integer.
    * Exceptions: None.
    */
@@ -136,19 +136,19 @@ export interface GameMapListEntry {
  * Formats one unit price for the start screen.
  *
  * Purpose: Cost labels share one spelling.
- * When to use: After each unit type on the start menu, for the selected tab and region.
- * Expected outcome: The price in parentheses, such as `($20)`.
+ * When to use: After each unit type's cap on the start screen, for the selected tab and region.
+ * Expected outcome: The price with a dollar sign, such as `$20`.
  * Exceptions: None.
  */
 export function formatUnitCostLabel(cost: number): string {
-  return `($${cost})`;
+  return `$${cost}`;
 }
 
 /**
  * Formats the Advanced threshold line.
  *
  * Purpose: The start dialog states how many urban cells Advanced requires on the map that is showing.
- * When to use: Under the game size selector, for the Global map or the selected region.
+ * When to use: Beside the Forces title on the start screen, for the Global map or the selected region.
  * Expected outcome: `Advanced tech: $60+ hexes` when the threshold is 60.
  * Exceptions: None.
  */

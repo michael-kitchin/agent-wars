@@ -397,7 +397,7 @@ export const MULTI_PLAYER_FILL = '#b0b0b0';
 /**
  * Documents the module-scope binding `MULTI_PLAYER_STROKE` (MULTI_PLAYER_STROKE).
 
- * Purpose: Stacked mixed-side tokens use this for the circle stroke; keep `.game-over-size-token` in `static/index.html` on the same hex.
+ * Purpose: Stacked mixed-side tokens use this for the circle stroke; keep `.new-game-unit-token` in `static/newGameChrome.css` on the same hex.
  * When to use: Mixed-player stack markers and any token filled with `MULTI_PLAYER_FILL`.
  * Expected outcome: Very dark gray `#222222`, not pure black.
  * Exceptions: None.
