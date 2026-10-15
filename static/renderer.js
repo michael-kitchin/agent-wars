@@ -25828,6 +25828,14 @@ ${bonuses}`;
     ).join(", ");
   }
 
+  // src/shared/battleForceCounts.ts
+  function countBattleForces(subUnits) {
+    const human = subUnits.filter((sub) => sub.player === "human").length;
+    const opponent = subUnits.length - human;
+    const total = human + opponent;
+    return { human, opponent, humanShare: total > 0 ? human / total : 0.5 };
+  }
+
   // src/shared/battleHeaderText.ts
   function formatBattleHeaderTitle(hexCode) {
     return hexCode ? `Battle at (${hexCode})` : "Battle";
@@ -25873,12 +25881,31 @@ ${bonuses}`;
       captionEl.innerHTML = caption && caption.text.trim() !== "" ? formatHexNamingCaptionHtml(caption) : "";
     });
   }
+  function renderBattleForceBar(battle) {
+    const bar = document.getElementById("battle-force-bar");
+    if (!bar) return;
+    if (rendererSharedState.resolutionMoveAnimation != null && bar.dataset.battleId === battle.battleId) return;
+    bar.dataset.battleId = battle.battleId;
+    const counts = countBattleForces(battle.subUnits);
+    const humanCount = document.getElementById("battle-force-human-count");
+    if (humanCount) humanCount.textContent = counts.human.toLocaleString("en-US");
+    const opponentCount = document.getElementById("battle-force-opponent-count");
+    if (opponentCount) opponentCount.textContent = counts.opponent.toLocaleString("en-US");
+    const fill = document.getElementById("battle-force-human-fill");
+    if (fill) {
+      fill.style.width = `${(counts.humanShare * 100).toFixed(1)}%`;
+      const sidesMeet = counts.humanShare > 0 && counts.humanShare < 1;
+      fill.style.borderRightWidth = sidesMeet ? "" : "0";
+    }
+  }
   function renderBattleHeader(state, battle) {
     const inBattle = state != null && battle != null;
     switchTopBarToBattle(inBattle);
     if (!state || !battle) {
       const captionEl = document.getElementById("battle-header-caption");
       if (captionEl) delete captionEl.dataset.battleId;
+      const bar = document.getElementById("battle-force-bar");
+      if (bar) delete bar.dataset.battleId;
       return;
     }
     const titleEl = document.getElementById("battle-header-title");
@@ -25893,6 +25920,7 @@ ${bonuses}`;
       if (battle.weather) statusEl.insertAdjacentHTML("beforeend", ` \xB7 ${formatWeatherIconHtml(battle.weather)}`);
     }
     renderBattleHeaderCaption(battle);
+    renderBattleForceBar(battle);
   }
 
   // src/renderer/chrome/topBar.ts

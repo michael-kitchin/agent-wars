@@ -1,8 +1,10 @@
 /**
- * The battle header: while a battle is open, the top bar names the battle and its beat in place of the match status.
+ * The battle header: while a battle is open, the top bar names the battle and its beat, and shows the force bar, in
+ * place of the match status.
  */
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import type { TacticalBattleSnapshot } from '../../shared/tacticalBattleTypes';
+import { countBattleForces } from '../../shared/battleForceCounts';
 import { formatBattleHeaderStatus, formatBattleHeaderTitle } from '../../shared/battleHeaderText';
 import { formatHexNamingCaptionHtml } from '../../shared/hexNamingCaption';
 import { orderTargetHexCode } from '../../shared/orderTargetHexCode';
@@ -68,14 +70,43 @@ function renderBattleHeaderCaption(battle: TacticalBattleSnapshot): void {
 }
 
 /**
+ * Writes the force bar: each side's sub-unit count and the player's share of the bar.
+ *
+ * Purpose: The player sees at a glance how the two sides compare in the fight.
+ * When to use: From `renderBattleHeader` while a battle is open.
+ * Expected outcome: The counts and the teal part of the bar follow `countBattleForces` for the battle's sub-units. While
+ *   a beat plays back, the snapshot already holds the beat's result, so the bar keeps the counts it showed before the
+ *   beat and catches up when the playback ends, as the map does. The light edge between the colors is omitted when the
+ *   player's share is 0 or 1, so a side with every remaining sub-unit fills the bar in one color.
+ * Exceptions: None; missing elements are skipped.
+ */
+function renderBattleForceBar(battle: TacticalBattleSnapshot): void {
+  const bar = document.getElementById('battle-force-bar');
+  if (!bar) return;
+  if (S.resolutionMoveAnimation != null && bar.dataset.battleId === battle.battleId) return;
+  bar.dataset.battleId = battle.battleId;
+  const counts = countBattleForces(battle.subUnits);
+  const humanCount = document.getElementById('battle-force-human-count');
+  if (humanCount) humanCount.textContent = counts.human.toLocaleString('en-US');
+  const opponentCount = document.getElementById('battle-force-opponent-count');
+  if (opponentCount) opponentCount.textContent = counts.opponent.toLocaleString('en-US');
+  const fill = document.getElementById('battle-force-human-fill');
+  if (fill) {
+    fill.style.width = `${(counts.humanShare * 100).toFixed(1)}%`;
+    const sidesMeet = counts.humanShare > 0 && counts.humanShare < 1;
+    fill.style.borderRightWidth = sidesMeet ? '' : '0';
+  }
+}
+
+/**
  * Shows the battle header while a battle is open, and the match status otherwise.
  *
  * Purpose: In a battle the player needs where the fight is and which beat it is, not the world-map readouts.
  * When to use: From `renderTopBarStatus`, with the latest game state and `S.tacticalBattleSnapshot`.
  * Expected outcome: With a game state and a battle, the bar switches to the battle header: the title, such as "Battle at
  *   (E8)", the hex caption, and the status line, such as "Beat 2 · Tactical planning · April, Year 1", ending with the
- *   battle's weather when it has one. Otherwise the bar shows the match status, and the next battle's caption is
- *   requested again.
+ *   battle's weather when it has one, and the force bar from `renderBattleForceBar`. Otherwise the bar shows the match
+ *   status, and the next battle's caption and counts are written afresh.
  * Exceptions: None; missing elements are skipped.
  */
 export function renderBattleHeader(state: GameStateSnapshot | null, battle: TacticalBattleSnapshot | null): void {
@@ -84,6 +115,8 @@ export function renderBattleHeader(state: GameStateSnapshot | null, battle: Tact
   if (!state || !battle) {
     const captionEl = document.getElementById('battle-header-caption');
     if (captionEl) delete captionEl.dataset.battleId;
+    const bar = document.getElementById('battle-force-bar');
+    if (bar) delete bar.dataset.battleId;
     return;
   }
   const titleEl = document.getElementById('battle-header-title');
@@ -98,4 +131,5 @@ export function renderBattleHeader(state: GameStateSnapshot | null, battle: Tact
     if (battle.weather) statusEl.insertAdjacentHTML('beforeend', ` · ${formatWeatherIconHtml(battle.weather)}`);
   }
   renderBattleHeaderCaption(battle);
+  renderBattleForceBar(battle);
 }

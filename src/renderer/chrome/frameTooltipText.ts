@@ -162,3 +162,14 @@ export const mapTechModeTooltipText =
  * Exceptions: None.
  */
 export const mapLegendToggleTooltipText = 'Show or hide the terrain legend and its style choice.';
+
+/**
+ * The battle header's force bar tip.
+ *
+ * Purpose: Says what the two counts include, and that the enemy count is not limited by fog of war.
+ * When to use: `#battle-force-bar`.
+ * Expected outcome: The control tip shows this sentence.
+ * Exceptions: None.
+ */
+export const battleForceBarTooltipText =
+  'Sub-units each side has in this battle, counting any carried by a ship. A battle has no fog of war, so both counts are exact.';

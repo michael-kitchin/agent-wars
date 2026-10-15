@@ -30,6 +30,7 @@ While a battle is open, the bar is the battle header. Its face is darker and war
 - The game menu button.
 - The title, "Battle at (E8)", naming the battle's world hex by its code (`orderTargetHexCode`), then that hex's caption as the hex tooltip shows it, with flags. The caption ends in an ellipsis when the header is narrow; the title keeps its width.
 - Under the title, the status line: "Beat N · Tactical planning" while the player drafts, or "Beat N · Tactical resolution" while a beat resolves or plays back. N is the battle's current beat. A committed beat advances that number before playback, so the resolution line names the next beat. The line then gives the match date (`formatBattleHeaderStatus` in `src/shared/battleHeaderText.ts`), then the battle's weather icon and word when the battle has weather (`formatWeatherIconHtml`, added by `renderBattleHeader`).
+- The force bar, centred in the space between the title and Exit Battle: the player's sub-unit count and "yours", the caption "Sub-units in battle", then "enemy" and the opponent's count, over a bar whose teal part is the player's share of both counts (`countBattleForces` in `src/shared/battleForceCounts.ts`). A light edge marks where the teal and rose meet, and it is left off when one side has the whole bar. Every sub-unit counts, including one carried by a ship. A battle has no fog of war, so the enemy count is exact. While a beat plays back, the bar keeps the counts from before the beat and catches up when the playback ends. Below a 1100 px window the bar narrows and the words and the caption hide; the counts and the bar stay.
 - Exit Battle, beside Settings. When it is shown, enabled, or hidden is in [tactical-battle-controls.md](tactical-battle-controls.md).
 - Settings and Help.
 
@@ -66,7 +67,7 @@ While a battle is open, the bar is the battle header. Its face is darker and war
 
 | Aspect | Strategic | Tactical |
 | --- | --- | --- |
-| What the bar shows | The match status: sides, readouts, and the date block | The battle header: the title, the hex caption, the status line, and Exit Battle beside Settings |
+| What the bar shows | The match status: sides, readouts, and the date block | The battle header: the title, the hex caption, the status line, the force bar, and Exit Battle beside Settings |
 | Turn line | "Turn N · Planning" in the date block | "Beat N · Tactical planning" while drafting. While a beat plays back, "Beat N · Tactical resolution", and N is already the next beat. Then the match date and the battle's weather |
 | Face | `--chrome-bg-deep` | `--battle-header-bg` |
 | Readouts | Strategic snapshot | Hidden; a battle does not change them |
@@ -90,7 +91,7 @@ None.
 
 ## Code Entry Points
 
-- `static/index.html` (`#app-topbar`, `#game-menu-btn`, `#topbar-human-side`, `#topbar-opponent-side`, `#topbar-stat-production`, `#topbar-stat-production-suffix`, `#topbar-stat-forces-host`, `#topbar-stat-forces`, `#topbar-stat-forces-cap`, `#topbar-stat-human-home`, `#topbar-stat-human-home-total`, `#topbar-stat-opponent-home`, `#topbar-stat-opponent-home-total`, `#topbar-date`, `#topbar-turn-phase`, `#topbar-settings-btn`, `#topbar-help-btn`, `#battle-header-place`, `#battle-header-title`, `#battle-header-caption`, `#battle-header-status`, `#battle-header-center`, `#tactical-exit-host`, `#tactical-exit-btn`)
+- `static/index.html` (`#app-topbar`, `#game-menu-btn`, `#topbar-human-side`, `#topbar-opponent-side`, `#topbar-stat-production`, `#topbar-stat-production-suffix`, `#topbar-stat-forces-host`, `#topbar-stat-forces`, `#topbar-stat-forces-cap`, `#topbar-stat-human-home`, `#topbar-stat-human-home-total`, `#topbar-stat-opponent-home`, `#topbar-stat-opponent-home-total`, `#topbar-date`, `#topbar-turn-phase`, `#topbar-settings-btn`, `#topbar-help-btn`, `#battle-header-place`, `#battle-header-title`, `#battle-header-caption`, `#battle-header-status`, `#battle-header-center`, `#battle-force-bar`, `#battle-force-human-count`, `#battle-force-opponent-count`, `#battle-force-human-fill`, `#tactical-exit-host`, `#tactical-exit-btn`)
 - `static/frameChrome.css`
 - `src/renderer/chrome/topBar.ts`
 - `src/renderer/chrome/battleHeader.ts` (`renderBattleHeader`)
@@ -98,3 +99,4 @@ None.
 - `src/shared/topBarStats.ts`
 - `src/shared/topBarDateBlock.ts`
 - `src/shared/battleHeaderText.ts`
+- `src/shared/battleForceCounts.ts`

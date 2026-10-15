@@ -61,6 +61,7 @@ The tip can appear whenever the control can receive the pointer or keyboard focu
 - Weather map mode: Show the map as usual: terrain, and each hex's weather while the weather bonus is on.
 - Tech map mode: Show each hex's code, production, and tech tier instead of terrain on the world map, until you choose Weather. Holding T shows the same view while the key is down.
 - Legend: Show or hide the terrain legend and its style choice.
+- Force bar in the battle header: Sub-units each side has in this battle, counting any carried by a ship. A battle has no fog of war, so both counts are exact.
 - Production readout: The production your cities can add each turn. A city adds its share only while it is building, and a city on the neutral border adds none.
 - Forces readout: Units you have fielded, out of the most this game size allows: then each unit type as "infantry 3 of 12", separated by commas, ending with a period.
 - Your home readout: Hexes of your home region that you hold, out of all its hexes.

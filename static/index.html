@@ -48,7 +48,16 @@
       <span id="topbar-date" class="topbar-date">—</span>
       <span id="topbar-turn-phase" class="topbar-turn-phase">—</span>
     </div>
-    <div id="battle-header-center" class="battle-header-center battle-header-only"></div>
+    <div id="battle-header-center" class="battle-header-center battle-header-only">
+      <div id="battle-force-bar" class="battle-force-bar" data-control-tooltip="Sub-units each side has in this battle, counting any carried by a ship. A battle has no fog of war, so both counts are exact.">
+        <div class="battle-force-labels">
+          <span class="battle-force-side"><span id="battle-force-human-count" class="battle-force-count">—</span><span class="battle-force-word">yours</span></span>
+          <span class="battle-force-caption">Sub-units in battle</span>
+          <span class="battle-force-side"><span class="battle-force-word">enemy</span><span id="battle-force-opponent-count" class="battle-force-count">—</span></span>
+        </div>
+        <div class="battle-force-track" aria-hidden="true"><div id="battle-force-human-fill" class="battle-force-fill"></div></div>
+      </div>
+    </div>
     <div class="battle-header-exit battle-header-only">
       <span id="tactical-exit-host" class="control-tooltip-host" data-control-tooltip="Leave the battle, bring back your world-map orders, and play that turn. The button does nothing while a battle turn is resolving or playing back."><button type="button" id="tactical-exit-btn" class="battle-exit-btn"><svg class="chrome-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3H3v10h3M10 5l3 3-3 3M13 8H6"></path></svg>Exit Battle</button></span>
     </div>

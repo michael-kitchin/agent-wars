@@ -216,14 +216,76 @@ body:has(#game-over-overlay:not(.hidden)) #sidebar {
   font-size: 11.5px;
   line-height: 1.1;
 }
-/* The middle of the header; it fills the space between the title and the controls on the right. */
+/* The middle of the header, holding the force bar. It fills the space between the title and the controls on the right,
+   and never narrows past the bar, so the title's caption gives way first. */
 .battle-header-center {
-  flex: 1 1 auto;
-  min-width: 8px;
+  flex: 1 0 auto;
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 0 12px;
   border-left: 1px solid var(--chrome-divider);
+}
+/* The force bar: each side's sub-unit count, and the player's share drawn in teal against the opponent's rose. */
+.battle-force-bar {
+  flex: none;
+  width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.battle-force-labels {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11px;
+  line-height: 1;
+}
+.battle-force-side {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+}
+.battle-force-count {
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.battle-force-word {
+  color: var(--chrome-muted);
+}
+.battle-force-caption {
+  color: var(--chrome-muted);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.battle-force-track {
+  display: flex;
+  height: 8px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--force-bar-opponent);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12);
+}
+/* battleHeader.ts sets the width to the player's share. The light right edge marks where the two sides meet, and is omitted when one side has the whole bar. */
+.battle-force-fill {
+  flex: none;
+  height: 100%;
+  background: var(--force-bar-human);
+  border-right: 2px solid var(--chrome-text);
+}
+/* Narrow windows keep the two counts and the bar. The words and the caption give way; the bar's tip still explains it. */
+@media (max-width: 1099px) {
+  .battle-force-bar {
+    width: 160px;
+  }
+  .battle-force-word,
+  .battle-force-caption {
+    display: none;
+  }
 }
 /* Exit Battle, beside Settings. Its colors are the shared button colors. The block hides with the button: no battle, or the annihilation dialog. */
 .battle-header-exit {
