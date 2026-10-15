@@ -64,7 +64,7 @@ None.
 ## Code Entry Points
 
 - `static/index.html` (`#terrain-legend`, `#map-legend-toggle`)
-- `src/renderer/map/mapModeColumn.ts`
+- `src/renderer/map/mapModeTabs.ts`
 - `src/renderer/map/mapChromeLayout.ts`
 - `src/shared/mapChromePlacement.ts`
 - `src/renderer/rendering/terrainVisualStyles.ts`

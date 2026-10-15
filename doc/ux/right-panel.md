@@ -12,7 +12,7 @@ Shown in Strategic planning, Tactical planning, Resolution playback, the tactica
 
 ## Information Displayed
 
-- A tab rail on the panel's outer edge, with Orders, Reports, Opponent, Build, and Forces. Build and Forces are disabled in this version. The selected tab is marked while the panel is expanded, and the mark is cleared while the panel is collapsed.
+- A tab rail on the panel's outer edge, with Orders, Reports, Opponent, Build, and Forces. Build and Forces are disabled in this version. Each tab is 56 × 58 px, an icon above a 9 px label, the same size as the map-mode tabs on the [minimap panel](minimap.md). The selected tab is marked while the panel is expanded, and the mark is cleared while the panel is collapsed.
 - A header with the selected tab's name, a subtitle, and a button that collapses the panel. On the Orders tab the subtitle reads "N queued for turn T", or "N queued for beat B" in a battle, where N counts every row of the three order groups (`formatQueuedOrdersSubtitle` in `src/shared/orderRowDetail.ts`). On the Reports tab it reads "this match". On the Opponent tab it names the opponent's home region, as the top bar does.
 - A count on the Orders tab in the rail: the number of queued orders, the same N. It is hidden while nothing is queued.
 - A count on the Reports tab in the rail: the number of unread reports. It is hidden at zero. See [reports-tab.md](reports-tab.md).

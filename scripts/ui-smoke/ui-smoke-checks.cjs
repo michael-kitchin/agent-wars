@@ -31,8 +31,8 @@ const { BATTLE_CHECKS } = require('./ui-smoke-battle-checks.cjs');
  * Purpose: Runs inside the page through `page.evaluate`, so it may only use browser globals and its argument.
  * When to use: Once per scene, after the scene has settled, with every selector that any check reads.
  * Expected outcome: A plain object that can be passed back to Node. `elements` has one entry per selector:
- *   null when the selector matches nothing, otherwise the first match's box, text, and the attributes the checks use,
- *   plus the text of every match in `allTexts`.
+ *   null when the selector matches nothing, otherwise the first match's box, text, font size, and the attributes the
+ *   checks use, plus the text of every match in `allTexts`.
  * Exceptions: None.
  */
 function probePage(selectors) {
@@ -41,8 +41,8 @@ function probePage(selectors) {
    *
    * Purpose: Every check reads elements the same way.
    * When to use: For each selector passed to `probePage`.
-   * Expected outcome: The first match's box, whether it is shown, its trimmed text, and selected attributes, and the
-   *   trimmed text of every match, or null when the selector matches nothing.
+   * Expected outcome: The first match's box, whether it is shown, its trimmed text, its computed font size, and selected
+   *   attributes, and the trimmed text of every match, or null when the selector matches nothing.
    * Exceptions: None.
    */
   const describe = (selector) => {
@@ -70,6 +70,7 @@ function probePage(selectors) {
       collapsed: el.getAttribute('data-collapsed'),
       expanded: el.getAttribute('aria-expanded'),
       pressed: el.getAttribute('aria-pressed'),
+      fontSize: getComputedStyle(el).fontSize,
       ancestorIds,
     };
   };

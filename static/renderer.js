@@ -36054,8 +36054,8 @@ ${bonuses}`;
     band.style.right = `${span.right}px`;
   }
 
-  // src/renderer/map/mapModeColumn.ts
-  function syncMapModeColumn() {
+  // src/renderer/map/mapModeTabs.ts
+  function syncMapModeTabs() {
     const mode = getMapViewMode();
     document.getElementById("map-mode-weather")?.setAttribute("aria-pressed", String(mode === "weather"));
     document.getElementById("map-mode-tech")?.setAttribute("aria-pressed", String(mode === "tech"));
@@ -36067,21 +36067,21 @@ ${bonuses}`;
   function chooseMapView(mode, requestRedraw3) {
     if (getMapViewMode() === mode) return;
     setMapViewMode(mode);
-    syncMapModeColumn();
+    syncMapModeTabs();
     requestRedraw3();
   }
   function toggleTerrainLegend() {
     const legend = document.getElementById("terrain-legend");
     if (!legend) return;
     legend.hidden = !legend.hidden;
-    syncMapModeColumn();
+    syncMapModeTabs();
     layoutMapChrome();
   }
-  function wireMapModeColumn(requestRedraw3) {
+  function wireMapModeTabs(requestRedraw3) {
     document.getElementById("map-mode-weather")?.addEventListener("click", () => chooseMapView("weather", requestRedraw3));
     document.getElementById("map-mode-tech")?.addEventListener("click", () => chooseMapView("tech", requestRedraw3));
     document.getElementById("map-legend-toggle")?.addEventListener("click", toggleTerrainLegend);
-    syncMapModeColumn();
+    syncMapModeTabs();
   }
 
   // src/renderer/map/initCore.ts
@@ -36133,7 +36133,7 @@ ${bonuses}`;
           }
         });
       }
-      wireMapModeColumn(() => deps.requestRedraw());
+      wireMapModeTabs(() => deps.requestRedraw());
       layoutMapChrome();
     } catch (err) {
       console.error("Map init failed:", err);

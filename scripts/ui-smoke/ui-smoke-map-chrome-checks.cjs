@@ -1,5 +1,5 @@
 /**
- * Checks of the chrome on the map for the UI smoke run: the minimap panel and its mode buttons, the terrain legend, and
+ * Checks of the chrome on the map for the UI smoke run: the minimap panel and its map-mode tabs, the terrain legend, and
  * Leaflet's zoom buttons, scale, and attribution.
  *
  * Purpose: Keeps the map chrome checks apart from the frame, console, and scenario checks, so each table stays readable.
@@ -12,26 +12,26 @@
 const { SCENES, NEW_GAME_SCENES, near, fmt } = require('./ui-smoke-scenes.cjs');
 
 /**
- * Sizes of the minimap panel, in CSS pixels.
+ * Sizes of the minimap panel, in CSS pixels, and the label size its tabs share with the console rail.
  *
- * Purpose: The panel keeps today's 200 px minimap and adds a 96 px column of five 40 px buttons, 12 px in from the map's
- *   top-left corner. The legend opens 8 px from it.
- * When to use: The panel and legend geometry checks.
- * Expected outcome: Matches `.minimap-panel` and `.map-mode-btn` in `static/shellChrome.css`, and `MAP_CHROME_INSET`
- *   and `MAP_CHROME_GAP` in `src/shared/mapChromePlacement.ts`.
+ * Purpose: The panel sits 12 px in from the map's top-left corner: a row of five 56 x 58 px tabs, then the 280 x 200 px
+ *   overview under it. The legend opens 8 px from the panel.
+ * When to use: The panel, tab, and legend checks.
+ * Expected outcome: Matches `--minimap-width`, `--chrome-tab-height`, and `--chrome-tab-label-size` in
+ *   `static/shellChrome.css`, and `MAP_CHROME_INSET` and `MAP_CHROME_GAP` in `src/shared/mapChromePlacement.ts`.
  * Exceptions: None.
  */
-const PANEL = Object.freeze({ inset: 12, minimap: 200, column: 96, button: 40, legendGap: 8 });
+const PANEL = Object.freeze({ inset: 12, minimapWidth: 280, minimapHeight: 200, tabWidth: 56, tabHeight: 58, labelSize: '9px', legendGap: 8 });
 
 /**
- * The map-mode buttons, top to bottom.
+ * The map-mode tabs, left to right.
  *
- * Purpose: The panel's column must hold exactly these, in this order.
+ * Purpose: The panel's tab row must hold exactly these, in this order.
  * When to use: The panel geometry check.
  * Expected outcome: Weather, Tech, Control, Production, Legend.
  * Exceptions: None.
  */
-const MODE_BUTTONS = Object.freeze(['#map-mode-weather', '#map-mode-tech', '#map-mode-control', '#map-mode-production', '#map-legend-toggle']);
+const MODE_TABS = Object.freeze(['#map-mode-weather', '#map-mode-tech', '#map-mode-control', '#map-mode-production', '#map-legend-toggle']);
 
 /**
  * Leaflet's zoom buttons, scale, and attribution on the main map.
@@ -70,33 +70,50 @@ const MAP_CHROME_CHECKS = Object.freeze([
   {
     name: 'minimap-panel-layout',
     scenes: PLACEMENT_SCENES,
-    needs: ['#canvas-container', '#minimap-panel', '#minimap', '#map-mode-column', ...MODE_BUTTONS],
+    needs: ['#canvas-container', '#minimap-panel', '#minimap', '#map-mode-tabs', ...MODE_TABS],
     run: (p, el) => {
       const c = el('#canvas-container');
       const panel = el('#minimap-panel');
       const mini = el('#minimap');
-      const column = el('#map-mode-column');
+      const tabs = el('#map-mode-tabs');
       if (!panel.shown) return 'the minimap panel is not shown';
       if (!near(panel.x, c.x + PANEL.inset) || !near(panel.y, c.y + PANEL.inset)) {
         return `the minimap panel is at ${fmt(panel)}, expected its corner ${PANEL.inset} px in from the map's top-left`;
       }
-      if (!near(mini.w, PANEL.minimap) || !near(mini.h, PANEL.minimap)) return `the minimap is ${fmt(mini)}, expected ${PANEL.minimap}x${PANEL.minimap}`;
-      if (!near(column.w, PANEL.column) || column.x < mini.x + mini.w - 1) return `the mode column is ${fmt(column)}, expected ${PANEL.column} px wide right of the minimap`;
-      for (const [i, selector] of MODE_BUTTONS.entries()) {
-        const button = el(selector);
-        if (!near(button.h, PANEL.button) || !near(button.y, column.y + i * PANEL.button)) {
-          return `${selector} is at ${fmt(button)}, expected button ${i + 1} of the column, ${PANEL.button} px tall`;
+      if (!near(tabs.w, PANEL.minimapWidth) || !near(tabs.y, panel.y + 1)) {
+        return `the mode tabs are at ${fmt(tabs)}, expected a ${PANEL.minimapWidth} px row at the top of the panel ${fmt(panel)}`;
+      }
+      for (const [i, selector] of MODE_TABS.entries()) {
+        const tab = el(selector);
+        if (!near(tab.w, PANEL.tabWidth) || !near(tab.h, PANEL.tabHeight) || !near(tab.x, tabs.x + i * PANEL.tabWidth) || !near(tab.y, tabs.y)) {
+          return `${selector} is at ${fmt(tab)}, expected tab ${i + 1} of the row, ${PANEL.tabWidth}x${PANEL.tabHeight}`;
         }
+      }
+      if (!near(mini.w, PANEL.minimapWidth) || !near(mini.h, PANEL.minimapHeight) || mini.y < tabs.y + tabs.h - 1) {
+        return `the minimap is at ${fmt(mini)}, expected ${PANEL.minimapWidth}x${PANEL.minimapHeight} under the tabs ${fmt(tabs)}`;
       }
       return null;
     },
   },
   {
+    name: 'map-mode-tabs-match-rail',
+    scenes: PLACEMENT_SCENES,
+    needs: ['#map-mode-weather', '#console-tab-orders'],
+    run: (p, el) => {
+      const tab = el('#map-mode-weather');
+      const rail = el('#console-tab-orders');
+      if (tab.fontSize !== PANEL.labelSize || rail.fontSize !== PANEL.labelSize) {
+        return `the tab labels are ${tab.fontSize} on the minimap panel and ${rail.fontSize} on the console rail, expected ${PANEL.labelSize} on both`;
+      }
+      return near(tab.h, rail.h) ? null : `a map-mode tab is ${tab.h} px tall and a console tab ${rail.h} px, expected the same height`;
+    },
+  },
+  {
     name: 'map-mode-weather-default',
     scenes: [...PLACEMENT_SCENES, SCENES.ordersQueued],
-    needs: [...MODE_BUTTONS, '#terrain-legend'],
+    needs: [...MODE_TABS, '#terrain-legend'],
     run: (p, el) => {
-      const state = MODE_BUTTONS.map((selector) => `${selector} ${el(selector).disabled ? 'disabled' : `pressed=${el(selector).pressed}`}`);
+      const state = MODE_TABS.map((selector) => `${selector} ${el(selector).disabled ? 'disabled' : `pressed=${el(selector).pressed}`}`);
       const expected = [
         '#map-mode-weather pressed=true',
         '#map-mode-tech pressed=false',
@@ -104,7 +121,7 @@ const MAP_CHROME_CHECKS = Object.freeze([
         '#map-mode-production disabled',
         '#map-legend-toggle pressed=false',
       ];
-      if (state.join(', ') !== expected.join(', ')) return `the mode buttons read "${state.join(', ')}"`;
+      if (state.join(', ') !== expected.join(', ')) return `the mode tabs read "${state.join(', ')}"`;
       return el('#terrain-legend').shown ? 'the terrain legend is open' : null;
     },
   },
@@ -114,7 +131,7 @@ const MAP_CHROME_CHECKS = Object.freeze([
     needs: ['#map-mode-weather', '#map-mode-tech'],
     run: (p, el) => {
       const line = `Weather pressed=${el('#map-mode-weather').pressed}, Tech pressed=${el('#map-mode-tech').pressed}`;
-      return line === 'Weather pressed=false, Tech pressed=true' ? null : `the view buttons read "${line}"`;
+      return line === 'Weather pressed=false, Tech pressed=true' ? null : `the view tabs read "${line}"`;
     },
   },
   {
@@ -126,7 +143,7 @@ const MAP_CHROME_CHECKS = Object.freeze([
       const panel = el('#minimap-panel');
       const legend = el('#terrain-legend');
       const toggle = el('#map-legend-toggle');
-      if (toggle.pressed !== 'true' || toggle.expanded !== 'true') return `the Legend button reads pressed=${toggle.pressed}, expanded=${toggle.expanded}`;
+      if (toggle.pressed !== 'true' || toggle.expanded !== 'true') return `the Legend tab reads pressed=${toggle.pressed}, expanded=${toggle.expanded}`;
       if (!legend.shown) return 'the terrain legend is not shown';
       const besideX = panel.x + panel.w + PANEL.legendGap;
       if (besideX + legend.w + PANEL.inset <= c.x + c.w + 1) {

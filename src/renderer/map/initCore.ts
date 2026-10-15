@@ -20,7 +20,7 @@ import { resumeHexTooltipDwellAfterAimingEnds } from './mainMapInteractions';
 import { getMainLeafletMap, initWorldLeafletMaps, setMainBasemapByProviderId, setMainBasemapFilter } from './worldLeafletMap';
 import { installControlTooltip } from '../chrome/controlTooltip';
 import { layoutMapChrome } from './mapChromeLayout';
-import { wireMapModeColumn } from './mapModeColumn';
+import { wireMapModeTabs } from './mapModeTabs';
 
 /**
  * Documents the `InitCoreDeps` interface as a named contract surface (interface InitCoreDeps).
@@ -372,7 +372,7 @@ export function wireInitCore(deps: InitCoreDeps): void {
         },
       });
     }
-    wireMapModeColumn(() => deps.requestRedraw());
+    wireMapModeTabs(() => deps.requestRedraw());
     layoutMapChrome();
   } catch (err) {
     console.error('Map init failed:', err);

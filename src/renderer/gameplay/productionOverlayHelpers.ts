@@ -83,7 +83,7 @@ export function getUrbanProductionCapacityForHex(h3Index: string): number {
  * Reports whether the map shows its inspection view: terrain fill hidden and, on the world map, hex codes and tech icons.
  *
  * Purpose: Every drawing path that used to ask whether T is held asks here. The name stays because many callers pass
- *   it along; the answer now also covers the Tech view chosen in the mode column.
+ *   it along; the answer now also covers the Tech view chosen in the mode tabs.
  * When to use: Wherever drawing depends on the inspection view.
  * Expected outcome: True while T is held, or while the Tech view is chosen outside a battle and outside the new-game
  *   or game-over overlay. See `isTerrainInspectionShown`.
