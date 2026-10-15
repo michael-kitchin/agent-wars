@@ -1,6 +1,6 @@
-# Right Panel Command Bar
+# Console Command Bar
 
-Ready, in the right panel's footer, and the Ranged and air-strike controls in the [selection panel](selection-panel.md). The game-state readout is the date block in the [top bar](top-bar.md), or the battle header's status line in a battle.
+Ready, in the console's footer, and the Ranged and air-strike controls in the [selection panel](selection-panel.md). The game-state readout is the date block in the [top bar](top-bar.md), or the battle header's status line in a battle.
 
 ## Purpose
 
@@ -8,11 +8,11 @@ Give the player the buttons that end the turn or start a targeted order.
 
 ## Availability
 
-Ready shows whenever the right panel does. Ranged and the air-strike controls show in the selection panel, which shows while units are selected. All of them follow the rules below in Strategic planning and Tactical planning. While the tactical battles list is open, the bar stays visible and does not receive pointer input. In New game and Game over the right panel and the selection panel are absent, so these controls are absent with them. In Tactical annihilation they are disabled or hidden as stated in [modes-and-transitions.md](modes-and-transitions.md).
+Ready shows whenever the console does. Ranged and the air-strike controls show in the selection panel, which shows while units are selected. All of them follow the rules below in Strategic planning and Tactical planning. While the tactical battles list is open, the bar stays visible and does not receive pointer input. In New game and Game over the console and the selection panel are absent, so these controls are absent with them. In Tactical annihilation they are disabled or hidden as stated in [modes-and-transitions.md](modes-and-transitions.md).
 
 ## Information Displayed
 
-- The Ready button, across the width of the footer, under the opponent status line. Its label is "Ready", or "AI:" plus the elapsed wait, while opponent planning is still running. While the right panel is collapsed, the status line is hidden, Ready narrows to the tab rail's width, and the "AI:" label takes two lines. The status line's own rules are in [right-panel.md](right-panel.md).
+- The Ready button, across the width of the footer, under the opponent status line. Its label is "Ready", or "AI:" plus the elapsed wait, while opponent planning is still running. While the console is collapsed, the status line is hidden, Ready narrows to the tab rail's width, and the "AI:" label takes two lines. The status line's own rules are in [console.md](console.md).
 - The Ranged control, in the selection panel's summary bar, shown whenever the selection panel is. Its label is "Ranged", "Cancel", or "Strike". The air-strike target list and its Cancel button use that same height.
 - While the selection cannot use it, the control is greyed out. Its label is "Strike" when the selection has an air unit and "Ranged" otherwise. Its reason is its tip, and also shows in the selection panel's details under the unit rows: "Infantry can't fire on the world map." when a world-map selection includes infantry and no air unit, or "Strike needs a selection of air units only." when air units are selected with other types (`selectionSupportAction` in `src/shared/selectionSupportButtonMode.ts`).
 - While Strike targeting is on, a target-type choice: Enemy Units, Production, Airports, or Seaports, and a Cancel button for that targeting.
@@ -61,7 +61,7 @@ Ready shows whenever the right panel does. Ranged and the air-strike controls sh
 
 ## Related Documents
 
-- [right-panel.md](right-panel.md)
+- [console.md](console.md)
 - [selection-panel.md](selection-panel.md)
 - [selection-model.md](selection-model.md)
 - [order-lifecycle.md](order-lifecycle.md)

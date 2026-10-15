@@ -35,12 +35,12 @@ Visual styling and the arrangement of items inside an element are out of scope. 
 | Multi-hex build | [build-popup.md](ux/build-popup.md) | [multi-hex-build-popup.md](ux/multi-hex-build-popup.md) |
 | The top bar, its readouts, its date block, or the battle header | [modes-and-transitions.md](ux/modes-and-transitions.md) | [top-bar.md](ux/top-bar.md) |
 | The game menu, New game, or Offer tactical battles | [modes-and-transitions.md](ux/modes-and-transitions.md), [input-map.md](ux/input-map.md) | [game-menu.md](ux/game-menu.md) |
-| The right panel as a whole, its tabs, its footer status line, or collapsing it | [modes-and-transitions.md](ux/modes-and-transitions.md) | [right-panel.md](ux/right-panel.md) |
-| Ready, Ranged, or Strike | [selection-model.md](ux/selection-model.md), [order-lifecycle.md](ux/order-lifecycle.md), [modes-and-transitions.md](ux/modes-and-transitions.md) | [right-panel-command-bar.md](ux/right-panel-command-bar.md) |
-| Order lists on the Orders tab | [order-lifecycle.md](ux/order-lifecycle.md), [selection-model.md](ux/selection-model.md) | [right-panel-selection-and-orders.md](ux/right-panel-selection-and-orders.md) |
+| The console as a whole, its tabs, its footer status line, or collapsing it | [modes-and-transitions.md](ux/modes-and-transitions.md) | [console.md](ux/console.md) |
+| Ready, Ranged, or Strike | [selection-model.md](ux/selection-model.md), [order-lifecycle.md](ux/order-lifecycle.md), [modes-and-transitions.md](ux/modes-and-transitions.md) | [console-command-bar.md](ux/console-command-bar.md) |
+| Order lists on the Orders tab | [order-lifecycle.md](ux/order-lifecycle.md), [selection-model.md](ux/selection-model.md) | [orders-tab.md](ux/orders-tab.md) |
 | The selection panel | [selection-model.md](ux/selection-model.md), [order-lifecycle.md](ux/order-lifecycle.md) | [selection-panel.md](ux/selection-panel.md) |
-| The Opponent tab's tool groups | [modes-and-transitions.md](ux/modes-and-transitions.md) | [right-panel-tools-tab.md](ux/right-panel-tools-tab.md) |
-| Run, its status sentence, API key, model, or reasoning effort | [modes-and-transitions.md](ux/modes-and-transitions.md), [notifications-and-feedback.md](ux/notifications-and-feedback.md) | [right-panel-model-tab.md](ux/right-panel-model-tab.md) |
+| The Opponent tab's tool groups | [modes-and-transitions.md](ux/modes-and-transitions.md) | [opponent-tab-tool-groups.md](ux/opponent-tab-tool-groups.md) |
+| Run, its status sentence, API key, model, or reasoning effort | [modes-and-transitions.md](ux/modes-and-transitions.md), [notifications-and-feedback.md](ux/notifications-and-feedback.md) | [opponent-tab-commander.md](ux/opponent-tab-commander.md) |
 | The AI activity log | [notifications-and-feedback.md](ux/notifications-and-feedback.md) | [ai-activity-log.md](ux/ai-activity-log.md) |
 | The Reports tab, or where the map toasts show | [notifications-and-feedback.md](ux/notifications-and-feedback.md) | [reports-tab.md](ux/reports-tab.md) |
 | New game or game over | [modes-and-transitions.md](ux/modes-and-transitions.md) | [new-game-dialog.md](ux/new-game-dialog.md) |
@@ -86,12 +86,12 @@ Element documents share a fixed heading set:
 - [multi-hex-build-popup.md](ux/multi-hex-build-popup.md): the build queue popup used when several build hexes are selected together.
 - [top-bar.md](ux/top-bar.md): the bar across the top: the two sides, the Production, Forces, and home readouts, and the date block, and the battle header it becomes in a battle.
 - [game-menu.md](ux/game-menu.md): the menu under the top bar's menu button: New game, Offer tactical battles, Quit, and the disabled placeholders.
-- [right-panel.md](ux/right-panel.md): the console docked on the right: its tab rail, collapsing it, and the footer that holds the opponent status line and Ready.
-- [right-panel-command-bar.md](ux/right-panel-command-bar.md): Ready, and the Ranged and air strike controls in the selection panel.
-- [right-panel-selection-and-orders.md](ux/right-panel-selection-and-orders.md): the Movement, Ranged attacks, and Air strikes groups on the Orders tab.
+- [console.md](ux/console.md): the console docked on the right: its tab rail, collapsing it, and the footer that holds the opponent status line and Ready.
+- [console-command-bar.md](ux/console-command-bar.md): Ready, and the Ranged and air strike controls in the selection panel.
+- [orders-tab.md](ux/orders-tab.md): the Movement, Ranged attacks, and Air strikes groups on the Orders tab.
 - [selection-panel.md](ux/selection-panel.md): the panel at the map's bottom-left that describes the selected units, their hex, and their orders, and holds Ranged and Strike.
-- [right-panel-tools-tab.md](ux/right-panel-tools-tab.md): the Opponent tab's Tool groups section.
-- [right-panel-model-tab.md](ux/right-panel-model-tab.md): the Opponent tab's Status and Commander sections: Run and its sentence, API key, model, reasoning effort, and the model description tooltip.
+- [opponent-tab-tool-groups.md](ux/opponent-tab-tool-groups.md): the Opponent tab's Tool groups section.
+- [opponent-tab-commander.md](ux/opponent-tab-commander.md): the Opponent tab's Status and Commander sections: Run and its sentence, API key, model, reasoning effort, and the model description tooltip.
 - [ai-activity-log.md](ux/ai-activity-log.md): the log of AI interactions and errors.
 - [reports-tab.md](ux/reports-tab.md): the console tab that keeps what the map toasts showed during the match.
 - [new-game-dialog.md](ux/new-game-dialog.md): the overlay used to start a game and to show game over, and the map preview beside it.
@@ -108,7 +108,7 @@ Element documents share a fixed heading set:
 - Targeting mode: Ranged or Strike, while the next map click chooses a target.
 - Order: a march, ferry, ranged attack, air strike, or build queue entry. Sealift embark and debark apply immediately and are not orders in this sense.
 - Draft order: an order that is queued and not yet resolved.
-- Pending order: a draft order shown in a right-panel list.
+- Pending order: a draft order shown in a list on the console's Orders tab.
 - Theater: strategic play on the world map, or tactical play inside a battle.
 - Contested hex: a strategic hex with units from both sides, eligible for a tactical battle.
 - Fog of war: hidden information the player has not yet earned. The rules are in the combat rules.
@@ -130,9 +130,9 @@ Cells are `Shown`, `Hidden`, `Disabled` (visible, but pointer input is off), `Ch
 | Multi-hex build popup | Hidden | Shown | Disabled | Disabled | Hidden | Hidden | Hidden |
 | Top bar | Changed | Shown | Disabled | Changed | Changed | Disabled | Changed |
 | Game menu | Changed | Shown | Hidden | Shown | Shown | Hidden | Changed |
-| Right panel | Hidden | Shown | Disabled | Shown | Shown | Disabled | Hidden |
+| Console | Hidden | Shown | Disabled | Shown | Shown | Disabled | Hidden |
 | Command bar | Hidden | Shown | Disabled | Shown | Changed | Disabled | Hidden |
-| Selection and orders | Hidden | Shown | Disabled | Shown | Changed | Disabled | Hidden |
+| Orders tab | Hidden | Shown | Disabled | Shown | Changed | Disabled | Hidden |
 | Selection panel | Hidden | Shown | Disabled | Shown | Changed | Disabled | Hidden |
 | Opponent tool groups | Hidden | Shown | Disabled | Shown | Shown | Disabled | Hidden |
 | Opponent status and commander | Hidden | Shown | Disabled | Shown | Changed | Disabled | Hidden |

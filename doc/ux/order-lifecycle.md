@@ -34,7 +34,7 @@ Build orders are queue rows on a hex, not map double-clicks. See [build-popup.md
 
 ## Lifecycle
 
-- Draft: the order sits in a group on the right panel's Orders tab. Movement, ranged attacks, and air strikes are separate groups. Ferries are listed in the Movement group in both theaters, and their rows select and cancel the same way.
+- Draft: the order sits in a group on the console's Orders tab. Movement, ranged attacks, and air strikes are separate groups. Ferries are listed in the Movement group in both theaters, and their rows select and cancel the same way.
 - Hover preview: while units are selected and the pointer is over a legal destination, the map draws a preview of the route or shot. The preview is dropped when the selection changes, when targeting turns off, when Ready finishes, and when a newer pointer position supersedes it. A preview that started before targeting turned off must not appear after the button has changed.
 - Commit: Ready submits pending ranged attacks, air strikes, and ferries, then resolves the turn. A tactical Ready submits marches, ranged attacks, air strikes, and ferries for the current beat. A successful grouped march or ferry commit clears the draft selection immediately, before Ready.
 - Rows: each row can select its unit and cancel that order. Cancel removes that order only.

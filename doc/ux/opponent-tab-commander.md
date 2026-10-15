@@ -8,7 +8,7 @@ Let the player connect a model and start or stop opponent planning.
 
 ## Availability
 
-Shown while the console's Opponent tab is selected and the console is expanded. The [Tool groups](right-panel-tools-tab.md) section and the [AI activity log](ai-activity-log.md) show below these sections at the same time; the tab has no sub-tabs. The model description tooltip can appear while the model dropdown is in use. While the tactical battles list is open, these sections stay visible while the console is expanded and do not receive pointer input. In New game and Game over the console is absent, so these sections are absent with it.
+Shown while the console's Opponent tab is selected and the console is expanded. The [Tool groups](opponent-tab-tool-groups.md) section and the [AI activity log](ai-activity-log.md) show below these sections at the same time; the tab has no sub-tabs. The model description tooltip can appear while the model dropdown is in use. While the tactical battles list is open, these sections stay visible while the console is expanded and do not receive pointer input. In New game and Game over the console is absent, so these sections are absent with it.
 
 ## Information Displayed
 
@@ -20,7 +20,7 @@ Shown while the console's Opponent tab is selected and the console is expanded. 
 - A refresh control labeled "Refresh model list", the same height as the model dropdown beside it.
 - A Run button in the Status section. It stays unavailable until both a key and a model are set.
 - A reasoning effort dropdown on the row below the model dropdown. It lists only the selected model's reasoning levels, as "High" and so on, and marks the model's default level "(default)". When the model has no default level, or no levels at all, an extra first option reads "Model default". The dropdown is disabled when the model offers fewer than two levels, and before models load.
-- The console footer's status line repeats whether planning is on, the selected model's name, and the match cost. See [right-panel.md](right-panel.md).
+- The console footer's status line repeats whether planning is on, the selected model's name, and the match cost. See [console.md](console.md).
 - Control tips for these sections' fields, buttons, and dropdowns are in [control-tooltips.md](control-tooltips.md). The model dropdown keeps the model description tooltip and does not use those tips.
 - A model description tooltip: the selected model's description, one second after the pointer arrives on the model dropdown. Moving on the dropdown does not start that wait again. An empty description shows nothing.
 
@@ -44,7 +44,7 @@ Shown while the console's Opponent tab is selected and the console is expanded. 
 ### Other
 
 - If the key or model is removed while Run is pressed, Run turns off and any in-flight planning request is cancelled.
-- When the selected model does not support tool calls, its consultations run without tools, whatever the Tool groups section says. See [right-panel-tools-tab.md](right-panel-tools-tab.md).
+- When the selected model does not support tool calls, its consultations run without tools, whatever the Tool groups section says. See [opponent-tab-tool-groups.md](opponent-tab-tool-groups.md).
 
 ## States
 
@@ -66,8 +66,8 @@ Run, the key, the model, and the cost readout work in both theaters. In Tactical
 
 ## Related Documents
 
-- [right-panel.md](right-panel.md)
-- [right-panel-tools-tab.md](right-panel-tools-tab.md)
+- [console.md](console.md)
+- [opponent-tab-tool-groups.md](opponent-tab-tool-groups.md)
 - [modes-and-transitions.md](modes-and-transitions.md)
 - [notifications-and-feedback.md](notifications-and-feedback.md)
 - [game-menu.md](game-menu.md)

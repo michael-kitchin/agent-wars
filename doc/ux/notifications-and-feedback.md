@@ -73,7 +73,7 @@ Both toasts use the same show, replace, and dismiss behavior in both theaters. T
 - [modes-and-transitions.md](modes-and-transitions.md)
 - [order-lifecycle.md](order-lifecycle.md)
 - [input-map.md](input-map.md)
-- [right-panel-selection-and-orders.md](right-panel-selection-and-orders.md)
+- [orders-tab.md](orders-tab.md)
 - [reports-tab.md](reports-tab.md)
 
 ## Known Deviations

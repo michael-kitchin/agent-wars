@@ -67,7 +67,7 @@ None. The menu works the same in both theaters.
 - [modes-and-transitions.md](modes-and-transitions.md)
 - [new-game-dialog.md](new-game-dialog.md)
 - [tactical-battles-list.md](tactical-battles-list.md)
-- [right-panel-model-tab.md](right-panel-model-tab.md)
+- [opponent-tab-commander.md](opponent-tab-commander.md)
 - [input-map.md](input-map.md)
 
 ## Known Deviations

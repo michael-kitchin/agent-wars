@@ -8,7 +8,7 @@ Collect the settings for a match, and later tell the player who won.
 
 ## Availability
 
-Opens in New game and in Game over. See [modes-and-transitions.md](modes-and-transitions.md). It opens at startup when no match is loaded, when the player clicks New game in the game menu, and when the match ends. It cannot be dismissed without starting a match. The right panel and the selection panel are not on screen while it is open, including while the choices are hidden. The top bar is the new-game bar ([top-bar.md](top-bar.md)). The setup panel is docked at the left, under the top bar, and the map fills the rest of the window beside it. Drag and the wheel pan and zoom the preview, with the choices showing or hidden.
+Opens in New game and in Game over. See [modes-and-transitions.md](modes-and-transitions.md). It opens at startup when no match is loaded, when the player clicks New game in the game menu, and when the match ends. It cannot be dismissed without starting a match. The console and the selection panel are not on screen while it is open, including while the choices are hidden. The top bar is the new-game bar ([top-bar.md](top-bar.md)). The setup panel is docked at the left, under the top bar, and the map fills the rest of the window beside it. Drag and the wheel pan and zoom the preview, with the choices showing or hidden.
 
 ## Information Displayed
 
@@ -43,7 +43,7 @@ Opens in New game and in Game over. See [modes-and-transitions.md](modes-and-tra
 - When the player clicks the starting-month randomize control, the month becomes a random month from the list, including the month already shown. Opening the overlay draws a month the same way.
 - When the player changes game size, the caps in the unit row update to that size.
 - When the player changes Fog of war, Origin bonus, Tech bonus, Terrain bonus, Weather bonus, or the starting month, the next match uses that setting. A global match starts in that month of Year 1, and each turn is one month. A regional match starts on the 1st of that month, and each turn is one week. Changing the starting month or Weather bonus updates the weather icons on the map beside the panel without reloading the grid. Changing Tech bonus updates the tech icons the same way while T is held. Opening the overlay checks Fog of war again, sets every bonus dropdown back to Low, and draws a new starting month. A refresh while the overlay stays open keeps the month the player is looking at.
-- When the player clicks Start game or New game, the match starts, drafts and the selection clear, the match cost resets to zero in the Commander section and on the footer status line, the AI activity log and the Reports tab clear, and the overlay closes on success. The top bar shows the match status again, the right panel is on screen, and the view then frames the new match in the map beside the right panel, as in [map-surface.md](map-surface.md). A failure leaves the overlay open.
+- When the player clicks Start game or New game, the match starts, drafts and the selection clear, the match cost resets to zero in the Commander section and on the footer status line, the AI activity log and the Reports tab clear, and the overlay closes on success. The top bar shows the match status again, the console is on screen, and the view then frames the new match in the map beside the console, as in [map-surface.md](map-surface.md). A failure leaves the overlay open.
 
 ### Keyboard
 
@@ -79,7 +79,7 @@ New game, in the game menu, opens this overlay during strategic planning, tactic
 - [minimap.md](minimap.md)
 - [game size and unit caps](../game-size-unit-caps.md)
 - [region versus region](../region-vs-region.md)
-- [right-panel-model-tab.md](right-panel-model-tab.md)
+- [opponent-tab-commander.md](opponent-tab-commander.md)
 
 ## Known Deviations
 

@@ -265,10 +265,10 @@ setMainUIControlsEnabled: (enabled: boolean) => void;
  * When to use: Once at renderer startup.
  * Expected outcome: The randomize buttons and the game-size caps are live. Clicking Start sends
  *   fog, the four bonus levels, the starting month, home regions, and game size to `newGame`, then reloads the map,
- *   sidebars, and overlay from the returned state. The overlay closes, and the map is resized beside the right panel,
+ *   sidebars, and overlay from the returned state. The overlay closes, and the map is resized beside the console,
  *   before the loaded extent is fit. Start then zooms one level toward human infantry and armor, or any human units
- *   when those are absent. While that attempt runs, a preview reply cannot move the camera. Failures are logged to
- *   the console and the dialog's map is framed again.
+ *   when those are absent. While that attempt runs, a preview reply cannot move the camera. Failures are logged with
+ *   `console.error`, and the dialog's map is framed again.
  * Exceptions: None; click handler errors are caught.
  */
 export function registerNewGameButton(deps: NewGameDeps): void {

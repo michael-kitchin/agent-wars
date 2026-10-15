@@ -8,7 +8,7 @@ Let the player read a turn update, an opponent message, or a notice again after 
 
 ## Availability
 
-Shown while the right panel's Reports tab is selected and the panel is expanded, in every mode where the panel is visible. While the tactical battles list is open, the tab stays visible while the panel is expanded and does not receive pointer input. In New game and Game over the panel is absent, so this tab is absent with it. Entries are filed whether or not the tab is shown.
+Shown while the console's Reports tab is selected and the console is expanded, in every mode where the console is visible. While the tactical battles list is open, the tab stays visible while the console is expanded and does not receive pointer input. In New game and Game over the console is absent, so this tab is absent with it. Entries are filed whether or not the tab is shown.
 
 ## Information Displayed
 
@@ -18,7 +18,7 @@ Shown while the right panel's Reports tab is selected and the panel is expanded,
 - A turn report carries a disabled Replay button.
 - Entries filed since the player last left this tab are marked with a gold dot.
 - With no entries, the tab reads "No reports yet this match."
-- The header's subtitle reads "this match". The Reports tab in the rail shows the number of unread entries, and hides it at zero. See [right-panel.md](right-panel.md).
+- The console header's subtitle reads "this match". The Reports tab in the rail shows the number of unread entries, and hides it at zero. See [console.md](console.md).
 - Control tips for the tab and the Replay placeholder are in [control-tooltips.md](control-tooltips.md).
 
 ## Inputs and Responses
@@ -59,7 +59,7 @@ Shown while the right panel's Reports tab is selected and the panel is expanded,
 
 ## Related Documents
 
-- [right-panel.md](right-panel.md)
+- [console.md](console.md)
 - [notifications-and-feedback.md](notifications-and-feedback.md)
 - [ai-activity-log.md](ai-activity-log.md)
 

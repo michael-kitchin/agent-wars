@@ -8,7 +8,7 @@ Show the current theater and accept the pointer and keyboard gestures that plan 
 
 ## Availability
 
-Shown in Strategic planning, Resolution playback, and Tactical planning. While the tactical battles list is open, the map stays as it was when Ready paused, pointer input is off, and pan keys and T still follow [input-map.md](input-map.md). In New game and Game over, drag and the wheel pan and zoom the preview, with the new-game choices showing or hidden, and a click, double-click, or right-click does not select, order, or change the selection. In Tactical annihilation the map is visible, pointer input is off, and pan keys and T still follow [input-map.md](input-map.md). In New game and Game over the map fills the space under the top bar beside the new-game setup panel, and the full width while the choices are hidden. In the other modes it fills the space under the top bar and beside the right panel.
+Shown in Strategic planning, Resolution playback, and Tactical planning. While the tactical battles list is open, the map stays as it was when Ready paused, pointer input is off, and pan keys and T still follow [input-map.md](input-map.md). In New game and Game over, drag and the wheel pan and zoom the preview, with the new-game choices showing or hidden, and a click, double-click, or right-click does not select, order, or change the selection. In Tactical annihilation the map is visible, pointer input is off, and pan keys and T still follow [input-map.md](input-map.md). In New game and Game over the map fills the space under the top bar beside the new-game setup panel, and the full width while the choices are hidden. In the other modes it fills the space under the top bar and beside the console.
 
 ## Information Displayed
 
@@ -41,7 +41,7 @@ When no match is loaded, the basemap can still be visible beside the new-game se
 
 ### Other
 
-- When a match starts, the right panel is already on screen. The view frames that match's bounds in the map beside the panel, then zooms one level toward the player's infantry and armor. If the player has neither, that zoom uses any of the player's units. If the player has no units, the view stays on the framed bounds. A global match frames the Mercator world. A regional match frames that region's hexes. Starting a match on the same region as the previous match frames it again. A later turn does not move the view back to that frame while the match's hex footprint is unchanged.
+- When a match starts, the console is already on screen. The view frames that match's bounds in the map beside the console, then zooms one level toward the player's infantry and armor. If the player has neither, that zoom uses any of the player's units. If the player has no units, the view stays on the framed bounds. A global match frames the Mercator world. A regional match frames that region's hexes. Starting a match on the same region as the previous match frames it again. A later turn does not move the view back to that frame while the match's hex footprint is unchanged.
 - When a tactical battle starts, the view moves to the battle area and pan limits follow that area until the battle ends.
 - When the battle ends, pan limits return to the match's bounds. The view returns to the frame saved when that match opened. When no frame was saved, the view fits those bounds.
 - When some basemap tiles fail to load, a map toast says the game remains playable. That toast is shown once per session and hides like other map toasts. The Reports tab keeps it. See [notifications-and-feedback.md](notifications-and-feedback.md) and [reports-tab.md](reports-tab.md).
@@ -59,7 +59,7 @@ When no match is loaded, the basemap can still be visible beside the new-game se
 - A click outside the battle area never issues a strategic order.
 - A map gesture during Resolution playback never queues or changes an order.
 - Double-click never zooms the map.
-- Starting a match frames that match's bounds in the map beside the right panel before the player can act. A later turn does not return the view to that frame while the match's hex footprint is unchanged.
+- Starting a match frames that match's bounds in the map beside the console before the player can act. A later turn does not return the view to that frame while the match's hex footprint is unchanged.
 - Keyboard pan is the app pan, not the map library's own keyboard pan.
 - The weather icon appears on the strategic map outside a battle and outside battle-detail zoom, while the inspection view is off, on each world hex that has weather while the weather bonus is on, including a hex with no production label. An unexplored hex has none. While T is held or the Tech view is chosen, the weather icon is hidden. The tech icon is shown on that same band on each world hex whose original urban count can produce units, while the tech bonus is on, including an unexplored hex. A hex with no tech icon shows no status icon while that view is on. Neither icon appears in a battle or at battle-detail zoom. While the new-game overlay is open, weather and tech follow that dialog on every strategic hex of that preview, including on hexes the loaded match has not explored.
 

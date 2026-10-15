@@ -83,7 +83,7 @@ While the new-game overlay is open, in New game and Game over, the bar is the ne
 
 - [modes-and-transitions.md](modes-and-transitions.md)
 - [game-menu.md](game-menu.md)
-- [right-panel.md](right-panel.md)
+- [console.md](console.md)
 - [control-tooltips.md](control-tooltips.md)
 - [tactical-battle-controls.md](tactical-battle-controls.md)
 - [home region rules](../region-vs-region.md)

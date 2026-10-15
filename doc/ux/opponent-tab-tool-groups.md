@@ -8,7 +8,7 @@ Let the player turn tool groups on or off and see how many times each group was 
 
 ## Availability
 
-Shown while the console's Opponent tab is selected and the console is expanded, below the [Status and Commander](right-panel-model-tab.md) sections and above the [AI activity log](ai-activity-log.md). While the tactical battles list is open, the section stays visible while the console is expanded and does not receive pointer input. See [right-panel.md](right-panel.md). In New game and Game over the console is absent, so this section is absent with it.
+Shown while the console's Opponent tab is selected and the console is expanded, below the [Status and Commander](opponent-tab-commander.md) sections and above the [AI activity log](ai-activity-log.md). While the tactical battles list is open, the section stays visible while the console is expanded and does not receive pointer input. See [console.md](console.md). In New game and Game over the console is absent, so this section is absent with it.
 
 ## Information Displayed
 
@@ -54,8 +54,8 @@ The same section is used in both theaters. Counts reset on both strategic Ready 
 
 ## Related Documents
 
-- [right-panel.md](right-panel.md)
-- [right-panel-model-tab.md](right-panel-model-tab.md)
+- [console.md](console.md)
+- [opponent-tab-commander.md](opponent-tab-commander.md)
 - [ai-activity-log.md](ai-activity-log.md)
 - [AI tools](../ai-tools.md)
 - [modes-and-transitions.md](modes-and-transitions.md)

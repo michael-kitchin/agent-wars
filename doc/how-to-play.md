@@ -292,4 +292,4 @@ The full bonus rules are in [combat-rules-v3.md](combat-rules-v3.md) §4.9.
 
 - **Top centre of the map (map toast):** Errors, rejected orders, turn-loss summaries, and unknown-battle announcements. Use the × to dismiss; it also hides after a fixed interval, and a newer message replaces it. The Reports tab keeps every one except errors.
 - **Top centre of the map, above the map toast (AI strategy toast):** The opponent's Message and Strategy after a consultation. It dismisses and times out the same way, and the Reports tab keeps it.
-- **Right panel, Opponent tab, at the bottom (AI activity log):** AI interaction lines and errors, including a retry, a line when opponent planning stops, and a one-line copy of each turn update. Starting a new match clears it.
+- **Console, Opponent tab, at the bottom (Activity log):** AI interaction lines and errors, including a retry, a line when opponent planning stops, and a one-line copy of each turn update. Starting a new match clears it.

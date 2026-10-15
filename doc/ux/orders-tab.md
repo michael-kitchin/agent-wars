@@ -1,4 +1,4 @@
-# Right Panel Selection and Orders
+# Orders Tab
 
 The three order groups on the Orders tab. The selected units are shown in the [selection panel](selection-panel.md).
 
@@ -8,7 +8,7 @@ Show which drafts are queued, and let the player select a queued order's unit or
 
 ## Availability
 
-Shown on the right panel's Orders tab while the panel is expanded. The player can use the lists in Strategic planning and Tactical planning, and they follow the active theater. While the tactical battles list is open, the lists stay visible while the panel is expanded and do not receive pointer input. See [modes-and-transitions.md](modes-and-transitions.md). In New game and Game over the panel is absent, so these lists are absent with it.
+Shown on the console's Orders tab while the console is expanded. The player can use the lists in Strategic planning and Tactical planning, and they follow the active theater. While the tactical battles list is open, the lists stay visible while the console is expanded and do not receive pointer input. See [modes-and-transitions.md](modes-and-transitions.md). In New game and Game over the console is absent, so these lists are absent with it.
 
 ## Information Displayed
 
@@ -36,7 +36,7 @@ Strategic movement rows include standing movement and ferries. Tactical movement
 
 - The lists refresh when a draft is added, cancelled, committed, stashed, or restored.
 - The row highlight follows every selection change, including one made on the map.
-- The header's subtitle and the Orders tab's count follow the lists. See [right-panel.md](right-panel.md).
+- The console header's subtitle and the Orders tab's count follow the lists. See [console.md](console.md).
 - The [selection panel](selection-panel.md) shows each selected unit's order with the same words, read from these lists.
 
 ## States
@@ -64,7 +64,7 @@ Strategic movement rows include standing movement and ferries. Tactical movement
 
 ## Related Documents
 
-- [right-panel.md](right-panel.md)
+- [console.md](console.md)
 - [selection-panel.md](selection-panel.md)
 - [order-lifecycle.md](order-lifecycle.md)
 - [selection-model.md](selection-model.md)

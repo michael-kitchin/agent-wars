@@ -38,7 +38,7 @@ One selection drives the [selection panel](selection-panel.md), the gold ring on
 
 ## Selection and Targeting Modes
 
-- The support control is greyed out, with its reason, when the selection mixes air with other types, or when any selected unit cannot make a direct ranged attack in the current theater. It is not on screen while the selection is empty, because the selection panel is hidden. See [right-panel-command-bar.md](right-panel-command-bar.md).
+- The support control is greyed out, with its reason, when the selection mixes air with other types, or when any selected unit cannot make a direct ranged attack in the current theater. It is not on screen while the selection is empty, because the selection panel is hidden. See [console-command-bar.md](console-command-bar.md).
 - When every selected unit is air, the control offers Strike.
 - When every selected unit can make a direct ranged attack and none is air, the control offers Ranged. While that targeting mode is on, the label is Cancel.
 - Choosing Ranged or Strike does not change which units are selected. A successful target double-click then clears the selection. A single click while targeting is on does not.

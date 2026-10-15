@@ -8,7 +8,7 @@ The engine under `src/` wins if this file drifts.
 
 You supply an OpenRouter API key and pick a **tool-capable** model. The opponent does not see the true board: it gets a briefing built from **its** fog (or omniscient view if fog is off), then it may call a small set of **read** tools, then it submits one JSON envelope of orders. Standing orders and an engine attack sweep carry quiet turns. You can run **event-driven** consultation (consult when callbacks or mandatory overrides fire) or consult every turn. Tactical battles use the same loop once per beat.
 
-The OpenRouter panel is session control (key, model, reasoning effort, Run, status, tool count). It is not a full briefing observatory. Developer dumps: `debug-last-strategic-prompt.txt`, `debug-last-user-prompt.txt` (tactical dump on disk may be stale).
+The console's Opponent tab is session control (key, model, reasoning effort, Run, status, tool count). It is not a full briefing observatory. Developer dumps: `debug-last-strategic-prompt.txt`, `debug-last-user-prompt.txt` (tactical dump on disk may be stale).
 
 ## Layers
 

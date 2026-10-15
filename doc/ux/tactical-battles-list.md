@@ -8,7 +8,7 @@ Let the player pick one contested hex to fight as a tactical battle, or ignore m
 
 ## Availability
 
-Opens in the Tactical battles list mode, after Ready reports melee candidates and Offer tactical battles is checked in the game menu. A dimmed backdrop covers the window, and the panel is centered on the visible map area (not on the map plus the right panel). The panel follows the map area when the window resizes. On a small map area the panel shrinks to fit, and a long list scrolls inside it. The map, the top bar, the right panel, and the selection panel stay visible underneath and do not receive pointer input. Markers that were already on the map are not refreshed until the dialog closes. When that checkbox is unchecked, the dialog does not open and the turn continues as Ignore. See [modes-and-transitions.md](modes-and-transitions.md) and [game-menu.md](game-menu.md).
+Opens in the Tactical battles list mode, after Ready reports melee candidates and Offer tactical battles is checked in the game menu. A dimmed backdrop covers the window, and the panel is centered on the visible map area (not on the map plus the console). The panel follows the map area when the window resizes. On a small map area the panel shrinks to fit, and a long list scrolls inside it. The map, the top bar, the console, and the selection panel stay visible underneath and do not receive pointer input. Markers that were already on the map are not refreshed until the dialog closes. When that checkbox is unchecked, the dialog does not open and the turn continues as Ignore. See [modes-and-transitions.md](modes-and-transitions.md) and [game-menu.md](game-menu.md).
 
 ## Information Displayed
 
@@ -56,7 +56,7 @@ The dialog is a strategic Ready step. Fight is what enters Tactical planning. Th
 
 - [modes-and-transitions.md](modes-and-transitions.md)
 - [hex-tooltips.md](hex-tooltips.md)
-- [right-panel-model-tab.md](right-panel-model-tab.md)
+- [opponent-tab-commander.md](opponent-tab-commander.md)
 - [tactical-entry-markers.md](tactical-entry-markers.md)
 
 ## Known Deviations

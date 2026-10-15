@@ -18,7 +18,7 @@ Shown in Strategic planning, Resolution playback, and Tactical planning while at
   - Two lines of text. Each ends in an ellipsis when it does not fit, and the controls beside them keep their size.
   - The first line: the hex code of the first selected unit's hex in parentheses, such as "(D4)", then " · " and "N selected of M". N is the number of selected units in that hex, and M is the number of the player's units there that can be selected (`summarizeSelectionPanel` in `src/shared/selectionPanelSummary.ts`). An embarked land unit cannot be selected. When exactly one unit is selected, its origin flag and name take the place of the count. When selected units also stand in other hexes, the line ends with " · +K elsewhere", where K counts them (`selectionElsewhereText` in `src/shared/selectionBarText.ts`). In a battle the code names the battle cell, such as "(E8.K3)". A code that cannot be found shows "?".
   - The second line, a hint for the next map gesture (`selectionBarHint` in `src/shared/selectionBarText.ts`). The first that applies: "Playback is running · right-click to deselect" while a turn or a battle beat plays back; "Double-click a target in range" while Ranged or Strike targeting is on; "Double-click a hex to ferry · right-click to deselect" when every selected unit is air; "Air units can't move with other units" when air units are selected with other types; otherwise "Double-click a hex to move · right-click to deselect".
-  - A divider, then the Ranged and Strike controls. See [right-panel-command-bar.md](right-panel-command-bar.md).
+  - A divider, then the Ranged and Strike controls. See [console-command-bar.md](console-command-bar.md).
   - A close control (×).
 - The details, under the bar, shown only while the panel is expanded:
   - That hex's caption, the same naming line the [hex tooltip](hex-tooltips.md) shows, with its flags. It appears once its lookup returns.
@@ -28,7 +28,7 @@ Shown in Strategic planning, Resolution playback, and Tactical planning while at
     - The tech tier of units built there, Basic or Advanced with its icon, while the tech bonus is on and the hex can produce units. Not shown in a battle.
     - The production the hex adds each turn, such as "$94/turn", when it has urban cells and is not on the neutral border. Not shown in a battle.
     - "Home" in the player's home region, or "Enemy home" in the opponent's. Not shown in a battle.
-  - One row per selected unit, in selection order. Each row shows the unit type's glyph, the unit's origin flag and name, and, for a unit in a different hex, that hex's code in parentheses. The row ends with the unit's queued order, in the same words as its row on the Orders tab, followed by a cancel control (×), or "No orders". See [right-panel-selection-and-orders.md](right-panel-selection-and-orders.md).
+  - One row per selected unit, in selection order. Each row shows the unit type's glyph, the unit's origin flag and name, and, for a unit in a different hex, that hex's code in parentheses. The row ends with the unit's queued order, in the same words as its row on the Orders tab, followed by a cancel control (×), or "No orders". See [orders-tab.md](orders-tab.md).
   - The reason a greyed-out Ranged or Strike cannot be used, when one applies.
   - The sidebar error line, which stays hidden. See [notifications-and-feedback.md](notifications-and-feedback.md).
 - While Ranged targeting is on, the panel's border is the ranged amber, and while Strike targeting is on, the strike purple (`--order-ranged` and `--order-strike` in `static/shellChrome.css`).
@@ -84,8 +84,8 @@ Shown in Strategic planning, Resolution playback, and Tactical planning while at
 ## Related Documents
 
 - [selection-model.md](selection-model.md)
-- [right-panel-command-bar.md](right-panel-command-bar.md)
-- [right-panel-selection-and-orders.md](right-panel-selection-and-orders.md)
+- [console-command-bar.md](console-command-bar.md)
+- [orders-tab.md](orders-tab.md)
 - [map-surface.md](map-surface.md)
 - [hex-tooltips.md](hex-tooltips.md)
 
