@@ -46,17 +46,16 @@ The tip can appear whenever the control can receive the pointer or keyboard focu
 - Start game: Start the match with the choices on this screen. If the start fails, the screen stays open.
 - New game: Start a new match with the choices on this screen. This clears your selection and the orders you had queued.
 - Ready: End this planning step and play out the orders you have queued, on the world map or in a battle. It stays unavailable while the match is over, while the opponent is still planning, or while playback is already running. The sentence stays the same when the label reads "AI:".
-- Ranged: Turn this on, then double-click the target on the map. The button then reads Cancel.
-- Ranged Cancel: Stop aiming a ranged attack. Attacks already in the list stay there.
-- Strike: Turn this on to aim an air strike. A target list and a Cancel button replace this button.
-- Air-strike target: Choose enemy units, production, airports, or seaports. Your next double-click uses that choice until you cancel.
-- Air-strike Cancel: Stop aiming an air strike and show Strike again. Strikes already in the list stay there.
-- Ranged or Strike while it is greyed out: its reason, "Infantry can't fire on the world map." or "Strike needs a selection of air units only." (`selectionSupportAction` in `src/shared/selectionSupportButtonMode.ts`). The tip sits on a host around the control (`#ranged-attack-tip-host`), because a disabled control gets no pointer events.
-- Orders tab: Show the orders queued for this turn or beat.
-- Reports tab: Show the turn reports, opponent messages, and notices from this match, newest first.
-- Opponent tab: Show whether the opponent is planning, its model, its tools, and the AI activity log.
+- Reticle, for a selection that can fire: Aim a ranged attack. Turn this on, then double-click the target on the map.
+- Reticle, while a ranged attack is aimed: Stop aiming a ranged attack. Attacks already in the list stay there.
+- Reticle, for an all-air selection: Aim an air strike. Turn this on, pick a target type in the list beside it, then double-click the target on the map.
+- Reticle, while an air strike is aimed: Stop aiming an air strike. Strikes already in the list stay there.
+- Air-strike target: Choose enemy units, production, airports, or seaports. Your next double-click uses that choice until you stop aiming.
+- The reticle while it is greyed out: its reason, "Infantry can't fire on the world map." or "Strike needs a selection of air units only." (`selectionSupportAction` in `src/shared/selectionSupportButtonMode.ts`). The tip sits on a host around the control (`#ranged-attack-tip-host`), because a disabled control gets no pointer events.
+- Orders tab: Show the orders queued for this turn or beat. Click the selected tab to hide the console and widen the map.
+- Reports tab: Show the turn reports, opponent messages, and notices from this match, newest first. Click the selected tab to hide the console and widen the map.
+- Opponent tab: Show whether the opponent is planning, its model, its tools, and the AI activity log. Click the selected tab to hide the console and widen the map.
 - Settings, Help, Load game, How to play, Add another opponent, Build, Forces, Replay, and the Control and Production map modes: "<name> is not available in this version.", for example "Settings is not available in this version."
-- Collapse the console: Hide the console to widen the map. Click a tab to show it again.
 - Selection panel close: Clear the selection. Queued orders stay.
 - Selection panel grip: Drag to resize this panel. The size lasts until the app closes.
 - Selection panel expand control, while the panel is compact: Show the hex, its terrain, and each selected unit's orders.
@@ -113,7 +112,7 @@ The tip can appear whenever the control can receive the pointer or keyboard focu
 - The build popup close control, and each queue row's remove control, in both the single-hex and multi-hex popups.
 - Order rows in the Orders tab, and their cancel controls.
 - The cancel control on an order in the selection panel.
-- Ranged or Strike while it is greyed out and neither reason applies.
+- The reticle while it is greyed out and neither reason applies.
 - The choice on each tactical battles row.
 - The model dropdown. It uses the model description tooltip.
 - The map's + and − zoom buttons. They keep the map library's own "Zoom in" and "Zoom out" titles.

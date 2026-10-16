@@ -10,7 +10,7 @@
 
 - `package.json` and `package-lock.json`: version 2.6.0, the same change `npm version 2.6.0 --no-git-tag-version` makes, as exact edits so the Exact-match check covers them.
 - A new `doc/release-notes/v2.6.0.md`, from the 2.5.2 notes: downloads, first launch, setting up the key on the Opponent tab, what's new in 2.6.0, and the known limits.
-- `README.md`: the executable names, the test count (896), and the Status version and progress. `doc/README.md`: the shipping version and the same progress sentence. `doc/ui-style-guide.md`: its two status notes are as of 2.6.0.
+- `README.md`: the executable names, the test count (897), and the Status version and progress. `doc/README.md`: the shipping version and the same progress sentence. `doc/ui-style-guide.md`: its two status notes are as of 2.6.0.
 
 **Out of scope:**
 
@@ -123,7 +123,7 @@ Expected: `False`, `False`, `True`. Otherwise stop and report.
 
 - [ ] **Run the full tests once**
 
-Run the full tests from Verification Commands. Expected: exit 0, test total **896**, failure total **0**. Any other result means the starting point is not what this plan expects: stop and report.
+Run the full tests from Verification Commands. Expected: exit 0, test total **897**, failure total **0**. Any other result means the starting point is not what this plan expects: stop and report.
 
 ## Steps
 
@@ -228,8 +228,8 @@ A new layout. The rules, the opponent, and saved matches are unchanged.
 - **Console.** Orders, Reports, and Opponent tabs, with Ready at the bottom. Click the selected tab to fold the console to its rail and widen the map. Queued orders name their target hex, such as "→ E5 · 1h".
 - **Reports tab.** Turn updates and the opponent's messages stay there after their toasts close.
 - **Opponent tab.** Run, the API key, the model, and the reasoning effort, then the tool groups and the AI activity log, all on one tab. The line above Ready shows whether the opponent is planning, its model, and the match's cost.
-- **Selection panel.** A bar at the map's bottom left names the selected hex and units and says what a double-click does next. Expand it to see the hex and each unit's orders. Ranged and Strike moved here. They stay on screen, greyed out with the reason in their tip, when the selection can't use them.
-- **Map.** Weather, Tech, and the terrain legend are tabs across the top of the minimap. Selected units get a gold ring. Ranged and strike lines get arrowheads, and every order line gets a pale edge that keeps it readable on any terrain.
+- **Selection panel.** A bar at the map's bottom left names the selected hex and units and says what a double-click does next. Expand it to see the hex and each unit's orders. One reticle button there aims a ranged attack or an air strike: it stays pressed, in amber or purple, while you aim, and a second click stops aiming. It stays on screen, greyed out with the reason in its tip, when the selection can't use it.
+- **Map.** A toggle on the minimap's corner shows the Weather, Tech, and Legend buttons under it. Weather turns the weather icons on and off, and Tech turns on the view that holding T shows; with both on, a hex shows its tech and weather icons side by side. Selected units get a gold ring. Ranged and strike lines get arrowheads, and every order line gets a pale edge that keeps it readable on any terrain.
 - **New-game screen.** The choices sit in a panel docked at the left, in Map, Forces, and Rules sections, beside a preview you can pan and zoom. Hide them to widen the map.
 
 ## Known limits
@@ -244,7 +244,7 @@ A new layout. The rules, the opponent, and saved matches are unchanged.
 
 - [ ] **Step 4: Edit `README.md`**
 
-Play It names the 2.6.0 executables. What's Inside gives the current test count, 896. Status gives the version and says what 2.6.0 adds.
+Play It names the 2.6.0 executables. What's Inside gives the current test count, 897. Status gives the version and says what 2.6.0 adds.
 
 1. In `README.md`, find these lines. Together they occur exactly once:
 
@@ -269,7 +269,7 @@ Replace them with:
 Replace it with:
 
 ````markdown
-- **Guardrails.** `npm test` builds the main process, then runs ESLint (with custom rules in [eslint-rules/](eslint-rules/)), a naming-convention check, a renderer type check, the main-process and tool tests (896 tests), and a third-party-notices check. The renderer runs with context isolation, without Node integration, and under a Content-Security-Policy.
+- **Guardrails.** `npm test` builds the main process, then runs ESLint (with custom rules in [eslint-rules/](eslint-rules/)), a naming-convention check, a renderer type check, the main-process and tool tests (897 tests), and a third-party-notices check. The renderer runs with context isolation, without Node integration, and under a Content-Security-Policy.
 ````
 
 3. In `README.md`, find these lines. Together they occur exactly once:
@@ -338,7 +338,7 @@ Run the fast loop. Everything passes as described in Verification Commands.
 
 - [ ] **Step 8: Full tests**
 
-Run the full tests. Expected: exit 0, test total **896**, failure total **0**.
+Run the full tests. Expected: exit 0, test total **897**, failure total **0**.
 
 - [ ] **Step 9: Version check**
 
@@ -366,10 +366,10 @@ Expected, one line per file:
 | --- | --- |
 | `package.json` | `67f63c9f48eb9f01` |
 | `package-lock.json` | `4491cfaeb32bc65d` |
-| `doc/release-notes/v2.6.0.md` | `b21648ca82cb14fc` |
-| `README.md` | `b5a76d83735b28df` |
+| `doc/release-notes/v2.6.0.md` | `11dac90d7b206bd6` |
+| `README.md` | `8adf1b1c97d21ba5` |
 | `doc/README.md` | `a7939f6c00ea0a8b` |
-| `doc/ui-style-guide.md` | `e69ce768d3e4e41f` |
+| `doc/ui-style-guide.md` | `da4270dcef767517` |
 
 When a hash differs, run `git diff -- <file>` and compare it with this plan's steps for that file. If the difference is your own copying mistake, fix it and run the check again. If the steps cannot produce the expected text, stop and report.
 
@@ -382,10 +382,10 @@ npm run ui:smoke -- --label release-check
 Expected summary line:
 
 ```text
-ui-smoke release-check: 527 passed, 0 failed, 0 page errors, 40 screenshots in F:\Projects\Personal\agent-wars-public\.test\ui-smoke\release-check
+ui-smoke release-check: 575 passed, 0 failed, 0 page errors, 44 screenshots in F:\Projects\Personal\agent-wars-public\.test\ui-smoke\release-check
 ```
 
-Any `FAIL` line, any `PAGE-ERROR` line, or a `NOTE run stopped` line: stop and report the full output and `.test/ui-smoke/release-check/report.json`. Then open `01-new-game-startup.png`, `04-strategic-1280x720.png`, and `29-battle-start.png` in `.test/ui-smoke/release-check/` and describe each in your report; they are the new-game screen, a strategic turn, and a battle, all drawn without map tiles if the network is slow.
+Any `FAIL` line, any `PAGE-ERROR` line, or a `NOTE run stopped` line: stop and report the full output and `.test/ui-smoke/release-check/report.json`. Then open `01-new-game-startup.png`, `04-strategic-1280x720.png`, and `33-battle-start.png` in `.test/ui-smoke/release-check/` and describe each in your report; they are the new-game screen, a strategic turn, and a battle, all drawn without map tiles if the network is slow.
 
 ## Report
 
@@ -406,11 +406,11 @@ These checks need a person. Run them after the report is in.
 
 1. The manual regression pass, with `npm start` and a real model. If the app reopens a match, choose New game… in the game menu first.
 2. New-game screen: the new-game bar, the setup panel's Map, Forces, and Rules sections, panning and zooming the preview, hiding and showing the choices, and switching between Global and Regional.
-3. Start a global match: the top bar shows the sides, the four readouts, and the date; the console opens on Orders; the minimap panel shows Weather, Tech, and Legend tabs.
+3. Start a global match: the top bar shows the sides, the four readouts, and the date; the console opens on Orders; the minimap shows its overview with the corner toggle. The toggle shows the Weather, Tech, and Legend tabs under the overview. Weather and Tech each turn on and off, and with both on, a hex shows its tech and weather icons side by side.
 4. Opponent tab: set the key and a model, and click Run. Ready shows "AI:" and a time while the opponent plans, and the line above it follows.
-5. Orders: select units (gold ring, and the selection bar names them), queue a move, a ranged attack, and a strike from the selection bar, then cancel one from its row's ×.
+5. Orders: select units (gold ring, and the selection bar names them), queue a move, a ranged attack, and a strike with the reticle on the selection bar (it stays pressed while you aim, and a second click stops aiming), then cancel one from its row's ×.
 6. Click Ready: the turn plays back, toasts show at the top centre of the map, and the Reports tab counts them.
-7. Collapse the console to its rail and expand it again. Shrink the window to 800 × 600: nothing runs off the window.
+7. Click the selected console tab to fold the console to its rail, then any tab to expand it again. Shrink the window to 800 × 600: nothing runs off the window.
 8. With Offer tactical battles checked in the game menu, play until a melee, choose Fight, play a beat, and click Exit Battle in the battle header.
 9. Start a regional match from the game menu's New game…. On Windows, press Alt: the menu bar shows. Choose Quit: the app closes.
 10. Read `doc/release-notes/v2.6.0.md`, then commit, push, and follow `doc/releasing.md` from Build and draft the release.

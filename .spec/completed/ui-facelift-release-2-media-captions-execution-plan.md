@@ -9,7 +9,7 @@
 **What this plan changes:**
 
 - `README.md`: the opening image's caption, the What's Inside image's alternative text, and the OpenRouter table, which names `opponent-commander.png` and `opponent-activity.png` in place of `model-tab.png` and `tools-tab.png`.
-- `doc/how-to-play.md`: the captions and alternative text for the new-game previews, movement planning, Ranged, Strike, and the battle screen. One alternative text loses a duplicated "Step 2:".
+- `doc/how-to-play.md`: the captions and alternative text for the new-game previews, movement planning, the reticle for ranged attacks and air strikes, and the battle screen. One alternative text loses a duplicated "Step 2:".
 - `doc/media/model-tab.png` and `doc/media/tools-tab.png` are deleted.
 
 **Out of scope:**
@@ -18,7 +18,7 @@
 - Captions of the images the shot list keeps.
 - Code. This plan changes only Markdown and deletes two images, so it runs no build, tests, or smoke run.
 
-**How this plan was checked:** every step below was applied to a copy of the repository in the state the previous plan leaves, and the result matched the verified files exactly. On that result, the link check and the media check passed, with stand-ins for the reviewer's two new images. The numbers in Verify come from those runs, and the Exact-match check compares your files with that result.
+**How this plan was checked:** every step below was applied to a copy of the repository with plan 1 and the three toggles plans (`ui-facelift-toggles-execution-plan.md`) in, and the result matched the verified files exactly. On that result, the link check and the media check passed, with stand-ins for the reviewer's two new images. The numbers in Verify come from those runs, and the Exact-match check compares your files with that result.
 
 ## Ground Rules
 
@@ -69,16 +69,17 @@ git log --oneline -1
 
 Expected: `git status --short` prints nothing, or only `.spec/` files and images under `doc/media/`. The reviewer may have saved the new images without committing them.
 
-Then check that plan 1 is in, that the reviewer's two new images are in place, and that this plan is not:
+Then check that plan 1 and the toggles plans are in, that the reviewer's two new images are in place, and that this plan is not:
 
 ```powershell
 Test-Path doc/ux/console.md
+[bool](Select-String -Path src/shared/mapViewMode.ts -Pattern 'DEFAULT_WEATHER_ICONS_SHOWN' -SimpleMatch -Quiet)
 Test-Path doc/media/opponent-commander.png
 Test-Path doc/media/opponent-activity.png
 Test-Path doc/media/model-tab.png
 ```
 
-Expected: `True`, `True`, `True`, `True`. A `False` from the second or third means the reviewer has not saved those images yet: stop and report. Any other `False`: stop and report.
+Expected: `True`, `True`, `True`, `True`, `True`. A `False` from the second means the toggles plans are not in: stop and report. A `False` from the third or fourth means the reviewer has not saved those images yet: stop and report. Any other `False`: stop and report.
 
 Then record which images the reviewer changed, for your report:
 
@@ -145,7 +146,7 @@ Replace it with:
 
 - [ ] **Step 2: Edit `doc/how-to-play.md`**
 
-Captions and alternative text follow the new screens: the new-game Map section, the Orders tab, Ranged and Strike on the selection bar, and the battle header. A duplicated "Step 2:" in one alternative text goes.
+Captions and alternative text follow the new screens: the new-game Map section, the Orders tab, the reticle on the selection bar, and the battle header. A duplicated "Step 2:" in one alternative text goes.
 
 1. In `doc/how-to-play.md`, find these lines. Together they occur exactly once:
 
@@ -198,9 +199,9 @@ Replace them with:
 Replace them with:
 
 ````markdown
-| *Step 1: Select a unit or stack, then click **Ranged** on the selection bar, at the map's bottom left.*              | *Step 2: Double-click on a visible target to order the attack.*
+| *Step 1: Select a unit or stack, then click the reticle on the selection bar, at the map's bottom left.*              | *Step 2: Double-click on a visible target to order the attack.*
 | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| ![Step 1: Select a unit or stack, then click Ranged on the selection bar](media/ranged-attack-1.png) | ![Step 2: Double-click on a visible target to order the attack](media/ranged-attack-2.png) |
+| ![Step 1: Select a unit or stack, then click the reticle on the selection bar](media/ranged-attack-1.png) | ![Step 2: Double-click on a visible target to order the attack](media/ranged-attack-2.png) |
 ````
 
 4. In `doc/how-to-play.md`, find these lines. Together they occur exactly once:
@@ -214,9 +215,9 @@ Replace them with:
 Replace them with:
 
 ````markdown
-*Select an air unit or stack, then click **Strike** on the selection bar and pick a type of air strike to order. Then double-click on a hex to order the attack.*
+*Select an air unit or stack, then click the reticle on the selection bar and pick a type of air strike to order. Then double-click on a hex to order the attack.*
 
-![Select an air unit or stack, then click Strike on the selection bar and pick a type of air strike to order. Then double-click on a hex to order the attack.](media/air-strike.png)
+![Select an air unit or stack, then click the reticle on the selection bar and pick a type of air strike to order. Then double-click on a hex to order the attack.](media/air-strike.png)
 ````
 
 5. In `doc/how-to-play.md`, find these lines. Together they occur exactly once:
@@ -284,7 +285,7 @@ Expected, one line per file:
 | File | Hash |
 | --- | --- |
 | `README.md` | `ceb71825dcc4d990` |
-| `doc/how-to-play.md` | `06278ea21714a244` |
+| `doc/how-to-play.md` | `72755e32430c8aa0` |
 
 These must print `False`, because this plan deletes them:
 

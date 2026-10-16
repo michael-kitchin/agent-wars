@@ -4,7 +4,7 @@ The panel at the map's bottom-left that describes the selected units, their hex,
 
 ## Purpose
 
-Show what the player has selected, where it stands, and what it has been told to do, next to the map the player is working on, and hold the Ranged and Strike controls for that selection.
+Show what the player has selected, where it stands, and what it has been told to do, next to the map the player is working on, and hold the reticle that aims that selection's ranged attack or air strike.
 
 ## Availability
 
@@ -18,8 +18,8 @@ Shown in Strategic planning, Resolution playback, and Tactical planning while at
   - Two lines of text. Each ends in an ellipsis when it does not fit, and the controls beside them keep their size.
   - The first line: the hex code of the first selected unit's hex in parentheses, such as "(D4)", then " · " and "N selected of M". N is the number of selected units in that hex, and M is the number of the player's units there that can be selected (`summarizeSelectionPanel` in `src/shared/selectionPanelSummary.ts`). An embarked land unit cannot be selected. When exactly one unit is selected, its origin flag and name take the place of the count. When selected units also stand in other hexes, the line ends with " · +K elsewhere", where K counts them (`selectionElsewhereText` in `src/shared/selectionBarText.ts`). In a battle the code names the battle cell, such as "(E8.K3)". A code that cannot be found shows "?".
   - The second line, a hint for the next map gesture (`selectionBarHint` in `src/shared/selectionBarText.ts`). The first that applies: "Playback is running · right-click to deselect" while a turn or a battle beat plays back; "Double-click a target in range" while Ranged or Strike targeting is on; "Double-click a hex to ferry · right-click to deselect" when every selected unit is air; "Air units can't move with other units" when air units are selected with other types; otherwise "Double-click a hex to move · right-click to deselect".
-  - A divider, then the Ranged and Strike controls. See [console-command-bar.md](console-command-bar.md).
-  - A close control (×).
+  - A divider, then the reticle, and the air-strike target list beside it while a strike is aimed. See [console-command-bar.md](console-command-bar.md).
+  - The close control, an ×, the bar's full height and 32 px wide, with a divider on its left: the expand control's mirror on the right edge.
 - The details, under the bar, shown only while the panel is expanded:
   - That hex's caption, the same naming line the [hex tooltip](hex-tooltips.md) shows, with its flags. It appears once its lookup returns.
   - Chips describing that hex, in this order, each only when it applies:
@@ -29,12 +29,12 @@ Shown in Strategic planning, Resolution playback, and Tactical planning while at
     - The production the hex adds each turn, such as "$94/turn", when it has urban cells and is not on the neutral border. Not shown in a battle.
     - "Home" in the player's home region, or "Enemy home" in the opponent's. Not shown in a battle.
   - One row per selected unit, in selection order. Each row shows the unit type's glyph, the unit's origin flag and name, and, for a unit in a different hex, that hex's code in parentheses. The row ends with the unit's queued order, in the same words as its row on the Orders tab, followed by a cancel control (×), or "No orders". See [orders-tab.md](orders-tab.md).
-  - The reason a greyed-out Ranged or Strike cannot be used, when one applies.
+  - The reason a greyed-out reticle cannot be used, when one applies.
   - The sidebar error line, which stays hidden. See [notifications-and-feedback.md](notifications-and-feedback.md).
-- While Ranged targeting is on, the panel's border is the ranged amber, and while Strike targeting is on, the strike purple (`--order-ranged` and `--order-strike` in `static/shellChrome.css`).
-- A resize grip at the top-right corner, clear of the close control, shown only while the panel is expanded.
+- While Ranged targeting is on, the panel's border is the ranged amber, and while Strike targeting is on, the strike purple (`--order-ranged` and `--order-strike` in `static/shellChrome.css`). The pressed reticle's face takes the same color.
+- A resize grip at the top-right corner, shown only while the panel is expanded. It sits over the close control's top-right corner, clear of the ×, so a press there resizes the panel and does not clear the selection.
 - The panel opens 440 px wide, 12 px in from the map's left and bottom edges, and is never wider than the map minus 24 px; both states share that width. Compact, it is the bar's height. Expanded, its height fits the bar and the details, up to half the map's height; past that the unit rows scroll. When the panel is shorter than the bar, the caption, the chips, and one row, the details scroll as a whole. Where it overlaps the terrain legend, the map scale, or the minimap panel, it draws above them.
-- Control tips for the expand control, the close control, the grip, and a greyed-out Ranged or Strike are in [control-tooltips.md](control-tooltips.md).
+- Control tips for the expand control, the close control, the grip, and the reticle are in [control-tooltips.md](control-tooltips.md).
 
 ## Inputs and Responses
 
@@ -99,7 +99,7 @@ None.
 
 ## Code Entry Points
 
-- `static/index.html` (`#selection-panel`, `#selection-panel-grip`, `#selection-panel-bar`, `#selection-panel-expand`, `#sidebar-selected-unit`, `#selection-panel-hint`, `#ranged-attack-tip-host`, `#selection-panel-close`, `#selection-panel-details`, `#selection-panel-caption`, `#selection-panel-chips`, `#selection-panel-units`, `#selection-panel-action-note`, `#sidebar-error`)
+- `static/index.html` (`#selection-panel`, `#selection-panel-grip`, `#selection-panel-bar`, `#selection-panel-expand`, `#sidebar-selected-unit`, `#selection-panel-hint`, `#ranged-attack-tip-host`, `#ranged-attack-btn`, `#selection-panel-close`, `#selection-panel-details`, `#selection-panel-caption`, `#selection-panel-chips`, `#selection-panel-units`, `#selection-panel-action-note`, `#sidebar-error`)
 - `static/selectionChrome.css`
 - `src/renderer/gameplay/selectionPanel.ts`
 - `src/renderer/gameplay/selectionBar.ts`

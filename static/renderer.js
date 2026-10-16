@@ -18703,6 +18703,9 @@ ${bonuses}`;
   }
 
   // src/renderer/chrome/frameTooltipText.ts
+  var consoleTabCollapseSentence = "Click the selected tab to hide the console and widen the map.";
+  var ordersTabTooltipText = `Show the orders queued for this turn or beat. ${consoleTabCollapseSentence}`;
+  var opponentTabTooltipText = `Show whether the opponent is planning, its model, its tools, and the AI activity log. ${consoleTabCollapseSentence}`;
   function unavailableTooltipText(name) {
     return `${name} is not available in this version.`;
   }
@@ -18711,6 +18714,7 @@ ${bonuses}`;
   }
   var selectionPanelExpandTooltipText = "Show the hex, its terrain, and each selected unit's orders.";
   var selectionPanelCollapseTooltipText = "Hide the details. The bar stays.";
+  var reportsTabTooltipText = `Show the turn reports, opponent messages, and notices from this match, newest first. ${consoleTabCollapseSentence}`;
 
   // src/renderer/chrome/consoleReports.ts
   var unreadCount = 0;
@@ -20267,13 +20271,13 @@ ${bonuses}`;
   function newGameButtonTooltipText(startGame) {
     return startGame ? startGameButtonTooltipText : newMatchButtonTooltipText;
   }
-  var rangedAimTooltipText = "Turn this on, then double-click the target on the map. The button then reads Cancel.";
-  var rangedCancelTooltipText = "Stop aiming a ranged attack. Attacks already in the list stay there.";
-  var strikeAimTooltipText = "Turn this on to aim an air strike. A target list and a Cancel button replace this button.";
-  function rangedButtonTooltipText(label) {
-    if (label === "Cancel") return rangedCancelTooltipText;
-    if (label === "Strike") return strikeAimTooltipText;
-    return rangedAimTooltipText;
+  var rangedAimTooltipText = "Aim a ranged attack. Turn this on, then double-click the target on the map.";
+  var rangedStopTooltipText = "Stop aiming a ranged attack. Attacks already in the list stay there.";
+  var strikeAimTooltipText = "Aim an air strike. Turn this on, pick a target type in the list beside it, then double-click the target on the map.";
+  var strikeStopTooltipText = "Stop aiming an air strike. Strikes already in the list stay there.";
+  function supportButtonTooltipText(kind, aiming) {
+    if (kind === "strike") return aiming ? strikeStopTooltipText : strikeAimTooltipText;
+    return aiming ? rangedStopTooltipText : rangedAimTooltipText;
   }
   var runDisabledTooltipText = "Turn opponent planning on or off. Enter an API key and choose a model first.";
   var runEnabledTooltipText = "Turn opponent planning on or off. On can hold Ready until a plan exists; off cancels a plan that is still running.";
@@ -26021,7 +26025,6 @@ ${bonuses}`;
     const title = document.getElementById("console-title");
     if (title && active2) title.textContent = active2.title;
     document.getElementById("sidebar")?.setAttribute("data-collapsed", consoleState.collapsed ? "true" : "false");
-    document.getElementById("console-collapse-btn")?.setAttribute("aria-expanded", consoleState.collapsed ? "false" : "true");
     setConsoleReportsVisible(!consoleState.collapsed && consoleState.activeTabId === "console-tab-reports");
     refreshConsoleHeader();
     if (!consoleState.collapsed) active2?.onShow?.();
@@ -26035,10 +26038,6 @@ ${bonuses}`;
         applyConsoleState();
       });
     }
-    document.getElementById("console-collapse-btn")?.addEventListener("click", () => {
-      consoleState = { activeTabId: consoleState.activeTabId, collapsed: true };
-      applyConsoleState();
-    });
     applyConsoleState();
   }
 
@@ -27858,13 +27857,13 @@ ${bonuses}`;
   var STRIKE_NEEDS_AIR_ONLY_REASON = "Strike needs a selection of air units only.";
   function selectionSupportAction(unitTypes, tacticalBattleActive) {
     const mode = selectionSupportButtonMode(unitTypes, tacticalBattleActive);
-    if (mode === "strike") return { label: "Strike", enabled: true, reason: null };
-    if (mode === "ranged") return { label: "Ranged", enabled: true, reason: null };
-    if (unitTypes.includes("air")) return { label: "Strike", enabled: false, reason: STRIKE_NEEDS_AIR_ONLY_REASON };
+    if (mode === "strike") return { kind: "strike", enabled: true, reason: null };
+    if (mode === "ranged") return { kind: "ranged", enabled: true, reason: null };
+    if (unitTypes.includes("air")) return { kind: "strike", enabled: false, reason: STRIKE_NEEDS_AIR_ONLY_REASON };
     if (!tacticalBattleActive && unitTypes.includes("infantry")) {
-      return { label: "Ranged", enabled: false, reason: INFANTRY_CANNOT_FIRE_REASON };
+      return { kind: "ranged", enabled: false, reason: INFANTRY_CANNOT_FIRE_REASON };
     }
-    return { label: "Ranged", enabled: false, reason: null };
+    return { kind: "ranged", enabled: false, reason: null };
   }
 
   // src/renderer/gameplay/orderLabelFormatting.ts
@@ -29302,6 +29301,7 @@ ${bonuses}`;
   }
 
   // src/renderer/gameplay/tacticalOrders.ts
+  var SUPPORT_BUTTON_NAMES = Object.freeze({ ranged: "Ranged attack", strike: "Air strike" });
   function replacePendingOrdersForSelected(getRows, setRows, selectedIds, buildRow2) {
     const kept = getRows().filter((row) => !selectedIds.includes(row.unitId));
     for (const unitId of selectedIds) {
@@ -29405,7 +29405,6 @@ ${bonuses}`;
     const btnEl = document.getElementById("ranged-attack-btn");
     const btnHostEl = document.getElementById("ranged-attack-tip-host");
     const strikeTypeEl = document.getElementById("air-strike-target-type");
-    const strikeCancelEl = document.getElementById("air-strike-cancel-btn");
     const actionNoteEl = document.getElementById("selection-panel-action-note");
     if (!listEl) return;
     const battle = rendererSharedState.tacticalBattleSnapshot;
@@ -29444,36 +29443,27 @@ ${bonuses}`;
       if (actionNoteEl) actionNoteEl.textContent = action.reason ?? "";
       if (!action.enabled && action.reason) btnHostEl.setAttribute("data-control-tooltip", action.reason);
       else btnHostEl.removeAttribute("data-control-tooltip");
+      btnHostEl.style.display = "";
+      btnEl.setAttribute("aria-label", SUPPORT_BUTTON_NAMES[action.kind]);
       if (mode === "strike") {
         rendererSharedState.rangedModeActive = false;
-        btnEl.textContent = "Strike";
-        btnEl.setAttribute("data-control-tooltip", rangedButtonTooltipText("Strike"));
-        btnHostEl.style.display = rendererSharedState.airStrikeModeActive ? "none" : "";
+        btnEl.setAttribute("aria-pressed", String(rendererSharedState.airStrikeModeActive));
+        btnEl.setAttribute("data-control-tooltip", supportButtonTooltipText("strike", rendererSharedState.airStrikeModeActive));
         if (strikeTypeEl) {
           strikeTypeEl.style.display = rendererSharedState.airStrikeModeActive ? "" : "none";
           strikeTypeEl.value = rendererSharedState.airStrikeTargetType;
         }
-        if (strikeCancelEl) {
-          strikeCancelEl.style.display = rendererSharedState.airStrikeModeActive ? "" : "none";
-        }
       } else if (mode === "ranged") {
         rendererSharedState.airStrikeModeActive = false;
-        btnHostEl.style.display = "";
-        btnEl.textContent = rendererSharedState.rangedModeActive ? "Cancel" : "Ranged";
-        btnEl.setAttribute(
-          "data-control-tooltip",
-          rangedButtonTooltipText(rendererSharedState.rangedModeActive ? "Cancel" : "Ranged")
-        );
+        btnEl.setAttribute("aria-pressed", String(rendererSharedState.rangedModeActive));
+        btnEl.setAttribute("data-control-tooltip", supportButtonTooltipText("ranged", rendererSharedState.rangedModeActive));
         if (strikeTypeEl) strikeTypeEl.style.display = "none";
-        if (strikeCancelEl) strikeCancelEl.style.display = "none";
       } else {
-        btnHostEl.style.display = "";
-        btnEl.textContent = action.label;
+        btnEl.setAttribute("aria-pressed", "false");
         btnEl.removeAttribute("data-control-tooltip");
         rendererSharedState.rangedModeActive = false;
         rendererSharedState.airStrikeModeActive = false;
         if (strikeTypeEl) strikeTypeEl.style.display = "none";
-        if (strikeCancelEl) strikeCancelEl.style.display = "none";
       }
       const targetingModeCleared = rangedWasActive && !rendererSharedState.rangedModeActive || strikeWasActive && !rendererSharedState.airStrikeModeActive;
       if (targetingModeCleared) {
@@ -36191,11 +36181,10 @@ ${bonuses}`;
     deps.initNewGameButton();
     deps.updateReadyButtonState();
     document.getElementById("ranged-attack-btn")?.addEventListener("click", () => {
-      if (rendererSharedState.airStrikeModeActive) {
+      if (rendererSharedState.airStrikeModeActive || rendererSharedState.rangedModeActive) {
         rendererSharedState.airStrikeModeActive = false;
-        void deps.refreshHoverRoutePreview();
-      } else if (rendererSharedState.rangedModeActive) {
         rendererSharedState.rangedModeActive = false;
+        hideOrderSlowerHexTooltip();
         void deps.refreshHoverRoutePreview();
       } else if (rendererSharedState.selectedUnitIds.length > 0 && rendererSharedState.gameState) {
         const state = rendererSharedState.gameState;
@@ -36221,13 +36210,6 @@ ${bonuses}`;
       if (value === "units" || value === "urban" || value === "airport" || value === "seaport") {
         rendererSharedState.airStrikeTargetType = value;
       }
-    });
-    document.getElementById("air-strike-cancel-btn")?.addEventListener("click", () => {
-      rendererSharedState.airStrikeModeActive = false;
-      hideOrderSlowerHexTooltip();
-      void deps.refreshHoverRoutePreview();
-      deps.updateRangedSidebar();
-      deps.redraw();
     });
     if (window.gameApi) {
       window.gameApi.getGameState().then(async (raw) => {

@@ -13,10 +13,10 @@ Shown in Strategic planning, Tactical planning, Resolution playback, the tactica
 ## Information Displayed
 
 - A tab rail on the console's outer edge, with Orders, Reports, Opponent, Build, and Forces. Build and Forces are disabled in this version. Each tab is 56 × 58 px, an icon above a 9 px label, the same size as the map-mode tabs on the [minimap panel](minimap.md). The selected tab is marked while the console is expanded, and the mark is cleared while the console is collapsed.
-- A header with the selected tab's name, a subtitle, and a button that collapses the console. On the Orders tab the subtitle reads "N queued for turn T", or "N queued for beat B" in a battle, where N counts every row of the three order groups (`formatQueuedOrdersSubtitle` in `src/shared/orderRowDetail.ts`). On the Reports tab it reads "this match". On the Opponent tab it names the opponent's home region, as the top bar does.
+- A header with the selected tab's name and a subtitle. It has no collapse button: the selected tab collapses the console. On the Orders tab the subtitle reads "N queued for turn T", or "N queued for beat B" in a battle, where N counts every row of the three order groups (`formatQueuedOrdersSubtitle` in `src/shared/orderRowDetail.ts`). On the Reports tab it reads "this match". On the Opponent tab it names the opponent's home region, as the top bar does.
 - A count on the Orders tab in the rail: the number of queued orders, the same N. It is hidden while nothing is queued.
 - A count on the Reports tab in the rail: the number of unread reports. It is hidden at zero. See [reports-tab.md](reports-tab.md).
-- The Orders tab: the order groups. See [orders-tab.md](orders-tab.md). The selected units, and the Ranged and Strike controls, are in the [selection panel](selection-panel.md) on the map.
+- The Orders tab: the order groups. See [orders-tab.md](orders-tab.md). The selected units, and the reticle that aims a ranged attack or an air strike, are in the [selection panel](selection-panel.md) on the map.
 - The Reports tab: what the map toasts showed during this match. See [reports-tab.md](reports-tab.md).
 - The Opponent tab: four sections shown together, with no sub-tabs. Status holds Run and a sentence saying whether opponent planning is on. Commander holds the API key with the match cost, the model with refresh, and the reasoning effort. Tool groups holds the tool toggles in two columns. The AI activity log fills the height that is left. See [opponent-tab-commander.md](opponent-tab-commander.md), [opponent-tab-tool-groups.md](opponent-tab-tool-groups.md), and [ai-activity-log.md](ai-activity-log.md).
 - A footer under the tab content, with the opponent status line above Ready. For Ready, see [console-command-bar.md](console-command-bar.md).
@@ -27,7 +27,7 @@ Shown in Strategic planning, Tactical planning, Resolution playback, the tactica
   - The match cost, the same amount as the Commander section's cost readout.
   - The labels come from `src/shared/opponentPlanningStatus.ts`.
 - While collapsed, only the tab rail and a smaller Ready show. The opponent status line is hidden. While Ready reads "AI:" and a time, that label takes two lines.
-- Control tips for the tabs and the collapse button are in [control-tooltips.md](control-tooltips.md).
+- Control tips for the tabs are in [control-tooltips.md](control-tooltips.md). Each enabled tab's tip ends by saying that a click on the selected tab hides the console.
 
 ## Inputs and Responses
 
@@ -35,7 +35,6 @@ Shown in Strategic planning, Tactical planning, Resolution playback, the tactica
 
 - When the player clicks a tab other than the selected one, that tab's content shows and the header names it.
 - When the player clicks the selected tab, the console collapses to its rail.
-- When the player clicks the collapse button, the console collapses to its rail.
 - When the player clicks any tab while the console is collapsed, the console expands on that tab.
 - The map takes the width the console gives up, and gives it back when the console expands.
 - Turning Run on or off does not change the selected tab. See [opponent-tab-commander.md](opponent-tab-commander.md).
@@ -94,7 +93,7 @@ None.
 
 ## Code Entry Points
 
-- `static/index.html` (`#sidebar`, `#console-main`, `#console-title`, `#console-subtitle`, `#console-tab-orders-badge`, `#console-collapse-btn`, `#console-panel-orders`, `#console-panel-reports`, `#console-panel-opponent`, `#console-rail`, `#console-tab-orders`, `#console-tab-reports`, `#console-tab-reports-badge`, `#console-tab-opponent`, `#console-tab-build`, `#console-tab-forces`, `#console-footer`, `#opponent-status-line`, `#opponent-status-label`, `#opponent-status-model`, `#opponent-status-cost`)
+- `static/index.html` (`#sidebar`, `#console-main`, `#console-title`, `#console-subtitle`, `#console-tab-orders-badge`, `#console-panel-orders`, `#console-panel-reports`, `#console-panel-opponent`, `#console-rail`, `#console-tab-orders`, `#console-tab-reports`, `#console-tab-reports-badge`, `#console-tab-opponent`, `#console-tab-build`, `#console-tab-forces`, `#console-footer`, `#opponent-status-line`, `#opponent-status-label`, `#opponent-status-model`, `#opponent-status-cost`)
 - `static/frameChrome.css`
 - `static/consoleChrome.css`
 - `src/renderer/chrome/consoleFrame.ts`

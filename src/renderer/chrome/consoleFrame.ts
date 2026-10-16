@@ -1,5 +1,6 @@
 /**
- * The console docked on the right: its tab rail, its title, and collapsing it to the rail.
+ * The console docked on the right: its tab rail, its title, and collapsing it to the rail. A click on the selected tab
+ * collapses the console, and a click on any tab expands it again, so the header has no collapse button of its own.
  *
  * The console root keeps the id `sidebar` so existing lookups keep working.
  */
@@ -131,7 +132,7 @@ export function refreshConsoleHeader(): void {
 /**
  * Writes `consoleState` to the page.
  *
- * Purpose: The rail, the panels, the title, the collapse attribute, and the collapse button change together.
+ * Purpose: The rail, the panels, the title, and the collapse attribute change together.
  * When to use: After every change to `consoleState`, and once at startup.
  * Expected outcome: The active panel shows, the others hide, the title and subtitle match, and `#sidebar` carries
  *   `data-collapsed="true"` or `"false"`. The Reports tab learns whether it is on screen. While expanded, the active
@@ -144,19 +145,19 @@ function applyConsoleState(): void {
   const title = document.getElementById('console-title');
   if (title && active) title.textContent = active.title;
   document.getElementById('sidebar')?.setAttribute('data-collapsed', consoleState.collapsed ? 'true' : 'false');
-  document.getElementById('console-collapse-btn')?.setAttribute('aria-expanded', consoleState.collapsed ? 'false' : 'true');
   setConsoleReportsVisible(!consoleState.collapsed && consoleState.activeTabId === 'console-tab-reports');
   refreshConsoleHeader();
   if (!consoleState.collapsed) active?.onShow?.();
 }
 
 /**
- * Wires the rail's tabs and the collapse button.
+ * Wires the rail's tabs.
  *
  * Purpose: One bootstrap for the console's own behavior.
  * When to use: Once during renderer startup, after the page markup exists.
- * Expected outcome: A tab click follows `nextConsoleTabState`. The collapse button collapses the console. The header
- *   and badges follow every change to the queued orders and the reports. The console starts expanded on Orders.
+ * Expected outcome: A tab click follows `nextConsoleTabState`: the selected tab collapses the console, and any tab
+ *   expands it. The header and badges follow every change to the queued orders and the reports. The console starts
+ *   expanded on Orders.
  * Exceptions: None; missing elements are skipped.
  */
 export function wireConsoleFrame(): void {
@@ -168,9 +169,5 @@ export function wireConsoleFrame(): void {
       applyConsoleState();
     });
   }
-  document.getElementById('console-collapse-btn')?.addEventListener('click', () => {
-    consoleState = { activeTabId: consoleState.activeTabId, collapsed: true };
-    applyConsoleState();
-  });
   applyConsoleState();
 }

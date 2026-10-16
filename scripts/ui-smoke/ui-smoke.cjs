@@ -243,7 +243,8 @@ async function runFirstSession(app, page, report, outDir) {
   await parkPointer(page);
   await page.waitForTimeout(SETTLE_MS.click);
 
-  await page.click('#console-collapse-btn');
+  // Orders is the selected tab, so a click on it collapses the console to its rail; the console has no collapse button.
+  await page.click('#console-tab-orders');
   await parkPointer(page);
   await page.waitForTimeout(SETTLE_MS.resize);
   await recordScene(page, report, outDir, SCENES.consoleCollapsed);
@@ -288,6 +289,13 @@ async function runFirstSession(app, page, report, outDir) {
   await page.waitForTimeout(SETTLE_MS.click);
   await recordScene(page, report, outDir, SCENES.ordersQueued);
 
+  // Aim a ranged attack with the armor unit from the reticle, record it, then click the reticle again to stop aiming.
+  await page.click('#ranged-attack-btn');
+  await parkPointer(page);
+  await page.waitForTimeout(SETTLE_MS.click);
+  await recordScene(page, report, outDir, SCENES.rangedAiming);
+  await page.click('#ranged-attack-btn');
+
   await page.click('#selection-panel-close');
   await parkPointer(page);
   await page.waitForTimeout(SETTLE_MS.click);
@@ -297,13 +305,16 @@ async function runFirstSession(app, page, report, outDir) {
   await parkPointer(page);
   await recordScene(page, report, outDir, SCENES.selectionStack);
 
-  // Aim an air strike from the selection panel, record it, then stop aiming.
+  // Aim an air strike from the reticle and record it, then click the reticle again to stop aiming and record that.
   await selectLoneUnit(page, await readGameState(page), 'air');
   await page.click('#ranged-attack-btn');
   await parkPointer(page);
   await page.waitForTimeout(SETTLE_MS.click);
   await recordScene(page, report, outDir, SCENES.strikeAiming);
-  await page.click('#air-strike-cancel-btn');
+  await page.click('#ranged-attack-btn');
+  await parkPointer(page);
+  await page.waitForTimeout(SETTLE_MS.click);
+  await recordScene(page, report, outDir, SCENES.strikeStopped);
 
   // Expand the panel on the stack and record it. It stays expanded for the rest of this session, so its grip shows.
   await selectHumanStack(page);

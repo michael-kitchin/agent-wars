@@ -41,14 +41,14 @@ describe('selectionSupportButtonMode tactical', () => {
 
 describe('selectionSupportAction', () => {
   it('enables Ranged or Strike when the selection can use it', () => {
-    assert.deepEqual(selectionSupportAction(['armor'], false), { label: 'Ranged', enabled: true, reason: null });
-    assert.deepEqual(selectionSupportAction(['air', 'air'], false), { label: 'Strike', enabled: true, reason: null });
-    assert.deepEqual(selectionSupportAction(['infantry'], true), { label: 'Ranged', enabled: true, reason: null });
+    assert.deepEqual(selectionSupportAction(['armor'], false), { kind: 'ranged', enabled: true, reason: null });
+    assert.deepEqual(selectionSupportAction(['air', 'air'], false), { kind: 'strike', enabled: true, reason: null });
+    assert.deepEqual(selectionSupportAction(['infantry'], true), { kind: 'ranged', enabled: true, reason: null });
   });
 
   it('greys out Ranged with a reason when a world-map selection includes infantry', () => {
     assert.deepEqual(selectionSupportAction(['armor', 'infantry'], false), {
-      label: 'Ranged',
+      kind: 'ranged',
       enabled: false,
       reason: INFANTRY_CANNOT_FIRE_REASON,
     });
@@ -56,18 +56,18 @@ describe('selectionSupportAction', () => {
 
   it('greys out Strike with a reason when air is mixed with other types', () => {
     assert.deepEqual(selectionSupportAction(['infantry', 'air'], false), {
-      label: 'Strike',
+      kind: 'strike',
       enabled: false,
       reason: STRIKE_NEEDS_AIR_ONLY_REASON,
     });
     assert.deepEqual(selectionSupportAction(['armor', 'air'], true), {
-      label: 'Strike',
+      kind: 'strike',
       enabled: false,
       reason: STRIKE_NEEDS_AIR_ONLY_REASON,
     });
   });
 
   it('greys out Ranged without a reason for an empty selection', () => {
-    assert.deepEqual(selectionSupportAction([], false), { label: 'Ranged', enabled: false, reason: null });
+    assert.deepEqual(selectionSupportAction([], false), { kind: 'ranged', enabled: false, reason: null });
   });
 });

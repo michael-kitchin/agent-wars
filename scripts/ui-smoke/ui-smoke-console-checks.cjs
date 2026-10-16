@@ -142,6 +142,33 @@ function selectionPanelPlacement(c, s, width, height) {
 }
 
 /**
+ * The console header's inset on each side, in CSS pixels.
+ *
+ * Purpose: With no collapse button, the subtitle runs to the same inset on the right as the title has on the left.
+ * When to use: The console header check.
+ * Expected outcome: Matches the padding of `.console-header` in `static/frameChrome.css`.
+ * Exceptions: None.
+ */
+const CONSOLE_HEADER_INSET = 16;
+
+/**
+ * Says what is wrong with the selection bar's reticle, if anything.
+ *
+ * Purpose: Every reticle check reads the same things: it shows in the bar as an icon with no text, its accessible name
+ *   says which attack it aims, and its enabled and pressed states.
+ * When to use: With the probe of `#ranged-attack-btn` and the expected `{ name, enabled, pressed }`.
+ * Expected outcome: Null when the reticle matches, otherwise a failure message.
+ * Exceptions: None.
+ */
+function reticleProblem(reticle, expected) {
+  if (!reticle.shown || !reticle.ancestorIds.includes('selection-panel-bar')) return 'the reticle is not shown in the summary bar';
+  if (reticle.text !== '') return `the reticle reads "${reticle.text}", expected an icon with no text`;
+  if (reticle.label !== expected.name) return `the reticle is named "${reticle.label}", expected "${expected.name}"`;
+  if (reticle.disabled === expected.enabled) return `the reticle is ${reticle.disabled ? 'greyed out' : 'enabled'}, expected it ${expected.enabled ? 'enabled' : 'greyed out'}`;
+  return reticle.pressed === String(expected.pressed) ? null : `the reticle reads aria-pressed=${reticle.pressed}, expected ${expected.pressed}`;
+}
+
+/**
  * The content checks for the console and the selection panel, one row each.
  *
  * Purpose: One table that a reviewer can read top to bottom.
@@ -248,7 +275,7 @@ const CONSOLE_CHECKS = Object.freeze([
   },
   {
     name: 'selection-bar-layout',
-    scenes: [SCENES.ordersQueued, SCENES.selectionStack, SCENES.strikeAiming, SCENES.selectionExpanded],
+    scenes: [SCENES.ordersQueued, SCENES.rangedAiming, SCENES.selectionStack, SCENES.strikeAiming, SCENES.selectionExpanded],
     needs: ['#selection-panel', '#selection-panel-bar', '#selection-panel-expand', '#selection-panel-close', '#selection-panel-details'],
     run: (p, el) => {
       const s = el('#selection-panel');
@@ -258,7 +285,11 @@ const CONSOLE_CHECKS = Object.freeze([
       }
       const expand = el('#selection-panel-expand');
       if (!near(expand.x, s.x + 1) || !near(expand.h, SELECTION_BAR_HEIGHT)) return `the expand control is at ${fmt(expand)}, expected the bar's full height at its left edge`;
-      if (!el('#selection-panel-close').ancestorIds.includes('selection-panel-bar')) return 'the close control is not in the summary bar';
+      const close = el('#selection-panel-close');
+      if (!close.ancestorIds.includes('selection-panel-bar')) return 'the close control is not in the summary bar';
+      if (!near(close.x + close.w, s.x + s.w - 1) || !near(close.h, SELECTION_BAR_HEIGHT) || !near(close.w, expand.w)) {
+        return `the close control is at ${fmt(close)}, expected the bar's full height at its right edge, as wide as the expand control ${fmt(expand)}`;
+      }
       const details = el('#selection-panel-details');
       if (!details.shown) return null;
       return details.y >= bar.y + bar.h - 1 ? null : `the details start at ${fmt(details)}, above the bottom of the bar ${fmt(bar)}`;
@@ -313,9 +344,7 @@ const CONSOLE_CHECKS = Object.freeze([
       if (el('#selection-panel').borderColor === SELECTION_BAR.strikeBorder) return 'the panel has the strike border while nothing is aimed';
       const ranged = el('#ranged-attack-btn');
       if (el('#selection-panel-action-note').shown) return `a reason shows for an armor unit: "${el('#selection-panel-action-note').text}"`;
-      return ranged.shown && !ranged.disabled && ranged.text === 'Ranged' && ranged.ancestorIds.includes('selection-panel-bar')
-        ? null
-        : `Ranged reads "${ranged.text}"${ranged.shown ? '' : ' and is hidden'}${ranged.disabled ? ' and is disabled' : ''}, expected it enabled in the summary bar`;
+      return reticleProblem(ranged, { name: SELECTION_BAR.rangedName, enabled: true, pressed: false });
     },
   },
   {
@@ -334,10 +363,8 @@ const CONSOLE_CHECKS = Object.freeze([
     scenes: [SCENES.selectionStack, SCENES.selectionExpanded],
     needs: ['#ranged-attack-btn', '#ranged-attack-tip-host', '#selection-panel-action-note'],
     run: (p, el) => {
-      const ranged = el('#ranged-attack-btn');
-      if (!(ranged.shown && ranged.disabled && ranged.text === 'Ranged')) {
-        return `Ranged reads "${ranged.text}"${ranged.shown ? '' : ' and is hidden'}${ranged.disabled ? '' : ' and is enabled'}, expected it greyed out`;
-      }
+      const problem = reticleProblem(el('#ranged-attack-btn'), { name: SELECTION_BAR.rangedName, enabled: false, pressed: false });
+      if (problem) return problem;
       const reason = "Infantry can't fire on the world map.";
       const note = el('#selection-panel-action-note');
       if (note.text !== reason || !note.ancestorIds.includes('selection-panel-details')) return `the reason in the details reads "${note.text}"`;
@@ -346,19 +373,64 @@ const CONSOLE_CHECKS = Object.freeze([
     },
   },
   {
+    name: 'ranged-aiming-in-panel',
+    scenes: [SCENES.rangedAiming],
+    needs: ['#ranged-attack-btn', '#air-strike-target-type', '#selection-panel-hint', '#selection-panel'],
+    run: (p, el) => {
+      const ranged = el('#ranged-attack-btn');
+      const problem = reticleProblem(ranged, { name: SELECTION_BAR.rangedName, enabled: true, pressed: true });
+      if (problem) return problem;
+      if (el('#air-strike-target-type').shown) return 'the strike target list shows while a ranged attack is aimed';
+      const hint = el('#selection-panel-hint').text;
+      if (hint !== SELECTION_BAR.targetingHint) return `the hint reads "${hint}", expected "${SELECTION_BAR.targetingHint}"`;
+      const border = el('#selection-panel').borderColor;
+      if (border !== SELECTION_BAR.rangedBorder) return `the panel's border is ${border}, expected the ranged amber ${SELECTION_BAR.rangedBorder}`;
+      return ranged.background === SELECTION_BAR.rangedBorder ? null : `the pressed reticle's face is ${ranged.background}, expected the ranged amber ${SELECTION_BAR.rangedBorder}`;
+    },
+  },
+  {
     name: 'strike-aiming-in-panel',
     scenes: [SCENES.strikeAiming],
-    needs: ['#ranged-attack-btn', '#air-strike-target-type', '#air-strike-cancel-btn', '#sidebar-selected-unit', '#selection-panel-hint', '#selection-panel'],
+    needs: ['#ranged-attack-btn', '#air-strike-target-type', '#sidebar-selected-unit', '#selection-panel-hint', '#selection-panel'],
     run: (p, el) => {
-      if (el('#ranged-attack-btn').shown) return 'Strike still shows while aiming';
-      const missing = ['#air-strike-target-type', '#air-strike-cancel-btn']
-        .filter((selector) => !el(selector).shown || !el(selector).ancestorIds.includes('selection-panel-bar'));
-      if (missing.length > 0) return `not shown in the summary bar: ${missing.join(', ')}`;
+      const strike = el('#ranged-attack-btn');
+      const problem = reticleProblem(strike, { name: SELECTION_BAR.strikeName, enabled: true, pressed: true });
+      if (problem) return problem;
+      const list = el('#air-strike-target-type');
+      if (!list.shown || !list.ancestorIds.includes('selection-panel-bar')) return 'the strike target list is not shown in the summary bar';
+      if (list.x < strike.x + strike.w) return `the target list ${fmt(list)} is not to the right of the reticle ${fmt(strike)}`;
       if (!readSummaryLine(el('#sidebar-selected-unit').text)) return `the first line reads "${el('#sidebar-selected-unit').text}", expected a hex code, then the unit`;
       const hint = el('#selection-panel-hint').text;
       if (hint !== SELECTION_BAR.targetingHint) return `the hint reads "${hint}", expected "${SELECTION_BAR.targetingHint}"`;
       const border = el('#selection-panel').borderColor;
-      return border === SELECTION_BAR.strikeBorder ? null : `the panel's border is ${border}, expected the strike purple ${SELECTION_BAR.strikeBorder}`;
+      if (border !== SELECTION_BAR.strikeBorder) return `the panel's border is ${border}, expected the strike purple ${SELECTION_BAR.strikeBorder}`;
+      return strike.background === SELECTION_BAR.strikeBorder ? null : `the pressed reticle's face is ${strike.background}, expected the strike purple ${SELECTION_BAR.strikeBorder}`;
+    },
+  },
+  {
+    name: 'strike-stopped-by-reticle',
+    scenes: [SCENES.strikeStopped],
+    needs: ['#ranged-attack-btn', '#air-strike-target-type', '#selection-panel-hint', '#selection-panel'],
+    run: (p, el) => {
+      const problem = reticleProblem(el('#ranged-attack-btn'), { name: SELECTION_BAR.strikeName, enabled: true, pressed: false });
+      if (problem) return problem;
+      if (el('#air-strike-target-type').shown) return 'the strike target list still shows after the reticle stopped aiming';
+      const hint = el('#selection-panel-hint').text;
+      if (hint !== SELECTION_BAR.ferryHint) return `the hint reads "${hint}", expected "${SELECTION_BAR.ferryHint}"`;
+      const border = el('#selection-panel').borderColor;
+      return border === SELECTION_BAR.strikeBorder ? 'the panel keeps the strike border after the reticle stopped aiming' : null;
+    },
+  },
+  {
+    name: 'console-header-without-collapse-button',
+    scenes: [SCENES.strategic],
+    needs: ['#console-main', '#console-subtitle'],
+    run: (p, el) => {
+      const main = el('#console-main');
+      const subtitle = el('#console-subtitle');
+      return near(subtitle.x + subtitle.w, main.x + main.w - CONSOLE_HEADER_INSET)
+        ? null
+        : `the subtitle ends at ${Math.round(subtitle.x + subtitle.w)}, expected it to run to ${CONSOLE_HEADER_INSET} px inside the console's right edge at ${Math.round(main.x + main.w)}`;
     },
   },
   {

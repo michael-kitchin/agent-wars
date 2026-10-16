@@ -43,8 +43,8 @@ function probePage(selectors) {
    * Purpose: Every check reads elements the same way.
    * When to use: For each selector passed to `probePage`.
    * Expected outcome: The first match's box, whether it is shown, its trimmed text, its computed font size, top
-   *   border color, and pointer events, its control tip sentence, and selected attributes, and the trimmed text of every
-   *   match, or null when the selector matches nothing.
+   *   border color, background color, and pointer events, its control tip sentence, and selected attributes, including
+   *   its accessible name, and the trimmed text of every match, or null when the selector matches nothing.
    * Exceptions: None.
    */
   const describe = (selector) => {
@@ -72,8 +72,10 @@ function probePage(selectors) {
       collapsed: el.getAttribute('data-collapsed'),
       expanded: el.getAttribute('aria-expanded'),
       pressed: el.getAttribute('aria-pressed'),
+      label: el.getAttribute('aria-label'),
       fontSize: getComputedStyle(el).fontSize,
       borderColor: getComputedStyle(el).borderTopColor,
+      background: getComputedStyle(el).backgroundColor,
       pointerEvents: getComputedStyle(el).pointerEvents,
       tip: el.getAttribute('data-control-tooltip'),
       ancestorIds,

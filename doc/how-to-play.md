@@ -55,7 +55,7 @@ I'll add screenshots of specific functions as I can.
 2. **Zoom:** Mouse wheel (zooms toward the cursor). Zoomed in, contested strategic hexes show a marker that starts a tactical battle.
 3. **Select units:** Click a teal (human) unit's icon. A lone unit is selected right away. A stack opens a list of its units, where you can pick one or use **+ All**. A gold ring marks each hex that holds a selected unit. The selection panel at the map's bottom-left opens as a bar that names the hex and the selection, with a hint for what a double-click does next; its **×** clears the selection. Click the chevron at the bar's left edge to show the hex's terrain and each selected unit's orders, and click it again to hide them. While they show, drag the panel's corner grip to resize it. The panel's state and size last until you close the app.
 4. **Issue a move order:** With units selected, double-click a destination hex (land/water/terrain rules apply). The order appears in the Movement group of the Orders tab, with the destination's hex code and its distance, such as "→ E5 · 1h". Click a row to select that unit again. A destination beyond this turn's reach becomes a march that continues on later turns.
-5. **Ranged attack (armor or naval on strategic; broader types on tactical):** With capable units selected, click **Ranged** in the selection panel, then double-click an enemy hex within range. An all-air selection shows **Strike** instead. When the selection cannot fire, the button is greyed out, and pointing at it says why. Attacks are submitted with Ready. See [Aiming ranged attacks and air strikes](#aiming-ranged-attacks-and-air-strikes).
+5. **Ranged attack (armor or naval on strategic; broader types on tactical):** With capable units selected, click the reticle in the selection panel, then double-click an enemy hex within range. With an all-air selection, the same reticle aims an air strike. When the selection cannot fire, the reticle is greyed out, and pointing at it says why. Attacks are submitted with Ready. See [Aiming ranged attacks and air strikes](#aiming-ranged-attacks-and-air-strikes).
 6. **Ready:** Click **Ready** to submit orders and resolve the turn. A side wins by controlling the enemy home or wiping out its urban cells (rules in [region-vs-region.md](region-vs-region.md)). The new-game dialog then returns for the next match.
 7. You can issue multiple movement and ranged orders (one per unit each) before clicking Ready.
 
@@ -80,9 +80,9 @@ The full input map, including the exceptions, is in [ux/input-map.md](ux/input-m
 | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
 | ![Step 1: Select a unit or stack, then the Ranged button](media/ranged-attack-1.png) | ![Step 2: Step 2: Double-click on a visible target to order the attack](media/ranged-attack-2.png) |
 
-- **Ranged:** select units that can all fire, then click **Ranged**. The button reads **Cancel** while you aim.
-- **Strike:** select only air units, then click **Strike**. Pick a target type from the list that takes the button's place.
-- **Greyed button:** mixing air with other types greys out Strike. On the strategic map, infantry with no air unit greys out Ranged. Point at the greyed button to see why. Infantry can fire in a battle.
+- **Ranged:** select units that can all fire, then click the reticle in the selection panel. It stays pressed, in amber, while you aim.
+- **Strike:** select only air units, then click the reticle. It stays pressed, in purple, and a list beside it picks the target type.
+- **Greyed reticle:** mixing air with other types, or infantry with no air unit on the strategic map, greys out the reticle. Point at it to see why. Infantry can fire in a battle.
 - **The outline:** a dashed outline, with no fill, around the combined reach of every selected unit. Its dashes drift slowly.
 - **Colors:** amber for ranged fire, purple for air strikes. While you aim, the selection panel's border takes the same color.
 - **Reach on the strategic map:** armor 1 hex, naval 2, and air 3 from its base airport.
@@ -90,7 +90,7 @@ The full input map, including the exceptions, is in [ux/input-map.md](ux/input-m
 - **Hovering a valid target:** a dashed line in the same color runs from each selected unit to the target and ends in an arrowhead. A queued attack keeps that line.
 - **Hovering an invalid target:** a teal X marks the hex. After a second, a tip says why.
 - **Firing:** double-click the target. A single click does nothing. A failed double-click shows an error and keeps you aiming.
-- **Stopping:** click **Cancel**, click the selection panel's **×**, or right-click the map. Escape doesn't end aiming.
+- **Stopping:** click the pressed reticle again, click the selection panel's **×**, or right-click the map. Escape doesn't end aiming.
 - **What it doesn't show:** the outline ignores line of sight. In a battle, a mountain can still block a shot inside it.
 - **Moves:** there is no reach outline for movement. Hovering a destination draws a teal route, solid for this turn and dashed beyond, ending in an arrowhead. A queued move keeps that route. Move routes and the attack lines above are drawn over a pale edge so they stay readable.
 

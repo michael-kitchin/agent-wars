@@ -1,12 +1,12 @@
 # UI Facelift Release: Shot List
 
-This list is for the reviewer, not the coding agent. It names the screenshots in `doc/media/` that still show the layout from before the facelift, and what each new one must show. Capture them after plan 1 is committed and before plan 2 runs. Plan 2 rewrites the captions to match this list, and checks that every image the docs name is there.
+This list is for the reviewer, not the coding agent. It names the screenshots in `doc/media/` that still show the layout from before the facelift, and what each new one must show. Capture them after plan 1 and the toggles plans (`ui-facelift-toggles-execution-plan.md`) are committed, and before plan 2 runs. Plan 2 rewrites the captions to match this list, and checks that every image the docs name is there.
 
 [ui-facelift-release-execution-plan.md](ui-facelift-release-execution-plan.md) lists the plans.
 
 ## How to Capture
 
-- **The real app.** Run `npm start` on a build of plan 1's commit, with an internet connection so the map tiles load, and with a real opponent model where a shot shows the opponent's work.
+- **The real app.** Run `npm start` on a build of the commit with the toggles plans in, with an internet connection so the map tiles load, and with a real opponent model where a shot shows the opponent's work.
 - **Same names.** Save each new image over the old file of the same name in `doc/media/`, in the same format (`.png` or `.jpg`). Two images get new names, listed below. Plan 2 deletes the two old files they replace.
 - **Full-window shots.** Capture the window's content, from the top bar down, without the title bar. Electron's menu bar hides on its own; if it shows, press Alt to hide it. Scale the shot to the width listed.
 - **Crops.** Crop to the area described, at 100% scale, roughly the size listed. The sizes are those of the old images, so the pages keep their look.
@@ -15,7 +15,7 @@ This list is for the reviewer, not the coding agent. It names the screenshots in
 
 ## Replace
 
-These show the old right-hand panel, the old new-game dialog, or the old Ranged and Strike buttons.
+These show the old right-hand panel, the old new-game dialog, or the old Ranged and Strike buttons, which are now one reticle.
 
 ### 1. `tactical-battle-mexico.jpg`
 
@@ -100,25 +100,25 @@ These show the old right-hand panel, the old new-game dialog, or the old Ranged 
 ### 11. `ranged-attack-1.png`
 
 - **Used in:** How to play, under Aiming ranged attacks and air strikes.
-- **Caption:** "Step 1: Select a unit or stack, then click Ranged on the selection bar, at the map's bottom left."
-- **Set up:** select an armor or naval unit, and rest the pointer on Ranged until its tip shows.
-- **Must show:** the selection bar with Ranged and its tip, and the selected unit on the map with its gold ring.
+- **Caption:** "Step 1: Select a unit or stack, then click the reticle on the selection bar, at the map's bottom left."
+- **Set up:** select an armor or naval unit, and rest the pointer on the reticle until its tip shows.
+- **Must show:** the selection bar with the reticle and its tip, and the selected unit on the map with its gold ring.
 - **Size:** a crop of the map's lower left, about 750 × 310.
 
 ### 12. `ranged-attack-2.png`
 
 - **Used in:** How to play, under Aiming ranged attacks and air strikes.
 - **Caption:** "Step 2: Double-click on a visible target to order the attack."
-- **Set up:** click Ranged, then rest the pointer on an enemy hex in reach.
-- **Must show:** the amber reach outline, the amber line with its arrowhead to the target, and the selection panel's amber border with Ranged reading Cancel.
+- **Set up:** click the reticle, then rest the pointer on an enemy hex in reach.
+- **Must show:** the amber reach outline, the amber line with its arrowhead to the target, and the selection panel's amber border with the reticle pressed in amber.
 - **Size:** a crop of the map, about 750 × 320.
 
 ### 13. `air-strike.png`
 
 - **Used in:** How to play, under Air power.
-- **Caption:** "Select an air unit or stack, then click Strike on the selection bar and pick a type of air strike to order. Then double-click on a hex to order the attack."
-- **Set up:** select an air unit, click Strike, and open the target-type list.
-- **Must show:** the target-type list open on the selection bar, the purple reach outline, and the selection panel's purple border.
+- **Caption:** "Select an air unit or stack, then click the reticle on the selection bar and pick a type of air strike to order. Then double-click on a hex to order the attack."
+- **Set up:** select an air unit, click the reticle, and open the target-type list.
+- **Must show:** the target-type list open beside the pressed reticle on the selection bar, the purple reach outline, and the selection panel's purple border.
 - **Size:** a crop of the map, about 900 × 730.
 
 ## Optional

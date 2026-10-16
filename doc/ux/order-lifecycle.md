@@ -18,7 +18,7 @@ When the player double-clicks with an all-air selection, and Strike targeting is
 
 ### Ranged attack
 
-When Ranged targeting is on, a double-click on a hex validates the target for every selected unit. A single click does not queue the attack and does not change the selection, including a click that misses every hex. Success queues one ranged attack per selected unit, turns targeting off, and clears the selection. Failure shows an error toast, queues nothing, and leaves targeting on so the player can pick another hex. Cancel turns targeting off. A double-click outside the active tactical battle does not queue an attack; the clicks that led to it already show the outside-battle toast.
+When Ranged targeting is on, a double-click on a hex validates the target for every selected unit. A single click does not queue the attack and does not change the selection, including a click that misses every hex. Success queues one ranged attack per selected unit, turns targeting off, and clears the selection. Failure shows an error toast, queues nothing, and leaves targeting on so the player can pick another hex. Clicking the pressed reticle turns targeting off. A double-click outside the active tactical battle does not queue an attack; the clicks that led to it already show the outside-battle toast.
 
 ### Air strike
 
@@ -63,7 +63,7 @@ Build orders are queue rows on a hex, not map double-clicks. See [build-popup.md
 - Right-click never cancels queued orders.
 - Entering a tactical battle never deletes strategic drafts. It hides them until the battle ends.
 - Starting a new match clears drafts and discards the stash.
-- A rejected Ranged or Strike target double-click never turns targeting off. Targeting turns off only on Cancel, a successful target double-click, right-click, the selection panel's close control, a selection that can no longer fire, or entering a battle. The close control clears targeting the same way right-click does, and queued orders stay queued. A single click does not turn it off.
+- A rejected Ranged or Strike target double-click never turns targeting off. Targeting turns off only on a click on the pressed reticle, a successful target double-click, right-click, the selection panel's close control, a selection that can no longer fire, or entering a battle. The close control clears targeting the same way right-click does, and queued orders stay queued. A single click does not turn it off.
 - Drafting, changing, or cancelling an order never cancels or restarts opponent planning in either theater. See [modes-and-transitions.md](modes-and-transitions.md).
 - Every queued order that Ready will submit is visible in one of the three order groups.
 - Sealift assignment is never a pending order.

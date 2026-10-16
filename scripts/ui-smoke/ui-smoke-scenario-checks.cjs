@@ -180,9 +180,8 @@ const SCENARIO_CHECKS = Object.freeze([
     run: (p, el) => {
       const ranged = el('#ranged-attack-btn');
       if (el('#selection-panel-action-note').shown) return `a reason shows in a battle: "${el('#selection-panel-action-note').text}"`;
-      return ranged.shown && !ranged.disabled && ranged.text === 'Ranged'
-        ? null
-        : `Ranged reads "${ranged.text}"${ranged.shown ? '' : ' and is hidden'}${ranged.disabled ? ' and is disabled' : ''}, expected it enabled`;
+      if (!ranged.shown || ranged.disabled) return `the reticle is ${ranged.shown ? 'greyed out' : 'hidden'}, expected it enabled`;
+      return ranged.label === SELECTION_BAR.rangedName ? null : `the reticle is named "${ranged.label}", expected "${SELECTION_BAR.rangedName}"`;
     },
   },
   {

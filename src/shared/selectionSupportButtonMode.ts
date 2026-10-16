@@ -3,16 +3,16 @@ import { unitHasDirectRangedPlanning } from './rangePerimeterModel';
 /**
  * Which support action the current selection may start.
  *
- * Purpose: One result for the button's label and the button click, so those two gates cannot drift.
+ * Purpose: One result for the reticle's state and its click, so those two gates cannot drift.
  * When to use: Branch on the value returned by `selectionSupportButtonMode`. Do not re-derive air versus ranged at the call site.
- * Expected outcome: `hidden` starts nothing (the button is greyed out, see `selectionSupportAction`), `ranged` shows
- *   Ranged or Cancel, and `strike` shows Strike.
+ * Expected outcome: `hidden` starts nothing (the reticle is greyed out, see `selectionSupportAction`), `ranged` aims a
+ *   ranged attack, and `strike` aims an air strike.
  * Exceptions: None.
  */
 export type SelectionSupportButtonMode = 'hidden' | 'ranged' | 'strike';
 
 /**
- * Chooses whether the shared support button offers Ranged, Strike, or nothing.
+ * Chooses whether the selection panel's reticle aims a ranged attack, an air strike, or nothing.
  *
  * Purpose: Mixed selections must hide Ranged when any selected unit cannot fire one, including air. All-air stays Strike.
  * When to use: Sidebar visibility and the `#ranged-attack-btn` click gate, on the strategic map and in a tactical battle.
@@ -52,9 +52,9 @@ export const INFANTRY_CANNOT_FIRE_REASON = "Infantry can't fire on the world map
 export const STRIKE_NEEDS_AIR_ONLY_REASON = 'Strike needs a selection of air units only.';
 
 /**
- * What the support button shows for a selection: its label, whether it can be clicked, and why not.
+ * What the reticle shows for a selection: which attack it names, whether it can be clicked, and why not.
  *
- * Purpose: The button stays visible while units are selected, so a selection that cannot fire still needs a label
+ * Purpose: The reticle stays visible while units are selected, so a selection that cannot fire still needs a name
  *   and a reason.
  * When to use: Returned by `selectionSupportAction`.
  * Expected outcome: `reason` is null whenever `enabled` is true.
@@ -62,14 +62,14 @@ export const STRIKE_NEEDS_AIR_ONLY_REASON = 'Strike needs a selection of air uni
  */
 export interface SelectionSupportAction {
   /**
-   * The button's label before aiming starts.
+   * The attack the reticle names, enabled or greyed out.
    *
-   * Contract: Strike whenever the selection has an air unit, Ranged otherwise.
-   * When to use: The button's text while not aiming.
+   * Contract: `strike` whenever the selection has an air unit, `ranged` otherwise.
+   * When to use: The reticle's accessible name and its tip.
    * Expected outcome: Matches what a click would start.
    * Exceptions: None.
    */
-  readonly label: 'Ranged' | 'Strike';
+  readonly kind: 'ranged' | 'strike';
   /**
    * Whether a click can start aiming.
    *
@@ -91,22 +91,22 @@ export interface SelectionSupportAction {
 }
 
 /**
- * Decides the support button's label, whether it can be clicked, and the reason it cannot.
+ * Decides which attack the reticle names, whether it can be clicked, and the reason it cannot.
  *
- * Purpose: The selection panel shows Ranged or Strike for every selection and explains a greyed-out button.
+ * Purpose: The selection panel shows the reticle for every selection and explains a greyed-out one.
  * When to use: Each time the selection or the theater changes, next to `selectionSupportButtonMode`.
- * Expected outcome: All air: Strike, enabled. All able to fire: Ranged, enabled. Air with other types: Strike,
- *   disabled, `STRIKE_NEEDS_AIR_ONLY_REASON`. World-map infantry without air: Ranged, disabled,
- *   `INFANTRY_CANNOT_FIRE_REASON`. Anything else: Ranged, disabled, no reason.
+ * Expected outcome: All air: strike, enabled. All able to fire: ranged, enabled. Air with other types: strike,
+ *   disabled, `STRIKE_NEEDS_AIR_ONLY_REASON`. World-map infantry without air: ranged, disabled,
+ *   `INFANTRY_CANNOT_FIRE_REASON`. Anything else: ranged, disabled, no reason.
  * Exceptions: None.
  */
 export function selectionSupportAction(unitTypes: readonly string[], tacticalBattleActive: boolean): SelectionSupportAction {
   const mode = selectionSupportButtonMode(unitTypes, tacticalBattleActive);
-  if (mode === 'strike') return { label: 'Strike', enabled: true, reason: null };
-  if (mode === 'ranged') return { label: 'Ranged', enabled: true, reason: null };
-  if (unitTypes.includes('air')) return { label: 'Strike', enabled: false, reason: STRIKE_NEEDS_AIR_ONLY_REASON };
+  if (mode === 'strike') return { kind: 'strike', enabled: true, reason: null };
+  if (mode === 'ranged') return { kind: 'ranged', enabled: true, reason: null };
+  if (unitTypes.includes('air')) return { kind: 'strike', enabled: false, reason: STRIKE_NEEDS_AIR_ONLY_REASON };
   if (!tacticalBattleActive && unitTypes.includes('infantry')) {
-    return { label: 'Ranged', enabled: false, reason: INFANTRY_CANNOT_FIRE_REASON };
+    return { kind: 'ranged', enabled: false, reason: INFANTRY_CANNOT_FIRE_REASON };
   }
-  return { label: 'Ranged', enabled: false, reason: null };
+  return { kind: 'ranged', enabled: false, reason: null };
 }

@@ -40,21 +40,23 @@ body:has(#game-over-overlay:not(.hidden)) #selection-panel {
 }
 
 /* ---------- Summary bar ---------- */
-/* One 50 px row that never scrolls: the expand control, two lines of text, a divider, Ranged or Strike, and the close
-   control. The controls keep their size and the text gives way. The right padding keeps the close control clear of the
-   grip. */
+/* One 50 px row that never scrolls: the expand control, two lines of text, a divider, the reticle, and the close
+   control. The controls keep their size and the text gives way. */
 .selection-panel-bar {
   flex: none;
   height: 50px;
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 0 16px 0 0;
+  padding: 0;
   box-sizing: border-box;
 }
-/* The bar's full height on its left edge. The chevron points up while the panel is compact or expanding, and turns down
-   once it is expanded, until it is compact again. */
-.selection-panel-expand {
+/* The two end controls take the bar's full height, each with a divider on its inner side: expand on the left edge and
+   close on the right. The chevron points up while the panel is compact or expanding, and turns down once it is
+   expanded, until it is compact again. While the panel is expanded, the resize grip sits over the close control's
+   top-right corner, clear of its glyph. */
+.selection-panel-expand,
+.selection-panel-close {
   flex: none;
   align-self: stretch;
   width: 32px;
@@ -63,15 +65,22 @@ body:has(#game-over-overlay:not(.hidden)) #selection-panel {
   align-items: center;
   justify-content: center;
   border: 0;
-  border-right: 1px solid var(--chrome-divider);
   border-radius: 0;
   background: transparent;
   color: var(--chrome-text);
 }
-.selection-panel-expand:hover {
+.selection-panel-expand {
+  border-right: 1px solid var(--chrome-divider);
+}
+.selection-panel-close {
+  border-left: 1px solid var(--chrome-divider);
+}
+.selection-panel-expand:hover,
+.selection-panel-close:hover {
   background: var(--chrome-bg-raised);
 }
-.selection-panel-expand:focus {
+.selection-panel-expand:focus,
+.selection-panel-close:focus {
   outline-offset: -2px;
 }
 .selection-panel[data-state="expanded"] .selection-panel-chevron,
@@ -105,21 +114,6 @@ body:has(#game-over-overlay:not(.hidden)) #selection-panel {
   width: 1px;
   height: 30px;
   background: var(--chrome-divider);
-}
-.selection-panel-close {
-  flex: none;
-  width: 24px;
-  height: 24px;
-  padding: 0;
-  border: 1px solid var(--chrome-border);
-  border-radius: 3px;
-  background: transparent;
-  color: var(--chrome-text);
-  font-size: 14px;
-  line-height: 1;
-}
-.selection-panel-close:hover {
-  background: var(--chrome-bg-raised);
 }
 
 /* ---------- Details ---------- */
@@ -242,13 +236,35 @@ body:has(#game-over-overlay:not(.hidden)) #selection-panel {
 }
 
 /* ---------- Ranged and Strike ---------- */
-/* Ranged or Strike, or the strike target list and its Cancel, in the bar. The reason a greyed-out control cannot be used
-   sits in the details under the unit rows. */
+/* The reticle that aims a ranged attack or an air strike, and while a strike is aimed, the target list beside it. The
+   reason a greyed-out reticle cannot be used sits in the details under the unit rows. */
 .selection-panel-actions {
   flex: none;
   display: flex;
   align-items: center;
   gap: 0.35rem;
+}
+/* One square button for both kinds of attack, at the target list's height. Its colors come from the shared button rules
+   until the player aims: then it reads as pressed in the color of the order being aimed, the same color as the panel's
+   border (selectionBar.ts sets data-aim, and tacticalOrders.ts sets aria-pressed). */
+.selection-panel-reticle {
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.selection-panel[data-aim="ranged"] .selection-panel-reticle[aria-pressed="true"] {
+  background: var(--order-ranged);
+  border-color: var(--order-ranged);
+}
+.selection-panel[data-aim="strike"] .selection-panel-reticle[aria-pressed="true"] {
+  background: var(--order-strike);
+  border-color: var(--order-strike);
+}
+.selection-panel[data-aim] .selection-panel-reticle[aria-pressed="true"]:hover {
+  filter: brightness(1.2);
 }
 .selection-panel-action-note {
   flex: none;

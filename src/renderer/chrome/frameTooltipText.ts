@@ -1,24 +1,35 @@
 /**
- * The Orders tab's tip. This module holds the control tips for the app frame around the map: set
- * `data-control-tooltip` from these values, and keep the static markup in `static/index.html` the same, character for
- * character.
+ * The sentence that ends each enabled console tab's tip. This module holds the control tips for the app frame around
+ * the map: set `data-control-tooltip` from these values, and keep the static markup in `static/index.html` the same,
+ * character for character.
  *
- * Purpose: Says what the Orders tab shows.
- * When to use: `#console-tab-orders`.
- * Expected outcome: The control tip shows this sentence.
+ * Purpose: The console has no collapse button, so each tab says how to hide it.
+ * When to use: The last sentence of the Orders, Reports, and Opponent tabs' tips.
+ * Expected outcome: The control tip ends with this sentence.
  * Exceptions: None.
  */
-export const ordersTabTooltipText = 'Show the orders queued for this turn or beat.';
+const consoleTabCollapseSentence = 'Click the selected tab to hide the console and widen the map.';
+
+/**
+ * The Orders tab's tip.
+ *
+ * Purpose: Says what the Orders tab shows, and how to hide the console.
+ * When to use: `#console-tab-orders`.
+ * Expected outcome: The control tip shows these sentences.
+ * Exceptions: None.
+ */
+export const ordersTabTooltipText = `Show the orders queued for this turn or beat. ${consoleTabCollapseSentence}`;
 
 /**
  * The Opponent tab's tip.
  *
- * Purpose: Says what the Opponent tab shows.
+ * Purpose: Says what the Opponent tab shows, and how to hide the console.
  * When to use: `#console-tab-opponent`.
- * Expected outcome: The control tip shows this sentence.
+ * Expected outcome: The control tip shows these sentences.
  * Exceptions: None.
  */
-export const opponentTabTooltipText = "Show whether the opponent is planning, its model, its tools, and the AI activity log.";
+export const opponentTabTooltipText =
+  `Show whether the opponent is planning, its model, its tools, and the AI activity log. ${consoleTabCollapseSentence}`;
 
 /**
  * Builds the tip for a control this version does not offer.
@@ -31,14 +42,6 @@ export const opponentTabTooltipText = "Show whether the opponent is planning, it
 export function unavailableTooltipText(name: string): string {
   return `${name} is not available in this version.`;
 }
-
-/**
- * Purpose: Says collapsing widens the map and how to bring the console back.
- * When to use: `#console-collapse-btn`.
- * Expected outcome: The control tip shows this sentence.
- * Exceptions: None.
- */
-export const collapseConsoleTooltipText = 'Hide the console to widen the map. Click a tab to show it again.';
 
 /**
  * Purpose: Says what the Production readout counts and when it is earned.
@@ -144,12 +147,13 @@ export const selectionPanelCollapseTooltipText = 'Hide the details. The bar stay
 /**
  * The Reports tab's tip.
  *
- * Purpose: Says what the Reports tab lists.
+ * Purpose: Says what the Reports tab lists, and how to hide the console.
  * When to use: `#console-tab-reports`.
- * Expected outcome: The control tip shows this sentence.
+ * Expected outcome: The control tip shows these sentences.
  * Exceptions: None.
  */
-export const reportsTabTooltipText = 'Show the turn reports, opponent messages, and notices from this match, newest first.';
+export const reportsTabTooltipText =
+  `Show the turn reports, opponent messages, and notices from this match, newest first. ${consoleTabCollapseSentence}`;
 
 /**
  * The Weather map mode's tip.

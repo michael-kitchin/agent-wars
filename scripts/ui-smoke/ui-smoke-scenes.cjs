@@ -63,9 +63,11 @@ const SCENES = Object.freeze({
   legendOpen: 'legend-open',
   readyTip: 'ready-tip',
   ordersQueued: 'orders-queued',
+  rangedAiming: 'ranged-aiming',
   selectionCleared: 'selection-cleared',
   selectionStack: 'selection-stack',
   strikeAiming: 'strike-aiming',
+  strikeStopped: 'strike-stopped',
   selectionExpanded: 'selection-expanded',
   selectionResized: 'selection-resized',
   selectionResizedMin: 'selection-resized-min',
@@ -172,17 +174,23 @@ function fmt(b) {
 }
 
 /**
- * The selection bar's hints the smoke scenes reach, and the border color while a strike is aimed.
+ * The selection bar's hints the smoke scenes reach, the reticle's names, and the colors of an aimed attack.
  *
- * Purpose: The checks compare the bar's second line and border with the rules in `src/shared/selectionBarText.ts` and
- *   `static/selectionChrome.css`.
+ * Purpose: The checks compare the bar's second line, the reticle, and the border with the rules in
+ *   `src/shared/selectionBarText.ts`, `src/renderer/gameplay/tacticalOrders.ts`, and `static/selectionChrome.css`.
  * When to use: The selection bar checks.
- * Expected outcome: The move hint, the targeting hint, and the strike purple as a computed color.
+ * Expected outcome: The move, ferry, and targeting hints; the reticle's accessible name for each attack; and the ranged
+ *   amber and strike purple as computed colors. While an attack is aimed, the panel's border and the pressed reticle's
+ *   face both take that attack's color.
  * Exceptions: None.
  */
 const SELECTION_BAR = Object.freeze({
   moveHint: 'Double-click a hex to move · right-click to deselect',
+  ferryHint: 'Double-click a hex to ferry · right-click to deselect',
   targetingHint: 'Double-click a target in range',
+  rangedName: 'Ranged attack',
+  strikeName: 'Air strike',
+  rangedBorder: 'rgb(160, 96, 32)',
   strikeBorder: 'rgb(122, 61, 181)',
 });
 

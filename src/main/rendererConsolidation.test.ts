@@ -487,9 +487,9 @@ function testAirStrikeAndAirGlyphContracts(): void {
     'ready update toast should use consolidated turn update summary helpers'
   );
   assert.ok(
-    source.includes("btnHostEl.style.display = S.airStrikeModeActive ? 'none' : '';") &&
-      tacticalOrdersSource.includes("btnHostEl.style.display = S.airStrikeModeActive ? 'none' : '';"),
-    'Strike button should hide while strike planning mode is active'
+    tacticalOrdersSource.includes("btnEl.setAttribute('aria-pressed', String(S.airStrikeModeActive));") &&
+      tacticalOrdersSource.includes("btnEl.setAttribute('aria-pressed', String(S.rangedModeActive));"),
+    'the reticle should stay shown and read as pressed while strike or ranged planning mode is active'
   );
   assert.ok(
     tacticalOrdersSource.includes("from './orderLabelFormatting'") &&

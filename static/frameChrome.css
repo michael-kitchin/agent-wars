@@ -412,35 +412,20 @@ body:has(#game-over-overlay:not(.hidden)) #sidebar {
   min-height: 0;
   border-left: 1px solid var(--chrome-border);
 }
+/* The title and the subtitle. The header has no collapse button: clicking the selected tab collapses the console, so
+   the subtitle runs to the same 16 px inset on the right as the title has on the left. */
 .console-header {
   flex: 0 0 48px;
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 0 10px 0 16px;
+  padding: 0 16px;
   border-bottom: 1px solid var(--chrome-border);
 }
 .console-title {
   margin: 0;
   font-size: 15px;
   font-weight: 600;
-}
-.console-collapse-btn {
-  flex: none;
-  width: 28px;
-  height: 28px;
-  margin-left: auto;
-  padding: 0;
-  border: 1px solid var(--chrome-border);
-  border-radius: 4px;
-  background: transparent;
-  color: var(--chrome-text);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-.console-collapse-btn:hover {
-  background: var(--chrome-bg-raised);
 }
 .console-panel {
   flex: 1 1 auto;

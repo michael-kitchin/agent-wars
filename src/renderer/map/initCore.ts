@@ -387,12 +387,13 @@ export function wireInitCore(deps: InitCoreDeps): void {
   deps.initNewGameButton();
   deps.updateReadyButtonState();
 
+  // The reticle is a toggle: a click while a ranged attack or an air strike is aimed stops aiming, and otherwise starts
+  // aiming the attack the selection can make.
   document.getElementById('ranged-attack-btn')?.addEventListener('click', () => {
-    if (S.airStrikeModeActive) {
+    if (S.airStrikeModeActive || S.rangedModeActive) {
       S.airStrikeModeActive = false;
-      void deps.refreshHoverRoutePreview();
-    } else if (S.rangedModeActive) {
       S.rangedModeActive = false;
+      hideOrderSlowerHexTooltip();
       void deps.refreshHoverRoutePreview();
     } else if (S.selectedUnitIds.length > 0 && S.gameState) {
       const state = S.gameState;
@@ -424,13 +425,6 @@ export function wireInitCore(deps: InitCoreDeps): void {
     if (value === 'units' || value === 'urban' || value === 'airport' || value === 'seaport') {
       S.airStrikeTargetType = value;
     }
-  });
-  document.getElementById('air-strike-cancel-btn')?.addEventListener('click', () => {
-    S.airStrikeModeActive = false;
-    hideOrderSlowerHexTooltip();
-    void deps.refreshHoverRoutePreview();
-    deps.updateRangedSidebar();
-    deps.redraw();
   });
 
   if (window.gameApi) {
