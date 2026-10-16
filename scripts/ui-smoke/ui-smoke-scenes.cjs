@@ -74,6 +74,7 @@ const SCENES = Object.freeze({
   smallWindow: 'small-window',
   selectionCollapsed: 'selection-collapsed',
   legendSmallWindow: 'legend-small-window',
+  mapTabsHidden: 'map-tabs-hidden',
   turnResolved: 'turn-resolved',
   reportsTab: 'reports-tab',
   matchReopened: 'match-reopened',

@@ -17,7 +17,8 @@ Tell an agent which input does what, and which binding wins when two surfaces co
 | Double-click | Main map | Plans a march or ferry, or clears the selection, when targeting is off. While Ranged or Strike targeting is on, places that attack and does not plan a move. Map zoom-on-double-click is off. | [order-lifecycle.md](order-lifecycle.md) |
 | Right-click | Main map | Clears selection chrome and does not open the browser menu. Queued orders stay. | [selection-model.md](selection-model.md) |
 | Click, drag, wheel, double-click | Minimap | No pan, zoom, or click-to-recenter. The minimap only shows the current view. | [minimap.md](minimap.md) |
-| Click | Map-mode tabs above the minimap | Weather or Tech chooses the map view. Legend opens or closes the terrain legend. | [minimap.md](minimap.md) |
+| Click | Toggle on the minimap overview's lower-left corner | Shows or hides the map-mode tabs under the overview. Hiding them also closes the terrain legend. | [minimap.md](minimap.md) |
+| Click | Map-mode tabs under the minimap | Weather or Tech chooses the map view. Legend opens or closes the terrain legend. | [minimap.md](minimap.md) |
 | Click | Zoom buttons at the map's top-right | Zooms the map in or out. | [map-surface.md](map-surface.md) |
 | Click | Tactical battles list backdrop | Chooses Ignore. | [tactical-battles-list.md](tactical-battles-list.md) |
 | Click | Toast dismiss | Hides that toast. | [notifications-and-feedback.md](notifications-and-feedback.md) |

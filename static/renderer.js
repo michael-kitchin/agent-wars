@@ -18715,6 +18715,8 @@ ${bonuses}`;
   var selectionPanelExpandTooltipText = "Show the hex, its terrain, and each selected unit's orders.";
   var selectionPanelCollapseTooltipText = "Hide the details. The bar stays.";
   var reportsTabTooltipText = `Show the turn reports, opponent messages, and notices from this match, newest first. ${consoleTabCollapseSentence}`;
+  var mapModeTabsShowTooltipText = "Show the Weather, Tech, and Legend buttons under the overview.";
+  var mapModeTabsHideTooltipText = "Hide the Weather, Tech, and Legend buttons. Hiding them also closes the terrain legend.";
 
   // src/renderer/chrome/consoleReports.ts
   var unreadCount = 0;
@@ -36110,7 +36112,23 @@ ${bonuses}`;
     syncMapModeTabs();
     layoutMapChrome();
   }
+  function setMapModeTabsShown(shown) {
+    const row = document.getElementById("map-mode-tabs");
+    const toggle = document.getElementById("map-mode-tabs-toggle");
+    if (!row || !toggle) return;
+    row.hidden = !shown;
+    toggle.setAttribute("aria-expanded", String(shown));
+    toggle.setAttribute("aria-label", shown ? "Hide the map modes" : "Show the map modes");
+    toggle.setAttribute("data-control-tooltip", shown ? mapModeTabsHideTooltipText : mapModeTabsShowTooltipText);
+    const legend = document.getElementById("terrain-legend");
+    if (!shown && legend) legend.hidden = true;
+    syncMapModeTabs();
+    layoutMapChrome();
+  }
   function wireMapModeTabs(requestRedraw3) {
+    document.getElementById("map-mode-tabs-toggle")?.addEventListener("click", () => {
+      setMapModeTabsShown(document.getElementById("map-mode-tabs")?.hidden === true);
+    });
     document.getElementById("map-mode-weather")?.addEventListener("click", () => chooseMapView("weather", requestRedraw3));
     document.getElementById("map-mode-tech")?.addEventListener("click", () => chooseMapView("tech", requestRedraw3));
     document.getElementById("map-legend-toggle")?.addEventListener("click", toggleTerrainLegend);

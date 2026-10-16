@@ -8,7 +8,7 @@ Name the terrain kinds the map uses, and let the player switch the terrain style
 
 ## Availability
 
-Closed until the player clicks Legend in the [minimap panel](minimap.md), and closed again by the next click. Whether it is open lasts until the app closes; it is not saved. While open it stays available in Strategic planning and Tactical planning. It is hidden in New game and Game over, and shown again when that overlay closes if it was open. In Tactical annihilation, and while the tactical battles list is open, it stays visible and pointer input on the map container is off, so the style dropdown cannot be used.
+Closed until the player clicks Legend in the [minimap panel](minimap.md)'s map-mode tabs, which the toggle on the overview's corner shows, and closed again by the next click on Legend or by hiding those tabs. Whether it is open lasts until the app closes; it is not saved. While open it stays available in Strategic planning and Tactical planning. It is hidden in New game and Game over, and shown again when that overlay closes if it was open. In Tactical annihilation, and while the tactical battles list is open, it stays visible and pointer input on the map container is off, so the style dropdown cannot be used.
 
 ## Information Displayed
 
@@ -30,6 +30,7 @@ Closed until the player clicks Legend in the [minimap panel](minimap.md), and cl
 ### Other
 
 - When the player clicks Legend in the minimap panel, the legend opens, or closes if it is open.
+- When the player hides the minimap panel's map-mode tabs with the toggle on the overview's corner, the legend closes.
 
 ## States
 

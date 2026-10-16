@@ -77,7 +77,7 @@ Element documents share a fixed heading set:
 
 - [map-surface.md](ux/map-surface.md): the world map as the workspace for pan, zoom, selection, and orders. Pan and zoom-out stop at the loaded map's extent. A new match frames that extent before the first order.
 - [map-overlays.md](ux/map-overlays.md): range, path, order, hover, city, transport, infrastructure, and resolution drawings on the map.
-- [minimap.md](ux/minimap.md): the minimap panel: the world overview, how it relates to the main map view, and the map-mode tabs above it.
+- [minimap.md](ux/minimap.md): the minimap panel: the world overview, how it relates to the main map view, and the map-mode tabs under it, which a toggle on its corner shows and hides.
 - [terrain-legend.md](ux/terrain-legend.md): the terrain legend and any inputs it accepts.
 - [hex-tooltips.md](ux/hex-tooltips.md): the hover information tooltip, whose Effects line includes movement, range, and cover, and the blocked-order and effects tooltips that appear after the pointer rests. The effects tooltip then stays on that cell. The blocked notice hides a short time after the pointer stops.
 - [control-tooltips.md](ux/control-tooltips.md): the one-second tip on buttons, fields, checkboxes, and dropdowns, and the controls that have none.

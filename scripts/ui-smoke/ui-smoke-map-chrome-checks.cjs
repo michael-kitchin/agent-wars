@@ -14,14 +14,25 @@ const { SCENES, NEW_GAME_SCENES, near, fmt } = require('./ui-smoke-scenes.cjs');
 /**
  * Sizes of the minimap panel, in CSS pixels, and the label size its tabs share with the console rail.
  *
- * Purpose: The panel sits 12 px in from the map's top-left corner: a row of five 56 x 58 px tabs, then the 280 x 200 px
- *   overview under it. The legend opens 8 px from the panel.
+ * Purpose: The panel sits 12 px in from the map's top-left corner: the 280 x 200 px overview, with a 32 px square toggle
+ *   on its lower-left corner, then, while the toggle has shown them, a row of five 56 x 58 px tabs under it. The legend
+ *   opens 8 px from the panel.
  * When to use: The panel, tab, and legend checks.
- * Expected outcome: Matches `--minimap-width`, `--chrome-tab-height`, and `--chrome-tab-label-size` in
- *   `static/shellChrome.css`, and `MAP_CHROME_INSET` and `MAP_CHROME_GAP` in `src/shared/mapChromePlacement.ts`.
+ * Expected outcome: Matches `--minimap-width`, `--chrome-tab-height`, `--chrome-tab-label-size`, and
+ *   `.minimap-tabs-toggle` in `static/shellChrome.css`, and `MAP_CHROME_INSET` and `MAP_CHROME_GAP` in
+ *   `src/shared/mapChromePlacement.ts`.
  * Exceptions: None.
  */
-const PANEL = Object.freeze({ inset: 12, minimapWidth: 280, minimapHeight: 200, tabWidth: 56, tabHeight: 58, labelSize: '9px', legendGap: 8 });
+const PANEL = Object.freeze({
+  inset: 12,
+  minimapWidth: 280,
+  minimapHeight: 200,
+  toggleSize: 32,
+  tabWidth: 56,
+  tabHeight: 58,
+  labelSize: '9px',
+  legendGap: 8,
+});
 
 /**
  * The map-mode tabs, left to right.
@@ -59,6 +70,16 @@ const LEAFLET = Object.freeze({
 const PLACEMENT_SCENES = Object.freeze([SCENES.strategic, SCENES.matchReopened, SCENES.battleStart, SCENES.regionalStart]);
 
 /**
+ * Scenes where the toggle has shown the map-mode tabs.
+ *
+ * Purpose: The tabs' own geometry and size can only be read while the row is on screen.
+ * When to use: The checks that measure the tabs.
+ * Expected outcome: The Tech view and the open legend, both chosen from the shown row.
+ * Exceptions: None.
+ */
+const TABS_SHOWN_SCENES = Object.freeze([SCENES.mapTech, SCENES.legendOpen]);
+
+/**
  * The map chrome checks, one row each.
  *
  * Purpose: One table that a reviewer can read top to bottom.
@@ -69,35 +90,69 @@ const PLACEMENT_SCENES = Object.freeze([SCENES.strategic, SCENES.matchReopened, 
 const MAP_CHROME_CHECKS = Object.freeze([
   {
     name: 'minimap-panel-layout',
-    scenes: PLACEMENT_SCENES,
-    needs: ['#canvas-container', '#minimap-panel', '#minimap', '#map-mode-tabs', ...MODE_TABS],
+    scenes: [...PLACEMENT_SCENES, ...TABS_SHOWN_SCENES, SCENES.mapTabsHidden],
+    needs: ['#canvas-container', '#minimap-panel', '#minimap', '#map-mode-tabs-toggle', '#map-mode-tabs', ...MODE_TABS],
     run: (p, el) => {
       const c = el('#canvas-container');
       const panel = el('#minimap-panel');
       const mini = el('#minimap');
+      const toggle = el('#map-mode-tabs-toggle');
       const tabs = el('#map-mode-tabs');
       if (!panel.shown) return 'the minimap panel is not shown';
       if (!near(panel.x, c.x + PANEL.inset) || !near(panel.y, c.y + PANEL.inset)) {
         return `the minimap panel is at ${fmt(panel)}, expected its corner ${PANEL.inset} px in from the map's top-left`;
       }
-      if (!near(tabs.w, PANEL.minimapWidth) || !near(tabs.y, panel.y + 1)) {
-        return `the mode tabs are at ${fmt(tabs)}, expected a ${PANEL.minimapWidth} px row at the top of the panel ${fmt(panel)}`;
+      if (!near(mini.w, PANEL.minimapWidth) || !near(mini.h, PANEL.minimapHeight) || !near(mini.y, panel.y + 1)) {
+        return `the minimap is at ${fmt(mini)}, expected ${PANEL.minimapWidth}x${PANEL.minimapHeight} at the top of the panel ${fmt(panel)}`;
+      }
+      const toggleOnCorner = near(toggle.w, PANEL.toggleSize) && near(toggle.h, PANEL.toggleSize)
+        && near(toggle.x, mini.x) && near(toggle.y + toggle.h, mini.y + mini.h);
+      if (!toggle.shown || !toggleOnCorner) {
+        return `the tabs toggle is at ${fmt(toggle)}, expected a ${PANEL.toggleSize} px square on the overview's lower-left corner ${fmt(mini)}`;
+      }
+      if (toggle.expanded !== 'true') {
+        if (tabs.shown) return 'the mode tabs show while the toggle reads aria-expanded=false';
+        return near(panel.y + panel.h, mini.y + mini.h + 1) ? null : `the panel ${fmt(panel)} is taller than the overview ${fmt(mini)} while the tabs are hidden`;
+      }
+      if (!tabs.shown || !near(tabs.w, PANEL.minimapWidth) || !near(tabs.y, mini.y + mini.h)) {
+        return `the mode tabs are at ${fmt(tabs)}, expected a ${PANEL.minimapWidth} px row under the overview ${fmt(mini)}`;
       }
       for (const [i, selector] of MODE_TABS.entries()) {
         const tab = el(selector);
-        if (!near(tab.w, PANEL.tabWidth) || !near(tab.h, PANEL.tabHeight) || !near(tab.x, tabs.x + i * PANEL.tabWidth) || !near(tab.y, tabs.y)) {
+        if (!near(tab.w, PANEL.tabWidth) || !near(tab.h, PANEL.tabHeight) || !near(tab.x, tabs.x + i * PANEL.tabWidth) || !near(tab.y, tabs.y + 1)) {
           return `${selector} is at ${fmt(tab)}, expected tab ${i + 1} of the row, ${PANEL.tabWidth}x${PANEL.tabHeight}`;
         }
-      }
-      if (!near(mini.w, PANEL.minimapWidth) || !near(mini.h, PANEL.minimapHeight) || mini.y < tabs.y + tabs.h - 1) {
-        return `the minimap is at ${fmt(mini)}, expected ${PANEL.minimapWidth}x${PANEL.minimapHeight} under the tabs ${fmt(tabs)}`;
       }
       return null;
     },
   },
   {
+    name: 'map-mode-tabs-hidden-at-start',
+    scenes: [SCENES.strategic],
+    needs: ['#map-mode-tabs-toggle', '#map-mode-tabs'],
+    run: (p, el) => {
+      const toggle = el('#map-mode-tabs-toggle');
+      if (toggle.expanded !== 'false' || el('#map-mode-tabs').shown) return `the toggle reads aria-expanded=${toggle.expanded}, expected the tabs hidden at the start`;
+      return toggle.label === 'Show the map modes' ? null : `the toggle is named "${toggle.label}", expected "Show the map modes"`;
+    },
+  },
+  {
+    name: 'map-mode-tabs-hide-closes-legend',
+    scenes: [SCENES.mapTabsHidden],
+    needs: ['#map-mode-tabs-toggle', '#map-mode-tabs', '#terrain-legend', '#map-legend-toggle'],
+    run: (p, el) => {
+      const toggle = el('#map-mode-tabs-toggle');
+      if (toggle.expanded !== 'false' || el('#map-mode-tabs').shown) return `the toggle reads aria-expanded=${toggle.expanded}, expected the tabs hidden`;
+      if (el('#terrain-legend').shown) return 'the terrain legend stays open after its tab was hidden';
+      const legendTab = el('#map-legend-toggle');
+      return legendTab.pressed === 'false' && legendTab.expanded === 'false'
+        ? null
+        : `the Legend tab reads pressed=${legendTab.pressed}, expanded=${legendTab.expanded} after the legend closed`;
+    },
+  },
+  {
     name: 'map-mode-tabs-match-rail',
-    scenes: PLACEMENT_SCENES,
+    scenes: TABS_SHOWN_SCENES,
     needs: ['#map-mode-weather', '#console-tab-orders'],
     run: (p, el) => {
       const tab = el('#map-mode-weather');

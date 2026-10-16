@@ -156,6 +156,27 @@ export const reportsTabTooltipText =
   `Show the turn reports, opponent messages, and notices from this match, newest first. ${consoleTabCollapseSentence}`;
 
 /**
+ * The tip of the toggle on the minimap overview's corner while the map-mode tabs are hidden.
+ *
+ * Purpose: Says what the toggle shows and where.
+ * When to use: `#map-mode-tabs-toggle` while `#map-mode-tabs` is hidden. The static markup starts with this sentence.
+ * Expected outcome: The control tip shows this sentence.
+ * Exceptions: None.
+ */
+export const mapModeTabsShowTooltipText = 'Show the Weather, Tech, and Legend buttons under the overview.';
+
+/**
+ * The tip of the toggle on the minimap overview's corner while the map-mode tabs show.
+ *
+ * Purpose: Says what the toggle hides, and that the terrain legend closes with the tabs.
+ * When to use: `#map-mode-tabs-toggle` while `#map-mode-tabs` shows.
+ * Expected outcome: The control tip shows these sentences.
+ * Exceptions: None.
+ */
+export const mapModeTabsHideTooltipText =
+  'Hide the Weather, Tech, and Legend buttons. Hiding them also closes the terrain legend.';
+
+/**
  * The Weather map mode's tip.
  *
  * Purpose: Says Weather is the map's normal view.

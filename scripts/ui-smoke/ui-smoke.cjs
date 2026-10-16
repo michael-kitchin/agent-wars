@@ -267,7 +267,9 @@ async function runFirstSession(app, page, report, outDir) {
   await page.waitForTimeout(SETTLE_MS.click);
   await recordScene(page, report, outDir, SCENES.gameMenuOutside);
 
-  // Choose the Tech view and record it, then go back to Weather.
+  // Show the map-mode tabs from the toggle on the overview's corner; they start hidden and stay shown until the toggle
+  // hides them in the small window below. Choose the Tech view and record it, then go back to Weather.
+  await page.click('#map-mode-tabs-toggle');
   await page.click('#map-mode-tech');
   await parkPointer(page);
   await page.waitForTimeout(SETTLE_MS.click);
@@ -348,7 +350,11 @@ async function runFirstSession(app, page, report, outDir) {
   await parkPointer(page);
   await page.waitForTimeout(SETTLE_MS.click);
   await recordScene(page, report, outDir, SCENES.legendSmallWindow);
-  await page.click('#map-legend-toggle');
+  // Hide the tabs with the legend still open: the legend closes with them. The tabs stay hidden for the rest of the run.
+  await page.click('#map-mode-tabs-toggle');
+  await parkPointer(page);
+  await page.waitForTimeout(SETTLE_MS.click);
+  await recordScene(page, report, outDir, SCENES.mapTabsHidden);
 
   // Play turn 1 in the small window. With no model, the opponent runs its standing orders and says so in a notice.
   await page.click('#ready-btn');
