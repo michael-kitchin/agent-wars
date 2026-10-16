@@ -265,7 +265,7 @@ Each bonus is Off, Low, or High in the new-game dialog, and starts at Low.
 - **Tech:** a unit built in a hex with at least 21 urban cells is Advanced. Low adds 2 to its attack, and High adds 2 to attack and defense.
 - **Tech is fixed:** the tier comes from the birth hex's original city size. It doesn't change when the unit moves or the city is bombed.
 - **Where you build matters:** with tech on, big cities build better units, so the place matters as well as the points.
-- **Seeing them:** the flag tooltip lists a unit's bonuses. A hex tooltip shows that hex's weather and terrain effects. Click the toggle on the minimap's lower-left corner to show the Weather, Tech, and Legend buttons under it, then choose **Tech**, or hold T, to see each hex's tech tier.
+- **Seeing them:** the flag tooltip lists a unit's bonuses. A hex tooltip shows that hex's weather and terrain effects. Click the toggle on the minimap's lower-left corner to show the Weather, Tech, and Legend buttons under it, then turn on **Tech**, or hold T, to see each hex's tech tier. **Weather** turns the weather icons on the map off and on.
 
 The full bonus rules are in [combat-rules-v3.md](combat-rules-v3.md) §4.9.
 

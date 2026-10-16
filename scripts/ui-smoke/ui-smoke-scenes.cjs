@@ -60,6 +60,7 @@ const SCENES = Object.freeze({
   gameMenuEscape: 'game-menu-escape',
   gameMenuOutside: 'game-menu-outside',
   mapTech: 'map-tech',
+  mapWeatherOff: 'map-weather-off',
   legendOpen: 'legend-open',
   readyTip: 'ready-tip',
   ordersQueued: 'orders-queued',

@@ -268,12 +268,18 @@ async function runFirstSession(app, page, report, outDir) {
   await recordScene(page, report, outDir, SCENES.gameMenuOutside);
 
   // Show the map-mode tabs from the toggle on the overview's corner; they start hidden and stay shown until the toggle
-  // hides them in the small window below. Choose the Tech view and record it, then go back to Weather.
+  // hides them in the small window below. Turn the Tech view on and record it with the weather icons still on, then
+  // turn it off. Turn Weather off and record the map without weather icons, then turn it back on.
   await page.click('#map-mode-tabs-toggle');
   await page.click('#map-mode-tech');
   await parkPointer(page);
   await page.waitForTimeout(SETTLE_MS.click);
   await recordScene(page, report, outDir, SCENES.mapTech);
+  await page.click('#map-mode-tech');
+  await page.click('#map-mode-weather');
+  await parkPointer(page);
+  await page.waitForTimeout(SETTLE_MS.click);
+  await recordScene(page, report, outDir, SCENES.mapWeatherOff);
   await page.click('#map-mode-weather');
 
   // Open the terrain legend beside the minimap panel and record it, then close it.

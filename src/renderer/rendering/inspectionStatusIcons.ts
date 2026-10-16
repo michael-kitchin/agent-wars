@@ -1,15 +1,18 @@
 /**
- * Draws one status icon above a strategic world hex.
+ * Draws the status icons above a strategic world hex: the weather icon while the Weather tab is on, and the tech icon
+ * while the inspection view is on (T held or the Tech tab on).
  *
- * Purpose: Weather shows while T is not held. Tech replaces it, at the same enlarged size, while T is held.
+ * Purpose: Each icon follows its own toggle, so a hex can show both. They share one size and one band.
  * When to use: Immediately after the strategic hex-code pass.
- * Expected outcome: One centered icon on each qualifying world hex. Nothing in a tactical battle or at battle-detail zoom.
+ * Expected outcome: One centered icon, or a centered tech-then-weather pair, on each qualifying world hex. Nothing in a
+ *   tactical battle or at battle-detail zoom.
  * Exceptions: A missing map or a failed image load leaves that icon blank. The function does not throw.
  */
 
 import {
   inspectionStatusIconDrawPx,
   inspectionStatusIconsForHex,
+  statusIconCentersX,
   strategicOverlayBandOffsetPx,
   strategicProductionLabelSurface,
   techInspectionIconAssetPath,
@@ -23,6 +26,7 @@ import {
 } from '../gameplay/productionOverlayHelpers';
 import { getLeafletGlobal } from '../map/mapHelpers';
 import { getMainLeafletMapForProjection } from '../map/leafletMainMapProjection';
+import { areWeatherIconsShown } from '../map/mapViewModeState';
 import {
   projectHexBoundaryToContainerPoints,
   shouldRenderTacticalHexes,
@@ -144,18 +148,18 @@ function drawFittedIcon(
 }
 
 /**
- * Placement for the one status icon on a hex.
+ * Placement for one status icon on a hex.
  *
  * Purpose: Keeps the draw call within the argument limit while the icon still knows its center, size, and asset.
  * When to use: `drawStatusIcon`.
- * Expected outcome: One object per hex that will be painted.
+ * Expected outcome: One object per icon that will be painted.
  * Exceptions: None.
  */
 export interface StatusIconPlacement {
   /**
    * Horizontal center of the icon, in container pixels.
    *
-   * Contract: The hex centroid x.
+   * Contract: The hex centroid x for a lone icon, or one of the two centers `statusIconCentersX` returns for a pair.
    * When to use: Centering the icon.
    * Expected outcome: The icon is centered on this x.
    * Exceptions: None.
@@ -180,7 +184,7 @@ export interface StatusIconPlacement {
    */
   readonly iconPx: number;
   /**
-   * SVG path for the one icon.
+   * SVG path for this icon.
    *
    * Contract: A tech or weather asset path from the status-icon choice.
    * When to use: `iconImage`.
@@ -194,7 +198,7 @@ export interface StatusIconPlacement {
  * Draws one weather or tech icon for the new-game map preview.
  *
  * Purpose: The preview has no match, so it cannot use the status-icon pass that returns without game state.
- * When to use: One preview hex that is showing a weather icon, or a tech icon while T is held.
+ * When to use: Each icon of a preview hex: its weather icon, and its tech icon while T is held.
  * Expected outcome: The image is centered on the placement. A blank square is left while it loads, then a redraw paints it.
  * Exceptions: None.
  */
@@ -215,10 +219,10 @@ export function drawPlacedStatusIcon(
 }
 
 /**
- * Draws one status icon centered on a hex band.
+ * Draws one status icon centered on its placement.
  *
- * Purpose: Paints the one chosen image at the band center.
- * When to use: After the selector returns a tech or weather icon.
+ * Purpose: Paints one chosen image on the band.
+ * When to use: For each icon the selector returns.
  * Expected outcome: The image is centered on the placement point at `iconPx`. A blank square is left while it loads.
  * Exceptions: None.
  */
@@ -237,11 +241,14 @@ function drawStatusIcon(
 }
 
 /**
- * Draws the status icon above each qualifying world hex.
+ * Draws the status icons above each qualifying world hex.
  *
- * Purpose: Weather shows while T is not held. Tech replaces it while T is held. Neither requires a production label.
+ * Purpose: Weather shows while the Weather tab is on. Tech shows while the inspection view is on. Neither requires a
+ *   production label.
  * When to use: On the next line after each `drawStrategicInspectionHexCodes` call.
- * Expected outcome: No-op in a tactical battle or at battle-detail zoom. Otherwise one icon per qualifying hex. An unexplored hex is not passed a weather word, because the renderer snapshot still stores weather there.
+ * Expected outcome: No-op in a tactical battle or at battle-detail zoom. Otherwise one icon, or a tech-then-weather
+ *   pair side by side, per qualifying hex. An unexplored hex is not passed a weather word, because the renderer snapshot
+ *   still stores weather there.
  * Exceptions: A missing map returns without drawing. Image errors leave a blank square.
  */
 export function drawInspectionStatusIcons(ctx: CanvasRenderingContext2D, deps: InspectionStatusIconDrawDeps): void {
@@ -253,6 +260,7 @@ export function drawInspectionStatusIcons(ctx: CanvasRenderingContext2D, deps: I
   const unitHexes = new Set(state.units.map((unit) => unit.h3Index));
   const buildEntryZoom = shouldShowBuildEntryZoom();
   const mapInspectionHeld = isMapInspectionModeHeld();
+  const weatherIconsShown = areWeatherIconsShown();
   ctx.save();
   try {
     for (const hx of state.hexes) {
@@ -267,29 +275,30 @@ export function drawInspectionStatusIcons(ctx: CanvasRenderingContext2D, deps: I
         humanUrbanProduction,
         buildEntryZoom,
       });
-      const icon = inspectionStatusIconsForHex({
+      const icons = inspectionStatusIconsForHex({
         mapInspectionHeld,
+        weatherIconsShown,
         techBonusEnabled: state.techBonusEnabled === true,
         weatherBonusEnabled: state.weatherBonusEnabled === true,
         baselineUrbanHexCount: baselineUrbanHexCountForStrategicHex(hx.h3Index),
         weather: explored ? hx.weather : null,
       });
-      if (!icon) continue;
+      if (icons.length === 0) continue;
       const pts = projectHexBoundaryToContainerPoints(hx.h3Index, map, leaflet);
       if (pts.length === 0) continue;
       const centroid = projectedCentroid(pts);
-      const assetPath = icon.kind === 'tech'
-        ? techInspectionIconAssetPath(icon.level)
-        : weatherInspectionIconAssetPath(icon.state);
-      drawStatusIcon(ctx, deps, {
-        centerX: centroid.x,
-        centerY: centroid.y - strategicOverlayBandOffsetPx(spanForProjectedHex(pts)),
-        iconPx: inspectionStatusIconDrawPx({
-          productionSurface: surface === 'button' ? 'button' : 'canvas',
-          hasInfraSymbols: deps.hasInfraSymbols(hx.h3Index, unitHexes),
-          hasVisibleUnits: unitHexes.has(hx.h3Index),
-        }),
-        assetPath,
+      const centerY = centroid.y - strategicOverlayBandOffsetPx(spanForProjectedHex(pts));
+      const iconPx = inspectionStatusIconDrawPx({
+        productionSurface: surface === 'button' ? 'button' : 'canvas',
+        hasInfraSymbols: deps.hasInfraSymbols(hx.h3Index, unitHexes),
+        hasVisibleUnits: unitHexes.has(hx.h3Index),
+      });
+      const centersX = statusIconCentersX(centroid.x, iconPx, icons.length);
+      icons.forEach((icon, i) => {
+        const assetPath = icon.kind === 'tech'
+          ? techInspectionIconAssetPath(icon.level)
+          : weatherInspectionIconAssetPath(icon.state);
+        drawStatusIcon(ctx, deps, { centerX: centersX[i]!, centerY, iconPx, assetPath });
       });
     }
   } finally {

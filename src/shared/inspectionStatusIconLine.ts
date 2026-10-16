@@ -1,7 +1,9 @@
 /**
- * Decides which single status icon a strategic world hex shows, and how large it is.
+ * Decides which status icons a strategic world hex shows, how large they are, and where each sits on the band.
  *
- * Purpose: Weather shows while T is not held. Tech replaces it while T is held. Size and band offset stay pure so tests can lock them.
+ * Purpose: Weather shows while the Weather tab is on. Tech shows while the inspection view is on: T held or the Tech
+ *   tab on. A hex that shows both draws them side by side. Size, band offset, and spacing stay pure so tests can lock
+ *   them.
  * When to use: From the status-icon drawer, and from tests that lock those rules.
  * Expected outcome: Pure results with no map, canvas, or game snapshot.
  * Exceptions: None.
@@ -98,7 +100,7 @@ export interface StrategicProductionLabelInput {
 }
 
 /**
- * Facts that choose the one status icon for a world hex.
+ * Facts that choose the status icons for a world hex.
  *
  * Purpose: The drawer gathers the hold state and the snapshot fields, then asks this object what to paint.
  * When to use: `inspectionStatusIconsForHex`.
@@ -107,18 +109,27 @@ export interface StrategicProductionLabelInput {
  */
 export interface InspectionStatusIconInput {
   /**
-   * Whether T is held.
+   * Whether the inspection view is on: T is held, or the Tech tab is on.
    *
-   * Contract: True selects a tech icon. False selects a weather icon.
+   * Contract: True allows a tech icon. It does not affect the weather icon.
    * When to use: Pass `isMapInspectionModeHeld`.
-   * Expected outcome: The other icon is never returned for this hold state.
+   * Expected outcome: False never returns a tech icon.
    * Exceptions: None.
    */
   readonly mapInspectionHeld: boolean;
   /**
+   * Whether the Weather tab is on.
+   *
+   * Contract: True allows a weather icon. It does not affect the tech icon.
+   * When to use: Pass `areWeatherIconsShown`.
+   * Expected outcome: False never returns a weather icon.
+   * Exceptions: None.
+   */
+  readonly weatherIconsShown: boolean;
+  /**
    * Whether the match awards a tech tier.
    *
-   * Contract: Only `true` can show a tech icon, and only while T is held. Low and High use the same icon.
+   * Contract: Only `true` can show a tech icon, and only while the inspection view is on. Low and High use the same icon.
    * When to use: Pass `techBonusEnabled === true`.
    * Expected outcome: A false or missing flag omits the tech icon.
    * Exceptions: None.
@@ -127,7 +138,7 @@ export interface InspectionStatusIconInput {
   /**
    * Whether the match applies weather.
    *
-   * Contract: Only `true` can show a weather icon, and only while T is not held. Low and High use the same icon.
+   * Contract: Only `true` can show a weather icon, and only while the Weather tab is on. Low and High use the same icon.
    * When to use: Pass `weatherBonusEnabled === true`.
    * Expected outcome: A false or missing flag omits the weather icon even when the hex has a weather word.
    * Exceptions: None.
@@ -145,7 +156,7 @@ export interface InspectionStatusIconInput {
   /**
    * Weather word stored on the hex, if any.
    *
-   * Contract: Only `mild`, `rain`, `snow`, and `heat` count, and only while T is not held and the weather bonus is on.
+   * Contract: Only `mild`, `rain`, `snow`, and `heat` count, and only while the Weather tab and the weather bonus are on.
    * When to use: Pass the snapshot weather field, including null or undefined.
    * Expected outcome: An unknown word does not become Mild.
    * Exceptions: None.
@@ -154,11 +165,11 @@ export interface InspectionStatusIconInput {
 }
 
 /**
- * The one status icon to paint for a hex.
+ * One status icon to paint for a hex.
  *
- * Purpose: Tech and weather cannot both be set. The drawer centers whichever side is present.
- * When to use: The return value of `inspectionStatusIconsForHex`.
- * Expected outcome: A tech tier while T is held, or a weather state while T is not held.
+ * Purpose: A hex can show a tech icon, a weather icon, or both. The drawer places them with `statusIconCentersX`.
+ * When to use: The entries of the list `inspectionStatusIconsForHex` returns.
+ * Expected outcome: A tech tier, or a weather state.
  * Exceptions: None.
  */
 export type InspectionStatusIcon =
@@ -293,23 +304,49 @@ export function strategicProductionLabelSurface(input: StrategicProductionLabelI
 }
 
 /**
- * Returns the one status icon for a world hex, or null when that hex shows none.
+ * Returns the status icons for a world hex, left to right, or an empty list when that hex shows none.
  *
- * Purpose: T held selects tech. T released selects weather. A missing bonus or a missing hex fact omits the icon.
+ * Purpose: The inspection view allows tech. The Weather tab allows weather. Each is decided on its own, so a hex can
+ *   show both. A missing bonus or a missing hex fact omits that icon.
  * When to use: Once per world hex while the strategic map is outside a battle and outside battle-detail zoom.
- * Expected outcome: A tech icon, a weather icon, or null. Never both.
+ * Expected outcome: No icon, one icon, or the tech icon then the weather icon.
  * Exceptions: None.
  */
-export function inspectionStatusIconsForHex(input: InspectionStatusIconInput): InspectionStatusIcon | null {
-  if (input.mapInspectionHeld) {
-    if (input.techBonusEnabled !== true) return null;
-    if (!Number.isFinite(input.baselineUrbanHexCount) || input.baselineUrbanHexCount <= 0) return null;
-    return { kind: 'tech', level: techLevelFromUrbanHexCount(input.baselineUrbanHexCount) };
+export function inspectionStatusIconsForHex(input: InspectionStatusIconInput): readonly InspectionStatusIcon[] {
+  const icons: InspectionStatusIcon[] = [];
+  const urbanCount = input.baselineUrbanHexCount;
+  if (input.mapInspectionHeld && input.techBonusEnabled === true && Number.isFinite(urbanCount) && urbanCount > 0) {
+    icons.push({ kind: 'tech', level: techLevelFromUrbanHexCount(urbanCount) });
   }
-  if (input.weatherBonusEnabled !== true) return null;
-  const weather = knownWeather(input.weather);
-  if (weather == null) return null;
-  return { kind: 'weather', state: weather };
+  const weather = input.weatherIconsShown && input.weatherBonusEnabled === true ? knownWeather(input.weather) : null;
+  if (weather != null) icons.push({ kind: 'weather', state: weather });
+  return icons;
+}
+
+/**
+ * Space between two status icons on the same hex, in pixels.
+ *
+ * Purpose: A tech icon and a weather icon read as a pair without touching.
+ * When to use: `statusIconCentersX`.
+ * Expected outcome: `2`.
+ * Exceptions: None.
+ */
+export const STATUS_ICON_GAP_PX = 2;
+
+/**
+ * Returns the horizontal center of each status icon on a hex's band.
+ *
+ * Purpose: One icon is centered on the hex. Two sit side by side as a pair centered on the hex, `STATUS_ICON_GAP_PX`
+ *   apart, in the order `inspectionStatusIconsForHex` returns them.
+ * When to use: After the icons and their size are known, with the hex centroid's x.
+ * Expected outcome: `count` centers, left to right. One icon: `[centerX]`. Two icons of 16 px: `centerX - 9` and
+ *   `centerX + 9`. Zero icons: an empty list.
+ * Exceptions: None.
+ */
+export function statusIconCentersX(centerX: number, iconPx: number, count: number): number[] {
+  const step = iconPx + STATUS_ICON_GAP_PX;
+  const firstX = centerX - ((count - 1) * step) / 2;
+  return Array.from({ length: Math.max(0, count) }, (_, i) => firstX + i * step);
 }
 
 /**

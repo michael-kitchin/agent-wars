@@ -55,13 +55,13 @@ export function previewHexIsDrawn(
 /**
  * Chooses the weather icon for one preview hex, or null when that hex shows none.
  *
- * Purpose: The preview follows the dialog's month and weather bonus. Holding T hides this icon. Tech icons are chosen separately and appear while T is held.
+ * Purpose: The preview follows the dialog's month and weather bonus. The Weather tab does not apply here: the minimap panel is hidden while the overlay is open. Holding T keeps this icon; tech icons are chosen separately and sit beside it while T is held.
  * When to use: Once per hex per frame, with values read from the dialog and the view, not from a cached copy.
- * Expected outcome: A display state, including `mild`. Null when the bonus is off, T is held, the view is at battle-detail zoom, or the year is not twelve known states.
+ * Expected outcome: A display state, including `mild`. Null when the bonus is off, the view is at battle-detail zoom, or the year is not twelve known states.
  * Exceptions: None.
  */
 export function previewWeatherIcon(input: PreviewWeatherIconInput): WeatherState | null {
-  if (input.tacticalZoom || input.mapInspectionHeld || input.weatherBonusLevel === 'off') return null;
+  if (input.tacticalZoom || input.weatherBonusLevel === 'off') return null;
   if (input.weatherByMonth.length !== 12) return null;
   const weather: string | undefined = input.weatherByMonth[gameDateForTurn(1, input.startMonth, 'monthly').monthIndex];
   if (weather == null || !WEATHER_STATES.has(weather)) return null;

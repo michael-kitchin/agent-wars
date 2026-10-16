@@ -1,32 +1,31 @@
 /**
- * The row of map-mode tabs under the minimap overview: Weather and Tech choose the map view, Control and Production are
- * disabled placeholders in the markup, and Legend opens or closes the terrain legend. The row starts hidden, and the
- * toggle on the overview's lower-left corner shows and hides it.
+ * The row of map-mode tabs under the minimap overview: Weather shows or hides the weather icons and Tech turns the Tech
+ * view on or off, each a toggle on its own; Control and Production are disabled placeholders in the markup; and Legend
+ * opens or closes the terrain legend. The row starts hidden, and the toggle on the overview's lower-left corner shows
+ * and hides it.
  *
- * Purpose: Keeps the tabs, the row's toggle, the stored view, and the legend in step.
+ * Purpose: Keeps the tabs, the row's toggle, the stored choices, and the legend in step.
  * When to use: `wireMapModeTabs` once at startup.
- * Expected outcome: Exactly one of Weather and Tech reads as pressed, and Legend reads as pressed while the legend is
- *   open. The toggle reads as expanded while the row shows.
+ * Expected outcome: Weather reads as pressed while its icons show, Tech while its view is on, and Legend while the
+ *   legend is open. The toggle reads as expanded while the row shows.
  * Exceptions: None; missing elements are skipped.
  */
-import type { MapViewMode } from '../../shared/mapViewMode';
 import { mapModeTabsHideTooltipText, mapModeTabsShowTooltipText } from '../chrome/frameTooltipText';
 import { layoutMapChrome } from './mapChromeLayout';
-import { getMapViewMode, setMapViewMode } from './mapViewModeState';
+import { areWeatherIconsShown, isTechViewChosen, setTechViewChosen, setWeatherIconsShown } from './mapViewModeState';
 
 /**
- * Sets each tab's pressed state from the stored view and the legend.
+ * Sets each tab's pressed state from the stored choices and the legend.
  *
- * Purpose: The tabs are the only sign of which view is on, so they must never disagree with it.
- * When to use: After the view changes or the legend opens or closes.
- * Expected outcome: `aria-pressed` on Weather and Tech matches the stored view; `aria-pressed` and `aria-expanded` on
- *   Legend match whether `#terrain-legend` is shown.
+ * Purpose: The tabs are the only sign of which choices are on, so they must never disagree with them.
+ * When to use: After a choice changes or the legend opens or closes.
+ * Expected outcome: `aria-pressed` on Weather and on Tech matches its stored choice; `aria-pressed` and
+ *   `aria-expanded` on Legend match whether `#terrain-legend` is shown.
  * Exceptions: None.
  */
 function syncMapModeTabs(): void {
-  const mode = getMapViewMode();
-  document.getElementById('map-mode-weather')?.setAttribute('aria-pressed', String(mode === 'weather'));
-  document.getElementById('map-mode-tech')?.setAttribute('aria-pressed', String(mode === 'tech'));
+  document.getElementById('map-mode-weather')?.setAttribute('aria-pressed', String(areWeatherIconsShown()));
+  document.getElementById('map-mode-tech')?.setAttribute('aria-pressed', String(isTechViewChosen()));
   const legendOpen = document.getElementById('terrain-legend')?.hidden === false;
   const legendToggle = document.getElementById('map-legend-toggle');
   legendToggle?.setAttribute('aria-pressed', String(legendOpen));
@@ -34,16 +33,29 @@ function syncMapModeTabs(): void {
 }
 
 /**
- * Switches the map to a view, unless it is already showing.
+ * Turns the weather icons on the world map on or off.
  *
- * Purpose: The view decides the terrain fill, the hex codes, and the status icons, which the canvas draws.
- * When to use: From the Weather and Tech tabs.
- * Expected outcome: The view is stored, the tabs follow, and the map is redrawn.
+ * Purpose: The canvas draws the weather icons from the stored choice, in either view.
+ * When to use: From the Weather tab.
+ * Expected outcome: The choice flips, the tab follows, and the map is redrawn. The Tech view is not touched.
  * Exceptions: None.
  */
-function chooseMapView(mode: MapViewMode, requestRedraw: () => void): void {
-  if (getMapViewMode() === mode) return;
-  setMapViewMode(mode);
+function toggleWeatherIcons(requestRedraw: () => void): void {
+  setWeatherIconsShown(!areWeatherIconsShown());
+  syncMapModeTabs();
+  requestRedraw();
+}
+
+/**
+ * Turns the Tech view on or off.
+ *
+ * Purpose: The Tech view decides the terrain fill, the hex codes, and the tech icons, which the canvas draws.
+ * When to use: From the Tech tab.
+ * Expected outcome: The choice flips, the tab follows, and the map is redrawn. The weather icons are not touched.
+ * Exceptions: None.
+ */
+function toggleTechView(requestRedraw: () => void): void {
+  setTechViewChosen(!isTechViewChosen());
   syncMapModeTabs();
   requestRedraw();
 }
@@ -94,16 +106,16 @@ function setMapModeTabsShown(shown: boolean): void {
  *
  * Purpose: The mode tabs' single setup point.
  * When to use: Once at startup, after the maps and the legend are built.
- * Expected outcome: Clicks show or hide the row, or change the view or the legend, and the tabs show the session's
- *   starting state. The row's starting state, hidden, comes from the markup.
+ * Expected outcome: Clicks show or hide the row, turn Weather or Tech on or off, or open or close the legend, and the
+ *   tabs show the session's starting state. The row's starting state, hidden, comes from the markup.
  * Exceptions: None.
  */
 export function wireMapModeTabs(requestRedraw: () => void): void {
   document.getElementById('map-mode-tabs-toggle')?.addEventListener('click', () => {
     setMapModeTabsShown(document.getElementById('map-mode-tabs')?.hidden === true);
   });
-  document.getElementById('map-mode-weather')?.addEventListener('click', () => chooseMapView('weather', requestRedraw));
-  document.getElementById('map-mode-tech')?.addEventListener('click', () => chooseMapView('tech', requestRedraw));
+  document.getElementById('map-mode-weather')?.addEventListener('click', () => toggleWeatherIcons(requestRedraw));
+  document.getElementById('map-mode-tech')?.addEventListener('click', () => toggleTechView(requestRedraw));
   document.getElementById('map-legend-toggle')?.addEventListener('click', toggleTerrainLegend);
   syncMapModeTabs();
 }

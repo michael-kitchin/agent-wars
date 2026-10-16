@@ -30,7 +30,7 @@ A regional match stores the two side groups' display names in those same keys. T
 
 Opening a saved regional match fails when a stored home is not an installed side group's id or display name. The message is "This saved {map} game uses side groups that no longer exist. Start a new game." If that map's urban baseline is not loaded, the regional control win uses every hex.
 
-While the new-game dialog is open, a Global preview frames the world one zoom level closer than the world fit, and a Regional preview frames that region. A Global preview draws the two chosen homes and leaves the strategic hex grid hidden until the player holds T. A Regional preview always draws its strategic hex grid. Weather icons sit on every strategic hex until that hold, and tech icons replace them while it lasts. See [new-game-dialog.md](ux/new-game-dialog.md).
+While the new-game dialog is open, a Global preview frames the world one zoom level closer than the world fit, and a Regional preview frames that region. A Global preview draws the two chosen homes and leaves the strategic hex grid hidden until the player holds T. A Regional preview always draws its strategic hex grid. Weather icons sit on every strategic hex, and tech icons sit beside them while that hold lasts. See [new-game-dialog.md](ux/new-game-dialog.md).
 
 `scenarioId` on the snapshot is always `region_vs_region` for a new match (`fogState` / seeding). There is no second scenario picker in the live overlay.
 

@@ -179,24 +179,24 @@ export const mapModeTabsHideTooltipText =
 /**
  * The Weather map mode's tip.
  *
- * Purpose: Says Weather is the map's normal view.
+ * Purpose: Says Weather is a toggle for the weather icons, and when they can show.
  * When to use: `#map-mode-weather`.
  * Expected outcome: The control tip shows this sentence.
  * Exceptions: None.
  */
 export const mapWeatherModeTooltipText =
-  "Show the map as usual: terrain, and each hex's weather while the weather bonus is on.";
+  "Show or hide each hex's weather icon on the world map, while the weather bonus is on.";
 
 /**
  * The Tech map mode's tip.
  *
- * Purpose: Says what Tech shows, where it applies, how long it lasts, and how it relates to holding T.
+ * Purpose: Says Tech is a toggle, what its view shows and where, and how it relates to holding T.
  * When to use: `#map-mode-tech`.
- * Expected outcome: The control tip shows this sentence.
+ * Expected outcome: The control tip shows these sentences.
  * Exceptions: None.
  */
 export const mapTechModeTooltipText =
-  "Show each hex's code, production, and tech tier instead of terrain on the world map, until you choose Weather. Holding T shows the same view while the key is down.";
+  "Turn the Tech view on or off: each hex's code, production, and tech tier instead of terrain on the world map. Holding T shows the same view while the key is down.";
 
 /**
  * The Legend button's tip.

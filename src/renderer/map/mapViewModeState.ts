@@ -1,44 +1,79 @@
 /**
- * The map view the player chose in the mode tabs. This module holds that choice for the rest of the session; it is
- * not saved, so the app opens on the Weather view each time.
+ * The two view choices the player made in the map-mode tabs: whether weather icons show, and whether the Tech view is
+ * on. This module holds them for the rest of the session; they are not saved, so the app opens with weather icons shown
+ * and the Tech view off each time.
  *
- * Purpose: The mode tabs write the choice and the drawing code reads it, without either importing the other.
- * When to use: Through `getMapViewMode` and `setMapViewMode`.
- * Expected outcome: `DEFAULT_MAP_VIEW_MODE` until the player picks another view.
+ * Purpose: The mode tabs write the choices and the drawing code reads them, without either importing the other.
+ * When to use: Through the getters and setters below.
+ * Expected outcome: `DEFAULT_WEATHER_ICONS_SHOWN` and `DEFAULT_TECH_VIEW_CHOSEN` until the player changes them.
  * Exceptions: None.
  */
-import { DEFAULT_MAP_VIEW_MODE, type MapViewMode } from '../../shared/mapViewMode';
+import { DEFAULT_TECH_VIEW_CHOSEN, DEFAULT_WEATHER_ICONS_SHOWN } from '../../shared/mapViewMode';
 
 /**
- * The view chosen in the mode tabs.
+ * Whether Weather is on in the mode tabs.
  *
- * Purpose: The single record of the choice for this session.
- * When to use: Only through `getMapViewMode` and `setMapViewMode`.
- * Expected outcome: Starts as `DEFAULT_MAP_VIEW_MODE`.
+ * Purpose: The single record of that choice for this session.
+ * When to use: Only through `areWeatherIconsShown` and `setWeatherIconsShown`.
+ * Expected outcome: Starts as `DEFAULT_WEATHER_ICONS_SHOWN`.
  * Exceptions: None.
  */
-let mapViewMode: MapViewMode = DEFAULT_MAP_VIEW_MODE;
+let weatherIconsShown = DEFAULT_WEATHER_ICONS_SHOWN;
 
 /**
- * Returns the map view the player chose.
+ * Whether Tech is on in the mode tabs.
  *
- * Purpose: Drawing code and the mode tabs follow the same choice.
- * When to use: Each time the inspection view is decided, and when the mode tabs redraw their pressed state.
- * Expected outcome: `'weather'` or `'tech'`.
+ * Purpose: The single record of that choice for this session.
+ * When to use: Only through `isTechViewChosen` and `setTechViewChosen`.
+ * Expected outcome: Starts as `DEFAULT_TECH_VIEW_CHOSEN`.
  * Exceptions: None.
  */
-export function getMapViewMode(): MapViewMode {
-  return mapViewMode;
+let techViewChosen = DEFAULT_TECH_VIEW_CHOSEN;
+
+/**
+ * Returns whether the world map shows weather icons.
+ *
+ * Purpose: The status-icon pass and the Weather tab follow the same choice.
+ * When to use: Each time the status icons are drawn, and when the mode tabs redraw their pressed state.
+ * Expected outcome: True while Weather is on.
+ * Exceptions: None.
+ */
+export function areWeatherIconsShown(): boolean {
+  return weatherIconsShown;
 }
 
 /**
- * Records the map view the player chose.
+ * Records whether the world map shows weather icons.
  *
  * Purpose: The choice lasts for the session, across turns, battles, and new matches.
- * When to use: Only from the Weather and Tech tabs.
- * Expected outcome: Later calls to `getMapViewMode` return `mode`. Nothing is redrawn here.
+ * When to use: Only from the Weather tab.
+ * Expected outcome: Later calls to `areWeatherIconsShown` return `shown`. Nothing is redrawn here.
  * Exceptions: None.
  */
-export function setMapViewMode(mode: MapViewMode): void {
-  mapViewMode = mode;
+export function setWeatherIconsShown(shown: boolean): void {
+  weatherIconsShown = shown;
+}
+
+/**
+ * Returns whether the player turned the Tech view on.
+ *
+ * Purpose: Drawing code and the Tech tab follow the same choice.
+ * When to use: Each time the inspection view is decided, and when the mode tabs redraw their pressed state.
+ * Expected outcome: True while Tech is on.
+ * Exceptions: None.
+ */
+export function isTechViewChosen(): boolean {
+  return techViewChosen;
+}
+
+/**
+ * Records whether the player turned the Tech view on.
+ *
+ * Purpose: The choice lasts for the session, across turns, battles, and new matches.
+ * When to use: Only from the Tech tab.
+ * Expected outcome: Later calls to `isTechViewChosen` return `chosen`. Nothing is redrawn here.
+ * Exceptions: None.
+ */
+export function setTechViewChosen(chosen: boolean): void {
+  techViewChosen = chosen;
 }

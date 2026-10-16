@@ -1,6 +1,7 @@
 import { latLngToCell } from 'h3-js';
 import {
   inspectionStatusIconDrawPx,
+  statusIconCentersX,
   strategicOverlayBandOffsetPx,
   techInspectionIconAssetPath,
   weatherInspectionIconAssetPath,
@@ -133,7 +134,7 @@ export function storeNewGameMapPreview(next: NewGameMapPreview): boolean {
  *
  * Purpose: While the overlay is open the canvas shows this instead of the loaded match.
  * When to use: From the scene frame when the overlay is visible.
- * Expected outcome: Nothing when there is no payload for the map on screen or Leaflet is missing. Home hexes use the match's terrain fills and ownership rings. On the global map, other strategic hexes stay off the basemap until T is held, and then that grid is filled and stroked. A regional preview fills and strokes its whole strategic grid. Weather icons follow the month on every strategic hex, and tech icons follow the tech bonus on every strategic hex while T is held. Icons are painted after the hex bodies, so a fill does not cover one.
+ * Expected outcome: Nothing when there is no payload for the map on screen or Leaflet is missing. Home hexes use the match's terrain fills and ownership rings. On the global map, other strategic hexes stay off the basemap until T is held, and then that grid is filled and stroked. A regional preview fills and strokes its whole strategic grid. Weather icons follow the month on every strategic hex, and tech icons follow the tech bonus on every strategic hex while T is held; a hex with both shows the tech-then-weather pair, as on the world map. Icons are painted after the hex bodies, so a fill does not cover one.
  * Exceptions: None. A missing map returns without drawing.
  */
 export function drawNewGameMapPreview(ctx: CanvasRenderingContext2D, requestRedraw: () => void): void {
@@ -190,7 +191,6 @@ export function drawNewGameMapPreview(ctx: CanvasRenderingContext2D, requestRedr
       weatherBonusLevel,
       startMonth,
       weatherByMonth: hex.weatherByMonth,
-      mapInspectionHeld: inspectionHeld,
       tacticalZoom,
     });
     const tech = previewTechIcon({
@@ -200,12 +200,11 @@ export function drawNewGameMapPreview(ctx: CanvasRenderingContext2D, requestRedr
       mapInspectionHeld: inspectionHeld,
       tacticalZoom,
     });
-    const assetPath = tech
-      ? techInspectionIconAssetPath(tech)
-      : weather
-        ? weatherInspectionIconAssetPath(weather)
-        : null;
-    if (assetPath) icons.push(statusIconPlacement(pts, assetPath));
+    // Tech then weather, left to right, the same order as the world map's status icons.
+    const assetPaths: string[] = [];
+    if (tech) assetPaths.push(techInspectionIconAssetPath(tech));
+    if (weather) assetPaths.push(weatherInspectionIconAssetPath(weather));
+    icons.push(...statusIconPlacements(pts, assetPaths));
   }
   for (const icon of icons) drawPlacedStatusIcon(ctx, icon, requestRedraw);
 }
@@ -294,14 +293,19 @@ function samplePreviewHex(
 }
 
 /**
- * Places one status icon on the band above a hex center.
+ * Places a preview hex's status icons on the band above its center.
  *
- * Purpose: Weather and tech share the band and the plain 16.5px size, because the preview draws no units or infrastructure.
- * When to use: A preview hex that has a weather or tech icon this frame.
- * Expected outcome: A placement whose asset is the chosen icon.
+ * Purpose: Weather and tech share the band and the plain 16.5px size, because the preview draws no units or
+ *   infrastructure. One icon is centered, and two sit side by side as a centered pair (`statusIconCentersX`).
+ * When to use: Each preview hex, with the asset paths of the icons it shows this frame, tech first.
+ * Expected outcome: One placement per asset path, left to right. None when the list is empty.
  * Exceptions: None.
  */
-function statusIconPlacement(pts: readonly { x: number; y: number }[], assetPath: string): StatusIconPlacement {
+function statusIconPlacements(
+  pts: readonly { x: number; y: number }[],
+  assetPaths: readonly string[]
+): StatusIconPlacement[] {
+  if (assetPaths.length === 0) return [];
   let sumX = 0;
   let sumY = 0;
   for (const point of pts) {
@@ -309,14 +313,11 @@ function statusIconPlacement(pts: readonly { x: number; y: number }[], assetPath
     sumY += point.y;
   }
   const centerY = sumY / pts.length - strategicOverlayBandOffsetPx(spanForProjectedHex([...pts]));
-  return {
-    centerX: sumX / pts.length,
-    centerY,
-    iconPx: inspectionStatusIconDrawPx({
-      productionSurface: 'canvas',
-      hasInfraSymbols: false,
-      hasVisibleUnits: false,
-    }),
-    assetPath,
-  };
+  const iconPx = inspectionStatusIconDrawPx({
+    productionSurface: 'canvas',
+    hasInfraSymbols: false,
+    hasVisibleUnits: false,
+  });
+  const centersX = statusIconCentersX(sumX / pts.length, iconPx, assetPaths.length);
+  return assetPaths.map((assetPath, i) => ({ centerX: centersX[i]!, centerY, iconPx, assetPath }));
 }

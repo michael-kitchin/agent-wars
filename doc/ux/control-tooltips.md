@@ -62,8 +62,8 @@ The tip can appear whenever the control can receive the pointer or keyboard focu
 - Selection panel expand control, while the panel is expanded: Hide the details. The bar stays.
 - Map-mode tabs toggle, while the tabs are hidden: Show the Weather, Tech, and Legend buttons under the overview.
 - Map-mode tabs toggle, while the tabs show: Hide the Weather, Tech, and Legend buttons. Hiding them also closes the terrain legend.
-- Weather map mode: Show the map as usual: terrain, and each hex's weather while the weather bonus is on.
-- Tech map mode: Show each hex's code, production, and tech tier instead of terrain on the world map, until you choose Weather. Holding T shows the same view while the key is down.
+- Weather map mode: Show or hide each hex's weather icon on the world map, while the weather bonus is on.
+- Tech map mode: Turn the Tech view on or off: each hex's code, production, and tech tier instead of terrain on the world map. Holding T shows the same view while the key is down.
 - Legend: Show or hide the terrain legend and its style choice.
 - Force bar in the battle header: Sub-units each side has in this battle, counting any carried by a ship. A battle has no fog of war, so both counts are exact.
 - Production readout: The production your cities can add each turn. A city adds its share only while it is building, and a city on the neutral border adds none.

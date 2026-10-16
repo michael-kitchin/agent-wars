@@ -74,10 +74,10 @@ const PLACEMENT_SCENES = Object.freeze([SCENES.strategic, SCENES.matchReopened, 
  *
  * Purpose: The tabs' own geometry and size can only be read while the row is on screen.
  * When to use: The checks that measure the tabs.
- * Expected outcome: The Tech view and the open legend, both chosen from the shown row.
+ * Expected outcome: The Tech view, Weather turned off, and the open legend, all chosen from the shown row.
  * Exceptions: None.
  */
-const TABS_SHOWN_SCENES = Object.freeze([SCENES.mapTech, SCENES.legendOpen]);
+const TABS_SHOWN_SCENES = Object.freeze([SCENES.mapTech, SCENES.mapWeatherOff, SCENES.legendOpen]);
 
 /**
  * The map chrome checks, one row each.
@@ -181,12 +181,21 @@ const MAP_CHROME_CHECKS = Object.freeze([
     },
   },
   {
-    name: 'map-mode-tech-chosen',
+    name: 'map-mode-tech-on-keeps-weather',
     scenes: [SCENES.mapTech],
     needs: ['#map-mode-weather', '#map-mode-tech'],
     run: (p, el) => {
       const line = `Weather pressed=${el('#map-mode-weather').pressed}, Tech pressed=${el('#map-mode-tech').pressed}`;
-      return line === 'Weather pressed=false, Tech pressed=true' ? null : `the view tabs read "${line}"`;
+      return line === 'Weather pressed=true, Tech pressed=true' ? null : `the view tabs read "${line}"`;
+    },
+  },
+  {
+    name: 'map-mode-weather-off',
+    scenes: [SCENES.mapWeatherOff],
+    needs: ['#map-mode-weather', '#map-mode-tech'],
+    run: (p, el) => {
+      const line = `Weather pressed=${el('#map-mode-weather').pressed}, Tech pressed=${el('#map-mode-tech').pressed}`;
+      return line === 'Weather pressed=false, Tech pressed=false' ? null : `the view tabs read "${line}"`;
     },
   },
   {

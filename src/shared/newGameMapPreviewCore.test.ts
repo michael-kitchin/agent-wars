@@ -59,18 +59,16 @@ test('global preview paints homes always and the rest of the grid only while T i
   assert.equal(previewHexIsDrawn('northern_america', null, true), true);
 });
 
-test('preview weather icon follows the start month unless the bonus, inspection, or zoom hides it', () => {
+test('preview weather icon follows the start month unless the bonus or zoom hides it', () => {
   const shown = {
     weatherBonusLevel: 'low' as const,
     startMonth: 6,
     weatherByMonth: YEAR,
-    mapInspectionHeld: false,
     tacticalZoom: false,
   };
   assert.equal(previewWeatherIcon(shown), 'snow');
   assert.equal(previewWeatherIcon({ ...shown, weatherBonusLevel: 'high' }), 'snow');
   assert.equal(previewWeatherIcon({ ...shown, weatherBonusLevel: 'off' }), null);
-  assert.equal(previewWeatherIcon({ ...shown, mapInspectionHeld: true }), null);
   assert.equal(previewWeatherIcon({ ...shown, tacticalZoom: true }), null);
   assert.equal(previewWeatherIcon({ ...shown, weatherByMonth: YEAR.slice(0, 11) }), null);
 });

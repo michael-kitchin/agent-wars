@@ -23804,15 +23804,20 @@ ${bonuses}`;
     return "canvas";
   }
   function inspectionStatusIconsForHex(input) {
-    if (input.mapInspectionHeld) {
-      if (input.techBonusEnabled !== true) return null;
-      if (!Number.isFinite(input.baselineUrbanHexCount) || input.baselineUrbanHexCount <= 0) return null;
-      return { kind: "tech", level: techLevelFromUrbanHexCount(input.baselineUrbanHexCount) };
+    const icons = [];
+    const urbanCount = input.baselineUrbanHexCount;
+    if (input.mapInspectionHeld && input.techBonusEnabled === true && Number.isFinite(urbanCount) && urbanCount > 0) {
+      icons.push({ kind: "tech", level: techLevelFromUrbanHexCount(urbanCount) });
     }
-    if (input.weatherBonusEnabled !== true) return null;
-    const weather = knownWeather(input.weather);
-    if (weather == null) return null;
-    return { kind: "weather", state: weather };
+    const weather = input.weatherIconsShown && input.weatherBonusEnabled === true ? knownWeather(input.weather) : null;
+    if (weather != null) icons.push({ kind: "weather", state: weather });
+    return icons;
+  }
+  var STATUS_ICON_GAP_PX = 2;
+  function statusIconCentersX(centerX, iconPx, count) {
+    const step = iconPx + STATUS_ICON_GAP_PX;
+    const firstX = centerX - (count - 1) * step / 2;
+    return Array.from({ length: Math.max(0, count) }, (_, i) => firstX + i * step);
   }
   function inspectionStatusIconFontPx(input) {
     if (input.productionSurface === "button" || input.hasInfraSymbols || input.hasVisibleUnits) return 10;
@@ -23845,7 +23850,7 @@ ${bonuses}`;
     return homeOwnerIdentity != null;
   }
   function previewWeatherIcon(input) {
-    if (input.tacticalZoom || input.mapInspectionHeld || input.weatherBonusLevel === "off") return null;
+    if (input.tacticalZoom || input.weatherBonusLevel === "off") return null;
     if (input.weatherByMonth.length !== 12) return null;
     const weather = input.weatherByMonth[gameDateForTurn(1, input.startMonth, "monthly").monthIndex];
     if (weather == null || !WEATHER_STATES.has(weather)) return null;
@@ -24060,19 +24065,27 @@ ${bonuses}`;
   }
 
   // src/shared/mapViewMode.ts
-  var DEFAULT_MAP_VIEW_MODE = "weather";
+  var DEFAULT_WEATHER_ICONS_SHOWN = true;
+  var DEFAULT_TECH_VIEW_CHOSEN = false;
   function isTerrainInspectionShown(input) {
     if (input.tKeyHeld) return true;
-    return input.mapViewMode === "tech" && !input.inBattle && !input.newGameOverlayOpen;
+    return input.techViewChosen && !input.inBattle && !input.newGameOverlayOpen;
   }
 
   // src/renderer/map/mapViewModeState.ts
-  var mapViewMode = DEFAULT_MAP_VIEW_MODE;
-  function getMapViewMode() {
-    return mapViewMode;
+  var weatherIconsShown = DEFAULT_WEATHER_ICONS_SHOWN;
+  var techViewChosen = DEFAULT_TECH_VIEW_CHOSEN;
+  function areWeatherIconsShown() {
+    return weatherIconsShown;
   }
-  function setMapViewMode(mode) {
-    mapViewMode = mode;
+  function setWeatherIconsShown(shown) {
+    weatherIconsShown = shown;
+  }
+  function isTechViewChosen() {
+    return techViewChosen;
+  }
+  function setTechViewChosen(chosen) {
+    techViewChosen = chosen;
   }
 
   // src/shared/newGameBannerText.ts
@@ -24115,13 +24128,13 @@ ${bonuses}`;
     return getUrbanProductionCapacityForHex(h3Index);
   }
   function isMapInspectionModeHeld() {
-    const mapViewMode2 = getMapViewMode();
+    const techViewChosen2 = isTechViewChosen();
     return isTerrainInspectionShown({
       tKeyHeld: rendererSharedState.hideTerrainFillWhileHeld,
-      mapViewMode: mapViewMode2,
+      techViewChosen: techViewChosen2,
       inBattle: rendererSharedState.tacticalBattleSnapshot != null,
       // Drawing asks this for every hex, so the page is read only while the answer can depend on it.
-      newGameOverlayOpen: mapViewMode2 === "tech" && isNewGameOverlayOpen()
+      newGameOverlayOpen: techViewChosen2 && isNewGameOverlayOpen()
     });
   }
   function isStrategicHexHumanUrbanProduction(state, hx) {
@@ -24245,6 +24258,7 @@ ${bonuses}`;
     const unitHexes = new Set(state.units.map((unit) => unit.h3Index));
     const buildEntryZoom = shouldShowBuildEntryZoom();
     const mapInspectionHeld = isMapInspectionModeHeld();
+    const weatherIconsShown2 = areWeatherIconsShown();
     ctx.save();
     try {
       for (const hx of state.hexes) {
@@ -24259,27 +24273,28 @@ ${bonuses}`;
           humanUrbanProduction,
           buildEntryZoom
         });
-        const icon = inspectionStatusIconsForHex({
+        const icons = inspectionStatusIconsForHex({
           mapInspectionHeld,
+          weatherIconsShown: weatherIconsShown2,
           techBonusEnabled: state.techBonusEnabled === true,
           weatherBonusEnabled: state.weatherBonusEnabled === true,
           baselineUrbanHexCount: baselineUrbanHexCountForStrategicHex(hx.h3Index),
           weather: explored ? hx.weather : null
         });
-        if (!icon) continue;
+        if (icons.length === 0) continue;
         const pts = projectHexBoundaryToContainerPoints(hx.h3Index, map, leaflet);
         if (pts.length === 0) continue;
         const centroid = projectedCentroid(pts);
-        const assetPath = icon.kind === "tech" ? techInspectionIconAssetPath(icon.level) : weatherInspectionIconAssetPath(icon.state);
-        drawStatusIcon(ctx, deps, {
-          centerX: centroid.x,
-          centerY: centroid.y - strategicOverlayBandOffsetPx(spanForProjectedHex(pts)),
-          iconPx: inspectionStatusIconDrawPx({
-            productionSurface: surface === "button" ? "button" : "canvas",
-            hasInfraSymbols: deps.hasInfraSymbols(hx.h3Index, unitHexes),
-            hasVisibleUnits: unitHexes.has(hx.h3Index)
-          }),
-          assetPath
+        const centerY = centroid.y - strategicOverlayBandOffsetPx(spanForProjectedHex(pts));
+        const iconPx = inspectionStatusIconDrawPx({
+          productionSurface: surface === "button" ? "button" : "canvas",
+          hasInfraSymbols: deps.hasInfraSymbols(hx.h3Index, unitHexes),
+          hasVisibleUnits: unitHexes.has(hx.h3Index)
+        });
+        const centersX = statusIconCentersX(centroid.x, iconPx, icons.length);
+        icons.forEach((icon, i) => {
+          const assetPath = icon.kind === "tech" ? techInspectionIconAssetPath(icon.level) : weatherInspectionIconAssetPath(icon.state);
+          drawStatusIcon(ctx, deps, { centerX: centersX[i], centerY, iconPx, assetPath });
         });
       }
     } finally {
@@ -24980,7 +24995,6 @@ ${bonuses}`;
         weatherBonusLevel,
         startMonth,
         weatherByMonth: hex.weatherByMonth,
-        mapInspectionHeld: inspectionHeld,
         tacticalZoom
       });
       const tech = previewTechIcon({
@@ -24990,8 +25004,10 @@ ${bonuses}`;
         mapInspectionHeld: inspectionHeld,
         tacticalZoom
       });
-      const assetPath = tech ? techInspectionIconAssetPath(tech) : weather ? weatherInspectionIconAssetPath(weather) : null;
-      if (assetPath) icons.push(statusIconPlacement(pts, assetPath));
+      const assetPaths = [];
+      if (tech) assetPaths.push(techInspectionIconAssetPath(tech));
+      if (weather) assetPaths.push(weatherInspectionIconAssetPath(weather));
+      icons.push(...statusIconPlacements(pts, assetPaths));
     }
     for (const icon of icons) drawPlacedStatusIcon(ctx, icon, requestRedraw3);
   }
@@ -25039,7 +25055,8 @@ ${bonuses}`;
     }
     return first;
   }
-  function statusIconPlacement(pts, assetPath) {
+  function statusIconPlacements(pts, assetPaths) {
+    if (assetPaths.length === 0) return [];
     let sumX = 0;
     let sumY = 0;
     for (const point of pts) {
@@ -25047,16 +25064,13 @@ ${bonuses}`;
       sumY += point.y;
     }
     const centerY = sumY / pts.length - strategicOverlayBandOffsetPx(spanForProjectedHex([...pts]));
-    return {
-      centerX: sumX / pts.length,
-      centerY,
-      iconPx: inspectionStatusIconDrawPx({
-        productionSurface: "canvas",
-        hasInfraSymbols: false,
-        hasVisibleUnits: false
-      }),
-      assetPath
-    };
+    const iconPx = inspectionStatusIconDrawPx({
+      productionSurface: "canvas",
+      hasInfraSymbols: false,
+      hasVisibleUnits: false
+    });
+    const centersX = statusIconCentersX(sumX / pts.length, iconPx, assetPaths.length);
+    return assetPaths.map((assetPath, i) => ({ centerX: centersX[i], centerY, iconPx, assetPath }));
   }
 
   // src/renderer/gameplay/newGameMapPreviewUi.ts
@@ -36091,17 +36105,20 @@ ${bonuses}`;
 
   // src/renderer/map/mapModeTabs.ts
   function syncMapModeTabs() {
-    const mode = getMapViewMode();
-    document.getElementById("map-mode-weather")?.setAttribute("aria-pressed", String(mode === "weather"));
-    document.getElementById("map-mode-tech")?.setAttribute("aria-pressed", String(mode === "tech"));
+    document.getElementById("map-mode-weather")?.setAttribute("aria-pressed", String(areWeatherIconsShown()));
+    document.getElementById("map-mode-tech")?.setAttribute("aria-pressed", String(isTechViewChosen()));
     const legendOpen = document.getElementById("terrain-legend")?.hidden === false;
     const legendToggle = document.getElementById("map-legend-toggle");
     legendToggle?.setAttribute("aria-pressed", String(legendOpen));
     legendToggle?.setAttribute("aria-expanded", String(legendOpen));
   }
-  function chooseMapView(mode, requestRedraw3) {
-    if (getMapViewMode() === mode) return;
-    setMapViewMode(mode);
+  function toggleWeatherIcons(requestRedraw3) {
+    setWeatherIconsShown(!areWeatherIconsShown());
+    syncMapModeTabs();
+    requestRedraw3();
+  }
+  function toggleTechView(requestRedraw3) {
+    setTechViewChosen(!isTechViewChosen());
     syncMapModeTabs();
     requestRedraw3();
   }
@@ -36129,8 +36146,8 @@ ${bonuses}`;
     document.getElementById("map-mode-tabs-toggle")?.addEventListener("click", () => {
       setMapModeTabsShown(document.getElementById("map-mode-tabs")?.hidden === true);
     });
-    document.getElementById("map-mode-weather")?.addEventListener("click", () => chooseMapView("weather", requestRedraw3));
-    document.getElementById("map-mode-tech")?.addEventListener("click", () => chooseMapView("tech", requestRedraw3));
+    document.getElementById("map-mode-weather")?.addEventListener("click", () => toggleWeatherIcons(requestRedraw3));
+    document.getElementById("map-mode-tech")?.addEventListener("click", () => toggleTechView(requestRedraw3));
     document.getElementById("map-legend-toggle")?.addEventListener("click", toggleTerrainLegend);
     syncMapModeTabs();
   }
