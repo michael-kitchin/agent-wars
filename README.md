@@ -274,7 +274,8 @@ Setup, the Python CLIs, and troubleshooting are in [scripts/terrain_pipeline/REA
 - **Version:** 2.6.0, distributed as side-load builds only (no store, signing, or notarization).
 - **Progress:** Phase 0 (hybrid AI validation) and Phase 1 (global strategic game) are complete. Phase 2 is complete through milestone 2.5 (regional game and rules enhancements), including tactical battles (2.1 to 2.4) and playtester UI fixes (2.45). Release 2.6.0 redesigns the layout: a top bar, a console docked on the right, a selection panel on the map, and a new-game panel docked at the left. Player-facing save/load and session management, the development plan's milestone 2.6, isn't shipped. See the [development plan (v3.4)](doc/devleopment-plan-v3.4.md); milestones 0.2 to 0.5 were a throwaway prototype that validated combat, tools, and the AI loop before the production baseline.
 - **CI:** lint and tests run on every push that changes code, and on demand (Linux). The three-platform packaging build runs on demand and drafts each release.
-- **Contributions:** this is a personal R&D project, so it doesn't take issues or pull requests. To report a security problem, see [SECURITY.md](SECURITY.md).
+- **Contributions:** this is mostly a personal R&D project, but feel free to report issues (responses will be best-effort) or create a PR (accetpance is up to me).
+- **Security:** To report a vulnerability or other security problem, see [SECURITY.md](SECURITY.md).
 
 ## License
 
