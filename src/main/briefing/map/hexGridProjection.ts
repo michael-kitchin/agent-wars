@@ -11,6 +11,7 @@ import { cellToLatLng } from 'h3-js';
 import { logDebug, logTrace } from '../../logger';
 import type { CoordinateContext } from './coordinateContext';
 import { getHexCodeForContext } from './hexCoordinates';
+import { circularMeanLongitudeDegrees, wrapLongitudeDeltaDegrees } from './longitudeCircle';
 
 const DEFAULT_CLUSTER_THRESHOLD_DEG = 4;
 
@@ -115,42 +116,6 @@ export interface HexGrid {
    * Exceptions: None.
    */
   numCols: number;
-}
-
-/**
- * Wraps a longitude delta to (-180, 180] degrees.
- *
- * Purpose: Shared with bounding-box logic for consistent antimeridian behavior.
- * When to use: When normalizing longitudes relative to a cluster center.
- * Expected outcome: Principal longitude delta.
- * Exceptions: None.
- */
-function wrapLongitudeDeltaDegrees(delta: number): number {
-  let d = delta;
-  while (d > 180) d -= 360;
-  while (d <= -180) d += 360;
-  return d;
-}
-
-/**
- * Circular mean longitude for a set of degrees.
- *
- * Purpose: Stable center for sorting and clustering across the dateline.
- * When to use: Before assigning row/column indices.
- * Expected outcome: Finite mean for non-empty inputs; 0 for empty.
- * Exceptions: None.
- */
-function circularMeanLongitudeDegrees(longitudes: number[]): number {
-  if (longitudes.length === 0) return 0;
-  let sx = 0;
-  let sy = 0;
-  for (const lng of longitudes) {
-    const rad = (lng * Math.PI) / 180;
-    sx += Math.cos(rad);
-    sy += Math.sin(rad);
-  }
-  const mean = Math.atan2(sy / longitudes.length, sx / longitudes.length);
-  return (mean * 180) / Math.PI;
 }
 
 /**

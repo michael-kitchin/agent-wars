@@ -112,6 +112,7 @@ function main() {
       'generated-data-packaging.test.cjs',
       'generated-data-pack-assert.test.cjs',
       'renderer-typecheck-report.test.cjs',
+      'ui-smoke/ui-smoke-checks.test.cjs',
     ]) {
       const extra = path.join(repoRoot, 'scripts', extraName);
       if (fs.existsSync(extra)) {

@@ -53,9 +53,9 @@ I'll add screenshots of specific functions as I can.
 
 1. **Pan:** Drag with the left mouse button, or use WASD / arrow keys.
 2. **Zoom:** Mouse wheel (zooms toward the cursor). Zoomed in, contested strategic hexes show a marker that starts a tactical battle.
-3. **Select units:** Click a teal (human) unit's icon. A lone unit is selected right away. A stack opens a list of its units, where you can pick one or use **+ All**.
-4. **Issue a move order:** With units selected, double-click a destination hex (land/water/terrain rules apply). The order appears under "Movement orders." A destination beyond this turn's reach becomes a march that continues on later turns.
-5. **Ranged attack (armor or naval on strategic; broader types on tactical):** With capable units selected, click **Ranged**, then double-click an enemy hex within range. An all-air selection shows **Strike** instead. Attacks are submitted with Ready. See [Aiming ranged attacks and air strikes](#aiming-ranged-attacks-and-air-strikes).
+3. **Select units:** Click a teal (human) unit's icon. A lone unit is selected right away. A stack opens a list of its units, where you can pick one or use **+ All**. A gold ring replaces the white border of each token in a hex that holds a selected unit, including both tokens of a stack. The selection panel at the map's bottom-left opens as a bar that names the hex and the selection, with a hint for what a double-click does next; its **×** clears the selection. Click the chevron at the bar's left edge to show the hex's terrain and each selected unit's orders, and click it again to hide them. While they show, drag the panel's corner grip to resize it. The panel's state and size last until you close the app.
+4. **Issue a move order:** With units selected, double-click a destination hex (land/water/terrain rules apply). The order appears in the Movement group of the Orders tab, with the destination's hex code and its distance, such as "→ E5 · 1h". Click a row to select that unit again. A destination beyond this turn's reach becomes a march that continues on later turns.
+5. **Ranged attack (armor or naval on strategic; broader types on tactical):** With capable units selected, click the reticle in the selection panel, then double-click an enemy hex within range. With an all-air selection, the same reticle aims an air strike. When the selection cannot fire, the reticle is greyed out, and pointing at it says why. Attacks are submitted with Ready. See [Aiming ranged attacks and air strikes](#aiming-ranged-attacks-and-air-strikes).
 6. **Ready:** Click **Ready** to submit orders and resolve the turn. A side wins by controlling the enemy home or wiping out its urban cells (rules in [region-vs-region.md](region-vs-region.md)). The new-game dialog then returns for the next match.
 7. You can issue multiple movement and ranged orders (one per unit each) before clicking Ready.
 
@@ -80,19 +80,19 @@ The full input map, including the exceptions, is in [ux/input-map.md](ux/input-m
 | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
 | ![Step 1: Select a unit or stack, then the Ranged button](media/ranged-attack-1.png) | ![Step 2: Step 2: Double-click on a visible target to order the attack](media/ranged-attack-2.png) |
 
-- **Ranged:** select units that can all fire, then click **Ranged**. The button reads **Cancel** while you aim.
-- **Strike:** select only air units, then click **Strike**. Pick a target type from the list that takes the button's place.
-- **Hidden button:** mixing air with other types, or selecting any unit that can't fire, hides the button. On the strategic map that includes infantry.
+- **Ranged:** select units that can all fire, then click the reticle in the selection panel. It stays pressed, in amber, while you aim.
+- **Strike:** select only air units, then click the reticle. It stays pressed, in purple, and a list to its left picks the target type.
+- **Greyed reticle:** mixing air with other types, or infantry with no air unit on the strategic map, greys out the reticle. Point at it to see why. Infantry can fire in a battle.
 - **The outline:** a dashed outline, with no fill, around the combined reach of every selected unit. Its dashes drift slowly.
-- **Colors:** amber for ranged fire, purple for air strikes.
+- **Colors:** amber for ranged fire, purple for air strikes. While you aim, the selection panel's border takes the same color.
 - **Reach on the strategic map:** armor 1 hex, naval 2, and air 3 from its base airport.
 - **Reach in a battle:** the ranged outline uses each unit's range after terrain limits. The strike outline covers the whole battlefield.
-- **Hovering a valid target:** a dashed line in the same color runs from each selected unit to the target.
+- **Hovering a valid target:** a dashed line in the same color runs from each selected unit to the target and ends in an arrowhead. A queued attack keeps that line.
 - **Hovering an invalid target:** a teal X marks the hex. After a second, a tip says why.
 - **Firing:** double-click the target. A single click does nothing. A failed double-click shows an error and keeps you aiming.
-- **Stopping:** click **Cancel** or right-click the map. Escape doesn't end aiming.
+- **Stopping:** click the pressed reticle again, click the selection panel's **×**, or right-click the map. Escape doesn't end aiming.
 - **What it doesn't show:** the outline ignores line of sight. In a battle, a mountain can still block a shot inside it.
-- **Moves:** there is no reach outline for movement. Hovering a destination draws a teal route, solid for this turn and dashed beyond.
+- **Moves:** there is no reach outline for movement. Hovering a destination draws a teal route, solid for this turn and dashed beyond, ending in an arrowhead. A queued move keeps that route through the movement animation, then drops it once the animation has finished and the unit is on the destination. Move routes and the attack lines above are drawn over a pale edge so they stay readable.
 
 ## Air power
 
@@ -168,7 +168,7 @@ Manually fought battles take place entirely within one strategic turn, with the 
 - During that turn, strategic units will continue to follow existing orders and defend themselves.
 - When the battle is over, the strategic part of the game resumes in the next turn.
 
-Players win tactical battles by destroying their opponent's units, but they can leave at any time by clicking the **Exit Battle** button. Any strategic units with half or more of their sub-units remaining by the end of a battle will be returned to the strategic map. There is no concept of battle damage, to keep things simple.
+Players win tactical battles by destroying their opponent's units, but they can leave between beats by clicking **Exit Battle** at the top right of the window. Any strategic units with half or more of their sub-units remaining by the end of a battle will be returned to the strategic map. There is no concept of battle damage, to keep things simple.
 
 Complete rules are in [combat-rules-v3.md](combat-rules-v3.md) §12.
 
@@ -182,7 +182,7 @@ Complete rules are in [combat-rules-v3.md](combat-rules-v3.md) §12.
 - **After Fight:** the current turn finishes first, and the battle opens as the next turn begins.
 - **Who decides:** only you choose whether to fight a battle. The opponent never does.
 - **Joining ongoing battles:** On the strategic map, hexes with ongoing tactical battles are marked with magnifying glass icons (🔍). Click to join.
-- **Turning battles off:** uncheck **Tactical battles** on the Model tab. Every melee then resolves as if you chose **Ignore**.
+- **Turning battles off:** open the game menu (top left) and uncheck **Offer tactical battles**. Every melee then resolves as if you chose **Ignore**.
 
 ### How battles differ
 
@@ -192,7 +192,7 @@ Complete rules are in [combat-rules-v3.md](combat-rules-v3.md) §12.
 
 - **Scale:** the battlefield is the contested hex's cells, three H3 resolutions finer, plus three rings of neighboring cells.
 - **Pause:** the rest of the map waits until the battle ends. The date and weather stay fixed.
-- **Beats:** each Ready in a battle resolves one beat: air strikes, ranged fire, movement, then melee.
+- **Beats:** each Ready in a battle resolves one beat: air strikes, ranged fire, movement, then melee. The top bar becomes the battle header, which names the battle's hex and the beat, and compares each side's sub-units in a bar.
 - **Sub-units:** each unit splits into sub-units with its attack and defense: infantry 8, armor 4, naval 4, and air 3.
 - **Deployment:** units start on the edge of the hex they entered from.
 - **No fog:** both sides see everything in a battle.
@@ -221,7 +221,7 @@ Complete rules are in [combat-rules-v3.md](combat-rules-v3.md) §12.
 ### Ending a battle
 
 - **Annihilation:** when one side has no sub-units left, a dialog shows the result. Press its **Exit Battle** to return.
-- **Exit Battle:** you can leave between beats. A unit that kept fewer than half its sub-units is destroyed. Exactly half survives.
+- **Exit Battle:** you can leave between beats with **Exit Battle** in the battle header, beside Settings. A unit that kept fewer than half its sub-units is destroyed. Exactly half survives.
 - **Back to the map:** your strategic orders return, minus units that died, and Ready runs at once.
 - **Plan first:** before you click a 🔍 marker, queue the turn's strategic orders, because leaving the battle resolves the turn.
 - **After Fight, no planning:** a battle opens before you can plan that turn. Leaving it resolves the turn with only your standing marches.
@@ -265,16 +265,16 @@ Each bonus is Off, Low, or High in the new-game dialog, and starts at Low.
 - **Tech:** a unit built in a hex with at least 21 urban cells is Advanced. Low adds 2 to its attack, and High adds 2 to attack and defense.
 - **Tech is fixed:** the tier comes from the birth hex's original city size. It doesn't change when the unit moves or the city is bombed.
 - **Where you build matters:** with tech on, big cities build better units, so the place matters as well as the points.
-- **Seeing them:** the flag tooltip lists a unit's bonuses. A hex tooltip shows that hex's weather and terrain effects. Hold T to see each hex's tech tier.
+- **Seeing them:** the flag tooltip lists a unit's bonuses. A hex tooltip shows that hex's weather and terrain effects. Click the toggle on the minimap's lower-left corner to show the map-mode buttons under it, then turn on **Tech**, or hold T, to see each hex's tech tier. **Weather** turns the weather icons on the map off and on. **Control** starts on and draws who holds each hex; turn it off to leave the plain grid. **Production** starts off; turn it on to label production on every hex.
 
 The full bonus rules are in [combat-rules-v3.md](combat-rules-v3.md) §4.9.
 
 ## Things that may surprise you
 
 - **You pay for the opponent:** each model call bills your OpenRouter account. The model list shows each model's price per million tokens.
-- **Reasoning costs more:** a higher reasoning level on the Model tab makes each consult slower and dearer.
-- **Waiting on the AI:** while the model plans, Ready shows **AI:** and a timer. You can keep giving orders during the wait. Turn **Run** off to stop that plan. If the turn has not resolved yet, Ready can resolve it without those orders. If the turn already played back, Ready unlocks and the next turn does not use that plan. Changing the model stops the current plan. If Run is still on and Ready is still waiting, planning starts again with the new model.
-- **Not every turn:** with **Events** on (the default) on the Tools tab, the model is called when an event it's watching or a mandatory trigger fires, and at least every five turns. Otherwise its standing orders run.
+- **Reasoning costs more:** a higher reasoning level in the Opponent tab's Commander section makes each consult slower and dearer.
+- **Waiting on the AI:** while the model plans, Ready shows **AI:** and a timer, and the line above it reads **Opponent planning…**. You can keep giving orders during the wait. Turn **Run** off to stop that plan. If the turn has not resolved yet, Ready can resolve it without those orders. If the turn already played back, Ready unlocks and the next turn does not use that plan. Changing the model stops the current plan. If Run is still on and Ready is still waiting, planning starts again with the new model.
+- **Not every turn:** with **Events** on (the default) in the Opponent tab's Tool groups, the model is called when an event it's watching or a mandatory trigger fires, and at least every five turns. Otherwise its standing orders run.
 - **Every turn, if you like:** turn **Events** off to consult the model every turn, at more cost.
 - **The opponent nearly always shoots:** unless the model told it to hold fire, each enemy unit that can fire picks a legal target on its own when the model gives it none.
 - **Your units wait for orders:** they fire only when you aim them. There are no player defend or hold-fire orders.
@@ -282,14 +282,14 @@ The full bonus rules are in [combat-rules-v3.md](combat-rules-v3.md) §4.9.
 - **Fog fades:** an enemy you lose sight of stays at its last known spot for 2 turns, then disappears.
 - **Your home stays visible:** both home outlines show through fog, and your own home hexes are always visible.
 - **Playback blocks orders:** while a turn plays back, you can pan, zoom, and read tooltips, but not give orders.
-- **No save slots yet:** the app keeps the match in progress and reopens it, but there's no load list. Starting a new game replaces it.
+- **No save slots yet:** the app keeps the match in progress and reopens it, but there's no load list. Opening **New game** from the menu leaves that match running. Close the screen to come back, or start a match to replace it.
 
 ## Where messages appear
 
-| *LLM-supplied taunts (in this case, Claude Opus) and strategy messages appear in the upper-right.*                                                                 | *End-of-turn updates appear in the lower-right.*                                                |
+| *LLM-supplied taunts (in this case, Claude Opus) and strategy messages appear at the top of the map, 12 px in from its right edge, and stay on the Reports tab.*                                                                 | *End-of-turn updates appear at the top of the map, 12 px in from its right edge, and stay on the Reports tab.*                                                |
 | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| ![LLM-supplied taunts (in this case, Claude Opus) and strategy messages appear in the upper-right](media/message-popup.png) | ![End-of-turn updates appear in the lower-right](media/status-popup.png) |
+| ![LLM-supplied taunts (in this case, Claude Opus) and strategy messages appear at the top of the map, 12 px in from its right edge](media/message-popup.png) | ![End-of-turn updates appear at the top of the map, 12 px in from its right edge](media/status-popup.png) |
 
-- **Lower right of the map (map toast):** Errors, rejected orders, turn-loss summaries, and unknown-battle announcements. Use the × to dismiss; it also hides after a fixed interval, and a newer message replaces it.
-- **Upper right of the map (AI strategy toast):** The opponent's Message and Strategy after a consultation. It dismisses and times out the same way.
-- **Right panel, below the Tools and Model tabs (AI activity log):** AI interaction lines and errors, including a retry, a line when opponent planning stops, and a one-line copy of each turn update. Starting a new match clears it.
+- **Top of the map, 12 px in from its right edge (map toast):** Errors, rejected orders, turn-loss summaries, and unknown-battle announcements. The gap is the same while the console is open and while it is collapsed. Use the × to dismiss; it also hides after a fixed interval, and a newer message replaces it. The Reports tab keeps every one except errors.
+- **Top of the map, above the map toast (AI strategy toast):** The opponent's Message and Strategy after a consultation, in that same place. It dismisses and times out the same way, and the Reports tab keeps it.
+- **Console, Opponent tab, at the bottom (Activity log):** AI interaction lines and errors, including a retry, a line when opponent planning stops, and a one-line copy of each turn update. Starting a new match clears it.

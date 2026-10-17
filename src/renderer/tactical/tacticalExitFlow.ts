@@ -74,7 +74,7 @@ export type TacticalBattleExitIo = {
  *
  * Contract: No-op unless planning phase is active, snapshot exists, dialog not already open, and outcome is terminal.
  * When to use: Tactical draw paths after snapshot updates that may eliminate the last sub-units on a side.
- * Expected outcome: At most one modal per annihilation beat; `io.redraw` refreshes HUD exit visibility.
+ * Expected outcome: At most one modal per annihilation beat; `io.redraw` refreshes whether Exit Battle shows.
  * Exceptions: None.
  */
 export function tacticalMaybeScheduleAnnihilationExit(session: TacticalExitSessionAccessor, io: TacticalBattleExitIo): void {

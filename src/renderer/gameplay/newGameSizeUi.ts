@@ -24,27 +24,27 @@ export function readSelectedGameSizeFromDocument(): GameSize {
 }
 
 /**
- * Writes stack-style cap numbers for the currently selected size onto the preview badges.
+ * Writes the cap for the currently selected size beside each unit type in the unit row.
  *
- * Purpose: The four tokens must match the dropdown without duplicating cap tables in HTML.
+ * Purpose: The four caps must match the dropdown without duplicating cap tables in HTML.
  * When to use: Init, select `change`, and whenever the new-game overlay is shown.
- * Expected outcome: Badge text equals `gameSizeCapPreviewRows` caps; missing nodes are skipped.
+ * Expected outcome: Each cap's text equals its `gameSizeCapPreviewRows` cap; missing nodes are skipped.
  * Exceptions: None.
  */
 export function syncGameSizeCapPreview(): void {
   const rows = gameSizeCapPreviewRows(readSelectedGameSizeFromDocument());
   for (const row of rows) {
-    const badge = document.getElementById(`new-game-size-cap-${row.unitType}`);
-    if (badge) badge.textContent = String(row.cap);
+    const capText = document.getElementById(`new-game-size-cap-${row.unitType}`);
+    if (capText) capText.textContent = String(row.cap);
   }
 }
 
 /**
  * Binds the size dropdown to the cap preview and paints the initial Small numbers.
  *
- * Purpose: Change events must update badges before Start is clicked.
+ * Purpose: Change events must update the caps before Start is clicked.
  * When to use: Once from `registerNewGameButton`.
- * Expected outcome: `change` listener installed; badges match the current select value.
+ * Expected outcome: `change` listener installed; the caps match the current select value.
  * Exceptions: None; no-op if the select is absent.
  */
 export function registerGameSizeSelect(): void {

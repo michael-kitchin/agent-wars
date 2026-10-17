@@ -89,11 +89,24 @@ interface ExtentMap {
  * Last extent applied to the maps.
  *
  * Purpose: Leaving a tactical battle restores this extent instead of the whole world.
- * When to use: Read from `restoreLoadedMapExtent` only.
+ * When to use: Read from `restoreLoadedMapExtent`, and through `loadedMapExtentTarget`.
  * Expected outcome: `'world'` until a regional snapshot is applied.
  * Exceptions: None.
  */
 let active: 'world' | MapExtentBox = 'world';
+
+/**
+ * Returns the extent last applied to the maps.
+ *
+ * Purpose: The new-game preview applies its own extent, so the camera saved for going back to a match records the
+ *   match's extent first.
+ * When to use: From `saveMainMapCameraForReturn`, before the preview loads.
+ * Expected outcome: `'world'`, or the regional box last passed to `applyLoadedMapExtent`.
+ * Exceptions: None.
+ */
+export function loadedMapExtentTarget(): 'world' | MapExtentBox {
+  return active;
+}
 
 /**
  * Skips repeat fits when the same footprint is applied again.

@@ -315,7 +315,7 @@ test('tacticalHoverSolidEdgeCapByOriginH3 holds a land stack to its slowest sub-
   assert.equal(capFor(['su-arm', 'su-inf']), 2);
 });
 
-test('formatTacticalDraftMarchPendingOrderTargetLabel reports res4 grid steps with strategic-style status', () => {
+test('formatTacticalDraftMarchPendingOrderTargetLabel reports res4 grid steps', () => {
   const a = latLngToCell(5, 5, 4);
   const b = [...gridDisk(a, 1)].find((h) => h !== a);
   assert.ok(b);
@@ -337,5 +337,5 @@ test('formatTacticalDraftMarchPendingOrderTargetLabel reports res4 grid steps wi
     ],
   };
   const label = formatTacticalDraftMarchPendingOrderTargetLabel(battle, 'su1', b!);
-  assert.match(label, /^1h \(en_route\)$/);
+  assert.match(label, /^→ \S+ · 1h$/);
 });

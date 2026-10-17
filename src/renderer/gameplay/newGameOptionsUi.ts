@@ -37,26 +37,6 @@ const NEW_GAME_BONUS_LEVEL_SELECT_IDS = {
 const NEW_GAME_START_MONTH_ID = 'new-game-start-month';
 
 /**
- * Selector for the bonus options block.
- *
- * Purpose: Its slash separators are hidden when a line wraps a slash to the edge of that line.
- * When to use: `registerNewGameOptionSeparators`.
- * Expected outcome: Matches the block in `static/index.html`. That block is two lines: Country with Tech, then Terrain with Weather.
- * Exceptions: None.
- */
-const NEW_GAME_OPTIONS_BLOCK_SELECTOR = '.game-over-options';
-
-/**
- * Class of the slash separators between the bonus dropdowns.
- *
- * Purpose: Finds the separators without depending on their position on a line.
- * When to use: `syncNewGameOptionSeparators`.
- * Expected outcome: Matches the separator spans in `static/index.html`.
- * Exceptions: None.
- */
-const NEW_GAME_OPTION_SEPARATOR_CLASS = 'game-over-options-separator';
-
-/**
  * The choices the new-game option controls contribute to the `newGame` payload.
  *
  * Contract: Fog is a flag; each bonus is a level.
@@ -154,54 +134,4 @@ export function resetNewGameOptionControls(): void {
     const select = optionSelect(id);
     if (select) select.value = DEFAULT_BONUS_LEVEL;
   }
-}
-
-/**
- * Returns true when an element shares a flex line with a separator.
- *
- * Purpose: Items on one flex line can differ in height, so the test uses the separator's vertical midpoint
- *   instead of comparing tops.
- * When to use: `syncNewGameOptionSeparators`.
- * Expected outcome: True when the midpoint falls inside the neighbor's vertical extent. A missing neighbor counts as
- *   a different line.
- * Exceptions: None.
- */
-function isOnSeparatorLine(separatorMidY: number, neighbor: Element | null): boolean {
-  if (!neighbor) return false;
-  const rect = neighbor.getBoundingClientRect();
-  return separatorMidY >= rect.top && separatorMidY <= rect.bottom;
-}
-
-/**
- * Hides each slash separator that a line wrapped to its start or end.
- *
- * Purpose: A narrow window can wrap one bonus line, and a slash left at a line edge separates nothing.
- * When to use: Through `registerNewGameOptionSeparators`, whenever the block changes size.
- * Expected outcome: A separator stays visible only when both neighbors are on its line. Hidden separators keep their
- *   space, so hiding one never re-wraps the line.
- * Exceptions: None.
- */
-function syncNewGameOptionSeparators(block: Element): void {
-  for (const separator of block.querySelectorAll<HTMLElement>(`.${NEW_GAME_OPTION_SEPARATOR_CLASS}`)) {
-    const rect = separator.getBoundingClientRect();
-    const midY = (rect.top + rect.bottom) / 2;
-    const joinsNeighbors =
-      isOnSeparatorLine(midY, separator.previousElementSibling) && isOnSeparatorLine(midY, separator.nextElementSibling);
-    separator.style.visibility = joinsNeighbors ? '' : 'hidden';
-  }
-}
-
-/**
- * Keeps each bonus line's slash in step with how that line wraps.
- *
- * Purpose: Line width depends on the window and on the region lists, which load after the dialog opens.
- * When to use: Once while the renderer is starting.
- * Expected outcome: The separators are checked now and again each time the block changes size, including when the
- *   dialog opens. A missing block or a missing `ResizeObserver` leaves every separator visible.
- * Exceptions: None.
- */
-export function registerNewGameOptionSeparators(): void {
-  const block = document.querySelector(NEW_GAME_OPTIONS_BLOCK_SELECTOR);
-  if (!block || typeof ResizeObserver === 'undefined') return;
-  new ResizeObserver(() => syncNewGameOptionSeparators(block)).observe(block);
 }

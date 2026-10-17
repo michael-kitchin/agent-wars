@@ -14,6 +14,13 @@ import {
   isWaitingForPrecomputedAiOrders,
 } from './aiPlanningState';
 import { resolveToolInvocationCountsAfterReady } from '../../shared/openRouterToolInvocationCounts';
+import { currentConsoleReportTag, recordConsoleReport } from '../chrome/consoleReports';
+import {
+  modelNameFromOptionLabel,
+  OPPONENT_STATUS_LINE_LABELS,
+  opponentPlanningStatus,
+  opponentStatusSentence,
+} from '../../shared/opponentPlanningStatus';
 
 /**
  * Defines the `formatElapsedMmSs` function shape (export function formatElapsedMmSs(ms: number): string).
@@ -31,31 +38,71 @@ export function formatElapsedMmSs(ms: number): string {
 }
 
 /**
- * Defines the `setReadyButtonLabelReady` function shape (export function setReadyButtonLabelReady(readyBtn: HTMLButtonElement): void).
-
- * Purpose: Supports maintainability by documenting why `setReadyButtonLabelReady` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Path of the check mark drawn left of "Ready", in a 16 x 16 view box.
+ *
+ * Purpose: The markup in `static/index.html` and the label rebuilt here draw the same mark.
+ * When to use: `buildReadyCheckIcon`.
+ * Expected outcome: A stroked tick in the chrome icon style.
  * Exceptions: None.
  */
-export function setReadyButtonLabelReady(readyBtn: HTMLButtonElement): void {
-  readyBtn.textContent = 'Ready';
+const READY_CHECK_ICON_PATH = 'M3 8.5l3.2 3.2L13 4.8';
+
+/**
+ * Builds the check mark icon for the Ready label.
+ *
+ * Purpose: The AI wait label replaces the button's content, so the Ready label has to be rebuilt with its icon.
+ * When to use: From `setReadyButtonLabelReady`.
+ * Expected outcome: A new `svg.chrome-icon.ready-btn-check`, hidden from assistive technology.
+ * Exceptions: None.
+ */
+function buildReadyCheckIcon(): SVGSVGElement {
+  const svgNs = 'http://www.w3.org/2000/svg';
+  const icon = document.createElementNS(svgNs, 'svg');
+  icon.setAttribute('class', 'chrome-icon ready-btn-check');
+  icon.setAttribute('viewBox', '0 0 16 16');
+  icon.setAttribute('aria-hidden', 'true');
+  const path = document.createElementNS(svgNs, 'path');
+  path.setAttribute('d', READY_CHECK_ICON_PATH);
+  icon.appendChild(path);
+  return icon;
 }
 
 /**
- * Defines the `setReadyButtonLabelAiWait` function shape (export function setReadyButtonLabelAiWait(readyBtn: HTMLButtonElement, elapsedMs: number): void).
+ * Shows the Ready label: the check mark, then the word.
+ *
+ * Purpose: Ready's label whenever opponent planning is not holding the button, enabled or disabled.
+ * When to use: From `updateReadyButtonState` whenever the AI wait label does not apply.
+ * Expected outcome: The button holds `svg.ready-btn-check` and then `span.ready-btn-label` reading "Ready". A button
+ *   that already shows the mark is left alone, so repeated refreshes do not rebuild it. The collapsed console's styles
+ *   hide the word and keep the mark.
+ * Exceptions: None.
+ */
+export function setReadyButtonLabelReady(readyBtn: HTMLButtonElement): void {
+  if (readyBtn.querySelector('.ready-btn-check')) return;
+  const label = document.createElement('span');
+  label.className = 'ready-btn-label';
+  label.textContent = 'Ready';
+  readyBtn.replaceChildren(buildReadyCheckIcon(), label);
+}
 
- * Purpose: Supports maintainability by documenting why `setReadyButtonLabelAiWait` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+/**
+ * Shows the AI wait label: "AI:" and the elapsed wait, in the button's own type.
+ *
+ * Purpose: Tells the player that Ready is waiting on opponent planning, and for how long.
+ * When to use: From `updateReadyButtonState` while opponent planning holds the button.
+ * Expected outcome: One `span.ready-btn-ai-label`, "AI: " plus MM:SS, same type, one line, one space. Collapsed, it
+ *   wraps at the space. No check mark. An existing span only updates the time.
  * Exceptions: None.
  */
 export function setReadyButtonLabelAiWait(readyBtn: HTMLButtonElement, elapsedMs: number): void {
-  readyBtn.textContent = '';
-  const strong = document.createElement('strong');
-  strong.textContent = 'AI: ';
-  readyBtn.appendChild(strong);
-  readyBtn.appendChild(document.createTextNode(formatElapsedMmSs(elapsedMs)));
+  const text = `AI: ${formatElapsedMmSs(elapsedMs)}`;
+  let label = readyBtn.querySelector<HTMLElement>('.ready-btn-ai-label');
+  if (!label) {
+    label = document.createElement('span');
+    label.className = 'ready-btn-ai-label';
+    readyBtn.replaceChildren(label);
+  }
+  if (label.textContent !== text) label.textContent = text;
 }
 
 /**
@@ -67,8 +114,10 @@ export function setReadyButtonLabelAiWait(readyBtn: HTMLButtonElement, elapsedMs
  * deferred post-resolution / post-beat consultation is outstanding (`isDeferredResolutionPlaybackConsultPending`), or
  * while `readyRequestInFlight` is true for an in-progress strategic `game:ready` / melee-resolve IPC. Runs the "AI:"
  * elapsed timer while opponent planning is outstanding: prefetch waits, and deferred consultations from their
- * playback-complete notify until their push arrives. During the playback that precedes a deferred consultation, the
- * label stays "Ready". Log lines, including error lines, never affect the timer.
+ * playback-complete notify until their push arrives, and only while Run stays on. Turning Run off returns the label
+ * to "Ready" even if that consultation has not yet reported that it stopped. During the playback that precedes a
+ * deferred consultation, the label stays "Ready". Log lines, including error lines, never affect the timer. The
+ * opponent status follows.
  * Exceptions: None.
  */
 export function updateReadyButtonState(): void {
@@ -80,8 +129,9 @@ export function updateReadyButtonState(): void {
   const tacticalAnnihilationDialogOpen = S.tacticalAnnihilationOutcomeDialog != null;
   readyBtn.disabled =
     gameOver || waitingOnAi || deferredConsult || S.readyRequestInFlight || tacticalAnnihilationDialogOpen;
+  const showAiWait = waitingOnAi || (S.runButtonOn && isDeferredResolutionConsultRunning());
 
-  if (waitingOnAi || isDeferredResolutionConsultRunning()) {
+  if (showAiWait) {
     const now = Date.now();
     if (S.readyBtnAiWaitStartTime === null) {
       S.readyBtnAiWaitStartTime = now;
@@ -100,6 +150,36 @@ export function updateReadyButtonState(): void {
     S.readyBtnAiWaitStartTime = null;
     setReadyButtonLabelReady(readyBtn);
   }
+  renderOpponentStatus();
+}
+
+/**
+ * Writes the opponent's planning status: the Opponent tab's sentence and the footer line above Ready.
+ *
+ * Purpose: Shows whether opponent planning is on, which model plans, and what this match has cost, from any tab.
+ * When to use: After Run, the opponent's wait, the selected model, or the match cost changes. `updateReadyButtonState`
+ *   and `updateOpenRouterCostLabel` call it.
+ * Expected outcome: `#opponent-status-text` reads "Opponent planning is on." or "... is off." The footer line's
+ *   `data-status` is `off`, `on`, or `planning`, with the matching label, the selected model's name (or "No model"),
+ *   and the match cost. The wait is the one Ready's "AI:" timer shows.
+ * Exceptions: None; missing elements are skipped.
+ */
+export function renderOpponentStatus(): void {
+  const status = opponentPlanningStatus(
+    S.runButtonOn,
+    isWaitingForPrecomputedAiOrders() || isDeferredResolutionConsultRunning()
+  );
+  const sentence = document.getElementById('opponent-status-text');
+  if (sentence) sentence.textContent = opponentStatusSentence(status);
+  document.getElementById('opponent-status-line')?.setAttribute('data-status', status);
+  const label = document.getElementById('opponent-status-label');
+  if (label) label.textContent = OPPONENT_STATUS_LINE_LABELS[status];
+  const modelSelect = document.getElementById('openrouter-model') as HTMLSelectElement | null;
+  const selectedOption = modelSelect && modelSelect.value ? modelSelect.selectedOptions[0] : undefined;
+  const model = document.getElementById('opponent-status-model');
+  if (model) model.textContent = modelNameFromOptionLabel(selectedOption?.textContent ?? '');
+  const cost = document.getElementById('opponent-status-cost');
+  if (cost) cost.textContent = formatOpenRouterCost(S.openRouterGameCost);
 }
 
 /**
@@ -164,19 +244,22 @@ export function formatOpenRouterCost(dollars: number): string {
  * Purpose: Supports maintainability by documenting why `updateOpenRouterCostLabel` exists.
  * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
  * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ *   The footer status line shows the same cost.
  * Exceptions: None.
  */
 export function updateOpenRouterCostLabel(): void {
   const el = document.getElementById('openrouter-cost');
   if (el) el.textContent = formatOpenRouterCost(S.openRouterGameCost);
+  renderOpponentStatus();
 }
 
 /**
- * Defines the `appendOpenRouterLog` function shape (export function appendOpenRouterLog(line: string, isError = false): void).
-
- * Purpose: Supports maintainability by documenting why `appendOpenRouterLog` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Adds one timestamped line to the AI activity log and scrolls to it.
+ *
+ * Purpose: The player reads model calls, retries, and errors in one running list.
+ * When to use: For every AI interaction or error line the renderer reports.
+ * Expected outcome: A new line with the local time and `line`, styled as an error when `isError` is true. The log
+ *   scrolls to that line while it is shown. A missing log is a no-op.
  * Exceptions: None.
  */
 export function appendOpenRouterLog(line: string, isError = false): void {
@@ -187,7 +270,20 @@ export function appendOpenRouterLog(line: string, isError = false): void {
   span.textContent = `${time} ${line}`;
   if (isError) span.className = 'chrome-error';
   el.appendChild(span);
-  el.scrollTop = el.scrollHeight;
+  scrollOpenRouterLogToEnd();
+}
+
+/**
+ * Scrolls the AI activity log to its newest line.
+ *
+ * Purpose: A line added while the log is hidden cannot scroll it, so the log is scrolled again when it is shown.
+ * When to use: After a line is appended, and each time the console's Opponent tab is shown.
+ * Expected outcome: `#openrouter-log` shows its last line. A missing log is a no-op; a hidden log keeps its position.
+ * Exceptions: None.
+ */
+export function scrollOpenRouterLogToEnd(): void {
+  const el = document.getElementById('openrouter-log');
+  if (el) el.scrollTop = el.scrollHeight;
 }
 
 /**
@@ -232,6 +328,16 @@ export type MapToastOptions = {
    * Exceptions: None.
    */
   readonly unitOriginByDisplayName?: ReadonlyMap<string, LossFlagIdentity>;
+  /**
+   * How the Reports tab files this toast.
+   *
+   * Contract: Read only when `isError` is false; error toasts are never filed.
+   * When to use: Pass `{ kind: 'turn', tag }` for a turn or beat update, with the tag of the turn or beat it reports
+   *   on. Pass a notice with a tag to file a notice under a turn other than the current one.
+   * Expected outcome: Omitted, an informational toast is filed as a Notice tagged with the current turn or beat.
+   * Exceptions: None.
+   */
+  readonly report?: { readonly kind: 'turn' | 'notice'; readonly tag: string };
 };
 
 /**
@@ -338,12 +444,13 @@ function showToast(
 }
 
 /**
- * Shows the lower-right map toast with a sectioned, bulleted message, replacing any toast already shown.
+ * Shows the map toast with a sectioned, bulleted message, replacing any toast already shown.
  *
  * Purpose: The single entry point for turn updates, validation messages, and other map notices.
  * When to use: Whenever the player needs a transient notice on the map.
  * Expected outcome: The toast shows `message` (see `appendMapToastMessageBody`) and hides after the standard
- *   duration. `options.unitOriginByDisplayName` adds flags before named loss victims.
+ *   duration. `options.unitOriginByDisplayName` adds flags before named loss victims. An informational toast
+ *   (`isError: false`) is also filed on the Reports tab, as `options.report` says.
  * Exceptions: None.
  */
 export function showMapToast(message: string, options?: MapToastOptions): void {
@@ -362,6 +469,9 @@ export function showMapToast(message: string, options?: MapToastOptions): void {
       },
       options?.isError === false
     );
+    if (options?.isError === false) {
+      recordConsoleReport(options.report?.kind ?? 'notice', options.report?.tag ?? currentConsoleReportTag(), textEl);
+    }
   }
   S.toastHideTimer = setTimeout(() => {
     S.toastHideTimer = null;
@@ -387,11 +497,13 @@ export function hideMapToast(): void {
 }
 
 /**
- * Shows the upper-right toast with Message then Strategy sections, or hides it when both are empty.
+ * Shows the AI strategy toast with Message then Strategy sections, or hides it when both are empty.
  *
  * Purpose: Surfaces the opponent's taunt/threat and plan summary after consultation.
  * When to use: After Ready, tactical commit, deferred consult push, or tactical prefetch.
- * Expected outcome: Bold section titles matching the lower-right toast; plain (non-bulleted) body text; empty sections omitted; both empty hides a stale toast.
+ * Expected outcome: Bold section titles matching the map toast; plain (non-bulleted) body text; empty sections
+ *   omitted; both empty hides a stale toast. A shown toast is also filed on the Reports tab as a Message tagged with
+ *   the current turn or beat.
  * Exceptions: None.
  */
 export function showAiStrategyToast(content: AiStrategyToastFields): void {
@@ -422,6 +534,7 @@ export function showAiStrategyToast(content: AiStrategyToastFields): void {
       },
       true
     );
+    recordConsoleReport('message', currentConsoleReportTag(), textEl);
   }
   S.aiStrategyToastHideTimer = setTimeout(() => {
     S.aiStrategyToastHideTimer = null;
@@ -447,7 +560,7 @@ export function hideAiStrategyToast(): void {
 }
 
 /**
- * Dismisses the lower-right map toast and upper-right AI strategy toast together.
+ * Dismisses the map toast and the AI strategy toast together.
  *
  * Purpose: Gives planning entry points one call that clears both chrome toasts without
  * suppressing later `showMapToast` / `showAiStrategyToast` traffic.

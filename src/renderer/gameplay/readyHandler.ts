@@ -1,4 +1,5 @@
 import type { GameReadyIpcPayload, GameStateSnapshot } from '../../shared/ipcTypes';
+import { currentConsoleReportTag } from '../chrome/consoleReports';
 import type { MeleeInterceptModalOutcome } from './meleeInterceptModal';
 import { readTacticalBattlesInterceptPromptEnabled } from './tacticalBattlePromptPreference';
 import type { ResolutionMove } from '../core/types';
@@ -12,6 +13,7 @@ import {
 import { applyToolInvocationCountsAfterReady } from '../openRouter/openRouterUiHelpers';
 
 import { currentRendererMatchEpoch, rendererMatchEpochCurrent } from '../core/matchEpoch';
+import { ordersHeldUntilMovementEnds } from '../../shared/ordersHeldForPlayback';
 import type { ReadyHandlerDeps } from './readyHandlerTypes';
 import { rollbackReadyToolCounts, runTacticalReadyCommit } from './readyTacticalCommit';
 import {
@@ -139,6 +141,8 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
       cachedPrecomputedToolCountsAtReadyStart,
       matchEpoch,
     })) return;
+    // The turn this Ready resolves; its reports are filed under it after the snapshot moves on to the next turn.
+    const turnReportTag = currentConsoleReportTag();
     const hasPendingDraftOrders =
       S.pendingRangedAttacks.length > 0 ||
       S.pendingAirStrikes.length > 0 ||
@@ -258,7 +262,10 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
     }
     if (readyResult.aiConsulted === false) {
       deps.appendOpenRouterLog('AI executing standing orders (no event fired).');
-      deps.showMapToast('AI: standing orders only (no consultation).', { isError: false });
+      deps.showMapToast('AI: standing orders only (no consultation).', {
+        isError: false,
+        report: { kind: 'notice', tag: turnReportTag },
+      });
     }
 
     const hasRanged =
@@ -296,6 +303,7 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
     }
     if (needsAnimation) {
       if (S.resolutionMoveAnimationFrameId !== null) cancelAnimationFrame(S.resolutionMoveAnimationFrameId);
+      const marchArrowsUntilMovementEnds = ordersHeldUntilMovementEnds(S.humanStandingOrders, state.units, humanMoves);
       S.resolutionMoveAnimation = {
         moves: resolutionMoves,
         airStrikeOutboundMoves: airStrikeOutboundMoves.length > 0 ? airStrikeOutboundMoves : undefined,
@@ -320,6 +328,7 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
         meleeRemovedUnits: readyResult.meleeRemovedUnits?.length ? readyResult.meleeRemovedUnits : undefined,
         unknownCombatHexes: unknownCombatHexes.length > 0 ? unknownCombatHexes : undefined,
         unknownCasualtyHexes: unknownCasualtyHexes.length > 0 ? unknownCasualtyHexes : undefined,
+        ...(marchArrowsUntilMovementEnds.orders.length > 0 ? { marchArrowsUntilMovementEnds } : {}),
         ...pickPlaybackDiceRolls(readyResult, {
           visibleHexesBeforeTurn,
           visibleHexesAfterTurn: visibleHexes,
@@ -337,6 +346,7 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
           readySlice: readyResult,
           visibility,
           killToastFormatter,
+          reportTag: turnReportTag,
         },
         deps
       );

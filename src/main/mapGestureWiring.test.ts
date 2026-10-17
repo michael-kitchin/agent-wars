@@ -149,8 +149,13 @@ function testRightClickClearsSelectionWithoutIconException(): void {
   const listenerSource = interactionsSource.slice(listenerStart, listenerEnd);
 
   assert.ok(
-    listenerSource.includes('clearMapSelectionChrome()'),
-    'right-click should clear selection chrome through the shared helper'
+    listenerSource.includes('clearSelectionLikeRightClick(deps)'),
+    'right-click should clear the selection through the shared right-click helper'
+  );
+  const rightClickHelper = getFunctionSource(readRendererSource('map', 'mapClickSelectionPolicy.ts'), 'clearSelectionLikeRightClick');
+  assert.ok(
+    rightClickHelper.includes('clearMapSelectionChrome()'),
+    'the shared right-click helper should clear selection chrome through the shared helper'
   );
   assert.ok(
     !listenerSource.includes('pointerHitsDrawnUnitIcon'),

@@ -234,6 +234,50 @@ export function planTacticalMarch(args: TacticalMarchPlanArgs): TacticalMarchPla
 }
 
 /**
+ * Returns the unreachable march result used when no legal path exists.
+ *
+ * Purpose: Land and naval planning share one `no_path` object so the two copies cannot drift.
+ * When to use: Only when `planTacticalMarchWithoutTerrainBonus` has no legal land or naval path.
+ * Expected outcome: `reachable: false`, an infinite cost, and a first stop on `fromH3`.
+ * Exceptions: None. Do not use this for air or for a cell outside the footprint.
+ */
+function unreachedTacticalMarch(fromH3: string): TacticalMarchPlanResult {
+  return {
+    reachable: false,
+    reachableThisTurn: false,
+    totalCostToDestination: Infinity,
+    pathToDestination: null,
+    firstStopWithinBudget: { stopH3: fromH3, consumedFullPath: false },
+    failureReason: 'no_path',
+  };
+}
+
+/**
+ * Walks a path until the next step would exceed the movement-point budget.
+ *
+ * Purpose: Land and naval plans share the cumulative stop, then each caller applies the one-hex minimum.
+ * When to use: After a path of at least two cells is known.
+ * Expected outcome: `{ ok: true, stopIdx }` before `stopIdxWithMinimumOneHexProgress`, or `{ ok: false }` when a step cost is not finite.
+ * Exceptions: None.
+ */
+function firstStopIndexWithinBudget(
+  path: readonly string[],
+  movementPointBudget: number,
+  stepCostAt: (index: number) => number
+): { ok: true; stopIdx: number } | { ok: false } {
+  let cum = 0;
+  let stopIdx = 0;
+  for (let i = 1; i < path.length; i++) {
+    const stepCost = stepCostAt(i);
+    if (!Number.isFinite(stepCost)) return { ok: false };
+    if (cum + stepCost > movementPointBudget) break;
+    cum += stepCost;
+    stopIdx = i;
+  }
+  return { ok: true, stopIdx };
+}
+
+/**
  * Computes today's least movement-point plan, with no terrain-bonus stops.
  *
  * Purpose: The planner as it was before terrain-bonus movement, kept intact so that rule can only add a faster route.
@@ -289,21 +333,12 @@ function planTacticalMarchWithoutTerrainBonus(args: TacticalMarchPlanArgs): Tact
       weatherTags: args.weatherTags,
     });
     if (!landResult) {
-      return {
-        reachable: false,
-        reachableThisTurn: false,
-        totalCostToDestination: Infinity,
-        pathToDestination: null,
-        firstStopWithinBudget: { stopH3: fromH3, consumedFullPath: false },
-        failureReason: 'no_path',
-      };
+      return unreachedTacticalMarch(fromH3);
     }
     const { path, totalCost: total } = landResult;
-    let cum = 0;
-    let stopIdx = 0;
-    for (let i = 1; i < path.length; i++) {
+    const walked = firstStopIndexWithinBudget(path, movementPointBudget, (i) => {
       const prevOfFrom = i >= 2 ? path[i - 2]! : null;
-      const stepCost = landInfantryArmorEnterCost({
+      return landInfantryArmorEnterCost({
         toH3: path[i]!,
         unitTypeForMovement,
         terrain,
@@ -316,22 +351,10 @@ function planTacticalMarchWithoutTerrainBonus(args: TacticalMarchPlanArgs): Tact
         weather: args.weather,
         weatherTags: args.weatherTags,
       });
-      if (!Number.isFinite(stepCost)) {
-        return {
-          reachable: false,
-          reachableThisTurn: false,
-          totalCostToDestination: Infinity,
-          pathToDestination: null,
-          firstStopWithinBudget: { stopH3: fromH3, consumedFullPath: false },
-          failureReason: 'no_path',
-        };
-      }
-      if (cum + stepCost > movementPointBudget) break;
-      cum += stepCost;
-      stopIdx = i;
-    }
-    stopIdx = stopIdxWithMinimumOneHexProgress({
-      stopIdx,
+    });
+    if (!walked.ok) return unreachedTacticalMarch(fromH3);
+    const stopIdx = stopIdxWithMinimumOneHexProgress({
+      stopIdx: walked.stopIdx,
       pathLength: path.length,
       movementPointBudget,
     });
@@ -376,50 +399,22 @@ function planTacticalMarchWithoutTerrainBonus(args: TacticalMarchPlanArgs): Tact
   }
   const totalNaval = dist.get(toH3);
   if (totalNaval === undefined || !Number.isFinite(totalNaval)) {
-    return {
-      reachable: false,
-      reachableThisTurn: false,
-      totalCostToDestination: Infinity,
-      pathToDestination: null,
-      firstStopWithinBudget: { stopH3: fromH3, consumedFullPath: false },
-      failureReason: 'no_path',
-    };
+    return unreachedTacticalMarch(fromH3);
   }
   const path = reconstructPath(parent, fromH3, toH3);
   if (!path || path.length < 2) {
-    return {
-      reachable: false,
-      reachableThisTurn: false,
-      totalCostToDestination: Infinity,
-      pathToDestination: null,
-      firstStopWithinBudget: { stopH3: fromH3, consumedFullPath: false },
-      failureReason: 'no_path',
-    };
+    return unreachedTacticalMarch(fromH3);
   }
-  let cum = 0;
-  let stopIdx = 0;
-  for (let i = 1; i < path.length; i++) {
-    const stepCost = enterCostForHex(path[i]!, unitTypeForMovement, terrain, path[i - 1]!, {
+  const walked = firstStopIndexWithinBudget(path, movementPointBudget, (i) =>
+    enterCostForHex(path[i]!, unitTypeForMovement, terrain, path[i - 1]!, {
       weatherEnabled: args.weatherEnabled,
       weather: args.weather,
       weatherTags: args.weatherTags,
-    });
-    if (!Number.isFinite(stepCost)) {
-      return {
-        reachable: false,
-        reachableThisTurn: false,
-        totalCostToDestination: Infinity,
-        pathToDestination: null,
-        firstStopWithinBudget: { stopH3: fromH3, consumedFullPath: false },
-        failureReason: 'no_path',
-      };
-    }
-    if (cum + stepCost > movementPointBudget) break;
-    cum += stepCost;
-    stopIdx = i;
-  }
-  stopIdx = stopIdxWithMinimumOneHexProgress({
-    stopIdx,
+    })
+  );
+  if (!walked.ok) return unreachedTacticalMarch(fromH3);
+  const stopIdx = stopIdxWithMinimumOneHexProgress({
+    stopIdx: walked.stopIdx,
     pathLength: path.length,
     movementPointBudget,
   });

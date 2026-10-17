@@ -4,13 +4,13 @@ import { HEX_DETAILS_TOOLTIP_DELAY_MS, TOOLTIP_OFFSET_PX } from '../core/constan
  * Options for attaching the selected-model description tooltip to a `<select>`.
 
  * Purpose: Keeps wiring small and testable without reaching into OpenRouter control state.
- * When to use: Construct once when the Model tab select is available.
+ * When to use: Construct once when the Opponent tab's model dropdown is available.
  * Expected outcome: Tooltip shows trimmed descriptions after the hex-details dwell delay.
  * Exceptions: None.
  */
 export type ModelDescriptionTooltipOptions = {
   /**
-   * The Model-tab `<select>` that owns the hover dwell behavior.
+   * The Opponent-tab `<select>` that owns the hover dwell behavior.
 
    * Contract: Closed-control target only; native open-list options are not individually tipped.
    * When to use: Pass `#openrouter-model`.
@@ -33,7 +33,7 @@ export type ModelDescriptionTooltipOptions = {
  * Controller returned by `attachModelDescriptionTooltip`.
 
  * Purpose: Lets callers clear the tip on model refresh or teardown.
- * When to use: From OpenRouter Model-tab control wiring.
+ * When to use: From OpenRouter Opponent-tab control wiring.
  * Expected outcome: `clear` hides the tip and cancels any pending dwell timer.
  * Exceptions: None.
  */
@@ -115,7 +115,7 @@ function keyOpensNativeList(ev: KeyboardEvent): boolean {
  * Attaches hex-style delayed description tooltip behavior to the model select.
 
  * Purpose: Shows the selected model’s OpenRouter description after the same dwell as hex details.
- * When to use: Once during Model-tab control initialization.
+ * When to use: Once during Opponent-tab control initialization.
  * Expected outcome: Tip appears after the hex-details dwell on the closed select; suppressed while the native list is open.
  * Exceptions: None.
  */

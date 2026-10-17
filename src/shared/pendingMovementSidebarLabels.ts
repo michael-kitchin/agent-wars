@@ -1,44 +1,41 @@
 /**
- * Shared formatting for human pending movement rows in sidebars (strategic standing orders + tactical drafts).
+ * Lines for pending movement rows: strategic standing orders and tactical march drafts.
  *
- * Purpose: Keeps `Nh (status)` label contracts identical across modes; tactical uses tactical grid step counts for `N`.
- * When to use: Pending orders list rendering for strategic `HumanStandingOrderSnapshot` rows and tactical draft rows.
- * Expected outcome: Stable, parse-friendly labels suitable for sidebar rows and tests.
- * Exceptions: None for `formatPendingMovementSidebarTargetLabel`; distance helpers catch H3 failures when noted.
+ * Purpose: Both kinds of movement row name the destination hex and the hex steps the same way as every other order row.
+ * When to use: Rendering the Movement group of the Orders tab and the order chips of the selection panel.
+ * Expected outcome: Lines such as `→ E5 · 3h`, built by `formatOrderRowDetail`.
+ * Exceptions: None; an unknown code or distance shows a question mark.
  */
 
 import { gridDistance } from 'h3-js';
+import { formatOrderRowDetail } from './orderRowDetail';
+import { orderTargetHexCode } from './orderTargetHexCode';
 import type { TacticalBattleSnapshot } from './tacticalBattleTypes';
 
 /**
- * Default march `status` string shown for tactical draft rows, aligned with strategic `listHumanStandingOrders` defaulting.
+ * Formats the line for a strategic standing movement order.
  *
- * Purpose: Mirrors `String(o.status ?? 'en_route')` behavior for persisted strategic march rows when no status exists.
- * When to use: Tactical pending march draft sidebar labels until drafts are represented in the same persistence layer.
- * Expected outcome: Literal `en_route` token for display consistency with default strategic march orders.
+ * Purpose: One formatter for every strategic march row.
+ * When to use: Strategic rows of the Movement group, with the hex steps the route has left.
+ * Expected outcome: `→ <destination code> · <steps>h`. A missing destination shows `?`.
  * Exceptions: None.
  */
-export const TACTICAL_DRAFT_MARCH_DISPLAY_STATUS = 'en_route';
-
-/**
- * Formats the right-hand side of a pending movement sidebar row as `Nh (status)`.
- *
- * Purpose: Single formatter for both strategic and tactical pending movement distance + status display.
- * When to use: Any sidebar row that mirrors `formatPendingOrderSidebarLabel` target shape.
- * Expected outcome: Non-negative integer `N` with the provided status string parenthesized.
- * Exceptions: None.
- */
-export function formatPendingMovementSidebarTargetLabel(distanceHexSteps: number, orderStatus: string): string {
-  return `${distanceHexSteps}h (${orderStatus})`;
+export function formatPendingMovementSidebarTargetLabel(destinationH3Index: string | null, distanceHexSteps: number): string {
+  return formatOrderRowDetail({
+    targetCode: orderTargetHexCode(destinationH3Index, null),
+    distanceHexes: distanceHexSteps,
+    note: null,
+  });
 }
 
 /**
- * Builds the tactical draft march pending-order target label using tactical `gridDistance` and the shared status token.
+ * Formats the line for a tactical march draft, using battle cell codes and battle grid steps.
  *
- * Purpose: Replaces ad-hoc tactical-only label builders with the same contract as strategic pending movement rows.
- * When to use: Tactical battle snapshot active and `S.tacticalPendingMarches` rows are rendered.
- * Expected outcome: `0h (en_route)` when the sub-unit row is missing; otherwise tactical step count to destination.
- * Exceptions: Invalid H3 indexes fall back to `0h (en_route)` without throwing.
+ * Purpose: Battle marches read like world-map marches, with the destination cell's code.
+ * When to use: While a battle is active, for each row of `tacticalPendingMarches`.
+ * Expected outcome: `→ <battle cell code> · <steps>h`. The steps are `?` when the sub-unit is missing or the
+ *   destination is not a valid cell.
+ * Exceptions: None; H3 errors are caught.
  */
 export function formatTacticalDraftMarchPendingOrderTargetLabel(
   battle: TacticalBattleSnapshot,
@@ -46,11 +43,17 @@ export function formatTacticalDraftMarchPendingOrderTargetLabel(
   destinationH3Index: string
 ): string {
   const origin = battle.subUnits.find((u) => u.id === subUnitId)?.h3Index;
-  if (!origin) return formatPendingMovementSidebarTargetLabel(0, TACTICAL_DRAFT_MARCH_DISPLAY_STATUS);
-  try {
-    const steps = gridDistance(origin, destinationH3Index);
-    return formatPendingMovementSidebarTargetLabel(steps, TACTICAL_DRAFT_MARCH_DISPLAY_STATUS);
-  } catch {
-    return formatPendingMovementSidebarTargetLabel(0, TACTICAL_DRAFT_MARCH_DISPLAY_STATUS);
+  let steps: number | null = null;
+  if (origin) {
+    try {
+      steps = gridDistance(origin, destinationH3Index);
+    } catch {
+      steps = null;
+    }
   }
+  return formatOrderRowDetail({
+    targetCode: orderTargetHexCode(destinationH3Index, battle),
+    distanceHexes: steps,
+    note: null,
+  });
 }

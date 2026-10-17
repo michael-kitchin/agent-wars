@@ -99,7 +99,7 @@ In battle the memory, standing-order, and production groups are **always** off r
 
 ### 2.6 Model without tool support
 
-When the selected model's OpenRouter listing reports `supported_parameters` without `tools`, the enabled tool-name set is emptied before any surface is built, whatever the Tools tab says. The prompt therefore follows rows 2.1 through 2.4 together, the tool list is empty, and the requests carry neither `tools` nor `tool_choice`. The strategic Commander briefing is still attached, as it is for every strategic consultation, and the consultation policy in section 6 is unchanged. A model missing from the cached list, or listed without `supported_parameters`, is treated as supporting tools.
+When the selected model's OpenRouter listing reports `supported_parameters` without `tools`, the enabled tool-name set is emptied before any surface is built, whatever the Opponent tab's tool groups say. The prompt therefore follows rows 2.1 through 2.4 together, the tool list is empty, and the requests carry neither `tools` nor `tool_choice`. The strategic Commander briefing is still attached, as it is for every strategic consultation, and the consultation policy in section 6 is unchanged. A model missing from the cached list, or listed without `supported_parameters`, is treated as supporting tools.
 
 ## 3. Roster composition
 

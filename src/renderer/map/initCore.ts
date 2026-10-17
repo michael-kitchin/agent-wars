@@ -2,6 +2,7 @@ import type { GameStateSnapshot } from '../../shared/ipcTypes';
 import { selectionSupportButtonMode } from '../../shared/selectionSupportButtonMode';
 import { panBindingToDirection, panPhysicalKeyId } from '../../shared/mapKeyboardPanLogic';
 import { clearMapKeyboardPan, mapPanKeyDown, mapPanKeyUp } from './mapKeyboardPan';
+import { observeMapContainerResize } from './mapContainerResize';
 import { isEditableKeyboardTarget, shouldIgnoreGlobalKeydown } from './mapHelpers';
 import { rendererSharedState as S } from '../core/state';
 import { hidePlanningChromeToasts } from '../openRouter/openRouterUiHelpers';
@@ -18,6 +19,8 @@ import { clearOrderEffectsTooltipDwell, hideOrderSlowerHexTooltip } from './orde
 import { resumeHexTooltipDwellAfterAimingEnds } from './mainMapInteractions';
 import { getMainLeafletMap, initWorldLeafletMaps, setMainBasemapByProviderId, setMainBasemapFilter } from './worldLeafletMap';
 import { installControlTooltip } from '../chrome/controlTooltip';
+import { layoutMapChrome } from './mapChromeLayout';
+import { wireMapModeTabs } from './mapModeTabs';
 
 /**
  * Documents the `InitCoreDeps` interface as a named contract surface (interface InitCoreDeps).
@@ -369,6 +372,8 @@ export function wireInitCore(deps: InitCoreDeps): void {
         },
       });
     }
+    wireMapModeTabs(() => deps.requestRedraw());
+    layoutMapChrome();
   } catch (err) {
     console.error('Map init failed:', err);
   }
@@ -382,12 +387,13 @@ export function wireInitCore(deps: InitCoreDeps): void {
   deps.initNewGameButton();
   deps.updateReadyButtonState();
 
+  // The reticle is a toggle: a click while a ranged attack or an air strike is aimed stops aiming, and otherwise starts
+  // aiming the attack the selection can make.
   document.getElementById('ranged-attack-btn')?.addEventListener('click', () => {
-    if (S.airStrikeModeActive) {
+    if (S.airStrikeModeActive || S.rangedModeActive) {
       S.airStrikeModeActive = false;
-      void deps.refreshHoverRoutePreview();
-    } else if (S.rangedModeActive) {
       S.rangedModeActive = false;
+      hideOrderSlowerHexTooltip();
       void deps.refreshHoverRoutePreview();
     } else if (S.selectedUnitIds.length > 0 && S.gameState) {
       const state = S.gameState;
@@ -420,13 +426,6 @@ export function wireInitCore(deps: InitCoreDeps): void {
       S.airStrikeTargetType = value;
     }
   });
-  document.getElementById('air-strike-cancel-btn')?.addEventListener('click', () => {
-    S.airStrikeModeActive = false;
-    hideOrderSlowerHexTooltip();
-    void deps.refreshHoverRoutePreview();
-    deps.updateRangedSidebar();
-    deps.redraw();
-  });
 
   if (window.gameApi) {
     window.gameApi
@@ -449,8 +448,9 @@ export function wireInitCore(deps: InitCoreDeps): void {
     });
   }
 
-  window.addEventListener('resize', () => {
+  observeMapContainerResize(() => {
     deps.resizeAndRedraw();
+    layoutMapChrome();
   });
   window.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
@@ -525,7 +525,8 @@ export function wireInitCore(deps: InitCoreDeps): void {
     dismissTerrainTooltipWhenPointerLeavesMapPanel(deps);
     S.shiftKeyActive = false;
     deps.applyModifierDrivenPopoverCloseRules('window_blur');
-    if (!deps.isMapInspectionModeHeld()) return;
+    // The held key is separate from the Tech view. Blur releases the key only; a latched Tech view stays.
+    if (!S.hideTerrainFillWhileHeld) return;
     S.hideTerrainFillWhileHeld = false;
     deps.requestRedraw();
   });
@@ -617,19 +618,21 @@ export function wireInitCore(deps: InitCoreDeps): void {
 
   const canvasContainer = document.getElementById('canvas-container');
   /**
-   * Dismisses map hover tooltip state when the pointer enters the fixed sidebar.
+   * Dismisses map hover tooltip state when the pointer enters the console, the top bar, the game menu, or the
+   * selection panel.
    *
-   * Purpose: `#hex-tooltip` uses `position: fixed` with a higher z-index than `#sidebar`, so the tooltip can
-   * paint over the panel while the pointer is already over sidebar targets; `pointerleave` on `#main-map`
+   * Purpose: `#hex-tooltip` uses `position: fixed` with a higher z-index than that chrome, so the tooltip can
+   * paint over it while the pointer is already over its controls; `pointerleave` on `#main-map`
    * may not correlate with that visual in all paths (especially after tactical hover fixes).
-   * When to use: Wired once at init; runs on every `pointerenter` into the primary right-hand UI column.
+   * When to use: Wired once at init; runs on every `pointerenter` into that chrome.
    * Expected outcome: Tooltip timer cleared, `#hex-tooltip` hidden, and map hover preview state cleared.
    * Exceptions: None.
    */
-  const sidebarPanel = document.getElementById('sidebar');
-  sidebarPanel?.addEventListener('pointerenter', () => {
-    dismissTerrainTooltipWhenPointerLeavesMapPanel(deps);
-  });
+  for (const chromeId of ['sidebar', 'app-topbar', 'game-menu', 'selection-panel']) {
+    document.getElementById(chromeId)?.addEventListener('pointerenter', () => {
+      dismissTerrainTooltipWhenPointerLeavesMapPanel(deps);
+    });
+  }
   canvasContainer?.addEventListener('pointermove', (e) => {
     deps.updateMapInteractionCursor(e.clientX, e.clientY);
   });

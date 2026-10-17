@@ -16,7 +16,7 @@ import {
 } from './gameRuleText';
 import type { CoachingGates } from './coachingGates';
 import { MESSAGE_BLOCK, MESSAGE_DISCIPLINE_BULLET, STRATEGY_BLOCK } from './coachingTextStrategic';
-import { buildOptionCopyMappingClause } from './optionCopyText';
+import { buildOptionCopyOrRoutingBullet } from './optionCopyText';
 
 /**
  * Engage-priority, doctrine, and message guidance for the tactical context block.
@@ -46,7 +46,7 @@ export function buildTacticalCoachingBullets(gates: CoachingGates): readonly str
   const bullets: string[] = [
     tempoBullet(gates.hasAirUnits),
     STANDING_ORDERS_INERT_BULLET,
-    optionCopyOrRoutingBullet(gates),
+    buildOptionCopyOrRoutingBullet(gates, 'this-beat', 'sub-unit'),
     REACH_BULLET,
     INFANTRY_REACH_BULLET,
   ];
@@ -162,31 +162,3 @@ const CALLBACK_BULLET =
 const UNCONSULTED_BEAT_BULLET =
   '- The model is consulted when a subscribed event fires or when the engine forces a consultation; a beat it is not consulted for is a beat in which its sub-units issued nothing.';
 
-/**
- * Copy listed option rows, or send the model to the routing tool.
- *
- * Purpose: Same no-options failure mode as strategic, with sub-unit wording.
- * When to use: Tactical option-copy item.
- * Expected outcome: Copy-row wording when the table exists; otherwise the routing tool when planning is on.
- * Exceptions: None.
- */
-function optionCopyOrRoutingBullet(gates: CoachingGates): string {
-  if (gates.hasBestOptionsTable) {
-    const routing = gates.planningEnabled
-      ? ' Call plan_route only for a destination the table does not list for that sub-unit.'
-      : '';
-    return (
-      '- Best Options This Turn Target Hexes are already this-beat legal destinations. ' +
-      buildOptionCopyMappingClause({
-        actorNoun: 'sub-unit',
-        hasAirUnits: gates.hasAirUnits,
-        includeFerryMapping: gates.hasAirUnits,
-      }) +
-      routing
-    );
-  }
-  if (gates.planningEnabled) {
-    return '- No options are listed this period. Destinations must come from the routing tool, not from an absent options table.';
-  }
-  return '- No options are listed this period. Destinations come only from the adjacent-cell listing; the sub-unit\'s own cell means hold.';
-}

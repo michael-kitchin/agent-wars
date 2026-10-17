@@ -1,0 +1,385 @@
+/* The new-game screen. While the new-game overlay is open, the top bar becomes the new-game bar, and the setup panel
+   floats over the map's top-left corner, with the map preview under and around it. The panel's header bar holds the
+   expand control, the message, and, while a match waits under the screen, the close control. The body holds the Map,
+   Forces, and Rules sections and scrolls, and the footer holds Start game. Hiding the choices leaves the header bar, with
+   Start in place of the message. The grip on the panel's top-right corner moves it. */
+
+/* ---------- New-game bar ---------- */
+/* While the new-game overlay is open, the bar shows only the menu button, the title "New game", Load game…, Settings,
+   and Help. The overlay's `hidden` class switches it, so the bar follows the overlay however it opens or closes,
+   including from a battle. */
+body:not(:has(#game-over-overlay:not(.hidden))) #app-topbar .new-game-only,
+body:has(#game-over-overlay:not(.hidden)) #app-topbar .topbar-sides,
+body:has(#game-over-overlay:not(.hidden)) #app-topbar .topbar-stat,
+body:has(#game-over-overlay:not(.hidden)) #app-topbar .topbar-date-block,
+body:has(#game-over-overlay:not(.hidden)) #app-topbar .battle-header-only {
+  display: none;
+}
+body:has(#game-over-overlay:not(.hidden)) #app-topbar .topbar-spacer {
+  display: block;
+}
+body:has(#game-over-overlay:not(.hidden)) #app-topbar.topbar-battle {
+  background: var(--chrome-bg-deep);
+  border-bottom-color: var(--chrome-border);
+}
+.topbar-new-game-title {
+  display: flex;
+  align-items: center;
+  flex: none;
+  padding: 0 16px;
+  font-size: 15px;
+  font-weight: 600;
+}
+/* Load game…, a disabled placeholder that names itself beside its icon. */
+.topbar-text-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 100%;
+  padding: 0 16px;
+  border: 0;
+  border-left: 1px solid var(--chrome-divider);
+  border-radius: 0;
+  background: transparent;
+  color: var(--chrome-text);
+  font-size: 13px;
+  font-weight: 500;
+}
+/* Keeps the divider: the shared disabled-button rule would recolor it. */
+.topbar-text-btn:disabled {
+  background: transparent;
+  color: var(--chrome-disabled);
+  border-color: var(--chrome-divider);
+}
+
+/* ---------- Panel ---------- */
+/* A floating panel 12 px in from the map's top-left corner, in the selection panel's chrome. It is as tall as its
+   content, up to the map's height less both insets, and the body scrolls past that. newGameDialogMove.ts writes inline
+   `left` and `top` once the player drags the grip, and clears them each time the overlay opens. */
+.new-game-panel {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 7002;
+  width: var(--new-game-panel-width);
+  max-width: calc(100% - 24px);
+  max-height: calc(100% - 24px);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--chrome-bg);
+  color: var(--chrome-text);
+  color-scheme: dark;
+  border: 1px solid var(--chrome-border);
+  border-radius: 6px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+}
+.new-game-panel.hidden {
+  display: none;
+}
+/* Compact is the header bar alone, with Start in it and the message hidden. The body and the footer show in every
+   other state, including during a slide, and Start is in the footer then. */
+.new-game-panel[data-state="compact"] .new-game-panel-body,
+.new-game-panel[data-state="compact"] .new-game-panel-footer {
+  display: none;
+}
+/* One 50 px bar, the selection bar's height. While compact its bottom border is removed, so the 50 px is all content
+   and the panel's own border is the bar's edge. */
+.new-game-panel-header {
+  flex: none;
+  height: 50px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0;
+  border-bottom: 1px solid var(--chrome-border);
+}
+.new-game-panel[data-state="compact"] .new-game-panel-header {
+  border-bottom-width: 0;
+  gap: 0;
+}
+.new-game-panel[data-state="compact"] #game-over-message {
+  display: none;
+}
+/* The same Start button, filling the header while the choices are hidden. 6 px from the expand control, from the
+   close control or the bar's right edge, and from the top and bottom of the 50 px bar. `align-self: stretch` and
+   `height: auto` are both required: the header centers its items, and the footer's `#new-game-btn` rule sets a fixed
+   height, which would stop the stretch. This rule is the more specific of the two. */
+.new-game-panel-header #new-game-btn {
+  flex: 1 1 auto;
+  align-self: stretch;
+  width: auto;
+  min-width: 0;
+  height: auto;
+  margin: 6px;
+}
+#game-over-message {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0 10px 0 0;
+  overflow: hidden;
+  font-size: 15px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* The end controls, like the selection panel's: full-height 32 px columns with a divider on the inner side, expand at
+   the bar's left edge and close at its right edge. Close shows only while a match waits under the screen. The chevron
+   points down while the choices are hidden and turns up while they show. */
+.new-game-panel-expand,
+.new-game-panel-close {
+  flex: none;
+  align-self: stretch;
+  width: 32px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--chrome-text);
+}
+.new-game-panel-expand {
+  border-right: 1px solid var(--chrome-divider);
+}
+.new-game-panel-close {
+  border-left: 1px solid var(--chrome-divider);
+}
+.new-game-panel-close[hidden] {
+  display: none;
+}
+.new-game-panel-expand:hover,
+.new-game-panel-close:hover {
+  background: var(--chrome-bg-raised);
+}
+.new-game-panel-expand:focus,
+.new-game-panel-close:focus {
+  outline-offset: -2px;
+}
+/* The close control's divider separates it from the message, so the message needs no margin of its own then. */
+#game-over-message:has(+ .new-game-panel-close:not([hidden])) {
+  margin-right: 0;
+}
+.new-game-panel[data-state="expanded"] .new-game-panel-chevron,
+.new-game-panel[data-state="collapsing"] .new-game-panel-chevron {
+  transform: rotate(180deg);
+}
+.new-game-panel-body {
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+.new-game-panel-footer {
+  flex: none;
+  padding: 12px 18px;
+  border-top: 1px solid var(--chrome-border);
+}
+#new-game-btn {
+  width: 100%;
+  height: 42px;
+  font-size: 14px;
+  font-weight: 600;
+}
+/* The move grip on the panel's top-right corner, drawn like the selection panel's resize grip. It shows in both
+   states, so the header bar alone can be moved too. */
+.new-game-panel-grip {
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  right: 0;
+  width: 14px;
+  height: 14px;
+  cursor: move;
+  touch-action: none;
+  background: linear-gradient(225deg, transparent 0 3px, var(--chrome-border) 3px 4px, transparent 4px 6px, var(--chrome-border) 6px 7px, transparent 7px);
+  border-top-right-radius: 6px;
+}
+
+/* ---------- Sections ---------- */
+/* Map, Forces, and Rules, each under a small title and a divider. Controls are 30 px tall, the same as a randomize
+   square, so every row lines up. */
+.new-game-section {
+  padding: 14px 18px 16px;
+  border-bottom: 1px solid var(--chrome-divider);
+  font-size: 13px;
+}
+.new-game-section:last-child {
+  border-bottom: 0;
+}
+.new-game-section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.new-game-section-title {
+  margin: 0 0 10px;
+  color: var(--chrome-muted);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.new-game-panel-body select {
+  height: 30px;
+  padding: 0 8px;
+  box-sizing: border-box;
+  font-size: 13px;
+}
+/* A square the height of the dropdown beside it. */
+.new-game-panel-body .compact-square-btn.new-game-randomize {
+  width: 30px;
+  min-width: 30px;
+  height: 30px;
+  margin-left: 0;
+  font-size: 13px;
+}
+
+/* ---------- Map ---------- */
+.new-game-tabs {
+  margin: 0 0 12px;
+}
+.new-game-tabs button {
+  width: 110px;
+  height: 30px;
+  font-size: 13px;
+}
+/* Label, dropdown, randomize. Each tab has its own grid, so the label column has one width in both: 5em fits "Your side"
+   and "Opponent" in common system fonts, and every dropdown in both tabs then has the same left edge and width. A wider
+   font grows the column rather than running a label into its dropdown. */
+.new-game-rows {
+  display: grid;
+  grid-template-columns: minmax(5em, max-content) minmax(0, 1fr) 30px;
+  align-items: center;
+  gap: 8px 6px;
+}
+.new-game-rows select {
+  width: 100%;
+  min-width: 0;
+}
+/* Two classes, so the shared tip host's inline display does not win: the slot spans the section. */
+.control-tooltip-host.new-game-add-opponent-host {
+  display: flex;
+  width: 100%;
+  margin-top: 10px;
+}
+/* A disabled placeholder drawn as a dashed slot, so it reads as room for a later feature rather than a broken button. */
+.new-game-add-opponent,
+.new-game-add-opponent:disabled {
+  flex: 1 1 auto;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0;
+  background: transparent;
+  color: var(--chrome-muted);
+  border: 1px dashed var(--chrome-border);
+  border-radius: 2px;
+  font-size: 12.5px;
+}
+
+/* ---------- Forces ---------- */
+.new-game-advanced-tech {
+  margin: 0;
+  color: var(--chrome-muted);
+  font-size: 11px;
+}
+.new-game-advanced-tech:empty {
+  display: none;
+}
+.new-game-size-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 0 0 12px;
+}
+.new-game-size-row select {
+  width: max-content;
+}
+/* One row of the four unit types: the map glyph on a gray disk, the cap for the game size, and the price. A wide font
+   wraps the row rather than widening the panel. */
+.new-game-units {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 6px 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.new-game-unit {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.new-game-unit-token {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #b0b0b0;
+  border: 1px solid #222;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.new-game-unit-token img {
+  width: 18px;
+  height: 18px;
+  pointer-events: none;
+  filter: brightness(0.133);
+}
+.new-game-unit-cap {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.new-game-unit-dot,
+.new-game-unit-cost {
+  color: var(--chrome-muted);
+  font-size: 12px;
+}
+
+/* ---------- Rules ---------- */
+/* One grid of label and dropdown pairs: Origin and Tech, then Terrain and Weather, then the starting month across the
+   last three columns. Each label column is as wide as its longest label and the two dropdown columns share what is
+   left, so every dropdown in a column starts at the same edge however the system font measures the labels. */
+.new-game-rules {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr) max-content minmax(0, 1fr);
+  align-items: center;
+  gap: 8px 6px;
+}
+.new-game-rules > label {
+  white-space: nowrap;
+}
+/* Tech and Weather open the second pair, set a little apart from the first pair's dropdowns. */
+.new-game-rules > label:nth-of-type(2n) {
+  padding-left: 10px;
+}
+.new-game-rules > select {
+  width: 100%;
+  min-width: 0;
+}
+.new-game-month-controls {
+  grid-column: 2 / -1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.new-game-month-controls select {
+  width: max-content;
+}
+.new-game-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+}

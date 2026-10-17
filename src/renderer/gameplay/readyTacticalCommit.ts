@@ -10,6 +10,7 @@
  */
 
 import type { CommitHumanTacticalDraftOrdersIpcResult, GameStateSnapshot } from '../../shared/ipcTypes';
+import { currentConsoleReportTag } from '../chrome/consoleReports';
 import { pickPlaybackDiceRolls } from '../../shared/combatDiceChips';
 import { tacticalOpponentPlanPayloadHasAnyOrders } from '../../shared/ipc/tacticalOpponentPlanMerge';
 import { rendererSharedState as S } from '../core/state';
@@ -106,6 +107,8 @@ export async function runTacticalReadyCommit(context: TacticalReadyCommitContext
   const { deps, toolCountsBeforeReadyClick, cachedPrecomputedToolCountsAtReadyStart, matchEpoch } = context;
   if (!(S.tacticalBattleSnapshot && S.tacticalPhasePlanning)) return false;
   if (!window.gameApi) return true;
+  // The beat this commit resolves; its reports are filed under it after the battle moves on to the next beat.
+  const beatReportTag = currentConsoleReportTag();
   const commit = window.gameApi.commitHumanTacticalDraftOrders;
   if (!commit) {
     rollbackReadyToolCounts(deps, toolCountsBeforeReadyClick);
@@ -290,6 +293,7 @@ export async function runTacticalReadyCommit(context: TacticalReadyCommitContext
         readySlice: tacticalReadySlice,
         visibility,
         killToastFormatter,
+        reportTag: beatReportTag,
         extraKills: {
           killsByMelee: playback.killsByMelee,
           killsByAirStrike: playback.killsByAirStrike,

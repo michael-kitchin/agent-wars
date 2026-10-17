@@ -150,31 +150,37 @@ export const readyButtonTooltipText =
   'End this planning step and play out the orders you have queued, on the world map or in a battle. It stays unavailable while the match is over, while the opponent is still planning, or while playback is already running.';
 
 /**
- * Purpose: Says to double-click the target and that the button will read Cancel.
- * When to use: `#ranged-attack-btn` in ranged mode before targeting.
- * Expected outcome: The control tip shows this sentence.
+ * Purpose: Names the attack the reticle aims for a selection that can fire, and says to double-click the target.
+ * When to use: `#ranged-attack-btn` for a ranged selection while ranged targeting is off.
+ * Expected outcome: The control tip shows these sentences.
  * Exceptions: None.
  */
-export const rangedAimTooltipText =
-  'Turn this on, then double-click the target on the map. The button then reads Cancel.';
+export const rangedAimTooltipText = 'Aim a ranged attack. Turn this on, then double-click the target on the map.';
 
 /**
- * Purpose: Says queued ranged attacks stay in the list.
+ * Purpose: Says a second click stops aiming and queued ranged attacks stay in the list.
  * When to use: `#ranged-attack-btn` while ranged targeting is on.
- * Expected outcome: The control tip shows this sentence.
+ * Expected outcome: The control tip shows these sentences.
  * Exceptions: None.
  */
-export const rangedCancelTooltipText =
-  'Stop aiming a ranged attack. Attacks already in the list stay there.';
+export const rangedStopTooltipText = 'Stop aiming a ranged attack. Attacks already in the list stay there.';
 
 /**
- * Purpose: Says the target list and Cancel replace this button.
- * When to use: `#ranged-attack-btn` when the selection is air and strike targeting is off.
- * Expected outcome: The control tip shows this sentence.
+ * Purpose: Names the attack the reticle aims for an all-air selection, and points to the target list beside it.
+ * When to use: `#ranged-attack-btn` for an air selection while strike targeting is off.
+ * Expected outcome: The control tip shows these sentences.
  * Exceptions: None.
  */
 export const strikeAimTooltipText =
-  'Turn this on to aim an air strike. A target list and a Cancel button replace this button.';
+  'Aim an air strike. Turn this on, pick a target type in the list beside it, then double-click the target on the map.';
+
+/**
+ * Purpose: Says a second click stops aiming and queued strikes stay in the list.
+ * When to use: `#ranged-attack-btn` while strike targeting is on.
+ * Expected outcome: The control tip shows these sentences.
+ * Exceptions: None.
+ */
+export const strikeStopTooltipText = 'Stop aiming an air strike. Strikes already in the list stay there.';
 
 /**
  * Purpose: Names the four targets and says the next double-click uses the choice.
@@ -183,45 +189,19 @@ export const strikeAimTooltipText =
  * Exceptions: None.
  */
 export const airStrikeTargetTooltipText =
-  'Choose enemy units, production, airports, or seaports. Your next double-click uses that choice until you cancel.';
+  'Choose enemy units, production, airports, or seaports. Your next double-click uses that choice until you stop aiming.';
 
 /**
- * Purpose: Says Strike returns and queued strikes stay.
- * When to use: `#air-strike-cancel-btn`.
- * Expected outcome: The control tip shows this sentence.
+ * Purpose: One reticle aims both kinds of attack and stops aiming when clicked again. The tip must match the attack it
+ *   aims and whether it is pressed.
+ * When to use: Each time `#ranged-attack-btn` is updated for a selection that can use it.
+ * Expected outcome: The sentence for that attack and that state.
  * Exceptions: None.
  */
-export const airStrikeCancelTooltipText =
-  'Stop aiming an air strike and show Strike again. Strikes already in the list stay there.';
-
-/**
- * Purpose: One button wears three labels. The tip must match the label on screen.
- * When to use: Beside each assignment of `#ranged-attack-btn` text.
- * Expected outcome: The sentence for that label.
- * Exceptions: None. The parameter is only those three labels.
- */
-export function rangedButtonTooltipText(label: 'Ranged' | 'Cancel' | 'Strike'): string {
-  if (label === 'Cancel') return rangedCancelTooltipText;
-  if (label === 'Strike') return strikeAimTooltipText;
-  return rangedAimTooltipText;
+export function supportButtonTooltipText(kind: 'ranged' | 'strike', aiming: boolean): string {
+  if (kind === 'strike') return aiming ? strikeStopTooltipText : strikeAimTooltipText;
+  return aiming ? rangedStopTooltipText : rangedAimTooltipText;
 }
-
-/**
- * Purpose: Says the tab is where tool groups are turned on or off.
- * When to use: `#openrouter-tab-tools`.
- * Expected outcome: The control tip shows this sentence.
- * Exceptions: None.
- */
-export const toolsTabTooltipText = 'Show the tools the opponent can use, and turn each group on or off.';
-
-/**
- * Purpose: Says which opponent and match controls the tab shows.
- * When to use: `#openrouter-tab-model`.
- * Expected outcome: The control tip shows this sentence.
- * Exceptions: None.
- */
-export const modelTabTooltipText =
-  'Show the API key, model, reasoning effort, and the controls for opponent planning and a new match.';
 
 /**
  * Purpose: Says how to save the key and how to forget it.
@@ -251,13 +231,15 @@ export const runDisabledTooltipText =
   'Turn opponent planning on or off. Enter an API key and choose a model first.';
 
 /**
- * Purpose: Says what turning Run on and off does to the Tools tab and to Ready.
+ * Run's tip while it can be clicked.
+ *
+ * Purpose: Says what turning Run on and off does to Ready.
  * When to use: The wrapper around `#openrouter-run-btn` when Run is enabled.
  * Expected outcome: The control tip shows this sentence.
  * Exceptions: None.
  */
 export const runEnabledTooltipText =
-  'Turn opponent planning on or off. On opens the Tools tab and can hold Ready until a plan exists; off cancels a plan that is still running.';
+  'Turn opponent planning on or off. On can hold Ready until a plan exists; off cancels a plan that is still running.';
 
 /**
  * Purpose: Run's tip changes when a key and model become available.
@@ -270,13 +252,29 @@ export function runButtonTooltipText(enabled: boolean): string {
 }
 
 /**
- * Purpose: Says New opens the new-game screen and stops planning and playback immediately.
- * When to use: `#openrouter-new-btn`.
- * Expected outcome: The control tip shows this sentence.
+ * Purpose: Says New opens the new-game screen over the match, which keeps going until a new one starts.
+ * When to use: `#openrouter-new-btn`, the game menu's New game item.
+ * Expected outcome: The control tip shows these sentences.
  * Exceptions: None.
  */
 export const newButtonTooltipText =
-  'Open the new-game screen. Opponent planning and any playback stop right away; the current match is replaced when you start the new one.';
+  'Open the new-game screen. The current match keeps going underneath; close the screen to return to it, or start a new match to replace it.';
+
+/**
+ * Purpose: Says why New game is disabled while the new-game screen is open.
+ * When to use: The tip host around `#openrouter-new-btn`, from `syncGameMenuNewGameItem`.
+ * Expected outcome: The control tip shows this sentence.
+ * Exceptions: None.
+ */
+export const newGameItemOpenTooltipText = 'The new-game screen is already open.';
+
+/**
+ * Purpose: Says why New game is disabled while a Ready is being resolved.
+ * When to use: The tip host around `#openrouter-new-btn`, from `syncGameMenuNewGameItem`.
+ * Expected outcome: The control tip shows this sentence.
+ * Exceptions: None.
+ */
+export const newGameItemBusyTooltipText = 'New game is available again once this turn or beat finishes resolving.';
 
 /**
  * Purpose: Says the list is limited to the selected model's levels.
@@ -289,7 +287,7 @@ export const reasoningEffortTooltipText =
 
 /**
  * Purpose: Says what checked and unchecked do the next time Ready finds a melee.
- * When to use: The wrapper around `#openrouter-tactical-battles`.
+ * When to use: The game-menu label around `#openrouter-tactical-battles`.
  * Expected outcome: The control tip shows this sentence.
  * Exceptions: None.
  */
@@ -369,8 +367,10 @@ export const productionTooltipText =
   'Let the opponent read and change build queues on the world map, not during a battle. The number counts uses since the last Ready, and this does nothing when the model cannot use tools.';
 
 /**
+ * Returns a tool group's tip.
+ *
  * Purpose: New group ids must not invent a tip. Known ids keep one sentence each.
- * When to use: While building each Tools-tab cell.
+ * When to use: While building each tool-group cell.
  * Expected outcome: The group's sentence, or null.
  * Exceptions: None.
  */
@@ -533,7 +533,7 @@ export const ignoreTooltipText =
 
 /**
  * Purpose: Says world-map orders return and the button does nothing during playback.
- * When to use: `#tactical-battle-hud`.
+ * When to use: `#tactical-exit-host`, around Exit Battle in the battle header.
  * Expected outcome: The control tip shows this sentence.
  * Exceptions: None.
  */

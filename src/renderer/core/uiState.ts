@@ -1,8 +1,4 @@
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
-import { formatSidebarPhaseText } from '../../shared/sidebarPhaseLabel';
-import { formatWeatherIconHtml } from '../../shared/weatherIcons';
-import { rendererSharedState as S } from './state';
-import { setUnitNameContent } from './unitOriginFlags';
 import { initializeScenarioRegionSelectorsOnOverlayOpen } from '../gameplay/newGameRegionUi';
 import { prepareNewGameMapPanel, selectedNewGameTab } from '../gameplay/newGameMapUi';
 import { showGameOverBanner, showNewGameBanner } from '../gameplay/newGameBanner';
@@ -12,95 +8,62 @@ import { syncGameSizeCapPreview } from '../gameplay/newGameSizeUi';
 import { resetNewGameOptionControls } from '../gameplay/newGameOptionsUi';
 import { dismissStaleControlTooltip } from '../chrome/controlTooltip';
 import { newGameButtonTooltipText } from '../chrome/controlTooltipText';
-import { expandNewGameDialog, syncNewGameDialogMapPointer } from '../gameplay/newGameDialogCollapse';
+import { expandNewGameDialog, newGameOverlayIsOpen, syncNewGameDialogMapPointer } from '../gameplay/newGameDialogCollapse';
+import { placeNewGameDialogAtInset } from '../gameplay/newGameDialogMove';
+import { forgetMatchUnderNewGame, isMatchWaitingUnderNewGame } from '../gameplay/newGameReturn';
+import { renderTopBarStatus } from '../chrome/topBar';
+import { closeGameMenu, syncGameMenuNewGameItem } from '../chrome/gameMenu';
+import { refreshConsoleHeader } from '../chrome/consoleFrame';
+import { syncSidebarOrderRowSelection } from '../gameplay/sidebarOrderRow';
+import { renderSelectionPanel } from '../gameplay/selectionPanel';
+import { renderSelectionBarState } from '../gameplay/selectionBar';
 
 /**
- * Title-cases the strategic phase id from main (`planning` / `resolution`) for the sidebar line.
+ * Refreshes everything that shows the selection: the selection panel and the highlight of the order rows.
  *
- * Purpose: Keeps raw enum-style ids out of the player-facing panel while remaining stable if new phases are added.
- * When to use: Only from `updateGameStateSidebar` when `state.phase` is present.
- * Expected outcome: `Planning`, `Resolution`, or similar single-token labels.
- * Exceptions: None; empty string passes through unchanged.
- */
-function formatStrategicPhaseLabelForSidebar(phase: string): string {
-  if (!phase) return phase;
-  return phase.charAt(0).toUpperCase() + phase.slice(1).toLowerCase();
-}
-
-/**
- * Refreshes the selected-unit line in the right sidebar.
- *
- * Purpose: Shows which unit the player has selected, with its origin flag.
+ * Purpose: Keeps the name every caller already uses; the "Selected unit" line is now the selection panel.
  * When to use: After any selection change or snapshot that can change unit names.
- * Expected outcome: The primary unit's flag and name, followed by ` (+N)` when more units are selected;
- *   an em dash when nothing is selected.
+ * Expected outcome: The selection panel describes the selected units, or hides when none are selected. Order rows of
+ *   selected units are highlighted.
  * Exceptions: None.
  */
-export function updateSidebar(
-  getPrimarySelectedUnitId: () => string | null,
-  formatUnitDisplayName: (unitId: string) => string
-): void {
-  const selectedUnitEl = document.getElementById('sidebar-selected-unit');
-  if (selectedUnitEl) {
-    const primary = getPrimarySelectedUnitId();
-    if (!primary) {
-      selectedUnitEl.textContent = S.selectedUnitIds.length <= 1 ? '—' : `— (+${S.selectedUnitIds.length - 1})`;
-      return;
-    }
-    const extraCount = S.selectedUnitIds.length - 1;
-    const suffix = extraCount > 0 ? ` (+${extraCount})` : '';
-    setUnitNameContent(selectedUnitEl, primary, `${formatUnitDisplayName(primary)}${suffix}`);
-  }
+export function updateSidebar(formatUnitDisplayName: (unitId: string) => string): void {
+  syncSidebarOrderRowSelection();
+  renderSelectionPanel({ formatUnitDisplayName });
 }
 
 /**
- * Defines the `updateGameStateSidebar` function shape (export function updateGameStateSidebar(state: GameStateSnapshot | null): void).
-
- * Purpose: Refreshes phase and turn lines in the right sidebar from the latest snapshot.
+ * Refreshes the match status in the top bar, the console header, and the selection bar's hint, from the latest snapshot.
+ *
+ * Purpose: Keeps the name every caller already uses; the old Phase and Turn lines now live in the top bar.
  * When to use: After `applyGameStateSnapshot`, tactical entry/exit, tactical Ready commit, and when beat playback ends.
- * Expected outcome: The phase line is tactical planning or tactical resolution while a battle snapshot is set, otherwise the strategic label, or an em dash when `state` is null. `Turn:` shows the beat number while a tactical session is active, otherwise `state.turnNumber`, then the strategic date when the snapshot has one.
+ * Expected outcome: The top bar's sides, readouts, and date block match `state` and the current battle. The
+ *   console subtitle follows the active tab: the queued-order line, "this match", or the opponent's home region.
+ *   The selection bar's hint follows playback, which starts and ends around these calls. Null shows em dashes in the
+ *   top bar.
  * Exceptions: None.
  */
 export function updateGameStateSidebar(state: GameStateSnapshot | null): void {
-  const phaseEl = document.getElementById('sidebar-phase');
-  const turnEl = document.getElementById('sidebar-turn');
-  if (phaseEl) {
-    phaseEl.textContent = formatSidebarPhaseText({
-      hasGameState: state != null,
-      strategicPhaseLabel: state ? formatStrategicPhaseLabelForSidebar(state.phase) : '',
-      battleActive: S.tacticalBattleSnapshot != null,
-      beatPlaybackActive: S.resolutionMoveAnimation != null,
-    });
-  }
-  if (turnEl) {
-    if (!state) {
-      turnEl.textContent = '—';
-    } else if (S.tacticalBattleSnapshot) {
-      const date = state.currentDateLabel ? ` · ${state.currentDateLabel}` : '';
-      const weather = S.tacticalBattleSnapshot.weather
-        ? ` · ${formatWeatherIconHtml(S.tacticalBattleSnapshot.weather)}`
-        : '';
-      turnEl.innerHTML = `Turn: ${S.tacticalBattleSnapshot.tacticalTurnNumber}${date}${weather}`;
-    } else {
-      const date = state.currentDateLabel ? ` · ${state.currentDateLabel}` : '';
-      turnEl.textContent = `Turn: ${state.turnNumber}${date}`;
-    }
-  }
+  renderTopBarStatus(state);
+  refreshConsoleHeader();
+  renderSelectionBarState();
 }
 
 /**
  * Drops focus and a control tip from chrome the new-game overlay is about to cover.
  *
- * Purpose: The minimap, the legend, and the right panel are not on screen while that overlay is open. A focused control would still take keys, and a tip for the New button would stay up over the map.
+ * Purpose: The minimap panel, the legend, the top bar, the game menu, and the console are not on screen while that overlay is open. A focused control would still take keys, and a tip for New game would stay up over the map.
  * When to use: When that overlay goes from hidden to shown, after its `hidden` class is removed.
- * Expected outcome: Focus leaves the minimap, the legend, or the right panel. A dialog control that already has focus is left alone. A tip whose control has no box is dismissed.
+ * Expected outcome: Focus leaves the minimap panel, the legend, the top bar, the game menu, or the console. A dialog control that already has focus is left alone. A tip whose control has no box is dismissed.
  * Exceptions: None.
  */
 export function blurMapChromeIfFocused(): void {
   const active = document.activeElement;
   if (active instanceof HTMLElement) {
-    const insideHiddenChrome = active.closest('#minimap') != null
+    const insideHiddenChrome = active.closest('#minimap-panel') != null
       || active.closest('#terrain-legend') != null
+      || active.closest('#app-topbar') != null
+      || active.closest('#game-menu') != null
       || active.closest('#sidebar') != null;
     if (insideHiddenChrome) active.blur();
   }
@@ -108,11 +71,15 @@ export function blurMapChromeIfFocused(): void {
 }
 
 /**
- * Turns pointer input on or off for the map and the right panel.
+ * Turns pointer input on or off for the map, the top bar, and the console.
  *
  * Purpose: The new-game overlay and the annihilation dialog stay clickable while the match controls do not.
  * When to use: When those overlays open or close, and when the tactical battles list opens or closes.
- * Expected outcome: Children of the map pane other than those two overlays ignore the pointer while `enabled` is false. The right panel matches. While the new-game form is hidden, the main map takes the pointer again so drag and the wheel still move the preview.
+ * Expected outcome: Children of the map pane other than the annihilation dialog, and the console, ignore the pointer
+ *   while `enabled` is false. The top bar does too, except while the new-game overlay is open: it is the new-game bar
+ *   then, and its game menu keeps working. The game menu closes whenever the top bar stops taking the pointer, and its
+ *   New game item follows the overlay. The new-game overlay floats over the map pane but is not inside it, so this
+ *   never turns it off. While it is open, the main map takes the pointer again so drag and the wheel move the preview.
  * Exceptions: None.
  */
 export function setMainUIControlsEnabled(enabled: boolean): void {
@@ -120,15 +87,23 @@ export function setMainUIControlsEnabled(enabled: boolean): void {
   if (container) {
     for (const child of container.children) {
       const id = (child as HTMLElement).id;
-      if (id === 'game-over-overlay' || id === 'tactical-annihilation-overlay') continue;
+      if (id === 'tactical-annihilation-overlay') continue;
       (child as HTMLElement).style.pointerEvents = enabled ? '' : 'none';
     }
   }
-  const sidebar = document.getElementById('sidebar');
-  if (sidebar) {
-    (sidebar as HTMLElement).style.pointerEvents = enabled ? '' : 'none';
-    sidebar.classList.toggle('main-ui-disabled', !enabled);
+  const topBarEnabled = enabled || newGameOverlayIsOpen();
+  const chromeEnabled: readonly (readonly [string, boolean])[] = [
+    ['app-topbar', topBarEnabled],
+    ['sidebar', enabled],
+  ];
+  for (const [id, on] of chromeEnabled) {
+    const chrome = document.getElementById(id);
+    if (!chrome) continue;
+    chrome.style.pointerEvents = on ? '' : 'none';
+    chrome.classList.toggle('main-ui-disabled', !on);
   }
+  if (!topBarEnabled) closeGameMenu();
+  syncGameMenuNewGameItem();
   syncNewGameDialogMapPointer();
 }
 
@@ -141,8 +116,11 @@ export function setMainUIControlsEnabled(enabled: boolean): void {
  *   stays open, stays closed, or the element is missing. With a live game the overlay hides and controls are
  *   enabled. Otherwise the overlay shows a win, loss, or start message. Fog of war and the bonus dropdowns return
  *   to their defaults on every call while it shows. The home regions, the starting month, and the map preview are
- *   drawn only when the overlay opens. The form starts showing only on that open. A later refresh leaves a hidden
- *   form hidden.
+ *   drawn only when the overlay opens, and that open closes the game menu. The panel starts expanded, at the map's
+ *   top-left corner, only on that open. A later refresh leaves a collapsed or moved panel as it is. While a match
+ *   waits under the screen the player opened from the game menu, a refresh of that live match leaves the screen and
+ *   the controls as they are and returns false; a refresh in which that match has ended forgets it, so the close
+ *   control hides, and the screen shows the result.
  * Exceptions: None.
  */
 export function updateGameOverUI(
@@ -151,17 +129,22 @@ export function updateGameOverUI(
 ): boolean {
   const overlay = document.getElementById('game-over-overlay');
   const newGameBtn = document.getElementById('new-game-btn');
-  const rangedBtn = document.getElementById('ranged-attack-btn') as HTMLButtonElement | null;
 
   const noGame = !state || state.hexes.length === 0;
   const gameOver = !!state?.gameOver;
   const showOverlay = noGame || gameOver;
+  if (isMatchWaitingUnderNewGame()) {
+    if (!showOverlay) {
+      updateReadyButtonState();
+      return false;
+    }
+    forgetMatchUnderNewGame();
+  }
 
   const wasHidden = overlay?.classList.contains('hidden') !== false;
   if (!showOverlay) {
     overlay?.classList.add('hidden');
     setMainUIControlsEnabled(true);
-    if (rangedBtn) rangedBtn.disabled = false;
     updateReadyButtonState();
     return overlay != null && wasHidden === false;
   }
@@ -169,7 +152,9 @@ export function updateGameOverUI(
   overlay?.classList.remove('hidden');
   resetNewGameOptionControls();
   if (wasHidden) {
+    closeGameMenu();
     expandNewGameDialog();
+    placeNewGameDialogAtInset();
     blurMapChromeIfFocused();
     resetNewGameMapPreviewFrame();
     repaintNewGameMapPreview();
@@ -189,7 +174,6 @@ export function updateGameOverUI(
     newGameBtn.textContent = noGame ? 'Start game' : 'New game';
     newGameBtn.setAttribute('data-control-tooltip', newGameButtonTooltipText(noGame));
   }
-  if (rangedBtn) rangedBtn.disabled = true;
   updateReadyButtonState();
   return overlay != null && wasHidden === true;
 }

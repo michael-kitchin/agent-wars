@@ -6,6 +6,7 @@ import {
   inspectionStatusIconDrawPx,
   inspectionStatusIconFontPx,
   inspectionStatusIconsForHex,
+  statusIconCentersX,
   strategicOverlayBandOffsetPx,
   strategicProductionLabelSurface,
   techInspectionIconAssetPath,
@@ -17,14 +18,14 @@ import {
  *
  * Purpose: Production labels stay on their current hexes. The status icon does not use this surface as a yes-or-no gate.
  * When to use: From this file's runner.
- * Expected outcome: Tactical, hidden hexes, and opponent hexes outside inspection are `'none'`. The build button wins when it is shown. Inspection reveals a canvas label on the remaining hexes.
+ * Expected outcome: Tactical, hidden hexes, and opponent hexes without production detail are `'none'`. The build button wins when it is shown. Production detail reveals a canvas label on the remaining hexes.
  * Exceptions: AssertionError when the surface drifts from the production overlay.
  */
 test('a production label is a button, a canvas line, or absent', () => {
   const base = {
     tacticalRendered: false,
     explored: true,
-    mapInspectionHeld: false,
+    productionDetailShown: false,
     controlledByHuman: true,
     humanUrbanProduction: true,
     buildEntryZoom: true,
@@ -44,9 +45,9 @@ test('a production label is a button, a canvas line, or absent', () => {
     'none'
   );
   assert.equal(strategicProductionLabelSurface(base), 'button');
-  assert.equal(strategicProductionLabelSurface({ ...base, mapInspectionHeld: true }), 'button');
+  assert.equal(strategicProductionLabelSurface({ ...base, productionDetailShown: true }), 'button');
   assert.equal(
-    strategicProductionLabelSurface({ ...base, explored: false, mapInspectionHeld: true }),
+    strategicProductionLabelSurface({ ...base, explored: false, productionDetailShown: true }),
     'canvas'
   );
   assert.equal(
@@ -60,7 +61,7 @@ test('a production label is a button, a canvas line, or absent', () => {
       controlledByHuman: false,
       humanUrbanProduction: false,
       buildEntryZoom: false,
-      mapInspectionHeld: true,
+      productionDetailShown: true,
     }),
     'canvas'
   );
@@ -70,7 +71,7 @@ test('a production label is a button, a canvas line, or absent', () => {
       controlledByHuman: false,
       humanUrbanProduction: false,
       buildEntryZoom: false,
-      mapInspectionHeld: true,
+      productionDetailShown: true,
     }),
     'canvas'
   );
@@ -78,114 +79,54 @@ test('a production label is a button, a canvas line, or absent', () => {
 });
 
 /**
- * Checks which single status icon a world hex receives.
+ * Checks which status icons a world hex receives.
  *
- * Purpose: T held shows tech. T released shows weather. A missing bonus or a missing hex fact shows nothing.
+ * Purpose: The tech icon choice allows tech, and the Weather tab allows weather, each on its own. A missing bonus or a
+ *   missing hex fact omits that icon.
  * When to use: From this file's runner.
- * Expected outcome: Tech while held when the bonus is on and the urban count is a positive finite number. Weather while released when that bonus is on and the word is known. Null otherwise.
- * Exceptions: AssertionError when a missing count becomes Basic, an unknown weather becomes Mild, or the other icon leaks into the hold state.
+ * Expected outcome: Tech then weather when both apply. Weather alone when the tech icon cannot show: the tech bonus is
+ *   off, or the urban count cannot produce units. Tech alone when the weather word is unknown. An empty list when
+ *   neither applies.
+ * Exceptions: AssertionError when a missing count becomes Basic, an unknown weather becomes Mild, or a toggle leaks into
+ *   the other icon.
  */
-test('one status icon follows the hold and the bonus', () => {
-  assert.deepEqual(
-    inspectionStatusIconsForHex({
-      mapInspectionHeld: true,
-      techBonusEnabled: true,
-      weatherBonusEnabled: true,
-      baselineUrbanHexCount: 21,
-      weather: 'heat',
-    }),
-    { kind: 'tech', level: 'advanced' }
-  );
-  assert.deepEqual(
-    inspectionStatusIconsForHex({
-      mapInspectionHeld: true,
-      techBonusEnabled: true,
-      weatherBonusEnabled: false,
-      baselineUrbanHexCount: 20,
-      weather: null,
-    }),
-    { kind: 'tech', level: 'basic' }
-  );
-  assert.equal(
-    inspectionStatusIconsForHex({
-      mapInspectionHeld: true,
-      techBonusEnabled: false,
-      weatherBonusEnabled: true,
-      baselineUrbanHexCount: 21,
-      weather: 'heat',
-    }),
-    null
-  );
-  assert.equal(
-    inspectionStatusIconsForHex({
-      mapInspectionHeld: true,
-      techBonusEnabled: true,
-      weatherBonusEnabled: true,
-      baselineUrbanHexCount: 0,
-      weather: 'mild',
-    }),
-    null
-  );
-  assert.equal(
-    inspectionStatusIconsForHex({
-      mapInspectionHeld: true,
-      techBonusEnabled: true,
-      weatherBonusEnabled: false,
-      baselineUrbanHexCount: Number.NaN,
-      weather: null,
-    }),
-    null
-  );
-  assert.equal(
-    inspectionStatusIconsForHex({
-      mapInspectionHeld: true,
-      techBonusEnabled: true,
-      weatherBonusEnabled: true,
-      baselineUrbanHexCount: -1,
-      weather: 'snow',
-    }),
-    null
-  );
-  assert.deepEqual(
-    inspectionStatusIconsForHex({
-      mapInspectionHeld: false,
-      techBonusEnabled: true,
-      weatherBonusEnabled: true,
-      baselineUrbanHexCount: 21,
-      weather: 'heat',
-    }),
-    { kind: 'weather', state: 'heat' }
-  );
-  assert.equal(
-    inspectionStatusIconsForHex({
-      mapInspectionHeld: false,
-      techBonusEnabled: true,
-      weatherBonusEnabled: false,
-      baselineUrbanHexCount: 21,
-      weather: 'heat',
-    }),
-    null
-  );
-  assert.equal(
-    inspectionStatusIconsForHex({
-      mapInspectionHeld: false,
-      techBonusEnabled: true,
-      weatherBonusEnabled: true,
-      baselineUrbanHexCount: 21,
-      weather: 'fog',
-    }),
-    null
-  );
-  assert.equal(
-    inspectionStatusIconsForHex({
-      mapInspectionHeld: false,
-      techBonusEnabled: true,
-      weatherBonusEnabled: true,
-      baselineUrbanHexCount: 21,
-      weather: null,
-    }),
-    null
-  );
+test('status icons follow the tech icon choice, the Weather tab, and the bonuses', () => {
+  const both = {
+    techIconsShown: true,
+    weatherIconsShown: true,
+    techBonusEnabled: true,
+    weatherBonusEnabled: true,
+    baselineUrbanHexCount: 21,
+    weather: 'heat',
+  };
+  assert.deepEqual(inspectionStatusIconsForHex(both), [
+    { kind: 'tech', level: 'advanced' },
+    { kind: 'weather', state: 'heat' },
+  ]);
+  assert.deepEqual(inspectionStatusIconsForHex({ ...both, weatherIconsShown: false, baselineUrbanHexCount: 20 }), [
+    { kind: 'tech', level: 'basic' },
+  ]);
+  assert.deepEqual(inspectionStatusIconsForHex({ ...both, techIconsShown: false }), [{ kind: 'weather', state: 'heat' }]);
+  assert.deepEqual(inspectionStatusIconsForHex({ ...both, techBonusEnabled: false }), [{ kind: 'weather', state: 'heat' }]);
+  assert.deepEqual(inspectionStatusIconsForHex({ ...both, weather: 'fog' }), [{ kind: 'tech', level: 'advanced' }]);
+  assert.deepEqual(inspectionStatusIconsForHex({ ...both, baselineUrbanHexCount: -1 }), [{ kind: 'weather', state: 'heat' }]);
+  assert.deepEqual(inspectionStatusIconsForHex({ ...both, techBonusEnabled: false, weatherBonusEnabled: false }), []);
+  assert.deepEqual(inspectionStatusIconsForHex({ ...both, baselineUrbanHexCount: Number.NaN, weather: 'fog' }), []);
+  assert.deepEqual(inspectionStatusIconsForHex({ ...both, baselineUrbanHexCount: 0, weather: null }), []);
+});
+
+/**
+ * Checks where each status icon sits across a hex.
+ *
+ * Purpose: One icon is centered. Two sit side by side, centered as a pair, 2 px apart.
+ * When to use: From this file's runner.
+ * Expected outcome: One 16 px icon at the center. Two 16 px icons 9 px either side of it.
+ * Exceptions: AssertionError when the pair is off center or the gap drifts.
+ */
+test('one status icon is centered, and two sit side by side as a centered pair', () => {
+  assert.deepEqual(statusIconCentersX(100, 16, 1), [100]);
+  assert.deepEqual(statusIconCentersX(100, 16, 2), [91, 109]);
+  assert.deepEqual(statusIconCentersX(100, 16, 0), []);
 });
 
 /**

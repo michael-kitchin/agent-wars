@@ -235,7 +235,7 @@ export interface PreviewHomeBorder {
  *
  * Purpose: The month and the bonus live on the dialog, not in the payload.
  * When to use: Once per hex per frame while the overlay is open.
- * Expected outcome: One object. A null result from `previewWeatherIcon` draws no icon.
+ * Expected outcome: One object. A null result from `previewWeatherIcon` draws no weather icon.
  * Exceptions: None.
  */
 export interface PreviewWeatherIconInput {
@@ -266,15 +266,6 @@ export interface PreviewWeatherIconInput {
    * Exceptions: None.
    */
   readonly weatherByMonth: readonly WeatherState[];
-  /**
-   * Whether T is held.
-   *
-   * Contract: True hides the weather icon. Tech uses `previewTechIcon`.
-   * When to use: `isMapInspectionModeHeld`.
-   * Expected outcome: True returns null from `previewWeatherIcon`.
-   * Exceptions: None.
-   */
-  readonly mapInspectionHeld: boolean;
   /**
    * Whether the view is at battle-detail zoom.
    *

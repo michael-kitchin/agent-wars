@@ -7,6 +7,7 @@ import type {
   GameStateSnapshot,
   RemovedUnitSnapshot,
 } from '../../shared/ipcTypes';
+import type { OrdersHeldUntilMovementEnds } from '../../shared/ordersHeldForPlayback';
 import type { RangedResolutionShotLine } from '../../shared/rangedResolutionShotLines';
 import type { ResolutionMove, ResolutionPlaybackMove } from './types';
 
@@ -216,4 +217,16 @@ export type ResolutionMoveAnimationState = (CombatDicePlaybackFields & {
    * Exceptions: None.
    */
   unknownCasualtyHexes?: string[];
+  /**
+   * Queued human marches whose units are already on the destination in the settled snapshot.
+   *
+   * Purpose: The standing-order list is replaced with empty routes when Ready returns, before the movement stage.
+   *   These copies keep the route, and its arrowhead, until that stage finishes.
+   * When to use: Set from `ordersHeldUntilMovementEnds` when strategic playback is created. Drawn while movement
+   *   progress is below 1, from `originH3ByUnitId` when a route has no segments.
+   * Expected outcome: Omitted when no arrived march still has a playback move. After movement progress reaches 1 the
+   *   copies are ignored and the arrived march draws nothing.
+   * Exceptions: None.
+   */
+  marchArrowsUntilMovementEnds?: OrdersHeldUntilMovementEnds;
 }) | null;

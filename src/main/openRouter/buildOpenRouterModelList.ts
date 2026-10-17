@@ -4,7 +4,7 @@ import { mapOpenRouterModelRow } from './mapOpenRouterModelRow';
 import { isOpenRouterBatchModelId } from './openRouterBatchModelId';
 
 /**
- * Turns raw OpenRouter `/models` `data` rows into the sorted list shown in the Model tab.
+ * Turns raw OpenRouter `/models` `data` rows into the sorted list shown in the Opponent tab's model dropdown.
 
  * Purpose: One place for map, drop unusable rows, drop batch slugs, and name sort so `listModels` stays a fetch wrapper.
  * When to use: After `json.data` is known to be an array (empty array if missing/non-array).

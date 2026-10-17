@@ -7,7 +7,7 @@ const STORAGE_KEY = 'agentWars.tacticalBattlesInterceptPrompt';
 /**
  * Returns true when the melee-intercept modal should be shown; false means auto-resolve as Ignore.
  *
- * Purpose: Mirrors the Model tab checkbox default (on) while allowing a persistent opt-out for faster strategic play.
+ * Purpose: Mirrors the game menu's Offer tactical battles checkbox default (on) while allowing a persistent opt-out for faster strategic play.
  * When to use: `handleReadyButtonClick` before `openMeleeInterceptModal`; `initOpenRouterUI` to seed the checkbox.
  * Expected outcome: `true` when unset or any value other than `0` / `false`; survives reloads via `localStorage`.
  * Exceptions: Swallows storage errors and returns `true`.
@@ -23,7 +23,7 @@ export function readTacticalBattlesInterceptPromptEnabled(): boolean {
 }
 
 /**
- * Persists the Model tab "Tactical battles" checkbox state.
+ * Persists the game menu's "Offer tactical battles" checkbox state.
  *
  * Purpose: Keeps auto-ignore behavior stable across sessions when the player disables tactical prompts.
  * When to use: Checkbox `change` handler in `initOpenRouterUI`.

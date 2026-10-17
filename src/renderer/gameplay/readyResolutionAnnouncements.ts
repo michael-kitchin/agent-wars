@@ -291,7 +291,9 @@ function buildCombatActivityFallbackBullets(readyResult: CombatActivityFallbackS
  *
  * Purpose: Strategic Ready and tactical commit share one loss summary, fallback bullet, and toast order.
  * When to use: After the caller has already classified visibility and built its kill-toast formatter. Do not classify visibility here.
- * Expected outcome: One update toast and log line when there is text, then an unknown-battle toast when any unknown hex or victim remains.
+ *   Pass `reportTag`, the tag of the turn or beat that just resolved, captured before Ready resolved it.
+ * Expected outcome: One update toast and log line when there is text, then an unknown-battle toast when any unknown
+ *   hex or victim remains. The Reports tab files them as a Turn report and a Notice under `reportTag`.
  * Exceptions: None. Continent-name lookup failures follow `collectUnknownBattleContinentNames`.
  */
 export async function announceResolutionTurnUpdate(
@@ -299,6 +301,7 @@ export async function announceResolutionTurnUpdate(
     readySlice: ReadyResult;
     visibility: CombatVisibilityClassification;
     killToastFormatter: ReturnType<ReadyHandlerDeps['buildKillToastFormatterBundle']>;
+    reportTag: string;
     extraKills?: {
       killsByMelee?: readonly { victimId: string }[];
       killsByAirStrike?: readonly { victimId: string }[];
@@ -306,7 +309,7 @@ export async function announceResolutionTurnUpdate(
   },
   deps: Pick<ReadyHandlerDeps, 'showMapToast' | 'appendOpenRouterLog' | 'formatUnknownBattleAnnouncement'>
 ): Promise<void> {
-  const { readySlice, visibility, killToastFormatter, extraKills } = args;
+  const { readySlice, visibility, killToastFormatter, extraKills, reportTag } = args;
   const { unknownCombatHexes, unknownCasualtyHexes, knownVictimIds, unknownVictimIds } = visibility;
   const turnLossSummary = buildPopupTurnLossSummary({
     readySlice,
@@ -322,7 +325,7 @@ export async function announceResolutionTurnUpdate(
   });
   if (updateText) {
     const unitOriginByDisplayName = buildUnitOriginByLossDisplayName(turnLossSummary);
-    deps.showMapToast(updateText, { isError: false, unitOriginByDisplayName });
+    deps.showMapToast(updateText, { isError: false, unitOriginByDisplayName, report: { kind: 'turn', tag: reportTag } });
     deps.appendOpenRouterLog(`Update: ${updateText.replace(/\n/g, ' | ')}`);
   }
   const hasUnknownBattle =
@@ -334,7 +337,10 @@ export async function announceResolutionTurnUpdate(
       unknownCasualtyHexes,
       getContinentNames ? (h3Index) => getContinentNames({ h3Index }) : undefined
     );
-    deps.showMapToast(deps.formatUnknownBattleAnnouncement(unknownContinentNames), { isError: false });
+    deps.showMapToast(deps.formatUnknownBattleAnnouncement(unknownContinentNames), {
+      isError: false,
+      report: { kind: 'notice', tag: reportTag },
+    });
   }
 }
 

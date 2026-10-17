@@ -8,6 +8,9 @@ import { getMaxUnitsPerType, parseGameSize } from '../../shared/gameSize';
 import { getPlayerUnitCountsByType } from '../../shared/unitCountsByType';
 import { getUrbanProductionCapacityForHex as getUrbanProductionCapacityForHexFromTooltipState } from '../map/terrainTooltipStrategicState';
 import { rendererSharedState as S } from '../core/state';
+import { isMapLayerShown } from '../../shared/mapViewMode';
+import { isProductionDetailChosen, isTechViewChosen } from '../map/mapViewModeState';
+import { isNewGameOverlayOpen } from './newGameBanner';
 
 /**
  * Per-type unit totals for one side; used when FoW is off and inspection mode reveals all queues.
@@ -26,18 +29,27 @@ export interface ProductionOverlayContext {
     /**
    * Specifies the contract for the `mapInspectionHeld` member (mapInspectionHeld: boolean;).
 
-   * Contract: True while terrain fill is hidden (T held) for stack/inspection tooling.
-   * When to use: Read by `drawStrategicProductionOverlays` and `syncBuildEntryButton` each frame.
-   * Expected outcome: Matches `S.hideTerrainFillWhileHeld` via `isMapInspectionModeHeld`.
+   * Contract: True while the player holds T.
+   * When to use: Read by `drawStrategicProductionOverlays` each frame, to move labels to the lower band.
+   * Expected outcome: Matches `isMapInspectionModeHeld`.
    * Exceptions: None.
    */
 mapInspectionHeld: boolean;
+    /**
+   * Whether production labels show on every world hex, not only on the player's own.
+   *
+   * Contract: True while T is held, or while Production is on, on the world map outside a battle and outside the new-game or game-over overlay.
+   * When to use: Read by `drawStrategicProductionOverlays` each frame, to choose which hexes get a label.
+   * Expected outcome: Matches `isProductionDetailShown`.
+   * Exceptions: None.
+   */
+productionDetailShown: boolean;
     /**
    * Specifies the contract for the `revealAllControllerQueues` member (revealAllControllerQueues: boolean;).
 
    * Contract: When true with FoW disabled, labels may show opponent queue timing using precomputed counts.
    * When to use: Production overlay branch that formats opponent-controlled hex labels.
-   * Expected outcome: True only when inspection mode and FoW-off snapshot align.
+   * Expected outcome: True only while production detail is shown and the snapshot has fog of war off.
    * Exceptions: None.
    */
 revealAllControllerQueues: boolean;
@@ -77,10 +89,62 @@ export function getUrbanProductionCapacityForHex(h3Index: string): number {
 }
 
 /**
- * True while map inspection mode suppresses terrain fill (T key held).
+ * Reports whether the player is holding T, the map's inspection gesture.
+ *
+ * Purpose: Holding T hides terrain fill, shows hex codes, and moves production labels to the lower band, everywhere.
+ *   No map-mode tab turns these on, so this is the key alone. The tech icons and the production labels that T also
+ *   shows follow `areTechIconsShown` and `isProductionDetailShown`.
+ * When to use: Wherever drawing depends on T being held.
+ * Expected outcome: True while T is held.
+ * Exceptions: None.
  */
 export function isMapInspectionModeHeld(): boolean {
   return S.hideTerrainFillWhileHeld;
+}
+
+/**
+ * Reports whether a layer that holding T also shows is on screen, given whether its tab is on.
+ *
+ * Purpose: The tech icons and production detail share one rule. See `isMapLayerShown`.
+ * When to use: From `areTechIconsShown` and `isProductionDetailShown`.
+ * Expected outcome: True while T is held, or while the layer is chosen outside a battle and outside the new-game or
+ *   game-over overlay.
+ * Exceptions: None.
+ */
+function isChosenLayerShown(layerChosen: boolean): boolean {
+  return isMapLayerShown({
+    tKeyHeld: S.hideTerrainFillWhileHeld,
+    layerChosen,
+    inBattle: S.tacticalBattleSnapshot != null,
+    // Drawing asks this for every hex, so the page is read only while the answer can depend on it.
+    newGameOverlayOpen: layerChosen && isNewGameOverlayOpen(),
+  });
+}
+
+/**
+ * Reports whether the world map shows the tech tier icons.
+ *
+ * Purpose: The status-icon pass shows them while T is held or while Tech is on.
+ * When to use: Once per status-icon pass.
+ * Expected outcome: True while T is held, or while Tech is on outside a battle and outside the new-game or game-over
+ *   overlay.
+ * Exceptions: None.
+ */
+export function areTechIconsShown(): boolean {
+  return isChosenLayerShown(isTechViewChosen());
+}
+
+/**
+ * Reports whether production labels show on every world hex, not only on the player's own.
+ *
+ * Purpose: Holding T or turning Production on reveals the labels on opponent, neutral, and unexplored hexes.
+ * When to use: Once per production-label pass and once per status-icon pass.
+ * Expected outcome: True while T is held, or while Production is on outside a battle and outside the new-game or
+ *   game-over overlay.
+ * Exceptions: None.
+ */
+export function isProductionDetailShown(): boolean {
+  return isChosenLayerShown(isProductionDetailChosen());
 }
 
 /**
@@ -185,9 +249,11 @@ export function formatProductionLabelForAnyController(
  */
 export function buildProductionOverlayContext(state: GameStateSnapshot): ProductionOverlayContext {
   const mapInspectionHeld = isMapInspectionModeHeld();
-  const revealAllControllerQueues = mapInspectionHeld && isFogOfWarDisabledForSnapshot(state);
+  const productionDetailShown = isProductionDetailShown();
+  const revealAllControllerQueues = productionDetailShown && isFogOfWarDisabledForSnapshot(state);
   return {
     mapInspectionHeld,
+    productionDetailShown,
     revealAllControllerQueues,
     unitHexes: new Set(state.units.map((u) => u.h3Index)),
     unitCountsByPlayer: revealAllControllerQueues

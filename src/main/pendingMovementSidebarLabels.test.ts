@@ -6,18 +6,23 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { gridDisk, latLngToCell } from 'h3-js';
+import { GLOBAL_GAME_MAP, withGameMap } from '../shared/activeGameMap';
+import { getStrategicHexCode } from '../shared/hexLlmCodeAssignment';
 import {
   formatPendingMovementSidebarTargetLabel,
   formatTacticalDraftMarchPendingOrderTargetLabel,
-  TACTICAL_DRAFT_MARCH_DISPLAY_STATUS,
 } from '../shared/pendingMovementSidebarLabels';
 import type { TacticalBattleSnapshot } from '../shared/tacticalBattleTypes';
 
-test('formatPendingMovementSidebarTargetLabel formats Nh (status)', () => {
-  assert.equal(formatPendingMovementSidebarTargetLabel(3, 'en_route'), '3h (en_route)');
+test('formatPendingMovementSidebarTargetLabel names the destination code and the steps left', () => {
+  withGameMap(GLOBAL_GAME_MAP, () => {
+    const destination = '81263ffffffffff';
+    assert.equal(formatPendingMovementSidebarTargetLabel(destination, 3), `→ ${getStrategicHexCode(destination)} · 3h`);
+  });
+  assert.equal(formatPendingMovementSidebarTargetLabel(null, 3), '→ ? · 3h');
 });
 
-test('formatTacticalDraftMarchPendingOrderTargetLabel returns zero distance when sub-unit is missing', () => {
+test('formatTacticalDraftMarchPendingOrderTargetLabel shows unknown steps when the sub-unit is missing', () => {
   const center = latLngToCell(1, 2, 4);
   const battle: TacticalBattleSnapshot = {
     battleId: 'b',
@@ -28,7 +33,7 @@ test('formatTacticalDraftMarchPendingOrderTargetLabel returns zero distance when
     subUnits: [],
   };
   const label = formatTacticalDraftMarchPendingOrderTargetLabel(battle, 'missing', center);
-  assert.equal(label, `0h (${TACTICAL_DRAFT_MARCH_DISPLAY_STATUS})`);
+  assert.equal(label, '→ ? · ?h');
 });
 
 test('formatTacticalDraftMarchPendingOrderTargetLabel falls back safely on invalid destination H3', () => {
@@ -51,5 +56,5 @@ test('formatTacticalDraftMarchPendingOrderTargetLabel falls back safely on inval
     ],
   };
   const label = formatTacticalDraftMarchPendingOrderTargetLabel(battle, 'su', 'not-a-valid-h3-cell');
-  assert.equal(label, `0h (${TACTICAL_DRAFT_MARCH_DISPLAY_STATUS})`);
+  assert.equal(label, '→ ? · ?h');
 });

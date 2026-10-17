@@ -51,25 +51,19 @@ export function isBuildQueueSelectInPopupFocused(): boolean {
 }
 
 /**
- * Defines the `isBuildPopupOrEntryTarget` function shape (export function isBuildPopupOrEntryTarget(target: EventTarget | null): boolean).
-
- * Purpose: Supports maintainability by documenting why `isBuildPopupOrEntryTarget` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
+ * Reports whether a pointer target is the build popup, a build marker, or a battle-entry marker.
+ *
+ * Purpose: A press on any of these must not close the open build popup; a press anywhere else does.
+ * When to use: From the window's `pointerdown` handler while the build popup is open.
+ * Expected outcome: True when `target` is inside `#build-popup`, `#build-entry-layer`, or `#tactical-entry-layer`.
+ * Exceptions: None; a target that is not a DOM node returns false.
  */
 export function isBuildPopupOrEntryTarget(target: EventTarget | null): boolean {
   if (!(target instanceof Node)) return false;
   const popup = document.getElementById('build-popup');
   const layer = document.getElementById('build-entry-layer');
   const tacticalLayer = document.getElementById('tactical-entry-layer');
-  const tacticalHud = document.getElementById('tactical-battle-hud');
-  return !!(
-    popup?.contains(target) ||
-    layer?.contains(target) ||
-    tacticalLayer?.contains(target) ||
-    tacticalHud?.contains(target)
-  );
+  return !!(popup?.contains(target) || layer?.contains(target) || tacticalLayer?.contains(target));
 }
 
 /**
@@ -458,7 +452,15 @@ export function createBuildQueuePopupHandler(deps: BuildQueuePopupDeps) {
         if (countInput.value !== raw) countInput.value = raw;
         return parseInt(raw, 10);
       };
-      typeSelect.addEventListener('change', async () => {
+      /**
+       * Submits a type or count edit for this build-queue row.
+       *
+       * Purpose: The type-select and count-input listeners share one update, restore, and re-render path.
+       * When to use: From those two listeners, with the failure string for that control.
+       * Expected outcome: The row updates, or the previous controls return when the edit is still on screen and the server rejects it.
+       * Exceptions: None. Mutation failures are reported through `runBuildQueueMutation`.
+       */
+      async function submitBuildQueueEntryEdit(failureMessage: string): Promise<void> {
         if (restoreSingleHexQueueIfPlaybackBlocks(mount, h3Index)) return;
         if (!window.gameApi?.updateHexBuildQueueEntry) return;
         const submittedUnitType = typeSelect.value as BuildUnitType;
@@ -472,7 +474,7 @@ export function createBuildQueuePopupHandler(deps: BuildQueuePopupDeps) {
               unitType: submittedUnitType,
               count: submittedCount,
             }),
-          failureMessage: 'Failed to update build queue entry.',
+          failureMessage,
           refreshState: true,
         });
         if (!success) {
@@ -490,6 +492,9 @@ export function createBuildQueuePopupHandler(deps: BuildQueuePopupDeps) {
           return;
         }
         void renderBuildQueueIntoMount(mount, h3Index);
+      }
+      typeSelect.addEventListener('change', async () => {
+        await submitBuildQueueEntryEdit('Failed to update build queue entry.');
       });
       row.appendChild(typeSelect);
 
@@ -500,37 +505,7 @@ export function createBuildQueuePopupHandler(deps: BuildQueuePopupDeps) {
         event.preventDefault();
       });
       countInput.addEventListener('input', async () => {
-        if (restoreSingleHexQueueIfPlaybackBlocks(mount, h3Index)) return;
-        if (!window.gameApi?.updateHexBuildQueueEntry) return;
-        const submittedUnitType = typeSelect.value as BuildUnitType;
-        const submittedCount = readCurrentCount();
-        const submittedCountText = countInput.value;
-        const success = await runBuildQueueMutation({
-          mutate: () =>
-            window.gameApi!.updateHexBuildQueueEntry({
-              h3Index,
-              entryId: entry.id,
-              unitType: submittedUnitType,
-              count: submittedCount,
-            }),
-          failureMessage: 'Failed to update build count.',
-          refreshState: true,
-        });
-        if (!success) {
-          if (
-            rejectedBuildQueueEditStillShown(
-              typeSelect,
-              countInput,
-              submittedUnitType,
-              submittedCountText
-            )
-          ) {
-            restoreRejectedBuildQueueControls(typeSelect, countInput, entry);
-            await renderBuildQueueIntoMount(mount, h3Index);
-          }
-          return;
-        }
-        void renderBuildQueueIntoMount(mount, h3Index);
+        await submitBuildQueueEntryEdit('Failed to update build count.');
       });
       row.appendChild(countInput);
 

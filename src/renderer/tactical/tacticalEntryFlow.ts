@@ -3,7 +3,7 @@
  *
  * Purpose: Keeps `renderer.ts` as composition while preserving milestone-2.1 tactical activation sequencing.
  * When to use: Renderer bootstraps these helpers with renderer-local overlays (build popup, Ready pipeline).
- * Expected outcome: Same toasts, map mode transitions, and HUD updates as the pre-extraction inline paths.
+ * Expected outcome: Same toasts, map mode transitions, and Exit Battle updates as the pre-extraction inline paths.
  * Exceptions: IPC failures surface through injected `showMapToast` contracts from tactical exit helpers.
  */
 
@@ -83,7 +83,7 @@ export function buildDefaultTacticalBattleActivationSideEffects(
     },
     enterTacticalView: enterTacticalMapView,
     setStrategicSidebarTactical: tacticalApplyStrategicSidebarForTacticalMode,
-    refreshTacticalExitHud: tacticalUpdateExitButtonVisibility,
+    refreshTacticalExitButton: tacticalUpdateExitButtonVisibility,
     scheduleAnnihilationExit: bindings.scheduleAnnihilationExit,
     refreshReadyButton: bindings.refreshReadyButton,
     syncTacticalEntryOverlay: bindings.syncTacticalEntryOverlay,
@@ -160,7 +160,7 @@ export async function startTacticalBattleFromEntryHex(
  *
  * Contract: Does not perform IPC; assumes strategic `getGameState` already validated the snapshot.
  * When to use: `applyGameStateSnapshot` when `nextState.tacticalBattleSession` attaches a battle the renderer lacked.
- * Expected outcome: Tactical HUD and tactical bounds match a freshly started tactical session.
+ * Expected outcome: Exit Battle and tactical bounds match a freshly started tactical session.
  * Exceptions: None.
  */
 export function activateRestoredTacticalBattleFromMainSnapshot(
@@ -174,7 +174,7 @@ export function activateRestoredTacticalBattleFromMainSnapshot(
  * Ends the tactical session in the main process then resumes strategic Ready handling.
  *
  * Contract: Spreads caller IO and injects current `window.gameApi.endTacticalBattle` after the spread so IPC always wins.
- * When to use: Tactical HUD exit button and annihilation modal `Exit Battle` confirmation.
+ * When to use: Exit Battle in the battle header, and the annihilation modal's `Exit Battle` confirmation.
  * Expected outcome: Clears renderer tactical snapshot, applies post-exit strategic state, restores living-unit stash drafts, refreshes order sidebars, then invokes Ready pipeline on success.
  * Exceptions: Surfaces toasts when IPC fails per `tacticalPerformBattleExit` contract.
  */

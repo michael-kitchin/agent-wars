@@ -560,7 +560,7 @@ openRouter?: {
      * Reads the persisted reasoning-effort override for the selected model.
      *
      * Contract: Resolves to the saved effort, or `''` when the model default applies.
-     * When to use: Model-tab startup, to restore the reasoning dropdown.
+     * When to use: Opponent-tab startup, to restore the reasoning dropdown.
      * Expected outcome: A string; never rejects for a missing value.
      * Exceptions: Rejects only on IPC or database failure.
      */

@@ -39,7 +39,7 @@ const REASONING_EFFORT_ABBREVIATIONS: ReadonlyMap<string, string> = new Map([
 /**
  * Capitalizes the first letter of a reasoning effort name.
  *
- * Purpose: Vendor effort ids arrive in lowercase; the Model tab shows them as names.
+ * Purpose: Vendor effort ids arrive in lowercase; the Opponent tab shows them as names.
  * When to use: Reasoning dropdown options, and the fallback for efforts without an abbreviation.
  * Expected outcome: `high` becomes `High`. An empty string stays empty.
  * Exceptions: None.
@@ -79,7 +79,7 @@ export function sortReasoningEffortsAscending(efforts: readonly string[]): reado
 /**
  * Lists the reasoning efforts the player may choose for a model.
  *
- * Purpose: One rule for the Model-tab dropdown and for main-process request validation.
+ * Purpose: One rule for the Opponent-tab dropdown and for main-process request validation.
  * When to use: Building the reasoning dropdown, or checking a persisted effort before sending it.
  * Expected outcome: `[]` when effort is not selectable (unknown model or no `supported_efforts`); the gateway
  * list when `supported_efforts` is `null`; otherwise the API list in API order. `none` is dropped when

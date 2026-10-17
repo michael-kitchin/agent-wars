@@ -3,7 +3,6 @@
  * order live in basemapProvider.ts.
  */
 
-import { ORDER_LINE_COLOR } from '../core/constants';
 import { basemapNeedsRemountForMaps } from '../../shared/basemapStyleLogic';
 import { showMapToast } from '../openRouter/openRouterUiHelpers';
 import { getRasterBasemapChain, getRasterBasemapChainStartIndex } from './basemapProvider';
@@ -104,6 +103,7 @@ export type GlobalLeafletFactory = {
   rectangle: (bounds: VendorLatLngBounds, options?: Record<string, unknown>) => { addTo: (map: VendorLeafletMap) => VendorViewportRect };
   control: {
     scale: (options?: Record<string, unknown>) => { addTo: (map: VendorLeafletMap) => void };
+    zoom: (options?: Record<string, unknown>) => { addTo: (map: VendorLeafletMap) => void };
   };
   point: (x: number, y: number) => unknown;
 };
@@ -353,6 +353,8 @@ export function initWorldLeafletMaps(
     maxBoundsViscosity: 1,
     /* App-owned WASD/arrow screen pan; avoid Leaflet’s default keyboard panBy. */
     keyboard: false,
+    /* The map zooms from the wheel and from Shift-drag. There is no +/− control. */
+    zoomControl: false,
     /* Keep raster tiles and canvas overlay in lockstep (no CSS zoom/pan lag vs hex draw). */
     zoomAnimation: false,
     fadeAnimation: false,
@@ -365,9 +367,10 @@ export function initWorldLeafletMaps(
   mainMap.fitBounds(worldBounds, { padding: [2, 2], animate: false });
   mainMap.doubleClickZoom.disable();
   try {
-    // Show real-world distance context when Leaflet scale control is available.
+    // Show real-world distance context when Leaflet scale control is available, beside the attribution.
     leafletRef.control
       .scale({
+        position: 'bottomright',
         metric: true,
         imperial: true,
         maxWidth: 120,
@@ -430,12 +433,14 @@ function showBasemapErrorToast(): void {
 }
 
 /**
- * Defines the `syncMinimapViewportRect` function shape (export function syncMinimapViewportRect(): void).
-
- * Purpose: Supports maintainability by documenting why `syncMinimapViewportRect` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
+ * Draws or hides the rectangle that shows the main view on the minimap.
+ *
+ * Purpose: The player can see which part of the overview the main map is framing.
+ * When to use: After the main map or the minimap moves or zooms.
+ * Expected outcome: No rectangle when the main view covers nearly the whole overview. Otherwise one 2 px opaque
+ *   rectangle in the expand control's background (`--chrome-bg`), or `#1b2838` when that token cannot be read, with
+ *   no fill, that does not take the pointer.
+ * Exceptions: None. Returns immediately when either map is missing.
  */
 export function syncMinimapViewportRect(): void {
   if (!mainMap || !miniMap) return;
@@ -462,8 +467,9 @@ export function syncMinimapViewportRect(): void {
 
   if (!viewportRect) {
     viewportRect = leafletRef.rectangle(mainBounds, {
-      color: ORDER_LINE_COLOR,
+      color: getComputedStyle(document.documentElement).getPropertyValue('--chrome-bg').trim() || '#1b2838',
       weight: 2,
+      opacity: 1,
       fill: false,
       interactive: false,
     }).addTo(miniMap);

@@ -1,7 +1,9 @@
 # Curated subset for `npm run verify:modularization` (faster than full `npm test`).
 # Paths are relative to the repository root.
 
-dist/main/rendererConsolidation.test.js
+dist/main/rendererDrawConsolidation.test.js
+dist/main/rendererProductionAirConsolidation.test.js
+dist/main/rendererMapEntryConsolidation.test.js
 dist/main/rendererStackPopoverContracts.test.js
 dist/main/openRouter/openRouterMatrix.test.js
 dist/main/briefing/map/hexCoordinates.test.js

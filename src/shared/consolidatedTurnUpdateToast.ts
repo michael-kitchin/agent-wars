@@ -23,7 +23,8 @@ export const MAP_TOAST_UPDATES_SECTION_TITLE = 'Updates';
  *
  * Purpose: Surfaces production/deployment outcomes separate from combat losses.
  * When to use: `buildOtherTurnUpdatePrimaryLines` for strategic Ready results with `deployedUnitsByType`.
- * Expected outcome: Human-readable counts by type or null when nothing deployed.
+ * Expected outcome: Human-readable counts by type or null when nothing deployed. The noun is "unit" when exactly
+ *   one unit deployed in all, and "units" otherwise.
  * Exceptions: None.
  */
 function formatDeployedUnitsLine(
@@ -36,10 +37,12 @@ function formatDeployedUnitsLine(
   if ((deployed.naval ?? 0) > 0) parts.push(`${deployed.naval!.toLocaleString()} naval`);
   if ((deployed.air ?? 0) > 0) parts.push(`${deployed.air!.toLocaleString()} air`);
   if (parts.length === 0) return null;
-  if (parts.length === 1) return `${parts[0]} units deployed`;
-  if (parts.length === 2) return `${parts[0]} and ${parts[1]} units deployed`;
-  if (parts.length === 3) return `${parts[0]}, ${parts[1]}, and ${parts[2]} units deployed`;
-  return `${parts[0]}, ${parts[1]}, ${parts[2]}, and ${parts[3]} units deployed`;
+  const total = (deployed.armor ?? 0) + (deployed.infantry ?? 0) + (deployed.naval ?? 0) + (deployed.air ?? 0);
+  const noun = total === 1 ? 'unit' : 'units';
+  if (parts.length === 1) return `${parts[0]} ${noun} deployed`;
+  if (parts.length === 2) return `${parts[0]} and ${parts[1]} ${noun} deployed`;
+  if (parts.length === 3) return `${parts[0]}, ${parts[1]}, and ${parts[2]} ${noun} deployed`;
+  return `${parts[0]}, ${parts[1]}, ${parts[2]}, and ${parts[3]} ${noun} deployed`;
 }
 
 /**
@@ -69,7 +72,7 @@ function formatDeploymentCapReachedLine(
  *
  * Purpose: Feeds the consolidated popup Updates section without duplicating unit loss reporting.
  * When to use: Inside `buildConsolidatedTurnUpdateToastMessage` before optional combat fallbacks.
- * Expected outcome: Plain strings without leading bullets.
+ * Expected outcome: Plain strings without leading bullets. A count of one uses the singular noun.
  * Exceptions: None.
  */
 export function buildOtherTurnUpdatePrimaryLines(readyResult: ReadyResult): string[] {
@@ -78,8 +81,9 @@ export function buildOtherTurnUpdatePrimaryLines(readyResult: ReadyResult): stri
   if (deployedLine) lines.push(deployedLine);
   const deploymentCapLine = formatDeploymentCapReachedLine(readyResult.humanDeploymentCapReachedUnitTypes, 'human');
   if (deploymentCapLine) lines.push(deploymentCapLine);
-  if ((readyResult.humanHexesLostCount ?? 0) > 0) {
-    lines.push(`${readyResult.humanHexesLostCount!.toLocaleString()} hexes lost to opponent`);
+  const hexesLost = readyResult.humanHexesLostCount ?? 0;
+  if (hexesLost > 0) {
+    lines.push(`${hexesLost.toLocaleString()} ${hexesLost === 1 ? 'hex' : 'hexes'} lost to opponent`);
   }
   return lines;
 }

@@ -1,7 +1,7 @@
 /**
  * One tab button and the panel it shows.
  *
- * Purpose: Tools, Model, and the new-game dialog share one switch.
+ * Purpose: The console tabs, Tools and Model, and the new-game dialog share one switch.
  * When to use: Building the list passed to `selectTabPanel`.
  * Expected outcome: Both ids match elements already in the page.
  * Exceptions: None.
@@ -31,7 +31,7 @@ export interface TabPanelBinding {
  * Shows one tab and hides the others.
  *
  * Purpose: Click handlers should not each repeat the selected and hidden attributes.
- * When to use: A tab click in the new-game dialog or the Tools and Model bar.
+ * When to use: A tab click in the console rail, the new-game dialog, or the Tools and Model bar.
  * Expected outcome: The matching tab is selected and its panel is visible. A missing element is skipped.
  * Exceptions: None.
  */

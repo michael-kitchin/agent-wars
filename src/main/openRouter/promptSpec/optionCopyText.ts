@@ -12,6 +12,7 @@
  */
 
 import { logDebug } from '../../logger';
+import type { CoachingGates } from './coachingGates';
 import type { PromptCoordinateMode } from './promptCoordinateMode';
 
 /**
@@ -40,6 +41,46 @@ export function buildOptionCopyMappingClause(args: {
     `do not copy overlapping rows that relist the same ${actor}. ` +
     `Never copy a Target Hex from a row that does not list that ${actor}; if that ${actor} has no row, call plan_route or leave it idle.`
   );
+}
+
+/**
+ * Builds the option-copy coaching bullet for one consultation mode.
+ *
+ * Purpose: Strategic and tactical bullets share the table, routing, and hold branches, and differ by actor noun and period word.
+ * When to use: The option-copy item in each mode's coaching list.
+ * Expected outcome: The historical sentence for that mode's noun and period, including the mapping clause when a table is present.
+ * Exceptions: None.
+ */
+export function buildOptionCopyOrRoutingBullet(
+  gates: CoachingGates,
+  periodWord: 'this-turn' | 'this-beat',
+  actorNoun: 'unit' | 'sub-unit'
+): string {
+  logDebug('promptSpec buildOptionCopyOrRoutingBullet', {
+    periodWord,
+    actorNoun,
+    hasBestOptionsTable: gates.hasBestOptionsTable,
+    planningEnabled: gates.planningEnabled,
+    hasAirUnits: gates.hasAirUnits,
+  });
+  if (gates.hasBestOptionsTable) {
+    const routing = gates.planningEnabled
+      ? ` Call plan_route only for a destination the table does not list for that ${actorNoun}.`
+      : '';
+    return (
+      `- Best Options This Turn Target Hexes are already ${periodWord} legal destinations. ` +
+      buildOptionCopyMappingClause({
+        actorNoun,
+        hasAirUnits: gates.hasAirUnits,
+        includeFerryMapping: gates.hasAirUnits,
+      }) +
+      routing
+    );
+  }
+  if (gates.planningEnabled) {
+    return '- No options are listed this period. Destinations must come from the routing tool, not from an absent options table.';
+  }
+  return `- No options are listed this period. Destinations come only from the adjacent-cell listing; the ${actorNoun}'s own cell means hold.`;
 }
 
 /**

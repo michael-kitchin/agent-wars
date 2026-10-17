@@ -4,7 +4,6 @@ import { selectTabPanel, type TabPanelBinding } from '../chrome/selectTabPanel';
 import { showMapToast } from '../openRouter/openRouterUiHelpers';
 import { rendererSharedState as S } from '../core/state';
 import { refreshNewGameMapPreview } from './newGameMapPreviewUi';
-import { syncNewGameRegionSelectWidths } from './newGameRegionSelectWidth';
 import { syncNewGameBannerToTab } from './newGameBanner';
 
 /**
@@ -147,7 +146,7 @@ function selectNewGameTab(which: 'global' | 'regional'): void {
  *
  * Purpose: The player picks one extracted region.
  * When to use: After the map list loads.
- * Expected outcome: One option per regional row, in the list's order. The place dropdowns then share the width of the widest region name currently listed.
+ * Expected outcome: One option per regional row, in the list's order.
  * Exceptions: None.
  */
 function fillRegionSelect(regions: readonly GameMapListEntry[]): void {
@@ -160,7 +159,6 @@ function fillRegionSelect(regions: readonly GameMapListEntry[]): void {
     option.textContent = region.displayName;
     select.appendChild(option);
   }
-  syncNewGameRegionSelectWidths();
 }
 
 /**
@@ -266,7 +264,7 @@ function randomizeOneRegionalSide(which: 'human' | 'ai'): void {
  *
  * Purpose: The unit row and the Advanced line sit outside the tabs, so both follow the selection.
  * When to use: A tab change and a regional region change while Regional is selected.
- * Expected outcome: Each unit type reads like `Infantry ($20)` on Global and the catalog price the same way on Regional. The Advanced line under the game size selector uses that same map's threshold, or is cleared when that map is missing.
+ * Expected outcome: Each unit type's price reads like `$20`, from the global catalog on Global and the region's catalog on Regional. The Advanced line beside the Forces title uses that same map's threshold, or is cleared when that map is missing.
  * Exceptions: None.
  */
 function applyVisibleCosts(): void {
@@ -283,7 +281,7 @@ function applyVisibleCosts(): void {
 }
 
 /**
- * Writes the Advanced threshold under the game size selector.
+ * Writes the Advanced threshold beside the Forces title.
  *
  * Purpose: One line serves both tabs, and an empty line must not keep the previous map's threshold.
  * When to use: `applyVisibleCosts`, and at the start of `prepareNewGameMapPanel` before the map list returns.
@@ -296,11 +294,11 @@ function setAdvancedTechLine(text: string): void {
 }
 
 /**
- * Writes one parenthetical unit price.
+ * Writes one unit price.
  *
- * Purpose: The four labels share one format.
+ * Purpose: The four prices share one format.
  * When to use: `applyVisibleCosts`.
- * Expected outcome: The element's text is the parenthetical price, such as `($20)`.
+ * Expected outcome: The element's text is the price, such as `$20`.
  * Exceptions: None.
  */
 function setCost(id: string, cost: number): void {
