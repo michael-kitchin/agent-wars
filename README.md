@@ -14,7 +14,7 @@ The game is intended to be simple to learn and quick to play, but with enough de
 
 ![Tactical planning over central Mexico](doc/media/central-mexico-battle.png)
 
-*Tactical turn resolution in central Mexico on turn 5, showing dice roll/combat animations. Human/teal units face an LLM/rose opponent (in this case, Gemini Flash Lite). Movement orders are queued up in the orders tab, to the right.*
+*Tactical turn resolution in central Mexico on turn 5, showing in-progress, dice roll, combat, and movement animations. Human/teal units face an LLM/rose opponent (in this case, Gemini Flash Lite). Movement orders are queued up in the orders tab, to the right.*
 
 ## Why This Exists
 
