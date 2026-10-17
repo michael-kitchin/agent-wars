@@ -377,9 +377,18 @@ body:has(#game-over-overlay:not(.hidden)) #app-topbar.topbar-battle {
 .new-game-month-controls select {
   width: max-content;
 }
+.new-game-checks {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 16px;
+  row-gap: 8px;
+  margin-top: 12px;
+}
 .new-game-check {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  margin-top: 12px;
+  margin-top: 0;
 }

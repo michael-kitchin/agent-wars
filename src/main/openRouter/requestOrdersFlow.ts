@@ -443,9 +443,16 @@ export async function requestOrdersFlow(
     if (signal?.aborted) return failRequest('Cancelled');
     const content = loopResult.content;
     const productionEnabledForParse = tacticalBattle ? false : flags.productionEnabled;
-    let parsed = parseOrdersResponse(content, resolveToH3, planState, latLngByH3, productionEnabledForParse, coordinateContext);
-    if (!parsed) {
-      const repairContent = await runParseRepairExchange({
+    /**
+     * Asks the model once to replace assistant text that did not yield usable actor rows.
+     *
+     * Purpose: Unparseable JSON and an all-dropped actor envelope share one repair call.
+     * When to use: After the first parse fails, or after a parse whose actor rows were all dropped and production was not applied.
+     * Expected outcome: The repair assistant text, or null when the repair call fails or returns empty.
+     * Exceptions: None. Transport failures come back as null from `runParseRepairExchange`.
+     */
+    const repairAssistantText = (): Promise<string | null> =>
+      runParseRepairExchange({
         messages,
         unparseableContent: content,
         repairGates: envelopeGates,
@@ -460,15 +467,36 @@ export async function requestOrdersFlow(
         requestSettings,
         toolsOffered: tools.length > 0,
       });
+    /**
+     * Parses one assistant text with the same state this consultation already built.
+     *
+     * Purpose: The first reply and the repair reply must be read by the same parser.
+     * When to use: The original content and, at most once, the repair text.
+     * Expected outcome: The parsed envelope, or null when the text is not an envelope.
+     * Exceptions: None. `parseOrdersResponse` returns null instead of throwing for bad JSON.
+     */
+    const parseContent = (assistantText: string): ReturnType<typeof parseOrdersResponse> =>
+      parseOrdersResponse(
+        assistantText,
+        resolveToH3,
+        planState,
+        latLngByH3,
+        productionEnabledForParse,
+        coordinateContext
+      );
+    let parsed = parseContent(content);
+    if (!parsed) {
+      const repairContent = await repairAssistantText();
+      if (repairContent) parsed = parseContent(repairContent);
+    } else if (parsed.everyActorRowDropped && !(parsed.productionAppliedCount && parsed.productionAppliedCount > 0)) {
+      logDebug('openRouter requestOrders: every actor row dropped', {
+        turnNumber: state.turnNumber,
+        expandedActorRowCount: parsed.expandedActorRowCount,
+      });
+      const repairContent = await repairAssistantText();
       if (repairContent) {
-        parsed = parseOrdersResponse(
-          repairContent,
-          resolveToH3,
-          planState,
-          latLngByH3,
-          productionEnabledForParse,
-          coordinateContext
-        );
+        const repaired = parseContent(repairContent);
+        if (repaired) parsed = repaired;
       }
     }
     if (!parsed) {

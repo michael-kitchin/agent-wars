@@ -32,6 +32,8 @@ import {
 import { syncMapExtentToSnapshot } from '../map/mapExtent';
 import { prepareNewGameMapPanel, readNewGameMapChoice, regionalStartBlocked, registerNewGameMapControls, selectedNewGameTab } from './newGameMapUi';
 import { showNewGameBanner } from './newGameBanner';
+import { chooseStartMatchAi } from '../../shared/startMatchAiChoice';
+import { applyStartMatchAiChoice, readStartMatchAiInput } from './newGameAiStart';
 import { advanceRendererMatchEpoch, rendererMatchEpochCurrent } from '../core/matchEpoch';
 import { stopOpponentPlanning } from '../openRouter/openRouterRuntime';
 import { clearResolutionPlaybackAnimationState } from '../tactical/tacticalUiOrchestration';
@@ -298,7 +300,9 @@ function stopMatchWaitingUnderNewGame(): void {
  * When to use: Once at renderer startup.
  * Expected outcome: The randomize buttons, the game-size caps, the panel's grip, and its close control are live. Close
  *   goes back to a match waiting under the screen. Clicking Start stops that match, if any, then sends
- *   fog, the four bonus levels, the starting month, home regions, and game size to `newGame`, then reloads the map,
+ *   fog, the four bonus levels, the starting month, home regions, and game size to `newGame`. Auto-start AI is not sent.
+ *   A successful start then applies that click-time choice: planning turns on, or Run turns off and the Opponent tab opens.
+ *   A failure leaves Run and the console unchanged. Start reloads the map,
  *   sidebars, and overlay from the returned state. The overlay closes, and the map is resized beside the console,
  *   before the loaded extent is fit. Start then zooms one level toward human infantry and armor, or any human units
  *   when those are absent. While that attempt runs, a preview reply cannot move the camera. Failures are logged with
@@ -317,6 +321,7 @@ export function registerNewGameButton(deps: NewGameDeps): void {
   registerNewGameMapControls();
   registerGameSizeSelect();
   document.getElementById('new-game-btn')?.addEventListener('click', async () => {
+    const startMatchAi = chooseStartMatchAi(readStartMatchAiInput());
     if (!window.gameApi?.newGame) return;
     if (regionalStartBlocked()) {
       showMapToast('This map has no two sides.');
@@ -378,8 +383,10 @@ export function registerNewGameButton(deps: NewGameDeps): void {
       deps.updatePendingOrdersSidebar();
       deps.updateRangedSidebar();
       deps.updateSidebar();
-      deps.updateReadyButtonState();
-      if (S.runButtonOn) deps.startBackgroundRequestIfAllowed();
+      await applyStartMatchAiChoice(startMatchAi, {
+        startPlanning: () => deps.startBackgroundRequestIfAllowed(),
+        updateReadyButtonState: () => deps.updateReadyButtonState(),
+      });
       deps.resizeAndRedraw();
     } catch (err) {
       console.error('newGame failed:', err);
@@ -400,7 +407,7 @@ export function registerNewGameButton(deps: NewGameDeps): void {
  *   camera is saved, and the renderer match epoch moves forward; nothing about the match stops. Moving the epoch
  *   retires a Ready, battle-exit, or battle-start handler that is still awaiting its reply, so its result cannot land
  *   on the match after close or on the new match after Start. A reply already in flight when the screen opened is
- *   discarded rather than applied. Fog of war and the bonus dropdowns return to their defaults, the home regions,
+ *   discarded rather than applied. Fog of war, Auto-start AI, and the bonus dropdowns return to their defaults, the home regions,
  *   starting month, and map preview are drawn again, the panel opens expanded at the map's corner, and the overlay
  *   opens. Returns true only when this call removes `hidden` from `#game-over-overlay`.
  * Exceptions: None.

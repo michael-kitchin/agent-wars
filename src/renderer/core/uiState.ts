@@ -114,7 +114,7 @@ export function setMainUIControlsEnabled(enabled: boolean): void {
  * When to use: After every state refresh.
  * Expected outcome: Returns true only when `#game-over-overlay` gains or loses `hidden`. Returns false when it
  *   stays open, stays closed, or the element is missing. With a live game the overlay hides and controls are
- *   enabled. Otherwise the overlay shows a win, loss, or start message. Fog of war and the bonus dropdowns return
+ *   enabled. Otherwise the overlay shows a win, loss, or start message. Fog of war, Auto-start AI, and the bonus dropdowns return
  *   to their defaults on every call while it shows. The home regions, the starting month, and the map preview are
  *   drawn only when the overlay opens, and that open closes the game menu. The panel starts expanded, at the map's
  *   top-left corner, only on that open. A later refresh leaves a collapsed or moved panel as it is. While a match

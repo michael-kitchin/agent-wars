@@ -109,8 +109,8 @@ body {
   overflow: hidden;
 }
 /* The overview, with the tabs toggle laid over its lower-left corner. The overview is its own stacking context, so
-   Leaflet's panes stay under the toggle. A 2 px border runs around the overview's inside edge, over the map and the
-   toggle, and takes no pointer input. */
+   Leaflet's panes stay under the toggle. A 2 px border in the expand control's background runs around the overview's
+   inside edge, over the map and the toggle, and takes no pointer input. */
 .minimap-overview {
   flex: none;
   position: relative;
@@ -120,7 +120,7 @@ body {
   position: absolute;
   inset: 0;
   z-index: 2;
-  border: 2px solid var(--chrome-border);
+  border: 2px solid var(--chrome-bg);
   pointer-events: none;
 }
 #minimap {
@@ -243,7 +243,8 @@ body:has(#game-over-overlay:not(.hidden)) #minimap-panel,
 body:has(#game-over-overlay:not(.hidden)) #terrain-legend {
   visibility: hidden;
 }
-/* Leaflet's bottom-right corner keeps the map's 12px inset: the scale right of the attribution. */
+/* Leaflet's bottom-right corner keeps the map's 12px inset. The zoom buttons are the rightmost item, then the scale,
+   then the attribution, on one bottom line. */
 #main-map .leaflet-bottom.leaflet-right {
   bottom: 12px;
   right: 12px;
@@ -256,6 +257,32 @@ body:has(#game-over-overlay:not(.hidden)) #terrain-legend {
   margin: 0;
   float: none;
   clear: none;
+}
+/* The main map's + and − buttons, in the same teal as the other buttons. A button at the zoom limit is dimmed. */
+#main-map .leaflet-control-zoom {
+  border: 1px solid var(--button-border);
+  border-radius: 2px;
+  box-shadow: none;
+}
+#main-map .leaflet-control-zoom a {
+  width: 30px;
+  height: 30px;
+  line-height: 30px;
+  background: var(--button-bg);
+  color: var(--button-text);
+  border-bottom-color: var(--button-border);
+}
+#main-map .leaflet-control-zoom a:hover,
+#main-map .leaflet-control-zoom a:focus {
+  background: var(--button-bg-hover);
+  color: var(--button-text);
+}
+#main-map .leaflet-control-zoom a.leaflet-disabled,
+#main-map .leaflet-control-zoom a.leaflet-disabled:hover,
+#main-map .leaflet-control-zoom a.leaflet-disabled:focus {
+  background: var(--button-off-bg);
+  color: var(--button-off-text);
+  cursor: default;
 }
 #terrain-legend select {
   display: block;

@@ -22,7 +22,7 @@ In the Rules section the player picks:
 - Origin bonus and Terrain bonus dropdowns (Off, Low, or High; both default to Low; rules in [combat-rules-v3.md](combat-rules-v3.md) §4.9, "Origin bonus and terrain bonus")
 - Weather bonus dropdown (Off, Low, or High; default Low; rules in [combat-rules-v3.md](combat-rules-v3.md) §4.9, "Weather bonus")
 - Tech bonus dropdown (Off, Low, or High; default Low; rules in [combat-rules-v3.md](combat-rules-v3.md) §4.9, "Tech bonus")
-- Fog of war (default on), on the line after the starting month. The month is a random month whenever the new-game dialog opens, with a square randomize button beside the list.
+- Fog of war (default on), on the line after the starting month, with Auto-start AI to its right. Auto-start AI is checked when the dialog opens. What it does when the match starts is in [new-game-dialog.md](ux/new-game-dialog.md). The month is a random month whenever the new-game dialog opens, with a square randomize button beside the list. The engine does not store Auto-start AI.
 
 A global match stores the two home-region names in `scenario_region_human` and `scenario_region_ai`. Those two regions may be the same.
 

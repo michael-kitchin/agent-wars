@@ -63,6 +63,15 @@ export interface EnvelopeOrderRowsResult {
    * Exceptions: None.
    */
   dropReasons: string[];
+  /**
+   * Standing-order rows that were applied rather than dropped.
+   *
+   * Contract: Counts a non-tactical `assign_order` whose tool result is not `status: 'error'`, and every non-tactical `cancel_order`. A cancel is counted even when the tool reports an error, matching the row loop.
+   * When to use: Deciding whether every submitted actor row was dropped.
+   * Expected outcome: Zero when every standing-order row was rejected.
+   * Exceptions: None.
+   */
+  appliedStandingOrderCount: number;
 }
 
 /**
@@ -142,7 +151,13 @@ export function processV3OrdersArray(
   context: CoordinateContext
 ): EnvelopeOrderRowsResult {
   logDebug('openRouter processV3OrdersArray', { rowCount: entries.length, mode: context.mode });
-  const result: EnvelopeOrderRowsResult = { movementOrders: [], rangedAttacks: [], embarkOrders: [], dropReasons: [] };
+  const result: EnvelopeOrderRowsResult = {
+    movementOrders: [],
+    rangedAttacks: [],
+    embarkOrders: [],
+    dropReasons: [],
+    appliedStandingOrderCount: 0,
+  };
   const { movementOrders, rangedAttacks, embarkOrders, dropReasons } = result;
   for (const raw of entries) {
     if (!raw || typeof raw !== 'object') continue;
@@ -173,18 +188,22 @@ export function processV3OrdersArray(
       logDebug('openRouter processV3OrdersArray: assign_order', { unitId });
       const orderPayload = translateAssignOrderHexCodeParams(o.order, context, unitId);
       const assignResult = executeStandingOrders('assign_order', { unitId, order: orderPayload }, state, latLngByH3, resolveToH3);
-      if (assignResult.status === 'error' && typeof assignResult.error === 'string') {
-        const orderType =
-          orderPayload && typeof orderPayload === 'object' && !Array.isArray(orderPayload)
-            ? (orderPayload as { type?: unknown }).type
-            : undefined;
-        logError('openRouter processV3OrdersArray: assign_order rejected', {
-          unitId,
-          orderType: typeof orderType === 'string' ? orderType : undefined,
-          error: assignResult.error,
-        });
-        dropReasons.push(`assign_order ${unitId}: ${assignResult.error}`);
+      if (assignResult.status === 'error') {
+        if (typeof assignResult.error === 'string') {
+          const orderType =
+            orderPayload && typeof orderPayload === 'object' && !Array.isArray(orderPayload)
+              ? (orderPayload as { type?: unknown }).type
+              : undefined;
+          logError('openRouter processV3OrdersArray: assign_order rejected', {
+            unitId,
+            orderType: typeof orderType === 'string' ? orderType : undefined,
+            error: assignResult.error,
+          });
+          dropReasons.push(`assign_order ${unitId}: ${assignResult.error}`);
+        }
+        continue;
       }
+      result.appliedStandingOrderCount += 1;
       continue;
     }
     if (action === 'cancel_order') {
@@ -197,6 +216,7 @@ export function processV3OrdersArray(
       }
       logDebug('openRouter processV3OrdersArray: cancel_order', { unitId });
       executeStandingOrders('cancel_order', { unitId }, state, latLngByH3, resolveToH3);
+      result.appliedStandingOrderCount += 1;
       continue;
     }
     if (action === 'explicit_move') {

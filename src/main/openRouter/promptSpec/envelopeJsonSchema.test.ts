@@ -87,15 +87,33 @@ function assertEveryObjectClosed(node: unknown, path: string): void {
 }
 
 /**
+ * Reports whether a value matches any bare or sibling `anyOf` branch.
+ *
+ * Purpose: Order rows and standing-order objects are unions, so a single property table cannot accept them.
+ * When to use: `schemaMismatch`, when the node has `anyOf`.
+ * Expected outcome: `undefined` when one branch fits. Otherwise every branch mismatch, joined.
+ * Exceptions: AssertionError when a branch is not an object schema.
+ */
+function anyOfMismatch(value: unknown, schema: Record<string, unknown>, path: string): string | undefined {
+  const variantMismatches = (schema.anyOf as unknown[]).map((variant, index) =>
+    schemaMismatch(value, asRecord(variant, `${path}.anyOf[${index}]`), `${path}.anyOf[${index}]`)
+  );
+  return variantMismatches.some((mismatch) => mismatch === undefined)
+    ? undefined
+    : `${path} matches no anyOf variant: ${variantMismatches.join('; ')}`;
+}
+
+/**
  * Finds the first way a value fails a schema node, by keys, required keys, enums, and `anyOf` variants.
  *
  * Purpose: Shared by the example-fit drift guard and the per-action row checks.
  * When to use: Checking whether a value would be accepted by a schema node.
  * Expected outcome: `undefined` when the value fits. Otherwise a message naming the first unlisted or missing key,
  * the first value outside an enum, or every variant's mismatch when no `anyOf` variant fits.
- * Exceptions: AssertionError when the schema itself is malformed (missing `properties` or `items`).
+ * Exceptions: AssertionError when a schema node that should have `properties` or `items` does not.
  */
 function schemaMismatch(value: unknown, schema: Record<string, unknown>, path: string): string | undefined {
+  if (Array.isArray(schema.anyOf) && schema.properties === undefined) return anyOfMismatch(value, schema, path);
   if (Array.isArray(value)) {
     if (schema.type !== 'array') return `${path} must be an array schema`;
     const items = asRecord(schema.items, `${path}.items`);
@@ -116,12 +134,7 @@ function schemaMismatch(value: unknown, schema: Record<string, unknown>, path: s
       .find((m) => m !== undefined);
     if (keyMismatch) return keyMismatch;
     if (!Array.isArray(schema.anyOf)) return undefined;
-    const variantMismatches = schema.anyOf.map((variant, index) =>
-      schemaMismatch(value, asRecord(variant, `${path}.anyOf[${index}]`), `${path}.anyOf[${index}]`)
-    );
-    return variantMismatches.some((m) => m === undefined)
-      ? undefined
-      : `${path} matches no anyOf variant: ${variantMismatches.join('; ')}`;
+    return anyOfMismatch(value, schema, path);
   }
   if (Array.isArray(schema.enum) && !schema.enum.includes(value)) {
     return `${path} value ${String(value)} is not in the schema enum`;
@@ -194,10 +207,15 @@ function testStrategicFieldOrderAndClosure(): void {
 function testTacticalDropsStrategicOnlySurface(): void {
   const properties = asRecord(envelopeSchema(TACTICAL).properties, 'properties');
   const orderRow = orderRowSchemaFor(TACTICAL);
-  const actions = asRecord(asRecord(orderRow.properties, 'orders.items.properties').action, 'action').enum as unknown[];
+  const branches = orderRow.anyOf as unknown[];
+  assert.ok(Array.isArray(branches));
+  const actions = branches.flatMap((branch) => {
+    const branchProperties = asRecord(asRecord(branch, 'tactical branch').properties, 'tactical branch.properties');
+    assert.ok(!('order' in branchProperties));
+    return asRecord(branchProperties.action, 'action').enum as unknown[];
+  });
   assert.ok(!actions.includes('assign_order'));
   assert.ok(!actions.includes('cancel_order'));
-  assert.ok(!('order' in asRecord(orderRow.properties, 'orders.items.properties')));
   const callbackRow = asRecord(asRecord(properties.callbacks, 'callbacks').items, 'callbacks.items');
   const events = asRecord(asRecord(callbackRow.properties, 'callbacks.items.properties').event, 'event').enum as unknown[];
   assert.ok(!events.includes('unit_arrived'));
@@ -264,6 +282,122 @@ function testTaughtExamplesFitSchema(): void {
 }
 
 /**
+ * Verifies an order row is a bare union and still accepts both actor-id shapes.
+ *
+ * Purpose: A sibling property table would let Gemini omit `destination` and `order`.
+ * When to use: After changing `orderRowSchema`.
+ * Expected outcome: The items node has only `anyOf`. A move fits with `unitId` or `unitIds`. An assign without `order` fails.
+ * Exceptions: None.
+ */
+function testOrderRowIsBareUnion(): void {
+  [STRATEGIC_ALL_ON, TACTICAL].forEach((gates) => {
+    const orderRow = orderRowSchemaFor(gates);
+    assert.deepEqual(Object.keys(orderRow), ['anyOf']);
+    const path = gates.coordinateMode;
+    assert.equal(
+      schemaMismatch({ action: 'explicit_move', unitId: 'a1-t1', destination: 'AB' }, orderRow, path),
+      undefined
+    );
+    assert.equal(
+      schemaMismatch({ action: 'explicit_move', unitIds: ['a1-t1'], destination: 'AB' }, orderRow, path),
+      undefined
+    );
+    assert.ok(schemaMismatch({ action: 'explicit_move', unitId: 'a1-t1' }, orderRow, path));
+  });
+  const strategic = orderRowSchemaFor(STRATEGIC_ALL_ON);
+  assert.equal(
+    schemaMismatch(
+      { action: 'assign_order', unitId: 'a1-t1', order: { type: 'hold_fire' } },
+      strategic,
+      'assign'
+    ),
+    undefined
+  );
+  assert.ok(schemaMismatch({ action: 'assign_order', unitId: 'a1-t1' }, strategic, 'assign without order'));
+}
+
+/**
+ * Verifies each standing-order type requires its own place or target field.
+ *
+ * Purpose: A march object whose only key is `type` is what the loose order schema used to allow.
+ * When to use: After changing `standingOrderSchema`.
+ * Expected outcome: Each type fits with its required field and fails without it. `hold_fire` fits with `type` alone.
+ * Exceptions: None.
+ */
+function testStandingOrderBranchesRequireTypeFields(): void {
+  const orderRow = orderRowSchemaFor(STRATEGIC_ALL_ON);
+  const cases: ReadonlyArray<{ readonly order: Record<string, unknown>; readonly fits: boolean }> = [
+    { order: { type: 'march', destination: 'CF' }, fits: true },
+    { order: { type: 'march' }, fits: false },
+    { order: { type: 'defend', defendHex: 'CF' }, fits: true },
+    { order: { type: 'defend' }, fits: false },
+    { order: { type: 'pursue', targetUnitId: 'h1-i1' }, fits: true },
+    { order: { type: 'pursue' }, fits: false },
+    { order: { type: 'patrol', waypoints: ['CD', 'CF'] }, fits: true },
+    { order: { type: 'patrol' }, fits: false },
+    { order: { type: 'hold_fire' }, fits: true },
+  ];
+  cases.forEach(({ order, fits }) => {
+    const row = { action: 'assign_order', unitId: 'a1-t1', order };
+    const mismatch = schemaMismatch(row, orderRow, String(order.type));
+    assert.equal(mismatch === undefined, fits, mismatch ?? `${String(order.type)} should not fit`);
+  });
+}
+
+/**
+ * Verifies ranged rows and air strikes accept exactly one target key.
+ *
+ * Purpose: A row with both targets, or with neither, is dropped by the parser.
+ * When to use: After changing the ranged branches or `airStrikeRowSchema`.
+ * Expected outcome: One target fits. Neither or both fails. Ferry still requires `destination` and nothing else new.
+ * Exceptions: None.
+ */
+function testRangedAndAirStrikeTargets(): void {
+  [STRATEGIC_ALL_ON, TACTICAL].forEach((gates) => {
+    const orderRow = orderRowSchemaFor(gates);
+    const path = gates.coordinateMode;
+    assert.equal(
+      schemaMismatch({ action: 'ranged_attack', unitId: 'a1-n1', targetHexCode: 'AB' }, orderRow, path),
+      undefined
+    );
+    assert.equal(
+      schemaMismatch({ action: 'ranged_attack', unitId: 'a1-n1', targetUnitId: 'h1-i1' }, orderRow, path),
+      undefined
+    );
+    assert.ok(schemaMismatch({ action: 'ranged_attack', unitId: 'a1-n1' }, orderRow, path));
+    assert.ok(
+      schemaMismatch(
+        { action: 'ranged_attack', unitId: 'a1-n1', targetHexCode: 'AB', targetUnitId: 'h1-i1' },
+        orderRow,
+        path
+      )
+    );
+  });
+  const properties = asRecord(envelopeSchema(STRATEGIC_ALL_ON).properties, 'properties');
+  const airRow = asRecord(asRecord(properties.airStrikes, 'airStrikes').items, 'airStrikes.items');
+  assert.deepEqual(Object.keys(airRow), ['anyOf']);
+  assert.equal(
+    schemaMismatch({ unitId: 'a1-a1', targetType: 'units', targetHexCode: 'CI' }, airRow, 'air hex'),
+    undefined
+  );
+  assert.equal(
+    schemaMismatch({ unitId: 'a1-a1', targetType: 'units', targetUnitId: 'h1-i1' }, airRow, 'air unit'),
+    undefined
+  );
+  assert.ok(schemaMismatch({ unitId: 'a1-a1', targetType: 'units' }, airRow, 'air type only'));
+  assert.ok(
+    schemaMismatch(
+      { unitId: 'a1-a1', targetType: 'units', targetHexCode: 'CI', targetUnitId: 'h1-i1' },
+      airRow,
+      'air both'
+    )
+  );
+  const ferryRow = asRecord(asRecord(properties.ferryOrders, 'ferryOrders').items, 'ferryOrders.items');
+  assert.equal(schemaMismatch({ unitId: 'a1-a2', destination: 'CJ' }, ferryRow, 'ferry'), undefined);
+  assert.ok(schemaMismatch({ unitId: 'a1-a2' }, ferryRow, 'ferry without destination'));
+}
+
+/**
  * Verifies every taught callback parameter name is allowed by the callback params schema.
  *
  * Purpose: Drift guard; the prompt teaches parameters from `TAUGHT_CALLBACK_EVENTS`, and the closed params schema
@@ -300,6 +434,9 @@ function run(): void {
   testStrategicFieldOrderAndClosure();
   testTacticalDropsStrategicOnlySurface();
   testMoveRowsRequireDestination();
+  testOrderRowIsBareUnion();
+  testStandingOrderBranchesRequireTypeFields();
+  testRangedAndAirStrikeTargets();
   testTaughtExamplesFitSchema();
   testTaughtCallbackParametersFitSchema();
   console.log('envelopeJsonSchema.test.ts passed');

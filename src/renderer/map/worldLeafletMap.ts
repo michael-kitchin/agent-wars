@@ -353,7 +353,7 @@ export function initWorldLeafletMaps(
     maxBoundsViscosity: 1,
     /* App-owned WASD/arrow screen pan; avoid Leaflet’s default keyboard panBy. */
     keyboard: false,
-    /* The map zooms from the wheel and from Shift-drag. There is no +/− control. */
+    /* The main map zooms from the wheel, from Shift-drag, and from the +/− buttons added below. There is no second control. */
     zoomControl: false,
     /* Keep raster tiles and canvas overlay in lockstep (no CSS zoom/pan lag vs hex draw). */
     zoomAnimation: false,
@@ -379,6 +379,8 @@ export function initWorldLeafletMaps(
   } catch {
     /* scale control not available in some Leaflet builds */
   }
+  /* Leaflet inserts a bottom control at the front of the corner, so adding zoom after the scale puts it on the right. */
+  leafletRef.control.zoom({ position: 'bottomright' }).addTo(mainMap);
 
   miniMap = leafletRef.map(miniEl, {
     minZoom: 0,

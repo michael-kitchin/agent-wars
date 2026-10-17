@@ -28,6 +28,19 @@ export interface ConsoleTabState {
 }
 
 /**
+ * Shows one tab with the console expanded.
+ *
+ * Purpose: A successful start opens the Opponent tab without using a tab click. A click on the selected tab collapses
+ *   the console, so this result does not go through `nextConsoleTabState`.
+ * When to use: From the console frame when a start should show a tab.
+ * Expected outcome: The named tab is active and the console is expanded, whatever the previous tab and collapsed state were.
+ * Exceptions: None.
+ */
+export function expandedConsoleTabState(tabId: string): ConsoleTabState {
+  return { activeTabId: tabId, collapsed: false };
+}
+
+/**
  * Applies one click on a console tab.
  *
  * Purpose: A click on the active tab of an expanded console collapses it; any click on a collapsed console expands it.

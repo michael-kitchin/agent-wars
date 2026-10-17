@@ -55,6 +55,7 @@ const MODE_TABS = Object.freeze(['#map-mode-weather', '#map-mode-tech', '#map-mo
 const LEAFLET = Object.freeze({
   scale: '#main-map .leaflet-control-scale',
   attribution: '#main-map .leaflet-control-attribution',
+  zoom: '#main-map .leaflet-control-zoom',
 });
 
 /**
@@ -235,20 +236,40 @@ const MAP_CHROME_CHECKS = Object.freeze([
   {
     name: 'scale-and-attribution-bottom-right',
     scenes: PLACEMENT_SCENES,
-    needs: ['#canvas-container', LEAFLET.scale, LEAFLET.attribution],
+    needs: ['#canvas-container', LEAFLET.scale, LEAFLET.attribution, LEAFLET.zoom],
     run: (p, el) => {
       const c = el('#canvas-container');
       const scale = el(LEAFLET.scale);
       const attribution = el(LEAFLET.attribution);
+      const zoom = el(LEAFLET.zoom);
       if (!scale.shown) return 'the scale is not shown';
       const bottom = c.y + c.h - PANEL.inset;
-      if (!near(scale.x + scale.w, c.x + c.w - PANEL.inset) || !near(scale.y + scale.h, bottom)) {
-        return `the scale is at ${fmt(scale)}, expected ${PANEL.inset} px in from the map's bottom-right ${fmt(c)}`;
+      if (!near(scale.y + scale.h, bottom)) {
+        return `the scale is at ${fmt(scale)}, expected its bottom ${PANEL.inset} px in from the map ${fmt(c)}`;
+      }
+      if (!near(scale.x + scale.w, zoom.x - 6)) {
+        return `the scale is at ${fmt(scale)}, expected 6 px left of the zoom buttons ${fmt(zoom)}`;
       }
       if (!attribution.shown) return null;
       return attribution.x + attribution.w <= scale.x + 1 && near(attribution.y + attribution.h, bottom)
         ? null
         : `the attribution is at ${fmt(attribution)}, expected left of the scale ${fmt(scale)} on the same bottom line`;
+    },
+  },
+  {
+    name: 'zoom-buttons-bottom-right',
+    scenes: [...PLACEMENT_SCENES, ...NEW_GAME_SCENES],
+    needs: ['#canvas-container', LEAFLET.zoom],
+    run: (p, el) => {
+      if (p.minimapHasZoom) return 'the minimap has zoom buttons';
+      const c = el('#canvas-container');
+      const zoom = el(LEAFLET.zoom);
+      if (!zoom.shown) return 'the zoom buttons are not shown';
+      const right = c.x + c.w - PANEL.inset;
+      const bottom = c.y + c.h - PANEL.inset;
+      return near(zoom.x + zoom.w, right) && near(zoom.y + zoom.h, bottom)
+        ? null
+        : `the zoom buttons are at ${fmt(zoom)}, expected ${PANEL.inset} px in from the map's bottom-right ${fmt(c)}`;
     },
   },
   {
@@ -266,9 +287,10 @@ const MAP_CHROME_CHECKS = Object.freeze([
     needs: ['.minimap-overview'],
     run: (p, el) => {
       if (!el('.minimap-overview').shown) return 'the minimap overview is not shown';
-      return p.minimapBorderWidth === '2px'
+      if (p.minimapBorderWidth !== '2px') return `the overview's inner border is ${p.minimapBorderWidth}, expected 2px`;
+      return p.minimapBorderColor && p.minimapBorderColor === p.minimapToggleBackground
         ? null
-        : `the overview's inner border is ${p.minimapBorderWidth}, expected 2px`;
+        : `the overview's inner border is ${p.minimapBorderColor}, expected the expand control's ${p.minimapToggleBackground}`;
     },
   },
 ]);

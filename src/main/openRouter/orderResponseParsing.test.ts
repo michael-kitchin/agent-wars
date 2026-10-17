@@ -62,6 +62,7 @@ function testAcceptsNullStrategyAndOmittedOrders(): void {
   assert.strictEqual(parsed!.strategy, '');
   assert.strictEqual(parsed!.message, '');
   assert.strictEqual(parsed!.movementOrders.length, 0);
+  assert.strictEqual(parsed!.everyActorRowDropped, false);
 }
 
 /**
@@ -177,6 +178,7 @@ function testMoveWithoutDestinationSurfacesDropReason(): void {
     parsed!.dropReasons?.some((r) => r.includes('explicit_move opponent-1') && r.includes('destination')),
     'expected a missing-destination drop reason'
   );
+  assert.strictEqual(parsed!.everyActorRowDropped, true);
 }
 
 /**
@@ -256,6 +258,35 @@ function testUnitIdsExpandsGroupedMoveFireAirAndFerry(): void {
     parsed!.ferryOrders.map((row) => row.unitId).sort(),
     ['opponent-air-a', 'opponent-air-b']
   );
+  assert.strictEqual(parsed!.everyActorRowDropped, false);
+}
+
+/**
+ * Verifies one kept move keeps a reply that also contains a dropped move.
+ *
+ * Purpose: Repair runs only when every submitted actor row was dropped.
+ * When to use: After edits to `everyActorRowDropped`.
+ * Expected outcome: One movement order, and the flag is false.
+ * Exceptions: None.
+ */
+function testMixedKeptAndDroppedMoveIsNotAllDropped(): void {
+  ensureStrategicCoordinateRegistryInitialized();
+  const dest = h3ToCode(minimalState.hexes[0]!.h3Index, { mode: 'strategic' });
+  const parsed = parseFixture(
+    JSON.stringify({
+      strategy: 'mixed',
+      orders: [
+        { action: 'explicit_move', unitId: 'opponent-a', destination: dest },
+        { action: 'explicit_move', unitId: 'opponent-b' },
+      ],
+      airStrikes: [],
+      ferryOrders: [],
+      callbacks: [],
+    })
+  );
+  assert.ok(parsed);
+  assert.strictEqual(parsed!.movementOrders.length, 1);
+  assert.strictEqual(parsed!.everyActorRowDropped, false);
 }
 
 /**
@@ -403,6 +434,7 @@ const tests = [
   { name: 'parseOrdersResponse rejects top-level JSON array', fn: testRejectsTopLevelJsonArray },
   { name: 'parseOrdersResponse invalid assign_order type drop reason', fn: testInvalidAssignOrderTypeSurfacesDropReason },
   { name: 'parseOrdersResponse move without destination drop reason', fn: testMoveWithoutDestinationSurfacesDropReason },
+  { name: 'parseOrdersResponse mixed kept and dropped move', fn: testMixedKeptAndDroppedMoveIsNotAllDropped },
   { name: 'parseOrdersResponse tactical skips assign_order and cancel_order', fn: testTacticalModeSkipsAssignAndCancelOrder },
   { name: 'parseOrdersResponse unitIds expands grouped move fire air and ferry', fn: testUnitIdsExpandsGroupedMoveFireAirAndFerry },
   {

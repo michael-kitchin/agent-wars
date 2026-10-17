@@ -4,7 +4,7 @@
  *
  * The console root keeps the id `sidebar` so existing lookups keep working.
  */
-import { nextConsoleTabState, type ConsoleTabState } from '../../shared/consoleTabState';
+import { expandedConsoleTabState, nextConsoleTabState, type ConsoleTabState } from '../../shared/consoleTabState';
 import { formatQueuedOrdersSubtitle } from '../../shared/orderRowDetail';
 import { rendererSharedState as S } from '../core/state';
 import { onQueuedOrdersChanged, queuedOrderCount } from '../gameplay/queuedOrderRows';
@@ -148,6 +148,24 @@ function applyConsoleState(): void {
   setConsoleReportsVisible(!consoleState.collapsed && consoleState.activeTabId === 'console-tab-reports');
   refreshConsoleHeader();
   if (!consoleState.collapsed) active?.onShow?.();
+}
+
+/**
+ * Expands the console on one of its tabs.
+ *
+ * Purpose: A successful start can show the Opponent tab without a click. A click on the selected tab would collapse it.
+ * When to use: After a new match is installed and the console is on screen.
+ * Expected outcome: The named tab's panel shows and the console is expanded. An unknown id is logged and the console stays as it was.
+ * Exceptions: None. A missing page element is skipped by `applyConsoleState`.
+ */
+export function showConsoleTab(tabId: string): void {
+  if (!CONSOLE_TABS.some((tab) => tab.tabId === tabId)) {
+    console.error('[agent-wars] showConsoleTab unknown tab', tabId);
+    return;
+  }
+  console.debug('[agent-wars] showConsoleTab', { tabId });
+  consoleState = expandedConsoleTabState(tabId);
+  applyConsoleState();
 }
 
 /**

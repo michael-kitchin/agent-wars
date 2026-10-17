@@ -38,6 +38,7 @@ Shown in Strategic planning, Tactical planning, Resolution playback, the tactica
 - When the player clicks any tab while the console is collapsed, the console expands on that tab.
 - The map takes the width the console gives up, and gives it back when the console expands.
 - Turning Run on or off does not change the selected tab. See [opponent-tab-commander.md](opponent-tab-commander.md).
+- A successful start that does not turn planning on expands the console on the Opponent tab. That open does not collapse the console when Opponent was already selected. A start that turns planning on leaves the tab and the collapsed state as they were.
 
 ### Keyboard
 
@@ -96,10 +97,10 @@ None.
 - `static/index.html` (`#sidebar`, `#console-main`, `#console-title`, `#console-subtitle`, `#console-tab-orders-badge`, `#console-panel-orders`, `#console-panel-reports`, `#console-panel-opponent`, `#console-rail`, `#console-tab-orders`, `#console-tab-reports`, `#console-tab-reports-badge`, `#console-tab-opponent`, `#console-tab-build`, `#console-tab-forces`, `#console-footer`, `#opponent-status-line`, `#opponent-status-label`, `#opponent-status-model`, `#opponent-status-cost`)
 - `static/frameChrome.css`
 - `static/consoleChrome.css`
-- `src/renderer/chrome/consoleFrame.ts`
+- `src/renderer/chrome/consoleFrame.ts` (`showConsoleTab`)
 - `src/renderer/core/uiState.ts` (`updateGameStateSidebar`, which redraws the Opponent subtitle when the snapshot changes)
 - `src/renderer/gameplay/queuedOrderRows.ts`
-- `src/shared/consoleTabState.ts`
+- `src/shared/consoleTabState.ts` (`nextConsoleTabState`, `expandedConsoleTabState`)
 - `src/shared/opponentPlanningStatus.ts`
 - `src/renderer/openRouter/openRouterUiHelpers.ts` (`renderOpponentStatus`)
 - `src/renderer/map/mapContainerResize.ts`

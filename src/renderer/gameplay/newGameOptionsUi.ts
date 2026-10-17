@@ -4,12 +4,22 @@ import { parseStartMonth } from '../../shared/weatherBonusRules';
 /**
  * Id of the Fog of war checkbox.
  *
- * Purpose: The only on/off new-game option; the bonuses are levels.
+ * Purpose: One of the two on/off new-game controls. Auto-start AI is the other, and it is not part of the match payload.
  * When to use: `readNewGameOptionChoices` and `resetNewGameOptionControls`.
  * Expected outcome: Matches the checkbox in `static/index.html`.
  * Exceptions: None.
  */
 const NEW_GAME_FOG_CHECKBOX_ID = 'new-game-fog-checkbox';
+
+/**
+ * Id of the Auto-start AI checkbox.
+ *
+ * Purpose: A client-only choice for whether a successful start turns opponent planning on. It is not a match setting.
+ * When to use: `resetNewGameOptionControls`. The start handler reads the element by this id.
+ * Expected outcome: Matches the checkbox in `static/index.html`.
+ * Exceptions: None.
+ */
+const NEW_GAME_AUTO_START_CHECKBOX_ID = 'new-game-auto-start-checkbox';
 
 /**
  * DOM ids of the bonus level dropdowns, keyed by the `newGame` payload field each one fills.
@@ -58,6 +68,18 @@ export type NewGameOptionChoices = Readonly<
  */
 function fogCheckbox(): HTMLInputElement | null {
   return document.getElementById(NEW_GAME_FOG_CHECKBOX_ID) as HTMLInputElement | null;
+}
+
+/**
+ * Looks up the Auto-start AI checkbox.
+ *
+ * Purpose: Keeps the element cast in one place.
+ * When to use: Inside this module, from the reset.
+ * Expected outcome: The input element, or null when the markup lacks it.
+ * Exceptions: None.
+ */
+function autoStartCheckbox(): HTMLInputElement | null {
+  return document.getElementById(NEW_GAME_AUTO_START_CHECKBOX_ID) as HTMLInputElement | null;
 }
 
 /**
@@ -119,17 +141,19 @@ export function randomizeNewGameStartMonth(): void {
 }
 
 /**
- * Restores Fog of war and the bonus dropdowns.
+ * Restores Fog of war, Auto-start AI, and the bonus dropdowns.
  *
- * Purpose: Each refresh while the overlay is showing turns Fog of war on and sets every bonus to the default level.
+ * Purpose: Each refresh while the overlay is showing turns both checkboxes on and sets every bonus to the default level.
  * The starting month is drawn when the dialog opens, and a refresh leaves that draw in place.
  * When to use: Whenever the overlay is shown, including a refresh that does not reopen it.
- * Expected outcome: Fog is checked and each present bonus dropdown is Low. The month control is unchanged. Missing controls are skipped.
+ * Expected outcome: Fog and Auto-start AI are checked, and each present bonus dropdown is Low. The month control is unchanged. Missing controls are skipped.
  * Exceptions: None.
  */
 export function resetNewGameOptionControls(): void {
   const fog = fogCheckbox();
   if (fog) fog.checked = true;
+  const autoStart = autoStartCheckbox();
+  if (autoStart) autoStart.checked = true;
   for (const id of Object.values(NEW_GAME_BONUS_LEVEL_SELECT_IDS)) {
     const select = optionSelect(id);
     if (select) select.value = DEFAULT_BONUS_LEVEL;

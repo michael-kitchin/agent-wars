@@ -96,6 +96,15 @@ export const fogCheckboxTooltipText =
   'Leave this checked to hide places and enemy units you have not seen. Uncheck it to show the whole map for the next match.';
 
 /**
+ * Purpose: Says a checked box starts opponent planning when a key and a model are already set.
+ * When to use: `#new-game-auto-start-checkbox`.
+ * Expected outcome: The control tip shows this sentence.
+ * Exceptions: None.
+ */
+export const autoStartCheckboxTooltipText =
+  'Leave this checked to turn opponent planning on when the match starts, when an API key and a model are already set. Uncheck it, or start without them, to open the Opponent tab with planning off.';
+
+/**
  * Purpose: Says a global turn is a month, a regional turn is a week, and a battle stays on the current date.
  * When to use: `#new-game-start-month`.
  * Expected outcome: The control tip shows this sentence.

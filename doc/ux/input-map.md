@@ -13,6 +13,7 @@ Tell an agent which input does what, and which binding wins when two surfaces co
 | Drag | Main map | Pans the map. | [map-surface.md](map-surface.md) |
 | Shift-drag | Main map | Draws a box and zooms the map to fit it. It does not pan or select. | [map-surface.md](map-surface.md) |
 | Wheel | Main map | Zooms the map. | [map-surface.md](map-surface.md) |
+| Click | + or − at the main map's bottom-right | Zooms the main map by `zoomDelta` (half a level). It does not select or order. | [map-surface.md](map-surface.md) |
 | Click | Main map | Selects and opens map popups. A plain click on one stationary selectable human unit's icon sole-selects that unit and starts movement planning, and does not open the unit list. Hovering that icon shows the Bonuses tooltip and does not open the list. A stack, an enemy-only token, and an embarked-only token open the list from a click. While Ranged or Strike targeting is on, a click does not place the attack and does not change the selection. | [selection-model.md](selection-model.md) |
 | Double-click | Main map | Plans a march or ferry, or clears the selection, when targeting is off. While Ranged or Strike targeting is on, places that attack and does not plan a move. Map zoom-on-double-click is off. | [order-lifecycle.md](order-lifecycle.md) |
 | Right-click | Main map | Clears selection chrome and does not open the browser menu. Queued orders stay. | [selection-model.md](selection-model.md) |
@@ -39,7 +40,7 @@ Keys other than these do not pan, toggle terrain, or close popups.
 ## Precedence and Focus
 
 - When the key target is a text field, a text area, a dropdown, or other editable content, T and the pan keys do nothing, and pressing Shift does not refresh an open stack callout. Escape is handled before that check, so it still closes the build popup or the stack callout, and it still chooses Ignore on the tactical battles list. That includes Escape pressed inside the build popup's count field.
-- While the new-game overlay is open, drag and the wheel pan and zoom the preview under the setup panel, with the choices showing or hidden. Click, double-click, and right-click do not select, order, or change the selection. Hover does not open a hex tooltip or an order preview, and the pointer does not show a unit cursor. See [new-game-dialog.md](new-game-dialog.md).
+- While the new-game overlay is open, drag and the wheel pan and zoom the preview under the setup panel, and + or − zoom it, with the choices showing or hidden. Click, double-click, and right-click do not select, order, or change the selection. Hover does not open a hex tooltip or an order preview, and the pointer does not show a unit cursor. See [new-game-dialog.md](new-game-dialog.md).
 - Focusing an editable field stops keyboard pan immediately. Releasing a pan key still stops that key even if focus moved into a field after the key went down.
 - Window blur stops keyboard pan, clears the held-Shift flag, and, if T was held, restores terrain fill and removes the hex codes, the labels Production did not choose, and the tech icons Tech did not choose. While the new-game overlay is open, that same clear hides the global preview's hex grid and leaves the home regions drawn. A regional preview keeps its hex grid.
 - Hiding the window stops keyboard pan.

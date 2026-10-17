@@ -400,7 +400,7 @@ const NEW_GAME_CHECKS = Object.freeze([
   {
     name: 'new-game-rules',
     scenes: PANEL_SCENES,
-    needs: [...BONUS_SELECTS, '#new-game-start-month', '#new-game-start-month-randomize', '#new-game-fog-checkbox'],
+    needs: [...BONUS_SELECTS, '#new-game-start-month', '#new-game-start-month-randomize', '#new-game-fog-checkbox', '#new-game-auto-start-checkbox'],
     run: (p, el) => {
       const [origin, tech, terrain, weather] = BONUS_SELECTS.map(el);
       if (!near(origin.y, tech.y) || !near(terrain.y, weather.y) || terrain.y <= origin.y) return 'the bonuses are not two rows of two';
@@ -408,7 +408,11 @@ const NEW_GAME_CHECKS = Object.freeze([
       const month = el('#new-game-start-month');
       if (!near(month.x, origin.x) || month.y <= terrain.y) return `the starting month ${fmt(month)} should sit under the bonuses, on the first column's edge`;
       const fog = el('#new-game-fog-checkbox');
-      return fog.shown && fog.y > month.y ? null : 'Fog of war is not under the starting month';
+      if (!(fog.shown && fog.y > month.y)) return 'Fog of war is not under the starting month';
+      const autoStart = el('#new-game-auto-start-checkbox');
+      return autoStart.shown && near(autoStart.y, fog.y) && autoStart.x > fog.x
+        ? null
+        : `Auto-start AI is at ${fmt(autoStart)}, expected right of Fog of war ${fmt(fog)} on the same line`;
     },
   },
   {

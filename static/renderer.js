@@ -19459,7 +19459,7 @@ ${bonuses}`;
       maxBoundsViscosity: 1,
       /* App-owned WASD/arrow screen pan; avoid Leaflet’s default keyboard panBy. */
       keyboard: false,
-      /* The map zooms from the wheel and from Shift-drag. There is no +/− control. */
+      /* The main map zooms from the wheel, from Shift-drag, and from the +/− buttons added below. There is no second control. */
       zoomControl: false,
       /* Keep raster tiles and canvas overlay in lockstep (no CSS zoom/pan lag vs hex draw). */
       zoomAnimation: false,
@@ -19479,6 +19479,7 @@ ${bonuses}`;
       }).addTo(mainMap);
     } catch {
     }
+    leafletRef.control.zoom({ position: "bottomright" }).addTo(mainMap);
     miniMap = leafletRef.map(miniEl, {
       minZoom: 0,
       maxZoom: 2,
@@ -23578,6 +23579,7 @@ ${bonuses}`;
 
   // src/renderer/gameplay/newGameOptionsUi.ts
   var NEW_GAME_FOG_CHECKBOX_ID = "new-game-fog-checkbox";
+  var NEW_GAME_AUTO_START_CHECKBOX_ID = "new-game-auto-start-checkbox";
   var NEW_GAME_BONUS_LEVEL_SELECT_IDS = {
     originBonusLevel: "new-game-origin-bonus-select",
     terrainBonusLevel: "new-game-terrain-bonus-select",
@@ -23587,6 +23589,9 @@ ${bonuses}`;
   var NEW_GAME_START_MONTH_ID = "new-game-start-month";
   function fogCheckbox() {
     return document.getElementById(NEW_GAME_FOG_CHECKBOX_ID);
+  }
+  function autoStartCheckbox() {
+    return document.getElementById(NEW_GAME_AUTO_START_CHECKBOX_ID);
   }
   function optionSelect(id) {
     return document.getElementById(id);
@@ -23612,6 +23617,8 @@ ${bonuses}`;
   function resetNewGameOptionControls() {
     const fog = fogCheckbox();
     if (fog) fog.checked = true;
+    const autoStart = autoStartCheckbox();
+    if (autoStart) autoStart.checked = true;
     for (const id of Object.values(NEW_GAME_BONUS_LEVEL_SELECT_IDS)) {
       const select = optionSelect(id);
       if (select) select.value = DEFAULT_BONUS_LEVEL;
@@ -26245,6 +26252,9 @@ ${bonuses}`;
   }
 
   // src/shared/consoleTabState.ts
+  function expandedConsoleTabState(tabId) {
+    return { activeTabId: tabId, collapsed: false };
+  }
   function nextConsoleTabState(current, clickedTabId) {
     if (current.collapsed) return { activeTabId: clickedTabId, collapsed: false };
     if (clickedTabId === current.activeTabId) return { activeTabId: current.activeTabId, collapsed: true };
@@ -26334,6 +26344,15 @@ ${bonuses}`;
     setConsoleReportsVisible(!consoleState.collapsed && consoleState.activeTabId === "console-tab-reports");
     refreshConsoleHeader();
     if (!consoleState.collapsed) active2?.onShow?.();
+  }
+  function showConsoleTab(tabId) {
+    if (!CONSOLE_TABS.some((tab) => tab.tabId === tabId)) {
+      console.error("[agent-wars] showConsoleTab unknown tab", tabId);
+      return;
+    }
+    console.debug("[agent-wars] showConsoleTab", { tabId });
+    consoleState = expandedConsoleTabState(tabId);
+    applyConsoleState();
   }
   function wireConsoleFrame() {
     onQueuedOrdersChanged(refreshConsoleHeader);
@@ -31235,6 +31254,38 @@ ${bonuses}`;
     setLoadedStrategicFootprint(state.hexes.map((hex) => hex.h3Index), roles);
   }
 
+  // src/shared/startMatchAiChoice.ts
+  function chooseStartMatchAi(input) {
+    if (input.autoStartChecked && input.runEnabled) {
+      return { runOn: true, openOpponentTab: false };
+    }
+    return { runOn: false, openOpponentTab: true };
+  }
+
+  // src/renderer/gameplay/newGameAiStart.ts
+  var AUTO_START_CHECKBOX_ID = "new-game-auto-start-checkbox";
+  var RUN_BUTTON_ID = "openrouter-run-btn";
+  function readStartMatchAiInput() {
+    const checkbox = document.getElementById(AUTO_START_CHECKBOX_ID);
+    const runButton = document.getElementById(RUN_BUTTON_ID);
+    const input = {
+      autoStartChecked: checkbox?.checked === true,
+      runEnabled: runButton != null && runButton.disabled === false
+    };
+    console.debug("[agent-wars] readStartMatchAiInput", input);
+    return input;
+  }
+  async function applyStartMatchAiChoice(choice, deps) {
+    console.debug("[agent-wars] applyStartMatchAiChoice", choice);
+    await stopOpponentPlanning("run_off");
+    rendererSharedState.runButtonOn = choice.runOn;
+    const runButton = document.getElementById(RUN_BUTTON_ID);
+    if (runButton) runButton.setAttribute("aria-pressed", choice.runOn ? "true" : "false");
+    deps.updateReadyButtonState();
+    if (choice.runOn) deps.startPlanning();
+    if (choice.openOpponentTab) showConsoleTab("console-tab-opponent");
+  }
+
   // src/renderer/core/matchEpoch.ts
   var rendererMatchEpoch = 0;
   function advanceRendererMatchEpoch() {
@@ -31305,6 +31356,7 @@ ${bonuses}`;
     registerNewGameMapControls();
     registerGameSizeSelect();
     document.getElementById("new-game-btn")?.addEventListener("click", async () => {
+      const startMatchAi = chooseStartMatchAi(readStartMatchAiInput());
       if (!window.gameApi?.newGame) return;
       if (regionalStartBlocked()) {
         showMapToast("This map has no two sides.");
@@ -31366,8 +31418,10 @@ ${bonuses}`;
         deps.updatePendingOrdersSidebar();
         deps.updateRangedSidebar();
         deps.updateSidebar();
-        deps.updateReadyButtonState();
-        if (rendererSharedState.runButtonOn) deps.startBackgroundRequestIfAllowed();
+        await applyStartMatchAiChoice(startMatchAi, {
+          startPlanning: () => deps.startBackgroundRequestIfAllowed(),
+          updateReadyButtonState: () => deps.updateReadyButtonState()
+        });
         deps.resizeAndRedraw();
       } catch (err) {
         console.error("newGame failed:", err);

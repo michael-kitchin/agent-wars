@@ -64,13 +64,17 @@ async function waitForNewGameOverlay(page) {
  *
  * Purpose: One click for both matches. The button is the same element in the footer and in the collapsed header.
  * When to use: After the scenario's choices are set, whether or not the choices are hidden.
- * Expected outcome: `#game-over-overlay` has `hidden`, and the match has had time to fit the map.
+ * Expected outcome: `#game-over-overlay` has `hidden`, and the match has had time to fit the map. The console is then on
+ *   Orders. A start in this profile has no API key, so Auto-start AI opens the Opponent tab; the scenes after this
+ *   click measure Orders, and a later click on Opponent must open that tab rather than collapse it.
  * Exceptions: Throws a Playwright timeout when the overlay does not close within `timeoutMs`.
  */
 async function clickStartGame(page, timeoutMs) {
   await page.click('#new-game-btn');
   await page.waitForFunction(() => document.getElementById('game-over-overlay').classList.contains('hidden'), null, { timeout: timeoutMs });
   await page.waitForTimeout(SETTLE_MS.start);
+  await page.click('#console-tab-orders');
+  await page.waitForTimeout(SETTLE_MS.click);
 }
 
 /**

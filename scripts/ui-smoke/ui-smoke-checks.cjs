@@ -35,7 +35,9 @@ const { NEW_GAME_CHECKS } = require('./ui-smoke-new-game-checks.cjs');
  *   null when the selector matches nothing, otherwise the first match's box, text, font size, border color, pointer
  *   events, tip, and the attributes the checks use, plus the text of every match in `allTexts`.
  *   `minimapBorderWidth` is the computed top border width of `.minimap-overview::after`, such as `2px`, or `''` when
- *   the overview is missing.
+ *   the overview is missing. `minimapBorderColor` is that border's computed color, and `minimapToggleBackground` is
+ *   the expand control's computed background, or `''` when that control is missing. `minimapHasZoom` is true when the
+ *   overview itself has a zoom control.
  * Exceptions: None.
  */
 function probePage(selectors) {
@@ -86,12 +88,20 @@ function probePage(selectors) {
   const elements = {};
   for (const selector of selectors) elements[selector] = describe(selector);
   const overview = document.querySelector('.minimap-overview');
-  const minimapBorderWidth = overview ? getComputedStyle(overview, '::after').borderTopWidth : '';
+  const overviewStyle = overview ? getComputedStyle(overview, '::after') : null;
+  const minimapBorderWidth = overviewStyle ? overviewStyle.borderTopWidth : '';
+  const minimapBorderColor = overviewStyle ? overviewStyle.borderTopColor : '';
+  const toggle = document.getElementById('map-mode-tabs-toggle');
+  const minimapToggleBackground = toggle ? getComputedStyle(toggle).backgroundColor : '';
+  const minimapHasZoom = document.querySelector('#minimap .leaflet-control-zoom') != null;
   return {
     viewport: { w: window.innerWidth, h: window.innerHeight, dpr: window.devicePixelRatio || 1 },
     scroll: { w: document.documentElement.scrollWidth, h: document.documentElement.scrollHeight },
     activeElementId: document.activeElement ? document.activeElement.id : '',
     minimapBorderWidth,
+    minimapBorderColor,
+    minimapToggleBackground,
+    minimapHasZoom,
     elements,
   };
 }

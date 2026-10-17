@@ -185,7 +185,10 @@
             <button type="button" id="new-game-start-month-randomize" class="compact-blue-btn compact-square-btn new-game-randomize" aria-label="Randomize starting month" data-control-tooltip="Pick a month at random, including the month already shown.">↻</button>
           </div>
         </div>
-        <label class="new-game-check" for="new-game-fog-checkbox"><input type="checkbox" id="new-game-fog-checkbox" checked data-control-tooltip="Leave this checked to hide places and enemy units you have not seen. Uncheck it to show the whole map for the next match." /> Fog of war</label>
+        <div class="new-game-checks">
+          <label class="new-game-check" for="new-game-fog-checkbox"><input type="checkbox" id="new-game-fog-checkbox" checked data-control-tooltip="Leave this checked to hide places and enemy units you have not seen. Uncheck it to show the whole map for the next match." /> Fog of war</label>
+          <label class="new-game-check" for="new-game-auto-start-checkbox"><input type="checkbox" id="new-game-auto-start-checkbox" checked data-control-tooltip="Leave this checked to turn opponent planning on when the match starts, when an API key and a model are already set. Uncheck it, or start without them, to open the Opponent tab with planning off." /> Auto-start AI</label>
+        </div>
       </section>
     </div>
     <div id="new-game-panel-footer" class="new-game-panel-footer">
