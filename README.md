@@ -12,9 +12,9 @@ The game is intended to be simple to learn and quick to play, but with enough de
 
 **[Play It](#play-it) · [Why This Exists](#why-this-exists) · [Why I'm Sharing This](#why-im-sharing-this) · [What's Inside](#whats-inside) · [How It Was Built](#how-it-was-built) · [Architecture](#architecture) · [Build from Source](#build-from-source) · [Status](#status) · [License](#license)**
 
-![Tactical planning over central Mexico](doc/media/central-mexico-battle.png)
+![Tactical planning over central Mexico](doc/media/central-mexico-battle-animated.png)
 
-*Tactical turn resolution in central Mexico on turn 5, showing in-progress animations (combat, dice rolls, and movement). Human/teal units face an LLM/rose opponent (in this case, Gemini Flash Lite). Movement orders are queued up in the orders tab, to the right.*
+*Turn 5 of a tactical battle in central Mexico, showing human/AI losses and in-progress animations (combat, dice roll, and movement). Human/teal units face an LLM/rose opponent (in this case, Gemini Flash Lite).*
 
 ## Why This Exists
 

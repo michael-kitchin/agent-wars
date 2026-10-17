@@ -170,9 +170,9 @@ Players win tactical battles by destroying their opponent's units, but they can 
 
 Complete rules are in [combat-rules-v3.md](combat-rules-v3.md) §12.
 
-*Tactical battle in southern Mexico, from a global game.*
+*Turn 5 of a tactical battle in central Mexico, during a mild December.*
 
-![Tactical battle in southern Mexico, from a global game](media/central-mexico-battle.png)
+![Tactical battle in southern Mexico, from a global game](media/central-mexico-battle-static.png)
 
 ### Starting a battle
 
