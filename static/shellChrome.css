@@ -258,9 +258,9 @@ body:has(#game-over-overlay:not(.hidden)) #terrain-legend {
   float: none;
   clear: none;
 }
-/* The main map's + and − buttons, in the same teal as the other buttons. A button at the zoom limit is dimmed. */
+/* The main map's + and − buttons use the expand control's dark slate, not the Ready teal. A button at the zoom limit is dimmed. */
 #main-map .leaflet-control-zoom {
-  border: 1px solid var(--button-border);
+  border: 1px solid var(--chrome-border);
   border-radius: 2px;
   box-shadow: none;
 }
@@ -268,20 +268,20 @@ body:has(#game-over-overlay:not(.hidden)) #terrain-legend {
   width: 30px;
   height: 30px;
   line-height: 30px;
-  background: var(--button-bg);
-  color: var(--button-text);
-  border-bottom-color: var(--button-border);
+  background: var(--chrome-bg);
+  color: var(--chrome-text);
+  border-bottom-color: var(--chrome-border);
 }
 #main-map .leaflet-control-zoom a:hover,
 #main-map .leaflet-control-zoom a:focus {
-  background: var(--button-bg-hover);
-  color: var(--button-text);
+  background: var(--chrome-bg-raised);
+  color: var(--chrome-text);
 }
 #main-map .leaflet-control-zoom a.leaflet-disabled,
 #main-map .leaflet-control-zoom a.leaflet-disabled:hover,
 #main-map .leaflet-control-zoom a.leaflet-disabled:focus {
-  background: var(--button-off-bg);
-  color: var(--button-off-text);
+  background: var(--chrome-bg-deep);
+  color: var(--chrome-disabled);
   cursor: default;
 }
 #terrain-legend select {

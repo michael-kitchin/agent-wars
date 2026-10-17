@@ -440,8 +440,8 @@ function showBasemapErrorToast(): void {
  * Purpose: The player can see which part of the overview the main map is framing.
  * When to use: After the main map or the minimap moves or zooms.
  * Expected outcome: No rectangle when the main view covers nearly the whole overview. Otherwise one 2 px opaque
- *   rectangle in the expand control's background (`--chrome-bg`), or `#1b2838` when that token cannot be read, with
- *   no fill, that does not take the pointer.
+ *   rectangle in `--chrome-border`, or `#5a7090` when that token cannot be read, with no fill, that does not take
+ *   the pointer.
  * Exceptions: None. Returns immediately when either map is missing.
  */
 export function syncMinimapViewportRect(): void {
@@ -469,7 +469,7 @@ export function syncMinimapViewportRect(): void {
 
   if (!viewportRect) {
     viewportRect = leafletRef.rectangle(mainBounds, {
-      color: getComputedStyle(document.documentElement).getPropertyValue('--chrome-bg').trim() || '#1b2838',
+      color: getComputedStyle(document.documentElement).getPropertyValue('--chrome-border').trim() || '#5a7090',
       weight: 2,
       opacity: 1,
       fill: false,

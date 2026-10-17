@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { expandedConsoleTabState, nextConsoleTabState } from './consoleTabState';
+import { consoleTabIdForLiveMatchLaunch, expandedConsoleTabState, nextConsoleTabState } from './consoleTabState';
 
 test('nextConsoleTabState switches tabs while expanded', () => {
   assert.deepEqual(nextConsoleTabState({ activeTabId: 'orders', collapsed: false }, 'opponent'), {
@@ -25,6 +25,13 @@ test('expandedConsoleTabState shows the named tab expanded', () => {
     activeTabId: 'console-tab-orders',
     collapsed: false,
   });
+});
+
+test('consoleTabIdForLiveMatchLaunch opens Opponent only for a live match', () => {
+  assert.equal(consoleTabIdForLiveMatchLaunch({ hexCount: 1, gameOver: false }), 'console-tab-opponent');
+  assert.equal(consoleTabIdForLiveMatchLaunch(null), null);
+  assert.equal(consoleTabIdForLiveMatchLaunch({ hexCount: 0, gameOver: false }), null);
+  assert.equal(consoleTabIdForLiveMatchLaunch({ hexCount: 1, gameOver: true }), null);
 });
 
 test('nextConsoleTabState expands on the clicked tab while collapsed', () => {

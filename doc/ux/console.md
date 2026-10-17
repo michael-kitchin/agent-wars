@@ -46,13 +46,13 @@ Shown in Strategic planning, Tactical planning, Resolution playback, the tactica
 
 ### Other
 
-- The console starts expanded on the Orders tab.
+- The console starts expanded on the Orders tab. When the app opens onto a live match, that launch expands it on the Opponent tab. A launch that shows the new-game dialog leaves it on Orders. That launch open does not run again when a snapshot refreshes or when the player closes the dialog back onto the match.
 - The opponent status line updates whenever Run, the opponent's wait, the selected model, or the match cost changes.
 - The selected tab, and whether the console is collapsed, last until the app closes. Neither is saved.
 
 ## States
 
-- Expanded on Orders: the start state.
+- Expanded on Orders: the console's own start state. A launch onto a live match then moves to Opponent.
 - Expanded on Reports.
 - Expanded on Opponent.
 - Collapsed: only the rail and Ready show. The last selected tab is remembered.
@@ -98,9 +98,10 @@ None.
 - `static/frameChrome.css`
 - `static/consoleChrome.css`
 - `src/renderer/chrome/consoleFrame.ts` (`showConsoleTab`)
+- `src/renderer/map/initCore.ts` (`wireInitCore`, which calls `showConsoleTab` after the launch snapshot when `consoleTabIdForLiveMatchLaunch` returns the Opponent tab)
 - `src/renderer/core/uiState.ts` (`updateGameStateSidebar`, which redraws the Opponent subtitle when the snapshot changes)
 - `src/renderer/gameplay/queuedOrderRows.ts`
-- `src/shared/consoleTabState.ts` (`nextConsoleTabState`, `expandedConsoleTabState`)
+- `src/shared/consoleTabState.ts` (`nextConsoleTabState`, `expandedConsoleTabState`, `consoleTabIdForLiveMatchLaunch`)
 - `src/shared/opponentPlanningStatus.ts`
 - `src/renderer/openRouter/openRouterUiHelpers.ts` (`renderOpponentStatus`)
 - `src/renderer/map/mapContainerResize.ts`

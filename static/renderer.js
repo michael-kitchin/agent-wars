@@ -19526,7 +19526,7 @@ ${bonuses}`;
     }
     if (!viewportRect) {
       viewportRect = leafletRef.rectangle(mainBounds, {
-        color: getComputedStyle(document.documentElement).getPropertyValue("--chrome-bg").trim() || "#1b2838",
+        color: getComputedStyle(document.documentElement).getPropertyValue("--chrome-border").trim() || "#5a7090",
         weight: 2,
         opacity: 1,
         fill: false,
@@ -26254,6 +26254,10 @@ ${bonuses}`;
   // src/shared/consoleTabState.ts
   function expandedConsoleTabState(tabId) {
     return { activeTabId: tabId, collapsed: false };
+  }
+  function consoleTabIdForLiveMatchLaunch(match) {
+    if (match == null || match.hexCount === 0 || match.gameOver) return null;
+    return "console-tab-opponent";
   }
   function nextConsoleTabState(current, clickedTabId) {
     if (current.collapsed) return { activeTabId: clickedTabId, collapsed: false };
@@ -36490,6 +36494,7 @@ ${bonuses}`;
     if (window.gameApi) {
       window.gameApi.getGameState().then(async (raw) => {
         const state = raw;
+        if (!state) throw new Error("getGameState returned no snapshot");
         await deps.applyGameStateSnapshot(state, {
           refreshStandingOrders: true,
           updateGameStateSidebarUi: true,
@@ -36499,6 +36504,11 @@ ${bonuses}`;
           refreshBuildPopup: true,
           redraw: true
         });
+        const launchTabId = consoleTabIdForLiveMatchLaunch({
+          hexCount: state.hexes.length,
+          gameOver: !!state.gameOver
+        });
+        if (launchTabId) showConsoleTab(launchTabId);
       }).catch((err) => console.error("getGameState failed:", err));
       void deps.refreshTacticalTerrainOverridesForRenderer().catch((err) => {
         console.error("refreshRes4TerrainOverridesForRenderer failed:", err);

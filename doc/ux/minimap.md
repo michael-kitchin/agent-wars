@@ -17,7 +17,7 @@ Shown with the map in every mode where the map container is visible, except New 
 - Each tab is 56 × 58 px, the same size as a tab on the console's rail (`--chrome-tab-height`): an 18 px icon above a 9 px label (`--chrome-tab-label-size`), in the rail's colors. A label never wraps.
 - An overview of the loaded map, the Mercator world in a global match and the region's hexes in a regional match, using the same basemap family as the main map. In a global match it shows the whole width of the world; its height cuts the world off at about 80° north and south.
 - A 2 px border in the expand control's background (`--chrome-bg`) on the overview's inside edge, over the map and the tabs toggle. It does not take the pointer (`.minimap-overview::after` in `static/shellChrome.css`).
-- A rectangle for the main view when the main view covers less of the world than the overview: a 2 px opaque line in the expand control's background (`--chrome-bg`, read in `syncMinimapViewportRect`). When the main view is wide enough, the rectangle is removed.
+- A rectangle for the main view when the main view covers less of the world than the overview: a 2 px opaque line in `--chrome-border` (`#5a7090` when that token cannot be read), the lighter slate the overview frame used before it moved to `--chrome-bg`. `syncMinimapViewportRect` reads the token. When the main view is wide enough, the rectangle is removed.
 - The map-mode tabs, left to right:
   - Weather: shows or hides each hex's weather icon on the world map, in either view, as described in [map-surface.md](map-surface.md). On when the app opens.
   - Tech: shows or hides each hex's tech tier icon on the world map while the tech bonus is Low or High, as described in [map-surface.md](map-surface.md). Off when the app opens. It does not hide terrain fill or show hex codes or production. A battle and the new-game or game-over overlay keep their normal view; Tech applies again when they close.
@@ -85,8 +85,8 @@ None.
 ## Code Entry Points
 
 - `static/index.html` (`#minimap-panel`, `#minimap`, `#map-mode-tabs-toggle`, `#map-mode-tabs`)
-- `static/shellChrome.css` (`--chrome-bg`, `--minimap-width`, `--chrome-tab-height`, `--chrome-tab-label-size`, `.minimap-panel`, `.minimap-overview` and its `::after` border, `.minimap-tabs-toggle`, `.map-mode-tabs`, `.map-mode-btn`)
-- `src/renderer/map/worldLeafletMap.ts` (`syncMinimapViewportRect`)
+- `static/shellChrome.css` (`--chrome-bg`, `--chrome-border`, `--minimap-width`, `--chrome-tab-height`, `--chrome-tab-label-size`, `.minimap-panel`, `.minimap-overview` and its `::after` border, `.minimap-tabs-toggle`, `.map-mode-tabs`, `.map-mode-btn`)
+- `src/renderer/map/worldLeafletMap.ts` (`syncMinimapViewportRect`, which reads `--chrome-border`)
 - `src/renderer/map/mapExtent.ts`
 - `src/renderer/map/mapModeTabs.ts`
 - `src/renderer/map/mapViewModeState.ts`

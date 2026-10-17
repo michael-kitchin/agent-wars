@@ -154,7 +154,7 @@ function applyConsoleState(): void {
  * Expands the console on one of its tabs.
  *
  * Purpose: A successful start can show the Opponent tab without a click. A click on the selected tab would collapse it.
- * When to use: After a new match is installed and the console is on screen.
+ * When to use: After a new match is installed, and once when the app opens onto a live match. The console is on screen either way.
  * Expected outcome: The named tab's panel shows and the console is expanded. An unknown id is logged and the console stays as it was.
  * Exceptions: None. A missing page element is skipped by `applyConsoleState`.
  */

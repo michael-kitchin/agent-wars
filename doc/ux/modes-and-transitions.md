@@ -83,6 +83,7 @@ stateDiagram-v2
 ```
 
 - App start with no loaded match -> New game.
+- App start with a loaded match that is not over -> that match, with the console expanded on Opponent. Game over at launch still opens the dialog.
 - New game -> Strategic planning: Start game succeeds.
 - Strategic planning -> New game: New game in the game menu. The match keeps running under the screen. It is replaced when Start succeeds. New game is unavailable while a Ready is resolving.
 - New game -> Strategic planning: Close, while the screen was opened from strategic planning. The match, its orders, its selection, and its camera are as the player left them.
@@ -135,6 +136,8 @@ None.
 ## Code Entry Points
 
 - `static/index.html` (`#game-over-overlay`, `#tactical-annihilation-overlay`, `#tactical-exit-btn`, `#ready-btn`)
+- `src/renderer/map/initCore.ts` (`wireInitCore`, which opens the loaded match and, when that match has hexes and is not over, the Opponent tab)
+- `src/shared/consoleTabState.ts` (`consoleTabIdForLiveMatchLaunch`)
 - `src/renderer/core/uiState.ts`
 - `src/renderer/gameplay/newGame.ts`
 - `src/renderer/gameplay/newGameReturn.ts`

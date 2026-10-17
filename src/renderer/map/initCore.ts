@@ -19,6 +19,8 @@ import { clearOrderEffectsTooltipDwell, hideOrderSlowerHexTooltip } from './orde
 import { resumeHexTooltipDwellAfterAimingEnds } from './mainMapInteractions';
 import { getMainLeafletMap, initWorldLeafletMaps, setMainBasemapByProviderId, setMainBasemapFilter } from './worldLeafletMap';
 import { installControlTooltip } from '../chrome/controlTooltip';
+import { showConsoleTab } from '../chrome/consoleFrame';
+import { consoleTabIdForLiveMatchLaunch } from '../../shared/consoleTabState';
 import { layoutMapChrome } from './mapChromeLayout';
 import { wireMapModeTabs } from './mapModeTabs';
 
@@ -431,7 +433,8 @@ export function wireInitCore(deps: InitCoreDeps): void {
     window.gameApi
       .getGameState()
       .then(async (raw) => {
-        const state = raw as GameStateSnapshot;
+        const state = raw as GameStateSnapshot | null;
+        if (!state) throw new Error('getGameState returned no snapshot');
         await deps.applyGameStateSnapshot(state, {
           refreshStandingOrders: true,
           updateGameStateSidebarUi: true,
@@ -441,6 +444,11 @@ export function wireInitCore(deps: InitCoreDeps): void {
           refreshBuildPopup: true,
           redraw: true,
         });
+        const launchTabId = consoleTabIdForLiveMatchLaunch({
+          hexCount: state.hexes.length,
+          gameOver: !!state.gameOver,
+        });
+        if (launchTabId) showConsoleTab(launchTabId);
       })
       .catch((err) => console.error('getGameState failed:', err));
     void deps.refreshTacticalTerrainOverridesForRenderer().catch((err) => {
