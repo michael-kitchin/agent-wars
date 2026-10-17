@@ -1,5 +1,7 @@
 # How to play
 
+> **Note:** Some of the screenshots are out of date, since the v2.6.0 facelift. I'll replace these as soon as I can.
+
 This guide covers a match in the current build, from the new-game dialog to the end. Downloading the game and setting up the OpenRouter key for the opponent are covered under [Play it](../README.md#play-it) in the README. The full rules are in [combat-rules-v3.md](combat-rules-v3.md).
 
 Agent Wars is a WEGO game ("we go"), where neither player can see what the other is planning. For each turn, both sides create combat, movement, and production orders at the same time, based on partial, subjective views of the battlefield. Once players are ready, the game executes their orders and determines the outcomes (think: "Axis & Allies" meets "Diplomacy", with a software referee).
@@ -10,8 +12,6 @@ Accordingly, the game ends when one player:
 
 - Captures all the other player's home region hexes
 - Or destroys all production capacity in those hexes
-
-I'll add screenshots of specific functions as I can.
 
 ## Starting a match
 
@@ -172,9 +172,9 @@ Players win tactical battles by destroying their opponent's units, but they can 
 
 Complete rules are in [combat-rules-v3.md](combat-rules-v3.md) §12.
 
-*Tactical battle in central Mexico, from a global game.*
+*Tactical battle in southern Mexico, from a global game.*
 
-![Tactical battle in central Mexico, from a global game](media/tactical-battle-mexico.jpg)
+![Tactical battle in southern Mexico, from a global game](media/central-mexico-battle.png)
 
 ### Starting a battle
 

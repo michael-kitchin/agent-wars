@@ -12,9 +12,9 @@ The game is intended to be simple to learn and quick to play, but with enough de
 
 **[Play It](#play-it) · [Why This Exists](#why-this-exists) · [Why I'm Sharing This](#why-im-sharing-this) · [What's Inside](#whats-inside) · [How It Was Built](#how-it-was-built) · [Architecture](#architecture) · [Build from Source](#build-from-source) · [Status](#status) · [License](#license)**
 
-![Tactical planning over central Mexico](doc/media/tactical-battle-mexico.jpg)
+![Tactical planning over central Mexico](doc/media/central-mexico-battle.png)
 
-*A tactical battle in central Mexico on turn 2, during a rainy August. Teal/human units face the rose/LLM opponent (in this case, Gemini Flash Lite). Movement orders are queued up in the planning panel, to the right.*
+*A tactical battle in central Mexico on turn 6, during a mild October. Teal/human units face the rose/LLM opponent (in this case, Gemini Flash Lite). Movement orders are queued up in the orders tab, to the right.*
 
 ## Why This Exists
 
@@ -54,22 +54,34 @@ Download a build for Windows (x64), macOS (Apple silicon), or Linux (x64) from [
 
 The LLM opponent needs an [OpenRouter](https://openrouter.ai) API key to work:
 
-1. Start a match from the new-game screen. The console then shows on the right.
-2. On the console's tab rail, at the window's right edge, click **Opponent**.
+1. When you first run Agent Wars, you'll see the start game screen. Explore the options, assign sides, and click the **Start game** button.
+![Start game screen.](doc/media/first-start-game-1.png)
+2. After a moment, the opponent tab will automatically display on the right.
+![Opponent tab.](doc/media/first-start-game-2.png)
 3. Under **Commander**, paste your OpenRouter API key into the **API key** field (placeholder `Set key and blur to save`).
 4. Click outside the field, or press Enter, to save. A saved key loads the model list.
 5. Choose a model from Anthropic, Google, Meta, OpenAI, SpaceX, etc. The refresh button beside the list reloads it.
     - My go-to playtesting model is Google Gemini Flash Lite (version 3.5, currently). A fast, inexpensive, tool-using model that fights reasonably well. It can also finish a typical game for <$1.
     - Ollama/other local model support is on my radar (pun intended, I guess).
-6. Click **Run**, at the top of the Opponent tab, to start opponent planning. The line above **Ready** shows whether the opponent is planning, its model, and the match's cost so far.
+6. Click **Run**, at the top of the Opponent tab, to start opponent planning. 
+![Model setup.](doc/media/first-start-game-3.png)
+    - You can change models or disable the AI at any time by clicking **Run** again.
+7. Click **Opponent** to close the tab and start playing. You can explore the map, plan movement, etc. while the AI is doing its thing.
+8. When you and the AI are done planning, click the **Ready** button to execute orders and advance to the next turn.
+    - You can play all you want with the AI disabled. This is a great way to get used to the controls, without burning tokens.
+
+| *Ready button when the AI is planning (opponent tab open).* | *With the opponent tab closed.*
+| ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| ![Ready button when the AI is planning (opponent tab open).](doc/media/ready-planning-open.png) | ![With the opponent tab closed.](doc/media/ready-planning-closed.png) |
+
+| *Ready button when the AI is done (opponent tab open).* | *With the opponent tab closed.*
+| ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| ![Ready button when the AI is done (opponent tab open).](doc/media/ready-done-open.png) | ![With the opponent tab closed.](doc/media/ready-done-closed.png) |
+
 
 The key is handled only in the Electron main process and stored locally in the Electron user-data directory, not in repository files. Without a key or a model the app still runs, **Run** stays disabled, and the opponent makes no model calls.
 
 See [doc/how-to-play.md](doc/how-to-play.md) for how to play the game.
-
-| *Step 1: Enter an OpenRouter API key, pick a model, and click Run. The ongoing cost of LLM calls (in US$) is displayed on the right.*                           | *Step 2: Watch the LLM do its thing, and optionally enable/disable tools.*                          |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------- |
-| ![Step 1: Enter an OpenRouter API key, pick a model, and click Run. The ongoing cost of LLM calls (in US$) is displayed on the right.](doc/media/model-tab.png) | ![Step 2: Watch the LLM do its thing, and optionally enable/disable tools](doc/media/tools-tab.png) |
 
 
 ### See the Prompts (and Everything Else)
@@ -114,9 +126,9 @@ See [doc/hybrid-ai.md](doc/hybrid-ai.md) and [doc/ai-tools.md](doc/ai-tools.md) 
 
 ## What's Inside
 
-![Spain's 1st Fleet heading west across the Atlantic on the global map](doc/media/global-spain-new-world.png)
+![South Africa's 1st Fleet heading east across the Indian Ocean on the global map](doc/media/invading-asia-from-south-africa.png)
 
-*Re-invading the New World, at the start of a global game. What could go wrong?*
+*Invading east Asia from South Africa, at the start of a global game. What could go wrong?*
 
 - **A hybrid AI opponent.** The engine pre-computes a briefing (an ASCII hex map, Markdown tables of units and threats, and attention flags) before it consults the model. Standing orders carry the plan forward on turns the model isn't consulted, and event callbacks decide when it is. Any OpenRouter model can play; one without tool calls plays without the [planning tools](#the-opponents-tools). See [doc/hybrid-ai.md](doc/hybrid-ai.md) and [doc/ai-tools.md](doc/ai-tools.md).
 - **Prompts as code.** The prompts are assembled by builders in [src/main/openRouter/promptSpec/](src/main/openRouter/promptSpec/), documented in [doc/ai-commander-prompts/](doc/ai-commander-prompts/README.md), and held to that contract by tests such as `consultationContract.test.ts`, `envelopeJsonSchema.test.ts`, and `variantConformance.test.ts`.
