@@ -1,0 +1,296 @@
+/* The selection panel at the map's bottom-left: the summary bar, the details under it, and the resize grip. The panel is
+   compact (the bar alone) or expanded; selectionPanelExpand.ts sets data-state and slides between the two. */
+
+.selection-panel {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  z-index: 6200;
+  width: 440px;
+  max-width: calc(100% - 24px);
+  max-height: calc(50% - 12px);
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  overflow: hidden;
+  background: var(--chrome-bg);
+  color: var(--chrome-text);
+  color-scheme: dark;
+  border: 1px solid var(--chrome-border);
+  border-radius: 6px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+  font-size: 13px;
+}
+.selection-panel[hidden],
+body:has(#game-over-overlay:not(.hidden)) #selection-panel {
+  display: none;
+}
+/* While the player aims, the border takes the color of the order being aimed. */
+.selection-panel[data-aim="ranged"] {
+  border-color: var(--order-ranged);
+}
+.selection-panel[data-aim="strike"] {
+  border-color: var(--order-strike);
+}
+
+/* The details show while the panel is expanded and while it slides; the grip only once it is fully expanded. */
+.selection-panel[data-state="compact"] .selection-panel-details,
+.selection-panel:not([data-state="expanded"]) .selection-panel-grip {
+  display: none;
+}
+
+/* ---------- Summary bar ---------- */
+/* One 50 px row that never scrolls: the expand control, two lines of text, a divider, the reticle, and the close
+   control. While a strike is aimed, the target list sits between the divider and the reticle. The controls keep
+   their size and the text gives way. */
+.selection-panel-bar {
+  flex: none;
+  height: 50px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0;
+  box-sizing: border-box;
+}
+/* The two end controls take the bar's full height, each with a divider on its inner side: expand on the left edge and
+   close on the right. The chevron points up while the panel is compact or expanding, and turns down once it is
+   expanded, until it is compact again. While the panel is expanded, the resize grip sits over the close control's
+   top-right corner, clear of its glyph. */
+.selection-panel-expand,
+.selection-panel-close {
+  flex: none;
+  align-self: stretch;
+  width: 32px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--chrome-text);
+}
+.selection-panel-expand {
+  border-right: 1px solid var(--chrome-divider);
+}
+.selection-panel-close {
+  border-left: 1px solid var(--chrome-divider);
+}
+.selection-panel-expand:hover,
+.selection-panel-close:hover {
+  background: var(--chrome-bg-raised);
+}
+.selection-panel-expand:focus,
+.selection-panel-close:focus {
+  outline-offset: -2px;
+}
+.selection-panel[data-state="expanded"] .selection-panel-chevron,
+.selection-panel[data-state="collapsing"] .selection-panel-chevron {
+  transform: rotate(180deg);
+}
+.selection-panel-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.selection-panel-summary,
+.selection-panel-hint {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.selection-panel-summary {
+  font-size: 13px;
+  font-weight: 600;
+}
+.selection-panel-hint {
+  color: var(--chrome-muted);
+  font-size: 11px;
+}
+.selection-panel-divider {
+  flex: none;
+  width: 1px;
+  height: 30px;
+  background: var(--chrome-divider);
+}
+
+/* ---------- Details ---------- */
+/* Everything under the bar. The unit rows scroll first; when the panel is dragged shorter than the caption, the chips,
+   and one row, the whole details scroll. */
+.selection-panel-details {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+  padding: 10px 12px 12px;
+  border-top: 1px solid var(--chrome-divider);
+}
+.selection-panel-caption {
+  flex: none;
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+}
+.selection-panel-caption:empty {
+  display: none;
+}
+.selection-panel-chips {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.selection-panel-chips:empty {
+  display: none;
+}
+.selection-panel-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border: 1px solid var(--chrome-border);
+  border-radius: 10px;
+  background: var(--chrome-bg-raised);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.selection-panel-chip-home {
+  border-color: var(--chrome-accent-edge);
+}
+.selection-panel-chip-enemy-home {
+  border-color: var(--chrome-opponent-edge);
+}
+
+/* ---------- Unit rows ---------- */
+/* The rows take the height that is left and scroll past it, keeping room for one row. */
+.selection-panel-units {
+  flex: 1 1 auto;
+  min-height: 35px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.selection-panel-unit {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border-top: 1px solid var(--chrome-divider);
+}
+.selection-panel-unit-type {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  padding: 3px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  background: var(--player-human);
+  border: 1px solid var(--chrome-accent-edge);
+}
+.selection-panel-unit-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.selection-panel-unit-hex {
+  flex: none;
+  color: var(--chrome-muted);
+  font-size: 12px;
+}
+.selection-panel-order {
+  flex: none;
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 1px 2px 1px 8px;
+  border: 1px solid var(--chrome-accent-edge);
+  border-radius: 3px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.selection-panel-order-none {
+  padding: 2px 8px;
+  border-color: var(--chrome-border);
+  color: var(--chrome-muted);
+}
+.selection-panel-order-cancel {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: 2px;
+  background: transparent;
+  color: var(--chrome-text);
+  font-size: 13px;
+  line-height: 1;
+}
+.selection-panel-order-cancel:hover {
+  background: var(--chrome-bg-raised);
+}
+
+/* ---------- Ranged and Strike ---------- */
+/* The reticle that aims a ranged attack or an air strike, and while a strike is aimed, the target list to its left. The
+   reason a greyed-out reticle cannot be used sits in the details under the unit rows. */
+.selection-panel-actions {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+/* One square button for both kinds of attack, at the target list's height. Its colors come from the shared button rules
+   until the player aims: then it reads as pressed in the color of the order being aimed, the same color as the panel's
+   border (selectionBar.ts sets data-aim, and tacticalOrders.ts sets aria-pressed). */
+.selection-panel-reticle {
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.selection-panel[data-aim="ranged"] .selection-panel-reticle[aria-pressed="true"] {
+  background: var(--order-ranged);
+  border-color: var(--order-ranged);
+}
+.selection-panel[data-aim="strike"] .selection-panel-reticle[aria-pressed="true"] {
+  background: var(--order-strike);
+  border-color: var(--order-strike);
+}
+.selection-panel[data-aim] .selection-panel-reticle[aria-pressed="true"]:hover {
+  filter: brightness(1.2);
+}
+.selection-panel-action-note {
+  flex: none;
+  margin: 0;
+  color: var(--chrome-muted);
+  font-size: 12px;
+}
+.selection-panel-action-note:empty {
+  display: none;
+}
+.selection-panel #sidebar-error {
+  margin: 0;
+}
+
+/* ---------- Resize grip ---------- */
+/* The panel is anchored at its bottom-left, so the grip sits at the opposite, top-right corner. */
+.selection-panel-grip {
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  right: 0;
+  width: 14px;
+  height: 14px;
+  cursor: nesw-resize;
+  touch-action: none;
+  background: linear-gradient(225deg, transparent 0 3px, var(--chrome-border) 3px 4px, transparent 4px 6px, var(--chrome-border) 6px 7px, transparent 7px);
+  border-top-right-radius: 6px;
+}

@@ -39,8 +39,7 @@ import { paintTerrainSwatches } from './rendering/terrainVisualStyles';
 
 import { applyStrategicBaselineUrbanHexCounts, applyTacticalCityOverlayRows } from './rendererTacticalHydration';
 import { applyGameStateSnapshot as applyGameStateSnapshotFromModule, refreshGameStateAfterBuildQueueChange as refreshGameStateAfterBuildQueueChangeFromModule, updateClientStaleEnemyIntel } from './core/stateSnapshot';
-import { applySelectionFromSidebarUnitButton as applySelectionFromSidebarUnitButtonFromModule, clearSidebarError, formatUnitArrowLabel as formatUnitArrowLabelFromModule, showSidebarError as showSidebarErrorFromModule, syncUiAfterSelectionChange as syncUiAfterSelectionChangeFromModule } from './gameplay/sidebarSupport';
-import { createSidebarOrderRow } from './gameplay/sidebarOrderRow';
+import { applySelectionFromSidebarUnitButton as applySelectionFromSidebarUnitButtonFromModule, clearSidebarError, showSidebarError as showSidebarErrorFromModule, syncUiAfterSelectionChange as syncUiAfterSelectionChangeFromModule } from './gameplay/sidebarSupport';
 
 /**
  * Entry callbacks that still live in renderer.ts.
@@ -281,7 +280,7 @@ export function syncTacticalEntryButtonOverlay(): void {
  *
  * Purpose: Deduplicates the `TacticalRendererStartBattleSideEffects` literal previously repeated in `applyGameStateSnapshot`.
  * When to use: Passed to `startTacticalBattleFromEntryHexFromModule` and `activateRestoredTacticalBattleFromMainSnapshot`.
- * Expected outcome: Identical sequencing for sidebar suppression, tactical entry, HUD refresh, and redraw.
+ * Expected outcome: Identical sequencing for sidebar suppression, tactical entry, Exit Battle refresh, and redraw.
  * Exceptions: None.
  */
 export function getTacticalBattleActivationSideEffects(): TacticalRendererStartBattleSideEffects {
@@ -767,13 +766,13 @@ export async function buildMeleeInterceptHexPopupHtmlForStrategic(h3Index: strin
  * Exceptions: None.
  */
 export function updateSidebar(): void {
-  return updateSidebarFromModule(getPrimarySelectedUnitId, formatUnitDisplayName);
+  return updateSidebarFromModule(formatUnitDisplayName);
 }
 
 /**
  * Shows or hides the new-game overlay, and resizes the map when that visibility changes.
  *
- * Purpose: The overlay and the right panel share the window width. Leaflet keeps the previous container size until a resize.
+ * Purpose: The overlay hides the top bar and the console, so the map's size changes. Leaflet keeps the previous container size until a resize.
  * When to use: After a snapshot, and when a match ends.
  * Expected outcome: The overlay matches the snapshot. The map is resized only when the overlay opens or closes.
  * Exceptions: None.
@@ -784,11 +783,11 @@ export function updateGameOverUI(state: GameStateSnapshot | null): void {
 }
 
 /**
- * Opens the new-game dialog from the Model tab, and resizes the map when it actually opens.
+ * Opens the new-game dialog from the game menu, and resizes the map when it actually opens.
  *
- * Purpose: The right panel leaves the layout when that dialog opens. The map has to take the freed width before the preview fits.
- * When to use: The Model tab's New button.
- * Expected outcome: The annihilation dialog ignores the click. Otherwise opponent planning and playback stop, the dialog opens, and the map resizes only when the overlay was hidden.
+ * Purpose: The top bar and the console leave the layout when that dialog opens. The map has to take the freed space before the preview fits.
+ * When to use: The game menu's New game item (`#openrouter-new-btn`).
+ * Expected outcome: The annihilation dialog and a Ready that is still resolving ignore the click. Otherwise the dialog opens over the match, which keeps running; when a live match is held, the renderer match epoch moves forward so a reply still in flight is discarded. The map resizes only when the overlay was hidden.
  * Exceptions: None.
  */
 export function openNewGameOverlayFromModelTab(): void {
@@ -810,18 +809,6 @@ export function applySelectionFromSidebarUnitButton(unitId: string, event: Mouse
     replaceSelection,
     syncUiAfterSelectionChange: () => syncUiAfterSelectionChange(),
   });
-}
-
-/**
- * Defines the `formatUnitArrowLabel` function shape (function formatUnitArrowLabel(unitId: string, targetLabel: string): string).
-
- * Purpose: Supports maintainability by documenting why `formatUnitArrowLabel` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
- * Exceptions: None.
- */
-export function formatUnitArrowLabel(unitId: string, targetLabel: string): string {
-  return formatUnitArrowLabelFromModule(unitId, targetLabel, formatUnitDisplayName);
 }
 
 /**
@@ -867,8 +854,7 @@ export function createTacticalSidebarDeps() {
     refreshStackCalloutIfOpen,
     refreshHumanStandingOrders,
     showMapToast,
-    createSidebarOrderRow,
-    formatUnitArrowLabel,
+    formatUnitDisplayName,
     applySelectionFromSidebarUnitButton,
     dismissMapDetailPopoversForHoverPlanning: dismissMapDetailPopoversIfHoverPlanningActive,
   };

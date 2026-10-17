@@ -1,4 +1,4 @@
-/* Page shell: navy chrome tokens, the right-hand panel, and shared controls. */
+/* Page shell: navy chrome tokens, the map pane, the AI panel's controls, and shared controls. The top bar, the console frame, and the game menu are in frameChrome.css. */
 * { box-sizing: border-box; }
 /* Navy chrome so flags and weather icons separate from the pale map. Text stays off-white so the gold weather icons remain the warm mark. */
 :root {
@@ -28,11 +28,38 @@
   --field-disabled-bg: #9fb8b5;
   --field-disabled-text: #243e3c;
   --field-disabled-border: #6b8a87;
+  /* App frame: the top bar and console footer, the console's tab rail, dividers inside those bars, and the side marks. */
+  --chrome-bg-deep: #121b27;
+  --chrome-rail-bg: #141f2d;
+  --chrome-divider: #243246;
+  --player-human: #115e59;
+  --player-opponent: #9d174d;
+  --topbar-height: 44px;
+  --console-content-width: 320px;
+  --console-rail-width: 56px;
+  /* The battle header: the top bar's darker, warmer face while a battle is open, so the theater reads at a glance. */
+  --battle-header-bg: #17141f;
+  --battle-header-border: #4a3247;
+  /* The battle header's force bar: brighter forms of the side colors, so both parts read on the dark face. */
+  --force-bar-human: #1b8a82;
+  --force-bar-opponent: #b02a62;
+  /* One tab size for the console's rail and the map-mode tabs on the minimap panel, so the two sets match. */
+  --chrome-tab-height: 58px;
+  --chrome-tab-label-size: 9px;
+  /* The minimap overview's width, and so the width of the tab row under it: five tabs of 56 px. */
+  --minimap-width: 280px;
+  /* The new-game setup panel's width. The panel floats over the map's top-left corner while the new-game overlay is open. */
+  --new-game-panel-width: 432px;
+  /* The ranged and air-strike order colors the map draws (RANGE_PERIMETER_RANGED_COLOR, RANGE_PERIMETER_AIR_STRIKE_COLOR). */
+  --order-ranged: #a06020;
+  --order-strike: #7a3db5;
+  /* Marks what the player has selected, in lists and on the map. */
+  --selection-mark: #f2c14e;
 }
 html, body { height: 100%; margin: 0; overflow: hidden; }
 body {
   display: flex;
-  flex-direction: row;
+  flex-direction: column;
   width: 100vw;
   height: 100vh;
   overflow: hidden;
@@ -65,25 +92,137 @@ body {
   display: block;
   pointer-events: none;
 }
-#minimap {
+/* The minimap panel at the map's top-left: the 280 x 200 overview, which sets the width, and under it a row of five
+   map-mode tabs. The tabs start hidden; the toggle on the overview's lower-left corner shows and hides them. */
+.minimap-panel {
   position: absolute;
   top: 12px;
   left: 12px;
-  width: 200px;
-  height: 200px;
   z-index: 6200;
-  border: 1px solid #999;
+  display: flex;
+  flex-direction: column;
+  background: var(--chrome-bg);
+  color: var(--chrome-text);
+  border: 1px solid var(--chrome-border);
   border-radius: 2px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.28);
   overflow: hidden;
+}
+/* The overview, with the tabs toggle laid over its lower-left corner. The overview is its own stacking context, so
+   Leaflet's panes stay under the toggle. A 2 px border in the expand control's background runs around the overview's
+   inside edge, over the map and the toggle, and takes no pointer input. */
+.minimap-overview {
+  flex: none;
+  position: relative;
+}
+.minimap-overview::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border: 2px solid var(--chrome-bg);
+  pointer-events: none;
+}
+#minimap {
+  width: var(--minimap-width);
+  height: 200px;
   background: #e8e4e0;
+  isolation: isolate;
+}
+/* The selection bar's expand control as a 32 px square, with dividers on its two inner edges. The chevron points down
+   while the tabs are hidden and turns up while they show. */
+.minimap-tabs-toggle {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  z-index: 1;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-top: 1px solid var(--chrome-divider);
+  border-right: 1px solid var(--chrome-divider);
+  border-radius: 0;
+  background: var(--chrome-bg);
+  color: var(--chrome-text);
+}
+.minimap-tabs-toggle:hover {
+  background: var(--chrome-bg-raised);
+}
+.minimap-tabs-toggle:focus {
+  outline-offset: -2px;
+}
+.minimap-tabs-toggle[aria-expanded="true"] .minimap-tabs-chevron {
+  transform: rotate(180deg);
 }
 #minimap.leaflet-container {
   font-family: system-ui, -apple-system, sans-serif;
 }
+/* Five equal tabs in the console rail's tab size and colors, under the overview. Each tab's right edge is the divider
+   before the next. */
+.map-mode-tabs {
+  flex: none;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  background: var(--chrome-rail-bg);
+  border-top: 1px solid var(--chrome-divider);
+}
+.map-mode-tabs[hidden] {
+  display: none;
+}
+.map-mode-btn {
+  width: 100%;
+  min-width: 0;
+  height: var(--chrome-tab-height);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border: 0;
+  border-right: 1px solid var(--chrome-divider);
+  border-radius: 0;
+  background: transparent;
+  color: var(--chrome-muted);
+  font-size: var(--chrome-tab-label-size);
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.map-mode-tabs > :last-child {
+  border-right: 0;
+}
+.map-mode-btn .chrome-icon {
+  width: 18px;
+  height: 18px;
+}
+.map-mode-btn:hover {
+  background: var(--chrome-bg-raised);
+  color: var(--chrome-text);
+}
+/* The chosen view and an open legend get the console's selected-tab mark, on the top edge, next to the overview. */
+.map-mode-btn[aria-pressed="true"] {
+  background: var(--chrome-bg-raised);
+  color: var(--chrome-text);
+  box-shadow: inset 0 3px 0 var(--chrome-accent-edge);
+}
+.map-mode-btn:disabled {
+  background: transparent;
+  color: var(--chrome-disabled);
+  opacity: 0.6;
+  cursor: default;
+}
+.map-mode-btn:focus {
+  outline-offset: -2px;
+}
+/* Opened by the Legend tab. mapChromeLayout.ts places it beside the minimap panel, or under it on a narrow map. */
 #terrain-legend {
   position: absolute;
-  top: 220px;
+  top: 12px;
   left: 12px;
   z-index: 6200;
   width: max-content;
@@ -96,14 +235,54 @@ body {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.28);
   pointer-events: auto;
 }
-/* Hidden, not removed, so the minimap keeps its 200px box while the start dialog is open. */
-#canvas-container:has(#game-over-overlay:not(.hidden)) #minimap,
-#canvas-container:has(#game-over-overlay:not(.hidden)) #terrain-legend {
+#terrain-legend[hidden] {
+  display: none;
+}
+/* Hidden, not removed, so the panel and the legend keep their boxes while the start dialog is open. */
+body:has(#game-over-overlay:not(.hidden)) #minimap-panel,
+body:has(#game-over-overlay:not(.hidden)) #terrain-legend {
   visibility: hidden;
 }
-/* Hidden for the whole time the start dialog is open, including while its form is collapsed. Not removed, so it shows again when that dialog closes. The battle-result dialog does not use this overlay. */
-#canvas-container:has(#game-over-overlay:not(.hidden)) #main-map .leaflet-control-zoom {
-  visibility: hidden;
+/* Leaflet's bottom-right corner keeps the map's 12px inset. The zoom buttons are the rightmost item, then the scale,
+   then the attribution, on one bottom line. */
+#main-map .leaflet-bottom.leaflet-right {
+  bottom: 12px;
+  right: 12px;
+  display: flex;
+  flex-direction: row-reverse;
+  align-items: flex-end;
+  gap: 6px;
+}
+#main-map .leaflet-right .leaflet-control {
+  margin: 0;
+  float: none;
+  clear: none;
+}
+/* The main map's + and − buttons use the expand control's dark slate, not the Ready teal. A button at the zoom limit is dimmed. */
+#main-map .leaflet-control-zoom {
+  border: 1px solid var(--chrome-border);
+  border-radius: 2px;
+  box-shadow: none;
+}
+#main-map .leaflet-control-zoom a {
+  width: 30px;
+  height: 30px;
+  line-height: 30px;
+  background: var(--chrome-bg);
+  color: var(--chrome-text);
+  border-bottom-color: var(--chrome-border);
+}
+#main-map .leaflet-control-zoom a:hover,
+#main-map .leaflet-control-zoom a:focus {
+  background: var(--chrome-bg-raised);
+  color: var(--chrome-text);
+}
+#main-map .leaflet-control-zoom a.leaflet-disabled,
+#main-map .leaflet-control-zoom a.leaflet-disabled:hover,
+#main-map .leaflet-control-zoom a.leaflet-disabled:focus {
+  background: var(--chrome-bg-deep);
+  color: var(--chrome-disabled);
+  cursor: default;
 }
 #terrain-legend select {
   display: block;
@@ -112,46 +291,6 @@ body {
   font-size: 11px;
   padding: 1px 3px;
   text-align: left;
-}
-#sidebar {
-  width: 320px;
-  min-width: 320px;
-  height: 100%;
-  flex-shrink: 0;
-  position: relative;
-  z-index: 6000;
-  display: flex;
-  flex-direction: column;
-  padding: 0;
-  background: var(--chrome-bg);
-  color: var(--chrome-text);
-  color-scheme: dark;
-  border-left: 1px solid var(--chrome-border);
-  overflow: hidden;
-}
-/* Out of the row for the whole time #game-over-overlay is open, including while its form is collapsed. The map pane takes that width. The battle-result dialog is a different element. */
-body:has(#game-over-overlay:not(.hidden)) #sidebar {
-  display: none;
-}
-#sidebar.main-ui-disabled {
-  opacity: 0.65;
-  transition: opacity 0.15s ease;
-}
-#sidebar-top {
-  flex: 1 1 auto;
-  min-height: 0;
-  padding: 1rem;
-  overflow: auto;
-}
-#sidebar-bottom {
-  flex: 0 0 40%;
-  min-height: 180px;
-  padding: 1rem;
-  border-top: 1px solid var(--chrome-border);
-  background: var(--chrome-bg);
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
 }
 .openrouter-tab-bar {
   display: flex;
@@ -227,18 +366,6 @@ body:has(#game-over-overlay:not(.hidden)) #sidebar {
 .openrouter-tool-toggle:disabled {
   opacity: 0.55;
 }
-/* Ready sits in a tip host. A shown control clears its inline display so this rule can center its label. The host and Ranged share one top edge and one height, including Strike's list and Cancel. */
-#sidebar-top p:has(#ready-btn) {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  column-gap: 0.35rem;
-  row-gap: 0.35rem;
-}
-#sidebar-top p:has(#ready-btn) > .control-tooltip-host {
-  height: 1.75rem;
-  align-items: stretch;
-}
 .ready-btn,
 .ranged-btn {
   box-sizing: border-box;
@@ -251,34 +378,6 @@ body:has(#game-over-overlay:not(.hidden)) #sidebar {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-}
-.openrouter-status-row {
-  margin-top: 0.5rem;
-  padding-top: 0.5rem;
-  border-top: 1px solid var(--chrome-border);
-  flex: 1 1 auto;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-}
-/* Both tabs: no rule line above the shared output log (status row follows both panels in DOM). */
-#openrouter-tools-panel.active ~ .openrouter-status-row,
-#openrouter-model-panel.active ~ .openrouter-status-row {
-  border-top: none;
-  margin-top: 0;
-  padding-top: 0;
-}
-#openrouter-model-panel.active > .openrouter-row:last-child {
-  margin-bottom: 0;
-}
-.openrouter-row {
-  margin-bottom: 0.6rem;
-}
-.openrouter-row label {
-  display: block;
-  font-size: 0.85rem;
-  color: var(--chrome-muted);
-  margin-bottom: 0.2rem;
 }
 .openrouter-key-row {
   display: flex;
@@ -297,75 +396,6 @@ body:has(#game-over-overlay:not(.hidden)) #sidebar {
   font-variant-numeric: tabular-nums;
   font-size: 0.85rem;
   color: var(--chrome-text);
-}
-.openrouter-row input[type="password"],
-.openrouter-row select {
-  width: 100%;
-  padding: 0.3rem 0.4rem;
-  font-size: 12px;
-  box-sizing: border-box;
-}
-.openrouter-model-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto auto;
-  gap: 0.4rem;
-  align-items: center;
-}
-.openrouter-model-grid select {
-  min-width: 0;
-}
-.openrouter-model-grid-checkbox {
-  grid-column: 2 / -1;
-}
-.openrouter-model-grid-checkbox label {
-  white-space: nowrap;
-}
-.openrouter-inline-checkbox {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 0.45rem;
-}
-.openrouter-inline-checkbox input[type="checkbox"] {
-  margin: 0;
-  flex-shrink: 0;
-}
-.openrouter-inline-checkbox label {
-  margin: 0;
-  font-weight: normal;
-}
-/* The model dropdown sets this row's height. Refresh, Run, and New stretch to that border box. */
-.openrouter-model-grid > button {
-  align-self: stretch;
-  height: auto;
-  box-sizing: border-box;
-  padding-block: 0;
-  line-height: 1;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-.openrouter-model-grid > .control-tooltip-host {
-  display: flex;
-  align-self: stretch;
-  min-width: 0;
-}
-.openrouter-model-grid > .control-tooltip-host > button {
-  align-self: stretch;
-  width: 100%;
-  height: 100%;
-  box-sizing: border-box;
-  padding-block: 0;
-  line-height: 1;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-.openrouter-model-grid > .control-tooltip-host > select {
-  width: 100%;
-  min-width: 0;
-  align-self: center;
-  height: auto;
 }
 .openrouter-refresh-btn {
   flex-shrink: 0;

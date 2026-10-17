@@ -1,5 +1,17 @@
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
-import { COUNT_BADGE_OFFSET, MULTI_PLAYER_FILL, MULTI_PLAYER_GLYPH_FILTER, MULTI_PLAYER_STROKE, PLAYER_COLORS, STACK_OFFSET_X, STACK_OFFSET_Y, UNIT_RADIUS, UNIT_TYPE_LABELS } from '../core/constants';
+import {
+  COUNT_BADGE_OFFSET,
+  MULTI_PLAYER_FILL,
+  MULTI_PLAYER_GLYPH_FILTER,
+  MULTI_PLAYER_STROKE,
+  PLAYER_COLORS,
+  SELECTION_RING_COLOR,
+  SELECTION_RING_WIDTH,
+  STACK_OFFSET_X,
+  STACK_OFFSET_Y,
+  UNIT_RADIUS,
+  UNIT_TYPE_LABELS,
+} from '../core/constants';
 import { rendererSharedState as S } from '../core/state';
 import { hexCenterPx } from '../map/mapHelpers';
 import { shouldHideStrategicMapUnitsForZoom } from '../map/terrainView';
@@ -100,6 +112,19 @@ function iconPathForType(unitType: UnitIconType): string {
 }
 
 /**
+ * Path of the glyph for a unit type, for page elements that show a unit's type.
+ *
+ * Purpose: A list row and the map token use the same glyph.
+ * When to use: As an `<img>` source in panel markup.
+ * Expected outcome: `units/<type>.svg`; a type with no glyph of its own uses the mixed glyph.
+ * Exceptions: None.
+ */
+export function unitIconPathForUnitType(unitType: string): string {
+  const known = Object.prototype.hasOwnProperty.call(UNIT_ICON_FILE_BY_TYPE, unitType);
+  return iconPathForType(known ? (unitType as UnitIconType) : 'mixed');
+}
+
+/**
  * Defines the `getOrStartUnitIconLoad` function shape (function getOrStartUnitIconLoad(unitType: UnitIconType): HTMLImageElement | null).
 
  * Purpose: Supports maintainability by documenting why `getOrStartUnitIconLoad` exists.
@@ -187,11 +212,34 @@ export function drawUnitTypeGlyph(
 }
 
 /**
- * Defines the `drawOneUnitMarker` function shape (export function drawOneUnitMarker( ctx: CanvasRenderingContext2D, x: number, y: number, color: string, label: string, strokeColor: string = '#).
+ * Covers one marker's border with the gold selection ring.
+ *
+ * Purpose: Replaces the marker's border with the gold ring, in the border's own paint step.
+ * When to use: From `drawOneUnitMarker`, in the border's own step, before the glyph. A stack draws its lower marker
+ *   first, so the upper marker covers the lower ring where they overlap, the same way it covers the lower border.
+ * Expected outcome: A `SELECTION_RING_WIDTH` stroke in `SELECTION_RING_COLOR` on the marker's circle, in the place of
+ *   the 2 px border.
+ * Exceptions: None.
+ */
+function drawSelectionRing(ctx: CanvasRenderingContext2D, x: number, y: number): void {
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(x, y, UNIT_RADIUS, 0, Math.PI * 2);
+  ctx.strokeStyle = SELECTION_RING_COLOR;
+  ctx.lineWidth = SELECTION_RING_WIDTH;
+  ctx.stroke();
+  ctx.restore();
+}
 
- * Purpose: Supports maintainability by documenting why `drawOneUnitMarker` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+/**
+ * Draws one unit token: fill, border, then glyph.
+ *
+ * Purpose: Map markers, moving markers, and stale intel share one token.
+ * When to use: Pass the side fill and the border color. A selected marker passes `SELECTION_RING_COLOR` so the border
+ *   is the gold ring, painted in the border's own step, under the glyph.
+ * Expected outcome: A filled circle of `UNIT_RADIUS`. Its border is the passed color, 2 px wide, except the selection
+ *   color, which is the wider gold ring. The glyph is drawn after the border, so it covers the border's inner edge
+ *   the same way it covers a white border. A mixed-side fill still tints the glyph dark.
  * Exceptions: None.
  */
 export function drawOneUnitMarker(
@@ -208,9 +256,13 @@ export function drawOneUnitMarker(
   ctx.arc(x, y, UNIT_RADIUS, 0, Math.PI * 2);
   ctx.fillStyle = color;
   ctx.fill();
-  ctx.strokeStyle = stackedNeutral ? MULTI_PLAYER_STROKE : strokeColor;
-  ctx.lineWidth = 2;
-  ctx.stroke();
+  if (strokeColor === SELECTION_RING_COLOR) {
+    drawSelectionRing(ctx, x, y);
+  } else {
+    ctx.strokeStyle = strokeColor;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
   ctx.save();
   if (stackedNeutral) ctx.filter = MULTI_PLAYER_GLYPH_FILTER;
   ctx.fillStyle = '#fff';
@@ -228,11 +280,16 @@ export function drawOneUnitMarker(
 }
 
 /**
- * Defines the `drawUnits` function shape (export function drawUnits().
-
- * Purpose: Supports maintainability by documenting why `drawUnits` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Draws one marker per hex for the given units, with a second offset marker and a count badge for a stack.
+ *
+ * Purpose: Units are drawn on the canvas, one token per hex, in both theaters.
+ * When to use: From the scene draw, with the strategic units or the battle's sub-units. Pass the ids of units drawn
+ *   elsewhere this frame, such as units moving in playback, as `movingUnitIds`.
+ * Expected outcome: Each hex gets a marker in its side's color, or the mixed-side fill when both sides are there. A hex
+ *   with two or more units gets a second marker offset up and right, and a count badge. Each marker of a hex that
+ *   holds a unit in the current selection uses the gold ring as that marker's border, under the glyph. The upper
+ *   marker of a stack therefore covers the lower ring where they overlap. Badges are drawn after every marker, so a
+ *   badge stays readable over a ring.
  * Exceptions: None.
  */
 export function drawUnits(
@@ -247,9 +304,21 @@ export function drawUnits(
     list.push(u);
     byHex.set(u.h3Index, list);
   }
-  for (const [h3Index, hexUnits] of byHex) {
+  const selectedUnitIds = new Set(S.selectedUnitIds);
+  const tokens = [...byHex].map(([h3Index, hexUnits]) => {
     const { x, y } = hexCenterPx(h3Index);
     const count = hexUnits.length;
+    return {
+      x,
+      y,
+      count,
+      top: count > 1 ? { x: x + STACK_OFFSET_X, y: y + STACK_OFFSET_Y } : { x, y },
+      selected: hexUnits.some((u) => selectedUnitIds.has(u.id)),
+      units: hexUnits,
+    };
+  });
+
+  for (const { x, y, count, top, selected, units: hexUnits } of tokens) {
     const types = new Set(hexUnits.map((u) => u.unitType));
     const players = new Set(hexUnits.map((u) => u.player));
     const mixedType = types.size > 1;
@@ -257,21 +326,24 @@ export function drawUnits(
     const fillColor = multiPlayer ? MULTI_PLAYER_FILL : (PLAYER_COLORS[hexUnits[0]!.player] ?? '#333');
     const strokeColor = multiPlayer ? MULTI_PLAYER_STROKE : '#fff';
     const label = mixedType ? '*' : (UNIT_TYPE_LABELS[hexUnits[0]!.unitType] ?? '?');
-
-    drawOneUnitMarker(ctx, x, y, fillColor, label, strokeColor, hexUnits[0]!.player);
+    const markerStroke = selected ? SELECTION_RING_COLOR : strokeColor;
+    drawOneUnitMarker(ctx, x, y, fillColor, label, markerStroke, hexUnits[0]!.player);
     if (count > 1) {
-      drawOneUnitMarker(ctx, x + STACK_OFFSET_X, y + STACK_OFFSET_Y, fillColor, label, strokeColor, hexUnits[0]!.player);
-      const badgeX = x + COUNT_BADGE_OFFSET;
-      const badgeY = y - COUNT_BADGE_OFFSET;
-      ctx.font = 'bold 13px system-ui, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.strokeStyle = '#fff';
-      ctx.lineWidth = 2;
-      ctx.strokeText(String(count), badgeX, badgeY);
-      ctx.fillStyle = '#000';
-      ctx.fillText(String(count), badgeX, badgeY);
+      drawOneUnitMarker(ctx, top.x, top.y, fillColor, label, markerStroke, hexUnits[0]!.player);
     }
+  }
+  for (const { x, y, count } of tokens) {
+    if (count < 2) continue;
+    const badgeX = x + COUNT_BADGE_OFFSET;
+    const badgeY = y - COUNT_BADGE_OFFSET;
+    ctx.font = 'bold 13px system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 2;
+    ctx.strokeText(String(count), badgeX, badgeY);
+    ctx.fillStyle = '#000';
+    ctx.fillText(String(count), badgeX, badgeY);
   }
 }
 

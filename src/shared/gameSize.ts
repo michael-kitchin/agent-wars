@@ -86,8 +86,8 @@ export function getMaxUnitsPerType(size: GameSize): Readonly<Record<BuildUnitTyp
 /**
  * Preview rows for the new-game unit-token cap display.
  *
- * Purpose: Lets the dialog show stack-style numbers without duplicating type order in HTML/JS.
- * When to use: Rendering or refreshing the four cap badges under the Game size dropdown.
+ * Purpose: Lets the start screen's unit row show each cap without duplicating type order in HTML/JS.
+ * When to use: Rendering or refreshing the four caps in the unit row under the Game size dropdown.
  * Expected outcome: Infantry → armor → naval → air with capitalized names and `getMaxUnitsPerType` caps.
  * Exceptions: None.
  */

@@ -1,0 +1,303 @@
+/* Console contents: the header subtitle, the rail badges, and the Orders tab's groups and rows. The frame itself is in frameChrome.css. */
+
+/* ---------- Header subtitle and rail badges ---------- */
+.console-subtitle {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--chrome-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+/* The badge sits on the tab icon's upper-right corner; `.console-tab` is its positioning box. */
+.console-tab-badge {
+  position: absolute;
+  top: 6px;
+  left: calc(50% + 4px);
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--button-bg);
+  border: 1px solid var(--chrome-accent-edge);
+  color: var(--button-text);
+  font-size: 10px;
+  line-height: 14px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+.console-tab-badge[hidden] {
+  display: none;
+}
+
+/* ---------- Orders tab groups ---------- */
+.console-order-group + .console-order-group {
+  margin-top: 14px;
+}
+.console-group-heading {
+  margin: 0 0 6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--chrome-muted);
+}
+.console-group-count {
+  margin-left: 6px;
+  color: var(--chrome-text);
+  font-variant-numeric: tabular-nums;
+}
+.console-order-list > .chrome-muted {
+  display: block;
+  padding: 2px 0;
+}
+
+/* ---------- Order rows ---------- */
+/* One row: a select button holding the unit's name and its order's line, then the cancel ×. */
+.console-order-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--chrome-divider);
+  border-radius: 3px;
+}
+.console-order-row:has(> .console-order-select[aria-pressed="true"]) {
+  background: color-mix(in srgb, var(--selection-mark) 12%, transparent);
+}
+.console-order-select {
+  flex: 1 1 auto;
+  min-width: 0;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 0 14px 0 0;
+  border: 0;
+  background: transparent;
+  color: var(--chrome-text);
+  text-align: left;
+}
+.console-order-select:hover {
+  background: transparent;
+  color: var(--chrome-accent-edge);
+}
+/* A gold dot marks a row whose unit is selected, matching the map's selection color. */
+.console-order-select[aria-pressed="true"]::after {
+  content: "";
+  position: absolute;
+  right: 2px;
+  top: 50%;
+  width: 7px;
+  height: 7px;
+  margin-top: -3.5px;
+  border-radius: 50%;
+  background: var(--selection-mark);
+}
+.console-order-name {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+.console-order-detail {
+  color: var(--chrome-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.console-order-cancel {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--chrome-border);
+  border-radius: 3px;
+  background: transparent;
+  color: var(--chrome-text);
+  font-size: 14px;
+  line-height: 1;
+}
+.console-order-cancel:hover {
+  background: var(--chrome-bg-raised);
+}
+
+/* ---------- Reports tab ---------- */
+.console-report-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.console-report {
+  position: relative;
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--chrome-divider);
+  font-size: 12px;
+}
+.console-report-message {
+  background: color-mix(in srgb, var(--player-opponent) 14%, transparent);
+}
+/* A gold dot marks entries filed since the player last left this tab. */
+.console-report[data-fresh]::after {
+  content: "";
+  position: absolute;
+  top: 14px;
+  right: 8px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--selection-mark);
+}
+.console-report-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  padding-right: 14px;
+}
+.console-report-tag {
+  padding: 1px 5px;
+  border: 1px solid var(--chrome-border);
+  border-radius: 3px;
+  color: var(--chrome-muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.console-report-kind {
+  font-size: 13px;
+  font-weight: 600;
+}
+.console-report-replay-host {
+  margin-left: auto;
+}
+.console-report-replay {
+  padding: 2px 8px;
+  font-size: 11px;
+}
+.console-report-body {
+  white-space: pre-line;
+  line-height: 1.45;
+}
+
+/* ---------- Opponent tab ---------- */
+/* Status, Commander, Tool groups, and the activity log, which takes the height that is left. */
+.opponent-section {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--chrome-divider);
+}
+.opponent-section:first-child {
+  padding-top: 0;
+}
+.opponent-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.opponent-status-text {
+  margin: 0;
+  font-size: 13px;
+}
+.opponent-field {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+.opponent-field label {
+  color: var(--chrome-muted);
+  font-size: 12px;
+}
+.opponent-field input[type="password"],
+.opponent-field select {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 0.3rem 0.4rem;
+  font-size: 12px;
+}
+.opponent-field > .control-tooltip-host {
+  display: flex;
+  min-width: 0;
+}
+.opponent-model-row {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+  min-width: 0;
+}
+.opponent-model-row > select {
+  flex: 1 1 auto;
+}
+/* Refresh stretches to the dropdown's height and centres its icon. */
+.opponent-model-row > button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding-block: 0;
+  line-height: 1;
+}
+.opponent-section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.opponent-section-note {
+  color: var(--chrome-muted);
+  font-size: 11px;
+}
+.opponent-log-section {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+/* ---------- Footer status line ---------- */
+.opponent-status-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  margin: 0;
+  color: var(--chrome-muted);
+  font-size: 12px;
+}
+.opponent-status-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--chrome-disabled);
+}
+.opponent-status-line[data-status="on"] .opponent-status-dot {
+  background: var(--chrome-accent-edge);
+}
+.opponent-status-line[data-status="planning"] .opponent-status-dot {
+  background: var(--chrome-opponent-edge);
+}
+.opponent-status-label {
+  flex: none;
+  color: var(--chrome-text);
+}
+.opponent-status-model {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.opponent-status-model::before {
+  content: "· ";
+}
+.opponent-status-cost {
+  flex: none;
+  color: var(--chrome-text);
+  font-variant-numeric: tabular-nums;
+}

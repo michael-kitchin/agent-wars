@@ -1,5 +1,5 @@
 import type { AirStrikeTargetType } from '../../shared/ipcTypes';
-import { selectionSupportButtonMode } from '../../shared/selectionSupportButtonMode';
+import { selectionSupportAction, selectionSupportButtonMode } from '../../shared/selectionSupportButtonMode';
 import {
   formatPendingAirStrikeSidebarLabel,
   formatPendingRangedAttackSidebarLabel,
@@ -7,13 +7,24 @@ import {
 import { rendererSharedState as S } from '../core/state';
 import { showOrderBlockHexTooltip } from '../map/orderBlockHexTooltip';
 import { hideOrderSlowerHexTooltip } from '../map/orderSlowerHexTooltip';
-import { appendMutedPlaceholder } from './sidebarListHelpers';
+import { renderSidebarOrderGroup, sidebarOrderRowArgs } from './sidebarOrderRow';
 import type { TacticalOrderDeps } from './tacticalOrderDeps';
 export type { TacticalOrderDeps } from './tacticalOrderDeps';
 export type { RefreshHoverRoutePreviewOptions } from './hoverRoutePreviewTypes';
 import { refreshHoverRoutePreview } from './hoverRoutePreviewRefresh';
-import { rangedButtonTooltipText } from '../chrome/controlTooltipText';
+import { renderSelectionBarState, selectedUnitTypes } from './selectionBar';
+import { supportButtonTooltipText } from '../chrome/controlTooltipText';
 export { refreshHoverRoutePreview };
+
+/**
+ * The reticle's accessible names, one per kind of attack.
+ *
+ * Purpose: The reticle is an icon with no visible label, so assistive technology and the smoke run read this name.
+ * When to use: `updateRangedSidebar`, as `aria-label` on `#ranged-attack-btn`.
+ * Expected outcome: The name of the attack a click would aim, greyed out or not.
+ * Exceptions: None.
+ */
+const SUPPORT_BUTTON_NAMES = Object.freeze({ ranged: 'Ranged attack', strike: 'Air strike' });
 
 /**
  * Replaces pending support-order rows for the selected unit ids via a row builder.
@@ -221,107 +232,91 @@ export function cancelFerryForUnit(unitId: string, deps: TacticalOrderDeps): voi
 }
 
 /**
- * Rebuilds the pending ranged and air-strike rows and chooses Ranged, Strike, or neither for the current selection.
+ * Rebuilds the pending ranged and air-strike rows and sets the reticle for the current selection.
  *
- * Purpose: The shared button follows `selectionSupportButtonMode`. Clearing a targeting flag here must also drop a hover preview that sampled the old flag.
+ * Purpose: The reticle follows `selectionSupportButtonMode`, and `selectionSupportAction` names it and explains it when
+ *   it cannot be used. Clearing a targeting flag here must also drop a hover preview that sampled the old flag.
  * When to use: After a selection change, a pending-order change, or a targeting-mode toggle.
- * Expected outcome: Pending rows match the draft arrays. The button is hidden unless every resolved unit can range, or every resolved unit is air. `Cancel` stays while ranged mode is still valid. A true-to-false flag change nulls the hover preview, hides the block and slower tooltips, redraws, and starts one hover refresh.
+ * Expected outcome: Pending rows match the draft arrays. The reticle shows while units are selected; its tip host
+ *   (`#ranged-attack-tip-host`) is what shows and hides. It is enabled when every resolved unit can range, or every
+ *   resolved unit is air; otherwise it is greyed out, and its reason is in `#selection-panel-action-note` and is the
+ *   tip host's tip. Its `aria-label` names the attack, and `aria-pressed` is true while that attack is aimed; the strike
+ *   target list shows to its left only while a strike is aimed. A true-to-false flag change nulls the hover preview,
+ *   hides the block and slower tooltips, redraws, and starts one hover refresh. The selection bar's hint and border then
+ *   follow the flags (`renderSelectionBarState`).
  * Exceptions: None. Returns immediately when `#ranged-attacks-list` is missing, and then leaves the button untouched.
  */
 export function updateRangedSidebar(deps: TacticalOrderDeps): void {
   const listEl = document.getElementById('ranged-attacks-list');
   const strikeListEl = document.getElementById('air-strikes-list');
   const btnEl = document.getElementById('ranged-attack-btn') as HTMLButtonElement | null;
+  const btnHostEl = document.getElementById('ranged-attack-tip-host');
   const strikeTypeEl = document.getElementById('air-strike-target-type') as HTMLSelectElement | null;
-  const strikeCancelEl = document.getElementById('air-strike-cancel-btn') as HTMLButtonElement | null;
+  const actionNoteEl = document.getElementById('selection-panel-action-note');
   if (!listEl) return;
 
-  const tacticalPositions = S.tacticalBattleSnapshot?.subUnits;
-  listEl.innerHTML = '';
-  if (S.pendingRangedAttacks.length === 0) {
-    appendMutedPlaceholder(listEl, 'None');
-  } else {
-    for (const r of S.pendingRangedAttacks) {
-      const row = deps.createSidebarOrderRow({
-        labelText: deps.formatUnitArrowLabel(
-          r.unitId,
-          formatPendingRangedAttackSidebarLabel(S.gameState, r, tacticalPositions)
-        ),
-        unitId: r.unitId,
-        selected: S.selectedUnitIds.includes(r.unitId),
-        onToggleSelect: (event) => deps.applySelectionFromSidebarUnitButton(r.unitId, event),
-        onCancel: () => cancelRangedForUnit(r.unitId, deps),
-        compactBlueButtons: true,
-      });
-      listEl.appendChild(row);
-    }
-  }
+  const battle = S.tacticalBattleSnapshot;
+  renderSidebarOrderGroup(
+    'ranged',
+    S.pendingRangedAttacks.map((r) =>
+      sidebarOrderRowArgs(
+        r.unitId,
+        formatPendingRangedAttackSidebarLabel(S.gameState, r, battle),
+        () => cancelRangedForUnit(r.unitId, deps),
+        deps
+      )
+    )
+  );
   if (strikeListEl) {
-    strikeListEl.innerHTML = '';
-    if (S.pendingAirStrikes.length === 0) {
-      appendMutedPlaceholder(strikeListEl, 'None');
-    } else {
-      for (const strike of S.pendingAirStrikes) {
-        const row = deps.createSidebarOrderRow({
-          labelText: deps.formatUnitArrowLabel(
-            strike.unitId,
-            formatPendingAirStrikeSidebarLabel(S.gameState, strike, tacticalPositions)
-          ),
-          unitId: strike.unitId,
-          selected: S.selectedUnitIds.includes(strike.unitId),
-          onToggleSelect: (event) => deps.applySelectionFromSidebarUnitButton(strike.unitId, event),
-          onCancel: () => cancelAirStrikeForUnit(strike.unitId, deps),
-          compactBlueButtons: true,
-        });
-        strikeListEl.appendChild(row);
-      }
-    }
+    renderSidebarOrderGroup(
+      'strike',
+      S.pendingAirStrikes.map((strike) =>
+        sidebarOrderRowArgs(
+          strike.unitId,
+          formatPendingAirStrikeSidebarLabel(S.gameState, strike, battle),
+          () => cancelAirStrikeForUnit(strike.unitId, deps),
+          deps
+        )
+      )
+    );
   }
 
-  if (btnEl) {
+  if (btnEl && btnHostEl) {
     const tb = S.tacticalBattleSnapshot;
-    const selectedUnits = tb
-      ? S.selectedUnitIds
-          .map((id) => tb.subUnits.find((u) => u.id === id))
-          .filter((unit): unit is NonNullable<typeof unit> => !!unit)
-      : S.selectedUnitIds
-          .map((id) => S.gameState?.units.find((u) => u.id === id))
-          .filter((unit): unit is NonNullable<typeof unit> => !!unit);
     const rangedWasActive = S.rangedModeActive;
     const strikeWasActive = S.airStrikeModeActive;
-    const mode = selectionSupportButtonMode(
-      selectedUnits.map((unit) => unit.unitType),
-      !!tb
-    );
+    const unitTypes = selectedUnitTypes();
+    const mode = selectionSupportButtonMode(unitTypes, !!tb);
+    const action = selectionSupportAction(unitTypes, !!tb);
+    btnEl.disabled = !action.enabled;
+    if (actionNoteEl) actionNoteEl.textContent = action.reason ?? '';
+    // The host carries the reason, because a disabled button gets no pointer events.
+    if (!action.enabled && action.reason) btnHostEl.setAttribute('data-control-tooltip', action.reason);
+    else btnHostEl.removeAttribute('data-control-tooltip');
+    // An empty display hands the host back to `.control-tooltip-host`, whose inline flex keeps the button centered.
+    btnHostEl.style.display = '';
+    // The reticle has no visible label, so its name says which attack it aims, greyed out or not.
+    btnEl.setAttribute('aria-label', SUPPORT_BUTTON_NAMES[action.kind]);
     if (mode === 'strike') {
       S.rangedModeActive = false;
-      btnEl.textContent = 'Strike';
-      btnEl.setAttribute('data-control-tooltip', rangedButtonTooltipText('Strike'));
-      // An empty display lets the command-row rule center the label in the shared height.
-      btnEl.style.display = S.airStrikeModeActive ? 'none' : '';
+      btnEl.setAttribute('aria-pressed', String(S.airStrikeModeActive));
+      btnEl.setAttribute('data-control-tooltip', supportButtonTooltipText('strike', S.airStrikeModeActive));
       if (strikeTypeEl) {
         strikeTypeEl.style.display = S.airStrikeModeActive ? '' : 'none';
         strikeTypeEl.value = S.airStrikeTargetType;
       }
-      if (strikeCancelEl) {
-        strikeCancelEl.style.display = S.airStrikeModeActive ? '' : 'none';
-      }
     } else if (mode === 'ranged') {
       S.airStrikeModeActive = false;
-      btnEl.style.display = '';
-      btnEl.textContent = S.rangedModeActive ? 'Cancel' : 'Ranged';
-      btnEl.setAttribute(
-        'data-control-tooltip',
-        rangedButtonTooltipText(S.rangedModeActive ? 'Cancel' : 'Ranged')
-      );
+      btnEl.setAttribute('aria-pressed', String(S.rangedModeActive));
+      btnEl.setAttribute('data-control-tooltip', supportButtonTooltipText('ranged', S.rangedModeActive));
       if (strikeTypeEl) strikeTypeEl.style.display = 'none';
-      if (strikeCancelEl) strikeCancelEl.style.display = 'none';
     } else {
-      btnEl.style.display = 'none';
+      // Greyed out with its reason: the reticle stays visible so the player can see why it cannot be used.
+      btnEl.setAttribute('aria-pressed', 'false');
+      btnEl.removeAttribute('data-control-tooltip');
       S.rangedModeActive = false;
       S.airStrikeModeActive = false;
       if (strikeTypeEl) strikeTypeEl.style.display = 'none';
-      if (strikeCancelEl) strikeCancelEl.style.display = 'none';
     }
     const targetingModeCleared =
       (rangedWasActive && !S.rangedModeActive) || (strikeWasActive && !S.airStrikeModeActive);
@@ -333,4 +328,5 @@ export function updateRangedSidebar(deps: TacticalOrderDeps): void {
       void refreshHoverRoutePreview(deps);
     }
   }
+  renderSelectionBarState();
 }

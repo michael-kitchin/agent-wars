@@ -16,7 +16,7 @@ import {
   buildHoldFireRule,
 } from './gameRuleText';
 import type { CoachingGates } from './coachingGates';
-import { buildOptionCopyMappingClause } from './optionCopyText';
+import { buildOptionCopyOrRoutingBullet } from './optionCopyText';
 
 /**
  * Five-goal list, doctrine, and message guidance for the strategic context block.
@@ -54,7 +54,7 @@ export function buildStrategicCoachingBullets(gates: CoachingGates): readonly st
   bullets.push(RESOLUTION_ORDER_BULLET, tempoBullet(gates.hasAirUnits));
   if (gates.ordersEnabled) bullets.push(`- ${buildHoldFireRule()}`);
   bullets.push(`- ${buildCasualtySortRule()}`);
-  bullets.push(optionCopyOrRoutingBullet(gates));
+  bullets.push(buildOptionCopyOrRoutingBullet(gates, 'this-turn', 'unit'));
   bullets.push(`- ${buildDestinationOccupancyRule(gates.coordinateMode)}`);
   if (gates.ordersEnabled) {
     bullets.push(ORDERLESS_BULLET);
@@ -299,32 +299,3 @@ export const MESSAGE_DISCIPLINE_BULLET =
  */
 const TOOL_BUDGET_BULLET =
   '- Rounds are limited and exhausting them submits nothing at all; once destinations are chosen, submit.';
-
-/**
- * Copy listed option rows, or tell the model to use the routing tool when none are listed.
- *
- * Purpose: Pointing copy-the-row coaching at an absent table is the failure this branch exists to prevent.
- * When to use: Strategic option-copy item.
- * Expected outcome: Copy-row wording when the table exists; otherwise "no options are listed this period" and the routing tool when planning is on.
- * Exceptions: None.
- */
-function optionCopyOrRoutingBullet(gates: CoachingGates): string {
-  if (gates.hasBestOptionsTable) {
-    const routing = gates.planningEnabled
-      ? ' Call plan_route only for a destination the table does not list for that unit.'
-      : '';
-    return (
-      '- Best Options This Turn Target Hexes are already this-turn legal destinations. ' +
-      buildOptionCopyMappingClause({
-        actorNoun: 'unit',
-        hasAirUnits: gates.hasAirUnits,
-        includeFerryMapping: gates.hasAirUnits,
-      }) +
-      routing
-    );
-  }
-  if (gates.planningEnabled) {
-    return '- No options are listed this period. Destinations must come from the routing tool, not from an absent options table.';
-  }
-  return '- No options are listed this period. Destinations come only from the adjacent-cell listing; the unit\'s own cell means hold.';
-}

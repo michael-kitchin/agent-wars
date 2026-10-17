@@ -6,15 +6,23 @@ The engine under `src/` wins if this file drifts.
 
 ## Setup
 
-On the Global tab the player picks:
+The player picks the homes in the Map section. On the Global tab:
 
 - Human home region
 - AI home region
+
+On the Regional tab the player picks one region and two different side groups.
+
+In the Forces section the player picks:
+
 - Game size (caps only — [game-size-unit-caps.md](game-size-unit-caps.md))
+
+In the Rules section the player picks:
+
 - Origin bonus and Terrain bonus dropdowns (Off, Low, or High; both default to Low; rules in [combat-rules-v3.md](combat-rules-v3.md) §4.9, "Origin bonus and terrain bonus")
 - Weather bonus dropdown (Off, Low, or High; default Low; rules in [combat-rules-v3.md](combat-rules-v3.md) §4.9, "Weather bonus")
 - Tech bonus dropdown (Off, Low, or High; default Low; rules in [combat-rules-v3.md](combat-rules-v3.md) §4.9, "Tech bonus")
-- Fog of war (default on), on the same row as the starting month and to its left. The month is a random month whenever the new-game dialog opens, with a square randomize button beside the list.
+- Fog of war (default on), on the line after the starting month, with Auto-start AI to its right. Auto-start AI is checked when the dialog opens. What it does when the match starts is in [new-game-dialog.md](ux/new-game-dialog.md). The month is a random month whenever the new-game dialog opens, with a square randomize button beside the list. The engine does not store Auto-start AI.
 
 A global match stores the two home-region names in `scenario_region_human` and `scenario_region_ai`. Those two regions may be the same.
 
@@ -22,7 +30,7 @@ A regional match stores the two side groups' display names in those same keys. T
 
 Opening a saved regional match fails when a stored home is not an installed side group's id or display name. The message is "This saved {map} game uses side groups that no longer exist. Start a new game." If that map's urban baseline is not loaded, the regional control win uses every hex.
 
-While the new-game dialog is open, a Global preview frames the world one zoom level closer than the world fit, and a Regional preview frames that region. A Global preview draws the two chosen homes and leaves the strategic hex grid hidden until the player holds T. A Regional preview always draws its strategic hex grid. Weather icons sit on every strategic hex until that hold, and tech icons replace them while it lasts. See [new-game-dialog.md](ux/new-game-dialog.md).
+While the new-game dialog is open, a Global preview frames the world one zoom level closer than the world fit, and a Regional preview frames that region. A Global preview draws the two chosen homes and leaves the strategic hex grid hidden until the player holds T. A Regional preview always draws its strategic hex grid. Weather icons sit on every strategic hex, and tech icons sit beside them while that hold lasts. See [new-game-dialog.md](ux/new-game-dialog.md).
 
 `scenarioId` on the snapshot is always `region_vs_region` for a new match (`fogState` / seeding). There is no second scenario picker in the live overlay.
 

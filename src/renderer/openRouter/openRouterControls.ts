@@ -2,20 +2,20 @@ import type { PostResolutionConsultationPushPayload } from '../../shared/ipcType
 import type { AiStrategyToastFields } from '../../shared/aiStrategyToastContent';
 import type { OpenRouterModel } from '../../shared/ipc/openRouterTypes';
 import { formatModelOptionLabel } from '../../shared/openRouterModelDisplay';
-import { selectTabPanel } from '../chrome/selectTabPanel';
 import { rendererSharedState as S } from '../core/state';
 import {
   readTacticalBattlesInterceptPromptEnabled,
   writeTacticalBattlesInterceptPromptEnabled,
 } from '../gameplay/tacticalBattlePromptPreference';
 import { applyTacticalPostBeatConsultSideEffects } from '../tactical/applyTacticalPostBeatConsultSideEffects';
-import { updateOpenRouterCostLabel } from './openRouterUiHelpers';
+import { renderOpponentStatus, updateOpenRouterCostLabel } from './openRouterUiHelpers';
 import { attachModelDescriptionTooltip } from './modelDescriptionTooltip';
 import { attachReasoningEffortSelect } from './reasoningEffortSelect';
 import { resetPrecomputedAiState } from './precomputedAiState';
 import { isDeferredResolutionPlaybackConsultPending } from './aiPlanningState';
 import { stopOpponentPlanning } from './openRouterRuntime';
 import { isNewGameOverlayOpen } from '../gameplay/newGameBanner';
+import { isMatchWaitingUnderNewGame } from '../gameplay/newGameReturn';
 
 /**
  * Documents the `OpenRouterUiDeps` interface as a named contract surface (interface OpenRouterUiDeps).
@@ -171,11 +171,12 @@ function startTacticalOpponentPlanAfterStrategicConsult(deps: OpenRouterUiDeps):
  * already in planning, the battle's opponent-plan request starts then, because it was held while this consult ran.
  * Exceptions: Stale `planningTurnNumber` merges log, clear the strategic latch, and still start that battle request.
  * `abandoned` pushes unlatch and resume Run prefetch without applying a plan; the player-visible skip line is sent on
- * `openRouter:log`.
+ * `openRouter:log`. While the new-game screen is open with no match waiting under it, a push only clears its latch;
+ * while a match is waiting under that screen, the push applies to that match as usual.
  */
 function initDeferredResolutionPlaybackPushListeners(deps: OpenRouterUiDeps): void {
   window.gameApi?.registerPostResolutionConsultationListener?.((payload: PostResolutionConsultationPushPayload) => {
-    if (isNewGameOverlayOpen()) {
+    if (isNewGameOverlayOpen() && !isMatchWaitingUnderNewGame()) {
       S.pendingDeferredStrategicPostResolutionConsult = false;
       deps.updateReadyButtonState();
       return;
@@ -208,7 +209,7 @@ function initDeferredResolutionPlaybackPushListeners(deps: OpenRouterUiDeps): vo
     deps.updateReadyButtonState();
   });
   window.gameApi?.registerPostTacticalBeatConsultationListener?.((fields) => {
-    if (isNewGameOverlayOpen()) {
+    if (isNewGameOverlayOpen() && !isMatchWaitingUnderNewGame()) {
       S.pendingDeferredTacticalPostBeatConsult = false;
       deps.updateReadyButtonState();
       return;
@@ -266,9 +267,9 @@ function applyAbandonedDeferredConsultRecovery(kind: 'strategic' | 'tactical', d
 /**
  * Wires the OpenRouter panel and the deferred-consultation push listeners.
  *
- * Purpose: One bootstrap for the Tools and Model tabs plus the pushes that release Ready after a deferred consult.
+ * Purpose: One bootstrap for the Opponent tab's controls plus the pushes that release Ready after a deferred consult.
  * When to use: Once during renderer startup.
- * Expected outcome: Tabs, model list, and consultation listeners are registered.
+ * Expected outcome: The Opponent tab's controls, the model list, and the consultation listeners are registered.
  * Exceptions: None; a missing OpenRouter API leaves the listeners that were registered and returns.
  */
 export function initOpenRouterUI(deps: OpenRouterUiDeps): void {
@@ -278,20 +279,6 @@ export function initOpenRouterUI(deps: OpenRouterUiDeps): void {
 
   window.gameApi?.registerOpenRouterLogListener?.((p) => deps.appendOpenRouterLog(p.line, p.isError ?? false));
   deps.updateOpenRouterCostLabel();
-
-  const tabTools = document.getElementById('openrouter-tab-tools');
-  const tabModel = document.getElementById('openrouter-tab-model');
-
-  function setActiveTab(active: 'tools' | 'model'): void {
-    selectTabPanel(active === 'model' ? 'openrouter-tab-model' : 'openrouter-tab-tools', [
-      { tabId: 'openrouter-tab-tools', panelId: 'openrouter-tools-panel' },
-      { tabId: 'openrouter-tab-model', panelId: 'openrouter-model-panel' },
-    ]);
-  }
-
-  tabTools?.addEventListener('click', () => setActiveTab('tools'));
-  tabModel?.addEventListener('click', () => setActiveTab('model'));
-  setActiveTab('model');
 
   (async () => {
     try {
@@ -458,6 +445,7 @@ export function initOpenRouterUI(deps: OpenRouterUiDeps): void {
       void deps.syncOpenRouterRunToggleInteractable();
     }).finally(() => {
       modelRefreshInFlight = false;
+      renderOpponentStatus();
     });
   }
 
@@ -469,6 +457,7 @@ export function initOpenRouterUI(deps: OpenRouterUiDeps): void {
       opt.textContent = modelId;
       modelSelect.appendChild(opt);
       modelSelect.value = modelId;
+      renderOpponentStatus();
     }
     refreshModels(true);
   }).catch(() => refreshModels(true));
@@ -531,6 +520,7 @@ export function initOpenRouterUI(deps: OpenRouterUiDeps): void {
 
   if (modelSelect) {
     modelSelect.addEventListener('change', () => {
+      renderOpponentStatus();
       void (async () => {
         try {
           await api.setSelectedModel(modelSelect.value);
@@ -569,7 +559,6 @@ export function initOpenRouterUI(deps: OpenRouterUiDeps): void {
       S.runButtonOn = !S.runButtonOn;
       runBtn.setAttribute('aria-pressed', S.runButtonOn ? 'true' : 'false');
       if (S.runButtonOn) {
-        document.getElementById('openrouter-tab-tools')?.click();
         resetPrecomputedAiState('null');
         if (S.useEventDrivenConsultation) S.eventDrivenInitialConsultationDone = false;
         deps.updateReadyButtonState();

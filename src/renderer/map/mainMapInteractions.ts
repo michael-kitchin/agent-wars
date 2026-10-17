@@ -4,7 +4,7 @@ import { HEX_DETAILS_TOOLTIP_DELAY_MS, HEX_DETAILS_TOOLTIP_REST_PX } from '../co
 import { isHoverOrderPlanningActive } from '../rendering/canvasPreviewPolicy';
 import { hitTestHexAtContainerPixel, hitTestTacticalHexAtContainerPixel } from './mapHelpers';
 import { rendererSharedState as S } from '../core/state';
-import { clearMapSelectionChrome, isEmbarkedLandUnitBlockedForSelection } from '../core/selection';
+import { isEmbarkedLandUnitBlockedForSelection } from '../core/selection';
 import { getMainLeafletMap } from './worldLeafletMap';
 import { newGameOverlayIsOpen } from '../gameplay/newGameDialogCollapse';
 import { tacticalRendererHitInsideBattleFootprint } from '../tactical/tacticalUiGuards';
@@ -12,7 +12,7 @@ import { buildTacticalPendingMarchRowFromDraft } from '../tactical/tacticalPendi
 import {
   applyHumanUnitIconClickSelectionPolicy,
   clearDeferredHumanUnitSingleSelectTimer,
-  clearDeferredStackCalloutTimer,
+  clearSelectionLikeRightClick,
   scheduleDeferredStackCallout,
 } from './mapClickSelectionPolicy';
 import { forgetSingleUnitHoverCallout, syncMapSingleUnitHover } from './singleUnitHoverCallout';
@@ -944,16 +944,7 @@ export function wireMainMapInteractions(deps: MainMapInteractionDeps): void {
   mainMapEl.addEventListener('contextmenu', (e) => {
     e.preventDefault();
     if (newGameOverlayIsOpen()) return;
-    clearDeferredHumanUnitSingleSelectTimer();
-    clearDeferredStackCalloutTimer();
-    if (S.selectedUnitIds.length === 0 && !S.hoverRoutePreview) {
-      S.selectedUnitIdsAtMouseDown = [];
-      S.gestureSelectionSnapshotAtMs = 0;
-      return;
-    }
-    clearMapSelectionChrome();
-    deps.updateSidebar();
-    deps.updateRangedSidebar();
-    deps.redraw();
+    clearSelectionLikeRightClick(deps);
   });
+  document.getElementById('selection-panel-close')?.addEventListener('click', () => clearSelectionLikeRightClick(deps));
 }

@@ -8,12 +8,12 @@ Say why the player would use the control, and state a limit only when the player
 
 ## Availability
 
-The tip can appear whenever the control can receive the pointer or keyboard focus. A control inside a surface that has pointer input turned off cannot show it. A disabled control still shows its tip when the pointer can rest on it. That includes Ready while its label reads "AI:", Run before a key and model are set, a reasoning list with fewer than two levels, a sealift slot that cannot be changed, Fight before a row is chosen, Keep building when it cannot be turned on, and Exit Battle while a battle turn is resolving or playing back.
+The tip can appear whenever the control can receive the pointer or keyboard focus. A control inside a surface that has pointer input turned off cannot show it. A disabled control still shows its tip when the pointer can rest on it. That includes Ready while its label reads "AI:", Run before a key and model are set, a reasoning list with fewer than two levels, a sealift slot that cannot be changed, Fight before a row is chosen, Keep building when it cannot be turned on, and Exit Battle while a battle turn is resolving or playing back. It also includes New game in the game menu while the new-game screen is open, and every disabled placeholder: Settings and Help in the top bar, Load game on the new-game bar, Add another opponent on the new-game screen, Save game, Load game, and How to play in the game menu, the Build and Forces tabs, and Replay on a turn report. The top bar's four readouts show a tip the same way, though they are not controls.
 
 ## Information Displayed
 
 - One shared tip, using the same chrome as the [hex tooltip](hex-tooltips.md). It is wider than that tooltip and draws above the new-game overlay, the tactical battles list, and the annihilation dialog.
-- The tip appears one second after the pointer or keyboard focus arrives on the control or on its label. Moving on that same control does not start the wait again. It follows the pointer. Keyboard focus, with the pointer on a different control or on none, places the tip at the focused control.
+- The tip appears one second after the pointer or keyboard focus arrives on the control or on its label. Moving on that same control does not start the wait again. It follows the pointer. Keyboard focus, with the pointer on a different control or on none, places the tip at the focused control. The tip opens below and to the right of that point, or above or to the left of it where it would otherwise leave the window.
 - The text is plain. Opening a dropdown, or choosing an item in it, hides the tip until the pointer leaves that control.
 - While a blocked-order tip or an order-effects tip is showing, this tip hides and does not hide those tips. Once that order tip hides, moving on the control starts this wait again. When this tip appears, the hex tooltip hides.
 - Hiding a control hides its tip. The in-battle Exit Battle tip does not remain over the annihilation dialog.
@@ -39,27 +39,54 @@ The tip can appear whenever the control can receive the pointer or keyboard focu
 - Terrain bonus: In a battle, Low adds 2 and High adds 4 when a unit fights on the terrain where it was built. Off adds nothing, and a unit that also gets the origin bonus receives only the larger of the two.
 - Weather bonus: Choose Off to ignore weather. Low and High slow movement and cut some attacks for units that lack that weather, and High is the harsher penalty.
 - Fog of war: Leave this checked to hide places and enemy units you have not seen. Uncheck it to show the whole map for the next match.
+- Auto-start AI: Leave this checked to turn opponent planning on when the match starts, when an API key and a model are already set. Uncheck it, or start without them, to open the Opponent tab with planning off.
 - Starting month: Pick the month the match starts in. A global turn is one month. A regional turn is one week, starting on the 1st. Weather changes when the date enters a new month, and a battle stays on the date that is current.
 - Randomize starting month: Pick a month at random, including the month already shown.
-- Hide the new game choices: Hide the new game choices. The map stays up.
+- Hide the new game choices: Hide the new game choices to see more of the map.
 - Show the new game choices: Show the new game choices.
+- New-game panel grip: Drag to move this screen. It goes back to the corner each time it opens.
 - Start game: Start the match with the choices on this screen. If the start fails, the screen stays open.
 - New game: Start a new match with the choices on this screen. This clears your selection and the orders you had queued.
 - Ready: End this planning step and play out the orders you have queued, on the world map or in a battle. It stays unavailable while the match is over, while the opponent is still planning, or while playback is already running. The sentence stays the same when the label reads "AI:".
-- Ranged: Turn this on, then double-click the target on the map. The button then reads Cancel.
-- Ranged Cancel: Stop aiming a ranged attack. Attacks already in the list stay there.
-- Strike: Turn this on to aim an air strike. A target list and a Cancel button replace this button.
-- Air-strike target: Choose enemy units, production, airports, or seaports. Your next double-click uses that choice until you cancel.
-- Air-strike Cancel: Stop aiming an air strike and show Strike again. Strikes already in the list stay there.
-- Tools tab: Show the tools the opponent can use, and turn each group on or off.
-- Model tab: Show the API key, model, reasoning effort, and the controls for opponent planning and a new match.
+- Reticle, for a selection that can fire: Aim a ranged attack. Turn this on, then double-click the target on the map.
+- Reticle, while a ranged attack is aimed: Stop aiming a ranged attack. Attacks already in the list stay there.
+- Reticle, for an all-air selection: Aim an air strike. Turn this on, pick a target type in the list beside it, then double-click the target on the map.
+- Reticle, while an air strike is aimed: Stop aiming an air strike. Strikes already in the list stay there.
+- Air-strike target: Choose enemy units, production, airports, or seaports. Your next double-click uses that choice until you stop aiming.
+- The reticle while it is greyed out: its reason, "Infantry can't fire on the world map." or "Strike needs a selection of air units only." (`selectionSupportAction` in `src/shared/selectionSupportButtonMode.ts`). The tip sits on a host around the control (`#ranged-attack-tip-host`), because a disabled control gets no pointer events.
+- Orders tab: Show the orders queued for this turn or beat. Click the selected tab to hide the console and widen the map.
+- Reports tab: Show the turn reports, opponent messages, and notices from this match, newest first. Click the selected tab to hide the console and widen the map.
+- Opponent tab: Show whether the opponent is planning, its model, its tools, and the AI activity log. Click the selected tab to hide the console and widen the map.
+- Settings, Help, Load game, How to play, Add another opponent, Build, Forces, Replay: "<name> is not available in this version.", for example "Settings is not available in this version."
+- Selection panel close: Clear the selection. Queued orders stay.
+- Selection panel grip: Drag to resize this panel. The size lasts until the app closes.
+- Selection panel expand control, while the panel is compact: Show the hex, its terrain, and each selected unit's orders.
+- Selection panel expand control, while the panel is expanded: Hide the details. The bar stays.
+- Map-mode tabs toggle, while the tabs are hidden: Show the map-mode buttons under the overview.
+- Map-mode tabs toggle, while the tabs show: Hide the map-mode buttons. Hiding them also closes the terrain legend.
+- Weather map mode: Show or hide each hex's weather icon on the world map, while the weather bonus is on.
+- Tech map mode: Show or hide each hex's tech tier icon on the world map, while the tech bonus is on. Holding T shows them too, while the key is down.
+- Control map mode: Show or hide the borders that mark who controls each hex, and the home-region outlines.
+- Production map mode: Show or hide production on every world hex, the way holding T does. Off shows it only on hexes you control.
+- Legend: Show or hide the terrain legend and its style choice.
+- Force bar in the battle header: Sub-units each side has in this battle, counting any carried by a ship. A battle has no fog of war, so both counts are exact.
+- Production readout: The production your cities can add each turn. A city adds its share only while it is building, and a city on the neutral border adds none.
+- Forces readout: Units you have fielded, out of the most this game size allows: then each unit type as "infantry 3 of 12", separated by commas, ending with a period.
+- Your home readout: Hexes of your home region that you hold, out of all its hexes.
+- Enemy home readout: Hexes of the opponent's home region that you hold, out of all its hexes.
+- Game menu button: Open the game menu to start a new game, choose whether Ready offers tactical battles, or quit.
+- Quit: Close Agent Wars.
+- Save game: Saving to a file is not available in this version. The match in progress is kept on disk between sessions.
 - API key: Enter your OpenRouter key, then click away or press Enter to save it. The key stays hidden after that; clear the field and leave it to forget the saved key.
 - Refresh models: Load the model list again. If that fails, the message appears in the AI activity log.
 - Run, while it cannot be clicked: Turn opponent planning on or off. Enter an API key and choose a model first.
-- Run, while it can be clicked: Turn opponent planning on or off. On opens the Tools tab and can hold Ready until a plan exists; off cancels a plan that is still running.
-- New: Open the new-game screen. Opponent planning and any playback stop right away; the current match is replaced when you start the new one.
+- Run, while it can be clicked: Turn opponent planning on or off. On can hold Ready until a plan exists; off cancels a plan that is still running.
+- New game in the game menu: Open the new-game screen. The current match keeps going underneath; close the screen to return to it, or start a new match to replace it.
+- New game in the game menu while a Ready is resolving, on its tip host: New game is available again once this turn or beat finishes resolving.
+- New-game panel close, shown only while a match is waiting under the screen: Close this screen and go back to the match in progress.
+- New game in the game menu while the new-game screen is open, on its tip host: The new-game screen is already open.
 - Reasoning effort: Choose how much reasoning this model uses. You only see levels this model offers, its default is marked, and the list stays unavailable when it has fewer than two.
-- Tactical battles: Leave this checked if you want Ready to let you fight one melee. Uncheck it to skip that list and resolve melee as Ignore.
+- Offer tactical battles: Leave this checked if you want Ready to let you fight one melee. Uncheck it to skip that list and resolve melee as Ignore.
 - Precomputation: Turn on a summary of units, hexes, and combat that is prepared before the model plans. The number counts uses since the last Ready, and the button stays pressed while this is on.
 - Events: Turn this on to stop a background plan every turn. One plan still runs when the match starts, when you turn Run on, or when you turn this on, and the number counts uses since the last Ready.
 - Planning: Let the opponent plan routes and measure distances. The number counts uses since the last Ready, and this does nothing when the model cannot use tools.
@@ -91,7 +118,9 @@ The tip can appear whenever the control can receive the pointer or keyboard focu
 - The map toast dismiss control and the AI strategy toast dismiss control.
 - The stack callout close control, and its per-unit selection controls, including "+ All" and "- All".
 - The build popup close control, and each queue row's remove control, in both the single-hex and multi-hex popups.
-- Sidebar order select and cancel controls.
+- Order rows in the Orders tab, and their cancel controls.
+- The cancel control on an order in the selection panel.
+- The reticle while it is greyed out and neither reason applies.
 - The choice on each tactical battles row.
 - The model dropdown. It uses the model description tooltip.
 
@@ -145,3 +174,4 @@ Ready, sealift, and Exit Battle name the battle case in the same sentence. Produ
 - `static/overlayChrome.css` (`.control-tooltip`, `.control-tooltip-host`)
 - `src/renderer/chrome/controlTooltip.ts`
 - `src/renderer/chrome/controlTooltipText.ts`
+- `src/renderer/chrome/frameTooltipText.ts`

@@ -58,6 +58,7 @@ import {
   TOOL_GROUP_REGISTRY,
 } from './openRouter/openRouter';
 import { logDebug, logError } from './logger';
+import { applyUserDataDirOverride } from './userDataDirOverride';
 import { parseBonusLevel } from '../shared/bonusLevel';
 import { parseGameSize } from '../shared/gameSize';
 import {
@@ -191,6 +192,8 @@ function createWindow(): void {
     y,
     minWidth: MIN_WINDOW_WIDTH,
     minHeight: MIN_WINDOW_HEIGHT,
+    // The game menu in the top bar replaces Electron's default menu bar. Alt still shows it, and its shortcuts still work.
+    autoHideMenuBar: true,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -553,6 +556,7 @@ function registerIpcHandlers(): void {
 }
 
 applyVersionedAppName();
+applyUserDataDirOverride(app);
 
 process.on('uncaughtException', (err) => {
   logError('main uncaughtException', { message: err?.message ?? String(err), stack: err?.stack ?? null });

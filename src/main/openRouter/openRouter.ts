@@ -83,7 +83,7 @@ const OPENROUTER_SELECTED_MODEL_DB_CONFIG_KEY = 'openrouter_selected_model';
 /**
  * `game_config` key holding the player's reasoning-effort override for the selected model.
  *
- * Purpose: Persists the Model-tab reasoning choice with the model choice.
+ * Purpose: Persists the Opponent-tab reasoning choice with the model choice.
  * When to use: `getSelectedReasoningEffort` / `setSelectedReasoningEffort` only.
  * Expected outcome: Missing row means "use the model default".
  * Exceptions: None.
@@ -238,8 +238,8 @@ let selectedModelId: string = '';
 /**
  * Persists the player's model choice.
  *
- * Purpose: Keeps the Model-tab selection across restarts; a different model starts on its own default effort.
- * When to use: When the player picks a model in the Model tab (via IPC).
+ * Purpose: Keeps the Opponent tab's model selection across restarts; a different model starts on its own default effort.
+ * When to use: When the player picks a model on the Opponent tab (via IPC).
  * Expected outcome: Saves or deletes the model row. When the id differs from the current selection, the
  * reasoning-effort override is cleared too.
  * Exceptions: Propagates database errors.
@@ -261,7 +261,7 @@ export function setSelectedModel(modelId: string): void {
 /**
  * Returns the persisted reasoning-effort override for the selected model.
  *
- * Purpose: Restores the Model-tab reasoning dropdown and sizes consultation requests.
+ * Purpose: Restores the Opponent-tab reasoning dropdown and sizes consultation requests.
  * When to use: Renderer startup (via IPC) and request-profile resolution for the selected model.
  * Expected outcome: The saved effort, or `''` ("use the model default") when none is saved. Reads the database
  * on every call so it never disagrees with the stored row.

@@ -54,13 +54,14 @@ Download a build for Windows (x64), macOS (Apple silicon), or Linux (x64) from [
 
 The LLM opponent needs an [OpenRouter](https://openrouter.ai) API key to work:
 
-1. In the right-side panel, open the **Model** tab (the panel starts on it).
-2. Paste your OpenRouter API key into the API key field (placeholder `Set key and blur to save`).
-3. Click outside the field, or press Enter, to save. A saved key loads the model list.
-4. Choose a model from Anthropic, Google, Meta, OpenAI, SpaceX, etc. **Refresh model list** reloads the list.
+1. Start a match from the new-game screen. The console then shows on the right.
+2. On the console's tab rail, at the window's right edge, click **Opponent**.
+3. Under **Commander**, paste your OpenRouter API key into the **API key** field (placeholder `Set key and blur to save`).
+4. Click outside the field, or press Enter, to save. A saved key loads the model list.
+5. Choose a model from Anthropic, Google, Meta, OpenAI, SpaceX, etc. The refresh button beside the list reloads it.
     - My go-to playtesting model is Google Gemini Flash Lite (version 3.5, currently). A fast, inexpensive, tool-using model that fights reasonably well. It can also finish a typical game for <$1.
     - Ollama/other local model support is on my radar (pun intended, I guess).
-5. Click **Run** to start opponent planning.
+6. Click **Run**, at the top of the Opponent tab, to start opponent planning. The line above **Ready** shows whether the opponent is planning, its model, and the match's cost so far.
 
 The key is handled only in the Electron main process and stored locally in the Electron user-data directory, not in repository files. Without a key or a model the app still runs, **Run** stays disabled, and the opponent makes no model calls.
 

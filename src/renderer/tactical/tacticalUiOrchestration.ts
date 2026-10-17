@@ -1,5 +1,5 @@
 /**
- * DOM and renderer-state orchestration for tactical battle HUD, sidebar suppression, and entry-layer sync.
+ * DOM and renderer-state orchestration for Exit Battle, sidebar suppression, and entry-layer sync.
  */
 
 import type { GameStateSnapshot } from '../../shared/ipcTypes';
@@ -56,7 +56,7 @@ export function tacticalBattleExitTeardownTransientRendererState(): void {
  *
  * Purpose: `newGame` IPC clears the active battle in main but does not run tactical exit UI; this mirrors that teardown on the renderer.
  * When to use: After a fresh `GameStateSnapshot` with no `tacticalBattleSession`, including `newGame` and any `getGameState` apply where main dropped the session. Pass `cancelOpponentPlanning` false when the caller already stopped planning for a new game, so this release does not send a second stop.
- * Expected outcome: Tactical HUD hidden, tactical map bounds released, resolution animation cancelled, `S.tacticalBattleSnapshot` null; sidebar turn uses `nextState`.
+ * Expected outcome: Exit Battle hidden with the battle header, tactical map bounds released, resolution animation cancelled, `S.tacticalBattleSnapshot` null; sidebar turn uses `nextState`.
  * Exceptions: None; safe when already strategic (no-op aside from `exitTacticalMapView` if pre-tactical zoom was captured).
  */
 export function tacticalReleaseRendererSessionForNewStrategicMatch(
@@ -95,11 +95,11 @@ export function tacticalApplyStrategicSidebarForTacticalMode(tactical: boolean):
 }
 
 /**
- * Updates tactical HUD visibility and exit button disabled state from renderer shared state.
+ * Updates whether Exit Battle is hidden or disabled, from renderer shared state.
  *
- * Contract: Reads `S.tacticalBattleSnapshot`, `S.tacticalPhasePlanning`, and `S.resolutionMoveAnimation`; mutates DOM button disabled flags. Does not assign `S.tacticalPhasePlanning`.
+ * Contract: Reads `S.tacticalBattleSnapshot`, `S.tacticalPhasePlanning`, `S.resolutionMoveAnimation`, and `S.tacticalAnnihilationOutcomeDialog`. Sets the button's hidden class and disabled flag. Does not assign `S.tacticalPhasePlanning`.
  * When to use: After tactical snapshot changes, phase flips, beat playback start or end, and redraw passes that affect tactical controls.
- * Expected outcome: Exit button disabled when there is no snapshot, when tactical planning is closed, or while beat playback is running.
+ * Expected outcome: Exit Battle hidden when there is no snapshot or the annihilation dialog is open, and disabled when tactical planning is closed or while beat playback is running.
  * Exceptions: None.
  */
 export function tacticalUpdateExitButtonVisibility(): void {

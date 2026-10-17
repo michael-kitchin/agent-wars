@@ -219,6 +219,29 @@ test('callback coaching states the empty-list event-driven consequence', () => {
   assert.match(joined(tacticalGates()), /engine-forced/);
 });
 
+test('option-copy bullets keep the mode noun and the absent-table sentences', () => {
+  const strategic = joined(strategicGates());
+  assert.match(strategic, /already this-turn legal destinations/);
+  assert.match(strategic, /Call plan_route only for a destination the table does not list for that unit\./);
+  const tactical = joined(tacticalGates());
+  assert.match(tactical, /already this-beat legal destinations/);
+  assert.match(tactical, /Call plan_route only for a destination the table does not list for that sub-unit\./);
+  const absent =
+    'No options are listed this period. Destinations must come from the routing tool, not from an absent options table.';
+  assert.ok(joined(strategicGates({ hasBestOptionsTable: false })).includes(absent));
+  assert.ok(joined(tacticalGates({ hasBestOptionsTable: false })).includes(absent));
+  assert.ok(
+    joined(strategicGates({ hasBestOptionsTable: false, planningEnabled: false })).includes(
+      "the unit's own cell means hold."
+    )
+  );
+  assert.ok(
+    joined(tacticalGates({ hasBestOptionsTable: false, planningEnabled: false })).includes(
+      "the sub-unit's own cell means hold."
+    )
+  );
+});
+
 test('prohibited claims appear in no gate combination', () => {
   const samples: CoachingGates[] = [
     strategicGates(),

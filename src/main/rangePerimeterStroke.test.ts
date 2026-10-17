@@ -33,7 +33,7 @@ function readRenderer(relativePath: string): string {
  *
  * Purpose: Prevents tactical ranged/air-strike overlays from thickening, and keeps strategic overlays on the previous 2×/1.5× home-border widths.
  * When to use: Regression guard after restyling support overlays.
- * Expected outcome: Width helper returns `ORDER_LINE_WIDTH` in tactical battles and home-border multipliers on the strategic map; overlay, hover, and shot drawers share `rangePerimeterStaticLineStyle`.
+ * Expected outcome: Width helper returns `ORDER_LINE_WIDTH` in tactical battles and home-border multipliers on the strategic map; overlay and shot drawers share `rangePerimeterStaticLineStyle`, and hover draws through the shared `strokeSupportOrderLines`.
  * Exceptions: None.
  */
 function testSupportOverlayStrokeWidthsByMapLayer(): void {
@@ -60,8 +60,8 @@ function testSupportOverlayStrokeWidthsByMapLayer(): void {
   );
   assert.ok(
     overlay.includes("rangePerimeterStaticLineStyle(S.airStrikeModeActive ? 'airStrike' : 'ranged', 'perimeter')") &&
-      hover.includes('rangePerimeterStaticLineStyle'),
-    'perimeter overlay should request perimeter width; hover should reuse the shared style helper'
+      hover.includes('strokeSupportOrderLines'),
+    'perimeter overlay should request perimeter width; hover should draw through the shared support-line drawer'
   );
   assert.ok(
     orderDrawing.includes('drawRangedResolutionShotLines') &&
@@ -98,8 +98,8 @@ function testPerimeterDashAndCapStayVisibleAtStrategicWidth(): void {
   );
   assert.ok(
     overlay.includes('ctx.lineCap = style.lineCap') &&
-      orderDrawing.includes('ctx.lineCap = style.lineCap') &&
-      hover.includes('ctx.lineCap = style.lineCap'),
+      orderDrawing.includes('cap: style.lineCap') &&
+      hover.includes('strokeSupportOrderLines'),
     'perimeter, planned, and hover strokes should apply lineCap from the shared style'
   );
 }

@@ -1,6 +1,6 @@
 # Tactical Battle Controls
 
-Exit Battle during a battle, and the annihilation dialog that can replace it.
+Exit Battle in the battle header, and the annihilation dialog that can replace it.
 
 ## Purpose
 
@@ -8,11 +8,11 @@ Let the player leave a battle, and make a wiped side an explicit step instead of
 
 ## Availability
 
-The Exit Battle control is shown whenever a battle is active, including during a tactical Resolution playback, and hidden when no battle is active. It is enabled during Tactical planning. It is disabled from the moment a tactical Ready commits a beat until that beat's playback ends. It is hidden and disabled while the annihilation dialog is open. See [modes-and-transitions.md](modes-and-transitions.md).
+Exit Battle sits in the battle header, the top bar's form during a battle, beside Settings. See [top-bar.md](top-bar.md). It is shown whenever a battle is active, including during a tactical Resolution playback, and hidden when no battle is active. The button hides when the battle snapshot is cleared, before the header returns to the match status. It is enabled during Tactical planning. It is disabled from the moment a tactical Ready commits a beat until that beat's playback ends. It is hidden and disabled while the annihilation dialog is open. See [modes-and-transitions.md](modes-and-transitions.md).
 
 ## Information Displayed
 
-- A button labeled "Exit Battle" while a battle is active and annihilation is not showing.
+- A button with an exit icon and the label "Exit Battle", in the battle header, while a battle is active and annihilation is not showing. It uses the shared button colors, and the dimmed teal while it is disabled.
 - The annihilation dialog: "You win!", "You lose.", or "All units destroyed.", plus an Exit Battle button.
 - Control tips for both Exit Battle buttons are in [control-tooltips.md](control-tooltips.md).
 
@@ -54,6 +54,7 @@ These controls exist only in a tactical battle. During a strategic Resolution pl
 ## Related Documents
 
 - [modes-and-transitions.md](modes-and-transitions.md)
+- [top-bar.md](top-bar.md)
 - [map-surface.md](map-surface.md)
 - [tactical-entry-markers.md](tactical-entry-markers.md)
 - [tactical-battles-list.md](tactical-battles-list.md)
@@ -68,7 +69,8 @@ None.
 
 ## Code Entry Points
 
-- `static/index.html` (`#tactical-battle-hud`, `#tactical-exit-btn`, `#tactical-annihilation-overlay`, `#tactical-annihilation-message`, `#tactical-annihilation-exit-btn`)
+- `static/index.html` (`#tactical-exit-host`, `#tactical-exit-btn`, `#tactical-annihilation-overlay`, `#tactical-annihilation-message`, `#tactical-annihilation-exit-btn`)
+- `static/frameChrome.css` (`.battle-header-exit`, `.battle-exit-btn`)
 - `src/renderer/tactical/tacticalExitButtonDom.ts`
 - `src/renderer/tactical/tacticalExitFlow.ts`
 - `src/renderer/tactical/tacticalAnnihilationDialog.ts`

@@ -87,6 +87,64 @@ function publishHoverRoutePreview(
 }
 
 /**
+ * Reports whether the hover request that started this preview is still the one on screen.
+ *
+ * Purpose: Tactical and strategic preview branches share one stale check so a late response cannot publish over a newer hover.
+ * When to use: After every await in `refreshHoverRoutePreview`, before writing `S.hoverRoutePreview`.
+ * Expected outcome: False when the sequence, hovered cell, or selected unit ids changed.
+ * Exceptions: None.
+ */
+function hoverPreviewStillCurrent(seq: number, hoveredH3: string, unitIds: readonly string[]): boolean {
+  return hoverRoutePreviewAsyncContextStillValid({
+    seqAtStart: seq,
+    hoveredH3,
+    unitIdsAtStart: unitIds,
+  });
+}
+
+/**
+ * Publishes a ranged or air support-targeting hover preview.
+ *
+ * Purpose: The tactical and strategic ranged and air branches share the representative-origin lines and the reason slot.
+ * When to use: After that branch's validator returns and the hover is still current.
+ * Expected outcome: A support-targeting preview, with the blocking reason in the ranged slot or the air slot matching `supportKind`.
+ * Exceptions: None.
+ */
+function publishGroupedSupportTargetingPreview(args: {
+  deps: TacticalOrderDeps;
+  hoveredH3: string;
+  unitIds: readonly string[];
+  validation: { success: boolean; reason?: string | null };
+  supportKind: 'ranged' | 'air';
+  originH3ForGrouping: (unitId: string) => string | undefined;
+  originH3ForPreview: (unitId: string) => string | undefined;
+  allowBlockingOrderTooltip: boolean;
+}): void {
+  const valid = args.validation.success;
+  const reason = valid ? null : (args.validation.reason ?? null);
+  const previewUnitIds = representativeMarchPreviewUnitIdsByOriginH3(
+    args.unitIds.map((id) => ({
+      unitId: id,
+      originH3: args.originH3ForGrouping(id) ?? '',
+    }))
+  );
+  const data = buildGroupedSupportTargetingLinePreview(
+    previewUnitIds,
+    args.hoveredH3,
+    valid,
+    args.validation.reason ?? null,
+    args.originH3ForPreview
+  );
+  publishHoverRoutePreview(
+    args.deps,
+    { hoveredH3Index: args.hoveredH3, data, renderAsSupportTargeting: args.supportKind },
+    args.supportKind === 'ranged' ? reason : null,
+    args.supportKind === 'air' ? reason : null,
+    args.allowBlockingOrderTooltip
+  );
+}
+
+/**
  * Defines the `refreshHoverRoutePreview` function shape (export async function refreshHoverRoutePreview(deps: TacticalOrderDeps, options?: RefreshHoverRoutePreviewOptions): Promise<void>).
  *
  * Purpose: Supports maintainability by documenting why `refreshHoverRoutePreview` exists.
@@ -115,36 +173,17 @@ export async function refreshHoverRoutePreview(
         return;
       }
       const validation = await validateRanged({ unitIds, targetH3Index: hoveredH3 });
-      if (
-        !hoverRoutePreviewAsyncContextStillValid({
-          seqAtStart: seq,
-          hoveredH3,
-          unitIdsAtStart: unitIds,
-        })
-      ) {
-        return;
-      }
-      const valid = validation.success;
-      const previewUnitIds = representativeMarchPreviewUnitIdsByOriginH3(
-        unitIds.map((id) => ({
-          unitId: id,
-          originH3: tb.subUnits.find((s) => s.id === id)?.h3Index ?? '',
-        }))
-      );
-      const data = buildGroupedSupportTargetingLinePreview(
-        previewUnitIds,
-        hoveredH3,
-        valid,
-        validation.reason ?? null,
-        (unitId) => tb.subUnits.find((s) => s.id === unitId && s.player === 'human')?.h3Index
-      );
-      publishHoverRoutePreview(
+      if (!hoverPreviewStillCurrent(seq, hoveredH3, unitIds)) return;
+      publishGroupedSupportTargetingPreview({
         deps,
-        { hoveredH3Index: hoveredH3, data, renderAsSupportTargeting: 'ranged' },
-        valid ? null : (validation.reason ?? null),
-        null,
-        allowBlockingOrderTooltip
-      );
+        hoveredH3,
+        unitIds,
+        validation,
+        supportKind: 'ranged',
+        originH3ForGrouping: (unitId) => tb.subUnits.find((s) => s.id === unitId)?.h3Index,
+        originH3ForPreview: (unitId) => tb.subUnits.find((s) => s.id === unitId && s.player === 'human')?.h3Index,
+        allowBlockingOrderTooltip,
+      });
       return;
     }
     if (S.airStrikeModeActive) {
@@ -158,36 +197,17 @@ export async function refreshHoverRoutePreview(
         targetH3Index: hoveredH3,
         targetType: S.airStrikeTargetType,
       });
-      if (
-        !hoverRoutePreviewAsyncContextStillValid({
-          seqAtStart: seq,
-          hoveredH3,
-          unitIdsAtStart: unitIds,
-        })
-      ) {
-        return;
-      }
-      const valid = validation.success;
-      const previewUnitIds = representativeMarchPreviewUnitIdsByOriginH3(
-        unitIds.map((id) => ({
-          unitId: id,
-          originH3: tb.subUnits.find((s) => s.id === id)?.h3Index ?? '',
-        }))
-      );
-      const data = buildGroupedSupportTargetingLinePreview(
-        previewUnitIds,
-        hoveredH3,
-        valid,
-        validation.reason ?? null,
-        (unitId) => tb.subUnits.find((s) => s.id === unitId && s.player === 'human')?.h3Index
-      );
-      publishHoverRoutePreview(
+      if (!hoverPreviewStillCurrent(seq, hoveredH3, unitIds)) return;
+      publishGroupedSupportTargetingPreview({
         deps,
-        { hoveredH3Index: hoveredH3, data, renderAsSupportTargeting: 'air' },
-        null,
-        valid ? null : (validation.reason ?? null),
-        allowBlockingOrderTooltip
-      );
+        hoveredH3,
+        unitIds,
+        validation,
+        supportKind: 'air',
+        originH3ForGrouping: (unitId) => tb.subUnits.find((s) => s.id === unitId)?.h3Index,
+        originH3ForPreview: (unitId) => tb.subUnits.find((s) => s.id === unitId && s.player === 'human')?.h3Index,
+        allowBlockingOrderTooltip,
+      });
       return;
     }
     const selectedHumanTactical = unitIds
@@ -197,15 +217,7 @@ export async function refreshHoverRoutePreview(
     const tacticalHasNonAir = selectedHumanTactical.some((u) => u.unitType !== 'air');
     if (tacticalHasAir && tacticalHasNonAir) {
       const data = buildTacticalMixedAirNonAirHoverEnvelope(unitIds);
-      if (
-        !hoverRoutePreviewAsyncContextStillValid({
-          seqAtStart: seq,
-          hoveredH3,
-          unitIdsAtStart: unitIds,
-        })
-      ) {
-        return;
-      }
+      if (!hoverPreviewStillCurrent(seq, hoveredH3, unitIds)) return;
       publishHoverRoutePreview(deps, { hoveredH3Index: hoveredH3, data }, null, null, allowBlockingOrderTooltip);
       return;
     }
@@ -218,29 +230,13 @@ export async function refreshHoverRoutePreview(
         return;
       }
       const validation = await validateFerry({ unitIds, destinationH3Index: hoveredH3 });
-      if (
-        !hoverRoutePreviewAsyncContextStillValid({
-          seqAtStart: seq,
-          hoveredH3,
-          unitIdsAtStart: unitIds,
-        })
-      ) {
-        return;
-      }
+      if (!hoverPreviewStillCurrent(seq, hoveredH3, unitIds)) return;
       const data = buildTacticalFerryHoverPreview(tb, unitIds, hoveredH3, validation);
       publishHoverRoutePreview(deps, { hoveredH3Index: hoveredH3, data }, null, null, allowBlockingOrderTooltip);
       return;
     }
     const data = buildTacticalMarchHoverPreview(tb, unitIds, hoveredH3);
-    if (
-      !hoverRoutePreviewAsyncContextStillValid({
-        seqAtStart: seq,
-        hoveredH3,
-        unitIdsAtStart: unitIds,
-      })
-    ) {
-      return;
-    }
+    if (!hoverPreviewStillCurrent(seq, hoveredH3, unitIds)) return;
     publishHoverRoutePreview(deps, { hoveredH3Index: hoveredH3, data }, null, null, allowBlockingOrderTooltip);
     return;
   }
@@ -256,36 +252,17 @@ export async function refreshHoverRoutePreview(
       return;
     }
     const validation = await validateRanged({ unitIds, targetH3Index: hoveredH3 });
-    if (
-      !hoverRoutePreviewAsyncContextStillValid({
-        seqAtStart: seq,
-        hoveredH3,
-        unitIdsAtStart: unitIds,
-      })
-    ) {
-      return;
-    }
-    const valid = validation.success;
-    const previewUnitIds = representativeMarchPreviewUnitIdsByOriginH3(
-      unitIds.map((id) => ({
-        unitId: id,
-        originH3: gs.units.find((u) => u.id === id)?.h3Index ?? '',
-      }))
-    );
-    const data = buildGroupedSupportTargetingLinePreview(
-      previewUnitIds,
-      hoveredH3,
-      valid,
-      validation.reason ?? null,
-      (unitId) => gs.units.find((u) => u.id === unitId && u.player === 'human')?.h3Index
-    );
-    publishHoverRoutePreview(
+    if (!hoverPreviewStillCurrent(seq, hoveredH3, unitIds)) return;
+    publishGroupedSupportTargetingPreview({
       deps,
-      { hoveredH3Index: hoveredH3, data, renderAsSupportTargeting: 'ranged' },
-      valid ? null : (validation.reason ?? null),
-      null,
-      allowBlockingOrderTooltip
-    );
+      hoveredH3,
+      unitIds,
+      validation,
+      supportKind: 'ranged',
+      originH3ForGrouping: (unitId) => gs.units.find((u) => u.id === unitId)?.h3Index,
+      originH3ForPreview: (unitId) => gs.units.find((u) => u.id === unitId && u.player === 'human')?.h3Index,
+      allowBlockingOrderTooltip,
+    });
     return;
   }
   if (S.airStrikeModeActive) {
@@ -299,36 +276,17 @@ export async function refreshHoverRoutePreview(
       targetH3Index: hoveredH3,
       targetType: S.airStrikeTargetType,
     });
-    if (
-      !hoverRoutePreviewAsyncContextStillValid({
-        seqAtStart: seq,
-        hoveredH3,
-        unitIdsAtStart: unitIds,
-      })
-    ) {
-      return;
-    }
-    const valid = validation.success;
-    const previewUnitIds = representativeMarchPreviewUnitIdsByOriginH3(
-      unitIds.map((id) => ({
-        unitId: id,
-        originH3: gs.units.find((u) => u.id === id)?.h3Index ?? '',
-      }))
-    );
-    const data = buildGroupedSupportTargetingLinePreview(
-      previewUnitIds,
-      hoveredH3,
-      valid,
-      validation.reason ?? null,
-      (unitId) => gs.units.find((u) => u.id === unitId && u.player === 'human')?.h3Index
-    );
-    publishHoverRoutePreview(
+    if (!hoverPreviewStillCurrent(seq, hoveredH3, unitIds)) return;
+    publishGroupedSupportTargetingPreview({
       deps,
-      { hoveredH3Index: hoveredH3, data, renderAsSupportTargeting: 'air' },
-      null,
-      valid ? null : (validation.reason ?? null),
-      allowBlockingOrderTooltip
-    );
+      hoveredH3,
+      unitIds,
+      validation,
+      supportKind: 'air',
+      originH3ForGrouping: (unitId) => gs.units.find((u) => u.id === unitId)?.h3Index,
+      originH3ForPreview: (unitId) => gs.units.find((u) => u.id === unitId && u.player === 'human')?.h3Index,
+      allowBlockingOrderTooltip,
+    });
     return;
   }
   const previewMarch = getPreviewHumanMarchOrders();
@@ -337,14 +295,6 @@ export async function refreshHoverRoutePreview(
     return;
   }
   const data = await previewMarch({ unitIds, hoveredH3Index: hoveredH3 });
-  if (
-    !hoverRoutePreviewAsyncContextStillValid({
-      seqAtStart: seq,
-      hoveredH3,
-      unitIdsAtStart: unitIds,
-    })
-  ) {
-    return;
-  }
+  if (!hoverPreviewStillCurrent(seq, hoveredH3, unitIds)) return;
   publishHoverRoutePreview(deps, { hoveredH3Index: hoveredH3, data }, null, null, allowBlockingOrderTooltip);
 }

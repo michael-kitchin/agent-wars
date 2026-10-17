@@ -20,6 +20,25 @@ export const BACKGROUND_COLOR = '#e0dcd4';
  */
 export const UNIT_RADIUS = 18;
 /**
+ * The color of the ring that covers the border of each marker in a hex that holds a selected unit.
+ *
+ * Purpose: Shows on the map which hexes hold the selection, in the same gold that marks selected rows in the console.
+ * When to use: Only by `drawSelectionRing` in `src/renderer/rendering/unitDrawing.ts`, once per marker of that hex.
+ * Expected outcome: `#f2c14e`, the same color as the `--selection-mark` token in `static/shellChrome.css`.
+ * Exceptions: None.
+ */
+export const SELECTION_RING_COLOR = '#f2c14e';
+/**
+ * The width of the selection ring, in CSS pixels.
+ *
+ * Purpose: Wider than the marker's 2 px border, so the gold stroke covers that border, and thin enough to leave the
+ *   unit glyph clear.
+ * When to use: Only by `drawSelectionRing`.
+ * Expected outcome: 3.
+ * Exceptions: None.
+ */
+export const SELECTION_RING_WIDTH = 3;
+/**
  * Documents the module-scope binding `PLAYER_COLORS` (PLAYER_COLORS: Record<string, string>).
 
  * Purpose: Supports maintainability by documenting why `PLAYER_COLORS` exists.
@@ -130,6 +149,24 @@ export const ORDER_ARROW_SIZE = 10;
  * Exceptions: None.
  */
 export const AI_ORDER_LINE_COLOR = PLAYER_COLORS.opponent;
+/**
+ * The pale outline drawn under every order line, in CSS color.
+ *
+ * Purpose: A dashed teal, amber, or purple line can vanish on similar terrain; the casing keeps it readable anywhere.
+ * When to use: Only by `drawOrderLine` in `src/renderer/rendering/orderLineStroke.ts`.
+ * Expected outcome: White at 80% opacity.
+ * Exceptions: None.
+ */
+export const ORDER_LINE_CASING_COLOR = 'rgba(255, 255, 255, 0.8)';
+/**
+ * How far the order-line casing shows on each side of the line, in CSS pixels.
+ *
+ * Purpose: Wide enough to read as an outline, narrow enough not to look like a second line.
+ * When to use: Only by `drawOrderLine` in `src/renderer/rendering/orderLineStroke.ts`.
+ * Expected outcome: 1.5.
+ * Exceptions: None.
+ */
+export const ORDER_LINE_CASING_PAD = 1.5;
 
 /**
  * Documents the module-scope binding `TOOLTIP_OFFSET_PX` (TOOLTIP_OFFSET_PX).
@@ -361,7 +398,7 @@ export const MULTI_PLAYER_FILL = '#b0b0b0';
 /**
  * Documents the module-scope binding `MULTI_PLAYER_STROKE` (MULTI_PLAYER_STROKE).
 
- * Purpose: Stacked mixed-side tokens use this for the circle stroke; keep `.game-over-size-token` in `static/index.html` on the same hex.
+ * Purpose: Stacked mixed-side tokens use this for the circle stroke; keep `.new-game-unit-token` in `static/newGameChrome.css` on the same hex.
  * When to use: Mixed-player stack markers and any token filled with `MULTI_PLAYER_FILL`.
  * Expected outcome: Very dark gray `#222222`, not pure black.
  * Exceptions: None.

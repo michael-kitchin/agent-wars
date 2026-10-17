@@ -18,25 +18,31 @@ Visual styling and the arrangement of items inside an element are out of scope. 
 4. If your change alters user-visible behavior, update the requirement text in the same change.
 5. If the spec is silent or ambiguous, add an Open Question rather than inventing a requirement.
 
+`npm run ui:smoke` checks the layout after a change. It builds the app and starts it in Electron with a throwaway user-data folder (the `AGENT_WARS_USER_DATA_DIR` environment variable), three times over that folder. The first session starts one fixed global match and records its scenes, one of them at the 800 × 600 minimum window. The second reopens that match, opens a battle in it, shows that battle at the 800 × 600 minimum too, leaves it with Exit Battle, hides the new-game choices, and starts a new regional match from the header button. The third reopens the regional match as a finished one, hides the new-game choices and shows them again, and shows its game-over screen at the 800 × 600 minimum too. Between sessions the run changes only its throwaway copy of the match: before the second it moves the enemy's land units into the hex where the player has the most, so a battle can start there, and before the third it marks the match as lost (`scripts/ui-smoke/ui-smoke-session.cjs`, which runs `scripts/ui-smoke/ui-smoke-db-edit.cjs` under Electron's own Node). The run writes numbered screenshots and `report.json` to `.test/ui-smoke/<label>/`. Pass `-- --label <name>` to name that folder. It prints one PASS or FAIL line per check and exits with an error when any check fails. The frame's checks are in `scripts/ui-smoke/ui-smoke-checks.cjs`, the console's are in `scripts/ui-smoke/ui-smoke-console-checks.cjs`, the checks for the later scenarios (the small window, the reopened match, the battle, the regional match, and the finished match) are in `scripts/ui-smoke/ui-smoke-scenario-checks.cjs`, the checks of the minimap panel, the legend, and Leaflet's controls are in `scripts/ui-smoke/ui-smoke-map-chrome-checks.cjs`, the checks of the battle header are in `scripts/ui-smoke/ui-smoke-battle-checks.cjs`, and the checks of the new-game screen are in `scripts/ui-smoke/ui-smoke-new-game-checks.cjs`; add one to the matching file when a layout rule needs a machine check. Scenes that click units find them through the game state and the main map (`scripts/ui-smoke/ui-smoke-map.cjs`), and the steps on the new-game overlay are in `scripts/ui-smoke/ui-smoke-new-game.cjs`.
+
 ## Routing Table
 
 | If you are changing | Read first | Then read |
 | --- | --- | --- |
 | Map pan, zoom, or clicks | [modes-and-transitions.md](ux/modes-and-transitions.md), [input-map.md](ux/input-map.md), [selection-model.md](ux/selection-model.md) | [map-surface.md](ux/map-surface.md) |
 | Range, path, order, or combat drawings | [order-lifecycle.md](ux/order-lifecycle.md), [modes-and-transitions.md](ux/modes-and-transitions.md) | [map-overlays.md](ux/map-overlays.md) |
-| The minimap | [map-surface.md](ux/map-surface.md) | [minimap.md](ux/minimap.md) |
+| The minimap panel or its map-mode tabs | [map-surface.md](ux/map-surface.md) | [minimap.md](ux/minimap.md) |
 | The terrain legend or terrain style | [map-surface.md](ux/map-surface.md) | [terrain-legend.md](ux/terrain-legend.md) |
 | Hex or order tooltips | [order-lifecycle.md](ux/order-lifecycle.md), [notifications-and-feedback.md](ux/notifications-and-feedback.md) | [hex-tooltips.md](ux/hex-tooltips.md) |
 | A button, field, checkbox, or dropdown tip | [control-tooltips.md](ux/control-tooltips.md) | the element document for that control |
 | The stack callout | [selection-model.md](ux/selection-model.md), [input-map.md](ux/input-map.md) | [stack-callout.md](ux/stack-callout.md) |
 | Single-hex build | [input-map.md](ux/input-map.md), [modes-and-transitions.md](ux/modes-and-transitions.md) | [build-popup.md](ux/build-popup.md) |
 | Multi-hex build | [build-popup.md](ux/build-popup.md) | [multi-hex-build-popup.md](ux/multi-hex-build-popup.md) |
-| The right panel as a whole | [modes-and-transitions.md](ux/modes-and-transitions.md) | [right-panel.md](ux/right-panel.md) |
-| Ready, Ranged, or Strike | [selection-model.md](ux/selection-model.md), [order-lifecycle.md](ux/order-lifecycle.md), [modes-and-transitions.md](ux/modes-and-transitions.md) | [right-panel-command-bar.md](ux/right-panel-command-bar.md) |
-| Selected unit or order lists | [order-lifecycle.md](ux/order-lifecycle.md), [selection-model.md](ux/selection-model.md) | [right-panel-selection-and-orders.md](ux/right-panel-selection-and-orders.md) |
-| The Tools tab | [modes-and-transitions.md](ux/modes-and-transitions.md) | [right-panel-tools-tab.md](ux/right-panel-tools-tab.md) |
-| API key, model, reasoning effort, Run, New, or Tactical battles | [modes-and-transitions.md](ux/modes-and-transitions.md), [notifications-and-feedback.md](ux/notifications-and-feedback.md) | [right-panel-model-tab.md](ux/right-panel-model-tab.md) |
+| The top bar, its readouts, its date block, or the battle header | [modes-and-transitions.md](ux/modes-and-transitions.md) | [top-bar.md](ux/top-bar.md) |
+| The game menu, New game, or Offer tactical battles | [modes-and-transitions.md](ux/modes-and-transitions.md), [input-map.md](ux/input-map.md) | [game-menu.md](ux/game-menu.md) |
+| The console as a whole, its tabs, its footer status line, or collapsing it | [modes-and-transitions.md](ux/modes-and-transitions.md) | [console.md](ux/console.md) |
+| Ready or the reticle | [selection-model.md](ux/selection-model.md), [order-lifecycle.md](ux/order-lifecycle.md), [modes-and-transitions.md](ux/modes-and-transitions.md) | [console-command-bar.md](ux/console-command-bar.md) |
+| Order lists on the Orders tab | [order-lifecycle.md](ux/order-lifecycle.md), [selection-model.md](ux/selection-model.md) | [orders-tab.md](ux/orders-tab.md) |
+| The selection panel | [selection-model.md](ux/selection-model.md), [order-lifecycle.md](ux/order-lifecycle.md) | [selection-panel.md](ux/selection-panel.md) |
+| The Opponent tab's tool groups | [modes-and-transitions.md](ux/modes-and-transitions.md) | [opponent-tab-tool-groups.md](ux/opponent-tab-tool-groups.md) |
+| Run, its status sentence, API key, model, or reasoning effort | [modes-and-transitions.md](ux/modes-and-transitions.md), [notifications-and-feedback.md](ux/notifications-and-feedback.md) | [opponent-tab-commander.md](ux/opponent-tab-commander.md) |
 | The AI activity log | [notifications-and-feedback.md](ux/notifications-and-feedback.md) | [ai-activity-log.md](ux/ai-activity-log.md) |
+| The Reports tab, or where the map toasts show | [notifications-and-feedback.md](ux/notifications-and-feedback.md) | [reports-tab.md](ux/reports-tab.md) |
 | New game or game over | [modes-and-transitions.md](ux/modes-and-transitions.md) | [new-game-dialog.md](ux/new-game-dialog.md) |
 | Turn or beat animation | [modes-and-transitions.md](ux/modes-and-transitions.md), [notifications-and-feedback.md](ux/notifications-and-feedback.md) | [resolution-playback.md](ux/resolution-playback.md) |
 | Tactical entry markers | [modes-and-transitions.md](ux/modes-and-transitions.md) | [tactical-entry-markers.md](ux/tactical-entry-markers.md) |
@@ -71,20 +77,24 @@ Element documents share a fixed heading set:
 
 - [map-surface.md](ux/map-surface.md): the world map as the workspace for pan, zoom, selection, and orders. Pan and zoom-out stop at the loaded map's extent. A new match frames that extent before the first order.
 - [map-overlays.md](ux/map-overlays.md): range, path, order, hover, city, transport, infrastructure, and resolution drawings on the map.
-- [minimap.md](ux/minimap.md): the world overview and how it relates to the main map view.
+- [minimap.md](ux/minimap.md): the minimap panel: the world overview, how it relates to the main map view, and the map-mode tabs under it, which a toggle on its corner shows and hides.
 - [terrain-legend.md](ux/terrain-legend.md): the terrain legend and any inputs it accepts.
 - [hex-tooltips.md](ux/hex-tooltips.md): the hover information tooltip, whose Effects line includes movement, range, and cover, and the blocked-order and effects tooltips that appear after the pointer rests. The effects tooltip then stays on that cell. The blocked notice hides a short time after the pointer stops.
 - [control-tooltips.md](ux/control-tooltips.md): the one-second tip on buttons, fields, checkboxes, and dropdowns, and the controls that have none.
 - [stack-callout.md](ux/stack-callout.md): the list of units in a hex, the Bonuses tooltip, and how the list changes the selection.
 - [build-popup.md](ux/build-popup.md): the single-hex build queue popup and the markers that open it.
 - [multi-hex-build-popup.md](ux/multi-hex-build-popup.md): the build queue popup used when several build hexes are selected together.
-- [right-panel.md](ux/right-panel.md): the right panel as a whole, including tab switching.
-- [right-panel-command-bar.md](ux/right-panel-command-bar.md): game state readout, Ready, Ranged, and air strike controls.
-- [right-panel-selection-and-orders.md](ux/right-panel-selection-and-orders.md): the selected-unit readout and the movement, ranged, and air-strike lists.
-- [right-panel-tools-tab.md](ux/right-panel-tools-tab.md): the Tools tab and its tool list.
-- [right-panel-model-tab.md](ux/right-panel-model-tab.md): API key, model, reasoning effort, Run, New, the Tactical battles checkbox, and the model description tooltip.
+- [top-bar.md](ux/top-bar.md): the bar across the top: the two sides, the Production, Forces, and home readouts, and the date block, and the battle header it becomes in a battle.
+- [game-menu.md](ux/game-menu.md): the menu under the top bar's menu button: New game, Offer tactical battles, Quit, and the disabled placeholders.
+- [console.md](ux/console.md): the console docked on the right: its tab rail, collapsing it, and the footer that holds the opponent status line and Ready.
+- [console-command-bar.md](ux/console-command-bar.md): Ready, and the reticle and the air-strike target list in the selection panel.
+- [orders-tab.md](ux/orders-tab.md): the Movement, Ranged attacks, and Air strikes groups on the Orders tab.
+- [selection-panel.md](ux/selection-panel.md): the panel at the map's bottom-left that describes the selected units, their hex, and their orders, and holds the reticle that aims a ranged attack or an air strike.
+- [opponent-tab-tool-groups.md](ux/opponent-tab-tool-groups.md): the Opponent tab's Tool groups section.
+- [opponent-tab-commander.md](ux/opponent-tab-commander.md): the Opponent tab's Status and Commander sections: Run and its sentence, API key, model, reasoning effort, and the model description tooltip.
 - [ai-activity-log.md](ux/ai-activity-log.md): the log of AI interactions and errors.
-- [new-game-dialog.md](ux/new-game-dialog.md): the overlay used to start a game and to show game over, and the map preview behind it.
+- [reports-tab.md](ux/reports-tab.md): the console tab that keeps what the map toasts showed during the match.
+- [new-game-dialog.md](ux/new-game-dialog.md): the overlay used to start a game and to show game over, and the map preview beside it.
 - [resolution-playback.md](ux/resolution-playback.md): the animated replay of turn resolution and the inputs it blocks.
 - [tactical-entry-markers.md](ux/tactical-entry-markers.md): markers on contested hexes that lead into a tactical battle.
 - [tactical-battles-list.md](ux/tactical-battles-list.md): the list of melee hexes where the player chooses to fight or ignore.
@@ -98,7 +108,7 @@ Element documents share a fixed heading set:
 - Targeting mode: Ranged or Strike, while the next map click chooses a target.
 - Order: a march, ferry, ranged attack, air strike, or build queue entry. Sealift embark and debark apply immediately and are not orders in this sense.
 - Draft order: an order that is queued and not yet resolved.
-- Pending order: a draft order shown in a right-panel list.
+- Pending order: a draft order shown in a list on the console's Orders tab.
 - Theater: strategic play on the world map, or tactical play inside a battle.
 - Contested hex: a strategic hex with units from both sides, eligible for a tactical battle.
 - Fog of war: hidden information the player has not yet earned. The rules are in the combat rules.
@@ -111,19 +121,22 @@ Cells are `Shown`, `Hidden`, `Disabled` (visible, but pointer input is off), `Ch
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | Map surface | Changed | Shown | Disabled | Changed | Changed | Disabled | Changed |
 | Map overlays | Hidden | Shown | Disabled | Shown | Changed | Disabled | Hidden |
-| Minimap | Hidden | Shown | Disabled | Shown | Shown | Disabled | Hidden |
+| Minimap panel | Hidden | Shown | Disabled | Changed | Changed | Disabled | Hidden |
 | Terrain legend | Hidden | Shown | Disabled | Shown | Shown | Disabled | Hidden |
-| Map zoom control | Hidden | Shown | Disabled | Shown | Shown | Disabled | Hidden |
 | Hex tooltips | Hidden | Shown | Hidden | Shown | Shown | Hidden | Hidden |
 | Stack callout | Hidden | Shown | Hidden | Hidden | Shown | Hidden | Hidden |
 | Build popup | Hidden | Shown | Disabled | Disabled | Hidden | Hidden | Hidden |
 | Multi-hex build popup | Hidden | Shown | Disabled | Disabled | Hidden | Hidden | Hidden |
-| Right panel | Hidden | Shown | Disabled | Shown | Shown | Disabled | Hidden |
+| Top bar | Changed | Shown | Disabled | Changed | Changed | Disabled | Changed |
+| Game menu | Changed | Shown | Hidden | Shown | Shown | Hidden | Changed |
+| Console | Hidden | Shown | Disabled | Shown | Shown | Disabled | Hidden |
 | Command bar | Hidden | Shown | Disabled | Shown | Changed | Disabled | Hidden |
-| Selection and orders | Hidden | Shown | Disabled | Shown | Changed | Disabled | Hidden |
-| Tools tab | Hidden | Shown | Disabled | Shown | Shown | Disabled | Hidden |
-| Model tab | Hidden | Shown | Disabled | Shown | Changed | Disabled | Hidden |
+| Orders tab | Hidden | Shown | Disabled | Shown | Changed | Disabled | Hidden |
+| Selection panel | Hidden | Shown | Disabled | Shown | Changed | Disabled | Hidden |
+| Opponent tool groups | Hidden | Shown | Disabled | Shown | Shown | Disabled | Hidden |
+| Opponent status and commander | Hidden | Shown | Disabled | Shown | Changed | Disabled | Hidden |
 | AI activity log | Hidden | Shown | Disabled | Shown | Shown | Disabled | Hidden |
+| Reports tab | Hidden | Shown | Disabled | Shown | Shown | Disabled | Hidden |
 | New game dialog | Shown | Hidden | Hidden | Hidden | Hidden | Hidden | Shown |
 | Resolution playback | Hidden | Hidden | Hidden | Shown | Hidden | Hidden | Hidden |
 | Tactical entry markers | Hidden | Shown | Disabled | Shown | Hidden | Hidden | Hidden |

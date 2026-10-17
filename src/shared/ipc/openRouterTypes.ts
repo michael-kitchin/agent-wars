@@ -36,7 +36,7 @@ id: string;
    */
 name?: string;
   /**
-   * Optional model blurb from OpenRouter for the Model-tab description tooltip.
+   * Optional model blurb from OpenRouter for the Opponent-tab description tooltip.
 
    * Contract: Trimmed plain text when present; whitespace-only values should be omitted by mappers.
    * When to use: Selected-model tooltip on the closed `#openrouter-model` select.
@@ -48,7 +48,7 @@ name?: string;
    * Optional per-token USD pricing used to build the dropdown cost suffix.
 
    * Contract: `prompt` / `completion` are string forms of finite numbers when present.
-   * When to use: `formatModelOptionSuffix` when building Model-tab option labels.
+   * When to use: `formatModelOptionSuffix` when building Opponent-tab option labels.
    * Expected outcome: Usable rates contribute to `$…/M`; both missing/invalid omits the cost part.
    * Exceptions: None.
    */
@@ -103,10 +103,10 @@ name?: string;
     readonly max_completion_tokens?: number;
   };
   /**
-   * Optional reasoning metadata used for the Model-tab reasoning suffix and the reasoning dropdown.
+   * Optional reasoning metadata used for the Opponent-tab reasoning suffix and the reasoning dropdown.
 
    * Contract: `default_effort` is a trimmed string when set; `default_enabled` / `mandatory` are booleans when set.
-   * When to use: `formatModelOptionSuffix` for Model-tab option labels, and the reasoning-effort helpers.
+   * When to use: `formatModelOptionSuffix` for Opponent-tab option labels, and the reasoning-effort helpers.
    * Expected outcome: The suffix lists the selectable levels when `supported_efforts` makes them known; otherwise it
    * shows `reasoning: <effort>` / `reasoning: default` when on, and omits the part when off/unknown.
    * Exceptions: None.

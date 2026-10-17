@@ -29,7 +29,7 @@ Dice chips show every die rolled in air combat, ranged combat, and melee combat.
 - Rolls of the same kind, player, unit type, and hit number share a row. A row with more than three rolls shows a tally such as `2/5 ≤3` (hits, then rolls) instead of each face.
 - A chip shows at most four lines. When it has more rows, it shows three of them and a final `+N more` line.
 
-A map toast can summarize losses the player can see. Combat outside vision is announced as an unknown battle, with continent names when those names are known. See [notifications-and-feedback.md](notifications-and-feedback.md).
+A map toast can summarize losses the player can see. Combat outside vision is announced as an unknown battle, with continent names when those names are known. The Reports tab keeps that summary as a turn report, and the unknown-battle announcement as a notice, both tagged with the turn or beat Ready just resolved. See [notifications-and-feedback.md](notifications-and-feedback.md) and [reports-tab.md](reports-tab.md).
 
 ## Inputs and Responses
 
@@ -37,8 +37,8 @@ A map toast can summarize losses the player can see. Combat outside vision is an
 
 - The animation does not have its own controls.
 - While playback runs, map gestures that change orders or the selection are ignored. That covers unit clicks and Shift-clicks, opening the stack callout, Ranged and Strike target double-clicks, double-click march and ferry, and build marker clicks and build queue edits. Hover order previews are not drawn.
-- While playback runs, the player can still drag to pan, zoom with the wheel, read hex tooltips, and right-click to clear selection chrome. A tactical entry marker still starts a battle, which cancels a strategic playback. Build markers and tactical entry markers are hidden while dice chips are showing, so a tactical entry marker can't be clicked then. Both come back when the chips fade.
-- The right panel is not blocked by playback. Its own rules apply.
+- While playback runs, the player can still drag to pan, zoom with the wheel, read hex tooltips, and right-click to clear selection chrome. The selection panel's close control still clears the selection, and queued orders stay queued. A tactical entry marker still starts a battle, which cancels a strategic playback. Build markers and tactical entry markers are hidden while dice chips are showing, so a tactical entry marker can't be clicked then. Both come back when the chips fade.
+- The console is not blocked by playback. Its own rules apply.
 
 ### Keyboard
 
@@ -53,7 +53,7 @@ A map toast can summarize losses the player can see. Combat outside vision is an
 ## States
 
 - Idle: no animation.
-- Playing: one or more stages are on screen, or dice chips are still fading after the last stage. The game-state readout can already show the next planning turn.
+- Playing: one or more stages are on screen, or dice chips are still fading after the last stage. On the world map, the top bar's date block can already show the next planning turn. In a battle, that date block stays hidden and the battle header's status line reads "Tactical resolution" and already names the next beat, until the animation ends.
 - Finished: the animation is cleared and Strategic planning or Tactical planning continues.
 
 ## Invariants
@@ -73,6 +73,7 @@ A map toast can summarize losses the player can see. Combat outside vision is an
 | Aspect | Strategic | Tactical |
 | --- | --- | --- |
 | What plays | The strategic turn, on the world map | The battle beat, on the battle map |
+| Top bar | The date block can already name the next planning turn | The battle header stays up. Its status line reads "Tactical resolution" and already names the next beat |
 | Dice chips | Under hexes in the player's vision before or after the turn only, and not at the zoom that hides strategic units | Under every battle cell that rolled, because battles have no fog |
 | Afterward | Strategic planning, or a battle if Fight started one | Tactical planning, or Tactical annihilation if a side is gone |
 
@@ -81,6 +82,7 @@ A map toast can summarize losses the player can see. Combat outside vision is an
 - [modes-and-transitions.md](modes-and-transitions.md)
 - [map-overlays.md](map-overlays.md)
 - [notifications-and-feedback.md](notifications-and-feedback.md)
+- [reports-tab.md](reports-tab.md)
 - [combat rules](../combat-rules-v3.md)
 
 ## Known Deviations
@@ -97,6 +99,7 @@ None.
 - `src/shared/resolutionCasualtyDraw.ts`
 - `src/renderer/map/drawInteraction.ts`
 - `src/renderer/rendering/gameScene.ts` (`drawGameScene`, `tickResolutionMoveAnimation`)
+- `src/renderer/chrome/battleHeader.ts` (`renderBattleHeader`)
 - `src/renderer/rendering/resolutionCombatOverlays.ts`
 - `src/renderer/rendering/combatDiceChipDrawing.ts`
 - `src/shared/combatDiceChips.ts`

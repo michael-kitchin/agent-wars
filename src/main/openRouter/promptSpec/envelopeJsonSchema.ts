@@ -134,28 +134,56 @@ function arraySchema(items: Readonly<Record<string, unknown>>): Record<string, u
 }
 
 /**
- * Builds the schema for an `assign_order` row's nested `order` object.
+ * Place and option keys every standing-order type branch lists.
  *
- * Purpose: Lists every `AssignOrderParams` key the parser translates.
- * When to use: Only when the action enum includes `assign_order`.
- * Expected outcome: `type` is required and limited to the standing-order types.
+ * Purpose: A branch that omits a taught key would strip it under `additionalProperties: false`.
+ * When to use: Each entry of `standingOrderSchema`, spread beside that type's `type` enum.
+ * Expected outcome: String, string-array, number, and boolean leaves for every place and option key a type may carry.
  * Exceptions: None.
  */
+const STANDING_ORDER_BRANCH_PROPERTIES: Readonly<Record<string, unknown>> = Object.freeze({
+  destination: STRING_SCHEMA,
+  defendHex: STRING_SCHEMA,
+  waypoints: STRING_ARRAY_SCHEMA,
+  targetUnitId: STRING_SCHEMA,
+  engageRange: { type: 'number' },
+  maxDistance: { type: 'number' },
+  avoidEnemies: { type: 'boolean' },
+  engageEnRoute: { type: 'boolean' },
+});
+
+/**
+ * Required keys for each standing-order type, including `type`.
+ *
+ * Purpose: A march without a destination, and the other placed types without their place or target, must not match a branch.
+ * When to use: `standingOrderSchema`.
+ * Expected outcome: One required-key list per `STANDING_ORDER_TYPES` entry. `hold_fire` requires `type` only.
+ * Exceptions: None.
+ */
+const STANDING_ORDER_REQUIRED_KEYS: Readonly<Record<string, readonly string[]>> = Object.freeze({
+  march: ['type', 'destination'],
+  defend: ['type', 'defendHex'],
+  pursue: ['type', 'targetUnitId'],
+  patrol: ['type', 'waypoints'],
+  hold_fire: ['type'],
+});
+
+/**
+ * Builds the schema for an `assign_order` row's nested `order` object.
+ *
+ * Purpose: Each standing-order type is its own closed branch, so a march without a destination does not match.
+ * When to use: Only when the action enum includes `assign_order`.
+ * Expected outcome: A bare `anyOf` whose branches cover `STANDING_ORDER_TYPES`.
+ * Exceptions: Throws when a standing-order type has no required-key list.
+ */
 function standingOrderSchema(): Record<string, unknown> {
-  return closedObjectSchema(
-    {
-      type: enumSchema(STANDING_ORDER_TYPES),
-      destination: STRING_SCHEMA,
-      defendHex: STRING_SCHEMA,
-      waypoints: STRING_ARRAY_SCHEMA,
-      targetUnitId: STRING_SCHEMA,
-      engageRange: { type: 'number' },
-      maxDistance: { type: 'number' },
-      avoidEnemies: { type: 'boolean' },
-      engageEnRoute: { type: 'boolean' },
-    },
-    ['type']
-  );
+  return {
+    anyOf: STANDING_ORDER_TYPES.map((orderType) => {
+      const required = STANDING_ORDER_REQUIRED_KEYS[orderType];
+      if (!required) throw new Error(`envelopeJsonSchema: no required keys for standing order "${orderType}"`);
+      return closedObjectSchema({ type: enumSchema([orderType]), ...STANDING_ORDER_BRANCH_PROPERTIES }, required);
+    }),
+  };
 }
 
 /**
@@ -179,7 +207,7 @@ interface OrderActionRowShape {
   /**
    * Keys without which `processV3OrdersArray` drops the row.
    *
-   * Contract: Subset of `keys`. Leave a key out when the parser accepts one of several alternatives (ranged targets).
+   * Contract: Subset of `keys`. `ranged_attack` is not listed here; it is two branches in `rangedAttackRowSchemas`.
    * When to use: Building the action's row schema.
    * Expected outcome: Added to `required` after `action`.
    * Exceptions: None.
@@ -193,12 +221,11 @@ interface OrderActionRowShape {
  * Purpose: Moves, transport moves, and disembarks must carry a destination; embark and transport moves must name the
  * naval unit; standing orders must carry the order.
  * When to use: `orderActionRowSchema`.
- * Expected outcome: One entry per legal action name.
+ * Expected outcome: One entry per legal action except `ranged_attack`, which `rangedAttackRowSchemas` builds as two branches.
  * Exceptions: None.
  */
 const ORDER_ACTION_ROW_SHAPES: Readonly<Record<string, OrderActionRowShape>> = Object.freeze({
   explicit_move: { keys: ['destination'], required: ['destination'] },
-  ranged_attack: { keys: ['targetHexCode', 'targetUnitId'], required: [] },
   embark: { keys: ['navalUnitId'], required: ['navalUnitId'] },
   transport_move: { keys: ['navalUnitId', 'destination'], required: ['navalUnitId', 'destination'] },
   disembark: { keys: ['destination'], required: ['destination'] },
@@ -209,8 +236,8 @@ const ORDER_ACTION_ROW_SHAPES: Readonly<Record<string, OrderActionRowShape>> = O
 /**
  * Builds the property table for an `orders[]` row.
  *
- * Purpose: One source for every row key's schema, shared by the combined row and the per-action rows.
- * When to use: `orderRowSchema` and `orderActionRowSchema`.
+ * Purpose: One source for every row key's schema, shared by the per-action branches.
+ * When to use: `orderRowSchema`, `orderActionRowSchema`, and `rangedAttackRowSchemas`.
  * Expected outcome: `action` limited to `actions`; `order` present only when `assign_order` is legal.
  * Exceptions: None.
  */
@@ -246,25 +273,68 @@ function orderActionRowSchema(action: string, allProperties: Readonly<Record<str
 }
 
 /**
+ * Builds the two `ranged_attack` branches.
+ *
+ * Purpose: A shot must name a hex or a unit, and a row that names both matches neither branch.
+ * When to use: `orderRowSchema`, in place of `orderActionRowSchema` for `ranged_attack`.
+ * Expected outcome: Two closed objects. One requires `targetHexCode` and omits `targetUnitId`. The other does the reverse.
+ * Exceptions: None.
+ */
+function rangedAttackRowSchemas(allProperties: Readonly<Record<string, unknown>>): Record<string, unknown>[] {
+  const actors = { unitId: allProperties.unitId, unitIds: allProperties.unitIds };
+  return [
+    closedObjectSchema(
+      { action: enumSchema(['ranged_attack']), ...actors, targetHexCode: allProperties.targetHexCode },
+      ['action', 'targetHexCode']
+    ),
+    closedObjectSchema(
+      { action: enumSchema(['ranged_attack']), ...actors, targetUnitId: allProperties.targetUnitId },
+      ['action', 'targetUnitId']
+    ),
+  ];
+}
+
+/**
  * Builds the schema for one `orders[]` row.
  *
- * The row is the combined closed row (every action's keys, only `action` required) plus an `anyOf` of one closed
- * row per action. A provider that honors `anyOf` enforces the per-action required keys. One that ignores `anyOf`,
- * or ignores the sibling keys, still sees a complete valid row. `type: 'object'` must stay beside `anyOf`: DeepSeek
- * rejects an `anyOf` without a sibling `type`.
+ * The node is a bare `anyOf`. Sibling `type` or `properties` would make Gemini ignore the branches and accept a
+ * move that has no destination.
  *
- * Purpose: Requires a destination on move, transport, and disembark rows while every other action keeps its own keys.
+ * Purpose: Requires a destination on move, transport, and disembark rows, and a target on ranged rows.
  * When to use: The `orders` property.
  * Expected outcome: `action` is limited to the mode's legal actions; `order` appears only when standing orders are
- * legal.
- * Exceptions: Throws when a legal action has no row shape.
+ * legal. `unitId` and `unitIds` stay optional on every branch.
+ * Exceptions: Throws when a legal action other than `ranged_attack` has no row shape.
  */
 function orderRowSchema(gates: EnvelopeGates): Record<string, unknown> {
   const actions = legalOrderActionsForMode(gates.coordinateMode, true, gates.includeStandingOrderActions !== false);
   const properties = orderRowProperties(actions);
   return {
-    ...closedObjectSchema(properties, ['action']),
-    anyOf: actions.map((action) => orderActionRowSchema(action, properties)),
+    anyOf: actions.flatMap((action) =>
+      action === 'ranged_attack' ? rangedAttackRowSchemas(properties) : [orderActionRowSchema(action, properties)]
+    ),
+  };
+}
+
+/**
+ * Builds the schema for one `airStrikes[]` row.
+ *
+ * Purpose: A strike must name a hex or a unit, and a row that names both matches neither branch.
+ * When to use: The `airStrikes` property.
+ * Expected outcome: A bare `anyOf` of two closed objects. `targetType` is required on both. `unitId` and `unitIds` stay optional.
+ * Exceptions: None.
+ */
+function airStrikeRowSchema(): Record<string, unknown> {
+  const actors = {
+    unitId: STRING_SCHEMA,
+    unitIds: STRING_ARRAY_SCHEMA,
+    targetType: enumSchema(AIR_STRIKE_TARGET_TYPES),
+  };
+  return {
+    anyOf: [
+      closedObjectSchema({ ...actors, targetHexCode: STRING_SCHEMA }, ['targetType', 'targetHexCode']),
+      closedObjectSchema({ ...actors, targetUnitId: STRING_SCHEMA }, ['targetType', 'targetUnitId']),
+    ],
   };
 }
 
@@ -310,18 +380,7 @@ function envelopeFieldSchema(field: string, gates: EnvelopeGates): Record<string
     case 'orders':
       return arraySchema(orderRowSchema(gates));
     case 'airStrikes':
-      return arraySchema(
-        closedObjectSchema(
-          {
-            unitId: STRING_SCHEMA,
-            unitIds: STRING_ARRAY_SCHEMA,
-            targetHexCode: STRING_SCHEMA,
-            targetUnitId: STRING_SCHEMA,
-            targetType: enumSchema(AIR_STRIKE_TARGET_TYPES),
-          },
-          ['targetType']
-        )
-      );
+      return arraySchema(airStrikeRowSchema());
     case 'ferryOrders':
       return arraySchema(
         closedObjectSchema({ unitId: STRING_SCHEMA, unitIds: STRING_ARRAY_SCHEMA, destination: STRING_SCHEMA }, [
@@ -364,8 +423,9 @@ function envelopeFieldSchema(field: string, gates: EnvelopeGates): Record<string
  *
  * The schema is closed at every depth (`additionalProperties: false`) because some providers strip keys a schema
  * does not list. It may use only `type`, `properties`, `required`, `additionalProperties`, `items`, `enum`, and
- * `anyOf` (inline, beside `type`, never with `$ref`), because providers reject other keywords. `strict` stays false:
- * strict mode would require every property.
+ * `anyOf` (inline, never with `$ref`). An `anyOf` that constrains a row is the only key on that node, because a
+ * sibling `type` or `properties` makes Gemini ignore the branches. `strict` stays false: strict mode would require
+ * every property.
  *
  * Purpose: Constrains the final reply to the envelope the system prompt teaches.
  * When to use: Once per consultation for models that support structured outputs.

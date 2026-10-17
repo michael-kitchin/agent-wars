@@ -27,7 +27,7 @@ function tacticalAnnihilationMessageForOutcome(outcome: TacticalAnnihilationOutc
 }
 
 /**
- * Shows the annihilation overlay, blocks map interaction, and refreshes tactical HUD / Ready affordances.
+ * Shows the annihilation overlay, blocks map interaction, and refreshes Exit Battle and Ready.
  *
  * Purpose: Replaces the former annihilation toast + immediate auto-exit with an explicit confirmation step.
  * When to use: From `tacticalMaybeScheduleAnnihilationExit` when a planning-phase snapshot is terminal.

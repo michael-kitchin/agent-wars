@@ -669,6 +669,24 @@ export function parseOrdersResponse(
   memoryUpdates?: MemoryUpdateItem[];
   productionAppliedCount?: number;
   dropReasons?: string[];
+  /**
+   * True when the envelope named actor rows and none of them were kept.
+   *
+   * Contract: True only when the expanded `orders`, `airStrikes`, and `ferryOrders` arrays together are non-empty, and movement, ranged, embark, air, ferry, and applied standing-order counts are all zero. Empty actor arrays are false.
+   * When to use: The consultation flow, to decide whether one repair call should replace this parse.
+   * Expected outcome: False when at least one actor row was applied, or when no actor row was submitted.
+   * Exceptions: None.
+   */
+  everyActorRowDropped: boolean;
+  /**
+   * How many actor rows the envelope submitted after grouped ids were expanded.
+   *
+   * Contract: Sum of the expanded `orders`, `airStrikes`, and `ferryOrders` lengths, including entries that are not objects.
+   * When to use: The debug log when `everyActorRowDropped` triggers a repair.
+   * Expected outcome: Zero when those three arrays are empty.
+   * Exceptions: None.
+   */
+  expandedActorRowCount: number;
 } | null {
   const trimmed = content.trim();
   const candidates: string[] = [];
@@ -735,15 +753,18 @@ export function parseOrdersResponse(
           });
         }
         const message = typeof obj.message === 'string' ? obj.message.trim() : '';
-        const { movementOrders, rangedAttacks, embarkOrders, dropReasons: orderRowDropReasons } = processV3OrdersArray(
-          ordersArray,
-          state,
-          latLngByH3,
-          resolveToH3,
-          context
-        );
-        const normalizedAirStrikes = normalizeAirStrikeOrders(expandGroupedActorEntries(obj.airStrikes), state, context);
-        const normalizedFerryOrders = normalizeFerryOrders(expandGroupedActorEntries(obj.ferryOrders), context);
+        const {
+          movementOrders,
+          rangedAttacks,
+          embarkOrders,
+          dropReasons: orderRowDropReasons,
+          appliedStandingOrderCount,
+        } = processV3OrdersArray(ordersArray, state, latLngByH3, resolveToH3, context);
+        const expandedAirStrikes = expandGroupedActorEntries(obj.airStrikes);
+        const expandedFerryOrders = expandGroupedActorEntries(obj.ferryOrders);
+        const normalizedAirStrikes = normalizeAirStrikeOrders(expandedAirStrikes, state, context);
+        const normalizedFerryOrders = normalizeFerryOrders(expandedFerryOrders, context);
+        const expandedActorRowCount = ordersArray.length + expandedAirStrikes.length + expandedFerryOrders.length;
         let productionDropReasons: string[] = [];
         let productionAppliedCount = 0;
         if (productionEnabled) {
@@ -773,6 +794,15 @@ export function parseOrdersResponse(
           memoryUpdates: memoryUpdates.length > 0 ? memoryUpdates : undefined,
           productionAppliedCount: productionAppliedCount > 0 ? productionAppliedCount : undefined,
           dropReasons: dropReasons.length > 0 ? dropReasons : undefined,
+          everyActorRowDropped:
+            expandedActorRowCount > 0 &&
+            movementOrders.length === 0 &&
+            rangedAttacks.length === 0 &&
+            embarkOrders.length === 0 &&
+            normalizedAirStrikes.airStrikes.length === 0 &&
+            normalizedFerryOrders.ferryOrders.length === 0 &&
+            appliedStandingOrderCount === 0,
+          expandedActorRowCount,
         };
       }
     } catch {

@@ -162,11 +162,33 @@ function selectForTip(target: EventTarget | null): HTMLSelectElement | null {
 }
 
 /**
+ * Places the visible tip below and to the right of a point, or above or to the left of it where it would leave the window.
+ *
+ * Purpose: Controls at the window's right and bottom edges, such as the console's tab rail and Ready, still get a
+ *   readable tip instead of one squeezed against the edge or cut off below it.
+ * When to use: Each time the tip is shown or follows the pointer, after its text is set and it is not hidden.
+ * Expected outcome: The tip sits `TOOLTIP_OFFSET_PX` from the point on each axis, on the side where it fits. A tip
+ *   too large for either side keeps to the window's left or top edge.
+ * Exceptions: None.
+ */
+function placeTip(el: HTMLElement, x: number, y: number): void {
+  el.style.left = '0px';
+  el.style.top = '0px';
+  const { width, height } = el.getBoundingClientRect();
+  const fitsRight = x + TOOLTIP_OFFSET_PX + width <= window.innerWidth;
+  const fitsBelow = y + TOOLTIP_OFFSET_PX + height <= window.innerHeight;
+  const left = fitsRight ? x + TOOLTIP_OFFSET_PX : Math.max(0, x - TOOLTIP_OFFSET_PX - width);
+  const top = fitsBelow ? y + TOOLTIP_OFFSET_PX : Math.max(0, y - TOOLTIP_OFFSET_PX - height);
+  el.style.left = `${left}px`;
+  el.style.top = `${top}px`;
+}
+
+/**
  * Shows the sentence near the pointer, or beside the control when focus arrived without the pointer.
  *
  * Purpose: Matches the hex-tooltip offset and chrome.
  * When to use: After the dwell, when the host is still current and no order tip is showing.
- * Expected outcome: The tip is visible. The hex tooltip is cleared so it does not sit underneath.
+ * Expected outcome: The tip is visible, placed by `placeTip`. The hex tooltip is cleared so it does not sit underneath.
  * Exceptions: A missing tip element returns without throwing. An order tip that is already visible is left in place.
  */
 function showTip(host: HTMLElement, text: string): void {
@@ -182,9 +204,8 @@ function showTip(host: HTMLElement, text: string): void {
     y = rect.top;
   }
   el.textContent = text;
-  el.style.left = `${x + TOOLTIP_OFFSET_PX}px`;
-  el.style.top = `${y + TOOLTIP_OFFSET_PX}px`;
   el.classList.remove('hidden');
+  placeTip(el, x, y);
   el.setAttribute('aria-hidden', 'false');
   el.setAttribute('role', 'tooltip');
 }
@@ -359,14 +380,13 @@ export function dismissStaleControlTooltip(): void {
  *
  * Purpose: Moving inside a control follows the pointer without starting the dwell again.
  * When to use: Pointer move and pointer enter on the current host.
- * Expected outcome: A visible tip is repositioned. A hidden tip is left hidden.
+ * Expected outcome: A visible tip is repositioned by `placeTip`. A hidden tip is left hidden.
  * Exceptions: None.
  */
 function moveVisibleTip(clientX: number, clientY: number): void {
   const el = tipElement();
   if (!el || el.classList.contains('hidden')) return;
-  el.style.left = `${clientX + TOOLTIP_OFFSET_PX}px`;
-  el.style.top = `${clientY + TOOLTIP_OFFSET_PX}px`;
+  placeTip(el, clientX, clientY);
 }
 
 /**

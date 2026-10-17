@@ -1,7 +1,7 @@
 import type { MapExtentBox } from '../../shared/mapExtent';
 import type { NewGameMapPreviewRequest } from '../../shared/newGameMapPreviewTypes';
 import { applyLoadedMapExtent } from '../map/mapExtent';
-import { getMainLeafletMap } from '../map/worldLeafletMap';
+import { getMainLeafletMap, invalidateLeafletMapSizes } from '../map/worldLeafletMap';
 import {
   noteNewGameMapPreviewRequest,
   repaintNewGameMapPreview,
@@ -127,7 +127,7 @@ export function releaseNewGameMapPreviewCamera(holdSerial: number): boolean {
  *
  * Purpose: Opening the dialog, changing a tab, or changing a home area must frame that map and paint its grid.
  * When to use: After those controls settle. Month and weather-bonus changes call `repaintNewGameMapPreview` instead.
- * Expected outcome: The camera fits when the extent changes or the dialog has just opened. A global fit then zooms in one level, still centered on that fit. A home change on the same extent only repaints. A regional choice with a missing id paints nothing and does not call IPC. A failure logs and leaves a same-map payload in place. A response that arrives after the dialog closes, or while Start holds the camera, does not move the match.
+ * Expected outcome: The camera fits the map under the setup panel when the extent changes or the dialog has just opened. A global fit then zooms in one level, still centered on that fit. A home change on the same extent only repaints. A regional choice with a missing id paints nothing and does not call IPC. A failure logs and leaves a same-map payload in place. A response that arrives after the dialog closes, or while Start holds the camera, does not move the match.
  * Exceptions: None. IPC failures are logged.
  */
 export async function refreshNewGameMapPreview(): Promise<void> {
@@ -149,9 +149,14 @@ export async function refreshNewGameMapPreview(): Promise<void> {
     if (serial !== requestSerial || !newGameOverlayOpen() || mapCameraHeldForStart) return;
     if (!storeNewGameMapPreview(preview)) return;
     const key = extentKey(preview.extent);
-    if (key !== framedExtentKey && applyLoadedMapExtent(preview.extent, true)) {
-      framedExtentKey = key;
-      if (preview.gameMapId === 'global') zoomGlobalPreviewInOneLevel();
+    if (key !== framedExtentKey) {
+      // The console leaves the window as the overlay opens, so fit to the map's size now rather than the size Leaflet
+      // last measured.
+      invalidateLeafletMapSizes();
+      if (applyLoadedMapExtent(preview.extent, true)) {
+        framedExtentKey = key;
+        if (preview.gameMapId === 'global') zoomGlobalPreviewInOneLevel();
+      }
     }
     repaintNewGameMapPreview();
   } catch (err) {
