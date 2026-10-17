@@ -1,0 +1,135 @@
+name: Bug report
+description: Something in Agent Wars doesn't work the way it should.
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report this. Agent Wars is a personal R&D project with one maintainer, so responses are best-effort and not every report will be fixed.
+
+        Please file one problem per issue. For a security problem, don't open an issue: use **Report a vulnerability** on the Security tab instead (see [SECURITY.md](https://github.com/michael-kitchin/agent-wars/blob/main/SECURITY.md)).
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: The release you downloaded, or `version` in package.json if you built from source.
+      placeholder: "2.6.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: platform
+    attributes:
+      label: How are you running it?
+      options:
+        - Release build, Windows x64
+        - Release build, macOS (Apple silicon)
+        - Release build, Linux x64
+        - Built from source (name your OS under "What happened")
+    validations:
+      required: true
+
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Game mode
+      options:
+        - Global map
+        - Regional map
+        - Not in a game yet (new-game panel, settings)
+    validations:
+      required: true
+
+  - type: input
+    id: region-and-turn
+    attributes:
+      label: Region and turn
+      description: The regional map's name, if you were playing one, and the turn number when it happened.
+      placeholder: "Western Europe, turn 14"
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      description: Pick everything that applies.
+      multiple: true
+      options:
+        - Layout and controls (top bar, console, selection panel, popups)
+        - Strategic map (movement, orders, embarking)
+        - Production and economy
+        - Tactical battle
+        - Combat results
+        - AI opponent behavior
+        - Crash, hang, or performance
+        - Something else
+    validations:
+      required: true
+
+  - type: textarea
+    id: opponent
+    attributes:
+      label: AI opponent settings
+      description: The model you picked, if the AI was running, and anything you changed on the Opponent tab. Leave blank if the AI was off.
+      placeholder: "Gemini Flash Lite, all tool groups on"
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you saw. Name the units, hexes, and numbers where they matter.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+      description: What should have happened instead. For AI behavior, say what made the move look wrong.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: There's no save/load yet, so the turns leading up to the problem matter. If you can't reproduce it, say so and describe what led up to it.
+      placeholder: |
+        1. Start a regional game in ...
+        2. ...
+        3. See ...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: frequency
+    attributes:
+      label: How often does it happen?
+      options:
+        - Every time
+        - Sometimes
+        - Once so far
+    validations:
+      required: true
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      description: Your call. It may change during triage.
+      options:
+        - "Blocker: crash, hang, or the game can't continue"
+        - "Major: wrong result or broken rule, no reasonable workaround"
+        - "Minor: wrong or awkward, but there's a workaround"
+        - "Cosmetic: looks wrong, plays fine"
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Screenshots, recordings, and logs
+      description: |
+        Drag files in. A screenshot of the map and console at the moment of the problem helps most.
+
+        For AI opponent problems or crashes, turn on logging (see [See the Prompts](https://github.com/michael-kitchin/agent-wars#see-the-prompts-and-everything-else) in the README), delete any old debug.log, reproduce the problem, and attach debug.log and the debug-last-*.txt files. Issues are public, so check attachments for anything you don't want shared.
