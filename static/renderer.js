@@ -18841,11 +18841,14 @@ ${bonuses}`;
     readyBtn.replaceChildren(buildReadyCheckIcon(), label);
   }
   function setReadyButtonLabelAiWait(readyBtn, elapsedMs) {
-    readyBtn.textContent = "";
-    const strong = document.createElement("strong");
-    strong.textContent = "AI: ";
-    readyBtn.appendChild(strong);
-    readyBtn.appendChild(document.createTextNode(formatElapsedMmSs(elapsedMs)));
+    const text = `AI: ${formatElapsedMmSs(elapsedMs)}`;
+    let label = readyBtn.querySelector(".ready-btn-ai-label");
+    if (!label) {
+      label = document.createElement("span");
+      label.className = "ready-btn-ai-label";
+      readyBtn.replaceChildren(label);
+    }
+    if (label.textContent !== text) label.textContent = text;
   }
   function updateReadyButtonState() {
     const readyBtn = document.getElementById("ready-btn");
@@ -19456,7 +19459,7 @@ ${bonuses}`;
       maxBoundsViscosity: 1,
       /* App-owned WASD/arrow screen pan; avoid Leaflet’s default keyboard panBy. */
       keyboard: false,
-      /* Added below at the top-right, clear of the minimap panel. */
+      /* The map zooms from the wheel and from Shift-drag. There is no +/− control. */
       zoomControl: false,
       /* Keep raster tiles and canvas overlay in lockstep (no CSS zoom/pan lag vs hex draw). */
       zoomAnimation: false,
@@ -19467,7 +19470,6 @@ ${bonuses}`;
     mountRasterBasemap(leafletRef, mainMap, true, startIdx, "main");
     mainMap.fitBounds(worldBounds2, { padding: [2, 2], animate: false });
     mainMap.doubleClickZoom.disable();
-    leafletRef.control.zoom({ position: "topright" }).addTo(mainMap);
     try {
       leafletRef.control.scale({
         position: "bottomright",
@@ -19523,8 +19525,9 @@ ${bonuses}`;
     }
     if (!viewportRect) {
       viewportRect = leafletRef.rectangle(mainBounds, {
-        color: ORDER_LINE_COLOR,
+        color: getComputedStyle(document.documentElement).getPropertyValue("--chrome-bg").trim() || "#1b2838",
         weight: 2,
+        opacity: 1,
         fill: false,
         interactive: false
       }).addTo(miniMap);
@@ -25752,11 +25755,10 @@ ${bonuses}`;
     }
     const band = document.getElementById("map-toast-band");
     if (!band) return;
-    const zoomBox = document.querySelector("#main-map .leaflet-control-zoom")?.getBoundingClientRect();
     const span = toastBandSpan({
       mapWidth: mapBox.width,
       leftObstacleRight,
-      rightObstacleLeft: zoomBox && zoomBox.width > 0 ? zoomBox.left - mapBox.left : mapBox.width
+      rightObstacleLeft: mapBox.width
     });
     band.style.left = `${span.left}px`;
     band.style.right = `${span.right}px`;

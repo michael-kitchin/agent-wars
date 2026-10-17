@@ -123,7 +123,6 @@ Cells are `Shown`, `Hidden`, `Disabled` (visible, but pointer input is off), `Ch
 | Map overlays | Hidden | Shown | Disabled | Shown | Changed | Disabled | Hidden |
 | Minimap panel | Hidden | Shown | Disabled | Changed | Changed | Disabled | Hidden |
 | Terrain legend | Hidden | Shown | Disabled | Shown | Shown | Disabled | Hidden |
-| Map zoom control | Hidden | Shown | Disabled | Shown | Shown | Disabled | Hidden |
 | Hex tooltips | Hidden | Shown | Hidden | Shown | Shown | Hidden | Hidden |
 | Stack callout | Hidden | Shown | Hidden | Hidden | Shown | Hidden | Hidden |
 | Build popup | Hidden | Shown | Disabled | Disabled | Hidden | Hidden | Hidden |

@@ -18,7 +18,7 @@ test('legendPopoverPosition puts the legend under the panel on a narrow map', ()
   });
 });
 
-test('toastBandSpan keeps the band between the chrome on the left and the zoom buttons', () => {
+test('toastBandSpan keeps the inset clear of a right-hand obstacle', () => {
   assert.deepEqual(toastBandSpan({ mapWidth: 904, leftObstacleRight: 310, rightObstacleLeft: 858 }), {
     left: 322,
     right: 58,
@@ -27,14 +27,14 @@ test('toastBandSpan keeps the band between the chrome on the left and the zoom b
 });
 
 test('toastBandSpan spans the top of a map too narrow for the band beside the chrome', () => {
-  assert.deepEqual(toastBandSpan({ mapWidth: 424, leftObstacleRight: 310, rightObstacleLeft: 378 }), {
+  assert.deepEqual(toastBandSpan({ mapWidth: 424, leftObstacleRight: 310, rightObstacleLeft: 424 }), {
     left: 12,
-    right: 58,
+    right: 12,
     overChrome: true,
   });
 });
 
-test('toastBandSpan keeps the inset at the right edge when there are no zoom buttons', () => {
+test('toastBandSpan keeps the inset at the map right edge', () => {
   assert.deepEqual(toastBandSpan({ mapWidth: 904, leftObstacleRight: 310, rightObstacleLeft: 904 }), {
     left: 322,
     right: 12,

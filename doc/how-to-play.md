@@ -286,10 +286,10 @@ The full bonus rules are in [combat-rules-v3.md](combat-rules-v3.md) §4.9.
 
 ## Where messages appear
 
-| *LLM-supplied taunts (in this case, Claude Opus) and strategy messages appear at the top centre of the map, and stay on the Reports tab.*                                                                 | *End-of-turn updates appear at the top centre of the map, and stay on the Reports tab.*                                                |
+| *LLM-supplied taunts (in this case, Claude Opus) and strategy messages appear at the top of the map, 12 px in from its right edge, and stay on the Reports tab.*                                                                 | *End-of-turn updates appear at the top of the map, 12 px in from its right edge, and stay on the Reports tab.*                                                |
 | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| ![LLM-supplied taunts (in this case, Claude Opus) and strategy messages appear at the top centre of the map](media/message-popup.png) | ![End-of-turn updates appear at the top centre of the map](media/status-popup.png) |
+| ![LLM-supplied taunts (in this case, Claude Opus) and strategy messages appear at the top of the map, 12 px in from its right edge](media/message-popup.png) | ![End-of-turn updates appear at the top of the map, 12 px in from its right edge](media/status-popup.png) |
 
-- **Top centre of the map (map toast):** Errors, rejected orders, turn-loss summaries, and unknown-battle announcements. Use the × to dismiss; it also hides after a fixed interval, and a newer message replaces it. The Reports tab keeps every one except errors.
-- **Top centre of the map, above the map toast (AI strategy toast):** The opponent's Message and Strategy after a consultation. It dismisses and times out the same way, and the Reports tab keeps it.
+- **Top of the map, 12 px in from its right edge (map toast):** Errors, rejected orders, turn-loss summaries, and unknown-battle announcements. The gap is the same while the console is open and while it is collapsed. Use the × to dismiss; it also hides after a fixed interval, and a newer message replaces it. The Reports tab keeps every one except errors.
+- **Top of the map, above the map toast (AI strategy toast):** The opponent's Message and Strategy after a consultation, in that same place. It dismisses and times out the same way, and the Reports tab keeps it.
 - **Console, Opponent tab, at the bottom (Activity log):** AI interaction lines and errors, including a retry, a line when opponent planning stops, and a one-line copy of each turn update. Starting a new match clears it.

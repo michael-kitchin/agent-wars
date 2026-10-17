@@ -19,7 +19,6 @@ Tell an agent which input does what, and which binding wins when two surfaces co
 | Click, drag, wheel, double-click | Minimap | No pan, zoom, or click-to-recenter. The minimap only shows the current view. | [minimap.md](minimap.md) |
 | Click | Toggle on the minimap overview's lower-left corner | Shows or hides the map-mode tabs under the overview. Hiding them also closes the terrain legend. | [minimap.md](minimap.md) |
 | Click | Map-mode tabs under the minimap | Weather turns the weather icons on or off. Tech turns the tech icons on or off. Control turns the control borders and home-region outlines on or off. Production turns production labels on every hex on or off. Legend opens or closes the terrain legend. | [minimap.md](minimap.md) |
-| Click | Zoom buttons at the map's top-right | Zooms the map in or out. | [map-surface.md](map-surface.md) |
 | Click | Tactical battles list backdrop | Chooses Ignore. | [tactical-battles-list.md](tactical-battles-list.md) |
 | Click | Toast dismiss | Hides that toast. | [notifications-and-feedback.md](notifications-and-feedback.md) |
 

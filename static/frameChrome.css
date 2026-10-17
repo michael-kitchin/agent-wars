@@ -516,11 +516,15 @@ body:has(#game-over-overlay:not(.hidden)) #sidebar {
   font-weight: 600;
   border-radius: 4px;
 }
-/* The check mark left of "Ready". The "AI:" label has none. A margin, not a gap, so "AI:" and its timer stay together. */
+/* The check mark left of "Ready". The "AI:" label has none. A margin, not a gap, so the mark stays off that label. */
 .console-footer #ready-btn .ready-btn-check {
   width: 18px;
   height: 18px;
   margin-right: 8px;
+}
+/* One run, so "AI:" and the time share the button's type and baseline, with the space that is in the text. */
+.console-footer #ready-btn .ready-btn-ai-label {
+  white-space: nowrap;
 }
 
 /* ---------- Collapsed console ---------- */
@@ -548,7 +552,7 @@ body:has(#game-over-overlay:not(.hidden)) #sidebar {
 #sidebar.console[data-collapsed="true"] .opponent-status-line {
   display: none;
 }
-/* The "AI:" label and its timer are separate flex items, so wrapping puts them on two lines. */
+/* The rail is too narrow for "AI:" and the time on one line, so that label wraps at the space. */
 #sidebar.console[data-collapsed="true"] #ready-btn {
   flex-wrap: wrap;
   align-content: center;
@@ -557,6 +561,12 @@ body:has(#game-over-overlay:not(.hidden)) #sidebar {
   font-size: 12px;
   line-height: 1.15;
   white-space: normal;
+}
+#sidebar.console[data-collapsed="true"] #ready-btn .ready-btn-ai-label {
+  min-width: 0;
+  max-width: 100%;
+  white-space: normal;
+  text-align: center;
 }
 /* The rail is too narrow for the word, so only the check mark shows. The word stays as the button's accessible name. */
 #sidebar.console[data-collapsed="true"] #ready-btn .ready-btn-check {

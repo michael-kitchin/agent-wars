@@ -2,7 +2,7 @@
  * Places the terrain legend and the toast band among the chrome at the top of the map. The rules are in
  * `src/shared/mapChromePlacement.ts`; this module measures the page and applies them.
  *
- * Purpose: The legend's width and the zoom buttons' position come from the page, so they are measured, not assumed.
+ * Purpose: The legend's width comes from the page, so it is measured, not assumed. The toast band's right edge is the map's.
  * When to use: Through `layoutMapChrome`.
  * Expected outcome: Inline `left`, `top`, and `right` on `#terrain-legend` and `#map-toast-band`. While the new-game
  *   setup panel is open over the map, the band also keeps clear of it.
@@ -12,13 +12,15 @@ import { legendPopoverPosition, toastBandSpan } from '../../shared/mapChromePlac
 
 /**
  * Moves the open legend beside or under the minimap panel, then fits the toast band between the chrome on the left
- * and the zoom buttons.
+ * and the map's right edge.
  *
- * Purpose: Keeps the legend on the map and the toasts clear of the panel, the legend, and the zoom buttons at any size.
+ * Purpose: Keeps the legend on the map and the toasts clear of the panel and the legend, with the same right inset
+ *   whether the console is open or collapsed.
  * When to use: After the maps are created, after the legend opens or closes, and whenever the map changes size.
  * Expected outcome: An open legend sits beside the panel when it fits, otherwise under it. The band sits right of the
- *   panel, or of the legend when the legend is beside it, or of the open new-game panel when that reaches farther, and
- *   left of the zoom buttons; on a narrow map it spans the top of the map instead. A closed legend is left where it was.
+ *   panel, or of the legend when the legend is beside it, or of the open new-game panel when that reaches farther,
+ *   and `MAP_CHROME_INSET` in from the map's right edge. On a narrow map it spans the top of the map instead. A closed
+ *   legend is left where it was.
  * Exceptions: None. Does nothing without `#canvas-container` or `#minimap-panel`.
  */
 export function layoutMapChrome(): void {
@@ -49,11 +51,10 @@ export function layoutMapChrome(): void {
 
   const band = document.getElementById('map-toast-band');
   if (!band) return;
-  const zoomBox = document.querySelector('#main-map .leaflet-control-zoom')?.getBoundingClientRect();
   const span = toastBandSpan({
     mapWidth: mapBox.width,
     leftObstacleRight,
-    rightObstacleLeft: zoomBox && zoomBox.width > 0 ? zoomBox.left - mapBox.left : mapBox.width,
+    rightObstacleLeft: mapBox.width,
   });
   band.style.left = `${span.left}px`;
   band.style.right = `${span.right}px`;

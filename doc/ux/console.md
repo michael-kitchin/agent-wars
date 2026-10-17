@@ -26,7 +26,7 @@ Shown in Strategic planning, Tactical planning, Resolution playback, the tactica
   - The selected model's name: the model option's text before " [", or "No model". A long name is cut short with an ellipsis.
   - The match cost, the same amount as the Commander section's cost readout.
   - The labels come from `src/shared/opponentPlanningStatus.ts`.
-- While collapsed, only the tab rail and a smaller Ready show. The opponent status line is hidden. Ready shows only its check mark while its label is "Ready". While Ready reads "AI:" and a time, that label takes two lines.
+- While collapsed, only the tab rail and a smaller Ready show. The opponent status line is hidden. Ready shows only its check mark while its label is "Ready". While Ready reads "AI:" and a time, that label wraps at the space onto two lines, in the same type as the open console.
 - Control tips for the tabs are in [control-tooltips.md](control-tooltips.md). Each enabled tab's tip ends by saying that a click on the selected tab hides the console.
 
 ## Inputs and Responses

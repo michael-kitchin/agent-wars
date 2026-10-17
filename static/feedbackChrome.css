@@ -1,5 +1,5 @@
 /* Toasts, and the dialog that reports a battle's result. */
-/* The two toasts stack in one band at the top centre of the map, between the minimap panel (or the legend beside it) and the zoom buttons. mapChromeLayout.ts sets left and right; on a narrow map the band spans the top of the map. The band is only as wide as its widest toast, so it does not block the map beside them. */
+/* The two toasts stack in one band at the top of the map. mapChromeLayout.ts sets left and right; the band is only as wide as its widest toast, and that width sits against the right inset, so the gap to the map's right edge stays the same when the console collapses. On a narrow map the band spans the top of the map. */
 .map-toast-band {
   position: absolute;
   top: 12px;
@@ -8,7 +8,8 @@
   z-index: 7000;
   width: fit-content;
   max-width: 560px;
-  margin-inline: auto;
+  margin-left: auto;
+  margin-right: 0;
   display: flex;
   flex-direction: column;
   gap: 8px;

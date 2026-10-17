@@ -53,16 +53,16 @@ const TOAST_BAND_MIN_WIDTH = 280;
 /**
  * Works out where the toast band may sit, from the boxes of the chrome around it.
  *
- * Purpose: The band sits between the minimap panel (or the legend, when it is open beside the panel) and the zoom
- *   buttons, each 12 px away; on a map too narrow for that it spans the top of the map from the left inset.
+ * Purpose: The band sits between the minimap panel (or the legend, when it is open beside the panel) and the map's
+ *   right edge, each 12 px away; on a map too narrow for that it spans the top of the map from the left inset.
  * When to use: The toast band check, with probed boxes in window coordinates.
- * Expected outcome: `{ left, right }`, the x range the band must fit in.
+ * Expected outcome: `{ left, right }`, the x range the band must fit in. Its right edge is the map's right inset.
  * Exceptions: None.
  */
-function toastBandSpace(map, panel, legend, zoom) {
+function toastBandSpace(map, panel, legend) {
   const legendBeside = legend.shown && legend.y < panel.y + panel.h;
   const left = (legendBeside ? legend.x + legend.w : panel.x + panel.w) + MAP_OVERLAY_INSET;
-  const right = (zoom.shown ? zoom.x : map.x + map.w) - MAP_OVERLAY_INSET;
+  const right = map.x + map.w - MAP_OVERLAY_INSET;
   return right - left >= TOAST_BAND_MIN_WIDTH ? { left, right } : { left: map.x + MAP_OVERLAY_INSET, right };
 }
 
@@ -457,9 +457,9 @@ const CONSOLE_CHECKS = Object.freeze([
     },
   },
   {
-    name: 'toast-band-top-centre',
+    name: 'toast-band-top-right',
     scenes: [SCENES.turnResolved, SCENES.reportsTab],
-    needs: ['#canvas-container', '#map-toast-band', '#map-toast', '#minimap-panel', '#terrain-legend', '#main-map .leaflet-control-zoom'],
+    needs: ['#canvas-container', '#map-toast-band', '#map-toast', '#minimap-panel', '#terrain-legend'],
     run: (p, el) => {
       const c = el('#canvas-container');
       const band = el('#map-toast-band');
@@ -467,12 +467,13 @@ const CONSOLE_CHECKS = Object.freeze([
       if (!toast.shown || !toast.ancestorIds.includes('map-toast-band')) return 'the map toast is not shown in the toast band';
       if (!near(band.y, c.y + MAP_OVERLAY_INSET)) return `the toast band is at ${fmt(band)}, expected its top ${MAP_OVERLAY_INSET} px below the map's top`;
       if (band.w > TOAST_BAND_MAX_WIDTH + 1) return `the toast band is ${Math.round(band.w)} wide, more than ${TOAST_BAND_MAX_WIDTH}`;
-      const space = toastBandSpace(c, el('#minimap-panel'), el('#terrain-legend'), el('#main-map .leaflet-control-zoom'));
+      const space = toastBandSpace(c, el('#minimap-panel'), el('#terrain-legend'));
       if (band.x < space.left - 1 || band.x + band.w > space.right + 1) {
         return `the toast band is at ${fmt(band)}, outside x=${Math.round(space.left)} to x=${Math.round(space.right)}`;
       }
-      const centre = (space.left + space.right) / 2;
-      return near(band.x + band.w / 2, centre) ? null : `the toast band is at ${fmt(band)}, expected it centred at x=${Math.round(centre)}`;
+      return near(band.x + band.w, space.right)
+        ? null
+        : `the toast band is at ${fmt(band)}, expected its right edge ${MAP_OVERLAY_INSET} px in from the map at x=${Math.round(space.right)}`;
     },
   },
   {

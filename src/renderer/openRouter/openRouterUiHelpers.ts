@@ -86,20 +86,23 @@ export function setReadyButtonLabelReady(readyBtn: HTMLButtonElement): void {
 }
 
 /**
- * Shows the AI wait label: "AI:" in bold, then the elapsed wait.
+ * Shows the AI wait label: "AI:" and the elapsed wait, in the button's own type.
  *
  * Purpose: Tells the player that Ready is waiting on opponent planning, and for how long.
  * When to use: From `updateReadyButtonState` while opponent planning holds the button.
- * Expected outcome: The button's content becomes `<strong>AI: </strong>` and the time as MM:SS, with no check mark.
- *   `setReadyButtonLabelReady` rebuilds the Ready label afterwards.
+ * Expected outcome: One `span.ready-btn-ai-label`, "AI: " plus MM:SS, same type, one line, one space. Collapsed, it
+ *   wraps at the space. No check mark. An existing span only updates the time.
  * Exceptions: None.
  */
 export function setReadyButtonLabelAiWait(readyBtn: HTMLButtonElement, elapsedMs: number): void {
-  readyBtn.textContent = '';
-  const strong = document.createElement('strong');
-  strong.textContent = 'AI: ';
-  readyBtn.appendChild(strong);
-  readyBtn.appendChild(document.createTextNode(formatElapsedMmSs(elapsedMs)));
+  const text = `AI: ${formatElapsedMmSs(elapsedMs)}`;
+  let label = readyBtn.querySelector<HTMLElement>('.ready-btn-ai-label');
+  if (!label) {
+    label = document.createElement('span');
+    label.className = 'ready-btn-ai-label';
+    readyBtn.replaceChildren(label);
+  }
+  if (label.textContent !== text) label.textContent = text;
 }
 
 /**

@@ -1,6 +1,6 @@
 /**
  * Checks of the chrome on the map for the UI smoke run: the minimap panel and its map-mode tabs, the terrain legend, and
- * Leaflet's zoom buttons, scale, and attribution.
+ * Leaflet's scale and attribution.
  *
  * Purpose: Keeps the map chrome checks apart from the frame, console, and scenario checks, so each table stays readable.
  * When to use: Required by `ui-smoke-checks.cjs`, which runs these rows after the scenario checks.
@@ -45,15 +45,14 @@ const PANEL = Object.freeze({
 const MODE_TABS = Object.freeze(['#map-mode-weather', '#map-mode-tech', '#map-mode-control', '#map-mode-production', '#map-legend-toggle']);
 
 /**
- * Leaflet's zoom buttons, scale, and attribution on the main map.
+ * Leaflet's scale and attribution on the main map.
  *
  * Purpose: One place for the selectors the position checks read.
- * When to use: The zoom, scale, and attribution checks.
+ * When to use: The scale and attribution check.
  * Expected outcome: Leaflet's own class names inside `#main-map`.
  * Exceptions: None.
  */
 const LEAFLET = Object.freeze({
-  zoom: '#main-map .leaflet-control-zoom',
   scale: '#main-map .leaflet-control-scale',
   attribution: '#main-map .leaflet-control-attribution',
 });
@@ -234,18 +233,6 @@ const MAP_CHROME_CHECKS = Object.freeze([
     },
   },
   {
-    name: 'zoom-buttons-top-right',
-    scenes: PLACEMENT_SCENES,
-    needs: ['#canvas-container', LEAFLET.zoom],
-    run: (p, el) => {
-      const c = el('#canvas-container');
-      const zoom = el(LEAFLET.zoom);
-      if (!zoom.shown) return 'the zoom buttons are not shown';
-      const placed = near(zoom.x + zoom.w, c.x + c.w - PANEL.inset) && near(zoom.y, c.y + PANEL.inset);
-      return placed ? null : `the zoom buttons are at ${fmt(zoom)}, expected ${PANEL.inset} px in from the map's top-right ${fmt(c)}`;
-    },
-  },
-  {
     name: 'scale-and-attribution-bottom-right',
     scenes: PLACEMENT_SCENES,
     needs: ['#canvas-container', LEAFLET.scale, LEAFLET.attribution],
@@ -267,9 +254,9 @@ const MAP_CHROME_CHECKS = Object.freeze([
   {
     name: 'map-chrome-hidden-during-new-game',
     scenes: NEW_GAME_SCENES,
-    needs: ['#minimap-panel', '#terrain-legend', LEAFLET.zoom],
+    needs: ['#minimap-panel', '#terrain-legend'],
     run: (p, el) => {
-      const shown = ['#minimap-panel', '#terrain-legend', LEAFLET.zoom].filter((selector) => el(selector).shown);
+      const shown = ['#minimap-panel', '#terrain-legend'].filter((selector) => el(selector).shown);
       return shown.length === 0 ? null : `shown on the new-game screen: ${shown.join(', ')}`;
     },
   },

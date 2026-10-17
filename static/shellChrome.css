@@ -243,15 +243,7 @@ body:has(#game-over-overlay:not(.hidden)) #minimap-panel,
 body:has(#game-over-overlay:not(.hidden)) #terrain-legend {
   visibility: hidden;
 }
-/* Hidden for the whole time the start dialog is open, including while its choices are hidden. Not removed, so it shows again when that dialog closes. The battle-result dialog does not use this overlay. */
-body:has(#game-over-overlay:not(.hidden)) #main-map .leaflet-control-zoom {
-  visibility: hidden;
-}
-/* Leaflet's right-hand corners keep the map's 12px inset: the zoom buttons at the top, and the scale right of the attribution at the bottom. */
-#main-map .leaflet-top.leaflet-right {
-  top: 12px;
-  right: 12px;
-}
+/* Leaflet's bottom-right corner keeps the map's 12px inset: the scale right of the attribution. */
 #main-map .leaflet-bottom.leaflet-right {
   bottom: 12px;
   right: 12px;
@@ -264,26 +256,6 @@ body:has(#game-over-overlay:not(.hidden)) #main-map .leaflet-control-zoom {
   margin: 0;
   float: none;
   clear: none;
-}
-#main-map .leaflet-control-zoom {
-  border: 1px solid var(--chrome-border);
-  border-radius: 2px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.28);
-}
-#main-map .leaflet-control-zoom a {
-  background: var(--chrome-bg);
-  color: var(--chrome-text);
-  border-bottom-color: var(--chrome-divider);
-}
-#main-map .leaflet-control-zoom a:hover {
-  background: var(--chrome-bg-raised);
-}
-/* At the zoom limit Leaflet marks that button disabled; dim it like the other disabled chrome. */
-#main-map .leaflet-control-zoom a.leaflet-disabled,
-#main-map .leaflet-control-zoom a.leaflet-disabled:hover {
-  background: var(--chrome-bg);
-  color: var(--chrome-disabled);
-  cursor: default;
 }
 #terrain-legend select {
   display: block;

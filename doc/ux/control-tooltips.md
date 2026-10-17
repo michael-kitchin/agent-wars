@@ -122,7 +122,6 @@ The tip can appear whenever the control can receive the pointer or keyboard focu
 - The reticle while it is greyed out and neither reason applies.
 - The choice on each tactical battles row.
 - The model dropdown. It uses the model description tooltip.
-- The map's + and − zoom buttons. They keep the map library's own "Zoom in" and "Zoom out" titles.
 
 ## Inputs and Responses
 

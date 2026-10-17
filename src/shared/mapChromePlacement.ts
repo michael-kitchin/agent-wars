@@ -1,9 +1,9 @@
 /**
  * How far map chrome stays from the map's edges, in CSS pixels. This module holds the placement rules for the chrome
- * that shares the top of the map: the minimap panel at the top-left, the terrain legend beside or under it, the zoom
- * buttons at the top-right, the toast band between them, and the new-game setup panel that floats over the map.
+ * that shares the top of the map: the minimap panel at the top-left, the terrain legend beside or under it, the toast
+ * band against the map's right edge, and the new-game setup panel that floats over the map.
  *
- * Purpose: The minimap panel, the legend, the zoom buttons, and the toast band keep the same inset.
+ * Purpose: The minimap panel, the legend, and the toast band keep the same inset.
  * When to use: Through `legendPopoverPosition`, `toastBandSpan`, and `floatingPanelOffset`.
  * Expected outcome: 12.
  * Exceptions: None.
@@ -58,10 +58,10 @@ export function legendPopoverPosition(input: {
  * Finds the toast band's left and right offsets inside the map.
  *
  * Purpose: Toasts sit between the chrome at the top-left (the minimap panel, or the legend when it is open beside the
- *   panel) and the zoom buttons at the top-right. On a map too narrow for that, a toast is better wide and briefly
- *   over the panel than squeezed into a thin column.
+ *   panel) and the map's right edge. On a map too narrow for that, a toast is better wide and briefly over the panel
+ *   than squeezed into a thin column.
  * When to use: Each time the map changes size and each time the legend opens or closes, with x positions measured from
- *   the map's left edge. Pass the map width as `rightObstacleLeft` when there are no zoom buttons.
+ *   the map's left edge. Pass the map width as `rightObstacleLeft`.
  * Expected outcome: `left` and `right` are CSS offsets from the map's left and right edges, each keeping
  *   `MAP_CHROME_INSET` from the chrome beside it. When the space between is narrower than `TOAST_BAND_MIN_WIDTH`,
  *   `left` is the map's own inset instead and `overChrome` is true.
