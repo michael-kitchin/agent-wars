@@ -13,7 +13,7 @@ Accordingly, the game ends when one player:
 - Captures all the other player's home region hexes
 - Or destroys all production capacity in those hexes
 
-## Starting a match
+# Starting a match
 
 ## Global and regional maps
 
@@ -26,30 +26,30 @@ Accordingly, the game ends when one player:
 ![New regional game: Click the Regional tab, then pick the region and player home sub-regions (in this case: Japan vs South & East China).](media/regional-preview.png)
 
 - **Global games:** the whole world, 842 strategic hexes at H3 resolution 1. Each side picks a home region, and both may pick the same one. Units are at the scale of WW2-style field armies, air wings, and naval fleets.
-- **Regional games:** one of 23 maps drawn from UN subregions, ranging from 257 to 352 strategic hexes. Sides are made up of countries, provinces, or states grouped by production capacity. Units are at the scale of WW2-style divisons, air groups, and naval task forces.
-- **Turn length:** a global strategic turn represents one month of game time, wheras regional turns represent one week.
+- **Regional games:** one of 23 maps drawn from UN subregions, ranging from 257 to 352 strategic hexes. Sides are made up of countries, provinces, or states grouped by production capacity. Units are at the scale of WW2-style divisions, air groups, and naval task forces.
+- **Turn length:** a global strategic turn represents one month of game time, whereas regional turns represent one week.
 - **Economy:** each regional map sets its own unit prices, build minimums, and bomb damage. The dialog shows that map's price beside each unit type.
 - **Tech cutoff:** the dialog's `Advanced tech: $N+ hexes` line shows the selected map's cutoff.
 - **Map edges:** a few regional maps have neutral-border hexes at their edges. Those produce nothing and can't base air or naval units.
 - **Weather:** the hex-level weather changes every month, meaning with every global game turn or roughly four regional turns.
-- **Winning by control:** on the global map, hold every hex of the enemy home. On a regional map, hold enemy-home hexes with at least 75% of its original urban cells.
+- **Winning by control:** on the global map, hold every hex of the enemy home region. On a regional map, hold enough of the enemy's home area hexes to control at least 75% of their production capacity.
 - **Other way to win:** destroy every urban cell in the enemy home while yours keeps one. Details are in [region-vs-region.md](region-vs-region.md).
 
 ## Playing a turn
 
-### Selecting Units
+### Selecting units
 
 | *Click to select lone units or open the stack popup. In the stack popup, click + to select or +All to select all units.*              | *Shift-click to multi-select. In the stack popup, click +/- to select/deselect, or +All/-All to select/deselect all units.*
 | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
 | ![Click to select lone units or open the stack popup. In the stack popup, click + to select or +All to select all units.](media/stack-select-1.png) | ![Shift-click to multi-select. In the stack popup, click +/- to select/deselect, or +All/-All to select/deselect all units.](media/stack-select-2.png) |
 
-### Planning Movement
+### Planning movement
 
 | *Step 1: Plan movement orders by selecting units, then hovering over a destination hex. The game will automatically pick the fastest route.*              | *Step 2: Double-click to create movement orders, or right-click to stop. Orders are listed on the planning panel, on the right.*
 | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
 | ![Step 1: Plan movement orders by selecting units, then hovering over a destination hex. The game will automatically pick the fastest route.](media/movement-planning-1.png) | ![Step 2: Double-click to create movement orders, or right-click to stop. Orders are listed on the planning panel, on the right.](media/movement-planning-2.png) |
 
-### Other Operations
+### Other operations
 
 1. **Pan:** Drag with the left mouse button, or use WASD / arrow keys.
 2. **Zoom:** Mouse wheel (zooms toward the cursor), or the + and − buttons at the map's bottom-right (half a level each). Zoomed in, contested strategic hexes show a marker that starts a tactical battle.
@@ -78,7 +78,7 @@ The full input map, including the exceptions, is in [ux/input-map.md](ux/input-m
 
 | *Step 1: Select a unit or stack, then click the **Ranged** button.*              | *Step 2: Double-click on a visible target to order the attack.*
 | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| ![Step 1: Select a unit or stack, then the Ranged button](media/ranged-attack-1.png) | ![Step 2: Step 2: Double-click on a visible target to order the attack](media/ranged-attack-2.png) |
+| ![Step 1: Select a unit or stack, then the Ranged button](media/ranged-attack-1.png) | ![Step 2: Double-click on a visible target to order the attack](media/ranged-attack-2.png) |
 
 - **Ranged:** select units that can all fire, then click the reticle in the selection panel. It stays pressed, in amber, while you aim.
 - **Strike:** select only air units, then click the reticle. It stays pressed, in purple, and a list to its left picks the target type.
@@ -160,7 +160,7 @@ The full input map, including the exceptions, is in [ux/input-map.md](ux/input-m
 
 ![Tactical battle dialog in southern Mexico, from a regional game. Click the Fight button to run the battle manually or Ignore to leave the outcome to chance.](media/tactical-battle-dialog.png)
 
-Tactical battles are initiated when human and LLM units end their turns in the same hex. The human player has the option of fighting manually or leaving the results up to dice rolls. If players choose to fight, their stratetgic units will be broken into sub-units, the map will zoom in, and the fight is on. Tactical sub-units are at the scale of WW2-style regiments, squadrons, and naval task groups.
+Tactical battles are initiated when human and LLM units end their turns in the same hex. The human player has the option of fighting manually or leaving the results up to dice rolls. If players choose to fight, their strategic units will be broken into sub-units, the map will zoom in, and the fight is on. Tactical sub-units are at the scale of WW2-style regiments, squadrons, and naval task groups.
 
 Manually fought battles take place entirely within one strategic turn, with the following consequences:
 
