@@ -80,7 +80,7 @@ The full input map, including the exceptions, is in [ux/input-map.md](ux/input-m
 
 - **Ranged:** select units that can all fire, then click the reticle in the selection panel. It stays pressed, in amber, while you aim.
 - **Strike:** select only air units, then click the reticle. It stays pressed, in purple, and a list to its left picks the target type.
-- **Greyed reticle:** mixing air with other types, or infantry with no air unit on the strategic map, greys out the reticle. Point at it to see why. Infantry can fire in a battle.
+- **Greyed reticle:** mixing air with other types, or infantry with no air unit on the strategic map, greys out the reticle. Infantry can use ranged attacks in battles, however.
 - **The outline:** a dashed outline, with no fill, around the combined reach of every selected unit. Its dashes drift slowly.
 - **Colors:** amber for ranged fire, purple for air strikes. While you aim, the selection panel's border takes the same color.
 - **Reach on the strategic map:** armor 1 hex, naval 2, and air 3 from its base airport.
@@ -158,7 +158,9 @@ The full input map, including the exceptions, is in [ux/input-map.md](ux/input-m
 
 ![Tactical battle dialog in southern Mexico, from a regional game. Click the Fight button to run the battle manually or Ignore to leave the outcome to chance.](media/tactical-battle-dialog.png)
 
-Tactical battles are initiated when human and LLM units end their turns in the same hex. The human player has the option of fighting manually or leaving the results up to dice rolls. If players choose to fight, their strategic units will be broken into sub-units, the map will zoom in, and the fight is on. Tactical sub-units are at the scale of WW2-style regiments, squadrons, and naval task groups.
+Tactical battles are initiated when human and LLM units end their turns in the same hex. When this happens, the **Tactgical Battles** dialog is displayed, with a list of tactical battles players can fight manually. There may be more than one battle in the list, but players can only fight one at a time.
+
+When players pick a battle and click **Fight**, their strategic units will be broken into sub-units, the map will zoom in, and the fight is on. When they click **Ignore**, all tactical battles will be resolved using dice rolls. 
 
 Manually fought battles take place entirely within one strategic turn, with the following consequences:
 
@@ -166,21 +168,19 @@ Manually fought battles take place entirely within one strategic turn, with the 
 - During that turn, strategic units will continue to follow existing orders and defend themselves.
 - When the battle is over, the strategic part of the game resumes in the next turn.
 
-Players win tactical battles by destroying their opponent's units, but they can leave between beats by clicking **Exit Battle** at the top right of the window. Any strategic units with half or more of their sub-units remaining by the end of a battle will be returned to the strategic map. There is no concept of battle damage, to keep things simple.
+The above forces players to choose where to focus their attention.
+
+Players can win tactical battles by destroying their opponent's units, or they can abandon the battle at any time by clicking the **Exit Battle** button. Any strategic units with half or more of their sub-units remaining will be returned to the strategic map. There is no concept of battle damage, to keep things simple.
+
+When battles are ignored or abandoned, it's possible for human and AI units to survive in the same hex for longer than one strategic turn. Battles like these are marked with magnifying glass icons (🔍). Clicking this icon rejoins battle, as if it had been selected from the **Tactical Battles** dialog.
+
+Tactical sub-units are at the scale of WW2-style regiments, squadrons, and naval task groups.
 
 Complete rules are in [combat-rules-v3.md](combat-rules-v3.md) §12.
 
 *Turn 5 of a tactical battle in central Mexico, during a mild December.*
 
 ![Tactical battle in southern Mexico, from a global game](media/central-mexico-battle-static.png)
-
-### Starting a battle
-
-- **During resolution:** when melee is about to happen, a **Tactical Battles** list can open. Pick a hex and click **Fight**, or click **Ignore** to roll that melee on the strategic map.
-- **After Fight:** the current turn finishes first, and the battle opens as the next turn begins.
-- **Who decides:** only you choose whether to fight a battle. The opponent never does.
-- **Joining ongoing battles:** On the strategic map, hexes with ongoing tactical battles are marked with magnifying glass icons (🔍). Click to join.
-- **Turning battles off:** open the game menu (top left) and uncheck **Offer tactical battles**. Every melee then resolves as if you chose **Ignore**.
 
 ### How battles differ
 
@@ -204,7 +204,7 @@ Complete rules are in [combat-rules-v3.md](combat-rules-v3.md) §12.
 | Air strikes   | 3 hexes from base                | Anywhere on the battlefield                   |
 | Movement      | Infantry 1 hex, armor 2, naval 2 | Points per beat: infantry 2, armor 4, naval 3 |
 
-- **Infantry fires in battles.** It can also shoot back at air strikes, which it can't do on the strategic map.
+- **Infantry can use ranged attacks in battles.** It can also shoot back at air strikes, which it can't do on the strategic map.
 - **Cover limits reach:** infantry or armor firing from a forest, urban, or rubble cell reaches only 1 cell.
 - **Mountains block fire:** a mountain in the path blocks armor and naval shots. Infantry and air fire past it.
 - **Terrain costs:** forest costs 2 points to enter, and mountains cost infantry 2. Armor can't enter mountain, wetland, or arctic cells.
@@ -288,6 +288,6 @@ The full bonus rules are in [combat-rules-v3.md](combat-rules-v3.md) §4.9.
 | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
 | ![LLM-supplied taunts (in this case, Claude Opus) and strategy messages appear at the top of the map, 12 px in from its right edge](media/message-popup.png) | ![End-of-turn updates appear at the top of the map, 12 px in from its right edge](media/status-popup.png) |
 
-- **Top of the map, 12 px in from its right edge (map toast):** Errors, rejected orders, turn-loss summaries, and unknown-battle announcements. The gap is the same while the console is open and while it is collapsed. Use the × to dismiss; it also hides after a fixed interval, and a newer message replaces it. The Reports tab keeps every one except errors.
+- **Top of the map, near the right edge (map toast):** Errors, rejected orders, turn-loss summaries, and unknown-battle announcements. The gap is the same while the console is open and while it is collapsed. Use the × to dismiss; it also hides after a fixed interval, and a newer message replaces it. The Reports tab keeps every one except errors.
 - **Top of the map, above the map toast (AI strategy toast):** The opponent's Message and Strategy after a consultation, in that same place. It dismisses and times out the same way, and the Reports tab keeps it.
 - **Console, Opponent tab, at the bottom (Activity log):** AI interaction lines and errors, including a retry, a line when opponent planning stops, and a one-line copy of each turn update. Starting a new match clears it.
