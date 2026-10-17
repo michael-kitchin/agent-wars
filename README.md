@@ -64,8 +64,8 @@ The LLM opponent needs an [OpenRouter](https://openrouter.ai) API key to work:
     - My go-to playtesting model is Google Gemini Flash Lite (version 3.5, currently). A fast, inexpensive, tool-using model that fights reasonably well. It can also finish a typical game for <$1.
     - Ollama/other local model support is on my radar (pun intended, I guess).
 6. Click **Run**, at the top of the Opponent tab, to start opponent planning. 
-![Model setup.](doc/media/first-start-game-3.png)
     - You can change models or disable the AI at any time by clicking **Run** again.
+![Model setup.](doc/media/first-start-game-3.png)
 7. Click **Opponent** to close the tab and start playing. You can explore the map, plan movement, etc. while the AI is doing its thing.
 8. When you and the AI are done planning, click the **Ready** button to execute orders and advance to the next turn.
     - You can play all you want with the AI disabled. This is a great way to get used to the controls, without burning tokens.
