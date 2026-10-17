@@ -26565,15 +26565,28 @@ ${bonuses}`;
     const fitScaleMultiplier = sizePx / (UNIT_RADIUS * 2 * TOKEN_ICON_FIT_RATIO);
     return drawUnitSvgIcon(ctx, centerX, centerY, unitType, player, true, fitScaleMultiplier);
   }
+  function drawSelectionRing(ctx, x, y) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(x, y, UNIT_RADIUS, 0, Math.PI * 2);
+    ctx.strokeStyle = SELECTION_RING_COLOR;
+    ctx.lineWidth = SELECTION_RING_WIDTH;
+    ctx.stroke();
+    ctx.restore();
+  }
   function drawOneUnitMarker(ctx, x, y, color, label, strokeColor = "#fff", unitPlayer) {
     const stackedNeutral = color === MULTI_PLAYER_FILL;
     ctx.beginPath();
     ctx.arc(x, y, UNIT_RADIUS, 0, Math.PI * 2);
     ctx.fillStyle = color;
     ctx.fill();
-    ctx.strokeStyle = stackedNeutral ? MULTI_PLAYER_STROKE : strokeColor;
-    ctx.lineWidth = 2;
-    ctx.stroke();
+    if (strokeColor === SELECTION_RING_COLOR) {
+      drawSelectionRing(ctx, x, y);
+    } else {
+      ctx.strokeStyle = strokeColor;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
     ctx.save();
     if (stackedNeutral) ctx.filter = MULTI_PLAYER_GLYPH_FILTER;
     ctx.fillStyle = "#fff";
@@ -26582,15 +26595,6 @@ ${bonuses}`;
     ctx.textBaseline = "middle";
     const drewIcon = label === UNIT_TYPE_LABELS.armor && drawUnitSvgIcon(ctx, x, y, "armor", unitPlayer) || label === UNIT_TYPE_LABELS.infantry && drawUnitSvgIcon(ctx, x, y, "infantry", unitPlayer) || label === UNIT_TYPE_LABELS.air && drawUnitSvgIcon(ctx, x, y, "air", unitPlayer) || label === UNIT_TYPE_LABELS.naval && drawUnitSvgIcon(ctx, x, y, "naval", unitPlayer) || label === "*" && drawUnitSvgIcon(ctx, x, y, "mixed", unitPlayer, false, 0.5);
     if (!drewIcon) ctx.fillText(label, x, y);
-    ctx.restore();
-  }
-  function drawSelectionRing(ctx, x, y) {
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(x, y, UNIT_RADIUS + 1 + SELECTION_RING_WIDTH / 2, 0, Math.PI * 2);
-    ctx.strokeStyle = SELECTION_RING_COLOR;
-    ctx.lineWidth = SELECTION_RING_WIDTH;
-    ctx.stroke();
     ctx.restore();
   }
   function drawUnits(ctx, units, movingUnitIds) {
@@ -26614,7 +26618,7 @@ ${bonuses}`;
         units: hexUnits
       };
     });
-    for (const { x, y, count, top, units: hexUnits } of tokens) {
+    for (const { x, y, count, top, selected, units: hexUnits } of tokens) {
       const types = new Set(hexUnits.map((u) => u.unitType));
       const players = new Set(hexUnits.map((u) => u.player));
       const mixedType = types.size > 1;
@@ -26622,13 +26626,11 @@ ${bonuses}`;
       const fillColor = multiPlayer ? MULTI_PLAYER_FILL : PLAYER_COLORS[hexUnits[0].player] ?? "#333";
       const strokeColor = multiPlayer ? MULTI_PLAYER_STROKE : "#fff";
       const label = mixedType ? "*" : UNIT_TYPE_LABELS[hexUnits[0].unitType] ?? "?";
-      drawOneUnitMarker(ctx, x, y, fillColor, label, strokeColor, hexUnits[0].player);
+      const markerStroke = selected ? SELECTION_RING_COLOR : strokeColor;
+      drawOneUnitMarker(ctx, x, y, fillColor, label, markerStroke, hexUnits[0].player);
       if (count > 1) {
-        drawOneUnitMarker(ctx, top.x, top.y, fillColor, label, strokeColor, hexUnits[0].player);
+        drawOneUnitMarker(ctx, top.x, top.y, fillColor, label, markerStroke, hexUnits[0].player);
       }
-    }
-    for (const { top, selected } of tokens) {
-      if (selected) drawSelectionRing(ctx, top.x, top.y);
     }
     for (const { x, y, count } of tokens) {
       if (count < 2) continue;
@@ -29921,6 +29923,9 @@ ${bonuses}`;
       right: { x: lineEnd.x - uy * halfBase, y: lineEnd.y + ux * halfBase }
     };
   }
+  function orderEndsCoincide(from, to) {
+    return Math.hypot(to.x - from.x, to.y - from.y) < 0.5;
+  }
 
   // src/renderer/rendering/orderLineStroke.ts
   var ORDER_LINE_LATER_DASH = [6, 4];
@@ -29981,10 +29986,12 @@ ${bonuses}`;
     ctx.restore();
   }
   function straightOrderLineShape(from, to, tipInset, dash = ORDER_LINE_SOLID) {
+    if (orderEndsCoincide(from, to)) return { runs: [], arrow: null };
     const arrow = orderArrowGeometry(from, to, { arrowSize: ORDER_ARROW_SIZE, tipInset });
     return { runs: [{ points: [from, arrow.lineEnd], dash }], arrow };
   }
   function routeEndArrow(from, to) {
+    if (orderEndsCoincide(from, to)) return null;
     return orderArrowGeometry(from, to, { arrowSize: ORDER_ARROW_SIZE, tipInset: 0 });
   }
 
@@ -30015,19 +30022,23 @@ ${bonuses}`;
     drawOrderLine(ctx, { runs, arrow }, { color: ORDER_LINE_COLOR, width: ORDER_LINE_WIDTH });
     ctx.restore();
   }
-  function drawStandingOrderLines(ctx, orders, units, excludeUnitIds) {
+  function drawStandingOrderLines(ctx, orders, units, excludeUnitIds, options) {
     if (orders.length === 0) return;
+    const originH3ByUnitId = options?.originH3ByUnitId;
     for (const order of orders) {
       if (excludeUnitIds?.has(order.unitId)) continue;
       const unit = units.find((u) => u.id === order.unitId && u.player === "human");
       if (!unit) continue;
+      const originH3 = originH3ByUnitId?.[order.unitId];
+      if (!originH3 && order.destinationH3Index && unit.h3Index === order.destinationH3Index) continue;
+      const fromH3 = originH3 ?? unit.h3Index;
       const segments = order.routeSegments ?? [];
       if (segments.length === 0) {
         if (order.destinationH3Index) {
           drawLineArrow(
             ctx,
-            hexCenterPx(unit.h3Index),
-            hexCenterPxRelativeTo(unit.h3Index, order.destinationH3Index),
+            hexCenterPx(fromH3),
+            hexCenterPxRelativeTo(fromH3, order.destinationH3Index),
             ORDER_LINE_COLOR
           );
         }
@@ -31117,6 +31128,16 @@ ${bonuses}`;
     const hiddenCommittedUnitIdsWhilePreviewing = getCommittedOrderUnitsHiddenDuringPreview(shouldDrawPathPreview);
     if (shouldDrawCommittedPaths && !rendererSharedState.hideCommittedOrderLinesAfterReady && rendererSharedState.humanStandingOrders.length > 0 && state.units.length) {
       drawStandingOrderLines(ctx, rendererSharedState.humanStandingOrders, state.units, hiddenCommittedUnitIdsWhilePreviewing);
+    }
+    const marchArrowsUntilMovementEnds = anim?.marchArrowsUntilMovementEnds;
+    if (shouldDrawCommittedPaths && !rendererSharedState.hideCommittedOrderLinesAfterReady && moveProgress < 1 && marchArrowsUntilMovementEnds && marchArrowsUntilMovementEnds.orders.length > 0 && state.units.length) {
+      drawStandingOrderLines(
+        ctx,
+        marchArrowsUntilMovementEnds.orders,
+        state.units,
+        hiddenCommittedUnitIdsWhilePreviewing,
+        { originH3ByUnitId: marchArrowsUntilMovementEnds.originH3ByUnitId }
+      );
     }
     drawPendingMarchesHoverAndSupportOrderStack({
       ctx,
@@ -32513,6 +32534,30 @@ ${bonuses}`;
     }
   }
 
+  // src/shared/ordersHeldForPlayback.ts
+  function ordersHeldUntilMovementEnds(orders, units, moves) {
+    const originH3ByUnitId = {};
+    const held = [];
+    for (const order of orders) {
+      if (!order.destinationH3Index) continue;
+      const unit = units.find((candidate) => candidate.id === order.unitId && candidate.player === "human");
+      if (!unit || unit.h3Index !== order.destinationH3Index) continue;
+      const move = moves.find(
+        (candidate) => candidate.unitId === order.unitId && candidate.fromH3Index !== order.destinationH3Index
+      );
+      if (!move) continue;
+      originH3ByUnitId[order.unitId] = move.fromH3Index;
+      held.push({
+        ...order,
+        routeSegments: order.routeSegments?.map((segment) => ({
+          turn: segment.turn,
+          hexes: segment.hexes.map((hex) => [hex[0], hex[1]])
+        }))
+      });
+    }
+    return { orders: held, originH3ByUnitId };
+  }
+
   // src/shared/ipc/tacticalOpponentPlanMerge.ts
   function tacticalOpponentPlanPayloadHasAnyOrders(plan) {
     if (plan == null) return false;
@@ -33559,6 +33604,7 @@ ${bonuses}`;
       }
       if (needsAnimation) {
         if (rendererSharedState.resolutionMoveAnimationFrameId !== null) cancelAnimationFrame(rendererSharedState.resolutionMoveAnimationFrameId);
+        const marchArrowsUntilMovementEnds = ordersHeldUntilMovementEnds(rendererSharedState.humanStandingOrders, state.units, humanMoves);
         rendererSharedState.resolutionMoveAnimation = {
           moves: resolutionMoves,
           airStrikeOutboundMoves: airStrikeOutboundMoves.length > 0 ? airStrikeOutboundMoves : void 0,
@@ -33579,6 +33625,7 @@ ${bonuses}`;
           meleeRemovedUnits: readyResult.meleeRemovedUnits?.length ? readyResult.meleeRemovedUnits : void 0,
           unknownCombatHexes: unknownCombatHexes.length > 0 ? unknownCombatHexes : void 0,
           unknownCasualtyHexes: unknownCasualtyHexes.length > 0 ? unknownCasualtyHexes : void 0,
+          ...marchArrowsUntilMovementEnds.orders.length > 0 ? { marchArrowsUntilMovementEnds } : {},
           ...pickPlaybackDiceRolls(readyResult, {
             visibleHexesBeforeTurn,
             visibleHexesAfterTurn: visibleHexes,

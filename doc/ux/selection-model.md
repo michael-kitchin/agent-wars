@@ -4,7 +4,7 @@ How the player selects human units, and what clears or keeps that selection.
 
 ## Purpose
 
-One selection drives the [selection panel](selection-panel.md), the gold ring on the map around the top marker of each hex that holds a selected unit, the highlight on the Orders tab's rows, ranged and strike targeting, and double-click orders. Hex clicks also record the hex under the pointer for orders, which is separate from the unit selection.
+One selection drives the [selection panel](selection-panel.md), the gold ring on the map in place of the border of each marker of a hex that holds a selected unit, the highlight on the Orders tab's rows, ranged and strike targeting, and double-click orders. Hex clicks also record the hex under the pointer for orders, which is separate from the unit selection.
 
 ## What Can Be Selected
 
@@ -25,7 +25,7 @@ One selection drives the [selection panel](selection-panel.md), the gold ring on
 - When the click is the second press of a double-click on the same spot, the click does not retarget the selection. The order is planned for the units selected at the start of the gesture.
 - When Ranged and Strike targeting are off and the player clicks a unit icon, and no hover order preview is already active, the stack callout opens after the same delay, except a Shift-click on one selectable human unit, and except a plain click on a hex with exactly one stationary selectable human unit. The preview that then appears because the pointer is still on the selected units' hex does not cancel or close that callout. A later click while that preview remains active does not open it again. Moving the pointer onto another hex while a preview is active does. The second press of a double-click on that spot does not schedule another callout. A double-click that plans an order cancels the one already scheduled.
 - The [selection panel](selection-panel.md) names the first selected unit's hex and the selection on its bar, and lists the units when the panel is expanded. It is hidden when nothing is selected.
-- On the map, the top marker of each hex that holds a selected unit gets a 3 px gold ring (`SELECTION_RING_COLOR`), in both theaters. The ring is drawn over neighboring markers, and every stack's count badge is drawn over the rings. A unit drawn moving during playback, or hidden at battle-detail zoom, shows no ring.
+- On the map, each marker of a hex that holds a selected unit gets a 3 px gold ring (`SELECTION_RING_COLOR`) in place of that marker's border, in both theaters. A stack has two markers, and both borders are covered. Each ring is drawn with its marker, so the upper marker covers the lower marker's ring where they overlap, the same way the upper marker's border covers the lower one. Every stack's count badge is drawn over the rings. A unit drawn moving during playback, or hidden at battle-detail zoom, shows no ring.
 
 ## Clearing and Keeping a Selection
 

@@ -19,8 +19,8 @@ import { legendPopoverPosition, toastBandSpan } from '../../shared/mapChromePlac
  * When to use: After the maps are created, after the legend opens or closes, and whenever the map changes size.
  * Expected outcome: An open legend sits beside the panel when it fits, otherwise under it. The band sits right of the
  *   panel, or of the legend when the legend is beside it, or of the open new-game panel when that reaches farther,
- *   and `MAP_CHROME_INSET` in from the map's right edge. On a narrow map it spans the top of the map instead. A closed
- *   legend is left where it was.
+ *   and `MAP_CHROME_INSET` in from the map's right edge. On a narrow map the offsets let the toast overlap the left
+ *   chrome; the toast's own width stays within one third of the map. A closed legend is left where it was.
  * Exceptions: None. Does nothing without `#canvas-container` or `#minimap-panel`.
  */
 export function layoutMapChrome(): void {

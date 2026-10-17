@@ -49,3 +49,15 @@ export function orderArrowGeometry(
     right: { x: lineEnd.x - uy * halfBase, y: lineEnd.y + ux * halfBase },
   };
 }
+
+/**
+ * True when two canvas points are the same spot.
+ *
+ * Purpose: A movement line from a unit to the hex it already occupies has no route, and must not leave an arrowhead.
+ * When to use: Before building an arrow or a straight order line.
+ * Expected outcome: True when the points are under half a pixel apart. A real hex step is many pixels, so it stays false.
+ * Exceptions: None.
+ */
+export function orderEndsCoincide(from: CanvasPoint, to: CanvasPoint): boolean {
+  return Math.hypot(to.x - from.x, to.y - from.y) < 0.5;
+}

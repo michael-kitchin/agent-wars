@@ -23,7 +23,8 @@ export const MAP_CHROME_GAP = 8;
 /**
  * The narrowest the toast band may be beside the panel, in CSS pixels.
  *
- * Purpose: Below this width a toast wraps into a thin column; the band then spans the top of the map instead.
+ * Purpose: Below this width the left offset moves to the map's inset, so the toast is not held in a thinner column.
+ *   The toast's own width is still capped at one third of the map.
  * When to use: Through `toastBandSpan`.
  * Expected outcome: 280.
  * Exceptions: None.
@@ -58,8 +59,9 @@ export function legendPopoverPosition(input: {
  * Finds the toast band's left and right offsets inside the map.
  *
  * Purpose: Toasts sit between the chrome at the top-left (the minimap panel, or the legend when it is open beside the
- *   panel) and the map's right edge. On a map too narrow for that, a toast is better wide and briefly over the panel
- *   than squeezed into a thin column.
+ *   panel) and the map's right edge. When that gap is under `TOAST_BAND_MIN_WIDTH`, the left offset moves to the map's
+ *   inset so the toast is not held in a thinner column. The toast's width is capped at one third of the map in the
+ *   stylesheet.
  * When to use: Each time the map changes size and each time the legend opens or closes, with x positions measured from
  *   the map's left edge. Pass the map width as `rightObstacleLeft`.
  * Expected outcome: `left` and `right` are CSS offsets from the map's left and right edges, each keeping

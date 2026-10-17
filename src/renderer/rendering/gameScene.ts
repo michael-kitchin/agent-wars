@@ -599,6 +599,24 @@ function drawGameScene(
   if (shouldDrawCommittedPaths && !S.hideCommittedOrderLinesAfterReady && S.humanStandingOrders.length > 0 && state.units.length) {
     drawStandingOrderLines(ctx, S.humanStandingOrders, state.units, hiddenCommittedUnitIdsWhilePreviewing);
   }
+  // The live list drops an arrived march when Ready returns, before the movement stage. This copy keeps its arrowhead until that stage ends.
+  const marchArrowsUntilMovementEnds = anim?.marchArrowsUntilMovementEnds;
+  if (
+    shouldDrawCommittedPaths &&
+    !S.hideCommittedOrderLinesAfterReady &&
+    moveProgress < 1 &&
+    marchArrowsUntilMovementEnds &&
+    marchArrowsUntilMovementEnds.orders.length > 0 &&
+    state.units.length
+  ) {
+    drawStandingOrderLines(
+      ctx,
+      marchArrowsUntilMovementEnds.orders,
+      state.units,
+      hiddenCommittedUnitIdsWhilePreviewing,
+      { originH3ByUnitId: marchArrowsUntilMovementEnds.originH3ByUnitId }
+    );
+  }
   drawPendingMarchesHoverAndSupportOrderStack({
     ctx,
     width,

@@ -1,5 +1,5 @@
 /* Toasts, and the dialog that reports a battle's result. */
-/* The two toasts stack in one band at the top of the map. mapChromeLayout.ts sets left and right; the band is only as wide as its widest toast, and that width sits against the right inset, so the gap to the map's right edge stays the same when the console collapses. On a narrow map the band spans the top of the map. */
+/* The two toasts stack in one band at the top of the map. mapChromeLayout.ts sets left and right; the band is only as wide as its widest toast, and that width sits against the right inset, so the gap to the map's right edge stays the same when the console collapses. It is never wider than one third of the map, including a long unbroken line. The map is the area beside the console, so that third changes when the console opens or collapses. On a narrow map the toast may overlap the left chrome, and it still stays within that third. */
 .map-toast-band {
   position: absolute;
   top: 12px;
@@ -7,7 +7,7 @@
   right: 12px;
   z-index: 7000;
   width: fit-content;
-  max-width: 560px;
+  max-width: calc(100% / 3);
   margin-left: auto;
   margin-right: 0;
   display: flex;
@@ -16,6 +16,8 @@
 }
 .map-toast {
   max-height: 40vh;
+  min-width: 0;
+  max-width: 100%;
   overflow-y: auto;
   padding: 0.5rem 0.75rem;
   background: var(--chrome-bg);
@@ -59,7 +61,7 @@
 }
 .game-over-box p { margin: 0 0 1rem 0; font-size: 1.1rem; font-weight: 600; }
 .game-over-box button { padding: 0.5rem 1rem; font-size: 14px; }
-.map-toast p { margin: 0; flex: 1; white-space: pre-line; }
+.map-toast p { margin: 0; flex: 1; min-width: 0; white-space: pre-line; overflow-wrap: break-word; }
 #map-toast-dismiss {
   flex-shrink: 0;
   padding: 0.1rem 0.35rem;

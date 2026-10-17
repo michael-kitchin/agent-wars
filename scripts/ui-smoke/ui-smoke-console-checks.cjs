@@ -43,7 +43,7 @@ const RETICLE_CLOSE_GAP = 10;
 /**
  * The narrowest the toast band may be beside the minimap panel, in CSS pixels.
  *
- * Purpose: Below this width the band spans the top of the map instead, over the panel.
+ * Purpose: Below this width the allowed range starts at the map's left inset, so a right-aligned toast may overlap the left chrome. Its width is still capped at one third of the map.
  * When to use: Only by `toastBandSpace`.
  * Expected outcome: Matches `TOAST_BAND_MIN_WIDTH` in `src/shared/mapChromePlacement.ts`.
  * Exceptions: None.
@@ -53,10 +53,11 @@ const TOAST_BAND_MIN_WIDTH = 280;
 /**
  * Works out where the toast band may sit, from the boxes of the chrome around it.
  *
- * Purpose: The band sits between the minimap panel (or the legend, when it is open beside the panel) and the map's
- *   right edge, each 12 px away; on a map too narrow for that it spans the top of the map from the left inset.
+ * Purpose: The toast sits between the minimap panel (or the legend, when it is open beside the panel) and the map's
+ *   right edge, each 12 px away. On a map too narrow for that, the allowed range starts at the map's left inset.
  * When to use: The toast band check, with probed boxes in window coordinates.
- * Expected outcome: `{ left, right }`, the x range the band must fit in. Its right edge is the map's right inset.
+ * Expected outcome: `{ left, right }`, the x range the toast must fit in. Its right edge is the map's right inset. A
+ *   short toast may start to the right of `left`.
  * Exceptions: None.
  */
 function toastBandSpace(map, panel, legend) {
@@ -65,16 +66,6 @@ function toastBandSpace(map, panel, legend) {
   const right = map.x + map.w - MAP_OVERLAY_INSET;
   return right - left >= TOAST_BAND_MIN_WIDTH ? { left, right } : { left: map.x + MAP_OVERLAY_INSET, right };
 }
-
-/**
- * The widest the toast band can be, in CSS pixels.
- *
- * Purpose: Toasts stay readable lines, not banners across the map.
- * When to use: The toast band check.
- * Expected outcome: Matches `.map-toast-band` in `static/feedbackChrome.css`.
- * Exceptions: None.
- */
-const TOAST_BAND_MAX_WIDTH = 560;
 
 /**
  * What the footer status line reads in a fresh match: Run is off and there is no API key, so no model loads.
@@ -466,7 +457,10 @@ const CONSOLE_CHECKS = Object.freeze([
       const toast = el('#map-toast');
       if (!toast.shown || !toast.ancestorIds.includes('map-toast-band')) return 'the map toast is not shown in the toast band';
       if (!near(band.y, c.y + MAP_OVERLAY_INSET)) return `the toast band is at ${fmt(band)}, expected its top ${MAP_OVERLAY_INSET} px below the map's top`;
-      if (band.w > TOAST_BAND_MAX_WIDTH + 1) return `the toast band is ${Math.round(band.w)} wide, more than ${TOAST_BAND_MAX_WIDTH}`;
+      const maxWidth = c.w / 3;
+      if (band.w > maxWidth + 1) {
+        return `the toast band is ${Math.round(band.w)} wide, more than one third of the map (${Math.round(maxWidth)})`;
+      }
       const space = toastBandSpace(c, el('#minimap-panel'), el('#terrain-legend'));
       if (band.x < space.left - 1 || band.x + band.w > space.right + 1) {
         return `the toast band is at ${fmt(band)}, outside x=${Math.round(space.left)} to x=${Math.round(space.right)}`;

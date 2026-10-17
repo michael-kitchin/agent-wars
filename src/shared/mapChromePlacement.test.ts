@@ -26,7 +26,7 @@ test('toastBandSpan keeps the inset clear of a right-hand obstacle', () => {
   });
 });
 
-test('toastBandSpan spans the top of a map too narrow for the band beside the chrome', () => {
+test('toastBandSpan moves the left offset to the map inset when the gap is under the minimum', () => {
   assert.deepEqual(toastBandSpan({ mapWidth: 424, leftObstacleRight: 310, rightObstacleLeft: 424 }), {
     left: 12,
     right: 12,

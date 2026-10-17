@@ -13,6 +13,7 @@ import {
 import { applyToolInvocationCountsAfterReady } from '../openRouter/openRouterUiHelpers';
 
 import { currentRendererMatchEpoch, rendererMatchEpochCurrent } from '../core/matchEpoch';
+import { ordersHeldUntilMovementEnds } from '../../shared/ordersHeldForPlayback';
 import type { ReadyHandlerDeps } from './readyHandlerTypes';
 import { rollbackReadyToolCounts, runTacticalReadyCommit } from './readyTacticalCommit';
 import {
@@ -302,6 +303,7 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
     }
     if (needsAnimation) {
       if (S.resolutionMoveAnimationFrameId !== null) cancelAnimationFrame(S.resolutionMoveAnimationFrameId);
+      const marchArrowsUntilMovementEnds = ordersHeldUntilMovementEnds(S.humanStandingOrders, state.units, humanMoves);
       S.resolutionMoveAnimation = {
         moves: resolutionMoves,
         airStrikeOutboundMoves: airStrikeOutboundMoves.length > 0 ? airStrikeOutboundMoves : undefined,
@@ -326,6 +328,7 @@ export async function handleReadyButtonClick(deps: ReadyHandlerDeps): Promise<vo
         meleeRemovedUnits: readyResult.meleeRemovedUnits?.length ? readyResult.meleeRemovedUnits : undefined,
         unknownCombatHexes: unknownCombatHexes.length > 0 ? unknownCombatHexes : undefined,
         unknownCasualtyHexes: unknownCasualtyHexes.length > 0 ? unknownCasualtyHexes : undefined,
+        ...(marchArrowsUntilMovementEnds.orders.length > 0 ? { marchArrowsUntilMovementEnds } : {}),
         ...pickPlaybackDiceRolls(readyResult, {
           visibleHexesBeforeTurn,
           visibleHexesAfterTurn: visibleHexes,

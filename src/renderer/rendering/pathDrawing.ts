@@ -35,7 +35,7 @@ import {
  * Purpose: Standing orders without a route, and played-back moves that need an arrow, share this look.
  * When to use: `from` and `to` are hex centers in canvas pixels, and a unit marker may sit at `to`.
  * Expected outcome: A cased line in `color` that stops at the arrow's base, and an arrowhead whose tip stops a unit
- *   radius short of `to`.
+ *   radius short of `to`. Draws nothing when `from` and `to` are the same point.
  * Exceptions: None.
  */
 export function drawLineArrow(
@@ -85,31 +85,38 @@ export function drawHumanMarchStyleRouteSegments(
 }
 
 /**
- * Defines the `drawStandingOrderLines` function shape (export function drawStandingOrderLines( ctx: CanvasRenderingContext2D, orders: HumanStandingOrderSnapshot[], units: GameStateSnapshot['units'], excl).
-
- * Purpose: Supports maintainability by documenting why `drawStandingOrderLines` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Draws each human standing-order route that still has somewhere to go.
+ *
+ * Purpose: A queued march stays on the map until movement playback ends and the unit is on its destination.
+ * When to use: From the scene draw with the current standing orders, or with the marches held for playback.
+ * Expected outcome: One march-style route per order that has segments. An order with no segments draws a straight
+ *   arrow from the unit, or from `originH3ByUnitId` when that unit is held for playback. An order whose unit is
+ *   already on that destination draws nothing, including no arrowhead, unless playback is still holding it.
  * Exceptions: None.
  */
 export function drawStandingOrderLines(
   ctx: CanvasRenderingContext2D,
   orders: HumanStandingOrderSnapshot[],
   units: GameStateSnapshot['units'],
-  excludeUnitIds?: ReadonlySet<string> | null
+  excludeUnitIds?: ReadonlySet<string> | null,
+  options?: { originH3ByUnitId?: Readonly<Record<string, string>> }
 ): void {
   if (orders.length === 0) return;
+  const originH3ByUnitId = options?.originH3ByUnitId;
   for (const order of orders) {
     if (excludeUnitIds?.has(order.unitId)) continue;
     const unit = units.find((u) => u.id === order.unitId && u.player === 'human');
     if (!unit) continue;
+    const originH3 = originH3ByUnitId?.[order.unitId];
+    if (!originH3 && order.destinationH3Index && unit.h3Index === order.destinationH3Index) continue;
+    const fromH3 = originH3 ?? unit.h3Index;
     const segments = order.routeSegments ?? [];
     if (segments.length === 0) {
       if (order.destinationH3Index) {
         drawLineArrow(
           ctx,
-          hexCenterPx(unit.h3Index),
-          hexCenterPxRelativeTo(unit.h3Index, order.destinationH3Index),
+          hexCenterPx(fromH3),
+          hexCenterPxRelativeTo(fromH3, order.destinationH3Index),
           ORDER_LINE_COLOR
         );
       }

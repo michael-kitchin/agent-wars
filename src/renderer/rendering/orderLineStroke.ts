@@ -8,7 +8,7 @@
  * Exceptions: None.
  */
 import { ORDER_ARROW_SIZE, ORDER_LINE_CASING_COLOR, ORDER_LINE_CASING_PAD, ORDER_LINE_WIDTH } from '../core/constants';
-import { orderArrowGeometry, type CanvasPoint } from '../../shared/orderArrowGeometry';
+import { orderArrowGeometry, orderEndsCoincide, type CanvasPoint } from '../../shared/orderArrowGeometry';
 
 /**
  * The dash pattern for the part of a route beyond this turn or beat, in CSS pixels.
@@ -151,7 +151,8 @@ export function drawOrderLine(
  * Purpose: Most order lines are one straight run; this keeps their arrow geometry in one place.
  * When to use: For a line from `from` to `to` in canvas pixels. `tipInset` is the unit radius when a unit marker
  *   sits at `to`, or 0 for a hex center.
- * Expected outcome: One run from `from` to the arrow's base, with `dash`, and the arrowhead.
+ * Expected outcome: One run from `from` to the arrow's base, with `dash`, and the arrowhead. When `from` and `to` are the
+ *   same point, no run and no arrowhead.
  * Exceptions: None.
  */
 export function straightOrderLineShape(
@@ -160,6 +161,7 @@ export function straightOrderLineShape(
   tipInset: number,
   dash: readonly number[] = ORDER_LINE_SOLID
 ): OrderLineShape {
+  if (orderEndsCoincide(from, to)) return { runs: [], arrow: null };
   const arrow = orderArrowGeometry(from, to, { arrowSize: ORDER_ARROW_SIZE, tipInset });
   return { runs: [{ points: [from, arrow.lineEnd], dash }], arrow };
 }
@@ -169,9 +171,10 @@ export function straightOrderLineShape(
  *
  * Purpose: Route arrows end on the destination hex's center, as the movement arrows always have.
  * When to use: For the last two points of a route's last run.
- * Expected outcome: An arrowhead whose tip is `to`.
+ * Expected outcome: An arrowhead whose tip is `to`, or null when `from` and `to` are the same point.
  * Exceptions: None.
  */
-export function routeEndArrow(from: CanvasPoint, to: CanvasPoint): ReturnType<typeof orderArrowGeometry> {
+export function routeEndArrow(from: CanvasPoint, to: CanvasPoint): ReturnType<typeof orderArrowGeometry> | null {
+  if (orderEndsCoincide(from, to)) return null;
   return orderArrowGeometry(from, to, { arrowSize: ORDER_ARROW_SIZE, tipInset: 0 });
 }

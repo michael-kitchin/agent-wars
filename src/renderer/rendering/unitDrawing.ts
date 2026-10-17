@@ -212,11 +212,34 @@ export function drawUnitTypeGlyph(
 }
 
 /**
- * Defines the `drawOneUnitMarker` function shape (export function drawOneUnitMarker( ctx: CanvasRenderingContext2D, x: number, y: number, color: string, label: string, strokeColor: string = '#).
+ * Covers one marker's border with the gold selection ring.
+ *
+ * Purpose: Replaces the marker's border with the gold ring, in the border's own paint step.
+ * When to use: From `drawOneUnitMarker`, in the border's own step, before the glyph. A stack draws its lower marker
+ *   first, so the upper marker covers the lower ring where they overlap, the same way it covers the lower border.
+ * Expected outcome: A `SELECTION_RING_WIDTH` stroke in `SELECTION_RING_COLOR` on the marker's circle, in the place of
+ *   the 2 px border.
+ * Exceptions: None.
+ */
+function drawSelectionRing(ctx: CanvasRenderingContext2D, x: number, y: number): void {
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(x, y, UNIT_RADIUS, 0, Math.PI * 2);
+  ctx.strokeStyle = SELECTION_RING_COLOR;
+  ctx.lineWidth = SELECTION_RING_WIDTH;
+  ctx.stroke();
+  ctx.restore();
+}
 
- * Purpose: Supports maintainability by documenting why `drawOneUnitMarker` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+/**
+ * Draws one unit token: fill, border, then glyph.
+ *
+ * Purpose: Map markers, moving markers, and stale intel share one token.
+ * When to use: Pass the side fill and the border color. A selected marker passes `SELECTION_RING_COLOR` so the border
+ *   is the gold ring, painted in the border's own step, under the glyph.
+ * Expected outcome: A filled circle of `UNIT_RADIUS`. Its border is the passed color, 2 px wide, except the selection
+ *   color, which is the wider gold ring. The glyph is drawn after the border, so it covers the border's inner edge
+ *   the same way it covers a white border. A mixed-side fill still tints the glyph dark.
  * Exceptions: None.
  */
 export function drawOneUnitMarker(
@@ -233,9 +256,13 @@ export function drawOneUnitMarker(
   ctx.arc(x, y, UNIT_RADIUS, 0, Math.PI * 2);
   ctx.fillStyle = color;
   ctx.fill();
-  ctx.strokeStyle = stackedNeutral ? MULTI_PLAYER_STROKE : strokeColor;
-  ctx.lineWidth = 2;
-  ctx.stroke();
+  if (strokeColor === SELECTION_RING_COLOR) {
+    drawSelectionRing(ctx, x, y);
+  } else {
+    ctx.strokeStyle = strokeColor;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
   ctx.save();
   if (stackedNeutral) ctx.filter = MULTI_PLAYER_GLYPH_FILTER;
   ctx.fillStyle = '#fff';
@@ -253,35 +280,16 @@ export function drawOneUnitMarker(
 }
 
 /**
- * Draws the gold selection ring around one unit marker.
- *
- * Purpose: Marks a hex that holds a selected unit, on top of the marker's own white edge.
- * When to use: Only by `drawUnits`, at the top marker of a hex that holds a selected unit, after every marker and
- *   before every count badge.
- * Expected outcome: A `SELECTION_RING_WIDTH` ring in `SELECTION_RING_COLOR` just outside the marker's edge.
- * Exceptions: None.
- */
-function drawSelectionRing(ctx: CanvasRenderingContext2D, x: number, y: number): void {
-  ctx.save();
-  ctx.beginPath();
-  // The marker's 2 px edge ends 1 px outside its radius; the ring starts there.
-  ctx.arc(x, y, UNIT_RADIUS + 1 + SELECTION_RING_WIDTH / 2, 0, Math.PI * 2);
-  ctx.strokeStyle = SELECTION_RING_COLOR;
-  ctx.lineWidth = SELECTION_RING_WIDTH;
-  ctx.stroke();
-  ctx.restore();
-}
-
-/**
  * Draws one marker per hex for the given units, with a second offset marker and a count badge for a stack.
  *
  * Purpose: Units are drawn on the canvas, one token per hex, in both theaters.
  * When to use: From the scene draw, with the strategic units or the battle's sub-units. Pass the ids of units drawn
  *   elsewhere this frame, such as units moving in playback, as `movingUnitIds`.
  * Expected outcome: Each hex gets a marker in its side's color, or the mixed-side fill when both sides are there. A hex
- *   with two or more units gets a second marker offset up and right, and a count badge. The top marker of a hex that
- *   holds a unit in the current selection gets the gold selection ring. Markers are drawn first, then rings, then
- *   badges, so a ring stays visible over a neighboring marker and a badge stays readable over a ring.
+ *   with two or more units gets a second marker offset up and right, and a count badge. Each marker of a hex that
+ *   holds a unit in the current selection uses the gold ring as that marker's border, under the glyph. The upper
+ *   marker of a stack therefore covers the lower ring where they overlap. Badges are drawn after every marker, so a
+ *   badge stays readable over a ring.
  * Exceptions: None.
  */
 export function drawUnits(
@@ -310,7 +318,7 @@ export function drawUnits(
     };
   });
 
-  for (const { x, y, count, top, units: hexUnits } of tokens) {
+  for (const { x, y, count, top, selected, units: hexUnits } of tokens) {
     const types = new Set(hexUnits.map((u) => u.unitType));
     const players = new Set(hexUnits.map((u) => u.player));
     const mixedType = types.size > 1;
@@ -318,13 +326,11 @@ export function drawUnits(
     const fillColor = multiPlayer ? MULTI_PLAYER_FILL : (PLAYER_COLORS[hexUnits[0]!.player] ?? '#333');
     const strokeColor = multiPlayer ? MULTI_PLAYER_STROKE : '#fff';
     const label = mixedType ? '*' : (UNIT_TYPE_LABELS[hexUnits[0]!.unitType] ?? '?');
-    drawOneUnitMarker(ctx, x, y, fillColor, label, strokeColor, hexUnits[0]!.player);
+    const markerStroke = selected ? SELECTION_RING_COLOR : strokeColor;
+    drawOneUnitMarker(ctx, x, y, fillColor, label, markerStroke, hexUnits[0]!.player);
     if (count > 1) {
-      drawOneUnitMarker(ctx, top.x, top.y, fillColor, label, strokeColor, hexUnits[0]!.player);
+      drawOneUnitMarker(ctx, top.x, top.y, fillColor, label, markerStroke, hexUnits[0]!.player);
     }
-  }
-  for (const { top, selected } of tokens) {
-    if (selected) drawSelectionRing(ctx, top.x, top.y);
   }
   for (const { x, y, count } of tokens) {
     if (count < 2) continue;
