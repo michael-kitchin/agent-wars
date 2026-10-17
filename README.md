@@ -14,7 +14,7 @@ The game is intended to be simple to learn and quick to play, but with enough de
 
 ![Tactical planning over central Mexico](doc/media/central-mexico-battle.png)
 
-*A tactical battle in central Mexico on turn 6, during a mild October. Teal/human units face the rose/LLM opponent (in this case, Gemini Flash Lite). Movement orders are queued up in the orders tab, to the right.*
+*A tactical battle in central Mexico on turn 5, during a mild October. Teal/human units face the rose/LLM opponent (in this case, Gemini Flash Lite). Movement orders are queued up in the orders tab, to the right.*
 
 ## Why This Exists
 
