@@ -13,9 +13,7 @@ Accordingly, the game ends when one player:
 - Captures all the other player's home region hexes
 - Or destroys all production capacity in those hexes
 
-# Starting a match
-
-## Global and regional maps
+## Starting the game
 
 *New global game: Click the Global tab, then pick human and LLM home regions (in this case: Eastern Asia vs Southern Africa). Buttons to the right of the drop-down lists pick random choices.*
 
