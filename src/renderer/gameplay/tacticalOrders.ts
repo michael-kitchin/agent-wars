@@ -241,7 +241,7 @@ export function cancelFerryForUnit(unitId: string, deps: TacticalOrderDeps): voi
  *   (`#ranged-attack-tip-host`) is what shows and hides. It is enabled when every resolved unit can range, or every
  *   resolved unit is air; otherwise it is greyed out, and its reason is in `#selection-panel-action-note` and is the
  *   tip host's tip. Its `aria-label` names the attack, and `aria-pressed` is true while that attack is aimed; the strike
- *   target list shows beside it only while a strike is aimed. A true-to-false flag change nulls the hover preview,
+ *   target list shows to its left only while a strike is aimed. A true-to-false flag change nulls the hover preview,
  *   hides the block and slower tooltips, redraws, and starts one hover refresh. The selection bar's hint and border then
  *   follow the flags (`renderSelectionBarState`).
  * Exceptions: None. Returns immediately when `#ranged-attacks-list` is missing, and then leaves the button untouched.

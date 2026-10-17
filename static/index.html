@@ -188,7 +188,7 @@
         <label class="new-game-check" for="new-game-fog-checkbox"><input type="checkbox" id="new-game-fog-checkbox" checked data-control-tooltip="Leave this checked to hide places and enemy units you have not seen. Uncheck it to show the whole map for the next match." /> Fog of war</label>
       </section>
     </div>
-    <div class="new-game-panel-footer">
+    <div id="new-game-panel-footer" class="new-game-panel-footer">
       <button type="button" id="new-game-btn" data-control-tooltip="Start the match with the choices on this screen. If the start fails, the screen stays open.">Start game</button>
     </div>
   </div>
@@ -253,13 +253,13 @@
         </div>
         <span class="selection-panel-divider" aria-hidden="true"></span>
         <div class="selection-panel-actions">
-          <span id="ranged-attack-tip-host" class="control-tooltip-host" style="display: none;"><button type="button" id="ranged-attack-btn" class="selection-panel-reticle" aria-label="Ranged attack" aria-pressed="false"><svg class="chrome-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="4.5"></circle><path d="M8 1.5v3M8 11.5v3M1.5 8h3M11.5 8h3"></path></svg></button></span>
           <select id="air-strike-target-type" class="ranged-btn" style="display: none;" data-control-tooltip="Choose enemy units, production, airports, or seaports. Your next double-click uses that choice until you stop aiming.">
             <option value="units">Enemy Units</option>
             <option value="urban">Production</option>
             <option value="airport">Airports</option>
             <option value="seaport">Seaports</option>
           </select>
+          <span id="ranged-attack-tip-host" class="control-tooltip-host" style="display: none;"><button type="button" id="ranged-attack-btn" class="selection-panel-reticle" aria-label="Ranged attack" aria-pressed="false"><svg class="chrome-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="4.5"></circle><path d="M8 1.5v3M8 11.5v3M1.5 8h3M11.5 8h3"></path></svg></button></span>
         </div>
         <button type="button" id="selection-panel-close" class="selection-panel-close" aria-label="Clear the selection" data-control-tooltip="Clear the selection. Queued orders stay."><svg class="chrome-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7"></path></svg></button>
       </div>

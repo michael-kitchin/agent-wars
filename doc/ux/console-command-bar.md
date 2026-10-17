@@ -16,7 +16,7 @@ Ready shows whenever the console does. The reticle and the air-strike target lis
 - The reticle, in the selection panel's summary bar, shown whenever the selection panel is: one square button with a target reticle icon and no text, for both kinds of attack. It aims a ranged attack when every selected unit can fire, and an air strike when every selected unit is air; it never offers both. Its accessible name is "Ranged attack" or "Air strike" (`selectionSupportAction` in `src/shared/selectionSupportButtonMode.ts`, and `updateRangedSidebar`). The air-strike target list uses the same height.
 - While an attack is aimed, the reticle reads as pressed (`aria-pressed`), its face in that order's color: the ranged amber or the strike purple, the same color as the selection panel's border.
 - While the selection cannot use it, the reticle is greyed out. Its name is "Air strike" when the selection has an air unit and "Ranged attack" otherwise. Its reason is its tip, and also shows in the selection panel's details under the unit rows: "Infantry can't fire on the world map." when a world-map selection includes infantry and no air unit, or "Strike needs a selection of air units only." when air units are selected with other types (`selectionSupportAction` in `src/shared/selectionSupportButtonMode.ts`).
-- While Strike targeting is on, a target-type choice beside the pressed reticle: Enemy Units, Production, Airports, or Seaports.
+- While Strike targeting is on, a target-type choice to the left of the pressed reticle: Enemy Units, Production, Airports, or Seaports.
 - Control tips for Ready, the reticle, and the target-type list are in [control-tooltips.md](control-tooltips.md).
 
 ## Inputs and Responses
@@ -25,7 +25,7 @@ Ready shows whenever the console does. The reticle and the air-strike target lis
 
 - When the player clicks Ready, the turn or the battle beat resolves, unless Ready is disabled. Disabled cases are in [modes-and-transitions.md](modes-and-transitions.md).
 - When the player clicks the reticle for a selection that can fire, ranged targeting turns on and the reticle reads as pressed. Clicking the pressed reticle turns it off.
-- When the player clicks the reticle for an all-air selection, strike targeting turns on, the reticle reads as pressed, and the target-type choice shows beside it. Clicking the pressed reticle turns strike targeting off and hides the choice.
+- When the player clicks the reticle for an all-air selection, strike targeting turns on, the reticle reads as pressed, and the target-type choice shows to its left. Clicking the pressed reticle turns strike targeting off and hides the choice.
 - When the player changes the target type, later strike clicks use that type.
 
 ### Keyboard
@@ -43,7 +43,7 @@ Ready shows whenever the console does. The reticle and the air-strike target lis
 - Ready disabled: game over, AI wait, deferred consultation, a Ready request in flight, or the annihilation dialog.
 - Reticle greyed out: the selection mixes air with other types, or includes a unit that cannot make a direct ranged attack in the current theater. When one of the two sentences applies, it is the control's tip and shows in the selection panel's details.
 - Reticle for a ranged attack: every selected unit can make a direct ranged attack. Pressed while ranged targeting is on.
-- Reticle for an air strike: every selected unit is air. Pressed while strike targeting is on, with the target-type choice beside it.
+- Reticle for an air strike: every selected unit is air. Pressed while strike targeting is on, with the target-type choice to its left.
 
 ## Invariants
 
@@ -80,7 +80,7 @@ None.
 
 ## Code Entry Points
 
-- `static/index.html` (`#console-footer`, `#ready-btn`, `#ranged-attack-tip-host`, `#ranged-attack-btn`, `#air-strike-target-type`, `#selection-panel-action-note`)
+- `static/index.html` (`#console-footer`, `#ready-btn`, `#air-strike-target-type`, `#ranged-attack-tip-host`, `#ranged-attack-btn`, `#selection-panel-action-note`)
 - `src/shared/selectionSupportButtonMode.ts`
 - `src/renderer/gameplay/tacticalOrders.ts` (`updateRangedSidebar`)
 - `src/renderer/gameplay/readyHandler.ts`

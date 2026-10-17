@@ -4,7 +4,8 @@
  *
  * Purpose: Keeps the overlay's choices and their checks together, apart from the scene order in `ui-smoke.cjs`.
  * When to use: Required by `ui-smoke.cjs`.
- * Expected outcome: Async helpers that drive the overlay the way a player would; nothing runs on load.
+ * Expected outcome: Async helpers that drive the overlay the way a player would. Choosing a regional match and
+ *   clicking Start are separate, so the runner can hide the choices between them. Nothing runs on load.
  * Exceptions: None.
  */
 'use strict';
@@ -30,7 +31,7 @@ const SCENARIO = Object.freeze({
  * The fixed regional scenario, as option values on the new-game overlay's Regional tab.
  *
  * Purpose: The regional scenes always show the same region and sides, so their checks can compare known values.
- * When to use: Only by `startRegionalMatch`.
+ * When to use: Only by `chooseRegionalScenario`.
  * Expected outcome: Southern Mexico and the isthmus against NE Mexico and the Bajio in Central America, a small game,
  *   starting in April.
  * Exceptions: None.
@@ -56,6 +57,20 @@ async function waitForNewGameOverlay(page) {
     const overlay = document.getElementById('game-over-overlay');
     return overlay !== null && !overlay.classList.contains('hidden');
   }, null, { timeout: 60000 });
+}
+
+/**
+ * Clicks Start and waits until the overlay has closed.
+ *
+ * Purpose: One click for both matches. The button is the same element in the footer and in the collapsed header.
+ * When to use: After the scenario's choices are set, whether or not the choices are hidden.
+ * Expected outcome: `#game-over-overlay` has `hidden`, and the match has had time to fit the map.
+ * Exceptions: Throws a Playwright timeout when the overlay does not close within `timeoutMs`.
+ */
+async function clickStartGame(page, timeoutMs) {
+  await page.click('#new-game-btn');
+  await page.waitForFunction(() => document.getElementById('game-over-overlay').classList.contains('hidden'), null, { timeout: timeoutMs });
+  await page.waitForTimeout(SETTLE_MS.start);
 }
 
 /**
@@ -89,9 +104,7 @@ async function startScenarioMatch(page) {
     || !chosen.human.includes(SCENARIO.humanRegion) || !chosen.ai.includes(SCENARIO.aiRegion)) {
     throw new Error(`scenario choices did not hold: ${JSON.stringify(chosen)}`);
   }
-  await page.click('#new-game-btn');
-  await page.waitForFunction(() => document.getElementById('game-over-overlay').classList.contains('hidden'), null, { timeout: 60000 });
-  await page.waitForTimeout(SETTLE_MS.start);
+  await clickStartGame(page, 60000);
 }
 
 /**
@@ -110,14 +123,14 @@ async function openNewGameOverlay(page) {
 }
 
 /**
- * Chooses the fixed regional scenario on the open new-game overlay and starts the match.
+ * Chooses the fixed regional scenario on the open new-game overlay.
  *
- * Purpose: The regional scenes check the console on a map other than the world map.
+ * Purpose: The runner records that tab, then hides the choices, then starts. Choosing stops before the click.
  * When to use: While the new-game overlay is open.
- * Expected outcome: The overlay closes with `REGIONAL_SCENARIO`'s region and sides.
- * Exceptions: Throws when a choice does not hold or the match does not start within 90 seconds.
+ * Expected outcome: Regional is selected, with `REGIONAL_SCENARIO`'s region and sides. The overlay stays open.
+ * Exceptions: Throws when a choice does not hold.
  */
-async function startRegionalMatch(page) {
+async function chooseRegionalScenario(page) {
   await page.click('#new-game-tab-regional');
   await page.waitForTimeout(SETTLE_MS.click);
   await page.selectOption('#new-game-region-select', REGIONAL_SCENARIO.region);
@@ -135,9 +148,6 @@ async function startRegionalMatch(page) {
   if (chosen.region !== REGIONAL_SCENARIO.region || chosen.human !== REGIONAL_SCENARIO.humanSide || chosen.ai !== REGIONAL_SCENARIO.aiSide) {
     throw new Error(`regional choices did not hold: ${JSON.stringify(chosen)}`);
   }
-  await page.click('#new-game-btn');
-  await page.waitForFunction(() => document.getElementById('game-over-overlay').classList.contains('hidden'), null, { timeout: 90000 });
-  await page.waitForTimeout(SETTLE_MS.start);
 }
 
-module.exports = { openNewGameOverlay, startRegionalMatch, startScenarioMatch, waitForNewGameOverlay };
+module.exports = { chooseRegionalScenario, clickStartGame, openNewGameOverlay, startScenarioMatch, waitForNewGameOverlay };

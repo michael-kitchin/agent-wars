@@ -12,7 +12,8 @@
  * The run uses a fresh, temporary Electron user-data folder (`AGENT_WARS_USER_DATA_DIR`), so it never reads or
  * changes the player's saved match, API key, or model choice, and it never calls a model. The three sessions share
  * that folder: the first plays a new global match, the second reopens it with a hex both sides hold, plays the first
- * beat of a battle there, and starts a regional match, and the third reopens that match after the run marks it as lost.
+ * beat of a battle there, hides the new-game choices, and starts a regional match from the header button, and the
+ * third reopens that match after the run marks it as lost.
  */
 'use strict';
 
@@ -21,7 +22,7 @@ const os = require('os');
 const path = require('path');
 const { SCENES, probePage, probeSelectors, runChecks } = require('./ui-smoke-checks.cjs');
 const { NEW_GAME_MOVE, SETTLE_MS } = require('./ui-smoke-scenes.cjs');
-const { openNewGameOverlay, startRegionalMatch, startScenarioMatch, waitForNewGameOverlay } = require('./ui-smoke-new-game.cjs');
+const { chooseRegionalScenario, clickStartGame, openNewGameOverlay, startScenarioMatch, waitForNewGameOverlay } = require('./ui-smoke-new-game.cjs');
 const {
   LAND_UNIT_TYPES,
   captureMainMap,
@@ -208,8 +209,8 @@ async function runFirstSession(app, page, report, outDir) {
   await recordScene(page, report, outDir, SCENES.newGameMenu);
   await page.keyboard.press('Escape');
   await page.waitForTimeout(SETTLE_MS.click);
-  // Hiding the choices leaves only the header bar over the map. Show them again, then move the panel by its grip; the
-  // next open puts it back in the corner.
+  // Hiding the choices leaves the header bar, with Start in place of the message. Show them again, then move the
+  // panel by its grip; the next open puts it back in the corner.
   await page.click('#new-game-dialog-collapse');
   await parkPointer(page);
   await page.waitForTimeout(SETTLE_MS.resize);
@@ -463,7 +464,13 @@ async function runReopenedSession(app, page, report, outDir, battleHex) {
   await parkPointer(page);
   await page.waitForTimeout(SETTLE_MS.overlay);
   await recordScene(page, report, outDir, SCENES.newGameRegional);
-  await startRegionalMatch(page);
+  // Choose the regional match, hide the choices, and start from the button in the header.
+  await chooseRegionalScenario(page);
+  await page.click('#new-game-dialog-collapse');
+  await parkPointer(page);
+  await page.waitForTimeout(SETTLE_MS.resize);
+  await recordScene(page, report, outDir, SCENES.newGameRegionalHidden);
+  await clickStartGame(page, 90000);
   await parkPointer(page);
   await recordScene(page, report, outDir, SCENES.regionalStart);
   await captureMainMap(page);
@@ -486,6 +493,14 @@ async function runFinishedMatchSession(app, page, report, outDir) {
   await waitForNewGameOverlay(page);
   await page.waitForTimeout(SETTLE_MS.overlay);
   await recordScene(page, report, outDir, SCENES.gameOverReopened);
+  // Hide the choices, so the header shows New game in place of the result, then show them again before the small window.
+  await page.click('#new-game-dialog-collapse');
+  await parkPointer(page);
+  await page.waitForTimeout(SETTLE_MS.resize);
+  await recordScene(page, report, outDir, SCENES.gameOverHidden);
+  await page.click('#new-game-dialog-collapse');
+  await parkPointer(page);
+  await page.waitForTimeout(SETTLE_MS.resize);
   await setViewport(app, page, SMALL_WINDOW);
   await page.waitForTimeout(SETTLE_MS.resize);
   await recordScene(page, report, outDir, SCENES.gameOverSmallWindow);

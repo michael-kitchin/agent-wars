@@ -81,7 +81,7 @@ The full input map, including the exceptions, is in [ux/input-map.md](ux/input-m
 | ![Step 1: Select a unit or stack, then the Ranged button](media/ranged-attack-1.png) | ![Step 2: Step 2: Double-click on a visible target to order the attack](media/ranged-attack-2.png) |
 
 - **Ranged:** select units that can all fire, then click the reticle in the selection panel. It stays pressed, in amber, while you aim.
-- **Strike:** select only air units, then click the reticle. It stays pressed, in purple, and a list beside it picks the target type.
+- **Strike:** select only air units, then click the reticle. It stays pressed, in purple, and a list to its left picks the target type.
 - **Greyed reticle:** mixing air with other types, or infantry with no air unit on the strategic map, greys out the reticle. Point at it to see why. Infantry can fire in a battle.
 - **The outline:** a dashed outline, with no fill, around the combined reach of every selected unit. Its dashes drift slowly.
 - **Colors:** amber for ranged fire, purple for air strikes. While you aim, the selection panel's border takes the same color.

@@ -109,7 +109,7 @@ body {
   overflow: hidden;
 }
 /* The overview, with the tabs toggle laid over its lower-left corner. The overview is its own stacking context, so
-   Leaflet's panes stay under the toggle. A thin border runs around the overview's inside edge, over the map and the
+   Leaflet's panes stay under the toggle. A 2 px border runs around the overview's inside edge, over the map and the
    toggle, and takes no pointer input. */
 .minimap-overview {
   flex: none;
@@ -120,7 +120,7 @@ body {
   position: absolute;
   inset: 0;
   z-index: 2;
-  border: 1px solid var(--chrome-border);
+  border: 2px solid var(--chrome-border);
   pointer-events: none;
 }
 #minimap {

@@ -273,6 +273,17 @@ const MAP_CHROME_CHECKS = Object.freeze([
       return shown.length === 0 ? null : `shown on the new-game screen: ${shown.join(', ')}`;
     },
   },
+  {
+    name: 'minimap-overview-border',
+    scenes: [SCENES.strategic],
+    needs: ['.minimap-overview'],
+    run: (p, el) => {
+      if (!el('.minimap-overview').shown) return 'the minimap overview is not shown';
+      return p.minimapBorderWidth === '2px'
+        ? null
+        : `the overview's inner border is ${p.minimapBorderWidth}, expected 2px`;
+    },
+  },
 ]);
 
 module.exports = { MAP_CHROME_CHECKS };

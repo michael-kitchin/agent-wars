@@ -34,6 +34,8 @@ const { NEW_GAME_CHECKS } = require('./ui-smoke-new-game-checks.cjs');
  * Expected outcome: A plain object that can be passed back to Node. `elements` has one entry per selector:
  *   null when the selector matches nothing, otherwise the first match's box, text, font size, border color, pointer
  *   events, tip, and the attributes the checks use, plus the text of every match in `allTexts`.
+ *   `minimapBorderWidth` is the computed top border width of `.minimap-overview::after`, such as `2px`, or `''` when
+ *   the overview is missing.
  * Exceptions: None.
  */
 function probePage(selectors) {
@@ -83,10 +85,13 @@ function probePage(selectors) {
   };
   const elements = {};
   for (const selector of selectors) elements[selector] = describe(selector);
+  const overview = document.querySelector('.minimap-overview');
+  const minimapBorderWidth = overview ? getComputedStyle(overview, '::after').borderTopWidth : '';
   return {
     viewport: { w: window.innerWidth, h: window.innerHeight, dpr: window.devicePixelRatio || 1 },
     scroll: { w: document.documentElement.scrollWidth, h: document.documentElement.scrollHeight },
     activeElementId: document.activeElement ? document.activeElement.id : '',
+    minimapBorderWidth,
     elements,
   };
 }

@@ -18,7 +18,7 @@ Shown in Strategic planning, Resolution playback, and Tactical planning while at
   - Two lines of text. Each ends in an ellipsis when it does not fit, and the controls beside them keep their size.
   - The first line: the hex code of the first selected unit's hex in parentheses, such as "(D4)", then " · " and "N selected of M". N is the number of selected units in that hex, and M is the number of the player's units there that can be selected (`summarizeSelectionPanel` in `src/shared/selectionPanelSummary.ts`). An embarked land unit cannot be selected. When exactly one unit is selected, its origin flag and name take the place of the count. When selected units also stand in other hexes, the line ends with " · +K elsewhere", where K counts them (`selectionElsewhereText` in `src/shared/selectionBarText.ts`). In a battle the code names the battle cell, such as "(E8.K3)". A code that cannot be found shows "?".
   - The second line, a hint for the next map gesture (`selectionBarHint` in `src/shared/selectionBarText.ts`). The first that applies: "Playback is running · right-click to deselect" while a turn or a battle beat plays back; "Double-click a target in range" while Ranged or Strike targeting is on; "Double-click a hex to ferry · right-click to deselect" when every selected unit is air; "Air units can't move with other units" when air units are selected with other types; otherwise "Double-click a hex to move · right-click to deselect".
-  - A divider, then the reticle, and the air-strike target list beside it while a strike is aimed. See [console-command-bar.md](console-command-bar.md).
+  - A divider, then the air-strike target list, then the reticle, while a strike is aimed. The list is hidden otherwise, and the reticle stays next to the close control. See [console-command-bar.md](console-command-bar.md).
   - The close control, an ×, the bar's full height and 32 px wide, with a divider on its left: the expand control's mirror on the right edge.
 - The details, under the bar, shown only while the panel is expanded:
   - That hex's caption, the same naming line the [hex tooltip](hex-tooltips.md) shows, with its flags. It appears once its lookup returns.
@@ -99,7 +99,7 @@ None.
 
 ## Code Entry Points
 
-- `static/index.html` (`#selection-panel`, `#selection-panel-grip`, `#selection-panel-bar`, `#selection-panel-expand`, `#sidebar-selected-unit`, `#selection-panel-hint`, `#ranged-attack-tip-host`, `#ranged-attack-btn`, `#selection-panel-close`, `#selection-panel-details`, `#selection-panel-caption`, `#selection-panel-chips`, `#selection-panel-units`, `#selection-panel-action-note`, `#sidebar-error`)
+- `static/index.html` (`#selection-panel`, `#selection-panel-grip`, `#selection-panel-bar`, `#selection-panel-expand`, `#sidebar-selected-unit`, `#selection-panel-hint`, `#air-strike-target-type`, `#ranged-attack-tip-host`, `#ranged-attack-btn`, `#selection-panel-close`, `#selection-panel-details`, `#selection-panel-caption`, `#selection-panel-chips`, `#selection-panel-units`, `#selection-panel-action-note`, `#sidebar-error`)
 - `static/selectionChrome.css`
 - `src/renderer/gameplay/selectionPanel.ts`
 - `src/renderer/gameplay/selectionBar.ts`

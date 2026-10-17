@@ -16,7 +16,7 @@ Shown with the map in every mode where the map container is visible, except New 
 - A toggle on the overview's lower-left corner: a 32 px square in the selection panel's expand-control style, with dividers on its top and right edges and a chevron that points down while the tabs are hidden and up while they show.
 - Each tab is 56 × 58 px, the same size as a tab on the console's rail (`--chrome-tab-height`): an 18 px icon above a 9 px label (`--chrome-tab-label-size`), in the rail's colors. A label never wraps.
 - An overview of the loaded map, the Mercator world in a global match and the region's hexes in a regional match, using the same basemap family as the main map. In a global match it shows the whole width of the world; its height cuts the world off at about 80° north and south.
-- A thin border in the chrome's border color (`--chrome-border`) on the overview's inside edge, over the map and the tabs toggle. It does not take the pointer (`.minimap-overview::after` in `static/shellChrome.css`).
+- A 2 px border in the chrome's border color (`--chrome-border`) on the overview's inside edge, over the map and the tabs toggle. It does not take the pointer (`.minimap-overview::after` in `static/shellChrome.css`).
 - A rectangle for the main view when the main view covers less of the world than the overview. When the main view is wide enough, the rectangle is removed.
 - The map-mode tabs, left to right:
   - Weather: shows or hides each hex's weather icon on the world map, in either view, as described in [map-surface.md](map-surface.md). On when the app opens.

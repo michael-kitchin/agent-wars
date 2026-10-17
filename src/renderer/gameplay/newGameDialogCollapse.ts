@@ -1,12 +1,16 @@
 /**
  * The new-game setup panel's two states: expanded, the header bar over the choices and Start, and compact, the header
- * bar alone. The expand control at the bar's left edge switches them, and the panel slides between them from its top
- * edge, so the choices open downward under the bar.
+ * bar alone with Start in place of the message. The expand control at the bar's left edge switches them, and the panel
+ * slides between them from its top edge, so the choices open downward under the bar.
  *
- * Purpose: Lets the player see more of the preview map without closing the screen.
+ * Purpose: Lets the player see more of the preview map without closing the screen, and start the match from the bar
+ *   while the choices are hidden.
  * When to use: `expandNewGameDialog` whenever the overlay opens; `toggleNewGameDialogCollapsed` from the expand control.
  * Expected outcome: `data-state` on `#game-over-overlay` is `compact`, `expanding`, `expanded`, or `collapsing`. The
- *   styles hide the body and the footer only while compact, and turn the chevron up while expanded or collapsing.
+ *   styles hide the body, the footer, and the message only while compact, and turn the chevron up while expanded or
+ *   collapsing. `#new-game-btn` is in the header only while compact. While expanding, expanded, or collapsing it is in
+ *   the footer, so a collapse slide keeps the message and the button on screen until the panel settles. Moving the button
+ *   keeps the listener, label, tip, and enabled state already set on it.
  * Exceptions: None; missing elements are skipped.
  */
 import { startPanelHeightSlide } from '../chrome/panelSlideHelpers';
@@ -98,6 +102,54 @@ function syncCollapseControl(button: HTMLButtonElement): void {
 }
 
 /**
+ * The panel's slide states.
+ *
+ * Purpose: One value for both `data-state` and where Start sits.
+ * When to use: `setPanelState`.
+ * Expected outcome: `compact` is the settled state with the choices hidden. The other three show the choices,
+ *   including during a slide.
+ * Exceptions: None.
+ */
+type NewGamePanelState = 'compact' | 'expanding' | 'expanded' | 'collapsing';
+
+/**
+ * Puts Start in the header or the footer for this state.
+ *
+ * Purpose: One button, so its click listener, label, tip, and enabled state stay with it. The header shows it only
+ *   once the choices are hidden. During a collapse it stays in the footer until the panel settles.
+ * When to use: From `setPanelState`, before `data-state` changes, in the same turn.
+ * Expected outcome: Compact inserts `#new-game-btn` before the close control, or at the end of the header when that
+ *   control is absent. Every other state appends it to `#new-game-panel-footer`. Does nothing when the button is
+ *   already in that parent, or when the button or the destination is missing.
+ * Exceptions: None.
+ */
+function placeStartButton(state: NewGamePanelState): void {
+  const button = document.getElementById('new-game-btn');
+  const parent = document.getElementById(state === 'compact' ? 'new-game-panel-header' : 'new-game-panel-footer');
+  if (!(button instanceof HTMLButtonElement) || !parent || button.parentElement === parent) return;
+  if (state === 'compact') {
+    const close = document.getElementById('new-game-dialog-close');
+    parent.insertBefore(button, close && close.parentElement === parent ? close : null);
+    return;
+  }
+  parent.appendChild(button);
+}
+
+/**
+ * Records the panel's state and puts Start where that state shows it.
+ *
+ * Purpose: The only writer of `data-state`, so the button cannot be left in the wrong bar.
+ * When to use: From `settle` and from both branches of `toggleNewGameDialogCollapsed`. Callers that measure the
+ *   panel's height do it after this returns.
+ * Expected outcome: The button is moved, then `data-state` is set, both before this returns.
+ * Exceptions: None. A missing button or destination still sets `data-state`.
+ */
+function setPanelState(panel: HTMLElement, state: NewGamePanelState): void {
+  placeStartButton(state);
+  panel.dataset.state = state;
+}
+
+/**
  * Ends the panel in the state the player chose, with no slide running.
  *
  * Purpose: One place that leaves the panel settled, after a slide or without one.
@@ -108,7 +160,7 @@ function syncCollapseControl(button: HTMLButtonElement): void {
 function settle(panel: HTMLElement): void {
   slide?.cancel();
   slide = null;
-  panel.dataset.state = expanded ? 'expanded' : 'compact';
+  setPanelState(panel, expanded ? 'expanded' : 'compact');
 }
 
 /**
@@ -132,7 +184,8 @@ function slideTo(panel: HTMLElement, from: number, to: number): void {
  *
  * Purpose: Opening the overlay always starts expanded, including after the player had collapsed it.
  * When to use: Only when the overlay goes from hidden to shown, and before pointer input is disabled for that open.
- * Expected outcome: The panel is expanded and the expand control says it hides the choices. The camera does not move.
+ * Expected outcome: The panel is expanded, Start is in the footer, and the expand control says it hides the choices.
+ *   The camera does not move.
  * Exceptions: None. Missing elements leave the panel unchanged.
  */
 export function expandNewGameDialog(): void {
@@ -148,9 +201,10 @@ export function expandNewGameDialog(): void {
  *
  * Purpose: The expand control's single action.
  * When to use: On a click on `#new-game-dialog-collapse`, which also covers Enter and Space.
- * Expected outcome: The choice flips at once. Expanding shows the choices and grows the panel to its content, held
- *   inside the map; collapsing drops focus from the choices and shrinks the panel to the header bar. A click during a
- *   slide starts from the panel's current height. The map keeps the pointer either way.
+ * Expected outcome: The choice flips at once. Expanding puts Start in the footer, shows the choices, and grows the
+ *   panel to its content, held inside the map. Collapsing drops focus from the choices and shrinks the panel to the
+ *   header bar; Start moves into that bar, and the message hides, when the panel settles. A click during a slide
+ *   starts from the panel's current height. The map keeps the pointer either way.
  * Exceptions: None. Missing elements leave the panel unchanged.
  */
 export function toggleNewGameDialogCollapsed(): void {
@@ -163,7 +217,7 @@ export function toggleNewGameDialogCollapsed(): void {
   expanded = !expanded;
   syncCollapseControl(button);
   if (expanded) {
-    panel.dataset.state = 'expanding';
+    setPanelState(panel, 'expanding');
     const to = panel.getBoundingClientRect().height;
     keepNewGameDialogOnMap(to);
     slideTo(panel, from, to);
@@ -171,7 +225,7 @@ export function toggleNewGameDialogCollapsed(): void {
   }
   const active = document.activeElement;
   if (active instanceof HTMLElement && panel.contains(active) && !header.contains(active)) active.blur();
-  panel.dataset.state = 'collapsing';
+  setPanelState(panel, 'collapsing');
   const borders = panel.offsetHeight - panel.clientHeight;
   slideTo(panel, from, header.offsetHeight + borders);
 }

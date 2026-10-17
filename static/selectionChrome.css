@@ -41,7 +41,8 @@ body:has(#game-over-overlay:not(.hidden)) #selection-panel {
 
 /* ---------- Summary bar ---------- */
 /* One 50 px row that never scrolls: the expand control, two lines of text, a divider, the reticle, and the close
-   control. The controls keep their size and the text gives way. */
+   control. While a strike is aimed, the target list sits between the divider and the reticle. The controls keep
+   their size and the text gives way. */
 .selection-panel-bar {
   flex: none;
   height: 50px;
@@ -236,7 +237,7 @@ body:has(#game-over-overlay:not(.hidden)) #selection-panel {
 }
 
 /* ---------- Ranged and Strike ---------- */
-/* The reticle that aims a ranged attack or an air strike, and while a strike is aimed, the target list beside it. The
+/* The reticle that aims a ranged attack or an air strike, and while a strike is aimed, the target list to its left. The
    reason a greyed-out reticle cannot be used sits in the details under the unit rows. */
 .selection-panel-actions {
   flex: none;

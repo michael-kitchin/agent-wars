@@ -25844,10 +25844,25 @@ ${bonuses}`;
     button.setAttribute("aria-label", expanded ? EXPANDED_LABEL : COLLAPSED_LABEL);
     button.setAttribute("data-control-tooltip", expanded ? EXPANDED_TOOLTIP : COLLAPSED_TOOLTIP);
   }
+  function placeStartButton(state) {
+    const button = document.getElementById("new-game-btn");
+    const parent = document.getElementById(state === "compact" ? "new-game-panel-header" : "new-game-panel-footer");
+    if (!(button instanceof HTMLButtonElement) || !parent || button.parentElement === parent) return;
+    if (state === "compact") {
+      const close = document.getElementById("new-game-dialog-close");
+      parent.insertBefore(button, close && close.parentElement === parent ? close : null);
+      return;
+    }
+    parent.appendChild(button);
+  }
+  function setPanelState(panel, state) {
+    placeStartButton(state);
+    panel.dataset.state = state;
+  }
   function settle(panel) {
     slide?.cancel();
     slide = null;
-    panel.dataset.state = expanded ? "expanded" : "compact";
+    setPanelState(panel, expanded ? "expanded" : "compact");
   }
   function slideTo(panel, from, to) {
     slide = startPanelHeightSlide(panel, from, to, (finished) => {
@@ -25872,7 +25887,7 @@ ${bonuses}`;
     expanded = !expanded;
     syncCollapseControl(button);
     if (expanded) {
-      panel.dataset.state = "expanding";
+      setPanelState(panel, "expanding");
       const to = panel.getBoundingClientRect().height;
       keepNewGameDialogOnMap(to);
       slideTo(panel, from, to);
@@ -25880,7 +25895,7 @@ ${bonuses}`;
     }
     const active2 = document.activeElement;
     if (active2 instanceof HTMLElement && panel.contains(active2) && !header.contains(active2)) active2.blur();
-    panel.dataset.state = "collapsing";
+    setPanelState(panel, "collapsing");
     const borders = panel.offsetHeight - panel.clientHeight;
     slideTo(panel, from, header.offsetHeight + borders);
   }

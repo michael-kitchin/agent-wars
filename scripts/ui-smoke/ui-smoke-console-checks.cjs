@@ -31,6 +31,16 @@ const WORLD_ORDER_DETAIL = /^→ [0-9A-Z]{2} · \d+h$/;
 const SELECTION_PANEL_LIMITS = Object.freeze({ minWidth: 400, maxWidth: 640, minHeight: 140, mapMargin: 24 });
 
 /**
+ * The gap between the reticle and the close control, in CSS pixels.
+ *
+ * Purpose: Opening the strike target list must not push the reticle. The list grows to the reticle's left.
+ * When to use: The strike aiming and strike stopped checks.
+ * Expected outcome: Matches `gap` on `.selection-panel-bar` in `static/selectionChrome.css`.
+ * Exceptions: None.
+ */
+const RETICLE_CLOSE_GAP = 10;
+
+/**
  * The narrowest the toast band may be beside the minimap panel, in CSS pixels.
  *
  * Purpose: Below this width the band spans the top of the map instead, over the panel.
@@ -391,14 +401,22 @@ const CONSOLE_CHECKS = Object.freeze([
   {
     name: 'strike-aiming-in-panel',
     scenes: [SCENES.strikeAiming],
-    needs: ['#ranged-attack-btn', '#air-strike-target-type', '#sidebar-selected-unit', '#selection-panel-hint', '#selection-panel'],
+    needs: ['#ranged-attack-btn', '#air-strike-target-type', '#sidebar-selected-unit', '#selection-panel-hint', '#selection-panel', '#selection-panel .selection-panel-divider', '#selection-panel-close'],
     run: (p, el) => {
       const strike = el('#ranged-attack-btn');
       const problem = reticleProblem(strike, { name: SELECTION_BAR.strikeName, enabled: true, pressed: true });
       if (problem) return problem;
       const list = el('#air-strike-target-type');
+      const divider = el('#selection-panel .selection-panel-divider');
+      const close = el('#selection-panel-close');
+      const panel = el('#selection-panel');
       if (!list.shown || !list.ancestorIds.includes('selection-panel-bar')) return 'the strike target list is not shown in the summary bar';
-      if (list.x < strike.x + strike.w) return `the target list ${fmt(list)} is not to the right of the reticle ${fmt(strike)}`;
+      if (divider.x + divider.w > list.x + 1) return `the target list ${fmt(list)} is not to the right of the divider ${fmt(divider)}`;
+      if (list.x + list.w > strike.x + 1) return `the target list ${fmt(list)} is not to the left of the reticle ${fmt(strike)}`;
+      if (!near(close.x - (strike.x + strike.w), RETICLE_CLOSE_GAP)) {
+        return `the reticle ${fmt(strike)} is not ${RETICLE_CLOSE_GAP} px left of the close control ${fmt(close)}`;
+      }
+      if (close.x + close.w > panel.x + panel.w + 1) return `the close control ${fmt(close)} falls outside the panel ${fmt(panel)}`;
       if (!readSummaryLine(el('#sidebar-selected-unit').text)) return `the first line reads "${el('#sidebar-selected-unit').text}", expected a hex code, then the unit`;
       const hint = el('#selection-panel-hint').text;
       if (hint !== SELECTION_BAR.targetingHint) return `the hint reads "${hint}", expected "${SELECTION_BAR.targetingHint}"`;
@@ -410,11 +428,16 @@ const CONSOLE_CHECKS = Object.freeze([
   {
     name: 'strike-stopped-by-reticle',
     scenes: [SCENES.strikeStopped],
-    needs: ['#ranged-attack-btn', '#air-strike-target-type', '#selection-panel-hint', '#selection-panel'],
+    needs: ['#ranged-attack-btn', '#air-strike-target-type', '#selection-panel-hint', '#selection-panel', '#selection-panel-close'],
     run: (p, el) => {
-      const problem = reticleProblem(el('#ranged-attack-btn'), { name: SELECTION_BAR.strikeName, enabled: true, pressed: false });
+      const strike = el('#ranged-attack-btn');
+      const problem = reticleProblem(strike, { name: SELECTION_BAR.strikeName, enabled: true, pressed: false });
       if (problem) return problem;
       if (el('#air-strike-target-type').shown) return 'the strike target list still shows after the reticle stopped aiming';
+      const close = el('#selection-panel-close');
+      if (!near(close.x - (strike.x + strike.w), RETICLE_CLOSE_GAP)) {
+        return `the reticle ${fmt(strike)} is not ${RETICLE_CLOSE_GAP} px left of the close control ${fmt(close)}`;
+      }
       const hint = el('#selection-panel-hint').text;
       if (hint !== SELECTION_BAR.ferryHint) return `the hint reads "${hint}", expected "${SELECTION_BAR.ferryHint}"`;
       const border = el('#selection-panel').borderColor;

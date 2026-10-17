@@ -1,8 +1,8 @@
 /* The new-game screen. While the new-game overlay is open, the top bar becomes the new-game bar, and the setup panel
    floats over the map's top-left corner, with the map preview under and around it. The panel's header bar holds the
    expand control, the message, and, while a match waits under the screen, the close control. The body holds the Map,
-   Forces, and Rules sections and scrolls, and the footer holds Start game. Hiding the choices leaves only the header
-   bar. The grip on the panel's top-right corner moves it. */
+   Forces, and Rules sections and scrolls, and the footer holds Start game. Hiding the choices leaves the header bar, with
+   Start in place of the message. The grip on the panel's top-right corner moves it. */
 
 /* ---------- New-game bar ---------- */
 /* While the new-game overlay is open, the bar shows only the menu button, the title "New game", Load game…, Settings,
@@ -78,13 +78,14 @@ body:has(#game-over-overlay:not(.hidden)) #app-topbar.topbar-battle {
 .new-game-panel.hidden {
   display: none;
 }
-/* Compact is the header bar alone. The body and the footer show in every other state, including during a slide. */
+/* Compact is the header bar alone, with Start in it and the message hidden. The body and the footer show in every
+   other state, including during a slide, and Start is in the footer then. */
 .new-game-panel[data-state="compact"] .new-game-panel-body,
 .new-game-panel[data-state="compact"] .new-game-panel-footer {
   display: none;
 }
-/* One 50 px bar, the selection bar's height. Its bottom border turns transparent while compact, so the compact panel is
-   the bar inside the panel's own border. */
+/* One 50 px bar, the selection bar's height. While compact its bottom border is removed, so the 50 px is all content
+   and the panel's own border is the bar's edge. */
 .new-game-panel-header {
   flex: none;
   height: 50px;
@@ -96,7 +97,23 @@ body:has(#game-over-overlay:not(.hidden)) #app-topbar.topbar-battle {
   border-bottom: 1px solid var(--chrome-border);
 }
 .new-game-panel[data-state="compact"] .new-game-panel-header {
-  border-bottom-color: transparent;
+  border-bottom-width: 0;
+  gap: 0;
+}
+.new-game-panel[data-state="compact"] #game-over-message {
+  display: none;
+}
+/* The same Start button, filling the header while the choices are hidden. 6 px from the expand control, from the
+   close control or the bar's right edge, and from the top and bottom of the 50 px bar. `align-self: stretch` and
+   `height: auto` are both required: the header centers its items, and the footer's `#new-game-btn` rule sets a fixed
+   height, which would stop the stretch. This rule is the more specific of the two. */
+.new-game-panel-header #new-game-btn {
+  flex: 1 1 auto;
+  align-self: stretch;
+  width: auto;
+  min-width: 0;
+  height: auto;
+  margin: 6px;
 }
 #game-over-message {
   flex: 1 1 auto;

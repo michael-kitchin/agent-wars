@@ -30,6 +30,7 @@ const PANEL = Object.freeze({
   border: 1,
   barHeight: 50,
   controlWidth: 32,
+  headerStartMargin: 6,
   footerInset: 18,
   footerBottom: 12,
   sectionInset: 18,
@@ -92,14 +93,25 @@ const BONUS_SELECTS = Object.freeze([
 ]);
 
 /**
- * The new-game scenes that show the setup panel expanded: every new-game scene except the one with the choices hidden.
+ * The new-game scenes that show the setup panel with its choices hidden.
  *
- * Purpose: The panel's layout checks apply only while the panel shows.
- * When to use: The `scenes` list of a panel layout check.
- * Expected outcome: Derived from `NEW_GAME_SCENES`.
+ * Purpose: Those scenes show Start in the header. The expanded layout checks must not run on them.
+ * When to use: The hidden-choices check, and the filter that builds `PANEL_SCENES`.
+ * Expected outcome: The startup screen and the regional screen, each after the expand control is clicked. Game over
+ *   has its own check, because the button there reads "New game".
  * Exceptions: None.
  */
-const PANEL_SCENES = Object.freeze(NEW_GAME_SCENES.filter((scene) => scene !== SCENES.newGameHidden));
+const HIDDEN_CHOICE_SCENES = Object.freeze([SCENES.newGameHidden, SCENES.newGameRegionalHidden]);
+
+/**
+ * The new-game scenes that show the setup panel expanded.
+ *
+ * Purpose: The panel's layout checks apply only while the choices and the footer show.
+ * When to use: The `scenes` list of a panel layout check.
+ * Expected outcome: Derived from `NEW_GAME_SCENES`, without the three scenes whose choices are hidden.
+ * Exceptions: None.
+ */
+const PANEL_SCENES = Object.freeze(NEW_GAME_SCENES.filter((scene) => !HIDDEN_CHOICE_SCENES.includes(scene) && scene !== SCENES.gameOverHidden));
 
 /**
  * The top bar's parts that the new-game screen shows, and the parts it hides.
@@ -149,6 +161,36 @@ function sectionInnerRight(body) {
 }
 
 /**
+ * Checks Start in the header bar while the choices are hidden.
+ *
+ * Purpose: The same button fills the bar between the expand control and the close control, or the bar's right edge.
+ * When to use: The hidden-choices checks, with the label that screen shows.
+ * Expected outcome: Null when the button is in the header, inset by `PANEL.headerStartMargin`, and reads `label`.
+ *   A failure message otherwise. This does not check whether the button is enabled: at game over the Regional tab
+ *   can be a map with fewer than two sides, and Start is disabled then.
+ * Exceptions: None.
+ */
+function hiddenHeaderStartProblem(panel, collapse, start, close, label) {
+  const innerY = panel.y + PANEL.border;
+  const innerRight = panel.x + panel.w - PANEL.border;
+  const margin = PANEL.headerStartMargin;
+  if (!start.shown || !start.ancestorIds.includes('new-game-panel-header')) return `Start is not in the header (${fmt(start)})`;
+  if (start.text !== label) return `the header button reads "${start.text}", expected "${label}"`;
+  if (!near(start.x, collapse.x + collapse.w + margin)) {
+    return `the header button is at ${fmt(start)}, expected ${margin} px right of the expand control ${fmt(collapse)}`;
+  }
+  const rightEdge = close.shown ? close.x : innerRight;
+  const rightOf = close.shown ? 'the close control' : "the bar's right edge";
+  if (!near(start.x + start.w, rightEdge - margin)) {
+    return `the header button is at ${fmt(start)}, expected ${margin} px left of ${rightOf}`;
+  }
+  if (!near(start.y, innerY + margin) || !near(start.h, PANEL.barHeight - 2 * margin)) {
+    return `the header button is at ${fmt(start)}, expected ${margin} px below the header's top and ${PANEL.barHeight - 2 * margin} px tall`;
+  }
+  return null;
+}
+
+/**
  * The new-game screen's checks, one row each.
  *
  * Purpose: One table that a reviewer can read top to bottom.
@@ -195,6 +237,7 @@ const NEW_GAME_CHECKS = Object.freeze([
       }
       if (collapse.expanded !== 'true') return `the expand control reads aria-expanded=${collapse.expanded}`;
       if (!message.shown || message.x < collapse.x + collapse.w) return `the message ${fmt(message)} is not right of the expand control`;
+      if (!start.ancestorIds.includes('new-game-panel-footer')) return 'Start game is not in the footer while the choices show';
       if (!start.shown || !near(start.x, innerX + PANEL.footerInset) || !near(start.x + start.w, innerRight - PANEL.footerInset)) {
         return `Start game is at ${fmt(start)}, expected the footer's width inside ${PANEL.footerInset} px of padding`;
       }
@@ -207,8 +250,8 @@ const NEW_GAME_CHECKS = Object.freeze([
   },
   {
     name: 'new-game-choices-hidden',
-    scenes: [SCENES.newGameHidden],
-    needs: ['#game-over-overlay', '#canvas-container', '#new-game-dialog-collapse', '#game-over-message', '#game-over-dialog', '#new-game-btn'],
+    scenes: HIDDEN_CHOICE_SCENES,
+    needs: ['#game-over-overlay', '#canvas-container', '#new-game-dialog-collapse', '#game-over-message', '#game-over-dialog', '#new-game-btn', '#new-game-dialog-close'],
     run: (p, el) => {
       const panel = el('#game-over-overlay');
       const c = el('#canvas-container');
@@ -220,12 +263,31 @@ const NEW_GAME_CHECKS = Object.freeze([
         return `the expand control is at ${fmt(collapse)}, expected where it sits while the choices show`;
       }
       if (collapse.expanded !== 'false') return `the expand control reads aria-expanded=${collapse.expanded}`;
-      if (!el('#game-over-message').shown) return 'the message is hidden with the choices';
-      const shown = ['#game-over-dialog', '#new-game-btn'].filter((selector) => el(selector).shown);
-      if (shown.length > 0) return `still shown with the choices hidden: ${shown.join(', ')}`;
-      return near(panel.h, PANEL.barHeight + 2 * PANEL.border)
-        ? null
-        : `the panel is ${Math.round(panel.h)} px tall with the choices hidden, expected the ${PANEL.barHeight} px bar inside its border`;
+      if (el('#game-over-message').shown) return 'the message is shown with the choices hidden';
+      if (el('#game-over-dialog').shown) return 'the choices are shown';
+      if (!near(panel.h, PANEL.barHeight + 2 * PANEL.border)) {
+        return `the panel is ${Math.round(panel.h)} px tall with the choices hidden, expected the ${PANEL.barHeight} px bar inside its border`;
+      }
+      const start = el('#new-game-btn');
+      const problem = hiddenHeaderStartProblem(panel, collapse, start, el('#new-game-dialog-close'), 'Start game');
+      if (problem) return problem;
+      return start.disabled ? 'Start game is disabled' : null;
+    },
+  },
+  {
+    name: 'game-over-choices-hidden',
+    scenes: [SCENES.gameOverHidden],
+    needs: ['#game-over-overlay', '#new-game-dialog-collapse', '#game-over-message', '#game-over-dialog', '#new-game-btn', '#new-game-dialog-close'],
+    run: (p, el) => {
+      const panel = el('#game-over-overlay');
+      const close = el('#new-game-dialog-close');
+      if (close.shown) return 'the close control shows at game over';
+      if (el('#game-over-message').shown) return 'the result is shown with the choices hidden';
+      if (el('#game-over-dialog').shown) return 'the choices are shown at game over';
+      if (!near(panel.h, PANEL.barHeight + 2 * PANEL.border)) {
+        return `the panel is ${Math.round(panel.h)} px tall with the choices hidden, expected the ${PANEL.barHeight} px bar inside its border`;
+      }
+      return hiddenHeaderStartProblem(panel, el('#new-game-dialog-collapse'), el('#new-game-btn'), close, 'New game');
     },
   },
   {
@@ -244,13 +306,13 @@ const NEW_GAME_CHECKS = Object.freeze([
   },
   {
     name: 'new-game-close-hidden-without-match',
-    scenes: [SCENES.newGameStartup, SCENES.newGameMenu, SCENES.newGameHidden, SCENES.newGameMoved, SCENES.gameOverReopened, SCENES.gameOverSmallWindow],
+    scenes: [SCENES.newGameStartup, SCENES.newGameMenu, SCENES.newGameHidden, SCENES.newGameMoved, SCENES.gameOverReopened, SCENES.gameOverHidden, SCENES.gameOverSmallWindow],
     needs: ['#new-game-dialog-close'],
     run: (p, el) => (el('#new-game-dialog-close').shown ? 'the close control shows with no match to go back to' : null),
   },
   {
     name: 'new-game-close-over-match',
-    scenes: [SCENES.newGameReopened, SCENES.newGameRegional],
+    scenes: [SCENES.newGameReopened, SCENES.newGameRegional, SCENES.newGameRegionalHidden],
     needs: ['#game-over-overlay', '#new-game-dialog-close', '#game-over-message'],
     run: (p, el) => {
       const panel = el('#game-over-overlay');
