@@ -1,6 +1,6 @@
 /**
  * Draws the status icons above a strategic world hex: the weather icon while the Weather tab is on, and the tech icon
- * while the inspection view is on (T held or the Tech tab on).
+ * while tech icons are shown (T held or the Tech tab on).
  *
  * Purpose: Each icon follows its own toggle, so a hex can show both. They share one size and one band.
  * When to use: Immediately after the strategic hex-code pass.
@@ -20,8 +20,9 @@ import {
 } from '../../shared/inspectionStatusIconLine';
 import { rendererSharedState as S } from '../core/state';
 import {
+  areTechIconsShown,
   getControllerForHex,
-  isMapInspectionModeHeld,
+  isProductionDetailShown,
   isStrategicHexHumanUrbanProduction,
 } from '../gameplay/productionOverlayHelpers';
 import { getLeafletGlobal } from '../map/mapHelpers';
@@ -243,7 +244,7 @@ function drawStatusIcon(
 /**
  * Draws the status icons above each qualifying world hex.
  *
- * Purpose: Weather shows while the Weather tab is on. Tech shows while the inspection view is on. Neither requires a
+ * Purpose: Weather shows while the Weather tab is on. Tech shows while tech icons are shown. Neither requires a
  *   production label.
  * When to use: On the next line after each `drawStrategicInspectionHexCodes` call.
  * Expected outcome: No-op in a tactical battle or at battle-detail zoom. Otherwise one icon, or a tech-then-weather
@@ -259,7 +260,8 @@ export function drawInspectionStatusIcons(ctx: CanvasRenderingContext2D, deps: I
   const state = S.gameState;
   const unitHexes = new Set(state.units.map((unit) => unit.h3Index));
   const buildEntryZoom = shouldShowBuildEntryZoom();
-  const mapInspectionHeld = isMapInspectionModeHeld();
+  const productionDetailShown = isProductionDetailShown();
+  const techIconsShown = areTechIconsShown();
   const weatherIconsShown = areWeatherIconsShown();
   ctx.save();
   try {
@@ -270,13 +272,13 @@ export function drawInspectionStatusIcons(ctx: CanvasRenderingContext2D, deps: I
       const surface = strategicProductionLabelSurface({
         tacticalRendered: false,
         explored,
-        mapInspectionHeld,
+        productionDetailShown,
         controlledByHuman,
         humanUrbanProduction,
         buildEntryZoom,
       });
       const icons = inspectionStatusIconsForHex({
-        mapInspectionHeld,
+        techIconsShown,
         weatherIconsShown,
         techBonusEnabled: state.techBonusEnabled === true,
         weatherBonusEnabled: state.weatherBonusEnabled === true,

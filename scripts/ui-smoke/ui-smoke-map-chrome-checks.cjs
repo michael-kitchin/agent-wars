@@ -74,10 +74,11 @@ const PLACEMENT_SCENES = Object.freeze([SCENES.strategic, SCENES.matchReopened, 
  *
  * Purpose: The tabs' own geometry and size can only be read while the row is on screen.
  * When to use: The checks that measure the tabs.
- * Expected outcome: The Tech view, Weather turned off, and the open legend, all chosen from the shown row.
+ * Expected outcome: Tech turned on, Weather turned off, Control and Production swapped, and the open legend, all chosen
+ *   from the shown row.
  * Exceptions: None.
  */
-const TABS_SHOWN_SCENES = Object.freeze([SCENES.mapTech, SCENES.mapWeatherOff, SCENES.legendOpen]);
+const TABS_SHOWN_SCENES = Object.freeze([SCENES.mapTech, SCENES.mapWeatherOff, SCENES.mapLayersSwapped, SCENES.legendOpen]);
 
 /**
  * The map chrome checks, one row each.
@@ -164,7 +165,7 @@ const MAP_CHROME_CHECKS = Object.freeze([
     },
   },
   {
-    name: 'map-mode-weather-default',
+    name: 'map-mode-defaults',
     scenes: [...PLACEMENT_SCENES, SCENES.ordersQueued],
     needs: [...MODE_TABS, '#terrain-legend'],
     run: (p, el) => {
@@ -172,8 +173,8 @@ const MAP_CHROME_CHECKS = Object.freeze([
       const expected = [
         '#map-mode-weather pressed=true',
         '#map-mode-tech pressed=false',
-        '#map-mode-control disabled',
-        '#map-mode-production disabled',
+        '#map-mode-control pressed=true',
+        '#map-mode-production pressed=false',
         '#map-legend-toggle pressed=false',
       ];
       if (state.join(', ') !== expected.join(', ')) return `the mode tabs read "${state.join(', ')}"`;
@@ -187,6 +188,18 @@ const MAP_CHROME_CHECKS = Object.freeze([
     run: (p, el) => {
       const line = `Weather pressed=${el('#map-mode-weather').pressed}, Tech pressed=${el('#map-mode-tech').pressed}`;
       return line === 'Weather pressed=true, Tech pressed=true' ? null : `the view tabs read "${line}"`;
+    },
+  },
+  {
+    name: 'map-mode-layers-swapped',
+    scenes: [SCENES.mapLayersSwapped],
+    needs: ['#map-mode-weather', '#map-mode-tech', '#map-mode-control', '#map-mode-production'],
+    run: (p, el) => {
+      const line = ['#map-mode-weather', '#map-mode-tech', '#map-mode-control', '#map-mode-production']
+        .map((selector) => `${selector} pressed=${el(selector).pressed}`)
+        .join(', ');
+      const expected = '#map-mode-weather pressed=true, #map-mode-tech pressed=false, #map-mode-control pressed=false, #map-mode-production pressed=true';
+      return line === expected ? null : `the layer tabs read "${line}"`;
     },
   },
   {

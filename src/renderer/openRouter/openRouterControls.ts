@@ -15,6 +15,7 @@ import { resetPrecomputedAiState } from './precomputedAiState';
 import { isDeferredResolutionPlaybackConsultPending } from './aiPlanningState';
 import { stopOpponentPlanning } from './openRouterRuntime';
 import { isNewGameOverlayOpen } from '../gameplay/newGameBanner';
+import { isMatchWaitingUnderNewGame } from '../gameplay/newGameReturn';
 
 /**
  * Documents the `OpenRouterUiDeps` interface as a named contract surface (interface OpenRouterUiDeps).
@@ -170,11 +171,12 @@ function startTacticalOpponentPlanAfterStrategicConsult(deps: OpenRouterUiDeps):
  * already in planning, the battle's opponent-plan request starts then, because it was held while this consult ran.
  * Exceptions: Stale `planningTurnNumber` merges log, clear the strategic latch, and still start that battle request.
  * `abandoned` pushes unlatch and resume Run prefetch without applying a plan; the player-visible skip line is sent on
- * `openRouter:log`.
+ * `openRouter:log`. While the new-game screen is open with no match waiting under it, a push only clears its latch;
+ * while a match is waiting under that screen, the push applies to that match as usual.
  */
 function initDeferredResolutionPlaybackPushListeners(deps: OpenRouterUiDeps): void {
   window.gameApi?.registerPostResolutionConsultationListener?.((payload: PostResolutionConsultationPushPayload) => {
-    if (isNewGameOverlayOpen()) {
+    if (isNewGameOverlayOpen() && !isMatchWaitingUnderNewGame()) {
       S.pendingDeferredStrategicPostResolutionConsult = false;
       deps.updateReadyButtonState();
       return;
@@ -207,7 +209,7 @@ function initDeferredResolutionPlaybackPushListeners(deps: OpenRouterUiDeps): vo
     deps.updateReadyButtonState();
   });
   window.gameApi?.registerPostTacticalBeatConsultationListener?.((fields) => {
-    if (isNewGameOverlayOpen()) {
+    if (isNewGameOverlayOpen() && !isMatchWaitingUnderNewGame()) {
       S.pendingDeferredTacticalPostBeatConsult = false;
       deps.updateReadyButtonState();
       return;

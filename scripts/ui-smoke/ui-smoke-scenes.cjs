@@ -52,6 +52,7 @@ const SCENES = Object.freeze({
   newGameStartup: 'new-game-startup',
   newGameMenu: 'new-game-menu',
   newGameHidden: 'new-game-hidden',
+  newGameMoved: 'new-game-moved',
   strategic: 'strategic',
   opponentTab: 'opponent-tab',
   consoleCollapsed: 'console-collapsed',
@@ -61,6 +62,7 @@ const SCENES = Object.freeze({
   gameMenuOutside: 'game-menu-outside',
   mapTech: 'map-tech',
   mapWeatherOff: 'map-weather-off',
+  mapLayersSwapped: 'map-layers-swapped',
   legendOpen: 'legend-open',
   readyTip: 'ready-tip',
   ordersQueued: 'orders-queued',
@@ -86,6 +88,7 @@ const SCENES = Object.freeze({
   battleBeat: 'battle-beat',
   battleExited: 'battle-exited',
   newGameReopened: 'new-game-reopened',
+  newGameClosed: 'new-game-closed',
   newGameRegional: 'new-game-regional',
   regionalStart: 'regional-start',
   regionalSelection: 'regional-selection',
@@ -98,14 +101,15 @@ const SCENES = Object.freeze({
  *
  * Purpose: The overlay replaces the match chrome with the new-game screen, so these scenes get their own checks.
  * When to use: The `scenes` list of a check that applies only while the overlay is open.
- * Expected outcome: The first scene, the game menu opened on it, the choices hidden, the overlay opened from a match
- *   and its Regional tab, and the finished match reopened, then at the 800 x 600 minimum.
+ * Expected outcome: The first scene, the game menu opened on it, the choices hidden, the panel moved by its grip, the
+ *   overlay opened from a match and its Regional tab, and the finished match reopened, then at the 800 x 600 minimum.
  * Exceptions: None.
  */
 const NEW_GAME_SCENES = Object.freeze([
   SCENES.newGameStartup,
   SCENES.newGameMenu,
   SCENES.newGameHidden,
+  SCENES.newGameMoved,
   SCENES.newGameReopened,
   SCENES.newGameRegional,
   SCENES.gameOverReopened,
@@ -150,6 +154,16 @@ const MATCH_SCENES = Object.freeze(Object.values(SCENES).filter((scene) => !NEW_
  * Exceptions: None.
  */
 const SETTLE_MS = Object.freeze({ resize: 1500, click: 500, overlay: 2500, start: 2500, tip: 1500, turn: 120000 });
+
+/**
+ * How far the run drags the new-game panel by its grip, in CSS pixels.
+ *
+ * Purpose: The runner drags by this offset and the moved-panel check expects it, held inside the map.
+ * When to use: The new-game moved scene and its check.
+ * Expected outcome: 200 right and 100 down.
+ * Exceptions: None.
+ */
+const NEW_GAME_MOVE = Object.freeze({ x: 200, y: 100 });
 
 /**
  * Reports whether two numbers are within one CSS pixel.
@@ -219,6 +233,7 @@ module.exports = {
   BATTLE_SCENES,
   MATCH_SCENES,
   SETTLE_MS,
+  NEW_GAME_MOVE,
   SELECTION_BAR,
   near,
   fmt,

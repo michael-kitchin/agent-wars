@@ -10,7 +10,7 @@ Name the modes a player can be in, what starts and ends each one, and what plann
 
 ### New game
 
-The player sees the new-game overlay. The message is "Start the global game when ready." or "Start the regional game when ready." when no match is loaded, and "Start a new global game when ready." or "Start a new regional game when ready." when the player opened the overlay from the game menu during a match. The sentence follows the selected tab. A win or loss does not. The button reads "Start game". The body has three sections: Map, Forces, and Rules. Map holds the Global and Regional tabs. Global chooses a home region for each side. Regional chooses one region and a different side group for each side. Forces holds the Advanced tech line, game size, and each unit type's cap and price. Rules holds a level (Off, Low, or High) for each of the origin bonus, tech bonus, terrain bonus, and weather bonus, a starting month, and fog of war. The console and the selection panel are not on screen. The top bar is the new-game bar: the game menu button, the title "New game", Load game…, Settings, and Help, and the game menu works with New game… disabled. The setup panel is docked at the left, under the top bar, and the map fills the rest of the window beside it. Drag and the wheel pan and zoom the preview, with the choices showing or hidden, and a click, double-click, or right-click does not select, order, or change the selection. Hiding the choices leaves only the hide-choices button, and the map widens to the window's left edge. Ready is disabled. The map shows that tab's preview, as in [new-game-dialog.md](new-game-dialog.md). The minimap panel, the terrain legend, and the map's + and − zoom control are hidden. This mode ends when Start game succeeds and a match is loaded.
+The player sees the new-game overlay. The message is "Start the global game when ready." or "Start the regional game when ready." when no match is loaded, and "Start a new global game when ready." or "Start a new regional game when ready." when the player opened the overlay from the game menu during a match. The sentence follows the selected tab. A win or loss does not. The button reads "Start game". The body has three sections: Map, Forces, and Rules. Map holds the Global and Regional tabs. Global chooses a home region for each side. Regional chooses one region and a different side group for each side. Forces holds the Advanced tech line, game size, and each unit type's cap and price. Rules holds a level (Off, Low, or High) for each of the origin bonus, tech bonus, terrain bonus, and weather bonus, a starting month, and fog of war. The console and the selection panel are not on screen. The top bar is the new-game bar: the game menu button, the title "New game", Load game…, Settings, and Help, and the game menu works with New game… disabled. The setup panel floats 12 px in from the map's top-left corner, and the map fills the window under the top bar. Drag and the wheel pan and zoom the preview, with the choices showing or hidden, and a click, double-click, or right-click does not select, order, or change the selection. Hiding the choices leaves only the header bar. Ready is disabled. The map shows that tab's preview, as in [new-game-dialog.md](new-game-dialog.md). The minimap panel, the terrain legend, and the map's + and − zoom control are hidden. This mode ends when Start game succeeds and a match is loaded. While it was opened over a live match, Close ends it and returns to the mode the player left, with that match as it was.
 
 ### Strategic planning
 
@@ -52,7 +52,7 @@ The player sees an overlay with "You win!", "You lose.", or "All units destroyed
 
 ### Game over
 
-The player sees the same overlay as New game. The message is "You win!" or "You lose." The button reads "New game". The console and the selection panel are not on screen, and the top bar is the same new-game bar. The map follows the same show and hide rules as New game, and Ready is disabled. The map shows the same preview as New game. The setup panel, the hide-choices button, and the hidden minimap panel, legend, and + and − zoom control match New game. Starting a new match leaves this mode for strategic planning.
+The player sees the same overlay as New game. The message is "You win!" or "You lose." The button reads "New game". The console and the selection panel are not on screen, and the top bar is the same new-game bar. The map follows the same show and hide rules as New game, and Ready is disabled. The map shows the same preview as New game. The setup panel, its expand control, and the hidden minimap panel, legend, and + and − zoom control match New game. The panel can still be collapsed to the header bar, which keeps the win or loss message. There is no close control. Starting a new match leaves this mode for strategic planning.
 
 ## Transitions
 
@@ -72,6 +72,9 @@ stateDiagram-v2
   ResolutionPlayback --> NewGame: New game
   ResolutionPlayback --> TacticalPlanning: battle entry cancels playback
   TacticalPlanning --> NewGame: New game
+  NewGame --> StrategicPlanning: close
+  NewGame --> ResolutionPlayback: close
+  NewGame --> TacticalPlanning: close
   TacticalPlanning --> ResolutionPlayback: Ready commits a beat with playback
   TacticalPlanning --> TacticalAnnihilation: a side is wiped
   TacticalPlanning --> StrategicPlanning: Exit Battle, then Ready
@@ -81,9 +84,12 @@ stateDiagram-v2
 
 - App start with no loaded match -> New game.
 - New game -> Strategic planning: Start game succeeds.
-- Strategic planning -> New game: New game in the game menu. Opponent planning and any playback stop immediately. The match is replaced when Start succeeds.
-- Resolution playback -> New game: New game in the game menu, in either theater. Playback stops.
-- Tactical planning -> New game: New game in the game menu. The battle preview stops. The annihilation dialog and the tactical battles list do not accept New game; the game menu closes and stays closed while either is open.
+- Strategic planning -> New game: New game in the game menu. The match keeps running under the screen. It is replaced when Start succeeds. New game is unavailable while a Ready is resolving.
+- New game -> Strategic planning: Close, while the screen was opened from strategic planning. The match, its orders, its selection, and its camera are as the player left them.
+- Resolution playback -> New game: New game in the game menu, in either theater. Playback continues under the screen.
+- New game -> Resolution playback: Close, while playback was running. Playback has finished or continues.
+- Tactical planning -> New game: New game in the game menu. The battle keeps running under the screen. The annihilation dialog and the tactical battles list do not accept New game; the game menu closes and stays closed while either is open.
+- New game -> Tactical planning: Close, while the screen was opened from a battle. The battle view, its zoom limits, and its pan limit are back.
 - Strategic planning -> Tactical battles list: Ready reports melee candidates and Offer tactical battles is checked in the game menu.
 - Strategic planning -> Resolution playback: Ready succeeds and the turn has movement or combat to animate. If Offer tactical battles is unchecked, melee is ignored without the list.
 - Strategic planning -> Tactical planning: the player uses a tactical entry marker, or Fight auto-starts the chosen battle.
@@ -105,7 +111,7 @@ stateDiagram-v2
 - Tactical planning or Tactical annihilation into Strategic planning: tactical draft orders are cleared. Stashed strategic drafts return, minus drafts whose units are gone. The map view leaves the battle area. A failed exit does not clear the battle. Leaving the battle stops the battle's opponent planning, including a post-beat consult. A strategic consult still running from the world-map turn keeps running and can still hold Ready. A successful exit then runs Ready, using the same rules as pressing Ready in Strategic planning. That can submit the restored drafts, open the tactical battles list, or start resolution playback. It does nothing while a deferred consultation is outstanding, and it shows the AI-wait toast while opponent orders are not ready.
 - Ready, in either theater: a successful commit clears the drafts that were just submitted. Grouped march and ferry commits also clear the selection. Hover preview is cleared after strategic Ready. Tactical march continuations can reappear as pending movement after a tactical commit.
 - Resolution playback: it does not by itself clear the stash or restore drafts. Cancelling playback to enter a battle flushes a deferred consultation notice if one was waiting on the animation.
-- Opening New game during a match discards the stash instead of restoring it.
+- Starting a new match from the new-game screen discards the stash instead of restoring it. Closing the screen returns to the match with its stash as it was.
 
 ## Strategic and Tactical Theaters
 
@@ -131,6 +137,7 @@ None.
 - `static/index.html` (`#game-over-overlay`, `#tactical-annihilation-overlay`, `#tactical-exit-btn`, `#ready-btn`)
 - `src/renderer/core/uiState.ts`
 - `src/renderer/gameplay/newGame.ts`
+- `src/renderer/gameplay/newGameReturn.ts`
 - `src/renderer/gameplay/newGameBanner.ts`
 - `src/renderer/gameplay/readyHandler.ts`
 - `src/renderer/gameplay/readyTacticalCommit.ts`

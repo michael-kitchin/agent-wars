@@ -20,12 +20,13 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { SCENES, probePage, probeSelectors, runChecks } = require('./ui-smoke-checks.cjs');
-const { SETTLE_MS } = require('./ui-smoke-scenes.cjs');
+const { NEW_GAME_MOVE, SETTLE_MS } = require('./ui-smoke-scenes.cjs');
 const { openNewGameOverlay, startRegionalMatch, startScenarioMatch, waitForNewGameOverlay } = require('./ui-smoke-new-game.cjs');
 const {
   LAND_UNIT_TYPES,
   captureMainMap,
   contestedHexEdit,
+  dragGrip,
   dragSelectionPanelGrip,
   enterBattleAt,
   queueBattleMarch,
@@ -207,7 +208,8 @@ async function runFirstSession(app, page, report, outDir) {
   await recordScene(page, report, outDir, SCENES.newGameMenu);
   await page.keyboard.press('Escape');
   await page.waitForTimeout(SETTLE_MS.click);
-  // Hiding the choices widens the map under the hide-choices button. Show them again before starting the match.
+  // Hiding the choices leaves only the header bar over the map. Show them again, then move the panel by its grip; the
+  // next open puts it back in the corner.
   await page.click('#new-game-dialog-collapse');
   await parkPointer(page);
   await page.waitForTimeout(SETTLE_MS.resize);
@@ -215,6 +217,10 @@ async function runFirstSession(app, page, report, outDir) {
   await page.click('#new-game-dialog-collapse');
   await parkPointer(page);
   await page.waitForTimeout(SETTLE_MS.resize);
+  await dragGrip(page, '#new-game-panel-grip', NEW_GAME_MOVE.x, NEW_GAME_MOVE.y);
+  await parkPointer(page);
+  await page.waitForTimeout(SETTLE_MS.click);
+  await recordScene(page, report, outDir, SCENES.newGameMoved);
 
   await startScenarioMatch(page);
   for (const size of VIEWPORTS) {
@@ -268,8 +274,9 @@ async function runFirstSession(app, page, report, outDir) {
   await recordScene(page, report, outDir, SCENES.gameMenuOutside);
 
   // Show the map-mode tabs from the toggle on the overview's corner; they start hidden and stay shown until the toggle
-  // hides them in the small window below. Turn the Tech view on and record it with the weather icons still on, then
-  // turn it off. Turn Weather off and record the map without weather icons, then turn it back on.
+  // hides them in the small window below. Turn Tech on and record it with the weather icons still on, then turn it
+  // off. Turn Weather off and record the map without weather icons, then turn it back on. Turn Control off and
+  // Production on and record that, then put both back.
   await page.click('#map-mode-tabs-toggle');
   await page.click('#map-mode-tech');
   await parkPointer(page);
@@ -281,6 +288,13 @@ async function runFirstSession(app, page, report, outDir) {
   await page.waitForTimeout(SETTLE_MS.click);
   await recordScene(page, report, outDir, SCENES.mapWeatherOff);
   await page.click('#map-mode-weather');
+  await page.click('#map-mode-control');
+  await page.click('#map-mode-production');
+  await parkPointer(page);
+  await page.waitForTimeout(SETTLE_MS.click);
+  await recordScene(page, report, outDir, SCENES.mapLayersSwapped);
+  await page.click('#map-mode-control');
+  await page.click('#map-mode-production');
 
   // Open the terrain legend beside the minimap panel and record it, then close it.
   await page.click('#map-legend-toggle');
@@ -382,8 +396,8 @@ async function runFirstSession(app, page, report, outDir) {
 }
 
 /**
- * Runs the second session: the reopened match, a battle on the hex both sides now hold, leaving that battle, and a new
- * regional match.
+ * Runs the second session: the reopened match, a battle on the hex both sides now hold, leaving that battle, the
+ * new-game screen opened over the match and closed again, and a new regional match.
  *
  * Purpose: Checks what a player sees after restarting the app, inside a battle, and on a regional map.
  * When to use: After `runFirstSession` and the saved-match change from `contestedHexEdit`, on the same folder.
@@ -437,6 +451,14 @@ async function runReopenedSession(app, page, report, outDir, battleHex) {
 
   await openNewGameOverlay(page);
   await recordScene(page, report, outDir, SCENES.newGameReopened);
+  // Close the screen and go back to the match that kept running under it, then open the screen again for the regional
+  // match.
+  await page.click('#new-game-dialog-close');
+  await page.waitForFunction(() => document.getElementById('game-over-overlay')?.classList.contains('hidden'), null, { timeout: 10000 });
+  await parkPointer(page);
+  await page.waitForTimeout(SETTLE_MS.resize);
+  await recordScene(page, report, outDir, SCENES.newGameClosed);
+  await openNewGameOverlay(page);
   await page.click('#new-game-tab-regional');
   await parkPointer(page);
   await page.waitForTimeout(SETTLE_MS.overlay);

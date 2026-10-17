@@ -3,10 +3,12 @@
  *
  * The menu is a disclosure popup. The button's `aria-expanded` and the menu's `hidden` attribute always agree.
  * New game and Offer tactical battles keep their own handlers in `openRouterControls.ts`; this module opens and
- * closes the menu, disables New game while the new-game screen is open, and handles Quit.
+ * closes the menu, disables New game while the new-game screen is open or a Ready is resolving, and handles Quit.
  */
+import { rendererSharedState as S } from '../core/state';
 import { newGameOverlayIsOpen } from '../gameplay/newGameDialogCollapse';
 import { dismissStaleControlTooltip } from './controlTooltip';
+import { newGameItemBusyTooltipText, newGameItemOpenTooltipText } from './controlTooltipText';
 
 /**
  * Id of the menu element.
@@ -52,19 +54,23 @@ export function isGameMenuOpen(): boolean {
 }
 
 /**
- * Disables the menu's New game item while the new-game screen is open.
+ * Disables the menu's New game item while the new-game screen is open or a Ready is resolving.
  *
  * Purpose: The menu also works on the new-game screen, where opening that screen again would only throw away the
- *   choices the player has made.
+ *   choices the player has made. While a Ready is being sent and answered, the match under the screen could not be
+ *   returned to safely, so New game waits for it.
  * When to use: When the menu opens, and whenever pointer input for the match controls is switched on or off, which
  *   happens each time the new-game overlay opens or closes.
- * Expected outcome: New game is disabled while `#game-over-overlay` is open and enabled otherwise. Its tip host says
- *   why while it is disabled.
+ * Expected outcome: New game is disabled while `#game-over-overlay` is open or `S.readyRequestInFlight` is set, and
+ *   enabled otherwise. Its tip host names the reason that applies, the open screen first.
  * Exceptions: None; does nothing when the item is missing.
  */
 export function syncGameMenuNewGameItem(): void {
   const item = document.getElementById(NEW_GAME_ITEM_ID);
-  if (item instanceof HTMLButtonElement) item.disabled = newGameOverlayIsOpen();
+  if (!(item instanceof HTMLButtonElement)) return;
+  const screenOpen = newGameOverlayIsOpen();
+  item.disabled = screenOpen || S.readyRequestInFlight;
+  item.parentElement?.setAttribute('data-control-tooltip', screenOpen ? newGameItemOpenTooltipText : newGameItemBusyTooltipText);
 }
 
 /**

@@ -236,6 +236,21 @@ const FRAME_CHECKS = Object.freeze([
     },
   },
   {
+    name: 'ready-check-mark',
+    scenes: [SCENES.strategic, SCENES.consoleCollapsed, SCENES.consoleExpandedAgain],
+    needs: ['#sidebar', '#ready-btn', '#ready-btn .ready-btn-check', '#ready-btn .ready-btn-label'],
+    run: (p, el) => {
+      const check = el('#ready-btn .ready-btn-check');
+      const label = el('#ready-btn .ready-btn-label');
+      if (!check.shown) return 'the check mark is not shown on Ready';
+      if (el('#sidebar').collapsed === 'true') {
+        return label.w <= 1 ? null : `the Ready label is ${Math.round(label.w)} px wide while the console is collapsed, expected only the check mark`;
+      }
+      if (label.text !== 'Ready') return `the Ready label reads "${label.text}"`;
+      return check.x + check.w <= label.x + 1 ? null : `the check mark ${fmt(check)} is not left of the label ${fmt(label)}`;
+    },
+  },
+  {
     name: 'orders-tab-shows-panel',
     scenes: [SCENES.strategic, SCENES.consoleExpandedAgain],
     needs: ['#console-panel-orders', '#console-panel-opponent', '#console-title'],

@@ -1,10 +1,10 @@
 /**
  * How far map chrome stays from the map's edges, in CSS pixels. This module holds the placement rules for the chrome
  * that shares the top of the map: the minimap panel at the top-left, the terrain legend beside or under it, the zoom
- * buttons at the top-right, and the toast band between them.
+ * buttons at the top-right, the toast band between them, and the new-game setup panel that floats over the map.
  *
  * Purpose: The minimap panel, the legend, the zoom buttons, and the toast band keep the same inset.
- * When to use: Through `legendPopoverPosition` and `toastBandSpan`.
+ * When to use: Through `legendPopoverPosition`, `toastBandSpan`, and `floatingPanelOffset`.
  * Expected outcome: 12.
  * Exceptions: None.
  */
@@ -78,4 +78,30 @@ export function toastBandSpan(input: {
     return { left: MAP_CHROME_INSET, right, overChrome: true };
   }
   return { left, right, overChrome: false };
+}
+
+/**
+ * Keeps a floating panel inside the map, with the inset to spare.
+ *
+ * Purpose: A panel the player drags must stay reachable: its header and grip never leave the map.
+ * When to use: While the new-game setup panel is dragged, when its height changes, and when the window changes size,
+ *   with the wanted offsets measured from the map's top-left corner.
+ * Expected outcome: `left` and `top` clamped to at least `MAP_CHROME_INSET`, and to at most the map's size less the
+ *   panel's size and the inset. A panel larger than the map on an axis sits at the inset on that axis.
+ * Exceptions: None.
+ */
+export function floatingPanelOffset(input: {
+  readonly left: number;
+  readonly top: number;
+  readonly panelWidth: number;
+  readonly panelHeight: number;
+  readonly mapWidth: number;
+  readonly mapHeight: number;
+}): { readonly left: number; readonly top: number } {
+  const maxLeft = Math.max(MAP_CHROME_INSET, input.mapWidth - input.panelWidth - MAP_CHROME_INSET);
+  const maxTop = Math.max(MAP_CHROME_INSET, input.mapHeight - input.panelHeight - MAP_CHROME_INSET);
+  return {
+    left: Math.min(maxLeft, Math.max(MAP_CHROME_INSET, input.left)),
+    top: Math.min(maxTop, Math.max(MAP_CHROME_INSET, input.top)),
+  };
 }

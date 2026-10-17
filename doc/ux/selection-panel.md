@@ -104,6 +104,7 @@ None.
 - `src/renderer/gameplay/selectionPanel.ts`
 - `src/renderer/gameplay/selectionBar.ts`
 - `src/renderer/gameplay/selectionPanelExpand.ts`
+- `src/renderer/chrome/panelSlideHelpers.ts` (`startPanelHeightSlide`: the 150 ms height slide and the reduced-motion rule)
 - `src/shared/selectionBarText.ts`
 - `src/renderer/gameplay/selectionPanelResize.ts`
 - `src/shared/selectionPanelSummary.ts`

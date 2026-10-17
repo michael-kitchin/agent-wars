@@ -1,8 +1,8 @@
-/* The new-game screen. While the new-game overlay is open, the top bar becomes the new-game bar, and the setup panel is
-   docked at the left of the window, under the top bar, with the map preview beside it. The panel's header holds the
-   hide-choices button and the message, the body holds the Map, Forces, and Rules sections and scrolls, and the footer
-   holds Start game. Hiding the choices leaves only that button, in the same spot over the map's top-left corner, and
-   the map widens under it. */
+/* The new-game screen. While the new-game overlay is open, the top bar becomes the new-game bar, and the setup panel
+   floats over the map's top-left corner, with the map preview under and around it. The panel's header bar holds the
+   expand control, the message, and, while a match waits under the screen, the close control. The body holds the Map,
+   Forces, and Rules sections and scrolls, and the footer holds Start game. Hiding the choices leaves only the header
+   bar. The grip on the panel's top-right corner moves it. */
 
 /* ---------- New-game bar ---------- */
 /* While the new-game overlay is open, the bar shows only the menu button, the title "New game", Load game…, Settings,
@@ -53,52 +53,107 @@ body:has(#game-over-overlay:not(.hidden)) #app-topbar.topbar-battle {
 }
 
 /* ---------- Panel ---------- */
+/* A floating panel 12 px in from the map's top-left corner, in the selection panel's chrome. It is as tall as its
+   content, up to the map's height less both insets, and the body scrolls past that. newGameDialogMove.ts writes inline
+   `left` and `top` once the player drags the grip, and clears them each time the overlay opens. */
 .new-game-panel {
-  position: relative;
+  position: absolute;
+  top: 12px;
+  left: 12px;
   z-index: 7002;
-  flex: none;
   width: var(--new-game-panel-width);
-  height: 100%;
+  max-width: calc(100% - 24px);
+  max-height: calc(100% - 24px);
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
   background: var(--chrome-bg);
   color: var(--chrome-text);
   color-scheme: dark;
-  border-right: 1px solid var(--chrome-border);
-  box-shadow: 4px 0 12px rgba(8, 14, 22, 0.35);
+  border: 1px solid var(--chrome-border);
+  border-radius: 6px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
 }
 .new-game-panel.hidden {
   display: none;
 }
+/* Compact is the header bar alone. The body and the footer show in every other state, including during a slide. */
+.new-game-panel[data-state="compact"] .new-game-panel-body,
+.new-game-panel[data-state="compact"] .new-game-panel-footer {
+  display: none;
+}
+/* One 50 px bar, the selection bar's height. Its bottom border turns transparent while compact, so the compact panel is
+   the bar inside the panel's own border. */
 .new-game-panel-header {
   flex: none;
+  height: 50px;
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 12px;
+  padding: 0;
   border-bottom: 1px solid var(--chrome-border);
 }
+.new-game-panel[data-state="compact"] .new-game-panel-header {
+  border-bottom-color: transparent;
+}
 #game-over-message {
+  flex: 1 1 auto;
   min-width: 0;
-  margin: 0;
+  margin: 0 10px 0 0;
+  overflow: hidden;
   font-size: 15px;
   font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-/* The square matches a randomize button (`--new-game-collapse-size`). It keeps the pointer while the choices are
-   hidden and the rest of the panel does not. */
-#new-game-dialog-collapse {
+/* The end controls, like the selection panel's: full-height 32 px columns with a divider on the inner side, expand at
+   the bar's left edge and close at its right edge. Close shows only while a match waits under the screen. The chevron
+   points down while the choices are hidden and turns up while they show. */
+.new-game-panel-expand,
+.new-game-panel-close {
   flex: none;
-  width: var(--new-game-collapse-size, 1.75rem);
-  height: var(--new-game-collapse-size, 1.75rem);
+  align-self: stretch;
+  width: 32px;
   min-width: 0;
-  margin-left: 0;
+  margin: 0;
   padding: 0;
-  box-sizing: border-box;
-  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--chrome-text);
+}
+.new-game-panel-expand {
+  border-right: 1px solid var(--chrome-divider);
+}
+.new-game-panel-close {
+  border-left: 1px solid var(--chrome-divider);
+}
+.new-game-panel-close[hidden] {
+  display: none;
+}
+.new-game-panel-expand:hover,
+.new-game-panel-close:hover {
+  background: var(--chrome-bg-raised);
+}
+.new-game-panel-expand:focus,
+.new-game-panel-close:focus {
+  outline-offset: -2px;
+}
+/* The close control's divider separates it from the message, so the message needs no margin of its own then. */
+#game-over-message:has(+ .new-game-panel-close:not([hidden])) {
+  margin-right: 0;
+}
+.new-game-panel[data-state="expanded"] .new-game-panel-chevron,
+.new-game-panel[data-state="collapsing"] .new-game-panel-chevron {
+  transform: rotate(180deg);
 }
 .new-game-panel-body {
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   min-height: 0;
   overflow: auto;
 }
@@ -113,28 +168,19 @@ body:has(#game-over-overlay:not(.hidden)) #app-topbar.topbar-battle {
   font-size: 14px;
   font-weight: 600;
 }
-
-/* ---------- Hidden choices ---------- */
-/* Only the hide-choices button stays. The panel leaves the row, so the map widens to the window's left edge, and the
-   header keeps its padding, so the button does not move. #app-body is the containing block. */
-.new-game-panel.game-over-dialog-collapsed {
+/* The move grip on the panel's top-right corner, drawn like the selection panel's resize grip. It shows in both
+   states, so the header bar alone can be moved too. */
+.new-game-panel-grip {
   position: absolute;
+  z-index: 1;
   top: 0;
-  left: 0;
-  width: auto;
-  height: auto;
-  background: transparent;
-  border: 0;
-  box-shadow: none;
-  pointer-events: none;
-}
-.new-game-panel.game-over-dialog-collapsed .new-game-panel-header {
-  border-bottom: 0;
-}
-.new-game-panel.game-over-dialog-collapsed #game-over-message,
-.new-game-panel.game-over-dialog-collapsed .new-game-panel-body,
-.new-game-panel.game-over-dialog-collapsed .new-game-panel-footer {
-  display: none;
+  right: 0;
+  width: 14px;
+  height: 14px;
+  cursor: move;
+  touch-action: none;
+  background: linear-gradient(225deg, transparent 0 3px, var(--chrome-border) 3px 4px, transparent 4px 6px, var(--chrome-border) 6px 7px, transparent 7px);
+  border-top-right-radius: 6px;
 }
 
 /* ---------- Sections ---------- */
@@ -168,8 +214,7 @@ body:has(#game-over-overlay:not(.hidden)) #app-topbar.topbar-battle {
   box-sizing: border-box;
   font-size: 13px;
 }
-/* A square the height of the dropdown beside it. `--new-game-collapse-size` copies this size onto the hide-choices
-   button. */
+/* A square the height of the dropdown beside it. */
 .new-game-panel-body .compact-square-btn.new-game-randomize {
   width: 30px;
   min-width: 30px;

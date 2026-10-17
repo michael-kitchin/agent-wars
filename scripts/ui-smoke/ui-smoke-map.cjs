@@ -392,8 +392,21 @@ function contestedHexEdit(state) {
  * Exceptions: Throws when the grip is not on screen.
  */
 async function dragSelectionPanelGrip(page, dx, dy) {
-  const box = await page.locator('#selection-panel-grip').boundingBox();
-  if (!box) throw new Error('the selection panel grip is not on screen');
+  await dragGrip(page, '#selection-panel-grip', dx, dy);
+}
+
+/**
+ * Drags a panel grip by an offset and lets go.
+ *
+ * Purpose: The selection panel's resize grip and the new-game panel's move grip are dragged the same way a player would.
+ * When to use: While the grip is on screen. Keep the end point inside the window.
+ * Expected outcome: The pointer presses the grip's center, moves by the offset in eight steps, and lets go; then the
+ *   map settles.
+ * Exceptions: Throws when the grip is not on screen.
+ */
+async function dragGrip(page, gripSelector, dx, dy) {
+  const box = await page.locator(gripSelector).boundingBox();
+  if (!box) throw new Error(`${gripSelector} is not on screen`);
   const x = box.x + box.width / 2;
   const y = box.y + box.height / 2;
   await page.mouse.move(x, y);
@@ -410,6 +423,7 @@ module.exports = {
   enterBattleAt,
   queueBattleMarch,
   selectLoneBattleUnit,
+  dragGrip,
   dragSelectionPanelGrip,
   readGameState,
   selectLoneUnit,

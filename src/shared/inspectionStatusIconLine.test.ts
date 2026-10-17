@@ -18,14 +18,14 @@ import {
  *
  * Purpose: Production labels stay on their current hexes. The status icon does not use this surface as a yes-or-no gate.
  * When to use: From this file's runner.
- * Expected outcome: Tactical, hidden hexes, and opponent hexes outside inspection are `'none'`. The build button wins when it is shown. Inspection reveals a canvas label on the remaining hexes.
+ * Expected outcome: Tactical, hidden hexes, and opponent hexes without production detail are `'none'`. The build button wins when it is shown. Production detail reveals a canvas label on the remaining hexes.
  * Exceptions: AssertionError when the surface drifts from the production overlay.
  */
 test('a production label is a button, a canvas line, or absent', () => {
   const base = {
     tacticalRendered: false,
     explored: true,
-    mapInspectionHeld: false,
+    productionDetailShown: false,
     controlledByHuman: true,
     humanUrbanProduction: true,
     buildEntryZoom: true,
@@ -45,9 +45,9 @@ test('a production label is a button, a canvas line, or absent', () => {
     'none'
   );
   assert.equal(strategicProductionLabelSurface(base), 'button');
-  assert.equal(strategicProductionLabelSurface({ ...base, mapInspectionHeld: true }), 'button');
+  assert.equal(strategicProductionLabelSurface({ ...base, productionDetailShown: true }), 'button');
   assert.equal(
-    strategicProductionLabelSurface({ ...base, explored: false, mapInspectionHeld: true }),
+    strategicProductionLabelSurface({ ...base, explored: false, productionDetailShown: true }),
     'canvas'
   );
   assert.equal(
@@ -61,7 +61,7 @@ test('a production label is a button, a canvas line, or absent', () => {
       controlledByHuman: false,
       humanUrbanProduction: false,
       buildEntryZoom: false,
-      mapInspectionHeld: true,
+      productionDetailShown: true,
     }),
     'canvas'
   );
@@ -71,7 +71,7 @@ test('a production label is a button, a canvas line, or absent', () => {
       controlledByHuman: false,
       humanUrbanProduction: false,
       buildEntryZoom: false,
-      mapInspectionHeld: true,
+      productionDetailShown: true,
     }),
     'canvas'
   );
@@ -81,7 +81,7 @@ test('a production label is a button, a canvas line, or absent', () => {
 /**
  * Checks which status icons a world hex receives.
  *
- * Purpose: The inspection view allows tech, and the Weather tab allows weather, each on its own. A missing bonus or a
+ * Purpose: The tech icon choice allows tech, and the Weather tab allows weather, each on its own. A missing bonus or a
  *   missing hex fact omits that icon.
  * When to use: From this file's runner.
  * Expected outcome: Tech then weather when both apply. Weather alone when the tech icon cannot show: the tech bonus is
@@ -90,9 +90,9 @@ test('a production label is a button, a canvas line, or absent', () => {
  * Exceptions: AssertionError when a missing count becomes Basic, an unknown weather becomes Mild, or a toggle leaks into
  *   the other icon.
  */
-test('status icons follow the inspection view, the Weather tab, and the bonuses', () => {
+test('status icons follow the tech icon choice, the Weather tab, and the bonuses', () => {
   const both = {
-    mapInspectionHeld: true,
+    techIconsShown: true,
     weatherIconsShown: true,
     techBonusEnabled: true,
     weatherBonusEnabled: true,
@@ -106,7 +106,7 @@ test('status icons follow the inspection view, the Weather tab, and the bonuses'
   assert.deepEqual(inspectionStatusIconsForHex({ ...both, weatherIconsShown: false, baselineUrbanHexCount: 20 }), [
     { kind: 'tech', level: 'basic' },
   ]);
-  assert.deepEqual(inspectionStatusIconsForHex({ ...both, mapInspectionHeld: false }), [{ kind: 'weather', state: 'heat' }]);
+  assert.deepEqual(inspectionStatusIconsForHex({ ...both, techIconsShown: false }), [{ kind: 'weather', state: 'heat' }]);
   assert.deepEqual(inspectionStatusIconsForHex({ ...both, techBonusEnabled: false }), [{ kind: 'weather', state: 'heat' }]);
   assert.deepEqual(inspectionStatusIconsForHex({ ...both, weather: 'fog' }), [{ kind: 'tech', level: 'advanced' }]);
   assert.deepEqual(inspectionStatusIconsForHex({ ...both, baselineUrbanHexCount: -1 }), [{ kind: 'weather', state: 'heat' }]);

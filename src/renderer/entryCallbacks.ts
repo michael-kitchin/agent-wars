@@ -787,7 +787,7 @@ export function updateGameOverUI(state: GameStateSnapshot | null): void {
  *
  * Purpose: The top bar and the console leave the layout when that dialog opens. The map has to take the freed space before the preview fits.
  * When to use: The game menu's New game item (`#openrouter-new-btn`).
- * Expected outcome: The annihilation dialog ignores the click. Otherwise opponent planning and playback stop, the dialog opens, and the map resizes only when the overlay was hidden.
+ * Expected outcome: The annihilation dialog and a Ready that is still resolving ignore the click. Otherwise the dialog opens over the match, which keeps running; when a live match is held, the renderer match epoch moves forward so a reply still in flight is discarded. The map resizes only when the overlay was hidden.
  * Exceptions: None.
  */
 export function openNewGameOverlayFromModelTab(): void {

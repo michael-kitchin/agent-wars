@@ -38,23 +38,60 @@ export function formatElapsedMmSs(ms: number): string {
 }
 
 /**
- * Defines the `setReadyButtonLabelReady` function shape (export function setReadyButtonLabelReady(readyBtn: HTMLButtonElement): void).
-
- * Purpose: Supports maintainability by documenting why `setReadyButtonLabelReady` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Path of the check mark drawn left of "Ready", in a 16 x 16 view box.
+ *
+ * Purpose: The markup in `static/index.html` and the label rebuilt here draw the same mark.
+ * When to use: `buildReadyCheckIcon`.
+ * Expected outcome: A stroked tick in the chrome icon style.
  * Exceptions: None.
  */
-export function setReadyButtonLabelReady(readyBtn: HTMLButtonElement): void {
-  readyBtn.textContent = 'Ready';
+const READY_CHECK_ICON_PATH = 'M3 8.5l3.2 3.2L13 4.8';
+
+/**
+ * Builds the check mark icon for the Ready label.
+ *
+ * Purpose: The AI wait label replaces the button's content, so the Ready label has to be rebuilt with its icon.
+ * When to use: From `setReadyButtonLabelReady`.
+ * Expected outcome: A new `svg.chrome-icon.ready-btn-check`, hidden from assistive technology.
+ * Exceptions: None.
+ */
+function buildReadyCheckIcon(): SVGSVGElement {
+  const svgNs = 'http://www.w3.org/2000/svg';
+  const icon = document.createElementNS(svgNs, 'svg');
+  icon.setAttribute('class', 'chrome-icon ready-btn-check');
+  icon.setAttribute('viewBox', '0 0 16 16');
+  icon.setAttribute('aria-hidden', 'true');
+  const path = document.createElementNS(svgNs, 'path');
+  path.setAttribute('d', READY_CHECK_ICON_PATH);
+  icon.appendChild(path);
+  return icon;
 }
 
 /**
- * Defines the `setReadyButtonLabelAiWait` function shape (export function setReadyButtonLabelAiWait(readyBtn: HTMLButtonElement, elapsedMs: number): void).
+ * Shows the Ready label: the check mark, then the word.
+ *
+ * Purpose: Ready's label whenever opponent planning is not holding the button, enabled or disabled.
+ * When to use: From `updateReadyButtonState` whenever the AI wait label does not apply.
+ * Expected outcome: The button holds `svg.ready-btn-check` and then `span.ready-btn-label` reading "Ready". A button
+ *   that already shows the mark is left alone, so repeated refreshes do not rebuild it. The collapsed console's styles
+ *   hide the word and keep the mark.
+ * Exceptions: None.
+ */
+export function setReadyButtonLabelReady(readyBtn: HTMLButtonElement): void {
+  if (readyBtn.querySelector('.ready-btn-check')) return;
+  const label = document.createElement('span');
+  label.className = 'ready-btn-label';
+  label.textContent = 'Ready';
+  readyBtn.replaceChildren(buildReadyCheckIcon(), label);
+}
 
- * Purpose: Supports maintainability by documenting why `setReadyButtonLabelAiWait` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+/**
+ * Shows the AI wait label: "AI:" in bold, then the elapsed wait.
+ *
+ * Purpose: Tells the player that Ready is waiting on opponent planning, and for how long.
+ * When to use: From `updateReadyButtonState` while opponent planning holds the button.
+ * Expected outcome: The button's content becomes `<strong>AI: </strong>` and the time as MM:SS, with no check mark.
+ *   `setReadyButtonLabelReady` rebuilds the Ready label afterwards.
  * Exceptions: None.
  */
 export function setReadyButtonLabelAiWait(readyBtn: HTMLButtonElement, elapsedMs: number): void {

@@ -48,7 +48,7 @@
   --chrome-tab-label-size: 9px;
   /* The minimap overview's width, and so the width of the tab row under it: five tabs of 56 px. */
   --minimap-width: 280px;
-  /* The new-game setup panel's width, docked at the left of the window while the new-game overlay is open. */
+  /* The new-game setup panel's width. The panel floats over the map's top-left corner while the new-game overlay is open. */
   --new-game-panel-width: 432px;
   /* The ranged and air-strike order colors the map draws (RANGE_PERIMETER_RANGED_COLOR, RANGE_PERIMETER_AIR_STRIKE_COLOR). */
   --order-ranged: #a06020;
@@ -109,10 +109,19 @@ body {
   overflow: hidden;
 }
 /* The overview, with the tabs toggle laid over its lower-left corner. The overview is its own stacking context, so
-   Leaflet's panes stay under the toggle. */
+   Leaflet's panes stay under the toggle. A thin border runs around the overview's inside edge, over the map and the
+   toggle, and takes no pointer input. */
 .minimap-overview {
   flex: none;
   position: relative;
+}
+.minimap-overview::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border: 1px solid var(--chrome-border);
+  pointer-events: none;
 }
 #minimap {
   width: var(--minimap-width);
@@ -163,10 +172,6 @@ body {
 }
 .map-mode-tabs[hidden] {
   display: none;
-}
-.map-mode-host {
-  display: flex;
-  min-width: 0;
 }
 .map-mode-btn {
   width: 100%;

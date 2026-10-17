@@ -1,14 +1,19 @@
 /**
- * The two view choices the player made in the map-mode tabs: whether weather icons show, and whether the Tech view is
- * on. This module holds them for the rest of the session; they are not saved, so the app opens with weather icons shown
- * and the Tech view off each time.
+ * The layer choices the player made in the map-mode tabs: weather icons, tech icons, control borders, and production
+ * detail. This module holds them for the rest of the session; they are not saved, so the app opens with the defaults
+ * in `src/shared/mapViewMode.ts` each time.
  *
  * Purpose: The mode tabs write the choices and the drawing code reads them, without either importing the other.
  * When to use: Through the getters and setters below.
- * Expected outcome: `DEFAULT_WEATHER_ICONS_SHOWN` and `DEFAULT_TECH_VIEW_CHOSEN` until the player changes them.
+ * Expected outcome: The `DEFAULT_*` values until the player changes them.
  * Exceptions: None.
  */
-import { DEFAULT_TECH_VIEW_CHOSEN, DEFAULT_WEATHER_ICONS_SHOWN } from '../../shared/mapViewMode';
+import {
+  DEFAULT_CONTROL_BORDERS_SHOWN,
+  DEFAULT_PRODUCTION_DETAIL_CHOSEN,
+  DEFAULT_TECH_VIEW_CHOSEN,
+  DEFAULT_WEATHER_ICONS_SHOWN,
+} from '../../shared/mapViewMode';
 
 /**
  * Whether Weather is on in the mode tabs.
@@ -29,6 +34,26 @@ let weatherIconsShown = DEFAULT_WEATHER_ICONS_SHOWN;
  * Exceptions: None.
  */
 let techViewChosen = DEFAULT_TECH_VIEW_CHOSEN;
+
+/**
+ * Whether Control is on in the mode tabs.
+ *
+ * Purpose: The single record of that choice for this session.
+ * When to use: Only through `areControlBordersShown` and `setControlBordersShown`.
+ * Expected outcome: Starts as `DEFAULT_CONTROL_BORDERS_SHOWN`.
+ * Exceptions: None.
+ */
+let controlBordersShown = DEFAULT_CONTROL_BORDERS_SHOWN;
+
+/**
+ * Whether Production is on in the mode tabs.
+ *
+ * Purpose: The single record of that choice for this session.
+ * When to use: Only through `isProductionDetailChosen` and `setProductionDetailChosen`.
+ * Expected outcome: Starts as `DEFAULT_PRODUCTION_DETAIL_CHOSEN`.
+ * Exceptions: None.
+ */
+let productionDetailChosen = DEFAULT_PRODUCTION_DETAIL_CHOSEN;
 
 /**
  * Returns whether the world map shows weather icons.
@@ -55,10 +80,11 @@ export function setWeatherIconsShown(shown: boolean): void {
 }
 
 /**
- * Returns whether the player turned the Tech view on.
+ * Returns whether the player turned Tech on.
  *
- * Purpose: Drawing code and the Tech tab follow the same choice.
- * When to use: Each time the inspection view is decided, and when the mode tabs redraw their pressed state.
+ * Purpose: The tech-icon pass and the Tech tab follow the same choice.
+ * When to use: Through `areTechIconsShown`, which adds the T key and the battle and overlay rules, and when the mode
+ *   tabs redraw their pressed state.
  * Expected outcome: True while Tech is on.
  * Exceptions: None.
  */
@@ -67,7 +93,7 @@ export function isTechViewChosen(): boolean {
 }
 
 /**
- * Records whether the player turned the Tech view on.
+ * Records whether the player turned Tech on.
  *
  * Purpose: The choice lasts for the session, across turns, battles, and new matches.
  * When to use: Only from the Tech tab.
@@ -76,4 +102,54 @@ export function isTechViewChosen(): boolean {
  */
 export function setTechViewChosen(chosen: boolean): void {
   techViewChosen = chosen;
+}
+
+/**
+ * Returns whether the world map shows the borders that mark who controls each hex, and the home-region outlines.
+ *
+ * Purpose: The terrain pass and the Control tab follow the same choice.
+ * When to use: Each time the world map's hexes or the home-region outlines are drawn, and when the mode tabs redraw
+ *   their pressed state.
+ * Expected outcome: True while Control is on.
+ * Exceptions: None.
+ */
+export function areControlBordersShown(): boolean {
+  return controlBordersShown;
+}
+
+/**
+ * Records whether the world map shows the control borders and the home-region outlines.
+ *
+ * Purpose: The choice lasts for the session, across turns, battles, and new matches.
+ * When to use: Only from the Control tab.
+ * Expected outcome: Later calls to `areControlBordersShown` return `shown`. Nothing is redrawn here.
+ * Exceptions: None.
+ */
+export function setControlBordersShown(shown: boolean): void {
+  controlBordersShown = shown;
+}
+
+/**
+ * Returns whether the player turned Production on.
+ *
+ * Purpose: The production labels and the Production tab follow the same choice.
+ * When to use: Through `isProductionDetailShown`, which adds the T key and the battle and overlay rules, and when the
+ *   mode tabs redraw their pressed state.
+ * Expected outcome: True while Production is on.
+ * Exceptions: None.
+ */
+export function isProductionDetailChosen(): boolean {
+  return productionDetailChosen;
+}
+
+/**
+ * Records whether the player turned Production on.
+ *
+ * Purpose: The choice lasts for the session, across turns, battles, and new matches.
+ * When to use: Only from the Production tab.
+ * Expected outcome: Later calls to `isProductionDetailChosen` return `chosen`. Nothing is redrawn here.
+ * Exceptions: None.
+ */
+export function setProductionDetailChosen(chosen: boolean): void {
+  productionDetailChosen = chosen;
 }

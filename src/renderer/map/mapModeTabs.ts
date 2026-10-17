@@ -1,31 +1,93 @@
 /**
- * The row of map-mode tabs under the minimap overview: Weather shows or hides the weather icons and Tech turns the Tech
- * view on or off, each a toggle on its own; Control and Production are disabled placeholders in the markup; and Legend
- * opens or closes the terrain legend. The row starts hidden, and the toggle on the overview's lower-left corner shows
- * and hides it.
+ * The row of map-mode tabs under the minimap overview: Weather, Tech, Control, and Production each show or hide one map
+ * layer, and Legend opens or closes the terrain legend. The row starts hidden, and the toggle on the overview's
+ * lower-left corner shows and hides it.
  *
  * Purpose: Keeps the tabs, the row's toggle, the stored choices, and the legend in step.
  * When to use: `wireMapModeTabs` once at startup.
- * Expected outcome: Weather reads as pressed while its icons show, Tech while its view is on, and Legend while the
- *   legend is open. The toggle reads as expanded while the row shows.
+ * Expected outcome: Each layer tab reads as pressed while its layer is chosen, and Legend while the legend is open.
+ *   The toggle reads as expanded while the row shows.
  * Exceptions: None; missing elements are skipped.
  */
 import { mapModeTabsHideTooltipText, mapModeTabsShowTooltipText } from '../chrome/frameTooltipText';
 import { layoutMapChrome } from './mapChromeLayout';
-import { areWeatherIconsShown, isTechViewChosen, setTechViewChosen, setWeatherIconsShown } from './mapViewModeState';
+import {
+  areControlBordersShown,
+  areWeatherIconsShown,
+  isProductionDetailChosen,
+  isTechViewChosen,
+  setControlBordersShown,
+  setProductionDetailChosen,
+  setTechViewChosen,
+  setWeatherIconsShown,
+} from './mapViewModeState';
+
+/**
+ * One layer tab: its element id and the stored choice it reads and writes.
+ *
+ * Purpose: The four layer tabs behave the same way, so one table drives them.
+ * When to use: Entries of `LAYER_TABS`.
+ * Expected outcome: `read` returns the stored choice; `write` records a new one without redrawing.
+ * Exceptions: None.
+ */
+interface MapLayerTab {
+  /**
+   * The tab's id in `static/index.html`.
+   *
+   * Contract: The button id, also used as its tip host's id.
+   * When to use: Read while the tabs are wired and while a layer toggles.
+   * Expected outcome: One of the four ids in `LAYER_TABS`.
+   * Exceptions: None.
+   */
+  readonly id: string;
+  /**
+   * Returns whether the layer is chosen.
+   *
+   * Contract: Reads the stored choice and does not redraw.
+   * When to use: Read while the tabs sync and after a toggle.
+   * Expected outcome: True when the layer is on.
+   * Exceptions: None.
+   */
+  readonly read: () => boolean;
+  /**
+   * Records whether the layer is chosen.
+   *
+   * Contract: Writes the stored choice and does not redraw.
+   * When to use: Called when the player toggles the tab.
+   * Expected outcome: The next `read` returns the value written.
+   * Exceptions: None.
+   */
+  readonly write: (chosen: boolean) => void;
+}
+
+/**
+ * The layer tabs, left to right.
+ *
+ * Purpose: A layer tab is one row here, plus its markup and its stored choice.
+ * When to use: `syncMapModeTabs` and `wireMapModeTabs`.
+ * Expected outcome: Weather, Tech, Control, Production.
+ * Exceptions: None.
+ */
+const LAYER_TABS: readonly MapLayerTab[] = Object.freeze([
+  { id: 'map-mode-weather', read: areWeatherIconsShown, write: setWeatherIconsShown },
+  { id: 'map-mode-tech', read: isTechViewChosen, write: setTechViewChosen },
+  { id: 'map-mode-control', read: areControlBordersShown, write: setControlBordersShown },
+  { id: 'map-mode-production', read: isProductionDetailChosen, write: setProductionDetailChosen },
+]);
 
 /**
  * Sets each tab's pressed state from the stored choices and the legend.
  *
  * Purpose: The tabs are the only sign of which choices are on, so they must never disagree with them.
  * When to use: After a choice changes or the legend opens or closes.
- * Expected outcome: `aria-pressed` on Weather and on Tech matches its stored choice; `aria-pressed` and
- *   `aria-expanded` on Legend match whether `#terrain-legend` is shown.
+ * Expected outcome: `aria-pressed` on each layer tab matches its stored choice; `aria-pressed` and `aria-expanded` on
+ *   Legend match whether `#terrain-legend` is shown.
  * Exceptions: None.
  */
 function syncMapModeTabs(): void {
-  document.getElementById('map-mode-weather')?.setAttribute('aria-pressed', String(areWeatherIconsShown()));
-  document.getElementById('map-mode-tech')?.setAttribute('aria-pressed', String(isTechViewChosen()));
+  for (const tab of LAYER_TABS) {
+    document.getElementById(tab.id)?.setAttribute('aria-pressed', String(tab.read()));
+  }
   const legendOpen = document.getElementById('terrain-legend')?.hidden === false;
   const legendToggle = document.getElementById('map-legend-toggle');
   legendToggle?.setAttribute('aria-pressed', String(legendOpen));
@@ -33,29 +95,15 @@ function syncMapModeTabs(): void {
 }
 
 /**
- * Turns the weather icons on the world map on or off.
+ * Turns one map layer on or off.
  *
- * Purpose: The canvas draws the weather icons from the stored choice, in either view.
- * When to use: From the Weather tab.
- * Expected outcome: The choice flips, the tab follows, and the map is redrawn. The Tech view is not touched.
+ * Purpose: The canvas draws each layer from its stored choice, so a click only flips the choice and redraws.
+ * When to use: From a layer tab's click.
+ * Expected outcome: The choice flips, the tabs follow, and the map is redrawn. The other layers are not touched.
  * Exceptions: None.
  */
-function toggleWeatherIcons(requestRedraw: () => void): void {
-  setWeatherIconsShown(!areWeatherIconsShown());
-  syncMapModeTabs();
-  requestRedraw();
-}
-
-/**
- * Turns the Tech view on or off.
- *
- * Purpose: The Tech view decides the terrain fill, the hex codes, and the tech icons, which the canvas draws.
- * When to use: From the Tech tab.
- * Expected outcome: The choice flips, the tab follows, and the map is redrawn. The weather icons are not touched.
- * Exceptions: None.
- */
-function toggleTechView(requestRedraw: () => void): void {
-  setTechViewChosen(!isTechViewChosen());
+function toggleMapLayer(tab: MapLayerTab, requestRedraw: () => void): void {
+  tab.write(!tab.read());
   syncMapModeTabs();
   requestRedraw();
 }
@@ -102,20 +150,21 @@ function setMapModeTabsShown(shown: boolean): void {
 }
 
 /**
- * Wires the row's toggle and the Weather, Tech, and Legend tabs.
+ * Wires the row's toggle, the layer tabs, and the Legend tab.
  *
  * Purpose: The mode tabs' single setup point.
  * When to use: Once at startup, after the maps and the legend are built.
- * Expected outcome: Clicks show or hide the row, turn Weather or Tech on or off, or open or close the legend, and the
- *   tabs show the session's starting state. The row's starting state, hidden, comes from the markup.
+ * Expected outcome: Clicks show or hide the row, turn a layer on or off, or open or close the legend, and the tabs
+ *   show the session's starting state. The row's starting state, hidden, comes from the markup.
  * Exceptions: None.
  */
 export function wireMapModeTabs(requestRedraw: () => void): void {
   document.getElementById('map-mode-tabs-toggle')?.addEventListener('click', () => {
     setMapModeTabsShown(document.getElementById('map-mode-tabs')?.hidden === true);
   });
-  document.getElementById('map-mode-weather')?.addEventListener('click', () => toggleWeatherIcons(requestRedraw));
-  document.getElementById('map-mode-tech')?.addEventListener('click', () => toggleTechView(requestRedraw));
+  for (const tab of LAYER_TABS) {
+    document.getElementById(tab.id)?.addEventListener('click', () => toggleMapLayer(tab, requestRedraw));
+  }
   document.getElementById('map-legend-toggle')?.addEventListener('click', toggleTerrainLegend);
   syncMapModeTabs();
 }

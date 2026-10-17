@@ -55,25 +55,25 @@ export interface StrategicProductionLabelInput {
   /**
    * Whether the player has explored this world hex.
    *
-   * Contract: The build button requires this. Inspection can still show a canvas label when it is false.
+   * Contract: The build button requires this. Production detail can still show a canvas label when it is false.
    * When to use: Pass the exploration predicate used by the production overlay.
-   * Expected outcome: An unexplored hex outside inspection yields `'none'`.
+   * Expected outcome: An unexplored hex without production detail yields `'none'`.
    * Exceptions: None.
    */
   readonly explored: boolean;
   /**
-   * Whether map inspection is held.
+   * Whether production labels show on every hex.
    *
-   * Contract: True is the T key. It reveals labels that are otherwise hidden.
-   * When to use: Pass `isMapInspectionModeHeld`.
+   * Contract: True while T is held or Production is on. It reveals labels that are otherwise hidden.
+   * When to use: Pass `isProductionDetailShown`.
    * Expected outcome: Opponent and unexplored hexes can return `'canvas'`.
    * Exceptions: None.
    */
-  readonly mapInspectionHeld: boolean;
+  readonly productionDetailShown: boolean;
   /**
    * Whether the human controls this hex.
    *
-   * Contract: A human non-urban hex still shows a canvas label outside inspection.
+   * Contract: A human non-urban hex still shows a canvas label without production detail.
    * When to use: Pass true when the control row is `'human'`.
    * Expected outcome: Combined with the other flags, selects `'canvas'` or `'none'`.
    * Exceptions: None.
@@ -109,14 +109,14 @@ export interface StrategicProductionLabelInput {
  */
 export interface InspectionStatusIconInput {
   /**
-   * Whether the inspection view is on: T is held, or the Tech tab is on.
+   * Whether tech icons are shown: T is held, or the Tech tab is on.
    *
    * Contract: True allows a tech icon. It does not affect the weather icon.
-   * When to use: Pass `isMapInspectionModeHeld`.
+   * When to use: Pass `areTechIconsShown`.
    * Expected outcome: False never returns a tech icon.
    * Exceptions: None.
    */
-  readonly mapInspectionHeld: boolean;
+  readonly techIconsShown: boolean;
   /**
    * Whether the Weather tab is on.
    *
@@ -129,7 +129,7 @@ export interface InspectionStatusIconInput {
   /**
    * Whether the match awards a tech tier.
    *
-   * Contract: Only `true` can show a tech icon, and only while the inspection view is on. Low and High use the same icon.
+   * Contract: Only `true` can show a tech icon, and only while tech icons are shown. Low and High use the same icon.
    * When to use: Pass `techBonusEnabled === true`.
    * Expected outcome: A false or missing flag omits the tech icon.
    * Exceptions: None.
@@ -298,15 +298,15 @@ export function strategicOverlayBandOffsetPx(spanPx: number): number {
 export function strategicProductionLabelSurface(input: StrategicProductionLabelInput): StrategicProductionLabelSurface {
   if (input.tacticalRendered) return 'none';
   if (input.explored && input.humanUrbanProduction && input.buildEntryZoom) return 'button';
-  if (!input.explored && !input.mapInspectionHeld) return 'none';
-  if (!input.mapInspectionHeld && !input.humanUrbanProduction && !input.controlledByHuman) return 'none';
+  if (!input.explored && !input.productionDetailShown) return 'none';
+  if (!input.productionDetailShown && !input.humanUrbanProduction && !input.controlledByHuman) return 'none';
   return 'canvas';
 }
 
 /**
  * Returns the status icons for a world hex, left to right, or an empty list when that hex shows none.
  *
- * Purpose: The inspection view allows tech. The Weather tab allows weather. Each is decided on its own, so a hex can
+ * Purpose: T and the Tech tab allow tech. The Weather tab allows weather. Each is decided on its own, so a hex can
  *   show both. A missing bonus or a missing hex fact omits that icon.
  * When to use: Once per world hex while the strategic map is outside a battle and outside battle-detail zoom.
  * Expected outcome: No icon, one icon, or the tech icon then the weather icon.
@@ -315,7 +315,7 @@ export function strategicProductionLabelSurface(input: StrategicProductionLabelI
 export function inspectionStatusIconsForHex(input: InspectionStatusIconInput): readonly InspectionStatusIcon[] {
   const icons: InspectionStatusIcon[] = [];
   const urbanCount = input.baselineUrbanHexCount;
-  if (input.mapInspectionHeld && input.techBonusEnabled === true && Number.isFinite(urbanCount) && urbanCount > 0) {
+  if (input.techIconsShown && input.techBonusEnabled === true && Number.isFinite(urbanCount) && urbanCount > 0) {
     icons.push({ kind: 'tech', level: techLevelFromUrbanHexCount(urbanCount) });
   }
   const weather = input.weatherIconsShown && input.weatherBonusEnabled === true ? knownWeather(input.weather) : null;

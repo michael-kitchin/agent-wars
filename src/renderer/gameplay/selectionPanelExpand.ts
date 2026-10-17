@@ -12,16 +12,7 @@
  */
 import { selectionPanelCollapseTooltipText, selectionPanelExpandTooltipText } from '../chrome/frameTooltipText';
 import { applyDraggedPanelHeight, clearPanelHeight } from './selectionPanelResize';
-
-/**
- * How long the panel takes to slide between its states, in milliseconds.
- *
- * Purpose: Long enough to show where the details come from, short enough not to slow the player down.
- * When to use: The slide's duration.
- * Expected outcome: 150.
- * Exceptions: None.
- */
-const SELECTION_PANEL_SLIDE_MS = 150;
+import { startPanelHeightSlide } from '../chrome/panelSlideHelpers';
 
 /**
  * Whether the player last chose the expanded state.
@@ -59,18 +50,6 @@ function syncExpandControl(button: HTMLElement): void {
 }
 
 /**
- * Reports whether the system asks for reduced motion.
- *
- * Purpose: The slide is skipped for players who turn motion off.
- * When to use: Before each slide.
- * Expected outcome: True when `prefers-reduced-motion: reduce` matches.
- * Exceptions: None; false when the media query cannot be read.
- */
-function reducedMotionRequested(): boolean {
-  return window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
-}
-
-/**
  * Ends the panel in the state the player chose, with no slide running.
  *
  * Purpose: One place that leaves the panel settled, after a slide or without one.
@@ -90,22 +69,15 @@ function settle(panel: HTMLElement): void {
  *
  * Purpose: The panel's bottom edge stays put, so a changing height moves the bar up or down.
  * When to use: From `toggleSelectionPanel`, after `data-state` shows the details and the target height is in place.
- * Expected outcome: The panel settles at once when motion is reduced, the heights match, or the page cannot animate.
+ * Expected outcome: The panel settles at once when `startPanelHeightSlide` declines to slide: motion is reduced, the
+ *   heights match, or the page cannot animate. A slide that a later click replaced does not settle the panel.
  * Exceptions: None.
  */
 function slidePanel(panel: HTMLElement, from: number, to: number): void {
-  if (reducedMotionRequested() || Math.abs(from - to) < 1 || typeof panel.animate !== 'function') {
-    settle(panel);
-    return;
-  }
-  const running = panel.animate([{ height: `${from}px` }, { height: `${to}px` }], {
-    duration: SELECTION_PANEL_SLIDE_MS,
-    easing: 'ease-out',
+  slide = startPanelHeightSlide(panel, from, to, (finished) => {
+    if (slide === finished) settle(panel);
   });
-  slide = running;
-  running.onfinish = () => {
-    if (slide === running) settle(panel);
-  };
+  if (!slide) settle(panel);
 }
 
 /**

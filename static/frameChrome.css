@@ -370,7 +370,7 @@ body:has(#game-over-overlay:not(.hidden)) #sidebar {
 }
 
 /* ---------- Map and console row ---------- */
-/* The containing block for the new-game panel's hide-choices button while the choices are hidden. */
+/* The containing block for the new-game panel while it floats over the map. */
 #app-body {
   position: relative;
   flex: 1 1 auto;
@@ -516,6 +516,12 @@ body:has(#game-over-overlay:not(.hidden)) #sidebar {
   font-weight: 600;
   border-radius: 4px;
 }
+/* The check mark left of "Ready". The "AI:" label has none. A margin, not a gap, so "AI:" and its timer stay together. */
+.console-footer #ready-btn .ready-btn-check {
+  width: 18px;
+  height: 18px;
+  margin-right: 8px;
+}
 
 /* ---------- Collapsed console ---------- */
 /* Only the tab rail and a compact Ready stay; the map takes the freed width. */
@@ -551,4 +557,16 @@ body:has(#game-over-overlay:not(.hidden)) #sidebar {
   font-size: 12px;
   line-height: 1.15;
   white-space: normal;
+}
+/* The rail is too narrow for the word, so only the check mark shows. The word stays as the button's accessible name. */
+#sidebar.console[data-collapsed="true"] #ready-btn .ready-btn-check {
+  margin-right: 0;
+}
+#sidebar.console[data-collapsed="true"] #ready-btn .ready-btn-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }

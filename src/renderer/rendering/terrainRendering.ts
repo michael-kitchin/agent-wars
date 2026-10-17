@@ -23,6 +23,7 @@ import {
 } from '../map/terrainView';
 import { rendererSharedState as S } from '../core/state';
 import { getMainLeafletMap } from '../map/worldLeafletMap';
+import { areControlBordersShown } from '../map/mapViewModeState';
 
 /**
  * Returns the map zoom stroke scale factor used for terrain and ownership borders.
@@ -241,11 +242,13 @@ function buildInsetPolygonPoints(
 }
 
 /**
- * Defines the `drawTerrainHexes` function shape (export function drawTerrainHexes(ctx: CanvasRenderingContext2D, deps: TerrainRenderingDeps): void).
-
- * Purpose: Supports maintainability by documenting why `drawTerrainHexes` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Draws the world map's hexes: terrain fill, the grid stroke, and the borders that mark who controls each hex.
+ *
+ * Purpose: The base layer of the strategic map, under units, labels, and icons.
+ * When to use: Once per strategic frame. A battle and battle-detail zoom draw their own hexes.
+ * Expected outcome: Nothing in a battle, at battle-detail zoom, or without a map. Explored hexes are filled unless T
+ *   is held. While Control is on, ownership borders follow `resolveOwnershipBorderStyle`; while it is off, every hex
+ *   gets only the normal grid stroke.
  * Exceptions: None.
  */
 export function drawTerrainHexes(ctx: CanvasRenderingContext2D, deps: TerrainRenderingDeps): void {
@@ -263,6 +266,7 @@ export function drawTerrainHexes(ctx: CanvasRenderingContext2D, deps: TerrainRen
   const visibleHexes = S.gameState.visibleHexes ? new Set(S.gameState.visibleHexes) : new Set(S.gameState.hexes.map((h) => h.h3Index));
   const controlByHex = buildControlByHex(S.gameState);
   const perspective = S.gameState.playerPerspective === 'opponent' ? 'opponent' : 'human';
+  const controlBordersShown = areControlBordersShown();
   for (const hx of S.gameState.hexes) {
     const boundary = getHexBoundaryLatLngForLeafletOverlay(hx.h3Index);
     const pts = boundary.map(([lat, lng]: [number, number]) => {
@@ -300,14 +304,16 @@ export function drawTerrainHexes(ctx: CanvasRenderingContext2D, deps: TerrainRen
       aiHomeRegionHexes: S.gameState.aiHomeRegionHexes,
       intersectingHomeRegionHexes: S.gameState.intersectingHomeRegionHexes,
     });
-    const ownershipStyle = resolveOwnershipBorderStyle({
-      h3Index: hx.h3Index,
-      controllerPlayerId: controlByHex.get(hx.h3Index),
-      isOwnershipVisible: ownershipVisible,
-      humanHomeRegionHexes: S.gameState.humanHomeRegionHexes,
-      aiHomeRegionHexes: S.gameState.aiHomeRegionHexes,
-      intersectingHomeRegionHexes: S.gameState.intersectingHomeRegionHexes,
-    });
+    const ownershipStyle: OwnershipBorderStyle = controlBordersShown
+      ? resolveOwnershipBorderStyle({
+          h3Index: hx.h3Index,
+          controllerPlayerId: controlByHex.get(hx.h3Index),
+          isOwnershipVisible: ownershipVisible,
+          humanHomeRegionHexes: S.gameState.humanHomeRegionHexes,
+          aiHomeRegionHexes: S.gameState.aiHomeRegionHexes,
+          intersectingHomeRegionHexes: S.gameState.intersectingHomeRegionHexes,
+        })
+      : 'none';
     const ownershipColor = resolveOwnershipBorderColor(ownershipStyle);
     ctx.strokeStyle = ownershipStyle.startsWith('outlined') ? 'rgba(0, 0, 0, 0)' : stroke.color;
     ctx.lineWidth = stroke.width * zoomStrokeScale;
@@ -419,16 +425,17 @@ export function drawTacticalTerrainHexes(ctx: CanvasRenderingContext2D, deps: Te
 }
 
 /**
- * Defines the `drawScenarioHomeRegionOutlines` function shape (export function drawScenarioHomeRegionOutlines(ctx: CanvasRenderingContext2D): void).
-
- * Purpose: Supports maintainability by documenting why `drawScenarioHomeRegionOutlines` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Outlines the human and AI home regions at battle-detail zoom.
+ *
+ * Purpose: The world map's ownership borders are not drawn at that zoom, so the home regions get their own outline.
+ * When to use: Once per frame from the scene pass.
+ * Expected outcome: Nothing without a match, while Control is off, without home regions, or outside battle-detail
+ *   zoom. Otherwise each home-region hex gets its outlined border.
  * Exceptions: None.
  */
 export function drawScenarioHomeRegionOutlines(ctx: CanvasRenderingContext2D): void {
   const state = S.gameState;
-  if (!state) return;
+  if (!state || !areControlBordersShown()) return;
   const homeRegionHexes = [...new Set([...(state.humanHomeRegionHexes ?? []), ...(state.aiHomeRegionHexes ?? [])])];
   if (homeRegionHexes.length === 0) return;
   if (!shouldRenderTacticalHexes()) return;

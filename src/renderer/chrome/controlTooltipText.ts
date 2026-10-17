@@ -252,13 +252,29 @@ export function runButtonTooltipText(enabled: boolean): string {
 }
 
 /**
- * Purpose: Says New opens the new-game screen and stops planning and playback immediately.
+ * Purpose: Says New opens the new-game screen over the match, which keeps going until a new one starts.
  * When to use: `#openrouter-new-btn`, the game menu's New game item.
- * Expected outcome: The control tip shows this sentence.
+ * Expected outcome: The control tip shows these sentences.
  * Exceptions: None.
  */
 export const newButtonTooltipText =
-  'Open the new-game screen. Opponent planning and any playback stop right away; the current match is replaced when you start the new one.';
+  'Open the new-game screen. The current match keeps going underneath; close the screen to return to it, or start a new match to replace it.';
+
+/**
+ * Purpose: Says why New game is disabled while the new-game screen is open.
+ * When to use: The tip host around `#openrouter-new-btn`, from `syncGameMenuNewGameItem`.
+ * Expected outcome: The control tip shows this sentence.
+ * Exceptions: None.
+ */
+export const newGameItemOpenTooltipText = 'The new-game screen is already open.';
+
+/**
+ * Purpose: Says why New game is disabled while a Ready is being resolved.
+ * When to use: The tip host around `#openrouter-new-btn`, from `syncGameMenuNewGameItem`.
+ * Expected outcome: The control tip shows this sentence.
+ * Exceptions: None.
+ */
+export const newGameItemBusyTooltipText = 'New game is available again once this turn or beat finishes resolving.';
 
 /**
  * Purpose: Says the list is limited to the selected model's levels.

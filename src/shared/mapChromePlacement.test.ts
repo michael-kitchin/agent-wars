@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { legendPopoverPosition, toastBandSpan } from './mapChromePlacement';
+import { floatingPanelOffset, legendPopoverPosition, toastBandSpan } from './mapChromePlacement';
 
 test('legendPopoverPosition puts the legend right of the panel when it fits', () => {
   assert.deepEqual(legendPopoverPosition({ mapWidth: 904, panelRight: 310, panelBottom: 214, legendWidth: 110 }), {
@@ -40,4 +40,29 @@ test('toastBandSpan keeps the inset at the right edge when there are no zoom but
     right: 12,
     overChrome: false,
   });
+});
+
+test('floatingPanelOffset leaves a panel that fits where it was dragged', () => {
+  assert.deepEqual(
+    floatingPanelOffset({ left: 212, top: 112, panelWidth: 432, panelHeight: 400, mapWidth: 1280, mapHeight: 756 }),
+    { left: 212, top: 112 }
+  );
+});
+
+test('floatingPanelOffset keeps a dragged panel the inset inside every edge', () => {
+  assert.deepEqual(
+    floatingPanelOffset({ left: 2000, top: -50, panelWidth: 432, panelHeight: 400, mapWidth: 1280, mapHeight: 756 }),
+    { left: 836, top: 12 }
+  );
+  assert.deepEqual(
+    floatingPanelOffset({ left: -50, top: 900, panelWidth: 432, panelHeight: 400, mapWidth: 1280, mapHeight: 756 }),
+    { left: 12, top: 344 }
+  );
+});
+
+test('floatingPanelOffset puts a panel larger than the map at the inset', () => {
+  assert.deepEqual(
+    floatingPanelOffset({ left: 200, top: 200, panelWidth: 432, panelHeight: 800, mapWidth: 800, mapHeight: 556 }),
+    { left: 200, top: 12 }
+  );
 });

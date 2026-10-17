@@ -1,6 +1,6 @@
 /**
  * Checks of the new-game screen for the UI smoke run: the top bar while the new-game overlay is open, the game menu
- * there, the setup panel docked at the left with its Map, Forces, and Rules sections, and the map beside it.
+ * there, the setup panel floating over the map with its Map, Forces, and Rules sections, and the map under it.
  *
  * Purpose: Keeps the new-game screen's checks apart from the frame, console, scenario, map chrome, and battle checks,
  *   so each table stays readable.
@@ -10,20 +10,31 @@
  */
 'use strict';
 
-const { TOPBAR_HEIGHT, SCENES, NEW_GAME_SCENES, near, fmt } = require('./ui-smoke-scenes.cjs');
+const { TOPBAR_HEIGHT, SCENES, NEW_GAME_SCENES, NEW_GAME_MOVE, near, fmt } = require('./ui-smoke-scenes.cjs');
 
 /**
  * Sizes of the setup panel, in CSS pixels.
  *
- * Purpose: The panel is docked at the left, the hide-choices button sits 12 px in from the panel's top-left corner,
- *   Start game spans the footer inside its 18 px padding, and each section's content sits inside 18 px of padding. A
- *   map row's dropdown starts after that padding, the 5em label column (65 px at the rows' 13 px text), and a 6 px gap.
- * When to use: The panel, hidden-choices, and section checks.
- * Expected outcome: Matches `--new-game-panel-width` in `static/shellChrome.css` and the padding, the label column,
- *   and the gap in `static/newGameChrome.css`.
+ * Purpose: The panel floats 12 px in from the map's top-left corner, inside a 1 px border. Its header bar is 50 px
+ *   tall, with the 32 px expand control at its left edge. Start game spans the footer inside 18 px of side padding and
+ *   12 px of bottom padding, and each section's content sits inside 18 px of padding. A map row's dropdown starts
+ *   after that padding, the 5em label column (65 px at the rows' 13 px text), and a 6 px gap.
+ * When to use: The panel, hidden-choices, moved-panel, and section checks.
+ * Expected outcome: Matches `--new-game-panel-width` in `static/shellChrome.css`, `MAP_CHROME_INSET` in
+ *   `src/shared/mapChromePlacement.ts`, and the sizes in `static/newGameChrome.css`.
  * Exceptions: None.
  */
-const PANEL = Object.freeze({ width: 432, headerInset: 12, footerInset: 18, sectionInset: 18, rowSelectInset: 89 });
+const PANEL = Object.freeze({
+  width: 432,
+  inset: 12,
+  border: 1,
+  barHeight: 50,
+  controlWidth: 32,
+  footerInset: 18,
+  footerBottom: 12,
+  sectionInset: 18,
+  rowSelectInset: 89,
+});
 
 /**
  * The rows of each map tab: the label of each row, then each row's dropdown and randomize button, top to bottom.
@@ -81,7 +92,7 @@ const BONUS_SELECTS = Object.freeze([
 ]);
 
 /**
- * The new-game scenes that show the setup panel: every new-game scene except the one with the choices hidden.
+ * The new-game scenes that show the setup panel expanded: every new-game scene except the one with the choices hidden.
  *
  * Purpose: The panel's layout checks apply only while the panel shows.
  * When to use: The `scenes` list of a panel layout check.
@@ -149,19 +160,20 @@ function sectionInnerRight(body) {
  */
 const NEW_GAME_CHECKS = Object.freeze([
   {
-    name: 'new-game-panel-beside-map',
-    scenes: PANEL_SCENES,
+    name: 'new-game-panel-over-map',
+    scenes: PANEL_SCENES.filter((scene) => scene !== SCENES.newGameMoved),
     needs: ['#game-over-overlay', '#canvas-container'],
     run: (p, el) => {
       const panel = el('#game-over-overlay');
       const c = el('#canvas-container');
       if (!panel.shown) return 'the setup panel is not shown';
-      if (!near(panel.x, 0) || !near(panel.y, TOPBAR_HEIGHT) || !near(panel.w, PANEL.width) || !near(panel.y + panel.h, p.viewport.h)) {
-        return `the setup panel is at ${fmt(panel)}, expected ${PANEL.width} px wide at the left, from the top bar to the window's bottom`;
+      if (!near(panel.x, PANEL.inset) || !near(panel.y, TOPBAR_HEIGHT + PANEL.inset) || !near(panel.w, PANEL.width)) {
+        return `the setup panel is at ${fmt(panel)}, expected ${PANEL.width} px wide, ${PANEL.inset} px in from the map's top-left corner`;
       }
-      return near(c.x, PANEL.width) && near(c.y, TOPBAR_HEIGHT) && near(c.x + c.w, p.viewport.w) && near(c.y + c.h, p.viewport.h)
+      if (panel.y + panel.h > p.viewport.h - PANEL.inset + 1) return `the setup panel ${fmt(panel)} runs into the map's bottom inset`;
+      return near(c.x, 0) && near(c.y, TOPBAR_HEIGHT) && near(c.w, p.viewport.w) && near(c.y + c.h, p.viewport.h)
         ? null
-        : `#canvas-container ${fmt(c)} should fill the rest of the window, right of the panel and under the top bar`;
+        : `#canvas-container ${fmt(c)} should fill the window under the top bar, with the panel over it`;
     },
   },
   {
@@ -174,16 +186,20 @@ const NEW_GAME_CHECKS = Object.freeze([
       const message = el('#game-over-message');
       const body = el('#game-over-dialog');
       const start = el('#new-game-btn');
-      if (!near(collapse.x, panel.x + PANEL.headerInset) || !near(collapse.y, panel.y + PANEL.headerInset)) {
-        return `the hide-choices button is at ${fmt(collapse)}, expected ${PANEL.headerInset} px in from the panel's top-left corner`;
+      const innerX = panel.x + PANEL.border;
+      const innerY = panel.y + PANEL.border;
+      const innerRight = panel.x + panel.w - PANEL.border;
+      const innerBottom = panel.y + panel.h - PANEL.border;
+      if (!near(collapse.x, innerX) || !near(collapse.y, innerY) || !near(collapse.w, PANEL.controlWidth)) {
+        return `the expand control is at ${fmt(collapse)}, expected a ${PANEL.controlWidth} px column at the header bar's left edge`;
       }
-      if (collapse.expanded !== 'true') return `the hide-choices button reads aria-expanded=${collapse.expanded}`;
-      if (!message.shown || message.x < collapse.x + collapse.w) return `the message ${fmt(message)} is not right of the hide-choices button`;
-      if (!start.shown || !near(start.x, panel.x + PANEL.footerInset) || !near(start.x + start.w, panel.x + panel.w - 1 - PANEL.footerInset)) {
+      if (collapse.expanded !== 'true') return `the expand control reads aria-expanded=${collapse.expanded}`;
+      if (!message.shown || message.x < collapse.x + collapse.w) return `the message ${fmt(message)} is not right of the expand control`;
+      if (!start.shown || !near(start.x, innerX + PANEL.footerInset) || !near(start.x + start.w, innerRight - PANEL.footerInset)) {
         return `Start game is at ${fmt(start)}, expected the footer's width inside ${PANEL.footerInset} px of padding`;
       }
-      if (start.y + start.h > p.viewport.h || start.y + start.h < p.viewport.h - 2 * PANEL.footerInset) {
-        return `Start game is at ${fmt(start)}, expected at the bottom of the window`;
+      if (!near(start.y + start.h, innerBottom - PANEL.footerBottom)) {
+        return `Start game is at ${fmt(start)}, expected ${PANEL.footerBottom} px above the panel's bottom edge`;
       }
       if (body.y < collapse.y + collapse.h || body.y + body.h > start.y) return `the choices ${fmt(body)} are not between the header and the footer`;
       return body.scrollWidth <= body.clientWidth + 1 ? null : `the choices are ${body.scrollWidth} px wide in a ${body.clientWidth} px panel`;
@@ -194,17 +210,67 @@ const NEW_GAME_CHECKS = Object.freeze([
     scenes: [SCENES.newGameHidden],
     needs: ['#game-over-overlay', '#canvas-container', '#new-game-dialog-collapse', '#game-over-message', '#game-over-dialog', '#new-game-btn'],
     run: (p, el) => {
+      const panel = el('#game-over-overlay');
       const c = el('#canvas-container');
       const collapse = el('#new-game-dialog-collapse');
       if (!near(c.x, 0) || !near(c.y, TOPBAR_HEIGHT) || !near(c.w, p.viewport.w)) {
-        return `#canvas-container ${fmt(c)} should fill the window's width under the top bar while the choices are hidden`;
+        return `#canvas-container ${fmt(c)} should fill the window's width under the top bar`;
       }
-      if (!collapse.shown || !near(collapse.x, PANEL.headerInset) || !near(collapse.y, TOPBAR_HEIGHT + PANEL.headerInset)) {
-        return `the hide-choices button is at ${fmt(collapse)}, expected where it sits while the choices show`;
+      if (!collapse.shown || !near(collapse.x, PANEL.inset + PANEL.border) || !near(collapse.y, TOPBAR_HEIGHT + PANEL.inset + PANEL.border)) {
+        return `the expand control is at ${fmt(collapse)}, expected where it sits while the choices show`;
       }
-      if (collapse.expanded !== 'false') return `the hide-choices button reads aria-expanded=${collapse.expanded}`;
-      const shown = ['#game-over-message', '#game-over-dialog', '#new-game-btn'].filter((selector) => el(selector).shown);
-      return shown.length === 0 ? null : `still shown with the choices hidden: ${shown.join(', ')}`;
+      if (collapse.expanded !== 'false') return `the expand control reads aria-expanded=${collapse.expanded}`;
+      if (!el('#game-over-message').shown) return 'the message is hidden with the choices';
+      const shown = ['#game-over-dialog', '#new-game-btn'].filter((selector) => el(selector).shown);
+      if (shown.length > 0) return `still shown with the choices hidden: ${shown.join(', ')}`;
+      return near(panel.h, PANEL.barHeight + 2 * PANEL.border)
+        ? null
+        : `the panel is ${Math.round(panel.h)} px tall with the choices hidden, expected the ${PANEL.barHeight} px bar inside its border`;
+    },
+  },
+  {
+    name: 'new-game-panel-moved',
+    scenes: [SCENES.newGameMoved],
+    needs: ['#game-over-overlay'],
+    run: (p, el) => {
+      const panel = el('#game-over-overlay');
+      const mapHeight = p.viewport.h - TOPBAR_HEIGHT;
+      const x = PANEL.inset + NEW_GAME_MOVE.x;
+      const y = TOPBAR_HEIGHT + Math.min(PANEL.inset + NEW_GAME_MOVE.y, Math.max(PANEL.inset, mapHeight - panel.h - PANEL.inset));
+      return Math.abs(panel.x - x) <= 2 && Math.abs(panel.y - y) <= 2
+        ? null
+        : `the moved panel is at ${fmt(panel)}, expected ${Math.round(x)},${Math.round(y)}: dragged by ${NEW_GAME_MOVE.x},${NEW_GAME_MOVE.y} and kept ${PANEL.inset} px inside the map`;
+    },
+  },
+  {
+    name: 'new-game-close-hidden-without-match',
+    scenes: [SCENES.newGameStartup, SCENES.newGameMenu, SCENES.newGameHidden, SCENES.newGameMoved, SCENES.gameOverReopened, SCENES.gameOverSmallWindow],
+    needs: ['#new-game-dialog-close'],
+    run: (p, el) => (el('#new-game-dialog-close').shown ? 'the close control shows with no match to go back to' : null),
+  },
+  {
+    name: 'new-game-close-over-match',
+    scenes: [SCENES.newGameReopened, SCENES.newGameRegional],
+    needs: ['#game-over-overlay', '#new-game-dialog-close', '#game-over-message'],
+    run: (p, el) => {
+      const panel = el('#game-over-overlay');
+      const close = el('#new-game-dialog-close');
+      const message = el('#game-over-message');
+      if (!close.shown) return 'the close control is hidden while a match waits under the screen';
+      const atRightEdge = near(close.x + close.w, panel.x + panel.w - PANEL.border) && near(close.y, panel.y + PANEL.border) && near(close.w, PANEL.controlWidth);
+      if (!atRightEdge) return `the close control is at ${fmt(close)}, expected a ${PANEL.controlWidth} px column at the header bar's right edge`;
+      return message.x + message.w <= close.x + 1 ? null : `the message ${fmt(message)} runs under the close control ${fmt(close)}`;
+    },
+  },
+  {
+    name: 'new-game-closed-returns-to-match',
+    scenes: [SCENES.newGameClosed],
+    needs: ['#game-over-overlay', '#sidebar', '#topbar-turn-phase'],
+    run: (p, el) => {
+      if (el('#game-over-overlay').shown) return 'the new-game screen still shows after Close';
+      if (!el('#sidebar').shown) return 'the console is not back after Close';
+      const phase = el('#topbar-turn-phase').text;
+      return /· Planning$/.test(phase) ? null : `the top bar reads "${phase}", expected the match's planning step`;
     },
   },
   {

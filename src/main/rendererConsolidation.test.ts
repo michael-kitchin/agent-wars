@@ -242,11 +242,11 @@ function testProductionLabelContractsForExploredVsUnexploredHexes(): void {
   );
   assertMatches(
     drawProductionFn,
-    /if\s*\(!explored\s*&&\s*!overlayContext\.mapInspectionHeld\)\s*continue;/,
-    'drawStrategicProductionOverlays should only show unexplored production labels while T is held'
+    /if\s*\(!explored\s*&&\s*!overlayContext\.productionDetailShown\)\s*continue;/,
+    'drawStrategicProductionOverlays should only show unexplored production labels while production detail is shown'
   );
   assert.ok(
-    drawProductionFn.includes('!overlayContext.mapInspectionHeld') &&
+    drawProductionFn.includes('!overlayContext.productionDetailShown') &&
       drawProductionFn.includes('isStrategicHexHumanUrbanProduction(S.gameState, hx)'),
     'drawStrategicProductionOverlays should include shared human-urban production eligibility checks'
   );

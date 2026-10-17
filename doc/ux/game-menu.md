@@ -30,7 +30,7 @@ Control tips for these items are in [control-tooltips.md](control-tooltips.md).
 ### Mouse
 
 - When the player clicks the menu button, the menu opens. A second click closes it.
-- When the player clicks New game…, the menu closes and the new-game overlay opens. New game works during strategic planning, tactical planning, and resolution playback. Opponent planning and playback stop immediately. See [new-game-dialog.md](new-game-dialog.md). While that overlay is open, in New game and Game over, New game… is disabled, and its tip says the new-game screen is already open (`syncGameMenuNewGameItem`).
+- When the player clicks New game…, the menu closes and the new-game overlay opens over the match, which keeps running. New game works during strategic planning, tactical planning, and resolution playback. See [new-game-dialog.md](new-game-dialog.md). While that overlay is open, in New game and Game over, New game… is disabled, and its tip says the new-game screen is already open. While a Ready is resolving, New game… is also disabled, and its tip host says "New game is available again once this turn or beat finishes resolving." (`syncGameMenuNewGameItem`).
 - When the player changes Offer tactical battles, the menu stays open. Later Ready resolutions either show the tactical battles list or skip it and resolve melee as Ignore. The choice survives a restart. See [tactical-battles-list.md](tactical-battles-list.md).
 - When the player clicks Quit, the menu closes and the window closes. On Windows and Linux the app quits. On macOS the app stays in the dock.
 - A press anywhere outside the menu and its button closes the menu.

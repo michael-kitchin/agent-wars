@@ -163,7 +163,7 @@ export const reportsTabTooltipText =
  * Expected outcome: The control tip shows this sentence.
  * Exceptions: None.
  */
-export const mapModeTabsShowTooltipText = 'Show the Weather, Tech, and Legend buttons under the overview.';
+export const mapModeTabsShowTooltipText = 'Show the map-mode buttons under the overview.';
 
 /**
  * The tip of the toggle on the minimap overview's corner while the map-mode tabs show.
@@ -174,7 +174,7 @@ export const mapModeTabsShowTooltipText = 'Show the Weather, Tech, and Legend bu
  * Exceptions: None.
  */
 export const mapModeTabsHideTooltipText =
-  'Hide the Weather, Tech, and Legend buttons. Hiding them also closes the terrain legend.';
+  'Hide the map-mode buttons. Hiding them also closes the terrain legend.';
 
 /**
  * The Weather map mode's tip.
@@ -190,13 +190,35 @@ export const mapWeatherModeTooltipText =
 /**
  * The Tech map mode's tip.
  *
- * Purpose: Says Tech is a toggle, what its view shows and where, and how it relates to holding T.
+ * Purpose: Says Tech is a toggle for the tech tier icons, when they can show, and how it relates to holding T.
  * When to use: `#map-mode-tech`.
  * Expected outcome: The control tip shows these sentences.
  * Exceptions: None.
  */
 export const mapTechModeTooltipText =
-  "Turn the Tech view on or off: each hex's code, production, and tech tier instead of terrain on the world map. Holding T shows the same view while the key is down.";
+  "Show or hide each hex's tech tier icon on the world map, while the tech bonus is on. Holding T shows them too, while the key is down.";
+
+/**
+ * The Control map mode's tip.
+ *
+ * Purpose: Says Control is a toggle for the control borders and the home-region outlines.
+ * When to use: `#map-mode-control`.
+ * Expected outcome: The control tip shows this sentence.
+ * Exceptions: None.
+ */
+export const mapControlModeTooltipText =
+  'Show or hide the borders that mark who controls each hex, and the home-region outlines.';
+
+/**
+ * The Production map mode's tip.
+ *
+ * Purpose: Says Production shows labels on every hex, as holding T does, and what Off shows.
+ * When to use: `#map-mode-production`.
+ * Expected outcome: The control tip shows these sentences.
+ * Exceptions: None.
+ */
+export const mapProductionModeTooltipText =
+  'Show or hide production on every world hex, the way holding T does. Off shows it only on hexes you control.';
 
 /**
  * The Legend button's tip.
@@ -207,6 +229,27 @@ export const mapTechModeTooltipText =
  * Exceptions: None.
  */
 export const mapLegendToggleTooltipText = 'Show or hide the terrain legend and its style choice.';
+
+/**
+ * The new-game setup panel's grip tip.
+ *
+ * Purpose: Says the grip moves the panel, and that each open puts it back in the corner.
+ * When to use: `#new-game-panel-grip`. The static markup holds this sentence.
+ * Expected outcome: The control tip shows these sentences.
+ * Exceptions: None.
+ */
+export const newGameGripTooltipText = 'Drag to move this screen. It goes back to the corner each time it opens.';
+
+/**
+ * The new-game setup panel's close tip.
+ *
+ * Purpose: Says close goes back to the match that kept running under the screen.
+ * When to use: `#new-game-dialog-close`, which shows only while a match is waiting. The static markup holds this
+ *   sentence.
+ * Expected outcome: The control tip shows this sentence.
+ * Exceptions: None.
+ */
+export const newGameCloseTooltipText = 'Close this screen and go back to the match in progress.';
 
 /**
  * The battle header's force bar tip.

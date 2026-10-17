@@ -388,11 +388,14 @@ function drawTerrainInfrastructureOverlays(ctx: CanvasRenderingContext2D): void 
 }
 
 /**
- * Defines the `drawStrategicProductionOverlays` function shape (function drawStrategicProductionOverlays(ctx: CanvasRenderingContext2D): void).
-
- * Purpose: Supports maintainability by documenting why `drawStrategicProductionOverlays` exists.
- * When to use: Use per team conventions when this declaration is the correct extension point for the current task.
- * Expected outcome: Callers and maintainers can rely on the described behavior without reading the full implementation.
+ * Draws the production label on each world hex that shows one.
+ *
+ * Purpose: The player's own production always shows; holding T or turning Production on shows it on every hex.
+ * When to use: Once per strategic frame, from the scene pass.
+ * Expected outcome: No labels at battle-detail zoom or without a map. Otherwise a label on each explored hex the human
+ *   controls, and on every hex while production detail is shown, unexplored ones as plain `$N`. A hex whose build
+ *   button shows gets no canvas label. A label moves to the lower band while T is held or when its hex has
+ *   infrastructure or units.
  * Exceptions: None.
  */
 function drawStrategicProductionOverlays(ctx: CanvasRenderingContext2D): void {
@@ -407,11 +410,11 @@ function drawStrategicProductionOverlays(ctx: CanvasRenderingContext2D): void {
   const overlayContext = buildProductionOverlayContext(S.gameState);
   for (const hx of S.gameState.hexes) {
     const explored = isHexExploredByPlayer(hx.h3Index);
-    if (!explored && !overlayContext.mapInspectionHeld) continue;
+    if (!explored && !overlayContext.productionDetailShown) continue;
     const controller = getControllerForHex(S.gameState, hx.h3Index);
     const controlledByHuman = controller === 'human';
     const capacityPerTurn = getUrbanProductionCapacityForHex(hx.h3Index);
-    if (!overlayContext.mapInspectionHeld) {
+    if (!overlayContext.productionDetailShown) {
       const canShowLabelWithoutInspection = isStrategicHexHumanUrbanProduction(S.gameState, hx) || controlledByHuman;
       if (!canShowLabelWithoutInspection) continue;
     }
@@ -419,7 +422,7 @@ function drawStrategicProductionOverlays(ctx: CanvasRenderingContext2D): void {
     const hasInfraSymbols = hasVisibleStrategicInfrastructureGlyphs(hx.h3Index, false, overlayContext.unitHexes);
     const hasVisibleUnits = overlayContext.unitHexes.has(hx.h3Index);
     const center = hexCenterPx(hx.h3Index);
-    // Inspection mode shows centered hex codes on strategic; push production text to the same lower band as infra-heavy hexes.
+    // Holding T shows centered hex codes on strategic; push production text to the same lower band as infra-heavy hexes.
     const textY = computeStrategicOverlayTextY(
       hx.h3Index,
       map,

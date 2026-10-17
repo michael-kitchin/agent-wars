@@ -18715,8 +18715,8 @@ ${bonuses}`;
   var selectionPanelExpandTooltipText = "Show the hex, its terrain, and each selected unit's orders.";
   var selectionPanelCollapseTooltipText = "Hide the details. The bar stays.";
   var reportsTabTooltipText = `Show the turn reports, opponent messages, and notices from this match, newest first. ${consoleTabCollapseSentence}`;
-  var mapModeTabsShowTooltipText = "Show the Weather, Tech, and Legend buttons under the overview.";
-  var mapModeTabsHideTooltipText = "Hide the Weather, Tech, and Legend buttons. Hiding them also closes the terrain legend.";
+  var mapModeTabsShowTooltipText = "Show the map-mode buttons under the overview.";
+  var mapModeTabsHideTooltipText = "Hide the map-mode buttons. Hiding them also closes the terrain legend.";
 
   // src/renderer/chrome/consoleReports.ts
   var unreadCount = 0;
@@ -18821,8 +18821,24 @@ ${bonuses}`;
     const s = totalSeconds % 60;
     return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
   }
+  var READY_CHECK_ICON_PATH = "M3 8.5l3.2 3.2L13 4.8";
+  function buildReadyCheckIcon() {
+    const svgNs = "http://www.w3.org/2000/svg";
+    const icon = document.createElementNS(svgNs, "svg");
+    icon.setAttribute("class", "chrome-icon ready-btn-check");
+    icon.setAttribute("viewBox", "0 0 16 16");
+    icon.setAttribute("aria-hidden", "true");
+    const path = document.createElementNS(svgNs, "path");
+    path.setAttribute("d", READY_CHECK_ICON_PATH);
+    icon.appendChild(path);
+    return icon;
+  }
   function setReadyButtonLabelReady(readyBtn) {
-    readyBtn.textContent = "Ready";
+    if (readyBtn.querySelector(".ready-btn-check")) return;
+    const label = document.createElement("span");
+    label.className = "ready-btn-label";
+    label.textContent = "Ready";
+    readyBtn.replaceChildren(buildReadyCheckIcon(), label);
   }
   function setReadyButtonLabelAiWait(readyBtn, elapsedMs) {
     readyBtn.textContent = "";
@@ -20286,6 +20302,8 @@ ${bonuses}`;
   function runButtonTooltipText(enabled) {
     return enabled ? runEnabledTooltipText : runDisabledTooltipText;
   }
+  var newGameItemOpenTooltipText = "The new-game screen is already open.";
+  var newGameItemBusyTooltipText = "New game is available again once this turn or beat finishes resolving.";
   var precomputationTooltipText = "Turn on a summary of units, hexes, and combat that is prepared before the model plans. The number counts uses since the last Ready, and the button stays pressed while this is on.";
   var eventsTooltipText = "Turn this on to stop a background plan every turn. One plan still runs when the match starts, when you turn Run on, or when you turn this on, and the number counts uses since the last Ready.";
   var planningTooltipText = "Let the opponent plan routes and measure distances. The number counts uses since the last Ready, and this does nothing when the model cannot use tools.";
@@ -23684,6 +23702,9 @@ ${bonuses}`;
 
   // src/renderer/map/mapExtent.ts
   var active = "world";
+  function loadedMapExtentTarget() {
+    return active;
+  }
   var appliedKey = "";
   var resizeListenerAttached = false;
   var activeBounds = null;
@@ -23799,14 +23820,14 @@ ${bonuses}`;
   function strategicProductionLabelSurface(input) {
     if (input.tacticalRendered) return "none";
     if (input.explored && input.humanUrbanProduction && input.buildEntryZoom) return "button";
-    if (!input.explored && !input.mapInspectionHeld) return "none";
-    if (!input.mapInspectionHeld && !input.humanUrbanProduction && !input.controlledByHuman) return "none";
+    if (!input.explored && !input.productionDetailShown) return "none";
+    if (!input.productionDetailShown && !input.humanUrbanProduction && !input.controlledByHuman) return "none";
     return "canvas";
   }
   function inspectionStatusIconsForHex(input) {
     const icons = [];
     const urbanCount = input.baselineUrbanHexCount;
-    if (input.mapInspectionHeld && input.techBonusEnabled === true && Number.isFinite(urbanCount) && urbanCount > 0) {
+    if (input.techIconsShown && input.techBonusEnabled === true && Number.isFinite(urbanCount) && urbanCount > 0) {
       icons.push({ kind: "tech", level: techLevelFromUrbanHexCount(urbanCount) });
     }
     const weather = input.weatherIconsShown && input.weatherBonusEnabled === true ? knownWeather(input.weather) : null;
@@ -24067,14 +24088,18 @@ ${bonuses}`;
   // src/shared/mapViewMode.ts
   var DEFAULT_WEATHER_ICONS_SHOWN = true;
   var DEFAULT_TECH_VIEW_CHOSEN = false;
-  function isTerrainInspectionShown(input) {
+  var DEFAULT_CONTROL_BORDERS_SHOWN = true;
+  var DEFAULT_PRODUCTION_DETAIL_CHOSEN = false;
+  function isMapLayerShown(input) {
     if (input.tKeyHeld) return true;
-    return input.techViewChosen && !input.inBattle && !input.newGameOverlayOpen;
+    return input.layerChosen && !input.inBattle && !input.newGameOverlayOpen;
   }
 
   // src/renderer/map/mapViewModeState.ts
   var weatherIconsShown = DEFAULT_WEATHER_ICONS_SHOWN;
   var techViewChosen = DEFAULT_TECH_VIEW_CHOSEN;
+  var controlBordersShown = DEFAULT_CONTROL_BORDERS_SHOWN;
+  var productionDetailChosen = DEFAULT_PRODUCTION_DETAIL_CHOSEN;
   function areWeatherIconsShown() {
     return weatherIconsShown;
   }
@@ -24086,6 +24111,18 @@ ${bonuses}`;
   }
   function setTechViewChosen(chosen) {
     techViewChosen = chosen;
+  }
+  function areControlBordersShown() {
+    return controlBordersShown;
+  }
+  function setControlBordersShown(shown) {
+    controlBordersShown = shown;
+  }
+  function isProductionDetailChosen() {
+    return productionDetailChosen;
+  }
+  function setProductionDetailChosen(chosen) {
+    productionDetailChosen = chosen;
   }
 
   // src/shared/newGameBannerText.ts
@@ -24128,14 +24165,22 @@ ${bonuses}`;
     return getUrbanProductionCapacityForHex(h3Index);
   }
   function isMapInspectionModeHeld() {
-    const techViewChosen2 = isTechViewChosen();
-    return isTerrainInspectionShown({
+    return rendererSharedState.hideTerrainFillWhileHeld;
+  }
+  function isChosenLayerShown(layerChosen) {
+    return isMapLayerShown({
       tKeyHeld: rendererSharedState.hideTerrainFillWhileHeld,
-      techViewChosen: techViewChosen2,
+      layerChosen,
       inBattle: rendererSharedState.tacticalBattleSnapshot != null,
       // Drawing asks this for every hex, so the page is read only while the answer can depend on it.
-      newGameOverlayOpen: techViewChosen2 && isNewGameOverlayOpen()
+      newGameOverlayOpen: layerChosen && isNewGameOverlayOpen()
     });
+  }
+  function areTechIconsShown() {
+    return isChosenLayerShown(isTechViewChosen());
+  }
+  function isProductionDetailShown() {
+    return isChosenLayerShown(isProductionDetailChosen());
   }
   function isStrategicHexHumanUrbanProduction(state, hx) {
     if (getControllerForHex(state, hx.h3Index) !== "human") return false;
@@ -24179,9 +24224,11 @@ ${bonuses}`;
   }
   function buildProductionOverlayContext(state) {
     const mapInspectionHeld = isMapInspectionModeHeld();
-    const revealAllControllerQueues = mapInspectionHeld && isFogOfWarDisabledForSnapshot(state);
+    const productionDetailShown = isProductionDetailShown();
+    const revealAllControllerQueues = productionDetailShown && isFogOfWarDisabledForSnapshot(state);
     return {
       mapInspectionHeld,
+      productionDetailShown,
       revealAllControllerQueues,
       unitHexes: new Set(state.units.map((u) => u.h3Index)),
       unitCountsByPlayer: revealAllControllerQueues ? {
@@ -24257,7 +24304,8 @@ ${bonuses}`;
     const state = rendererSharedState.gameState;
     const unitHexes = new Set(state.units.map((unit) => unit.h3Index));
     const buildEntryZoom = shouldShowBuildEntryZoom();
-    const mapInspectionHeld = isMapInspectionModeHeld();
+    const productionDetailShown = isProductionDetailShown();
+    const techIconsShown = areTechIconsShown();
     const weatherIconsShown2 = areWeatherIconsShown();
     ctx.save();
     try {
@@ -24268,13 +24316,13 @@ ${bonuses}`;
         const surface = strategicProductionLabelSurface({
           tacticalRendered: false,
           explored,
-          mapInspectionHeld,
+          productionDetailShown,
           controlledByHuman,
           humanUrbanProduction,
           buildEntryZoom
         });
         const icons = inspectionStatusIconsForHex({
-          mapInspectionHeld,
+          techIconsShown,
           weatherIconsShown: weatherIconsShown2,
           techBonusEnabled: state.techBonusEnabled === true,
           weatherBonusEnabled: state.weatherBonusEnabled === true,
@@ -24652,6 +24700,7 @@ ${bonuses}`;
     const visibleHexes = rendererSharedState.gameState.visibleHexes ? new Set(rendererSharedState.gameState.visibleHexes) : new Set(rendererSharedState.gameState.hexes.map((h) => h.h3Index));
     const controlByHex = buildControlByHex(rendererSharedState.gameState);
     const perspective = rendererSharedState.gameState.playerPerspective === "opponent" ? "opponent" : "human";
+    const controlBordersShown2 = areControlBordersShown();
     for (const hx of rendererSharedState.gameState.hexes) {
       const boundary = getHexBoundaryLatLngForLeafletOverlay(hx.h3Index);
       const pts = boundary.map(([lat, lng]) => {
@@ -24688,14 +24737,14 @@ ${bonuses}`;
         aiHomeRegionHexes: rendererSharedState.gameState.aiHomeRegionHexes,
         intersectingHomeRegionHexes: rendererSharedState.gameState.intersectingHomeRegionHexes
       });
-      const ownershipStyle = resolveOwnershipBorderStyle({
+      const ownershipStyle = controlBordersShown2 ? resolveOwnershipBorderStyle({
         h3Index: hx.h3Index,
         controllerPlayerId: controlByHex.get(hx.h3Index),
         isOwnershipVisible: ownershipVisible,
         humanHomeRegionHexes: rendererSharedState.gameState.humanHomeRegionHexes,
         aiHomeRegionHexes: rendererSharedState.gameState.aiHomeRegionHexes,
         intersectingHomeRegionHexes: rendererSharedState.gameState.intersectingHomeRegionHexes
-      });
+      }) : "none";
       const ownershipColor = resolveOwnershipBorderColor(ownershipStyle);
       ctx.strokeStyle = ownershipStyle.startsWith("outlined") ? "rgba(0, 0, 0, 0)" : stroke.color;
       ctx.lineWidth = stroke.width * zoomStrokeScale;
@@ -24791,7 +24840,7 @@ ${bonuses}`;
   }
   function drawScenarioHomeRegionOutlines(ctx) {
     const state = rendererSharedState.gameState;
-    if (!state) return;
+    if (!state || !areControlBordersShown()) return;
     const homeRegionHexes = [.../* @__PURE__ */ new Set([...state.humanHomeRegionHexes ?? [], ...state.aiHomeRegionHexes ?? []])];
     if (homeRegionHexes.length === 0) return;
     if (!shouldRenderTacticalHexes()) return;
@@ -25633,54 +25682,207 @@ ${bonuses}`;
     );
   }
 
+  // src/renderer/chrome/panelSlideHelpers.ts
+  var PANEL_SLIDE_MS = 150;
+  function reducedMotionRequested() {
+    return window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
+  }
+  function startPanelHeightSlide(panel, from, to, onFinish) {
+    if (reducedMotionRequested() || Math.abs(from - to) < 1 || typeof panel.animate !== "function") return null;
+    const running = panel.animate([{ height: `${from}px` }, { height: `${to}px` }], {
+      duration: PANEL_SLIDE_MS,
+      easing: "ease-out"
+    });
+    running.onfinish = () => onFinish(running);
+    return running;
+  }
+
+  // src/shared/mapChromePlacement.ts
+  var MAP_CHROME_INSET = 12;
+  var MAP_CHROME_GAP = 8;
+  var TOAST_BAND_MIN_WIDTH = 280;
+  function legendPopoverPosition(input) {
+    const besideLeft = input.panelRight + MAP_CHROME_GAP;
+    if (besideLeft + input.legendWidth + MAP_CHROME_INSET <= input.mapWidth) {
+      return { left: besideLeft, top: MAP_CHROME_INSET, beside: true };
+    }
+    return { left: MAP_CHROME_INSET, top: input.panelBottom + MAP_CHROME_GAP, beside: false };
+  }
+  function toastBandSpan(input) {
+    const right = Math.max(MAP_CHROME_INSET, input.mapWidth - input.rightObstacleLeft + MAP_CHROME_INSET);
+    const left = input.leftObstacleRight + MAP_CHROME_INSET;
+    if (input.mapWidth - left - right < TOAST_BAND_MIN_WIDTH) {
+      return { left: MAP_CHROME_INSET, right, overChrome: true };
+    }
+    return { left, right, overChrome: false };
+  }
+  function floatingPanelOffset(input) {
+    const maxLeft = Math.max(MAP_CHROME_INSET, input.mapWidth - input.panelWidth - MAP_CHROME_INSET);
+    const maxTop = Math.max(MAP_CHROME_INSET, input.mapHeight - input.panelHeight - MAP_CHROME_INSET);
+    return {
+      left: Math.min(maxLeft, Math.max(MAP_CHROME_INSET, input.left)),
+      top: Math.min(maxTop, Math.max(MAP_CHROME_INSET, input.top))
+    };
+  }
+
+  // src/renderer/map/mapChromeLayout.ts
+  function layoutMapChrome() {
+    const map = document.getElementById("canvas-container");
+    const panel = document.getElementById("minimap-panel");
+    if (!map || !panel) return;
+    const mapBox = map.getBoundingClientRect();
+    const panelBox = panel.getBoundingClientRect();
+    const panelRight = panelBox.right - mapBox.left;
+    let leftObstacleRight = panelRight;
+    const legend = document.getElementById("terrain-legend");
+    if (legend && !legend.hidden) {
+      const place = legendPopoverPosition({
+        mapWidth: mapBox.width,
+        panelRight,
+        panelBottom: panelBox.bottom - mapBox.top,
+        legendWidth: legend.offsetWidth
+      });
+      legend.style.left = `${place.left}px`;
+      legend.style.top = `${place.top}px`;
+      if (place.beside) leftObstacleRight = place.left + legend.offsetWidth;
+    }
+    const dialog = document.getElementById("game-over-overlay");
+    if (dialog && !dialog.classList.contains("hidden")) {
+      leftObstacleRight = Math.max(leftObstacleRight, dialog.getBoundingClientRect().right - mapBox.left);
+    }
+    const band = document.getElementById("map-toast-band");
+    if (!band) return;
+    const zoomBox = document.querySelector("#main-map .leaflet-control-zoom")?.getBoundingClientRect();
+    const span = toastBandSpan({
+      mapWidth: mapBox.width,
+      leftObstacleRight,
+      rightObstacleLeft: zoomBox && zoomBox.width > 0 ? zoomBox.left - mapBox.left : mapBox.width
+    });
+    band.style.left = `${span.left}px`;
+    band.style.right = `${span.right}px`;
+  }
+
+  // src/renderer/gameplay/newGameDialogMove.ts
+  var dragStart = null;
+  function dialogAndArea() {
+    const panel = document.getElementById("game-over-overlay");
+    const area = document.getElementById("app-body");
+    if (!panel || !area) return null;
+    return { panel, area };
+  }
+  function applyOffset(panel, area, left, top, panelHeight = panel.offsetHeight) {
+    const place = floatingPanelOffset({
+      left,
+      top,
+      panelWidth: panel.offsetWidth,
+      panelHeight,
+      mapWidth: area.clientWidth,
+      mapHeight: area.clientHeight
+    });
+    panel.style.left = `${place.left}px`;
+    panel.style.top = `${place.top}px`;
+  }
+  function placeNewGameDialogAtInset() {
+    dragStart = null;
+    const parts = dialogAndArea();
+    if (!parts) return;
+    parts.panel.style.removeProperty("left");
+    parts.panel.style.removeProperty("top");
+    layoutMapChrome();
+  }
+  function keepNewGameDialogOnMap(panelHeight) {
+    const parts = dialogAndArea();
+    if (!parts || parts.panel.style.left === "" || parts.panel.classList.contains("hidden")) return;
+    applyOffset(parts.panel, parts.area, parts.panel.offsetLeft, parts.panel.offsetTop, panelHeight ?? parts.panel.offsetHeight);
+  }
+  function endDrag() {
+    if (!dragStart) return;
+    dragStart = null;
+    layoutMapChrome();
+  }
+  function wireNewGameDialogMove() {
+    const grip = document.getElementById("new-game-panel-grip");
+    if (!grip) return;
+    grip.addEventListener("pointerdown", (event) => {
+      if (event.button !== 0) return;
+      const parts = dialogAndArea();
+      if (!parts) return;
+      event.preventDefault();
+      dragStart = { x: event.clientX, y: event.clientY, left: parts.panel.offsetLeft, top: parts.panel.offsetTop };
+      grip.setPointerCapture(event.pointerId);
+    });
+    grip.addEventListener("pointermove", (event) => {
+      const parts = dialogAndArea();
+      if (!dragStart || !parts) return;
+      applyOffset(parts.panel, parts.area, dragStart.left + event.clientX - dragStart.x, dragStart.top + event.clientY - dragStart.y);
+    });
+    grip.addEventListener("pointerup", endDrag);
+    grip.addEventListener("pointercancel", endDrag);
+    window.addEventListener("resize", () => keepNewGameDialogOnMap());
+  }
+
   // src/renderer/gameplay/newGameDialogCollapse.ts
-  var COLLAPSED_CLASS = "game-over-dialog-collapsed";
   var EXPANDED_LABEL = "Hide the new game choices";
-  var EXPANDED_TOOLTIP = "Hide the new game choices and widen the map.";
+  var EXPANDED_TOOLTIP = "Hide the new game choices to see more of the map.";
   var COLLAPSED_LABEL = "Show the new game choices";
   var COLLAPSED_TOOLTIP = "Show the new game choices.";
+  var expanded = true;
+  var slide = null;
   function newGameOverlayIsOpen() {
     const overlay = document.getElementById("game-over-overlay");
     return overlay != null && !overlay.classList.contains("hidden");
   }
-  function measureCollapseSquare(overlay) {
-    if (overlay.classList.contains(COLLAPSED_CLASS)) return;
-    const globalButton = document.getElementById("new-game-human-region-randomize");
-    const regionalButton = document.getElementById("new-game-region-randomize");
-    const source = globalButton != null && globalButton.offsetHeight > 0 ? globalButton : regionalButton;
-    if (source == null || source.offsetHeight <= 0) return;
-    overlay.style.setProperty("--new-game-collapse-size", `${source.offsetHeight}px`);
+  function dialogParts() {
+    const panel = document.getElementById("game-over-overlay");
+    const header = document.getElementById("new-game-panel-header");
+    const button = document.getElementById("new-game-dialog-collapse");
+    if (!panel || !header || !(button instanceof HTMLButtonElement)) return null;
+    return { panel, header, button };
   }
-  function applyExpandedChrome(overlay, button) {
-    overlay.classList.remove(COLLAPSED_CLASS);
-    button.textContent = UNIT_DESELECT_GLYPH;
-    button.setAttribute("aria-expanded", "true");
-    button.setAttribute("aria-label", EXPANDED_LABEL);
-    button.setAttribute("data-control-tooltip", EXPANDED_TOOLTIP);
-    measureCollapseSquare(overlay);
+  function syncCollapseControl(button) {
+    button.setAttribute("aria-expanded", String(expanded));
+    button.setAttribute("aria-label", expanded ? EXPANDED_LABEL : COLLAPSED_LABEL);
+    button.setAttribute("data-control-tooltip", expanded ? EXPANDED_TOOLTIP : COLLAPSED_TOOLTIP);
   }
-  function applyCollapsedChrome(overlay, button) {
-    const active2 = document.activeElement;
-    if (active2 instanceof HTMLElement && active2 !== button && overlay.contains(active2)) active2.blur();
-    overlay.classList.add(COLLAPSED_CLASS);
-    button.textContent = UNIT_SELECT_GLYPH;
-    button.setAttribute("aria-expanded", "false");
-    button.setAttribute("aria-label", COLLAPSED_LABEL);
-    button.setAttribute("data-control-tooltip", COLLAPSED_TOOLTIP);
+  function settle(panel) {
+    slide?.cancel();
+    slide = null;
+    panel.dataset.state = expanded ? "expanded" : "compact";
+  }
+  function slideTo(panel, from, to) {
+    slide = startPanelHeightSlide(panel, from, to, (finished) => {
+      if (slide === finished) settle(panel);
+    });
+    if (!slide) settle(panel);
   }
   function expandNewGameDialog() {
-    const overlay = document.getElementById("game-over-overlay");
-    const button = document.getElementById("new-game-dialog-collapse");
-    if (!(overlay instanceof HTMLElement) || !(button instanceof HTMLButtonElement)) return;
-    applyExpandedChrome(overlay, button);
+    const parts = dialogParts();
+    if (!parts) return;
+    expanded = true;
+    syncCollapseControl(parts.button);
+    settle(parts.panel);
   }
   function toggleNewGameDialogCollapsed() {
-    const overlay = document.getElementById("game-over-overlay");
-    const button = document.getElementById("new-game-dialog-collapse");
-    if (!(overlay instanceof HTMLElement) || !(button instanceof HTMLButtonElement)) return;
-    if (overlay.classList.contains(COLLAPSED_CLASS)) applyExpandedChrome(overlay, button);
-    else applyCollapsedChrome(overlay, button);
-    syncNewGameDialogMapPointer();
+    const parts = dialogParts();
+    if (!parts) return;
+    const { panel, header, button } = parts;
+    const from = panel.getBoundingClientRect().height;
+    slide?.cancel();
+    slide = null;
+    expanded = !expanded;
+    syncCollapseControl(button);
+    if (expanded) {
+      panel.dataset.state = "expanding";
+      const to = panel.getBoundingClientRect().height;
+      keepNewGameDialogOnMap(to);
+      slideTo(panel, from, to);
+      return;
+    }
+    const active2 = document.activeElement;
+    if (active2 instanceof HTMLElement && panel.contains(active2) && !header.contains(active2)) active2.blur();
+    panel.dataset.state = "collapsing";
+    const borders = panel.offsetHeight - panel.clientHeight;
+    slideTo(panel, from, header.offsetHeight + borders);
   }
   function syncNewGameDialogMapPointer() {
     const overlay = document.getElementById("game-over-overlay");
@@ -25688,6 +25890,74 @@ ${bonuses}`;
     if (!(overlay instanceof HTMLElement) || !(map instanceof HTMLElement)) return;
     if (overlay.classList.contains("hidden")) return;
     map.style.pointerEvents = "auto";
+  }
+
+  // src/renderer/map/mainMapCameraReturn.ts
+  var saved = null;
+  function saveMainMapCameraForReturn() {
+    const map = getMainLeafletMap();
+    if (!map?.getCenter || !map.getZoom || !map.getMinZoom || !map.getMaxZoom) {
+      saved = null;
+      return;
+    }
+    saved = {
+      extent: loadedMapExtentTarget(),
+      center: map.getCenter(),
+      zoom: map.getZoom(),
+      minZoom: map.getMinZoom(),
+      maxZoom: map.getMaxZoom(),
+      maxBounds: map.options?.maxBounds ?? null,
+      worldCopyJump: map.options?.worldCopyJump === true
+    };
+  }
+  function returnMainMapCamera() {
+    const camera = saved;
+    saved = null;
+    const map = getMainLeafletMap();
+    if (!camera || !map) return false;
+    applyLoadedMapExtent(camera.extent, true);
+    if (map.options) map.options.worldCopyJump = camera.worldCopyJump;
+    map.setMaxBounds?.(camera.maxBounds);
+    map.setMinZoom?.(camera.minZoom);
+    map.setMaxZoom?.(camera.maxZoom);
+    map.setView?.(camera.center, camera.zoom, { animate: false });
+    return true;
+  }
+  function forgetMainMapCameraForReturn() {
+    saved = null;
+  }
+
+  // src/renderer/gameplay/newGameReturn.ts
+  var matchWaiting = false;
+  function syncCloseControl() {
+    const close = document.getElementById("new-game-dialog-close");
+    if (close instanceof HTMLButtonElement) close.hidden = !matchWaiting;
+  }
+  function isMatchWaitingUnderNewGame() {
+    return matchWaiting;
+  }
+  function holdMatchUnderNewGame() {
+    matchWaiting = true;
+    saveMainMapCameraForReturn();
+    syncCloseControl();
+  }
+  function forgetMatchUnderNewGame() {
+    matchWaiting = false;
+    forgetMainMapCameraForReturn();
+    syncCloseControl();
+  }
+  function closeNewGameOverlayToMatch(deps) {
+    if (!matchWaiting || !newGameOverlayIsOpen()) return;
+    matchWaiting = false;
+    syncCloseControl();
+    document.getElementById("game-over-overlay")?.classList.add("hidden");
+    dismissStaleControlTooltip();
+    deps.setMainUIControlsEnabled(true);
+    invalidateLeafletMapSizes();
+    returnMainMapCamera();
+    deps.updateReadyButtonState();
+    if (rendererSharedState.runButtonOn) deps.startBackgroundRequestIfAllowed();
+    deps.resizeAndRedraw();
   }
 
   // src/shared/topBarDateBlock.ts
@@ -25896,7 +26166,10 @@ ${bonuses}`;
   }
   function syncGameMenuNewGameItem() {
     const item = document.getElementById(NEW_GAME_ITEM_ID);
-    if (item instanceof HTMLButtonElement) item.disabled = newGameOverlayIsOpen();
+    if (!(item instanceof HTMLButtonElement)) return;
+    const screenOpen = newGameOverlayIsOpen();
+    item.disabled = screenOpen || rendererSharedState.readyRequestInFlight;
+    item.parentElement?.setAttribute("data-control-tooltip", screenOpen ? newGameItemOpenTooltipText : newGameItemBusyTooltipText);
   }
   function openGameMenu() {
     const menu = document.getElementById(GAME_MENU_ID);
@@ -26514,7 +26787,7 @@ ${bonuses}`;
   }
 
   // src/renderer/gameplay/selectionPanelResize.ts
-  var dragStart = null;
+  var dragStart2 = null;
   var draggedHeight = null;
   function applyDraggedPanelHeight(panel) {
     if (draggedHeight === null) return;
@@ -26538,67 +26811,55 @@ ${bonuses}`;
       if (event.button !== 0 || panel.dataset.state !== "expanded") return;
       event.preventDefault();
       const box = panel.getBoundingClientRect();
-      dragStart = { x: event.clientX, y: event.clientY, width: box.width, height: box.height };
+      dragStart2 = { x: event.clientX, y: event.clientY, width: box.width, height: box.height };
       grip.setPointerCapture(event.pointerId);
     });
     grip.addEventListener("pointermove", (event) => {
-      if (!dragStart) return;
+      if (!dragStart2) return;
       const mapHeight = document.getElementById(MAP_CONTAINER_ID)?.clientHeight ?? 0;
       const size = clampSelectionPanelSize(
-        { width: dragStart.width + (event.clientX - dragStart.x), height: dragStart.height - (event.clientY - dragStart.y) },
+        { width: dragStart2.width + (event.clientX - dragStart2.x), height: dragStart2.height - (event.clientY - dragStart2.y) },
         mapHeight
       );
       applyPanelSize(panel, size.width, size.height);
     });
-    const endDrag = (event) => {
-      if (!dragStart) return;
-      dragStart = null;
+    const endDrag2 = (event) => {
+      if (!dragStart2) return;
+      dragStart2 = null;
       if (grip.hasPointerCapture(event.pointerId)) grip.releasePointerCapture(event.pointerId);
     };
-    grip.addEventListener("pointerup", endDrag);
-    grip.addEventListener("pointercancel", endDrag);
+    grip.addEventListener("pointerup", endDrag2);
+    grip.addEventListener("pointercancel", endDrag2);
   }
 
   // src/renderer/gameplay/selectionPanelExpand.ts
-  var SELECTION_PANEL_SLIDE_MS = 150;
-  var expanded = false;
-  var slide = null;
+  var expanded2 = false;
+  var slide2 = null;
   function syncExpandControl(button) {
-    button.setAttribute("aria-expanded", String(expanded));
-    button.setAttribute("aria-label", expanded ? "Hide selection details" : "Show selection details");
-    const tip = expanded ? selectionPanelCollapseTooltipText : selectionPanelExpandTooltipText;
+    button.setAttribute("aria-expanded", String(expanded2));
+    button.setAttribute("aria-label", expanded2 ? "Hide selection details" : "Show selection details");
+    const tip = expanded2 ? selectionPanelCollapseTooltipText : selectionPanelExpandTooltipText;
     button.setAttribute("data-control-tooltip", tip);
   }
-  function reducedMotionRequested() {
-    return window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
-  }
-  function settle(panel) {
-    slide?.cancel();
-    slide = null;
-    panel.dataset.state = expanded ? "expanded" : "compact";
-    if (!expanded) clearPanelHeight(panel);
+  function settle2(panel) {
+    slide2?.cancel();
+    slide2 = null;
+    panel.dataset.state = expanded2 ? "expanded" : "compact";
+    if (!expanded2) clearPanelHeight(panel);
   }
   function slidePanel(panel, from, to) {
-    if (reducedMotionRequested() || Math.abs(from - to) < 1 || typeof panel.animate !== "function") {
-      settle(panel);
-      return;
-    }
-    const running = panel.animate([{ height: `${from}px` }, { height: `${to}px` }], {
-      duration: SELECTION_PANEL_SLIDE_MS,
-      easing: "ease-out"
+    slide2 = startPanelHeightSlide(panel, from, to, (finished) => {
+      if (slide2 === finished) settle2(panel);
     });
-    slide = running;
-    running.onfinish = () => {
-      if (slide === running) settle(panel);
-    };
+    if (!slide2) settle2(panel);
   }
   function toggleSelectionPanel(panel, bar, button) {
     const from = panel.getBoundingClientRect().height;
-    slide?.cancel();
-    slide = null;
-    expanded = !expanded;
+    slide2?.cancel();
+    slide2 = null;
+    expanded2 = !expanded2;
     syncExpandControl(button);
-    if (expanded) {
+    if (expanded2) {
       panel.dataset.state = "expanding";
       applyDraggedPanelHeight(panel);
       slidePanel(panel, from, panel.getBoundingClientRect().height);
@@ -26611,14 +26872,14 @@ ${bonuses}`;
   }
   function settleSelectionPanelSlide() {
     const panel = document.getElementById("selection-panel");
-    if (panel && slide) settle(panel);
+    if (panel && slide2) settle2(panel);
   }
   function wireSelectionPanelExpand() {
     const panel = document.getElementById("selection-panel");
     const bar = document.getElementById("selection-panel-bar");
     const button = document.getElementById("selection-panel-expand");
     if (!panel || !bar || !button) return;
-    settle(panel);
+    settle2(panel);
     syncExpandControl(button);
     button.addEventListener("click", () => toggleSelectionPanel(panel, bar, button));
   }
@@ -26807,6 +27068,13 @@ ${bonuses}`;
     const noGame = !state || state.hexes.length === 0;
     const gameOver = !!state?.gameOver;
     const showOverlay = noGame || gameOver;
+    if (isMatchWaitingUnderNewGame()) {
+      if (!showOverlay) {
+        updateReadyButtonState2();
+        return false;
+      }
+      forgetMatchUnderNewGame();
+    }
     const wasHidden = overlay?.classList.contains("hidden") !== false;
     if (!showOverlay) {
       overlay?.classList.add("hidden");
@@ -26819,6 +27087,7 @@ ${bonuses}`;
     if (wasHidden) {
       closeGameMenu();
       expandNewGameDialog();
+      placeNewGameDialogAtInset();
       blurMapChromeIfFocused();
       resetNewGameMapPreviewFrame();
       repaintNewGameMapPreview();
@@ -31057,20 +31326,40 @@ ${bonuses}`;
       repaintNewGameMapPreview();
     });
   }
+  function stopMatchWaitingUnderNewGame() {
+    if (!isMatchWaitingUnderNewGame()) return;
+    forgetMatchUnderNewGame();
+    void stopOpponentPlanning("new_game");
+    clearResolutionPlaybackAnimationState();
+    if (rendererSharedState.tacticalBattleSnapshot && rendererSharedState.gameState) {
+      tacticalReleaseRendererSessionForNewStrategicMatch(rendererSharedState.gameState, false);
+    }
+    resetPrecomputedAiState("null");
+    rendererSharedState.pendingDeferredStrategicPostResolutionConsult = false;
+    rendererSharedState.pendingDeferredTacticalPostBeatConsult = false;
+    rendererSharedState.backgroundRequestInFlight = false;
+    rendererSharedState.readyRequestInFlight = false;
+    rendererSharedState.eventDrivenInitialConsultationDone = false;
+  }
   function registerNewGameButton(deps) {
     document.getElementById("new-game-dialog-collapse")?.addEventListener("click", () => {
       toggleNewGameDialogCollapsed();
+    });
+    wireNewGameDialogMove();
+    document.getElementById("new-game-dialog-close")?.addEventListener("click", () => {
+      closeNewGameOverlayToMatch(deps);
     });
     registerRegionRandomizeButtons();
     registerNewGameMapControls();
     registerGameSizeSelect();
     document.getElementById("new-game-btn")?.addEventListener("click", async () => {
       if (!window.gameApi?.newGame) return;
-      const matchEpoch = advanceRendererMatchEpoch();
       if (regionalStartBlocked()) {
         showMapToast("This map has no two sides.");
         return;
       }
+      const matchEpoch = advanceRendererMatchEpoch();
+      stopMatchWaitingUnderNewGame();
       const cameraHold = holdNewGameMapPreviewCamera();
       try {
         const selectedRegions = getSelectedScenarioRegions();
@@ -31137,20 +31426,14 @@ ${bonuses}`;
   }
   function openNewGameOverlayFromModelTab(setMainUIControlsEnabled2, updateReadyButtonState2) {
     if (rendererSharedState.tacticalAnnihilationOutcomeDialog != null) return false;
-    advanceRendererMatchEpoch();
-    void stopOpponentPlanning("new_game");
-    clearResolutionPlaybackAnimationState();
-    if (rendererSharedState.tacticalBattleSnapshot && rendererSharedState.gameState) {
-      tacticalReleaseRendererSessionForNewStrategicMatch(rendererSharedState.gameState, false);
-    }
-    resetPrecomputedAiState("null");
-    rendererSharedState.pendingDeferredStrategicPostResolutionConsult = false;
-    rendererSharedState.pendingDeferredTacticalPostBeatConsult = false;
-    rendererSharedState.backgroundRequestInFlight = false;
-    rendererSharedState.readyRequestInFlight = false;
-    rendererSharedState.eventDrivenInitialConsultationDone = false;
+    if (rendererSharedState.readyRequestInFlight) return false;
     const overlay = document.getElementById("game-over-overlay");
     const newGameBtn = document.getElementById("new-game-btn");
+    const opened = overlay?.classList.contains("hidden") === true;
+    if (opened && rendererSharedState.gameState && rendererSharedState.gameState.hexes.length > 0 && !rendererSharedState.gameState.gameOver) {
+      holdMatchUnderNewGame();
+      advanceRendererMatchEpoch();
+    }
     showNewGameBanner("newGame", selectedNewGameTab());
     if (newGameBtn) {
       newGameBtn.textContent = "Start game";
@@ -31162,9 +31445,9 @@ ${bonuses}`;
       await refreshNewGameMapPreview();
     })();
     syncGameSizeCapPreview();
-    const opened = overlay?.classList.contains("hidden") === true;
     overlay?.classList.remove("hidden");
     expandNewGameDialog();
+    placeNewGameDialogAtInset();
     blurMapChromeIfFocused();
     resetNewGameMapPreviewFrame();
     repaintNewGameMapPreview();
@@ -34110,7 +34393,7 @@ ${bonuses}`;
   }
   function initDeferredResolutionPlaybackPushListeners(deps) {
     window.gameApi?.registerPostResolutionConsultationListener?.((payload2) => {
-      if (isNewGameOverlayOpen()) {
+      if (isNewGameOverlayOpen() && !isMatchWaitingUnderNewGame()) {
         rendererSharedState.pendingDeferredStrategicPostResolutionConsult = false;
         deps.updateReadyButtonState();
         return;
@@ -34143,7 +34426,7 @@ ${bonuses}`;
       deps.updateReadyButtonState();
     });
     window.gameApi?.registerPostTacticalBeatConsultationListener?.((fields) => {
-      if (isNewGameOverlayOpen()) {
+      if (isNewGameOverlayOpen() && !isMatchWaitingUnderNewGame()) {
         rendererSharedState.pendingDeferredTacticalPostBeatConsult = false;
         deps.updateReadyButtonState();
         return;
@@ -36050,75 +36333,24 @@ ${bonuses}`;
     return !shiftKeyAlreadyActive;
   }
 
-  // src/shared/mapChromePlacement.ts
-  var MAP_CHROME_INSET = 12;
-  var MAP_CHROME_GAP = 8;
-  var TOAST_BAND_MIN_WIDTH = 280;
-  function legendPopoverPosition(input) {
-    const besideLeft = input.panelRight + MAP_CHROME_GAP;
-    if (besideLeft + input.legendWidth + MAP_CHROME_INSET <= input.mapWidth) {
-      return { left: besideLeft, top: MAP_CHROME_INSET, beside: true };
-    }
-    return { left: MAP_CHROME_INSET, top: input.panelBottom + MAP_CHROME_GAP, beside: false };
-  }
-  function toastBandSpan(input) {
-    const right = Math.max(MAP_CHROME_INSET, input.mapWidth - input.rightObstacleLeft + MAP_CHROME_INSET);
-    const left = input.leftObstacleRight + MAP_CHROME_INSET;
-    if (input.mapWidth - left - right < TOAST_BAND_MIN_WIDTH) {
-      return { left: MAP_CHROME_INSET, right, overChrome: true };
-    }
-    return { left, right, overChrome: false };
-  }
-
-  // src/renderer/map/mapChromeLayout.ts
-  function layoutMapChrome() {
-    const map = document.getElementById("canvas-container");
-    const panel = document.getElementById("minimap-panel");
-    if (!map || !panel) return;
-    const mapBox = map.getBoundingClientRect();
-    const panelBox = panel.getBoundingClientRect();
-    const panelRight = panelBox.right - mapBox.left;
-    let leftObstacleRight = panelRight;
-    const legend = document.getElementById("terrain-legend");
-    if (legend && !legend.hidden) {
-      const place = legendPopoverPosition({
-        mapWidth: mapBox.width,
-        panelRight,
-        panelBottom: panelBox.bottom - mapBox.top,
-        legendWidth: legend.offsetWidth
-      });
-      legend.style.left = `${place.left}px`;
-      legend.style.top = `${place.top}px`;
-      if (place.beside) leftObstacleRight = place.left + legend.offsetWidth;
-    }
-    const band = document.getElementById("map-toast-band");
-    if (!band) return;
-    const zoomBox = document.querySelector("#main-map .leaflet-control-zoom")?.getBoundingClientRect();
-    const span = toastBandSpan({
-      mapWidth: mapBox.width,
-      leftObstacleRight,
-      rightObstacleLeft: zoomBox && zoomBox.width > 0 ? zoomBox.left - mapBox.left : mapBox.width
-    });
-    band.style.left = `${span.left}px`;
-    band.style.right = `${span.right}px`;
-  }
-
   // src/renderer/map/mapModeTabs.ts
+  var LAYER_TABS = Object.freeze([
+    { id: "map-mode-weather", read: areWeatherIconsShown, write: setWeatherIconsShown },
+    { id: "map-mode-tech", read: isTechViewChosen, write: setTechViewChosen },
+    { id: "map-mode-control", read: areControlBordersShown, write: setControlBordersShown },
+    { id: "map-mode-production", read: isProductionDetailChosen, write: setProductionDetailChosen }
+  ]);
   function syncMapModeTabs() {
-    document.getElementById("map-mode-weather")?.setAttribute("aria-pressed", String(areWeatherIconsShown()));
-    document.getElementById("map-mode-tech")?.setAttribute("aria-pressed", String(isTechViewChosen()));
+    for (const tab of LAYER_TABS) {
+      document.getElementById(tab.id)?.setAttribute("aria-pressed", String(tab.read()));
+    }
     const legendOpen = document.getElementById("terrain-legend")?.hidden === false;
     const legendToggle = document.getElementById("map-legend-toggle");
     legendToggle?.setAttribute("aria-pressed", String(legendOpen));
     legendToggle?.setAttribute("aria-expanded", String(legendOpen));
   }
-  function toggleWeatherIcons(requestRedraw3) {
-    setWeatherIconsShown(!areWeatherIconsShown());
-    syncMapModeTabs();
-    requestRedraw3();
-  }
-  function toggleTechView(requestRedraw3) {
-    setTechViewChosen(!isTechViewChosen());
+  function toggleMapLayer(tab, requestRedraw3) {
+    tab.write(!tab.read());
     syncMapModeTabs();
     requestRedraw3();
   }
@@ -36146,8 +36378,9 @@ ${bonuses}`;
     document.getElementById("map-mode-tabs-toggle")?.addEventListener("click", () => {
       setMapModeTabsShown(document.getElementById("map-mode-tabs")?.hidden === true);
     });
-    document.getElementById("map-mode-weather")?.addEventListener("click", () => toggleWeatherIcons(requestRedraw3));
-    document.getElementById("map-mode-tech")?.addEventListener("click", () => toggleTechView(requestRedraw3));
+    for (const tab of LAYER_TABS) {
+      document.getElementById(tab.id)?.addEventListener("click", () => toggleMapLayer(tab, requestRedraw3));
+    }
     document.getElementById("map-legend-toggle")?.addEventListener("click", toggleTerrainLegend);
     syncMapModeTabs();
   }
@@ -36557,11 +36790,11 @@ ${bonuses}`;
     const overlayContext = buildProductionOverlayContext(rendererSharedState.gameState);
     for (const hx of rendererSharedState.gameState.hexes) {
       const explored = isHexExploredByPlayer(hx.h3Index);
-      if (!explored && !overlayContext.mapInspectionHeld) continue;
+      if (!explored && !overlayContext.productionDetailShown) continue;
       const controller = getControllerForHex(rendererSharedState.gameState, hx.h3Index);
       const controlledByHuman = controller === "human";
       const capacityPerTurn = getUrbanProductionCapacityForHex2(hx.h3Index);
-      if (!overlayContext.mapInspectionHeld) {
+      if (!overlayContext.productionDetailShown) {
         const canShowLabelWithoutInspection = isStrategicHexHumanUrbanProduction(rendererSharedState.gameState, hx) || controlledByHuman;
         if (!canShowLabelWithoutInspection) continue;
       }

@@ -9,6 +9,8 @@ import { resetNewGameOptionControls } from '../gameplay/newGameOptionsUi';
 import { dismissStaleControlTooltip } from '../chrome/controlTooltip';
 import { newGameButtonTooltipText } from '../chrome/controlTooltipText';
 import { expandNewGameDialog, newGameOverlayIsOpen, syncNewGameDialogMapPointer } from '../gameplay/newGameDialogCollapse';
+import { placeNewGameDialogAtInset } from '../gameplay/newGameDialogMove';
+import { forgetMatchUnderNewGame, isMatchWaitingUnderNewGame } from '../gameplay/newGameReturn';
 import { renderTopBarStatus } from '../chrome/topBar';
 import { closeGameMenu, syncGameMenuNewGameItem } from '../chrome/gameMenu';
 import { refreshConsoleHeader } from '../chrome/consoleFrame';
@@ -76,8 +78,8 @@ export function blurMapChromeIfFocused(): void {
  * Expected outcome: Children of the map pane other than the annihilation dialog, and the console, ignore the pointer
  *   while `enabled` is false. The top bar does too, except while the new-game overlay is open: it is the new-game bar
  *   then, and its game menu keeps working. The game menu closes whenever the top bar stops taking the pointer, and its
- *   New game item follows the overlay. The new-game overlay sits beside the map pane, not in it, so this never turns
- *   it off. While it is open, the main map takes the pointer again so drag and the wheel move the preview.
+ *   New game item follows the overlay. The new-game overlay floats over the map pane but is not inside it, so this
+ *   never turns it off. While it is open, the main map takes the pointer again so drag and the wheel move the preview.
  * Exceptions: None.
  */
 export function setMainUIControlsEnabled(enabled: boolean): void {
@@ -114,8 +116,11 @@ export function setMainUIControlsEnabled(enabled: boolean): void {
  *   stays open, stays closed, or the element is missing. With a live game the overlay hides and controls are
  *   enabled. Otherwise the overlay shows a win, loss, or start message. Fog of war and the bonus dropdowns return
  *   to their defaults on every call while it shows. The home regions, the starting month, and the map preview are
- *   drawn only when the overlay opens, and that open closes the game menu. The choices start showing only on that
- *   open. A later refresh leaves hidden choices hidden.
+ *   drawn only when the overlay opens, and that open closes the game menu. The panel starts expanded, at the map's
+ *   top-left corner, only on that open. A later refresh leaves a collapsed or moved panel as it is. While a match
+ *   waits under the screen the player opened from the game menu, a refresh of that live match leaves the screen and
+ *   the controls as they are and returns false; a refresh in which that match has ended forgets it, so the close
+ *   control hides, and the screen shows the result.
  * Exceptions: None.
  */
 export function updateGameOverUI(
@@ -128,6 +133,13 @@ export function updateGameOverUI(
   const noGame = !state || state.hexes.length === 0;
   const gameOver = !!state?.gameOver;
   const showOverlay = noGame || gameOver;
+  if (isMatchWaitingUnderNewGame()) {
+    if (!showOverlay) {
+      updateReadyButtonState();
+      return false;
+    }
+    forgetMatchUnderNewGame();
+  }
 
   const wasHidden = overlay?.classList.contains('hidden') !== false;
   if (!showOverlay) {
@@ -142,6 +154,7 @@ export function updateGameOverUI(
   if (wasHidden) {
     closeGameMenu();
     expandNewGameDialog();
+    placeNewGameDialogAtInset();
     blurMapChromeIfFocused();
     resetNewGameMapPreviewFrame();
     repaintNewGameMapPreview();
