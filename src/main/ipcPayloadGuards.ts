@@ -224,6 +224,71 @@ export type ParsedHumanTacticalCommitOrders = {
 };
 
 /**
+ * Reads rows that each carry a unit id and one string field.
+ *
+ * Purpose: Human and opponent tactical commit payloads use the same row shape for movement, ranged fire, ferry, and embark.
+ * When to use: Only from `parseHumanTacticalCommitPayload`. Callers apply `?? []` when a missing array is allowed.
+ * Expected outcome: Normalized `{ unitId, value }` rows, or the shared invalid reason.
+ * Exceptions: None. A non-array or a bad row returns `ok: false`.
+ */
+function parseUnitIdFieldRows(
+  raw: unknown,
+  fieldName: 'toH3Index' | 'targetH3Index' | 'destinationH3Index' | 'navalUnitId',
+  invalid: string
+): { ok: true; rows: { unitId: string; value: string }[] } | { ok: false; reason: string } {
+  if (!Array.isArray(raw)) return { ok: false, reason: invalid };
+  const rows: { unitId: string; value: string }[] = [];
+  for (const row of raw) {
+    if (typeof row !== 'object' || row === null) return { ok: false, reason: invalid };
+    const record = row as Record<string, unknown>;
+    const unitId = record.unitId;
+    const value = record[fieldName];
+    if (typeof unitId !== 'string' || typeof value !== 'string') {
+      return { ok: false, reason: invalid };
+    }
+    rows.push({ unitId, value });
+  }
+  return { ok: true, rows };
+}
+
+/**
+ * Reads air-strike rows and rejects an unknown target type.
+ *
+ * Purpose: Human and opponent tactical commits share the same four target types.
+ * When to use: Only from `parseHumanTacticalCommitPayload`, after `?? []` when the array may be absent.
+ * Expected outcome: `AirStrikeOrder` rows, or the shared invalid reason.
+ * Exceptions: None. A non-array or a bad row returns `ok: false`.
+ */
+function parseAirStrikeRows(
+  raw: unknown,
+  invalid: string
+): { ok: true; rows: AirStrikeOrder[] } | { ok: false; reason: string } {
+  if (!Array.isArray(raw)) return { ok: false, reason: invalid };
+  const rows: AirStrikeOrder[] = [];
+  for (const row of raw) {
+    if (typeof row !== 'object' || row === null) return { ok: false, reason: invalid };
+    const record = row as Record<string, unknown>;
+    const targetType = record.targetType;
+    if (
+      typeof record.unitId !== 'string' ||
+      typeof record.targetH3Index !== 'string' ||
+      (targetType !== 'units' &&
+        targetType !== 'urban' &&
+        targetType !== 'airport' &&
+        targetType !== 'seaport')
+    ) {
+      return { ok: false, reason: invalid };
+    }
+    rows.push({
+      unitId: record.unitId,
+      targetH3Index: record.targetH3Index,
+      targetType,
+    });
+  }
+  return { ok: true, rows };
+}
+
+/**
  * Validates and normalizes the renderer tactical draft commit payload for IPC.
  *
  * Purpose: Keeps tactical commit validation unit-testable and identical to the prior inline `main.ts` checks.
@@ -249,68 +314,21 @@ export function parseHumanTacticalCommitPayload(
   };
   const useEventDrivenConsultation = p.useEventDrivenConsultation === true;
   const aiPlanningRunEnabled = p.aiPlanningRunEnabled === true;
-  const movementRaw = p.movementOrders;
-  if (!Array.isArray(movementRaw)) return { ok: false, reason: invalid };
-  const movementOrders: { unitId: string; toH3Index: string }[] = [];
-  for (const row of movementRaw) {
-    if (typeof row !== 'object' || row === null) return { ok: false, reason: invalid };
-    const r = row as { unitId?: unknown; toH3Index?: unknown };
-    if (typeof r.unitId !== 'string' || typeof r.toH3Index !== 'string') {
-      return { ok: false, reason: invalid };
-    }
-    movementOrders.push({ unitId: r.unitId, toH3Index: r.toH3Index });
-  }
-  const rangedRaw = p.rangedAttacks ?? [];
-  if (!Array.isArray(rangedRaw)) return { ok: false, reason: invalid };
-  const rangedAttacks: { unitId: string; targetH3Index: string }[] = [];
-  for (const row of rangedRaw) {
-    if (typeof row !== 'object' || row === null) return { ok: false, reason: invalid };
-    const r = row as { unitId?: unknown; targetH3Index?: unknown };
-    if (typeof r.unitId !== 'string' || typeof r.targetH3Index !== 'string') {
-      return { ok: false, reason: invalid };
-    }
-    rangedAttacks.push({ unitId: r.unitId, targetH3Index: r.targetH3Index });
-  }
-  const airRaw = p.airStrikes ?? [];
-  if (!Array.isArray(airRaw)) return { ok: false, reason: invalid };
-  const airStrikes: AirStrikeOrder[] = [];
-  for (const row of airRaw) {
-    if (typeof row !== 'object' || row === null) return { ok: false, reason: invalid };
-    const r = row as { unitId?: unknown; targetH3Index?: unknown; targetType?: unknown };
-    if (
-      typeof r.unitId !== 'string' ||
-      typeof r.targetH3Index !== 'string' ||
-      (r.targetType !== 'units' &&
-        r.targetType !== 'urban' &&
-        r.targetType !== 'airport' &&
-        r.targetType !== 'seaport')
-    ) {
-      return { ok: false, reason: invalid };
-    }
-    airStrikes.push({ unitId: r.unitId, targetH3Index: r.targetH3Index, targetType: r.targetType });
-  }
-  const ferryRaw = p.ferryOrders ?? [];
-  if (!Array.isArray(ferryRaw)) return { ok: false, reason: invalid };
-  const ferryOrders: FerryOrder[] = [];
-  for (const row of ferryRaw) {
-    if (typeof row !== 'object' || row === null) return { ok: false, reason: invalid };
-    const r = row as { unitId?: unknown; destinationH3Index?: unknown };
-    if (typeof r.unitId !== 'string' || typeof r.destinationH3Index !== 'string') {
-      return { ok: false, reason: invalid };
-    }
-    ferryOrders.push({ unitId: r.unitId, destinationH3Index: r.destinationH3Index });
-  }
-  const embarkRaw = p.embarkOrders ?? [];
-  if (!Array.isArray(embarkRaw)) return { ok: false, reason: invalid };
-  const embarkOrders: EmbarkOrder[] = [];
-  for (const row of embarkRaw) {
-    if (typeof row !== 'object' || row === null) return { ok: false, reason: invalid };
-    const r = row as { unitId?: unknown; navalUnitId?: unknown };
-    if (typeof r.unitId !== 'string' || typeof r.navalUnitId !== 'string') {
-      return { ok: false, reason: invalid };
-    }
-    embarkOrders.push({ unitId: r.unitId, navalUnitId: r.navalUnitId });
-  }
+  const movementParsed = parseUnitIdFieldRows(p.movementOrders, 'toH3Index', invalid);
+  if (!movementParsed.ok) return movementParsed;
+  const movementOrders = movementParsed.rows.map((row) => ({ unitId: row.unitId, toH3Index: row.value }));
+  const rangedParsed = parseUnitIdFieldRows(p.rangedAttacks ?? [], 'targetH3Index', invalid);
+  if (!rangedParsed.ok) return rangedParsed;
+  const rangedAttacks = rangedParsed.rows.map((row) => ({ unitId: row.unitId, targetH3Index: row.value }));
+  const airParsed = parseAirStrikeRows(p.airStrikes ?? [], invalid);
+  if (!airParsed.ok) return airParsed;
+  const airStrikes = airParsed.rows;
+  const ferryParsed = parseUnitIdFieldRows(p.ferryOrders ?? [], 'destinationH3Index', invalid);
+  if (!ferryParsed.ok) return ferryParsed;
+  const ferryOrders = ferryParsed.rows.map((row) => ({ unitId: row.unitId, destinationH3Index: row.value }));
+  const embarkParsed = parseUnitIdFieldRows(p.embarkOrders ?? [], 'navalUnitId', invalid);
+  if (!embarkParsed.ok) return embarkParsed;
+  const embarkOrders = embarkParsed.rows.map((row) => ({ unitId: row.unitId, navalUnitId: row.value }));
   let opponentTacticalDraft: TacticalOpponentPlanPayload | undefined;
   const oppRaw = (p as { opponentTacticalDraft?: unknown }).opponentTacticalDraft;
   if (oppRaw !== undefined) {
@@ -322,70 +340,22 @@ export function parseHumanTacticalCommitPayload(
       ferryOrders?: unknown;
       embarkOrders?: unknown;
     };
-    const omRaw = o.movementOrders ?? [];
-    if (!Array.isArray(omRaw)) return { ok: false, reason: invalid };
-    const om: { unitId: string; toH3Index: string }[] = [];
-    for (const row of omRaw) {
-      if (typeof row !== 'object' || row === null) return { ok: false, reason: invalid };
-      const r = row as { unitId?: unknown; toH3Index?: unknown };
-      if (typeof r.unitId !== 'string' || typeof r.toH3Index !== 'string') return { ok: false, reason: invalid };
-      om.push({ unitId: r.unitId, toH3Index: r.toH3Index });
-    }
-    const orRaw = o.rangedAttacks ?? [];
-    if (!Array.isArray(orRaw)) return { ok: false, reason: invalid };
-    const ora: { unitId: string; targetH3Index: string }[] = [];
-    for (const row of orRaw) {
-      if (typeof row !== 'object' || row === null) return { ok: false, reason: invalid };
-      const r = row as { unitId?: unknown; targetH3Index?: unknown };
-      if (typeof r.unitId !== 'string' || typeof r.targetH3Index !== 'string') return { ok: false, reason: invalid };
-      ora.push({ unitId: r.unitId, targetH3Index: r.targetH3Index });
-    }
-    const oaRaw = o.airStrikes ?? [];
-    if (!Array.isArray(oaRaw)) return { ok: false, reason: invalid };
-    const oa: AirStrikeOrder[] = [];
-    for (const row of oaRaw) {
-      if (typeof row !== 'object' || row === null) return { ok: false, reason: invalid };
-      const r = row as { unitId?: unknown; targetH3Index?: unknown; targetType?: unknown };
-      if (
-        typeof r.unitId !== 'string' ||
-        typeof r.targetH3Index !== 'string' ||
-        (r.targetType !== 'units' &&
-          r.targetType !== 'urban' &&
-          r.targetType !== 'airport' &&
-          r.targetType !== 'seaport')
-      ) {
-        return { ok: false, reason: invalid };
-      }
-      oa.push({ unitId: r.unitId, targetH3Index: r.targetH3Index, targetType: r.targetType });
-    }
-    const ofRaw = o.ferryOrders ?? [];
-    if (!Array.isArray(ofRaw)) return { ok: false, reason: invalid };
-    const ofe: FerryOrder[] = [];
-    for (const row of ofRaw) {
-      if (typeof row !== 'object' || row === null) return { ok: false, reason: invalid };
-      const r = row as { unitId?: unknown; destinationH3Index?: unknown };
-      if (typeof r.unitId !== 'string' || typeof r.destinationH3Index !== 'string') {
-        return { ok: false, reason: invalid };
-      }
-      ofe.push({ unitId: r.unitId, destinationH3Index: r.destinationH3Index });
-    }
-    const oeRaw = o.embarkOrders ?? [];
-    if (!Array.isArray(oeRaw)) return { ok: false, reason: invalid };
-    const oe: EmbarkOrder[] = [];
-    for (const row of oeRaw) {
-      if (typeof row !== 'object' || row === null) return { ok: false, reason: invalid };
-      const r = row as { unitId?: unknown; navalUnitId?: unknown };
-      if (typeof r.unitId !== 'string' || typeof r.navalUnitId !== 'string') {
-        return { ok: false, reason: invalid };
-      }
-      oe.push({ unitId: r.unitId, navalUnitId: r.navalUnitId });
-    }
+    const opponentMovement = parseUnitIdFieldRows(o.movementOrders ?? [], 'toH3Index', invalid);
+    if (!opponentMovement.ok) return opponentMovement;
+    const opponentRanged = parseUnitIdFieldRows(o.rangedAttacks ?? [], 'targetH3Index', invalid);
+    if (!opponentRanged.ok) return opponentRanged;
+    const opponentAir = parseAirStrikeRows(o.airStrikes ?? [], invalid);
+    if (!opponentAir.ok) return opponentAir;
+    const opponentFerry = parseUnitIdFieldRows(o.ferryOrders ?? [], 'destinationH3Index', invalid);
+    if (!opponentFerry.ok) return opponentFerry;
+    const opponentEmbark = parseUnitIdFieldRows(o.embarkOrders ?? [], 'navalUnitId', invalid);
+    if (!opponentEmbark.ok) return opponentEmbark;
     opponentTacticalDraft = {
-      movementOrders: om,
-      rangedAttacks: ora,
-      airStrikes: oa,
-      ferryOrders: ofe,
-      embarkOrders: oe,
+      movementOrders: opponentMovement.rows.map((row) => ({ unitId: row.unitId, toH3Index: row.value })),
+      rangedAttacks: opponentRanged.rows.map((row) => ({ unitId: row.unitId, targetH3Index: row.value })),
+      airStrikes: opponentAir.rows,
+      ferryOrders: opponentFerry.rows.map((row) => ({ unitId: row.unitId, destinationH3Index: row.value })),
+      embarkOrders: opponentEmbark.rows.map((row) => ({ unitId: row.unitId, navalUnitId: row.value })),
     };
   }
   return {

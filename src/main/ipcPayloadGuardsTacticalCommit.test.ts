@@ -107,12 +107,31 @@ function testRejectsNullPayload(): void {
   assert.strictEqual(r.ok, false);
 }
 
+/**
+ * Rejects an opponent air strike whose target type is not one of the four legal kinds.
+ *
+ * Purpose: The shared air-strike parser must keep the same rejection the inline loop used.
+ * When to use: After edits to `parseHumanTacticalCommitPayload`.
+ * Expected outcome: `ok: false` with `Invalid tactical commit payload`.
+ * Exceptions: Assertion failure on contract drift.
+ */
+function testRejectsBadOpponentAirTargetType(): void {
+  const r = parseHumanTacticalCommitPayload({
+    movementOrders: [],
+    opponentTacticalDraft: { airStrikes: [{ unitId: 'a', targetH3Index: 'h', targetType: 'road' }] },
+  });
+  assert.strictEqual(r.ok, false);
+  if (r.ok) return;
+  assert.strictEqual(r.reason, 'Invalid tactical commit payload');
+}
+
 const tests: { name: string; fn: () => void }[] = [
   { name: 'parseHumanTacticalCommitPayload happy path', fn: testHappyPathMinimalMovement },
   { name: 'parseHumanTacticalCommitPayload event-driven flags true', fn: testEventDrivenFlagsTrue },
   { name: 'parseHumanTacticalCommitPayload opponent draft round trip', fn: testOpponentDraftRoundTrip },
   { name: 'parseHumanTacticalCommitPayload rejects bad movement', fn: testRejectsBadMovementRow },
   { name: 'parseHumanTacticalCommitPayload rejects null', fn: testRejectsNullPayload },
+  { name: 'parseHumanTacticalCommitPayload rejects bad opponent air target', fn: testRejectsBadOpponentAirTargetType },
 ];
 
 for (const t of tests) {

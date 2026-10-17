@@ -28480,6 +28480,28 @@ ${bonuses}`;
     const footprintNeighbors = args.footprintNeighbors ?? ((h) => tacticalNeighborsInFootprint(h, args.tacticalSet));
     return preferFasterTerrainBonusMarch({ plan, search: { ...args, footprintNeighbors } });
   }
+  function unreachedTacticalMarch(fromH3) {
+    return {
+      reachable: false,
+      reachableThisTurn: false,
+      totalCostToDestination: Infinity,
+      pathToDestination: null,
+      firstStopWithinBudget: { stopH3: fromH3, consumedFullPath: false },
+      failureReason: "no_path"
+    };
+  }
+  function firstStopIndexWithinBudget(path, movementPointBudget, stepCostAt) {
+    let cum = 0;
+    let stopIdx = 0;
+    for (let i = 1; i < path.length; i++) {
+      const stepCost = stepCostAt(i);
+      if (!Number.isFinite(stepCost)) return { ok: false };
+      if (cum + stepCost > movementPointBudget) break;
+      cum += stepCost;
+      stopIdx = i;
+    }
+    return { ok: true, stopIdx };
+  }
   function planTacticalMarchWithoutTerrainBonus(args) {
     const { fromH3, toH3, tacticalSet, unitTypeForMovement, movementPointBudget, terrain } = args;
     const neighborsOf = args.footprintNeighbors ?? ((h) => tacticalNeighborsInFootprint(h, tacticalSet));
@@ -28526,21 +28548,12 @@ ${bonuses}`;
         weatherTags: args.weatherTags
       });
       if (!landResult) {
-        return {
-          reachable: false,
-          reachableThisTurn: false,
-          totalCostToDestination: Infinity,
-          pathToDestination: null,
-          firstStopWithinBudget: { stopH3: fromH3, consumedFullPath: false },
-          failureReason: "no_path"
-        };
+        return unreachedTacticalMarch(fromH3);
       }
       const { path: path2, totalCost: total } = landResult;
-      let cum2 = 0;
-      let stopIdx2 = 0;
-      for (let i = 1; i < path2.length; i++) {
+      const walked2 = firstStopIndexWithinBudget(path2, movementPointBudget, (i) => {
         const prevOfFrom = i >= 2 ? path2[i - 2] : null;
-        const stepCost = landInfantryArmorEnterCost({
+        return landInfantryArmorEnterCost({
           toH3: path2[i],
           unitTypeForMovement,
           terrain,
@@ -28553,22 +28566,10 @@ ${bonuses}`;
           weather: args.weather,
           weatherTags: args.weatherTags
         });
-        if (!Number.isFinite(stepCost)) {
-          return {
-            reachable: false,
-            reachableThisTurn: false,
-            totalCostToDestination: Infinity,
-            pathToDestination: null,
-            firstStopWithinBudget: { stopH3: fromH3, consumedFullPath: false },
-            failureReason: "no_path"
-          };
-        }
-        if (cum2 + stepCost > movementPointBudget) break;
-        cum2 += stepCost;
-        stopIdx2 = i;
-      }
-      stopIdx2 = stopIdxWithMinimumOneHexProgress({
-        stopIdx: stopIdx2,
+      });
+      if (!walked2.ok) return unreachedTacticalMarch(fromH3);
+      const stopIdx2 = stopIdxWithMinimumOneHexProgress({
+        stopIdx: walked2.stopIdx,
         pathLength: path2.length,
         movementPointBudget
       });
@@ -28612,50 +28613,24 @@ ${bonuses}`;
     }
     const totalNaval = dist.get(toH3);
     if (totalNaval === void 0 || !Number.isFinite(totalNaval)) {
-      return {
-        reachable: false,
-        reachableThisTurn: false,
-        totalCostToDestination: Infinity,
-        pathToDestination: null,
-        firstStopWithinBudget: { stopH3: fromH3, consumedFullPath: false },
-        failureReason: "no_path"
-      };
+      return unreachedTacticalMarch(fromH3);
     }
     const path = reconstructPath(parent, fromH3, toH3);
     if (!path || path.length < 2) {
-      return {
-        reachable: false,
-        reachableThisTurn: false,
-        totalCostToDestination: Infinity,
-        pathToDestination: null,
-        firstStopWithinBudget: { stopH3: fromH3, consumedFullPath: false },
-        failureReason: "no_path"
-      };
+      return unreachedTacticalMarch(fromH3);
     }
-    let cum = 0;
-    let stopIdx = 0;
-    for (let i = 1; i < path.length; i++) {
-      const stepCost = enterCostForHex(path[i], unitTypeForMovement, terrain, path[i - 1], {
+    const walked = firstStopIndexWithinBudget(
+      path,
+      movementPointBudget,
+      (i) => enterCostForHex(path[i], unitTypeForMovement, terrain, path[i - 1], {
         weatherEnabled: args.weatherEnabled,
         weather: args.weather,
         weatherTags: args.weatherTags
-      });
-      if (!Number.isFinite(stepCost)) {
-        return {
-          reachable: false,
-          reachableThisTurn: false,
-          totalCostToDestination: Infinity,
-          pathToDestination: null,
-          firstStopWithinBudget: { stopH3: fromH3, consumedFullPath: false },
-          failureReason: "no_path"
-        };
-      }
-      if (cum + stepCost > movementPointBudget) break;
-      cum += stepCost;
-      stopIdx = i;
-    }
-    stopIdx = stopIdxWithMinimumOneHexProgress({
-      stopIdx,
+      })
+    );
+    if (!walked.ok) return unreachedTacticalMarch(fromH3);
+    const stopIdx = stopIdxWithMinimumOneHexProgress({
+      stopIdx: walked.stopIdx,
       pathLength: path.length,
       movementPointBudget
     });
@@ -29371,6 +29346,37 @@ ${bonuses}`;
     deps.dismissMapDetailPopoversForHoverPlanning?.();
     deps.requestRedraw();
   }
+  function hoverPreviewStillCurrent(seq, hoveredH3, unitIds) {
+    return hoverRoutePreviewAsyncContextStillValid({
+      seqAtStart: seq,
+      hoveredH3,
+      unitIdsAtStart: unitIds
+    });
+  }
+  function publishGroupedSupportTargetingPreview(args) {
+    const valid = args.validation.success;
+    const reason = valid ? null : args.validation.reason ?? null;
+    const previewUnitIds = representativeMarchPreviewUnitIdsByOriginH3(
+      args.unitIds.map((id) => ({
+        unitId: id,
+        originH3: args.originH3ForGrouping(id) ?? ""
+      }))
+    );
+    const data = buildGroupedSupportTargetingLinePreview(
+      previewUnitIds,
+      args.hoveredH3,
+      valid,
+      args.validation.reason ?? null,
+      args.originH3ForPreview
+    );
+    publishHoverRoutePreview(
+      args.deps,
+      { hoveredH3Index: args.hoveredH3, data, renderAsSupportTargeting: args.supportKind },
+      args.supportKind === "ranged" ? reason : null,
+      args.supportKind === "air" ? reason : null,
+      args.allowBlockingOrderTooltip
+    );
+  }
   async function refreshHoverRoutePreview2(deps, options) {
     const allowBlockingOrderTooltip = options?.allowBlockingOrderTooltip === true;
     const unitIds = [...rendererSharedState.selectedUnitIds];
@@ -29389,34 +29395,17 @@ ${bonuses}`;
           return;
         }
         const validation = await validateRanged({ unitIds, targetH3Index: hoveredH3 });
-        if (!hoverRoutePreviewAsyncContextStillValid({
-          seqAtStart: seq,
-          hoveredH3,
-          unitIdsAtStart: unitIds
-        })) {
-          return;
-        }
-        const valid = validation.success;
-        const previewUnitIds = representativeMarchPreviewUnitIdsByOriginH3(
-          unitIds.map((id) => ({
-            unitId: id,
-            originH3: tb.subUnits.find((s) => s.id === id)?.h3Index ?? ""
-          }))
-        );
-        const data3 = buildGroupedSupportTargetingLinePreview(
-          previewUnitIds,
-          hoveredH3,
-          valid,
-          validation.reason ?? null,
-          (unitId) => tb.subUnits.find((s) => s.id === unitId && s.player === "human")?.h3Index
-        );
-        publishHoverRoutePreview(
+        if (!hoverPreviewStillCurrent(seq, hoveredH3, unitIds)) return;
+        publishGroupedSupportTargetingPreview({
           deps,
-          { hoveredH3Index: hoveredH3, data: data3, renderAsSupportTargeting: "ranged" },
-          valid ? null : validation.reason ?? null,
-          null,
+          hoveredH3,
+          unitIds,
+          validation,
+          supportKind: "ranged",
+          originH3ForGrouping: (unitId) => tb.subUnits.find((s) => s.id === unitId)?.h3Index,
+          originH3ForPreview: (unitId) => tb.subUnits.find((s) => s.id === unitId && s.player === "human")?.h3Index,
           allowBlockingOrderTooltip
-        );
+        });
         return;
       }
       if (rendererSharedState.airStrikeModeActive) {
@@ -29430,34 +29419,17 @@ ${bonuses}`;
           targetH3Index: hoveredH3,
           targetType: rendererSharedState.airStrikeTargetType
         });
-        if (!hoverRoutePreviewAsyncContextStillValid({
-          seqAtStart: seq,
-          hoveredH3,
-          unitIdsAtStart: unitIds
-        })) {
-          return;
-        }
-        const valid = validation.success;
-        const previewUnitIds = representativeMarchPreviewUnitIdsByOriginH3(
-          unitIds.map((id) => ({
-            unitId: id,
-            originH3: tb.subUnits.find((s) => s.id === id)?.h3Index ?? ""
-          }))
-        );
-        const data3 = buildGroupedSupportTargetingLinePreview(
-          previewUnitIds,
-          hoveredH3,
-          valid,
-          validation.reason ?? null,
-          (unitId) => tb.subUnits.find((s) => s.id === unitId && s.player === "human")?.h3Index
-        );
-        publishHoverRoutePreview(
+        if (!hoverPreviewStillCurrent(seq, hoveredH3, unitIds)) return;
+        publishGroupedSupportTargetingPreview({
           deps,
-          { hoveredH3Index: hoveredH3, data: data3, renderAsSupportTargeting: "air" },
-          null,
-          valid ? null : validation.reason ?? null,
+          hoveredH3,
+          unitIds,
+          validation,
+          supportKind: "air",
+          originH3ForGrouping: (unitId) => tb.subUnits.find((s) => s.id === unitId)?.h3Index,
+          originH3ForPreview: (unitId) => tb.subUnits.find((s) => s.id === unitId && s.player === "human")?.h3Index,
           allowBlockingOrderTooltip
-        );
+        });
         return;
       }
       const selectedHumanTactical = unitIds.map((id) => tb.subUnits.find((s) => s.id === id && s.player === "human")).filter((u) => !!u);
@@ -29465,13 +29437,7 @@ ${bonuses}`;
       const tacticalHasNonAir = selectedHumanTactical.some((u) => u.unitType !== "air");
       if (tacticalHasAir && tacticalHasNonAir) {
         const data3 = buildTacticalMixedAirNonAirHoverEnvelope(unitIds);
-        if (!hoverRoutePreviewAsyncContextStillValid({
-          seqAtStart: seq,
-          hoveredH3,
-          unitIdsAtStart: unitIds
-        })) {
-          return;
-        }
+        if (!hoverPreviewStillCurrent(seq, hoveredH3, unitIds)) return;
         publishHoverRoutePreview(deps, { hoveredH3Index: hoveredH3, data: data3 }, null, null, allowBlockingOrderTooltip);
         return;
       }
@@ -29483,25 +29449,13 @@ ${bonuses}`;
           return;
         }
         const validation = await validateFerry({ unitIds, destinationH3Index: hoveredH3 });
-        if (!hoverRoutePreviewAsyncContextStillValid({
-          seqAtStart: seq,
-          hoveredH3,
-          unitIdsAtStart: unitIds
-        })) {
-          return;
-        }
+        if (!hoverPreviewStillCurrent(seq, hoveredH3, unitIds)) return;
         const data3 = buildTacticalFerryHoverPreview(tb, unitIds, hoveredH3, validation);
         publishHoverRoutePreview(deps, { hoveredH3Index: hoveredH3, data: data3 }, null, null, allowBlockingOrderTooltip);
         return;
       }
       const data2 = buildTacticalMarchHoverPreview(tb, unitIds, hoveredH3);
-      if (!hoverRoutePreviewAsyncContextStillValid({
-        seqAtStart: seq,
-        hoveredH3,
-        unitIdsAtStart: unitIds
-      })) {
-        return;
-      }
+      if (!hoverPreviewStillCurrent(seq, hoveredH3, unitIds)) return;
       publishHoverRoutePreview(deps, { hoveredH3Index: hoveredH3, data: data2 }, null, null, allowBlockingOrderTooltip);
       return;
     }
@@ -29517,34 +29471,17 @@ ${bonuses}`;
         return;
       }
       const validation = await validateRanged({ unitIds, targetH3Index: hoveredH3 });
-      if (!hoverRoutePreviewAsyncContextStillValid({
-        seqAtStart: seq,
-        hoveredH3,
-        unitIdsAtStart: unitIds
-      })) {
-        return;
-      }
-      const valid = validation.success;
-      const previewUnitIds = representativeMarchPreviewUnitIdsByOriginH3(
-        unitIds.map((id) => ({
-          unitId: id,
-          originH3: gs.units.find((u) => u.id === id)?.h3Index ?? ""
-        }))
-      );
-      const data2 = buildGroupedSupportTargetingLinePreview(
-        previewUnitIds,
-        hoveredH3,
-        valid,
-        validation.reason ?? null,
-        (unitId) => gs.units.find((u) => u.id === unitId && u.player === "human")?.h3Index
-      );
-      publishHoverRoutePreview(
+      if (!hoverPreviewStillCurrent(seq, hoveredH3, unitIds)) return;
+      publishGroupedSupportTargetingPreview({
         deps,
-        { hoveredH3Index: hoveredH3, data: data2, renderAsSupportTargeting: "ranged" },
-        valid ? null : validation.reason ?? null,
-        null,
+        hoveredH3,
+        unitIds,
+        validation,
+        supportKind: "ranged",
+        originH3ForGrouping: (unitId) => gs.units.find((u) => u.id === unitId)?.h3Index,
+        originH3ForPreview: (unitId) => gs.units.find((u) => u.id === unitId && u.player === "human")?.h3Index,
         allowBlockingOrderTooltip
-      );
+      });
       return;
     }
     if (rendererSharedState.airStrikeModeActive) {
@@ -29558,34 +29495,17 @@ ${bonuses}`;
         targetH3Index: hoveredH3,
         targetType: rendererSharedState.airStrikeTargetType
       });
-      if (!hoverRoutePreviewAsyncContextStillValid({
-        seqAtStart: seq,
-        hoveredH3,
-        unitIdsAtStart: unitIds
-      })) {
-        return;
-      }
-      const valid = validation.success;
-      const previewUnitIds = representativeMarchPreviewUnitIdsByOriginH3(
-        unitIds.map((id) => ({
-          unitId: id,
-          originH3: gs.units.find((u) => u.id === id)?.h3Index ?? ""
-        }))
-      );
-      const data2 = buildGroupedSupportTargetingLinePreview(
-        previewUnitIds,
-        hoveredH3,
-        valid,
-        validation.reason ?? null,
-        (unitId) => gs.units.find((u) => u.id === unitId && u.player === "human")?.h3Index
-      );
-      publishHoverRoutePreview(
+      if (!hoverPreviewStillCurrent(seq, hoveredH3, unitIds)) return;
+      publishGroupedSupportTargetingPreview({
         deps,
-        { hoveredH3Index: hoveredH3, data: data2, renderAsSupportTargeting: "air" },
-        null,
-        valid ? null : validation.reason ?? null,
+        hoveredH3,
+        unitIds,
+        validation,
+        supportKind: "air",
+        originH3ForGrouping: (unitId) => gs.units.find((u) => u.id === unitId)?.h3Index,
+        originH3ForPreview: (unitId) => gs.units.find((u) => u.id === unitId && u.player === "human")?.h3Index,
         allowBlockingOrderTooltip
-      );
+      });
       return;
     }
     const previewMarch = getPreviewHumanMarchOrders();
@@ -29594,13 +29514,7 @@ ${bonuses}`;
       return;
     }
     const data = await previewMarch({ unitIds, hoveredH3Index: hoveredH3 });
-    if (!hoverRoutePreviewAsyncContextStillValid({
-      seqAtStart: seq,
-      hoveredH3,
-      unitIdsAtStart: unitIds
-    })) {
-      return;
-    }
+    if (!hoverPreviewStillCurrent(seq, hoveredH3, unitIds)) return;
     publishHoverRoutePreview(deps, { hoveredH3Index: hoveredH3, data }, null, null, allowBlockingOrderTooltip);
   }
 
@@ -32276,7 +32190,7 @@ ${bonuses}`;
           if (countInput.value !== raw) countInput.value = raw;
           return parseInt(raw, 10);
         };
-        typeSelect.addEventListener("change", async () => {
+        async function submitBuildQueueEntryEdit(failureMessage) {
           if (restoreSingleHexQueueIfPlaybackBlocks(mount, h3Index)) return;
           if (!window.gameApi?.updateHexBuildQueueEntry) return;
           const submittedUnitType = typeSelect.value;
@@ -32289,7 +32203,7 @@ ${bonuses}`;
               unitType: submittedUnitType,
               count: submittedCount
             }),
-            failureMessage: "Failed to update build queue entry.",
+            failureMessage,
             refreshState: true
           });
           if (!success) {
@@ -32305,6 +32219,9 @@ ${bonuses}`;
             return;
           }
           void renderBuildQueueIntoMount(mount, h3Index);
+        }
+        typeSelect.addEventListener("change", async () => {
+          await submitBuildQueueEntryEdit("Failed to update build queue entry.");
         });
         row.appendChild(typeSelect);
         countInput.addEventListener("keydown", (event) => {
@@ -32314,34 +32231,7 @@ ${bonuses}`;
           event.preventDefault();
         });
         countInput.addEventListener("input", async () => {
-          if (restoreSingleHexQueueIfPlaybackBlocks(mount, h3Index)) return;
-          if (!window.gameApi?.updateHexBuildQueueEntry) return;
-          const submittedUnitType = typeSelect.value;
-          const submittedCount = readCurrentCount();
-          const submittedCountText = countInput.value;
-          const success = await runBuildQueueMutation({
-            mutate: () => window.gameApi.updateHexBuildQueueEntry({
-              h3Index,
-              entryId: entry.id,
-              unitType: submittedUnitType,
-              count: submittedCount
-            }),
-            failureMessage: "Failed to update build count.",
-            refreshState: true
-          });
-          if (!success) {
-            if (rejectedBuildQueueEditStillShown(
-              typeSelect,
-              countInput,
-              submittedUnitType,
-              submittedCountText
-            )) {
-              restoreRejectedBuildQueueControls(typeSelect, countInput, entry);
-              await renderBuildQueueIntoMount(mount, h3Index);
-            }
-            return;
-          }
-          void renderBuildQueueIntoMount(mount, h3Index);
+          await submitBuildQueueEntryEdit("Failed to update build count.");
         });
         row.appendChild(countInput);
         const removeBtn = document.createElement("button");

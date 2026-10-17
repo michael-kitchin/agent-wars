@@ -9,8 +9,32 @@ import type { HumanStandingOrderSnapshot } from './ipc/humanOrderPreviewTypes';
  * Exceptions: None.
  */
 export interface PlaybackMarchHoldUnit {
+  /**
+   * The unit this hold is about.
+   *
+   * Contract: Matches `HumanStandingOrderSnapshot.unitId`.
+   * When to use: Finding the unit that owns a queued march.
+   * Expected outcome: The snapshot id of that unit.
+   * Exceptions: None.
+   */
   id: string;
+  /**
+   * The side that owns the unit.
+   *
+   * Contract: A side string such as `human`.
+   * When to use: Keeping opponent units out of the human march hold.
+   * Expected outcome: Only a `human` unit can hold its march arrow.
+   * Exceptions: None.
+   */
   player: string;
+  /**
+   * The hex the unit occupies after resolution.
+   *
+   * Contract: Compared with the order destination to decide that the march has arrived.
+   * When to use: After the resolution state is known and before movement playback.
+   * Expected outcome: The settled cell, which is the destination for an arrived march.
+   * Exceptions: None.
+   */
   h3Index: string;
 }
 
@@ -23,7 +47,23 @@ export interface PlaybackMarchHoldUnit {
  * Exceptions: None.
  */
 export interface PlaybackMarchHoldMove {
+  /**
+   * The unit that moved.
+   *
+   * Contract: Matches `PlaybackMarchHoldUnit.id` and the standing order's unit id.
+   * When to use: Pairing a resolved move with the march being held.
+   * Expected outcome: The id of the unit whose origin hex is recorded.
+   * Exceptions: None.
+   */
   unitId: string;
+  /**
+   * The hex the unit left.
+   *
+   * Contract: A march that starts on its destination has nothing to animate.
+   * When to use: Deciding whether the held arrow has a real origin.
+   * Expected outcome: The cell occupied before this resolution.
+   * Exceptions: None.
+   */
   fromH3Index: string;
 }
 
@@ -36,7 +76,23 @@ export interface PlaybackMarchHoldMove {
  * Exceptions: None.
  */
 export interface OrdersHeldUntilMovementEnds {
+  /**
+   * The marches whose arrows stay up through movement playback.
+   *
+   * Contract: Copies of the input orders, including copied route segments.
+   * When to use: Drawing queued marches while movement progress is below 1.
+   * Expected outcome: Later edits to the input orders do not change these copies.
+   * Exceptions: None.
+   */
   orders: HumanStandingOrderSnapshot[];
+  /**
+   * The hex each held march left.
+   *
+   * Contract: Keys are unit ids. Values are `fromH3Index` for that unit's move.
+   * When to use: Drawing the held arrow from the pre-resolution cell.
+   * Expected outcome: One origin for each held order.
+   * Exceptions: None.
+   */
   originH3ByUnitId: Record<string, string>;
 }
 
