@@ -177,15 +177,15 @@ A hex needs the urban cells in this table, and anything named under **Also needs
 
 ![Tactical battle dialog in southern Mexico, from a regional game. Click the Fight button to run the battle manually or Ignore to leave the outcome to chance.](media/tactical-battle-dialog.png)
 
-Tactical battles are initiated when human and LLM units end their turns in the same hex. When this happens, the **Tactical Battles** dialog is displayed, with a list of tactical battles players can fight manually. There may be more than one battle in the list, but players can only fight one at a time.
+Tactical battles happen when human and LLM units end their turns in the same hex. When this happens, the **Tactical Battles** dialog is displayed, with a list of tactical battles players can fight manually. There may be more than one battle in this list, but players may only fight one at a time.
 
 When players pick a battle and click **Fight**, their strategic units will be broken into sub-units, the map will zoom in, and the fight is on. When they click **Ignore**, all tactical battles will be resolved using dice rolls. 
 
 Manually fought battles take place entirely within one strategic turn, with the following consequences:
 
-- Fighting a tactical battle means ignoring the strategic part of the game for one turn (for both human and LLM players).
-- During that turn, strategic units will continue to follow existing orders and defend themselves.
-- When the battle is over, the strategic part of the game resumes in the next turn.
+1. Fighting a tactical battle means ignoring the strategic part of the game for one turn (for both human and LLM players).
+2. During that turn, strategic units will continue to follow existing orders and defend themselves.
+3. When the battle is over, the strategic part of the game resumes in the next turn.
 
 The above forces players to choose where to focus their attention.
 
