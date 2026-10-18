@@ -14,7 +14,7 @@ The game is intended to be simple to learn and quick to play, but with enough de
 
 ![Tactical planning over central Mexico](doc/media/central-mexico-battle-animated.png)
 
-*Turn 5 of a tactical battle in central Mexico, showing in-progress animations (combat, dice rolls, and movement) and human/AI losses. Human/teal units face an LLM/rose opponent (in this case, Gemini Flash Lite).*
+*Turn 5 of a tactical battle in central Mexico, showing end-of-turn animations (combat, dice rolls, and movement) and human/AI losses. Human/teal units face an LLM/rose opponent (in this case, Gemini Flash Lite).*
 
 ## Why This Exists
 
