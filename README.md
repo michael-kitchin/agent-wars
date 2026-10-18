@@ -25,7 +25,7 @@ I chose this approach because:
 - I wanted a crash course in agentic development, on work I could afford to screw up. I especially wanted to learn what to expect as a codebase grows, from greenfield through features, bug fixes, and (eventual) replacement.
 - It feels good to blow up commercial LLMs on imaginary battlefields, even if I'm paying their vendors for the privilege.
 - For something new, I wanted LLMs to navigate real-world geography, planning combat, movement, and logistics on a hex map across many turns.
-    - Example: ever played [Rogue](https://en.wikipedia.org/wiki/Rogue_(video_game)) or [NetHack](https://en.wikipedia.org/wiki/NetHack)? Turns out LLMs have too, and they can use ASCII maps for spatial reasoning (see [doc/ai-commander-prompts.strategic-prompt.md](doc/ai-commander-prompts.strategic-prompt.md) for more on this).
+    - Example: ever played [Rogue](https://en.wikipedia.org/wiki/Rogue_(video_game)) or [NetHack](https://en.wikipedia.org/wiki/NetHack)? Turns out LLMs have too, and they can use ASCII maps for spatial reasoning (see [doc/ai-commander-prompts/strategic-prompt.md](doc/ai-commander-prompts/strategic-prompt.md) for more on this).
 - For calibration, I built it on familiar ground (Electron and TypeScript, database development, and geospatial data), so I could catch bad agent output sooner.
 
 I'm telling the story of how I built Agent Wars (and am still adding to it) in *[Standing Orders](https://standingorders.substack.com)*.
