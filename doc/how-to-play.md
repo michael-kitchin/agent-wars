@@ -187,7 +187,7 @@ Manually fought battles take place entirely within one strategic turn, with the 
 2. During that turn, strategic units will continue to follow existing orders and defend themselves.
 3. When the battle is over, the strategic part of the game resumes in the next turn.
 
-The above forces players to choose where to focus their attention.
+This forces players to choose where to focus their attention.
 
 Players can win tactical battles by destroying their opponent's units, or they can abandon the battle at any time by clicking the **Exit Battle** button. Any strategic units with half or more of their sub-units remaining will be returned to the strategic map. There is no concept of battle damage, to keep things simple.
 
