@@ -191,7 +191,7 @@ This forces players to choose where to focus their attention.
 
 Players can win tactical battles by destroying their opponent's units, or they can abandon the battle at any time by clicking the **Exit Battle** button. Any strategic units with half or more of their sub-units remaining will be returned to the strategic map. There is no concept of battle damage, to keep things simple.
 
-When battles are ignored or abandoned, it's possible for human and AI units to survive in the same hex for longer than one strategic turn. Battles like these are marked with magnifying glass icons (🔍). Clicking this icon rejoins battle, as if it had been selected from the **Tactical Battles** dialog.
+When battles are ignored or abandoned, it's possible for human and AI units to survive in the same hex for longer than one strategic turn. Battles like these are marked with magnifying glass icons (🔍) on the strategic map. Clicking this icon (re)joins a battle, as if it had been selected from the **Tactical Battles** dialog.
 
 Tactical sub-units are at the scale of WW2-style regiments, squadrons, and naval task groups.
 
