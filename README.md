@@ -63,23 +63,15 @@ The LLM opponent needs an [OpenRouter](https://openrouter.ai) API key to work:
 5. Choose a model from Anthropic, Google, Meta, OpenAI, SpaceX, etc. The refresh button beside the list reloads it.
     - My go-to playtesting model is Google Gemini Flash Lite (version 3.5, currently). A fast, inexpensive, tool-using model that fights reasonably well. It can also finish a typical game for <$1.
     - Ollama/other local model support is on my radar (pun intended, I guess).
-6. Click **Run**, at the top of the Opponent tab, to start opponent planning. 
+6. Click **Run**, at the top of the Opponent tab, to start opponent planning.
     - You can change models at any time or disable the AI by clicking **Run** again.
 ![Model setup.](doc/media/first-start-game-3.png)
-7. Click **Opponent** to close the tab and start playing. You can explore the map, plan movement, etc. while the AI is doing its thing.
-8. When you and the AI are done planning, click the **Ready** button to execute orders and advance to the next turn.
+7. Then click **Opponent** to close the tab. You can explore the map, plan movement, etc. while the AI is doing its thing.
+8. When the AI is done planning, the **Ready** turns green and you can click it to execute planned orders and start the next turn.
     - You can play all you want with the AI disabled. This is a great way to get used to the controls, without burning tokens.
+![Ready button when the AI is done (opponent tab open).](doc/media/ready-done-open.png)
 
-| *Ready button when the AI is planning (opponent tab open).* | *With the opponent tab closed.*
-| ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| ![Ready button when the AI is planning (opponent tab open).](doc/media/ready-planning-open.png) | ![With the opponent tab closed.](doc/media/ready-planning-closed.png) |
-
-| *Ready button when the AI is done (opponent tab open).* | *With the opponent tab closed.*
-| ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| ![Ready button when the AI is done (opponent tab open).](doc/media/ready-done-open.png) | ![With the opponent tab closed.](doc/media/ready-done-closed.png) |
-
-
-The key is handled only in the Electron main process and stored locally in the Electron user-data directory, not in repository files. Without a key or a model the app still runs, **Run** stays disabled, and the opponent makes no model calls.
+The OpenRouter key is handled only in the Electron main process and stored locally in the Electron user-data directory, not in repository files. Without a key or a model the app still runs, **Run** stays disabled, and the opponent makes no model calls.
 
 See [doc/how-to-play.md](doc/how-to-play.md) for how to play the game.
 
