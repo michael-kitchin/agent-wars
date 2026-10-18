@@ -67,7 +67,7 @@ The LLM opponent needs an [OpenRouter](https://openrouter.ai) API key to work:
     - You can change models at any time or disable the AI by clicking **Run** again.
 ![Model setup.](doc/media/first-start-game-3.png)
 7. Then click **Opponent** to close the tab. You can explore the map, plan movement, etc. while the AI is doing its thing.
-8. When the AI is done planning, the **Ready** turns green and you can click it to execute planned orders and start the next turn.
+8. When the AI is done planning, the **Ready** button turns green. Click it to execute planned orders and start the next turn.
     - You can play all you want with the AI disabled. This is a great way to get used to the controls, without burning tokens.
 ![Ready button when the AI is done (opponent tab open).](doc/media/ready-done-open.png)
 
