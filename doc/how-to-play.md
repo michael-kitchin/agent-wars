@@ -242,14 +242,6 @@ In a battle, these cell types also change how a unit moves and how far it can fi
 - **Rubble counts:** rubbled urban cells lower the hex's production after the battle. A rubbled airport can take the air units based there with it.
 - **Outer rings:** cells in the three neighboring rings slow movement and give cover. Shots there don't damage any hex's infrastructure.
 
-### Ending a battle
-
-- **Annihilation:** when one side has no sub-units left, a dialog shows the result. Press its **Exit Battle** to return.
-- **Exit Battle:** you can leave between beats with **Exit Battle** in the battle header, beside Settings. A unit that kept fewer than half its sub-units is destroyed. Exactly half survives.
-- **Back to the map:** your strategic orders return, minus units that died, and Ready runs at once.
-- **Plan first:** before you click a 🔍 marker, queue the turn's strategic orders, because leaving the battle resolves the turn.
-- **After Fight, no planning:** a battle opens before you can plan that turn. Leaving it resolves the turn with only your standing marches.
-
 ## Roads and rail in battles
 
 | *Shaanxi 1st Armored moving faster by road, then slower through urban hexes. Movement planning automatically picks the fastest route.*                                                                 | *A stack of Ukraine's armored units plans rapid movement by rail. Rail is faster than road, and movement planning will use both.*                                                |
