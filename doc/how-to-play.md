@@ -10,8 +10,8 @@ I'm a geographer by training, so Agent Wars focuses more on geospatial features 
 
 Accordingly, the game ends when one player:
 
-  1. Capturing some or all of the other player's home region (depending on the game type)
-  2. Or destroying all of their home region production capacity
+  1. Captures some or all of the other player's home region (depending on the game type)
+  2. Or destroys all of their home region's production capacity
 
 ## Starting the game
 
@@ -146,7 +146,7 @@ A city, airport, or seaport shoots back at those odds whether or not the strike 
 
 ## Building units
 
-*Zoom in until the production capacity ($) becomes a button, then click to open the build popup. The choice of buildable units depends on the capacity of the hex and presence of airports or seaports.*
+*Zoom in until the production capacity ($) becomes a button, then click to open the build popup. The choice of buildable units depends on the capacity of the hex and the presence of airports or seaports.*
 
 ![Zoom in until the production capacity ($) becomes a button, then click to open the build popup. The choice of buildable units depends on the capacity of the hex and presence of airports or seaports.](media/unit-building.png)
 
@@ -177,7 +177,7 @@ A hex needs the urban cells in this table, and anything named under Also needs. 
 
 ![Tactical battle dialog in southern Mexico, from a regional game. Click the Fight button to run the battle manually or Ignore to leave the outcome to chance.](media/tactical-battle-dialog.png)
 
-Tactical battles are initiated when human and LLM units end their turns in the same hex. When this happens, the **Tactgical Battles** dialog is displayed, with a list of tactical battles players can fight manually. There may be more than one battle in the list, but players can only fight one at a time.
+Tactical battles are initiated when human and LLM units end their turns in the same hex. When this happens, the **Tactical Battles** dialog is displayed, with a list of tactical battles players can fight manually. There may be more than one battle in the list, but players can only fight one at a time.
 
 When players pick a battle and click **Fight**, their strategic units will be broken into sub-units, the map will zoom in, and the fight is on. When they click **Ignore**, all tactical battles will be resolved using dice rolls. 
 

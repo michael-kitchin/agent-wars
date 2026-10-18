@@ -95,7 +95,7 @@ The game's "working directory" is:
 - **Windows:**
   - When the game is started by double-clicking on the executable or a shortcut: wherever the executable is located.
   - When the game is started from PowerShell or the Command Line: wherever the executable is invoked from.
-- **macOS:** Not verified, but opening the app from Finder probably won'’'t pick up `.env`. I'll provide an update when I can.
+- **macOS:** Not verified, but opening the app from Finder probably won't pick up `.env`. I'll provide an update when I can.
 - **Linux:** Wherever the executable is invoked from.
 
 When the `.env` file is present at runtime, the game will create the following files in the same directory:
@@ -142,8 +142,7 @@ Every map is a grid of [H3](https://h3geo.org) cells, Uber's hierarchical hexago
 | 5             | Battles on resolution 2 maps     | 253 km²     | 9.9 km | Malta             |
 | 6             | Battles on resolution 3 maps     | 36 km²      | 3.7 km | Macau             |
 
-
-Each of the 23 regional maps holds 257 to 352 strategic hexes. Those are the footprint totals in [doc/region-summary-1.md](doc/region-summary-1.md): South-Eastern Asia is the smallest and Southern Asia east is the largest.
+Each of the 23 regional maps holds 257 to 352 strategic hexes. Those are the footprint totals in [doc/region-summary-1.md](doc/region-summary-1.md): South-Eastern Asia is the smallest and South Asia east is the largest.
 
 Cell areas and edge lengths are averages from the H3 library. The other counts come from the engine and the generated packs.
 
