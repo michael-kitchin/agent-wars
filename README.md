@@ -130,7 +130,7 @@ See [doc/hybrid-ai.md](doc/hybrid-ai.md) and [doc/ai-tools.md](doc/ai-tools.md) 
 
 ![South Africa's 1st Fleet heading east across the Indian Ocean on the global map](doc/media/invading-asia-from-south-africa.png)
 
-*Invading east Asia from southern Africa at the start of a global game, with "fog of war" enabled (can't see enemy units, until their close). What could go wrong?*
+*Invading east Asia from southern Africa at the start of a game, with "fog of war" enabled (can't see enemy units, until they're close to your own). What could go wrong?*
 
 - **A hybrid AI opponent.** The engine pre-computes a briefing (an ASCII hex map, Markdown tables of units and threats, and attention flags) before it consults the model. Standing orders carry the plan forward on turns the model isn't consulted, and event callbacks decide when it is. Any OpenRouter model can play; one without tool calls plays without the [planning tools](#the-opponents-tools). See [doc/hybrid-ai.md](doc/hybrid-ai.md) and [doc/ai-tools.md](doc/ai-tools.md).
 - **Prompts as code.** The prompts are assembled by builders in [src/main/openRouter/promptSpec/](src/main/openRouter/promptSpec/), documented in [doc/ai-commander-prompts/](doc/ai-commander-prompts/README.md), and held to that contract by tests such as `consultationContract.test.ts`, `envelopeJsonSchema.test.ts`, and `variantConformance.test.ts`.
