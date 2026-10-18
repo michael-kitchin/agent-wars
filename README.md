@@ -78,7 +78,7 @@ The LLM opponent needs an [OpenRouter](https://openrouter.ai) API key to work:
 
 ![Ready button when the AI is done (opponent tab open).](doc/media/ready-done-open.png)
 
-The OpenRouter key is handled only in the Electron main process and stored locally in the Electron user-data directory, not in repository files. Without a key or a model the app still runs, **Run** stays disabled, and the opponent makes no model calls.
+The OpenRouter key is handled only in the Electron main process and stored locally in the Electron user-data directory. Without a key or a model the app still runs, **Run** stays disabled, and the opponent makes no model calls.
 
 See [doc/how-to-play.md](doc/how-to-play.md) for how to play the game.
 
