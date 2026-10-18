@@ -11,7 +11,7 @@ Roles in order for a normal consultation:
 1. `system` — the prompt assembled by `buildSystemPromptForTools` per [`assembly-contract.md`](assembly-contract.md) and the active mode file. Built once.
 2. `user` — the opening instruction, section 2.
 3. Zero or more rounds of: `assistant` carrying tool calls, then one `tool` message per call, section 3.
-4. `assistant` — the response envelope as text.
+4. `assistant` — the response envelope as text. One captured strategic reply is in [`example-strategic-response.md`](example-strategic-response.md).
 
 Invariants:
 

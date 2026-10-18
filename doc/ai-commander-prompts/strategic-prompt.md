@@ -1,6 +1,6 @@
 # Strategic prompt
 
-The strategic system prompt as `buildSystemPromptForTools` emits it. On the global map the preamble says `Global Earth map` at that profile's strategic resolution (`1`, from `activeGameMap().strategicResolution`). On a regional map it names that map's `displayName` at the same field. Shared assembly comes from [`assembly-contract.md`](assembly-contract.md). Messages after the system prompt are in [`consultation-flow.md`](consultation-flow.md); gates are in [`variants.md`](variants.md). If this file disagrees with the builders, the builders win.
+The strategic system prompt as `buildSystemPromptForTools` emits it. A formatted snapshot of one consultation is in [`example-strategic-prompt.md`](example-strategic-prompt.md). On the global map the preamble says `Global Earth map` at that profile's strategic resolution (`1`, from `activeGameMap().strategicResolution`). On a regional map it names that map's `displayName` at the same field. Shared assembly comes from [`assembly-contract.md`](assembly-contract.md). Messages after the system prompt are in [`consultation-flow.md`](consultation-flow.md); gates are in [`variants.md`](variants.md). If this file disagrees with the builders, the builders win.
 
 Heading strings in backticks are exact and must match the generated prompt character for character.
 
@@ -96,6 +96,7 @@ Assessment-tool and combat-estimate hints must **not** appear when a precomputed
 
 #### `# Operational Map`
 
+- **Example:** one rendered grid from a single consultation is in [`example-strategic-prompt.md`](example-strategic-prompt.md).
 - **Shape:** a legend, then a fenced ASCII grid, then a displaced-features footnote when needed, then the options subsection.
 - **Extent:** every strategic cell of the match that is loaded. Global is the world grid. Regional is that region's footprint. A new match replaces the codes, including when the new map uses the same resolution. A code from the previous match is not a cell on this map.
 - **Legend contract:** each cell shows its code on the top line and terrain plus overlay on the bottom line; `x` is land and `.` is water; `*` marks own units, `!` enemy units, `#` contested, `?` undiscovered intel; feature letters mark airport, seaport, both, and urban, with uppercase meaning own control; odd rows are indented one space; only codes from this map or the tables may be used.
@@ -260,7 +261,7 @@ Cell contracts that carry meaning beyond the column name:
 
 ### 3.1 Field contract
 
-Fields, order, and presence follow [`assembly-contract.md`](assembly-contract.md) section 5.1. Strategic prompts offer the standing-order actions, memory updates when memory tools are enabled, and production orders when production tools are enabled.
+Fields, order, and presence follow [`assembly-contract.md`](assembly-contract.md) section 5.1. Strategic prompts offer the standing-order actions, memory updates when memory tools are enabled, and production orders when production tools are enabled. One captured reply is in [`example-strategic-response.md`](example-strategic-response.md).
 
 ### 3.2 Legal actions and their required fields
 

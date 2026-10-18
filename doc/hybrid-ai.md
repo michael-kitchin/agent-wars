@@ -8,7 +8,7 @@ The engine under `src/` wins if this file drifts.
 
 You supply an OpenRouter API key and pick a **tool-capable** model. The opponent does not see the true board: it gets a briefing built from **its** fog (or omniscient view if fog is off), then it may call a small set of **read** tools, then it submits one JSON envelope of orders. Standing orders and an engine attack sweep carry quiet turns. You can run **event-driven** consultation (consult when callbacks or mandatory overrides fire) or consult every turn. Tactical battles use the same loop once per beat.
 
-The console's Opponent tab is session control (key, model, reasoning effort, Run, status, tool count). It is not a full briefing observatory. Developer dumps: `debug-last-strategic-prompt.txt`, `debug-last-user-prompt.txt` (tactical dump on disk may be stale).
+The console's Opponent tab is session control (key, model, reasoning effort, Run, status, tool count). It is not a full briefing observatory. The last run can write `debug-last-strategic-prompt.txt`, `debug-last-tactical-prompt.txt`, `debug-last-user-prompt.txt`, and `debug-last-openrouter-response-body.txt`. Those files show that run and can go stale. Formatted snapshots of one strategic prompt, one tactical prompt, and one strategic reply: [example-strategic-prompt.md](ai-commander-prompts/example-strategic-prompt.md), [example-tactical-prompt.md](ai-commander-prompts/example-tactical-prompt.md), [example-strategic-response.md](ai-commander-prompts/example-strategic-response.md).
 
 ## Layers
 
@@ -66,6 +66,7 @@ The model never sees raw H3 indexes. Briefing hex codes (and lat/lng internally)
 ## Related
 
 - Prompt catalog (emitted text): [ai-commander-prompts/README.md](ai-commander-prompts/README.md)
+- One captured strategic reply: [ai-commander-prompts/example-strategic-response.md](ai-commander-prompts/example-strategic-response.md)
 - Tools: [ai-tools.md](ai-tools.md)
 - Scenario: [region-vs-region.md](region-vs-region.md)
 - Historical rationale: [poc-analysis.md](poc-analysis.md)

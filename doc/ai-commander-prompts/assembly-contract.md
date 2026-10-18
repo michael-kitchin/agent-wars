@@ -114,7 +114,7 @@ Tool inventory and per-consult availability:
 
 ## 5. Shared response envelope
 
-The envelope is one JSON object. Field order, optional tails, and legal actions are implemented by `promptSpec/envelopeContract.ts` and `promptContracts.ts`. If this section disagrees with those builders, the builders win.
+The envelope is one JSON object. Field order, optional tails, and legal actions are implemented by `promptSpec/envelopeContract.ts` and `promptContracts.ts`. If this section disagrees with those builders, the builders win. One captured strategic reply is in [`example-strategic-response.md`](example-strategic-response.md).
 
 ### 5.1 Field contract
 

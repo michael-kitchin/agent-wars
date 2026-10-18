@@ -86,6 +86,8 @@ See [doc/how-to-play.md](doc/how-to-play.md) for how to play the game.
 
 ### See the Prompts (and Everything Else)
 
+Formatted examples of one consultation are in the repo: [doc/ai-commander-prompts/example-strategic-prompt.md](doc/ai-commander-prompts/example-strategic-prompt.md) and [doc/ai-commander-prompts/example-tactical-prompt.md](doc/ai-commander-prompts/example-tactical-prompt.md). One captured strategic reply is in [doc/ai-commander-prompts/example-strategic-response.md](doc/ai-commander-prompts/example-strategic-response.md).
+
 To see how Agent Wars prompts the LLM, create a text file called `.env` in the game's working directory with the following:
 
 ```
@@ -116,9 +118,9 @@ debug-last-user-prompt.txt
 debug.log
 ```
 
-- **debug-last-openrouter-response-body.txt**: The last response from OpenRouter, including tool calls.
-- **debug-last-strategic-prompt.txt**: The last system prompt sent during a strategic game. This doesn't include tool calls or results.
-- **debug-last-tactical-prompt.txt**: The last system prompt sent during a tactical battle. This also doesn't include tool calls or results.
+- **debug-last-openrouter-response-body.txt**: The last response from OpenRouter, including tool calls. A formatted example of one strategic reply is [doc/ai-commander-prompts/example-strategic-response.md](doc/ai-commander-prompts/example-strategic-response.md).
+- **debug-last-strategic-prompt.txt**: The last system prompt sent during a strategic game. This doesn't include tool calls or results. A formatted example is [doc/ai-commander-prompts/example-strategic-prompt.md](doc/ai-commander-prompts/example-strategic-prompt.md).
+- **debug-last-tactical-prompt.txt**: The last system prompt sent during a tactical battle. This also doesn't include tool calls or results. A formatted example is [doc/ai-commander-prompts/example-tactical-prompt.md](doc/ai-commander-prompts/example-tactical-prompt.md).
 - **debug-last-user-prompt.txt**: Stock prompt suffix, sent after the strategic/tactical prompts.
 - **debug.log**: Complete log output at the specified level of detail, including truncated tool calls. This file is appended to with every run, so it should be deleted when no longer needed.
 

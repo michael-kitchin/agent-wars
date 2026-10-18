@@ -18,8 +18,9 @@ It records two things:
 1. **Live engine behaviour is first authority.** If a fact, stat, range, cap, phase order, or legality rule can be read from a symbol under `src/`, that symbol wins. Game-rule pages in `doc/` answer to the same symbols.
 2. **Prompt-generating code is first authority for wording.** The system prompt is assembled by `buildSystemPromptForTools` (`openRouterBuildSystemPrompt.ts`). Combat sentences live in `promptSpec/gameRuleText.ts`. Coaching lives in `promptSpec/coachingTextStrategic.ts` and `coachingTextTactical.ts`. Envelope shape lives in `promptSpec/envelopeContract.ts`; the structured-output schema built from the same gates lives in `promptSpec/envelopeJsonSchema.ts`. Opening and repair user messages live in `promptSpec/consultationText.ts`. Briefing tables live in `briefingFormatter.ts`, `formatTacticalBriefing.ts`, and the section builders they call.
 3. **This package describes that emission.** A sentence here is evidence of what we tell the model only insofar as it matches those builders.
-4. Captured dumps (`debug-last-strategic-prompt.txt`, `debug-last-user-prompt.txt`) are examples of emitted shape for one consultation. The tactical dump on disk may be stale; tactical catalogs below are derived from code.
-5. [`devleopment-plan-v3.4.md`](../devleopment-plan-v3.4.md) is historical architecture and is not prompt authority.
+4. [`example-strategic-prompt.md`](example-strategic-prompt.md) and [`example-tactical-prompt.md`](example-tactical-prompt.md) are reading copies of one consultation each. Runtime captures (`debug-last-strategic-prompt.txt`, `debug-last-user-prompt.txt`, `debug-last-tactical-prompt.txt`) show whatever consultation last ran. None of these is a contract. Tactical catalogs in [`source-inventory.md`](source-inventory.md) are derived from code.
+5. [`example-strategic-response.md`](example-strategic-response.md) is a reading copy of one strategic completion. `debug-last-openrouter-response-body.txt` is the runtime capture. Neither is a contract.
+6. [`devleopment-plan-v3.4.md`](../devleopment-plan-v3.4.md) is historical architecture and is not prompt authority.
 
 ## 3. How to use this package
 
@@ -30,12 +31,14 @@ It records two things:
 | See section order, headings, or the response shape | [`assembly-contract.md`](assembly-contract.md), then the mode file |
 | See a strategic section, column, or coaching bullet | [`strategic-prompt.md`](strategic-prompt.md) |
 | See a tactical section, column, or coaching bullet | [`tactical-prompt.md`](tactical-prompt.md) |
+| Read one full strategic or tactical emission | [`example-strategic-prompt.md`](example-strategic-prompt.md), [`example-tactical-prompt.md`](example-tactical-prompt.md) |
+| Read one captured strategic reply | [`example-strategic-response.md`](example-strategic-response.md) |
 | See anything after the system prompt | [`consultation-flow.md`](consultation-flow.md) |
 | See a configuration, roster, or scenario case | [`variants.md`](variants.md) |
 | Find where an existing prompt section is specified | [`crosswalk.md`](crosswalk.md) |
 | Know what the builders emit today, and remaining engine-versus-copy gaps | [`source-inventory.md`](source-inventory.md) |
 
-Reading order for a first pass: this file, then [`information-decision-model.md`](information-decision-model.md), [`assembly-contract.md`](assembly-contract.md), the mode file you need, [`consultation-flow.md`](consultation-flow.md), [`variants.md`](variants.md). [`source-inventory.md`](source-inventory.md) and [`crosswalk.md`](crosswalk.md) are reference.
+Reading order for a first pass: this file, then [`information-decision-model.md`](information-decision-model.md), [`assembly-contract.md`](assembly-contract.md), the mode file you need, [`consultation-flow.md`](consultation-flow.md), [`variants.md`](variants.md). After the mode file, the matching example shows one full emission. [`source-inventory.md`](source-inventory.md) and [`crosswalk.md`](crosswalk.md) are reference.
 
 Two rules the builders actually enforce:
 
@@ -52,6 +55,9 @@ Two rules the builders actually enforce:
 - [`consultation-flow.md`](consultation-flow.md) — the opening message, tool results, the corrective message, the repair request, and outcomes with no prompt.
 - [`variants.md`](variants.md) — fog, tool groups, roster composition, scenarios, game size, consultation policy.
 - [`crosswalk.md`](crosswalk.md) — item to carrier, existing section to disposition, and closed or remaining defects.
+- [`example-strategic-prompt.md`](example-strategic-prompt.md) — one strategic system prompt, formatted for reading.
+- [`example-tactical-prompt.md`](example-tactical-prompt.md) — one tactical system prompt, formatted for reading.
+- [`example-strategic-response.md`](example-strategic-response.md) — one strategic order envelope, taken from an OpenRouter completion and formatted for reading.
 
 ## 5. Related documents
 
