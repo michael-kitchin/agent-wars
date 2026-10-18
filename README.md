@@ -58,7 +58,7 @@ The LLM opponent needs an [OpenRouter](https://openrouter.ai) API key to work:
 
 ![Start game screen.](doc/media/first-start-game-1.png)
 
-2. After a moment, the opponent tab will automatically display on the right.
+2. After a moment, the **Opponent** tab will automatically display on the right.
 
 ![Opponent tab.](doc/media/first-start-game-2.png)
 
