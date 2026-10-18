@@ -55,9 +55,13 @@ Download a build for Windows (x64), macOS (Apple silicon), or Linux (x64) from [
 The LLM opponent needs an [OpenRouter](https://openrouter.ai) API key to work:
 
 1. When you first run Agent Wars, you'll see the start game screen. Explore the options, assign sides, and click the **Start game** button.
+
 ![Start game screen.](doc/media/first-start-game-1.png)
+
 2. After a moment, the opponent tab will automatically display on the right.
+
 ![Opponent tab.](doc/media/first-start-game-2.png)
+
 3. Under **Commander**, paste your OpenRouter API key into the **API key** field (placeholder `Set key and blur to save`).
 4. Click outside the field, or press Enter, to save. A saved key loads the model list.
 5. Choose a model from Anthropic, Google, Meta, OpenAI, SpaceX, etc. The refresh button beside the list reloads it.
@@ -65,10 +69,13 @@ The LLM opponent needs an [OpenRouter](https://openrouter.ai) API key to work:
     - Ollama/other local model support is on my radar (pun intended, I guess).
 6. Click **Run**, at the top of the Opponent tab, to start opponent planning.
     - You can change models at any time or disable the AI by clicking **Run** again.
+
 ![Model setup.](doc/media/first-start-game-3.png)
+
 7. Then click **Opponent** to close the tab. You can explore the map, plan movement, etc. while the AI is doing its thing.
 8. When the AI is done planning, the **Ready** button turns green. Click it to execute planned orders and start the next turn.
     - You can play all you want with the AI disabled. This is a great way to get used to the controls, without burning tokens.
+
 ![Ready button when the AI is done (opponent tab open).](doc/media/ready-done-open.png)
 
 The OpenRouter key is handled only in the Electron main process and stored locally in the Electron user-data directory, not in repository files. Without a key or a model the app still runs, **Run** stays disabled, and the opponent makes no model calls.
