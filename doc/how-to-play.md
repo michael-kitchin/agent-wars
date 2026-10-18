@@ -10,8 +10,8 @@ I'm a geographer by training, so Agent Wars focuses more on geospatial features 
 
 Accordingly, the game ends when one player:
 
-- Captures all the other player's home region hexes
-- Or destroys all production capacity in those hexes
+  1. Capturing some or all of the other player's home region (depending on the game type)
+  2. Or destroying all of their home region production capacity
 
 ## Starting the game
 
@@ -23,15 +23,19 @@ Accordingly, the game ends when one player:
 
 ![New regional game: Click the Regional tab, then pick the region and player home sub-regions (in this case: Japan vs South & East China).](media/regional-preview.png)
 
-- **Global games:** the whole world, 842 strategic hexes at H3 resolution 1. Each side picks a home region, and both may pick the same one. Units are at the scale of WW2-style field armies, air wings, and naval fleets.
-- **Regional games:** one of 23 maps drawn from UN subregions, ranging from 257 to 352 strategic hexes. Sides are made up of countries, provinces, or states grouped by production capacity. Units are at the scale of WW2-style divisions, air groups, and naval task forces.
-- **Turn length:** a global strategic turn represents one month of game time, whereas regional turns represent one week.
-- **Economy:** each regional map sets its own unit prices, build minimums, and bomb damage. The dialog shows that map's price beside each unit type.
-- **Tech cutoff:** the dialog's `Advanced tech: $N+ hexes` line shows the selected map's cutoff.
-- **Map edges:** a few regional maps have neutral-border hexes at their edges. Those produce nothing and can't base air or naval units.
-- **Weather:** the hex-level weather changes every month, meaning with every global game turn or roughly four regional turns.
-- **Winning by control:** on the global map, hold every hex of the enemy home region. On a regional map, hold enough of the enemy's home area hexes to control at least 75% of their production capacity.
-- **Other way to win:** destroy every urban cell in the enemy home while yours keeps one. Details are in [region-vs-region.md](region-vs-region.md).
+|                                         | Global game                                                    | Regional game                                                                                          |
+| --------------------------------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| Map                                     | The whole world, 842 strategic hexes at H3 resolution 1        | One of 23 maps drawn from UN subregions, with 257 to 352 strategic hexes                               |
+| Sides                                   | Each side picks a home region, and both may pick the same one  | Each side picks a different group of countries, provinces, or states, grouped by production capacity   |
+| Unit scale                              | WW2-style field armies, air wings, and naval fleets            | WW2-style divisions, air groups, and naval task forces                                                 |
+| Turn length                             | One month                                                      | One week                                                                                               |
+| Weather changes                         | Every turn                                                     | Roughly every four turns                                                                               |
+| Unit prices, build minimums, bomb damage | Prices and minimums in [Building units](#building-units). Bomb damage in [Air power](#air-power) | Each map sets its own                                                               |
+| Tech cutoff                             | 21 urban cells                                                 | Set by each map                                                                                        |
+| Map edges                               | None                                                           | A few maps have neutral-border hexes at their edges. Those produce nothing and can't base air or naval units |
+| Winning by control                      | Hold every hex of the enemy home region                        | Hold enemy-home hexes with at least 75% of that home's original urban cells. Bombing doesn't change the target. A home that started with none is won by holding every hex |
+
+The dialog shows the selected map's price beside each unit type, and its tech cutoff in the `Advanced tech: $N+ hexes` line. You don't win by control when the enemy meets the same rule on your home. On either map, you can also win by destroying every urban cell in the enemy home while yours keeps one. Details are in [region-vs-region.md](region-vs-region.md).
 
 ## Playing a turn
 
@@ -78,14 +82,19 @@ The full input map, including the exceptions, is in [ux/input-map.md](ux/input-m
 | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
 | ![Step 1: Select a unit or stack, then the Ranged button](media/ranged-attack-1.png) | ![Step 2: Double-click on a visible target to order the attack](media/ranged-attack-2.png) |
 
-- **Ranged:** select units that can all fire, then click the reticle in the selection panel. It stays pressed, in amber, while you aim.
-- **Strike:** select only air units, then click the reticle. It stays pressed, in purple, and a list to its left picks the target type.
+Select units, then click the reticle in the selection panel. It stays pressed while you aim.
+
+|                                       | Ranged fire                            | Air strike                                       |
+| ------------------------------------- | -------------------------------------- | ------------------------------------------------ |
+| What to select                        | Units that can all fire                | Only air units                                   |
+| Color of the reticle and panel border | Amber                                  | Purple                                           |
+| Target type list                      | None                                   | A list to the reticle's left picks the target type |
+| Reach on the strategic map            | Infantry none, armor 1 hex, naval 2    | 3 hexes from the base airport                    |
+| Reach in a battle                     | Each unit's range after terrain limits | The whole battlefield                            |
+
 - **Greyed reticle:** mixing air with other types, or infantry with no air unit on the strategic map, greys out the reticle. Infantry can use ranged attacks in battles, however.
 - **The outline:** a dashed outline, with no fill, around the combined reach of every selected unit. Its dashes drift slowly.
-- **Colors:** amber for ranged fire, purple for air strikes. While you aim, the selection panel's border takes the same color.
-- **Reach on the strategic map:** armor 1 hex, naval 2, and air 3 from its base airport.
-- **Reach in a battle:** the ranged outline uses each unit's range after terrain limits. The strike outline covers the whole battlefield.
-- **Hovering a valid target:** a dashed line in the same color runs from each selected unit to the target and ends in an arrowhead. A queued attack keeps that line.
+- **Hovering a valid target:** a dashed line in the attack's color runs from each selected unit to the target and ends in an arrowhead. A queued attack keeps that line.
 - **Hovering an invalid target:** a teal X marks the hex. After a second, a tip says why.
 - **Firing:** double-click the target. A single click does nothing. A failed double-click shows an error and keeps you aiming.
 - **Stopping:** click the pressed reticle again, click the selection panel's **×**, or right-click the map. Escape doesn't end aiming.
@@ -100,18 +109,23 @@ The full input map, including the exceptions, is in [ux/input-map.md](ux/input-m
 
 - **Bases:** air units sit at an airport and don't march. They strike from there and return in the same turn.
 - **One action a turn:** strike or ferry, not both.
-- **Target types:** **Enemy Units**, **Production** (a city's urban cells), **Airports**, and **Seaports**. The list keeps your last choice.
 - **Odds:** a strike hits on 10 or less (50%), before cover and bonuses.
-- **Striking units:** a hit removes one unit. Armor, naval, and air units based in the target hex shoot back, and any hit destroys the striker. Strategic infantry can't shoot back.
-- **Striking a city:** a hit destroys 9 urban cells, which permanently lowers the hex's production. The striker faces a 15% counter-fire roll.
-- **Striking an airport:** a hit wrecks one airport cell and destroys every air unit based in that hex. Counter-fire is 35%.
-- **Striking a seaport:** a hit wrecks one seaport cell. Ships at sea are unaffected. Counter-fire is 15%.
+- **Target types:** the list beside the reticle offers four, and keeps your last choice.
+
+| Target                                | A hit                                                                                                    | Counter-fire against the striker                                                                                      |
+| ------------------------------------- | -------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| **Enemy Units**                       | Removes one unit                                                                                         | Armor, naval, and air units based in the target hex shoot back, and any hit destroys the striker. Strategic infantry can't shoot back |
+| **Production** (a city's urban cells) | Destroys 9 urban cells, or that map's own number on a regional map. This permanently lowers the hex's production | 15%                                                                                                          |
+| **Airports**                          | Wrecks one airport cell and destroys every air unit based in that hex                                    | 35%                                                                                                                   |
+| **Seaports**                          | Wrecks one seaport cell. Ships are unaffected                                                            | 15%                                                                                                                   |
+
+A city, airport, or seaport shoots back at those odds whether or not the strike hits, and bonuses don't change them. Units shoot back with their own attack rolls, also whether or not the strike hits.
+
 - **Several ports:** some hexes have more than one airport or seaport cell. They keep basing air units or building ships until every one is wrecked.
 - **For good:** destroyed cities, airports, and seaports never rebuild. You can bomb your own.
 - **Losing a base:** an air unit dies if an enemy ground unit takes its airport hex, or if a strike hits that hex's airport.
 - **Ferrying:** with only air units selected, double-click one of your airports within 4 hexes. With the weather bonus on, a unit without the snow tag can ferry only 2 hexes into snow.
 - **Vision:** each air unit sees 3 hexes around its base, even when it does nothing.
-- **Regional maps:** a city hit destroys that map's own number of urban cells.
 
 ## Sealift
 
@@ -142,14 +156,19 @@ The full input map, including the exceptions, is in [ux/input-map.md](ux/input-m
 - **Queueing:** use **+** to add a unit type, then set a count. **Keep building** repeats the queue's last unit type once the queue is done.
 - **Several hexes:** Shift-click more markers to give them all one queue. A hex that can't build a type skips it.
 - **Spawning:** points build up toward the next unit. It appears at that hex once the points cover its cost.
-- **Prerequisites:**
-  - Infantry: 20 points and 1 urban cell.
-  - Armor: 40 points and 2 urban cells.
-  - Air: 60 points, 5 urban cells, and an airport.
-  - Naval: 100 points, 10 urban cells, and a seaport.
+
+A hex needs the urban cells in this table, and anything named under Also needs. Costs and minimums are for the global map. Caps apply on every map.
+
+| Unit type | Cost in points | Minimum urban cells | Also needs | Cap per side, Small game |
+| --------- | -------------- | ------------------- | ---------- | ------------------------ |
+| Infantry  | 20             | 1                   | Nothing else | 12                     |
+| Armor     | 40             | 2                   | Nothing else | 8                      |
+| Air       | 60             | 5                   | An airport | 6                        |
+| Naval     | 100            | 10                  | A seaport  | 8                        |
+
 - **Regional maps:** prices and minimums follow the map, as the new-game dialog shows.
 - **Only legal choices:** the type list offers only what that hex can build.
-- **Caps:** each side has a per-type cap set by game size. Small allows 12 infantry, 8 armor, 8 naval, and 6 air. See [game-size-unit-caps.md](game-size-unit-caps.md).
+- **Caps:** each side's per-type cap is set by game size. Medium doubles the Small caps, and Large triples them. See [game-size-unit-caps.md](game-size-unit-caps.md).
 - **Bombing hurts:** destroyed urban cells lower income for the rest of the match.
 
 ## Battles
@@ -191,25 +210,32 @@ Complete rules are in [combat-rules-v3.md](combat-rules-v3.md) §12.
 - **Scale:** the battlefield is the contested hex's cells, three H3 resolutions finer, plus three rings of neighboring cells.
 - **Pause:** the rest of the map waits until the battle ends. The date and weather stay fixed.
 - **Beats:** each Ready in a battle resolves one beat: air strikes, ranged fire, movement, then melee. The top bar becomes the battle header, which names the battle's hex and the beat, and compares each side's sub-units in a bar.
-- **Sub-units:** each unit splits into sub-units with its attack and defense: infantry 8, armor 4, naval 4, and air 3.
 - **Deployment:** units start on the edge of the hex they entered from.
 - **No fog:** both sides see everything in a battle.
 - **No production:** nothing is built while a battle runs.
 
-|               | Strategic map                    | Battle                                        |
-| ------------- | -------------------------------- | --------------------------------------------- |
-| Infantry fire | None                             | 2 cells                                       |
-| Armor fire    | 1 hex                            | 5 cells                                       |
-| Naval fire    | 2 hexes                          | 10 cells                                      |
-| Air strikes   | 3 hexes from base                | Anywhere on the battlefield                   |
-| Movement      | Infantry 1 hex, armor 2, naval 2 | Points per beat: infantry 2, armor 4, naval 3 |
+Each unit splits into sub-units that keep its attack and defense. Unit types also differ in reach and speed between the strategic map and battles.
 
-- **Infantry can use ranged attacks in battles.** It can also shoot back at air strikes, which it can't do on the strategic map.
-- **Cover limits reach:** infantry or armor firing from a forest, urban, or rubble cell reaches only 1 cell.
-- **Mountains block fire:** a mountain in the path blocks armor and naval shots. Infantry and air fire past it.
-- **Terrain costs:** forest costs 2 points to enter, and mountains cost infantry 2. Armor can't enter mountain, wetland, or arctic cells.
-- **Armor on the strategic map:** armor that enters a rugged, arctic, or city hex stops there for the turn.
-- **Cities slow units:** infantry or armor that starts a beat on an urban or rubble cell gets 1 point. Armor that starts in forest gets 2.
+|                            | Infantry     | Armor   | Naval    | Air                         |
+| -------------------------- | ------------ | ------- | -------- | --------------------------- |
+| Sub-units in a battle      | 8            | 4       | 4        | 3                           |
+| Fire reach, strategic map  | None         | 1 hex   | 2 hexes  | 3 hexes from base           |
+| Fire reach, battle         | 2 cells      | 5 cells | 10 cells | Anywhere on the battlefield |
+| Movement, strategic map    | 1 hex        | 2 hexes | 2 hexes  | Doesn't march               |
+| Movement points per beat   | 2            | 4       | 3        | Doesn't march               |
+| Shoots back at air strikes | Battles only | Yes     | Yes      | Yes                         |
+
+Armor that enters a rugged, arctic, or city hex stops there for the turn.
+
+In a battle, these cell types also change how a unit moves and how far it can fire. An intact road or rail replaces the enter cost, including through forest and mountains. The next section gives those prices.
+
+| Cell terrain       | Cost to enter                                         | Budget at the start of a beat      | Reach and line of sight                                                         |
+| ------------------ | ----------------------------------------------------- | ---------------------------------- | ------------------------------------------------------------------------------- |
+| Forest             | Infantry and armor pay 2 points                       | Armor's budget is 2                | Infantry or armor firing from it reaches 1 cell                                 |
+| Urban or rubble    | Rubble costs 2 points off a road or rail              | Infantry and armor have a budget of 1 | Infantry or armor firing from it reaches 1 cell                              |
+| Mountain           | Infantry pays 2 points. Armor can't enter             | None                               | Armor and naval shots that cross it are blocked. Infantry shots and air strikes pass |
+| Wetlands or arctic | Armor can't enter                                     | None                               | No change to reach or line of sight                                             |
+
 - **Terrain-bonus step:** with the terrain bonus on, armor born on mountains, wetlands, or arctic terrain can enter one such cell it's otherwise barred from. A naval unit born on wetlands can do the same into wetlands. It stops there for that beat.
 - **Shooting infrastructure:** ranged fire can target a city, airport, seaport, road, or rail cell on the battle hex itself. A hit turns that cell to rubble for good.
 - **Collateral damage:** a ranged kill on one of those cells rubbles it too.
@@ -230,12 +256,18 @@ Complete rules are in [combat-rules-v3.md](combat-rules-v3.md) §12.
 | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
 | ![Shaanxi 1st Armored moving faster by road, then slower through urban hexes. Movement planning automatically picks the fastest route.](media/tactical-road-movement.png) | ![A stack of Ukraine's armored units plans rapid movement by rail. Rail is faster than road, and movement planning will use both.](media/tactical-rail-movement.png) |
 
+In a battle, infantry and armor move faster along intact road and rail cells.
+
+|                                          | Road         | Rail               |
+| ---------------------------------------- | ------------ | ------------------ |
+| Cost to enter a cell                     | Half a point | A third of a point |
+| Infantry cells per beat, at full budget  | 4            | 6                  |
+| Armor cells per beat, at full budget     | 8            | 12                 |
+
 - **Battles only:** strategic movement ignores roads and rail.
-- **Cheaper steps:** infantry and armor pay half a point to enter an intact road cell, and a third of a point for rail.
 - **Any terrain:** the price holds through forest and mountains, so armor can cross mountains along a road.
-- **How far:** with a full budget, infantry covers 4 road cells a beat and armor 8. On rail, that's 6 and 12.
 - **Getting off:** a unit can leave a line only onto terrain it could enter anyway, or onto more line.
-- **Weather:** snow and rain raise open-ground costs, but not road or rail costs.
+- **Weather:** snow and rain raise infantry's cost to enter open ground (plains, desert, wetlands, arctic, or coastal), but not road or rail costs.
 - **Rubble:** a rubbled road cell costs 1 point and no longer carries armor through terrain it can't enter.
 - **Deployment:** roads and rail can let units start on cells they couldn't otherwise enter.
 - **Naval units** ignore roads and rail.
@@ -250,20 +282,28 @@ Hovering a unit's flag, in the stack list or anywhere else it appears, or the to
 
 Each bonus is Off, Low, or High in the new-game dialog, and starts at Low.
 
-- **Origin:** a unit adds 2 (Low) or 4 (High) to its rolls in the country where it was built, on the strategic map and in battles. On a regional map, that's its home province or other origin area.
-- **Terrain:** in battles only, a unit adds the same 2 or 4 on cells of the terrain it was born on. It also allows the terrain-bonus step under [How battles differ](#how-battles-differ).
+| Bonus   | Low          | High                     | When it counts                                                                                                                          |
+| ------- | ------------ | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Origin  | +2 to rolls  | +4 to rolls              | Rolls in the unit's birth country, on the strategic map and in battles. On a regional map, its birth province or other origin area      |
+| Terrain | +2 to rolls  | +4 to rolls              | Battle rolls on the unit's birth terrain. Also the terrain-bonus step under [How battles differ](#how-battles-differ)                   |
+| Tech    | +2 to attack | +2 to attack and defense | Rolls by an Advanced unit. The birth hex must meet the map's tech cutoff: 21 urban cells on the global map, or the cutoff shown in the new-game dialog for a regional map |
+
 - **No stacking:** a unit that qualifies for origin and terrain adds only the larger amount.
-- **Weather:** each hex has a fixed monthly climate of mild, rain, snow, or heat. Icons on the map show the current month's weather.
-- **Weather tags:** a unit gets up to two tags, for conditions its birth hex has at least 3 months a year. Only units without the matching tag pay the penalties below.
-  - Armor slows in snow and rain, and at High also in heat. Naval slows in snow, and at High also in rain.
-  - A slowed unit moves 1 hex on the strategic map, and has fewer points in a battle.
-  - Armor firing in snow or heat loses 3 to its attack (High: 5).
-  - An air strike loses 3 (High: 5) when the base or the target has weather the unit isn't tagged for.
-  - In a battle, snow or rain makes open ground cost infantry 2 points.
-- **Tech:** a unit built in a hex with at least 21 urban cells is Advanced. Low adds 2 to its attack, and High adds 2 to attack and defense.
 - **Tech is fixed:** the tier comes from the birth hex's original city size. It doesn't change when the unit moves or the city is bombed.
 - **Where you build matters:** with tech on, big cities build better units, so the place matters as well as the points.
-- **Seeing them:** the flag tooltip lists a unit's bonuses. A hex tooltip shows that hex's weather and terrain effects. Click the toggle on the minimap's lower-left corner to show the map-mode buttons under it, then turn on **Tech**, or hold T, to see each hex's tech tier. **Weather** turns the weather icons on the map off and on. **Control** starts on and draws who holds each hex; turn it off to leave the plain grid. **Production** starts off; turn it on to label production on every hex.
+
+Each hex has a fixed monthly climate of mild, rain, snow, or heat, and icons on the map show the current month's weather. A unit gets up to two weather tags, for the conditions its birth hex has at least 3 months a year. Mild is never a tag. Only a unit without the matching tag pays these penalties. An attack cut is the Low amount, with the High amount in parentheses. A slow that says "at High" applies only at High.
+
+| Unit type | Rain                                        | Snow                                              | Heat                                                      |
+| --------- | ------------------------------------------- | ------------------------------------------------- | --------------------------------------------------------- |
+| Infantry  | In a battle, open ground costs 2 to enter   | In a battle, open ground costs 2 to enter         | None                                                      |
+| Armor     | Slowed                                      | Slowed, and -3 ranged attack (-5 at High)         | -3 ranged attack (-5 at High), and slowed at High         |
+| Naval     | Slowed at High                              | Slowed                                            | None                                                      |
+| Air       | -3 to a strike (-5 at High)                 | -3 to a strike (-5 at High)                       | -3 to a strike (-5 at High)                               |
+
+Open ground is plains, desert, wetlands, arctic, or coastal. A slowed unit moves 1 hex on the strategic map. In a battle its budget is 2 points at Low and 1 at High, and no higher than the budget for the cell it starts on. An air strike takes its penalty once, when the base or the target has weather the unit isn't tagged for.
+
+The flag tooltip lists a unit's bonuses. A hex tooltip shows that hex's weather and terrain effects. Click the toggle on the minimap's lower-left corner to show the map-mode buttons under it, then turn on **Tech**, or hold T, to see each hex's tech tier. **Weather** turns the weather icons on the map off and on. **Control** starts on and draws who holds each hex; turn it off to leave the plain grid. **Production** starts off; turn it on to label production on every hex.
 
 The full bonus rules are in [combat-rules-v3.md](combat-rules-v3.md) §4.9.
 
@@ -288,6 +328,8 @@ The full bonus rules are in [combat-rules-v3.md](combat-rules-v3.md) §4.9.
 | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
 | ![LLM-supplied taunts (in this case, Claude Opus) and strategy messages appear at the top of the map, 12 px in from its right edge](media/message-popup.png) | ![End-of-turn updates appear at the top of the map, 12 px in from its right edge](media/status-popup.png) |
 
-- **Top of the map, near the right edge (map toast):** Errors, rejected orders, turn-loss summaries, and unknown-battle announcements. The gap is the same while the console is open and while it is collapsed. Use the × to dismiss; it also hides after a fixed interval, and a newer message replaces it. The Reports tab keeps every one except errors.
-- **Top of the map, above the map toast (AI strategy toast):** The opponent's Message and Strategy after a consultation, in that same place. It dismisses and times out the same way, and the Reports tab keeps it.
-- **Console, Opponent tab, at the bottom (Activity log):** AI interaction lines and errors, including a retry, a line when opponent planning stops, and a one-line copy of each turn update. Starting a new match clears it.
+| Message area      | Where                                                                                     | What it shows                                                                                                    | How long it stays                                                                                                         |
+| ----------------- | ----------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| Map toast         | Top of the map, 12 px in from its right edge, whether the console is open or collapsed    | Errors, rejected orders, turn-loss summaries, and unknown-battle announcements                                   | Until you click its ×, a fixed interval passes, or a newer message replaces it. The Reports tab keeps every one except errors |
+| AI strategy toast | Top of the map, above the map toast                                                       | The opponent's Message and Strategy after a consultation                                                        | It dismisses and times out like the map toast. The Reports tab keeps it                                                   |
+| Activity log      | Console, Opponent tab, at the bottom                                                      | AI interaction lines and errors, including a retry, a line when opponent planning stops, and a one-line copy of each turn update | Until you start a new match                                                                       |
