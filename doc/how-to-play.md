@@ -183,7 +183,7 @@ When players pick a battle and click **Fight**, their strategic units will be br
 
 Manually fought battles take place entirely within one strategic turn, with the following consequences:
 
-1. Fighting a tactical battle means ignoring the strategic part of the game for one turn (for both human and LLM players).
+1. Fighting a tactical battle means ignoring the strategic game for one turn (for both human and LLM players).
 2. During that turn, strategic units will continue to follow existing orders and defend themselves.
 3. When the battle is over, the strategic part of the game resumes in the next turn.
 
