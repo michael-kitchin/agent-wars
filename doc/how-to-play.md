@@ -201,7 +201,7 @@ Complete rules are in [combat-rules-v3.md](combat-rules-v3.md) §12.
 
 ![Tactical battle in southern Mexico, from a global game](media/central-mexico-battle-static.png)
 
-### How battles differ
+### How battles are different
 
 *Ukrainian 1st Fleet moves through wetlands, thanks to their terrain bonus (built on a wetland hex, near the Black Sea).*
 
